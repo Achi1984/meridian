@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.3.0';
-const BUILD_ID='2026-08-21-2100';
+const APP_VERSION='3.4.0';
+const BUILD_ID='2026-08-21-2050';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -246,6 +246,15 @@ function renderBoden(){
   nadirGrid.innerHTML=scores.map(x=>`<div class="nadir-card"><span>${x[0]}</span><b>${Math.round(x[1])}/100</b><div class="score-track"><i style="width:${Math.round(x[1])}%"></i></div></div>`).join('');
 }
 
+
+function tradeSnapshotAge(){
+  const ts=state.data.snapshotAt?new Date(state.data.snapshotAt):null;
+  if(!ts)return 'Snapshot';
+  const mins=Math.max(0,Math.round((Date.now()-ts.getTime())/60000));
+  if(mins<60)return `Snapshot · ${mins} min alt`;
+  const h=Math.round(mins/60); return `Snapshot · ${h} h alt`;
+}
+
 function renderTrade(){
   const d=state.data.daytrade;
   const r4=Number(d.rsi4h),r1=Number(d.rsi1h),fund=Math.abs(Number(d.funding));
@@ -255,7 +264,8 @@ function renderTrade(){
   tradeDecision.textContent=allowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN';
   tradeFreshness.textContent='Indikatoren: Snapshot';
   tradeGrid.innerHTML=[['BTC Preis',money(d.btcPrice),'snapshot'],['4H RSI',d.rsi4h,r4>=80?'bad':r4>=70?'warn':'good'],['1H RSI',d.rsi1h,r1>=75?'warn':'good'],['Funding',d.funding+'%',fund<0.02?'good':'warn'],['OI','$'+d.oi+'B','snapshot'],['VWAP',money(d.vwap),'snapshot']].map(x=>`<div class="trade-kpi ${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]==='snapshot'?'Snapshot':x[2]==='bad'?'überdehnt':x[2]==='warn'?'erhöht':'OK'}</small></div>`).join('');
-  const checks=[['Datenfrische','Indikatoren · Snapshot','warn'],['MTF-Konfluenz',r1>50&&r4>50?'bullish':'gemischt',r1>50&&r4>50?'pass':'warn'],['Entry-Streckung',`4H RSI ${d.rsi4h} → ${r4>=80?'stark überdehnt':r4>=70?'überdehnt':'OK'}`,r4>=80?'fail':r4>=70?'warn':'pass'],['Liquidationspuffer',money(d.liqAbove),'warn']];
+  const checks=[['Datenfrische',tradeSnapshotAge(),'warn'],['MTF-Konfluenz',r1>50&&r4>50?'bullish':'gemischt',r1>50&&r4>50?'pass':'warn'],['Entry-Streckung',`4H RSI ${d.rsi4h} → ${r4>=80?'stark überdehnt':r4>=70?'überdehnt':'OK'}`,r4>=80?'fail':r4>=70?'warn':'pass'],['Liquidationspuffer',money(d.liqAbove),'warn']];
+  document.getElementById('tradeDataMode')?.replaceChildren(document.createTextNode(tradeSnapshotAge()));
   tradeChecks.innerHTML=checks.map(x=>`<div class="check-row"><span>${x[0]}</span><b style="color:${x[2]==='pass'?'var(--green)':x[2]==='fail'?'var(--red)':'var(--amber)'}">${x[1]}</b></div>`).join('');
 }
 
@@ -294,6 +304,31 @@ async function hardRefreshApp(){
   location.href=`./?build=${BUILD_ID}&t=${Date.now()}`;
 }
 
+
+function getMissingLiveAssets(){
+  const expected=state.data.liveDiagnostics?.expectedLiveMappedAssets||Object.keys(cgMap);
+  return expected.filter(c=>state.priceMeta[c]?.source!=='Live');
+}
+function renderLiveDiagnostics(){
+  const missing=getMissingLiveAssets();
+  const el=document.getElementById('missingLiveAssets');
+  const reason=document.getElementById('missingLiveReason');
+  if(!el||!reason)return;
+  if(!missing.length){
+    el.textContent='keine';
+    el.className='data-fresh';
+    reason.textContent='alle gemappten Assets live';
+    reason.className='data-fresh';
+  }else{
+    el.textContent=missing.join(', ');
+    el.className=missing.length<=1?'data-stale':'data-missing';
+    const snapshotOnly=(state.data.liveDiagnostics?.snapshotOnlyAssets||[]);
+    const knownSnapshot=missing.filter(x=>snapshotOnly.includes(x));
+    reason.textContent=knownSnapshot.length===missing.length?'Snapshot-only / kein Live-Mapping':'Live-API oder Mapping fehlt';
+    reason.className='data-stale';
+  }
+}
+
 function renderSettings(){
   const {total,liveValue}=buildAggregates();
   const rows=[
@@ -307,6 +342,7 @@ function renderSettings(){
   ];
   dataStatus.innerHTML=rows.map(x=>`<div class="status-row"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
   updatedPill.textContent='↻ '+fmtTime(state.lastUpdated);
+  renderLiveDiagnostics();
   setSystemStatus('systemBuild',`v${APP_VERSION} · ${BUILD_ID}`,'system-ok');
   const expected=(state.data.diagnostics?.expectedLiveMappedAssets||Object.keys(cgMap)).length;
   const liveNow=Object.values(state.priceMeta).filter(x=>x.source==='Live').length;
@@ -357,7 +393,7 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=33').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=34').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);

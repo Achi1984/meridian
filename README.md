@@ -1,13 +1,11 @@
-# MERIDIAN V3.3 — Intelligence Update
+# MERIDIAN V3.4 – Live Diagnostics
 
-Build: `2026-08-21-2100`
+Build `2026-08-21-2050`
 
-Aufbauend auf V3.2 Stability Release.
-
-- Depot: Portfolio-Verlauf mit 24H / 7T / 30T / ALL; lokale Historie wird aus V3.2 übernommen.
-- Markt: Marktbreite, Ø 24H, Leader/Laggard und erweitertes Momentum-Radar.
-- Boden: NADIR-Gesamtscore und visuelle Säulen-Scores.
-- Day-Trade: Gate-Score, Ampellogik und klare Snapshot-Kennzeichnung der Indikatoren.
-- Settings: Version/Build und Datenstatus bleiben erhalten.
-
-Hinweis: Portfolio-Historie wird nur lokal im Browser aufgezeichnet, wenn MERIDIAN geöffnet/aktualisiert wird. Die Zeitfilter erzeugen keine rückwirkenden Daten. Live-Kurse kommen weiterhin zur Laufzeit über CoinGecko; Snapshot-Werte wurden nicht künstlich als live markiert.
+Neu:
+- zeigt exakt, welches Asset nicht live bewertet wird
+- unterscheidet Snapshot-only von API-/Mapping-Fehlern
+- Day-Trade zeigt pro Kennzahl Live/Snapshot und Snapshot-Alter
+- BTC-Preis im Day-Trade nutzt Live-Preis, wenn verfügbar
+- Settings zeigen Live-Diagnose separat
+- Version 3.4.0

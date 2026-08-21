@@ -295,7 +295,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.3.0",
+  "appVersion": "3.4.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -310,7 +310,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2100",
+  "buildId": "2026-08-21-2050",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
@@ -334,5 +334,34 @@
       "VSN"
     ],
     "pionexMode": "committed_capital"
+  },
+  "liveDiagnostics": {
+    "snapshotOnlyAssets": [
+      "VSN"
+    ],
+    "expectedLiveMappedAssets": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "SUI",
+      "ADA",
+      "FET",
+      "HBAR",
+      "DOT",
+      "ATOM",
+      "NEAR",
+      "AVAX",
+      "TAO",
+      "INJ",
+      "PEPE",
+      "XLM"
+    ],
+    "note": "VSN derzeit Snapshot-only; Pionex ist kein Spot-Asset sondern gebundenes Kapital."
+  },
+  "indicatorPolicy": {
+    "dayTrade": "Live where available; otherwise timestamped snapshot",
+    "market": "Live 24h changes from CoinGecko",
+    "boden": "Snapshot indicators until dedicated live sources are integrated"
   }
 }
