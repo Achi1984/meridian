@@ -1,1 +1,40 @@
-
+{
+  "name": "Update MERIDIAN Market History",
+  "on": {
+    "workflow_dispatch": {},
+    "schedule": [
+      {
+        "cron": "17 2 * * *"
+      }
+    ]
+  },
+  "permissions": {
+    "contents": "write"
+  },
+  "jobs": {
+    "update-history": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout",
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Build history.json",
+          "shell": "bash",
+          "run": "python3 <<'PY'\nimport json,time,pathlib,datetime,urllib.parse,urllib.request\nDAYS=2000\nLIMIT=1000\nBINANCE={\n'BTC':'BTCUSDT','ETH':'ETHUSDT','SOL':'SOLUSDT','XRP':'XRPUSDT','SUI':'SUIUSDT','ADA':'ADAUSDT','FET':'FETUSDT','HBAR':'HBARUSDT','DOT':'DOTUSDT','NEAR':'NEARUSDT','AVAX':'AVAXUSDT','ATOM':'ATOMUSDT','TAO':'TAOUSDT','INJ':'INJUSDT','PEPE':'PEPEUSDT','XLM':'XLMUSDT'}\nCG={'BTC':'bitcoin','ETH':'ethereum','SOL':'solana','XRP':'ripple','SUI':'sui','ADA':'cardano','FET':'artificial-superintelligence-alliance','HBAR':'hedera-hashgraph','DOT':'polkadot','NEAR':'near','AVAX':'avalanche-2','ATOM':'cosmos','TAO':'bittensor','INJ':'injective-protocol','PEPE':'pepe','XLM':'stellar','VSN':'vision'}\nBASES=['https://data-api.binance.vision','https://api.binance.com','https://api1.binance.com']\ndef getj(url):\n    req=urllib.request.Request(url,headers={'User-Agent':'MERIDIAN-GitHub-Actions/4.0'})\n    with urllib.request.urlopen(req,timeout=30) as r:return json.loads(r.read().decode())\ndef bh(sym):\n    rows=[]; end=None\n    while len(rows)<DAYS:\n        lim=min(LIMIT,DAYS-len(rows)); p={'symbol':sym,'interval':'1d','limit':lim}\n        if end is not None:p['endTime']=end\n        chunk=None; err=None\n        for base in BASES:\n            try:\n                x=getj(base+'/api/v3/klines?'+urllib.parse.urlencode(p))\n                if isinstance(x,list) and x:chunk=x;break\n            except Exception as e:err=e\n        if not chunk:\n            if rows:break\n            raise err or RuntimeError('no binance data')\n        n=[[int(x[0]),float(x[1]),float(x[2]),float(x[3]),float(x[4]),float(x[5])] for x in chunk]\n        rows=n+rows; end=int(chunk[0][0])-1\n        if len(chunk)<lim:break\n        time.sleep(.12)\n    d={r[0]:r for r in rows}; return [d[k] for k in sorted(d)][-DAYS:]\ndef cg(cid):\n    u='https://api.coingecko.com/api/v3/coins/'+cid+'/market_chart?vs_currency=usd&days=365&interval=daily'\n    p=getj(u).get('prices',[])\n    return [[int(t),float(v),float(v),float(v),float(v),0.0] for t,v in p]\nout={'schemaVersion':2,'generatedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'ok','days':DAYS,'source':'GitHub Actions','coins':{},'errors':{}}\nfor coin,cid in CG.items():\n    try:\n        candles=[]; source=''\n        if coin in BINANCE:\n            try:candles=bh(BINANCE[coin]); source='Binance'\n            except Exception as e:print('Binance fallback',coin,e)\n        if len(candles)<30:candles=cg(cid); source='CoinGecko fallback'\n        if len(candles)<10:raise RuntimeError('too few candles')\n        out['coins'][coin]={'source':source,'count':len(candles),'candles':candles}\n        print('OK',coin,source,len(candles))\n    except Exception as e:\n        out['errors'][coin]=str(e); print('ERROR',coin,e)\nif 'BTC' not in out['coins']:out['status']='error'\npathlib.Path('history.json').write_text(json.dumps(out,separators=(',',':')),encoding='utf-8')\nPY"
+        },
+        {
+          "name": "Validate history",
+          "shell": "bash",
+          "run": "python3 - <<'PY'\nimport json\nj=json.load(open('history.json'))\nassert 'BTC' in j.get('coins',{})\nassert len(j['coins']['BTC'].get('candles',[]))>=30\nprint('history OK',len(j.get('coins',{})))\nPY"
+        },
+        {
+          "name": "Commit history",
+          "shell": "bash",
+          "run": "git config user.name 'MERIDIAN Data Bot'\ngit config user.email 'actions@users.noreply.github.com'\ngit add history.json\ngit diff --cached --quiet || git commit -m 'chore: update MERIDIAN market history'\ngit push"
+        }
+      ]
+    }
+  }
+}
