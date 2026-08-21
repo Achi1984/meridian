@@ -78,6 +78,7 @@ async function load(){
  loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
 }
 function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
+function coinIcon(sym){return `<span class="coin-icon coin-${sym}">${sym==='BTC'?'₿':sym.slice(0,2)}</span>`}
 function metric(label,value,cls=''){return `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`}
 function donutVenue(){
  const p=DATA.portfolio;
@@ -97,16 +98,16 @@ function depot(){
     donutVenue()+
     `<div class="section-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2">${p.byVenue.map(v=>metric(v.name,`$${fmt(v.value)}<div class="${v.name==='Pionex'?'red':'green'}" style="font-size:16px;margin-top:8px">${fmt(v.sharePct,1)}%</div>`)).join('')}</div>`+
-    card(`<div class="section-title">TOP 5 POSITIONEN</div>${p.topPositions.map((x,i)=>`<div class="row"><span>${i+1}. <b>${x.symbol}</b> · ${x.venue}</span><span><b>$${fmt(x.value)}</b> <span class="green">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</span></span></div>`).join('')}`)+
+    card(`<div class="section-title">TOP 5 POSITIONEN <span class="muted" style="float:right;font-size:9px">live nach Wert sortiert</span></div>${p.topPositions.map((x,i)=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${x.venue}</div></div><div><b>$${fmt(x.value)}</b><div class="asset-desc">${fmt(x.sharePct,1)}% Anteil</div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`)+
     `<div class="grid2">${metric('24H PERFORMANCE','+'+fmt(p.performance24hPct,1)+'%<div class="muted" style="font-size:14px">+$'+fmt(p.performance24hUsd)+'</div>','green')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted" style="font-size:14px">+'+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted" style="font-size:14px">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted" style="font-size:14px">24h Streuung</div>')}</div>`+
     card(`<div class="section-title">PIONEX FUTURES RISK</div><div class="grid2">${metric('KONTOWERT','$'+fmt(r.accountValue,2))}${metric('BOT P&L',fmt(r.botPnl,2)+' USDT','red')}${metric('DYN. MARGIN',fmt(r.dynamicMargin,2)+' USDT')}${metric('NÄCHSTE LIQ.','$'+fmt(r.nextLiquidation,1)+' ('+fmt(r.liquidationDistancePct,1)+'%)','red')}</div><p class="footer-note">Separat vom Depotwert. Snapshot-basiertes Risikomodul.</p>`);
 }
 function market(){
  const m=DATA.market;
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
- return card(`<div class="eyebrow">MARKTREGIME</div><div class="forecast-main">${m.regime}</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div>`)+
- `<div class="grid2">${metric('MARKTBREITE',m.breadth)}${metric('Ø 24H','+'+fmt(m.avg24hPct,1)+'%')}${metric('LEADER',m.leader.symbol+' +'+fmt(m.leader.change24h,1)+'%')}${metric('LAGGARD',m.laggard.symbol+' '+fmt(m.laggard.change24h,1)+'%')}</div>`+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:13px">24H MOMENTUM</span></div>${radar.map(x=>`<div class="row"><span><b>${x.symbol}</b><div class="muted" style="font-size:12px">Momentum positiv</div></span><b class="${x.change24h>=0?'green':'red'}">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</b></div>`).join('')}`);
+ return card(`<div class="market-hero"><img class="market-logo" src="achi-meridian-logo.png" alt=""><div class="market-copy"><div class="eyebrow">MARKTREGIME</div><div class="forecast-main" style="font-size:30px">RISK-ON</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div></div></div>`)+
+ `<div class="grid2">${metric('MARKTBREITE',m.breadth,'cyan')}${metric('Ø 24H','+'+fmt(m.avg24hPct,1)+'%','cyan')}${metric('LEADER',m.leader.symbol+' +'+fmt(m.leader.change24h,1)+'%')}${metric('LAGGARD',m.laggard.symbol+' '+fmt(m.laggard.change24h,1)+'%','red')}</div>`+
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">24H MOMENTUM</span></div>${radar.map(x=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">Momentum positiv</div></div><div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`);
 }
 function bottomView(){
  const n=DATA.nadir;
@@ -162,7 +163,7 @@ function forecast(symbol){
 }
 function renderForecast(){
  const f=forecast(activeCoin), coins=DATA.forecastCoins;
- let body=card(`<div class="forecast-head"><div><div class="eyebrow">MERIDIAN FORECAST 1.1</div><div class="forecast-main">COIN CYCLE<br>FORECAST</div><div class="sub">FIB · Rotation · Relative Strength · Cycle Timing</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?f.confidence:'—'}</div></div></div><p class="footer-note">Direkt im iPhone-Browser. Keine GitHub Action nötig.</p>`);
+ let body=card(`<div class="forecast-head"><div><div class="eyebrow">ACHI MERIDIAN FORECAST 1.2</div><div class="forecast-main">COIN CYCLE<br>FORECAST</div><div class="sub">FIB · Rotation · Relative Strength · Cycle Timing</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?f.confidence:'—'}</div></div></div><p class="footer-note">Direkt im iPhone-Browser · Blue Edition · keine GitHub Action nötig.</p>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
  if(!f.ready){
    body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><div class="row"><span>Zyklusphase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Coin-Offset</span><b>+${f.cycle.lag} Tage</b></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button><p class="footer-note">Die Daten werden lokal auf dem iPhone gespeichert. Beim nächsten Öffnen sind sie sofort verfügbar.</p>`);

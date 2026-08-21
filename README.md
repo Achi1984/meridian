@@ -1,16 +1,14 @@
-# MERIDIAN v4.2 — Original Layout / iPhone Edition
+# ACHI MERIDIAN v4.4 — Blue Dashboard Edition
 
-Diese Version behält die iPhone-taugliche Datenlogik ohne GitHub Actions bei,
-stellt aber die kompakte MERIDIAN-Optik aus den vorherigen Versionen wieder her.
-
-- kein `.github`-Ordner
-- keine Workflows
-- gleiche Hauptnavigation
-- kompakter Header
-- kompakte Portfolio-Karten
-- FIB Levels
-- Zyklus-Uhr
-- Coin Forecast
-- History direkt im Browser + lokaler iPhone-Cache
+Umgesetzt nach dem gewählten Design:
+- ACHI + MERIDIAN Branding
+- durchgängige blaue Akzentfarbe
+- ausgewähltes ACHI/MERIDIAN Logo oben rechts
+- kompakteres Dashboard
+- Asset-Icons in Radar und Top-Positionen
+- klarere Tabellenstruktur
+- blaue Wallet-Verteilung
+- bestehende Forecast-, FIB-, Zyklus- und Browser-History-Logik bleibt erhalten
+- kein GitHub Actions Workflow nötig
 
 Alle Dateien direkt ins Root des GitHub-Repositories hochladen und bestehende Dateien ersetzen.
