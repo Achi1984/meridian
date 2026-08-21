@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.8.0';
-const BUILD_ID='2026-08-21-2215';
+const APP_VERSION='3.8.1';
+const BUILD_ID='2026-08-21-2140';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -721,30 +721,48 @@ function computeForecastFromHistory(coin,coinPrices,btcPrices){
 }
 
 async function loadForecastCoin(coin){
+  state.forecastLoading=true;
   state.forecastCoin=coin;
   renderForecastCoinStrip();
   const status=document.getElementById('forecastState');
   if(status){status.textContent='LÄDT…';status.className='forecast-state'}
   const cached=state.forecastCache[coin];
-  if(cached && Date.now()-cached.ts<30*60*1000){renderForecast(cached.model);return;}
+  if(cached && Date.now()-cached.ts<30*60*1000){state.forecastLoading=false;renderForecast(cached.model);return;}
 
   const id=cgIdForCoin(coin),btcId=cgIdForCoin('BTC');
   if(!id){
+    state.forecastLoading=false;
     renderForecastUnavailable(coin,'Keine historische Live-Datenquelle hinterlegt.');
     return;
   }
   try{
     const days=state.data.forecast.historyDays||90;
+    const loadHistory=async(coinId)=>{
+      const urls=[
+        `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`,
+        `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`
+      ];
+      let lastErr=null;
+      for(const url of urls){
+        try{
+          const j=await fetchJsonTimeout(url,6500);
+          if(j?.prices?.length>=10)return j;
+        }catch(e){lastErr=e;}
+      }
+      throw lastErr||new Error('Historie nicht verfügbar');
+    };
     const [cj,bj]=await Promise.all([
-      fetchJsonTimeout(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=daily`,10000),
-      coin==='BTC'?Promise.resolve(null):fetchJsonTimeout(`https://api.coingecko.com/api/v3/coins/${btcId}/market_chart?vs_currency=usd&days=${days}&interval=daily`,10000)
+      loadHistory(id),
+      coin==='BTC'?Promise.resolve(null):loadHistory(btcId)
     ]);
     const model=computeForecastFromHistory(coin,cj.prices,coin==='BTC'?cj.prices:bj.prices);
     if(!model)throw new Error('Zu wenig Historie');
     state.forecastCache[coin]={ts:Date.now(),model};
+    state.forecastLoading=false;
     renderForecast(model);
   }catch(e){
     console.error('Forecast',e);
+    state.forecastLoading=false;
     renderForecastUnavailable(coin,'90T-Historie derzeit nicht erreichbar. Keine erfundenen Zielwerte angezeigt.');
   }
 }
@@ -873,7 +891,7 @@ function setupTabs(){
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+tab).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(n=>n.classList.toggle('active',n.dataset.tab===tab));
-    if(tab==='forecast')loadForecastCoin(state.forecastCoin);
+    if(tab==='forecast'&&!state.forecastLoading)loadForecastCoin(state.forecastCoin);
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
