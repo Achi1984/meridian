@@ -59,7 +59,7 @@ async function loadCoinHistory(sym,force=false){
 }
 async function refreshCurrentPortfolioPrices(){
  const symbols=[...new Set([
-   ...DATA.portfolio.topPositions.map(x=>x.symbol),
+   ...(DATA.portfolio.holdings||[]).map(x=>x.symbol),
    ...(DATA.forecastCoins||[]),
    'PEPE','NEAR','DOT','HBAR'
  ])];
@@ -79,10 +79,28 @@ async function refreshCurrentPortfolioPrices(){
        if(v.image) DATA.assetIcons[sym]=v.image;
      }
    });
+   recalcPortfolio();
  }catch(e){
    DATA.assetIcons=DATA.assetIcons||{};
  }
 }
+
+function recalcPortfolio(){
+ const p=DATA.portfolio, hs=p.holdings||[];
+ const priced=hs.map(h=>{const q=DATA.livePrices?.[h.symbol];return {...h,price:q?.price||0,change24h:q?.change24h||0,value:h.quantity*(q?.price||0)}});
+ const total=priced.reduce((a,h)=>a+h.value,0); if(!total)return;
+ const venues={}; priced.forEach(h=>{venues[h.venue]=(venues[h.venue]||0)+h.value});
+ p.total=total; p.eurApprox=total*0.86; p.custodiansCount=Object.keys(venues).length;
+ p.byVenue=Object.entries(venues).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value,sharePct:value/total*100}));
+ const coins={}; priced.forEach(h=>{let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h});c.value+=h.value;c.quantity+=h.quantity;c.venues.add(h.venue)});
+ const positions=Object.values(coins).sort((a,b)=>b.value-a.value);
+ p.assetsCount=positions.length; p.largestPosition={symbol:positions[0].symbol,sharePct:positions[0].value/total*100};
+ p.topPositions=positions.slice(0,5).map(x=>({symbol:x.symbol,venue:[...x.venues].join(' + '),value:x.value,sharePct:x.value/total*100,change24h:x.change24h,quantity:x.quantity}));
+ const changes=positions.map(x=>x.change24h).filter(Number.isFinite);
+ p.performance24hPct=positions.reduce((a,x)=>a+(x.value/total)*x.change24h,0); p.performance24hUsd=total*(p.performance24hPct/100);
+ const sorted=[...positions].sort((a,b)=>b.change24h-a.change24h); if(sorted.length){p.bestPerformer={symbol:sorted[0].symbol,change24h:sorted[0].change24h};p.worstPerformer={symbol:sorted.at(-1).symbol,change24h:sorted.at(-1).change24h}}
+}
+
 async function load(){
  const stamp=Date.now();
  DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>r.json());
@@ -101,9 +119,10 @@ function coinIcon(sym){
  return `<span class="coin-icon coin-${sym}">${sym==='BTC'?'₿':sym.slice(0,2)}</span>`;
 }
 function metric(label,value,cls=''){return `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`}
+function venueGradient(vs){let at=0;const cs=['#22aaff','#4a90ff','#9b7cff','#ff5b5b'];return 'conic-gradient('+vs.map((v,i)=>{const a=at;at+=v.sharePct;return `${cs[i%cs.length]} ${a}% ${at}%`}).join(',')+')'}
 function donutVenue(){
  const p=DATA.portfolio;
- return card(`<div class="section-title">BÖRSE / WALLET</div><div class="grid2"><div style="position:relative"><div class="donut"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div><div>${p.byVenue.map(v=>`<div class="row"><span>● ${v.name}</span><b>${fmt(v.sharePct,1)}%</b></div>`).join('')}</div></div>`);
+ return card(`<div class="section-title">BÖRSE / WALLET</div><div class="grid2"><div style="position:relative"><div class="donut" style="background:${venueGradient(p.byVenue)}"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div><div>${p.byVenue.map(v=>`<div class="row"><span>● ${v.name}</span><b>${fmt(v.sharePct,1)}%</b></div>`).join('')}</div></div>`);
 }
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk;
@@ -119,7 +138,7 @@ function depot(){
     donutVenue()+
     `<div class="section-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2">${p.byVenue.map(v=>metric(v.name,`$${fmt(v.value)}<div class="${v.name==='Pionex'?'red':'green'}" style="font-size:16px;margin-top:8px">${fmt(v.sharePct,1)}%</div>`)).join('')}</div>`+
-    card(`<div class="section-title">TOP 5 POSITIONEN <span class="muted" style="float:right;font-size:9px">live nach Wert sortiert</span></div>${p.topPositions.map((x,i)=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${x.venue}</div></div><div><b>$${fmt(x.value)}</b><div class="asset-desc">${fmt(x.sharePct,1)}% Anteil</div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`)+
+    card(`<div class="section-title">TOP 5 POSITIONEN <span class="muted" style="float:right;font-size:9px">live nach Wert sortiert</span></div>${p.topPositions.map((x,i)=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${x.venue} · ${fmt(x.quantity, x.quantity<1?6:2)} ${x.symbol}</div></div><div><b>$${fmt(x.value)}</b><div class="asset-desc">${fmt(x.sharePct,1)}% Anteil</div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`)+
     `<div class="grid2">${metric('24H PERFORMANCE','+'+fmt(p.performance24hPct,1)+'%<div class="muted" style="font-size:14px">+$'+fmt(p.performance24hUsd)+'</div>','green')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted" style="font-size:14px">+'+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted" style="font-size:14px">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted" style="font-size:14px">24h Streuung</div>')}</div>`+
     card(`<div class="section-title">PIONEX FUTURES RISK</div><div class="grid2">${metric('KONTOWERT','$'+fmt(r.accountValue,2))}${metric('BOT P&L',fmt(r.botPnl,2)+' USDT','red')}${metric('DYN. MARGIN',fmt(r.dynamicMargin,2)+' USDT')}${metric('NÄCHSTE LIQ.','$'+fmt(r.nextLiquidation,1)+' ('+fmt(r.liquidationDistancePct,1)+'%)','red')}</div><p class="footer-note">Separat vom Depotwert. Snapshot-basiertes Risikomodul.</p>`);
 }

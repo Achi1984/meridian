@@ -1,13 +1,13 @@
 {
-  "appVersion": "4.6.0",
-  "build": "2026-08-21-2350",
+  "appVersion": "4.7.0",
+  "build": "2026-08-22-portfolio-live",
   "currency": "USD",
   "portfolio": {
     "total": 25948,
     "eurApprox": 22100,
     "coveragePct": 90,
     "assetsCount": 17,
-    "custodiansCount": 4,
+    "custodiansCount": 3,
     "largestPosition": {
       "symbol": "SOL",
       "sharePct": 22.1
@@ -85,7 +85,121 @@
       "symbol": "VSN",
       "change24h": 1.3
     },
-    "volatility24hPct": 4.73
+    "volatility24hPct": 4.73,
+    "holdings": [
+      {
+        "symbol": "SOL",
+        "venue": "Bitpanda",
+        "quantity": 59.74480061
+      },
+      {
+        "symbol": "SUI",
+        "venue": "Bitpanda",
+        "quantity": 1906.09534613
+      },
+      {
+        "symbol": "ADA",
+        "venue": "Bitpanda",
+        "quantity": 6554.30546026
+      },
+      {
+        "symbol": "FET",
+        "venue": "Bitpanda",
+        "quantity": 8501.8871269
+      },
+      {
+        "symbol": "HBAR",
+        "venue": "Bitpanda",
+        "quantity": 17499.57092867
+      },
+      {
+        "symbol": "DOT",
+        "venue": "Bitpanda",
+        "quantity": 1392.73090601
+      },
+      {
+        "symbol": "VSN",
+        "venue": "Bitpanda",
+        "quantity": 25394.24790729
+      },
+      {
+        "symbol": "ATOM",
+        "venue": "Bitpanda",
+        "quantity": 495.74796046
+      },
+      {
+        "symbol": "NEAR",
+        "venue": "Bitpanda",
+        "quantity": 371.53655905
+      },
+      {
+        "symbol": "AVAX",
+        "venue": "Bitpanda",
+        "quantity": 89.12763042
+      },
+      {
+        "symbol": "TAO",
+        "venue": "Bitpanda",
+        "quantity": 2.01879244
+      },
+      {
+        "symbol": "BTC",
+        "venue": "OKX",
+        "quantity": 0.07161038
+      },
+      {
+        "symbol": "XRP",
+        "venue": "OKX",
+        "quantity": 1368.67480512
+      },
+      {
+        "symbol": "ETH",
+        "venue": "OKX",
+        "quantity": 0.56676504,
+        "sourceSymbol": "BETH"
+      },
+      {
+        "symbol": "PEPE",
+        "venue": "OKX",
+        "quantity": 85366256
+      },
+      {
+        "symbol": "SOL",
+        "venue": "OKX",
+        "quantity": 3.28816999,
+        "sourceSymbol": "OKSOL"
+      },
+      {
+        "symbol": "INJ",
+        "venue": "Ledger",
+        "quantity": 102.843
+      },
+      {
+        "symbol": "BTC",
+        "venue": "Ledger",
+        "quantity": 0.00031799
+      },
+      {
+        "symbol": "ETH",
+        "venue": "Ledger",
+        "quantity": 0.00282925
+      },
+      {
+        "symbol": "XRP",
+        "venue": "Ledger",
+        "quantity": 1.00088
+      },
+      {
+        "symbol": "ADA",
+        "venue": "Ledger",
+        "quantity": 5.86151
+      },
+      {
+        "symbol": "XLM",
+        "venue": "Ledger",
+        "quantity": 1.001
+      }
+    ]
   },
   "market": {
     "regime": "RISK-ON",
