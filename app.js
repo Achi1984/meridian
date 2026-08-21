@@ -58,15 +58,30 @@ async function loadCoinHistory(sym,force=false){
  }
 }
 async function refreshCurrentPortfolioPrices(){
- const symbols=[...new Set(DATA.portfolio.topPositions.map(x=>x.symbol))];
- const ids=symbols.map(s=>CG_IDS[s]).filter(Boolean).join(',');
- if(!ids) return;
+ const symbols=[...new Set([
+   ...DATA.portfolio.topPositions.map(x=>x.symbol),
+   ...(DATA.forecastCoins||[]),
+   'PEPE','NEAR','DOT','HBAR'
+ ])];
+ const ids=symbols.map(s=>CG_IDS[s]).filter(Boolean);
+ if(!ids.length) return;
  try{
-  const j=await fetchJSON(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
-  const map={}; Object.entries(CG_IDS).forEach(([s,id])=>map[id]=s);
-  DATA.livePrices={};
-  Object.entries(j).forEach(([id,v])=>{DATA.livePrices[map[id]]={price:v.usd,change24h:v.usd_24h_change}});
- }catch(e){}
+   const j=await fetchJSON(
+     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&price_change_percentage=24h`
+   );
+   const byId={}; j.forEach(v=>byId[v.id]=v);
+   DATA.livePrices={};
+   DATA.assetIcons={};
+   symbols.forEach(sym=>{
+     const id=CG_IDS[sym], v=byId[id];
+     if(v){
+       DATA.livePrices[sym]={price:v.current_price,change24h:v.price_change_percentage_24h};
+       if(v.image) DATA.assetIcons[sym]=v.image;
+     }
+   });
+ }catch(e){
+   DATA.assetIcons=DATA.assetIcons||{};
+ }
 }
 async function load(){
  const stamp=Date.now();
@@ -78,7 +93,13 @@ async function load(){
  loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
 }
 function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
-function coinIcon(sym){return `<span class="coin-icon coin-${sym}">${sym==='BTC'?'₿':sym.slice(0,2)}</span>`}
+function coinIcon(sym){
+ const img=DATA?.assetIcons?.[sym];
+ if(img){
+   return `<span class="coin-icon coin-real"><img src="${img}" alt="${sym}" loading="lazy" onerror="this.parentElement.classList.remove('coin-real');this.remove();this.parentElement.textContent='${sym==='BTC'?'₿':sym.slice(0,2)}'"></span>`;
+ }
+ return `<span class="coin-icon coin-${sym}">${sym==='BTC'?'₿':sym.slice(0,2)}</span>`;
+}
 function metric(label,value,cls=''){return `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`}
 function donutVenue(){
  const p=DATA.portfolio;
@@ -105,7 +126,7 @@ function depot(){
 function market(){
  const m=DATA.market;
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
- return card(`<div class="market-hero"><img class="market-logo" src="achi-meridian-logo.png" alt=""><div class="market-copy"><div class="eyebrow">MARKTREGIME</div><div class="forecast-main" style="font-size:30px">RISK-ON</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div></div></div>`)+
+ return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME</div><div class="forecast-main" style="font-size:30px">RISK-ON</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div></div></div>`)+
  `<div class="grid2">${metric('MARKTBREITE',m.breadth,'cyan')}${metric('Ø 24H','+'+fmt(m.avg24hPct,1)+'%','cyan')}${metric('LEADER',m.leader.symbol+' +'+fmt(m.leader.change24h,1)+'%')}${metric('LAGGARD',m.laggard.symbol+' '+fmt(m.laggard.change24h,1)+'%','red')}</div>`+
  card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">24H MOMENTUM</span></div>${radar.map(x=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">Momentum positiv</div></div><div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`);
 }

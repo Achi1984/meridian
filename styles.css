@@ -113,3 +113,54 @@ button{font:inherit}
   .nav{font-size:7.5px;padding:6px 0}
   .nav span{font-size:13px}
 }
+
+
+/* v4.5 — single ACHI/MERIDIAN logo + real asset icons */
+.logo-btn{
+  width:54px !important;
+  height:54px !important;
+  padding:4px !important;
+  border:1px solid #1478b8 !important;
+  border-radius:16px !important;
+  overflow:hidden !important;
+  background:#050b12 !important;
+  display:grid !important;
+  place-items:center !important;
+}
+.logo-btn img{
+  width:100% !important;
+  height:100% !important;
+  object-fit:contain !important;
+  object-position:center !important;
+  border-radius:11px !important;
+}
+.market-logo{display:none !important;}
+.market-copy{padding-right:0 !important;}
+
+.coin-icon{
+  overflow:hidden;
+  flex:0 0 auto;
+}
+.coin-icon.coin-real{
+  background:#07111a !important;
+  border:1px solid rgba(255,255,255,.10);
+  padding:2px;
+}
+.coin-icon.coin-real img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  border-radius:50%;
+}
+.asset-row{
+  grid-template-columns:32px 62px minmax(0,1fr) auto;
+}
+.asset-row .asset-name{font-size:13px;}
+.asset-row .asset-desc{font-size:8.5px;}
+.asset-row .asset-change{font-size:11px;}
+
+@media(max-width:650px){
+  .logo-btn{width:50px !important;height:50px !important;padding:4px !important;}
+  .asset-row{grid-template-columns:30px 56px minmax(0,1fr) auto;}
+}
