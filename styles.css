@@ -131,3 +131,36 @@ body{
 .data-stale{color:var(--amber)!important}
 .data-missing{color:var(--red)!important}
 .live-note{font:7px var(--mono);color:var(--dim);margin-top:4px}
+
+
+/* ===== V3.5 DECISION ENGINE ===== */
+.decision-card{
+  background:radial-gradient(circle at 85% 15%,rgba(84,191,210,.10),transparent 30%),linear-gradient(145deg,#08111a,#0b131b);
+  border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:10px;
+}
+.decision-top{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.decision-title{font:900 30px var(--mono);margin-top:5px}
+.decision-text{font:9px var(--mono);color:var(--dim);margin-top:4px;line-height:1.45}
+.decision-score{font:900 18px var(--mono);color:var(--amber);border:1px solid #50431f;border-radius:10px;padding:8px 10px;background:rgba(213,165,72,.06)}
+.decision-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.decision-kpi{background:#081019;border:1px solid var(--line);border-radius:9px;padding:8px}
+.decision-kpi span{display:block;font:7px var(--mono);color:var(--dim)}
+.decision-kpi b{display:block;font:900 11px var(--mono);margin-top:4px}
+.decision-status{margin-top:9px;font:7.5px var(--mono);color:var(--dim)}
+.fib-card{margin-top:10px}
+.fib-row{display:grid;grid-template-columns:55px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font:8px var(--mono)}
+.fib-row:first-child{border-top:0}
+.fib-label{color:#aab5c1}.fib-price{font-weight:900}
+.fib-distance{text-align:right;color:var(--dim)}
+.fib-row.active{color:var(--amber)}
+.fib-row.near{background:rgba(213,165,72,.04)}
+.fib-position{margin-top:8px;font:7.5px var(--mono);color:var(--dim)}
+.pionex-risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.pionex-risk-item{background:#081019;border:1px solid var(--line);border-radius:9px;padding:8px}
+.pionex-risk-item span{display:block;font:7px var(--mono);color:var(--dim)}
+.pionex-risk-item b{display:block;font:900 11px var(--mono);margin-top:4px}
+.risk-high{color:var(--red)}.risk-ok{color:var(--green)}.risk-warn{color:var(--amber)}
+@media(max-width:600px){
+ .decision-title{font-size:26px}
+ .decision-score{font-size:15px}
+}

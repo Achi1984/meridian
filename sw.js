@@ -1,5 +1,5 @@
-const CACHE='meridian-v34-2026-08-21-2050';
-const SHELL=['./styles.css?v=34','./app.js?v=34','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='meridian-v35-2026-08-21-2120';
+const SHELL=['./styles.css?v=35','./app.js?v=35','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))}); 
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{

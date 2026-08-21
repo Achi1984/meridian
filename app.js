@@ -9,7 +9,7 @@ const state = {
 
 const cgMap = {
   BTC:'bitcoin', ETH:'ethereum', SOL:'solana', XRP:'ripple', SUI:'sui', ADA:'cardano',
-  FET:'artificial-superintelligence-alliance', HBAR:'hedera-hashgraph', DOT:'polkadot',
+  FET:'fetch-ai', HBAR:'hedera-hashgraph', DOT:'polkadot',
   ATOM:'cosmos', NEAR:'near', AVAX:'avalanche-2', TAO:'bittensor',
   INJ:'injective-protocol', PEPE:'pepe', XLM:'stellar'
 };
@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.4.0';
-const BUILD_ID='2026-08-21-2050';
+const APP_VERSION='3.5.0';
+const BUILD_ID='2026-08-21-2120';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -226,6 +226,102 @@ function renderDepot(){
   renderHistory();
 }
 
+
+function marketScore(){
+  const {assets}=buildAggregates();
+  const vals=Object.keys(assets).filter(c=>Number.isFinite(state.changes[c])).map(c=>state.changes[c]);
+  if(!vals.length)return 50;
+  const positive=vals.filter(v=>v>0).length/vals.length*100;
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+  return Math.max(0,Math.min(100,positive*0.65 + Math.max(0,Math.min(35,avg*3))));
+}
+
+function nadirScore(){
+  const b=state.data.boden;
+  const valuation=Math.max(0,Math.min(100,100-((b.mvrv-0.5)/(3-0.5))*100));
+  const capitulation=Math.max(0,Math.min(100,(75-b.fearGreed)/65*100));
+  const holder=50, timing=55;
+  return Math.round((valuation+capitulation+holder+timing)/4);
+}
+
+function entryScore(){
+  const d=state.data.daytrade;
+  let score=100;
+  if(d.rsi4h>80)score-=25; else if(d.rsi4h>70)score-=15;
+  if(d.rsi1h>75)score-=10;
+  if(Math.abs(d.funding)>0.02)score-=10;
+  const staleMins=(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
+  if(staleMins>(state.data.decisionEngine?.staleMinutes||60))score-=15;
+  return Math.max(0,Math.min(100,score));
+}
+
+function renderDecisionEngine(){
+  const m=Math.round(marketScore()), n=nadirScore(), e=entryScore();
+  const w=state.data.decisionEngine?.weights||{market:.35,nadir:.30,entry:.35};
+  const total=Math.round(m*w.market+n*w.nadir+e*w.entry);
+  let label='WAIT',text='Markt konstruktiv, aber Entry-Qualität nicht ausreichend.';
+  if(total>=78 && e>=70){label='GO';text='Markt, Zyklus und Entry-Gate sind ausreichend ausgerichtet.'}
+  if(total<45){label='DEFENSIVE';text='Risiko reduzieren; Markt-/Entry-Signale sind schwach.'}
+  const staleMins=(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
+  if(staleMins>(state.data.decisionEngine?.staleMinutes||60)){
+    label='WAIT';
+    text='Markt stark, aber Trading-Indikatoren sind zu alt für einen neuen Entry.';
+  }
+  const dl=document.getElementById('decisionLabel'),ds=document.getElementById('decisionScore');
+  if(dl)dl.textContent=label;if(ds)ds.textContent=`${total}/100`;
+  const dt=document.getElementById('decisionText');if(dt)dt.textContent=text;
+  const dm=document.getElementById('decisionMarket');if(dm)dm.textContent=`${m}/100`;
+  const dn=document.getElementById('decisionNadir');if(dn)dn.textContent=`${n}/100`;
+  const de=document.getElementById('decisionEntry');if(de)de.textContent=`${e}/100`;
+  const st=document.getElementById('decisionStatus');
+  if(st)st.textContent=staleMins>60?`Entry-Daten stale · ${Math.round(staleMins/60)} h alt`:'Entry-Daten frisch';
+  if(ds)ds.style.color=label==='GO'?'var(--green)':label==='DEFENSIVE'?'var(--red)':'var(--amber)';
+}
+
+function fibLevels(){
+  const f=state.data.fib||{};
+  const low=f.swingLow,high=f.swingHigh,range=high-low;
+  const levels=(f.levels||[0.236,0.382,0.5,0.618,0.786]).map(r=>({r,price:high-range*r}));
+  const ext=(f.extensionLevels||[1.272,1.618]).map(r=>({r,price:high+range*(r-1),ext:true}));
+  return {low,high,levels,ext};
+}
+
+function renderFib(){
+  const el=document.getElementById('fibLevels'); if(!el)return;
+  const btc=priceFor('BTC')||state.data.daytrade.btcPrice;
+  const f=fibLevels(), all=f.levels;
+  document.getElementById('fibRangeLabel').textContent=`${money(f.low)} → ${money(f.high)}`;
+  let nearest=null;
+  all.forEach(x=>{const d=Math.abs(btc-x.price);if(!nearest||d<nearest.d)nearest={...x,d}});
+  el.innerHTML=all.map(x=>{
+    const dist=(btc-x.price)/btc*100;
+    const near=Math.abs(dist)<1.5;
+    return `<div class="fib-row ${near?'near active':''}">
+      <span class="fib-label">${(x.r*100).toFixed(1)}%</span>
+      <span class="fib-price">${money(x.price)}</span>
+      <span class="fib-distance">${dist>=0?'+':''}${dist.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+  const pos=document.getElementById('fibPosition');
+  if(pos&&nearest)pos.textContent=`BTC ${money(btc)} · nächstes FIB ${(nearest.r*100).toFixed(1)}% bei ${money(nearest.price)} · Abstand ${(nearest.d/btc*100).toFixed(1)}%`;
+}
+
+function renderPionexRisk(){
+  const el=document.getElementById('pionexRiskCard'); if(!el)return;
+  const p=state.data.venues.Pionex,btc=priceFor('BTC')||state.data.daytrade.btcPrice;
+  const bots=p.bots||[];
+  const nearestLiq=bots.length?Math.min(...bots.map(b=>b.liq)):null;
+  const liqDist=nearestLiq?((nearestLiq-btc)/btc*100):null;
+  const totalPnl=bots.reduce((s,b)=>s+(b.pnl||0),0);
+  const totalMargin=bots.reduce((s,b)=>s+(b.dynamicMargin||0),0);
+  el.innerHTML=`<div class="pionex-risk-grid">
+    <div class="pionex-risk-item"><span>KONTOWERT</span><b>${money(p.cash,2)}</b></div>
+    <div class="pionex-risk-item"><span>BOT P&L</span><b class="${totalPnl<0?'risk-high':'risk-ok'}">${totalPnl.toFixed(2)} USDT</b></div>
+    <div class="pionex-risk-item"><span>DYN. MARGIN</span><b>${totalMargin.toFixed(2)} USDT</b></div>
+    <div class="pionex-risk-item"><span>NÄCHSTE LIQ.</span><b class="${liqDist!=null&&liqDist<8?'risk-high':'risk-warn'}">${nearestLiq?money(nearestLiq,1):'—'} ${liqDist!=null?`(${liqDist.toFixed(1)}%)`:''}</b></div>
+  </div>`;
+}
+
 function renderMarket(){
   const {assets}=buildAggregates(),btc=state.changes.BTC||0,regime=btc>2?'RISK-ON':btc<-2?'RISK-OFF':'NEUTRAL';
   marketRegime.textContent=regime;regimeDot.style.left=regime==='RISK-ON'?'82%':regime==='RISK-OFF'?'18%':'50%';
@@ -349,7 +445,7 @@ function renderSettings(){
   setSystemStatus('liveAssetCount',`${liveNow}/${expected}`,liveNow===expected?'system-ok':liveNow>0?'system-warn':'system-bad');
 }
 
-function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();}
+function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();renderDecisionEngine();renderFib();renderPionexRisk();}
 
 async function refreshPrices(silent=false){
   const btn=document.getElementById('refreshPrices');
@@ -393,7 +489,7 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=34').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=35').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);

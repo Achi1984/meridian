@@ -207,7 +207,7 @@
     "Pionex": {
       "color": "#ef5350",
       "positions": {},
-      "cash": 257.51,
+      "cash": 169.61,
       "bots": [
         {
           "name": "BTC/USDT Futures Moon · 19.08.",
@@ -215,16 +215,17 @@
           "leverage": 30,
           "investment": 52,
           "dynamicMargin": 138.51,
-          "pnl": -102.45,
-          "gridProfit": 5.61,
-          "trendPnl": -108.06,
+          "pnl": -91.62,
+          "gridProfit": 5.8,
+          "trendPnl": -97.42,
           "rangeLow": 59589.2,
           "rangeHigh": 79671.1,
-          "liq": 81446.9,
-          "breakEven": 71462.1,
+          "liq": 81455.9,
+          "breakEven": 71242.1,
           "funding": 0.01,
-          "rounds24": 386,
-          "roundsTotal": 554
+          "rounds24": 392,
+          "roundsTotal": 573,
+          "createdPrice": 69243.5
         },
         {
           "name": "BTC/USDT Futures Moon · 21.08.",
@@ -232,22 +233,23 @@
           "leverage": 30,
           "investment": 57,
           "dynamicMargin": 10,
-          "pnl": -7.25,
-          "gridProfit": 2.11,
-          "trendPnl": -9.37,
+          "pnl": -0.632,
+          "gridProfit": 2.31,
+          "trendPnl": -2.95,
           "rangeLow": 64678.3,
           "rangeHigh": 87793.3,
-          "liq": 81538.7,
-          "breakEven": 76616.8,
+          "liq": 81551.6,
+          "breakEven": 76610.8,
           "funding": 0.01,
-          "rounds24": 182,
-          "roundsTotal": 182
+          "rounds24": 199,
+          "roundsTotal": 199,
+          "createdPrice": 76369.5
         }
       ],
-      "snapshotAt": "2026-08-21T18:36:00+02:00",
-      "source": "Pionex screenshots",
-      "cashLabel": "gebundenes Kapital (Investition + dynamische Margin)",
-      "valuationMode": "committed_capital"
+      "snapshotAt": "2026-08-21T20:49:00+02:00",
+      "source": "Pionex screenshots 21.08.2026 20:49",
+      "cashLabel": "Kontowert laut Pionex",
+      "valuationMode": "account_value"
     }
   },
   "fallbackChanges24h": {
@@ -295,7 +297,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.4.0",
+  "appVersion": "3.5.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -310,7 +312,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2050",
+  "buildId": "2026-08-21-2120",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
@@ -363,5 +365,34 @@
     "dayTrade": "Live where available; otherwise timestamped snapshot",
     "market": "Live 24h changes from CoinGecko",
     "boden": "Snapshot indicators until dedicated live sources are integrated"
+  },
+  "decisionEngine": {
+    "weights": {
+      "market": 0.35,
+      "nadir": 0.3,
+      "entry": 0.35
+    },
+    "staleMinutes": 60,
+    "labels": {
+      "go": "GO",
+      "wait": "WAIT",
+      "defensive": "DEFENSIVE"
+    }
+  },
+  "fib": {
+    "source": "Day-Trade Swing",
+    "swingLow": 62600,
+    "swingHigh": 79306.4,
+    "levels": [
+      0.236,
+      0.382,
+      0.5,
+      0.618,
+      0.786
+    ],
+    "extensionLevels": [
+      1.272,
+      1.618
+    ]
   }
 }

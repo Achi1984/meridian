@@ -1,11 +1,16 @@
-# MERIDIAN V3.4 – Live Diagnostics
+# MERIDIAN V3.5 – Decision Engine
 
-Build `2026-08-21-2050`
+Build `2026-08-21-2120`
 
 Neu:
-- zeigt exakt, welches Asset nicht live bewertet wird
-- unterscheidet Snapshot-only von API-/Mapping-Fehlern
-- Day-Trade zeigt pro Kennzahl Live/Snapshot und Snapshot-Alter
-- BTC-Preis im Day-Trade nutzt Live-Preis, wenn verfügbar
-- Settings zeigen Live-Diagnose separat
-- Version 3.4.0
+- MERIDIAN SIGNAL: GO / WAIT / DEFENSIVE
+- kombiniert Market Score, NADIR Score und Entry Score
+- Datenfrische kann GO blockieren
+- Fibonacci-Retracement 23.6 / 38.2 / 50 / 61.8 / 78.6
+- FIB-Zonen dynamisch aus Swing Low/High
+- Pionex Kontowert auf 169.61 USDT korrigiert
+- Bot-P&L, dynamische Margin und Liquidationsabstand separat
+- FET Live-Mapping korrigiert
+- Icons liegen direkt im Hauptverzeichnis, kein `icons/` Ordner mehr
+
+Version `3.5.0`
