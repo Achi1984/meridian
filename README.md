@@ -1,16 +1,21 @@
-# MERIDIAN V3
+# MERIDIAN V3.2 – Stability Release
 
-## Was neu ist
-- Sauberes Datenmodell: Menge, Snapshot-Wert, Snapshot-Kurs, Quelle und Zeitstempel je Position.
-- Live-Kurs = Menge × CoinGecko-Kurs; bei fehlendem Live-Kurs bleibt der bestätigte Snapshot aktiv.
-- Pionex wird separat als gebundenes Kapital ausgewiesen, nicht als Spot-BTC.
-- Dynamische Asset- und Börsen-Donuts.
-- Top-5 und Portfolio-24h werden aus den aktuellen Werten neu berechnet.
-- Preisquelle pro Position in den Depot-Details.
-- Live-Abdeckung als Kennzahl.
-- Portfolio-Verlauf wird ab V3 lokal im Browser aufgezeichnet (localStorage).
-- Service Worker / Cache auf V3 angehoben.
+Build: `2026-08-21-2030`
 
-## GitHub Pages Update
-Im bestehenden Repository `meridian` alle Dateien aus diesem Paket hochladen und bestehende Dateien ersetzen.
-GitHub Pages veröffentlicht den main-Branch automatisch neu.
+## Wichtigste Änderungen
+- Version + Build-ID sichtbar im Header und unter Settings.
+- `version.json` für echten Build-/Cache-Check.
+- Button **Update erzwingen** löscht Service Worker + Cache und lädt den aktuellen Build neu.
+- `index.html`, `data.json` und `version.json` werden vom Service Worker nicht dauerhaft gecacht.
+- Live-API-Diagnose: `online · X Assets` oder `nicht erreichbar · Snapshot aktiv`.
+- Live-Asset-Zähler: z. B. `16/16`.
+- Portfolio-Verlauf ist nie leer:
+  - erster Start erzeugt zwei reale Startpunkte mit gleichem Portfoliowert
+  - danach werden echte Live-/Refresh-Werte gespeichert
+  - bei unverändertem Wert erscheint eine saubere horizontale Linie.
+- iPhone Safe-Area nochmals robuster gemacht.
+- App-Version: 3.2.0
+
+## GitHub
+Alle Dateien aus diesem Paket über das bestehende `meridian` Repository hochladen und überschreiben.
+Danach GitHub Pages neu deployen lassen.

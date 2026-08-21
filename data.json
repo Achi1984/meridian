@@ -295,10 +295,44 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 3,
-  "appVersion": "3.0.0",
+  "appVersion": "3.2.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
     "note": "Aktueller Wert = Menge × Live-Kurs, falls verfügbar; sonst letzter bestätigter Snapshot."
+  },
+  "marketFallback": {
+    "updatedAt": "2026-08-21T20:10:00+02:00",
+    "note": "Öffentliche Markt-Referenzen; beim App-Start wird CoinGecko Live-Refresh versucht.",
+    "prices": {
+      "BTC": 77380.0,
+      "SOL": 91.41,
+      "SUI": 0.7429
+    }
+  },
+  "buildId": "2026-08-21-2030",
+  "diagnostics": {
+    "expectedLiveMappedAssets": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "SUI",
+      "ADA",
+      "FET",
+      "HBAR",
+      "DOT",
+      "ATOM",
+      "NEAR",
+      "AVAX",
+      "TAO",
+      "INJ",
+      "PEPE",
+      "XLM"
+    ],
+    "snapshotOnlyAssets": [
+      "VSN"
+    ],
+    "pionexMode": "committed_capital"
   }
 }

@@ -16,7 +16,10 @@ const cgMap = {
 
 const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'];
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
-const HISTORY_KEY='meridian_portfolio_history_v3';
+const HISTORY_KEY='meridian_portfolio_history_v32';
+const APP_VERSION='3.2.0';
+const BUILD_ID='2026-08-21-2030';
+const VERSION_URL='./version.json';
 
 function money(v,d=0){
   return '$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -38,13 +41,15 @@ function ageLabel(ts){
 
 async function load(){
   try{
-    const r=await fetch('./data.json?v=3',{cache:'no-store'});
+    const r=await fetch('./data.json?v=32&t='+Date.now(),{cache:'no-store'});
     if(!r.ok)throw new Error('data.json HTTP '+r.status);
     state.data=await r.json();
     restoreSnapshot();
     renderAll();
-    recordHistory();
+    recordHistory(false,'snapshot');
     registerSW();
+    await checkBuild();
+    setTimeout(()=>refreshPrices(true),700);
   }catch(err){
     console.error(err);
     document.getElementById('portfolioUsd').textContent='Datenfehler';
@@ -104,26 +109,51 @@ function getHistory(){
   try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return []}
 }
 function setHistory(h){localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-96)));}
-function recordHistory(){
+function recordHistory(force=false, label=''){
   const {total}=buildAggregates(); if(!total)return;
   let h=getHistory(); const now=Date.now();
-  if(!h.length || now-h[h.length-1].t>10*60*1000){
-    h.push({t:now,v:total}); setHistory(h);
+
+  if(!h.length){
+    // Seed with a real start value and a tiny earlier timestamp so chart is never blank.
+    h.push({t:now-60000,v:total,label:'start'});
+    h.push({t:now,v:total,label:label||'snapshot'});
+    setHistory(h);
+  }else if(force || now-h[h.length-1].t>10*60*1000){
+    h.push({t:now,v:total,label}); setHistory(h);
   }
   renderHistory();
 }
 function renderHistory(){
   const h=getHistory();
   const line=document.getElementById('historyLine'),area=document.getElementById('historyArea'),label=document.getElementById('historyLabel');
+  const hero=document.querySelector('.hero-card');
   if(!line||!area)return;
-  if(h.length<2){line.setAttribute('d','');area.setAttribute('d','');label.textContent='ab jetzt lokal aufgezeichnet';return;}
+
+  if(h.length<2){
+    line.setAttribute('d','M0 45 L320 45');
+    line.setAttribute('class','history-single-line');
+    area.setAttribute('d','M0 45 L320 45 L320 90 L0 90 Z');
+    label.textContent=h.length?`Startwert ${money(h[0].v)}`:'Startwert wird gespeichert';
+    hero?.classList.add('history-short');
+    return;
+  }
+
   const vals=h.map(x=>x.v), min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
-  const pts=h.map((x,i)=>[i/(h.length-1)*320,82-(x.v-min)/span*70]);
+  const flat=(max-min)<0.01;
+  let pts;
+  if(flat){
+    pts=h.map((x,i)=>[i/(h.length-1)*320,45]);
+    hero?.classList.add('history-short');
+  }else{
+    pts=h.map((x,i)=>[i/(h.length-1)*320,82-(x.v-min)/span*70]);
+    hero?.classList.remove('history-short');
+  }
   const d='M'+pts.map(p=>p.map(n=>n.toFixed(1)).join(' ')).join(' L');
+  line.setAttribute('class','line');
   line.setAttribute('d',d);
   area.setAttribute('d',d+` L 320 90 L 0 90 Z`);
   const diff=h[h.length-1].v-h[0].v, pctv=diff/h[0].v*100;
-  label.textContent=`${diff>=0?'+':'−'}${money(Math.abs(diff))} · ${pct(pctv)} seit ${new Date(h[0].t).toLocaleDateString('de-DE')}`;
+  label.textContent=`${diff>=0?'+':'−'}${money(Math.abs(diff))} · ${pct(pctv)} seit ${new Date(h[0].t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}`;
 }
 
 function renderDepot(){
@@ -200,10 +230,46 @@ function renderTrade(){
   tradeChecks.innerHTML=checks.map(x=>`<div class="check-row"><span>${x[0]}</span><b style="color:${x[2]==='pass'?'var(--green)':x[2]==='fail'?'var(--red)':'var(--amber)'}">${x[1]}</b></div>`).join('');
 }
 
+
+function setSystemStatus(id,text,cls=''){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.textContent=text;
+  el.className=cls;
+}
+
+async function checkBuild(){
+  try{
+    const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const v=await r.json();
+    setSystemStatus('cacheStatus',v.buildId===BUILD_ID?'aktuell':'Update verfügbar',
+                    v.buildId===BUILD_ID?'system-ok':'system-warn');
+    return v;
+  }catch(e){
+    setSystemStatus('cacheStatus','nicht prüfbar','system-warn');
+    return null;
+  }
+}
+
+async function hardRefreshApp(){
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+  }catch(e){}
+  location.href=`./?build=${BUILD_ID}&t=${Date.now()}`;
+}
+
 function renderSettings(){
   const {total,liveValue}=buildAggregates();
   const rows=[
-    ['App-Version',state.data.appVersion||'3.0.0'],
+    ['App-Version',state.data.appVersion||'3.1.0'],
     ['Letzter Refresh',state.lastUpdated.toLocaleString('de-DE')],
     ['Live bewertet',`${(total?liveValue/total*100:0).toFixed(0)}%`],
     ['Bitpanda','Screenshot + Live-Kurse'],
@@ -213,24 +279,44 @@ function renderSettings(){
   ];
   dataStatus.innerHTML=rows.map(x=>`<div class="status-row"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
   updatedPill.textContent='↻ '+fmtTime(state.lastUpdated);
+  setSystemStatus('systemBuild',`v${APP_VERSION} · ${BUILD_ID}`,'system-ok');
+  const expected=(state.data.diagnostics?.expectedLiveMappedAssets||Object.keys(cgMap)).length;
+  const liveNow=Object.values(state.priceMeta).filter(x=>x.source==='Live').length;
+  setSystemStatus('liveAssetCount',`${liveNow}/${expected}`,liveNow===expected?'system-ok':liveNow>0?'system-warn':'system-bad');
 }
 
 function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();}
 
-async function refreshPrices(){
-  const btn=refreshPrices;btn.disabled=true;btn.textContent='Aktualisiere…';
+async function refreshPrices(silent=false){
+  const btn=document.getElementById('refreshPrices');
+  if(btn && !silent){btn.disabled=true;btn.textContent='Aktualisiere…';}
+  setSystemStatus('liveApiStatus','verbinde…','system-warn');
   try{
     const ids=[...new Set(Object.values(cgMap))].join(',');
     const url=`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
-    const res=await fetch(url,{cache:'no-store'}); if(!res.ok)throw new Error('HTTP '+res.status);
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
     const j=await res.json(); const now=new Date().toISOString();
+    let liveCount=0;
     for(const [coin,id] of Object.entries(cgMap)){
-      if(j[id]?.usd){state.prices[coin]=j[id].usd;state.priceMeta[coin]={source:'Live',updatedAt:now};}
+      if(j[id]?.usd){
+        state.prices[coin]=j[id].usd;
+        state.priceMeta[coin]={source:'Live',updatedAt:now};
+        liveCount++;
+      }
       if(Number.isFinite(j[id]?.usd_24h_change))state.changes[coin]=j[id].usd_24h_change;
     }
-    state.lastUpdated=new Date();renderAll();recordHistory();btn.textContent='✓ Aktualisiert';
-  }catch(e){console.error(e);btn.textContent='Fehler – Snapshot aktiv';}
-  setTimeout(()=>{btn.disabled=false;btn.textContent='Live-Kurse aktualisieren'},1800);
+    state.lastUpdated=new Date();
+    setSystemStatus('liveApiStatus',`online · ${liveCount} Assets`,'system-ok');
+    renderAll();
+    recordHistory(true,'live');
+    if(btn && !silent)btn.textContent=`✓ ${liveCount} Assets live`;
+  }catch(e){
+    console.error(e);
+    setSystemStatus('liveApiStatus','nicht erreichbar · Snapshot aktiv','system-bad');
+    if(btn && !silent)btn.textContent='Fehler – Snapshot aktiv';
+  }
+  if(btn && !silent)setTimeout(()=>{btn.disabled=false;btn.textContent='Live-Kurse aktualisieren'},1800);
 }
 
 function setupTabs(){
@@ -243,10 +329,11 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=3').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=32').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);
-  document.getElementById('resetSnapshot').addEventListener('click',()=>{restoreSnapshot();renderAll();recordHistory();});
+  document.getElementById('resetSnapshot').addEventListener('click',()=>{restoreSnapshot();renderAll();recordHistory(true,'snapshot');});
+  document.getElementById('forceReload')?.addEventListener('click',hardRefreshApp);
   setupTabs();load();
 });
