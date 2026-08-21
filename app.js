@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.8.1';
-const BUILD_ID='2026-08-21-2140';
+const APP_VERSION='3.8.2';
+const BUILD_ID='2026-08-21-2135';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -454,12 +454,17 @@ function calcVWAP(klines){
 
 async function fetchJsonTimeout(url,ms=8000){
   const ctrl=new AbortController();
-  const t=setTimeout(()=>ctrl.abort(),ms);
-  try{
+  let timer;
+  const timeout=new Promise((_,reject)=>{
+    timer=setTimeout(()=>{try{ctrl.abort()}catch(_e){} reject(new Error('TIMEOUT'));},ms);
+  });
+  const request=(async()=>{
     const r=await fetch(url,{cache:'no-store',signal:ctrl.signal});
     if(!r.ok)throw new Error('HTTP '+r.status);
     return await r.json();
-  }finally{clearTimeout(t)}
+  })();
+  try{return await Promise.race([request,timeout]);}
+  finally{clearTimeout(timer);}
 }
 
 async function refreshTradingIntelligence(){
@@ -726,18 +731,38 @@ async function loadForecastCoin(coin){
   renderForecastCoinStrip();
   const status=document.getElementById('forecastState');
   if(status){status.textContent='LÄDT…';status.className='forecast-state'}
+  const watchdog=setTimeout(()=>{
+    if(state.forecastLoading && state.forecastCoin===coin){
+      state.forecastLoading=false;
+      renderForecastUnavailable(coin,'Historische Kursdaten konnten nicht rechtzeitig geladen werden. Bitte Forecast erneut antippen.');
+    }
+  },16000);
   const cached=state.forecastCache[coin];
-  if(cached && Date.now()-cached.ts<30*60*1000){state.forecastLoading=false;renderForecast(cached.model);return;}
+  if(cached && Date.now()-cached.ts<30*60*1000){clearTimeout(watchdog);state.forecastLoading=false;renderForecast(cached.model);return;}
 
   const id=cgIdForCoin(coin),btcId=cgIdForCoin('BTC');
   if(!id){
+    clearTimeout(watchdog);
     state.forecastLoading=false;
     renderForecastUnavailable(coin,'Keine historische Live-Datenquelle hinterlegt.');
     return;
   }
   try{
     const days=state.data.forecast.historyDays||90;
-    const loadHistory=async(coinId)=>{
+    const loadHistory=async(coinId,symbol)=>{
+      // Primary: Binance public daily candles. More reliable in iOS PWAs than CoinGecko market_chart.
+      if(symbol){
+        const bases=['https://api.binance.com','https://api1.binance.com','https://api2.binance.com'];
+        for(const base of bases){
+          try{
+            const k=await fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=${days}`,4500);
+            if(Array.isArray(k)&&k.length>=10){
+              return {prices:k.map(x=>[+x[0],+x[4]])};
+            }
+          }catch(_e){}
+        }
+      }
+      // Fallback: CoinGecko.
       const urls=[
         `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`,
         `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`
@@ -745,23 +770,25 @@ async function loadForecastCoin(coin){
       let lastErr=null;
       for(const url of urls){
         try{
-          const j=await fetchJsonTimeout(url,6500);
+          const j=await fetchJsonTimeout(url,4500);
           if(j?.prices?.length>=10)return j;
         }catch(e){lastErr=e;}
       }
       throw lastErr||new Error('Historie nicht verfügbar');
     };
     const [cj,bj]=await Promise.all([
-      loadHistory(id),
-      coin==='BTC'?Promise.resolve(null):loadHistory(btcId)
+      loadHistory(id,coin),
+      coin==='BTC'?Promise.resolve(null):loadHistory(btcId,'BTC')
     ]);
     const model=computeForecastFromHistory(coin,cj.prices,coin==='BTC'?cj.prices:bj.prices);
     if(!model)throw new Error('Zu wenig Historie');
     state.forecastCache[coin]={ts:Date.now(),model};
+    clearTimeout(watchdog);
     state.forecastLoading=false;
     renderForecast(model);
   }catch(e){
     console.error('Forecast',e);
+    clearTimeout(watchdog);
     state.forecastLoading=false;
     renderForecastUnavailable(coin,'90T-Historie derzeit nicht erreichbar. Keine erfundenen Zielwerte angezeigt.');
   }
