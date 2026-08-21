@@ -1,0 +1,199 @@
+{
+  "snapshotAt": "2026-08-21T18:38:00+02:00",
+  "eurRate": 0.854774,
+  "venues": {
+    "Bitpanda": {
+      "color": "#34c978",
+      "positions": {
+        "SOL": {
+          "qty": 59.74480061,
+          "value": 5462.85
+        },
+        "SUI": {
+          "qty": 1906.09534613,
+          "value": 1550.99
+        },
+        "ADA": {
+          "qty": 6554.30546026,
+          "value": 1439.17
+        },
+        "FET": {
+          "qty": 8501.8871269,
+          "value": 1375.79
+        },
+        "HBAR": {
+          "qty": 17499.57092867,
+          "value": 1364.01
+        },
+        "DOT": {
+          "qty": 1392.73090601,
+          "value": 1257.59
+        },
+        "VSN": {
+          "qty": 25394.24790729,
+          "value": 970.8
+        },
+        "ATOM": {
+          "qty": 495.74796046,
+          "value": 781.25
+        },
+        "NEAR": {
+          "qty": 371.53655905,
+          "value": 704.77
+        },
+        "AVAX": {
+          "qty": 89.12763042,
+          "value": 677.98
+        },
+        "TAO": {
+          "qty": 2.01879244,
+          "value": 465.99
+        }
+      },
+      "cash": 5.33
+    },
+    "OKX": {
+      "color": "#3f83f8",
+      "positions": {
+        "BTC": {
+          "qty": 0.07161018,
+          "value": 5533.66
+        },
+        "XRP": {
+          "qty": 1368.67480512,
+          "value": 1911.19
+        },
+        "ETH": {
+          "qty": 0.56676504,
+          "value": 1359.73,
+          "label": "BETH"
+        },
+        "PEPE": {
+          "qty": 85366256,
+          "value": 322.56
+        },
+        "SOL": {
+          "qty": 3.28816999,
+          "value": 300.95,
+          "label": "OKSOL"
+        }
+      },
+      "cash": 0
+    },
+    "Ledger": {
+      "color": "#9b82ff",
+      "positions": {
+        "INJ": {
+          "qty": 102.843,
+          "value": 499.82
+        },
+        "BTC": {
+          "qty": 0.00031799,
+          "value": 22.94
+        },
+        "ETH": {
+          "qty": 0.00282925,
+          "value": 6.79
+        },
+        "XRP": {
+          "qty": 1.00088,
+          "value": 1.4
+        },
+        "ADA": {
+          "qty": 5.86151,
+          "value": 1.12
+        },
+        "XLM": {
+          "qty": 1.001,
+          "value": 0.18
+        }
+      },
+      "cash": 0
+    },
+    "Pionex": {
+      "color": "#ef5350",
+      "positions": {},
+      "cash": 257.51,
+      "bots": [
+        {
+          "name": "BTC/USDT Futures Moon · 19.08.",
+          "side": "SHORT",
+          "leverage": 30,
+          "investment": 52,
+          "dynamicMargin": 138.51,
+          "pnl": -102.45,
+          "gridProfit": 5.61,
+          "trendPnl": -108.06,
+          "rangeLow": 59589.2,
+          "rangeHigh": 79671.1,
+          "liq": 81446.9,
+          "breakEven": 71462.1,
+          "funding": 0.01,
+          "rounds24": 386,
+          "roundsTotal": 554
+        },
+        {
+          "name": "BTC/USDT Futures Moon · 21.08.",
+          "side": "SHORT",
+          "leverage": 30,
+          "investment": 57,
+          "dynamicMargin": 10,
+          "pnl": -7.25,
+          "gridProfit": 2.11,
+          "trendPnl": -9.37,
+          "rangeLow": 64678.3,
+          "rangeHigh": 87793.3,
+          "liq": 81538.7,
+          "breakEven": 76616.8,
+          "funding": 0.01,
+          "rounds24": 182,
+          "roundsTotal": 182
+        }
+      ]
+    }
+  },
+  "fallbackChanges24h": {
+    "BTC": 6.41,
+    "ETH": 4.6,
+    "SOL": 5.2,
+    "XRP": 13.6,
+    "SUI": 1.21,
+    "ADA": 3.17,
+    "FET": -2.28,
+    "HBAR": 1.42,
+    "DOT": -0.91,
+    "VSN": 1.25,
+    "ATOM": 0.75,
+    "NEAR": 7.24,
+    "AVAX": -0.93,
+    "TAO": 3.77,
+    "INJ": 2.91,
+    "PEPE": 8.1,
+    "XLM": 0.0
+  },
+  "boden": {
+    "btcPrice": 77704,
+    "mvrv": 0.35,
+    "puell": 0.65,
+    "sopr": 0.998,
+    "nupl": 0.19,
+    "fearGreed": 71,
+    "funding": 0.0067,
+    "realizedPrice": 52240,
+    "dxy": 98.79,
+    "us10y": 4.707,
+    "fedRate": "3.50–3.75%"
+  },
+  "daytrade": {
+    "btcPrice": 77704,
+    "rsi4h": 92.45,
+    "rsi1h": 77.37,
+    "rsi15m": 70,
+    "funding": 0.0067,
+    "oi": 54.95,
+    "swingHigh": 79306.4,
+    "swingLow": 62600,
+    "vwap": 73454.27,
+    "liqAbove": 81538.7
+  }
+}
