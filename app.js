@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.8.3';
-const BUILD_ID='2026-08-21-2148';
+const APP_VERSION='3.9.0';
+const BUILD_ID='2026-08-21-2200';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -43,7 +43,7 @@ function ageLabel(ts){
 
 async function load(){
   try{
-    const r=await fetch('./data.json?v=383&t='+Date.now(),{cache:'no-store'});
+    const r=await fetch('./data.json?v=39&t='+Date.now(),{cache:'no-store'});
     if(!r.ok)throw new Error('data.json HTTP '+r.status);
     state.data=await r.json();
     restoreSnapshot();
@@ -53,6 +53,7 @@ async function load(){
     await checkBuild();
     setTimeout(()=>refreshPrices(true),500);
     setTimeout(()=>refreshTradingIntelligence(),900);
+    setTimeout(()=>loadServerHistory(false),1100);
   }catch(err){
     console.error(err);
     document.getElementById('portfolioUsd').textContent='Datenfehler';
@@ -642,8 +643,126 @@ function renderSettings(){
   const expected=(state.data.diagnostics?.expectedLiveMappedAssets||Object.keys(cgMap)).length;
   const liveNow=Object.values(state.priceMeta).filter(x=>x.source==='Live').length;
   setSystemStatus('liveAssetCount',`${liveNow}/${expected}`,liveNow===expected?'system-ok':liveNow>0?'system-warn':'system-bad');
+  loadServerHistory(false).then(h=>{
+    const n=Object.keys(h?.coins||{}).length;
+    const label=h?.status==='ok'?`History Server · ${n} Coins`:'History Server · pending';
+    // reuse cache status text only as an extra human-readable line if element exists
+    const cacheEl=document.getElementById('cacheStatus');
+    if(cacheEl && h?.status==='ok')cacheEl.title=label;
+  });
 }
 
+
+
+async function loadServerHistory(force=false){
+  if(state.historyStore && !force)return state.historyStore;
+  if(state.historyPromise && !force)return state.historyPromise;
+  const file=state.data?.forecast?.historyFile||'./history.json';
+  state.historyPromise=(async()=>{
+    const pill=document.getElementById('forecastHistoryStatus');
+    try{
+      const r=await fetch(`${file}?t=${Date.now()}`,{cache:'no-store'});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      state.historyStore=j;
+      const count=Object.keys(j.coins||{}).length;
+      if(pill){
+        if(j.status==='ok'&&count){
+          const dt=j.generatedAt?new Date(j.generatedAt):null;
+          pill.textContent=`HISTORY · SERVER · ${count} Coins${dt?' · '+fmtTime(dt):''}`;
+          pill.className='forecast-history-pill ok';
+        }else{
+          pill.textContent='HISTORY · GitHub Update ausstehend';
+          pill.className='forecast-history-pill warn';
+        }
+      }
+      return j;
+    }catch(e){
+      console.error('Server history',e);
+      if(pill){pill.textContent='HISTORY · nicht erreichbar';pill.className='forecast-history-pill warn';}
+      state.historyStore={status:'error',coins:{},errors:{_history:String(e)}};
+      return state.historyStore;
+    }finally{
+      state.historyPromise=null;
+    }
+  })();
+  return state.historyPromise;
+}
+
+function historyPrices(entry){
+  const c=entry?.candles||[];
+  return c.map(x=>[+x[0],+x[4]]).filter(x=>Number.isFinite(x[1]));
+}
+function historySlice(entry,days){
+  const c=entry?.candles||[];
+  return c.slice(-Math.max(1,days));
+}
+function calcDailyRsiFromEntry(entry,period=14){
+  const closes=(entry?.candles||[]).slice(-(period+80)).map(x=>+x[4]).filter(Number.isFinite);
+  return closes.length>period+1?calcRSI(closes,period):null;
+}
+function swingFromEntry(entry,days){
+  const rows=historySlice(entry,days);
+  if(!rows.length)return null;
+  const lows=rows.map(x=>+x[3]).filter(Number.isFinite);
+  const highs=rows.map(x=>+x[2]).filter(Number.isFinite);
+  return lows.length&&highs.length?{low:Math.min(...lows),high:Math.max(...highs)}:null;
+}
+
+function detectMajorPeaks(entry,minSepDays=420){
+  const rows=entry?.candles||[];
+  if(rows.length<100)return [];
+  // Monthly-ish local maxima: point is a max within ±45 days, then keep peaks separated.
+  const candidates=[];
+  const radius=45;
+  for(let i=radius;i<rows.length-radius;i++){
+    const p=+rows[i][4];
+    let max=p;
+    for(let j=i-radius;j<=i+radius;j++)max=Math.max(max,+rows[j][4]);
+    if(p>=max*0.999)candidates.push({ts:+rows[i][0],price:p});
+  }
+  candidates.sort((a,b)=>b.price-a.price);
+  const picked=[];
+  for(const c of candidates){
+    if(picked.every(x=>Math.abs(x.ts-c.ts)>=minSepDays*86400000))picked.push(c);
+    if(picked.length>=4)break;
+  }
+  return picked.sort((a,b)=>a.ts-b.ts);
+}
+
+function observedCoinLag(coinEntry,btcEntry){
+  if(!coinEntry||!btcEntry)return null;
+  const cfg=state.data.forecast?.peakDetection||{};
+  const btcPeaks=detectMajorPeaks(btcEntry,cfg.minPeakSeparationDays||420);
+  const coinRows=coinEntry.candles||[];
+  if(!btcPeaks.length||!coinRows.length)return null;
+  const lags=[];
+  for(const bp of btcPeaks){
+    const lo=bp.ts-(cfg.coinWindowBeforeDays||120)*86400000;
+    const hi=bp.ts+(cfg.coinWindowAfterDays||180)*86400000;
+    const rows=coinRows.filter(x=>+x[0]>=lo&&+x[0]<=hi);
+    if(rows.length<20)continue;
+    let top=rows[0];
+    for(const r of rows)if(+r[2]>+top[2])top=r;
+    const lag=Math.round((+top[0]-bp.ts)/86400000);
+    if(lag>=-(cfg.coinWindowBeforeDays||120)&&lag<=(cfg.coinWindowAfterDays||180))lags.push(lag);
+  }
+  if(!lags.length)return null;
+  lags.sort((a,b)=>a-b);
+  const mid=Math.floor(lags.length/2);
+  const median=lags.length%2?lags[mid]:Math.round((lags[mid-1]+lags[mid])/2);
+  return {median,samples:lags.length,lags};
+}
+
+function resolveCycleLag(coin,cfg,observed){
+  if(coin==='BTC')return {min:0,max:0,source:'BTC Master'};
+  if(observed&&observed.samples>=1){
+    const spread=observed.samples>=2?30:45;
+    return {min:observed.median-spread,max:observed.median+spread,source:`Historie · ${observed.samples} Peak-Fenster`};
+  }
+  const lag=cfg.lagDays||[0,0];
+  return {min:lag[0],max:lag[1],source:'Klassen-Fallback'};
+}
 
 function forecastCoins(){
   const {assets}=buildAggregates();
@@ -681,119 +800,106 @@ function computeReturn(prices,days){
   return first?((end/first)-1)*100:null;
 }
 
-function computeForecastFromHistory(coin,coinPrices,btcPrices){
+function computeForecastFromHistory(coin,coinEntry,btcEntry){
   const cfg=state.data.forecast.coins[coin];
-  const values=coinPrices.map(p=>p[1]).filter(Number.isFinite);
-  if(values.length<10)return null;
+  const prices=historyPrices(coinEntry);
+  const btcPrices=coin==='BTC'?prices:historyPrices(btcEntry);
+  if(prices.length<30)return null;
 
-  const low=Math.min(...values),high=Math.max(...values);
-  const current=liveTradeValue && coin==='BTC' ? liveTradeValue('price',priceFor(coin)) : (priceFor(coin)||values[values.length-1]);
-  const range=Math.max(high-low,high*.001);
-  const swingPct=Math.max(0,Math.min(100,(current-low)/range*100));
+  const shortDays=state.data.forecast.swingShortDays||90;
+  const longDays=state.data.forecast.swingLongDays||180;
+  const sw90=swingFromEntry(coinEntry,shortDays);
+  const sw180=swingFromEntry(coinEntry,longDays)||sw90;
+  if(!sw90||!sw180)return null;
 
-  const r30=computeReturn(coinPrices,30);
-  const btc30=coin==='BTC'?r30:computeReturn(btcPrices,30);
+  const current=(coin==='BTC'&&state.tradeLive?.price) ? state.tradeLive.price : (priceFor(coin)||prices[prices.length-1][1]);
+  const range=Math.max(sw180.high-sw180.low,sw180.high*.001);
+  const swingPct=Math.max(0,Math.min(100,(current-sw180.low)/range*100));
+
+  const relDays=state.data.forecast.relativeStrengthDays||30;
+  const r30=computeReturn(prices,relDays);
+  const btc30=coin==='BTC'?r30:computeReturn(btcPrices,relDays);
   const rel=(Number.isFinite(r30)&&Number.isFinite(btc30))?r30-btc30:0;
+  const dailyRsi=calcDailyRsiFromEntry(coinEntry,14);
 
-  let topRisk=Math.round(swingPct*.62 + Math.max(0,Math.min(25,rel*.8)) + Math.max(0,Math.min(13,(state.changes[coin]||0)*.7)));
-  topRisk=Math.max(0,Math.min(100,topRisk));
+  // Local top risk = long swing position + RSI + relative strength + current 24h impulse.
+  let topRisk=swingPct*.50;
+  if(Number.isFinite(dailyRsi))topRisk += Math.max(0,Math.min(25,(dailyRsi-50)*.65));
+  topRisk += Math.max(0,Math.min(15,rel*.55));
+  topRisk += Math.max(0,Math.min(10,(state.changes[coin]||0)*.45));
+  topRisk=Math.round(Math.max(0,Math.min(100,topRisk)));
 
   const fibs=(state.data.forecast.fibExtensions||[1.272,1.618,2,2.618]).map(level=>({
-    level,price:high+range*(level-1)
+    level,price:sw180.high+range*(level-1)
   }));
 
   let phase='AKKUMULATION',tone='amber';
-  if(swingPct>82&&rel>5){phase='EXPANSION / HEISS';tone='red'}
-  else if(swingPct>60&&rel>=0){phase='EXPANSION';tone='green'}
+  if(topRisk>=80){phase='TOP-RISK HOCH';tone='red'}
+  else if(swingPct>65&&rel>3){phase='EXPANSION';tone='green'}
   else if(swingPct<35){phase='AKKUMULATION';tone='amber'}
   else {phase='ÜBERGANG';tone='amber'}
 
-  const nextHalving=new Date(state.data.cycleClock.nextHalvingEstimate);
+  const observed=coin==='BTC'?{median:0,samples:0,lags:[]}:observedCoinLag(coinEntry,btcEntry);
+  const lag=resolveCycleLag(coin,cfg,observed);
+
+  // Choose the next future macro window. If the current-halving window is past, roll to next halving.
+  const halvingCurrent=new Date(state.data.cycleClock.halving);
+  const halvingNext=new Date(state.data.cycleClock.nextHalvingEstimate);
   const btcRange=state.data.forecast.macroTopAfterHalvingDays||[450,600];
-  const lag=cfg.lagDays||[0,0];
-  const btcStart=addDays(nextHalving,btcRange[0]),btcEnd=addDays(nextHalving,btcRange[1]);
-  const coinStart=addDays(nextHalving,btcRange[0]+lag[0]),coinEnd=addDays(nextHalving,btcRange[1]+lag[1]);
+  let anchor=halvingCurrent;
+  let btcStart=addDays(anchor,btcRange[0]), btcEnd=addDays(anchor,btcRange[1]);
+  if(new Date()>btcEnd){anchor=halvingNext;btcStart=addDays(anchor,btcRange[0]);btcEnd=addDays(anchor,btcRange[1]);}
+  const coinStart=addDays(anchor,btcRange[0]+lag.min);
+  const coinEnd=addDays(anchor,btcRange[1]+lag.max);
 
-  let confidence=55;
-  if(values.length>=80)confidence+=10;
-  if(Math.abs(rel)>4)confidence+=8;
-  if(state.priceMeta[coin]?.source==='Live')confidence+=7;
-  if(coin==='VSN')confidence-=25;
-  confidence=Math.max(state.data.forecast.confidenceFloor||30,Math.min(85,confidence));
+  let confidence=45;
+  const count=coinEntry?.count||(coinEntry?.candles||[]).length;
+  if(count>=180)confidence+=8;
+  if(count>=700)confidence+=8;
+  if(count>=1500)confidence+=6;
+  if(observed?.samples>=1)confidence+=8;
+  if(observed?.samples>=2)confidence+=5;
+  if(Number.isFinite(dailyRsi))confidence+=4;
+  if(state.priceMeta[coin]?.source==='Live'||coin==='BTC')confidence+=4;
+  if(coinEntry?.source?.includes('fallback'))confidence-=10;
+  confidence=Math.max(state.data.forecast.confidenceFloor||30,Math.min(88,confidence));
 
-  return {coin,cfg,current,low,high,swingPct,r30,btc30,rel,topRisk,phase,tone,fibs,
-          btcStart,btcEnd,coinStart,coinEnd,confidence};
+  return {coin,cfg,current,low:sw90.low,high:sw90.high,low180:sw180.low,high180:sw180.high,
+          swingPct,r30,btc30,rel,topRisk,phase,tone,fibs,btcStart,btcEnd,coinStart,coinEnd,
+          confidence,dailyRsi,observedLag:observed,lagResolved:lag,dataCount:count,dataSource:coinEntry?.source||'Server'};
 }
-
 async function loadForecastCoin(coin){
+  if(state.forecastLoading && state.forecastCoin===coin)return;
   state.forecastLoading=true;
   state.forecastCoin=coin;
   renderForecastCoinStrip();
   const status=document.getElementById('forecastState');
-  if(status){status.textContent='LÄDT…';status.className='forecast-state'}
-  const watchdog=setTimeout(()=>{
-    if(state.forecastLoading && state.forecastCoin===coin){
-      state.forecastLoading=false;
-      renderForecastUnavailable(coin,'Historische Kursdaten konnten nicht rechtzeitig geladen werden. Bitte Forecast erneut antippen.');
-    }
-  },16000);
-  const cached=state.forecastCache[coin];
-  if(cached && Date.now()-cached.ts<30*60*1000){clearTimeout(watchdog);state.forecastLoading=false;renderForecastModel(cached.model);return;}
+  if(status){status.textContent='LÄDT…';status.className='forecast-state';}
 
-  const id=cgIdForCoin(coin),btcId=cgIdForCoin('BTC');
-  if(!id){
-    clearTimeout(watchdog);
-    state.forecastLoading=false;
-    renderForecastUnavailable(coin,'Keine historische Live-Datenquelle hinterlegt.');
-    return;
-  }
   try{
-    const days=state.data.forecast.historyDays||90;
-    const loadHistory=async(coinId,symbol)=>{
-      // Primary: Binance public daily candles. More reliable in iOS PWAs than CoinGecko market_chart.
-      if(symbol){
-        const bases=['https://api.binance.com','https://api1.binance.com','https://api2.binance.com'];
-        for(const base of bases){
-          try{
-            const k=await fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=${days}`,4500);
-            if(Array.isArray(k)&&k.length>=10){
-              return {prices:k.map(x=>[+x[0],+x[4]])};
-            }
-          }catch(_e){}
-        }
-      }
-      // Fallback: CoinGecko.
-      const urls=[
-        `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`,
-        `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`
-      ];
-      let lastErr=null;
-      for(const url of urls){
-        try{
-          const j=await fetchJsonTimeout(url,4500);
-          if(j?.prices?.length>=10)return j;
-        }catch(e){lastErr=e;}
-      }
-      throw lastErr||new Error('Historie nicht verfügbar');
-    };
-    const [cj,bj]=await Promise.all([
-      loadHistory(id,coin),
-      coin==='BTC'?Promise.resolve(null):loadHistory(btcId,'BTC')
-    ]);
-    const model=computeForecastFromHistory(coin,cj.prices,coin==='BTC'?cj.prices:bj.prices);
-    if(!model)throw new Error('Zu wenig Historie');
+    const store=await loadServerHistory(false);
+    const coinEntry=store?.coins?.[coin];
+    const btcEntry=store?.coins?.BTC;
+    if(store?.status!=='ok' || !btcEntry){
+      renderForecastUnavailable(coin,'Server-Historie ist noch nicht aufgebaut. GitHub Action „Update MERIDIAN market history“ einmal ausführen oder den automatischen Lauf abwarten.');
+      return;
+    }
+    if(!coinEntry){
+      const err=store?.errors?.[coin];
+      renderForecastUnavailable(coin,err?`Für ${coin} konnte serverseitig keine Historie geladen werden: ${err}`:`Für ${coin} liegt noch keine Server-Historie vor.`);
+      return;
+    }
+    const model=computeForecastFromHistory(coin,coinEntry,btcEntry);
+    if(!model)throw new Error('Zu wenig verwertbare Historie');
     state.forecastCache[coin]={ts:Date.now(),model};
-    clearTimeout(watchdog);
-    state.forecastLoading=false;
     renderForecastModel(model);
   }catch(e){
-    console.error('Forecast',e);
-    clearTimeout(watchdog);
+    console.error('Forecast same-origin',e);
+    renderForecastUnavailable(coin,'history.json konnte nicht verarbeitet werden. Keine erfundenen Forecast-Werte angezeigt.');
+  }finally{
     state.forecastLoading=false;
-    renderForecastUnavailable(coin,'90T-Historie derzeit nicht erreichbar. Keine erfundenen Zielwerte angezeigt.');
   }
 }
-
 function renderForecastUnavailable(coin,msg){
   state.forecastLoading=false;
   const cfg=state.data.forecast.coins[coin]||{label:coin,class:'—'};
@@ -808,6 +914,7 @@ function renderForecastUnavailable(coin,msg){
   document.getElementById('forecastFibTargets').innerHTML='<div class="forecast-method">Forecast wird erst berechnet, wenn historische Kursdaten verfügbar sind.</div>';
   document.getElementById('forecastScenarios').innerHTML='';
   document.getElementById('forecastInterpretation').textContent='Kein belastbarer Forecast verfügbar.';
+  const ids=['forecast180Range','forecastRsiDaily','forecastPeakLag','forecastDataCount'];ids.forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
 }
 
 function renderForecastModel(m){
@@ -827,7 +934,7 @@ function renderForecastModel(m){
 
   document.getElementById('forecastCycleWindow').textContent=`${forecastFmtDate(m.coinStart)} – ${forecastFmtDate(m.coinEnd)}`;
   document.getElementById('forecastCycleSub').textContent=
-    m.coin==='BTC'?'Modelliertes BTC-Makrofenster':`BTC-Fenster + ${cfg.lagDays[0]}–${cfg.lagDays[1]} Tage Rotations-Offset`;
+    m.coin==='BTC'?'Modelliertes BTC-Makrofenster':`${m.lagResolved.source} · ${m.lagResolved.min>=0?'+':''}${m.lagResolved.min} bis ${m.lagResolved.max>=0?'+':''}${m.lagResolved.max} Tage vs BTC`;
   document.getElementById('btcWindowBar').style.width='64%';
   document.getElementById('coinWindowBar').style.width=`${Math.min(92,64+(cfg.lagDays[1]||0)/5)}%`;
 
@@ -835,6 +942,10 @@ function renderForecastModel(m){
   document.getElementById('forecastHigh').textContent=money(m.high);
   document.getElementById('forecastSwingPct').textContent=`${m.swingPct.toFixed(0)}%`;
   document.getElementById('forecastSwingBar').style.width=`${m.swingPct}%`;
+  const r180=document.getElementById('forecast180Range');if(r180)r180.textContent=`${money(m.low180)} – ${money(m.high180)}`;
+  const rd=document.getElementById('forecastRsiDaily');if(rd)rd.textContent=Number.isFinite(m.dailyRsi)?m.dailyRsi.toFixed(1):'—';
+  const pl=document.getElementById('forecastPeakLag');if(pl)pl.textContent=m.coin==='BTC'?'MASTER':m.observedLag?.samples?`${m.observedLag.median>=0?'+':''}${m.observedLag.median} T · ${m.observedLag.samples}x`:`${m.lagResolved.min}…${m.lagResolved.max} T`;
+  const dc=document.getElementById('forecastDataCount');if(dc)dc.textContent=`${m.dataCount}T · ${m.dataSource}`;
 
   document.getElementById('forecastFibTargets').innerHTML=m.fibs.map(x=>{
     const move=(x.price/m.current-1)*100;
@@ -868,7 +979,7 @@ function renderForecastModel(m){
   else if(m.rel>5)interpretation=`${m.coin}: positive Rotation gegenüber BTC. Das erhöht die Wahrscheinlichkeit, dass der Coin in einer Altcoin-Phase später als BTC sein lokales Hoch bildet.`;
   else interpretation=`${m.coin}: neutrales Übergangsbild. Der Forecast bleibt szenariobasiert; weder Top noch Expansion sind ausreichend bestätigt.`;
   document.getElementById('forecastInterpretation').textContent=interpretation;
-  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote+' · Historie: Binance bevorzugt, CoinGecko Fallback.';
+  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote+` · Daten: ${m.dataCount} Tageskerzen · ${m.dataSource}.`;
 }
 
 function renderForecast(){
@@ -924,7 +1035,7 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=383').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=39').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);

@@ -297,7 +297,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.8.3",
+  "appVersion": "3.9.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -312,7 +312,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2148",
+  "buildId": "2026-08-21-2200",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
@@ -469,7 +469,7 @@
     ]
   },
   "forecast": {
-    "historyDays": 90,
+    "historyDays": 2000,
     "macroTopAfterHalvingDays": [
       450,
       600
@@ -624,6 +624,16 @@
       "base": 1.618,
       "blowoff": 2.0
     },
-    "methodNote": "Preisziele: 90T Swing + Fibonacci-Extensions. Zeitfenster: nächster BTC-Halving-Zyklus + coin-spezifischer Rotations-Offset. Modell, keine Garantie."
+    "methodNote": "Preisziele: 180T Swing + Fibonacci-Extensions. Timing: erkannter historischer Coin-vs.-BTC Peak-Versatz, Klassen-Offset nur als Fallback. Historie wird serverseitig via GitHub Actions aktualisiert. Modell, keine Garantie.",
+    "swingShortDays": 90,
+    "swingLongDays": 180,
+    "historyMode": "same-origin",
+    "historyFile": "./history.json",
+    "relativeStrengthDays": 30,
+    "peakDetection": {
+      "minPeakSeparationDays": 420,
+      "coinWindowBeforeDays": 120,
+      "coinWindowAfterDays": 180
+    }
   }
 }

@@ -353,3 +353,21 @@ body{
   .bottom-nav .nav-btn{font-size:5.2px !important;}
   .bottom-nav .nav-btn span{font-size:11px !important;}
 }
+
+
+/* ===== V3.9 SERVER HISTORY / FORECAST ===== */
+.forecast-history-pill{
+  display:inline-flex;margin-top:9px;padding:5px 8px;border-radius:999px;
+  border:1px solid #244653;color:var(--cyan);background:rgba(84,191,210,.05);
+  font:800 6.5px var(--mono)
+}
+.forecast-history-pill.ok{color:var(--green);border-color:#245339;background:rgba(52,201,120,.05)}
+.forecast-history-pill.warn{color:var(--amber);border-color:#5d4920;background:rgba(213,165,72,.05)}
+.forecast-secondary-stats{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px
+}
+.forecast-secondary-stats>div{
+  padding:8px;border:1px solid var(--line);border-radius:8px;background:#071019
+}
+.forecast-secondary-stats span{display:block;font:6px var(--mono);color:var(--dim)}
+.forecast-secondary-stats b{display:block;font:900 8px var(--mono);margin-top:4px}
