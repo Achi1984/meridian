@@ -7,108 +7,202 @@
       "positions": {
         "SOL": {
           "qty": 59.74480061,
-          "value": 5462.85
+          "value": 5462.85,
+          "snapshotValue": 5462.85,
+          "snapshotUnitPrice": 91.43640859495372,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "SUI": {
           "qty": 1906.09534613,
-          "value": 1550.99
+          "value": 1550.99,
+          "snapshotValue": 1550.99,
+          "snapshotUnitPrice": 0.8137001137687154,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "ADA": {
           "qty": 6554.30546026,
-          "value": 1439.17
+          "value": 1439.17,
+          "snapshotValue": 1439.17,
+          "snapshotUnitPrice": 0.21957627832971188,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "FET": {
           "qty": 8501.8871269,
-          "value": 1375.79
+          "value": 1375.79,
+          "snapshotValue": 1375.79,
+          "snapshotUnitPrice": 0.1618217202210314,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "HBAR": {
           "qty": 17499.57092867,
-          "value": 1364.01
+          "value": 1364.01,
+          "snapshotValue": 1364.01,
+          "snapshotUnitPrice": 0.07794533966346039,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "DOT": {
           "qty": 1392.73090601,
-          "value": 1257.59
+          "value": 1257.59,
+          "snapshotValue": 1257.59,
+          "snapshotUnitPrice": 0.9029669655302173,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "VSN": {
           "qty": 25394.24790729,
-          "value": 970.8
+          "value": 970.8,
+          "snapshotValue": 970.8,
+          "snapshotUnitPrice": 0.038229129822793834,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "ATOM": {
           "qty": 495.74796046,
-          "value": 781.25
+          "value": 781.25,
+          "snapshotValue": 781.25,
+          "snapshotUnitPrice": 1.5759015917586132,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "NEAR": {
           "qty": 371.53655905,
-          "value": 704.77
+          "value": 704.77,
+          "snapshotValue": 704.77,
+          "snapshotUnitPrice": 1.896906193570993,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "AVAX": {
           "qty": 89.12763042,
-          "value": 677.98
+          "value": 677.98,
+          "snapshotValue": 677.98,
+          "snapshotUnitPrice": 7.606844216604048,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         },
         "TAO": {
           "qty": 2.01879244,
-          "value": 465.99
+          "value": 465.99,
+          "snapshotValue": 465.99,
+          "snapshotUnitPrice": 230.82610711579642,
+          "source": "Bitpanda screenshot",
+          "snapshotAt": "2026-08-21T18:33:00+02:00"
         }
       },
-      "cash": 5.33
+      "cash": 5.33,
+      "snapshotAt": "2026-08-21T18:33:00+02:00",
+      "source": "User screenshot"
     },
     "OKX": {
       "color": "#3f83f8",
       "positions": {
         "BTC": {
           "qty": 0.07161018,
-          "value": 5533.66
+          "value": 5533.66,
+          "snapshotValue": 5533.66,
+          "snapshotUnitPrice": 77274.76735849568,
+          "source": "OKX screenshot",
+          "snapshotAt": "2026-08-21T18:38:00+02:00"
         },
         "XRP": {
           "qty": 1368.67480512,
-          "value": 1911.19
+          "value": 1911.19,
+          "snapshotValue": 1911.19,
+          "snapshotUnitPrice": 1.396379909128549,
+          "source": "OKX screenshot",
+          "snapshotAt": "2026-08-21T18:38:00+02:00"
         },
         "ETH": {
           "qty": 0.56676504,
           "value": 1359.73,
-          "label": "BETH"
+          "label": "BETH",
+          "snapshotValue": 1359.73,
+          "snapshotUnitPrice": 2399.1070444288516,
+          "source": "OKX screenshot",
+          "snapshotAt": "2026-08-21T18:38:00+02:00"
         },
         "PEPE": {
           "qty": 85366256,
-          "value": 322.56
+          "value": 322.56,
+          "snapshotValue": 322.56,
+          "snapshotUnitPrice": 3.7785421911908613e-06,
+          "source": "OKX screenshot",
+          "snapshotAt": "2026-08-21T18:38:00+02:00"
         },
         "SOL": {
           "qty": 3.28816999,
           "value": 300.95,
-          "label": "OKSOL"
+          "label": "OKSOL",
+          "snapshotValue": 300.95,
+          "snapshotUnitPrice": 91.5250734953639,
+          "source": "OKX screenshot",
+          "snapshotAt": "2026-08-21T18:38:00+02:00"
         }
       },
-      "cash": 0
+      "cash": 0,
+      "snapshotAt": "2026-08-21T18:38:00+02:00",
+      "source": "User screenshot"
     },
     "Ledger": {
       "color": "#9b82ff",
       "positions": {
         "INJ": {
           "qty": 102.843,
-          "value": 499.82
+          "value": 499.82,
+          "snapshotValue": 499.82,
+          "snapshotUnitPrice": 4.860029365148819,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         },
         "BTC": {
           "qty": 0.00031799,
-          "value": 22.94
+          "value": 22.94,
+          "snapshotValue": 22.94,
+          "snapshotUnitPrice": 72140.63335325012,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         },
         "ETH": {
           "qty": 0.00282925,
-          "value": 6.79
+          "value": 6.79,
+          "snapshotValue": 6.79,
+          "snapshotUnitPrice": 2399.9293098877793,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         },
         "XRP": {
           "qty": 1.00088,
-          "value": 1.4
+          "value": 1.4,
+          "snapshotValue": 1.4,
+          "snapshotUnitPrice": 1.398769083206778,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         },
         "ADA": {
           "qty": 5.86151,
-          "value": 1.12
+          "value": 1.12,
+          "snapshotValue": 1.12,
+          "snapshotUnitPrice": 0.19107704328748054,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         },
         "XLM": {
           "qty": 1.001,
-          "value": 0.18
+          "value": 0.18,
+          "snapshotValue": 0.18,
+          "snapshotUnitPrice": 0.17982017982017984,
+          "source": "Ledger screenshot",
+          "snapshotAt": "2026-08-21T18:37:00+02:00"
         }
       },
-      "cash": 0
+      "cash": 0,
+      "snapshotAt": "2026-08-21T18:37:00+02:00",
+      "source": "User screenshot"
     },
     "Pionex": {
       "color": "#ef5350",
@@ -149,7 +243,11 @@
           "rounds24": 182,
           "roundsTotal": 182
         }
-      ]
+      ],
+      "snapshotAt": "2026-08-21T18:36:00+02:00",
+      "source": "Pionex screenshots",
+      "cashLabel": "gebundenes Kapital (Investition + dynamische Margin)",
+      "valuationMode": "committed_capital"
     }
   },
   "fallbackChanges24h": {
@@ -195,5 +293,12 @@
     "swingLow": 62600,
     "vwap": 73454.27,
     "liqAbove": 81538.7
+  },
+  "schemaVersion": 3,
+  "appVersion": "3.0.0",
+  "pricePolicy": {
+    "liveProvider": "CoinGecko",
+    "fallback": "snapshot",
+    "note": "Aktueller Wert = Menge × Live-Kurs, falls verfügbar; sonst letzter bestätigter Snapshot."
   }
 }

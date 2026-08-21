@@ -9,168 +9,173 @@
   <meta name="apple-mobile-web-app-title" content="MERIDIAN">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=3">
   <title>MERIDIAN</title>
 </head>
 <body>
-  <div id="app">
-    <header class="app-header">
-      <div>
-        <div class="brand">MERIDIAN</div>
-        <div class="live"><span class="live-dot"></span> LIVE DASHBOARD</div>
+<div id="app">
+  <header class="app-header">
+    <div>
+      <div class="brand">MERIDIAN</div>
+      <div class="live"><span class="live-dot"></span> LIVE DASHBOARD</div>
+    </div>
+    <div class="header-actions">
+      <button class="pill muted" id="updatedPill">↻ --:--</button>
+      <button class="pill icon" data-tab="settings" aria-label="Einstellungen">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="tab-panel active" id="tab-depot">
+      <article class="hero-card">
+        <div class="hero-top">
+          <div>
+            <div class="eyebrow">GESAMTPORTFOLIO</div>
+            <div class="balance" id="portfolioUsd">$—</div>
+            <div class="balance-eur" id="portfolioEur">≈ €—</div>
+          </div>
+          <div class="day-badge" id="dayBadge">
+            <div class="day-main" id="portfolio24h">—</div>
+            <div class="day-sub" id="portfolio24hUsd">—</div>
+          </div>
+        </div>
+
+        <div class="history-head">
+          <span>PORTFOLIO-VERLAUF</span>
+          <small id="historyLabel">ab jetzt lokal aufgezeichnet</small>
+        </div>
+        <div class="hero-chart">
+          <svg viewBox="0 0 320 90" preserveAspectRatio="none" id="historySvg">
+            <defs><linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34c978" stop-opacity=".22"/><stop offset="1" stop-color="#34c978" stop-opacity="0"/></linearGradient></defs>
+            <path class="area" id="historyArea" d=""></path>
+            <path class="line" id="historyLine" d=""></path>
+          </svg>
+        </div>
+
+        <div class="hero-stats">
+          <div class="metric"><span>Assets</span><b id="assetCount">—</b></div>
+          <div class="metric"><span>Verwahrstellen</span><b>4</b></div>
+          <div class="metric"><span>Größte Position</span><b id="largestAsset">—</b></div>
+          <div class="metric"><span>Datenabdeckung</span><b id="coverageMetric">—</b></div>
+        </div>
+      </article>
+
+      <div class="two-col always-two">
+        <article class="card allocation-card">
+          <div class="card-title">ASSET VERTEILUNG</div>
+          <div class="donut-grid">
+            <div class="donut" id="assetDonut"><div class="donut-hole"><b id="assetDonutTotal">$—</b><span>100%</span></div></div>
+            <div class="legend" id="assetLegend"></div>
+          </div>
+        </article>
+
+        <article class="card allocation-card">
+          <div class="card-title">BÖRSE / WALLET</div>
+          <div class="donut-grid">
+            <div class="donut" id="venueDonut"><div class="donut-hole"><b>100%</b><span>Verteilung</span></div></div>
+            <div class="legend" id="venueLegend"></div>
+          </div>
+        </article>
       </div>
-      <div class="header-actions">
-        <button class="pill muted" id="updatedPill">↻ --:--</button>
-        <button class="pill icon" data-tab="settings">⚙</button>
+
+      <div class="section-title">WERT NACH BÖRSE / WALLET</div>
+      <div class="venue-grid" id="venueCards"></div>
+
+      <article class="card">
+        <div class="card-title row-title"><span>TOP 5 POSITIONEN</span><small>live nach Wert sortiert</small></div>
+        <div class="table-wrap">
+          <table class="portfolio-table">
+            <thead><tr><th>#</th><th>Asset</th><th>Börse</th><th>Wert</th><th>Anteil</th><th>24h</th></tr></thead>
+            <tbody id="top5Body"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <div class="mini-grid">
+        <article class="mini-card"><span>24H PERFORMANCE</span><b id="mini24h">—</b><small id="mini24hUsd">—</small></article>
+        <article class="mini-card"><span>BEST PERFORMER</span><b id="bestCoin">—</b><small id="bestMove">—</small></article>
+        <article class="mini-card"><span>WORST PERFORMER</span><b id="worstCoin">—</b><small id="worstMove">—</small></article>
+        <article class="mini-card"><span>VOLATILITÄT</span><b id="volatility">—</b><small>24h Streuung</small></article>
       </div>
-    </header>
 
-    <main>
-      <section class="tab-panel active" id="tab-depot">
-        <div class="hero-card">
-          <div class="hero-top">
-            <div>
-              <div class="eyebrow">GESAMTPORTFOLIO</div>
-              <div class="balance" id="portfolioUsd">$—</div>
-              <div class="balance-eur" id="portfolioEur">≈ €—</div>
-            </div>
-            <div class="day-badge" id="dayBadge">
-              <div class="day-main" id="portfolio24h">—</div>
-              <div class="day-sub" id="portfolio24hUsd">—</div>
-            </div>
-          </div>
-
-          <div class="hero-chart">
-            <svg viewBox="0 0 300 90" preserveAspectRatio="none" aria-label="Portfolio Verlauf">
-              <defs><linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34c978" stop-opacity=".18"/><stop offset="1" stop-color="#34c978" stop-opacity="0"/></linearGradient></defs>
-              <path class="area" d="M0 76 L18 73 L36 77 L54 67 L72 70 L90 60 L108 64 L126 52 L144 57 L162 44 L180 49 L198 35 L216 42 L234 26 L252 34 L270 19 L300 12 L300 90 L0 90 Z"/>
-              <path class="line" d="M0 76 L18 73 L36 77 L54 67 L72 70 L90 60 L108 64 L126 52 L144 57 L162 44 L180 49 L198 35 L216 42 L234 26 L252 34 L270 19 L300 12"/>
-            </svg>
-          </div>
-
-          <div class="hero-stats">
-            <div class="metric"><span>Assets</span><b id="assetCount">—</b></div>
-            <div class="metric"><span>Verwahrstellen</span><b>4</b></div>
-            <div class="metric"><span>Größte Position</span><b id="largestAsset">—</b></div>
-            <div class="metric"><span>Gesamt-P&amp;L</span><b class="dim">—</b></div>
-          </div>
-          <div class="hero-note">Gesamt-P&amp;L erst, wenn Einstandsdaten vollständig vorliegen.</div>
+      <details class="details-card">
+        <summary>DEPOT-DETAILS <span>Positionen · Preisquelle · Pionex</span></summary>
+        <div class="details-body">
+          <div class="subsection-title">POSITIONEN</div>
+          <div id="positionsList"></div>
+          <div class="subsection-title">PIONEX BOTS</div>
+          <div id="botsList"></div>
         </div>
+      </details>
+    </section>
 
-        <div class="two-col">
-          <article class="card">
-            <div class="card-title">ASSET VERTEILUNG</div>
-            <div class="donut-grid">
-              <div class="donut" id="assetDonut"><div class="donut-hole"><b id="assetDonutTotal">$—</b><span>100%</span></div></div>
-              <div class="legend" id="assetLegend"></div>
-            </div>
-          </article>
+    <section class="tab-panel" id="tab-market">
+      <div class="module-hero cyan">
+        <div class="eyebrow">MARKTREGIME</div>
+        <div class="module-title" id="marketRegime">NEUTRAL</div>
+        <div class="module-sub">BTC als Filter für Altcoin-Signale</div>
+        <div class="regime-meter"><i id="regimeDot"></i></div>
+      </div>
+      <div class="section-title">RADAR</div>
+      <div class="card"><div id="marketRadar"></div></div>
+    </section>
 
-          <article class="card">
-            <div class="card-title">VERTEILUNG NACH BÖRSE / WALLET</div>
-            <div class="donut-grid">
-              <div class="donut" id="venueDonut"><div class="donut-hole"><b>100%</b><span>Verteilung</span></div></div>
-              <div class="legend" id="venueLegend"></div>
-            </div>
-          </article>
-        </div>
+    <section class="tab-panel" id="tab-boden">
+      <div class="module-hero amber">
+        <div class="eyebrow">NADIR 2.0</div>
+        <div class="module-title">AKKUMULATIONS-REGIME</div>
+        <div class="module-sub">Bewertung · Kapitulation · Holder · Timing</div>
+      </div>
+      <div class="nadir-grid" id="nadirGrid"></div>
+      <article class="card">
+        <div class="card-title">BTC BODEN-SZENARIEN</div>
+        <div class="scenario-row"><span>Shallow</span><b>$55k–65k</b></div>
+        <div class="scenario-row active"><span>Base Case</span><b>$42k–52k</b></div>
+        <div class="scenario-row"><span>Capitulation</span><b>$30k–40k</b></div>
+      </article>
+    </section>
 
-        <div class="section-title">WERT NACH BÖRSE / WALLET</div>
-        <div class="venue-grid" id="venueCards"></div>
+    <section class="tab-panel" id="tab-trade">
+      <div class="module-hero red">
+        <div class="eyebrow">DAY-TRADE 2.0</div>
+        <div class="module-title">ENTRY NICHT FREIGEGEBEN</div>
+        <div class="module-sub">Bias ≠ Ausführung</div>
+      </div>
+      <div class="trade-grid" id="tradeGrid"></div>
+      <article class="card"><div class="card-title">TRADE GATE</div><div id="tradeChecks"></div></article>
+    </section>
 
-        <article class="card">
-          <div class="card-title">TOP 5 POSITIONEN</div>
-          <div class="table-wrap">
-            <table class="portfolio-table">
-              <thead><tr><th>#</th><th>Asset</th><th>Börse</th><th>Wert</th><th>Anteil</th><th>24h</th></tr></thead>
-              <tbody id="top5Body"></tbody>
-            </table>
-          </div>
-        </article>
+    <section class="tab-panel" id="tab-settings">
+      <article class="card">
+        <div class="card-title">DATENSTATUS</div>
+        <div id="dataStatus"></div>
+      </article>
 
-        <div class="mini-grid">
-          <article class="mini-card"><span>24H PERFORMANCE</span><b id="mini24h">—</b><small id="mini24hUsd">—</small></article>
-          <article class="mini-card"><span>BEST PERFORMER</span><b id="bestCoin">—</b><small id="bestMove">—</small></article>
-          <article class="mini-card"><span>WORST PERFORMER</span><b id="worstCoin">—</b><small id="worstMove">—</small></article>
-          <article class="mini-card"><span>VOLATILITÄT</span><b id="volatility">—</b><small>24h Streuung</small></article>
-        </div>
+      <article class="card">
+        <div class="card-title">LIVE PREISE</div>
+        <button class="primary" id="refreshPrices">Live-Kurse aktualisieren</button>
+        <button class="secondary" id="resetSnapshot">Snapshot wiederherstellen</button>
+        <div class="settings-note">Live-Refresh: CoinGecko. VSN und Pionex bleiben Snapshot-/Manuelldaten. Kein API-Key im Browser gespeichert.</div>
+      </article>
 
-        <details class="details-card">
-          <summary>DEPOT-DETAILS <span>Positionen · Pionex</span></summary>
-          <div class="details-body">
-            <div id="positionsList"></div>
-            <div class="subsection-title">PIONEX BOTS</div>
-            <div id="botsList"></div>
-          </div>
-        </details>
-      </section>
+      <article class="card">
+        <div class="card-title">BEWERTUNGSLOGIK</div>
+        <div class="status-row"><span>Live Asset</span><b>Menge × Live-Kurs</b></div>
+        <div class="status-row"><span>Fallback Asset</span><b>Snapshot-Wert</b></div>
+        <div class="status-row"><span>Pionex</span><b>gebundenes Kapital</b></div>
+        <div class="status-row"><span>Gesamt-P&amp;L</span><b>nicht berechnet</b></div>
+      </article>
+    </section>
+  </main>
 
-      <section class="tab-panel" id="tab-market">
-        <div class="module-hero cyan">
-          <div class="eyebrow">MARKTREGIME</div>
-          <div class="module-title" id="marketRegime">NEUTRAL</div>
-          <div class="module-sub">BTC als Filter für Altcoin-Signale</div>
-          <div class="regime-meter"><i id="regimeDot"></i></div>
-        </div>
-        <div class="section-title">RADAR</div>
-        <div class="card"><div id="marketRadar"></div></div>
-      </section>
-
-      <section class="tab-panel" id="tab-boden">
-        <div class="module-hero amber">
-          <div class="eyebrow">NADIR 2.0</div>
-          <div class="module-title">AKKUMULATIONS-REGIME</div>
-          <div class="module-sub">Bewertung · Kapitulation · Holder · Timing</div>
-        </div>
-        <div class="nadir-grid" id="nadirGrid"></div>
-        <article class="card">
-          <div class="card-title">BTC BODEN-SZENARIEN</div>
-          <div class="scenario-row"><span>Shallow</span><b>$55k–65k</b></div>
-          <div class="scenario-row active"><span>Base Case</span><b>$42k–52k</b></div>
-          <div class="scenario-row"><span>Capitulation</span><b>$30k–40k</b></div>
-        </article>
-      </section>
-
-      <section class="tab-panel" id="tab-trade">
-        <div class="module-hero red">
-          <div class="eyebrow">DAY-TRADE 2.0</div>
-          <div class="module-title" id="tradeGateTitle">ENTRY NICHT FREIGEGEBEN</div>
-          <div class="module-sub">Bias ≠ Ausführung</div>
-        </div>
-        <div class="trade-grid" id="tradeGrid"></div>
-        <article class="card">
-          <div class="card-title">TRADE GATE</div>
-          <div id="tradeChecks"></div>
-        </article>
-      </section>
-
-      <section class="tab-panel" id="tab-settings">
-        <article class="card">
-          <div class="card-title">DATENSTATUS</div>
-          <div id="dataStatus"></div>
-        </article>
-        <article class="card">
-          <div class="card-title">LIVE PREISE</div>
-          <button class="primary" id="refreshPrices">Live-Kurse aktualisieren</button>
-          <button class="secondary" id="resetSnapshot">Snapshot wiederherstellen</button>
-          <div class="settings-note">Live-Refresh nutzt CoinGecko ohne API-Key. VSN und Pionex bleiben Snapshot-/Manuelldaten.</div>
-        </article>
-        <article class="card">
-          <div class="card-title">PWA INSTALLIEREN</div>
-          <div class="settings-note">Nach dem Hosting in Safari öffnen → Teilen → „Zum Home-Bildschirm“. Dann läuft MERIDIAN wie eine App.</div>
-        </article>
-      </section>
-    </main>
-
-    <nav class="bottom-nav">
-      <button class="nav-btn active" data-tab="depot"><span>◕</span>DEPOT</button>
-      <button class="nav-btn" data-tab="market"><span>▥</span>MARKT</button>
-      <button class="nav-btn" data-tab="boden"><span>◎</span>BODEN</button>
-      <button class="nav-btn" data-tab="trade"><span>⌁</span>DAY-TRADE</button>
-      <button class="nav-btn" data-tab="settings"><span>⚙</span>SETTINGS</button>
-    </nav>
-  </div>
-
-  <script src="./app.js"></script>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="depot"><span>◕</span>DEPOT</button>
+    <button class="nav-btn" data-tab="market"><span>▥</span>MARKT</button>
+    <button class="nav-btn" data-tab="boden"><span>◎</span>BODEN</button>
+    <button class="nav-btn" data-tab="trade"><span>⌁</span>DAY-TRADE</button>
+    <button class="nav-btn" data-tab="settings"><span>⚙</span>SETTINGS</button>
+  </nav>
+</div>
+<script src="./app.js?v=3"></script>
 </body>
 </html>
