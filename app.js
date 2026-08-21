@@ -1,7 +1,7 @@
 
 const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
-let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC';
+let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null;
 
 const CG_IDS={
  BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
@@ -79,6 +79,7 @@ async function refreshCurrentPortfolioPrices(){
        if(v.image) DATA.assetIcons[sym]=v.image;
      }
    });
+   LAST_PRICE_UPDATE=Date.now();
    recalcPortfolio();
  }catch(e){
    DATA.assetIcons=DATA.assetIcons||{};
@@ -120,16 +121,17 @@ function recalcPortfolio(){
 
  const coins={};
  priced.forEach(h=>{
-   let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h,priceSource:h.priceSource});
+   let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h,priceSource:h.priceSource,price:h.price});
    c.value+=h.value;c.quantity+=h.quantity;c.venues.add(h.venue);
-   if(h.priceSource!=='LIVE') c.priceSource=h.priceSource
+   if(h.priceSource!=='LIVE') c.priceSource=h.priceSource;
+   if(h.price) c.price=h.price
  });
  const positions=Object.values(coins).sort((a,b)=>b.value-a.value);
  p.assetsCount=positions.length;
  p.largestPosition={symbol:positions[0].symbol,sharePct:positions[0].value/total*100};
  p.topPositions=positions.slice(0,5).map(x=>({
    symbol:x.symbol, venue:[...x.venues].join(' + '), value:x.value,
-   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity, priceSource:x.priceSource
+   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity, priceSource:x.priceSource, price:x.price
  }));
 
  p.performance24hPct=positions.reduce((a,x)=>a+(x.value/liveSpotTotal)*x.change24h,0);
@@ -181,12 +183,13 @@ function depot(){
  )).join('');
 
  const topRows=p.topPositions.map(x=>`
-   <div class="position-row">
+   <div class="position-row position-click" onclick="openAssetDetail('${x.symbol}')">
      ${coinIcon(x.symbol)}
      <div class="position-asset">
        <div class="position-symbol">${x.symbol}</div>
        <div class="position-venue">${x.venue} ${sourceBadge(x.priceSource||'LIVE')}</div>
        <div class="position-qty">${fmt(x.quantity, x.quantity<1?6:2)} ${x.symbol}</div>
+       <div class="position-price">Kurs $${fmt(x.price, x.price<1?4:2)}</div>
      </div>
      <div class="position-value">
        <b>$${fmt(x.value)}</b>
@@ -237,6 +240,25 @@ function depot(){
       <p class="footer-note">Pionex-Hauptkonto ist in der Depotverteilung enthalten. Futures-Risiko bleibt separat ausgewiesen.</p>
     `,'pionex-card');
 }
+function assetDetail(sym){
+ const hs=(DATA.portfolio.holdings||[]).filter(h=>h.symbol===sym);
+ const q=DATA.livePrices?.[sym], fb=DATA.priceFallbacks?.[sym];
+ const price=q?.price||fb?.price||0, source=q?.price?'LIVE':fb?.price?'SNAPSHOT':'MISSING';
+ const qty=hs.reduce((a,h)=>a+Number(h.quantity||0),0), value=qty*price;
+ const venues=hs.map(h=>({name:h.venue,qty:Number(h.quantity||0),value:Number(h.quantity||0)*price}));
+ const age=LAST_PRICE_UPDATE?Math.max(0,Math.round((Date.now()-LAST_PRICE_UPDATE)/1000)):null;
+ const f=forecast(sym);
+ return `<div class="detail-overlay" onclick="if(event.target===this)closeAssetDetail()"><div class="asset-detail">
+   <div class="detail-head"><button class="detail-close" onclick="closeAssetDetail()">←</button><div>${coinIcon(sym)} <b>${sym}</b></div><span>${sourceBadge(source)}</span></div>
+   <div class="detail-price">$${fmt(price,price<1?4:2)}</div><div class="detail-fresh">${source==='LIVE'?'zuletzt aktualisiert vor '+(age??0)+' Sek.':'Preisquelle: '+source}</div>
+   <div class="grid2">${metric('GESAMTMENGE',fmt(qty,qty<1?6:2)+' '+sym)}${metric('POSITIONSWERT','$'+fmt(value))}${metric('24H',(q?.change24h>=0?'+':'')+fmt(q?.change24h||0,1)+'%',(q?.change24h||0)>=0?'green':'red')}${metric('VERWAHRSTELLEN',venues.length)}</div>
+   <div class="section-title detail-section">VERTEILUNG</div>${venues.map(v=>`<div class="row"><span>${v.name}<small class="detail-qty">${fmt(v.qty,v.qty<1?6:2)} ${sym}</small></span><b>$${fmt(v.value)}</b></div>`).join('')}
+   ${f.ready?`<div class="section-title detail-section">FORECAST</div><div class="grid2">${metric('RISK',f.risk+'/100',f.risk>75?'red':'amber')}${metric('RSI',fmt(f.dailyRsi,1))}${metric('90T',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}${metric('CONFIDENCE',f.confidence+'/100','cyan')}</div>`:'<p class="footer-note">Forecast-Historie wird beim Öffnen des Forecast-Tabs geladen.</p>'}
+   <button class="tab active detail-forecast-btn" onclick="closeAssetDetail();document.querySelector('.nav[data-view=forecast]').click();selectCoin('${sym}')">IM FORECAST ÖFFNEN</button>
+ </div></div>`;
+}
+window.openAssetDetail=async sym=>{document.body.insertAdjacentHTML('beforeend',assetDetail(sym));try{await loadCoinHistory(sym);if(sym!=='BTC')await loadCoinHistory('BTC')}catch(e){};const el=document.querySelector('.detail-overlay');if(el)el.outerHTML=assetDetail(sym)};
+window.closeAssetDetail=()=>document.querySelector('.detail-overlay')?.remove();
 function market(){
  const m=DATA.market;
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
@@ -304,6 +326,7 @@ function renderForecast(){
    body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><div class="row"><span>Zyklusphase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Coin-Offset</span><b>+${f.cycle.lag} Tage</b></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button><p class="footer-note">Die Daten werden lokal auf dem iPhone gespeichert. Beim nächsten Öffnen sind sie sofort verfügbar.</p>`);
  }else{
    body+=card(`<div class="forecast-price-card"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last, activeCoin==='PEPE'?8:2)}</div><div class="grid2">${metric('LOCAL TOP-RISK',f.risk+'/100',f.risk>75?'red':f.risk>55?'amber':'green')}${metric('REL. STÄRKE VS BTC',f.rel==null?'BTC Basis':(f.rel>=0?'+':'')+fmt(f.rel,1)+'%')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div><div class="bar"><i style="width:${Math.max(3,Math.min(100,f.pos))}%"></i></div><p class="muted">Position im 90T Swing: ${fmt(f.pos,1)}%</p></div>`)+
+   card(`<div class="section-title">SZENARIEN</div><div class="scenario-grid"><div><span>BEAR</span><b>$${fmt(f.low,activeCoin==='PEPE'?8:2)}</b></div><div><span>BASE</span><b class="cyan">$${fmt(f.high,activeCoin==='PEPE'?8:2)}</b></div><div><span>BULL</span><b class="green">$${fmt(f.fib[1],activeCoin==='PEPE'?8:2)}</b></div></div><p class="footer-note">Bear = 90T Low · Base = 90T High · Bull = 1,618 FIB. Modellzonen, keine Garantie.</p>`)+
    card(`<div class="section-title">ZYKLUS-UHR</div><div class="row"><span>Phase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Halving-Zyklus</span><b>${fmt(f.cycle.pct,1)}%</b></div><div class="bar"><i style="width:${f.cycle.pct}%"></i></div><div class="row"><span>Coin-spezifischer Modell-Offset</span><b>+${f.cycle.lag} Tage</b></div><div class="row"><span>Modell-Peakfenster Mitte</span><b>${f.cycle.estimatedPeak.toLocaleDateString('de-DE')}</b></div>`)+
    card(`<div class="section-title">MACRO CYCLE WINDOW</div><div class="row"><span>90T Peak-Lag vs BTC</span><b>${f.lag==null?'—':(f.lag>=0?'+':'')+f.lag+' Tage'}</b></div><p class="footer-note">Der dynamische Lag wird aus den lokalen 90T-Hochs berechnet; der Modell-Offset ist die längerfristige Zyklusannahme.</p>`)+
    card(`<div class="section-title">90T SWING</div><div class="grid2">${metric('LOW','$'+fmt(f.low,activeCoin==='PEPE'?8:2))}${metric('HIGH','$'+fmt(f.high,activeCoin==='PEPE'?8:2))}</div><div class="row"><span>Position im Swing</span><b>${fmt(f.pos,1)}%</b></div>`)+
@@ -316,7 +339,7 @@ window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHist
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length;
- return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Datenmodus</span><b class="green">iPhone Browser</b></div><div class="row"><span>Lokaler History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
+ return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Datenmodus</span><b class="green">iPhone Browser</b></div><div class="row"><span>Live-Kurse zuletzt</span><b>${LAST_PRICE_UPDATE?new Date(LAST_PRICE_UPDATE).toLocaleTimeString('de-DE'):'—'}</b></div><div class="row"><span>Lokaler History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
  card(`<div class="section-title">SYSTEM</div><div class="row"><span>GitHub Actions</span><b class="green">nicht nötig</b></div><div class="row"><span>Historie</span><b>direkt pro Coin</b></div><div class="row"><span>Speicher</span><b>localStorage</b></div><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">APP NEU LADEN</button>`)+
  card(`<div class="section-title">BEWERTUNGSLOGIK</div><div class="row"><span>Live Asset</span><b>Browser API</b></div><div class="row"><span>Fallback</span><b>lokaler Cache</b></div><div class="row"><span>Forecast</span><b>365T History + FIB + RSI + Relative Strength + Cycle Clock</b></div><div class="row"><span>Zyklus-Uhr</span><b>Halving-Zeitmodell + Coin Offset</b></div>`);
 }

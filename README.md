@@ -1,3 +1,10 @@
+# ACHI MERIDIAN v4.8.3 — Current Price
+
+Neu:
+- Aktueller Kurs wird jetzt direkt unter der Menge jeder Top-Position angezeigt.
+- Kurs übernimmt denselben Datenstatus wie die Position: LIVE / MIXED / SNAPSHOT.
+- Gesamtwert bleibt Menge × aktueller Kurs.
+
 # ACHI MERIDIAN v4.8.2 — Bitpanda Valuation Fix
 
 Fehler gefunden und behoben:

@@ -1,6 +1,6 @@
 {
-  "appVersion": "4.8.2",
-  "build": "2026-08-22-bitpanda-fix",
+  "appVersion": "4.9.0",
+  "build": "2026-08-22-asset-detail",
   "currency": "USD",
   "portfolio": {
     "total": 25948,
