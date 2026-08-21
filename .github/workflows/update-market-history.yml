@@ -1,1 +1,11 @@
+name: MERIDIAN Test
 
+"on":
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "MERIDIAN OK"
