@@ -202,3 +202,111 @@ button{font:inherit}
   .logo-btn{width:54px !important;height:54px !important}
   .forecast-price{font-size:34px !important}
 }
+
+
+/* v4.8 — spacing + Pionex + cleaner portfolio rows */
+.portfolio-summary{margin-top:18px}
+.venue-title{margin-top:18px;margin-bottom:10px}
+.venue-grid{gap:10px;margin-bottom:14px}
+.venue-grid .metric{min-height:92px;display:flex;flex-direction:column;justify-content:center}
+.venue-share{font-size:15px;margin-top:6px}
+.venue-source{font-size:7px;color:var(--muted);margin-top:4px;letter-spacing:1px}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+.section-head .section-title{margin:0 0 8px}
+.section-note{font-size:8px;color:var(--muted);white-space:nowrap;letter-spacing:1px}
+
+.positions-card{padding-left:14px;padding-right:14px}
+.position-row{
+  display:grid;grid-template-columns:34px minmax(120px,1.25fr) minmax(92px,.9fr) 58px;
+  gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(100,145,180,.16)
+}
+.position-row:last-child{border-bottom:0}
+.position-asset{min-width:0}
+.position-symbol{font-size:14px;font-weight:900;line-height:1.05}
+.position-venue{font-size:9px;color:#9aabc0;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.position-qty{font-size:8.5px;color:var(--muted);margin-top:3px;white-space:nowrap}
+.position-value{text-align:left;min-width:0}
+.position-value b{font-size:15px;white-space:nowrap}
+.position-value small{display:block;color:var(--muted);font-size:8px;margin-top:4px;white-space:nowrap}
+.position-change{text-align:right;color:var(--blue);font-size:11px;font-weight:900;white-space:nowrap}
+
+.performance-grid{gap:10px;margin:12px 0 14px}
+.performance-grid .metric{min-height:86px}
+.perf-sub{font-size:12px!important;margin-top:3px}
+
+.pionex-card{margin-top:2px}
+.pionex-summary{gap:9px;margin-bottom:10px}
+.pionex-summary .metric{min-height:78px}
+.pionex-bots{display:grid;gap:9px}
+.pionex-bot{border:1px solid var(--line2);background:#06101a;border-radius:13px;padding:10px}
+.pionex-bot-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid rgba(100,145,180,.14)}
+.pionex-bot-head b{font-size:12px}
+.pionex-bot-head small{display:block;color:var(--muted);font-size:8px;margin-top:2px}
+.pionex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+.pionex-grid>div{min-width:0}
+.pionex-grid span{display:block;color:var(--muted);font-size:7.5px;margin-bottom:3px}
+.pionex-grid b{font-size:10px;white-space:nowrap}
+.pionex-meta{color:var(--muted);font-size:7.5px;margin-top:9px;line-height:1.35}
+
+@media(max-width:650px){
+  .venue-grid{gap:8px}
+  .position-row{grid-template-columns:30px minmax(108px,1.25fr) minmax(78px,.9fr) 52px;gap:8px;padding:11px 0}
+  .position-symbol{font-size:13px}
+  .position-venue{font-size:8.5px}
+  .position-qty{font-size:8px}
+  .position-value b{font-size:14px}
+  .position-change{font-size:10.5px}
+}
+@media(max-width:390px){
+  .position-row{grid-template-columns:28px minmax(96px,1.2fr) minmax(70px,.85fr) 48px;gap:6px}
+  .position-value b{font-size:13px}
+  .position-venue{font-size:8px}
+  .pionex-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+
+/* v4.8.1 — unmistakable live-data pulse */
+.live-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  vertical-align:middle;
+  font-size:7.5px;
+  font-weight:900;
+  letter-spacing:1px;
+  color:#2fe59a;
+  white-space:nowrap;
+}
+.live-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#2fe59a;
+  box-shadow:0 0 0 0 rgba(47,229,154,.55);
+  animation:meridianLivePulse 1.55s ease-out infinite;
+  flex:0 0 auto;
+}
+@keyframes meridianLivePulse{
+  0%{transform:scale(.92);box-shadow:0 0 0 0 rgba(47,229,154,.55);opacity:1}
+  65%{transform:scale(1);box-shadow:0 0 0 7px rgba(47,229,154,0);opacity:.95}
+  100%{transform:scale(.92);box-shadow:0 0 0 0 rgba(47,229,154,0);opacity:1}
+}
+.snapshot-badge{
+  display:inline-flex;
+  align-items:center;
+  font-size:7px;
+  font-weight:800;
+  letter-spacing:.8px;
+  color:#f0b84b;
+  border:1px solid rgba(240,184,75,.35);
+  border-radius:999px;
+  padding:2px 5px;
+  white-space:nowrap;
+}
+.position-venue .live-badge{margin-left:5px}
+.venue-source .live-badge,.venue-source .snapshot-badge{margin-top:1px}
+
+@media (prefers-reduced-motion: reduce){
+  .live-dot{animation:none}
+}

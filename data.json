@@ -1,6 +1,6 @@
 {
-  "appVersion": "4.7.0",
-  "build": "2026-08-22-portfolio-live",
+  "appVersion": "4.8.1",
+  "build": "2026-08-22-live-pulse",
   "currency": "USD",
   "portfolio": {
     "total": 25948,
@@ -199,6 +199,14 @@
         "venue": "Ledger",
         "quantity": 1.001
       }
+    ],
+    "manualVenueBalances": [
+      {
+        "name": "Pionex",
+        "value": 119.75,
+        "source": "snapshot",
+        "note": "Pionex Hauptkonto"
+      }
     ]
   },
   "market": {
@@ -290,11 +298,47 @@
     }
   },
   "pionexRisk": {
-    "accountValue": 169.61,
-    "botPnl": -92.25,
+    "accountValue": 119.75,
+    "botPnl": -141.95,
     "dynamicMargin": 148.51,
-    "nextLiquidation": 81455.9,
-    "liquidationDistancePct": 5.8
+    "nextLiquidation": 81474.9,
+    "liquidationDistancePct": 3.87,
+    "bots": [
+      {
+        "name": "Moon #1",
+        "side": "Short",
+        "leverage": 30,
+        "investment": 52,
+        "totalProfit": -122.75,
+        "gridProfit": 6.15,
+        "trendPnl": -128.9,
+        "fundingPct": 0.01,
+        "rangeLow": 59589.2,
+        "rangeHigh": 79671.1,
+        "dynamicMargin": 138.51,
+        "liquidation": 81474.9,
+        "liquidationDistancePct": 3.87,
+        "breakEven": 71837.8,
+        "createdPrice": 69243.5
+      },
+      {
+        "name": "Moon #2",
+        "side": "Short",
+        "leverage": 30,
+        "investment": 57,
+        "totalProfit": -19.2,
+        "gridProfit": 2.65,
+        "trendPnl": -21.85,
+        "fundingPct": 0.01,
+        "rangeLow": 64678.3,
+        "rangeHigh": 87793.3,
+        "dynamicMargin": 10.0,
+        "liquidation": 81576.3,
+        "liquidationDistancePct": 4.06,
+        "breakEven": 76761.5,
+        "createdPrice": 76369.5
+      }
+    ]
   },
   "forecastCoins": [
     "BTC",
