@@ -117,3 +117,10 @@ body{
     padding-top:max(calc(16px + env(safe-area-inset-top)), 32px);
   }
 }
+
+
+/* ===== V3.3 INTELLIGENCE ===== */
+.history-head-v33{margin-bottom:5px}.history-range{display:flex;gap:4px;margin:0 0 3px}.history-range button{border:1px solid var(--line);background:#091018;color:var(--dim);border-radius:999px;padding:4px 8px;font:800 6.5px var(--mono)}.history-range button.active{color:var(--green);border-color:#24523a;background:rgba(52,201,120,.08)}
+.section-title small{float:right;color:var(--dim);font-size:6px}.market-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.summary-kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.summary-kpi span{display:block;font:7px var(--mono);color:var(--dim);text-transform:uppercase}.summary-kpi b{display:block;font:900 11px var(--mono);margin-top:4px}
+.nadir-score-card{margin:10px 0}.score-top{display:flex;justify-content:space-between;align-items:center;font:800 8px var(--mono);color:var(--dim)}.score-top b{font-size:15px;color:var(--amber)}.score-track{height:5px;background:#111d28;border-radius:99px;overflow:hidden;margin-top:7px}.score-track i{display:block;height:100%;background:linear-gradient(90deg,var(--red),var(--amber),var(--green));border-radius:99px}.nadir-score-card small{display:block;color:var(--dim);font:7px var(--mono);margin-top:6px}.nadir-card .score-track{margin-top:8px}
+.gate-score{margin-top:14px;border-top:1px solid rgba(255,255,255,.07);padding-top:10px;font:800 7px var(--mono);color:var(--dim)}.gate-score b{float:right;color:var(--amber);font-size:10px}.trade-kpi small{display:block;font:6px var(--mono);margin-top:4px;color:var(--dim)}.trade-kpi.good{border-color:#1f5134}.trade-kpi.warn{border-color:#5a4823}.trade-kpi.bad{border-color:#5b2b28}.trade-kpi.good small{color:var(--green)}.trade-kpi.warn small{color:var(--amber)}.trade-kpi.bad small{color:var(--red)}

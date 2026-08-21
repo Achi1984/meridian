@@ -1,23 +1,13 @@
-MERIDIAN PWA V1
+# MERIDIAN V3.3 — Intelligence Update
 
-1) Vorschau:
-   index.html kann lokal geöffnet werden. Tabs und Dashboard funktionieren.
-   Service Worker / echte PWA-Installation funktionieren erst über http(s).
+Build: `2026-08-21-2100`
 
-2) Empfohlenes Hosting:
-   - GitHub Pages
-   - Cloudflare Pages
-   - Vercel
-   Den Inhalt dieses Ordners unverändert hochladen.
+Aufbauend auf V3.2 Stability Release.
 
-3) iPhone Installation:
-   Safari öffnen -> URL aufrufen -> Teilen -> "Zum Home-Bildschirm".
+- Depot: Portfolio-Verlauf mit 24H / 7T / 30T / ALL; lokale Historie wird aus V3.2 übernommen.
+- Markt: Marktbreite, Ø 24H, Leader/Laggard und erweitertes Momentum-Radar.
+- Boden: NADIR-Gesamtscore und visuelle Säulen-Scores.
+- Day-Trade: Gate-Score, Ampellogik und klare Snapshot-Kennzeichnung der Indikatoren.
+- Settings: Version/Build und Datenstatus bleiben erhalten.
 
-4) Daten:
-   Bitpanda / OKX / Ledger / Pionex basieren auf den zuletzt gelieferten Screenshots vom 21.08.2026.
-   Live-Kurse können in SETTINGS über CoinGecko aktualisiert werden.
-   VSN und Pionex-Botdaten bleiben Snapshot-/Manuelldaten.
-
-5) Sicherheit:
-   Keine API-Schlüssel in index.html/app.js speichern.
-   Für echte Börsen-API-Anbindung später Backend/Proxy verwenden.
+Hinweis: Portfolio-Historie wird nur lokal im Browser aufgezeichnet, wenn MERIDIAN geöffnet/aktualisiert wird. Die Zeitfilter erzeugen keine rückwirkenden Daten. Live-Kurse kommen weiterhin zur Laufzeit über CoinGecko; Snapshot-Werte wurden nicht künstlich als live markiert.

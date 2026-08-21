@@ -294,8 +294,8 @@
     "vwap": 73454.27,
     "liqAbove": 81538.7
   },
-  "schemaVersion": 3,
-  "appVersion": "3.2.0",
+  "schemaVersion": 4,
+  "appVersion": "3.3.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -310,7 +310,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2030",
+  "buildId": "2026-08-21-2100",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",

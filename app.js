@@ -16,9 +16,11 @@ const cgMap = {
 
 const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'];
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
-const HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.2.0';
-const BUILD_ID='2026-08-21-2030';
+const HISTORY_KEY='meridian_portfolio_history_v33';
+const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
+const APP_VERSION='3.3.0';
+const BUILD_ID='2026-08-21-2100';
+let historyRange='24h';
 const VERSION_URL='./version.json';
 
 function money(v,d=0){
@@ -106,9 +108,21 @@ function conic(items,colors){
 }
 
 function getHistory(){
-  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return []}
+  try{
+    let h=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
+    if(!h.length){h=JSON.parse(localStorage.getItem(LEGACY_HISTORY_KEY)||'[]');if(h.length)setHistory(h)}
+    return h;
+  }catch(e){return []}
 }
-function setHistory(h){localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-96)));}
+function setHistory(h){
+  // 30 days at max. one point / 10 min while the app is open (~4320 points).
+  const cutoff=Date.now()-31*24*60*60*1000;
+  localStorage.setItem(HISTORY_KEY,JSON.stringify(h.filter(x=>x.t>=cutoff).slice(-4500)));
+}
+function rangedHistory(h){
+  const now=Date.now(), ms={"24h":864e5,"7d":7*864e5,"30d":30*864e5,all:Infinity}[historyRange]||864e5;
+  return ms===Infinity?h:h.filter(x=>now-x.t<=ms);
+}
 function recordHistory(force=false, label=''){
   const {total}=buildAggregates(); if(!total)return;
   let h=getHistory(); const now=Date.now();
@@ -124,7 +138,8 @@ function recordHistory(force=false, label=''){
   renderHistory();
 }
 function renderHistory(){
-  const h=getHistory();
+  const all=getHistory();
+  const h=rangedHistory(all);
   const line=document.getElementById('historyLine'),area=document.getElementById('historyArea'),label=document.getElementById('historyLabel');
   const hero=document.querySelector('.hero-card');
   if(!line||!area)return;
@@ -153,7 +168,7 @@ function renderHistory(){
   line.setAttribute('d',d);
   area.setAttribute('d',d+` L 320 90 L 0 90 Z`);
   const diff=h[h.length-1].v-h[0].v, pctv=diff/h[0].v*100;
-  label.textContent=`${diff>=0?'+':'−'}${money(Math.abs(diff))} · ${pct(pctv)} seit ${new Date(h[0].t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}`;
+  label.textContent=`${diff>=0?'+':'−'}${money(Math.abs(diff))} · ${pct(pctv)} · ${h.length} Punkte`;
 }
 
 function renderDepot(){
@@ -214,22 +229,35 @@ function renderDepot(){
 function renderMarket(){
   const {assets}=buildAggregates(),btc=state.changes.BTC||0,regime=btc>2?'RISK-ON':btc<-2?'RISK-OFF':'NEUTRAL';
   marketRegime.textContent=regime;regimeDot.style.left=regime==='RISK-ON'?'82%':regime==='RISK-OFF'?'18%':'50%';
-  const rows=Object.keys(assets).filter(c=>Number.isFinite(state.changes[c])).sort((a,b)=>state.changes[b]-state.changes[a]).slice(0,12);
-  marketRadar.innerHTML=rows.map(c=>`<div class="radar-row"><div><strong>${c}</strong><br><small>${state.changes[c]>=3?'Momentum positiv':state.changes[c]<=-3?'Momentum negativ':'Neutral'}</small></div><b style="color:${state.changes[c]>=0?'var(--green)':'var(--red)'}">${pct(state.changes[c])}</b></div>`).join('');
+  const rows=Object.keys(assets).filter(c=>Number.isFinite(state.changes[c])).sort((a,b)=>state.changes[b]-state.changes[a]);
+  const adv=rows.filter(c=>state.changes[c]>0).length, dec=rows.filter(c=>state.changes[c]<0).length;
+  const avg=rows.length?rows.reduce((s,c)=>s+state.changes[c],0)/rows.length:0;
+  const best=rows[0]||'—', worst=rows[rows.length-1]||'—';
+  marketSummary.innerHTML=[['Marktbreite',`${adv}/${rows.length} positiv`],['Ø 24H',pct(avg)],['Leader',best==='—'?'—':`${best} ${pct(state.changes[best])}`],['Laggard',worst==='—'?'—':`${worst} ${pct(state.changes[worst])}`]].map(x=>`<div class="summary-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+  marketRadar.innerHTML=rows.slice(0,14).map(c=>`<div class="radar-row"><div><strong>${c}</strong><br><small>${state.changes[c]>=3?'Momentum positiv':state.changes[c]<=-3?'Momentum negativ':'Neutral'}</small></div><b style="color:${state.changes[c]>=0?'var(--green)':'var(--red)'}">${pct(state.changes[c])}</b></div>`).join('');
 }
 
 function renderBoden(){
   const b=state.data.boden,valuation=Math.max(0,Math.min(100,100-((b.mvrv-0.5)/(3-0.5))*100)),capitulation=Math.max(0,Math.min(100,(75-b.fearGreed)/65*100));
-  nadirGrid.innerHTML=[['Bewertung',valuation],['Kapitulation',capitulation],['Holder',50],['Timing',55]].map(x=>`<div class="nadir-card"><span>${x[0]}</span><b>${Math.round(x[1])}/100</b></div>`).join('');
+  const scores=[['Bewertung',valuation],['Kapitulation',capitulation],['Holder',50],['Timing',55]];
+  const total=Math.round(scores.reduce((s,x)=>s+x[1],0)/scores.length);
+  nadirTotal.textContent=`${total}/100`;nadirTotalBar.style.width=total+'%';
+  nadirState.textContent=total>=70?'starke Akkumulations-Evidenz':total>=45?'Akkumulations-Regime · gemischte Evidenz':'geringe Akkumulations-Evidenz';
+  nadirGrid.innerHTML=scores.map(x=>`<div class="nadir-card"><span>${x[0]}</span><b>${Math.round(x[1])}/100</b><div class="score-track"><i style="width:${Math.round(x[1])}%"></i></div></div>`).join('');
 }
 
 function renderTrade(){
   const d=state.data.daytrade;
-  tradeGrid.innerHTML=[['BTC Preis',money(d.btcPrice)],['4H RSI',d.rsi4h],['1H RSI',d.rsi1h],['Funding',d.funding+'%'],['OI','$'+d.oi+'B'],['VWAP',money(d.vwap)]].map(x=>`<div class="trade-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
-  const checks=[['Datenfrische','Snapshot · prüfen','warn'],['MTF-Konfluenz','bullish','pass'],['Entry-Streckung',`4H RSI ${d.rsi4h} → überdehnt`,'fail'],['Liquidationspuffer',money(d.liqAbove),'warn']];
+  const r4=Number(d.rsi4h),r1=Number(d.rsi1h),fund=Math.abs(Number(d.funding));
+  const stretch=r4>=80?0:r4>=70?8:25, mtf=r1>50&&r4>50?25:10, funding=fund<0.02?25:fund<0.05?15:5, vwap=d.btcPrice>d.vwap?20:8;
+  const score=Math.round(stretch+mtf+funding+vwap),allowed=score>=75&&r4<75;
+  tradeScore.textContent=`${score}/100`;tradeScoreBar.style.width=score+'%';
+  tradeDecision.textContent=allowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN';
+  tradeFreshness.textContent='Indikatoren: Snapshot';
+  tradeGrid.innerHTML=[['BTC Preis',money(d.btcPrice),'snapshot'],['4H RSI',d.rsi4h,r4>=80?'bad':r4>=70?'warn':'good'],['1H RSI',d.rsi1h,r1>=75?'warn':'good'],['Funding',d.funding+'%',fund<0.02?'good':'warn'],['OI','$'+d.oi+'B','snapshot'],['VWAP',money(d.vwap),'snapshot']].map(x=>`<div class="trade-kpi ${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]==='snapshot'?'Snapshot':x[2]==='bad'?'überdehnt':x[2]==='warn'?'erhöht':'OK'}</small></div>`).join('');
+  const checks=[['Datenfrische','Indikatoren · Snapshot','warn'],['MTF-Konfluenz',r1>50&&r4>50?'bullish':'gemischt',r1>50&&r4>50?'pass':'warn'],['Entry-Streckung',`4H RSI ${d.rsi4h} → ${r4>=80?'stark überdehnt':r4>=70?'überdehnt':'OK'}`,r4>=80?'fail':r4>=70?'warn':'pass'],['Liquidationspuffer',money(d.liqAbove),'warn']];
   tradeChecks.innerHTML=checks.map(x=>`<div class="check-row"><span>${x[0]}</span><b style="color:${x[2]==='pass'?'var(--green)':x[2]==='fail'?'var(--red)':'var(--amber)'}">${x[1]}</b></div>`).join('');
 }
-
 
 function setSystemStatus(id,text,cls=''){
   const el=document.getElementById(id);
@@ -329,11 +357,12 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=32').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=33').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);
   document.getElementById('resetSnapshot').addEventListener('click',()=>{restoreSnapshot();renderAll();recordHistory(true,'snapshot');});
   document.getElementById('forceReload')?.addEventListener('click',hardRefreshApp);
+  document.getElementById('historyRange')?.addEventListener('click',e=>{const b=e.target.closest('button[data-range]');if(!b)return;historyRange=b.dataset.range;document.querySelectorAll('#historyRange button').forEach(x=>x.classList.toggle('active',x===b));renderHistory();});
   setupTabs();load();
 });

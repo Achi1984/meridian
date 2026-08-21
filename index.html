@@ -12,14 +12,14 @@
   <meta name="apple-mobile-web-app-title" content="MERIDIAN">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=32">
+  <link rel="stylesheet" href="./styles.css?v=33">
   <title>MERIDIAN</title>
 </head>
 <body>
 <div id="app">
   <header class="app-header">
     <div>
-      <div class="brand-line"><div class="brand">MERIDIAN</div><div class="version-badge">v3.2 · 2030</div></div>
+      <div class="brand-line"><div class="brand">MERIDIAN</div><div class="version-badge">v3.3 · 2100</div></div>
       <div class="live"><span class="live-dot"></span> LIVE DASHBOARD</div>
     </div>
     <div class="header-actions">
@@ -43,9 +43,12 @@
           </div>
         </div>
 
-        <div class="history-head">
+        <div class="history-head history-head-v33">
           <span>PORTFOLIO-VERLAUF</span>
-          <small id="historyLabel">ab jetzt lokal aufgezeichnet</small>
+          <small id="historyLabel">lokal aufgezeichnet</small>
+        </div>
+        <div class="history-range" id="historyRange">
+          <button data-range="24h" class="active">24H</button><button data-range="7d">7T</button><button data-range="30d">30T</button><button data-range="all">ALL</button>
         </div>
         <div class="hero-chart">
           <svg viewBox="0 0 320 90" preserveAspectRatio="none" id="historySvg">
@@ -119,7 +122,8 @@
         <div class="module-sub">BTC als Filter für Altcoin-Signale</div>
         <div class="regime-meter"><i id="regimeDot"></i></div>
       </div>
-      <div class="section-title">RADAR</div>
+      <div class="market-summary" id="marketSummary"></div>
+      <div class="section-title">RADAR <small>24H MOMENTUM</small></div>
       <div class="card"><div id="marketRadar"></div></div>
     </section>
 
@@ -129,6 +133,7 @@
         <div class="module-title">AKKUMULATIONS-REGIME</div>
         <div class="module-sub">Bewertung · Kapitulation · Holder · Timing</div>
       </div>
+      <article class="card nadir-score-card"><div class="score-top"><span>NADIR GESAMTSCORE</span><b id="nadirTotal">—</b></div><div class="score-track"><i id="nadirTotalBar"></i></div><small id="nadirState">—</small></article>
       <div class="nadir-grid" id="nadirGrid"></div>
       <article class="card">
         <div class="card-title">BTC BODEN-SZENARIEN</div>
@@ -141,8 +146,9 @@
     <section class="tab-panel" id="tab-trade">
       <div class="module-hero red">
         <div class="eyebrow">DAY-TRADE 2.0</div>
-        <div class="module-title">ENTRY NICHT FREIGEGEBEN</div>
-        <div class="module-sub">Bias ≠ Ausführung</div>
+        <div class="module-title" id="tradeDecision">ENTRY NICHT FREIGEGEBEN</div>
+        <div class="module-sub">Bias ≠ Ausführung · <span id="tradeFreshness">Indikatoren: Snapshot</span></div>
+        <div class="gate-score"><span>GATE SCORE</span><b id="tradeScore">—</b><div class="score-track"><i id="tradeScoreBar"></i></div></div>
       </div>
       <div class="trade-grid" id="tradeGrid"></div>
       <article class="card"><div class="card-title">TRADE GATE</div><div id="tradeChecks"></div></article>
@@ -163,7 +169,7 @@
 
       <article class="card">
         <div class="card-title">SYSTEM</div>
-        <div class="status-row"><span>Version</span><b id="systemBuild">v3.2 · 2026-08-21-2030</b></div>
+        <div class="status-row"><span>Version</span><b id="systemBuild">v3.3 · 2026-08-21-2100</b></div>
         <div class="status-row"><span>Live-API</span><b id="liveApiStatus">prüfe…</b></div>
         <div class="status-row"><span>Live Assets</span><b id="liveAssetCount">0/16</b></div>
         <div class="status-row"><span>Cache</span><b id="cacheStatus">prüfe…</b></div>
@@ -188,6 +194,6 @@
     <button class="nav-btn" data-tab="settings"><span>⚙</span>SETTINGS</button>
   </nav>
 </div>
-<script src="./app.js?v=32"></script>
+<script src="./app.js?v=33"></script>
 </body>
 </html>

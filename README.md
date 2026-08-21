@@ -1,21 +1,13 @@
-# MERIDIAN V3.2 – Stability Release
+# MERIDIAN V3.3 — Intelligence Update
 
-Build: `2026-08-21-2030`
+Build: `2026-08-21-2100`
 
-## Wichtigste Änderungen
-- Version + Build-ID sichtbar im Header und unter Settings.
-- `version.json` für echten Build-/Cache-Check.
-- Button **Update erzwingen** löscht Service Worker + Cache und lädt den aktuellen Build neu.
-- `index.html`, `data.json` und `version.json` werden vom Service Worker nicht dauerhaft gecacht.
-- Live-API-Diagnose: `online · X Assets` oder `nicht erreichbar · Snapshot aktiv`.
-- Live-Asset-Zähler: z. B. `16/16`.
-- Portfolio-Verlauf ist nie leer:
-  - erster Start erzeugt zwei reale Startpunkte mit gleichem Portfoliowert
-  - danach werden echte Live-/Refresh-Werte gespeichert
-  - bei unverändertem Wert erscheint eine saubere horizontale Linie.
-- iPhone Safe-Area nochmals robuster gemacht.
-- App-Version: 3.2.0
+Aufbauend auf V3.2 Stability Release.
 
-## GitHub
-Alle Dateien aus diesem Paket über das bestehende `meridian` Repository hochladen und überschreiben.
-Danach GitHub Pages neu deployen lassen.
+- Depot: Portfolio-Verlauf mit 24H / 7T / 30T / ALL; lokale Historie wird aus V3.2 übernommen.
+- Markt: Marktbreite, Ø 24H, Leader/Laggard und erweitertes Momentum-Radar.
+- Boden: NADIR-Gesamtscore und visuelle Säulen-Scores.
+- Day-Trade: Gate-Score, Ampellogik und klare Snapshot-Kennzeichnung der Indikatoren.
+- Settings: Version/Build und Datenstatus bleiben erhalten.
+
+Hinweis: Portfolio-Historie wird nur lokal im Browser aufgezeichnet, wenn MERIDIAN geöffnet/aktualisiert wird. Die Zeitfilter erzeugen keine rückwirkenden Daten. Live-Kurse kommen weiterhin zur Laufzeit über CoinGecko; Snapshot-Werte wurden nicht künstlich als live markiert.
