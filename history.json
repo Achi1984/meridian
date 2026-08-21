@@ -1,9 +1,8 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generatedAt": null,
-  "status": "pending",
-  "days": 2000,
-  "source": "GitHub Actions",
+  "status": "browser-live",
+  "source": "Browser cache / CoinGecko",
   "coins": {},
-  "note": "Wird durch .github/workflows/update-market-history.yml aktualisiert."
+  "errors": {}
 }

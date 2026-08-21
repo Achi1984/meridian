@@ -1,35 +1,38 @@
-# MERIDIAN V3.9 – Server History Forecast
+# MERIDIAN v4.1 — iPhone Edition
 
-Build `2026-08-21-2200`
+Diese Version benötigt KEIN GitHub Actions Workflow und KEIN `.github`-Verzeichnis.
 
-## Kernänderung
-Der FORECAST lädt historische Kursdaten NICHT mehr direkt aus Safari/PWA.
-GitHub Actions erzeugt `history.json`; GitHub Pages liefert sie same-origin aus.
+## Warum diese Version?
+Auf dem iPhone sind versteckte `.github`-Ordner beim Upload unpraktisch. MERIDIAN 4.1 lädt deshalb die Historie direkt im Browser und speichert sie lokal auf dem iPhone.
 
-## Forecast 2.0
-- bis zu 2000 Tageskerzen je Coin
-- 90T Swing für lokale Lage
-- 180T Swing als Basis für FIB-Extensions
-- Daily RSI14
-- 30T Relative Strength vs BTC
-- Local Top-Risk
-- FIB 1.272 / 1.618 / 2.0 / 2.618
-- historische Peak-Erkennung BTC
-- beobachteter Coin-vs.-BTC Peak-Lag
-- Klassen-Offset nur als Fallback
-- nächstes zukünftiges Macro-Cycle-Window
-- Confidence nach Datenmenge und Modellqualität
+## Upload
+Alle Dateien dieses Ordners direkt ins Hauptverzeichnis deines GitHub-Repositories hochladen:
+- index.html
+- styles.css
+- app.js
+- data.json
+- history.json
+- version.json
+- manifest.webmanifest
+- sw.js
+- icon-192.png
+- icon-512.png
+- README.md
 
-## GitHub Action
-Im ZIP liegt:
-`.github/workflows/update-market-history.yml`
+Keine Unterordner nötig.
 
-Die Action läuft:
-- automatisch nach Push auf main (außer reinen history.json-Updates)
-- täglich um 02:17 UTC
-- manuell via Actions > Update MERIDIAN market history > Run workflow
+## Forecast
+- 365 Tage Coin-Historie direkt im Browser
+- 90T Swing
+- Fibonacci Target Cluster
+- Daily RSI
+- Relative Strength vs BTC
+- dynamischer 90T Peak-Lag
+- Zyklus-Uhr auf Basis des BTC-Halving-Zeitmodells plus coin-spezifischem Offset
+- lokaler Cache auf dem iPhone
 
-Sie aktualisiert `history.json` und committed die Datei automatisch.
+## Aktualisierung
+Im Forecast pro Coin auf „HISTORIE AKTUALISIEREN“ tippen.
+In Settings kann die App komplett neu geladen werden.
 
-Für einfachen iPhone-Zugriff liegt zusätzlich eine Kopie `update-market-history.yml`
-im Hauptverzeichnis. GitHub führt aber nur die Datei unter `.github/workflows/` aus.
+Hinweis: Forecasts sind modellbasierte Szenarien und keine Kursgarantie.

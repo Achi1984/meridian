@@ -1,12 +1,10 @@
 {
-  "name": "MERIDIAN V3.5",
+  "name": "MERIDIAN Crypto Dashboard",
   "short_name": "MERIDIAN",
   "start_url": "./",
-  "scope": "./",
   "display": "standalone",
   "background_color": "#05080d",
   "theme_color": "#05080d",
-  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "icon-192.png",

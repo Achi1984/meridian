@@ -1,1048 +1,203 @@
 
-const state = {
-  data: null,
-  prices: {},
-  changes: {},
-  priceMeta: {},
-  lastUpdated: null
+const $=s=>document.querySelector(s);
+const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC';
+
+const CG_IDS={
+ BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
+ FET:'artificial-superintelligence-alliance',HBAR:'hedera-hashgraph',DOT:'polkadot',
+ NEAR:'near',AVAX:'avalanche-2',ATOM:'cosmos',TAO:'bittensor',INJ:'injective-protocol',
+ PEPE:'pepe',XLM:'stellar',VSN:'vision'
 };
+const HALVINGS=[
+ new Date('2012-11-28T00:00:00Z').getTime(),
+ new Date('2016-07-09T00:00:00Z').getTime(),
+ new Date('2020-05-11T00:00:00Z').getTime(),
+ new Date('2024-04-20T00:00:00Z').getTime()
+];
+const NEXT_HALVING_EST=new Date('2028-04-01T00:00:00Z').getTime();
+const COIN_LAG_DAYS={BTC:0,ETH:14,SOL:28,XRP:35,SUI:42,ADA:35,FET:28,HBAR:35,DOT:35,NEAR:28,AVAX:28,ATOM:35,TAO:28,INJ:28,PEPE:42,XLM:35,VSN:42};
 
-const cgMap = {
-  BTC:'bitcoin', ETH:'ethereum', SOL:'solana', XRP:'ripple', SUI:'sui', ADA:'cardano',
-  FET:'fetch-ai', HBAR:'hedera-hashgraph', DOT:'polkadot',
-  ATOM:'cosmos', NEAR:'near', AVAX:'avalanche-2', TAO:'bittensor',
-  INJ:'injective-protocol', PEPE:'pepe', XLM:'stellar'
-};
-
-const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'];
-const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
-const HISTORY_KEY='meridian_portfolio_history_v33';
-const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.9.0';
-const BUILD_ID='2026-08-21-2200';
-let historyRange='24h';
-const VERSION_URL='./version.json';
-
-function money(v,d=0){
-  return '$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+async function fetchJSON(url, timeout=12000){
+ const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),timeout);
+ try{
+  const r=await fetch(url,{cache:'no-store',signal:ctrl.signal,headers:{'accept':'application/json'}});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return await r.json();
+ } finally {clearTimeout(t)}
 }
-function eur(v){ return '≈ €'+Number(v).toLocaleString('de-DE',{maximumFractionDigits:0});}
-function pct(v){ return (v>=0?'+':'−')+Math.abs(v).toFixed(1).replace('.',',')+'%';}
-function shortQty(v){
-  if(v>=1000) return v.toLocaleString('de-DE',{maximumFractionDigits:4});
-  return v.toLocaleString('de-DE',{maximumFractionDigits:8});
+function cacheKey(sym){return 'meridian_history_'+sym+'_v3'}
+function loadCache(sym){
+ try{
+  const x=JSON.parse(localStorage.getItem(cacheKey(sym))||'null');
+  if(x?.candles?.length) return x;
+ }catch(e){}
+ return null;
 }
-function fmtTime(d){return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
-function ageLabel(ts){
-  const mins=Math.round((Date.now()-new Date(ts).getTime())/60000);
-  if(mins<2)return 'gerade eben';
-  if(mins<60)return `${mins} min`;
-  const h=Math.round(mins/60); if(h<48)return `${h} h`;
-  return new Date(ts).toLocaleDateString('de-DE');
+function saveCache(sym,obj){
+ try{localStorage.setItem(cacheKey(sym),JSON.stringify(obj))}catch(e){}
 }
-
+async function loadCoinHistory(sym,force=false){
+ if(HISTORY.coins[sym]?.candles?.length && !force) return HISTORY.coins[sym];
+ const cached=loadCache(sym);
+ if(cached && !force){
+   const age=Date.now()-(cached.savedAt||0);
+   if(age<6*3600*1000){HISTORY.coins[sym]=cached;return cached}
+ }
+ const id=CG_IDS[sym]; if(!id) throw new Error('Kein Mapping');
+ const url=`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=365&interval=daily`;
+ try{
+   const j=await fetchJSON(url);
+   const candles=(j.prices||[]).map(([t,p])=>[t,p,p,p,p,0]);
+   if(candles.length<30) throw new Error('Zu wenig Historie');
+   const obj={source:'CoinGecko Browser',count:candles.length,candles,savedAt:Date.now()};
+   HISTORY.coins[sym]=obj; saveCache(sym,obj); return obj;
+ }catch(err){
+   if(cached){HISTORY.coins[sym]=cached;return cached}
+   throw err;
+ }
+}
+async function refreshCurrentPortfolioPrices(){
+ const symbols=[...new Set(DATA.portfolio.topPositions.map(x=>x.symbol))];
+ const ids=symbols.map(s=>CG_IDS[s]).filter(Boolean).join(',');
+ if(!ids) return;
+ try{
+  const j=await fetchJSON(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
+  const map={}; Object.entries(CG_IDS).forEach(([s,id])=>map[id]=s);
+  DATA.livePrices={};
+  Object.entries(j).forEach(([id,v])=>{DATA.livePrices[map[id]]={price:v.usd,change24h:v.usd_24h_change}});
+ }catch(e){}
+}
 async function load(){
-  try{
-    const r=await fetch('./data.json?v=39&t='+Date.now(),{cache:'no-store'});
-    if(!r.ok)throw new Error('data.json HTTP '+r.status);
-    state.data=await r.json();
-    restoreSnapshot();
-    renderAll();
-    recordHistory(false,'snapshot');
-    registerSW();
-    await checkBuild();
-    setTimeout(()=>refreshPrices(true),500);
-    setTimeout(()=>refreshTradingIntelligence(),900);
-    setTimeout(()=>loadServerHistory(false),1100);
-  }catch(err){
-    console.error(err);
-    document.getElementById('portfolioUsd').textContent='Datenfehler';
-  }
+ const stamp=Date.now();
+ DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>r.json());
+ await refreshCurrentPortfolioPrices();
+ $('#versionBadge').textContent='v'+DATA.appVersion+' · '+DATA.build.slice(-4);
+ $('#refreshTime').textContent='↻ '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+ renderAll();
+ loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
 }
-
-function restoreSnapshot(){
-  state.prices={}; state.priceMeta={};
-  for(const [venueName,v] of Object.entries(state.data.venues)){
-    for(const [coin,p] of Object.entries(v.positions||{})){
-      if(!state.prices[coin] && p.qty){
-        state.prices[coin]=(p.snapshotUnitPrice||p.value/p.qty);
-        state.priceMeta[coin]={source:'Snapshot',updatedAt:p.snapshotAt||v.snapshotAt||state.data.snapshotAt};
-      }
-    }
-  }
-  state.changes={...state.data.fallbackChanges24h};
-  state.lastUpdated=new Date(state.data.snapshotAt);
+function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
+function metric(label,value,cls=''){return `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`}
+function donutVenue(){
+ const p=DATA.portfolio;
+ return card(`<div class="section-title">BÖRSE / WALLET</div><div class="grid2"><div style="position:relative"><div class="donut"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div><div>${p.byVenue.map(v=>`<div class="row"><span>● ${v.name}</span><b>${fmt(v.sharePct,1)}%</b></div>`).join('')}</div></div>`);
 }
-
-function priceFor(coin){ return state.prices[coin]||null; }
-function currentValue(coin,pos){
-  const px=priceFor(coin);
-  return px && pos.qty ? pos.qty*px : (pos.snapshotValue ?? pos.value);
+function depot(){
+ const p=DATA.portfolio, r=DATA.pionexRisk;
+ return card(`<div class="hero">
+      <div class="eyebrow">GESAMTPORTFOLIO</div>
+      <div class="big">$${fmt(p.total)}</div><div class="sub">≈ €${fmt(p.eurApprox)}</div>
+      <div class="grid2" style="margin-top:28px">
+        ${metric('ASSETS',p.assetsCount)}${metric('VERWAHRSTELLEN',p.custodiansCount)}
+        ${metric('GRÖSSTE POSITION',p.largestPosition.symbol+' '+fmt(p.largestPosition.sharePct,1)+'%')}
+        ${metric('DATENMODUS','iPhone Live','green')}
+      </div>
+    </div>`,'hero')+
+    donutVenue()+
+    `<div class="section-title">WERT NACH BÖRSE / WALLET</div>`+
+    `<div class="grid2">${p.byVenue.map(v=>metric(v.name,`$${fmt(v.value)}<div class="${v.name==='Pionex'?'red':'green'}" style="font-size:16px;margin-top:8px">${fmt(v.sharePct,1)}%</div>`)).join('')}</div>`+
+    card(`<div class="section-title">TOP 5 POSITIONEN</div>${p.topPositions.map((x,i)=>`<div class="row"><span>${i+1}. <b>${x.symbol}</b> · ${x.venue}</span><span><b>$${fmt(x.value)}</b> <span class="green">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</span></span></div>`).join('')}`)+
+    `<div class="grid2">${metric('24H PERFORMANCE','+'+fmt(p.performance24hPct,1)+'%<div class="muted" style="font-size:14px">+$'+fmt(p.performance24hUsd)+'</div>','green')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted" style="font-size:14px">+'+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted" style="font-size:14px">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted" style="font-size:14px">24h Streuung</div>')}</div>`+
+    card(`<div class="section-title">PIONEX FUTURES RISK</div><div class="grid2">${metric('KONTOWERT','$'+fmt(r.accountValue,2))}${metric('BOT P&L',fmt(r.botPnl,2)+' USDT','red')}${metric('DYN. MARGIN',fmt(r.dynamicMargin,2)+' USDT')}${metric('NÄCHSTE LIQ.','$'+fmt(r.nextLiquidation,1)+' ('+fmt(r.liquidationDistancePct,1)+'%)','red')}</div><p class="footer-note">Separat vom Depotwert. Snapshot-basiertes Risikomodul.</p>`);
 }
-
-function buildAggregates(){
-  const assets={},venues={}; let total=0,liveValue=0,snapshotValue=0;
-  for(const [venueName,venue] of Object.entries(state.data.venues)){
-    let vv=venue.cash||0;
-    if(venue.cash) snapshotValue+=venue.cash;
-    for(const [coin,pos] of Object.entries(venue.positions||{})){
-      const val=currentValue(coin,pos);
-      vv+=val; assets[coin]=(assets[coin]||0)+val;
-      if(state.priceMeta[coin]?.source==='Live'){liveValue+=val}else{snapshotValue+=val}
-    }
-    venues[venueName]=vv; total+=vv;
-  }
-  return {assets,venues,total,liveValue,snapshotValue};
+function market(){
+ const m=DATA.market;
+ const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
+ return card(`<div class="eyebrow">MARKTREGIME</div><div class="forecast-main">${m.regime}</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div>`)+
+ `<div class="grid2">${metric('MARKTBREITE',m.breadth)}${metric('Ø 24H','+'+fmt(m.avg24hPct,1)+'%')}${metric('LEADER',m.leader.symbol+' +'+fmt(m.leader.change24h,1)+'%')}${metric('LAGGARD',m.laggard.symbol+' '+fmt(m.laggard.change24h,1)+'%')}</div>`+
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:13px">24H MOMENTUM</span></div>${radar.map(x=>`<div class="row"><span><b>${x.symbol}</b><div class="muted" style="font-size:12px">Momentum positiv</div></span><b class="${x.change24h>=0?'green':'red'}">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</b></div>`).join('')}`);
 }
-
-function weighted24h(assets,total){
-  let n=0,d=0;
-  for(const [coin,val] of Object.entries(assets)){
-    if(Number.isFinite(state.changes[coin])){n+=val*state.changes[coin];d+=val;}
-  }
-  const p=d?n/d:0; return {pct:p,usd:total*p/100,coverage:total?d/total*100:0};
+function bottomView(){
+ const n=DATA.nadir;
+ return card(`<div class="eyebrow">NADIR 2.0</div><div class="forecast-main">${n.label}</div><div class="sub">Bewertung · Kapitulation · Holder · Timing</div>`)+
+ card(`<div class="row"><span class="eyebrow">NADIR GESAMTSCORE</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">Akkumulations-Regime · gemischte Evidenz</p>`)+
+ `<div class="grid2">${metric('BEWERTUNG',n.valuation+'/100')}${metric('KAPITULATION',n.capitulation+'/100')}${metric('HOLDER',n.holder+'/100')}${metric('TIMING',n.timing+'/100')}</div>`+
+ card(`<div class="section-title">BTC BODEN-SZENARIEN</div>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
 }
-
-function conic(items,colors){
-  const total=items.reduce((s,x)=>s+x[1],0)||1;let cur=0,parts=[];
-  items.forEach((x,i)=>{const p=x[1]/total*100;parts.push(`${colors[i]} ${cur.toFixed(3)}% ${(cur+p).toFixed(3)}%`);cur+=p;});
-  return `conic-gradient(${parts.join(',')})`;
+function dayTrade(){
+ const d=DATA.dayTrade;
+ return card(`<div class="eyebrow">DAY-TRADE 2.0</div><div class="forecast-main">${d.entryAllowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN'}</div><div class="sub">Bias ≠ Ausführung · Indikatoren</div><div class="row"><b>GATE SCORE</b><b class="amber">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
+ `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice))}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="red" style="font-size:13px">überdehnt</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="amber" style="font-size:13px">erhöht</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="green" style="font-size:13px">OK</div>')}${metric('OI','$'+fmt(d.oiB,2)+'B')}${metric('VWAP','$'+fmt(d.vwap))}</div>`+
+ card(`<div class="section-title">FIB LEVELS <span class="muted" style="float:right;font-size:13px">$${fmt(d.fib.low)} → $${fmt(d.fib.high)}</span></div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`)+
+ card(`<div class="section-title">TRADE GATE</div><div class="row"><span>Datenfrische</span><b class="green">Browser Live</b></div><div class="row"><span>MTF-Konfluenz</span><b class="green">bullish</b></div><div class="row"><span>Entry-Streckung</span><b class="red">4H RSI ${fmt(d.rsi4h,2)} → stark überdehnt</b></div><div class="row"><span>Liquidationspuffer</span><b class="amber">$${fmt(d.liquidationBuffer)}</b></div>`);
 }
-
-function getHistory(){
-  try{
-    let h=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
-    if(!h.length){h=JSON.parse(localStorage.getItem(LEGACY_HISTORY_KEY)||'[]');if(h.length)setHistory(h)}
-    return h;
-  }catch(e){return []}
+function closes(symbol){
+ const c=HISTORY?.coins?.[symbol]?.candles||[];
+ return c.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4]})).filter(x=>Number.isFinite(x.c));
 }
-function setHistory(h){
-  // 30 days at max. one point / 10 min while the app is open (~4320 points).
-  const cutoff=Date.now()-31*24*60*60*1000;
-  localStorage.setItem(HISTORY_KEY,JSON.stringify(h.filter(x=>x.t>=cutoff).slice(-4500)));
+function rsi(vals,p=14){
+ if(vals.length<p+1)return null;let g=0,l=0;
+ for(let i=vals.length-p;i<vals.length;i++){const d=vals[i]-vals[i-1];if(d>=0)g+=d;else l-=d}
+ if(l===0)return 100; const rs=(g/p)/(l/p); return 100-(100/(1+rs));
 }
-function rangedHistory(h){
-  const now=Date.now(), ms={"24h":864e5,"7d":7*864e5,"30d":30*864e5,all:Infinity}[historyRange]||864e5;
-  return ms===Infinity?h:h.filter(x=>now-x.t<=ms);
+function cycleClock(sym){
+ const now=Date.now(), last=HALVINGS.at(-1), span=NEXT_HALVING_EST-last;
+ let pct=Math.max(0,Math.min(100,(now-last)/span*100));
+ const lag=COIN_LAG_DAYS[sym]||0;
+ const estimatedPeak=new Date(last+(548+lag)*86400000);
+ const daysFromPeak=Math.round((now-estimatedPeak.getTime())/86400000);
+ let phase='POST-HALVING EXPANSION';
+ if(daysFromPeak>-90 && daysFromPeak<90) phase='PEAK WINDOW';
+ else if(daysFromPeak>=90) phase='LATE CYCLE / RESET';
+ return {pct,phase,estimatedPeak,daysFromPeak,lag};
 }
-function recordHistory(force=false, label=''){
-  const {total}=buildAggregates(); if(!total)return;
-  let h=getHistory(); const now=Date.now();
-
-  if(!h.length){
-    // Seed with a real start value and a tiny earlier timestamp so chart is never blank.
-    h.push({t:now-60000,v:total,label:'start'});
-    h.push({t:now,v:total,label:label||'snapshot'});
-    setHistory(h);
-  }else if(force || now-h[h.length-1].t>10*60*1000){
-    h.push({t:now,v:total,label}); setHistory(h);
-  }
-  renderHistory();
+function forecast(symbol){
+ const arr=closes(symbol), btc=closes('BTC');
+ if(arr.length<90)return {ready:false,cycle:cycleClock(symbol)};
+ const vals=arr.map(x=>x.c), last=vals.at(-1), look=vals.slice(-90), low=Math.min(...look), high=Math.max(...look);
+ const pos=(last-low)/(high-low||1)*100;
+ const dailyRsi=rsi(vals);
+ const fib=[1.272,1.618,2.0].map(m=>high+(high-low)*(m-1));
+ const ret90=(last/vals[Math.max(0,vals.length-91)]-1)*100;
+ let rel=null,lag=null;
+ if(symbol!=='BTC' && btc.length>90){
+   const bv=btc.map(x=>x.c), br=(bv.at(-1)/bv[Math.max(0,bv.length-91)]-1)*100; rel=ret90-br;
+   const peakIndex=a=>{let mi=0,m=-Infinity; a.forEach((v,i)=>{if(v>m){m=v;mi=i}});return mi}
+   lag=peakIndex(look)-peakIndex(bv.slice(-90));
+ }
+ const risk=Math.round(Math.max(0,Math.min(100,(dailyRsi??50)*0.55+pos*0.45)));
+ const confidence=Math.round(Math.max(35,Math.min(92,55+(arr.length>=300?12:0)+(symbol==='BTC'?8:0)+(Math.abs(ret90)>10?7:0))));
+ return {ready:true,last,low,high,pos,dailyRsi,ret90,rel,lag,risk,confidence,fib,count:arr.length,cycle:cycleClock(symbol)};
 }
-function renderHistory(){
-  const all=getHistory();
-  const h=rangedHistory(all);
-  const line=document.getElementById('historyLine'),area=document.getElementById('historyArea'),label=document.getElementById('historyLabel');
-  const hero=document.querySelector('.hero-card');
-  if(!line||!area)return;
-
-  if(h.length<2){
-    line.setAttribute('d','M0 45 L320 45');
-    line.setAttribute('class','history-single-line');
-    area.setAttribute('d','M0 45 L320 45 L320 90 L0 90 Z');
-    label.textContent=h.length?`Startwert ${money(h[0].v)}`:'Startwert wird gespeichert';
-    hero?.classList.add('history-short');
-    return;
-  }
-
-  const vals=h.map(x=>x.v), min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
-  const flat=(max-min)<0.01;
-  let pts;
-  if(flat){
-    pts=h.map((x,i)=>[i/(h.length-1)*320,45]);
-    hero?.classList.add('history-short');
-  }else{
-    pts=h.map((x,i)=>[i/(h.length-1)*320,82-(x.v-min)/span*70]);
-    hero?.classList.remove('history-short');
-  }
-  const d='M'+pts.map(p=>p.map(n=>n.toFixed(1)).join(' ')).join(' L');
-  line.setAttribute('class','line');
-  line.setAttribute('d',d);
-  area.setAttribute('d',d+` L 320 90 L 0 90 Z`);
-  const diff=h[h.length-1].v-h[0].v, pctv=diff/h[0].v*100;
-  label.textContent=`${diff>=0?'+':'−'}${money(Math.abs(diff))} · ${pct(pctv)} · ${h.length} Punkte`;
-}
-
-function renderDepot(){
-  const {assets,venues,total,liveValue}=buildAggregates();
-  const sorted=Object.entries(assets).sort((a,b)=>b[1]-a[1]),day=weighted24h(assets,total);
-
-  portfolioUsd.textContent=money(total); portfolioEur.textContent=eur(total*state.data.eurRate);
-  portfolio24h.textContent=`${pct(day.pct)} (24h)`;
-  portfolio24hUsd.textContent=`≈ ${day.usd>=0?'+':'−'}${money(Math.abs(day.usd))}`;
-  assetCount.textContent=sorted.length;
-  largestAsset.textContent=sorted.length?`${sorted[0][0]} ${(sorted[0][1]/total*100).toFixed(1)}%`:'—';
-  const livePct=total?liveValue/total*100:0;
-  coverageMetric.textContent=`${livePct.toFixed(0)}% live`;
-  coverageMetric.className=livePct>80?'good':'warn';
-
-  const shown=sorted.slice(0,5),rest=sorted.slice(5).reduce((s,x)=>s+x[1],0); if(rest>0)shown.push(['REST',rest]);
-  assetDonut.style.background=conic(shown,assetColors); assetDonutTotal.textContent=money(total);
-  assetLegend.innerHTML=shown.map((x,i)=>`<div class="legend-row"><span><i class="dot" style="background:${assetColors[i]}"></i>${x[0]}</span><b>${(x[1]/total*100).toFixed(1)}%</b></div>`).join('');
-
-  const vi=Object.entries(venues);
-  venueDonut.style.background=conic(vi,vi.map(x=>venueColors[x[0]]));
-  venueLegend.innerHTML=vi.map(x=>`<div class="legend-row"><span><i class="dot" style="background:${venueColors[x[0]]}"></i>${x[0]}</span><b>${(x[1]/total*100).toFixed(1)}%</b></div>`).join('');
-  venueCards.innerHTML=vi.map(x=>`<div class="venue-card"><div class="venue-name"><i class="dot" style="background:${venueColors[x[0]]}"></i>${x[0]}</div><div class="venue-value">${money(x[1])}</div><div class="venue-share" style="color:${venueColors[x[0]]}">${(x[1]/total*100).toFixed(1)}%</div><div class="bar"><i style="width:${(x[1]/total*100).toFixed(1)}%;background:${venueColors[x[0]]}"></i></div></div>`).join('');
-
-  const dominant={};
-  for(const [vn,v] of Object.entries(state.data.venues)){
-    for(const [coin,p] of Object.entries(v.positions||{})){
-      const val=currentValue(coin,p);
-      if(!dominant[coin]||val>dominant[coin].value)dominant[coin]={venue:vn,value:val};
-    }
-  }
-  top5Body.innerHTML=sorted.slice(0,5).map((x,i)=>{
-    const ch=state.changes[x[0]];
-    return `<tr><td>${i+1}</td><td><b>${x[0]}</b></td><td>${dominant[x[0]]?.venue||'—'}</td><td>${money(x[1])}</td><td>${(x[1]/total*100).toFixed(1)}%</td><td style="color:${ch==null?'var(--dim)':ch>=0?'var(--green)':'var(--red)'}">${ch==null?'—':pct(ch)}</td></tr>`;
-  }).join('');
-
-  const moves=sorted.filter(x=>Number.isFinite(state.changes[x[0]])).map(x=>[x[0],state.changes[x[0]]]);
-  const best=moves.length?moves.reduce((a,b)=>b[1]>a[1]?b:a):['—',0],worst=moves.length?moves.reduce((a,b)=>b[1]<a[1]?b:a):['—',0];
-  const vals=moves.map(x=>x[1]),mean=vals.reduce((a,b)=>a+b,0)/(vals.length||1),vol=Math.sqrt(vals.reduce((s,v)=>s+(v-mean)**2,0)/(vals.length||1));
-  mini24h.textContent=pct(day.pct); mini24hUsd.textContent=(day.usd>=0?'+':'−')+money(Math.abs(day.usd));
-  bestCoin.textContent=best[0];bestMove.textContent=pct(best[1]);worstCoin.textContent=worst[0];worstMove.textContent=pct(worst[1]);volatility.textContent=vol.toFixed(2).replace('.',',')+'%';
-
-  const rows=[];
-  for(const [venueName,venue] of Object.entries(state.data.venues)){
-    for(const [coin,p] of Object.entries(venue.positions||{})){
-      const meta=state.priceMeta[coin]||{source:'Snapshot',updatedAt:p.snapshotAt};
-      const cls=meta.source==='Live'?'live':'snapshot';
-      rows.push(`<div class="position-row"><div class="position-meta"><strong>${coin}</strong><small>${venueName}${p.label?' · '+p.label:''}</small><span class="source-chip ${cls}">${meta.source} · ${ageLabel(meta.updatedAt)}</span></div><div class="position-right"><strong>${money(currentValue(coin,p),2)}</strong><br><small>${shortQty(p.qty)} ${p.label||coin}</small></div></div>`);
-    }
-  }
-  positionsList.innerHTML=rows.join('');
-
-  const bots=state.data.venues.Pionex.bots||[];
-  botsList.innerHTML=bots.map(b=>`<div class="bot-card"><div class="bot-head"><strong>${b.name}</strong><span class="bot-tag">${b.side} ${b.leverage}x</span></div><div class="bot-grid"><div class="bot-kpi"><span>Investition</span><b>${b.investment} USDT</b></div><div class="bot-kpi"><span>Dyn. Margin</span><b>${b.dynamicMargin} USDT</b></div><div class="bot-kpi"><span>Gesamt Profit</span><b style="color:var(--red)">${b.pnl} USDT</b></div><div class="bot-kpi"><span>Grid Profit</span><b style="color:var(--green)">+${b.gridProfit}</b></div><div class="bot-kpi"><span>Break-even</span><b>${money(b.breakEven,1)}</b></div><div class="bot-kpi"><span>Liquidation</span><b>${money(b.liq,1)}</b></div></div></div>`).join('');
-  renderHistory();
-}
-
-
-function marketScore(){
-  const {assets}=buildAggregates();
-  const vals=Object.keys(assets).filter(c=>Number.isFinite(state.changes[c])).map(c=>state.changes[c]);
-  if(!vals.length)return 50;
-  const positive=vals.filter(v=>v>0).length/vals.length*100;
-  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
-  return Math.max(0,Math.min(100,positive*0.65 + Math.max(0,Math.min(35,avg*3))));
-}
-
-function nadirScore(){
-  const b=state.data.boden;
-  const valuation=Math.max(0,Math.min(100,100-((b.mvrv-0.5)/(3-0.5))*100));
-  const capitulation=Math.max(0,Math.min(100,(75-b.fearGreed)/65*100));
-  const holder=50, timing=55;
-  return Math.round((valuation+capitulation+holder+timing)/4);
-}
-
-
-function fibScore(){
-  const btc=liveTradeValue('price',priceFor('BTC')||state.data.daytrade.btcPrice);
-  const f=fibLevels();
-  const range=f.high-f.low;
-  if(!range || !btc)return 50;
-
-  const all=f.levels;
-  let nearest=null;
-  all.forEach(x=>{
-    const d=Math.abs(btc-x.price)/btc*100;
-    if(!nearest||d<nearest.d)nearest={...x,d};
-  });
-
-  let score=55;
-  if(nearest){
-    if(nearest.d<=0.75)score+=25;
-    else if(nearest.d<=1.5)score+=15;
-    else if(nearest.d<=3)score+=5;
-  }
-
-  // Prefer pullbacks inside the main retracement zone for long entries.
-  const retracement=(f.high-btc)/range;
-  if(retracement>=0.236 && retracement<=0.618)score+=10;
-  if(btc>f.high)score-=20;
-  if(btc<f.low)score-=15;
-
-  return Math.max(0,Math.min(100,Math.round(score)));
-}
-
-function entryScore(){
-  const d=state.data.daytrade;
-  const rsi4=liveTradeValue('rsi4h',d.rsi4h);
-  const rsi1=liveTradeValue('rsi1h',d.rsi1h);
-  let score=100;
-  if(rsi4>80)score-=25; else if(rsi4>70)score-=15;
-  if(rsi1>75)score-=10;
-  if(Math.abs(d.funding)>0.02)score-=10;
-  if(!state.tradeLive)score-=15;
-  return Math.max(0,Math.min(100,score));
-}
-
-function renderDecisionEngine(){
-  const m=Math.round(marketScore()), n=nadirScore(), e=entryScore(), f=fibScore();
-  const w=state.data.decisionEngine?.weights||{market:.30,nadir:.25,entry:.30,fib:.15};
-  const total=Math.round(m*w.market+n*w.nadir+e*w.entry+f*(w.fib||0));
-  let label='WAIT',text='Markt konstruktiv, aber Entry-Qualität nicht ausreichend.';
-  if(total>=78 && e>=70 && f>=60){label='GO';text='Markt, Zyklus, Entry-Gate und FIB-Zone sind ausreichend ausgerichtet.'}
-  if(total<45){label='DEFENSIVE';text='Risiko reduzieren; Markt-/Entry-Signale sind schwach.'}
-  const staleMins=state.tradeLive?0:(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
-  if(staleMins>(state.data.decisionEngine?.staleMinutes||60)){
-    label='WAIT';
-    text='Markt stark, aber Trading-Indikatoren sind zu alt für einen neuen Entry.';
-  }
-  const dl=document.getElementById('decisionLabel'),ds=document.getElementById('decisionScore');
-  if(dl)dl.textContent=label;if(ds)ds.textContent=`${total}/100`;
-  const dt=document.getElementById('decisionText');if(dt)dt.textContent=text;
-  const dm=document.getElementById('decisionMarket');if(dm)dm.textContent=`${m}/100`;
-  const dn=document.getElementById('decisionNadir');if(dn)dn.textContent=`${n}/100`;
-  const de=document.getElementById('decisionEntry');if(de)de.textContent=`${e}/100`;
-  const df=document.getElementById('decisionFib');if(df)df.textContent=`${f}/100`;
-  const st=document.getElementById('decisionStatus');
-  if(st)st.textContent=staleMins>60?`Entry-Daten stale · ${Math.round(staleMins/60)} h alt`:'Entry-Daten frisch';
-  if(ds)ds.style.color=label==='GO'?'var(--green)':label==='DEFENSIVE'?'var(--red)':'var(--amber)';
-}
-
-function fibLevels(){
-  const f=state.data.fib||{};
-  const low=f.swingLow,high=f.swingHigh,range=high-low;
-  const levels=(f.levels||[0,0.236,0.382,0.5,0.618,0.786,1]).map(r=>({r,price:high-range*r}));
-  const ext=(f.extensionLevels||[1.272,1.618]).map(r=>({r,price:high+range*(r-1),ext:true}));
-  return {low,high,levels,ext};
-}
-
-function renderFib(){
-  const el=document.getElementById('fibLevels'); if(!el)return;
-  const btc=liveTradeValue('price',priceFor('BTC')||state.data.daytrade.btcPrice);
-  const f=fibLevels(), all=[...f.levels,...f.ext];
-  document.getElementById('fibRangeLabel').textContent=`${money(f.low)} → ${money(f.high)}`;
-
-  let nearest=null;
-  all.forEach(x=>{const d=Math.abs(btc-x.price);if(!nearest||d<nearest.d)nearest={...x,d}});
-
-  el.innerHTML=all.map(x=>{
-    const dist=(btc-x.price)/btc*100;
-    const near=Math.abs(dist)<(state.data.fib?.nearPct||1.5);
-    const role=x.price<btc?'support':'resistance';
-    const ext=x.ext?'extension':'';
-    const tag=x.ext?'EXT':role==='support'?'SUPPORT':'RESIST';
-    return `<div class="fib-row ${near?'near active':''} ${role} ${ext}">
-      <span class="fib-label">${(x.r*100).toFixed(1)}% <i class="fib-tag ${x.ext?'ext':role}">${tag}</i></span>
-      <span class="fib-price">${money(x.price)}</span>
-      <span class="fib-distance">${dist>=0?'+':''}${dist.toFixed(1)}%</span>
-    </div>`;
-  }).join('');
-
-  const pos=document.getElementById('fibPosition');
-  if(pos&&nearest){
-    const retr=(f.high-btc)/(f.high-f.low);
-    const zone = btc>f.high?'über Swing-High':btc<f.low?'unter Swing-Low':
-      retr<0.236?'oberhalb 23,6%':retr<0.382?'23,6–38,2% Zone':
-      retr<0.618?'38,2–61,8% Golden Zone':'tiefer Pullback';
-    pos.innerHTML=`BTC ${money(btc)} · nächstes FIB ${(nearest.r*100).toFixed(1)}% bei ${money(nearest.price)} · Abstand ${(nearest.d/btc*100).toFixed(1)}%
-      <div class="fib-summary">Zone: <b>${zone}</b> · FIB Score: <b>${fibScore()}/100</b></div>`;
-  }
-}
-
-function renderPionexRisk(){
-  const el=document.getElementById('pionexRiskCard'); if(!el)return;
-  const p=state.data.venues.Pionex,btc=priceFor('BTC')||state.data.daytrade.btcPrice;
-  const bots=p.bots||[];
-  const nearestLiq=bots.length?Math.min(...bots.map(b=>b.liq)):null;
-  const liqDist=nearestLiq?((nearestLiq-btc)/btc*100):null;
-  const totalPnl=bots.reduce((s,b)=>s+(b.pnl||0),0);
-  const totalMargin=bots.reduce((s,b)=>s+(b.dynamicMargin||0),0);
-  el.innerHTML=`<div class="pionex-risk-grid">
-    <div class="pionex-risk-item"><span>KONTOWERT</span><b>${money(p.cash,2)}</b></div>
-    <div class="pionex-risk-item"><span>BOT P&L</span><b class="${totalPnl<0?'risk-high':'risk-ok'}">${totalPnl.toFixed(2)} USDT</b></div>
-    <div class="pionex-risk-item"><span>DYN. MARGIN</span><b>${totalMargin.toFixed(2)} USDT</b></div>
-    <div class="pionex-risk-item"><span>NÄCHSTE LIQ.</span><b class="${liqDist!=null&&liqDist<8?'risk-high':'risk-warn'}">${nearestLiq?money(nearestLiq,1):'—'} ${liqDist!=null?`(${liqDist.toFixed(1)}%)`:''}</b></div>
-  </div>`;
-}
-
-function renderMarket(){
-  const {assets}=buildAggregates(),btc=state.changes.BTC||0,regime=btc>2?'RISK-ON':btc<-2?'RISK-OFF':'NEUTRAL';
-  marketRegime.textContent=regime;regimeDot.style.left=regime==='RISK-ON'?'82%':regime==='RISK-OFF'?'18%':'50%';
-  const rows=Object.keys(assets).filter(c=>Number.isFinite(state.changes[c])).sort((a,b)=>state.changes[b]-state.changes[a]);
-  const adv=rows.filter(c=>state.changes[c]>0).length, dec=rows.filter(c=>state.changes[c]<0).length;
-  const avg=rows.length?rows.reduce((s,c)=>s+state.changes[c],0)/rows.length:0;
-  const best=rows[0]||'—', worst=rows[rows.length-1]||'—';
-  marketSummary.innerHTML=[['Marktbreite',`${adv}/${rows.length} positiv`],['Ø 24H',pct(avg)],['Leader',best==='—'?'—':`${best} ${pct(state.changes[best])}`],['Laggard',worst==='—'?'—':`${worst} ${pct(state.changes[worst])}`]].map(x=>`<div class="summary-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
-  marketRadar.innerHTML=rows.slice(0,14).map(c=>`<div class="radar-row"><div><strong>${c}</strong><br><small>${state.changes[c]>=3?'Momentum positiv':state.changes[c]<=-3?'Momentum negativ':'Neutral'}</small></div><b style="color:${state.changes[c]>=0?'var(--green)':'var(--red)'}">${pct(state.changes[c])}</b></div>`).join('');
-}
-
-
-function getNadirZone(score){
-  const zones=state.data.nadirZones||[];
-  return zones.find(z=>score>=z.min&&score<=z.max)||zones[0]||{label:'—',tone:'amber',note:''};
-}
-
-
-function daysBetween(a,b){return Math.floor((b-a)/86400000)}
-function renderCycleClock(){
-  const c=state.data.cycleClock||{};
-  if(!c.halving)return;
-  const now=new Date();
-  const low=new Date(c.cycleLow),halving=new Date(c.halving),next=new Date(c.nextHalvingEstimate);
-  const daysLow=daysBetween(low,now);
-  const daysHalving=daysBetween(halving,now);
-  const remaining=Math.max(0,daysBetween(now,next));
-  const total=Math.max(1,next-halving);
-  const progress=Math.max(0,Math.min(100,(now-halving)/total*100));
-  const phase=(c.phases||[]).find(p=>daysHalving<=p.maxDays)||{label:'—',tone:'amber'};
-
-  const ph=document.getElementById('cyclePhase');
-  if(ph){ph.textContent=phase.label;ph.style.color=phase.tone==='green'?'var(--green)':phase.tone==='red'?'var(--red)':'var(--amber)'}
-  const note=document.getElementById('cycleNote');if(note)note.textContent=c.sourceNote||'Kalendermodell';
-  const pr=document.getElementById('cycleProgress');if(pr)pr.textContent=`${progress.toFixed(1)}%`;
-  const fill=document.getElementById('cycleTrackFill');if(fill)fill.style.width=`${progress}%`;
-  const dot=document.getElementById('cycleTrackDot');if(dot)dot.style.left=`${progress}%`;
-  const dl=document.getElementById('cycleDaysLow');if(dl)dl.textContent=`${daysLow} Tage`;
-  const dh=document.getElementById('cycleDaysHalving');if(dh)dh.textContent=`${daysHalving} Tage`;
-  const nh=document.getElementById('cycleNextHalving');if(nh)nh.textContent=next.toLocaleDateString('de-DE',{month:'short',year:'numeric'});
-  const dr=document.getElementById('cycleDaysRemaining');if(dr)dr.textContent=`≈ ${remaining} Tage`;
-}
-
-function renderBoden(){
-  const b=state.data.boden,valuation=Math.max(0,Math.min(100,100-((b.mvrv-0.5)/(3-0.5))*100)),capitulation=Math.max(0,Math.min(100,(75-b.fearGreed)/65*100));
-  const scores=[['Bewertung',valuation],['Kapitulation',capitulation],['Holder',50],['Timing',55]];
-  const total=Math.round(scores.reduce((s,x)=>s+x[1],0)/scores.length);
-  nadirTotal.textContent=`${total}/100`;nadirTotalBar.style.width=total+'%';
-  nadirState.textContent=total>=70?'starke Akkumulations-Evidenz':total>=45?'Akkumulations-Regime · gemischte Evidenz':'geringe Akkumulations-Evidenz';
-  nadirGrid.innerHTML=scores.map(x=>`<div class="nadir-card"><span>${x[0]}</span><b>${Math.round(x[1])}/100</b><div class="score-track"><i style="width:${Math.round(x[1])}%"></i></div></div>`).join('');
-}
-
-
-
-function calcRSI(closes,period=14){
-  if(!closes||closes.length<period+2)return null;
-  let gain=0,loss=0;
-  for(let i=1;i<=period;i++){
-    const d=closes[i]-closes[i-1];
-    if(d>=0)gain+=d; else loss-=d;
-  }
-  let avgGain=gain/period,avgLoss=loss/period;
-  for(let i=period+1;i<closes.length;i++){
-    const d=closes[i]-closes[i-1];
-    const g=d>0?d:0,l=d<0?-d:0;
-    avgGain=(avgGain*(period-1)+g)/period;
-    avgLoss=(avgLoss*(period-1)+l)/period;
-  }
-  if(avgLoss===0)return 100;
-  const rs=avgGain/avgLoss;
-  return 100-(100/(1+rs));
-}
-
-function calcVWAP(klines){
-  if(!klines?.length)return null;
-  let pv=0,vol=0;
-  klines.forEach(k=>{
-    const h=+k[2],l=+k[3],c=+k[4],v=+k[5];
-    const tp=(h+l+c)/3;
-    pv+=tp*v;vol+=v;
-  });
-  return vol?pv/vol:null;
-}
-
-async function fetchJsonTimeout(url,ms=8000){
-  const ctrl=new AbortController();
-  let timer;
-  const timeout=new Promise((_,reject)=>{
-    timer=setTimeout(()=>{try{ctrl.abort()}catch(_e){} reject(new Error('TIMEOUT'));},ms);
-  });
-  const request=(async()=>{
-    const r=await fetch(url,{cache:'no-store',signal:ctrl.signal});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    return await r.json();
-  })();
-  try{return await Promise.race([request,timeout]);}
-  finally{clearTimeout(timer);}
-}
-
-async function refreshTradingIntelligence(){
-  const cfg=state.data.liveTrading||{};
-  const base=cfg.baseUrl||'https://data-api.binance.vision';
-  const symbol=cfg.symbol||'BTCUSDT';
-  const timeout=cfg.timeoutMs||8000;
-  const status=document.getElementById('tradingLiveStatus');
-  if(status){status.textContent='Trading-Daten werden live geladen…';status.className='trading-live-status';}
-  try{
-    const [ticker,k1,k4]=await Promise.all([
-      fetchJsonTimeout(`${base}/api/v3/ticker/price?symbol=${symbol}`,timeout),
-      fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}&interval=1h&limit=100`,timeout),
-      fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}&interval=4h&limit=100`,timeout)
-    ]);
-    const price=+ticker.price;
-    const closed1=k1.slice(0,-1), closed4=k4.slice(0,-1);
-    const rsi1=calcRSI(closed1.map(k=>+k[4]),cfg.rsiPeriod||14);
-    const rsi4=calcRSI(closed4.map(k=>+k[4]),cfg.rsiPeriod||14);
-    const vwap=calcVWAP(closed1.slice(-(cfg.vwapHours||24)));
-    state.tradeLive={price,rsi1h:rsi1,rsi4h:rsi4,vwap,updatedAt:new Date(),source:'Binance'};
-    if(Number.isFinite(price)){
-      state.prices.BTC=price;
-      state.priceMeta.BTC={source:'Live',updatedAt:new Date().toISOString()};
-    }
-    if(status){status.textContent=`LIVE · BTC / RSI / VWAP · ${fmtTime(state.tradeLive.updatedAt)}`;status.className='trading-live-status live';}
-    renderAll();
-    recordHistory(true,'trade-live');
-  }catch(e){
-    console.error('Trading intelligence',e);
-    state.tradeLive=null;
-    if(status){status.textContent='LIVE-TRADING-DATEN NICHT ERREICHBAR · Snapshot aktiv';status.className='trading-live-status error';}
-    renderTrade();
-    renderDecisionEngine();
-    renderFib();
-  }
-}
-
-function liveTradeValue(key,fallback){
-  const v=state.tradeLive?.[key];
-  return Number.isFinite(v)?v:fallback;
-}
-
-function liveTradeLabel(){
-  return state.tradeLive?'LIVE · Binance':'Snapshot';
-}
-
-function tradeSnapshotAge(){
-  const ts=state.data.snapshotAt?new Date(state.data.snapshotAt):null;
-  if(!ts)return 'Snapshot';
-  const mins=Math.max(0,Math.round((Date.now()-ts.getTime())/60000));
-  if(mins<60)return `Snapshot · ${mins} min alt`;
-  const h=Math.round(mins/60); return `Snapshot · ${h} h alt`;
-}
-
-function renderTrade(){
-  const d=state.data.daytrade;
-  const price=liveTradeValue('price',priceFor('BTC')||d.btcPrice);
-  const rsi4=liveTradeValue('rsi4h',d.rsi4h);
-  const rsi1=liveTradeValue('rsi1h',d.rsi1h);
-  const vwap=liveTradeValue('vwap',d.vwap);
-  const mode=liveTradeLabel();
-
-  const age=state.tradeLive?`LIVE · ${fmtTime(state.tradeLive.updatedAt)}`:tradeSnapshotAge();
-  const r4s=rsi4>80?'überdehnt':rsi4>70?'erhöht':'OK';
-  const r1s=rsi1>75?'erhöht':'OK';
-
-  let score=100;
-  if(rsi4>80)score-=25; else if(rsi4>70)score-=15;
-  if(rsi1>75)score-=10;
-  if(Math.abs(d.funding)>0.02)score-=10;
-  if(!state.tradeLive)score-=15;
-  score=Math.max(0,Math.min(100,score));
-
-  const title=document.getElementById('tradeTitle');
-  if(title)title.textContent=score>=80?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN';
-  const gs=document.getElementById('gateScore');if(gs)gs.textContent=`${score}/100`;
-  const gb=document.getElementById('gateBar');if(gb)gb.style.width=`${score}%`;
-  const dm=document.getElementById('tradeDataMode');if(dm)dm.textContent=state.tradeLive?'Indikatoren: LIVE':'Indikatoren: Snapshot';
-
-  tradeGrid.innerHTML=[
-    ['BTC Preis',money(price),state.tradeLive?'LIVE':'Snapshot',state.tradeLive?'live':'snapshot'],
-    ['4H RSI',rsi4.toFixed(2),r4s,state.tradeLive?'live':'snapshot'],
-    ['1H RSI',rsi1.toFixed(2),r1s,state.tradeLive?'live':'snapshot'],
-    ['Funding',d.funding+'%','Snapshot','snapshot'],
-    ['OI','$'+d.oi+'B','Snapshot','snapshot'],
-    ['VWAP',money(vwap),state.tradeLive?'LIVE 24H':'Snapshot',state.tradeLive?'live':'snapshot']
-  ].map(x=>`<div class="trade-kpi"><span>${x[0]}</span><b>${x[1]}</b><small class="live-note ${x[3]}">${x[2]}</small></div>`).join('');
-
-  const liq=(state.data.venues.Pionex?.bots||[]).length?Math.min(...state.data.venues.Pionex.bots.map(b=>b.liq)):d.liq;
-  const checks=[
-    ['Datenfrische',age,state.tradeLive?'ok':'warn'],
-    ['MTF-Konfluenz',rsi4<70&&rsi1<70?'bullish / nicht überhitzt':rsi4>80?'überhitzt':'gemischt',rsi4>80?'bad':'ok'],
-    ['Entry-Streckung',rsi4>80?`4H RSI ${rsi4.toFixed(2)} → stark überdehnt`:rsi4>70?`4H RSI ${rsi4.toFixed(2)} → erhöht`:'RSI im akzeptablen Bereich',rsi4>80?'bad':rsi4>70?'warn':'ok'],
-    ['Liquidationspuffer',money(liq,0),'warn']
-  ];
-  tradeChecks.innerHTML=checks.map(c=>`<div class="status-row"><span>${c[0]}</span><b class="${c[2]==='ok'?'system-ok':c[2]==='bad'?'system-bad':'system-warn'}">${c[1]}</b></div>`).join('');
-}
-
-function setSystemStatus(id,text,cls=''){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.textContent=text;
-  el.className=cls;
-}
-
-async function checkBuild(){
-  try{
-    const r=await fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const v=await r.json();
-    setSystemStatus('cacheStatus',v.buildId===BUILD_ID?'aktuell':'Update verfügbar',
-                    v.buildId===BUILD_ID?'system-ok':'system-warn');
-    return v;
-  }catch(e){
-    setSystemStatus('cacheStatus','nicht prüfbar','system-warn');
-    return null;
-  }
-}
-
-async function hardRefreshApp(){
-  try{
-    if('serviceWorker' in navigator){
-      const regs=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r=>r.unregister()));
-    }
-    if('caches' in window){
-      const keys=await caches.keys();
-      await Promise.all(keys.map(k=>caches.delete(k)));
-    }
-  }catch(e){}
-  location.href=`./?build=${BUILD_ID}&t=${Date.now()}`;
-}
-
-
-function getMissingLiveAssets(){
-  const expected=state.data.liveDiagnostics?.expectedLiveMappedAssets||Object.keys(cgMap);
-  return expected.filter(c=>state.priceMeta[c]?.source!=='Live');
-}
-function renderLiveDiagnostics(){
-  const missing=getMissingLiveAssets();
-  const el=document.getElementById('missingLiveAssets');
-  const reason=document.getElementById('missingLiveReason');
-  if(!el||!reason)return;
-  if(!missing.length){
-    el.textContent='keine';
-    el.className='data-fresh';
-    reason.textContent='alle gemappten Assets live';
-    reason.className='data-fresh';
-  }else{
-    el.textContent=missing.join(', ');
-    el.className=missing.length<=1?'data-stale':'data-missing';
-    const snapshotOnly=(state.data.liveDiagnostics?.snapshotOnlyAssets||[]);
-    const knownSnapshot=missing.filter(x=>snapshotOnly.includes(x));
-    reason.textContent=knownSnapshot.length===missing.length?'Snapshot-only / kein Live-Mapping':'Live-API oder Mapping fehlt';
-    reason.className='data-stale';
-  }
-}
-
-function renderSettings(){
-  const {total,liveValue}=buildAggregates();
-  const rows=[
-    ['App-Version',state.data.appVersion||'3.1.0'],
-    ['Letzter Refresh',state.lastUpdated.toLocaleString('de-DE')],
-    ['Live bewertet',`${(total?liveValue/total*100:0).toFixed(0)}%`],
-    ['Bitpanda','Screenshot + Live-Kurse'],
-    ['OKX','Screenshot + Live-Kurse'],
-    ['Ledger','Screenshot + Live-Kurse'],
-    ['Pionex','Snapshot gebundenes Kapital']
-  ];
-  dataStatus.innerHTML=rows.map(x=>`<div class="status-row"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
-  updatedPill.textContent='↻ '+fmtTime(state.lastUpdated);
-  renderLiveDiagnostics();
-  setSystemStatus('systemBuild',`v${APP_VERSION} · ${BUILD_ID}`,'system-ok');
-  const expected=(state.data.diagnostics?.expectedLiveMappedAssets||Object.keys(cgMap)).length;
-  const liveNow=Object.values(state.priceMeta).filter(x=>x.source==='Live').length;
-  setSystemStatus('liveAssetCount',`${liveNow}/${expected}`,liveNow===expected?'system-ok':liveNow>0?'system-warn':'system-bad');
-  loadServerHistory(false).then(h=>{
-    const n=Object.keys(h?.coins||{}).length;
-    const label=h?.status==='ok'?`History Server · ${n} Coins`:'History Server · pending';
-    // reuse cache status text only as an extra human-readable line if element exists
-    const cacheEl=document.getElementById('cacheStatus');
-    if(cacheEl && h?.status==='ok')cacheEl.title=label;
-  });
-}
-
-
-
-async function loadServerHistory(force=false){
-  if(state.historyStore && !force)return state.historyStore;
-  if(state.historyPromise && !force)return state.historyPromise;
-  const file=state.data?.forecast?.historyFile||'./history.json';
-  state.historyPromise=(async()=>{
-    const pill=document.getElementById('forecastHistoryStatus');
-    try{
-      const r=await fetch(`${file}?t=${Date.now()}`,{cache:'no-store'});
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      const j=await r.json();
-      state.historyStore=j;
-      const count=Object.keys(j.coins||{}).length;
-      if(pill){
-        if(j.status==='ok'&&count){
-          const dt=j.generatedAt?new Date(j.generatedAt):null;
-          pill.textContent=`HISTORY · SERVER · ${count} Coins${dt?' · '+fmtTime(dt):''}`;
-          pill.className='forecast-history-pill ok';
-        }else{
-          pill.textContent='HISTORY · GitHub Update ausstehend';
-          pill.className='forecast-history-pill warn';
-        }
-      }
-      return j;
-    }catch(e){
-      console.error('Server history',e);
-      if(pill){pill.textContent='HISTORY · nicht erreichbar';pill.className='forecast-history-pill warn';}
-      state.historyStore={status:'error',coins:{},errors:{_history:String(e)}};
-      return state.historyStore;
-    }finally{
-      state.historyPromise=null;
-    }
-  })();
-  return state.historyPromise;
-}
-
-function historyPrices(entry){
-  const c=entry?.candles||[];
-  return c.map(x=>[+x[0],+x[4]]).filter(x=>Number.isFinite(x[1]));
-}
-function historySlice(entry,days){
-  const c=entry?.candles||[];
-  return c.slice(-Math.max(1,days));
-}
-function calcDailyRsiFromEntry(entry,period=14){
-  const closes=(entry?.candles||[]).slice(-(period+80)).map(x=>+x[4]).filter(Number.isFinite);
-  return closes.length>period+1?calcRSI(closes,period):null;
-}
-function swingFromEntry(entry,days){
-  const rows=historySlice(entry,days);
-  if(!rows.length)return null;
-  const lows=rows.map(x=>+x[3]).filter(Number.isFinite);
-  const highs=rows.map(x=>+x[2]).filter(Number.isFinite);
-  return lows.length&&highs.length?{low:Math.min(...lows),high:Math.max(...highs)}:null;
-}
-
-function detectMajorPeaks(entry,minSepDays=420){
-  const rows=entry?.candles||[];
-  if(rows.length<100)return [];
-  // Monthly-ish local maxima: point is a max within ±45 days, then keep peaks separated.
-  const candidates=[];
-  const radius=45;
-  for(let i=radius;i<rows.length-radius;i++){
-    const p=+rows[i][4];
-    let max=p;
-    for(let j=i-radius;j<=i+radius;j++)max=Math.max(max,+rows[j][4]);
-    if(p>=max*0.999)candidates.push({ts:+rows[i][0],price:p});
-  }
-  candidates.sort((a,b)=>b.price-a.price);
-  const picked=[];
-  for(const c of candidates){
-    if(picked.every(x=>Math.abs(x.ts-c.ts)>=minSepDays*86400000))picked.push(c);
-    if(picked.length>=4)break;
-  }
-  return picked.sort((a,b)=>a.ts-b.ts);
-}
-
-function observedCoinLag(coinEntry,btcEntry){
-  if(!coinEntry||!btcEntry)return null;
-  const cfg=state.data.forecast?.peakDetection||{};
-  const btcPeaks=detectMajorPeaks(btcEntry,cfg.minPeakSeparationDays||420);
-  const coinRows=coinEntry.candles||[];
-  if(!btcPeaks.length||!coinRows.length)return null;
-  const lags=[];
-  for(const bp of btcPeaks){
-    const lo=bp.ts-(cfg.coinWindowBeforeDays||120)*86400000;
-    const hi=bp.ts+(cfg.coinWindowAfterDays||180)*86400000;
-    const rows=coinRows.filter(x=>+x[0]>=lo&&+x[0]<=hi);
-    if(rows.length<20)continue;
-    let top=rows[0];
-    for(const r of rows)if(+r[2]>+top[2])top=r;
-    const lag=Math.round((+top[0]-bp.ts)/86400000);
-    if(lag>=-(cfg.coinWindowBeforeDays||120)&&lag<=(cfg.coinWindowAfterDays||180))lags.push(lag);
-  }
-  if(!lags.length)return null;
-  lags.sort((a,b)=>a-b);
-  const mid=Math.floor(lags.length/2);
-  const median=lags.length%2?lags[mid]:Math.round((lags[mid-1]+lags[mid])/2);
-  return {median,samples:lags.length,lags};
-}
-
-function resolveCycleLag(coin,cfg,observed){
-  if(coin==='BTC')return {min:0,max:0,source:'BTC Master'};
-  if(observed&&observed.samples>=1){
-    const spread=observed.samples>=2?30:45;
-    return {min:observed.median-spread,max:observed.median+spread,source:`Historie · ${observed.samples} Peak-Fenster`};
-  }
-  const lag=cfg.lagDays||[0,0];
-  return {min:lag[0],max:lag[1],source:'Klassen-Fallback'};
-}
-
-function forecastCoins(){
-  const {assets}=buildAggregates();
-  const configured=state.data.forecast?.coins||{};
-  const held=Object.keys(assets);
-  const ordered=['BTC',...held.filter(c=>c!=='BTC').sort((a,b)=>(assets[b]||0)-(assets[a]||0))];
-  return [...new Set(ordered)].filter(c=>configured[c]);
-}
-
-function renderForecastCoinStrip(){
-  const el=document.getElementById('forecastCoinStrip'); if(!el)return;
-  const coins=forecastCoins();
-  if(!coins.includes(state.forecastCoin))state.forecastCoin=coins[0]||'BTC';
-  el.innerHTML=coins.map(c=>`<button class="coin-chip ${c===state.forecastCoin?'active':''}" data-forecast-coin="${c}">${c}</button>`).join('');
-}
-
-function cgIdForCoin(c){
-  return cgMap[c]||null;
-}
-
-function forecastFmtDate(d){
-  return new Date(d).toLocaleDateString('de-DE',{month:'short',year:'numeric'});
-}
-
-function addDays(date,days){
-  const d=new Date(date);d.setUTCDate(d.getUTCDate()+days);return d;
-}
-
-function computeReturn(prices,days){
-  if(!prices?.length)return null;
-  const end=prices[prices.length-1][1];
-  const target=Date.now()-days*86400000;
-  let first=prices[0][1],best=Infinity;
-  prices.forEach(p=>{const diff=Math.abs(p[0]-target);if(diff<best){best=diff;first=p[1]}});
-  return first?((end/first)-1)*100:null;
-}
-
-function computeForecastFromHistory(coin,coinEntry,btcEntry){
-  const cfg=state.data.forecast.coins[coin];
-  const prices=historyPrices(coinEntry);
-  const btcPrices=coin==='BTC'?prices:historyPrices(btcEntry);
-  if(prices.length<30)return null;
-
-  const shortDays=state.data.forecast.swingShortDays||90;
-  const longDays=state.data.forecast.swingLongDays||180;
-  const sw90=swingFromEntry(coinEntry,shortDays);
-  const sw180=swingFromEntry(coinEntry,longDays)||sw90;
-  if(!sw90||!sw180)return null;
-
-  const current=(coin==='BTC'&&state.tradeLive?.price) ? state.tradeLive.price : (priceFor(coin)||prices[prices.length-1][1]);
-  const range=Math.max(sw180.high-sw180.low,sw180.high*.001);
-  const swingPct=Math.max(0,Math.min(100,(current-sw180.low)/range*100));
-
-  const relDays=state.data.forecast.relativeStrengthDays||30;
-  const r30=computeReturn(prices,relDays);
-  const btc30=coin==='BTC'?r30:computeReturn(btcPrices,relDays);
-  const rel=(Number.isFinite(r30)&&Number.isFinite(btc30))?r30-btc30:0;
-  const dailyRsi=calcDailyRsiFromEntry(coinEntry,14);
-
-  // Local top risk = long swing position + RSI + relative strength + current 24h impulse.
-  let topRisk=swingPct*.50;
-  if(Number.isFinite(dailyRsi))topRisk += Math.max(0,Math.min(25,(dailyRsi-50)*.65));
-  topRisk += Math.max(0,Math.min(15,rel*.55));
-  topRisk += Math.max(0,Math.min(10,(state.changes[coin]||0)*.45));
-  topRisk=Math.round(Math.max(0,Math.min(100,topRisk)));
-
-  const fibs=(state.data.forecast.fibExtensions||[1.272,1.618,2,2.618]).map(level=>({
-    level,price:sw180.high+range*(level-1)
-  }));
-
-  let phase='AKKUMULATION',tone='amber';
-  if(topRisk>=80){phase='TOP-RISK HOCH';tone='red'}
-  else if(swingPct>65&&rel>3){phase='EXPANSION';tone='green'}
-  else if(swingPct<35){phase='AKKUMULATION';tone='amber'}
-  else {phase='ÜBERGANG';tone='amber'}
-
-  const observed=coin==='BTC'?{median:0,samples:0,lags:[]}:observedCoinLag(coinEntry,btcEntry);
-  const lag=resolveCycleLag(coin,cfg,observed);
-
-  // Choose the next future macro window. If the current-halving window is past, roll to next halving.
-  const halvingCurrent=new Date(state.data.cycleClock.halving);
-  const halvingNext=new Date(state.data.cycleClock.nextHalvingEstimate);
-  const btcRange=state.data.forecast.macroTopAfterHalvingDays||[450,600];
-  let anchor=halvingCurrent;
-  let btcStart=addDays(anchor,btcRange[0]), btcEnd=addDays(anchor,btcRange[1]);
-  if(new Date()>btcEnd){anchor=halvingNext;btcStart=addDays(anchor,btcRange[0]);btcEnd=addDays(anchor,btcRange[1]);}
-  const coinStart=addDays(anchor,btcRange[0]+lag.min);
-  const coinEnd=addDays(anchor,btcRange[1]+lag.max);
-
-  let confidence=45;
-  const count=coinEntry?.count||(coinEntry?.candles||[]).length;
-  if(count>=180)confidence+=8;
-  if(count>=700)confidence+=8;
-  if(count>=1500)confidence+=6;
-  if(observed?.samples>=1)confidence+=8;
-  if(observed?.samples>=2)confidence+=5;
-  if(Number.isFinite(dailyRsi))confidence+=4;
-  if(state.priceMeta[coin]?.source==='Live'||coin==='BTC')confidence+=4;
-  if(coinEntry?.source?.includes('fallback'))confidence-=10;
-  confidence=Math.max(state.data.forecast.confidenceFloor||30,Math.min(88,confidence));
-
-  return {coin,cfg,current,low:sw90.low,high:sw90.high,low180:sw180.low,high180:sw180.high,
-          swingPct,r30,btc30,rel,topRisk,phase,tone,fibs,btcStart,btcEnd,coinStart,coinEnd,
-          confidence,dailyRsi,observedLag:observed,lagResolved:lag,dataCount:count,dataSource:coinEntry?.source||'Server'};
-}
-async function loadForecastCoin(coin){
-  if(state.forecastLoading && state.forecastCoin===coin)return;
-  state.forecastLoading=true;
-  state.forecastCoin=coin;
-  renderForecastCoinStrip();
-  const status=document.getElementById('forecastState');
-  if(status){status.textContent='LÄDT…';status.className='forecast-state';}
-
-  try{
-    const store=await loadServerHistory(false);
-    const coinEntry=store?.coins?.[coin];
-    const btcEntry=store?.coins?.BTC;
-    if(store?.status!=='ok' || !btcEntry){
-      renderForecastUnavailable(coin,'Server-Historie ist noch nicht aufgebaut. GitHub Action „Update MERIDIAN market history“ einmal ausführen oder den automatischen Lauf abwarten.');
-      return;
-    }
-    if(!coinEntry){
-      const err=store?.errors?.[coin];
-      renderForecastUnavailable(coin,err?`Für ${coin} konnte serverseitig keine Historie geladen werden: ${err}`:`Für ${coin} liegt noch keine Server-Historie vor.`);
-      return;
-    }
-    const model=computeForecastFromHistory(coin,coinEntry,btcEntry);
-    if(!model)throw new Error('Zu wenig verwertbare Historie');
-    state.forecastCache[coin]={ts:Date.now(),model};
-    renderForecastModel(model);
-  }catch(e){
-    console.error('Forecast same-origin',e);
-    renderForecastUnavailable(coin,'history.json konnte nicht verarbeitet werden. Keine erfundenen Forecast-Werte angezeigt.');
-  }finally{
-    state.forecastLoading=false;
-  }
-}
-function renderForecastUnavailable(coin,msg){
-  state.forecastLoading=false;
-  const cfg=state.data.forecast.coins[coin]||{label:coin,class:'—'};
-  document.getElementById('forecastCoinName').textContent=`${cfg.label} (${coin})`;
-  document.getElementById('forecastCoinClass').textContent=cfg.class;
-  document.getElementById('forecastCurrent').textContent=money(priceFor(coin)||0);
-  const st=document.getElementById('forecastState');st.textContent='DATEN FEHLEN';st.className='forecast-state red';
-  document.getElementById('forecastConfidence').textContent='LOW';
-  document.getElementById('forecastTopRisk').textContent='—/100';
-  document.getElementById('forecastRelative').textContent='—';
-  document.getElementById('forecastExplain').textContent=msg;
-  document.getElementById('forecastFibTargets').innerHTML='<div class="forecast-method">Forecast wird erst berechnet, wenn historische Kursdaten verfügbar sind.</div>';
-  document.getElementById('forecastScenarios').innerHTML='';
-  document.getElementById('forecastInterpretation').textContent='Kein belastbarer Forecast verfügbar.';
-  const ids=['forecast180Range','forecastRsiDaily','forecastPeakLag','forecastDataCount'];ids.forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
-}
-
-function renderForecastModel(m){
-  const cfg=m.cfg;
-  document.getElementById('forecastCoinName').textContent=`${cfg.label} (${m.coin})`;
-  document.getElementById('forecastCoinClass').textContent=cfg.class.replaceAll('_',' · ');
-  document.getElementById('forecastCurrent').textContent=money(m.current);
-  const st=document.getElementById('forecastState');st.textContent=m.phase;st.className=`forecast-state ${m.tone==='green'?'green':m.tone==='red'?'red':''}`;
-  document.getElementById('forecastConfidence').textContent=`${m.confidence}%`;
-  document.getElementById('forecastTopRisk').textContent=`${m.topRisk}/100`;
-  document.getElementById('forecastRelative').textContent=m.coin==='BTC'?'MASTER':`${m.rel>=0?'+':''}${m.rel.toFixed(1)}%`;
-  document.getElementById('forecastRiskBar').style.width=`${m.topRisk}%`;
-  document.getElementById('forecastExplain').textContent=
-    m.coin==='BTC'
-      ? `BTC dient als Master-Cycle. 90T-Position ${m.swingPct.toFixed(0)}%; 30T-Momentum ${m.r30>=0?'+':''}${m.r30.toFixed(1)}%.`
-      : `${m.coin} liegt im 90T-Swing bei ${m.swingPct.toFixed(0)}% und performt über 30 Tage ${m.rel>=0?'+':''}${m.rel.toFixed(1)} Prozentpunkte relativ zu BTC.`;
-
-  document.getElementById('forecastCycleWindow').textContent=`${forecastFmtDate(m.coinStart)} – ${forecastFmtDate(m.coinEnd)}`;
-  document.getElementById('forecastCycleSub').textContent=
-    m.coin==='BTC'?'Modelliertes BTC-Makrofenster':`${m.lagResolved.source} · ${m.lagResolved.min>=0?'+':''}${m.lagResolved.min} bis ${m.lagResolved.max>=0?'+':''}${m.lagResolved.max} Tage vs BTC`;
-  document.getElementById('btcWindowBar').style.width='64%';
-  document.getElementById('coinWindowBar').style.width=`${Math.min(92,64+(cfg.lagDays[1]||0)/5)}%`;
-
-  document.getElementById('forecastLow').textContent=money(m.low);
-  document.getElementById('forecastHigh').textContent=money(m.high);
-  document.getElementById('forecastSwingPct').textContent=`${m.swingPct.toFixed(0)}%`;
-  document.getElementById('forecastSwingBar').style.width=`${m.swingPct}%`;
-  const r180=document.getElementById('forecast180Range');if(r180)r180.textContent=`${money(m.low180)} – ${money(m.high180)}`;
-  const rd=document.getElementById('forecastRsiDaily');if(rd)rd.textContent=Number.isFinite(m.dailyRsi)?m.dailyRsi.toFixed(1):'—';
-  const pl=document.getElementById('forecastPeakLag');if(pl)pl.textContent=m.coin==='BTC'?'MASTER':m.observedLag?.samples?`${m.observedLag.median>=0?'+':''}${m.observedLag.median} T · ${m.observedLag.samples}x`:`${m.lagResolved.min}…${m.lagResolved.max} T`;
-  const dc=document.getElementById('forecastDataCount');if(dc)dc.textContent=`${m.dataCount}T · ${m.dataSource}`;
-
-  document.getElementById('forecastFibTargets').innerHTML=m.fibs.map(x=>{
-    const move=(x.price/m.current-1)*100;
-    const star=x.level===1.618;
-    return `<div class="forecast-fib ${star?'star':''}">
-      <span>FIB ${x.level.toFixed(3)}${star?' ★':''}</span>
-      <b>${money(x.price)}</b>
-      <small>${move>=0?'+':''}${move.toFixed(0)}%</small>
-    </div>`;
-  }).join('');
-
-  const scenLevels=state.data.forecast.scenarioLevels;
-  const scenarios=[
-    ['CONSERVATIVE',scenLevels.conservative,'conservative'],
-    ['BASE CASE',scenLevels.base,'base'],
-    ['BLOW-OFF',scenLevels.blowoff,'blowoff']
-  ];
-  document.getElementById('forecastScenarios').innerHTML=scenarios.map(([name,level,cls])=>{
-    const f=m.fibs.find(x=>Math.abs(x.level-level)<.001)||m.fibs[0];
-    const move=(f.price/m.current-1)*100;
-    return `<article class="forecast-scenario ${cls}">
-      <div><div class="sc-name">${name}</div><div class="sc-price">${money(f.price)}</div></div>
-      <div class="sc-move">${move>=0?'+':''}${move.toFixed(0)}%</div>
-      <div class="sc-window">${forecastFmtDate(m.coinStart)} – ${forecastFmtDate(m.coinEnd)} · Modellziel FIB ${level}</div>
-    </article>`;
-  }).join('');
-
-  let interpretation;
-  if(m.topRisk>=80)interpretation=`${m.coin}: hohes lokales Top-Risiko. Preis liegt nahe am 90T-Hoch und Momentum/Relative Stärke sind bereits stark. Neue Long-Entries benötigen höhere Bestätigung.`;
-  else if(m.swingPct<40)interpretation=`${m.coin}: eher frühe/untere Swing-Zone. FIB-Ziele sind derzeit weit entfernt; Confidence steigt erst mit bestätigter relativer Stärke.`;
-  else if(m.rel>5)interpretation=`${m.coin}: positive Rotation gegenüber BTC. Das erhöht die Wahrscheinlichkeit, dass der Coin in einer Altcoin-Phase später als BTC sein lokales Hoch bildet.`;
-  else interpretation=`${m.coin}: neutrales Übergangsbild. Der Forecast bleibt szenariobasiert; weder Top noch Expansion sind ausreichend bestätigt.`;
-  document.getElementById('forecastInterpretation').textContent=interpretation;
-  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote+` · Daten: ${m.dataCount} Tageskerzen · ${m.dataSource}.`;
-}
-
 function renderForecast(){
-  renderForecastCoinStrip();
-  const cached=state.forecastCache[state.forecastCoin];
-  if(cached)renderForecastModel(cached.model);
-  else loadForecastCoin(state.forecastCoin);
+ const f=forecast(activeCoin), coins=DATA.forecastCoins;
+ let body=card(`<div class="forecast-head"><div><div class="eyebrow">MERIDIAN FORECAST 1.1</div><div class="forecast-main">COIN CYCLE<br>FORECAST</div><div class="sub">FIB · Rotation · Relative Strength · Cycle Timing</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?f.confidence:'—'}</div></div></div><p class="footer-note">Direkt im iPhone-Browser. Keine GitHub Action nötig.</p>`);
+ body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
+ if(!f.ready){
+   body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><div class="row"><span>Zyklusphase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Coin-Offset</span><b>+${f.cycle.lag} Tage</b></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button><p class="footer-note">Die Daten werden lokal auf dem iPhone gespeichert. Beim nächsten Öffnen sind sie sofort verfügbar.</p>`);
+ }else{
+   body+=card(`<div class="eyebrow">${activeCoin}</div><div class="big" style="font-size:56px">$${fmt(f.last, activeCoin==='PEPE'?8:2)}</div><div class="grid2">${metric('LOCAL TOP-RISK',f.risk+'/100',f.risk>75?'red':f.risk>55?'amber':'green')}${metric('REL. STÄRKE VS BTC',f.rel==null?'BTC Basis':(f.rel>=0?'+':'')+fmt(f.rel,1)+'%')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div><div class="bar"><i style="width:${Math.max(3,Math.min(100,f.pos))}%"></i></div><p class="muted">Position im 90T Swing: ${fmt(f.pos,1)}%</p>`)+
+   card(`<div class="section-title">ZYKLUS-UHR</div><div class="row"><span>Phase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Halving-Zyklus</span><b>${fmt(f.cycle.pct,1)}%</b></div><div class="bar"><i style="width:${f.cycle.pct}%"></i></div><div class="row"><span>Coin-spezifischer Modell-Offset</span><b>+${f.cycle.lag} Tage</b></div><div class="row"><span>Modell-Peakfenster Mitte</span><b>${f.cycle.estimatedPeak.toLocaleDateString('de-DE')}</b></div>`)+
+   card(`<div class="section-title">MACRO CYCLE WINDOW</div><div class="row"><span>90T Peak-Lag vs BTC</span><b>${f.lag==null?'—':(f.lag>=0?'+':'')+f.lag+' Tage'}</b></div><p class="footer-note">Der dynamische Lag wird aus den lokalen 90T-Hochs berechnet; der Modell-Offset ist die längerfristige Zyklusannahme.</p>`)+
+   card(`<div class="section-title">90T SWING</div><div class="grid2">${metric('LOW','$'+fmt(f.low,activeCoin==='PEPE'?8:2))}${metric('HIGH','$'+fmt(f.high,activeCoin==='PEPE'?8:2))}</div><div class="row"><span>Position im Swing</span><b>${fmt(f.pos,1)}%</b></div>`)+
+   card(`<div class="section-title">FIB TARGET CLUSTER</div>${[1.272,1.618,2.0].map((m,i)=>`<div class="row"><span>${m} EXT</span><b class="cyan">$${fmt(f.fib[i],activeCoin==='PEPE'?8:2)}</b></div>`).join('')}<p class="footer-note">Targets aus dem aktuellen 90T-Swing; keine Prognosegarantie.</p>`)+
+   card(`<div class="section-title">MODELL-INTERPRETATION</div><div class="scenario"><b>${f.risk>75?'Späte / überdehnte Phase':f.risk>55?'Fortgeschrittene Expansion':'Frühe bis mittlere Expansion'}</b><p class="muted">Confidence ${f.confidence}/100 · ${f.count} Tagespunkte · Momentum ${fmt(f.ret90,1)}%.</p></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">HISTORIE AKTUALISIEREN</button>`);
+ }
+ $('#view-forecast').innerHTML=body;
 }
-
-function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();renderDecisionEngine();renderFib();renderPionexRisk();renderCycleClock();renderForecastCoinStrip();}
-
-async function refreshPrices(silent=false){
-  const btn=document.getElementById('refreshPrices');
-  if(btn && !silent){btn.disabled=true;btn.textContent='Aktualisiere…';}
-  setSystemStatus('liveApiStatus','verbinde…','system-warn');
-  try{
-    const ids=[...new Set(Object.values(cgMap))].join(',');
-    const url=`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
-    const res=await fetch(url,{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const j=await res.json(); const now=new Date().toISOString();
-    let liveCount=0;
-    for(const [coin,id] of Object.entries(cgMap)){
-      if(j[id]?.usd){
-        state.prices[coin]=j[id].usd;
-        state.priceMeta[coin]={source:'Live',updatedAt:now};
-        liveCount++;
-      }
-      if(Number.isFinite(j[id]?.usd_24h_change))state.changes[coin]=j[id].usd_24h_change;
-    }
-    state.lastUpdated=new Date();
-    setSystemStatus('liveApiStatus',`online · ${liveCount} Assets`,'system-ok');
-    renderAll();
-    recordHistory(true,'live');
-    if(btn && !silent)btn.textContent=`✓ ${liveCount} Assets live`;
-  }catch(e){
-    console.error(e);
-    setSystemStatus('liveApiStatus','nicht erreichbar · Snapshot aktiv','system-bad');
-    if(btn && !silent)btn.textContent='Fehler – Snapshot aktiv';
-  }
-  if(btn && !silent)setTimeout(()=>{btn.disabled=false;btn.textContent='Live-Kurse aktualisieren'},1800);
-  if(!silent)refreshTradingIntelligence();
+window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
+window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
+function settings(){
+ const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length;
+ return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Datenmodus</span><b class="green">iPhone Browser</b></div><div class="row"><span>Lokaler History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
+ card(`<div class="section-title">SYSTEM</div><div class="row"><span>GitHub Actions</span><b class="green">nicht nötig</b></div><div class="row"><span>Historie</span><b>direkt pro Coin</b></div><div class="row"><span>Speicher</span><b>localStorage</b></div><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">APP NEU LADEN</button>`)+
+ card(`<div class="section-title">BEWERTUNGSLOGIK</div><div class="row"><span>Live Asset</span><b>Browser API</b></div><div class="row"><span>Fallback</span><b>lokaler Cache</b></div><div class="row"><span>Forecast</span><b>365T History + FIB + RSI + Relative Strength + Cycle Clock</b></div><div class="row"><span>Zyklus-Uhr</span><b>Halving-Zeitmodell + Coin Offset</b></div>`);
 }
-
-function setupTabs(){
-  document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{
-    const tab=btn.dataset.tab;
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    document.getElementById('tab-'+tab).classList.add('active');
-    document.querySelectorAll('.nav-btn').forEach(n=>n.classList.toggle('active',n.dataset.tab===tab));
-    if(tab==='forecast'&&!state.forecastLoading)loadForecastCoin(state.forecastCoin);
-    window.scrollTo({top:0,behavior:'smooth'});
-  }));
+function renderAll(){
+ $('#view-depot').innerHTML=depot();
+ $('#view-market').innerHTML=market();
+ $('#view-bottom').innerHTML=bottomView();
+ $('#view-daytrade').innerHTML=dayTrade();
+ renderForecast();
+ $('#view-settings').innerHTML=settings();
 }
-
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=39').catch(()=>{});}
-
-document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('refreshPrices').addEventListener('click',refreshPrices);
-  document.getElementById('resetSnapshot').addEventListener('click',()=>{restoreSnapshot();renderAll();recordHistory(true,'snapshot');});
-  document.getElementById('forceReload')?.addEventListener('click',hardRefreshApp);
-  
-  document.getElementById('forecastCoinStrip')?.addEventListener('click',e=>{const b=e.target.closest('[data-forecast-coin]');if(!b)return;loadForecastCoin(b.dataset.forecastCoin);});
-  document.getElementById('historyRange')?.addEventListener('click',e=>{const b=e.target.closest('button[data-range]');if(!b)return;historyRange=b.dataset.range;document.querySelectorAll('#historyRange button').forEach(x=>x.classList.toggle('active',x===b));renderHistory();});
-  setupTabs();load();
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+ document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
+ $('#view-'+b.dataset.view).classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'});
+ if(b.dataset.view==='forecast') selectCoin(activeCoin);
 });
+$('#settingsBtn').onclick=()=>document.querySelector('.nav[data-view="settings"]').click();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+load();

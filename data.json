@@ -1,639 +1,205 @@
 {
-  "snapshotAt": "2026-08-21T18:38:00+02:00",
-  "eurRate": 0.854774,
-  "venues": {
-    "Bitpanda": {
-      "color": "#34c978",
-      "positions": {
-        "SOL": {
-          "qty": 59.74480061,
-          "value": 5462.85,
-          "snapshotValue": 5462.85,
-          "snapshotUnitPrice": 91.43640859495372,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "SUI": {
-          "qty": 1906.09534613,
-          "value": 1550.99,
-          "snapshotValue": 1550.99,
-          "snapshotUnitPrice": 0.8137001137687154,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "ADA": {
-          "qty": 6554.30546026,
-          "value": 1439.17,
-          "snapshotValue": 1439.17,
-          "snapshotUnitPrice": 0.21957627832971188,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "FET": {
-          "qty": 8501.8871269,
-          "value": 1375.79,
-          "snapshotValue": 1375.79,
-          "snapshotUnitPrice": 0.1618217202210314,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "HBAR": {
-          "qty": 17499.57092867,
-          "value": 1364.01,
-          "snapshotValue": 1364.01,
-          "snapshotUnitPrice": 0.07794533966346039,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "DOT": {
-          "qty": 1392.73090601,
-          "value": 1257.59,
-          "snapshotValue": 1257.59,
-          "snapshotUnitPrice": 0.9029669655302173,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "VSN": {
-          "qty": 25394.24790729,
-          "value": 970.8,
-          "snapshotValue": 970.8,
-          "snapshotUnitPrice": 0.038229129822793834,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "ATOM": {
-          "qty": 495.74796046,
-          "value": 781.25,
-          "snapshotValue": 781.25,
-          "snapshotUnitPrice": 1.5759015917586132,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "NEAR": {
-          "qty": 371.53655905,
-          "value": 704.77,
-          "snapshotValue": 704.77,
-          "snapshotUnitPrice": 1.896906193570993,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "AVAX": {
-          "qty": 89.12763042,
-          "value": 677.98,
-          "snapshotValue": 677.98,
-          "snapshotUnitPrice": 7.606844216604048,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        },
-        "TAO": {
-          "qty": 2.01879244,
-          "value": 465.99,
-          "snapshotValue": 465.99,
-          "snapshotUnitPrice": 230.82610711579642,
-          "source": "Bitpanda screenshot",
-          "snapshotAt": "2026-08-21T18:33:00+02:00"
-        }
-      },
-      "cash": 5.33,
-      "snapshotAt": "2026-08-21T18:33:00+02:00",
-      "source": "User screenshot"
+  "appVersion": "4.1.0",
+  "build": "2026-08-21-2315",
+  "currency": "USD",
+  "portfolio": {
+    "total": 25948,
+    "eurApprox": 22100,
+    "coveragePct": 90,
+    "assetsCount": 17,
+    "custodiansCount": 4,
+    "largestPosition": {
+      "symbol": "SOL",
+      "sharePct": 22.1
     },
-    "OKX": {
-      "color": "#3f83f8",
-      "positions": {
-        "BTC": {
-          "qty": 0.07161018,
-          "value": 5533.66,
-          "snapshotValue": 5533.66,
-          "snapshotUnitPrice": 77274.76735849568,
-          "source": "OKX screenshot",
-          "snapshotAt": "2026-08-21T18:38:00+02:00"
-        },
-        "XRP": {
-          "qty": 1368.67480512,
-          "value": 1911.19,
-          "snapshotValue": 1911.19,
-          "snapshotUnitPrice": 1.396379909128549,
-          "source": "OKX screenshot",
-          "snapshotAt": "2026-08-21T18:38:00+02:00"
-        },
-        "ETH": {
-          "qty": 0.56676504,
-          "value": 1359.73,
-          "label": "BETH",
-          "snapshotValue": 1359.73,
-          "snapshotUnitPrice": 2399.1070444288516,
-          "source": "OKX screenshot",
-          "snapshotAt": "2026-08-21T18:38:00+02:00"
-        },
-        "PEPE": {
-          "qty": 85366256,
-          "value": 322.56,
-          "snapshotValue": 322.56,
-          "snapshotUnitPrice": 3.7785421911908613e-06,
-          "source": "OKX screenshot",
-          "snapshotAt": "2026-08-21T18:38:00+02:00"
-        },
-        "SOL": {
-          "qty": 3.28816999,
-          "value": 300.95,
-          "label": "OKSOL",
-          "snapshotValue": 300.95,
-          "snapshotUnitPrice": 91.5250734953639,
-          "source": "OKX screenshot",
-          "snapshotAt": "2026-08-21T18:38:00+02:00"
-        }
+    "byVenue": [
+      {
+        "name": "Bitpanda",
+        "value": 15859,
+        "sharePct": 61.1,
+        "color": "#31d07c"
       },
-      "cash": 0,
-      "snapshotAt": "2026-08-21T18:38:00+02:00",
-      "source": "User screenshot"
-    },
-    "Ledger": {
-      "color": "#9b82ff",
-      "positions": {
-        "INJ": {
-          "qty": 102.843,
-          "value": 499.82,
-          "snapshotValue": 499.82,
-          "snapshotUnitPrice": 4.860029365148819,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        },
-        "BTC": {
-          "qty": 0.00031799,
-          "value": 22.94,
-          "snapshotValue": 22.94,
-          "snapshotUnitPrice": 72140.63335325012,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        },
-        "ETH": {
-          "qty": 0.00282925,
-          "value": 6.79,
-          "snapshotValue": 6.79,
-          "snapshotUnitPrice": 2399.9293098877793,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        },
-        "XRP": {
-          "qty": 1.00088,
-          "value": 1.4,
-          "snapshotValue": 1.4,
-          "snapshotUnitPrice": 1.398769083206778,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        },
-        "ADA": {
-          "qty": 5.86151,
-          "value": 1.12,
-          "snapshotValue": 1.12,
-          "snapshotUnitPrice": 0.19107704328748054,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        },
-        "XLM": {
-          "qty": 1.001,
-          "value": 0.18,
-          "snapshotValue": 0.18,
-          "snapshotUnitPrice": 0.17982017982017984,
-          "source": "Ledger screenshot",
-          "snapshotAt": "2026-08-21T18:37:00+02:00"
-        }
+      {
+        "name": "OKX",
+        "value": 9383,
+        "sharePct": 36.2,
+        "color": "#4a90ff"
       },
-      "cash": 0,
-      "snapshotAt": "2026-08-21T18:37:00+02:00",
-      "source": "User screenshot"
+      {
+        "name": "Ledger",
+        "value": 536,
+        "sharePct": 2.1,
+        "color": "#9b7cff"
+      },
+      {
+        "name": "Pionex",
+        "value": 170,
+        "sharePct": 0.7,
+        "color": "#ff5b5b"
+      }
+    ],
+    "topPositions": [
+      {
+        "symbol": "SOL",
+        "venue": "Bitpanda",
+        "value": 5746,
+        "sharePct": 22.1,
+        "change24h": 4.7
+      },
+      {
+        "symbol": "BTC",
+        "venue": "OKX",
+        "value": 5540,
+        "sharePct": 21.4,
+        "change24h": 6.4
+      },
+      {
+        "symbol": "XRP",
+        "venue": "OKX",
+        "value": 1876,
+        "sharePct": 7.2,
+        "change24h": 11.1
+      },
+      {
+        "symbol": "SUI",
+        "venue": "Bitpanda",
+        "value": 1512,
+        "sharePct": 5.8,
+        "change24h": 9.4
+      },
+      {
+        "symbol": "ADA",
+        "venue": "Bitpanda",
+        "value": 1410,
+        "sharePct": 5.4,
+        "change24h": 10.2
+      }
+    ],
+    "performance24hPct": 6.9,
+    "performance24hUsd": 1789,
+    "bestPerformer": {
+      "symbol": "PEPE",
+      "change24h": 22.6
     },
-    "Pionex": {
-      "color": "#ef5350",
-      "positions": {},
-      "cash": 169.61,
-      "bots": [
-        {
-          "name": "BTC/USDT Futures Moon · 19.08.",
-          "side": "SHORT",
-          "leverage": 30,
-          "investment": 52,
-          "dynamicMargin": 138.51,
-          "pnl": -91.62,
-          "gridProfit": 5.8,
-          "trendPnl": -97.42,
-          "rangeLow": 59589.2,
-          "rangeHigh": 79671.1,
-          "liq": 81455.9,
-          "breakEven": 71242.1,
-          "funding": 0.01,
-          "rounds24": 392,
-          "roundsTotal": 573,
-          "createdPrice": 69243.5
-        },
-        {
-          "name": "BTC/USDT Futures Moon · 21.08.",
-          "side": "SHORT",
-          "leverage": 30,
-          "investment": 57,
-          "dynamicMargin": 10,
-          "pnl": -0.632,
-          "gridProfit": 2.31,
-          "trendPnl": -2.95,
-          "rangeLow": 64678.3,
-          "rangeHigh": 87793.3,
-          "liq": 81551.6,
-          "breakEven": 76610.8,
-          "funding": 0.01,
-          "rounds24": 199,
-          "roundsTotal": 199,
-          "createdPrice": 76369.5
-        }
-      ],
-      "snapshotAt": "2026-08-21T20:49:00+02:00",
-      "source": "Pionex screenshots 21.08.2026 20:49",
-      "cashLabel": "Kontowert laut Pionex",
-      "valuationMode": "account_value"
+    "worstPerformer": {
+      "symbol": "VSN",
+      "change24h": 1.3
+    },
+    "volatility24hPct": 4.73
+  },
+  "market": {
+    "regime": "RISK-ON",
+    "breadth": "16/17 positiv",
+    "avg24hPct": 6.9,
+    "leader": {
+      "symbol": "PEPE",
+      "change24h": 25.0
+    },
+    "laggard": {
+      "symbol": "FET",
+      "change24h": -2.3
     }
   },
-  "fallbackChanges24h": {
-    "BTC": 6.41,
-    "ETH": 4.6,
-    "SOL": 5.2,
-    "XRP": 13.6,
-    "SUI": 1.21,
-    "ADA": 3.17,
-    "FET": -2.28,
-    "HBAR": 1.42,
-    "DOT": -0.91,
-    "VSN": 1.25,
-    "ATOM": 0.75,
-    "NEAR": 7.24,
-    "AVAX": -0.93,
-    "TAO": 3.77,
-    "INJ": 2.91,
-    "PEPE": 8.1,
-    "XLM": 0.0
+  "nadir": {
+    "label": "AKKUMULATIONS-REGIME",
+    "score": 53,
+    "valuation": 100,
+    "capitulation": 6,
+    "holder": 50,
+    "timing": 55,
+    "btcScenarios": {
+      "Shallow": "$55k–65k",
+      "Base Case": "$42k–52k",
+      "Capitulation": "$30k–40k"
+    }
   },
-  "boden": {
-    "btcPrice": 77704,
-    "mvrv": 0.35,
-    "puell": 0.65,
-    "sopr": 0.998,
-    "nupl": 0.19,
-    "fearGreed": 71,
-    "funding": 0.0067,
-    "realizedPrice": 52240,
-    "dxy": 98.79,
-    "us10y": 4.707,
-    "fedRate": "3.50–3.75%"
-  },
-  "daytrade": {
+  "dayTrade": {
+    "entryAllowed": false,
+    "gateScore": 70,
     "btcPrice": 77704,
     "rsi4h": 92.45,
     "rsi1h": 77.37,
-    "rsi15m": 70,
-    "funding": 0.0067,
-    "oi": 54.95,
-    "swingHigh": 79306.4,
-    "swingLow": 62600,
-    "vwap": 73454.27,
-    "liqAbove": 81538.7
-  },
-  "schemaVersion": 4,
-  "appVersion": "3.9.0",
-  "pricePolicy": {
-    "liveProvider": "CoinGecko",
-    "fallback": "snapshot",
-    "note": "Aktueller Wert = Menge × Live-Kurs, falls verfügbar; sonst letzter bestätigter Snapshot."
-  },
-  "marketFallback": {
-    "updatedAt": "2026-08-21T20:10:00+02:00",
-    "note": "Öffentliche Markt-Referenzen; beim App-Start wird CoinGecko Live-Refresh versucht.",
-    "prices": {
-      "BTC": 77380.0,
-      "SOL": 91.41,
-      "SUI": 0.7429
+    "fundingPct": 0.0067,
+    "oiB": 54.95,
+    "vwap": 73454,
+    "liquidationBuffer": 81539,
+    "fib": {
+      "low": 62600,
+      "high": 79306,
+      "levels": [
+        {
+          "ratio": 0.0,
+          "price": 79306,
+          "tag": "RESIST"
+        },
+        {
+          "ratio": 23.6,
+          "price": 75364,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 38.2,
+          "price": 72925,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 50.0,
+          "price": 70953,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 61.8,
+          "price": 68982,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 78.6,
+          "price": 66175,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 100.0,
+          "price": 62600,
+          "tag": "SUPPORT"
+        },
+        {
+          "ratio": 127.2,
+          "price": 83851,
+          "tag": "EXT"
+        },
+        {
+          "ratio": 161.8,
+          "price": 89631,
+          "tag": "EXT"
+        }
+      ]
     }
   },
-  "buildId": "2026-08-21-2200",
-  "diagnostics": {
-    "expectedLiveMappedAssets": [
-      "BTC",
-      "ETH",
-      "SOL",
-      "XRP",
-      "SUI",
-      "ADA",
-      "FET",
-      "HBAR",
-      "DOT",
-      "ATOM",
-      "NEAR",
-      "AVAX",
-      "TAO",
-      "INJ",
-      "PEPE",
-      "XLM"
-    ],
-    "snapshotOnlyAssets": [
-      "VSN"
-    ],
-    "pionexMode": "committed_capital"
+  "pionexRisk": {
+    "accountValue": 169.61,
+    "botPnl": -92.25,
+    "dynamicMargin": 148.51,
+    "nextLiquidation": 81455.9,
+    "liquidationDistancePct": 5.8
   },
-  "liveDiagnostics": {
-    "snapshotOnlyAssets": [
-      "VSN"
-    ],
-    "expectedLiveMappedAssets": [
-      "BTC",
-      "ETH",
-      "SOL",
-      "XRP",
-      "SUI",
-      "ADA",
-      "FET",
-      "HBAR",
-      "DOT",
-      "ATOM",
-      "NEAR",
-      "AVAX",
-      "TAO",
-      "INJ",
-      "PEPE",
-      "XLM"
-    ],
-    "note": "VSN derzeit Snapshot-only; Pionex ist kein Spot-Asset sondern gebundenes Kapital."
-  },
-  "indicatorPolicy": {
-    "dayTrade": "Live where available; otherwise timestamped snapshot",
-    "market": "Live 24h changes from CoinGecko",
-    "boden": "Snapshot indicators until dedicated live sources are integrated"
-  },
-  "decisionEngine": {
-    "weights": {
-      "market": 0.3,
-      "nadir": 0.25,
-      "entry": 0.3,
-      "fib": 0.15
-    },
-    "staleMinutes": 60,
-    "labels": {
-      "go": "GO",
-      "wait": "WAIT",
-      "defensive": "DEFENSIVE"
-    }
-  },
-  "fib": {
-    "source": "Day-Trade Swing",
-    "swingLow": 62600,
-    "swingHigh": 79306.4,
-    "levels": [
-      0.0,
-      0.236,
-      0.382,
-      0.5,
-      0.618,
-      0.786,
-      1.0
-    ],
-    "extensionLevels": [
-      1.272,
-      1.618
-    ],
-    "entryWeight": 0.15,
-    "nearPct": 1.5
-  },
-  "nadirZones": [
-    {
-      "min": 0,
-      "max": 34,
-      "label": "KEIN BODEN",
-      "tone": "red",
-      "note": "Zu wenig Akkumulations-/Kapitulations-Evidenz."
-    },
-    {
-      "min": 35,
-      "max": 54,
-      "label": "FRÜHE AKKUMULATION",
-      "tone": "amber",
-      "note": "Gemischte Evidenz; Boden noch nicht bestätigt."
-    },
-    {
-      "min": 55,
-      "max": 74,
-      "label": "AKKUMULATION",
-      "tone": "green",
-      "note": "Mehrere Bodenmerkmale stimmen überein."
-    },
-    {
-      "min": 75,
-      "max": 100,
-      "label": "KAPITULATION / HIGH CONVICTION",
-      "tone": "green",
-      "note": "Starke Boden- und Kapitulations-Evidenz."
-    }
+  "forecastCoins": [
+    "BTC",
+    "SOL",
+    "XRP",
+    "SUI",
+    "ADA",
+    "ETH",
+    "FET",
+    "HBAR",
+    "DOT",
+    "NEAR",
+    "AVAX",
+    "TAO",
+    "INJ",
+    "PEPE",
+    "XLM",
+    "ATOM"
   ],
-  "liveTrading": {
-    "provider": "Binance public market data",
-    "baseUrl": "https://data-api.binance.vision",
-    "symbol": "BTCUSDT",
-    "rsiPeriod": 14,
-    "vwapHours": 24,
-    "timeoutMs": 8000,
-    "fallback": "snapshot"
-  },
-  "cycleClock": {
-    "cycleLow": "2022-11-21T00:00:00Z",
-    "cycleLowLabel": "BTC Zyklus-Tief 2022",
-    "halving": "2024-04-20T00:09:27Z",
-    "nextHalvingEstimate": "2028-04-17T00:00:00Z",
-    "sourceNote": "Kalender-/Halving-Modell, kein eigenständiges Trading-Signal.",
-    "phases": [
-      {
-        "maxDays": 180,
-        "label": "RE-AKKUMULATION",
-        "tone": "amber"
-      },
-      {
-        "maxDays": 540,
-        "label": "EXPANSION",
-        "tone": "green"
-      },
-      {
-        "maxDays": 730,
-        "label": "LATE CYCLE / DISTRIBUTION",
-        "tone": "amber"
-      },
-      {
-        "maxDays": 99999,
-        "label": "RESET / BODEN-SUCHE",
-        "tone": "red"
-      }
-    ]
-  },
-  "forecast": {
-    "historyDays": 2000,
-    "macroTopAfterHalvingDays": [
-      450,
-      600
-    ],
-    "confidenceFloor": 30,
-    "coins": {
-      "BTC": {
-        "class": "BTC",
-        "lagDays": [
-          0,
-          0
-        ],
-        "label": "Bitcoin"
-      },
-      "ETH": {
-        "class": "MAJOR",
-        "lagDays": [
-          7,
-          35
-        ],
-        "label": "Ethereum"
-      },
-      "SOL": {
-        "class": "L1",
-        "lagDays": [
-          14,
-          55
-        ],
-        "label": "Solana"
-      },
-      "XRP": {
-        "class": "LEGACY",
-        "lagDays": [
-          20,
-          75
-        ],
-        "label": "XRP"
-      },
-      "SUI": {
-        "class": "HIGH_BETA_L1",
-        "lagDays": [
-          25,
-          80
-        ],
-        "label": "Sui"
-      },
-      "ADA": {
-        "class": "LEGACY",
-        "lagDays": [
-          25,
-          85
-        ],
-        "label": "Cardano"
-      },
-      "FET": {
-        "class": "AI",
-        "lagDays": [
-          30,
-          90
-        ],
-        "label": "Fetch.ai / ASI"
-      },
-      "HBAR": {
-        "class": "MID_CAP",
-        "lagDays": [
-          25,
-          80
-        ],
-        "label": "Hedera"
-      },
-      "DOT": {
-        "class": "LEGACY",
-        "lagDays": [
-          30,
-          95
-        ],
-        "label": "Polkadot"
-      },
-      "VSN": {
-        "class": "SNAPSHOT_ONLY",
-        "lagDays": [
-          35,
-          100
-        ],
-        "label": "Vision"
-      },
-      "ATOM": {
-        "class": "LEGACY",
-        "lagDays": [
-          30,
-          95
-        ],
-        "label": "Cosmos"
-      },
-      "NEAR": {
-        "class": "L1",
-        "lagDays": [
-          20,
-          75
-        ],
-        "label": "NEAR"
-      },
-      "AVAX": {
-        "class": "L1",
-        "lagDays": [
-          20,
-          70
-        ],
-        "label": "Avalanche"
-      },
-      "TAO": {
-        "class": "AI_HIGH_BETA",
-        "lagDays": [
-          30,
-          100
-        ],
-        "label": "Bittensor"
-      },
-      "INJ": {
-        "class": "HIGH_BETA",
-        "lagDays": [
-          25,
-          85
-        ],
-        "label": "Injective"
-      },
-      "PEPE": {
-        "class": "MEME",
-        "lagDays": [
-          40,
-          120
-        ],
-        "label": "PEPE"
-      },
-      "XLM": {
-        "class": "LEGACY",
-        "lagDays": [
-          30,
-          95
-        ],
-        "label": "Stellar"
-      }
-    },
-    "fibExtensions": [
-      1.272,
-      1.618,
-      2.0,
-      2.618
-    ],
-    "scenarioLevels": {
-      "conservative": 1.272,
-      "base": 1.618,
-      "blowoff": 2.0
-    },
-    "methodNote": "Preisziele: 180T Swing + Fibonacci-Extensions. Timing: erkannter historischer Coin-vs.-BTC Peak-Versatz, Klassen-Offset nur als Fallback. Historie wird serverseitig via GitHub Actions aktualisiert. Modell, keine Garantie.",
-    "swingShortDays": 90,
-    "swingLongDays": 180,
-    "historyMode": "same-origin",
-    "historyFile": "./history.json",
-    "relativeStrengthDays": 30,
-    "peakDetection": {
-      "minPeakSeparationDays": 420,
-      "coinWindowBeforeDays": 120,
-      "coinWindowAfterDays": 180
-    }
-  }
+  "updatedAt": "2026-08-21T22:45:00+02:00",
+  "historyMode": "browser"
 }
