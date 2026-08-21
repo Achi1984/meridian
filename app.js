@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.6.0';
-const BUILD_ID='2026-08-21-2135';
+const APP_VERSION='3.8.0';
+const BUILD_ID='2026-08-21-2215';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -51,7 +51,8 @@ async function load(){
     recordHistory(false,'snapshot');
     registerSW();
     await checkBuild();
-    setTimeout(()=>refreshPrices(true),700);
+    setTimeout(()=>refreshPrices(true),500);
+    setTimeout(()=>refreshTradingIntelligence(),900);
   }catch(err){
     console.error(err);
     document.getElementById('portfolioUsd').textContent='Datenfehler';
@@ -246,7 +247,7 @@ function nadirScore(){
 
 
 function fibScore(){
-  const btc=priceFor('BTC')||state.data.daytrade.btcPrice;
+  const btc=liveTradeValue('price',priceFor('BTC')||state.data.daytrade.btcPrice);
   const f=fibLevels();
   const range=f.high-f.low;
   if(!range || !btc)return 50;
@@ -276,12 +277,13 @@ function fibScore(){
 
 function entryScore(){
   const d=state.data.daytrade;
+  const rsi4=liveTradeValue('rsi4h',d.rsi4h);
+  const rsi1=liveTradeValue('rsi1h',d.rsi1h);
   let score=100;
-  if(d.rsi4h>80)score-=25; else if(d.rsi4h>70)score-=15;
-  if(d.rsi1h>75)score-=10;
+  if(rsi4>80)score-=25; else if(rsi4>70)score-=15;
+  if(rsi1>75)score-=10;
   if(Math.abs(d.funding)>0.02)score-=10;
-  const staleMins=(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
-  if(staleMins>(state.data.decisionEngine?.staleMinutes||60))score-=15;
+  if(!state.tradeLive)score-=15;
   return Math.max(0,Math.min(100,score));
 }
 
@@ -292,7 +294,7 @@ function renderDecisionEngine(){
   let label='WAIT',text='Markt konstruktiv, aber Entry-Qualität nicht ausreichend.';
   if(total>=78 && e>=70 && f>=60){label='GO';text='Markt, Zyklus, Entry-Gate und FIB-Zone sind ausreichend ausgerichtet.'}
   if(total<45){label='DEFENSIVE';text='Risiko reduzieren; Markt-/Entry-Signale sind schwach.'}
-  const staleMins=(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
+  const staleMins=state.tradeLive?0:(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
   if(staleMins>(state.data.decisionEngine?.staleMinutes||60)){
     label='WAIT';
     text='Markt stark, aber Trading-Indikatoren sind zu alt für einen neuen Entry.';
@@ -319,7 +321,7 @@ function fibLevels(){
 
 function renderFib(){
   const el=document.getElementById('fibLevels'); if(!el)return;
-  const btc=priceFor('BTC')||state.data.daytrade.btcPrice;
+  const btc=liveTradeValue('price',priceFor('BTC')||state.data.daytrade.btcPrice);
   const f=fibLevels(), all=[...f.levels,...f.ext];
   document.getElementById('fibRangeLabel').textContent=`${money(f.low)} → ${money(f.high)}`;
 
@@ -383,6 +385,32 @@ function getNadirZone(score){
   return zones.find(z=>score>=z.min&&score<=z.max)||zones[0]||{label:'—',tone:'amber',note:''};
 }
 
+
+function daysBetween(a,b){return Math.floor((b-a)/86400000)}
+function renderCycleClock(){
+  const c=state.data.cycleClock||{};
+  if(!c.halving)return;
+  const now=new Date();
+  const low=new Date(c.cycleLow),halving=new Date(c.halving),next=new Date(c.nextHalvingEstimate);
+  const daysLow=daysBetween(low,now);
+  const daysHalving=daysBetween(halving,now);
+  const remaining=Math.max(0,daysBetween(now,next));
+  const total=Math.max(1,next-halving);
+  const progress=Math.max(0,Math.min(100,(now-halving)/total*100));
+  const phase=(c.phases||[]).find(p=>daysHalving<=p.maxDays)||{label:'—',tone:'amber'};
+
+  const ph=document.getElementById('cyclePhase');
+  if(ph){ph.textContent=phase.label;ph.style.color=phase.tone==='green'?'var(--green)':phase.tone==='red'?'var(--red)':'var(--amber)'}
+  const note=document.getElementById('cycleNote');if(note)note.textContent=c.sourceNote||'Kalendermodell';
+  const pr=document.getElementById('cycleProgress');if(pr)pr.textContent=`${progress.toFixed(1)}%`;
+  const fill=document.getElementById('cycleTrackFill');if(fill)fill.style.width=`${progress}%`;
+  const dot=document.getElementById('cycleTrackDot');if(dot)dot.style.left=`${progress}%`;
+  const dl=document.getElementById('cycleDaysLow');if(dl)dl.textContent=`${daysLow} Tage`;
+  const dh=document.getElementById('cycleDaysHalving');if(dh)dh.textContent=`${daysHalving} Tage`;
+  const nh=document.getElementById('cycleNextHalving');if(nh)nh.textContent=next.toLocaleDateString('de-DE',{month:'short',year:'numeric'});
+  const dr=document.getElementById('cycleDaysRemaining');if(dr)dr.textContent=`≈ ${remaining} Tage`;
+}
+
 function renderBoden(){
   const b=state.data.boden,valuation=Math.max(0,Math.min(100,100-((b.mvrv-0.5)/(3-0.5))*100)),capitulation=Math.max(0,Math.min(100,(75-b.fearGreed)/65*100));
   const scores=[['Bewertung',valuation],['Kapitulation',capitulation],['Holder',50],['Timing',55]];
@@ -392,6 +420,92 @@ function renderBoden(){
   nadirGrid.innerHTML=scores.map(x=>`<div class="nadir-card"><span>${x[0]}</span><b>${Math.round(x[1])}/100</b><div class="score-track"><i style="width:${Math.round(x[1])}%"></i></div></div>`).join('');
 }
 
+
+
+function calcRSI(closes,period=14){
+  if(!closes||closes.length<period+2)return null;
+  let gain=0,loss=0;
+  for(let i=1;i<=period;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>=0)gain+=d; else loss-=d;
+  }
+  let avgGain=gain/period,avgLoss=loss/period;
+  for(let i=period+1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    const g=d>0?d:0,l=d<0?-d:0;
+    avgGain=(avgGain*(period-1)+g)/period;
+    avgLoss=(avgLoss*(period-1)+l)/period;
+  }
+  if(avgLoss===0)return 100;
+  const rs=avgGain/avgLoss;
+  return 100-(100/(1+rs));
+}
+
+function calcVWAP(klines){
+  if(!klines?.length)return null;
+  let pv=0,vol=0;
+  klines.forEach(k=>{
+    const h=+k[2],l=+k[3],c=+k[4],v=+k[5];
+    const tp=(h+l+c)/3;
+    pv+=tp*v;vol+=v;
+  });
+  return vol?pv/vol:null;
+}
+
+async function fetchJsonTimeout(url,ms=8000){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),ms);
+  try{
+    const r=await fetch(url,{cache:'no-store',signal:ctrl.signal});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return await r.json();
+  }finally{clearTimeout(t)}
+}
+
+async function refreshTradingIntelligence(){
+  const cfg=state.data.liveTrading||{};
+  const base=cfg.baseUrl||'https://data-api.binance.vision';
+  const symbol=cfg.symbol||'BTCUSDT';
+  const timeout=cfg.timeoutMs||8000;
+  const status=document.getElementById('tradingLiveStatus');
+  if(status){status.textContent='Trading-Daten werden live geladen…';status.className='trading-live-status';}
+  try{
+    const [ticker,k1,k4]=await Promise.all([
+      fetchJsonTimeout(`${base}/api/v3/ticker/price?symbol=${symbol}`,timeout),
+      fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}&interval=1h&limit=100`,timeout),
+      fetchJsonTimeout(`${base}/api/v3/klines?symbol=${symbol}&interval=4h&limit=100`,timeout)
+    ]);
+    const price=+ticker.price;
+    const closed1=k1.slice(0,-1), closed4=k4.slice(0,-1);
+    const rsi1=calcRSI(closed1.map(k=>+k[4]),cfg.rsiPeriod||14);
+    const rsi4=calcRSI(closed4.map(k=>+k[4]),cfg.rsiPeriod||14);
+    const vwap=calcVWAP(closed1.slice(-(cfg.vwapHours||24)));
+    state.tradeLive={price,rsi1h:rsi1,rsi4h:rsi4,vwap,updatedAt:new Date(),source:'Binance'};
+    if(Number.isFinite(price)){
+      state.prices.BTC=price;
+      state.priceMeta.BTC={source:'Live',updatedAt:new Date().toISOString()};
+    }
+    if(status){status.textContent=`LIVE · BTC / RSI / VWAP · ${fmtTime(state.tradeLive.updatedAt)}`;status.className='trading-live-status live';}
+    renderAll();
+    recordHistory(true,'trade-live');
+  }catch(e){
+    console.error('Trading intelligence',e);
+    state.tradeLive=null;
+    if(status){status.textContent='LIVE-TRADING-DATEN NICHT ERREICHBAR · Snapshot aktiv';status.className='trading-live-status error';}
+    renderTrade();
+    renderDecisionEngine();
+    renderFib();
+  }
+}
+
+function liveTradeValue(key,fallback){
+  const v=state.tradeLive?.[key];
+  return Number.isFinite(v)?v:fallback;
+}
+
+function liveTradeLabel(){
+  return state.tradeLive?'LIVE · Binance':'Snapshot';
+}
 
 function tradeSnapshotAge(){
   const ts=state.data.snapshotAt?new Date(state.data.snapshotAt):null;
@@ -403,16 +517,46 @@ function tradeSnapshotAge(){
 
 function renderTrade(){
   const d=state.data.daytrade;
-  const r4=Number(d.rsi4h),r1=Number(d.rsi1h),fund=Math.abs(Number(d.funding));
-  const stretch=r4>=80?0:r4>=70?8:25, mtf=r1>50&&r4>50?25:10, funding=fund<0.02?25:fund<0.05?15:5, vwap=d.btcPrice>d.vwap?20:8;
-  const score=Math.round(stretch+mtf+funding+vwap),allowed=score>=75&&r4<75;
-  tradeScore.textContent=`${score}/100`;tradeScoreBar.style.width=score+'%';
-  tradeDecision.textContent=allowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN';
-  tradeFreshness.textContent='Indikatoren: Snapshot';
-  tradeGrid.innerHTML=[['BTC Preis',money(d.btcPrice),'snapshot'],['4H RSI',d.rsi4h,r4>=80?'bad':r4>=70?'warn':'good'],['1H RSI',d.rsi1h,r1>=75?'warn':'good'],['Funding',d.funding+'%',fund<0.02?'good':'warn'],['OI','$'+d.oi+'B','snapshot'],['VWAP',money(d.vwap),'snapshot']].map(x=>`<div class="trade-kpi ${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]==='snapshot'?'Snapshot':x[2]==='bad'?'überdehnt':x[2]==='warn'?'erhöht':'OK'}</small></div>`).join('');
-  const checks=[['Datenfrische',tradeSnapshotAge(),'warn'],['MTF-Konfluenz',r1>50&&r4>50?'bullish':'gemischt',r1>50&&r4>50?'pass':'warn'],['Entry-Streckung',`4H RSI ${d.rsi4h} → ${r4>=80?'stark überdehnt':r4>=70?'überdehnt':'OK'}`,r4>=80?'fail':r4>=70?'warn':'pass'],['Liquidationspuffer',money(d.liqAbove),'warn']];
-  document.getElementById('tradeDataMode')?.replaceChildren(document.createTextNode(tradeSnapshotAge()));
-  tradeChecks.innerHTML=checks.map(x=>`<div class="check-row"><span>${x[0]}</span><b style="color:${x[2]==='pass'?'var(--green)':x[2]==='fail'?'var(--red)':'var(--amber)'}">${x[1]}</b></div>`).join('');
+  const price=liveTradeValue('price',priceFor('BTC')||d.btcPrice);
+  const rsi4=liveTradeValue('rsi4h',d.rsi4h);
+  const rsi1=liveTradeValue('rsi1h',d.rsi1h);
+  const vwap=liveTradeValue('vwap',d.vwap);
+  const mode=liveTradeLabel();
+
+  const age=state.tradeLive?`LIVE · ${fmtTime(state.tradeLive.updatedAt)}`:tradeSnapshotAge();
+  const r4s=rsi4>80?'überdehnt':rsi4>70?'erhöht':'OK';
+  const r1s=rsi1>75?'erhöht':'OK';
+
+  let score=100;
+  if(rsi4>80)score-=25; else if(rsi4>70)score-=15;
+  if(rsi1>75)score-=10;
+  if(Math.abs(d.funding)>0.02)score-=10;
+  if(!state.tradeLive)score-=15;
+  score=Math.max(0,Math.min(100,score));
+
+  const title=document.getElementById('tradeTitle');
+  if(title)title.textContent=score>=80?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN';
+  const gs=document.getElementById('gateScore');if(gs)gs.textContent=`${score}/100`;
+  const gb=document.getElementById('gateBar');if(gb)gb.style.width=`${score}%`;
+  const dm=document.getElementById('tradeDataMode');if(dm)dm.textContent=state.tradeLive?'Indikatoren: LIVE':'Indikatoren: Snapshot';
+
+  tradeGrid.innerHTML=[
+    ['BTC Preis',money(price),state.tradeLive?'LIVE':'Snapshot',state.tradeLive?'live':'snapshot'],
+    ['4H RSI',rsi4.toFixed(2),r4s,state.tradeLive?'live':'snapshot'],
+    ['1H RSI',rsi1.toFixed(2),r1s,state.tradeLive?'live':'snapshot'],
+    ['Funding',d.funding+'%','Snapshot','snapshot'],
+    ['OI','$'+d.oi+'B','Snapshot','snapshot'],
+    ['VWAP',money(vwap),state.tradeLive?'LIVE 24H':'Snapshot',state.tradeLive?'live':'snapshot']
+  ].map(x=>`<div class="trade-kpi"><span>${x[0]}</span><b>${x[1]}</b><small class="live-note ${x[3]}">${x[2]}</small></div>`).join('');
+
+  const liq=(state.data.venues.Pionex?.bots||[]).length?Math.min(...state.data.venues.Pionex.bots.map(b=>b.liq)):d.liq;
+  const checks=[
+    ['Datenfrische',age,state.tradeLive?'ok':'warn'],
+    ['MTF-Konfluenz',rsi4<70&&rsi1<70?'bullish / nicht überhitzt':rsi4>80?'überhitzt':'gemischt',rsi4>80?'bad':'ok'],
+    ['Entry-Streckung',rsi4>80?`4H RSI ${rsi4.toFixed(2)} → stark überdehnt`:rsi4>70?`4H RSI ${rsi4.toFixed(2)} → erhöht`:'RSI im akzeptablen Bereich',rsi4>80?'bad':rsi4>70?'warn':'ok'],
+    ['Liquidationspuffer',money(liq,0),'warn']
+  ];
+  tradeChecks.innerHTML=checks.map(c=>`<div class="status-row"><span>${c[0]}</span><b class="${c[2]==='ok'?'system-ok':c[2]==='bad'?'system-bad':'system-warn'}">${c[1]}</b></div>`).join('');
 }
 
 function setSystemStatus(id,text,cls=''){
@@ -495,7 +639,200 @@ function renderSettings(){
   setSystemStatus('liveAssetCount',`${liveNow}/${expected}`,liveNow===expected?'system-ok':liveNow>0?'system-warn':'system-bad');
 }
 
-function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();renderDecisionEngine();renderFib();renderPionexRisk();}
+
+function forecastCoins(){
+  const {assets}=buildAggregates();
+  const configured=state.data.forecast?.coins||{};
+  const held=Object.keys(assets);
+  const ordered=['BTC',...held.filter(c=>c!=='BTC').sort((a,b)=>(assets[b]||0)-(assets[a]||0))];
+  return [...new Set(ordered)].filter(c=>configured[c]);
+}
+
+function renderForecastCoinStrip(){
+  const el=document.getElementById('forecastCoinStrip'); if(!el)return;
+  const coins=forecastCoins();
+  if(!coins.includes(state.forecastCoin))state.forecastCoin=coins[0]||'BTC';
+  el.innerHTML=coins.map(c=>`<button class="coin-chip ${c===state.forecastCoin?'active':''}" data-forecast-coin="${c}">${c}</button>`).join('');
+}
+
+function cgIdForCoin(c){
+  return cgMap[c]||null;
+}
+
+function forecastFmtDate(d){
+  return new Date(d).toLocaleDateString('de-DE',{month:'short',year:'numeric'});
+}
+
+function addDays(date,days){
+  const d=new Date(date);d.setUTCDate(d.getUTCDate()+days);return d;
+}
+
+function computeReturn(prices,days){
+  if(!prices?.length)return null;
+  const end=prices[prices.length-1][1];
+  const target=Date.now()-days*86400000;
+  let first=prices[0][1],best=Infinity;
+  prices.forEach(p=>{const diff=Math.abs(p[0]-target);if(diff<best){best=diff;first=p[1]}});
+  return first?((end/first)-1)*100:null;
+}
+
+function computeForecastFromHistory(coin,coinPrices,btcPrices){
+  const cfg=state.data.forecast.coins[coin];
+  const values=coinPrices.map(p=>p[1]).filter(Number.isFinite);
+  if(values.length<10)return null;
+
+  const low=Math.min(...values),high=Math.max(...values);
+  const current=liveTradeValue && coin==='BTC' ? liveTradeValue('price',priceFor(coin)) : (priceFor(coin)||values[values.length-1]);
+  const range=Math.max(high-low,high*.001);
+  const swingPct=Math.max(0,Math.min(100,(current-low)/range*100));
+
+  const r30=computeReturn(coinPrices,30);
+  const btc30=coin==='BTC'?r30:computeReturn(btcPrices,30);
+  const rel=(Number.isFinite(r30)&&Number.isFinite(btc30))?r30-btc30:0;
+
+  let topRisk=Math.round(swingPct*.62 + Math.max(0,Math.min(25,rel*.8)) + Math.max(0,Math.min(13,(state.changes[coin]||0)*.7)));
+  topRisk=Math.max(0,Math.min(100,topRisk));
+
+  const fibs=(state.data.forecast.fibExtensions||[1.272,1.618,2,2.618]).map(level=>({
+    level,price:high+range*(level-1)
+  }));
+
+  let phase='AKKUMULATION',tone='amber';
+  if(swingPct>82&&rel>5){phase='EXPANSION / HEISS';tone='red'}
+  else if(swingPct>60&&rel>=0){phase='EXPANSION';tone='green'}
+  else if(swingPct<35){phase='AKKUMULATION';tone='amber'}
+  else {phase='ÜBERGANG';tone='amber'}
+
+  const nextHalving=new Date(state.data.cycleClock.nextHalvingEstimate);
+  const btcRange=state.data.forecast.macroTopAfterHalvingDays||[450,600];
+  const lag=cfg.lagDays||[0,0];
+  const btcStart=addDays(nextHalving,btcRange[0]),btcEnd=addDays(nextHalving,btcRange[1]);
+  const coinStart=addDays(nextHalving,btcRange[0]+lag[0]),coinEnd=addDays(nextHalving,btcRange[1]+lag[1]);
+
+  let confidence=55;
+  if(values.length>=80)confidence+=10;
+  if(Math.abs(rel)>4)confidence+=8;
+  if(state.priceMeta[coin]?.source==='Live')confidence+=7;
+  if(coin==='VSN')confidence-=25;
+  confidence=Math.max(state.data.forecast.confidenceFloor||30,Math.min(85,confidence));
+
+  return {coin,cfg,current,low,high,swingPct,r30,btc30,rel,topRisk,phase,tone,fibs,
+          btcStart,btcEnd,coinStart,coinEnd,confidence};
+}
+
+async function loadForecastCoin(coin){
+  state.forecastCoin=coin;
+  renderForecastCoinStrip();
+  const status=document.getElementById('forecastState');
+  if(status){status.textContent='LÄDT…';status.className='forecast-state'}
+  const cached=state.forecastCache[coin];
+  if(cached && Date.now()-cached.ts<30*60*1000){renderForecast(cached.model);return;}
+
+  const id=cgIdForCoin(coin),btcId=cgIdForCoin('BTC');
+  if(!id){
+    renderForecastUnavailable(coin,'Keine historische Live-Datenquelle hinterlegt.');
+    return;
+  }
+  try{
+    const days=state.data.forecast.historyDays||90;
+    const [cj,bj]=await Promise.all([
+      fetchJsonTimeout(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=daily`,10000),
+      coin==='BTC'?Promise.resolve(null):fetchJsonTimeout(`https://api.coingecko.com/api/v3/coins/${btcId}/market_chart?vs_currency=usd&days=${days}&interval=daily`,10000)
+    ]);
+    const model=computeForecastFromHistory(coin,cj.prices,coin==='BTC'?cj.prices:bj.prices);
+    if(!model)throw new Error('Zu wenig Historie');
+    state.forecastCache[coin]={ts:Date.now(),model};
+    renderForecast(model);
+  }catch(e){
+    console.error('Forecast',e);
+    renderForecastUnavailable(coin,'90T-Historie derzeit nicht erreichbar. Keine erfundenen Zielwerte angezeigt.');
+  }
+}
+
+function renderForecastUnavailable(coin,msg){
+  const cfg=state.data.forecast.coins[coin]||{label:coin,class:'—'};
+  document.getElementById('forecastCoinName').textContent=`${cfg.label} (${coin})`;
+  document.getElementById('forecastCoinClass').textContent=cfg.class;
+  document.getElementById('forecastCurrent').textContent=money(priceFor(coin)||0);
+  const st=document.getElementById('forecastState');st.textContent='DATEN FEHLEN';st.className='forecast-state red';
+  document.getElementById('forecastConfidence').textContent='LOW';
+  document.getElementById('forecastTopRisk').textContent='—/100';
+  document.getElementById('forecastRelative').textContent='—';
+  document.getElementById('forecastExplain').textContent=msg;
+  document.getElementById('forecastFibTargets').innerHTML='<div class="forecast-method">Forecast wird erst berechnet, wenn historische Kursdaten verfügbar sind.</div>';
+  document.getElementById('forecastScenarios').innerHTML='';
+  document.getElementById('forecastInterpretation').textContent='Kein belastbarer Forecast verfügbar.';
+}
+
+function renderForecast(m){
+  const cfg=m.cfg;
+  document.getElementById('forecastCoinName').textContent=`${cfg.label} (${m.coin})`;
+  document.getElementById('forecastCoinClass').textContent=cfg.class.replaceAll('_',' · ');
+  document.getElementById('forecastCurrent').textContent=money(m.current);
+  const st=document.getElementById('forecastState');st.textContent=m.phase;st.className=`forecast-state ${m.tone==='green'?'green':m.tone==='red'?'red':''}`;
+  document.getElementById('forecastConfidence').textContent=`${m.confidence}%`;
+  document.getElementById('forecastTopRisk').textContent=`${m.topRisk}/100`;
+  document.getElementById('forecastRelative').textContent=m.coin==='BTC'?'MASTER':`${m.rel>=0?'+':''}${m.rel.toFixed(1)}%`;
+  document.getElementById('forecastRiskBar').style.width=`${m.topRisk}%`;
+  document.getElementById('forecastExplain').textContent=
+    m.coin==='BTC'
+      ? `BTC dient als Master-Cycle. 90T-Position ${m.swingPct.toFixed(0)}%; 30T-Momentum ${m.r30>=0?'+':''}${m.r30.toFixed(1)}%.`
+      : `${m.coin} liegt im 90T-Swing bei ${m.swingPct.toFixed(0)}% und performt über 30 Tage ${m.rel>=0?'+':''}${m.rel.toFixed(1)} Prozentpunkte relativ zu BTC.`;
+
+  document.getElementById('forecastCycleWindow').textContent=`${forecastFmtDate(m.coinStart)} – ${forecastFmtDate(m.coinEnd)}`;
+  document.getElementById('forecastCycleSub').textContent=
+    m.coin==='BTC'?'Modelliertes BTC-Makrofenster':`BTC-Fenster + ${cfg.lagDays[0]}–${cfg.lagDays[1]} Tage Rotations-Offset`;
+  document.getElementById('btcWindowBar').style.width='64%';
+  document.getElementById('coinWindowBar').style.width=`${Math.min(92,64+(cfg.lagDays[1]||0)/5)}%`;
+
+  document.getElementById('forecastLow').textContent=money(m.low);
+  document.getElementById('forecastHigh').textContent=money(m.high);
+  document.getElementById('forecastSwingPct').textContent=`${m.swingPct.toFixed(0)}%`;
+  document.getElementById('forecastSwingBar').style.width=`${m.swingPct}%`;
+
+  document.getElementById('forecastFibTargets').innerHTML=m.fibs.map(x=>{
+    const move=(x.price/m.current-1)*100;
+    const star=x.level===1.618;
+    return `<div class="forecast-fib ${star?'star':''}">
+      <span>FIB ${x.level.toFixed(3)}${star?' ★':''}</span>
+      <b>${money(x.price)}</b>
+      <small>${move>=0?'+':''}${move.toFixed(0)}%</small>
+    </div>`;
+  }).join('');
+
+  const scenLevels=state.data.forecast.scenarioLevels;
+  const scenarios=[
+    ['CONSERVATIVE',scenLevels.conservative,'conservative'],
+    ['BASE CASE',scenLevels.base,'base'],
+    ['BLOW-OFF',scenLevels.blowoff,'blowoff']
+  ];
+  document.getElementById('forecastScenarios').innerHTML=scenarios.map(([name,level,cls])=>{
+    const f=m.fibs.find(x=>Math.abs(x.level-level)<.001)||m.fibs[0];
+    const move=(f.price/m.current-1)*100;
+    return `<article class="forecast-scenario ${cls}">
+      <div><div class="sc-name">${name}</div><div class="sc-price">${money(f.price)}</div></div>
+      <div class="sc-move">${move>=0?'+':''}${move.toFixed(0)}%</div>
+      <div class="sc-window">${forecastFmtDate(m.coinStart)} – ${forecastFmtDate(m.coinEnd)} · Modellziel FIB ${level}</div>
+    </article>`;
+  }).join('');
+
+  let interpretation;
+  if(m.topRisk>=80)interpretation=`${m.coin}: hohes lokales Top-Risiko. Preis liegt nahe am 90T-Hoch und Momentum/Relative Stärke sind bereits stark. Neue Long-Entries benötigen höhere Bestätigung.`;
+  else if(m.swingPct<40)interpretation=`${m.coin}: eher frühe/untere Swing-Zone. FIB-Ziele sind derzeit weit entfernt; Confidence steigt erst mit bestätigter relativer Stärke.`;
+  else if(m.rel>5)interpretation=`${m.coin}: positive Rotation gegenüber BTC. Das erhöht die Wahrscheinlichkeit, dass der Coin in einer Altcoin-Phase später als BTC sein lokales Hoch bildet.`;
+  else interpretation=`${m.coin}: neutrales Übergangsbild. Der Forecast bleibt szenariobasiert; weder Top noch Expansion sind ausreichend bestätigt.`;
+  document.getElementById('forecastInterpretation').textContent=interpretation;
+  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote;
+}
+
+function renderForecast(){
+  renderForecastCoinStrip();
+  const cached=state.forecastCache[state.forecastCoin];
+  if(cached)renderForecast(cached.model);
+  else loadForecastCoin(state.forecastCoin);
+}
+
+function renderAll(){renderDepot();renderMarket();renderBoden();renderTrade();renderSettings();renderDecisionEngine();renderFib();renderPionexRisk();renderCycleClock();renderForecastCoinStrip();}
 
 async function refreshPrices(silent=false){
   const btn=document.getElementById('refreshPrices');
@@ -527,6 +864,7 @@ async function refreshPrices(silent=false){
     if(btn && !silent)btn.textContent='Fehler – Snapshot aktiv';
   }
   if(btn && !silent)setTimeout(()=>{btn.disabled=false;btn.textContent='Live-Kurse aktualisieren'},1800);
+  if(!silent)refreshTradingIntelligence();
 }
 
 function setupTabs(){
@@ -535,16 +873,19 @@ function setupTabs(){
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+tab).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(n=>n.classList.toggle('active',n.dataset.tab===tab));
+    if(tab==='forecast')loadForecastCoin(state.forecastCoin);
     window.scrollTo({top:0,behavior:'smooth'});
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=36').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=38').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);
   document.getElementById('resetSnapshot').addEventListener('click',()=>{restoreSnapshot();renderAll();recordHistory(true,'snapshot');});
   document.getElementById('forceReload')?.addEventListener('click',hardRefreshApp);
+  
+  document.getElementById('forecastCoinStrip')?.addEventListener('click',e=>{const b=e.target.closest('[data-forecast-coin]');if(!b)return;loadForecastCoin(b.dataset.forecastCoin);});
   document.getElementById('historyRange')?.addEventListener('click',e=>{const b=e.target.closest('button[data-range]');if(!b)return;historyRange=b.dataset.range;document.querySelectorAll('#historyRange button').forEach(x=>x.classList.toggle('active',x===b));renderHistory();});
   setupTabs();load();
 });

@@ -297,7 +297,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.6.0",
+  "appVersion": "3.8.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -312,7 +312,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2135",
+  "buildId": "2026-08-21-2215",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
@@ -429,5 +429,201 @@
       "tone": "green",
       "note": "Starke Boden- und Kapitulations-Evidenz."
     }
-  ]
+  ],
+  "liveTrading": {
+    "provider": "Binance public market data",
+    "baseUrl": "https://data-api.binance.vision",
+    "symbol": "BTCUSDT",
+    "rsiPeriod": 14,
+    "vwapHours": 24,
+    "timeoutMs": 8000,
+    "fallback": "snapshot"
+  },
+  "cycleClock": {
+    "cycleLow": "2022-11-21T00:00:00Z",
+    "cycleLowLabel": "BTC Zyklus-Tief 2022",
+    "halving": "2024-04-20T00:09:27Z",
+    "nextHalvingEstimate": "2028-04-17T00:00:00Z",
+    "sourceNote": "Kalender-/Halving-Modell, kein eigenständiges Trading-Signal.",
+    "phases": [
+      {
+        "maxDays": 180,
+        "label": "RE-AKKUMULATION",
+        "tone": "amber"
+      },
+      {
+        "maxDays": 540,
+        "label": "EXPANSION",
+        "tone": "green"
+      },
+      {
+        "maxDays": 730,
+        "label": "LATE CYCLE / DISTRIBUTION",
+        "tone": "amber"
+      },
+      {
+        "maxDays": 99999,
+        "label": "RESET / BODEN-SUCHE",
+        "tone": "red"
+      }
+    ]
+  },
+  "forecast": {
+    "historyDays": 90,
+    "macroTopAfterHalvingDays": [
+      450,
+      600
+    ],
+    "confidenceFloor": 30,
+    "coins": {
+      "BTC": {
+        "class": "BTC",
+        "lagDays": [
+          0,
+          0
+        ],
+        "label": "Bitcoin"
+      },
+      "ETH": {
+        "class": "MAJOR",
+        "lagDays": [
+          7,
+          35
+        ],
+        "label": "Ethereum"
+      },
+      "SOL": {
+        "class": "L1",
+        "lagDays": [
+          14,
+          55
+        ],
+        "label": "Solana"
+      },
+      "XRP": {
+        "class": "LEGACY",
+        "lagDays": [
+          20,
+          75
+        ],
+        "label": "XRP"
+      },
+      "SUI": {
+        "class": "HIGH_BETA_L1",
+        "lagDays": [
+          25,
+          80
+        ],
+        "label": "Sui"
+      },
+      "ADA": {
+        "class": "LEGACY",
+        "lagDays": [
+          25,
+          85
+        ],
+        "label": "Cardano"
+      },
+      "FET": {
+        "class": "AI",
+        "lagDays": [
+          30,
+          90
+        ],
+        "label": "Fetch.ai / ASI"
+      },
+      "HBAR": {
+        "class": "MID_CAP",
+        "lagDays": [
+          25,
+          80
+        ],
+        "label": "Hedera"
+      },
+      "DOT": {
+        "class": "LEGACY",
+        "lagDays": [
+          30,
+          95
+        ],
+        "label": "Polkadot"
+      },
+      "VSN": {
+        "class": "SNAPSHOT_ONLY",
+        "lagDays": [
+          35,
+          100
+        ],
+        "label": "Vision"
+      },
+      "ATOM": {
+        "class": "LEGACY",
+        "lagDays": [
+          30,
+          95
+        ],
+        "label": "Cosmos"
+      },
+      "NEAR": {
+        "class": "L1",
+        "lagDays": [
+          20,
+          75
+        ],
+        "label": "NEAR"
+      },
+      "AVAX": {
+        "class": "L1",
+        "lagDays": [
+          20,
+          70
+        ],
+        "label": "Avalanche"
+      },
+      "TAO": {
+        "class": "AI_HIGH_BETA",
+        "lagDays": [
+          30,
+          100
+        ],
+        "label": "Bittensor"
+      },
+      "INJ": {
+        "class": "HIGH_BETA",
+        "lagDays": [
+          25,
+          85
+        ],
+        "label": "Injective"
+      },
+      "PEPE": {
+        "class": "MEME",
+        "lagDays": [
+          40,
+          120
+        ],
+        "label": "PEPE"
+      },
+      "XLM": {
+        "class": "LEGACY",
+        "lagDays": [
+          30,
+          95
+        ],
+        "label": "Stellar"
+      }
+    },
+    "fibExtensions": [
+      1.272,
+      1.618,
+      2.0,
+      2.618
+    ],
+    "scenarioLevels": {
+      "conservative": 1.272,
+      "base": 1.618,
+      "blowoff": 2.0
+    },
+    "methodNote": "Preisziele: 90T Swing + Fibonacci-Extensions. Zeitfenster: nächster BTC-Halving-Zyklus + coin-spezifischer Rotations-Offset. Modell, keine Garantie."
+  }
 }

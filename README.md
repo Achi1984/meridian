@@ -1,14 +1,21 @@
-# MERIDIAN V3.6 – FIB 2.0 / NADIR Zones
+# MERIDIAN V3.8 – FORECAST 1.0
 
-Build `2026-08-21-2135`
+Build `2026-08-21-2215`
 
 Neu:
-- iPhone Safe-Area-Fix
-- FIB 0 / 23.6 / 38.2 / 50 / 61.8 / 78.6 / 100
-- FIB Extensions 127.2 / 161.8
-- Support/Resistance-Markierung
-- aktive FIB-Zone + Abstand zum nächsten Level
-- FIB Score fließt in MERIDIAN SIGNAL ein
-- NADIR-Zonen: Kein Boden / Frühe Akkumulation / Akkumulation / Kapitulation
-- Header, Navigation und Depot-Grundlayout unverändert
-- Icons bleiben im Hauptverzeichnis
+- eigener FORECAST Tab
+- coin-spezifische Forecasts für gehaltene Assets
+- 90-Tage-Swing via CoinGecko-Historie
+- FIB Extensions 1.272 / 1.618 / 2.0 / 2.618
+- Conservative / Base / Blow-Off Szenario
+- Relative Strength Coin vs BTC (30 Tage)
+- Local Top-Risk Score
+- individuelles Macro-Cycle-Fenster pro Coin
+- Coin-Klassen mit Rotations-Offsets relativ zu BTC
+- Confidence statt scheinpräziser Prognose
+- keine erfundenen Ziele bei fehlender Historie
+- responsive Darkmode UI im bestehenden MERIDIAN-Stil
+- Icons weiterhin direkt im Hauptverzeichnis
+
+Wichtig:
+Forecasts sind modellbasierte Szenarien, keine Kursgarantie oder Anlageberatung.
