@@ -164,3 +164,41 @@ button{font:inherit}
   .logo-btn{width:50px !important;height:50px !important;padding:4px !important;}
   .asset-row{grid-template-columns:30px 56px minmax(0,1fr) auto;}
 }
+
+
+/* v4.6 — iPhone refinement: frameless header, stronger brand mark, compact forecast */
+.topbar{align-items:center;margin-bottom:12px}
+.top-actions{align-items:center;gap:10px}
+.pill#refreshTime{
+  border:0 !important;background:transparent !important;border-radius:0 !important;
+  padding:0 !important;min-width:auto;color:#8fa2b8;font-size:11px;box-shadow:none !important;
+}
+.logo-btn{
+  width:62px !important;height:62px !important;padding:0 !important;
+  border:0 !important;background:transparent !important;border-radius:0 !important;
+  overflow:visible !important;box-shadow:none !important;
+}
+.logo-btn img{width:100% !important;height:100% !important;object-fit:contain !important;border-radius:0 !important;filter:drop-shadow(0 0 8px rgba(32,164,255,.18))}
+.forecast-price{font-size:42px !important;letter-spacing:-1.2px;margin-top:8px;white-space:nowrap}
+.forecast-price-card{padding-top:13px}
+.forecast-price-card .grid2{margin-top:10px}
+.forecast-price-card>p.muted{font-size:11px;margin:10px 0 2px}
+.confidence{min-width:70px;padding:8px 9px}
+.forecast-head .sub{max-width:245px}
+@media(max-width:650px){
+  .topbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .logo-btn{width:58px !important;height:58px !important}
+  .pill#refreshTime{font-size:10px}
+  .forecast-price{font-size:38px !important}
+  .forecast-head{gap:7px}
+  .forecast-main{font-size:19px;line-height:1.02;margin:7px 0}
+  .confidence{min-width:66px;padding:7px 7px}
+  .confidence .score{font-size:17px}
+}
+@media(max-width:390px){
+  .brandword .achi{font-size:25px;letter-spacing:5px}
+  .brandword .meridian{font-size:10px;letter-spacing:3.5px}
+  .version{font-size:7.5px}
+  .logo-btn{width:54px !important;height:54px !important}
+  .forecast-price{font-size:34px !important}
+}
