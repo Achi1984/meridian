@@ -1,21 +1,18 @@
-# MERIDIAN V3.8 – FORECAST 1.0
+# MERIDIAN V3.8.3 – Forecast Hotfix
 
-Build `2026-08-21-2215`
+Build `2026-08-21-2148`
 
-Neu:
-- eigener FORECAST Tab
-- coin-spezifische Forecasts für gehaltene Assets
-- 90-Tage-Swing via CoinGecko-Historie
-- FIB Extensions 1.272 / 1.618 / 2.0 / 2.618
-- Conservative / Base / Blow-Off Szenario
-- Relative Strength Coin vs BTC (30 Tage)
-- Local Top-Risk Score
-- individuelles Macro-Cycle-Fenster pro Coin
-- Coin-Klassen mit Rotations-Offsets relativ zu BTC
-- Confidence statt scheinpräziser Prognose
-- keine erfundenen Ziele bei fehlender Historie
-- responsive Darkmode UI im bestehenden MERIDIAN-Stil
-- Icons weiterhin direkt im Hauptverzeichnis
+Wichtigster Fix:
+- zwei JavaScript-Funktionen hießen gleichzeitig `renderForecast`
+- dadurch wurde der eigentliche Forecast-Renderer überschrieben
+- Modell-Renderer heißt jetzt `renderForecastModel`
+- erfolgreiche Historien-Daten können jetzt tatsächlich angezeigt werden
 
-Wichtig:
-Forecasts sind modellbasierte Szenarien, keine Kursgarantie oder Anlageberatung.
+Zusätzlich:
+- Forecast-Ladezustand wird sauber beendet
+- Binance weiterhin primäre Historienquelle
+- CoinGecko bleibt Fallback
+- Bottom Navigation auf 6 feste Spalten korrigiert
+- SETTINGS bleibt damit in derselben Navigationszeile
+- bestehende Forecast-Optik unverändert
+- Icons weiterhin im Hauptverzeichnis

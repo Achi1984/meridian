@@ -331,3 +331,25 @@ body{
   .forecast-scenario .sc-window{grid-column:1/-1}
   .bottom-nav .nav-btn{font-size:6px;padding-left:4px;padding-right:4px}
 }
+
+
+/* ===== V3.8.3 NAV FIX ===== */
+.bottom-nav{
+  display:grid !important;
+  grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  gap:0 !important;
+}
+.bottom-nav .nav-btn{
+  min-width:0 !important;
+  width:100% !important;
+  padding-left:2px !important;
+  padding-right:2px !important;
+  font-size:5.8px !important;
+}
+.bottom-nav .nav-btn span{
+  font-size:12px !important;
+}
+@media(max-width:390px){
+  .bottom-nav .nav-btn{font-size:5.2px !important;}
+  .bottom-nav .nav-btn span{font-size:11px !important;}
+}

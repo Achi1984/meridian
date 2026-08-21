@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.8.2';
-const BUILD_ID='2026-08-21-2135';
+const APP_VERSION='3.8.3';
+const BUILD_ID='2026-08-21-2148';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -43,7 +43,7 @@ function ageLabel(ts){
 
 async function load(){
   try{
-    const r=await fetch('./data.json?v=32&t='+Date.now(),{cache:'no-store'});
+    const r=await fetch('./data.json?v=383&t='+Date.now(),{cache:'no-store'});
     if(!r.ok)throw new Error('data.json HTTP '+r.status);
     state.data=await r.json();
     restoreSnapshot();
@@ -738,7 +738,7 @@ async function loadForecastCoin(coin){
     }
   },16000);
   const cached=state.forecastCache[coin];
-  if(cached && Date.now()-cached.ts<30*60*1000){clearTimeout(watchdog);state.forecastLoading=false;renderForecast(cached.model);return;}
+  if(cached && Date.now()-cached.ts<30*60*1000){clearTimeout(watchdog);state.forecastLoading=false;renderForecastModel(cached.model);return;}
 
   const id=cgIdForCoin(coin),btcId=cgIdForCoin('BTC');
   if(!id){
@@ -785,7 +785,7 @@ async function loadForecastCoin(coin){
     state.forecastCache[coin]={ts:Date.now(),model};
     clearTimeout(watchdog);
     state.forecastLoading=false;
-    renderForecast(model);
+    renderForecastModel(model);
   }catch(e){
     console.error('Forecast',e);
     clearTimeout(watchdog);
@@ -795,6 +795,7 @@ async function loadForecastCoin(coin){
 }
 
 function renderForecastUnavailable(coin,msg){
+  state.forecastLoading=false;
   const cfg=state.data.forecast.coins[coin]||{label:coin,class:'—'};
   document.getElementById('forecastCoinName').textContent=`${cfg.label} (${coin})`;
   document.getElementById('forecastCoinClass').textContent=cfg.class;
@@ -809,7 +810,7 @@ function renderForecastUnavailable(coin,msg){
   document.getElementById('forecastInterpretation').textContent='Kein belastbarer Forecast verfügbar.';
 }
 
-function renderForecast(m){
+function renderForecastModel(m){
   const cfg=m.cfg;
   document.getElementById('forecastCoinName').textContent=`${cfg.label} (${m.coin})`;
   document.getElementById('forecastCoinClass').textContent=cfg.class.replaceAll('_',' · ');
@@ -867,13 +868,13 @@ function renderForecast(m){
   else if(m.rel>5)interpretation=`${m.coin}: positive Rotation gegenüber BTC. Das erhöht die Wahrscheinlichkeit, dass der Coin in einer Altcoin-Phase später als BTC sein lokales Hoch bildet.`;
   else interpretation=`${m.coin}: neutrales Übergangsbild. Der Forecast bleibt szenariobasiert; weder Top noch Expansion sind ausreichend bestätigt.`;
   document.getElementById('forecastInterpretation').textContent=interpretation;
-  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote;
+  document.getElementById('forecastMethod').textContent=state.data.forecast.methodNote+' · Historie: Binance bevorzugt, CoinGecko Fallback.';
 }
 
 function renderForecast(){
   renderForecastCoinStrip();
   const cached=state.forecastCache[state.forecastCoin];
-  if(cached)renderForecast(cached.model);
+  if(cached)renderForecastModel(cached.model);
   else loadForecastCoin(state.forecastCoin);
 }
 
@@ -923,7 +924,7 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=38').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=383').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);

@@ -297,7 +297,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.8.2",
+  "appVersion": "3.8.3",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -312,7 +312,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2135",
+  "buildId": "2026-08-21-2148",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
