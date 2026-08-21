@@ -310,3 +310,18 @@ button{font:inherit}
 @media (prefers-reduced-motion: reduce){
   .live-dot{animation:none}
 }
+
+
+/* v4.8.2 — data integrity states */
+.missing-badge{
+  display:inline-flex;
+  align-items:center;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.8px;
+  color:#ff5a60;
+  border:1px solid rgba(255,90,96,.42);
+  border-radius:999px;
+  padding:2px 5px;
+  white-space:nowrap;
+}

@@ -5,9 +5,9 @@ let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC';
 
 const CG_IDS={
  BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
- FET:'artificial-superintelligence-alliance',HBAR:'hedera-hashgraph',DOT:'polkadot',
+ FET:'fetch-ai',HBAR:'hedera-hashgraph',DOT:'polkadot',
  NEAR:'near',AVAX:'avalanche-2',ATOM:'cosmos',TAO:'bittensor',INJ:'injective-protocol',
- PEPE:'pepe',XLM:'stellar',VSN:'vision'
+ PEPE:'pepe',XLM:'stellar',VSN:'vision-3'
 };
 const HALVINGS=[
  new Date('2012-11-28T00:00:00Z').getTime(),
@@ -87,7 +87,13 @@ async function refreshCurrentPortfolioPrices(){
 
 function recalcPortfolio(){
  const p=DATA.portfolio, hs=p.holdings||[];
- const priced=hs.map(h=>{const q=DATA.livePrices?.[h.symbol];return {...h,price:q?.price||0,change24h:q?.change24h||0,value:h.quantity*(q?.price||0)}});
+ const priced=hs.map(h=>{
+   const q=DATA.livePrices?.[h.symbol];
+   const fb=DATA.priceFallbacks?.[h.symbol];
+   const price=q?.price || fb?.price || 0;
+   const priceSource=q?.price ? 'LIVE' : fb?.price ? 'SNAPSHOT' : 'MISSING';
+   return {...h,price,priceSource,change24h:q?.change24h||0,value:h.quantity*price}
+ });
  const liveSpotTotal=priced.reduce((a,h)=>a+h.value,0);
  if(!liveSpotTotal)return;
 
@@ -102,22 +108,28 @@ function recalcPortfolio(){
  p.total=total;
  p.eurApprox=total*0.86;
  p.custodiansCount=Object.keys(venues).filter(k=>venues[k]>0).length;
- p.byVenue=Object.entries(venues).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({
-   name,value,sharePct:value/total*100,
-   source:manualBalances.some(x=>x.name===name)?'SNAPSHOT':'LIVE'
- }));
+ p.byVenue=Object.entries(venues).sort((a,b)=>b[1]-a[1]).map(([name,value])=>{
+   const venueHoldings=priced.filter(h=>h.venue===name);
+   const hasFallback=venueHoldings.some(h=>h.priceSource==='SNAPSHOT');
+   const hasMissing=venueHoldings.some(h=>h.priceSource==='MISSING');
+   return {
+     name,value,sharePct:value/total*100,
+     source:manualBalances.some(x=>x.name===name)?'SNAPSHOT':hasMissing?'MISSING':hasFallback?'MIXED':'LIVE'
+   }
+ });
 
  const coins={};
  priced.forEach(h=>{
-   let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h});
-   c.value+=h.value;c.quantity+=h.quantity;c.venues.add(h.venue)
+   let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h,priceSource:h.priceSource});
+   c.value+=h.value;c.quantity+=h.quantity;c.venues.add(h.venue);
+   if(h.priceSource!=='LIVE') c.priceSource=h.priceSource
  });
  const positions=Object.values(coins).sort((a,b)=>b.value-a.value);
  p.assetsCount=positions.length;
  p.largestPosition={symbol:positions[0].symbol,sharePct:positions[0].value/total*100};
  p.topPositions=positions.slice(0,5).map(x=>({
    symbol:x.symbol, venue:[...x.venues].join(' + '), value:x.value,
-   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity
+   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity, priceSource:x.priceSource
  }));
 
  p.performance24hPct=positions.reduce((a,x)=>a+(x.value/liveSpotTotal)*x.change24h,0);
@@ -153,13 +165,19 @@ function donutVenue(){
  return card(`<div class="section-title">BÖRSE / WALLET</div><div class="grid2"><div style="position:relative"><div class="donut" style="background:${venueGradient(p.byVenue)}"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div><div>${p.byVenue.map(v=>`<div class="row"><span>● ${v.name}</span><b>${fmt(v.sharePct,1)}%</b></div>`).join('')}</div></div>`);
 }
 function liveBadge(label='LIVE'){return `<span class="live-badge"><span class="live-dot"></span>${label}</span>`}
-function snapshotBadge(){return `<span class="snapshot-badge">SNAPSHOT</span>`}
+function snapshotBadge(label='SNAPSHOT'){return `<span class="snapshot-badge">${label}</span>`}
+function sourceBadge(src){
+ if(src==='LIVE') return liveBadge();
+ if(src==='MIXED') return snapshotBadge('MIXED');
+ if(src==='MISSING') return `<span class="missing-badge">FEHLT</span>`;
+ return snapshotBadge();
+}
 
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk;
  const venueCards=p.byVenue.map(v=>metric(
    v.name,
-   `$${fmt(v.value)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${v.source==='SNAPSHOT'?snapshotBadge():liveBadge()}</div>`
+   `$${fmt(v.value)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${sourceBadge(v.source)}</div>`
  )).join('');
 
  const topRows=p.topPositions.map(x=>`
@@ -167,7 +185,7 @@ function depot(){
      ${coinIcon(x.symbol)}
      <div class="position-asset">
        <div class="position-symbol">${x.symbol}</div>
-       <div class="position-venue">${x.venue} ${liveBadge()}</div>
+       <div class="position-venue">${x.venue} ${sourceBadge(x.priceSource||'LIVE')}</div>
        <div class="position-qty">${fmt(x.quantity, x.quantity<1?6:2)} ${x.symbol}</div>
      </div>
      <div class="position-value">

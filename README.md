@@ -1,3 +1,13 @@
+# ACHI MERIDIAN v4.8.2 — Bitpanda Valuation Fix
+
+Fehler gefunden und behoben:
+- FET verwendete den falschen CoinGecko-API-Identifier. Korrekt: `fetch-ai`.
+- VSN verwendete den falschen Vision-Identifier. Korrekt für Bitpanda Vision: `vision-3`.
+- Dadurch wurden FET und VSN im Bitpanda-Gesamtwert praktisch nicht bzw. falsch bewertet.
+- Fehlende API-Kurse werden künftig nicht mehr still mit 0 USD angesetzt.
+- Falls FET/VSN vorübergehend keinen Live-Quote liefern, verwendet MERIDIAN den letzten Bitpanda-Snapshot und markiert die Quelle als SNAPSHOT/MIXED.
+- Grün pulsierendes LIVE wird nur angezeigt, wenn tatsächlich ein Live-Quote vorhanden ist.
+
 # ACHI MERIDIAN v4.8.1 — LIVE Pulse
 
 Grün pulsierender Punkt + LIVE = Wert wird aus dem Live-Kursfeed berechnet.

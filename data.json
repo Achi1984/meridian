@@ -1,6 +1,6 @@
 {
-  "appVersion": "4.8.1",
-  "build": "2026-08-22-live-pulse",
+  "appVersion": "4.8.2",
+  "build": "2026-08-22-bitpanda-fix",
   "currency": "USD",
   "portfolio": {
     "total": 25948,
@@ -359,5 +359,17 @@
     "ATOM"
   ],
   "updatedAt": "2026-08-21T22:45:00+02:00",
-  "historyMode": "browser"
+  "historyMode": "browser",
+  "priceFallbacks": {
+    "FET": {
+      "price": 0.16937180869455423,
+      "source": "Bitpanda snapshot",
+      "valueAtSnapshot": 1439.98
+    },
+    "VSN": {
+      "price": 0.03820629000481153,
+      "source": "Bitpanda snapshot",
+      "valueAtSnapshot": 970.22
+    }
+  }
 }
