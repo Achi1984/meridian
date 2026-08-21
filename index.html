@@ -12,14 +12,14 @@
   <meta name="apple-mobile-web-app-title" content="MERIDIAN">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=35">
+  <link rel="stylesheet" href="./styles.css?v=36">
   <title>MERIDIAN</title>
 </head>
 <body>
 <div id="app">
   <header class="app-header">
     <div>
-      <div class="brand-line"><div class="brand">MERIDIAN</div><div class="version-badge">v3.5 · 2120</div></div>
+      <div class="brand-line"><div class="brand">MERIDIAN</div><div class="version-badge">v3.6 · 2135</div></div>
       <div class="live"><span class="live-dot"></span> LIVE DASHBOARD</div>
     </div>
     <div class="header-actions">
@@ -132,7 +132,7 @@
           <div class="decision-grid">
             <div class="decision-kpi"><span>MARKET</span><b id="decisionMarket">—</b></div>
             <div class="decision-kpi"><span>NADIR</span><b id="decisionNadir">—</b></div>
-            <div class="decision-kpi"><span>ENTRY</span><b id="decisionEntry">—</b></div>
+            <div class="decision-kpi"><span>ENTRY</span><b id="decisionEntry">—</b></div><div class="decision-kpi"><span>FIB</span><b id="decisionFib">—</b></div>
           </div>
           <div class="decision-status" id="decisionStatus">Datenfrische wird geprüft</div>
         </article>
@@ -151,7 +151,7 @@
       <div class="module-hero amber">
         <div class="eyebrow">NADIR 2.0</div>
         <div class="module-title">AKKUMULATIONS-REGIME</div>
-        <div class="module-sub">Bewertung · Kapitulation · Holder · Timing</div>
+        <div class="module-sub">Bewertung · Kapitulation · Holder · Timing</div><div class="nadir-zone-badge" id="nadirZoneLabel">—</div>
       </div>
       <article class="card nadir-score-card"><div class="score-top"><span>NADIR GESAMTSCORE</span><b id="nadirTotal">—</b></div><div class="score-track"><i id="nadirTotalBar"></i></div><small id="nadirState">—</small></article>
       <div class="nadir-grid" id="nadirGrid"></div>
@@ -225,6 +225,6 @@
     <button class="nav-btn" data-tab="settings"><span>⚙</span>SETTINGS</button>
   </nav>
 </div>
-<script src="./app.js?v=35"></script>
+<script src="./app.js?v=36"></script>
 </body>
 </html>

@@ -297,7 +297,7 @@
     "liqAbove": 81538.7
   },
   "schemaVersion": 4,
-  "appVersion": "3.5.0",
+  "appVersion": "3.6.0",
   "pricePolicy": {
     "liveProvider": "CoinGecko",
     "fallback": "snapshot",
@@ -312,7 +312,7 @@
       "SUI": 0.7429
     }
   },
-  "buildId": "2026-08-21-2120",
+  "buildId": "2026-08-21-2135",
   "diagnostics": {
     "expectedLiveMappedAssets": [
       "BTC",
@@ -368,9 +368,10 @@
   },
   "decisionEngine": {
     "weights": {
-      "market": 0.35,
-      "nadir": 0.3,
-      "entry": 0.35
+      "market": 0.3,
+      "nadir": 0.25,
+      "entry": 0.3,
+      "fib": 0.15
     },
     "staleMinutes": 60,
     "labels": {
@@ -384,15 +385,49 @@
     "swingLow": 62600,
     "swingHigh": 79306.4,
     "levels": [
+      0.0,
       0.236,
       0.382,
       0.5,
       0.618,
-      0.786
+      0.786,
+      1.0
     ],
     "extensionLevels": [
       1.272,
       1.618
-    ]
-  }
+    ],
+    "entryWeight": 0.15,
+    "nearPct": 1.5
+  },
+  "nadirZones": [
+    {
+      "min": 0,
+      "max": 34,
+      "label": "KEIN BODEN",
+      "tone": "red",
+      "note": "Zu wenig Akkumulations-/Kapitulations-Evidenz."
+    },
+    {
+      "min": 35,
+      "max": 54,
+      "label": "FRÜHE AKKUMULATION",
+      "tone": "amber",
+      "note": "Gemischte Evidenz; Boden noch nicht bestätigt."
+    },
+    {
+      "min": 55,
+      "max": 74,
+      "label": "AKKUMULATION",
+      "tone": "green",
+      "note": "Mehrere Bodenmerkmale stimmen überein."
+    },
+    {
+      "min": 75,
+      "max": 100,
+      "label": "KAPITULATION / HIGH CONVICTION",
+      "tone": "green",
+      "note": "Starke Boden- und Kapitulations-Evidenz."
+    }
+  ]
 }

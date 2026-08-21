@@ -1,16 +1,14 @@
-# MERIDIAN V3.5 – Decision Engine
+# MERIDIAN V3.6 – FIB 2.0 / NADIR Zones
 
-Build `2026-08-21-2120`
+Build `2026-08-21-2135`
 
 Neu:
-- MERIDIAN SIGNAL: GO / WAIT / DEFENSIVE
-- kombiniert Market Score, NADIR Score und Entry Score
-- Datenfrische kann GO blockieren
-- Fibonacci-Retracement 23.6 / 38.2 / 50 / 61.8 / 78.6
-- FIB-Zonen dynamisch aus Swing Low/High
-- Pionex Kontowert auf 169.61 USDT korrigiert
-- Bot-P&L, dynamische Margin und Liquidationsabstand separat
-- FET Live-Mapping korrigiert
-- Icons liegen direkt im Hauptverzeichnis, kein `icons/` Ordner mehr
-
-Version `3.5.0`
+- iPhone Safe-Area-Fix
+- FIB 0 / 23.6 / 38.2 / 50 / 61.8 / 78.6 / 100
+- FIB Extensions 127.2 / 161.8
+- Support/Resistance-Markierung
+- aktive FIB-Zone + Abstand zum nächsten Level
+- FIB Score fließt in MERIDIAN SIGNAL ein
+- NADIR-Zonen: Kein Boden / Frühe Akkumulation / Akkumulation / Kapitulation
+- Header, Navigation und Depot-Grundlayout unverändert
+- Icons bleiben im Hauptverzeichnis

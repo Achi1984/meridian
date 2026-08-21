@@ -18,8 +18,8 @@ const assetColors = ['#f59e0b','#4a90e2','#35c9bf','#8b74d8','#5bbf8a','#768190'
 const venueColors = {Bitpanda:'#34c978',OKX:'#3f83f8',Ledger:'#9b82ff',Pionex:'#ef5350'};
 const HISTORY_KEY='meridian_portfolio_history_v33';
 const LEGACY_HISTORY_KEY='meridian_portfolio_history_v32';
-const APP_VERSION='3.5.0';
-const BUILD_ID='2026-08-21-2120';
+const APP_VERSION='3.6.0';
+const BUILD_ID='2026-08-21-2135';
 let historyRange='24h';
 const VERSION_URL='./version.json';
 
@@ -244,6 +244,36 @@ function nadirScore(){
   return Math.round((valuation+capitulation+holder+timing)/4);
 }
 
+
+function fibScore(){
+  const btc=priceFor('BTC')||state.data.daytrade.btcPrice;
+  const f=fibLevels();
+  const range=f.high-f.low;
+  if(!range || !btc)return 50;
+
+  const all=f.levels;
+  let nearest=null;
+  all.forEach(x=>{
+    const d=Math.abs(btc-x.price)/btc*100;
+    if(!nearest||d<nearest.d)nearest={...x,d};
+  });
+
+  let score=55;
+  if(nearest){
+    if(nearest.d<=0.75)score+=25;
+    else if(nearest.d<=1.5)score+=15;
+    else if(nearest.d<=3)score+=5;
+  }
+
+  // Prefer pullbacks inside the main retracement zone for long entries.
+  const retracement=(f.high-btc)/range;
+  if(retracement>=0.236 && retracement<=0.618)score+=10;
+  if(btc>f.high)score-=20;
+  if(btc<f.low)score-=15;
+
+  return Math.max(0,Math.min(100,Math.round(score)));
+}
+
 function entryScore(){
   const d=state.data.daytrade;
   let score=100;
@@ -256,11 +286,11 @@ function entryScore(){
 }
 
 function renderDecisionEngine(){
-  const m=Math.round(marketScore()), n=nadirScore(), e=entryScore();
-  const w=state.data.decisionEngine?.weights||{market:.35,nadir:.30,entry:.35};
-  const total=Math.round(m*w.market+n*w.nadir+e*w.entry);
+  const m=Math.round(marketScore()), n=nadirScore(), e=entryScore(), f=fibScore();
+  const w=state.data.decisionEngine?.weights||{market:.30,nadir:.25,entry:.30,fib:.15};
+  const total=Math.round(m*w.market+n*w.nadir+e*w.entry+f*(w.fib||0));
   let label='WAIT',text='Markt konstruktiv, aber Entry-Qualität nicht ausreichend.';
-  if(total>=78 && e>=70){label='GO';text='Markt, Zyklus und Entry-Gate sind ausreichend ausgerichtet.'}
+  if(total>=78 && e>=70 && f>=60){label='GO';text='Markt, Zyklus, Entry-Gate und FIB-Zone sind ausreichend ausgerichtet.'}
   if(total<45){label='DEFENSIVE';text='Risiko reduzieren; Markt-/Entry-Signale sind schwach.'}
   const staleMins=(Date.now()-new Date(state.data.snapshotAt).getTime())/60000;
   if(staleMins>(state.data.decisionEngine?.staleMinutes||60)){
@@ -273,6 +303,7 @@ function renderDecisionEngine(){
   const dm=document.getElementById('decisionMarket');if(dm)dm.textContent=`${m}/100`;
   const dn=document.getElementById('decisionNadir');if(dn)dn.textContent=`${n}/100`;
   const de=document.getElementById('decisionEntry');if(de)de.textContent=`${e}/100`;
+  const df=document.getElementById('decisionFib');if(df)df.textContent=`${f}/100`;
   const st=document.getElementById('decisionStatus');
   if(st)st.textContent=staleMins>60?`Entry-Daten stale · ${Math.round(staleMins/60)} h alt`:'Entry-Daten frisch';
   if(ds)ds.style.color=label==='GO'?'var(--green)':label==='DEFENSIVE'?'var(--red)':'var(--amber)';
@@ -281,7 +312,7 @@ function renderDecisionEngine(){
 function fibLevels(){
   const f=state.data.fib||{};
   const low=f.swingLow,high=f.swingHigh,range=high-low;
-  const levels=(f.levels||[0.236,0.382,0.5,0.618,0.786]).map(r=>({r,price:high-range*r}));
+  const levels=(f.levels||[0,0.236,0.382,0.5,0.618,0.786,1]).map(r=>({r,price:high-range*r}));
   const ext=(f.extensionLevels||[1.272,1.618]).map(r=>({r,price:high+range*(r-1),ext:true}));
   return {low,high,levels,ext};
 }
@@ -289,21 +320,34 @@ function fibLevels(){
 function renderFib(){
   const el=document.getElementById('fibLevels'); if(!el)return;
   const btc=priceFor('BTC')||state.data.daytrade.btcPrice;
-  const f=fibLevels(), all=f.levels;
+  const f=fibLevels(), all=[...f.levels,...f.ext];
   document.getElementById('fibRangeLabel').textContent=`${money(f.low)} → ${money(f.high)}`;
+
   let nearest=null;
   all.forEach(x=>{const d=Math.abs(btc-x.price);if(!nearest||d<nearest.d)nearest={...x,d}});
+
   el.innerHTML=all.map(x=>{
     const dist=(btc-x.price)/btc*100;
-    const near=Math.abs(dist)<1.5;
-    return `<div class="fib-row ${near?'near active':''}">
-      <span class="fib-label">${(x.r*100).toFixed(1)}%</span>
+    const near=Math.abs(dist)<(state.data.fib?.nearPct||1.5);
+    const role=x.price<btc?'support':'resistance';
+    const ext=x.ext?'extension':'';
+    const tag=x.ext?'EXT':role==='support'?'SUPPORT':'RESIST';
+    return `<div class="fib-row ${near?'near active':''} ${role} ${ext}">
+      <span class="fib-label">${(x.r*100).toFixed(1)}% <i class="fib-tag ${x.ext?'ext':role}">${tag}</i></span>
       <span class="fib-price">${money(x.price)}</span>
       <span class="fib-distance">${dist>=0?'+':''}${dist.toFixed(1)}%</span>
     </div>`;
   }).join('');
+
   const pos=document.getElementById('fibPosition');
-  if(pos&&nearest)pos.textContent=`BTC ${money(btc)} · nächstes FIB ${(nearest.r*100).toFixed(1)}% bei ${money(nearest.price)} · Abstand ${(nearest.d/btc*100).toFixed(1)}%`;
+  if(pos&&nearest){
+    const retr=(f.high-btc)/(f.high-f.low);
+    const zone = btc>f.high?'über Swing-High':btc<f.low?'unter Swing-Low':
+      retr<0.236?'oberhalb 23,6%':retr<0.382?'23,6–38,2% Zone':
+      retr<0.618?'38,2–61,8% Golden Zone':'tiefer Pullback';
+    pos.innerHTML=`BTC ${money(btc)} · nächstes FIB ${(nearest.r*100).toFixed(1)}% bei ${money(nearest.price)} · Abstand ${(nearest.d/btc*100).toFixed(1)}%
+      <div class="fib-summary">Zone: <b>${zone}</b> · FIB Score: <b>${fibScore()}/100</b></div>`;
+  }
 }
 
 function renderPionexRisk(){
@@ -331,6 +375,12 @@ function renderMarket(){
   const best=rows[0]||'—', worst=rows[rows.length-1]||'—';
   marketSummary.innerHTML=[['Marktbreite',`${adv}/${rows.length} positiv`],['Ø 24H',pct(avg)],['Leader',best==='—'?'—':`${best} ${pct(state.changes[best])}`],['Laggard',worst==='—'?'—':`${worst} ${pct(state.changes[worst])}`]].map(x=>`<div class="summary-kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
   marketRadar.innerHTML=rows.slice(0,14).map(c=>`<div class="radar-row"><div><strong>${c}</strong><br><small>${state.changes[c]>=3?'Momentum positiv':state.changes[c]<=-3?'Momentum negativ':'Neutral'}</small></div><b style="color:${state.changes[c]>=0?'var(--green)':'var(--red)'}">${pct(state.changes[c])}</b></div>`).join('');
+}
+
+
+function getNadirZone(score){
+  const zones=state.data.nadirZones||[];
+  return zones.find(z=>score>=z.min&&score<=z.max)||zones[0]||{label:'—',tone:'amber',note:''};
 }
 
 function renderBoden(){
@@ -489,7 +539,7 @@ function setupTabs(){
   }));
 }
 
-function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=35').catch(()=>{});}
+function registerSW(){if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=36').catch(()=>{});}
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refreshPrices').addEventListener('click',refreshPrices);

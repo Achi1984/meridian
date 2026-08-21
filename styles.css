@@ -164,3 +164,51 @@ body{
  .decision-title{font-size:26px}
  .decision-score{font-size:15px}
 }
+
+
+/* ===== V3.6 SAFE AREA + FIB 2.0 + NADIR ZONES ===== */
+.app-header{
+  padding-top:max(calc(env(safe-area-inset-top) + 18px), 42px) !important;
+}
+body{
+  padding-top:0 !important;
+}
+.decision-grid{
+  grid-template-columns:repeat(4,1fr);
+}
+.nadir-zone-badge{
+  display:inline-flex;
+  margin-top:10px;
+  padding:5px 8px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  font:800 7px var(--mono);
+  letter-spacing:.04em;
+}
+.nadir-zone-badge.green{color:var(--green);border-color:#245339;background:rgba(52,201,120,.06)}
+.nadir-zone-badge.amber{color:var(--amber);border-color:#544526;background:rgba(213,165,72,.05)}
+.nadir-zone-badge.red{color:var(--red);border-color:#5c2b2b;background:rgba(239,83,80,.06)}
+
+.fib-row.support{border-left:3px solid var(--green);padding-left:7px}
+.fib-row.resistance{border-left:3px solid var(--red);padding-left:7px}
+.fib-row.extension{opacity:.92}
+.fib-tag{
+  display:inline-block;
+  margin-left:6px;
+  padding:1px 5px;
+  border-radius:999px;
+  font:700 6px var(--mono);
+  border:1px solid var(--line);
+  color:var(--dim);
+}
+.fib-tag.support{color:var(--green);border-color:#245339}
+.fib-tag.resistance{color:var(--red);border-color:#5c2b2b}
+.fib-tag.ext{color:var(--cyan);border-color:#244653}
+.fib-summary{
+  margin-top:10px;padding:9px;border:1px solid var(--line);border-radius:9px;
+  background:#081019;font:7.5px var(--mono);line-height:1.45;color:var(--dim)
+}
+@media(max-width:600px){
+  .app-header{padding-top:max(calc(env(safe-area-inset-top) + 18px), 44px) !important}
+  .decision-grid{grid-template-columns:1fr 1fr}
+}
