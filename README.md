@@ -1,15 +1,14 @@
-# ACHI MERIDIAN v4.9.2 — Futures & Exposure
+# ACHI MERIDIAN v4.9.3 — LIVE STREAM
 
-Neu in v4.9.2:
-- Pionex-Kontowert 1.277,70 USD im Gesamtportfolio
-- HBAR Long Futures Grid 5x und XRP Long Futures Grid 5x integriert
-- bestehender BTC Short Futures Grid als Hedge/Risikoposition konsolidiert
-- Futures-Kapital wird nicht doppelt als Spot-Vermögen gezählt
-- Exposure-Layer: Long-Kapital, Short-Hedge, bekannte 5x-Long-Kapazität
-- Bot Intelligence: HALTEN / BEOBACHTEN / KRITISCH PRÜFEN
-- DAY-TRADE 2.2 versucht RSI 1H/4H, Funding, Open Interest und 24H-VWAP direkt über Binance Futures im Browser zu aktualisieren
-- LIVE und SNAPSHOT werden strikt getrennt
-- NADIR bleibt transparent als letzter bestätigter Modell-Snapshot, solange aktuelle On-Chain-/Kapitulationsdaten fehlen
-- Settings zeigt offenen Weg zu v5.0 Portfolio Command Center
+Live-Preis-Engine:
+- Binance Spot WebSocket als Primärfeed
+- Binance Spot REST als 15-Sekunden Health/Fallback
+- CoinGecko REST als zweiter Fallback und für Icons/Assets ohne Binance-Paar
+- LIVE wird nur für tatsächlich aktuelle Feed-Daten angezeigt
+- nach 45 Sekunden ohne Update wird ein Kurs als STALE behandelt
+- SNAPSHOT bleibt ausschließlich für statische Referenz-/Bot-/Makrodaten
+- Markt, Depot und Positionswerte nutzen dieselbe Live-Preisquelle
+- Portfolio wird bei Live-Ticks automatisch neu berechnet, UI maximal 1x pro Sekunde
+- Feed-Health zeigt WebSocket/REST/CoinGecko-Zustand
 
-Datenstand Pionex-Screenshots: 22.08.2026 09:12 CEST.
+Pionex Futures bleiben Screenshot-Snapshot vom 22.08.2026 09:12 CEST, bis eine Pionex-API angebunden ist.

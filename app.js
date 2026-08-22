@@ -1,7 +1,8 @@
 
 const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
-let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null;
+let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null;
+let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 
 const CG_IDS={
  BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
@@ -9,6 +10,14 @@ const CG_IDS={
  NEAR:'near',AVAX:'avalanche-2',ATOM:'cosmos',TAO:'bittensor',INJ:'injective-protocol',
  PEPE:'pepe',XLM:'stellar',VSN:'vision-3'
 };
+const BINANCE_PAIRS={
+ BTC:'btcusdt',ETH:'ethusdt',SOL:'solusdt',XRP:'xrpusdt',SUI:'suiusdt',ADA:'adausdt',
+ FET:'fetusdt',HBAR:'hbarusdt',DOT:'dotusdt',NEAR:'nearusdt',AVAX:'avaxusdt',ATOM:'atomusdt',
+ TAO:'taousdt',INJ:'injusdt',PEPE:'pepeusdt',XLM:'xlmusdt'
+};
+const WS_STALE_MS=45000;
+const REST_HEALTH_MS=15000;
+
 const HALVINGS=[
  new Date('2012-11-28T00:00:00Z').getTime(),
  new Date('2016-07-09T00:00:00Z').getTime(),
@@ -57,33 +66,101 @@ async function loadCoinHistory(sym,force=false){
    throw err;
  }
 }
-async function refreshCurrentPortfolioPrices(){
- const symbols=[...new Set([
-   ...(DATA.portfolio.holdings||[]).map(x=>x.symbol),
-   ...(DATA.forecastCoins||[]),
-   'PEPE','NEAR','DOT','HBAR'
- ])];
+async function loadCoinGeckoQuotes(symbols, onlyMissing=false){
  const ids=symbols.map(s=>CG_IDS[s]).filter(Boolean);
- if(!ids.length) return;
+ if(!ids.length)return 0;
  try{
-   const j=await fetchJSON(
-     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&price_change_percentage=24h`
-   );
-   const byId={}; j.forEach(v=>byId[v.id]=v);
-   DATA.livePrices={};
-   DATA.assetIcons={};
-   symbols.forEach(sym=>{
-     const id=CG_IDS[sym], v=byId[id];
-     if(v){
-       DATA.livePrices[sym]={price:v.current_price,change24h:v.price_change_percentage_24h};
-       if(v.image) DATA.assetIcons[sym]=v.image;
-     }
-   });
-   LAST_PRICE_UPDATE=Date.now();
-   recalcPortfolio();
- }catch(e){
-   DATA.assetIcons=DATA.assetIcons||{};
- }
+  const j=await fetchJSON(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&price_change_percentage=24h`);
+  const byId={};j.forEach(v=>byId[v.id]=v);let n=0;
+  DATA.assetIcons=DATA.assetIcons||{}; DATA.livePrices=DATA.livePrices||{};
+  symbols.forEach(sym=>{
+   const v=byId[CG_IDS[sym]]; if(!v)return;
+   if(v.image)DATA.assetIcons[sym]=v.image;
+   const existing=DATA.livePrices[sym];
+   if(!onlyMissing || !existing || quoteAgeMs(existing)>WS_STALE_MS){
+    applyQuote(sym,v.current_price,v.price_change_percentage_24h,'CoinGecko REST','FALLBACK',Date.now(),false);n++;
+   }
+  });
+  FEED.coinGecko='OK';FEED.lastCgAt=Date.now();return n;
+ }catch(e){FEED.coinGecko='ERROR';FEED.lastError='CoinGecko: '+e.message;return 0}
+}
+function quoteAgeMs(q){return q?.updatedAt?Date.now()-q.updatedAt:Infinity}
+function quoteStatus(q){
+ if(!q)return 'MISSING';
+ const age=quoteAgeMs(q);
+ if(q.status==='LIVE' && age<=WS_STALE_MS)return 'LIVE';
+ if(q.status==='LIVE' && age>WS_STALE_MS)return 'STALE';
+ return q.status||'FALLBACK';
+}
+function applyQuote(sym,price,change24h,source,status='LIVE',ts=Date.now(),schedule=true){
+ price=Number(price);change24h=Number(change24h);
+ if(!Number.isFinite(price)||price<=0)return;
+ DATA.livePrices=DATA.livePrices||{};
+ DATA.livePrices[sym]={price,change24h:Number.isFinite(change24h)?change24h:(DATA.livePrices[sym]?.change24h||0),source,status,updatedAt:ts};
+ LAST_PRICE_UPDATE=Math.max(LAST_PRICE_UPDATE||0,ts);
+ if(schedule)scheduleLiveRender();
+}
+function scheduleLiveRender(){
+ if(UI_RENDER_TIMER)return;
+ UI_RENDER_TIMER=setTimeout(()=>{UI_RENDER_TIMER=null;recalcPortfolio();renderAll();updateHeaderFeedClock()},1000);
+}
+function updateHeaderFeedClock(){
+ const el=$('#refreshTime');if(!el)return;
+ const q=DATA?.livePrices?.BTC, age=q?.updatedAt?Math.max(0,Math.round((Date.now()-q.updatedAt)/1000)):null;
+ el.textContent=q&&quoteStatus(q)==='LIVE'?`● LIVE ${age}s`:`↻ ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}`;
+}
+async function refreshBinanceRest(symbols, force=false){
+ const supported=symbols.filter(s=>BINANCE_PAIRS[s]); if(!supported.length)return 0;
+ try{
+  const params=encodeURIComponent(JSON.stringify(supported.map(s=>BINANCE_PAIRS[s].toUpperCase())));
+  const rows=await fetchJSON(`https://api.binance.com/api/v3/ticker/24hr?symbols=${params}`);
+  const byPair={};(Array.isArray(rows)?rows:[rows]).forEach(v=>byPair[String(v.symbol||'').toLowerCase()]=v);
+  let n=0;
+  supported.forEach(sym=>{
+   const v=byPair[BINANCE_PAIRS[sym]];if(!v)return;
+   const current=DATA.livePrices?.[sym];
+   if(force || !current || quoteStatus(current)!=='LIVE'){
+    applyQuote(sym,v.lastPrice,v.priceChangePercent,'Binance REST','LIVE',Date.now(),false);n++;
+   }
+  });
+  FEED.binanceRest='OK';FEED.lastRestAt=Date.now(); if(n){recalcPortfolio();renderAll()} return n;
+ }catch(e){FEED.binanceRest='ERROR';FEED.lastError='Binance REST: '+e.message;return 0}
+}
+function startBinanceWebSocket(symbols){
+ const streams=symbols.filter(s=>BINANCE_PAIRS[s]).map(s=>BINANCE_PAIRS[s]+'@ticker');
+ if(!streams.length || typeof WebSocket==='undefined')return;
+ try{if(PRICE_WS)PRICE_WS.close()}catch(e){}
+ const reverse={};Object.entries(BINANCE_PAIRS).forEach(([s,p])=>reverse[p]=s);
+ try{
+  PRICE_WS=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams.join('/'));
+  PRICE_WS.onopen=()=>{FEED.ws='CONNECTED';FEED.lastError=null;scheduleLiveRender()};
+  PRICE_WS.onmessage=ev=>{
+   try{
+    const msg=JSON.parse(ev.data), t=msg.data||msg, sym=reverse[String(t.s||'').toLowerCase()];
+    if(!sym)return;
+    FEED.ws='CONNECTED';FEED.lastWsAt=Date.now();
+    applyQuote(sym,t.c,t.P,'Binance WebSocket','LIVE',Date.now(),true);
+   }catch(e){}
+  };
+  PRICE_WS.onerror=()=>{FEED.ws='ERROR';FEED.lastError='WebSocket Fehler';scheduleLiveRender()};
+  PRICE_WS.onclose=()=>{FEED.ws='DISCONNECTED';scheduleLiveRender();setTimeout(()=>startBinanceWebSocket(symbols),5000)};
+ }catch(e){FEED.ws='ERROR';FEED.lastError=e.message}
+}
+async function refreshCurrentPortfolioPrices(){
+ const symbols=[...new Set([...(DATA.portfolio.holdings||[]).map(x=>x.symbol),...(DATA.forecastCoins||[]),'PEPE','NEAR','DOT','HBAR','BTC','ETH','SOL','XRP'])];
+ DATA.livePrices=DATA.livePrices||{};
+ await refreshBinanceRest(symbols,true);
+ await loadCoinGeckoQuotes(symbols,true);
+ recalcPortfolio();
+ startBinanceWebSocket(symbols);
+ setInterval(async()=>{
+  const wsFresh=FEED.lastWsAt && (Date.now()-FEED.lastWsAt)<WS_STALE_MS;
+  if(!wsFresh)await refreshBinanceRest(symbols,true);
+  const missing=symbols.filter(s=>!DATA.livePrices[s]||quoteStatus(DATA.livePrices[s])!=='LIVE');
+  if(missing.length)await loadCoinGeckoQuotes(missing,true);
+  recalcPortfolio();renderAll();updateHeaderFeedClock();
+ },REST_HEALTH_MS);
+ setInterval(updateHeaderFeedClock,1000);
 }
 
 
@@ -136,8 +213,8 @@ function recalcPortfolio(){
    const q=DATA.livePrices?.[h.symbol];
    const fb=DATA.priceFallbacks?.[h.symbol];
    const price=q?.price || fb?.price || 0;
-   const priceSource=q?.price ? 'LIVE' : fb?.price ? 'SNAPSHOT' : 'MISSING';
-   return {...h,price,priceSource,change24h:q?.change24h||0,value:h.quantity*price}
+   const priceSource=q?.price ? quoteStatus(q) : fb?.price ? 'SNAPSHOT' : 'MISSING';
+   return {...h,price,priceSource,change24h:q?.change24h||0,priceProvider:q?.source||null,priceUpdatedAt:q?.updatedAt||null,value:h.quantity*price}
  });
  const liveSpotTotal=priced.reduce((a,h)=>a+h.value,0);
  if(!liveSpotTotal)return;
@@ -155,7 +232,7 @@ function recalcPortfolio(){
  p.custodiansCount=Object.keys(venues).filter(k=>venues[k]>0).length;
  p.byVenue=Object.entries(venues).sort((a,b)=>b[1]-a[1]).map(([name,value])=>{
    const venueHoldings=priced.filter(h=>h.venue===name);
-   const hasFallback=venueHoldings.some(h=>h.priceSource==='SNAPSHOT');
+   const hasFallback=venueHoldings.some(h=>['SNAPSHOT','FALLBACK','STALE'].includes(h.priceSource));
    const hasMissing=venueHoldings.some(h=>h.priceSource==='MISSING');
    return {
      name,value,sharePct:value/total*100,
@@ -167,7 +244,7 @@ function recalcPortfolio(){
  priced.forEach(h=>{
    let c=coins[h.symbol]||(coins[h.symbol]={symbol:h.symbol,value:0,quantity:0,venues:new Set(),change24h:h.change24h,priceSource:h.priceSource,price:h.price});
    c.value+=h.value;c.quantity+=h.quantity;c.venues.add(h.venue);
-   if(h.priceSource!=='LIVE') c.priceSource=h.priceSource;
+   if(h.priceSource!=='LIVE') c.priceSource=h.priceSource; c.priceProvider=h.priceProvider; c.priceUpdatedAt=h.priceUpdatedAt;
    if(h.price) c.price=h.price
  });
  const positions=Object.values(coins).sort((a,b)=>b.value-a.value);
@@ -175,7 +252,7 @@ function recalcPortfolio(){
  p.largestPosition={symbol:positions[0].symbol,sharePct:positions[0].value/total*100};
  p.topPositions=positions.slice(0,5).map(x=>({
    symbol:x.symbol, venue:[...x.venues].join(' + '), value:x.value,
-   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity, priceSource:x.priceSource, price:x.price
+   sharePct:x.value/total*100, change24h:x.change24h, quantity:x.quantity, priceSource:x.priceSource, priceProvider:x.priceProvider, priceUpdatedAt:x.priceUpdatedAt, price:x.price
  }));
 
  p.performance24hPct=positions.reduce((a,x)=>a+(x.value/liveSpotTotal)*x.change24h,0);
@@ -191,8 +268,8 @@ async function load(){
  const stamp=Date.now();
  DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>r.json());
  await Promise.allSettled([refreshCurrentPortfolioPrices(),refreshDayTradeTechnicals()]);
- $('#versionBadge').textContent='v'+DATA.appVersion+' · '+DATA.build.slice(-4);
- $('#refreshTime').textContent='↻ '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+ $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
+ updateHeaderFeedClock();
  renderAll();
  loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
 }
@@ -213,10 +290,17 @@ function donutVenue(){
 function liveBadge(label='LIVE'){return `<span class="live-badge"><span class="live-dot"></span>${label}</span>`}
 function snapshotBadge(label='SNAPSHOT'){return `<span class="snapshot-badge">${label}</span>`}
 function sourceBadge(src){
- if(src==='LIVE') return liveBadge();
+ if(src==='LIVE') return liveBadge('LIVE');
+ if(src==='FALLBACK') return `<span class="fallback-badge">FALLBACK</span>`;
+ if(src==='STALE') return `<span class="stale-badge">STALE</span>`;
  if(src==='MIXED') return snapshotBadge('MIXED');
  if(src==='MISSING') return `<span class="missing-badge">FEHLT</span>`;
- return snapshotBadge();
+ return snapshotBadge('SNAPSHOT');
+}
+function ageText(ts){if(!ts)return 'kein Live-Zeitstempel';const s=Math.max(0,Math.round((Date.now()-ts)/1000));return s<60?`vor ${s} Sek.`:`vor ${Math.round(s/60)} Min.`}
+function feedHealth(){
+ const q=DATA?.livePrices?.BTC; const st=quoteStatus(q);
+ return {status:st,age:q?.updatedAt?Math.max(0,Math.round((Date.now()-q.updatedAt)/1000)):null,source:q?.source||'—'};
 }
 
 function riskClass(score){return score<30?'red':score<60?'amber':'green'}
@@ -290,14 +374,14 @@ function depot(){
 function assetDetail(sym){
  const hs=(DATA.portfolio.holdings||[]).filter(h=>h.symbol===sym);
  const q=DATA.livePrices?.[sym], fb=DATA.priceFallbacks?.[sym];
- const price=q?.price||fb?.price||0, source=q?.price?'LIVE':fb?.price?'SNAPSHOT':'MISSING';
+ const price=q?.price||fb?.price||0, source=q?.price?quoteStatus(q):fb?.price?'SNAPSHOT':'MISSING';
  const qty=hs.reduce((a,h)=>a+Number(h.quantity||0),0), value=qty*price;
  const venues=hs.map(h=>({name:h.venue,qty:Number(h.quantity||0),value:Number(h.quantity||0)*price}));
- const age=LAST_PRICE_UPDATE?Math.max(0,Math.round((Date.now()-LAST_PRICE_UPDATE)/1000)):null;
+ const age=q?.updatedAt?Math.max(0,Math.round((Date.now()-q.updatedAt)/1000)):null;
  const f=forecast(sym);
  return `<div class="detail-overlay" onclick="if(event.target===this)closeAssetDetail()"><div class="asset-detail">
    <div class="detail-head"><button class="detail-close" onclick="closeAssetDetail()">←</button><div>${coinIcon(sym)} <b>${sym}</b></div><span>${sourceBadge(source)}</span></div>
-   <div class="detail-price">$${fmt(price,price<1?4:2)}</div><div class="detail-fresh">${source==='LIVE'?'zuletzt aktualisiert vor '+(age??0)+' Sek.':'Preisquelle: '+source}</div>
+   <div class="detail-price">$${fmt(price,price<1?4:2)}</div><div class="detail-fresh">${source==='LIVE'?`${q?.source||'Livefeed'} · vor ${age??0} Sek.`:'Preisquelle: '+source}</div>
    <div class="grid2">${metric('GESAMTMENGE',fmt(qty,qty<1?6:2)+' '+sym)}${metric('POSITIONSWERT','$'+fmt(value))}${metric('24H',(q?.change24h>=0?'+':'')+fmt(q?.change24h||0,1)+'%',(q?.change24h||0)>=0?'green':'red')}${metric('VERWAHRSTELLEN',venues.length)}</div>
    <div class="section-title detail-section">VERTEILUNG</div>${venues.map(v=>`<div class="row"><span>${v.name}<small class="detail-qty">${fmt(v.qty,v.qty<1?6:2)} ${sym}</small></span><b>$${fmt(v.value)}</b></div>`).join('')}
    ${f.ready?`<div class="section-title detail-section">FORECAST</div><div class="grid2">${metric('RISK',f.risk+'/100',f.risk>75?'red':'amber')}${metric('RSI',fmt(f.dailyRsi,1))}${metric('90T',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}${metric('CONFIDENCE',f.confidence+'/100','cyan')}</div>`:'<p class="footer-note">Forecast-Historie wird beim Öffnen des Forecast-Tabs geladen.</p>'}
@@ -307,19 +391,27 @@ function assetDetail(sym){
 window.openAssetDetail=async sym=>{document.body.insertAdjacentHTML('beforeend',assetDetail(sym));try{await loadCoinHistory(sym);if(sym!=='BTC')await loadCoinHistory('BTC')}catch(e){};const el=document.querySelector('.detail-overlay');if(el)el.outerHTML=assetDetail(sym)};
 window.closeAssetDetail=()=>document.querySelector('.detail-overlay')?.remove();
 function market(){
- const m=DATA.market, b=DATA.btcRegime||{}, mac=DATA.macro||{}, s=DATA.verifiedMarketSnapshot||{}, r=DATA.pionexRisk||{};
+ const m=DATA.market,b=DATA.btcRegime||{},mac=DATA.macro||{},s=DATA.verifiedMarketSnapshot||{},r=DATA.pionexRisk||{},fh=feedHealth();
+ const liveSyms=['BTC','ETH','SOL','XRP'];
+ const liveRows=liveSyms.map(sym=>{
+  const q=DATA.livePrices?.[sym], snap=s.prices?.[sym];
+  const price=q?.price??snap?.price, ch=q?.change24h??snap?.change24hPct, st=q?quoteStatus(q):'SNAPSHOT';
+  const provider=q?.source||'Referenz-Snapshot'; const ts=q?.updatedAt;
+  return `<div class="live-market-row"><div><b>${sym}</b> ${sourceBadge(st)}<small>${provider} · ${ts?ageText(ts):'Fallback'}</small></div><div><b>$${fmt(price,price<10?4:2)}</b><span class="${ch>=0?'green':'red'}">${ch>=0?'+':''}${fmt(ch,2)}%</span></div></div>`;
+ }).join('');
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
- return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${liveBadge('VERIFIED')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
+ return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${snapshotBadge('MODEL')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
  `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
- card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Risk-on unterstützt HBAR/XRP Long-Grids, erhöht aber das Risiko eines bereits stark belasteten BTC-Short-Hedges.</p>`)+
- card(`<div class="section-title">VERIFIZIERTE REFERENZKURSE</div>${Object.entries(s.prices||{}).map(([sym,q])=>`<div class="row"><span>${sym} ${liveBadge('VERIFIED')}</span><b>$${fmt(q.price,q.price<10?4:2)} <span class="${q.change24hPct>=0?'green':'red'}">${q.change24hPct>=0?'+':''}${fmt(q.change24hPct,2)}%</span></b></div>`).join('')}<p class="footer-note">Portfolio-Positionen nutzen weiterhin den Browser-Livefeed; diese Werte sind der öffentlich verifizierte Referenz-Snapshot.</p>`)+
- card(`<div class="section-title">MACRO ${liveBadge('VERIFIED')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">BROWSER-LIVE / FALLBACK</span></div>${radar.map(x=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">Momentum</div></div><div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`);
+ card(`<div class="section-title">LIVE FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">LIVE wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
+ card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
+ card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
+ card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':''}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
 }
 function bottomView(){
- const n=DATA.nadir, c=n.currentVerifiedContext||{};
+ const n=DATA.nadir,c=n.currentVerifiedContext||{},q=DATA.livePrices?.BTC,btc=q?.price||c.btcPrice||0;
  return card(`<div class="eyebrow">NADIR 2.1 ${snapshotBadge('MODEL')}</div><div class="forecast-main">${n.label}</div><div class="sub">Bewertung · Kapitulation · Holder · Timing</div><p class="footer-note">${n.note||''}</p>`)+
- card(`<div class="section-title">AKTUELL VERIFIZIERTER KONTEXT ${liveBadge('VERIFIED')}</div><div class="grid2">${metric('BTC','$'+fmt(c.btcPrice||0))}${metric('BTC 7T','+'+fmt(c.btc7dPct||0,2)+'%','green')}${metric('FEAR & GREED',c.fearGreed||'—','amber')}${metric('BTC DOM.',fmt(c.btcDominancePct||0,2)+'%')}</div>`)+
+ card(`<div class="section-title">MARKTKONTEXT</div><div class="grid2">${metric('BTC','$'+fmt(btc)+(q?'<div class="data-state">'+sourceBadge(quoteStatus(q))+'</div>':''))}${metric('BTC 7T','+'+fmt(c.btc7dPct||0,2)+'%','green')}${metric('FEAR & GREED',c.fearGreed||'—','amber')}${metric('BTC DOM.',fmt(c.btcDominancePct||0,2)+'%')}</div>`)+
  card(`<div class="row"><span class="eyebrow">NADIR GESAMTSCORE</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">${snapshotBadge('LAST CONFIRMED')} ${n.snapshotAt||''}</p>`)+
  `<div class="grid2">${metric('BEWERTUNG',n.valuation+'/100')}${metric('KAPITULATION',n.capitulation+'/100')}${metric('HOLDER',n.holder+'/100')}${metric('TIMING',n.timing+'/100')}</div>`+
  card(`<div class="section-title">BTC BODEN-SZENARIEN ${snapshotBadge('MODEL')}</div>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
@@ -390,10 +482,10 @@ function renderForecast(){
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 function settings(){
- const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length, r=DATA.pionexRisk||{};
- return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Live-Kurse zuletzt</span><b>${LAST_PRICE_UPDATE?new Date(LAST_PRICE_UPDATE).toLocaleTimeString('de-DE'):'—'}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
- card(`<div class="section-title">v4.9.2 MODULE</div><div class="row"><span>Portfolio Engine</span><b class="green">Spot + Cash + Futures getrennt</b></div><div class="row"><span>Bot Intelligence</span><b class="green">aktiv</b></div><div class="row"><span>Netto-Exposure</span><b class="amber">teilverifiziert</b></div><div class="row"><span>DAY-TRADE Live</span><b class="green">RSI / Funding / OI / VWAP</b></div><div class="row"><span>NADIR</span><b class="amber">On-Chain fehlt</b></div><div class="row"><span>Datenintegrität</span><b class="green">LIVE ≠ SNAPSHOT</b></div>`)+
- card(`<div class="section-title">NÄCHSTER SCHRITT → v5.0</div><div class="row"><span>BTC-Short Notional/Liq.</span><b class="red">frische Pionex-Daten nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">API/Quelle anbinden</b></div><div class="row"><span>Bot P&L Auto-Sync</span><b class="amber">Pionex API nötig</b></div><p class="footer-note">Die Architektur für das Portfolio Command Center ist jetzt vorbereitet; fehlende externe Daten werden bewusst nicht erfunden.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">APP NEU LADEN</button>`);
+ const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
+ card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
+ card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
 function renderAll(){
  $('#view-depot').innerHTML=depot();

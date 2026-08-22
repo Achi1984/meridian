@@ -351,3 +351,13 @@ button{font:inherit}
 .exposure-callout b{color:var(--red);white-space:nowrap}
 .exposure-callout span{color:var(--muted);font-size:11px;line-height:1.4}
 .data-state{font-size:8px;letter-spacing:.6px;margin-top:4px}
+
+/* v4.9.3 LIVE STREAM */
+.fallback-badge,.stale-badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:8px;font-weight:900;letter-spacing:.7px}
+.fallback-badge{color:#f0b84b;border:1px solid rgba(240,184,75,.45);background:rgba(240,184,75,.09)}
+.stale-badge{color:#ff8a65;border:1px solid rgba(255,138,101,.45);background:rgba(255,138,101,.09)}
+.live-market-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+.live-market-row:last-child{border-bottom:0}.live-market-row>div:first-child{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.live-market-row small{width:100%;color:var(--muted);font-size:9px;margin-top:2px}.live-market-row>div:last-child{text-align:right}.live-market-row>div:last-child span{display:block;font-size:11px;margin-top:3px}
+.feed-health{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:12px;margin-bottom:8px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.feed-health.live{border-color:rgba(47,229,154,.3)}.feed-health.stale,.feed-health.fallback{border-color:rgba(240,184,75,.35)}
+.feed-health span{font-size:10px;color:var(--muted)}

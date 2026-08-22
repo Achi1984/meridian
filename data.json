@@ -1,6 +1,6 @@
 {
-  "appVersion": "4.9.2",
-  "build": "2026-08-22-futures-exposure",
+  "appVersion": "4.9.3",
+  "build": "2026-08-22-live-stream",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -421,7 +421,7 @@
     "XLM",
     "ATOM"
   ],
-  "updatedAt": "2026-08-22T09:13:00+02:00",
+  "updatedAt": "2026-08-22T09:36:00+02:00",
   "historyMode": "browser",
   "priceFallbacks": {
     "FET": {
@@ -514,5 +514,14 @@
     "btcShortNotional": null,
     "directionalBias": "NET LONG / BTC HEDGE",
     "note": "Notional des BTC-Shorts bleibt absichtlich offen, bis aktuelle Positions-/Liquidationsdaten vorliegen."
+  },
+  "liveDataEngine": {
+    "version": "1.0",
+    "primary": "Binance Spot WebSocket",
+    "restFallback": "Binance Spot REST",
+    "secondaryFallback": "CoinGecko REST",
+    "staleAfterSeconds": 45,
+    "healthCheckSeconds": 15,
+    "uiRefreshMaxHz": 1
   }
 }
