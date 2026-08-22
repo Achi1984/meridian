@@ -1,9 +1,9 @@
 {
-  "version": "5.1.7",
-  "build": "2026-08-22-signal-engine-1",
+  "version": "5.1.8",
+  "build": "2026-08-22-confluence-engine-1",
   "base": "5.1.5 stable",
   "note": "Trigger Watch temporarily removed after startup regression.",
-  "baseline": "v5.1.6 GOLDEN",
+  "baseline": "v5.1.7 STABLE",
   "frozen": true,
   "rules": [
     "Header/spacing/bottom navigation are frozen",
@@ -11,6 +11,6 @@
     "Module failure must not blank the whole app",
     "No obsolete versioned JS/CSS files in future builds"
   ],
-  "module": "Signal Engine 1.0",
+  "module": "Confluence Engine 1.0",
   "coreLayoutFrozen": true
 }

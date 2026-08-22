@@ -1,20 +1,13 @@
-# ACHI MERIDIAN v5.1.6 — GOLDEN BASELINE
+# ACHI MERIDIAN v5.1.8 — Confluence Engine
 
-Dieser Build ist die eingefrorene stabile Referenzbasis.
+Stable basis: v5.1.7.
 
-Freeze-Regeln:
-- Header, vertikales Spacing und Bottom-Navigation nicht verändern.
-- Neue Funktionen nur modular ergänzen.
-- Ein Modulfehler darf niemals die gesamte App leeren.
-- Keine alten versionierten JS/CSS-Dateien in neue Builds mitschleppen.
-- Rückfallbasis bei Regressionen: diese v5.1.6 Golden Baseline.
+New:
+- CONFLUENCE ENGINE 1.0 in CENTER
+- combines MASTER RISK, BTC SPOT, DAY-TRADE, HBAR BOT and XRP BOT
+- central vocabulary: HOLD / WATCH / ADD / REDUCE / HEDGE
+- risk-first logic: new exposure cannot override elevated capital risk
+- HEDGE is suppressed when the existing BTC short is already critically stressed
+- no automatic order execution
 
-# ACHI MERIDIAN v5.1.4 — DAYTRADE Hotfix
-
-Fix:
-- `Can't find variable: stateLabel` im DAYTRADE-Modul behoben.
-- `stateLabel` wird innerhalb von `dayTrade()` definiert.
-- Layout-Geometrie des zuletzt freigegebenen Screens bleibt unverändert.
-- Bottom Navigation unverändert.
-- Versionsanzeige nutzt nach erfolgreichem Datenladen `data.json`.
-- Alte JS-Alias-Dateien enthalten ebenfalls den Hotfix, um stale HTML-Referenzen abzufangen.
+Layout/CSS remain frozen from the stable baseline.
