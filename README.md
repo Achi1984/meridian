@@ -1,18 +1,14 @@
-# ACHI MERIDIAN v5.1.0 — FIB GRID ENGINE
+# ACHI MERIDIAN v5.2.0 — ALERT CENTER
 
 Neu:
-- eigener GRID-Tab für HBAR und XRP COIN-M Long Bots
-- Live-Kurs + lokale 365T Historie
-- automatische 120T Swing-Erkennung
-- FIB 0,236 / 0,382 / 0,500 / 0,618 / 0,786
-- Preferred Entry Zone = 0,618–0,500
-- nächste Grid-Range = 0,786 -1,5% bis 0,382 +1%
-- TP1 = Swing High, TP2 = 1,272 Extension
-- dynamische Grid-Anzahl aus der Range-Breite
-- TP-Latch: wenn Livepreis den Bot-TP erreicht, merkt MERIDIAN das lokal auch nach einem Retracement
-- Signalstufen PREPARE / WAIT FOR RETRACE / WATCH ZONE / ARM GRID / START ZONE / RECALCULATE SWING
-- START ZONE verlangt FIB-Konfluenz + Daily RSI <=60 + Risk-on-Regime
-- Command Center zeigt NEXT GRID SETUPS
-- Sicherheitsreferenz für Liquidation, aber bewusst kein erfundener Pionex-Liquidationspreis
+- lokales Alert Center mit Status-Historie
+- Statuskette WAIT → WATCH → ARM → START ZONE → TP HIT → NEW RANGE
+- SOL / ETH / PEPE Scanner-Status wird auf Änderungen überwacht
+- XRP / HBAR TP-Hit wird erkannt, sobald Livekurs den hinterlegten TP erreicht
+- kritischer Liquidationspuffer wird als Risikoereignis markiert
+- Statuswechsel werden lokal gespeichert; kein Kurs-Spam
+- externer ChatGPT-Watch bleibt für Push-Benachrichtigungen zuständig
+- Pionex Live Sync bleibt ausdrücklich deaktiviert; Pionex-Daten = SNAPSHOT
 
-Wichtig: Das Modul erzeugt Modellzonen und keine automatische Order. Der echte COIN-M Liquidationspreis hängt von Margin, Hebel und Pionex-Kontraktdetails ab.
+Hinweis:
+Die lokale Alert-Historie läuft, wenn MERIDIAN geöffnet ist. Echte Pushs bei geschlossener App kommen weiterhin über den eingerichteten ChatGPT-Watch.
