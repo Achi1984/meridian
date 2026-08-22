@@ -1,16 +1,17 @@
 {
-  "version": "5.1.8",
-  "build": "2026-08-22-confluence-engine-1",
-  "base": "5.1.5 stable",
-  "note": "Trigger Watch temporarily removed after startup regression.",
-  "baseline": "v5.1.7 STABLE",
+  "version": "5.1.9",
+  "build": "2026-08-22-action-engine-1",
+  "base": "5.1.8 confluence stable",
+  "baseline": "v5.1.8 STABLE",
   "frozen": true,
-  "rules": [
-    "Header/spacing/bottom navigation are frozen",
-    "New features must be modular",
-    "Module failure must not blank the whole app",
-    "No obsolete versioned JS/CSS files in future builds"
-  ],
-  "module": "Confluence Engine 1.0",
-  "coreLayoutFrozen": true
+  "module": "Action Engine 1.0",
+  "coreLayoutFrozen": true,
+  "changes": [
+    "Concrete action queue replaces duplicated Today/Bot Watch/Active Signals blocks",
+    "BTC Short uses FREEZE / LIQ-DATEN PRÜFEN instead of generic risk reduction",
+    "HBAR 5x NO ADD when liquidation buffer is low",
+    "XRP 5x HOLD with retracement rule",
+    "Day-Trade BLOCKED below gate 70",
+    "Spot risk explicitly blocks new buys at high master risk"
+  ]
 }

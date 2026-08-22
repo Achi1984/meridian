@@ -1,13 +1,14 @@
-# ACHI MERIDIAN v5.1.8 — Confluence Engine
+# ACHI MERIDIAN v5.1.9 — Action Engine 1.0
 
-Stable basis: v5.1.7.
+Basis: v5.1.8 Confluence Engine (stabil).
 
-New:
-- CONFLUENCE ENGINE 1.0 in CENTER
-- combines MASTER RISK, BTC SPOT, DAY-TRADE, HBAR BOT and XRP BOT
-- central vocabulary: HOLD / WATCH / ADD / REDUCE / HEDGE
-- risk-first logic: new exposure cannot override elevated capital risk
-- HEDGE is suppressed when the existing BTC short is already critically stressed
-- no automatic order execution
+Neu:
+- Konkrete ACTION QUEUE statt drei überschneidender Center-Module
+- BTC Short: FREEZE / LIQ-DATEN PRÜFEN
+- HBAR 5x: NO ADD bei niedrigem Liquidationspuffer
+- XRP 5x: HOLD, neuer Bot erst nach Retracement
+- Day-Trade: BLOCKED solange Gate <70
+- Spot: keine neuen Käufe bei hohem MERIDIAN Risk
+- Core-Layout, Header, Bottom-Navigation und alle anderen Tabs bleiben unverändert
 
-Layout/CSS remain frozen from the stable baseline.
+Wichtig: Keine automatische Order-Ausführung. Snapshot-/unverifizierte Botdaten werden nicht als live interpretiert.

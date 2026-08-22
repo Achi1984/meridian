@@ -737,3 +737,22 @@ main>section:not(.hidden)>.card:first-child{
     margin-top:2px !important;
   }
 }
+
+
+/* v5.1.9 ACTION ENGINE */
+.actionq{margin-top:14px}
+.actionq-row{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:14px 0;border-top:1px solid rgba(37,91,126,.42)}
+.actionq-row:first-child{border-top:0}
+.actionq-num{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;border:1px solid rgba(88,181,246,.45)}
+.actionq-row.red .actionq-num{color:#ff5d69;border-color:rgba(255,93,105,.55);background:rgba(255,93,105,.06)}
+.actionq-row.amber .actionq-num{color:#f2b544;border-color:rgba(242,181,68,.55);background:rgba(242,181,68,.05)}
+.actionq-row.cyan .actionq-num{color:#24a9ff}
+.actionq-row.green .actionq-num{color:#2ed691}
+.actionq-main{min-width:0}
+.actionq-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.actionq-top>b{font-size:14px}
+.actionq-action{font-size:11px;letter-spacing:.4px;text-align:right;font-weight:900}
+.actionq-action.red{color:#ff5d69}.actionq-action.amber{color:#f2b544}.actionq-action.cyan{color:#24a9ff}.actionq-action.green{color:#2ed691}
+.actionq-main>small{display:block;color:#8495aa;line-height:1.45;margin-top:5px}
+.actionq-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:#63768b;font-size:10px}
+.actionq-meta strong{color:#9caec1}
