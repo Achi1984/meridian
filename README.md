@@ -1,19 +1,22 @@
-# ACHI MERIDIAN v5.0.5 — GRID RESTORE
+# ACHI MERIDIAN v5.0.6 — GRID ENGINE 1.1
 
-Stabile Basis: v5.0.4 Lazy View Fix.
+Stabile Basis: v5.0.5 / Lazy View Renderer.
 
-Einzige neue Funktion:
-- isolierter GRID-Tab
-- HBAR + XRP COIN-M Long
-- Livepreis + Pionex Snapshot-Botparameter
+Neu:
+- Bottom Navigation wieder einzeilig mit 7 Tabs
+- GRID nutzt echte Binance 4H-Kerzen für Swing High/Low
+- automatische Pivot-/Swing-Erkennung
+- ATR und Grid-Frequenz
 - FIB 0.236 / 0.382 / 0.500 / 0.618 / 0.786
-- Preferred Entry Zone 0.500–0.618
-- nächste Grid-Range und TP2 1.272
-- Status WAIT / WATCH / START ZONE / TP HIT / NEW RANGE
+- Extensions 1.272 und 1.618
+- HBAR/XRP: nächste COIN-M Range auf Basis des erkannten Swings
+- SOL/ETH/PEPE: integrierter Opportunity Scanner im GRID-Tab
+- Daten-Fallback: Binance 4H → CoinGecko Daily → bestehende Bot-Range
+- manuelle Schaltfläche „SWINGS NEU LADEN“
 
-Bewusst NICHT enthalten:
-- Alert Center
-- SOL/ETH/PEPE Scanner
-- automatische Swing-Erkennung
+Bewusst weiterhin NICHT enthalten:
+- Alert Center im App-Renderer
+- Pionex Live Sync
+- automatische Bot-Ausführung
 
-Ziel: stabile Funktion zuerst, dann Erweiterungen einzeln.
+Die externe ChatGPT-Push-Überwachung bleibt davon unabhängig.

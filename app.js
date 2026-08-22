@@ -3,6 +3,7 @@ const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
+let GRID_SWINGS={},GRID_LOADING={};
 
 const CG_IDS={
  BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
@@ -283,12 +284,13 @@ async function load(){
       $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
       try{recalcPortfolio()}catch(e){}
       renderAll(); updateHeaderFeedClock();
+      refreshGridEngine(false).catch(()=>{});
     });
 
    loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  }catch(e){
    console.error('MERIDIAN BOOT ERROR',e);
-   $('#versionBadge').textContent='v5.0.5 · ERROR';
+   $('#versionBadge').textContent='v5.0.6 · ERROR';
    const main=document.querySelector('main');
    if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
  }
@@ -586,26 +588,136 @@ function renderForecast(){
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 
+
 function gridQuote(sym){
- const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[sym])||{};
+ const q=(DATA&&DATA.livePrices&&DATA.livePrices[sym])||{};
  return +q.price||0;
+}
+function gridChange24h(sym){
+ const q=(DATA&&DATA.livePrices&&DATA.livePrices[sym])||{};
+ return +q.change24h||+q.change24hPct||0;
 }
 function gridBot(sym){
  return ((DATA&&DATA.pionexRisk&&DATA.pionexRisk.bots)||[]).find(b=>b.symbol===sym)||null;
 }
 function gridFmt(v,sym){
  if(!Number.isFinite(+v))return '—';
+ if(sym==='PEPE')return fmt(+v,8);
  if(sym==='HBAR')return fmt(+v,5);
  if(sym==='XRP')return fmt(+v,4);
- return fmt(+v,2);
+ if(sym==='SOL')return fmt(+v,2);
+ if(sym==='ETH'||sym==='BTC')return fmt(+v,0);
+ return fmt(+v,3);
 }
-function fibFromBot(sym){
- const b=gridBot(sym); if(!b)return null;
- const px=gridQuote(sym)||+b.currentPrice||+b.createdPrice||0;
- const hi=+b.takeProfit||+b.rangeHigh||px;
- let lo=+b.rangeLow||(+b.liquidation||px*.75);
- // Use bot range as stable swing proxy until a dedicated swing engine is reintroduced.
- if(!(hi>lo)){lo=px*.8}
+function gridPair(sym){
+ const x=BINANCE_PAIRS&&BINANCE_PAIRS[sym];
+ return x?x.toUpperCase():null;
+}
+function atrFromKlines(ks,p=14){
+ if(!Array.isArray(ks)||ks.length<p+1)return null;
+ const tr=[];
+ for(let i=1;i<ks.length;i++){
+   const h=+ks[i][2],l=+ks[i][3],pc=+ks[i-1][4];
+   tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));
+ }
+ return tr.slice(-p).reduce((a,b)=>a+b,0)/p;
+}
+function detectBullSwing(ks){
+ if(!Array.isArray(ks)||ks.length<25)return null;
+ const rows=ks.map((k,i)=>({i,t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
+ const look=rows.slice(-120);
+ const pivH=[],pivL=[],n=3;
+ for(let i=n;i<look.length-n;i++){
+   const r=look[i], win=look.slice(i-n,i+n+1);
+   if(r.h===Math.max(...win.map(x=>x.h)))pivH.push(r);
+   if(r.l===Math.min(...win.map(x=>x.l)))pivL.push(r);
+ }
+ let high=pivH.at(-1)||look.reduce((a,b)=>b.h>a.h?b:a,look[0]);
+ let lows=pivL.filter(x=>x.i<high.i);
+ let low=lows.at(-1);
+ if(!low){
+   const before=look.filter(x=>x.i<high.i);
+   low=before.length?before.reduce((a,b)=>b.l<a.l?b:a,before[0]):look[0];
+ }
+ // If latest detected high is too old, use the highest high after the most recent meaningful low.
+ const recentLow=pivL.at(-1);
+ if(recentLow && recentLow.i>high.i){
+   const after=look.filter(x=>x.i>recentLow.i);
+   if(after.length){
+     const h2=after.reduce((a,b)=>b.h>a.h?b:a,after[0]);
+     if(h2.h>recentLow.l*1.03){low=recentLow;high=h2}
+   }
+ }
+ if(!(high.h>low.l))return null;
+ return {low:low.l,high:high.h,lowTs:low.t,highTs:high.t,candles:look};
+}
+function gridFrequency(ks,atr){
+ if(!ks?.length||!atr)return 0;
+ const x=ks.slice(-72);
+ let moves=0, reversals=0,lastDir=0;
+ x.forEach(k=>{
+   const o=+k[1],c=+k[4],d=c-o,dir=Math.sign(d);
+   if(Math.abs(d)>=atr*.35)moves++;
+   if(lastDir&&dir&&dir!==lastDir)reversals++;
+   if(dir)lastDir=dir;
+ });
+ return Math.round(Math.min(100,(moves/x.length)*55+(reversals/Math.max(1,x.length-1))*90));
+}
+async function loadGridSwing(sym,force=false){
+ if(GRID_SWINGS[sym]&&!force)return GRID_SWINGS[sym];
+ if(GRID_LOADING[sym])return GRID_LOADING[sym];
+ const pair=gridPair(sym);
+ GRID_LOADING[sym]=(async()=>{
+   try{
+     if(!pair)throw new Error('Kein Binance Pair');
+     const ks=await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=4h&limit=180`);
+     const sw=detectBullSwing(ks);
+     if(!sw)throw new Error('Swing nicht erkannt');
+     const atr=atrFromKlines(ks,14);
+     const px=gridQuote(sym)||+ks.at(-1)[4];
+     const freq=gridFrequency(ks,atr);
+     GRID_SWINGS[sym]={...sw,atr,price:px,frequency:freq,source:'Binance 4H',updatedAt:Date.now()};
+   }catch(e){
+     // CoinGecko daily history as first fallback
+     try{
+       const h=await loadCoinHistory(sym);
+       const cs=(h?.candles||[]).slice(-90);
+       const fake=cs.map(x=>[x[0],x[1],x[2]||x[1],x[3]||x[1],x[4]||x[1],0]);
+       const sw=detectBullSwing(fake);
+       if(!sw)throw new Error('Fallback Swing fehlt');
+       GRID_SWINGS[sym]={...sw,atr:null,price:gridQuote(sym)||+fake.at(-1)[4],frequency:45,source:'CoinGecko Daily',updatedAt:Date.now()};
+     }catch(e2){
+       const b=gridBot(sym),px=gridQuote(sym)||+b?.currentPrice||0;
+       if(b){
+         GRID_SWINGS[sym]={low:+b.rangeLow||px*.8,high:+b.takeProfit||+b.rangeHigh||px*1.2,atr:null,price:px,frequency:35,source:'Bot Range Fallback',updatedAt:Date.now()};
+       }
+     }
+   }finally{
+     delete GRID_LOADING[sym];
+   }
+   return GRID_SWINGS[sym]||null;
+ })();
+ return GRID_LOADING[sym];
+}
+async function refreshGridEngine(force=false){
+ const syms=['HBAR','XRP','SOL','ETH','PEPE'];
+ await Promise.allSettled(syms.map(s=>loadGridSwing(s,force)));
+ try{renderOne('grid')}catch(e){}
+}
+function fibFromSwing(sym){
+ const s=GRID_SWINGS[sym],b=gridBot(sym);
+ if(!s){
+   // immediate safe fallback while the async 4H engine is loading
+   const px=gridQuote(sym)||+b?.currentPrice||0;
+   if(!px)return null;
+   const low=+b?.rangeLow||px*.78,high=+b?.takeProfit||+b?.rangeHigh||px*1.22;
+   return buildGridFib(sym,{low,high,price:px,frequency:0,source:'LOADING / FALLBACK'},b);
+ }
+ return buildGridFib(sym,s,b);
+}
+function buildGridFib(sym,s,b=null){
+ const px=gridQuote(sym)||+s.price||0,lo=+s.low,hi=+s.high;
+ if(!(hi>lo)||!px)return null;
  const span=hi-lo;
  const fib={
    f236:hi-span*.236,
@@ -613,53 +725,103 @@ function fibFromBot(sym){
    f500:hi-span*.500,
    f618:hi-span*.618,
    f786:hi-span*.786,
-   ext1272:hi+span*.272
+   ext1272:hi+span*.272,
+   ext1618:hi+span*.618
  };
- const entryLow=fib.f618, entryHigh=fib.f500;
- const rangeLow=fib.f786, rangeHigh=hi;
+ const entryLow=fib.f618,entryHigh=fib.f500,rangeLow=fib.f786,rangeHigh=hi;
  let state='WAIT';
- if(px>=entryLow&&px<=entryHigh) state='START ZONE';
- else if(px>entryHigh&&px<=fib.f382) state='WATCH';
- else if(px>=hi) state='TP HIT';
- else if(px<fib.f786) state='NEW RANGE';
- else state='WAIT';
- return {b,px,hi,lo,fib,entryLow,entryHigh,rangeLow,rangeHigh,state};
+ if(px>=hi)state='TP HIT';
+ else if(px>=entryLow&&px<=entryHigh)state='START ZONE';
+ else if(px>entryHigh&&px<=fib.f382)state='WATCH';
+ else if(px<fib.f786)state='NEW RANGE';
+ const atrPct=s.atr&&px?s.atr/px*100:null;
+ const ampPct=(hi/lo-1)*100;
+ return {sym,b,px,lo,hi,fib,entryLow,entryHigh,rangeLow,rangeHigh,state,source:s.source||'—',
+   atr:s.atr||null,atrPct,frequency:s.frequency||0,ampPct,updatedAt:s.updatedAt||null};
 }
 function gridVisual(g,sym){
  const top=g.hi,bottom=g.lo,span=Math.max(top-bottom,1e-12);
  const levels=[
-  ['TP/HIGH',g.hi],['0.236',g.fib.f236],['0.382',g.fib.f382],
+  ['HIGH',g.hi],['0.236',g.fib.f236],['0.382',g.fib.f382],
   ['0.500',g.fib.f500],['0.618',g.fib.f618],['0.786',g.fib.f786],['LOW',g.lo]
  ];
  const ptop=Math.max(1,Math.min(98,(top-g.px)/span*100));
  return `<div class="grid-fib-chart">
    <div class="grid-entry-band" style="top:${(top-g.entryHigh)/span*100}%;height:${(g.entryHigh-g.entryLow)/span*100}%"><span>PREFERRED ENTRY 0.500–0.618</span></div>
-   ${levels.map(([n,v])=>`<div class="grid-fib-line ${n==='0.500'||n==='0.618'?'preferred':''}" style="top:${(top-v)/span*100}%"><span>${n}</span><b>$${gridFmt(v,sym)}</b></div>`).join('')}
+   ${levels.map(([n,v])=>`<div class="grid-fib-line ${n==='0.500'||n==='0.618'?'preferred':''}" style="top:${Math.max(0,Math.min(100,(top-v)/span*100))}%"><span>${n}</span><b>$${gridFmt(v,sym)}</b></div>`).join('')}
    <div class="grid-price-line" style="top:${ptop}%"><i></i><b>$${gridFmt(g.px,sym)}</b></div>
  </div>`;
 }
 function gridStatusClass(s){
- return s==='START ZONE'?'green':s==='TP HIT'?'green':s==='NEW RANGE'?'red':'amber';
+ return ['START ZONE','TP HIT'].includes(s)?'green':s==='NEW RANGE'?'red':'amber';
+}
+function gridConfidence(g){
+ let x=50;
+ if(g.source==='Binance 4H')x+=20;
+ if(g.ampPct>=12)x+=10;
+ if(g.frequency>=55)x+=10;
+ if(g.atrPct&&g.atrPct>=1)x+=5;
+ return Math.max(35,Math.min(95,Math.round(x)));
+}
+function scannerScore(g,sym){
+ const liq={SOL:95,ETH:100,PEPE:72}[sym]||70;
+ const vol=Math.min(100,(g.atrPct||1.5)*28);
+ const range=Math.min(100,g.ampPct*3);
+ const freq=g.frequency||45;
+ const fib=g.state==='START ZONE'?95:g.state==='WATCH'?80:65;
+ const funding=65,rsiScore=65;
+ return Math.round(freq*.25+vol*.20+range*.20+liq*.15+fib*.10+funding*.05+rsiScore*.05);
+}
+function scannerLeverage(sym){return sym==='PEPE'?'2× max.':'3× max.'}
+function scannerGrids(sym,g){
+ const base=sym==='PEPE'?160:sym==='SOL'?120:100;
+ return Math.round(base*Math.max(.75,Math.min(1.3,(g.frequency||50)/55)));
+}
+function botGridCard(sym){
+ const g=fibFromSwing(sym);
+ if(!g)return card(`<div class="section-title">${sym}</div><p class="footer-note">Swing-Daten werden geladen …</p>`);
+ const b=g.b||{};
+ return card(`<div class="section-head"><div><div class="section-title">${sym} COIN-M LONG</div><div class="section-note">Pionex ${snapshotBadge('SNAPSHOT')} · Swing ${g.source}</div></div><span class="tag ${gridStatusClass(g.state)}">${g.state}</span></div>
+   ${gridVisual(g,sym)}
+   <div class="grid2">
+     ${metric('LIVE PREIS','$'+gridFmt(g.px,sym),'green')}
+     ${metric('SWING','$'+gridFmt(g.lo,sym)+' → $'+gridFmt(g.hi,sym))}
+     ${metric('ENTRY 0.5–0.618','$'+gridFmt(g.entryLow,sym)+'–$'+gridFmt(g.entryHigh,sym),'cyan')}
+     ${metric('NÄCHSTE RANGE','$'+gridFmt(g.rangeLow,sym)+'–$'+gridFmt(g.rangeHigh,sym),'amber')}
+     ${metric('TP1 / TP2','$'+gridFmt(g.hi,sym)+' / $'+gridFmt(g.fib.ext1272,sym))}
+     ${metric('CONFIDENCE',gridConfidence(g)+'/100')}
+   </div>
+   <div class="grid-meta"><span>4H Frequenz <b>${g.frequency||'—'}/100</b></span><span>Swing <b>${fmt(g.ampPct,1)}%</b></span><span>ATR <b>${g.atrPct?fmt(g.atrPct,2)+'%':'—'}</b></span><span>Hebel <b>${b.leverage||'—'}×</b></span></div>
+   <p class="footer-note">Nach TP: nicht sofort neu starten. Erst Retracement in die 0,500–0,618-Zone beobachten; unter 0,786 wird der Swing neu bewertet.</p>`);
+}
+function scannerCard(sym){
+ const g=fibFromSwing(sym);
+ if(!g)return '';
+ const score=scannerScore(g,sym),grids=scannerGrids(sym,g);
+ return `<div class="scanner-card">
+   <div class="scanner-head"><div><b>${sym}</b><small>${g.source} · ${scannerLeverage(sym)}</small></div><strong class="${score>=82?'green':score>=72?'amber':'red'}">${score}/100</strong></div>
+   <div class="scanner-status ${gridStatusClass(g.state)}">${g.state}</div>
+   <div class="scanner-grid">
+     <div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div>
+     <div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div>
+     <div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div>
+     <div><span>GRIDS</span><b>~${grids}</b></div>
+     <div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div>
+     <div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div>
+   </div>
+   <div class="scanner-foot">Frequenz ${g.frequency||'—'}/100 · Swing ${fmt(g.ampPct,1)}% · 24H ${gridChange24h(sym)>=0?'+':''}${fmt(gridChange24h(sym),1)}%</div>
+ </div>`;
 }
 function gridView(){
- const syms=['HBAR','XRP'];
- const cards=syms.map(sym=>{
-   const g=fibFromBot(sym);
-   if(!g)return card(`<div class="section-title">${sym}</div><p class="footer-note">Botdaten fehlen.</p>`);
-   const b=g.b;
-   return card(`<div class="section-head"><div><div class="section-title">${sym} COIN-M LONG</div><div class="section-note">Pionex ${snapshotBadge('SNAPSHOT')}</div></div><span class="tag ${gridStatusClass(g.state)}">${g.state}</span></div>
-    ${gridVisual(g,sym)}
-    <div class="grid2">
-      ${metric('LIVE PREIS','$'+gridFmt(g.px,sym),'green')}
-      ${metric('BOT TP','$'+gridFmt(g.hi,sym))}
-      ${metric('ENTRY ZONE','$'+gridFmt(g.entryLow,sym)+'–$'+gridFmt(g.entryHigh,sym),'cyan')}
-      ${metric('NÄCHSTE RANGE','$'+gridFmt(g.rangeLow,sym)+'–$'+gridFmt(g.rangeHigh,sym),'amber')}
-      ${metric('TP2 · 1.272','$'+gridFmt(g.fib.ext1272,sym))}
-      ${metric('HEBEL',String(b.leverage||'—')+'×')}
-    </div>
-    <p class="footer-note">Range-Basis in v5.0.5: bestehende Bot-Range/TP + Livepreis. Dedizierte Swing-Erkennung kommt erst in einem separaten Build.</p>`);
- }).join('');
- return card(`<div class="eyebrow">FIB GRID ENGINE ${liveBadge('LIVE PRICE')}</div><div class="forecast-main">NEXT COIN-M RANGE</div><div class="sub">HBAR + XRP · isoliertes Modul auf stabiler v5.0.4-Basis</div>`)+cards;
+ const bots=['HBAR','XRP'].map(botGridCard).join('');
+ const scan=['SOL','ETH','PEPE'].map(scannerCard).join('');
+ return card(`<div class="eyebrow">FIB GRID ENGINE 1.1 ${liveBadge('LIVE')}</div><div class="forecast-main">SWING → FIB → NEXT RANGE</div><div class="sub">Echte 4H Swing-Erkennung · HBAR/XRP Bots + SOL/ETH/PEPE Scanner</div>
+   <div class="row"><span>Datenquelle</span><b>Binance 4H → CoinGecko → Bot-Fallback</b></div>
+   <button class="mini-grid-btn" onclick="refreshGridEngine(true)">SWINGS NEU LADEN</button>`)+
+   bots+
+   card(`<div class="section-head"><div><div class="section-title">COIN-M OPPORTUNITY SCANNER</div><div class="section-note">Nicht-Bitpanda Kandidaten</div></div><span class="tag cyan">LIVE</span></div>
+   ${scan||'<p class="footer-note">Scanner lädt 4H-Daten …</p>'}
+   <p class="footer-note">Score ist ein MERIDIAN-Heuristikwert aus Bewegungsfrequenz, ATR, Swing-Breite, Liquiditätsqualität und FIB-Position. Keine Garantie für Ertrag.</p>`);
 }
 
 function settings(){
@@ -718,6 +880,7 @@ function openView(view,button){
  el.classList.remove('hidden');
  window.scrollTo({top:0,behavior:'smooth'});
  if(view==='forecast') selectCoin(activeCoin);
+ if(view==='grid') refreshGridEngine(false);
 }
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.view,b));
 $('#settingsBtn').onclick=()=>openView('settings',null);

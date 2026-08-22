@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.0.5",
-  "build": "2026-08-22-grid-restore",
+  "appVersion": "5.0.6",
+  "build": "2026-08-22-grid-engine-1-1",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -557,20 +557,29 @@
   "restoreNote": "Safe boot build from original v5.0.0: baseline renders before live APIs; each tab renders independently.",
   "gridModule": {
     "status": "ACTIVE",
-    "scope": [
+    "engine": "SWING DETECTION 1.1",
+    "timeframe": "4H",
+    "historyCandles": 180,
+    "activeBots": [
       "HBAR",
       "XRP"
     ],
-    "mode": "LIVE PRICE + SNAPSHOT BOT PARAMS",
-    "stateFlow": [
-      "PREPARE",
-      "WAIT",
-      "WATCH",
-      "ARM",
-      "START ZONE",
-      "TP HIT",
-      "NEW RANGE"
+    "scanner": [
+      "SOL",
+      "ETH",
+      "PEPE"
     ],
-    "note": "GRID-Modul isoliert wiederhergestellt. Keine Alert-Center- oder Scanner-Erweiterungen in diesem Build."
+    "fibLevels": [
+      0.236,
+      0.382,
+      0.5,
+      0.618,
+      0.786
+    ],
+    "extensions": [
+      1.272,
+      1.618
+    ],
+    "note": "Swing High/Low bevorzugt aus Binance 4H-Kerzen; CoinGecko/alte Bot-Range nur als Fallback."
   }
 }
