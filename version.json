@@ -1,5 +1,6 @@
 {
   "version": "5.1.6",
-  "build": "2026-08-22-trigger-watch-safe",
-  "base": "5.1.5 stable"
+  "build": "2026-08-22-hotfix1-stable-core",
+  "base": "5.1.5 stable",
+  "note": "Trigger Watch temporarily removed after startup regression."
 }

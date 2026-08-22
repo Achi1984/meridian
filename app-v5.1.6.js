@@ -3,6 +3,7 @@ const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 const APP_CODE_VERSION='5.1.6';
+const APP_RELEASE='5.1.6 HOTFIX · STABLE CORE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -480,63 +481,6 @@ function decisionPanel(){
    <p class="footer-note">Modellentscheidung, keine Auto-Ausführung. Pionex-Botdaten bleiben Snapshot; unbekannte Liquidationsdaten werden nicht geschätzt.</p>`,'decision-card');
 }
 
-
-function pctDistance(px,target){
- if(!Number.isFinite(px)||!Number.isFinite(target)||target===0)return null;
- return (target/px-1)*100;
-}
-function triggerWatchPanel(){
- const d=DATA.dayTrade||{};
- const btcF=forecast('BTC');
- const btcPx=DATA.livePrices?.BTC?.price||d.btcPrice||0;
- const breakout=btcF?.ready?btcF.high:null;
- const confirm=Number.isFinite(breakout)?breakout*1.01:null;
-
- const botState=sym=>{
-   const g=fibFromSwing(sym);
-   if(!g)return {sym,state:'LÄDT',tone:'amber',detail:'4H-Swing wird geladen'};
-   if(g.px>=g.entryLow&&g.px<=g.entryHigh)
-     return {sym,state:'ENTRY ZONE',tone:'green',detail:`$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}`};
-   if(g.px>g.entryHigh){
-     const dist=Math.abs(pctDistance(g.px,g.entryHigh));
-     return {sym,state:'WAIT RETRACE',tone:'amber',detail:`noch ~${fmt(dist,1)}% bis Entry-Oberkante`};
-   }
-   return {sym,state:'RANGE CHECK',tone:'red',detail:`unter Entry-Zone · Swing neu prüfen`};
- };
- const h=botState('HBAR'),x=botState('XRP');
-
- const scan=['SOL','ETH','PEPE'].map(sym=>{
-   const g=fibFromSwing(sym);
-   return {sym,g,score:g?scannerScore(g,sym):0};
- }).sort((a,b)=>b.score-a.score)[0];
-
- const rows=[];
- if(Number.isFinite(confirm)){
-   const dist=pctDistance(btcPx,confirm);
-   rows.push({
-     tone:btcPx>=confirm?'green':'cyan',
-     title:`BTC BREAKOUT ${btcPx>=confirm?'BESTÄTIGT':'WATCH'}`,
-     detail:btcPx>=confirm?`Close/Preis über ~$${fmt(confirm,0)}`:`Bestätigung ~$${fmt(confirm,0)} · Abstand ${dist>=0?'+':''}${fmt(dist,1)}%`
-   });
- }
- rows.push({
-   tone:d.entryAllowed?'green':'amber',
-   title:`DAY-TRADE ${d.entryAllowed?'ENTRY FREI':'BLOCKIERT'}`,
-   detail:`Gate ${d.gateScore||0}/100 · Freigabe ab 70`
- });
- rows.push({tone:h.tone,title:`HBAR · ${h.state}`,detail:h.detail});
- rows.push({tone:x.tone,title:`XRP · ${x.state}`,detail:x.detail});
- if(scan?.g)rows.push({
-   tone:scan.score>=82?'green':scan.score>=72?'amber':'red',
-   title:`SCANNER TOP: ${scan.sym} ${scan.score}/100`,
-   detail:`${scan.g.state} · Entry $${gridFmt(scan.g.entryLow,scan.sym)}–$${gridFmt(scan.g.entryHigh,scan.sym)}`
- });
-
- return card(`<div class="section-head"><div><div class="section-title">TRIGGER WATCH 1.0</div><div class="section-note">Nächster relevante Auslöser</div></div><span class="tag cyan">MODEL</span></div>
-   ${rows.map((r,i)=>`<div class="focus-row ${r.tone}"><div class="focus-num">${i+1}</div><div><b>${r.title}</b><small>${r.detail}</small></div></div>`).join('')}
-   <p class="footer-note">Live-Preise treiben die Trigger; Pionex-Positionen bleiben Snapshot. Keine automatische Orderausführung.</p>`);
-}
-
 function commandCenter(){
  const p=DATA.portfolio,r=DATA.pionexRisk||{},m=DATA.btcRegime||{},fh=feedHealth(),risk=commandRisk();
  const perf=performanceSince(Date.now()-86400000,p.total);
@@ -564,7 +508,6 @@ function commandCenter(){
  </div>`+
  card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('5x LONG CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('SHORT STRESS',DATA.pionex?.btcShortPnlPct!=null?fmt(DATA.pionex.btcShortPnlPct,1)+'%':'~−98%','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Risiko wird gemeinsam betrachtet: Spot-Konzentration + gehebelte Long-Bots + Short-Hedge-Stress. Bot-Kapital wird nicht doppelt zum Portfolio addiert.</p>`)+
  decisionPanel()+
- triggerWatchPanel()+
 card(`<div class="section-head"><div class="section-title">HEUTE BEACHTEN</div><span class="section-note">Priorisiert</span></div>${focus.slice(0,4).map((x,i)=>`<div class="focus-row ${x.tone}"><div class="focus-num">${i+1}</div><div><b>${x.title}</b><small>${x.text}</small></div></div>`).join('')}<p class="footer-note">*Hedge-Kapital ist keine echte Delta-Hedge-Quote. BTC-Short-Notional/Liquidationspreis ist weiterhin nicht verifiziert.</p>`,'cc-focus-card')+
  card(`<div class="section-head"><div class="section-title">BOT WATCH</div><span class="section-note">Pionex Snapshot</span></div>${botRows}<div class="cc-exposure"><span>Bekannte 5x Long-Kapazität</span><b>$${fmt(r.knownLeveragedLongCapacity||0)}</b></div>`,'cc-bot-card')+
  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
@@ -1083,7 +1026,7 @@ function gridView(){
 
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.1 · MODEL</b></div><div class="row"><span>Trigger Watch</span><b class="cyan">1.0 · LIVE/MODEL</b></div>`)+
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.0 · MODEL</b></div>`)+
  card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
