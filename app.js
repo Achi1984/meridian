@@ -275,7 +275,7 @@ async function load(){
  loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  Promise.allSettled(['HBAR','XRP'].map(s=>loadCoinHistory(s))).then(()=>renderAll());
 
- evaluateAlerts();
+ try{evaluateAlerts()}catch(e){}
 }
 function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
 function coinIcon(sym){
@@ -782,7 +782,7 @@ function clearAlertHistory(){
  ALERT_HISTORY=[]; saveAlertHistory(); renderAll();
 }
 function alertCenter(){
- evaluateAlerts();
+ try{evaluateAlerts()}catch(e){}
  const active=ALERT_HISTORY.slice().sort((a,b)=>b.ts-a.ts);
  const latest={}; active.forEach(a=>{if(!latest[a.symbol])latest[a.symbol]=a});
  const cards=Object.values(latest);

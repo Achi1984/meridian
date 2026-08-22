@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.2.0",
-  "build": "2026-08-22-alert-center",
+  "appVersion": "5.2.1",
+  "build": "2026-08-22-renderer-hotfix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -663,6 +663,7 @@
       "liqBufferWarningPct": 20,
       "notifyOnStateChangeOnly": true
     },
-    "note": "Pionex Live Sync bleibt bewusst deaktiviert. Botdaten werden nur als Snapshot behandelt."
+    "note": "Alert Center ist vom Haupt-Renderer isoliert. Fehler im Alert-Modul dürfen keine Hauptansicht mehr leeren.",
+    "rendererIsolation": "ENABLED"
   }
 }

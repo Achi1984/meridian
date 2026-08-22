@@ -1,14 +1,12 @@
-# ACHI MERIDIAN v5.2.0 — ALERT CENTER
+# ACHI MERIDIAN v5.2.1 — Renderer Hotfix
 
-Neu:
-- lokales Alert Center mit Status-Historie
-- Statuskette WAIT → WATCH → ARM → START ZONE → TP HIT → NEW RANGE
-- SOL / ETH / PEPE Scanner-Status wird auf Änderungen überwacht
-- XRP / HBAR TP-Hit wird erkannt, sobald Livekurs den hinterlegten TP erreicht
-- kritischer Liquidationspuffer wird als Risikoereignis markiert
-- Statuswechsel werden lokal gespeichert; kein Kurs-Spam
-- externer ChatGPT-Watch bleibt für Push-Benachrichtigungen zuständig
-- Pionex Live Sync bleibt ausdrücklich deaktiviert; Pionex-Daten = SNAPSHOT
+Fixes:
+- Haupt-Renderer gegen Fehler in Untermodulen isoliert
+- Alert Center erhält eigenen Fehler-Fallback
+- Command Center darf bei Alert-Fehlern nicht mehr leer werden
+- aggressiver Service-Worker Cache-Bust
+- iPhone Safe-Area für Header/Bottom-Navigation verbessert
+- Pionex bleibt SNAPSHOT-only
+- bestehende Livefeed-Engine bleibt erhalten
 
-Hinweis:
-Die lokale Alert-Historie läuft, wenn MERIDIAN geöffnet ist. Echte Pushs bei geschlossener App kommen weiterhin über den eingerichteten ChatGPT-Watch.
+Nach Installation v5.2.1 einmal vollständig neu laden.
