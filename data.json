@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.0.8",
-  "build": "2026-08-22-risk-integrity-cycle-fix",
+  "appVersion": "5.0.9",
+  "build": "2026-08-22-mobile-nadir-forecast-integrity",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -597,10 +597,10 @@
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
   "buildNotes": [
-    "Forecast cycle clock separates structural halving age from current market state.",
-    "Binance BTCUSDT open interest is labelled contract-specific, not global market OI.",
-    "Center risk links portfolio concentration, leveraged bot capital and hedge stress.",
-    "LIVE / VERIFIED / SNAPSHOT / MODEL semantics tightened.",
-    "Hard cache-bust + service-worker retirement."
+    "Unique versioned JS/CSS filenames prevent mixed code/data cache states.",
+    "Runtime build-integrity check flags cache mismatch.",
+    "Mobile top safe-area scrim prevents scrolled cards from drawing under Dynamic Island/status bar.",
+    "NADIR current-context engine added without overwriting last-confirmed on-chain snapshot.",
+    "Forecast 2.0 separates historical anchor, current state and conditional forward window."
   ]
 }
