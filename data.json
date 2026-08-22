@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.9a",
-  "build": "2026-08-22-confluence-engine-1",
+  "appVersion": "5.2.2",
+  "build": "2026-08-22-altcoin-cycle-rotation",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -622,5 +622,157 @@
     "execution": "NO AUTO EXECUTION",
     "note": "Decision Engine verdichtet vorhandene MERIDIAN-Module; sie ersetzt keine verifizierten Positions-/Liquidationsdaten."
   },
-  "goldenBaseline": true
+  "goldenBaseline": true,
+  "macroForecast": {
+    "engine": "MACRO PRICE × TIME 3.1",
+    "status": "MODEL",
+    "asOf": "2026-08-22",
+    "method": [
+      "historische Halving→Peak-Zeitfenster",
+      "abnehmende Zyklus-Renditen",
+      "ATH-zu-ATH-Kompression",
+      "logarithmische Preisentwicklung",
+      "FIB-Makrostruktur",
+      "Regime-/Liquiditäts-Confirmation"
+    ],
+    "previousPeak": {
+      "date": "2025-10-06",
+      "price": 126198
+    },
+    "nextHalving": {
+      "window": "≈ Apr 2028",
+      "block": 1050000
+    },
+    "peakWindow": {
+      "from": "2029 Q2",
+      "to": "2030 Q1",
+      "confidence": 68
+    },
+    "btcZones": {
+      "bear": {
+        "low": 145000,
+        "high": 185000,
+        "label": "BEAR MACRO"
+      },
+      "base": {
+        "low": 185000,
+        "high": 260000,
+        "label": "BASE MACRO"
+      },
+      "bull": {
+        "low": 260000,
+        "high": 360000,
+        "label": "BULL MACRO"
+      }
+    },
+    "activation": {
+      "time": "Peak-Zonen werden erst im 2029/30-Zeitfenster als Peak-Ziele gewertet.",
+      "structure": "Vorher müssen neues ATH, Makro-Higher-High-Struktur und Trendbestätigung vorliegen.",
+      "regime": "Liquidität/Regime darf keine bestätigte Distribution anzeigen."
+    },
+    "altLag": {
+      "ETH": "BTC + 0–12 Wochen",
+      "SOL": "BTC + 2–16 Wochen",
+      "XRP": "BTC + 4–20 Wochen",
+      "SUI": "BTC + 4–20 Wochen",
+      "ADA": "BTC + 4–20 Wochen",
+      "FET": "BTC + 4–24 Wochen",
+      "HBAR": "BTC + 4–24 Wochen"
+    },
+    "note": "Makro-Zonen sind Szenarien, keine Kursgarantie. Tactical 90T-Ziele und Macro-Cycle-Ziele werden strikt getrennt."
+  },
+  "altRotation": {
+    "engine": "ALTCOIN CYCLE ROTATION 3.2",
+    "status": "MODEL",
+    "asOf": "2026-08-22",
+    "marketGate": {
+      "state": "NOT CONFIRMED",
+      "btcDominanceTrigger": "falling + sustained <55%",
+      "ethBtcTrigger": "rising toward/above 0.048",
+      "altSeasonTrigger": ">=75/100",
+      "rule": "Broad ALT ROTATION only activates when at least 2/3 gates confirm; 3/3 = HIGH confirmation."
+    },
+    "rotationPhases": [
+      {
+        "phase": "1",
+        "name": "BTC LEAD",
+        "window": "BTC expansion",
+        "assets": "BTC",
+        "state": "BASELINE"
+      },
+      {
+        "phase": "2",
+        "name": "MAJOR ROTATION",
+        "window": "BTC peak -4w → +12w",
+        "assets": "ETH",
+        "state": "CONDITIONAL"
+      },
+      {
+        "phase": "3",
+        "name": "HIGH-BETA ROTATION",
+        "window": "BTC peak +2w → +20w",
+        "assets": "SOL · XRP · SUI · ADA",
+        "state": "CONDITIONAL"
+      },
+      {
+        "phase": "4",
+        "name": "NARRATIVE / LATE ROTATION",
+        "window": "BTC peak +4w → +24w",
+        "assets": "FET · HBAR · smaller caps",
+        "state": "CONDITIONAL"
+      }
+    ],
+    "coins": {
+      "ETH": {
+        "lag": "0–12w",
+        "beta": "MEDIUM",
+        "peakWindow": "2029 Q2–2030 Q2",
+        "rotationScore": 78,
+        "gate": "ETH/BTC strength"
+      },
+      "SOL": {
+        "lag": "2–16w",
+        "beta": "HIGH",
+        "peakWindow": "2029 Q2–2030 Q2",
+        "rotationScore": 84,
+        "gate": "SOL/BTC + breadth"
+      },
+      "XRP": {
+        "lag": "4–20w",
+        "beta": "HIGH",
+        "peakWindow": "2029 Q2–2030 Q3",
+        "rotationScore": 74,
+        "gate": "relative strength + breadth"
+      },
+      "SUI": {
+        "lag": "4–20w",
+        "beta": "VERY HIGH",
+        "peakWindow": "2029 Q2–2030 Q3",
+        "rotationScore": 72,
+        "gate": "liquidity + relative strength"
+      },
+      "ADA": {
+        "lag": "4–20w",
+        "beta": "HIGH",
+        "peakWindow": "2029 Q2–2030 Q3",
+        "rotationScore": 68,
+        "gate": "relative strength + breadth"
+      },
+      "FET": {
+        "lag": "4–24w",
+        "beta": "VERY HIGH",
+        "peakWindow": "2029 Q2–2030 Q3",
+        "rotationScore": 70,
+        "gate": "AI narrative + breadth"
+      },
+      "HBAR": {
+        "lag": "4–24w",
+        "beta": "HIGH",
+        "peakWindow": "2029 Q2–2030 Q3",
+        "rotationScore": 66,
+        "gate": "relative strength + breadth"
+      }
+    },
+    "note": "Lag-Fenster sind Modellfenster relativ zum BTC-Makro-Peak, keine garantierten Top-Daten. Token-spezifische Preisziele werden erst aus künftig bestätigter Struktur abgeleitet."
+  }
 }

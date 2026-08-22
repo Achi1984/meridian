@@ -760,3 +760,22 @@ main>section:not(.hidden)>.card:first-child{
 /* Forecast 3.0 — Time & Cycle Engine */
 .cycle-timeline{display:flex;gap:5px;justify-content:space-between;align-items:center;margin:14px 0 4px;font-size:8px;color:#8294aa;letter-spacing:.3px}
 .cycle-timeline span{flex:1;text-align:center;border-top:1px solid #17415e;padding-top:8px}
+
+/* v5.2.1 Macro Price × Time */
+.macro-window{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid #17354a}
+.macro-window span,.macro-confidence{color:#8497aa;letter-spacing:1px}
+.macro-window b{color:#2aa9ff;text-align:right}
+.macro-confidence{padding:12px 0}.macro-confidence b{float:right;color:#fff}
+.macro-zones{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.macro-zone{border:1px solid #19425f;border-radius:18px;padding:15px 12px;min-width:0}
+.macro-range{font-weight:900;font-size:17px;margin-top:8px;white-space:nowrap}
+.macro-zone.bear .macro-range{color:#ff5b66}.macro-zone.base .macro-range{color:#2aa9ff}.macro-zone.bull .macro-range{color:#31d794}
+@media(max-width:520px){.macro-zones{grid-template-columns:1fr}.macro-range{font-size:20px}}
+
+/* v5.2.2 Altcoin Cycle Rotation */
+.rotation-state{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid #17354a}
+.rotation-gates{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.rotation-gates div{border:1px solid #19425f;border-radius:14px;padding:10px}.rotation-gates span,.rotation-gates b{display:block}.rotation-gates span{font-size:10px;color:#8497aa}.rotation-gates b{font-size:12px;margin-top:4px}
+.rotation-row{display:grid;grid-template-columns:34px 1fr 1.25fr;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #17354a}.rotation-num{width:30px;height:30px;border:1px solid #168ed0;border-radius:10px;display:grid;place-items:center;color:#2aa9ff;font-weight:900}.rotation-row small{display:block;color:#8497aa;margin-top:4px}.rotation-window{text-align:right;color:#2aa9ff;font-size:12px}
+.coin-cycle-row{display:grid;grid-template-columns:.55fr .8fr .7fr 1.25fr .55fr;gap:7px;align-items:center;padding:11px 0;border-bottom:1px solid #17354a;font-size:11px}.coin-cycle-row span{color:#8497aa}.coin-cycle-row strong{color:#31d794}.coin-cycle-row i{font-style:normal;text-align:right;color:#2aa9ff;font-weight:900}
+@media(max-width:520px){.rotation-gates{grid-template-columns:1fr}.coin-cycle-row{grid-template-columns:.5fr .8fr .7fr 1.25fr}.coin-cycle-row i{display:none}}

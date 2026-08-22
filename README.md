@@ -1,21 +1,15 @@
-# ACHI MERIDIAN v5.1.9 — Action Engine 1.0
+# ACHI MERIDIAN v5.2.2 — Altcoin Cycle Rotation 3.2
 
-Basis: v5.1.8 Confluence Engine (stabil).
+Forecast hierarchy:
+1. Tactical 90T structure
+2. BTC Macro Price × Time
+3. Altcoin Cycle Rotation
 
-Neu:
-- Konkrete ACTION QUEUE statt drei überschneidender Center-Module
-- BTC Short: FREEZE / LIQ-DATEN PRÜFEN
-- HBAR 5x: NO ADD bei niedrigem Liquidationspuffer
-- XRP 5x: HOLD, neuer Bot erst nach Retracement
-- Day-Trade: BLOCKED solange Gate <70
-- Spot: keine neuen Käufe bei hohem MERIDIAN Risk
-- Core-Layout, Header, Bottom-Navigation und alle anderen Tabs bleiben unverändert
+Rotation confirmation:
+- BTC dominance falling and sustained below ~55%
+- ETH/BTC strengthening toward/above ~0.048
+- Altcoin Season Index >=75
+2/3 gates = rotation confirmed; 3/3 = high confirmation.
 
-Wichtig: Keine automatische Order-Ausführung. Snapshot-/unverifizierte Botdaten werden nicht als live interpretiert.
-
-
-## v5.1.9a
-- Zentrale Runtime-Version aus version.json
-- Header/Data/Fallback synchronisiert
-- Keine neue Runtime-Datei hinzugefügt
-- Action Engine und Layout unverändert
+Coin peak windows are relative lag models, not guaranteed dates.
+No fabricated long-range token price targets are shown before future structure confirms.

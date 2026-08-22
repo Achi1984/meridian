@@ -909,6 +909,41 @@ function cycleClock(sym){
  else structural='PRE-HALVING / RESET';
  return {pct,phase:structural,referencePeak,daysFromReference,lag};
 }
+
+
+function altRotationBlock(){
+ const a=DATA.altRotation||{}, coins=a.coins||{}, g=a.marketGate||{};
+ return card(`<div class="section-title">ALTCOIN CYCLE ROTATION <span class="tag cyan">3.2 MODEL</span></div>
+ <div class="rotation-state"><span>BROAD ROTATION</span><b class="amber">${g.state||'—'}</b></div>
+ <div class="rotation-gates">
+   <div><span>BTC.D</span><b>&lt;55% + falling</b></div>
+   <div><span>ETH/BTC</span><b>→ 0.048+</b></div>
+   <div><span>ALT INDEX</span><b>≥75</b></div>
+ </div>
+ <p class="footer-note">${g.rule||''}</p>
+ <div class="section-title" style="margin-top:20px">ROTATION MAP</div>
+ ${(a.rotationPhases||[]).map(p=>`<div class="rotation-row"><span class="rotation-num">${p.phase}</span><div><b>${p.name}</b><small>${p.assets}</small></div><div class="rotation-window">${p.window}<small>${p.state}</small></div></div>`).join('')}
+ <div class="section-title" style="margin-top:22px">COIN PEAK WINDOWS</div>
+ ${Object.entries(coins).map(([s,c])=>`<div class="coin-cycle-row"><b>${s}</b><span>BTC + ${c.lag}</span><span>${c.beta}</span><strong>${c.peakWindow}</strong><i>${c.rotationScore}/100</i></div>`).join('')}
+ <p class="footer-note">${a.note||''}</p>`);
+}
+
+function macroPriceTimeBlock(){
+ const m=DATA.macroForecast||{};
+ const z=m.btcZones||{};
+ const zone=(name,o,cls)=>o?`<div class="macro-zone ${cls}"><div class="eyebrow">${o.label||name}</div><div class="macro-range">$${fmt(o.low)}–$${fmt(o.high)}</div></div>`:'';
+ return (card(`<div class="section-title">MACRO PRICE × TIME <span class="tag cyan">3.1 MODEL</span></div>
+   <div class="macro-window"><span>NEXT MAJOR PEAK WINDOW</span><b>${m.peakWindow?.from||'—'} → ${m.peakWindow?.to||'—'}</b></div>
+   <div class="macro-confidence">WINDOW CONFIDENCE <b>${m.peakWindow?.confidence||'—'}/100</b></div>
+   <p class="footer-note">Nicht mit dem 90T-Swing verwechseln: Die folgenden Zonen sind langfristige BTC-Cycle-Szenarien.</p>
+   <div class="macro-zones">${zone('BEAR',z.bear,'bear')}${zone('BASE',z.base,'base')}${zone('BULL',z.bull,'bull')}</div>
+   <div class="section-title" style="margin-top:20px">ACTIVATION GATES</div>
+   <div class="row"><span>TIME</span><b>2029 Q2–2030 Q1</b></div>
+   <div class="row"><span>STRUCTURE</span><b>NEW ATH + HH</b></div>
+   <div class="row"><span>REGIME</span><b>NO CONFIRMED DISTRIBUTION</b></div>
+   <p class="footer-note">${m.note||''}</p>`)) + altRotationBlock();
+}
+
 function forecast(symbol){
  const arr=closes(symbol), btc=closes('BTC');
  if(arr.length<90)return {ready:false,cycle:cycleClock(symbol)};
@@ -925,7 +960,7 @@ function forecast(symbol){
  }
  const risk=Math.round(Math.max(0,Math.min(100,(dailyRsi??50)*0.55+pos*0.45)));
  const confidence=Math.round(Math.max(35,Math.min(92,55+(arr.length>=300?12:0)+(symbol==='BTC'?8:0)+(Math.abs(ret90)>10?7:0))));
- return {ready:true,last,low,high,pos,dailyRsi,ret90,rel,lag,risk,confidence,fib,count:arr.length,cycle:cycleClock(symbol)};
+ return ({ready:true,last,low,high,pos,dailyRsi,ret90,rel,lag,risk,confidence,fib,count:arr.length,cycle:cycleClock(symbol)}) + macroPriceTimeBlock();
 }
 
 function forecastState(f){
