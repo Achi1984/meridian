@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.2.2",
-  "build": "2026-08-22-clean-alert-rebuild",
+  "appVersion": "5.0.3",
+  "build": "2026-08-22-safe-boot-render-isolation",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -554,109 +554,5 @@
     ],
     "note": "Command Center aggregates live portfolio, futures risk and market regime without double-counting exposure."
   },
-  "gridFibEngine": {
-    "version": "1.0",
-    "symbols": [
-      "HBAR",
-      "XRP"
-    ],
-    "swingLookbackDays": 120,
-    "fibLevels": [
-      0.236,
-      0.382,
-      0.5,
-      0.618,
-      0.786
-    ],
-    "preferredEntry": [
-      0.5,
-      0.618
-    ],
-    "broadGridRange": [
-      0.382,
-      0.786
-    ],
-    "status": "BROWSER-LIVE + LOCAL HISTORY",
-    "note": "Range-Vorschläge sind Modellzonen. Pionex-Liquidation hängt von Margin, Leverage und COIN-M-Kontraktdetails ab."
-  },
-  "coinMScanner": {
-    "status": "LIVE-ENGINE",
-    "scope": "Non-Bitpanda candidates",
-    "candidates": [
-      {
-        "symbol": "SOL",
-        "venue": "OKX",
-        "priority": 1,
-        "maxLeverage": 3,
-        "risk": "MEDIUM-HIGH",
-        "fallbackSwingLow": 74.18,
-        "fallbackSwingHigh": 101.86
-      },
-      {
-        "symbol": "ETH",
-        "venue": "OKX / BETH exposure",
-        "priority": 2,
-        "maxLeverage": 3,
-        "risk": "MEDIUM",
-        "fallbackSwingLow": 1916.0,
-        "fallbackSwingHigh": 2546.0
-      },
-      {
-        "symbol": "PEPE",
-        "venue": "OKX",
-        "priority": 3,
-        "maxLeverage": 2,
-        "risk": "VERY HIGH",
-        "fallbackSwingLow": 2.55e-06,
-        "fallbackSwingHigh": 4.11e-06
-      },
-      {
-        "symbol": "XRP",
-        "venue": "OKX",
-        "priority": 4,
-        "maxLeverage": 5,
-        "risk": "MEDIUM",
-        "existingBot": true
-      },
-      {
-        "symbol": "BTC",
-        "venue": "OKX",
-        "priority": 5,
-        "maxLeverage": 3,
-        "risk": "MEDIUM",
-        "existingShort": true
-      }
-    ],
-    "weights": {
-      "frequency": 25,
-      "volatility": 20,
-      "rangeEfficiency": 20,
-      "liquidity": 15,
-      "fibStructure": 10,
-      "funding": 5,
-      "rsi": 5
-    },
-    "note": "Bitpanda assets excluded from new COIN-M candidate scanner because they are not transferable in the user's setup."
-  },
-  "alertCenter": {
-    "status": "ACTIVE",
-    "architecture": "ISOLATED VIEW",
-    "pionexSync": "SNAPSHOT ONLY",
-    "tracked": [
-      "SOL",
-      "ETH",
-      "PEPE",
-      "XRP",
-      "HBAR"
-    ],
-    "stateFlow": [
-      "WAIT",
-      "WATCH",
-      "ARM",
-      "START ZONE",
-      "TP HIT",
-      "NEW RANGE"
-    ],
-    "note": "Clean rebuild from stable v5.1.x. Alert Center does not modify the central renderer."
-  }
+  "restoreNote": "Safe boot build from original v5.0.0: baseline renders before live APIs; each tab renders independently."
 }

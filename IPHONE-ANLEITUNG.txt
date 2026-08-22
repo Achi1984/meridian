@@ -1,0 +1,12 @@
+MERIDIAN 4.1 iPhone Edition
+
+1. ZIP auf dem iPhone entpacken.
+2. Alle enthaltenen Dateien markieren.
+3. In GitHub im Hauptverzeichnis des Repositorys hochladen.
+4. Bestehende Dateien ersetzen.
+5. Commit changes.
+6. GitHub Pages neu laden.
+7. Forecast öffnen und gewünschten Coin antippen.
+
+Es gibt KEIN .github-Verzeichnis und KEINEN Workflow mehr.
+Die Historie wird direkt im Browser geladen und auf dem iPhone gespeichert.

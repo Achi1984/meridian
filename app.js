@@ -266,14 +266,32 @@ function recalcPortfolio(){
 }
 
 async function load(){
- const stamp=Date.now();
- DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>r.json());
- await Promise.allSettled([refreshCurrentPortfolioPrices(),refreshDayTradeTechnicals()]);
- $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
- updateHeaderFeedClock();
- renderAll();
- loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
- Promise.allSettled(['HBAR','XRP'].map(s=>loadCoinHistory(s))).then(()=>renderAll());
+ try{
+   const stamp=Date.now();
+   DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>{
+     if(!r.ok)throw new Error('data.json HTTP '+r.status);
+     return r.json();
+   });
+   try{loadPortfolioSeries()}catch(e){}
+   $('#versionBadge').textContent='v'+DATA.appVersion+' · START';
+   renderAll(); // snapshot must appear immediately, before any external API call
+   updateHeaderFeedClock();
+
+   // Live engines run independently and may fail without blanking the app.
+   Promise.allSettled([refreshCurrentPortfolioPrices(),refreshDayTradeTechnicals()])
+    .then(()=>{
+      $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
+      try{recalcPortfolio()}catch(e){}
+      renderAll(); updateHeaderFeedClock();
+    });
+
+   loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
+ }catch(e){
+   console.error('MERIDIAN BOOT ERROR',e);
+   $('#versionBadge').textContent='v5.0.3 · ERROR';
+   const main=document.querySelector('main');
+   if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
+ }
 }
 function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
 function coinIcon(sym){
@@ -390,9 +408,8 @@ function commandCenter(){
  </div>`+
  card(`<div class="section-head"><div class="section-title">HEUTE BEACHTEN</div><span class="section-note">Priorisiert</span></div>${focus.slice(0,4).map((x,i)=>`<div class="focus-row ${x.tone}"><div class="focus-num">${i+1}</div><div><b>${x.title}</b><small>${x.text}</small></div></div>`).join('')}<p class="footer-note">*Hedge-Kapital ist keine echte Delta-Hedge-Quote. BTC-Short-Notional/Liquidationspreis ist weiterhin nicht verifiziert.</p>`,'cc-focus-card')+
  card(`<div class="section-head"><div class="section-title">BOT WATCH</div><span class="section-note">Pionex Snapshot</span></div>${botRows}<div class="cc-exposure"><span>Bekannte 5x Long-Kapazität</span><b>$${fmt(r.knownLeveragedLongCapacity||0)}</b></div>`,'cc-bot-card')+
- gridSummaryCard()+
-  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
- `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+card(`<div class="section-title">COIN-M SCANNER TOP 3</div>${scannerCandidates().map(c=>`<div class="row"><span><b>${c.symbol}</b> · ${c.status}</span><b class="${c.score>=85?'green':'amber'}">${c.score}/100</b></div>`).join('')}<p class="footer-note">Details und FIB-Zonen im GRID-Tab.</p>`);
+ card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
+ `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`;
 }
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
@@ -511,158 +528,6 @@ function dayTrade(){
  card(`<div class="section-title">LIVE-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
  card(`<div class="section-title">FIB LEVELS ${snapshotBadge('MODEL')}</div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`);
 }
-
-function tpFlagKey(sym){return 'meridian_grid_tp_hit_'+sym+'_v1'}
-function getTpFlag(sym){try{return localStorage.getItem(tpFlagKey(sym))==='1'}catch(e){return false}}
-function setTpFlag(sym,v=true){try{localStorage.setItem(tpFlagKey(sym),v?'1':'0')}catch(e){}}
-function resetGridCycle(sym){setTpFlag(sym,false);renderAll()}
-
-async function loadGridHistories(force=false){
- const syms=['HBAR','XRP'];
- await Promise.allSettled(syms.map(s=>loadCoinHistory(s,force)));
- renderAll();
-}
-
-
-function scannerCandidates(){
- const cfg=DATA.coinMScanner||{}, qs=LIVE_QUOTES||{};
- return (cfg.candidates||[]).filter(c=>['SOL','ETH','PEPE'].includes(c.symbol)).map(c=>{
-   const q=qs[c.symbol]||{}, price=+q.price||+c.fallbackSwingHigh||0;
-   const hist=(HISTORY?.coins?.[c.symbol]||[]).map(x=>Array.isArray(x)?+x[1]:+x.close||+x.price).filter(Number.isFinite);
-   let lo=c.fallbackSwingLow, hi=c.fallbackSwingHigh;
-   if(hist.length>=20){const recent=hist.slice(-240);lo=Math.min(...recent);hi=Math.max(...recent)}
-   const span=Math.max(hi-lo,price*.001);
-   const fib={
-    f236:hi-span*.236,f382:hi-span*.382,f500:hi-span*.5,f618:hi-span*.618,f786:hi-span*.786,
-    ext1272:hi+span*.272
-   };
-   const entryLow=fib.f618, entryHigh=fib.f500, rangeLow=fib.f786, rangeHigh=hi;
-   const inEntry=price>=entryLow&&price<=entryHigh;
-   const near=price>entryHigh&&price<=fib.f382;
-   let score=c.symbol==='SOL'?87:c.symbol==='ETH'?79:72;
-   if(inEntry)score+=7; else if(near)score+=3;
-   score=Math.min(96,score);
-   const status=inEntry?'START ZONE':near?'WATCH ZONE':'WAIT FOR RETRACE';
-   const grids=c.symbol==='SOL'?120:c.symbol==='ETH'?100:160;
-   return {...c,price,lo,hi,fib,entryLow,entryHigh,rangeLow,rangeHigh,score,status,grids};
- });
-}
-function scannerPrice(v,s){return s==='PEPE'?fmt(v,8):s==='SOL'?fmt(v,2):fmt(v,0)}
-function fibVisual(c){
- const levels=[
-  ['HIGH',c.hi],['0.236',c.fib.f236],['0.382',c.fib.f382],['0.500',c.fib.f500],['0.618',c.fib.f618],['0.786',c.fib.f786],['LOW',c.lo]
- ];
- const top=c.hi,bottom=c.lo,span=Math.max(top-bottom,1e-12);
- return `<div class="fib-visual">
-   <div class="fib-price-marker" style="top:${Math.max(2,Math.min(96,(top-c.price)/span*100))}%"><i></i><b>$${scannerPrice(c.price,c.symbol)}</b></div>
-   <div class="fib-entry-zone" style="top:${(top-c.entryHigh)/span*100}%;height:${(c.entryHigh-c.entryLow)/span*100}%"><span>PREFERRED ENTRY</span></div>
-   ${levels.map(([n,v])=>`<div class="fib-line ${n==='0.500'||n==='0.618'?'preferred':''}" style="top:${(top-v)/span*100}%"><span>${n}</span><b>$${scannerPrice(v,c.symbol)}</b></div>`).join('')}
- </div>`;
-}
-function coinMScannerView(){
- const cs=scannerCandidates();
- return card(`<div class="section-head"><div class="section-title">COIN-M OPPORTUNITY SCANNER</div><span class="section-note">${liveBadge('LIVE')}</span></div>
- <p class="footer-note">Nur transferierbare Nicht-Bitpanda-Kandidaten. Ranking kombiniert Frequenz, Volatilität, Range-Effizienz, Liquidität, FIB-Struktur, Funding und RSI.</p>
- ${cs.map((c,i)=>`<div class="scanner-card">
-   <div class="scanner-head"><div><span class="scanner-rank">#${i+1}</span><b>${c.symbol}</b><small>${c.venue} · max. ${c.maxLeverage}× · ${c.risk}</small></div><div class="scanner-score ${c.score>=85?'green':c.score>=75?'amber':'red'}">${c.score}/100</div></div>
-   ${fibVisual(c)}
-   <div class="scanner-grid">
-    <div><span>STATUS</span><b class="${c.status==='START ZONE'?'green':'amber'}">${c.status}</b></div>
-    <div><span>ENTRY</span><b>$${scannerPrice(c.entryLow,c.symbol)}–$${scannerPrice(c.entryHigh,c.symbol)}</b></div>
-    <div><span>GRID RANGE</span><b>$${scannerPrice(c.rangeLow,c.symbol)}–$${scannerPrice(c.rangeHigh,c.symbol)}</b></div>
-    <div><span>GRIDS</span><b>~${c.grids}</b></div>
-    <div><span>TP1</span><b>$${scannerPrice(c.hi,c.symbol)}</b></div>
-    <div><span>TP2 · 1.272</span><b>$${scannerPrice(c.fib.ext1272,c.symbol)}</b></div>
-   </div>
- </div>`).join('')}`,'scanner-shell');
-}
-
-function gridDecimals(sym){return sym==='HBAR'?5:sym==='XRP'?4:2}
-function liveAssetPrice(sym,bot){
- const q=DATA?.livePrices?.[sym];
- return Number.isFinite(+q?.price)?+q.price:(Number.isFinite(+bot?.currentPrice)?+bot.currentPrice:null);
-}
-function fibPrice(high,low,ratio){return high-(high-low)*ratio}
-function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
-
-function gridFibModel(sym){
- const bot=(DATA.pionexRisk?.bots||[]).find(b=>b.symbol===sym&&b.side==='Long');
- const arr=closes(sym), price=liveAssetPrice(sym,bot);
- if(!bot||arr.length<45||!Number.isFinite(price)) return {ready:false,sym,bot,price,count:arr.length};
- const window=arr.slice(-120), vals=window.map(x=>x.c);
- let hiIdx=0; for(let i=1;i<vals.length;i++) if(vals[i]>vals[hiIdx]) hiIdx=i;
- let pre=vals.slice(0,Math.max(hiIdx+1,Math.min(vals.length,30)));
- if(pre.length<12) pre=vals;
- let low=Math.min(...pre), high=vals[hiIdx];
- if(!(high>low)){low=Math.min(...vals);high=Math.max(...vals)}
- const range=high-low;
- const f={}; [0.236,0.382,0.5,0.618,0.786].forEach(r=>f[String(r)]=fibPrice(high,low,r));
- const ext1272=high+range*0.272, ext1618=high+range*0.618;
- const prefLow=f['0.618'], prefHigh=f['0.5'];
- const gridLow=f['0.786']*0.985, gridHigh=f['0.382']*1.01;
- const widthPct=(gridHigh/gridLow-1)*100;
- const grids=clamp(Math.round(Math.log(gridHigh/gridLow)/Math.log(1.004)),60,220);
- const dailyRsi=rsi(arr.map(x=>x.c));
- const regime=(DATA.btcRegime?.label||DATA.market?.regime||'');
- const regimeOk=regime.includes('RISK-ON');
- const quote=DATA?.livePrices?.[sym];
- const liveStatus=quoteStatus(quote);
- if(Number.isFinite(bot.takeProfit)&&price>=bot.takeProfit) setTpFlag(sym,true);
- const tpHit=getTpFlag(sym);
- const inPreferred=price>=prefLow&&price<=prefHigh;
- const inBroad=price>=f['0.786']&&price<=f['0.382'];
- let status='PREPARE NEXT GRID',tone='cyan',score=45,reason='Aktueller Long-Bot laut letztem Pionex-Snapshot noch nicht als beendet bestätigt.';
- if(tpHit){
-   status='WAIT FOR RETRACE';tone='amber';score=58;reason='TP-Preis wurde erreicht. Nicht hinterherlaufen – auf Rücklauf in die FIB-Zone warten.';
-   if(inBroad){status='WATCH ZONE';tone='cyan';score=68;reason='Preis ist in der breiten 0,382–0,786 Retracement-Zone.'}
-   if(inPreferred){status='ARM GRID';tone='green';score=82;reason='Preis liegt in der bevorzugten 0,50–0,618 Zone.'}
-   if(inPreferred && (dailyRsi==null||dailyRsi<=60) && regimeOk){status='START ZONE';tone='green';score=92;reason='Bevorzugte FIB-Zone + RSI-Reset + Risk-on-Regime liefern die beste Modell-Konfluenz.'}
-   if(price<f['0.786']){status='RECALCULATE SWING';tone='red';score=28;reason='0,786 wurde unterschritten. Der bisherige Swing ist als Re-Entry-Basis geschwächt.'}
- }
- if(dailyRsi!=null&&dailyRsi>70){score-=10;reason+=' Daily RSI ist noch heiß.'}
- if(!regimeOk){score-=8;reason+=' Marktregime ist nicht klar Risk-on.'}
- score=clamp(Math.round(score),0,100);
- return {ready:true,sym,bot,price,low,high,f,ext1272,ext1618,prefLow,prefHigh,gridLow,gridHigh,widthPct,grids,dailyRsi,regime,regimeOk,status,tone,score,reason,tpHit,liveStatus,count:arr.length,
-   liqReference:gridLow*0.90};
-}
-
-function fibLadder(m){
- const rows=[['SWING HIGH',m.high,'high'],['0,236',m.f['0.236'],''],['0,382',m.f['0.382'],'range'],['0,500',m.f['0.5'],'entry'],['0,618',m.f['0.618'],'entry'],['0,786',m.f['0.786'],'range'],['SWING LOW',m.low,'low']];
- const max=m.high,min=m.low,span=max-min||1,d=gridDecimals(m.sym);
- return `<div class="fib-ladder">${rows.map(([label,val,kind])=>{const pos=clamp((max-val)/span*100,0,100);return `<div class="fib-level ${kind}" style="top:${pos}%"><span>${label}</span><i></i><b>$${fmt(val,d)}</b></div>`}).join('')}<div class="fib-price-pin" style="top:${clamp((max-m.price)/span*100,0,100)}%"><span>LIVE</span><b>$${fmt(m.price,d)}</b></div></div>`;
-}
-
-function gridEngineCard(sym){
- const m=gridFibModel(sym),d=gridDecimals(sym);
- if(!m.ready){return card(`<div class="section-head"><div class="section-title">${sym} NEXT GRID</div>${snapshotBadge('LOADING')}</div><div class="loading">Lade ${sym}-Historie für FIB Range Engine…</div><button class="tab active" onclick="loadGridHistories(true)" style="width:100%;margin-top:12px">HISTORIE LADEN</button>`,'grid-engine-card')}
- return card(`<div class="grid-engine-head"><div><div class="eyebrow">${sym} COIN-M · NEXT BOT</div><div class="grid-status ${m.tone}">${m.status}</div><div class="sub">Signal ${m.score}/100 · ${sourceBadge(m.liveStatus)}</div></div><div class="grid-live-price"><small>LIVE</small><b>$${fmt(m.price,d)}</b></div></div>
- <div class="grid-signal-bar"><i class="${m.tone}" style="width:${m.score}%"></i></div>
- <p class="grid-reason">${m.reason}</p>
- <div class="grid-engine-layout">${fibLadder(m)}<div class="grid-plan">
-   <div class="grid-plan-box preferred"><span>PREFERRED ENTRY</span><b>$${fmt(m.prefLow,d)} – $${fmt(m.prefHigh,d)}</b><small>FIB 0,618 → 0,500</small></div>
-   <div class="grid-plan-box"><span>NÄCHSTE GRID-RANGE</span><b>$${fmt(m.gridLow,d)} – $${fmt(m.gridHigh,d)}</b><small>0,786 −1,5% → 0,382 +1%</small></div>
-   <div class="grid-plan-pair"><div><span>GRIDS</span><b>${m.grids}</b></div><div><span>RANGE WIDTH</span><b>${fmt(m.widthPct,1)}%</b></div></div>
-   <div class="grid-plan-pair"><div><span>TP1</span><b>$${fmt(m.high,d)}</b></div><div><span>TP2 · 1,272</span><b>$${fmt(m.ext1272,d)}</b></div></div>
-   <div class="grid-plan-box risk"><span>LIQ.-SICHERHEITSREFERENZ</span><b>&lt; $${fmt(m.liqReference,d)}</b><small>Nur Sicherheitsziel, kein berechneter Pionex-Liquidationspreis</small></div>
- </div></div>
- <div class="grid-checks"><div><span>TP Preis-Latch</span><b class="${m.tpHit?'green':'amber'}">${m.tpHit?'ERREICHT':'NOCH NICHT'}</b></div><div><span>Daily RSI</span><b class="${m.dailyRsi!=null&&m.dailyRsi<=60?'green':'amber'}">${m.dailyRsi==null?'—':fmt(m.dailyRsi,1)}</b></div><div><span>BTC-Regime</span><b class="${m.regimeOk?'green':'amber'}">${m.regimeOk?'RISK-ON':'FILTER AKTIV'}</b></div></div>
- <div class="grid-actions"><button onclick="loadGridHistories(true)">↻ FIB AKTUALISIEREN</button><button onclick="resetGridCycle('${sym}')">NEUER BOT GESTARTET</button></div>
- <p class="footer-note">TP-Latch bleibt lokal gespeichert, auch wenn der Kurs nach dem TP wieder fällt. „Neuer Bot gestartet“ setzt den Zyklus zurück.</p>`,'grid-engine-card');
-}
-
-function gridEngineView(){
- const h=gridFibModel('HBAR'),x=gridFibModel('XRP');
- return card(`<div class="eyebrow">MERIDIAN v5.1 · FIB GRID ENGINE</div><div class="forecast-main">NEXT COIN-M<br>RANGE</div><div class="sub">TP → Retracement → FIB-Konfluenz → nächste Long-Grid-Range</div><div class="grid-engine-rules"><span>① TP abwarten</span><span>② nicht chase'n</span><span>③ 0,50–0,618 bevorzugt</span><span>④ 0,786 = Recalc</span></div><p class="footer-note">Live-Kurs + lokale 365T-Historie. Die Engine erstellt Modellzonen, keine automatische Order.</p>`,'grid-engine-hero')+
- gridEngineCard('HBAR')+gridEngineCard('XRP')+
- card(`<div class="section-title">LOGIK</div><div class="row"><span>Broad Grid Range</span><b>FIB 0,786 → 0,382</b></div><div class="row"><span>Preferred Entry</span><b class="green">FIB 0,618 → 0,500</b></div><div class="row"><span>TP1</span><b>vorheriges Swing High</b></div><div class="row"><span>TP2</span><b class="cyan">1,272 Extension</b></div><div class="row"><span>START ZONE</span><b>FIB + RSI ≤60 + Risk-on</b></div><p class="footer-note">COIN-M-Risiko: Margin und Kontraktmechanik beeinflussen den echten Liquidationspreis. Deshalb zeigt MERIDIAN nur eine Sicherheitsreferenz und keinen erfundenen Liq.-Wert.</p>`);
-}
-
-function gridSummaryCard(){
- const models=['HBAR','XRP'].map(gridFibModel).filter(x=>x.ready);
- if(!models.length)return '';
- return card(`<div class="section-head"><div class="section-title">NEXT GRID SETUPS</div><span class="section-note">FIB ENGINE</span></div>${models.map(m=>`<div class="cc-grid-setup" onclick="document.querySelector('.nav[data-view=grid]').click()"><div><b>${m.sym}</b><small>${m.status}</small></div><span class="${m.tone}">${m.score}/100</span></div>`).join('')}<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=grid]').click()">FIB GRID ENGINE ÖFFNEN →</button>`,'cc-grid-card');
-}
-
 function closes(symbol){
  const c=HISTORY?.coins?.[symbol]?.candles||[];
  return c.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4]})).filter(x=>Number.isFinite(x.c));
@@ -720,91 +585,39 @@ function renderForecast(){
 }
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
-
-function meridianAlertKey(){return 'meridian_alerts_v522'}
-function getMeridianAlerts(){
- try{return JSON.parse(localStorage.getItem(meridianAlertKey())||'[]')}catch(e){return []}
-}
-function saveMeridianAlerts(a){
- try{localStorage.setItem(meridianAlertKey(),JSON.stringify(a.slice(-80)))}catch(e){}
-}
-function buildAlertSnapshot(){
- const out=[], now=Date.now();
- try{
-  if(typeof scannerCandidates==='function'){
-   scannerCandidates().forEach(c=>{
-    let state='WAIT',sev='muted';
-    if(c.status==='START ZONE'&&c.score>=88){state='START ZONE';sev='green'}
-    else if(c.status==='START ZONE'){state='ARM';sev='amber'}
-    else if(c.status==='WATCH ZONE'||c.score>=82){state='WATCH';sev='amber'}
-    out.push({ts:now,symbol:c.symbol,state,price:c.price||0,sev,
-      msg:state==='START ZONE'?'FIB Entry + Score bestätigt':
-          state==='ARM'?'FIB Entry erreicht · Konfluenz prüfen':
-          state==='WATCH'?'Preferred Entry nähert sich':'Auf Retracement warten'});
-   });
-  }
- }catch(e){}
- try{
-  const bots=(DATA&&DATA.pionexRisk&&DATA.pionexRisk.bots)||[];
-  bots.filter(b=>['XRP','HBAR'].includes(b.symbol)).forEach(b=>{
-   const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[b.symbol])||{};
-   const px=+q.price||+b.currentPrice||0, tp=+b.takeProfit||0;
-   if(tp&&px>=tp) out.push({ts:now,symbol:b.symbol,state:'TP HIT',price:px,sev:'green',msg:'Take Profit erreicht · neue FIB Range berechnen'});
-   else out.push({ts:now,symbol:b.symbol,state:'BOT SNAPSHOT',price:px,sev:'amber',msg:'Pionex Botdaten bleiben Snapshot'});
-  });
- }catch(e){}
- return out;
-}
-function persistAlertTransitions(snapshot){
- const old=getMeridianAlerts(), last={};
- old.forEach(x=>last[x.symbol]=x.state);
- snapshot.forEach(x=>{
-  if(last[x.symbol]!==x.state) old.push(x);
- });
- saveMeridianAlerts(old);
- return old;
-}
-function alertCenter(){
- const snap=buildAlertSnapshot();
- const history=persistAlertTransitions(snap);
- return card(`<div class="eyebrow">ALERT CENTER ${liveBadge('ACTIVE')}</div>
- <div class="forecast-main">${snap.filter(x=>!['WAIT','BOT SNAPSHOT'].includes(x.state)).length} AKTIVE SIGNALE</div>
- <div class="sub">Statuswechsel statt Kurs-Spam · Pionex SNAPSHOT</div>`)+
- card(`<div class="section-title">STATUS FLOW</div>
- <div class="alert-flow">${['WAIT','WATCH','ARM','START','TP HIT','NEW RANGE'].map(x=>`<span>${x}</span>`).join('<i>›</i>')}</div>`)+
- card(`<div class="section-title">AKTUELL</div>
- ${snap.map(a=>`<div class="alert-row ${a.sev}">
-  <b>${a.symbol}</b><div><strong>${a.state}</strong><small>${a.msg}</small></div>
-  <em>${a.price?'$'+(a.symbol==='PEPE'?fmt(a.price,8):fmt(a.price,a.price<10?4:2)):'—'}</em>
- </div>`).join('')||'<p class="footer-note">Keine Signale.</p>'}`)+
- card(`<div class="section-title">LETZTE STATUSWECHSEL</div>
- ${history.slice().reverse().slice(0,10).map(a=>`<div class="row"><span>${new Date(a.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${a.symbol}</span><b>${a.state}</b></div>`).join('')||'<p class="footer-note">Noch keine Historie.</p>'}
- <p class="footer-note">Push bei geschlossener App läuft weiterhin über den externen ChatGPT-Watch.</p>`);
-}
-
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
  return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div>`)+
- card(`<div class="section-title">v5.1 DATA ENGINE</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div><div class="row"><span>FIB Grid Engine</span><b class="green">HBAR / XRP aktiv</b></div>`)+
+ card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
+function renderError(view,e){
+ console.error('MERIDIAN view error',view,e);
+ return card(`<div class="eyebrow">VIEW FEHLER · ${view.toUpperCase()}</div><div class="forecast-main">MODUL ISOLIERT</div><p class="footer-note">${String(e&&e.message||e||'Unbekannter Fehler')}</p><button class="tab active" onclick="location.reload()" style="width:100%;margin-top:12px">NEU LADEN</button>`);
+}
+function safeRender(selector,view,fn){
+ try{
+   const el=$(selector); if(!el)return;
+   el.innerHTML=fn();
+ }catch(e){
+   const el=$(selector); if(el)el.innerHTML=renderError(view,e);
+ }
+}
 function renderAll(){
- $('#view-center').innerHTML=commandCenter();
- $('#view-depot').innerHTML=depot();
- $('#view-market').innerHTML=market();
- $('#view-bottom').innerHTML=bottomView();
- $('#view-daytrade').innerHTML=dayTrade();
- $('#view-grid').innerHTML=gridEngineView();
- renderForecast();
- $('#view-settings').innerHTML=settings();
+ safeRender('#view-center','center',commandCenter);
+ safeRender('#view-depot','depot',depot);
+ safeRender('#view-market','market',market);
+ safeRender('#view-bottom','boden',bottomView);
+ safeRender('#view-daytrade','trade',dayTrade);
+ try{renderForecast()}catch(e){const el=$('#view-forecast');if(el)el.innerHTML=renderError('forecast',e)}
+ safeRender('#view-settings','settings',settings);
 }
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); b.classList.add('active');
  document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
  $('#view-'+b.dataset.view).classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'});
  if(b.dataset.view==='forecast') selectCoin(activeCoin);
- if(b.dataset.view==='grid') loadGridHistories(false);
 });
 $('#settingsBtn').onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));$('#view-settings').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})};
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+/* v5.0.3 safe boot: service worker disabled during recovery */
 load();

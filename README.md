@@ -1,14 +1,20 @@
-# ACHI MERIDIAN v5.2.2 — CLEAN ALERT REBUILD
+# ACHI MERIDIAN v5.0.3 — SAFE BOOT
 
-Neuaufbau direkt auf der stabilen v5.1.x-Basis.
+Diagnose:
+Forecast konnte weiterhin angezeigt werden, während die anderen Views leer blieben.
+Die zentrale renderAll()-Funktion renderte zuvor alle Views nacheinander; ein Fehler in nur einer View konnte dadurch alle folgenden Views blockieren.
 
-- zentrale Render- und Livefeed-Logik von v5.1.x unverändert
-- Alert Center als isolierter View
-- SOL / ETH / PEPE: WAIT / WATCH / ARM / START ZONE
-- XRP / HBAR: TP-Hit-Kontext
-- lokale Historie nur bei Statuswechsel
-- Pionex bleibt SNAPSHOT-only
-- externer ChatGPT-Watch bleibt für Push-Nachrichten zuständig
-- neuer Service-Worker Cache-Key
+Änderungen:
+- Basis ist die originale v5.0.0 Command-Center-Version
+- jeder Tab wird separat mit try/catch gerendert
+- Snapshot-Inhalt wird SOFORT nach data.json angezeigt
+- externe Live-APIs starten erst danach im Hintergrund
+- ein API- oder Modulfehler kann die App nicht mehr komplett leer machen
+- Service Worker während Recovery deaktiviert
+- app.js/styles.css mit Cache-Bust
+- RESET.html entfernt nur Service-Worker/CacheStorage, nicht LocalStorage
 
-Wichtig: Dieser Build übernimmt bewusst keinen Renderer-Code aus v5.2.0/v5.2.1.
+Installation:
+1. komplette ZIP auf das Hosting kopieren
+2. einmal RESET.html im Safari öffnen
+3. danach muss oben v5.0.3 stehen
