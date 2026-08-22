@@ -986,23 +986,51 @@ function forecastWindow(f){
  };
 }
 
+
+function forecast33Cycle(sym,f){
+ const a=DATA.altRotation?.coins?.[sym]||{};
+ const beta=String(a.beta||'').toUpperCase();
+ const lag=a.lag||0;
+ let strength=50;
+ if(f?.ready){
+   strength=Math.max(0,Math.min(100,50+(f.rel||0)*1.4+(f.ret90||0)*.45-(Math.max(0,(f.dailyRsi||50)-78))*.7));
+ }
+ const peak=a.peakWindow||DATA.forecast33?.cycleWindow?.majorPeak||'2029 Q2–2030 Q1';
+ let baseMult=sym==='BTC'?1.75:beta.includes('HIGH')?2.8:beta.includes('MID')?2.25:2.0;
+ let bullMult=sym==='BTC'?2.5:beta.includes('HIGH')?4.2:beta.includes('MID')?3.3:2.8;
+ const anchor=f?.high||f?.last||0;
+ return {peak,lag,beta:beta||'MODEL',strength,baseLow:anchor*1.25,baseHigh:anchor*baseMult,bullHigh:anchor*bullMult};
+}
+function forecast33Exit(sym,f,state){
+ const c=forecast33Cycle(sym,f);
+ const timeActive=/2029|2030/.test(c.peak) && new Date().getFullYear()>=2029;
+ const distribution=state?.label==='DISTRIBUTION RISK';
+ const cycleRisk=Math.round(Math.max(0,Math.min(100,(f?.risk||0)*.45+(f?.pos||0)*.20+(distribution?15:0)+(timeActive?20:0))));
+ let action='HOLD / NO CYCLE EXIT',cls='green',next='E1';
+ if(cycleRisk>=92){action='E4 · 35% REST-EXIT';cls='red';next='COMPLETE'}
+ else if(cycleRisk>=86){action='E3 · 30% REDUCE';cls='red';next='E4'}
+ else if(cycleRisk>=78){action='E2 · 20% REDUCE';cls='amber';next='E3'}
+ else if(cycleRisk>=70){action='E1 · 15% TRIM';cls='amber';next='E2'}
+ return {cycleRisk,action,cls,next,timeActive,c};
+}
+
 function renderForecast(){
  const f=forecast(activeCoin), coins=DATA.forecastCoins;
  const state=forecastState(f), fw=f.ready?forecastWindow(f):null;
- let body=card(`<div class="forecast-head"><div><div class="eyebrow">ACHI MERIDIAN FORECAST 2.0</div><div class="forecast-main">COIN CYCLE<br>FORECAST</div><div class="sub">Current State · Conditional Targets · Cycle Context</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?f.confidence:'—'}</div></div></div><p class="footer-note">Historischer Zyklusanker, aktueller Marktstatus und Forward Window werden getrennt dargestellt.</p>`);
+ const x=f.ready?forecast33Exit(activeCoin,f,state):null, cyc=x?.c;
+ let body=card(`<div class="forecast-head"><div><div class="eyebrow">ACHI MERIDIAN FORECAST 3.3</div><div class="forecast-main">TACTICAL · CYCLE<br>· EXIT</div><div class="sub">90T Price Structure · Next Cycle · Dynamic Exit</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?f.confidence:'—'}</div></div></div><p class="footer-note">Kurzfristige Swing-Ziele und das nächste große Bullenzyklus-Fenster werden strikt getrennt.</p>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
  if(!f.ready){
-   body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><div class="row"><span>Zyklusphase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Historischer Coin-Offset</span><b>+${f.cycle.lag} Tage</b></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button><p class="footer-note">Die Daten werden lokal auf dem iPhone gespeichert. Beim nächsten Öffnen sind sie sofort verfügbar.</p>`);
+   body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button>`);
  }else{
-   body+=card(`<div class="forecast-price-card"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last, activeCoin==='PEPE'?8:2)}</div><div class="grid2">${metric('LOCAL TOP-RISK',f.risk+'/100',f.risk>75?'red':f.risk>55?'amber':'green')}${metric('REL. STÄRKE VS BTC',f.rel==null?'BTC Basis':(f.rel>=0?'+':'')+fmt(f.rel,1)+'%')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div><div class="bar"><i style="width:${Math.max(3,Math.min(100,f.pos))}%"></i></div><p class="muted">Position im 90T Swing: ${fmt(f.pos,1)}%</p></div>`)+
-   card(`<div class="section-title">CURRENT STATE <span class="tag ${state.cls}">MODEL</span></div><div class="forecast-main ${state.cls}" style="font-size:24px">${state.label}</div><div class="row"><span>State Risk</span><b class="${state.cls}">${state.score}/100</b></div><p class="footer-note">Aus Top-Risk, Swing-Position und 90T-Momentum. Kein fixes Kalenderdatum.</p>`)+
-   card(`<div class="section-title">SZENARIEN</div><div class="scenario-grid"><div><span>BEAR</span><b>$${fmt(f.low,activeCoin==='PEPE'?8:2)}</b></div><div><span>BASE</span><b class="cyan">$${fmt(f.high,activeCoin==='PEPE'?8:2)}</b></div><div><span>BULL</span><b class="green">$${fmt(f.fib[1],activeCoin==='PEPE'?8:2)}</b></div></div><p class="footer-note">Bear = 90T Low · Base = 90T High · Bull = 1,618 FIB. Modellzonen, keine Garantie.</p>`)+
-   card(`<div class="section-title">CYCLE CONTEXT</div><div class="row"><span>Strukturelle Halving-Phase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Aktuelles Marktregime</span><b>${DATA.btcRegime?.label||DATA.market?.regime||'—'}</b></div><div class="row"><span>Halving-Zyklus</span><b>${fmt(f.cycle.pct,1)}%</b></div><div class="bar"><i style="width:${f.cycle.pct}%"></i></div><div class="row"><span>Historical Cycle Anchor</span><b>${f.cycle.referencePeak.toLocaleDateString('de-DE')}</b></div><div class="row"><span>Abstand zum Anchor</span><b>${f.cycle.daysFromReference>=0?'+':''}${f.cycle.daysFromReference} Tage</b></div><p class="footer-note">Der Anchor ist eine historische Halving-Referenz und ausdrücklich KEINE aktuelle Peak-Prognose.</p>`)+
-   card(`<div class="section-title">FORWARD WINDOW <span class="tag cyan">CONDITIONAL</span></div><div class="row"><span>Breakout-Level</span><b>$${fmt(fw.breakout,activeCoin==='PEPE'?8:2)}</b></div><div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,activeCoin==='PEPE'?8:2)}</b></div><div class="row"><span>Pullback-Zone</span><b>$${fmt(fw.pullbackLow,activeCoin==='PEPE'?8:2)}–$${fmt(fw.pullbackHigh,activeCoin==='PEPE'?8:2)}</b></div><div class="row"><span>Conditional T1</span><b class="cyan">$${fmt(fw.t1,activeCoin==='PEPE'?8:2)}</b></div><div class="row"><span>Conditional T2</span><b class="green">$${fmt(fw.t2,activeCoin==='PEPE'?8:2)}</b></div><p class="footer-note">T1/T2 werden erst nach bestätigtem Breakout als aktive Upside-Ziele betrachtet. Unter der Pullback-/0,618-Zone wird der Swing neu bewertet.</p>`)+
-   card(`<div class="section-title">MACRO CYCLE WINDOW</div><div class="row"><span>90T Peak-Lag vs BTC</span><b>${f.lag==null?'—':(f.lag>=0?'+':'')+f.lag+' Tage'}</b></div><p class="footer-note">Der 90T Peak-Lag ist marktbezogen und wird aus den lokalen Hochs abgeleitet.</p>`)+
-   card(`<div class="section-title">90T SWING</div><div class="grid2">${metric('LOW','$'+fmt(f.low,activeCoin==='PEPE'?8:2))}${metric('HIGH','$'+fmt(f.high,activeCoin==='PEPE'?8:2))}</div><div class="row"><span>Position im Swing</span><b>${fmt(f.pos,1)}%</b></div>`)+
-   card(`<div class="section-title">FIB TARGET CLUSTER</div>${[1.272,1.618,2.0].map((m,i)=>`<div class="row"><span>${m} EXT</span><b class="cyan">$${fmt(f.fib[i],activeCoin==='PEPE'?8:2)}</b></div>`).join('')}<p class="footer-note">Targets aus dem aktuellen 90T-Swing; keine Prognosegarantie.</p>`)+
-   card(`<div class="section-title">MODELL-INTERPRETATION</div><div class="scenario"><b>${state.label}</b><p class="muted">Confidence ${f.confidence}/100 · ${f.count} Tagespunkte · Momentum ${fmt(f.ret90,1)}%.</p></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">HISTORIE AKTUALISIEREN</button>`);
+   const dec=activeCoin==='PEPE'?8:2;
+   body+=card(`<div class="forecast-price-card"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last,dec)}</div><div class="grid2">${metric('LOCAL TOP-RISK',f.risk+'/100',f.risk>75?'red':f.risk>55?'amber':'green')}${metric('REL. STÄRKE VS BTC',f.rel==null?'BTC Basis':(f.rel>=0?'+':'')+fmt(f.rel,1)+'%')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div></div>`);
+   body+=card(`<div class="section-title">1 · TACTICAL <span class="tag cyan">90T</span></div><div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>TACTICAL T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div><div class="row"><span>Position im 90T Swing</span><b>${fmt(f.pos,1)}%</b></div><p class="footer-note">Diese Werte sind ausschließlich taktische Swing-/FIB-Ziele. Sie sind NICHT das erwartete Top des nächsten Bullenmarkts.</p>`);
+   body+=card(`<div class="section-title">2 · NEXT CYCLE <span class="tag amber">2028–2030 MODEL</span></div><div class="row"><span>Re-Accumulation</span><b>2026–2028 H1</b></div><div class="row"><span>Expansion</span><b class="cyan">2028 H2–2029 H1</b></div><div class="row"><span>${activeCoin} Peak Window</span><b class="green">${cyc.peak}</b></div><div class="row"><span>Rotation Lag vs BTC</span><b>+${cyc.lag} Tage</b></div><div class="row"><span>Relative Cycle Strength</span><b>${Math.round(cyc.strength)}/100</b></div><div class="cycle-targets"><div><span>CYCLE BASE ZONE*</span><b>$${fmt(cyc.baseLow,dec)}–$${fmt(cyc.baseHigh,dec)}</b></div><div><span>HIGH-BETA EXTENSION*</span><b class="green">bis ~$${fmt(cyc.bullHigh,dec)}</b></div></div><p class="footer-note">*Explorative Modellzonen aus aktuellem Struktur-Anker + Coin-Beta, nicht aktive Preisziele. Aktivierung erst mit Zeitfenster + Marktstruktur + Rotation.</p>`);
+   body+=card(`<div class="section-title">3 · EXIT ENGINE <span class="tag ${x.cls}">DYNAMIC</span></div><div class="exit-master"><span>CYCLE EXIT RISK</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${x.action}</strong></div><div class="row"><span>Peak Window aktuell aktiv?</span><b>${x.timeActive?'JA':'NEIN'}</b></div>${(DATA.forecast33?.exitTranches||[]).map(t=>`<div class="row"><span>${t.name} · ${t.pct}%</span><b>${t.trigger}</b></div>`).join('')}<p class="footer-note">Keine automatische Order-Ausführung. Ein hoher 90T-RSI allein löst keinen Cycle-Exit aus.</p>`);
+   body+=card(`<div class="section-title">TACTICAL FORWARD WINDOW <span class="tag cyan">CONDITIONAL</span></div><div class="row"><span>Breakout</span><b>$${fmt(fw.breakout,dec)}</b></div><div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,dec)}</b></div><div class="row"><span>Pullback</span><b>$${fmt(fw.pullbackLow,dec)}–$${fmt(fw.pullbackHigh,dec)}</b></div><div class="row"><span>T1 / T2</span><b class="cyan">$${fmt(fw.t1,dec)} / $${fmt(fw.t2,dec)}</b></div>`);
+   body+=altRotationBlock();
+   body+=card(`<button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%">HISTORIE AKTUALISIEREN</button>`);
  }
  $('#view-forecast').innerHTML=body;
 }

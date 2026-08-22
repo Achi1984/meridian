@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.2.2",
-  "build": "2026-08-22-altcoin-cycle-rotation",
+  "appVersion": "5.3.0",
+  "build": "forecast-3.3-tactical-cycle-exit",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -774,5 +774,38 @@
       }
     },
     "note": "Lag-Fenster sind Modellfenster relativ zum BTC-Makro-Peak, keine garantierten Top-Daten. Token-spezifische Preisziele werden erst aus künftig bestätigter Struktur abgeleitet."
+  },
+  "forecast33": {
+    "name": "Forecast 3.3",
+    "principle": "TACTICAL ≠ CYCLE. Kurzfristige 90T-Ziele werden nicht als nächstes Bullenmarkt-Top interpretiert.",
+    "cycleWindow": {
+      "reaccumulation": "2026–2028 H1",
+      "halving": "≈ APR 2028",
+      "expansion": "2028 H2–2029 H1",
+      "majorPeak": "2029 Q2–2030 Q1"
+    },
+    "exitTranches": [
+      {
+        "name": "E1",
+        "pct": 15,
+        "trigger": "Cycle-Risk ≥70 + Coin-Stärke schwächt sich"
+      },
+      {
+        "name": "E2",
+        "pct": 20,
+        "trigger": "Cycle-Risk ≥78 + Distribution bestätigt"
+      },
+      {
+        "name": "E3",
+        "pct": 30,
+        "trigger": "Cycle-Risk ≥86 + Peak-Window aktiv"
+      },
+      {
+        "name": "E4",
+        "pct": 35,
+        "trigger": "Cycle-Risk ≥92 / Strukturbruch"
+      }
+    ],
+    "note": "Exit-Stufen sind Modellregeln, keine automatische Order-Ausführung."
   }
 }
