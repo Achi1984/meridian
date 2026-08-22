@@ -1,6 +1,6 @@
 {
-  "appVersion": "4.9.3",
-  "build": "2026-08-22-live-stream",
+  "appVersion": "5.1.0",
+  "build": "2026-08-22-fib-grid-engine",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -421,7 +421,7 @@
     "XLM",
     "ATOM"
   ],
-  "updatedAt": "2026-08-22T09:36:00+02:00",
+  "updatedAt": "2026-08-22T10:55:00+02:00",
   "historyMode": "browser",
   "priceFallbacks": {
     "FET": {
@@ -523,5 +523,60 @@
     "staleAfterSeconds": 45,
     "healthCheckSeconds": 15,
     "uiRefreshMaxHz": 1
+  },
+  "portfolioHistory": {
+    "version": 2,
+    "mode": "browser-local",
+    "activeRange": "1D",
+    "ranges": [
+      "1D",
+      "1W",
+      "1M",
+      "6M",
+      "1Y"
+    ],
+    "cashflowAdjusted": true,
+    "note": "Performance-Chart trennt Marktbewegung von dokumentierten Ein-/Auszahlungen. Historie wird lokal im Browser gespeichert."
+  },
+  "cashflows": {
+    "status": "USER-MANAGED",
+    "items": [],
+    "note": "Neue Ein-/Auszahlungen können in MERIDIAN erfasst werden. Sie beeinflussen den Gesamtwert, werden aber aus der Performance herausgerechnet."
+  },
+  "commandCenter": {
+    "status": "ACTIVE",
+    "modules": [
+      "Portfolio Pulse",
+      "Risk Radar",
+      "Bot Watch",
+      "Today Focus",
+      "Data Health"
+    ],
+    "note": "Command Center aggregates live portfolio, futures risk and market regime without double-counting exposure."
+  },
+  "gridFibEngine": {
+    "version": "1.0",
+    "symbols": [
+      "HBAR",
+      "XRP"
+    ],
+    "swingLookbackDays": 120,
+    "fibLevels": [
+      0.236,
+      0.382,
+      0.5,
+      0.618,
+      0.786
+    ],
+    "preferredEntry": [
+      0.5,
+      0.618
+    ],
+    "broadGridRange": [
+      0.382,
+      0.786
+    ],
+    "status": "BROWSER-LIVE + LOCAL HISTORY",
+    "note": "Range-Vorschläge sind Modellzonen. Pionex-Liquidation hängt von Margin, Leverage und COIN-M-Kontraktdetails ab."
   }
 }
