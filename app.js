@@ -288,7 +288,7 @@ async function load(){
    loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  }catch(e){
    console.error('MERIDIAN BOOT ERROR',e);
-   $('#versionBadge').textContent='v5.0.3 · ERROR';
+   $('#versionBadge').textContent='v5.0.4 · ERROR';
    const main=document.querySelector('main');
    if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
  }
@@ -603,21 +603,45 @@ function safeRender(selector,view,fn){
    const el=$(selector); if(el)el.innerHTML=renderError(view,e);
  }
 }
-function renderAll(){
- safeRender('#view-center','center',commandCenter);
- safeRender('#view-depot','depot',depot);
- safeRender('#view-market','market',market);
- safeRender('#view-bottom','boden',bottomView);
- safeRender('#view-daytrade','trade',dayTrade);
- try{renderForecast()}catch(e){const el=$('#view-forecast');if(el)el.innerHTML=renderError('forecast',e)}
- safeRender('#view-settings','settings',settings);
+function renderOne(view){
+ const map={
+  center:['#view-center',commandCenter],
+  depot:['#view-depot',depot],
+  market:['#view-market',market],
+  bottom:['#view-bottom',bottomView],
+  daytrade:['#view-daytrade',dayTrade],
+  forecast:['#view-forecast',null],
+  settings:['#view-settings',settings]
+ };
+ const item=map[view]; if(!item)return;
+ const el=$(item[0]); if(!el)return;
+ try{
+   if(view==='forecast') renderForecast();
+   else el.innerHTML=item[1]();
+   el.dataset.rendered='1';
+ }catch(e){
+   console.error('MERIDIAN render error',view,e);
+   el.innerHTML='<div class="card render-fallback"><div class="eyebrow">VIEW FEHLER · '+view.toUpperCase()+
+     '</div><div class="forecast-main">MODULFEHLER</div><p class="footer-note">'+
+     String(e&&e.message||e)+'</p></div>';
+ }
 }
-document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{
- document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+function renderAll(){
+ ['center','depot','market','bottom','daytrade','forecast','settings'].forEach(renderOne);
+}
+function openView(view,button){
+ document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
+ if(button)button.classList.add('active');
  document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
- $('#view-'+b.dataset.view).classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'});
- if(b.dataset.view==='forecast') selectCoin(activeCoin);
-});
-$('#settingsBtn').onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));$('#view-settings').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})};
-/* v5.0.3 safe boot: service worker disabled during recovery */
+ const el=$('#view-'+view);
+ if(!el)return;
+ // Critical fix: render the requested view at click-time, not only during boot.
+ renderOne(view);
+ el.classList.remove('hidden');
+ window.scrollTo({top:0,behavior:'smooth'});
+ if(view==='forecast') selectCoin(activeCoin);
+}
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.view,b));
+$('#settingsBtn').onclick=()=>openView('settings',null);
+/* v5.0.4 lazy view recovery: service worker disabled during recovery */
 load();
