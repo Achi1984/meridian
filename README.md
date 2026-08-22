@@ -1,3 +1,14 @@
+# ACHI MERIDIAN v5.1.6 — GOLDEN BASELINE
+
+Dieser Build ist die eingefrorene stabile Referenzbasis.
+
+Freeze-Regeln:
+- Header, vertikales Spacing und Bottom-Navigation nicht verändern.
+- Neue Funktionen nur modular ergänzen.
+- Ein Modulfehler darf niemals die gesamte App leeren.
+- Keine alten versionierten JS/CSS-Dateien in neue Builds mitschleppen.
+- Rückfallbasis bei Regressionen: diese v5.1.6 Golden Baseline.
+
 # ACHI MERIDIAN v5.1.4 — DAYTRADE Hotfix
 
 Fix:

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.6",
-  "build": "2026-08-22-hotfix1-stable-core",
+  "appVersion": "5.1.7",
+  "build": "2026-08-22-signal-engine-1",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -621,5 +621,6 @@
     ],
     "execution": "NO AUTO EXECUTION",
     "note": "Decision Engine verdichtet vorhandene MERIDIAN-Module; sie ersetzt keine verifizierten Positions-/Liquidationsdaten."
-  }
+  },
+  "goldenBaseline": true
 }

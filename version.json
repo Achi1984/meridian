@@ -1,6 +1,16 @@
 {
-  "version": "5.1.6",
-  "build": "2026-08-22-hotfix1-stable-core",
+  "version": "5.1.7",
+  "build": "2026-08-22-signal-engine-1",
   "base": "5.1.5 stable",
-  "note": "Trigger Watch temporarily removed after startup regression."
+  "note": "Trigger Watch temporarily removed after startup regression.",
+  "baseline": "v5.1.6 GOLDEN",
+  "frozen": true,
+  "rules": [
+    "Header/spacing/bottom navigation are frozen",
+    "New features must be modular",
+    "Module failure must not blank the whole app",
+    "No obsolete versioned JS/CSS files in future builds"
+  ],
+  "module": "Signal Engine 1.0",
+  "coreLayoutFrozen": true
 }
