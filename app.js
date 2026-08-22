@@ -86,6 +86,50 @@ async function refreshCurrentPortfolioPrices(){
  }
 }
 
+
+function calcRSI(values,p=14){
+ if(!Array.isArray(values)||values.length<p+1)return null;
+ let g=0,l=0;
+ for(let i=values.length-p;i<values.length;i++){const d=values[i]-values[i-1]; if(d>=0)g+=d; else l-=d}
+ if(l===0)return 100;
+ const rs=(g/p)/(l/p); return 100-(100/(1+rs));
+}
+function calcVWAP(klines){
+ let pv=0,v=0;
+ (klines||[]).forEach(k=>{const h=+k[2],l=+k[3],c=+k[4],vol=+k[5],tp=(h+l+c)/3;pv+=tp*vol;v+=vol});
+ return v?pv/v:null;
+}
+async function refreshDayTradeTechnicals(){
+ const d=DATA?.dayTrade;if(!d)return;
+ try{
+  const [k1,k4,prem,oi]=await Promise.all([
+   fetchJSON('https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1h&limit=100'),
+   fetchJSON('https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=4h&limit=100'),
+   fetchJSON('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT'),
+   fetchJSON('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT')
+  ]);
+  const c1=k1.map(k=>+k[4]), c4=k4.map(k=>+k[4]), price=+prem.markPrice||c1.at(-1);
+  const r1=calcRSI(c1), r4=calcRSI(c4), vw=calcVWAP(k1.slice(-24));
+  if(Number.isFinite(price)&&price>0)d.btcPrice=price;
+  if(Number.isFinite(r1))d.rsi1h=r1;
+  if(Number.isFinite(r4))d.rsi4h=r4;
+  if(Number.isFinite(+prem.lastFundingRate))d.fundingPct=(+prem.lastFundingRate)*100;
+  if(Number.isFinite(+oi.openInterest)&&price>0)d.oiB=(+oi.openInterest*price/1e9);
+  if(Number.isFinite(vw))d.vwap=vw;
+  d.technicalUpdatedAt=new Date().toISOString();
+  d.status={btcPrice:'BROWSER LIVE',oiB:'BROWSER LIVE',rsi4h:'BROWSER LIVE',rsi1h:'BROWSER LIVE',fundingPct:'BROWSER LIVE',vwap:'BROWSER LIVE',fib:'MODEL / SNAPSHOT'};
+  let score=50;
+  if(d.rsi4h<70)score+=12; else if(d.rsi4h>78)score-=15;
+  if(d.rsi1h<70)score+=8; else if(d.rsi1h>78)score-=8;
+  if(Math.abs(d.fundingPct)<0.02)score+=8; else score-=8;
+  d.gateScore=Math.max(0,Math.min(100,Math.round(score)));
+  d.entryAllowed=d.gateScore>=70;
+  d.decisionNote=d.entryAllowed?'ENTRY technisch möglich – Risiko/Positionierung trotzdem prüfen.':'NO ENTRY: technische Konfluenz reicht aktuell nicht für Gate ≥70.';
+ }catch(e){
+  d.technicalUpdatedAt=null;
+ }
+}
+
 function recalcPortfolio(){
  const p=DATA.portfolio, hs=p.holdings||[];
  const priced=hs.map(h=>{
@@ -146,7 +190,7 @@ function recalcPortfolio(){
 async function load(){
  const stamp=Date.now();
  DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>r.json());
- await refreshCurrentPortfolioPrices();
+ await Promise.allSettled([refreshCurrentPortfolioPrices(),refreshDayTradeTechnicals()]);
  $('#versionBadge').textContent='v'+DATA.appVersion+' · '+DATA.build.slice(-4);
  $('#refreshTime').textContent='↻ '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
  renderAll();
@@ -175,13 +219,18 @@ function sourceBadge(src){
  return snapshotBadge();
 }
 
+function riskClass(score){return score<30?'red':score<60?'amber':'green'}
+function botStatusBadge(b){
+ const s=(b.recommendation||'').toUpperCase();
+ const cls=s.includes('KRIT')?'red':s.includes('BEOB')?'amber':'green';
+ return `<span class="tag ${cls}">${b.recommendation||'—'}</span>`;
+}
 function depot(){
- const p=DATA.portfolio, r=DATA.pionexRisk;
+ const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
  const venueCards=p.byVenue.map(v=>metric(
    v.name,
-   `$${fmt(v.value)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${sourceBadge(v.source)}</div>`
+   `$${fmt(v.value,0)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${sourceBadge(v.source)}</div>`
  )).join('');
-
  const topRows=p.topPositions.map(x=>`
    <div class="position-row position-click" onclick="openAssetDetail('${x.symbol}')">
      ${coinIcon(x.symbol)}
@@ -191,54 +240,52 @@ function depot(){
        <div class="position-qty">${fmt(x.quantity, x.quantity<1?6:2)} ${x.symbol}</div>
        <div class="position-price">Kurs $${fmt(x.price, x.price<1?4:2)}</div>
      </div>
-     <div class="position-value">
-       <b>$${fmt(x.value)}</b>
-       <small>${fmt(x.sharePct,1)}% Anteil</small>
-     </div>
+     <div class="position-value"><b>$${fmt(x.value)}</b><small>${fmt(x.sharePct,1)}% Anteil</small></div>
      <div class="position-change ${x.change24h<0?'red':''}">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div>
    </div>`).join('');
-
- const botCards=(r.bots||[]).map(b=>`
-   <div class="pionex-bot">
-     <div class="pionex-bot-head">
-       <div><b>${b.name}</b><small>${b.side} · ${b.leverage}x</small></div>
-       <div class="red">${fmt(b.totalProfit,2)} USDT</div>
-     </div>
-     <div class="pionex-grid">
-       <div><span>Invest.</span><b>${fmt(b.investment,0)} USDT</b></div>
-       <div><span>Grid</span><b class="green">+${fmt(b.gridProfit,2)}</b></div>
-       <div><span>Trend</span><b class="red">${fmt(b.trendPnl,2)}</b></div>
-       <div><span>Dyn. Margin</span><b>${fmt(b.dynamicMargin,2)}</b></div>
-       <div><span>Liq.</span><b class="red">$${fmt(b.liquidation,1)}</b></div>
-       <div><span>Abstand</span><b class="amber">${fmt(b.liquidationDistancePct,2)}%</b></div>
-     </div>
-     <div class="pionex-meta">Range $${fmt(b.rangeLow,1)}–$${fmt(b.rangeHigh,1)} · Funding ${fmt(b.fundingPct,4)}% · BE $${fmt(b.breakEven,1)}</div>
-   </div>`).join('');
-
+ const botCards=(r.bots||[]).map(b=>{
+   const liq=Number.isFinite(b.liquidation)?`$${fmt(b.liquidation,b.symbol==='HBAR'?5:b.symbol==='XRP'?4:0)}`:'nicht verifiziert';
+   const pnl=Number.isFinite(b.totalProfitUsdt)?`${fmt(b.totalProfitUsdt,2)} USDT`:Number.isFinite(b.totalProfitPct)?`${fmt(b.totalProfitPct,2)}%`:'—';
+   return `<div class="pionex-bot">
+    <div class="pionex-bot-head"><div><b>${b.symbol} ${b.side}</b><small>${b.name} · ${b.leverage||'—'}x</small></div>${botStatusBadge(b)}</div>
+    <div class="pionex-grid">
+      <div><span>Kapital</span><b>${fmt(b.investment,2)} USDT</b></div>
+      <div><span>P&L</span><b class="${(b.totalProfitPct||0)<0?'red':'green'}">${pnl}</b></div>
+      <div><span>Range</span><b>${Number.isFinite(b.rangeLow)?fmt(b.rangeLow,b.symbol==='HBAR'?2:1)+'–'+fmt(b.rangeHigh,b.symbol==='HBAR'?2:1):'—'}</b></div>
+      <div><span>Grids</span><b>${b.grids||b.orders||'—'}</b></div>
+      <div><span>Liq.</span><b class="red">${liq}</b></div>
+      <div><span>Liq.-Puffer</span><b class="amber">${Number.isFinite(b.liquidationDistancePct)?fmt(b.liquidationDistancePct,1)+'%':'—'}</b></div>
+    </div>
+    <div class="bot-reason">${b.reason||''}</div>
+   </div>`;
+ }).join('');
  return card(`<div class="hero">
       <div class="eyebrow">GESAMTPORTFOLIO</div>
       <div class="big">$${fmt(p.total)}</div><div class="sub">≈ €${fmt(p.eurApprox)}</div>
       <div class="grid2 portfolio-summary">
         ${metric('ASSETS',p.assetsCount)}${metric('VERWAHRSTELLEN',p.custodiansCount)}
         ${metric('GRÖSSTE POSITION',p.largestPosition.symbol+' '+fmt(p.largestPosition.sharePct,1)+'%')}
-        ${metric('DATENMODUS',`iPhone ${liveBadge('LIVE')}`,'green')}
+        ${metric('DATENMODUS',`Hybrid ${liveBadge('LIVE')}`,'green')}
       </div>
     </div>`,'hero')+
     donutVenue()+
     `<div class="section-title venue-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2 venue-grid">${venueCards}</div>`+
-    card(`<div class="section-head"><div class="section-title">TOP 5 POSITIONEN</div><span class="section-note">${liveBadge('LIVE')} nach Wert sortiert</span></div>${topRows}`,'positions-card')+
-    `<div class="grid2 performance-grid">${metric('24H PERFORMANCE',(p.performance24hPct>=0?'+':'')+fmt(p.performance24hPct,1)+'%<div class="muted perf-sub">'+(p.performance24hUsd>=0?'+':'')+'$'+fmt(p.performance24hUsd)+'</div>',p.performance24hPct>=0?'green':'red')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted perf-sub">'+(p.bestPerformer.change24h>=0?'+':'')+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted perf-sub">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted perf-sub">24h Streuung</div>')}</div>`+
-    card(`<div class="section-head"><div class="section-title">PIONEX FUTURES RISK</div><span class="section-note">SNAPSHOT</span></div>
+    card(`<div class="section-head"><div class="section-title">TOP 5 SPOT-POSITIONEN</div><span class="section-note">${liveBadge('LIVE')} ohne Futures-Doppelzählung</span></div>${topRows}`,'positions-card')+
+    card(`<div class="section-head"><div class="section-title">FUTURES & EXPOSURE</div><span class="section-note">${snapshotBadge('09:12')}</span></div>
       <div class="grid2 pionex-summary">
-        ${metric('KONTOWERT','$'+fmt(r.accountValue,2),'amber')}
-        ${metric('GESAMT BOT P&L',fmt(r.botPnl,2)+' USDT','red')}
-        ${metric('DYN. MARGIN',fmt(r.dynamicMargin,2)+' USDT')}
-        ${metric('NÄCHSTE LIQ.','$'+fmt(r.nextLiquidation,1)+'<div class="red perf-sub">'+fmt(r.liquidationDistancePct,2)+'%</div>','red')}
+        ${metric('PIONEX KONTO','$'+fmt(r.accountValue,2),'amber')}
+        ${metric('BOT-KAPITAL','$'+fmt(r.botCapital,2))}
+        ${metric('LONG-KAPITAL','$'+fmt(r.longCapital,2),'green')}
+        ${metric('SHORT-HEDGE','$'+fmt(r.shortCapital,2),'red')}
+        ${metric('5x LONG CAPACITY','$'+fmt(r.knownLeveragedLongCapacity,0),'amber')}
+        ${metric('BIAS',r.netDirection||'—','amber')}
       </div>
+      <div class="exposure-callout"><b>${r.riskLevel||'—'} RISK</b><span>${r.riskNote||''}</span></div>
       <div class="pionex-bots">${botCards}</div>
-      <p class="footer-note">Pionex-Hauptkonto ist in der Depotverteilung enthalten. Futures-Risiko bleibt separat ausgewiesen.</p>
-    `,'pionex-card');
+      <p class="footer-note">Pionex-Kontowert ist bereits im Gesamtportfolio enthalten. Futures-Bot-Kapital wird hier nur als Risiko-/Exposure-Layer dargestellt und nicht nochmals addiert.</p>
+    `,'pionex-card')+
+    `<div class="grid2 performance-grid">${metric('24H SPOT-PERF.',(p.performance24hPct>=0?'+':'')+fmt(p.performance24hPct,1)+'%<div class="muted perf-sub">'+(p.performance24hUsd>=0?'+':'')+'$'+fmt(p.performance24hUsd)+'</div>',p.performance24hPct>=0?'green':'red')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted perf-sub">'+(p.bestPerformer.change24h>=0?'+':'')+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted perf-sub">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted perf-sub">24h Streuung</div>')}</div>`;
 }
 function assetDetail(sym){
  const hs=(DATA.portfolio.holdings||[]).filter(h=>h.symbol===sym);
@@ -260,25 +307,30 @@ function assetDetail(sym){
 window.openAssetDetail=async sym=>{document.body.insertAdjacentHTML('beforeend',assetDetail(sym));try{await loadCoinHistory(sym);if(sym!=='BTC')await loadCoinHistory('BTC')}catch(e){};const el=document.querySelector('.detail-overlay');if(el)el.outerHTML=assetDetail(sym)};
 window.closeAssetDetail=()=>document.querySelector('.detail-overlay')?.remove();
 function market(){
- const m=DATA.market;
+ const m=DATA.market, b=DATA.btcRegime||{}, mac=DATA.macro||{}, s=DATA.verifiedMarketSnapshot||{}, r=DATA.pionexRisk||{};
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
- return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME</div><div class="forecast-main" style="font-size:30px">RISK-ON</div><div class="sub">BTC als Filter für Altcoin-Signale</div><div class="bar"><i style="width:82%"></i></div></div></div>`)+
- `<div class="grid2">${metric('MARKTBREITE',m.breadth,'cyan')}${metric('Ø 24H','+'+fmt(m.avg24hPct,1)+'%','cyan')}${metric('LEADER',m.leader.symbol+' +'+fmt(m.leader.change24h,1)+'%')}${metric('LAGGARD',m.laggard.symbol+' '+fmt(m.laggard.change24h,1)+'%','red')}</div>`+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">24H MOMENTUM</span></div>${radar.map(x=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">Momentum positiv</div></div><div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`);
+ return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${liveBadge('VERIFIED')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
+ `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
+ card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Risk-on unterstützt HBAR/XRP Long-Grids, erhöht aber das Risiko eines bereits stark belasteten BTC-Short-Hedges.</p>`)+
+ card(`<div class="section-title">VERIFIZIERTE REFERENZKURSE</div>${Object.entries(s.prices||{}).map(([sym,q])=>`<div class="row"><span>${sym} ${liveBadge('VERIFIED')}</span><b>$${fmt(q.price,q.price<10?4:2)} <span class="${q.change24hPct>=0?'green':'red'}">${q.change24hPct>=0?'+':''}${fmt(q.change24hPct,2)}%</span></b></div>`).join('')}<p class="footer-note">Portfolio-Positionen nutzen weiterhin den Browser-Livefeed; diese Werte sind der öffentlich verifizierte Referenz-Snapshot.</p>`)+
+ card(`<div class="section-title">MACRO ${liveBadge('VERIFIED')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">BROWSER-LIVE / FALLBACK</span></div>${radar.map(x=>`<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">Momentum</div></div><div></div><div class="asset-change">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div></div>`).join('')}`);
 }
 function bottomView(){
- const n=DATA.nadir;
- return card(`<div class="eyebrow">NADIR 2.0</div><div class="forecast-main">${n.label}</div><div class="sub">Bewertung · Kapitulation · Holder · Timing</div>`)+
- card(`<div class="row"><span class="eyebrow">NADIR GESAMTSCORE</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">Akkumulations-Regime · gemischte Evidenz</p>`)+
+ const n=DATA.nadir, c=n.currentVerifiedContext||{};
+ return card(`<div class="eyebrow">NADIR 2.1 ${snapshotBadge('MODEL')}</div><div class="forecast-main">${n.label}</div><div class="sub">Bewertung · Kapitulation · Holder · Timing</div><p class="footer-note">${n.note||''}</p>`)+
+ card(`<div class="section-title">AKTUELL VERIFIZIERTER KONTEXT ${liveBadge('VERIFIED')}</div><div class="grid2">${metric('BTC','$'+fmt(c.btcPrice||0))}${metric('BTC 7T','+'+fmt(c.btc7dPct||0,2)+'%','green')}${metric('FEAR & GREED',c.fearGreed||'—','amber')}${metric('BTC DOM.',fmt(c.btcDominancePct||0,2)+'%')}</div>`)+
+ card(`<div class="row"><span class="eyebrow">NADIR GESAMTSCORE</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">${snapshotBadge('LAST CONFIRMED')} ${n.snapshotAt||''}</p>`)+
  `<div class="grid2">${metric('BEWERTUNG',n.valuation+'/100')}${metric('KAPITULATION',n.capitulation+'/100')}${metric('HOLDER',n.holder+'/100')}${metric('TIMING',n.timing+'/100')}</div>`+
- card(`<div class="section-title">BTC BODEN-SZENARIEN</div>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
+ card(`<div class="section-title">BTC BODEN-SZENARIEN ${snapshotBadge('MODEL')}</div>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
 }
+function stateLabel(v){return (v||'').includes('LIVE')?liveBadge('LIVE'):snapshotBadge('SNAPSHOT')}
 function dayTrade(){
- const d=DATA.dayTrade;
- return card(`<div class="eyebrow">DAY-TRADE 2.0</div><div class="forecast-main">${d.entryAllowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN'}</div><div class="sub">Bias ≠ Ausführung · Indikatoren</div><div class="row"><b>GATE SCORE</b><b class="amber">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
- `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice))}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="red" style="font-size:13px">überdehnt</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="amber" style="font-size:13px">erhöht</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="green" style="font-size:13px">OK</div>')}${metric('OI','$'+fmt(d.oiB,2)+'B')}${metric('VWAP','$'+fmt(d.vwap))}</div>`+
- card(`<div class="section-title">FIB LEVELS <span class="muted" style="float:right;font-size:13px">$${fmt(d.fib.low)} → $${fmt(d.fib.high)}</span></div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`)+
- card(`<div class="section-title">TRADE GATE</div><div class="row"><span>Datenfrische</span><b class="green">Browser Live</b></div><div class="row"><span>MTF-Konfluenz</span><b class="green">bullish</b></div><div class="row"><span>Entry-Streckung</span><b class="red">4H RSI ${fmt(d.rsi4h,2)} → stark überdehnt</b></div><div class="row"><span>Liquidationspuffer</span><b class="amber">$${fmt(d.liquidationBuffer)}</b></div>`);
+ const d=DATA.dayTrade, st=d.status||{};
+ return card(`<div class="eyebrow">DAY-TRADE 2.2</div><div class="forecast-main">${d.entryAllowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN'}</div><div class="sub">${d.decisionNote||'Bias ≠ Ausführung'}</div><div class="row"><b>GATE SCORE</b><b class="${d.entryAllowed?'green':'amber'}">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
+ `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice)+'<div class="data-state">'+stateLabel(st.btcPrice)+'</div>')}${metric('OPEN INTEREST','$'+fmt(d.oiB,2)+'B<div class="data-state">'+stateLabel(st.oiB)+'</div>')}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="data-state">'+stateLabel(st.rsi4h)+'</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="data-state">'+stateLabel(st.rsi1h)+'</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="data-state">'+stateLabel(st.fundingPct)+'</div>')}${metric('24H VWAP','$'+fmt(d.vwap)+'<div class="data-state">'+stateLabel(st.vwap)+'</div>')}</div>`+
+ card(`<div class="section-title">LIVE-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
+ card(`<div class="section-title">FIB LEVELS ${snapshotBadge('MODEL')}</div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`);
 }
 function closes(symbol){
  const c=HISTORY?.coins?.[symbol]?.candles||[];
@@ -338,10 +390,10 @@ function renderForecast(){
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 function settings(){
- const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length;
- return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Datenmodus</span><b class="green">iPhone Browser</b></div><div class="row"><span>Live-Kurse zuletzt</span><b>${LAST_PRICE_UPDATE?new Date(LAST_PRICE_UPDATE).toLocaleTimeString('de-DE'):'—'}</b></div><div class="row"><span>Lokaler History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
- card(`<div class="section-title">SYSTEM</div><div class="row"><span>GitHub Actions</span><b class="green">nicht nötig</b></div><div class="row"><span>Historie</span><b>direkt pro Coin</b></div><div class="row"><span>Speicher</span><b>localStorage</b></div><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">APP NEU LADEN</button>`)+
- card(`<div class="section-title">BEWERTUNGSLOGIK</div><div class="row"><span>Live Asset</span><b>Browser API</b></div><div class="row"><span>Fallback</span><b>lokaler Cache</b></div><div class="row"><span>Forecast</span><b>365T History + FIB + RSI + Relative Strength + Cycle Clock</b></div><div class="row"><span>Zyklus-Uhr</span><b>Halving-Zeitmodell + Coin Offset</b></div>`);
+ const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length, r=DATA.pionexRisk||{};
+ return card(`<div class="section-title">DATENSTATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>Live-Kurse zuletzt</span><b>${LAST_PRICE_UPDATE?new Date(LAST_PRICE_UPDATE).toLocaleTimeString('de-DE'):'—'}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div>`)+
+ card(`<div class="section-title">v4.9.2 MODULE</div><div class="row"><span>Portfolio Engine</span><b class="green">Spot + Cash + Futures getrennt</b></div><div class="row"><span>Bot Intelligence</span><b class="green">aktiv</b></div><div class="row"><span>Netto-Exposure</span><b class="amber">teilverifiziert</b></div><div class="row"><span>DAY-TRADE Live</span><b class="green">RSI / Funding / OI / VWAP</b></div><div class="row"><span>NADIR</span><b class="amber">On-Chain fehlt</b></div><div class="row"><span>Datenintegrität</span><b class="green">LIVE ≠ SNAPSHOT</b></div>`)+
+ card(`<div class="section-title">NÄCHSTER SCHRITT → v5.0</div><div class="row"><span>BTC-Short Notional/Liq.</span><b class="red">frische Pionex-Daten nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">API/Quelle anbinden</b></div><div class="row"><span>Bot P&L Auto-Sync</span><b class="amber">Pionex API nötig</b></div><p class="footer-note">Die Architektur für das Portfolio Command Center ist jetzt vorbereitet; fehlende externe Daten werden bewusst nicht erfunden.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">APP NEU LADEN</button>`);
 }
 function renderAll(){
  $('#view-depot').innerHTML=depot();

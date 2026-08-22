@@ -344,3 +344,10 @@ button{font:inherit}
 .detail-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center}
 .asset-detail{width:min(100%,720px);max-height:88vh;overflow:auto;background:#07111b;border:1px solid var(--cyan);border-radius:24px 24px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,.45)}
 .detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.detail-head>div{display:flex;align-items:center;gap:10px;font-size:18px}.detail-close{border:0;background:transparent;color:#eef5ff;font-size:24px;padding:4px 8px 4px 0}.detail-price{font-size:38px;font-weight:900;margin:18px 0 2px}.detail-fresh{font-size:9px;color:var(--muted);margin-bottom:16px}.detail-section{margin-top:20px}.detail-qty{display:block;color:var(--muted);font-size:8px;margin-top:3px}.detail-forecast-btn{width:100%;margin-top:18px}.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.scenario-grid>div{border:1px solid var(--line2);border-radius:12px;padding:10px}.scenario-grid span{display:block;color:var(--muted);font-size:8px;margin-bottom:5px}.scenario-grid b{font-size:12px}
+
+/* v4.9.2 Futures & Exposure */
+.bot-reason{margin-top:10px;color:var(--muted);font-size:11px;line-height:1.45}
+.exposure-callout{display:flex;gap:10px;align-items:flex-start;padding:12px;margin:12px 0;border:1px solid rgba(255,91,91,.28);border-radius:14px;background:rgba(255,91,91,.06)}
+.exposure-callout b{color:var(--red);white-space:nowrap}
+.exposure-callout span{color:var(--muted);font-size:11px;line-height:1.4}
+.data-state{font-size:8px;letter-spacing:.6px;margin-top:4px}

@@ -1,41 +1,42 @@
 {
-  "appVersion": "4.9.0",
-  "build": "2026-08-22-asset-detail",
+  "appVersion": "4.9.2",
+  "build": "2026-08-22-futures-exposure",
   "currency": "USD",
   "portfolio": {
-    "total": 25948,
-    "eurApprox": 22100,
+    "total": 27055.7,
+    "eurApprox": 23268.0,
     "coveragePct": 90,
     "assetsCount": 17,
-    "custodiansCount": 3,
+    "custodiansCount": 4,
     "largestPosition": {
       "symbol": "SOL",
-      "sharePct": 22.1
+      "sharePct": 21.24
     },
     "byVenue": [
       {
         "name": "Bitpanda",
-        "value": 15859,
-        "sharePct": 61.1,
+        "value": 15859.0,
+        "sharePct": 58.62,
         "color": "#31d07c"
       },
       {
         "name": "OKX",
-        "value": 9383,
-        "sharePct": 36.2,
+        "value": 9383.0,
+        "sharePct": 34.68,
         "color": "#4a90ff"
       },
       {
         "name": "Ledger",
-        "value": 536,
-        "sharePct": 2.1,
+        "value": 536.0,
+        "sharePct": 1.98,
         "color": "#9b7cff"
       },
       {
         "name": "Pionex",
-        "value": 170,
-        "sharePct": 0.7,
-        "color": "#ff5b5b"
+        "value": 1277.7,
+        "sharePct": 4.72,
+        "color": "#ff5b5b",
+        "source": "SNAPSHOT"
       }
     ],
     "topPositions": [
@@ -43,35 +44,35 @@
         "symbol": "SOL",
         "venue": "Bitpanda",
         "value": 5746,
-        "sharePct": 22.1,
+        "sharePct": 21.24,
         "change24h": 4.7
       },
       {
         "symbol": "BTC",
         "venue": "OKX",
         "value": 5540,
-        "sharePct": 21.4,
+        "sharePct": 20.48,
         "change24h": 6.4
       },
       {
         "symbol": "XRP",
         "venue": "OKX",
         "value": 1876,
-        "sharePct": 7.2,
+        "sharePct": 6.93,
         "change24h": 11.1
       },
       {
         "symbol": "SUI",
         "venue": "Bitpanda",
         "value": 1512,
-        "sharePct": 5.8,
+        "sharePct": 5.59,
         "change24h": 9.4
       },
       {
         "symbol": "ADA",
         "venue": "Bitpanda",
         "value": 1410,
-        "sharePct": 5.4,
+        "sharePct": 5.21,
         "change24h": 10.2
       }
     ],
@@ -203,14 +204,14 @@
     "manualVenueBalances": [
       {
         "name": "Pionex",
-        "value": 119.75,
+        "value": 1277.7,
         "source": "snapshot",
-        "note": "Pionex Hauptkonto"
+        "note": "Pionex Hauptkonto inkl. Futures-Grid-Kapital; nicht zusätzlich als Spot addieren"
       }
     ]
   },
   "market": {
-    "regime": "RISK-ON",
+    "regime": "RISK-ON / SHORT-SQUEEZE",
     "breadth": "16/17 positiv",
     "avg24hPct": 6.9,
     "leader": {
@@ -220,7 +221,11 @@
     "laggard": {
       "symbol": "FET",
       "change24h": -2.3
-    }
+    },
+    "sentiment": "GREED 71",
+    "btcDominancePct": 59.35,
+    "totalMarketCapT": 2.18,
+    "verifiedAt": "2026-08-22T08:57:00+02:00"
   },
   "nadir": {
     "label": "AKKUMULATIONS-REGIME",
@@ -233,12 +238,22 @@
       "Shallow": "$55k–65k",
       "Base Case": "$42k–52k",
       "Capitulation": "$30k–40k"
-    }
+    },
+    "status": "LAST CONFIRMED MODEL SNAPSHOT",
+    "snapshotAt": "2026-08-22 ~00:30 CEST",
+    "currentVerifiedContext": {
+      "btcPrice": 77312,
+      "btc7dPct": 24.27,
+      "fearGreed": 71,
+      "btcDominancePct": 59.35,
+      "totalMarketCapT": 2.18
+    },
+    "note": "Score nicht künstlich neu berechnet: aktuelle On-Chain-/Kapitulationsdaten fehlen noch."
   },
   "dayTrade": {
     "entryAllowed": false,
-    "gateScore": 70,
-    "btcPrice": 77704,
+    "gateScore": 48,
+    "btcPrice": 77312,
     "rsi4h": 92.45,
     "rsi1h": 77.37,
     "fundingPct": 0.0067,
@@ -295,48 +310,96 @@
           "tag": "EXT"
         }
       ]
-    }
+    },
+    "status": {
+      "btcPrice": "VERIFIED / BROWSER-LIVE WHEN AVAILABLE",
+      "oiB": "BROWSER-LIVE WHEN AVAILABLE",
+      "rsi4h": "BROWSER-LIVE WHEN AVAILABLE",
+      "rsi1h": "BROWSER-LIVE WHEN AVAILABLE",
+      "fundingPct": "BROWSER-LIVE WHEN AVAILABLE",
+      "vwap": "BROWSER-LIVE WHEN AVAILABLE",
+      "fib": "MODEL / SNAPSHOT"
+    },
+    "decisionNote": "NO ENTRY im Snapshot: starkes Risk-on-Momentum, aber überdehnungsgefährdet. Browser versucht RSI, Funding, OI und VWAP direkt neu zu laden."
   },
   "pionexRisk": {
-    "accountValue": 119.75,
-    "botPnl": -141.95,
-    "dynamicMargin": 148.51,
-    "nextLiquidation": 81474.9,
-    "liquidationDistancePct": 3.87,
+    "status": "SCREENSHOT VERIFIED",
+    "snapshotAt": "2026-08-22T09:12:00+02:00",
+    "accountValue": 1277.7,
+    "botCapital": 1237.46,
+    "cashBufferApprox": 40.24,
+    "longCapital": 1128.46,
+    "shortCapital": 109.0,
+    "knownLeveragedLongCapacity": 5642.3,
+    "netDirection": "LONG-BIASED",
+    "riskLevel": "HIGH",
+    "riskNote": "Neue 5x Long-Grids erhöhen Altcoin-Exposure deutlich; BTC-Short bleibt Hedge, ist aber mit ~-98% P&L kritisch.",
     "bots": [
       {
-        "name": "Moon #1",
-        "side": "Short",
-        "leverage": 30,
-        "investment": 52,
-        "totalProfit": -122.75,
-        "gridProfit": 6.15,
-        "trendPnl": -128.9,
-        "fundingPct": 0.01,
-        "rangeLow": 59589.2,
-        "rangeHigh": 79671.1,
-        "dynamicMargin": 138.51,
-        "liquidation": 81474.9,
-        "liquidationDistancePct": 3.87,
-        "breakEven": 71837.8,
-        "createdPrice": 69243.5
+        "name": "HBAR COIN-M Futures Grid",
+        "symbol": "HBAR",
+        "side": "Long",
+        "leverage": 5,
+        "investment": 562.54,
+        "currentAssetInvestment": 7122.63,
+        "currentPrice": 0.07866,
+        "fundingPct": 0.0053,
+        "rangeLow": 0.06,
+        "rangeHigh": 0.09,
+        "grids": 127,
+        "createdPrice": 0.07888,
+        "breakEven": 0.0789,
+        "liquidation": 0.05862,
+        "liquidationDistancePct": 25.48,
+        "takeProfit": 0.09,
+        "gridProfitAsset": 1.49,
+        "trendPnlAsset": -26.75,
+        "totalProfitAsset": -25.26,
+        "totalProfitPct": -0.36,
+        "recommendation": "HALTEN / BEOBACHTEN",
+        "recommendationScore": 66,
+        "reason": "Preis innerhalb Grid-Range; Liquidationspuffer ~25%, aber 5x-Long erhöht Risiko."
       },
       {
-        "name": "Moon #2",
+        "name": "XRP COIN-M Futures Grid",
+        "symbol": "XRP",
+        "side": "Long",
+        "leverage": 5,
+        "investment": 565.92,
+        "currentAssetInvestment": 356.85,
+        "currentPrice": 1.5895,
+        "fundingPct": 0.01,
+        "rangeLow": 0.7,
+        "rangeHigh": 1.9,
+        "grids": 253,
+        "createdPrice": 1.586,
+        "breakEven": 1.5865,
+        "liquidation": 0.8498,
+        "liquidationDistancePct": 46.54,
+        "takeProfit": 1.9,
+        "gridProfitAsset": 0.0208,
+        "trendPnlAsset": 0.187,
+        "totalProfitAsset": 0.208,
+        "totalProfitPct": 0.05,
+        "recommendation": "HALTEN",
+        "recommendationScore": 78,
+        "reason": "Preis nahe Break-even, innerhalb Range und mit ~46,5% Liquidationspuffer."
+      },
+      {
+        "name": "BTC Futures Grid (gruppiert)",
+        "symbol": "BTC",
         "side": "Short",
         "leverage": 30,
-        "investment": 57,
-        "totalProfit": -19.2,
-        "gridProfit": 2.65,
-        "trendPnl": -21.85,
-        "fundingPct": 0.01,
-        "rangeLow": 64678.3,
-        "rangeHigh": 87793.3,
-        "dynamicMargin": 10.0,
-        "liquidation": 81576.3,
-        "liquidationDistancePct": 4.06,
-        "breakEven": 76761.5,
-        "createdPrice": 76369.5
+        "leverageStatus": "PRIOR CONFIG SNAPSHOT",
+        "investment": 109.0,
+        "orders": 2,
+        "totalProfitUsdt": -106.7,
+        "totalProfitPct": -97.89,
+        "liquidation": null,
+        "liquidationDistancePct": null,
+        "recommendation": "KRITISCH PRÜFEN",
+        "recommendationScore": 18,
+        "reason": "P&L ~-98%; aktueller Liquidationspreis im Screenshot nicht sichtbar. Kein automatisches Schließen ohne frische Liq-Daten."
       }
     ]
   },
@@ -358,7 +421,7 @@
     "XLM",
     "ATOM"
   ],
-  "updatedAt": "2026-08-21T22:45:00+02:00",
+  "updatedAt": "2026-08-22T09:13:00+02:00",
   "historyMode": "browser",
   "priceFallbacks": {
     "FET": {
@@ -371,5 +434,85 @@
       "source": "Bitpanda snapshot",
       "valueAtSnapshot": 970.22
     }
+  },
+  "verifiedAt": "2026-08-22T09:13:00+02:00",
+  "verifiedMarketSnapshot": {
+    "status": "VERIFIED",
+    "verifiedAt": "2026-08-22T08:57:00+02:00",
+    "prices": {
+      "BTC": {
+        "price": 77312.0,
+        "change24hPct": -0.09,
+        "source": "TradingView",
+        "freshness": "today"
+      },
+      "ETH": {
+        "price": 2415.66,
+        "change24hPct": 3.67,
+        "source": "CoinGlass",
+        "freshness": "today"
+      },
+      "SOL": {
+        "price": 90.37,
+        "change24hPct": 4.15,
+        "source": "CoinGlass",
+        "freshness": "today"
+      },
+      "XRP": {
+        "price": 1.3682,
+        "change24hPct": 15.12,
+        "source": "CoinGlass",
+        "freshness": "today"
+      }
+    },
+    "crypto": {
+      "fearGreed": 71,
+      "fearGreedLabel": "Greed",
+      "btcDominancePct": 59.35,
+      "totalMarketCapT": 2.18,
+      "btc7dPct": 24.27
+    }
+  },
+  "btcRegime": {
+    "label": "RISK-ON / SHORT-SQUEEZE",
+    "score": 76,
+    "status": "VERIFIED",
+    "verifiedAt": "2026-08-22T08:57:00+02:00",
+    "drivers": [
+      "BTC ~77.3k und +24.27% auf 7 Tage",
+      "Fear & Greed 71 (Greed)",
+      "BTC-Dominanz 59.35%",
+      "Starkes Short-Squeeze-Momentum",
+      "Technisches Tagesbild positiv"
+    ],
+    "risk": "Momentum stark, aber nach dem schnellen 7T-Anstieg klar überdehnungsgefährdet."
+  },
+  "macro": {
+    "status": "VERIFIED",
+    "verifiedAt": "2026-08-22T08:57:00+02:00",
+    "fedFunds": "3.50–3.75%",
+    "fedDecisionDate": "2026-07-29",
+    "fedBias": "HOLD / restriktiv",
+    "cpiHeadlineYoY": 3.4,
+    "cpiCoreYoY": 2.5,
+    "cpiMonth": "Jul 2026",
+    "unemploymentPct": 4.1,
+    "payrollChangeK": -23,
+    "jobsMonth": "Jul 2026",
+    "us10yPct": 4.707,
+    "us10yDate": "2026-08-21",
+    "summary": "Kurzfristig krypto-freundliches Momentum, aber Fed und Long-End-Renditen bleiben ein Gegenwind."
+  },
+  "exposure": {
+    "status": "PARTIAL VERIFIED",
+    "snapshotAt": "2026-08-22T09:12:00+02:00",
+    "pionexAccountValue": 1277.7,
+    "futuresBotCapital": 1237.46,
+    "known5xLongCapital": 1128.46,
+    "known5xLongCapacity": 5642.3,
+    "btcShortCapital": 109.0,
+    "btcShortNotional": null,
+    "directionalBias": "NET LONG / BTC HEDGE",
+    "note": "Notional des BTC-Shorts bleibt absichtlich offen, bis aktuelle Positions-/Liquidationsdaten vorliegen."
   }
 }
