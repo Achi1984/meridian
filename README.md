@@ -12,3 +12,10 @@ Neu:
 - Core-Layout, Header, Bottom-Navigation und alle anderen Tabs bleiben unverändert
 
 Wichtig: Keine automatische Order-Ausführung. Snapshot-/unverifizierte Botdaten werden nicht als live interpretiert.
+
+
+## v5.1.9a
+- Zentrale Runtime-Version aus version.json
+- Header/Data/Fallback synchronisiert
+- Keine neue Runtime-Datei hinzugefügt
+- Action Engine und Layout unverändert

@@ -1,17 +1,17 @@
 {
-  "version": "5.1.9",
-  "build": "2026-08-22-action-engine-1",
-  "base": "5.1.8 confluence stable",
-  "baseline": "v5.1.8 STABLE",
-  "frozen": true,
-  "module": "Action Engine 1.0",
+  "version": "5.2.0",
+  "build": "2026-08-22-forecast-time-cycle",
+  "base": "5.1.9a",
+  "baseline": "v5.1.9a VERSION SYNC",
+  "frozen": false,
+  "module": "Forecast 3.0 · Time & Cycle Engine",
   "coreLayoutFrozen": true,
   "changes": [
-    "Concrete action queue replaces duplicated Today/Bot Watch/Active Signals blocks",
-    "BTC Short uses FREEZE / LIQ-DATEN PRÜFEN instead of generic risk reduction",
-    "HBAR 5x NO ADD when liquidation buffer is low",
-    "XRP 5x HOLD with retracement rule",
-    "Day-Trade BLOCKED below gate 70",
-    "Spot risk explicitly blocks new buys at high master risk"
+    "Forecast 3.0 adds explicit temporal cycle model",
+    "2025-10-06 is treated as previous observed BTC cycle peak, not a future forecast",
+    "Next halving is an estimated April 2028 protocol window",
+    "Adds 2026-2028 re-accumulation, 2028H2-2029H1 expansion, and 2029Q2-2030Q1 major peak model windows",
+    "Price targets remain conditional on structure and breakout confirmation",
+    "Core Center/Trade/Grid layout preserved"
   ]
 }

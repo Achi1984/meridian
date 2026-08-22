@@ -756,3 +756,7 @@ main>section:not(.hidden)>.card:first-child{
 .actionq-main>small{display:block;color:#8495aa;line-height:1.45;margin-top:5px}
 .actionq-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:#63768b;font-size:10px}
 .actionq-meta strong{color:#9caec1}
+
+/* Forecast 3.0 — Time & Cycle Engine */
+.cycle-timeline{display:flex;gap:5px;justify-content:space-between;align-items:center;margin:14px 0 4px;font-size:8px;color:#8294aa;letter-spacing:.3px}
+.cycle-timeline span{flex:1;text-align:center;border-top:1px solid #17415e;padding-top:8px}

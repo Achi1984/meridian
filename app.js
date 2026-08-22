@@ -2,8 +2,8 @@
 const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-const APP_CODE_VERSION='5.1.8';
-const APP_RELEASE='5.1.8 · CONFLUENCE ENGINE';
+let APP_CODE_VERSION='5.1.9a';
+let APP_RELEASE='5.1.9a · ACTION ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -271,19 +271,28 @@ function recalcPortfolio(){
 async function load(){
  try{
    const stamp=Date.now();
-   DATA=await fetch('data.json?v='+stamp,{cache:'no-store'}).then(r=>{
-     if(!r.ok)throw new Error('data.json HTTP '+r.status);
-     return r.json();
-   });
+   const [dataRes, versionRes]=await Promise.all([
+     fetch('data.json?v='+stamp,{cache:'no-store'}),
+     fetch('version.json?v='+stamp,{cache:'no-store'})
+   ]);
+   if(!dataRes.ok)throw new Error('data.json HTTP '+dataRes.status);
+   DATA=await dataRes.json();
+   let runtimeVersion={version:'5.1.9a'};
+   if(versionRes.ok){
+     try{runtimeVersion=await versionRes.json()}catch(e){}
+   }
+   APP_CODE_VERSION=runtimeVersion.version||'5.1.9a';
+   APP_RELEASE=APP_CODE_VERSION+' · ACTION ENGINE';
+   DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
-   $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
+   $('#versionBadge').textContent='v'+APP_CODE_VERSION+' · LIVE';
    renderAll(); // snapshot must appear immediately, before any external API call
    updateHeaderFeedClock();
 
    // Live engines run independently and may fail without blanking the app.
    Promise.allSettled([refreshCurrentPortfolioPrices(),refreshDayTradeTechnicals()])
     .then(()=>{
-      $('#versionBadge').textContent='v'+DATA.appVersion+' · LIVE';
+      $('#versionBadge').textContent='v'+APP_CODE_VERSION+' · LIVE';
       try{recalcPortfolio()}catch(e){}
       renderAll(); updateHeaderFeedClock();
       refreshGridEngine(false).catch(()=>{});
@@ -292,7 +301,7 @@ async function load(){
    loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  }catch(e){
    console.error('MERIDIAN BOOT ERROR',e);
-   $('#versionBadge').textContent='v5.1.3 · ERROR';
+   $('#versionBadge').textContent='v'+APP_CODE_VERSION+' · ERROR';
    const main=document.querySelector('main');
    if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
  }
