@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.0.9",
-  "build": "2026-08-22-mobile-nadir-forecast-integrity",
+  "appVersion": "5.1.0",
+  "build": "2026-08-22-decision-engine-1-0",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -602,5 +602,25 @@
     "Mobile top safe-area scrim prevents scrolled cards from drawing under Dynamic Island/status bar.",
     "NADIR current-context engine added without overwriting last-confirmed on-chain snapshot.",
     "Forecast 2.0 separates historical anchor, current state and conditional forward window."
-  ]
+  ],
+  "decisionEngine": {
+    "version": "1.0",
+    "status": "MODEL",
+    "actions": [
+      "HOLD",
+      "ACCUMULATE",
+      "REDUCE",
+      "GRID ENTRY",
+      "NO TRADE"
+    ],
+    "inputs": [
+      "Forecast 2.0",
+      "NADIR 2.2",
+      "Day-Trade 2.2",
+      "Grid Engine 1.2",
+      "Portfolio Risk"
+    ],
+    "execution": "NO AUTO EXECUTION",
+    "note": "Decision Engine verdichtet vorhandene MERIDIAN-Module; sie ersetzt keine verifizierten Positions-/Liquidationsdaten."
+  }
 }

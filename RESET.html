@@ -1,9 +1,11 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MERIDIAN v5.0.9 Reset</title><style>body{background:#03070c;color:#f4f7fb;font:18px system-ui;padding:32px}b{color:#20a4ff}</style>
-<h2>ACHI MERIDIAN v5.0.9</h2><p id=s>Alte PWA-Caches werden entfernt…</p>
-<script>(async()=>{try{
- if('serviceWorker' in navigator){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister()}
- if('caches' in window){for(const k of await caches.keys())await caches.delete(k)}
- document.getElementById('s').innerHTML='<b>Cache sauber.</b> LocalStorage/Portfolio-Historie bleibt erhalten. Starte v5.0.9…';
- setTimeout(()=>location.replace('./index.html?build=v509-'+Date.now()),900)
-}catch(e){location.replace('./index.html?build=v509-'+Date.now())}})()</script>
+<title>MERIDIAN Reset</title><style>body{background:#05080d;color:#eef5ff;font:18px system-ui;padding:30px}b{color:#25aaff}</style>
+<h2>ACHI MERIDIAN v5.1.0</h2><p id="s">Cache wird bereinigt…</p>
+<script>
+(async()=>{try{
+ for(const r of await navigator.serviceWorker?.getRegistrations?.()||[]) await r.unregister();
+ for(const k of await caches.keys()) await caches.delete(k);
+ document.getElementById('s').innerHTML='<b>Fertig.</b> Portfolio-Historie und Cashflows bleiben erhalten. Weiterleitung…';
+ setTimeout(()=>location.replace('./index.html?v=5.1.0-reset-'+Date.now()),900);
+}catch(e){location.replace('./index.html?v=5.1.0-'+Date.now())}})();
+</script>
