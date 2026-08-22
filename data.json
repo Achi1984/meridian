@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.4",
-  "build": "2026-08-22-daytrade-stateLabel-hotfix",
+  "appVersion": "5.1.5",
+  "build": "2026-08-22-daytrade-runtime-helper-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -597,9 +597,10 @@
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
   "buildNotes": [
-    "DAYTRADE ReferenceError stateLabel fixed.",
-    "DAYTRADE state label is now derived locally from gate score / entry state.",
-    "UI geometry and bottom navigation are intentionally unchanged."
+    "DAYTRADE runtime bug fixed: stateLabel restored as a helper function.",
+    "Removed incorrect local stateLabel constant that accessed d before initialization.",
+    "Approved compact UI geometry remains unchanged.",
+    "Bottom navigation remains unchanged."
   ],
   "decisionEngine": {
     "version": "1.0",
