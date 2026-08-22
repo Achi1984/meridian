@@ -9,7 +9,7 @@ Fix:
 - Alte JS-Alias-Dateien enthalten ebenfalls den Hotfix, um stale HTML-Referenzen abzufangen.
 
 
-## v5.1.6 Header Compact
+## v5.1.7 Header Compact
 - Header horizontal spacing reduced for iPhone.
 - Version badge stays directly beside ACHI MERIDIAN.
 - LIVE status uses remaining space instead of a fixed gap.
