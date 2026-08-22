@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.1",
-  "build": "2026-08-22-mobile-space-cache-fix",
+  "appVersion": "5.1.2",
+  "build": "2026-08-22-top-space-revision-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -597,11 +597,10 @@
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
   "buildNotes": [
-    "Mobile vertical space optimized without shrinking core card typography.",
-    "Header moved upward and compacted.",
-    "Gap between header and first card reduced.",
-    "Bottom navigation height reduced while preserving iOS safe area.",
-    "Cache/version mismatch logic hardened."
+    "Top whitespace reduced using the actual .topbar/.app selectors.",
+    "Double iOS safe-area padding removed.",
+    "Revision badge fixed by aligning APP_CODE_VERSION with data version.",
+    "Bottom navigation retained from v5.1.1."
   ],
   "decisionEngine": {
     "version": "1.0",
