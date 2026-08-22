@@ -392,7 +392,7 @@ function commandCenter(){
  card(`<div class="section-head"><div class="section-title">BOT WATCH</div><span class="section-note">Pionex Snapshot</span></div>${botRows}<div class="cc-exposure"><span>Bekannte 5x Long-Kapazität</span><b>$${fmt(r.knownLeveragedLongCapacity||0)}</b></div>`,'cc-bot-card')+
  gridSummaryCard()+
   card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
- `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+card(`<div class="section-title">COIN-M SCANNER TOP 3</div>${scannerCandidates().map(c=>`<div class="row"><span><b>${c.symbol}</b> · ${c.status}</span><b class="${c.score>=85?'green':'amber'}">${c.score}/100</b></div>`).join('')}<p class="footer-note">Details und FIB-Zonen im GRID-Tab.</p>`);
+ `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`;
 }
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
@@ -521,60 +521,6 @@ async function loadGridHistories(force=false){
  const syms=['HBAR','XRP'];
  await Promise.allSettled(syms.map(s=>loadCoinHistory(s,force)));
  renderAll();
-}
-
-
-function scannerCandidates(){
- const cfg=DATA.coinMScanner||{}, qs=LIVE_QUOTES||{};
- return (cfg.candidates||[]).filter(c=>['SOL','ETH','PEPE'].includes(c.symbol)).map(c=>{
-   const q=qs[c.symbol]||{}, price=+q.price||+c.fallbackSwingHigh||0;
-   const hist=(HISTORY?.coins?.[c.symbol]||[]).map(x=>Array.isArray(x)?+x[1]:+x.close||+x.price).filter(Number.isFinite);
-   let lo=c.fallbackSwingLow, hi=c.fallbackSwingHigh;
-   if(hist.length>=20){const recent=hist.slice(-240);lo=Math.min(...recent);hi=Math.max(...recent)}
-   const span=Math.max(hi-lo,price*.001);
-   const fib={
-    f236:hi-span*.236,f382:hi-span*.382,f500:hi-span*.5,f618:hi-span*.618,f786:hi-span*.786,
-    ext1272:hi+span*.272
-   };
-   const entryLow=fib.f618, entryHigh=fib.f500, rangeLow=fib.f786, rangeHigh=hi;
-   const inEntry=price>=entryLow&&price<=entryHigh;
-   const near=price>entryHigh&&price<=fib.f382;
-   let score=c.symbol==='SOL'?87:c.symbol==='ETH'?79:72;
-   if(inEntry)score+=7; else if(near)score+=3;
-   score=Math.min(96,score);
-   const status=inEntry?'START ZONE':near?'WATCH ZONE':'WAIT FOR RETRACE';
-   const grids=c.symbol==='SOL'?120:c.symbol==='ETH'?100:160;
-   return {...c,price,lo,hi,fib,entryLow,entryHigh,rangeLow,rangeHigh,score,status,grids};
- });
-}
-function scannerPrice(v,s){return s==='PEPE'?fmt(v,8):s==='SOL'?fmt(v,2):fmt(v,0)}
-function fibVisual(c){
- const levels=[
-  ['HIGH',c.hi],['0.236',c.fib.f236],['0.382',c.fib.f382],['0.500',c.fib.f500],['0.618',c.fib.f618],['0.786',c.fib.f786],['LOW',c.lo]
- ];
- const top=c.hi,bottom=c.lo,span=Math.max(top-bottom,1e-12);
- return `<div class="fib-visual">
-   <div class="fib-price-marker" style="top:${Math.max(2,Math.min(96,(top-c.price)/span*100))}%"><i></i><b>$${scannerPrice(c.price,c.symbol)}</b></div>
-   <div class="fib-entry-zone" style="top:${(top-c.entryHigh)/span*100}%;height:${(c.entryHigh-c.entryLow)/span*100}%"><span>PREFERRED ENTRY</span></div>
-   ${levels.map(([n,v])=>`<div class="fib-line ${n==='0.500'||n==='0.618'?'preferred':''}" style="top:${(top-v)/span*100}%"><span>${n}</span><b>$${scannerPrice(v,c.symbol)}</b></div>`).join('')}
- </div>`;
-}
-function coinMScannerView(){
- const cs=scannerCandidates();
- return card(`<div class="section-head"><div class="section-title">COIN-M OPPORTUNITY SCANNER</div><span class="section-note">${liveBadge('LIVE')}</span></div>
- <p class="footer-note">Nur transferierbare Nicht-Bitpanda-Kandidaten. Ranking kombiniert Frequenz, Volatilität, Range-Effizienz, Liquidität, FIB-Struktur, Funding und RSI.</p>
- ${cs.map((c,i)=>`<div class="scanner-card">
-   <div class="scanner-head"><div><span class="scanner-rank">#${i+1}</span><b>${c.symbol}</b><small>${c.venue} · max. ${c.maxLeverage}× · ${c.risk}</small></div><div class="scanner-score ${c.score>=85?'green':c.score>=75?'amber':'red'}">${c.score}/100</div></div>
-   ${fibVisual(c)}
-   <div class="scanner-grid">
-    <div><span>STATUS</span><b class="${c.status==='START ZONE'?'green':'amber'}">${c.status}</b></div>
-    <div><span>ENTRY</span><b>$${scannerPrice(c.entryLow,c.symbol)}–$${scannerPrice(c.entryHigh,c.symbol)}</b></div>
-    <div><span>GRID RANGE</span><b>$${scannerPrice(c.rangeLow,c.symbol)}–$${scannerPrice(c.rangeHigh,c.symbol)}</b></div>
-    <div><span>GRIDS</span><b>~${c.grids}</b></div>
-    <div><span>TP1</span><b>$${scannerPrice(c.hi,c.symbol)}</b></div>
-    <div><span>TP2 · 1.272</span><b>$${scannerPrice(c.fib.ext1272,c.symbol)}</b></div>
-   </div>
- </div>`).join('')}`,'scanner-shell');
 }
 
 function gridDecimals(sym){return sym==='HBAR'?5:sym==='XRP'?4:2}
@@ -720,68 +666,6 @@ function renderForecast(){
 }
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
-
-function meridianAlertKey(){return 'meridian_alerts_v522'}
-function getMeridianAlerts(){
- try{return JSON.parse(localStorage.getItem(meridianAlertKey())||'[]')}catch(e){return []}
-}
-function saveMeridianAlerts(a){
- try{localStorage.setItem(meridianAlertKey(),JSON.stringify(a.slice(-80)))}catch(e){}
-}
-function buildAlertSnapshot(){
- const out=[], now=Date.now();
- try{
-  if(typeof scannerCandidates==='function'){
-   scannerCandidates().forEach(c=>{
-    let state='WAIT',sev='muted';
-    if(c.status==='START ZONE'&&c.score>=88){state='START ZONE';sev='green'}
-    else if(c.status==='START ZONE'){state='ARM';sev='amber'}
-    else if(c.status==='WATCH ZONE'||c.score>=82){state='WATCH';sev='amber'}
-    out.push({ts:now,symbol:c.symbol,state,price:c.price||0,sev,
-      msg:state==='START ZONE'?'FIB Entry + Score bestätigt':
-          state==='ARM'?'FIB Entry erreicht · Konfluenz prüfen':
-          state==='WATCH'?'Preferred Entry nähert sich':'Auf Retracement warten'});
-   });
-  }
- }catch(e){}
- try{
-  const bots=(DATA&&DATA.pionexRisk&&DATA.pionexRisk.bots)||[];
-  bots.filter(b=>['XRP','HBAR'].includes(b.symbol)).forEach(b=>{
-   const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[b.symbol])||{};
-   const px=+q.price||+b.currentPrice||0, tp=+b.takeProfit||0;
-   if(tp&&px>=tp) out.push({ts:now,symbol:b.symbol,state:'TP HIT',price:px,sev:'green',msg:'Take Profit erreicht · neue FIB Range berechnen'});
-   else out.push({ts:now,symbol:b.symbol,state:'BOT SNAPSHOT',price:px,sev:'amber',msg:'Pionex Botdaten bleiben Snapshot'});
-  });
- }catch(e){}
- return out;
-}
-function persistAlertTransitions(snapshot){
- const old=getMeridianAlerts(), last={};
- old.forEach(x=>last[x.symbol]=x.state);
- snapshot.forEach(x=>{
-  if(last[x.symbol]!==x.state) old.push(x);
- });
- saveMeridianAlerts(old);
- return old;
-}
-function alertCenter(){
- const snap=buildAlertSnapshot();
- const history=persistAlertTransitions(snap);
- return card(`<div class="eyebrow">ALERT CENTER ${liveBadge('ACTIVE')}</div>
- <div class="forecast-main">${snap.filter(x=>!['WAIT','BOT SNAPSHOT'].includes(x.state)).length} AKTIVE SIGNALE</div>
- <div class="sub">Statuswechsel statt Kurs-Spam · Pionex SNAPSHOT</div>`)+
- card(`<div class="section-title">STATUS FLOW</div>
- <div class="alert-flow">${['WAIT','WATCH','ARM','START','TP HIT','NEW RANGE'].map(x=>`<span>${x}</span>`).join('<i>›</i>')}</div>`)+
- card(`<div class="section-title">AKTUELL</div>
- ${snap.map(a=>`<div class="alert-row ${a.sev}">
-  <b>${a.symbol}</b><div><strong>${a.state}</strong><small>${a.msg}</small></div>
-  <em>${a.price?'$'+(a.symbol==='PEPE'?fmt(a.price,8):fmt(a.price,a.price<10?4:2)):'—'}</em>
- </div>`).join('')||'<p class="footer-note">Keine Signale.</p>'}`)+
- card(`<div class="section-title">LETZTE STATUSWECHSEL</div>
- ${history.slice().reverse().slice(0,10).map(a=>`<div class="row"><span>${new Date(a.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${a.symbol}</span><b>${a.state}</b></div>`).join('')||'<p class="footer-note">Noch keine Historie.</p>'}
- <p class="footer-note">Push bei geschlossener App läuft weiterhin über den externen ChatGPT-Watch.</p>`);
-}
-
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
  return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div>`)+
