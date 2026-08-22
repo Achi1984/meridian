@@ -1,20 +1,19 @@
-# ACHI MERIDIAN v5.0.3 — SAFE BOOT
+# ACHI MERIDIAN v5.0.5 — GRID RESTORE
 
-Diagnose:
-Forecast konnte weiterhin angezeigt werden, während die anderen Views leer blieben.
-Die zentrale renderAll()-Funktion renderte zuvor alle Views nacheinander; ein Fehler in nur einer View konnte dadurch alle folgenden Views blockieren.
+Stabile Basis: v5.0.4 Lazy View Fix.
 
-Änderungen:
-- Basis ist die originale v5.0.0 Command-Center-Version
-- jeder Tab wird separat mit try/catch gerendert
-- Snapshot-Inhalt wird SOFORT nach data.json angezeigt
-- externe Live-APIs starten erst danach im Hintergrund
-- ein API- oder Modulfehler kann die App nicht mehr komplett leer machen
-- Service Worker während Recovery deaktiviert
-- app.js/styles.css mit Cache-Bust
-- RESET.html entfernt nur Service-Worker/CacheStorage, nicht LocalStorage
+Einzige neue Funktion:
+- isolierter GRID-Tab
+- HBAR + XRP COIN-M Long
+- Livepreis + Pionex Snapshot-Botparameter
+- FIB 0.236 / 0.382 / 0.500 / 0.618 / 0.786
+- Preferred Entry Zone 0.500–0.618
+- nächste Grid-Range und TP2 1.272
+- Status WAIT / WATCH / START ZONE / TP HIT / NEW RANGE
 
-Installation:
-1. komplette ZIP auf das Hosting kopieren
-2. einmal RESET.html im Safari öffnen
-3. danach muss oben v5.0.3 stehen
+Bewusst NICHT enthalten:
+- Alert Center
+- SOL/ETH/PEPE Scanner
+- automatische Swing-Erkennung
+
+Ziel: stabile Funktion zuerst, dann Erweiterungen einzeln.

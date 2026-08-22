@@ -288,7 +288,7 @@ async function load(){
    loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  }catch(e){
    console.error('MERIDIAN BOOT ERROR',e);
-   $('#versionBadge').textContent='v5.0.4 · ERROR';
+   $('#versionBadge').textContent='v5.0.5 · ERROR';
    const main=document.querySelector('main');
    if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
  }
@@ -585,6 +585,83 @@ function renderForecast(){
 }
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
+
+function gridQuote(sym){
+ const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[sym])||{};
+ return +q.price||0;
+}
+function gridBot(sym){
+ return ((DATA&&DATA.pionexRisk&&DATA.pionexRisk.bots)||[]).find(b=>b.symbol===sym)||null;
+}
+function gridFmt(v,sym){
+ if(!Number.isFinite(+v))return '—';
+ if(sym==='HBAR')return fmt(+v,5);
+ if(sym==='XRP')return fmt(+v,4);
+ return fmt(+v,2);
+}
+function fibFromBot(sym){
+ const b=gridBot(sym); if(!b)return null;
+ const px=gridQuote(sym)||+b.currentPrice||+b.createdPrice||0;
+ const hi=+b.takeProfit||+b.rangeHigh||px;
+ let lo=+b.rangeLow||(+b.liquidation||px*.75);
+ // Use bot range as stable swing proxy until a dedicated swing engine is reintroduced.
+ if(!(hi>lo)){lo=px*.8}
+ const span=hi-lo;
+ const fib={
+   f236:hi-span*.236,
+   f382:hi-span*.382,
+   f500:hi-span*.500,
+   f618:hi-span*.618,
+   f786:hi-span*.786,
+   ext1272:hi+span*.272
+ };
+ const entryLow=fib.f618, entryHigh=fib.f500;
+ const rangeLow=fib.f786, rangeHigh=hi;
+ let state='WAIT';
+ if(px>=entryLow&&px<=entryHigh) state='START ZONE';
+ else if(px>entryHigh&&px<=fib.f382) state='WATCH';
+ else if(px>=hi) state='TP HIT';
+ else if(px<fib.f786) state='NEW RANGE';
+ else state='WAIT';
+ return {b,px,hi,lo,fib,entryLow,entryHigh,rangeLow,rangeHigh,state};
+}
+function gridVisual(g,sym){
+ const top=g.hi,bottom=g.lo,span=Math.max(top-bottom,1e-12);
+ const levels=[
+  ['TP/HIGH',g.hi],['0.236',g.fib.f236],['0.382',g.fib.f382],
+  ['0.500',g.fib.f500],['0.618',g.fib.f618],['0.786',g.fib.f786],['LOW',g.lo]
+ ];
+ const ptop=Math.max(1,Math.min(98,(top-g.px)/span*100));
+ return `<div class="grid-fib-chart">
+   <div class="grid-entry-band" style="top:${(top-g.entryHigh)/span*100}%;height:${(g.entryHigh-g.entryLow)/span*100}%"><span>PREFERRED ENTRY 0.500–0.618</span></div>
+   ${levels.map(([n,v])=>`<div class="grid-fib-line ${n==='0.500'||n==='0.618'?'preferred':''}" style="top:${(top-v)/span*100}%"><span>${n}</span><b>$${gridFmt(v,sym)}</b></div>`).join('')}
+   <div class="grid-price-line" style="top:${ptop}%"><i></i><b>$${gridFmt(g.px,sym)}</b></div>
+ </div>`;
+}
+function gridStatusClass(s){
+ return s==='START ZONE'?'green':s==='TP HIT'?'green':s==='NEW RANGE'?'red':'amber';
+}
+function gridView(){
+ const syms=['HBAR','XRP'];
+ const cards=syms.map(sym=>{
+   const g=fibFromBot(sym);
+   if(!g)return card(`<div class="section-title">${sym}</div><p class="footer-note">Botdaten fehlen.</p>`);
+   const b=g.b;
+   return card(`<div class="section-head"><div><div class="section-title">${sym} COIN-M LONG</div><div class="section-note">Pionex ${snapshotBadge('SNAPSHOT')}</div></div><span class="tag ${gridStatusClass(g.state)}">${g.state}</span></div>
+    ${gridVisual(g,sym)}
+    <div class="grid2">
+      ${metric('LIVE PREIS','$'+gridFmt(g.px,sym),'green')}
+      ${metric('BOT TP','$'+gridFmt(g.hi,sym))}
+      ${metric('ENTRY ZONE','$'+gridFmt(g.entryLow,sym)+'–$'+gridFmt(g.entryHigh,sym),'cyan')}
+      ${metric('NÄCHSTE RANGE','$'+gridFmt(g.rangeLow,sym)+'–$'+gridFmt(g.rangeHigh,sym),'amber')}
+      ${metric('TP2 · 1.272','$'+gridFmt(g.fib.ext1272,sym))}
+      ${metric('HEBEL',String(b.leverage||'—')+'×')}
+    </div>
+    <p class="footer-note">Range-Basis in v5.0.5: bestehende Bot-Range/TP + Livepreis. Dedizierte Swing-Erkennung kommt erst in einem separaten Build.</p>`);
+ }).join('');
+ return card(`<div class="eyebrow">FIB GRID ENGINE ${liveBadge('LIVE PRICE')}</div><div class="forecast-main">NEXT COIN-M RANGE</div><div class="sub">HBAR + XRP · isoliertes Modul auf stabiler v5.0.4-Basis</div>`)+cards;
+}
+
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
  return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div>`)+
@@ -610,6 +687,7 @@ function renderOne(view){
   market:['#view-market',market],
   bottom:['#view-bottom',bottomView],
   daytrade:['#view-daytrade',dayTrade],
+  grid:['#view-grid',gridView],
   forecast:['#view-forecast',null],
   settings:['#view-settings',settings]
  };
@@ -627,7 +705,7 @@ function renderOne(view){
  }
 }
 function renderAll(){
- ['center','depot','market','bottom','daytrade','forecast','settings'].forEach(renderOne);
+ ['center','depot','market','bottom','daytrade','grid','forecast','settings'].forEach(renderOne);
 }
 function openView(view,button){
  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));

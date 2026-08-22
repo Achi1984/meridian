@@ -408,3 +408,15 @@ button{font:inherit}
 
 /* v5.0.3 Safe Boot */
 .render-fallback{margin:20px 0;border-color:rgba(255,91,91,.35)}
+
+/* v5.0.5 isolated GRID restore */
+.grid-fib-chart{height:245px;position:relative;margin:16px 0 14px;border:1px solid rgba(32,164,255,.14);border-radius:16px;overflow:hidden;background:linear-gradient(180deg,rgba(32,164,255,.07),rgba(32,164,255,.01))}
+.grid-entry-band{position:absolute;left:0;right:0;background:rgba(32,164,255,.12);border-top:1px solid rgba(32,164,255,.38);border-bottom:1px solid rgba(32,164,255,.38)}
+.grid-entry-band span{position:absolute;right:8px;top:4px;font-size:7px;color:#64c7ff;font-weight:900;letter-spacing:.6px}
+.grid-fib-line{position:absolute;left:10px;right:10px;border-top:1px dashed rgba(160,180,200,.28);display:flex;justify-content:space-between}
+.grid-fib-line span,.grid-fib-line b{transform:translateY(-50%);background:#07111a;padding:0 5px;font-size:8px;color:var(--muted)}
+.grid-fib-line.preferred{border-color:rgba(32,164,255,.68)}
+.grid-fib-line.preferred span,.grid-fib-line.preferred b{color:#64c7ff}
+.grid-price-line{position:absolute;left:0;right:0;border-top:2px solid #fff;z-index:5}
+.grid-price-line i{position:absolute;left:8px;top:-4px;width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 12px #20a4ff}
+.grid-price-line b{position:absolute;right:7px;top:-10px;background:#20a4ff;color:#fff;border-radius:7px;padding:3px 6px;font-size:8px}
