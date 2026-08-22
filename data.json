@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.2.1",
-  "build": "2026-08-22-renderer-hotfix",
+  "appVersion": "5.2.2",
+  "build": "2026-08-22-clean-alert-rebuild",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -640,7 +640,7 @@
   },
   "alertCenter": {
     "status": "ACTIVE",
-    "mode": "LOCAL LIVE ENGINE + EXTERNAL CHATGPT WATCH",
+    "architecture": "ISOLATED VIEW",
     "pionexSync": "SNAPSHOT ONLY",
     "tracked": [
       "SOL",
@@ -657,13 +657,6 @@
       "TP HIT",
       "NEW RANGE"
     ],
-    "rules": {
-      "scannerScoreArm": 82,
-      "scannerScoreStart": 88,
-      "liqBufferWarningPct": 20,
-      "notifyOnStateChangeOnly": true
-    },
-    "note": "Alert Center ist vom Haupt-Renderer isoliert. Fehler im Alert-Modul dürfen keine Hauptansicht mehr leeren.",
-    "rendererIsolation": "ENABLED"
+    "note": "Clean rebuild from stable v5.1.x. Alert Center does not modify the central renderer."
   }
 }

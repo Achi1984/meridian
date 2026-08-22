@@ -1,7 +1,7 @@
 
 const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
-let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],ALERT_HISTORY=[];
+let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 
 const CG_IDS={
@@ -274,8 +274,6 @@ async function load(){
  renderAll();
  loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  Promise.allSettled(['HBAR','XRP'].map(s=>loadCoinHistory(s))).then(()=>renderAll());
-
- try{evaluateAlerts()}catch(e){}
 }
 function card(inner,cls=''){return `<div class="card ${cls}">${inner}</div>`}
 function coinIcon(sym){
@@ -723,82 +721,65 @@ function renderForecast(){
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 
-function alertHistoryKey(){return 'meridian_alert_history_v1'}
-function alertStateKey(){return 'meridian_alert_states_v1'}
-function loadAlertHistory(){
- try{ALERT_HISTORY=JSON.parse(localStorage.getItem(alertHistoryKey())||'[]')}catch(e){ALERT_HISTORY=[]}
+function meridianAlertKey(){return 'meridian_alerts_v522'}
+function getMeridianAlerts(){
+ try{return JSON.parse(localStorage.getItem(meridianAlertKey())||'[]')}catch(e){return []}
 }
-function saveAlertHistory(){
- try{localStorage.setItem(alertHistoryKey(),JSON.stringify(ALERT_HISTORY.slice(-100)))}catch(e){}
+function saveMeridianAlerts(a){
+ try{localStorage.setItem(meridianAlertKey(),JSON.stringify(a.slice(-80)))}catch(e){}
 }
-function alertStates(){
- try{return JSON.parse(localStorage.getItem(alertStateKey())||'{}')}catch(e){return {}}
-}
-function saveAlertStates(s){
- try{localStorage.setItem(alertStateKey(),JSON.stringify(s))}catch(e){}
-}
-function pushLocalAlert(symbol,state,price,message,severity='amber'){
- const states=alertStates(), key=symbol+':main', prev=states[key];
- if(prev===state)return;
- states[key]=state; saveAlertStates(states);
- ALERT_HISTORY.push({ts:Date.now(),symbol,state,price:+price||0,message,severity});
- saveAlertHistory();
-}
-function scannerAlertState(c){
- if(!c)return 'WAIT';
- if(c.status==='START ZONE' && c.score>=88)return 'START ZONE';
- if(c.status==='START ZONE')return 'ARM';
- if(c.status==='WATCH ZONE' || c.score>=82)return 'WATCH';
- return 'WAIT';
-}
-function evaluateAlerts(){
+function buildAlertSnapshot(){
+ const out=[], now=Date.now();
  try{
-   if(typeof scannerCandidates==='function'){
-     scannerCandidates().forEach(c=>{
-       const state=scannerAlertState(c);
-       const msg=state==='START ZONE'
-        ?`Preferred FIB-Zone aktiv · Score ${c.score}/100`
-        :state==='ARM'
-        ?`FIB-Zone erreicht · Konfluenz noch prüfen`
-        :state==='WATCH'
-        ?`Entry-Zone nähert sich · Score ${c.score}/100`
-        :`Auf Retracement warten`;
-       pushLocalAlert(c.symbol,state,c.price,msg,state==='START ZONE'?'green':state==='WAIT'?'muted':'amber');
-     });
-   }
-   const bots=DATA?.pionexRisk?.bots||[];
-   bots.filter(b=>['XRP','HBAR'].includes(b.symbol)).forEach(b=>{
-     const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[b.symbol])||{};
-     const px=+q.price||+b.currentPrice||0, tp=+b.takeProfit||0;
-     if(tp&&px>=tp){
-       pushLocalAlert(b.symbol,'TP HIT',px,`TP ${tp} erreicht · nächste FIB-Range neu berechnen`,'green');
-     }else if(Number.isFinite(+b.liquidationDistancePct)&&+b.liquidationDistancePct<20){
-       pushLocalAlert(b.symbol,'RISK',px,`Liquidationspuffer nur ${fmt(+b.liquidationDistancePct,1)}%`,'red');
-     }
+  if(typeof scannerCandidates==='function'){
+   scannerCandidates().forEach(c=>{
+    let state='WAIT',sev='muted';
+    if(c.status==='START ZONE'&&c.score>=88){state='START ZONE';sev='green'}
+    else if(c.status==='START ZONE'){state='ARM';sev='amber'}
+    else if(c.status==='WATCH ZONE'||c.score>=82){state='WATCH';sev='amber'}
+    out.push({ts:now,symbol:c.symbol,state,price:c.price||0,sev,
+      msg:state==='START ZONE'?'FIB Entry + Score bestätigt':
+          state==='ARM'?'FIB Entry erreicht · Konfluenz prüfen':
+          state==='WATCH'?'Preferred Entry nähert sich':'Auf Retracement warten'});
    });
+  }
  }catch(e){}
+ try{
+  const bots=(DATA&&DATA.pionexRisk&&DATA.pionexRisk.bots)||[];
+  bots.filter(b=>['XRP','HBAR'].includes(b.symbol)).forEach(b=>{
+   const q=(typeof LIVE_QUOTES!=='undefined'&&LIVE_QUOTES[b.symbol])||{};
+   const px=+q.price||+b.currentPrice||0, tp=+b.takeProfit||0;
+   if(tp&&px>=tp) out.push({ts:now,symbol:b.symbol,state:'TP HIT',price:px,sev:'green',msg:'Take Profit erreicht · neue FIB Range berechnen'});
+   else out.push({ts:now,symbol:b.symbol,state:'BOT SNAPSHOT',price:px,sev:'amber',msg:'Pionex Botdaten bleiben Snapshot'});
+  });
+ }catch(e){}
+ return out;
 }
-function clearAlertHistory(){
- ALERT_HISTORY=[]; saveAlertHistory(); renderAll();
+function persistAlertTransitions(snapshot){
+ const old=getMeridianAlerts(), last={};
+ old.forEach(x=>last[x.symbol]=x.state);
+ snapshot.forEach(x=>{
+  if(last[x.symbol]!==x.state) old.push(x);
+ });
+ saveMeridianAlerts(old);
+ return old;
 }
 function alertCenter(){
- try{evaluateAlerts()}catch(e){}
- const active=ALERT_HISTORY.slice().sort((a,b)=>b.ts-a.ts);
- const latest={}; active.forEach(a=>{if(!latest[a.symbol])latest[a.symbol]=a});
- const cards=Object.values(latest);
- return card(`<div class="alert-hero">
-   <div><div class="eyebrow">ALERT CENTER ${liveBadge('ACTIVE')}</div><div class="forecast-main">${cards.filter(x=>x.state!=='WAIT').length} AKTIVE SIGNALE</div><div class="sub">Statuswechsel statt Kurs-Spam · Pionex bleibt Snapshot</div></div>
- </div>`)+
- card(`<div class="section-title">STATUS FLOW</div><div class="alert-flow">${['WAIT','WATCH','ARM','START','TP HIT','NEW RANGE'].map(x=>`<span>${x}</span>`).join('<i>›</i>')}</div>`)+
- card(`<div class="section-head"><div class="section-title">AKTUELL</div><span class="section-note">${cards.length} Coins</span></div>
- ${cards.length?cards.map(a=>`<div class="alert-row ${a.severity}">
-   <div class="alert-symbol">${a.symbol}</div>
-   <div><b>${a.state}</b><small>${a.message}</small></div>
-   <div class="alert-price">${a.price?'$'+(a.symbol==='PEPE'?fmt(a.price,8):fmt(a.price,a.price<10?4:2)):'—'}<small>${new Date(a.ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div>
- </div>`).join(''):'<p class="footer-note">Noch keine Statuswechsel gespeichert.</p>'}`)+
- card(`<div class="section-head"><div class="section-title">ALERT HISTORIE</div><button class="mini-btn" onclick="clearAlertHistory()">LEEREN</button></div>
- ${active.slice(0,12).map(a=>`<div class="history-row"><span>${new Date(a.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span><b>${a.symbol}</b><em>${a.state}</em></div>`).join('')||'<p class="footer-note">Keine Historie.</p>'}
- <p class="footer-note">Externe Push-Benachrichtigungen laufen über den eingerichteten ChatGPT-Watch. Diese lokale Historie dokumentiert Statuswechsel während MERIDIAN geöffnet ist.</p>`);
+ const snap=buildAlertSnapshot();
+ const history=persistAlertTransitions(snap);
+ return card(`<div class="eyebrow">ALERT CENTER ${liveBadge('ACTIVE')}</div>
+ <div class="forecast-main">${snap.filter(x=>!['WAIT','BOT SNAPSHOT'].includes(x.state)).length} AKTIVE SIGNALE</div>
+ <div class="sub">Statuswechsel statt Kurs-Spam · Pionex SNAPSHOT</div>`)+
+ card(`<div class="section-title">STATUS FLOW</div>
+ <div class="alert-flow">${['WAIT','WATCH','ARM','START','TP HIT','NEW RANGE'].map(x=>`<span>${x}</span>`).join('<i>›</i>')}</div>`)+
+ card(`<div class="section-title">AKTUELL</div>
+ ${snap.map(a=>`<div class="alert-row ${a.sev}">
+  <b>${a.symbol}</b><div><strong>${a.state}</strong><small>${a.msg}</small></div>
+  <em>${a.price?'$'+(a.symbol==='PEPE'?fmt(a.price,8):fmt(a.price,a.price<10?4:2)):'—'}</em>
+ </div>`).join('')||'<p class="footer-note">Keine Signale.</p>'}`)+
+ card(`<div class="section-title">LETZTE STATUSWECHSEL</div>
+ ${history.slice().reverse().slice(0,10).map(a=>`<div class="row"><span>${new Date(a.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${a.symbol}</span><b>${a.state}</b></div>`).join('')||'<p class="footer-note">Noch keine Historie.</p>'}
+ <p class="footer-note">Push bei geschlossener App läuft weiterhin über den externen ChatGPT-Watch.</p>`);
 }
 
 function settings(){
