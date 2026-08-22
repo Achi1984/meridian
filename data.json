@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.3",
-  "build": "2026-08-22-header-position-revision-single-source",
+  "appVersion": "5.1.4",
+  "build": "2026-08-22-daytrade-stateLabel-hotfix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -597,11 +597,9 @@
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
   "buildNotes": [
-    "Header vertical position matched to the preferred iPhone screenshot.",
-    "Top whitespace reduced substantially without touching card typography.",
-    "Revision display now uses data.json as the single source of truth.",
-    "Legacy JS filenames are mirrored to current code so stale HTML references cannot show old 5.0.9 code.",
-    "Bottom navigation retained unchanged."
+    "DAYTRADE ReferenceError stateLabel fixed.",
+    "DAYTRADE state label is now derived locally from gate score / entry state.",
+    "UI geometry and bottom navigation are intentionally unchanged."
   ],
   "decisionEngine": {
     "version": "1.0",

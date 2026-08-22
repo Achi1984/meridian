@@ -1,23 +1,13 @@
 <!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MERIDIAN Reset</title>
-<style>
-body{background:#05080d;color:#eef5ff;font:18px system-ui;padding:max(22px,env(safe-area-inset-top)) 24px}
-b{color:#25aaff}
-</style>
-<h2>ACHI MERIDIAN v5.1.3</h2>
-<p id="s">Alte App-Shell und Browser-Caches werden bereinigt…</p>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MERIDIAN 5.1.4 Reset</title>
+<style>body{background:#05080d;color:#eef5ff;font:18px system-ui;padding:max(22px,env(safe-area-inset-top)) 24px}b{color:#25aaff}</style>
+<h2>ACHI MERIDIAN v5.1.4</h2><p id="s">DAYTRADE-Hotfix wird aktiviert…</p>
 <script>
-(async()=>{
-  try{
-    for(const r of await navigator.serviceWorker?.getRegistrations?.()||[]) await r.unregister();
-    for(const k of await caches.keys()) await caches.delete(k);
-    sessionStorage.setItem('meridianShellVersion','5.1.3');
-    document.getElementById('s').innerHTML='<b>Fertig.</b> LocalStorage bleibt erhalten. Weiterleitung…';
-    setTimeout(()=>location.replace('./index.html?v=5.1.3-reset-'+Date.now()),600);
-  }catch(e){
-    location.replace('./index.html?v=5.1.3-'+Date.now());
-  }
-})();
+(async()=>{try{
+for(const r of await navigator.serviceWorker?.getRegistrations?.()||[]) await r.unregister();
+for(const k of await caches.keys()) await caches.delete(k);
+document.getElementById('s').innerHTML='<b>Fertig.</b> Weiterleitung…';
+setTimeout(()=>location.replace('./index.html?v=5.1.4-'+Date.now()),500);
+}catch(e){location.replace('./index.html?v=5.1.4-'+Date.now())}})();
 </script>
