@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.0",
-  "build": "2026-08-22-decision-engine-1-0",
+  "appVersion": "5.1.1",
+  "build": "2026-08-22-mobile-space-cache-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -597,11 +597,11 @@
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
   "buildNotes": [
-    "Unique versioned JS/CSS filenames prevent mixed code/data cache states.",
-    "Runtime build-integrity check flags cache mismatch.",
-    "Mobile top safe-area scrim prevents scrolled cards from drawing under Dynamic Island/status bar.",
-    "NADIR current-context engine added without overwriting last-confirmed on-chain snapshot.",
-    "Forecast 2.0 separates historical anchor, current state and conditional forward window."
+    "Mobile vertical space optimized without shrinking core card typography.",
+    "Header moved upward and compacted.",
+    "Gap between header and first card reduced.",
+    "Bottom navigation height reduced while preserving iOS safe area.",
+    "Cache/version mismatch logic hardened."
   ],
   "decisionEngine": {
     "version": "1.0",
