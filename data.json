@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.1.7",
-  "build": "2026-08-22-daytrade-runtime-helper-fix",
+  "appVersion": "5.1.6",
+  "build": "2026-08-22-trigger-watch-safe",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,

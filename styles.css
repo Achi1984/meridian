@@ -737,25 +737,3 @@ main>section:not(.hidden)>.card:first-child{
     margin-top:2px !important;
   }
 }
-
-/* v5.1.7 — CSS recovery + safe compact header */
-@media (max-width: 600px){
-  .app-header{
-    padding-top: max(6px, env(safe-area-inset-top)) !important;
-    padding-bottom: 8px !important;
-    gap: 8px !important;
-  }
-  .version-badge{
-    margin-left: 6px !important;
-    white-space: nowrap !important;
-  }
-  .live-status{
-    margin-left: auto !important;
-    white-space: nowrap !important;
-  }
-  .app-logo{
-    width: 58px !important;
-    height: 58px !important;
-    object-fit: contain !important;
-  }
-}

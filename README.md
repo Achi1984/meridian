@@ -9,10 +9,19 @@ Fix:
 - Alte JS-Alias-Dateien enthalten ebenfalls den Hotfix, um stale HTML-Referenzen abzufangen.
 
 
-## v5.1.7 Header Compact
-- Header horizontal spacing reduced for iPhone.
-- Version badge stays directly beside ACHI MERIDIAN.
-- LIVE status uses remaining space instead of a fixed gap.
-- Right logo slightly reduced/contained.
-- Header top/bottom whitespace reduced.
-- Content cards and approved bottom navigation are unchanged.
+## v5.1.6 — Trigger Watch
+Built directly on the frozen v5.1.5 stable base.
+
+New:
+- Trigger Watch 1.0 in Command Center
+- BTC breakout/confirmation watch
+- Day-Trade gate status
+- HBAR/XRP distance to preferred FIB entry zone
+- Best current Coin-M scanner candidate
+- Decision Engine label 1.1
+
+Safety:
+- stable v5.1.5 CSS is reused unchanged
+- no header or bottom-nav CSS changes
+- no Pionex auto-sync changes
+- no automatic order execution
