@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.0.6",
-  "build": "2026-08-22-grid-engine-1-1",
+  "appVersion": "5.0.8",
+  "build": "2026-08-22-risk-integrity-cycle-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -557,7 +557,7 @@
   "restoreNote": "Safe boot build from original v5.0.0: baseline renders before live APIs; each tab renders independently.",
   "gridModule": {
     "status": "ACTIVE",
-    "engine": "SWING DETECTION 1.1",
+    "engine": "SWING DETECTION 1.2",
     "timeframe": "4H",
     "historyCandles": 180,
     "activeBots": [
@@ -568,6 +568,12 @@
       "SOL",
       "ETH",
       "PEPE"
+    ],
+    "sourcePriority": [
+      "Binance Futures 4H",
+      "Binance Spot 4H",
+      "CoinGecko Daily",
+      "Bot Range Fallback"
     ],
     "fibLevels": [
       0.236,
@@ -580,6 +586,21 @@
       1.272,
       1.618
     ],
-    "note": "Swing High/Low bevorzugt aus Binance 4H-Kerzen; CoinGecko/alte Bot-Range nur als Fallback."
-  }
+    "botActions": [
+      "HOLD",
+      "WATCH",
+      "NO ADD",
+      "ADD ZONE",
+      "RANGE SHIFT",
+      "TP HIT"
+    ],
+    "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
+  },
+  "buildNotes": [
+    "Forecast cycle clock separates structural halving age from current market state.",
+    "Binance BTCUSDT open interest is labelled contract-specific, not global market OI.",
+    "Center risk links portfolio concentration, leveraged bot capital and hedge stress.",
+    "LIVE / VERIFIED / SNAPSHOT / MODEL semantics tightened.",
+    "Hard cache-bust + service-worker retirement."
+  ]
 }

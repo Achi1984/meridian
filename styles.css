@@ -446,3 +446,39 @@ button{font:inherit}
  .bottom .nav span{font-size:11px!important}
  .grid-meta{grid-template-columns:1fr 1fr}
 }
+
+/* v5.0.7: hard one-line bottom navigation */
+.bottom .inner{
+ display:flex!important;
+ flex-wrap:nowrap!important;
+ align-items:stretch;
+ justify-content:stretch;
+ gap:2px!important;
+ width:100%;
+ max-width:none!important;
+ padding-left:3px!important;
+ padding-right:3px!important;
+ box-sizing:border-box;
+}
+.bottom .nav{
+ flex:1 1 0!important;
+ width:0!important;
+ min-width:0!important;
+ max-width:none!important;
+ overflow:hidden;
+ white-space:nowrap;
+ text-overflow:clip;
+ padding:7px 0!important;
+ font-size:6.4px!important;
+ letter-spacing:-.2px!important;
+}
+.bottom .nav span{font-size:11px!important}
+.grid-action-box{display:flex;gap:10px;align-items:flex-start;margin:11px 0;padding:11px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.grid-action-box b{white-space:nowrap;font-size:10px}.grid-action-box span{font-size:9px;line-height:1.4;color:var(--muted)}
+.grid-action-box.green{border-color:rgba(47,229,154,.28)}.grid-action-box.green b{color:var(--green)}
+.grid-action-box.amber{border-color:rgba(240,184,75,.28)}.grid-action-box.amber b{color:#f0b84b}
+.grid-action-box.red{border-color:rgba(255,91,91,.30)}.grid-action-box.red b{color:var(--red)}
+@media(max-width:390px){
+ .bottom .nav{font-size:5.8px!important}
+ .bottom .nav span{font-size:10px!important}
+}

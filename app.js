@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
-let GRID_SWINGS={},GRID_LOADING={};
+let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
 const CG_IDS={
  BTC:'bitcoin',ETH:'ethereum',SOL:'solana',XRP:'ripple',SUI:'sui',ADA:'cardano',
@@ -195,7 +195,7 @@ async function refreshDayTradeTechnicals(){
   if(Number.isFinite(+oi.openInterest)&&price>0)d.oiB=(+oi.openInterest*price/1e9);
   if(Number.isFinite(vw))d.vwap=vw;
   d.technicalUpdatedAt=new Date().toISOString();
-  d.status={btcPrice:'BROWSER LIVE',oiB:'BROWSER LIVE',rsi4h:'BROWSER LIVE',rsi1h:'BROWSER LIVE',fundingPct:'BROWSER LIVE',vwap:'BROWSER LIVE',fib:'MODEL / SNAPSHOT'};
+  d.status={btcPrice:'BROWSER LIVE · BINANCE FUTURES',oiB:'BROWSER LIVE · BINANCE BTCUSDT CONTRACT OI',rsi4h:'BROWSER LIVE · BINANCE FUTURES',rsi1h:'BROWSER LIVE · BINANCE FUTURES',fundingPct:'BROWSER LIVE · BINANCE BTCUSDT',vwap:'BROWSER LIVE · BINANCE FUTURES 1H',fib:'MODEL'};
   let score=50;
   if(d.rsi4h<70)score+=12; else if(d.rsi4h>78)score-=15;
   if(d.rsi1h<70)score+=8; else if(d.rsi1h>78)score-=8;
@@ -290,7 +290,7 @@ async function load(){
    loadCoinHistory(activeCoin).then(()=>renderForecast()).catch(()=>renderForecast());
  }catch(e){
    console.error('MERIDIAN BOOT ERROR',e);
-   $('#versionBadge').textContent='v5.0.6 · ERROR';
+   $('#versionBadge').textContent='v5.0.8 · ERROR';
    const main=document.querySelector('main');
    if(main)main.innerHTML=`<section><div class="card render-fallback"><div class="eyebrow">BOOT FEHLER</div><div class="forecast-main">DATA.JSON NICHT GELADEN</div><p class="footer-note">${String(e&&e.message||e)}</p></div></section>`;
  }
@@ -408,10 +408,11 @@ function commandCenter(){
    <div class="cc-tile"><span>BOT-KAPITAL</span><b>$${fmt(r.botCapital||0)}</b><small>${r.riskLevel||'—'} risk</small></div>
    <div class="cc-tile"><span>HEDGE-KAPITAL</span><b class="amber">${fmt(hedgeCapitalPct,1)}%</b><small>Short vs. Long Bot-Kapital*</small></div>
  </div>`+
- card(`<div class="section-head"><div class="section-title">HEUTE BEACHTEN</div><span class="section-note">Priorisiert</span></div>${focus.slice(0,4).map((x,i)=>`<div class="focus-row ${x.tone}"><div class="focus-num">${i+1}</div><div><b>${x.title}</b><small>${x.text}</small></div></div>`).join('')}<p class="footer-note">*Hedge-Kapital ist keine echte Delta-Hedge-Quote. BTC-Short-Notional/Liquidationspreis ist weiterhin nicht verifiziert.</p>`,'cc-focus-card')+
+ card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('5x LONG CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('SHORT STRESS',DATA.pionex?.btcShortPnlPct!=null?fmt(DATA.pionex.btcShortPnlPct,1)+'%':'~−98%','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Risiko wird gemeinsam betrachtet: Spot-Konzentration + gehebelte Long-Bots + Short-Hedge-Stress. Bot-Kapital wird nicht doppelt zum Portfolio addiert.</p>`)+
+card(`<div class="section-head"><div class="section-title">HEUTE BEACHTEN</div><span class="section-note">Priorisiert</span></div>${focus.slice(0,4).map((x,i)=>`<div class="focus-row ${x.tone}"><div class="focus-num">${i+1}</div><div><b>${x.title}</b><small>${x.text}</small></div></div>`).join('')}<p class="footer-note">*Hedge-Kapital ist keine echte Delta-Hedge-Quote. BTC-Short-Notional/Liquidationspreis ist weiterhin nicht verifiziert.</p>`,'cc-focus-card')+
  card(`<div class="section-head"><div class="section-title">BOT WATCH</div><span class="section-note">Pionex Snapshot</span></div>${botRows}<div class="cc-exposure"><span>Bekannte 5x Long-Kapazität</span><b>$${fmt(r.knownLeveragedLongCapacity||0)}</b></div>`,'cc-bot-card')+
  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
- `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`;
+ `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.2</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);return `<div class="row"><span>${sym} · ${g.state}</span><b class="${sc>=82?'green':sc>=72?'amber':'red'}">${sc}/100</b></div>`}).join('')}<p class="footer-note">Details und nächste FIB-Range im GRID-Tab.</p>`);
 }
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
@@ -526,7 +527,7 @@ function stateLabel(v){return (v||'').includes('LIVE')?liveBadge('LIVE'):snapsho
 function dayTrade(){
  const d=DATA.dayTrade, st=d.status||{};
  return card(`<div class="eyebrow">DAY-TRADE 2.2</div><div class="forecast-main">${d.entryAllowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN'}</div><div class="sub">${d.decisionNote||'Bias ≠ Ausführung'}</div><div class="row"><b>GATE SCORE</b><b class="${d.entryAllowed?'green':'amber'}">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
- `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice)+'<div class="data-state">'+stateLabel(st.btcPrice)+'</div>')}${metric('OPEN INTEREST','$'+fmt(d.oiB,2)+'B<div class="data-state">'+stateLabel(st.oiB)+'</div>')}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="data-state">'+stateLabel(st.rsi4h)+'</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="data-state">'+stateLabel(st.rsi1h)+'</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="data-state">'+stateLabel(st.fundingPct)+'</div>')}${metric('24H VWAP','$'+fmt(d.vwap)+'<div class="data-state">'+stateLabel(st.vwap)+'</div>')}</div>`+
+ `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice)+'<div class="data-state">'+stateLabel(st.btcPrice)+'</div>')}${metric('BTCUSDT OI','$'+fmt(d.oiB,2)+'B<div class="data-state">'+stateLabel(st.oiB)+'</div>')}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="data-state">'+stateLabel(st.rsi4h)+'</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="data-state">'+stateLabel(st.rsi1h)+'</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="data-state">'+stateLabel(st.fundingPct)+'</div>')}${metric('24H VWAP','$'+fmt(d.vwap)+'<div class="data-state">'+stateLabel(st.vwap)+'</div>')}</div>`+
  card(`<div class="section-title">LIVE-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
  card(`<div class="section-title">FIB LEVELS ${snapshotBadge('MODEL')}</div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`);
 }
@@ -541,14 +542,16 @@ function rsi(vals,p=14){
 }
 function cycleClock(sym){
  const now=Date.now(), last=HALVINGS.at(-1), span=NEXT_HALVING_EST-last;
- let pct=Math.max(0,Math.min(100,(now-last)/span*100));
+ const pct=Math.max(0,Math.min(100,(now-last)/span*100));
  const lag=COIN_LAG_DAYS[sym]||0;
- const estimatedPeak=new Date(last+(548+lag)*86400000);
- const daysFromPeak=Math.round((now-estimatedPeak.getTime())/86400000);
- let phase='POST-HALVING EXPANSION';
- if(daysFromPeak>-90 && daysFromPeak<90) phase='PEAK WINDOW';
- else if(daysFromPeak>=90) phase='LATE CYCLE / RESET';
- return {pct,phase,estimatedPeak,daysFromPeak,lag};
+ const referencePeak=new Date(last+(548+lag)*86400000);
+ const daysFromReference=Math.round((now-referencePeak.getTime())/86400000);
+ let structural='POST-HALVING · LATE';
+ if(pct<25)structural='POST-HALVING · EARLY';
+ else if(pct<50)structural='POST-HALVING · MID';
+ else if(pct<75)structural='POST-HALVING · LATE';
+ else structural='PRE-HALVING / RESET';
+ return {pct,phase:structural,referencePeak,daysFromReference,lag};
 }
 function forecast(symbol){
  const arr=closes(symbol), btc=closes('BTC');
@@ -577,8 +580,8 @@ function renderForecast(){
  }else{
    body+=card(`<div class="forecast-price-card"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last, activeCoin==='PEPE'?8:2)}</div><div class="grid2">${metric('LOCAL TOP-RISK',f.risk+'/100',f.risk>75?'red':f.risk>55?'amber':'green')}${metric('REL. STÄRKE VS BTC',f.rel==null?'BTC Basis':(f.rel>=0?'+':'')+fmt(f.rel,1)+'%')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div><div class="bar"><i style="width:${Math.max(3,Math.min(100,f.pos))}%"></i></div><p class="muted">Position im 90T Swing: ${fmt(f.pos,1)}%</p></div>`)+
    card(`<div class="section-title">SZENARIEN</div><div class="scenario-grid"><div><span>BEAR</span><b>$${fmt(f.low,activeCoin==='PEPE'?8:2)}</b></div><div><span>BASE</span><b class="cyan">$${fmt(f.high,activeCoin==='PEPE'?8:2)}</b></div><div><span>BULL</span><b class="green">$${fmt(f.fib[1],activeCoin==='PEPE'?8:2)}</b></div></div><p class="footer-note">Bear = 90T Low · Base = 90T High · Bull = 1,618 FIB. Modellzonen, keine Garantie.</p>`)+
-   card(`<div class="section-title">ZYKLUS-UHR</div><div class="row"><span>Phase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Halving-Zyklus</span><b>${fmt(f.cycle.pct,1)}%</b></div><div class="bar"><i style="width:${f.cycle.pct}%"></i></div><div class="row"><span>Coin-spezifischer Modell-Offset</span><b>+${f.cycle.lag} Tage</b></div><div class="row"><span>Modell-Peakfenster Mitte</span><b>${f.cycle.estimatedPeak.toLocaleDateString('de-DE')}</b></div>`)+
-   card(`<div class="section-title">MACRO CYCLE WINDOW</div><div class="row"><span>90T Peak-Lag vs BTC</span><b>${f.lag==null?'—':(f.lag>=0?'+':'')+f.lag+' Tage'}</b></div><p class="footer-note">Der dynamische Lag wird aus den lokalen 90T-Hochs berechnet; der Modell-Offset ist die längerfristige Zyklusannahme.</p>`)+
+   card(`<div class="section-title">ZYKLUS-UHR</div><div class="row"><span>Strukturelle Phase</span><b class="cyan">${f.cycle.phase}</b></div><div class="row"><span>Aktuelles Marktregime</span><b>${DATA.btcRegime?.label||DATA.market?.regime||'—'}</b></div><div class="row"><span>Halving-Zyklus</span><b>${fmt(f.cycle.pct,1)}%</b></div><div class="bar"><i style="width:${f.cycle.pct}%"></i></div><div class="row"><span>Historischer Coin-Offset</span><b>+${f.cycle.lag} Tage</b></div><div class="row"><span>Historische Zyklus-Referenz</span><b>${f.cycle.referencePeak.toLocaleDateString('de-DE')}</b></div>`)+
+   card(`<div class="section-title">MACRO CYCLE WINDOW</div><div class="row"><span>90T Peak-Lag vs BTC</span><b>${f.lag==null?'—':(f.lag>=0?'+':'')+f.lag+' Tage'}</b></div><p class="footer-note">Der 90T Peak-Lag ist marktbezogen. Die Zyklus-Referenz ist nur eine historische Halving-Annahme und keine Peak-Prognose.</p>`)+
    card(`<div class="section-title">90T SWING</div><div class="grid2">${metric('LOW','$'+fmt(f.low,activeCoin==='PEPE'?8:2))}${metric('HIGH','$'+fmt(f.high,activeCoin==='PEPE'?8:2))}</div><div class="row"><span>Position im Swing</span><b>${fmt(f.pos,1)}%</b></div>`)+
    card(`<div class="section-title">FIB TARGET CLUSTER</div>${[1.272,1.618,2.0].map((m,i)=>`<div class="row"><span>${m} EXT</span><b class="cyan">$${fmt(f.fib[i],activeCoin==='PEPE'?8:2)}</b></div>`).join('')}<p class="footer-note">Targets aus dem aktuellen 90T-Swing; keine Prognosegarantie.</p>`)+
    card(`<div class="section-title">MODELL-INTERPRETATION</div><div class="scenario"><b>${f.risk>75?'Späte / überdehnte Phase':f.risk>55?'Fortgeschrittene Expansion':'Frühe bis mittlere Expansion'}</b><p class="muted">Confidence ${f.confidence}/100 · ${f.count} Tagespunkte · Momentum ${fmt(f.ret90,1)}%.</p></div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">HISTORIE AKTUALISIEREN</button>`);
@@ -668,34 +671,59 @@ async function loadGridSwing(sym,force=false){
  if(GRID_LOADING[sym])return GRID_LOADING[sym];
  const pair=gridPair(sym);
  GRID_LOADING[sym]=(async()=>{
+   const errors=[];
+   GRID_ENGINE_STATUS[sym]={state:'LOADING',source:'—',error:null,updatedAt:Date.now()};
    try{
      if(!pair)throw new Error('Kein Binance Pair');
-     const ks=await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=4h&limit=180`);
-     const sw=detectBullSwing(ks);
-     if(!sw)throw new Error('Swing nicht erkannt');
-     const atr=atrFromKlines(ks,14);
-     const px=gridQuote(sym)||+ks.at(-1)[4];
-     const freq=gridFrequency(ks,atr);
-     GRID_SWINGS[sym]={...sw,atr,price:px,frequency:freq,source:'Binance 4H',updatedAt:Date.now()};
-   }catch(e){
-     // CoinGecko daily history as first fallback
+
+     // 1) Binance Futures is preferred because the strategy itself is futures/grid based
      try{
-       const h=await loadCoinHistory(sym);
-       const cs=(h?.candles||[]).slice(-90);
+       const ks=await fetchJSON(`https://fapi.binance.com/fapi/v1/klines?symbol=${pair}&interval=4h&limit=180`,10000);
+       const sw=detectBullSwing(ks);
+       if(!sw)throw new Error('Swing nicht erkannt');
+       const atr=atrFromKlines(ks,14), px=gridQuote(sym)||+ks.at(-1)[4], freq=gridFrequency(ks,atr);
+       GRID_SWINGS[sym]={...sw,atr,price:px,frequency:freq,source:'Binance Futures 4H',updatedAt:Date.now()};
+       GRID_ENGINE_STATUS[sym]={state:'LIVE',source:'Binance Futures 4H',error:null,updatedAt:Date.now()};
+       return GRID_SWINGS[sym];
+     }catch(e){errors.push('Futures: '+e.message)}
+
+     // 2) Spot 4H as secondary exchange source
+     try{
+       const ks=await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=4h&limit=180`,10000);
+       const sw=detectBullSwing(ks);
+       if(!sw)throw new Error('Swing nicht erkannt');
+       const atr=atrFromKlines(ks,14), px=gridQuote(sym)||+ks.at(-1)[4], freq=gridFrequency(ks,atr);
+       GRID_SWINGS[sym]={...sw,atr,price:px,frequency:freq,source:'Binance Spot 4H',updatedAt:Date.now()};
+       GRID_ENGINE_STATUS[sym]={state:'LIVE',source:'Binance Spot 4H',error:errors.join(' | '),updatedAt:Date.now()};
+       return GRID_SWINGS[sym];
+     }catch(e){errors.push('Spot: '+e.message)}
+
+     // 3) CoinGecko cached/daily fallback
+     try{
+       const h=await loadCoinHistory(sym,true);
+       const cs=(h?.candles||[]).slice(-120);
        const fake=cs.map(x=>[x[0],x[1],x[2]||x[1],x[3]||x[1],x[4]||x[1],0]);
        const sw=detectBullSwing(fake);
        if(!sw)throw new Error('Fallback Swing fehlt');
        GRID_SWINGS[sym]={...sw,atr:null,price:gridQuote(sym)||+fake.at(-1)[4],frequency:45,source:'CoinGecko Daily',updatedAt:Date.now()};
-     }catch(e2){
-       const b=gridBot(sym),px=gridQuote(sym)||+b?.currentPrice||0;
-       if(b){
-         GRID_SWINGS[sym]={low:+b.rangeLow||px*.8,high:+b.takeProfit||+b.rangeHigh||px*1.2,atr:null,price:px,frequency:35,source:'Bot Range Fallback',updatedAt:Date.now()};
-       }
+       GRID_ENGINE_STATUS[sym]={state:'FALLBACK',source:'CoinGecko Daily',error:errors.join(' | '),updatedAt:Date.now()};
+       return GRID_SWINGS[sym];
+     }catch(e){errors.push('CoinGecko: '+e.message)}
+
+     // 4) Existing bot range only as last resort
+     const b=gridBot(sym),px=gridQuote(sym)||+b?.currentPrice||0;
+     if(b){
+       GRID_SWINGS[sym]={low:+b.rangeLow||px*.8,high:+b.takeProfit||+b.rangeHigh||px*1.2,atr:null,price:px,frequency:35,source:'Bot Range Fallback',updatedAt:Date.now()};
+       GRID_ENGINE_STATUS[sym]={state:'FALLBACK',source:'Bot Range Fallback',error:errors.join(' | '),updatedAt:Date.now()};
+       return GRID_SWINGS[sym];
      }
+     throw new Error(errors.join(' | ')||'Keine Datenquelle');
+   }catch(e){
+     GRID_ENGINE_STATUS[sym]={state:'ERROR',source:'—',error:e.message,updatedAt:Date.now()};
+     return null;
    }finally{
      delete GRID_LOADING[sym];
    }
-   return GRID_SWINGS[sym]||null;
  })();
  return GRID_LOADING[sym];
 }
@@ -777,22 +805,45 @@ function scannerGrids(sym,g){
  const base=sym==='PEPE'?160:sym==='SOL'?120:100;
  return Math.round(base*Math.max(.75,Math.min(1.3,(g.frequency||50)/55)));
 }
+
+function botAction(g){
+ const b=g?.b||{}, buffer=+b.liquidationDistancePct;
+ if(!g)return {label:'WAIT',cls:'amber',reason:'Keine belastbaren Swing-Daten'};
+ if(g.state==='TP HIT')return {label:'TP HIT',cls:'green',reason:'TP/Swing-High erreicht → Gewinn sichern und neue Range abwarten'};
+ if(g.state==='NEW RANGE')return {label:'RANGE SHIFT',cls:'red',reason:'Preis unter 0,786 → bestehenden Swing nicht mehr für neuen Long-Grid verwenden'};
+ if(Number.isFinite(buffer)&&buffer<30){
+   if(g.state==='START ZONE')return {label:'NO ADD',cls:'red',reason:`FIB-Zone erreicht, aber Liq.-Puffer nur ${fmt(buffer,1)}%`};
+   return {label:'NO ADD',cls:'red',reason:`Liq.-Puffer ${fmt(buffer,1)}% → kein zusätzliches Long-Risiko`};
+ }
+ if(g.state==='START ZONE')return {label:'ADD ZONE',cls:'green',reason:'0,500–0,618 Retracement + ausreichender bekannter Liq.-Puffer'};
+ if(g.state==='WATCH')return {label:'WATCH',cls:'amber',reason:'Preis nähert sich bevorzugter Entry-Zone'};
+ return {label:'HOLD',cls:'green',reason:'Bestehenden Bot halten; für neuen Bot auf Retracement warten'};
+}
+function gridSourceBadge(sym){
+ const st=GRID_ENGINE_STATUS[sym];
+ if(!st)return snapshotBadge('LÄDT');
+ if(st.state==='LIVE')return liveBadge('4H LIVE');
+ if(st.state==='FALLBACK')return snapshotBadge('FALLBACK');
+ return `<span class="tag red">ERROR</span>`;
+}
+
 function botGridCard(sym){
  const g=fibFromSwing(sym);
  if(!g)return card(`<div class="section-title">${sym}</div><p class="footer-note">Swing-Daten werden geladen …</p>`);
- const b=g.b||{};
- return card(`<div class="section-head"><div><div class="section-title">${sym} COIN-M LONG</div><div class="section-note">Pionex ${snapshotBadge('SNAPSHOT')} · Swing ${g.source}</div></div><span class="tag ${gridStatusClass(g.state)}">${g.state}</span></div>
+ const b=g.b||{}, action=botAction(g), st=GRID_ENGINE_STATUS[sym];
+ return card(`<div class="section-head"><div><div class="section-title">${sym} COIN-M LONG</div><div class="section-note">Pionex ${snapshotBadge('SNAPSHOT')} · ${gridSourceBadge(sym)} ${g.source}</div></div><span class="tag ${action.cls}">${action.label}</span></div>
    ${gridVisual(g,sym)}
    <div class="grid2">
      ${metric('LIVE PREIS','$'+gridFmt(g.px,sym),'green')}
-     ${metric('SWING','$'+gridFmt(g.lo,sym)+' → $'+gridFmt(g.hi,sym))}
+     ${metric('4H SWING','$'+gridFmt(g.lo,sym)+' → $'+gridFmt(g.hi,sym))}
      ${metric('ENTRY 0.5–0.618','$'+gridFmt(g.entryLow,sym)+'–$'+gridFmt(g.entryHigh,sym),'cyan')}
-     ${metric('NÄCHSTE RANGE','$'+gridFmt(g.rangeLow,sym)+'–$'+gridFmt(g.rangeHigh,sym),'amber')}
+     ${metric('NEXT RANGE','$'+gridFmt(g.rangeLow,sym)+'–$'+gridFmt(g.rangeHigh,sym),'amber')}
      ${metric('TP1 / TP2','$'+gridFmt(g.hi,sym)+' / $'+gridFmt(g.fib.ext1272,sym))}
-     ${metric('CONFIDENCE',gridConfidence(g)+'/100')}
+     ${metric('LIQ.-PUFFER',Number.isFinite(+b.liquidationDistancePct)?fmt(+b.liquidationDistancePct,1)+'%':'—',Number.isFinite(+b.liquidationDistancePct)&&+b.liquidationDistancePct<30?'red':'green')}
    </div>
-   <div class="grid-meta"><span>4H Frequenz <b>${g.frequency||'—'}/100</b></span><span>Swing <b>${fmt(g.ampPct,1)}%</b></span><span>ATR <b>${g.atrPct?fmt(g.atrPct,2)+'%':'—'}</b></span><span>Hebel <b>${b.leverage||'—'}×</b></span></div>
-   <p class="footer-note">Nach TP: nicht sofort neu starten. Erst Retracement in die 0,500–0,618-Zone beobachten; unter 0,786 wird der Swing neu bewertet.</p>`);
+   <div class="grid-action-box ${action.cls}"><b>${action.label}</b><span>${action.reason}</span></div>
+   <div class="grid-meta"><span>4H Frequenz <b>${g.frequency||'—'}/100</b></span><span>Swing <b>${fmt(g.ampPct,1)}%</b></span><span>ATR <b>${g.atrPct?fmt(g.atrPct,2)+'%':'—'}</b></span><span>Confidence <b>${gridConfidence(g)}/100</b></span></div>
+   <p class="footer-note">Quelle: ${g.source}${st?.error?` · Fallback-Grund: ${st.error}`:''}. Botparameter/P&L bleiben Pionex-Snapshot.</p>`);
 }
 function scannerCard(sym){
  const g=fibFromSwing(sym);
@@ -815,9 +866,10 @@ function scannerCard(sym){
 function gridView(){
  const bots=['HBAR','XRP'].map(botGridCard).join('');
  const scan=['SOL','ETH','PEPE'].map(scannerCard).join('');
- return card(`<div class="eyebrow">FIB GRID ENGINE 1.1 ${liveBadge('LIVE')}</div><div class="forecast-main">SWING → FIB → NEXT RANGE</div><div class="sub">Echte 4H Swing-Erkennung · HBAR/XRP Bots + SOL/ETH/PEPE Scanner</div>
-   <div class="row"><span>Datenquelle</span><b>Binance 4H → CoinGecko → Bot-Fallback</b></div>
-   <button class="mini-grid-btn" onclick="refreshGridEngine(true)">SWINGS NEU LADEN</button>`)+
+ return card(`<div class="eyebrow">FIB GRID ENGINE 1.2 ${liveBadge('LIVE')}</div><div class="forecast-main">SWING → FIB → ACTION</div><div class="sub">4H Futures-Swings · Next Range · Bot-Risiko · COIN-M Scanner</div>
+   <div class="row"><span>Source Priority</span><b>Binance Futures → Spot → CoinGecko → Bot</b></div>
+   <div class="row"><span>Bot Actions</span><b>HOLD · WATCH · NO ADD · ADD ZONE · RANGE SHIFT</b></div>
+   <button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button>`)+
    bots+
    card(`<div class="section-head"><div><div class="section-title">COIN-M OPPORTUNITY SCANNER</div><div class="section-note">Nicht-Bitpanda Kandidaten</div></div><span class="tag cyan">LIVE</span></div>
    ${scan||'<p class="footer-note">Scanner lädt 4H-Daten …</p>'}
@@ -826,7 +878,7 @@ function gridView(){
 
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Browser Live':'Fallback/Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div>`)+
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div>`)+
  card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }

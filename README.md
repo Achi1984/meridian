@@ -1,22 +1,9 @@
-# ACHI MERIDIAN v5.0.6 — GRID ENGINE 1.1
+# ACHI MERIDIAN v5.0.8 — Risk Integrity / Cycle Fix
 
-Stabile Basis: v5.0.5 / Lazy View Renderer.
-
-Neu:
-- Bottom Navigation wieder einzeilig mit 7 Tabs
-- GRID nutzt echte Binance 4H-Kerzen für Swing High/Low
-- automatische Pivot-/Swing-Erkennung
-- ATR und Grid-Frequenz
-- FIB 0.236 / 0.382 / 0.500 / 0.618 / 0.786
-- Extensions 1.272 und 1.618
-- HBAR/XRP: nächste COIN-M Range auf Basis des erkannten Swings
-- SOL/ETH/PEPE: integrierter Opportunity Scanner im GRID-Tab
-- Daten-Fallback: Binance 4H → CoinGecko Daily → bestehende Bot-Range
-- manuelle Schaltfläche „SWINGS NEU LADEN“
-
-Bewusst weiterhin NICHT enthalten:
-- Alert Center im App-Renderer
-- Pionex Live Sync
-- automatische Bot-Ausführung
-
-Die externe ChatGPT-Push-Überwachung bleibt davon unabhängig.
+Änderungen:
+- Forecast: Halving-Alter und aktuelles Marktregime getrennt. Das alte 20.10.2025-Fenster ist jetzt klar als historische Zyklus-Referenz gekennzeichnet, nicht als aktuelle Peak-Prognose.
+- Day-Trade: Open Interest wird korrekt als Binance BTCUSDT Contract OI bezeichnet; kein Eindruck eines globalen BTC-Futures-OI.
+- Center: Cross-Risk Engine verbindet Spot-Konzentration, 5x-Long-Kapazität, BTC-Short-Stress und Marktregime.
+- Datenintegrität: LIVE / SNAPSHOT / MODEL semantisch verschärft.
+- Cache: v5.0.8 Cache-Bust, Service Worker wird stillgelegt. RESET.html löscht Cache/SW, aber nicht LocalStorage-Historie/Cashflows.
+- Basis: funktionierender v5.0.7 Grid Engine 1.2 Build; alle Tabs bleiben erhalten.

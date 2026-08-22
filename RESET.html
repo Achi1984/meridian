@@ -1,3 +1,11 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<body style="background:#05080d;color:white;font-family:monospace;padding:30px"><h2>MERIDIAN v5.0.6 SAFE BOOT</h2><p id=s>Cache wird entfernt…</p>
-<script>(async()=>{try{if('serviceWorker'in navigator){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister()}if('caches'in window){for(const k of await caches.keys())if(k.toLowerCase().includes('meridian'))await caches.delete(k)}}catch(e){}document.getElementById('s').textContent='Fertig. MERIDIAN wird frisch geladen.';setTimeout(()=>location.replace('./index.html?v=506&t='+Date.now()),800)})()</script></body>
+<title>MERIDIAN Reset</title><style>body{background:#05080d;color:#eef5ff;font:18px system-ui;padding:30px}b{color:#25aaff}</style>
+<h2>ACHI MERIDIAN v5.0.8</h2><p id="s">Cache wird bereinigt…</p>
+<script>
+(async()=>{try{
+ for(const r of await navigator.serviceWorker?.getRegistrations?.()||[]) await r.unregister();
+ for(const k of await caches.keys()) await caches.delete(k);
+ document.getElementById('s').innerHTML='<b>Fertig.</b> Portfolio-Historie und Cashflows in LocalStorage wurden nicht gelöscht. Weiterleitung…';
+ setTimeout(()=>location.replace('./index.html?v=5.0.8-reset-'+Date.now()),900);
+}catch(e){location.replace('./index.html?v=5.0.8-'+Date.now())}})();
+</script>
