@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.13.2",
-  "build": "2026-08-23-center-entry-intelligence-hotfix",
+  "appVersion": "5.13.3",
+  "build": "2026-08-23-center-multiassetriskplan-removal",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1566,8 +1566,9 @@
     "goal": "One dominant action, one capital gate, one opportunity ranking; technical depth stays collapsible."
   },
   "hotfix": {
-    "issue": "CENTER crash: multiAssetRiskPlan not in scope",
+    "issue": "CENTER crash: executable reference to non-existent multiAssetRiskPlan remained in entryIntelFactors",
     "status": "FIXED",
-    "scope": "UI dependency/scope only; risk and capital gate logic unchanged"
+    "fix": "R:R is now derived directly from the canonical fibFromSwing/buildGridFib object",
+    "riskLogicChanged": false
   }
 }

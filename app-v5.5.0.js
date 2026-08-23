@@ -1624,8 +1624,14 @@ function capitalReleasePanel(){
 
 function entryIntelFactors(g,sym){
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym);
- const rrRow=multiAssetRiskPlan(sym);
- const rr=Number(rrRow?.rr2||rrRow?.rr||0);
+ // CENTER-safe R:R derived directly from the canonical Fibonacci grid object.
+ // No dependency on the removed/non-existent multiAssetRiskPlan helper.
+ const entryMid=(Number(g.entryLow)+Number(g.entryHigh))/2;
+ const stop=Number(g.rangeLow);
+ const target=Number(g.hi);
+ const risk=Math.max(entryMid-stop, Number(g.px||1)*0.002);
+ const rr=Number.isFinite(target)&&Number.isFinite(entryMid)&&risk>0
+   ? Math.max(0,(target-entryMid)/risk) : 0;
  const trend=Math.max(0,Math.min(100,Math.round(setup*.82+(g.state==='START ZONE'?15:g.state==='WATCH'?8:0))));
  const momentum=Math.max(0,Math.min(100,Math.round(ready*.75+(g.frequency||50)*.25)));
  const volume=Math.max(0,Math.min(100,Math.round(55+Math.min(35,(g.atrPct||1.5)*10))));
