@@ -1,0 +1,10 @@
+ACHI MERIDIAN v5.9.4 — MULTI-ASSET SL ENGINE
+
+Neu:
+- SOL / ETH / XRP / HBAR / PEPE erhalten jeweils:
+  ENTRY · SL · TP1 · TP2 · R:R · INVALIDATION
+- SL wird strukturell unter Range-Support mit kleinem Volatilitätspuffer gesetzt
+- Scanner zeigt Risk Plan je Asset
+- GRID erhält eine Multi-Asset SL Matrix
+- keine automatische Order-Ausführung
+- bestehende BTC Dual-Hedge- und SL/Invalidation-Engine bleibt erhalten

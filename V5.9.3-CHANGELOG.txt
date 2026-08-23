@@ -1,0 +1,19 @@
+ACHI MERIDIAN v5.9.3 — SL & INVALIDATION ENGINE
+
+BTC Long 20x Model:
+- Entry: $76,586.4
+- SL: $71,750
+- TP1: $80,000
+- TP2: $83,000
+- R:R TP1: 0.71
+- R:R TP2: 1.33
+- Liquidation: $69,344.5
+- SL→Liq buffer: $2,405.5
+
+Neu:
+- SL wird strukturell berechnet, nicht als fixer %-Wert
+- Inputs: Fibonacci / Support / Short-BE / ATR-Proxy / Liquidationsabstand
+- Invalidation wird separat angezeigt
+- LEVERAGE TOO HIGH wenn technischer SL zu nahe an Liquidation liegt
+- Entry / SL / TP1 / TP2 / R:R als gemeinsame Decision-Kette
+- keine automatische Order-Ausführung

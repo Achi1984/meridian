@@ -1,0 +1,16 @@
+ACHI MERIDIAN v5.9.2 — DUAL BTC HEDGE ENGINE
+
+Pionex Snapshot 23.08.2026 11:23:
+- BTC Short 30x: 52 USDT Investment + 110,09 USDT Dynamic Margin
+  BE 71.410 · Liq 80.202,9 · Buffer 4,8% · CRITICAL
+- BTC Long 20x: 100 USDT Investment
+  BE 76.585,6 · Liq 69.344,5 · Buffer 9,38% · DANGER
+
+Neu:
+- BTC Long + Short werden als gemeinsames Hedge-System bewertet.
+- zentrale Decision: REDUCE SHORT / KEEP LONG
+- getrennte Liq Guards für beide Beine
+- Hedge Ratio und Net Exposure Proxy
+- Exposure Proxy = Investment × Hebel (Vergleichswert, kein exaktes Exchange-Notional)
+- Short-Exit und Long-Add bleiben getrennte Entscheidungen
+- keine automatische Order-Ausführung

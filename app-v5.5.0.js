@@ -723,30 +723,68 @@ function commandCenter(){
  const perf=performanceSince(Date.now()-86400000,p.total);
  const hasHist=PORTFOLIO_SERIES.length>2;
  const dayPct=hasHist?perf.pct:(p.performance24hPct||0), dayAbs=hasHist?perf.abs:(p.performance24hUsd||0);
- const critical=(r.bots||[]).find(b=>(b.recommendation||'').toUpperCase().includes('KRIT'));
- const hbar=(r.bots||[]).find(b=>b.symbol==='HBAR'),xrp=(r.bots||[]).find(b=>b.symbol==='XRP');
- const hedgeCapitalPct=r.longCapital?100*(r.shortCapital||0)/r.longCapital:0;
- const focus=[];
- if(critical)focus.push({tone:'red',title:`${critical.symbol} ${critical.side}: KRITISCH PRÜFEN`,text:critical.reason||'Risikoposition prüfen.'});
- if(hbar&&Number.isFinite(hbar.liquidationDistancePct))focus.push({tone:hbar.liquidationDistancePct<30?'amber':'green',title:`HBAR Long · Liq.-Puffer ${fmt(hbar.liquidationDistancePct,1)}%`,text:`Grid ${fmt(hbar.rangeLow,2)}–${fmt(hbar.rangeHigh,2)} · ${hbar.recommendation}`});
- if(xrp)focus.push({tone:'green',title:`XRP Long · ${xrp.recommendation}`,text:`Break-even ${fmt(xrp.breakEven,4)} · Liq.-Puffer ${fmt(xrp.liquidationDistancePct,1)}%`});
- if(m.label)focus.push({tone:'cyan',title:`Regime: ${m.label}`,text:m.risk||'Marktregime als Filter für neue Risiken.'});
- const botRows=(r.bots||[]).map(b=>`<div class="cc-bot-row"><div><b>${b.symbol} ${b.side}</b><small>${b.leverage||'—'}x · ${b.recommendation||'—'}</small></div><span class="${(b.recommendation||'').includes('KRIT')?'red':(b.recommendation||'').includes('BEOB')?'amber':'green'}">${Number.isFinite(b.totalProfitPct)?(b.totalProfitPct>=0?'+':'')+fmt(b.totalProfitPct,2)+'%':'—'}</span></div>`).join('');
- return `<div class="cc-hero">
+ const bots=r.bots||[];
+ const critical=bots.find(b=>(b.status||'').toUpperCase()==='CRITICAL'||(b.action||'').toUpperCase().includes('EXIT'));
+ const hbar=bots.find(b=>b.symbol==='HBAR'),xrp=bots.find(b=>b.symbol==='XRP');
+ const botCapital=bots.reduce((s,b)=>s+Number(b.investment||0),0);
+ const shortCapital=bots.filter(b=>(b.side||'').toLowerCase()==='short').reduce((s,b)=>s+Number(b.investment||0),0);
+ const longCapital=bots.filter(b=>(b.side||'').toLowerCase()==='long').reduce((s,b)=>s+Number(b.investment||0),0);
+ const hedgeCapitalPct=longCapital?100*shortCapital/longCapital:0;
+ const gate=Number(DATA.dayTrade?.gateScore||0);
+ const marketBullish=(m.label||DATA.market?.regime||'').includes('RISK-ON');
+ const criticalCount=bots.filter(b=>(b.status||'').toUpperCase()==='CRITICAL'||Number(b.liquidationDistancePct)<8).length;
+
+ // NOW layer: separate market opportunity from portfolio risk.
+ let nowAction='HALTEN / RISIKO NICHT ERHÖHEN', nowTone='amber';
+ let nowWhy='Marktregime bleibt konstruktiv, aber gehebelte Bot-Positionen begrenzen neues Risiko.';
+ if(criticalCount>0){
+   nowAction='BOT-RISIKO ZUERST';
+   nowTone='red';
+   nowWhy=`${criticalCount} kritische 30x-Position${criticalCount>1?'en':''}; Market Risk ≠ Portfolio Risk.`;
+ } else if(gate>=75 && risk.score<65){
+   nowAction='SELEKTIV BEREIT';
+   nowTone='green';
+   nowWhy='Technische Freigabe vorhanden und Gesamtrisiko moderat.';
+ }
+ const bestOpportunity = gate>=75 ? `DAY-TRADE ${gate}/100` : 'SOL WATCH / RETRACEMENT';
+ const biggestRisk = critical ? `${critical.id||critical.symbol} · Liq ${fmt(critical.liquidationDistancePct,1)}%` : `MERIDIAN RISK ${risk.score}/100`;
+ const changeTrigger = critical
+   ? `Liq.-Puffer > 12% ODER Position reduziert`
+   : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
+
+ return `<div class="cc-now ${nowTone}">
+   <div class="cc-now-head"><span>NOW · COMMAND CENTER 2.0</span><b>${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</b></div>
+   <div class="cc-now-action">${nowAction}</div>
+   <div class="cc-now-why">${nowWhy}</div>
+   <div class="cc-now-grid">
+    <div><span>GRÖSSTES RISIKO</span><b class="red">${biggestRisk}</b></div>
+    <div><span>BESTE CHANCE</span><b class="${gate>=75?'green':'amber'}">${bestOpportunity}</b></div>
+    <div><span>ÄNDERT DIE ENTSCHEIDUNG</span><b class="cyan">${changeTrigger}</b></div>
+   </div>
+   <div class="cc-now-explain"><b>${marketBullish?'MARKT: RISK-ON':'MARKT: DEFENSIV'}</b><span>Portfolio: ${risk.label} · Bot-Risiko: ${r.riskLevel||'SNAPSHOT'}</span></div>
+ </div>`+
+ `<div class="cc-hero">
    <div class="cc-kicker">COMMAND CENTER ${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</div>
    <div class="cc-value-row"><div><div class="cc-total">$${fmt(p.total)}</div><div class="cc-eur">≈ €${fmt(p.eurApprox)}</div></div><div class="cc-day ${dayPct>=0?'green':'red'}"><b>${dayPct>=0?'+':''}${fmt(dayPct,2)}%</b><small>${dayAbs>=0?'+':''}$${fmt(dayAbs,0)} · 24H</small></div></div>
    ${portfolioChart()}
  </div>`+
  `<div class="cc-grid">
-   <div class="cc-tile"><span>MERIDIAN RISK</span><b class="${risk.score>=75?'red':risk.score>=50?'amber':'green'}">${risk.score}/100</b><small>${risk.label}</small></div>
-   <div class="cc-tile"><span>MARKTREGIME</span><b class="cyan">${m.label||DATA.market.regime}</b><small>Score ${m.score||'—'}/100</small></div>
-   <div class="cc-tile"><span>BOT-KAPITAL</span><b>$${fmt(r.botCapital||0)}</b><small>${r.riskLevel||'—'} risk</small></div>
-   <div class="cc-tile"><span>HEDGE-KAPITAL</span><b class="amber">${fmt(hedgeCapitalPct,1)}%</b><small>Short vs. Long Bot-Kapital*</small></div>
+   <div class="cc-tile"><span>MERIDIAN RISK</span><b class="${risk.score>=75?'red':risk.score>=50?'amber':'green'}">${risk.score}/100</b><small>PORTFOLIO · ${risk.label}</small></div>
+   <div class="cc-tile"><span>MARKTREGIME</span><b class="cyan">${m.label||DATA.market.regime}</b><small>MARKET · Score ${m.score||'—'}/100</small></div>
+   <div class="cc-tile"><span>BOT-KAPITAL</span><b class="amber">$${fmt(botCapital,0)}</b><small>SNAPSHOT · ${bots.length} Bots</small></div>
+   <div class="cc-tile"><span>HEDGE-KAPITAL</span><b class="amber">${fmt(hedgeCapitalPct,1)}%</b><small>SNAPSHOT · Short vs. Long</small></div>
  </div>`+
+ card(`<div class="section-title">RISK SPLIT <span class="tag cyan">2.0</span></div>
+   <div class="risk-split">
+    <div><span>MARKET RISK</span><b class="${marketBullish?'green':'amber'}">${marketBullish?'RISK-ON':'NEUTRAL'}</b><small>Momentum / Regime</small></div>
+    <div><span>PORTFOLIO RISK</span><b class="${risk.score>=75?'red':'amber'}">${risk.score}/100</b><small>Spot + Leverage + Bots</small></div>
+   </div>
+   <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
  card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('5x LONG CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('SHORT STRESS',DATA.pionex?.btcShortPnlPct!=null?fmt(DATA.pionex.btcShortPnlPct,1)+'%':'~−98%','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Risiko wird gemeinsam betrachtet: Spot-Konzentration + gehebelte Long-Bots + Short-Hedge-Stress. Bot-Kapital wird nicht doppelt zum Portfolio addiert.</p>`)+
  actionQueuePanel()+
- card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 09:12</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
- `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.2</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);return `<div class="row"><span>${sym} · ${g.state}</span><b class="${sc>=82?'green':sc>=72?'amber':'red'}">${sc}/100</b></div>`}).join('')}<p class="footer-note">Details und nächste FIB-Range im GRID-Tab.</p>`);
+ card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">SNAPSHOT 08:40</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
+ `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
+ card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.3</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);const entry=Math.max(0,Math.min(100,Math.round(sc-(sym==='SOL'?20:sym==='ETH'?28:28))));return `<div class="row"><span>${sym} · ${entry>=75?'READY':entry>=60?'WATCH':'WAIT'}</span><b class="${entry>=75?'green':entry>=60?'amber':'red'}">${entry}/100</b></div>`}).join('')}<p class="footer-note">Hier wird Entry Readiness gezeigt; Setup Quality bleibt im GRID-Tab separat sichtbar.</p>`);
 }
 function depot(){
  const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
@@ -847,7 +885,7 @@ function market(){
  card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
  card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
  card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':''}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
 }
 
 function currentNadirContext(){
@@ -1356,25 +1394,103 @@ function scannerCard(sym){
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
  return `<details class="commander-detail" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
  <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
- <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)}%</div></details>`;
+ <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)+multiAssetRiskRow(sym)}%</div></details>`;
 }
 function commanderBot(b){
  const guard=liqGuard(b), liq=Number(b.liquidationDistancePct||0);
- const priority=b.status==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+ const priority=b.id==='BTC-S30'?'REDUCE SHORT':b.id==='BTC-L20'?'KEEP LONG':b.status==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority} · ${b.action}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason}</p></details>`;
 }
+
+function btcDualHedgeEngine(){
+ const cfg=DATA.dualBtcHedge||{}, bots=(DATA.pionexRisk?.bots||[]).filter(b=>b.symbol==='BTC');
+ const lng=bots.find(b=>(b.side||'').toLowerCase()==='long');
+ const sht=bots.find(b=>(b.side||'').toLowerCase()==='short');
+ if(!lng||!sht)return {ready:false};
+ const live=(LIVE&&LIVE.BTC&&Number(LIVE.BTC.price))||Number(lng.currentPrice||sht.currentPrice)||0;
+ const longBuf=Math.abs((live-Number(lng.liquidation))/live*100);
+ const shortBuf=Math.abs((Number(sht.liquidation)-live)/live*100);
+ const longProxy=Number(lng.investment||0)*Number(lng.leverage||1);
+ const shortProxy=Number(sht.investment||0)*Number(sht.leverage||1);
+ const netProxy=longProxy-shortProxy;
+ const hedge=longProxy?shortProxy/longProxy*100:0;
+ const shortCritical=shortBuf<8;
+ const longCritical=longBuf<8;
+ let decision='WAIT', cls='amber', score=62;
+ if(shortCritical&&!longCritical){decision='REDUCE SHORT / KEEP LONG';cls='red';score=86}
+ else if(shortCritical&&longCritical){decision='DEFEND BOTH / NO ADD';cls='red';score=94}
+ else if(longBuf<15&&shortBuf<15){decision='KEEP HEDGE / NO ADD';cls='amber';score=78}
+ else if(shortBuf>=15&&longBuf>=15){decision='HEDGE STABLE';cls='green';score=74}
+ const bias=netProxy>0?'NET LONG':netProxy<0?'NET SHORT':'DELTA BALANCED';
+ return {ready:true,live,lng,sht,longBuf,shortBuf,longProxy,shortProxy,netProxy,hedge,decision,cls,score,bias};
+}
+function dualBtcHedgePanel(){
+ const h=btcDualHedgeEngine(); if(!h.ready)return '';
+ const money=n=>'$'+fmt(Math.abs(n),0);
+ return card(`<div class="section-head"><div><div class="eyebrow">DUAL BOT HEDGE ENGINE 1.0 ${snapshotBadge('PIONEX')}</div><div class="forecast-main">BTC LONG ↔ SHORT</div><div class="sub">Net Exposure · Liquidation Guard · Rotation Decision</div></div><span class="tag ${h.cls}">${h.decision}</span></div>
+ <div class="hedge-decision ${h.cls}">
+   <div><span>CENTRAL ACTION</span><b>${h.decision}</b><small>Decision Score ${h.score}/100</small></div>
+   <div class="hedge-bias"><span>BIAS</span><b>${h.bias}</b><small>Proxy ${h.netProxy>=0?'+':'−'}${money(h.netProxy)}</small></div>
+ </div>
+ <div class="hedge-bots">
+  <div class="hedge-leg long">
+    <div class="hedge-leg-head"><span>LONG 20x</span><b>${h.longBuf<8?'CRITICAL':h.longBuf<15?'DANGER':h.longBuf<30?'TIGHT':'SAFE'}</b></div>
+    <strong>BTC-L20</strong>
+    <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.longBuf,2)}%</b></span><span>BE <b>$${fmt(h.lng.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.lng.liquidation,0)}</b></span><span>INVEST <b>$${fmt(h.lng.investment,0)}</b></span></div>
+    <div class="hedge-action">KEEP LONG / NO ADD</div>
+  </div>
+  <div class="hedge-leg short">
+    <div class="hedge-leg-head"><span>SHORT 30x</span><b>${h.shortBuf<8?'CRITICAL':h.shortBuf<15?'DANGER':h.shortBuf<30?'TIGHT':'SAFE'}</b></div>
+    <strong>BTC-S30</strong>
+    <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.shortBuf,2)}%</b></span><span>BE <b>$${fmt(h.sht.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.sht.liquidation,0)}</b></span><span>MARGIN <b>$${fmt((h.sht.investment||0)+(h.sht.dynamicMargin||0),0)}</b></span></div>
+    <div class="hedge-action red">REDUCE SHORT / NO ADD</div>
+  </div>
+ </div>
+ <div class="hedge-meter"><div><span>SHORT HEDGE RATIO</span><b>${fmt(h.hedge,1)}%</b></div><i><em style="width:${Math.min(100,h.hedge)}%"></em></i></div>
+ <div class="grid2">${metric('LONG EXPOSURE PROXY','$'+fmt(h.longProxy,0),'green')}${metric('SHORT EXPOSURE PROXY','$'+fmt(h.shortProxy,0),'red')}${metric('NET PROXY',(h.netProxy>=0?'+':'−')+'$'+fmt(Math.abs(h.netProxy),0),h.netProxy>=0?'green':'red')}${metric('LIVE BTC','$'+fmt(h.live,0),'cyan')}</div>
+ <p class="footer-note">Exposure Proxy = Investment × Hebel und dient nur zum Richtungsvergleich. Short-Exit und Long-Add bleiben getrennte Entscheidungen; keine automatische Order-Ausführung.</p>`);
+}
+
+
+function slInvalidationPanel(){
+ const e=DATA.slInvalidationEngine?.btcLong20x;
+ if(!e)return '';
+ const levWarn=(e.slToLiqUsd/Math.max(1,e.entry))*100<4;
+ return card(`<div class="section-head"><div><div class="eyebrow">SL & INVALIDATION ENGINE 1.0 ${snapshotBadge('MODEL')}</div><div class="forecast-main">BTC LONG 20x</div><div class="sub">ENTRY → SL → TP1 → TP2 → R:R</div></div><span class="tag ${levWarn?'red':'amber'}">${levWarn?'LEVERAGE TOO HIGH':'HIGH LEVERAGE'}</span></div>
+ <div class="sl-flow">
+   <div><span>ENTRY</span><b>$${fmt(e.entry,0)}</b></div>
+   <div class="sl-node stop"><span>SL</span><b>$${fmt(e.stopLoss,0)}</b><small>${fmt(e.stopLossPctFromEntry,2)}%</small></div>
+   <div class="sl-node tp"><span>TP1</span><b>$${fmt(e.takeProfit1,0)}</b><small>R:R ${fmt(e.rrTp1,2)}</small></div>
+   <div class="sl-node tp2"><span>TP2</span><b>$${fmt(e.takeProfit2,0)}</b><small>R:R ${fmt(e.rrTp2,2)}</small></div>
+ </div>
+ <div class="sl-riskbox">
+  <div><span>LIQUIDATION</span><b class="red">$${fmt(e.liquidation,0)}</b></div>
+  <div><span>SL → LIQ BUFFER</span><b class="${levWarn?'red':'amber'}">$${fmt(e.slToLiqUsd,0)}</b></div>
+  <div><span>INVALIDATION</span><b>4H Close &lt; $${fmt(e.invalidBelow,0)}</b></div>
+  <div><span>STATUS</span><b class="amber">${e.status}</b></div>
+ </div>
+ <div class="sl-rule ${levWarn?'red':''}"><b>${levWarn?'LEVERAGE TOO HIGH':'RISK CHECK'}</b><span>Technischer SL und Liquidation liegen zu nahe beieinander. Kein ADD, solange die Struktur nicht bestätigt und der Sicherheitsabstand nicht größer ist.</span></div>
+ <p class="footer-note">SL wird aus Struktur/Fibonacci/Short-BE plus Liquidations-Sicherheitsabstand abgeleitet. Kein fixer Prozent-SL und keine automatische Order-Ausführung.</p>`);
+}
+
 function gridView(){
  const r=DATA.pionexRisk||{}, bots=r.bots||[];
  const order=[...bots].sort((a,b)=>Number(a.liquidationDistancePct||99)-Number(b.liquidationDistancePct||99));
  const critical=order.filter(b=>liqGuard(b).label==='CRITICAL').length;
- return card(`<div class="eyebrow">GRID COMMANDER 3.0 ${snapshotBadge('PIONEX VERIFIED')}</div><div class="forecast-main">RISK FIRST</div><div class="sub">Liquidation Guard · Bot Health · Entry Readiness</div>
- <div class="grid2">${metric('FUTURES RISK',r.riskLevel||'—','red')}${metric('CRITICAL BOTS',critical,critical?'red':'green')}</div><p class="footer-note">${r.riskNote||''}</p>`)+
+ const danger=order.filter(b=>liqGuard(b).label==='DANGER').length;
+ return card(`<div class="eyebrow">GRID COMMANDER 3.2 ${snapshotBadge('PIONEX VERIFIED')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
+ <div class="grid2">${metric('FUTURES RISK',r.riskLevel||'—','red')}${metric('BTC BOTS','2 · LONG + SHORT','cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">${r.riskNote||''}</p>`)+
+ dualBtcHedgePanel()+
+ slInvalidationPanel()+
  card(`<div class="section-title">BOT PRIORITY QUEUE</div>${order.map(commanderBot).join('')}<p class="footer-note">SAFE ≥30% · TIGHT 15–30% · DANGER 8–15% · CRITICAL &lt;8% Liq.-Puffer. Details per Tap.</p>`)+
- card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div class="forecast-main">ENTRY READINESS</div><button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button><p class="footer-note">Setup Quality bewertet die Struktur. Entry Readiness bewertet, ob der Einstieg JETZT sinnvoll ist.</p>`)+
+ card(`<div class="section-title">MULTI-ASSET SL MATRIX <span class="tag cyan">MODEL</span></div>
+ ${['SOL','ETH','XRP','HBAR','PEPE'].map(s=>multiAssetRiskRow(s)).join('')}
+ <p class="footer-note">SL wird strukturell aus Range-Support + Volatilitätspuffer abgeleitet. Entry/SL/TP/R:R sind Modellwerte und keine automatische Order.</p>`)+card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div class="forecast-main">ENTRY READINESS</div><button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button><p class="footer-note">Setup Quality bewertet die Struktur. Entry Readiness bewertet, ob der Einstieg JETZT sinnvoll ist.</p>`)+
  card(`<div class="section-title">OPPORTUNITY SCANNER</div>${['SOL','ETH','PEPE'].map(scannerCard).join('')||'<p class="footer-note">Scanner lädt 4H-Daten …</p>'}<p class="footer-note">Keine automatische Bot-Ausführung.</p>`);
 }
+
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
  return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.0 · MODEL</b></div>`)+
@@ -1453,3 +1569,26 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   readinessClass(score){ return score>=75?'ready':score>=60?'watch':'wait'; },
   principle:'Forecast → Trigger → Action'
 };
+
+/* v5.9.4 — MULTI-ASSET SL ENGINE */
+function multiAssetSlData(sym){
+ const a=DATA.multiAssetSlEngine?.assets?.[sym];
+ return a||null;
+}
+function multiAssetRiskRow(sym){
+ const a=multiAssetSlData(sym); if(!a)return '';
+ const dec=(n)=>n<0.01?8:n<10?4:2;
+ const f=(n)=>fmt(n,dec(n));
+ const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0);
+ const rrCls=rr2>=2?'green':rr2>=1.3?'amber':'red';
+ return `<div class="scanner-risk-panel">
+   <div class="scanner-risk-head"><span>RISK PLAN</span><b>${sym}</b></div>
+   <div class="scanner-risk-grid">
+    <div><span>ENTRY</span><b>$${f(a.entryLow)}–$${f(a.entryHigh)}</b></div>
+    <div class="sl"><span>SL</span><b>$${f(a.stopLoss)}</b></div>
+    <div class="tp1"><span>TP1</span><b>$${f(a.tp1)}</b><small>R:R ${fmt(rr1,2)}</small></div>
+    <div class="tp2"><span>TP2</span><b>$${f(a.tp2)}</b><small>R:R ${fmt(rr2,2)}</small></div>
+   </div>
+   <div class="scanner-invalidation"><span>INVALIDATION</span><b>Close &lt; $${f(a.stopLoss)}</b><em class="${rrCls}">R:R2 ${fmt(rr2,2)}</em></div>
+  </div>`;
+}

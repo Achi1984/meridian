@@ -1,0 +1,11 @@
+ACHI MERIDIAN v5.8.0 — COMMAND CENTER 2.0
+
+Neu:
+- NOW-Layer ganz oben: wichtigste Aktion, größtes Risiko, beste Chance, Entscheidungs-Trigger
+- klare Trennung MARKET RISK vs PORTFOLIO RISK
+- Bot-Kapital wird aus verifizierten Pionex-Snapshot-Bots berechnet statt fälschlich $0
+- Hedge-Kapital als Snapshot-Verhältnis Short vs Long
+- Coin-M Scanner im Center zeigt Entry Readiness statt Setup Quality
+- Market Radar: Performance konsequent grün/rot
+- keine Auto-Ausführung
+- bestehendes v5.6/v5.7 Premium-Design und neues Logo bleiben erhalten
