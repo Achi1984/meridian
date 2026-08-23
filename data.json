@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.8",
-  "build": "2026-08-23-ui-detail-render-fix",
+  "appVersion": "5.10.9",
+  "build": "2026-08-23-decision-ssot",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -863,11 +863,7 @@
       "Langfristige Preiszonen standardmäßig NOT ACTIVE"
     ]
   },
-  "uiRelease": {
-    "name": "COMMAND CENTER 2.1",
-    "principle": "NOW → WHY → WHAT CHANGES IT",
-    "note": "Market risk and personal portfolio risk are shown separately."
-  },
+  "uiRelease": "5.10.9",
   "botSnapshot": {
     "status": "PIONEX SNAPSHOT",
     "snapshotAt": "2026-08-23T11:23:00+02:00",
@@ -1276,7 +1272,7 @@
       "side": "SHORT",
       "leverage": 30,
       "active": true,
-      "liqBufferPct": 4.36,
+      "liqBufferPct": 3.89,
       "risk": "CRITICAL"
     },
     {
@@ -1285,7 +1281,7 @@
       "side": "LONG",
       "leverage": 20,
       "active": true,
-      "liqBufferPct": 9.76,
+      "liqBufferPct": 10.14,
       "risk": "DANGER"
     },
     {
@@ -1294,7 +1290,7 @@
       "side": "LONG",
       "leverage": 5,
       "active": true,
-      "liqBufferPct": 25.61,
+      "liqBufferPct": 26.51,
       "risk": "TIGHT"
     },
     {
@@ -1303,7 +1299,7 @@
       "side": "LONG",
       "leverage": 5,
       "active": true,
-      "liqBufferPct": 43.01,
+      "liqBufferPct": 43.27,
       "risk": "SAFE"
     }
   ],
@@ -1361,18 +1357,25 @@
     "missingBufferBehavior": "N/A / SNAPSHOT MISSING",
     "excludeClosed": true,
     "excludeUnverified": true,
-    "singleSource": "pionexCanonicalBots"
+    "singleSource": "decisionSSOT() → pionexRisk.bots"
   },
   "dualBotHedge": {
     "longBotId": "BTC-L20",
     "shortBotId": "BTC-S30",
-    "long": {
-      "liqBufferPct": 9.76
-    },
-    "short": {
-      "liqBufferPct": 4.36
-    },
-    "source": "pionexRisk.bots",
-    "status": "SNAPSHOT"
+    "source": "decisionSSOT / pionexRisk.bots",
+    "status": "VERIFIED SNAPSHOT + LIVE BUFFER RECALC"
+  },
+  "decisionSSOT": {
+    "version": "1.1",
+    "source": "pionexRisk.bots + browser livePrices",
+    "priority": [
+      "LIQUIDATION_RISK",
+      "EXISTING_POSITION",
+      "HEDGE",
+      "NEW_ENTRY"
+    ],
+    "excludeClosed": true,
+    "liveBufferRecalc": true,
+    "snapshotFallback": true
   }
 }
