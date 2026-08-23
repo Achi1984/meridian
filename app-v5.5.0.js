@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.15.2';
-let APP_RELEASE='5.15.2 · DOMINANT ACTION FIX';
+let APP_CODE_VERSION='5.16.0';
+let APP_RELEASE='5.16.0 · LIVE RISK COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -849,7 +849,8 @@ function commandCenter(){
    ? `Liq.-Puffer > 12% ODER Short-Risiko reduziert`
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
- return actionCenterPanel()+
+ return liveRiskCockpitPanel()+
+ actionCenterPanel()+
  recoveryCommandPanel()+
  entryIntelligencePanel()+
  centerAdvancedRiskDetails()+
@@ -2465,6 +2466,95 @@ function recoveryCommandPanel(){
 }
 
 /* v5.10.4 — ACTION CENTER */
+
+function liveRiskCockpitState(){
+ const s=decisionSSOT();
+ const r=recoveryCommandState();
+ const act=dominantActionSSOT();
+ const bot=r?.bot||s.btcShort||null;
+
+ if(!bot){
+   return {
+     bot:null, buffer:NaN, target:null, gap:NaN, phase:'NO DATA', tone:'amber',
+     targetLiq:'—', reduce:'—', margin:'—', headline:'RISIKO-DATEN LADEN', unlock:'RECHECK'
+   };
+ }
+
+ const buffer=Number(r.cur);
+ const target=Number(r.target);
+ const gap=Number.isFinite(target)?Math.max(0,target-buffer):0;
+ const targetLiq=Number.isFinite(Number(r.opt?.targetLiq))?'$'+gridFmt(Number(r.opt.targetLiq),bot.symbol):'—';
+ const reduce=Number.isFinite(Number(r.opt?.reduceEq))?`~${fmt(Number(r.opt.reduceEq),0)}%`:'—';
+ const margin=Number.isFinite(Number(r.opt?.marginApprox))?`~$${fmt(Number(r.opt.marginApprox),0)}`:'—';
+
+ return {
+   bot,buffer,target:Number.isFinite(target)?target:null,gap,
+   phase:r.phase?.label||'NO DATA',tone:r.phase?.tone||'amber',
+   targetLiq,reduce,margin,
+   headline:act.headline,
+   unlock:r.phase?.key==='SAFE'?'RISK UNLOCKED':'BLOCKED'
+ };
+}
+
+function liveRiskCockpitPanel(){
+ const c=liveRiskCockpitState();
+ if(!c.bot) return '';
+
+ const targetText=c.target!==null?`${fmt(c.target,0)}%`:'SAFE';
+ const gapText=c.target!==null?`${fmt(c.gap,2)} %-Pkt`:'0,00 %-Pkt';
+ const progress=c.target!==null && c.target>0
+   ? Math.max(0,Math.min(100,Math.round((c.buffer/c.target)*100)))
+   : 100;
+
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">LIVE RISK COCKPIT 1.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${c.tone}">${c.headline}</div>
+   <div class="sub">Was jetzt? · Wie viel fehlt? · Wann wird freigeschaltet?</div>
+ </div><span class="tag ${c.tone}">${c.phase}</span></div>
+
+ <div class="lrc-grid">
+   <div class="lrc-main ${c.tone}">
+     <span>AKTUELLER PUFFER</span>
+     <b>${fmt(c.buffer,2)}%</b>
+     <small>${c.bot.id}</small>
+   </div>
+   <div>
+     <span>NÄCHSTES ZIEL</span>
+     <b>${targetText}</b>
+     <small>${c.phase}</small>
+   </div>
+   <div>
+     <span>FEHLT NOCH</span>
+     <b>${gapText}</b>
+     <small>bis nächste Stufe</small>
+   </div>
+   <div>
+     <span>UNLOCK</span>
+     <b class="${c.unlock==='RISK UNLOCKED'?'green':'red'}">${c.unlock}</b>
+     <small>${c.target!==null?'Risk Gate aktiv':'Capital + Entry Recheck'}</small>
+   </div>
+ </div>
+
+ <div class="lrc-progress">
+   <div><span>WEG ZUM NÄCHSTEN ZIEL</span><b>${progress}%</b></div>
+   <div class="bar"><i style="width:${progress}%"></i></div>
+ </div>
+
+ <div class="lrc-action-row">
+   <div><span>ZIEL-LIQ.</span><b>${c.targetLiq}</b></div>
+   <div><span>REDUCE-ÄQUIV.</span><b>${c.reduce}</b></div>
+   <div><span>MARGIN-ÄQUIV.</span><b>${c.margin}</b></div>
+ </div>
+
+ <div class="lrc-order">
+   <span>JETZT</span>
+   <b>${c.headline}</b>
+   <small>Manuell in Pionex anpassen → neuen Liquidationspreis prüfen → MERIDIAN synchronisieren.</small>
+ </div>
+
+ <p class="footer-note"><b>Keine automatische Order-Ausführung.</b> Cockpit-Werte sind SSOT-Modellwerte. Erst der neu synchronisierte Live-Puffer entscheidet über die nächste Recovery-Stufe.</p>`,'live-risk-cockpit-card');
+}
+
 function actionCenterPanel(){
  const s=decisionSSOT(), c=capitalReleaseState();
  const sl=s.btcShort, ll=s.btcLong;

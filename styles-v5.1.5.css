@@ -1282,3 +1282,25 @@ body{background:transparent;letter-spacing:.01em}
 .ac-priority-line{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .ac-priority-line>span{font-size:8px;letter-spacing:1.4px;color:#8191a4}
 .ac-priority-line em{font-style:normal;white-space:nowrap}
+
+/* v5.16.0 Live Risk Cockpit */
+.live-risk-cockpit-card{border-color:#1785c2}
+.lrc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.lrc-grid>div{padding:15px;border:1px solid #173a50;border-radius:16px;background:#071721}
+.lrc-grid>div.lrc-main{border-color:currentColor}
+.lrc-grid span,.lrc-action-row span,.lrc-order span{display:block;font-size:8px;letter-spacing:1px;color:#8191a4;margin-bottom:6px}
+.lrc-grid b{display:block;font-size:18px;line-height:1.1}
+.lrc-grid small{display:block;margin-top:5px;font-size:7px;color:#7d8da0}
+.lrc-progress{margin:13px 0 14px}
+.lrc-progress>div:first-child{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.lrc-progress span{font-size:8px;letter-spacing:1px;color:#8191a4}
+.lrc-progress b{font-size:11px}
+.lrc-action-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lrc-action-row>div{padding:12px;border:1px solid #173a50;border-radius:14px}
+.lrc-action-row b{display:block;font-size:11px;line-height:1.2}
+.lrc-order{margin-top:14px;padding:15px;border:1px solid #1785c2;border-radius:16px;background:rgba(23,133,194,.035)}
+.lrc-order b{display:block;font-size:16px;line-height:1.25}
+.lrc-order small{display:block;margin-top:7px;color:#8797aa;font-size:8px;line-height:1.45}
+@media (max-width:420px){
+  .lrc-action-row{grid-template-columns:1fr}
+}
