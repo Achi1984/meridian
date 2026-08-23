@@ -825,6 +825,7 @@ function commandCenter(){
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
  return actionCenterPanel()+
+ executionEnginePanel()+
  `<div class="cc-hero">
    <div class="cc-kicker">COMMAND CENTER ${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</div>
    <div class="cc-value-row"><div><div class="cc-total">$${fmt(p.total)}</div><div class="cc-eur">≈ €${fmt(p.eurApprox)}</div></div><div class="cc-day ${dayPct>=0?'green':'red'}"><b>${dayPct>=0?'+':''}${fmt(dayPct,2)}%</b><small>${dayAbs>=0?'+':''}$${fmt(dayAbs,0)} · 24H</small></div></div>
@@ -1537,9 +1538,10 @@ function gridView(){
  const order=[...bots];
  const critical=s.critical.length, danger=s.danger.length;
  const futuresRisk=critical?'HIGH':danger?'ELEVATED':'NORMAL';
- return card(`<div class="eyebrow">GRID COMMANDER 3.4 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
+ return card(`<div class="eyebrow">GRID COMMANDER 3.5 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
  <div class="grid2">${metric('FUTURES RISK',futuresRisk,critical?'red':danger?'amber':'green')}${metric('BTC BOTS',bots.filter(b=>b.symbol==='BTC').length+' · '+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG')?'LONG':'')+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT')?' + SHORT':''),'cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">SSOT: ACTIVE Pionex Bots; Liq.-Puffer wird mit Live-Kurs neu berechnet, Snapshot ist Fallback.</p>`)+
  dualBtcHedgePanel()+
+ executionEnginePanel()+
  slInvalidationPanel()+
  decisionQualityPanel()+
  card(`<div class="section-title">BOT PRIORITY QUEUE</div>${order.map(commanderBot).join('')}<p class="footer-note">SAFE ≥30% · TIGHT 15–30% · DANGER 8–15% · CRITICAL &lt;8% Liq.-Puffer. Details per Tap.</p>`)+
@@ -1552,7 +1554,7 @@ card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div cl
 
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.2 · FULL SSOT</b></div>`)+
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.3 · FULL SSOT</b></div>`)+
  card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
@@ -1831,6 +1833,134 @@ function unifiedDecisionQueue(){
  </div>`).join('')}
  <p class="footer-note">SSOT: ACTIVE Pionex Bots + Live-Kurse → Liquidation Guard → Position → Hedge → Entry. Keine automatische Order-Ausführung.</p>`);
 }
+
+
+/* v5.11.0 — EXECUTION ENGINE 1.0
+   Converts the SSOT decision into a manual action plan.
+   No automatic order execution. */
+function executionSeverity(buf){
+ const b=Number(buf);
+ if(!Number.isFinite(b)) return {label:'UNKNOWN',tone:'amber',rank:9};
+ if(b<4)  return {label:'CRITICAL+',tone:'red',rank:0};
+ if(b<8)  return {label:'CRITICAL', tone:'red',rank:1};
+ if(b<15) return {label:'DANGER',   tone:'amber',rank:2};
+ if(b<30) return {label:'TIGHT',    tone:'amber',rank:3};
+ return {label:'SAFE',tone:'green',rank:4};
+}
+function executionReductionBand(bot){
+ if(!bot) return '—';
+ const b=Number(bot.buffer), side=String(bot.side||'').toUpperCase();
+ if(!Number.isFinite(b)) return 'MANUELL PRÜFEN';
+ if(b<4) return side==='SHORT'?'25–50% REDUCE ODER MARGIN':'20–35% REDUCE ODER MARGIN';
+ if(b<8) return side==='SHORT'?'15–35% REDUCE ODER MARGIN':'10–25% REDUCE ODER MARGIN';
+ if(b<15) return 'KEEP / NO ADD · OPTIONAL 10–15% REDUCE';
+ if(b<30) return 'KEEP / NO ADD';
+ return 'KEEP';
+}
+function executionTarget(bot){
+ if(!bot) return '—';
+ const b=Number(bot.buffer);
+ if(!Number.isFinite(b)) return 'LIVE BUFFER PRÜFEN';
+ if(b<8) return '>8% MIN · >12% BEVORZUGT';
+ if(b<15) return '>15% RECOVERY';
+ if(b<30) return '>30% SAFE';
+ return 'SAFE ≥30%';
+}
+function executionTrigger(bot){
+ if(!bot) return '—';
+ const b=Number(bot.buffer), side=String(bot.side||'').toUpperCase();
+ if(!Number.isFinite(b)) return 'LIVE-DATEN FEHLEN';
+ if(b<4) return 'JETZT PRÜFEN · nach jeder Änderung neu rechnen';
+ if(b<8) return 'SOFORT MANUELL PRÜFEN';
+ if(b<15) return 'KEIN ADD · bei weiter fallendem Buffer reduzieren';
+ if(b<30) return 'WATCH · kein neues Hebelrisiko';
+ return side==='LONG'?'HOLD / Struktur beobachten':'HOLD';
+}
+function executionPlan(){
+ const s=decisionSSOT();
+ const cfg=DATA.executionEngine||{};
+ const bots=[...s.bots].sort((a,b)=>(a.guard.rank-b.guard.rank)||(a.buffer-b.buffer));
+ const primary=bots[0]||null;
+
+ const botPlans=bots.map((b,i)=>{
+   const sev=executionSeverity(b.buffer);
+   let action=b.action||'HOLD';
+   if(sev.rank<=1 && String(b.side||'').toUpperCase()==='SHORT') action='REDUCE / EXIT CHECK';
+   else if(sev.rank<=1) action='DEFEND / REDUCE CHECK';
+   else if(sev.label==='DANGER' && String(b.side||'').toUpperCase()==='LONG') action='KEEP / NO ADD';
+   return {
+     priority:i+1,id:b.id,symbol:b.symbol,side:b.side,leverage:b.leverage,
+     buffer:b.buffer,guard:b.guard,severity:sev,action,
+     adjustment:executionReductionBand(b),
+     target:executionTarget(b),
+     trigger:executionTrigger(b),
+     live:b.live,liq:b.liquidation,breakEven:Number(b.breakEven),
+     health:Number(b.healthScore||0),funding:Number(b.fundingPct)
+   };
+ });
+
+ const entryPlan={
+   action:s.entryBlocked?'BLOCKED':'CHECK',
+   tone:s.entryBlocked?'red':(s.btcEntry>=65&&s.rr2>=2?'green':'amber'),
+   reason:s.entryBlocked?'Bot-Risiko hat Vorrang':`BTC Entry ${s.btcEntry}/100 · R:R2 ${fmt(s.rr2,2)}`,
+   unlock:s.entryBlocked?'Kein CRITICAL/DANGER-Hochhebel-Bot mehr aktiv':'Entry ≥65 + R:R ≥2,0'
+ };
+
+ let headline='KEINE AKTION';
+ if(primary){
+   if(primary.buffer<8) headline=`${primary.id} ABSICHERN`;
+   else if(primary.buffer<15) headline=`${primary.id} KEIN ADD`;
+   else headline='POSITIONEN HALTEN';
+ }
+
+ return {
+   version:'1.0', ssot:s, primary, botPlans, entryPlan, headline,
+   source:'decisionSSOT + canonicalBotStates + livePrices',
+   cfg
+ };
+}
+function executionEnginePanel(){
+ const x=executionPlan(), p=x.botPlans[0], s=x.ssot;
+ if(!p) return card(`<div class="section-title">EXECUTION ENGINE 1.0</div><p class="footer-note">Keine aktiven Bot-Positionen vorhanden.</p>`);
+ const liveTxt=Number.isFinite(p.live)?'$'+gridFmt(p.live,p.symbol):'—';
+ const liqTxt=Number.isFinite(p.liq)?'$'+gridFmt(p.liq,p.symbol):'—';
+ const beTxt=Number.isFinite(p.breakEven)?'$'+gridFmt(p.breakEven,p.symbol):'—';
+
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">EXECUTION ENGINE 1.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${p.severity.tone}">${x.headline}</div>
+   <div class="sub">RISK → ACTION → TARGET → RECHECK · keine Auto-Ausführung</div>
+ </div><span class="tag ${p.severity.tone}">${p.severity.label}</span></div>
+
+ <div class="exec-hero ${p.severity.tone}">
+   <span>PRIORITÄT #1 · ${p.id} · ${String(p.side||'').toUpperCase()} ${p.leverage||'—'}x</span>
+   <b>${p.action}</b>
+   <small>Live Liq.-Puffer ${fmt(p.buffer,2)}% · Ziel ${p.target}</small>
+ </div>
+
+ <div class="exec-grid">
+   <div><span>MANUELLE ANPASSUNG</span><b class="${p.severity.tone}">${p.adjustment}</b><small>Modell-Band; danach Pionex neu prüfen</small></div>
+   <div><span>RECHECK</span><b>${p.trigger}</b><small>Entscheidung wird erst nach neuem Live-Buffer aktualisiert</small></div>
+   <div><span>LIVE / BE</span><b>${liveTxt}</b><small>Break-even ${beTxt}</small></div>
+   <div><span>LIQUIDATION</span><b class="red">${liqTxt}</b><small>Liquidation ≠ Stop-Loss</small></div>
+ </div>
+
+ <div class="exec-entry ${x.entryPlan.tone}">
+   <span>NEUES KAPITAL</span><b>${x.entryPlan.action}</b>
+   <small>${x.entryPlan.reason} · Unlock: ${x.entryPlan.unlock}</small>
+ </div>
+
+ <div class="exec-sequence">
+   ${x.botPlans.slice(0,4).map(q=>`<div class="exec-step">
+     <span>#${q.priority} ${q.id}</span>
+     <b class="${q.severity.tone}">${q.action}</b>
+     <small>${fmt(q.buffer,1)}% → ${q.target}</small>
+   </div>`).join('')}
+ </div>
+
+ <p class="footer-note">Execution Engine liefert einen manuellen Handlungsplan aus SSOT-Daten. Reduktionsband und Zielpuffer sind Modellregeln, keine automatische Order und keine Garantie für den neuen Liquidationspreis. Nach jeder Änderung muss der Pionex-Liquidationspuffer neu synchronisiert werden.</p>`,'execution-engine-card');
+}
+
 
 /* v5.10.4 — ACTION CENTER */
 function actionCenterPanel(){

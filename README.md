@@ -1,3 +1,7 @@
+# ACHI MERIDIAN v5.11.0 — EXECUTION ENGINE
+
+Aktueller Build: Execution Engine 1.0 auf SSOT-Basis. Keine Auto-Ausführung; manuelle Handlungsempfehlungen mit Zielpuffer und Recheck.
+
 # ACHI MERIDIAN v5.6.1 — UI POLISH
 
 Design-Pass auf Basis v5.6.0:

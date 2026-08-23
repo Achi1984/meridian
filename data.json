@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.11",
-  "build": "2026-08-23-ssot-hardening",
+  "appVersion": "5.11.0",
+  "build": "2026-08-23-execution-engine-1-0",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1389,6 +1389,24 @@
       "POSITION",
       "ADD",
       "NEW CAPITAL"
+    ]
+  },
+  "executionEngine": {
+    "version": "1.0",
+    "status": "MODEL + SSOT",
+    "principle": "RISK -> ACTION -> TARGET -> RECHECK",
+    "bufferTargets": {
+      "criticalMinimumPct": 8,
+      "preferredSafetyPct": 12,
+      "dangerRecoveryPct": 15,
+      "safePct": 30
+    },
+    "rules": [
+      "Bot-Liquidationsrisiko hat Vorrang vor neuem Kapital.",
+      "Bestehende Position und neuer Entry werden getrennt bewertet.",
+      "Bei CRITICAL wird ein Reduktions-/Margin-Band ausgegeben, keine automatische Order.",
+      "Nach jeder manuellen Anpassung muss der Live-Liquidationspuffer neu geprüft werden.",
+      "SL bleibt strukturell; Liquidationspreis ist keine Stop-Loss-Empfehlung."
     ]
   }
 }

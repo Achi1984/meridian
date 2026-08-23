@@ -1133,3 +1133,27 @@ body{background:transparent;letter-spacing:.01em}
 .sl-decision-strip span{padding:10px;border:1px solid rgba(38,158,255,.22);border-radius:12px;font-size:10px;letter-spacing:.6px;background:rgba(7,25,38,.55)}
 .sl-decision-strip b{display:block;margin-top:4px;font-size:12px}
 @media(max-width:480px){.sl-decision-strip{grid-template-columns:1fr 1fr}.sl-decision-strip span:first-child{grid-column:1/-1}}
+
+
+/* v5.11.0 — Execution Engine */
+.execution-engine-card{border-color:#1d789f}
+.exec-hero{margin:14px 0;padding:18px 20px;border:1px solid #254a60;border-radius:22px;background:rgba(5,21,31,.52)}
+.exec-hero.red{border-color:#9d3d4f;background:rgba(74,18,29,.18)}
+.exec-hero.amber{border-color:#80652b;background:rgba(68,48,7,.12)}
+.exec-hero.green{border-color:#176344;background:rgba(6,65,42,.12)}
+.exec-hero span,.exec-grid span,.exec-entry span,.exec-step span{display:block;color:#8190a0;font-size:10px;letter-spacing:1.15px;margin-bottom:8px}
+.exec-hero b{display:block;font-size:25px;line-height:1.08;letter-spacing:.5px}
+.exec-hero small,.exec-grid small,.exec-entry small,.exec-step small{display:block;color:#8190a0;margin-top:8px;line-height:1.35}
+.exec-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.exec-grid>div{padding:16px;border:1px solid #173e55;border-radius:20px;background:rgba(4,19,29,.42)}
+.exec-grid b{display:block;font-size:14px;line-height:1.3}
+.exec-entry{margin:14px 0;padding:16px;border:1px solid #254a60;border-radius:20px}
+.exec-entry.red{border-color:#8c394a}.exec-entry.amber{border-color:#745e2d}.exec-entry.green{border-color:#176344}
+.exec-entry b{font-size:19px}
+.exec-sequence{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.exec-step{padding:13px 14px;border:1px solid #15384c;border-radius:17px;background:rgba(4,18,28,.4)}
+.exec-step b{display:block;font-size:13px}
+@media(max-width:540px){
+ .exec-grid,.exec-sequence{grid-template-columns:1fr}
+ .exec-hero b{font-size:22px}
+}
