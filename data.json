@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.14.0",
-  "build": "2026-08-23-risk-recovery-engine",
+  "appVersion": "5.14.1",
+  "build": "2026-08-23-recovery-command-ux",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1572,15 +1572,14 @@
     "riskLogicChanged": false
   },
   "riskRecoveryEngine": {
-    "version": "1.0",
+    "version": "1.1",
     "status": "ACTIVE",
-    "rules": {
-      "minimumBufferPct": 8,
-      "preferredBufferPct": 12,
-      "recoveryBufferPct": 15
-    },
-    "principle": "Risk recovery precedes capital release and entry.",
+    "targetsPct": [
+      8,
+      12,
+      15
+    ],
     "execution": "MANUAL_ONLY",
-    "disclaimer": "Model-equivalents are not order sizes; recheck Pionex liquidation after every change."
+    "note": "Recovery Command is surfaced directly below ACTION CENTER."
   }
 }

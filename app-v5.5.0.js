@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.13.1';
-let APP_RELEASE='5.13.1 · DECISION UX 1.1';
+let APP_CODE_VERSION='5.14.1';
+let APP_RELEASE='5.14.1 · RECOVERY COMMAND';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -850,6 +850,7 @@ function commandCenter(){
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
  return actionCenterPanel()+
+ recoveryCommandPanel()+
  entryIntelligencePanel()+
  centerAdvancedRiskDetails()+
  `<div class="cc-hero">
@@ -2322,6 +2323,74 @@ function adaptiveRiskPanel(){
  <p class="footer-note">Praktische Reihenfolge: 1) in Pionex Position/Margin manuell anpassen, 2) neuen Liquidationspreis prüfen, 3) MERIDIAN neu synchronisieren. Erst der neu berechnete Live-Puffer entscheidet über die nächste Stufe.</p>`,'adaptive-risk-card');
 }
 
+
+
+/* v5.14.1 — RECOVERY COMMAND UX
+   Compact action card for the highest-priority blocked bot.
+   Uses SSOT + adaptiveRiskOption geometry; manual action only. */
+function recoveryCommandState(){
+ const s=decisionSSOT();
+ const bot=s.btcShort || s.bots.find(b=>String(b.side||'').toUpperCase()==='SHORT' && Number(b.buffer)<15) || null;
+ if(!bot) return {bot:null};
+
+ const cur=Number(bot.buffer);
+ const target=cur<8?8:(cur<12?12:(cur<15?15:15));
+ const opt=adaptiveRiskOption(bot,target);
+
+ const reduce=Number(opt.reduceEq);
+ const margin=Number(opt.marginApprox);
+ const targetLiq=Number(opt.targetLiq);
+
+ let stage='RECOVERED', tone='green', action='RECHECK CAPITAL GATE';
+ if(cur<8){stage='CRITICAL RECOVERY';tone='red';action=`PUFFER AUF ≥${target}% BRINGEN`;}
+ else if(cur<12){stage='RECOVERY';tone='amber';action=`PUFFER AUF ≥${target}% BRINGEN`;}
+ else if(cur<15){stage='STABILIZE';tone='amber';action=`PUFFER AUF ≥${target}% BRINGEN`;}
+
+ return {
+   bot,cur,target,opt,stage,tone,action,
+   reduceText:Number.isFinite(reduce)?`~${fmt(reduce,0)}% Exposure reduzieren`:'Exposure reduzieren',
+   marginText:Number.isFinite(margin)?`~$${fmt(margin,0)} Margin-Äquiv.`:'Margin erhöhen',
+   targetLiqText:Number.isFinite(targetLiq)?'$'+gridFmt(targetLiq,bot.symbol):'—'
+ };
+}
+
+function recoveryCommandPanel(){
+ const r=recoveryCommandState();
+ if(!r.bot) return '';
+
+ const blocked=r.cur<15;
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">RECOVERY COMMAND 1.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${r.tone}">${r.stage}</div>
+   <div class="sub">Aktueller Puffer → Ziel → manuelle Anpassung → Live-Recheck</div>
+ </div><span class="tag ${r.tone}">${r.bot.id} ${fmt(r.cur,2)}%</span></div>
+
+ <div class="rc-now ${r.tone}">
+   <span>JETZT</span>
+   <b>${r.action}</b>
+   <small>${blocked?'Kein neues Kapital, bis der neu synchronisierte Live-Puffer die nächste Stufe bestätigt.':'Risk-Recovery erreicht; Capital Gate separat neu prüfen.'}</small>
+ </div>
+
+ <div class="rc-scale">
+   <div class="${r.cur>=8?'done':r.target===8?'active':''}"><span>8%</span><b>MIN</b></div>
+   <div class="${r.cur>=12?'done':r.target===12?'active':''}"><span>12%</span><b>PREFERRED</b></div>
+   <div class="${r.cur>=15?'done':r.target===15?'active':''}"><span>15%</span><b>RECOVERY</b></div>
+ </div>
+
+ <div class="grid2">
+   ${metric('AKTUELL',fmt(r.cur,2)+'%',r.tone)}
+   ${metric('ZIEL',fmt(r.target,0)+'%',r.tone)}
+   ${metric('ZIEL-LIQ.',r.targetLiqText,r.tone)}
+   ${metric('RECHECK','PIONEX → MERIDIAN','cyan')}
+ </div>
+
+ <div class="rc-actions">
+   <div><span>OPTION A</span><b>${r.reduceText}</b><small>Modell-Äquivalent</small></div>
+   <div><span>OPTION B</span><b>${r.marginText}</b><small>Modell-Äquivalent</small></div>
+ </div>
+
+ <p class="footer-note"><b>Keine Ordergröße.</b> Nach jeder manuellen Änderung in Pionex zuerst den neuen Liquidationspreis prüfen und MERIDIAN synchronisieren. Erst der neue Live-Puffer entscheidet über die nächste Stufe.</p>`,'recovery-command-card');
+}
 
 /* v5.10.4 — ACTION CENTER */
 function actionCenterPanel(){
