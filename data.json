@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.13.3",
-  "build": "2026-08-23-center-multiassetriskplan-removal",
+  "appVersion": "5.14.0",
+  "build": "2026-08-23-risk-recovery-engine",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1570,5 +1570,17 @@
     "status": "FIXED",
     "fix": "R:R is now derived directly from the canonical fibFromSwing/buildGridFib object",
     "riskLogicChanged": false
+  },
+  "riskRecoveryEngine": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "rules": {
+      "minimumBufferPct": 8,
+      "preferredBufferPct": 12,
+      "recoveryBufferPct": 15
+    },
+    "principle": "Risk recovery precedes capital release and entry.",
+    "execution": "MANUAL_ONLY",
+    "disclaimer": "Model-equivalents are not order sizes; recheck Pionex liquidation after every change."
   }
 }
