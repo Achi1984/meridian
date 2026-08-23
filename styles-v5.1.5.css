@@ -871,3 +871,52 @@ body{background:transparent;letter-spacing:.01em}
 .forecast-separation,.cycle-master,.cycle-envelope>div,.trigger-grid>div,.exit-master,.cycle-targets>div{border-color:rgba(31,91,129,.72);background:linear-gradient(145deg,rgba(7,23,36,.9),rgba(6,17,27,.9))}
 @media(max-width:430px){.app{padding-left:14px!important;padding-right:14px!important}.card{padding:15px;border-radius:19px}.grid2{gap:9px}.metric{padding:11px}.big{font-size:39px}.topbar{gap:8px}.brandline{gap:8px}.brandword .achi{font-size:29px}.version{font-size:8px;padding:4px 7px}.bottom .inner{gap:3px}.nav{font-size:7.5px}}
 @media(max-width:370px){.brandword .achi{font-size:27px;letter-spacing:6px}.brandword .meridian{letter-spacing:4px}.big{font-size:35px}.metric .value{font-size:13px}}
+
+
+/* v5.6.1 — iPhone UI polish */
+.forecast-kicker{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:10px;
+}
+.confidence-pill{
+  flex:0 0 auto;min-width:150px;padding:7px 10px 6px;
+  border:1px solid rgba(32,164,255,.62);
+  border-radius:12px;background:rgba(16,82,122,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.confidence-pill span{
+  display:inline-block;color:#8497aa;font-size:8px;letter-spacing:1.15px;
+  font-weight:800;margin-right:7px;vertical-align:middle;
+}
+.confidence-pill b{color:#27aaff;font-size:13px;letter-spacing:.3px;vertical-align:middle}
+.confidence-pill i{
+  display:block;height:2px;margin-top:6px;border-radius:3px;
+  background:rgba(37,90,120,.42);overflow:hidden;
+}
+.confidence-pill i em{
+  display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,#168ed8,#32c8ff);
+}
+.forecast-sub{max-width:none}
+@media(max-width:430px){
+  .forecast-kicker{align-items:flex-start}
+  .confidence-pill{min-width:139px;padding:6px 9px 5px}
+  .confidence-pill span{font-size:7px;margin-right:5px}
+  .confidence-pill b{font-size:12px}
+}
+@media(max-width:370px){
+  .forecast-kicker{display:block}
+  .confidence-pill{width:100%;min-width:0;margin-top:8px}
+}
+
+/* Cleaner horizontal asset rail: intentional fade instead of a hard clipped last tab */
+.forecast-tabs,.coin-tabs,.asset-tabs{
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%);
+  mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%);
+  padding-right:28px;
+}
+
+/* Compact tactical cards on narrow iPhones */
+@media(max-width:430px){
+  .forecast-tactical .metric,.tactical-grid .metric{padding:11px 9px}
+}

@@ -1056,7 +1056,7 @@ function renderForecast(){
  const x=f.ready?cycle40Exit(activeCoin,f,state):null;
  const env=f.ready?cycle40Envelope(activeCoin,f):null;
  const conf=f.ready?forecast40Confidence(f,x):0;
- let body=card(`<div class="forecast-head"><div><div class="eyebrow">ACHI MERIDIAN FORECAST 4.0</div><div class="forecast-main">TIME × STRUCTURE<br>× EXIT</div><div class="sub">TACTICAL NOW · NEXT CYCLE · EXIT ENGINE 2.0</div></div><div class="confidence"><div class="muted">CONFIDENCE</div><div class="score cyan">${f.ready?conf:'—'}</div></div></div><p class="footer-note">90T-Ziele sind taktisch. Das nächste große Cycle-Peak-Fenster wird zeitlich separat bewertet.</p>`);
+ let body=card(`<div class="forecast-kicker"><div class="eyebrow">ACHI MERIDIAN FORECAST 4.0</div><div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div></div><div class="forecast-main">TIME × STRUCTURE<br>× EXIT</div><div class="sub forecast-sub">TACTICAL NOW · NEXT CYCLE · EXIT ENGINE 2.0</div><p class="footer-note">90T-Ziele sind taktisch. Das nächste große Cycle-Peak-Fenster wird zeitlich separat bewertet.</p>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
  if(!f.ready){
    body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button>`);

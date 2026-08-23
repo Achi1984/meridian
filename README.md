@@ -1,19 +1,9 @@
-# ACHI MERIDIAN v5.5.1 — GRID Detail State Fix
+# ACHI MERIDIAN v5.6.1 — UI POLISH
 
-Fix: Opportunity Scanner und Bot Priority Details bleiben beim Live-WebSocket-Refresh geöffnet.
-Die GRID-Ansicht wird weiterhin live aktualisiert, ohne dass ein aufgeklappter <details>-Block nach ~1 Sekunde wieder zufällt.
-
-# ACHI MERIDIAN v5.5.0 — GRID COMMANDER
-- Risk-first Bot Priority Queue
-- Liquidation Guard: SAFE / TIGHT / DANGER / CRITICAL
-- Compact expandable bot cards
-- Opportunity Scanner splits Setup Quality from Entry Readiness
-- Existing Pionex snapshot preserved; browser 4H live engine remains active
-- No automatic bot execution
-
-
-## v5.5.2
-- neues hochauflösendes ACHI MERIDIAN Master-Logo im Header
-- Logo exakt zentriert und iPhone-sicher skaliert
-- PWA Icons 192/512 aus demselben Master neu erzeugt
-- Opportunity-Scanner / Grid-Detail-State-Fix aus v5.5.1 unverändert übernommen
+Design-Pass auf Basis v5.6.0:
+- Forecast Confidence als kompakte horizontale Status-Kapsel mit Progressline
+- mehr Raum für TIME × STRUCTURE × EXIT
+- Asset-Rail mit weichem rechten Fade statt hart abgeschnittenem Tab
+- kleine iPhone-Abstände weiter optimiert
+- bestehende Logik und Opportunity-Scanner-Verhalten unverändert
+- neues ACHI MERIDIAN Logo bleibt Standard
