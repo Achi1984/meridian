@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.6",
-  "build": "2026-08-23-single-source-decision-details-fix",
+  "appVersion": "5.10.7",
+  "build": "2026-08-23-1456-pionex-bot-refresh",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -324,7 +324,7 @@
   },
   "pionexRisk": {
     "status": "PIONEX VERIFIED SNAPSHOT",
-    "snapshotAt": "2026-08-23T12:39:00+02:00",
+    "snapshotAt": "2026-08-23T14:56:00+02:00",
     "activeCount": 4,
     "closedCount": 1,
     "bots": [
@@ -336,16 +336,16 @@
         "status": "ACTIVE",
         "investment": 52,
         "dynamicMargin": 110.09,
-        "totalProfit": -91.4,
-        "breakEven": 71504.8,
-        "liquidation": 80204.1,
-        "liquidationPrice": 80204.1,
-        "liquidationDistancePct": 4.36,
-        "currentPrice": 76849.7,
+        "totalProfit": -97.33,
+        "breakEven": 71636.1,
+        "liquidation": 80207.5,
+        "liquidationPrice": 80207.5,
+        "liquidationDistancePct": 3.89,
+        "currentPrice": 77197.6,
         "fundingPct": 0.01,
-        "healthScore": 18,
+        "healthScore": 14,
         "action": "REDUCE / EXIT CHECK",
-        "reason": "BTC Short 30x: Pionex Liq.-Puffer 4,36%; kritisch. Kein ADD."
+        "reason": "BTC Short 30x: Pionex Liq.-Puffer 3,89%; CRITICAL. Priorität #1, kein ADD."
       },
       {
         "id": "BTC-L20",
@@ -355,16 +355,16 @@
         "status": "ACTIVE",
         "investment": 100,
         "dynamicMargin": 0,
-        "totalProfit": 2.61,
-        "breakEven": 76579.6,
-        "liquidation": 69341.9,
-        "liquidationPrice": 69341.9,
-        "liquidationDistancePct": 9.76,
-        "currentPrice": 76849.7,
+        "totalProfit": 5.7,
+        "breakEven": 76557.3,
+        "liquidation": 69336.5,
+        "liquidationPrice": 69336.5,
+        "liquidationDistancePct": 10.14,
+        "currentPrice": 77163.9,
         "fundingPct": 0.01,
-        "healthScore": 62,
+        "healthScore": 60,
         "action": "KEEP / NO ADD",
-        "reason": "BTC Long 20x: Liq.-Puffer 9,76%; bestehende Position halten, kein ADD bis Risikoabstand besser ist."
+        "reason": "BTC Long 20x: Pionex Liq.-Puffer 10,14%; DANGER. Bestehende Position, kein ADD."
       },
       {
         "id": "HBAR-L5",
@@ -374,16 +374,16 @@
         "status": "ACTIVE",
         "investment": 562.54,
         "dynamicMargin": 0,
-        "totalProfit": 0.264,
-        "breakEven": 0.07838,
+        "totalProfit": 15.55,
+        "breakEven": 0.07827,
         "liquidation": 0.05853,
         "liquidationPrice": 0.05853,
-        "liquidationDistancePct": 25.61,
-        "currentPrice": 0.07868,
+        "liquidationDistancePct": 26.51,
+        "currentPrice": 0.07965,
         "fundingPct": 0.01,
-        "healthScore": 58,
+        "healthScore": 59,
         "action": "WATCH / NO ADD",
-        "reason": "HBAR Long 5x: Liq.-Puffer 25,61%; TIGHT, kein aggressives Nachlegen."
+        "reason": "HBAR Long 5x: Pionex Liq.-Puffer 26,51%; TIGHT."
       },
       {
         "id": "XRP-L5",
@@ -393,16 +393,16 @@
         "status": "ACTIVE",
         "investment": 565.92,
         "dynamicMargin": 0,
-        "totalProfit": -43.91,
-        "breakEven": 1.5473,
-        "liquidation": 0.8483,
-        "liquidationPrice": 0.8483,
-        "liquidationDistancePct": 43.01,
-        "currentPrice": 1.4887,
+        "totalProfit": -40.52,
+        "breakEven": 1.5463,
+        "liquidation": 0.8482,
+        "liquidationPrice": 0.8482,
+        "liquidationDistancePct": 43.27,
+        "currentPrice": 1.4952,
         "fundingPct": 0.01,
         "healthScore": 66,
         "action": "HOLD",
-        "reason": "XRP Long 5x: Liq.-Puffer 43,01%; SAFE."
+        "reason": "XRP Long 5x: Pionex Liq.-Puffer 43,27%; SAFE."
       }
     ],
     "closedBots": [
@@ -414,7 +414,7 @@
         "note": "Historischer geschlossener BTC-Short; darf niemals in aktive Risk-/Decision-Logik einfließen."
       }
     ],
-    "note": "Single Source of Truth: Nur diese vier ACTIVE Bots fließen in Risiko-, Hedge-, Queue- und Action-Center-Logik ein. Es gab keinen ETH-S30."
+    "note": "Single Source of Truth refreshed from Pionex screenshots 23.08.2026 14:55–14:56. Four ACTIVE bots: BTC-S30, BTC-L20, HBAR-L5, XRP-L5. Closed/history excluded from active risk logic."
   },
   "forecastCoins": [
     "BTC",
