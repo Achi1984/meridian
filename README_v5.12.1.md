@@ -1,4 +1,4 @@
-# ACHI MERIDIAN v5.12.1 — Capital Release & SSOT Position Fix
+# ACHI MERIDIAN v5.12.2 — Capital Release & SSOT Position Fix
 
 Änderungen:
 - CAPITAL RELEASE ENGINE 1.0

@@ -871,7 +871,7 @@ function commandCenter(){
     <div><span>PORTFOLIO RISK</span><b class="${risk.score>=75?'red':'amber'}">${risk.score}/100</b><small>Spot + Leverage + Bots</small></div>
    </div>
    <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
- card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('NEW RISK CAPACITY',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${metric('SHORT HEDGE STRESS','98/100 · CRITICAL','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
+ card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('AVAILABLE NEW RISK',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${metric('SHORT HEDGE STRESS','98/100 · CRITICAL','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
  compactDecisionDetails()+
  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">${DATA.pionexRisk?.activeCount??'—'} ACTIVE · ${DATA.pionexRisk?.closedCount??0} CLOSED</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
  `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
@@ -1611,7 +1611,7 @@ function capitalReleasePanel(){
  return card(`<div class="section-head"><div><div class="eyebrow">CAPITAL RELEASE ENGINE 1.0 ${liveBadge('SSOT')}</div><div class="forecast-main ${c.cls}">${c.stage}</div><div class="sub">Risk Unlock → Entry Check → Kapitalfreigabe</div></div><span class="tag ${c.cls}">${c.blocked?'NEW CAPITAL $0':'CHECK ONLY'}</span></div>
  <div class="grid2">
   ${metric('THEORETICAL 5X CAPACITY','$'+fmt(c.theoretical,0),'amber')}
-  ${metric('NEW RISK CAPACITY',c.blocked?'$0 · BLOCKED':'CHECK ONLY',''+c.cls)}
+  ${metric('AVAILABLE NEW RISK',c.blocked?'$0 · BLOCKED':'CHECK ONLY',''+c.cls)}
   ${metric('BTC-S30 BUFFER',Number.isFinite(c.shortBuf)?fmt(c.shortBuf,1)+'%':'—',c.cls)}
   ${metric('NEXT UNLOCK',c.next,'cyan')}
  </div>
@@ -2016,7 +2016,7 @@ function unifiedDecisionQueue(){
 }
 
 
-/* v5.12.1 — POSITION LIFECYCLE + CAPITAL RELEASE */
+/* v5.12.2 — POSITION LIFECYCLE + CAPITAL RELEASE */
 function lifecycleDecision(bot){
  const s=decisionSSOT(), cfg=DATA.positionLifecycleEngine?.rules||{};
  const b=Number(bot?.buffer), health=Number(bot?.healthScore||0), side=String(bot?.side||'').toUpperCase();
@@ -2074,8 +2074,8 @@ function executionTarget(bot){
  if(!bot) return '—';
  const b=Number(bot.buffer);
  if(!Number.isFinite(b)) return 'LIVE BUFFER PRÜFEN';
- if(b<8) return '>8% MIN · >12% BEVORZUGT';
- if(b<15) return '>15% RECOVERY';
+ if(b<8) return '>8% MIN · >12–15% WATCH';
+ if(b<15) return '>≥15% ENTRY CHECK';
  if(b<30) return '>30% SAFE';
  return 'SAFE ≥30%';
 }
@@ -2243,7 +2243,7 @@ function adaptiveRiskPanel(){
    <div><span>PUFFER</span><b>${fmt(current,2)}%</b></div>
    <div><span>RICHTUNG</span><b>${side} ${b.leverage||'—'}x</b></div>
  </div>
- <div class="adaptive-path"><span class="red">JETZT ${fmt(current,1)}%</span><i></i><span class="amber">8% MIN</span><i></i><span class="green">12% BEVORZUGT</span><i></i><span class="cyan">15% RECOVERY</span></div>
+ <div class="adaptive-path"><span class="red">JETZT ${fmt(current,1)}%</span><i></i><span class="amber">8% MIN</span><i></i><span class="green">12–15% WATCH</span><i></i><span class="cyan">≥15% ENTRY CHECK</span></div>
  ${zoneHtml}
  <div class="adaptive-warning"><b>MODELL-ÄQUIVALENTE, KEINE ORDERGRÖSSE</b><span>Margin-Äquivalent ≈ Notional × zusätzlicher Puffer. Reduce-Äquivalent skaliert das Risiko invers zum Zielpuffer. Pionex-Futures-Grid, Maintenance Margin und offene Grid-Orders können den echten neuen Liquidationspreis abweichend verschieben.</span></div>
  <p class="footer-note">Praktische Reihenfolge: 1) in Pionex Position/Margin manuell anpassen, 2) neuen Liquidationspreis prüfen, 3) MERIDIAN neu synchronisieren. Erst der neu berechnete Live-Puffer entscheidet über die nächste Stufe.</p>`,'adaptive-risk-card');

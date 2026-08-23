@@ -1208,7 +1208,7 @@ body{background:transparent;letter-spacing:.01em}
 .life-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:18px 0;padding:12px 14px;border:1px solid rgba(31,169,255,.28);border-radius:14px;background:rgba(6,23,35,.58);font-size:10px;font-weight:900;letter-spacing:.7px}.life-flow i{color:#718297;font-style:normal}.life-row{padding:16px 0;border-top:1px solid rgba(61,117,151,.24)}.life-row:first-of-type{border-top:0}.life-main{display:flex;justify-content:space-between;gap:12px;align-items:center}.life-main b{font-size:17px}.life-main span,.life-meta, .life-row small{color:#7f91a8;font-size:10px}.life-state{font-size:15px;font-weight:950;margin:8px 0}.life-meta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:7px}.lifecycle-card{border-color:rgba(31,169,255,.5)}
 
 
-/* v5.12.1 — Capital Release / Scanner Risk Gate */
+/* v5.12.2 — Capital Release / Scanner Risk Gate */
 .scanner-risk summary{grid-template-columns:1.15fr .58fr .58fr .85fr}
 .scanner-risk summary span:last-child{text-align:right}
 .capital-release-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0 4px}

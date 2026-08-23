@@ -1,4 +1,4 @@
 {
-  "version": "5.12.1",
-  "build": "2026-08-23-capital-release-overhedge-ssot-fix"
+  "version": "5.12.2",
+  "build": "2026-08-23-ssot-consistency-cleanup"
 }

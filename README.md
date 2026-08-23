@@ -1,12 +1,12 @@
-# ACHI MERIDIAN v5.12.1
+# ACHI MERIDIAN v5.12.2
 
-Siehe README_v5.12.1.md für die Änderungen.
+Siehe README_v5.12.2.md für die Änderungen.
 
 # ACHI MERIDIAN v5.11.2 — Adaptive Risk Engine
 
 Neu in v5.11.2:
 - Adaptive Risk Engine 1.0 für die kritischste aktive Position
-- Live-Liquidationspuffer wird in konkrete Zielzonen übersetzt: 8% MIN, 12% BEVORZUGT, 15% RECOVERY
+- Live-Liquidationspuffer wird in konkrete Zielzonen übersetzt: 8% MIN, 12–15% WATCH, ≥15% ENTRY CHECK
 - je Zielzone: Ziel-Liquidationspreis, benötigte Liq.-Verschiebung, Margin-Äquivalent und Reduce-Äquivalent
 - Berechnung basiert auf dem bestehenden SSOT und Live-Kurs; keine zweite Datenquelle
 - nach jeder manuellen Änderung ist ein Pionex-Recheck zwingend
