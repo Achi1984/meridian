@@ -1390,7 +1390,7 @@ function commanderBot(b){
  const guard=liqGuard(b), liq=Number(b.liquidationDistancePct||0);
  const priority=b.id==='BTC-S30'?'REDUCE / EXIT CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':liqGuard(b).label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
- <div class="commander-priority ${guard.cls}">${priority} · ${b.action}</div>
+ <div class="commander-priority ${guard.cls}">${priority}${b.action && b.action!==priority?` · ${b.action}`:""}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason}</p></details>`;
 }
 

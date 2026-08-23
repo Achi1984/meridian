@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.7",
-  "build": "2026-08-23-1456-pionex-bot-refresh",
+  "appVersion": "5.10.8",
+  "build": "2026-08-23-ui-detail-render-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
