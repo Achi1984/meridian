@@ -1126,3 +1126,4 @@ body{background:transparent;letter-spacing:.01em}
 .dd-row span{font-size:8px;color:#8598aa}
 .dd-row b{text-align:right;font-size:9px}
 .dd-row small{grid-column:1/-1;font-size:7px;color:#687f92}
+\n/* v5.10.6 Decision Details persistent state */\n.decision-details summary strong::after{content:""}\n.decision-details[open] summary strong{font-size:0}\n.decision-details[open] summary strong::after{content:"SCHLIESSEN";font-size:12px}\n.decision-details summary{cursor:pointer;touch-action:manipulation}\n

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.5",
-  "build": "2026-08-23-bot-queue-integrity-fix",
+  "appVersion": "5.10.6",
+  "build": "2026-08-23-single-source-decision-details-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -323,9 +323,9 @@
     "decisionNote": "NO ENTRY im Snapshot: starkes Risk-on-Momentum, aber überdehnungsgefährdet. Browser versucht RSI, Funding, OI und VWAP direkt neu zu laden."
   },
   "pionexRisk": {
-    "status": "SNAPSHOT",
-    "snapshotAt": "2026-08-23",
-    "activeCount": 2,
+    "status": "PIONEX VERIFIED SNAPSHOT",
+    "snapshotAt": "2026-08-23T12:39:00+02:00",
+    "activeCount": 4,
     "closedCount": 1,
     "bots": [
       {
@@ -334,36 +334,87 @@
         "side": "SHORT",
         "leverage": 30,
         "status": "ACTIVE",
-        "investment": 174.76,
-        "dynamicMargin": 159.68,
-        "totalProfit": 55.84,
-        "breakEven": 75887.2,
-        "liquidationPrice": 95720.6
+        "investment": 52,
+        "dynamicMargin": 110.09,
+        "totalProfit": -91.4,
+        "breakEven": 71504.8,
+        "liquidation": 80204.1,
+        "liquidationPrice": 80204.1,
+        "liquidationDistancePct": 4.36,
+        "currentPrice": 76849.7,
+        "fundingPct": 0.01,
+        "healthScore": 18,
+        "action": "REDUCE / EXIT CHECK",
+        "reason": "BTC Short 30x: Pionex Liq.-Puffer 4,36%; kritisch. Kein ADD."
       },
       {
-        "id": "ETH-S30",
-        "symbol": "ETH",
-        "side": "SHORT",
-        "leverage": 30,
+        "id": "BTC-L20",
+        "symbol": "BTC",
+        "side": "LONG",
+        "leverage": 20,
         "status": "ACTIVE",
-        "investment": 200.0,
-        "dynamicMargin": 186.35,
-        "totalProfit": -0.75,
-        "breakEven": 2593.84,
-        "liquidationPrice": 3141.22
+        "investment": 100,
+        "dynamicMargin": 0,
+        "totalProfit": 2.61,
+        "breakEven": 76579.6,
+        "liquidation": 69341.9,
+        "liquidationPrice": 69341.9,
+        "liquidationDistancePct": 9.76,
+        "currentPrice": 76849.7,
+        "fundingPct": 0.01,
+        "healthScore": 62,
+        "action": "KEEP / NO ADD",
+        "reason": "BTC Long 20x: Liq.-Puffer 9,76%; bestehende Position halten, kein ADD bis Risikoabstand besser ist."
       },
+      {
+        "id": "HBAR-L5",
+        "symbol": "HBAR",
+        "side": "LONG",
+        "leverage": 5,
+        "status": "ACTIVE",
+        "investment": 562.54,
+        "dynamicMargin": 0,
+        "totalProfit": 0.264,
+        "breakEven": 0.07838,
+        "liquidation": 0.05853,
+        "liquidationPrice": 0.05853,
+        "liquidationDistancePct": 25.61,
+        "currentPrice": 0.07868,
+        "fundingPct": 0.01,
+        "healthScore": 58,
+        "action": "WATCH / NO ADD",
+        "reason": "HBAR Long 5x: Liq.-Puffer 25,61%; TIGHT, kein aggressives Nachlegen."
+      },
+      {
+        "id": "XRP-L5",
+        "symbol": "XRP",
+        "side": "LONG",
+        "leverage": 5,
+        "status": "ACTIVE",
+        "investment": 565.92,
+        "dynamicMargin": 0,
+        "totalProfit": -43.91,
+        "breakEven": 1.5473,
+        "liquidation": 0.8483,
+        "liquidationPrice": 0.8483,
+        "liquidationDistancePct": 43.01,
+        "currentPrice": 1.4887,
+        "fundingPct": 0.01,
+        "healthScore": 66,
+        "action": "HOLD",
+        "reason": "XRP Long 5x: Liq.-Puffer 43,01%; SAFE."
+      }
+    ],
+    "closedBots": [
       {
         "id": "BTC-S30-CLOSED",
         "symbol": "BTC",
         "side": "SHORT",
-        "leverage": 30,
         "status": "CLOSED",
-        "investment": 160.45,
-        "totalProfit": 41.82,
-        "entry": 75870.3
+        "note": "Historischer geschlossener BTC-Short; darf niemals in aktive Risk-/Decision-Logik einfließen."
       }
     ],
-    "note": "Nur ACTIVE Bots fließen in Risiko-, Hedge- und Action-Center-Logik ein."
+    "note": "Single Source of Truth: Nur diese vier ACTIVE Bots fließen in Risiko-, Hedge-, Queue- und Action-Center-Logik ein. Es gab keinen ETH-S30."
   },
   "forecastCoins": [
     "BTC",
@@ -1215,7 +1266,8 @@
       "compactDecisionDetails": true,
       "portfolioImmediatelyAfterMasterDecision": true
     },
-    "botStateRule": "ACTIVE_ONLY"
+    "botStateRule": "ACTIVE_ONLY_SINGLE_SOURCE",
+    "sourceOfTruth": "pionexRisk.bots"
   },
   "pionexCanonicalBots": [
     {
@@ -1310,5 +1362,17 @@
     "excludeClosed": true,
     "excludeUnverified": true,
     "singleSource": "pionexCanonicalBots"
+  },
+  "dualBotHedge": {
+    "longBotId": "BTC-L20",
+    "shortBotId": "BTC-S30",
+    "long": {
+      "liqBufferPct": 9.76
+    },
+    "short": {
+      "liqBufferPct": 4.36
+    },
+    "source": "pionexRisk.bots",
+    "status": "SNAPSHOT"
   }
 }
