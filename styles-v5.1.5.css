@@ -799,3 +799,13 @@ main>section:not(.hidden)>.card:first-child{
 .cycle-envelope{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}.cycle-envelope>div{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #174567;border-radius:14px}.cycle-envelope span{font-size:10px;color:#8193a8;letter-spacing:.8px}.cycle-envelope b{font-size:13px;text-align:right}
 .exit-inputs{margin:12px 0}.trigger-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.trigger-grid>div{padding:12px;border:1px solid #174567;border-radius:14px;display:flex;flex-direction:column;gap:6px}.trigger-grid span{font-size:10px;font-weight:800;letter-spacing:1px}.trigger-grid b{font-size:10px;line-height:1.35;color:#dfe7f2}
 @media(max-width:430px){.cycle-roadmap-item b{font-size:7px}.trigger-grid{grid-template-columns:1fr 1fr}.cycle-envelope b{font-size:12px}}
+
+/* v5.5 GRID COMMANDER */
+.commander-detail{border:1px solid var(--line2);border-radius:16px;margin:10px 0;overflow:hidden;background:rgba(8,19,29,.55)}
+.commander-detail summary{list-style:none;display:grid;grid-template-columns:1.4fr .8fr .7fr;gap:8px;align-items:center;padding:14px;cursor:pointer}
+.commander-detail summary::-webkit-details-marker{display:none}
+.commander-detail summary span{display:flex;flex-direction:column;gap:4px}.commander-detail summary small{color:var(--muted);font-size:8px;letter-spacing:.7px}
+.commander-detail[open]{padding-bottom:12px}.commander-detail[open] summary{border-bottom:1px solid var(--line2)}
+.commander-detail .grid2,.commander-detail .scanner-grid,.commander-detail .footer-note{margin-left:12px;margin-right:12px}
+.commander-priority{margin:12px;border:1px solid currentColor;border-radius:12px;padding:10px;font-weight:900;letter-spacing:.5px}
+.commander-detail.red{border-color:rgba(255,90,96,.5)}.commander-detail.amber{border-color:rgba(232,178,74,.45)}.commander-detail.green{border-color:rgba(47,210,133,.35)}

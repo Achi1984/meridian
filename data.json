@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.4.1",
-  "build": "2026-08-23-grid-health-2.0",
+  "appVersion": "5.5.0",
+  "build": "2026-08-23-grid-commander",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -433,7 +433,7 @@
       }
     ],
     "healthEngine": {
-      "version": "2.0",
+      "version": "3.0",
       "factors": [
         "GRID EDGE",
         "TREND DRAG",
