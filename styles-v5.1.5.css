@@ -1027,3 +1027,12 @@ body{background:transparent;letter-spacing:.01em}
 .scanner-risk-head em{font-style:normal;font-size:7px;margin-left:5px}
 .scanner-risk-head em.red{color:#ff5d68}.scanner-risk-head em.amber{color:#f0b84b}.scanner-risk-head em.green{color:#2fe59a}
 @media(max-width:420px){.dq-grid{grid-template-columns:1fr}.dq-rules{grid-template-columns:1fr 1fr}}
+
+
+/* v5.9.7 — ENTRY CONFLUENCE */
+.cf-row{display:grid;grid-template-columns:1fr 80px 1.6fr;gap:10px;align-items:center;padding:12px 2px;border-bottom:1px solid rgba(43,101,137,.25)}
+.cf-row:last-of-type{border-bottom:none}
+.cf-row div b,.cf-row div span{display:block}.cf-row div b{font-size:12px}.cf-row div span{font-size:7px;color:#7b8fa3;margin-top:3px;letter-spacing:.8px}
+.cf-row strong{font-size:9px;text-align:right}.cf-row strong.red{color:#ff5d68}.cf-row strong.amber{color:#f0b84b}.cf-row strong.green{color:#2fe59a}
+.cf-legend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.cf-legend span{font-size:7px;color:#71879b;padding:8px;border-radius:10px;background:rgba(8,29,43,.55)}
+@media(max-width:400px){.cf-row{grid-template-columns:1fr 60px 1.4fr}.cf-row strong{font-size:8px}.cf-legend{grid-template-columns:1fr}}

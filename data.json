@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.9.6",
-  "build": "2026-08-23-decision-quality-layer",
+  "appVersion": "5.9.7",
+  "build": "2026-08-23-entry-confluence-gate",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1133,7 +1133,10 @@
         "rrTp2": 3.4787740551404,
         "invalidation": "Close below structural SL",
         "status": "MODEL",
-        "rule": "SL below structural range support with small volatility buffer"
+        "rule": "SL below structural range support with small volatility buffer",
+        "entryReadiness": 53,
+        "confluenceLabel": "GOOD R:R · WAIT ENTRY",
+        "confluenceClass": "amber"
       },
       "ETH": {
         "entryLow": 2138.0,
@@ -1148,7 +1151,10 @@
         "rrTp2": 3.48954714836102,
         "invalidation": "Close below structural SL",
         "status": "MODEL",
-        "rule": "SL below structural range support with small volatility buffer"
+        "rule": "SL below structural range support with small volatility buffer",
+        "entryReadiness": 49,
+        "confluenceLabel": "GOOD R:R · WAIT ENTRY",
+        "confluenceClass": "amber"
       },
       "PEPE": {
         "entryLow": 3.31e-06,
@@ -1163,7 +1169,10 @@
         "rrTp2": 3.4008097165991886,
         "invalidation": "Close below structural SL",
         "status": "MODEL",
-        "rule": "SL below structural range support with small volatility buffer"
+        "rule": "SL below structural range support with small volatility buffer",
+        "entryReadiness": 45,
+        "confluenceLabel": "GOOD R:R · WAIT ENTRY",
+        "confluenceClass": "amber"
       },
       "XRP": {
         "entryLow": 1.2604,
@@ -1178,7 +1187,10 @@
         "rrTp2": 3.4797598909876952,
         "invalidation": "Close below structural SL",
         "status": "MODEL",
-        "rule": "SL below structural range support with small volatility buffer"
+        "rule": "SL below structural range support with small volatility buffer",
+        "entryReadiness": 58,
+        "confluenceLabel": "GOOD R:R · WATCH ENTRY",
+        "confluenceClass": "amber"
       },
       "HBAR": {
         "entryLow": 0.07342,
@@ -1193,7 +1205,10 @@
         "rrTp2": 3.4780012328556067,
         "invalidation": "Close below structural SL",
         "status": "MODEL",
-        "rule": "SL below structural range support with small volatility buffer"
+        "rule": "SL below structural range support with small volatility buffer",
+        "entryReadiness": 56,
+        "confluenceLabel": "GOOD R:R · WATCH ENTRY",
+        "confluenceClass": "amber"
       }
     }
   },
@@ -1231,6 +1246,25 @@
       "marketRegime": "RISK-ON / SHORT-SQUEEZE",
       "action": "REDUCE / EXIT CHECK",
       "reason": "Critical liquidation buffer gets higher priority when market regime is risk-on."
+    }
+  },
+  "entryConfluence": {
+    "version": "1.0",
+    "status": "MODEL",
+    "rules": {
+      "preferredRrMin": 2.5,
+      "preferredEntryMin": 70,
+      "readyRrMin": 2.0,
+      "readyEntryMin": 65,
+      "watchEntryMin": 55
+    },
+    "principle": "PREFERRED only when R:R AND Entry Readiness confirm.",
+    "entryReadiness": {
+      "SOL": 53,
+      "ETH": 49,
+      "PEPE": 45,
+      "XRP": 58,
+      "HBAR": 56
     }
   }
 }

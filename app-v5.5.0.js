@@ -1488,7 +1488,8 @@ function gridView(){
  card(`<div class="section-title">BOT PRIORITY QUEUE</div>${order.map(commanderBot).join('')}<p class="footer-note">SAFE ≥30% · TIGHT 15–30% · DANGER 8–15% · CRITICAL &lt;8% Liq.-Puffer. Details per Tap.</p>`)+
  card(`<div class="section-title">MULTI-ASSET SL MATRIX <span class="tag cyan">MODEL</span></div>
  ${['SOL','ETH','XRP','HBAR','PEPE'].map(s=>multiAssetRiskRow(s)).join('')}
- <p class="footer-note">SL wird strukturell aus Range-Support + Volatilitätspuffer abgeleitet. Entry/SL/TP/R:R sind Modellwerte und keine automatische Order.</p>`)+card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div class="forecast-main">ENTRY READINESS</div><button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button><p class="footer-note">Setup Quality bewertet die Struktur. Entry Readiness bewertet, ob der Einstieg JETZT sinnvoll ist.</p>`)+
+ <p class="footer-note">SL wird strukturell aus Range-Support + Volatilitätspuffer abgeleitet. Entry/SL/TP/R:R sind Modellwerte und keine automatische Order.</p>`)+confluenceSummaryPanel()+
+card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div class="forecast-main">ENTRY READINESS</div><button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button><p class="footer-note">Setup Quality bewertet die Struktur. Entry Readiness bewertet, ob der Einstieg JETZT sinnvoll ist.</p>`)+
  card(`<div class="section-title">OPPORTUNITY SCANNER</div>${['SOL','ETH','PEPE'].map(scannerCard).join('')||'<p class="footer-note">Scanner lädt 4H-Daten …</p>'}<p class="footer-note">Keine automatische Bot-Ausführung.</p>`);
 }
 
@@ -1571,7 +1572,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.9.6 — MULTI-ASSET SL ENGINE */
+/* v5.9.7 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1580,7 +1581,7 @@ function multiAssetRiskRow(sym){
  const a=multiAssetSlData(sym); if(!a)return '';
  const dec=(n)=>n<0.01?8:n<10?4:2;
  const f=(n)=>fmt(n,dec(n));
- const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0), gate=rrDecision(rr2);
+ const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0), gate=entryConfluence(sym,rr2);
  const rrCls=rr2>=2?'green':rr2>=1.3?'amber':'red';
  return `<div class="scanner-risk-panel">
    <div class="scanner-risk-head"><span>RISK PLAN</span><b>${sym} · <em class="${gate.cls}">${gate.label}</em></b></div>
@@ -1590,11 +1591,11 @@ function multiAssetRiskRow(sym){
     <div class="tp1"><span>TP1</span><b>$${f(a.tp1)}</b><small>R:R ${fmt(rr1,2)}</small></div>
     <div class="tp2"><span>TP2</span><b>$${f(a.tp2)}</b><small>R:R ${fmt(rr2,2)}</small></div>
    </div>
-   <div class="scanner-invalidation"><span>INVALIDATION</span><b>Close &lt; $${f(a.stopLoss)}</b><em class="${rrCls}">R:R2 ${fmt(rr2,2)}</em></div>
+   <div class="scanner-invalidation"><span>INVALIDATION</span><b>Close &lt; $${f(a.stopLoss)}</b><em class="${gate.cls}">ENTRY ${gate.entry}/100</em></div>
   </div>`;
 }
 
-/* v5.9.6 — DECISION QUALITY LAYER */
+/* v5.9.7 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1633,4 +1634,32 @@ function decisionQualityPanel(){
    <span><b>≥2,5</b> PREFERRED</span>
  </div>
  <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: ein Long kann KEEP sein, obwohl ein zusätzlicher Long wegen schlechtem R:R blockiert bleibt.</p>`);
+}
+
+/* v5.9.7 — ENTRY CONFLUENCE GATE */
+function entryConfluence(sym, rr2){
+ const cfg=DATA.entryConfluence?.rules||{};
+ const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
+ rr2=Number(rr2||0);
+ let label='NO ENTRY', cls='red';
+ if(rr2>=Number(cfg.preferredRrMin||2.5) && er>=Number(cfg.preferredEntryMin||70)){label='PREFERRED';cls='green';}
+ else if(rr2>=Number(cfg.readyRrMin||2.0) && er>=Number(cfg.readyEntryMin||65)){label='READY';cls='green';}
+ else if(rr2>=Number(cfg.readyRrMin||2.0) && er>=Number(cfg.watchEntryMin||55)){label='GOOD R:R · WATCH ENTRY';cls='amber';}
+ else if(rr2>=Number(cfg.readyRrMin||2.0)){label='GOOD R:R · WAIT ENTRY';cls='amber';}
+ return {label,cls,entry:er,rr:rr2};
+}
+function confluenceSummaryPanel(){
+ const assets=DATA.multiAssetSlEngine?.assets||{};
+ const rows=Object.keys(assets).map(sym=>{
+   const a=assets[sym], g=entryConfluence(sym,a.rrTp2);
+   return `<div class="cf-row">
+    <div><b>${sym}</b><span>R:R2 ${fmt(a.rrTp2,2)}</span></div>
+    <div><b>${g.entry}/100</b><span>ENTRY</span></div>
+    <strong class="${g.cls}">${g.label}</strong>
+   </div>`;
+ }).join('');
+ return card(`<div class="section-head"><div><div class="eyebrow">ENTRY CONFLUENCE 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × ENTRY READINESS</div><div class="sub">Gutes Chance/Risiko ≠ sofortiger Einstieg</div></div></div>
+ ${rows}
+ <div class="cf-legend"><span>PREFERRED: R:R ≥2,5 + Entry ≥70</span><span>READY: R:R ≥2,0 + Entry ≥65</span></div>
+ <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
 }
