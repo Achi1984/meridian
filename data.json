@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.9.8",
-  "build": "2026-08-23-confluence-ui-consistency",
+  "appVersion": "5.9.9",
+  "build": "2026-08-23-unified-decision-engine",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1264,7 +1264,8 @@
       "ETH": 49,
       "PEPE": 45,
       "XRP": 58,
-      "HBAR": 56
+      "HBAR": 56,
+      "BTC": 48
     },
     "uiVersion": "1.1",
     "legend": [
@@ -1285,5 +1286,16 @@
         "rule": "R:R ≥ 2,5 + Entry ≥ 70"
       }
     ]
+  },
+  "unifiedDecisionEngine": {
+    "version": "1.0",
+    "status": "MODEL",
+    "priority": [
+      "LIQUIDATION_RISK",
+      "EXISTING_POSITION",
+      "NEW_ENTRY",
+      "OPPORTUNITY_WATCH"
+    ],
+    "principle": "Kapitalrisiko zuerst, danach bestehende Positionen, erst danach neue Entries."
   }
 }

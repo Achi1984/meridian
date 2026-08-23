@@ -1572,7 +1572,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.9.8 — MULTI-ASSET SL ENGINE */
+/* v5.9.9 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1595,7 +1595,7 @@ function multiAssetRiskRow(sym){
   </div>`;
 }
 
-/* v5.9.8 — DECISION QUALITY LAYER */
+/* v5.9.9 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1624,7 +1624,7 @@ function decisionQualityPanel(){
  const sr=botRiskDecision(sht);
  return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × ENTRY × LIQ × REGIME</div><div class="sub">Entry-Gate nutzt R:R + Entry Readiness; Bot-Risiko bleibt separat</div></div></div>
  <div class="dq-grid">
-  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??'—'}/100</small></div>
+  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??0}/100</small></div>
   <div class="dq-card ${sr.cls}"><span>BTC SHORT RISK</span><b>${sr.label}</b><small>Liq.-Puffer ${fmt(sht.liquidationDistancePct,1)}% · ${DATA.market?.regime||'REGIME'}</small></div>
  </div>
  <div class="dq-rules dq-confluence-rules">
@@ -1636,7 +1636,7 @@ function decisionQualityPanel(){
  <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
-/* v5.9.8 — ENTRY CONFLUENCE GATE */
+/* v5.9.9 — ENTRY CONFLUENCE GATE */
 function entryConfluence(sym, rr2){
  const cfg=DATA.entryConfluence?.rules||{};
  const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
@@ -1662,4 +1662,50 @@ function confluenceSummaryPanel(){
  ${rows}
  <div class="cf-legend"><span>PREFERRED: R:R ≥2,5 + Entry ≥70</span><span>READY: R:R ≥2,0 + Entry ≥65</span></div>
  <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
+}
+
+/* v5.9.9 — UNIFIED DECISION ENGINE */
+function unifiedDecisionQueue(){
+ const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
+ const btcLongRR=Number(DATA.slInvalidationEngine?.btcLong?.rrTp2||1.33);
+ const shortBuf=Number(DATA.dualBotHedge?.short?.liqBufferPct||4.8);
+ const longBuf=Number(DATA.dualBotHedge?.long?.liqBufferPct||9.4);
+
+ const acts=[];
+ acts.push({
+   n:1, cls:'red', title:'BTC-S30', action:'REDUCE / EXIT CHECK',
+   why:`Liq.-Puffer ${fmt(shortBuf,1)}% · 30x · Markt RISK-ON`
+ });
+ acts.push({
+   n:2, cls:'amber', title:'BTC-L20', action:'KEEP / NO ADD',
+   why:`Entry ${btcEntry}/100 · TP2 R:R ${fmt(btcLongRR,2)} · Leverage hoch`
+ });
+
+ const opp=DATA.entryConfluence?.entryReadiness||{};
+ const rows=['XRP','HBAR','SOL','ETH','PEPE'].map(sym=>{
+   const a=DATA.multiAssetSlEngine?.assets?.[sym]||{};
+   const g=entryConfluence(sym,a.rrTp2);
+   return {sym, entry:g.entry, label:g.label, cls:g.cls, rr:Number(a.rrTp2||0)};
+ }).sort((a,b)=>b.entry-a.entry);
+
+ rows.forEach((x,i)=>{
+   acts.push({
+     n:i+3, cls:x.cls, title:x.sym,
+     action:x.label,
+     why:`Entry ${x.entry}/100 · R:R2 ${fmt(x.rr,2)}`
+   });
+ });
+
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">UNIFIED DECISION ENGINE 1.0 <span class="tag cyan">MODEL</span></div>
+   <div class="forecast-main">RISK → POSITION → ENTRY</div>
+   <div class="sub">Eine priorisierte Handlungskette statt getrennter Einzel-Signale.</div>
+ </div></div>
+ <div class="ude-hero"><span>JETZT</span><b>1. BTC-S30 RISIKO REDUZIEREN</b><em>danach erst neue Entries bewerten</em></div>
+ ${acts.map(a=>`<div class="ude-row">
+   <span class="ude-num ${a.cls}">${a.n}</span>
+   <div><b>${a.title}</b><small>${a.why}</small></div>
+   <strong class="${a.cls}">${a.action}</strong>
+ </div>`).join('')}
+ <p class="footer-note">Priorität: Liquidationsrisiko → bestehende Position → neue Entries → Opportunity Watchlist. Keine automatische Order-Ausführung.</p>`);
 }

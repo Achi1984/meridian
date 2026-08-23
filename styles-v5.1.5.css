@@ -1050,3 +1050,21 @@ body{background:transparent;letter-spacing:.01em}
   font-size:9px;
   margin-bottom:4px;
 }
+
+
+/* v5.9.9 — unified decision */
+.ude-hero{margin:12px 0 10px;padding:14px 16px;border:1px solid rgba(255,93,104,.45);border-radius:16px;background:rgba(255,93,104,.05)}
+.ude-hero span,.ude-hero b,.ude-hero em{display:block}
+.ude-hero span{font-size:7px;letter-spacing:1.2px;color:#7f93a6}
+.ude-hero b{font-size:16px;color:#ff5d68;margin-top:4px}
+.ude-hero em{font-size:8px;color:#7f93a6;margin-top:5px;font-style:normal}
+.ude-row{display:grid;grid-template-columns:36px 1fr 1.25fr;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(43,101,137,.25)}
+.ude-num{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;border:1px solid currentColor;font-weight:900}
+.ude-row div b,.ude-row div small{display:block}
+.ude-row div b{font-size:11px}
+.ude-row div small{font-size:7px;color:#7c90a3;margin-top:4px}
+.ude-row strong{text-align:right;font-size:9px}
+.ude-row .red,.ude-num.red{color:#ff5d68}
+.ude-row .amber,.ude-num.amber{color:#f0b84b}
+.ude-row .green,.ude-num.green{color:#2fe59a}
+@media(max-width:390px){.ude-row{grid-template-columns:32px 1fr 1.1fr}.ude-row strong{font-size:8px}}
