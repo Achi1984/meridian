@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.15.1",
-  "build": "2026-08-23-action-center-recovery-ssot-sync",
+  "appVersion": "5.15.2",
+  "build": "2026-08-23-dominant-action-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1608,5 +1608,18 @@
       "STABILIZE": ">=15% buffer",
       "SAFE": "capital + entry recheck"
     }
+  },
+  "dominantActionFix": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "source": "dominantActionSSOT",
+    "surfaces": [
+      "ACTION CENTER priority headline",
+      "ACTION CENTER recovery chip",
+      "NEXT UNLOCK",
+      "action chain",
+      "DYNAMIC RECOVERY"
+    ],
+    "principle": "One risk state, one dominant action, all CENTER surfaces synchronized."
   }
 }

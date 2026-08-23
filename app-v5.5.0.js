@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.15.1';
-let APP_RELEASE='5.15.1 · ACTION SYNC';
+let APP_CODE_VERSION='5.15.2';
+let APP_RELEASE='5.15.2 · DOMINANT ACTION FIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2473,20 +2473,39 @@ function actionCenterPanel(){
  const longGuard=ll?ll.guard:botGuardFromBuffer(NaN);
  const rank=entryIntelRank();
  const best=rank[0]||null;
- const actionText=s.entryBlocked ? (s.nextAction||'RISIKO ZUERST') : (best ? `${best.sym} ${best.a.label}` : 'ENTRY CHECK');
- const actionTone=s.entryBlocked?'red':(best?.a?.cls||'green');
- const unlock=c.blocked?c.next:'Capital Gate offen · Setup/Entry separat bestätigen';
+ const act=dominantActionSSOT();
+
+ // Dominant recovery action owns the headline whenever the risk gate is blocked.
+ // Once recovery is SAFE, Capital/Entry are still rechecked separately.
+ const actionText=s.entryBlocked ? act.headline : (best ? `${best.sym} ${best.a.label}` : 'ENTRY CHECK');
+ const actionDetail=s.entryBlocked ? act.detail : 'Risk Gate offen; Ausführung bleibt manuell.';
+ const actionTone=s.entryBlocked ? act.tone : (best?.a?.cls||'green');
+
+ let unlock=c.next;
+ if(s.entryBlocked && act.target){
+   unlock=`${act.botId} auf ≥${act.target}% Puffer bringen`;
+ }else if(!s.entryBlocked){
+   unlock='Capital Gate offen · Setup/Entry separat bestätigen';
+ }
+
+ const firstChain=s.entryBlocked
+   ? `<span class="${act.tone}">1 · ${act.botId} ${act.target?`→ ${act.target}%`:'RISK RECHECK'}</span>`
+   : (s.queue[0]?`<span class="${s.queue[0].tone}">1 · ${s.queue[0].id} ${s.queue[0].action.split(' / ')[0]}</span>`:'');
+
+ const secondChain=s.queue[1]
+   ? `<span class="${s.queue[1].tone}">2 · ${s.queue[1].id} ${s.queue[1].action.split(' / ')[0]}</span>`
+   : '';
 
  return card(`<div class="ac-top"><div>
-   <div class="eyebrow">ACTION CENTER 1.4 ${liveBadge('SSOT')}</div>
+   <div class="eyebrow">ACTION CENTER 1.5 ${liveBadge('SSOT')}</div>
    <div class="forecast-main ${actionTone}">JETZT TUN</div>
    <div class="sub">Eine dominante Entscheidung für CENTER + GRID.</div>
  </div><span class="tag ${c.blocked?'red':'green'}">${c.blocked?'RISK BLOCK':'CAPITAL CHECK'}</span></div>
 
  <div class="ac-now ${actionTone}">
-   <span>PRIORITÄT #1</span>
+   <div class="ac-priority-line"><span>PRIORITÄT #1</span><em class="tag ${act.tone}">${s.entryBlocked?act.chip:'ENTRY CHECK'}</em></div>
    <b>${actionText}</b>
-   <small>${s.entryBlocked?'Liquidationsrisiko hat Vorrang vor jedem Entry-Score.':'Risk Gate offen; Ausführung bleibt manuell.'}</small>
+   <small>${actionDetail}.</small>
  </div>
 
  <div class="ac-grid">
@@ -2497,10 +2516,11 @@ function actionCenterPanel(){
  </div>
 
  <div class="ac-chain">
-   ${s.queue.slice(0,2).map((q,i)=>`<span class="${q.tone}">${i+1} · ${q.id} ${q.action.split(' / ')[0]}</span>`).join('')}
+   ${firstChain}
+   ${secondChain}
    <span class="${c.blocked?'red':'cyan'}">3 · ${c.blocked?'ENTRY BLOCKED':'ENTRY CHECK'}</span>
  </div>
- <p class="footer-note">SETUP und ENTRY bleiben sichtbar, dürfen aber keinen vorgelagerten Risk-Block überschreiben.</p>`);
+ <p class="footer-note">ACTION CENTER und DYNAMIC RECOVERY lesen dieselbe dominante SSOT-Aktion. SETUP und ENTRY bleiben sichtbar, dürfen aber keinen vorgelagerten Risk-Block überschreiben.</p>`);
 }
 
 function centerAdvancedRiskDetails(){
