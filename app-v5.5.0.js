@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.6.0';
-let APP_RELEASE='5.6.0 · DESIGN SYSTEM 2.0';
+let APP_CODE_VERSION='5.13.0';
+let APP_RELEASE='5.13.0 · ENTRY INTELLIGENCE 2.0';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -1623,13 +1623,81 @@ function capitalReleasePanel(){
  </div>
  <p class="footer-note">Theoretical Capacity ist nur Rechenkapazität, keine Freigabe. ADD auf bestehende Bots bleibt separat und verlangt weiterhin SAFE ≥30% + Health ≥70 + keinen vorgelagerten Risk-Block.</p>`);
 }
+
+function entryIntelFactors(g,sym){
+ const setup=scannerScore(g,sym), ready=entryReadiness(g,sym);
+ const rrRow=multiAssetRiskPlan(sym);
+ const rr=Number(rrRow?.rr2||rrRow?.rr||0);
+ const trend=Math.max(0,Math.min(100,Math.round(setup*.82+(g.state==='START ZONE'?15:g.state==='WATCH'?8:0))));
+ const momentum=Math.max(0,Math.min(100,Math.round(ready*.75+(g.frequency||50)*.25)));
+ const volume=Math.max(0,Math.min(100,Math.round(55+Math.min(35,(g.atrPct||1.5)*10))));
+ const riskReward=rr>=2.5?95:rr>=2?82:rr>=1.5?65:rr>=1?45:30;
+ const regime=DATA.btcRegime?.score||76;
+ const derivatives=65; // neutral until fresh asset-specific Funding/OI is verified
+ const liqVol=Math.max(0,Math.min(100,Math.round(55+Math.min(35,(g.atrPct||1.5)*8))));
+ const timing=ready;
+ return {trend,momentum,volume,riskReward,regime,derivatives,liqVol,timing,rr};
+}
+function entryIntelScore(g,sym){
+ const f=entryIntelFactors(g,sym), w=DATA.entryIntelligence?.weights||{};
+ const weighted =
+  f.trend*(w.trendStructure||20)+f.momentum*(w.momentum||15)+f.volume*(w.volume||10)+
+  f.riskReward*(w.riskReward||20)+f.regime*(w.btcRegime||10)+f.derivatives*(w.fundingOpenInterest||10)+
+  f.liqVol*(w.liquidityVolatility||5)+f.timing*(w.timingTrigger||10);
+ return Math.round(weighted/100);
+}
+function entryIntelAction(g,sym){
+ const setup=scannerScore(g,sym), entry=entryReadiness(g,sym), total=entryIntelScore(g,sym);
+ const cap=capitalReleaseState(), f=entryIntelFactors(g,sym);
+ if(cap.blocked) return {label:'BLOCKED',cls:'red',reason:'PORTFOLIO RISK GATE',setup,entry,total,rr:f.rr};
+ if(f.rr && f.rr<2) return {label:'NO TRADE',cls:'red',reason:'R:R < 2,0',setup,entry,total,rr:f.rr};
+ if(setup>=70 && entry>=70 && f.rr>=2.5) return {label:'PREFERRED',cls:'green',reason:'Setup + Timing + R:R bestätigt',setup,entry,total,rr:f.rr};
+ if(setup>=65 && entry>=65 && f.rr>=2) return {label:'READY',cls:'green',reason:'Entry Check freigegeben',setup,entry,total,rr:f.rr};
+ if(entry>=55 || setup>=65) return {label:'WATCH',cls:'amber',reason:'Setup vorhanden, Trigger noch nicht vollständig',setup,entry,total,rr:f.rr};
+ return {label:'WAIT',cls:'red',reason:'Entry Timing noch zu schwach',setup,entry,total,rr:f.rr};
+}
+function entryIntelRank(){
+ return ['SOL','ETH','XRP','HBAR','PEPE'].map(sym=>{
+   const g=fibFromSwing(sym); return g?{sym,g,a:entryIntelAction(g,sym)}:null;
+ }).filter(Boolean).sort((x,y)=>y.a.total-x.a.total);
+}
+function saveDecisionJournal(sym){
+ const g=fibFromSwing(sym); if(!g)return;
+ const a=entryIntelAction(g,sym), f=entryIntelFactors(g,sym), cap=capitalReleaseState();
+ const row={ts:new Date().toISOString(),symbol:sym,price:g.px,setup:a.setup,entry:a.entry,intel:a.total,rr:a.rr,
+   action:a.label,reason:a.reason,riskGate:cap.blocked?'BLOCKED':'OPEN',regime:DATA.btcRegime?.label||DATA.market?.regime||'—'};
+ const key='meridianDecisionJournalV1', arr=JSON.parse(localStorage.getItem(key)||'[]');
+ arr.push(row); localStorage.setItem(key,JSON.stringify(arr.slice(-500)));
+ const btn=document.querySelector(`[data-journal="${sym}"]`);
+ if(btn){btn.textContent='GESPEICHERT ✓';setTimeout(()=>btn.textContent='DECISION LOGGEN',1200);}
+}
+function entryIntelligencePanel(){
+ const rank=entryIntelRank(), cap=capitalReleaseState();
+ return card(`<div class="section-head"><div><div class="eyebrow">ENTRY INTELLIGENCE 2.0 ${liveBadge('ACTIVE')}</div>
+ <div class="forecast-main">OPPORTUNITY RANKING</div><div class="sub">SETUP ≠ ENTRY · Risk Gate hat immer Vorrang.</div></div>
+ <span class="tag ${cap.blocked?'red':'green'}">${cap.blocked?'CAPITAL BLOCKED':'ENTRY CHECK'}</span></div>
+ ${rank.map((x,i)=>`<div class="intel-rank"><span class="intel-pos">#${i+1}</span><b>${x.sym}</b>
+ <span>SETUP <b>${x.a.setup}</b></span><span>ENTRY <b>${x.a.entry}</b></span><span>INTEL <b>${x.a.total}</b></span>
+ <strong class="${x.a.cls}">${x.a.label}</strong></div>
+ <div class="intel-why">${x.a.reason}${x.a.rr?` · R:R ${fmt(x.a.rr,2)}`:''}</div>`).join('')||'<p class="footer-note">4H-Daten werden geladen …</p>'}
+ <p class="footer-note">Kein automatischer BUY/SELL. Asset-spezifisches Funding/OI bleibt neutral gewichtet, bis frische verifizierte Daten vorliegen.</p>`);
+}
 function scannerCard(sym){
  const g=fibFromSwing(sym); if(!g)return '';
- const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
+ const a=entryIntelAction(g,sym), f=entryIntelFactors(g,sym), grids=scannerGrids(sym,g);
  const cap=capitalReleaseState(), riskLabel=cap.blocked?'RISK BLOCK':'RISK OPEN', riskCls=cap.blocked?'red':'green';
- return `<details class="commander-detail scanner-risk" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span><span><b class="${riskCls}">${riskLabel}</b><small>PORTFOLIO GATE</small></span></summary>
- <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
- <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · <b class="${riskCls}">${riskLabel}</b> · Swing ${fmt(g.ampPct,1)}%</div>${multiAssetRiskRow(sym)}</details>`;
+ return `<details class="commander-detail scanner-risk" data-detail-key="scanner-${sym}"><summary>
+ <span><b>${sym}</b><small>${g.state} · ${g.source}</small></span>
+ <span><b class="${a.setup>=70?'green':a.setup>=60?'amber':'red'}">${a.setup}</b><small>SETUP</small></span>
+ <span><b class="${a.entry>=70?'green':a.entry>=55?'amber':'red'}">${a.entry}</b><small>ENTRY</small></span>
+ <span><b class="${a.cls}">${a.label}</b><small>INTEL ${a.total}</small></span></summary>
+ <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div>
+ <div><span>R:R TP2</span><b>${f.rr?fmt(f.rr,2):'—'}</b></div><div><span>GRIDS</span><b>~${grids}</b></div>
+ <div><span>PORTFOLIO GATE</span><b class="${riskCls}">${riskLabel}</b></div><div><span>ACTION</span><b class="${a.cls}">${a.label}</b></div></div>
+ <div class="intel-factors"><span>Trend ${f.trend}</span><span>Momentum ${f.momentum}</span><span>Vol ${f.volume}</span><span>R:R ${f.riskReward}</span><span>Regime ${f.regime}</span><span>Timing ${f.timing}</span></div>
+ <div class="scanner-foot"><b class="${a.cls}">${a.reason}</b> · Setup ${a.setup}/100 · Entry ${a.entry}/100 · Intelligence ${a.total}/100</div>
+ <button class="mini-grid-btn" data-journal="${sym}" onclick="event.preventDefault();event.stopPropagation();saveDecisionJournal('${sym}')">DECISION LOGGEN</button>
+ ${multiAssetRiskRow(sym)}</details>`;
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
@@ -1730,6 +1798,7 @@ function gridView(){
  ${['SOL','ETH','XRP','HBAR','PEPE'].map(s=>multiAssetRiskRow(s)).join('')}
  <p class="footer-note">SL wird strukturell aus Range-Support + Volatilitätspuffer abgeleitet. Entry/SL/TP/R:R sind Modellwerte und keine automatische Order.</p>`)+confluenceSummaryPanel()+
 card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div class="forecast-main">ENTRY READINESS</div><button class="mini-grid-btn" onclick="refreshGridEngine(true)">4H SWINGS JETZT NEU LADEN</button><p class="footer-note">Setup Quality bewertet die Struktur. Entry Readiness bewertet, ob der Einstieg JETZT sinnvoll ist.</p>`)+
+ entryIntelligencePanel()+
  card(`<div class="section-title">OPPORTUNITY SCANNER</div>${['SOL','ETH','PEPE'].map(scannerCard).join('')||'<p class="footer-note">Scanner lädt 4H-Daten …</p>'}<p class="footer-note">Keine automatische Bot-Ausführung.</p>`);
 }
 

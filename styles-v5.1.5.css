@@ -1221,3 +1221,10 @@ body{background:transparent;letter-spacing:.01em}
   .scanner-risk summary b{font-size:11px}
   .capital-release-flow{grid-template-columns:repeat(2,1fr)}
 }
+
+/* v5.13 Entry Intelligence 2.0 */
+.intel-rank{display:grid;grid-template-columns:34px 1fr repeat(3,74px) 100px;gap:8px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(69,157,214,.18);font-size:12px}
+.intel-rank>span:not(.intel-pos){color:#8293a9;font-size:10px}.intel-rank strong{text-align:right;font-size:11px}
+.intel-pos{color:#24aaff;font-weight:900}.intel-why{font-size:9px;color:#74869c;padding:5px 0 10px 42px;letter-spacing:.4px}
+.intel-factors{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.intel-factors span{border:1px solid rgba(55,147,205,.24);border-radius:10px;padding:6px 8px;font-size:8px;color:#91a1b5}
+@media(max-width:520px){.intel-rank{grid-template-columns:28px 1fr 54px 54px 54px 78px;gap:4px}.intel-rank>span:not(.intel-pos){font-size:8px}.intel-rank strong{font-size:9px}}

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.12.2",
-  "build": "2026-08-23-ssot-consistency-cleanup",
+  "appVersion": "5.13.0",
+  "build": "2026-08-23-entry-intelligence-2.0",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1529,5 +1529,35 @@
       "blockHighLeverageAtOrAbove": 20
     },
     "policy": "New capital is blocked while a CRITICAL high-leverage bot is active. 8-12% = recovery lock, 12-15% = watch lock, >=15% = Entry Engine may check only if no other DANGER/CRITICAL high-leverage bot exists. Existing positions still require >=30% Liq buffer for ADD checks."
+  },
+  "entryIntelligence": {
+    "version": "2.0",
+    "status": "ACTIVE",
+    "principle": "Risk Gate -> Capital Release -> Setup Quality -> Entry Timing -> R:R -> Opportunity Rank -> Action",
+    "weights": {
+      "trendStructure": 20,
+      "momentum": 15,
+      "volume": 10,
+      "riskReward": 20,
+      "btcRegime": 10,
+      "fundingOpenInterest": 10,
+      "liquidityVolatility": 5,
+      "timingTrigger": 10
+    },
+    "thresholds": {
+      "preferredSetup": 70,
+      "preferredEntry": 70,
+      "readySetup": 65,
+      "readyEntry": 65,
+      "watchEntry": 55
+    },
+    "hardGate": "Upstream portfolio risk block always overrides Entry/Day-Trade scores.",
+    "autoExecution": false
+  },
+  "decisionJournal": {
+    "version": "1.0",
+    "storage": "browser-local",
+    "status": "FOUNDATION",
+    "note": "Scanner decisions can be recorded locally for later v5.14 validation/backtesting."
   }
 }
