@@ -1187,3 +1187,19 @@ body{background:transparent;letter-spacing:.01em}
 .radar-ranked{grid-template-columns:auto 1fr auto auto!important}
 .radar-rank{font-size:9px;color:var(--cyan,#28a9ff);letter-spacing:.8px;margin-left:6px}
 .radar-score{font-weight:900;font-size:13px;min-width:54px;text-align:right}
+
+/* v5.11.4 Opportunity Radar drill-down */
+.radar-click{width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer;padding-left:0;padding-right:0}
+.radar-click:active{background:rgba(30,169,255,.06)}
+.radar-detail{max-height:88vh;overflow:auto}
+.radar-detail-hero{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.radar-detail-hero>div{border:1px solid rgba(44,156,220,.35);border-radius:16px;padding:14px;background:rgba(5,24,38,.72)}
+.radar-detail-hero span{display:block;font-size:9px;letter-spacing:1.5px;color:#8598ab;margin-bottom:7px}
+.radar-detail-hero b{font-size:18px}.radar-detail-hero em{font-style:normal}
+.radar-parts{display:grid;gap:10px;margin:10px 0 18px}
+.radar-parts>div{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.radar-parts span{font-size:11px;font-weight:800;letter-spacing:.7px}.radar-parts small{color:#73869a;font-weight:500}
+.radar-parts b{font-size:12px}.radar-parts i{grid-column:1/3;height:5px;background:#0b2638;border-radius:99px;overflow:hidden}
+.radar-parts u{display:block;height:100%;background:#1ea9ff;border-radius:99px;text-decoration:none}
+.radar-plan{border-top:1px solid rgba(44,156,220,.25);padding-top:14px;margin-top:4px}
+@media(max-width:520px){.radar-detail-hero{grid-template-columns:1fr}.radar-detail{width:calc(100vw - 28px)}}

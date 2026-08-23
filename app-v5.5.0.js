@@ -1018,14 +1018,51 @@ function market(){
    const score=Math.round(momentum*.35+setup*.25+entry*.20+liquidity*.10+regimeFit*.10);
    return {...base,symbol:sym,change24h:ch,radarScore:score,radarParts:{momentum,setup,entry,liquidity,regimeFit}};
   }).sort((a,b)=>b.radarScore-a.radarScore);
+  window.MERIDIAN_RADAR_CACHE=Object.fromEntries(radar.map(x=>[x.symbol,x]));
  return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${snapshotBadge('MODEL')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
  `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
  card(`<div class="section-title">LIVE FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">LIVE wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
  card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
  card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
  card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map((x,i)=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;const tone=x.radarScore>=75?'green':x.radarScore>=60?'amber':'red';return `<div class="asset-row radar-ranked">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol} <span class="radar-rank">#${i+1}</span></div><div class="asset-desc">${q?q.source:'Fallback'} · Opportunity</div></div><div class="radar-score ${tone}">${x.radarScore}/100</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}<p class="footer-note">Opportunity Score: 35% Momentum · 25% Setup · 20% Entry Readiness · 10% Liquidität · 10% Regime-Fit. Live-Kurse ändern Ranking dynamisch; Überdehnung wird abgewertet.</p>`);
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map((x,i)=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;const tone=x.radarScore>=75?'green':x.radarScore>=60?'amber':'red';return `<button class="asset-row radar-ranked radar-click" onclick="openRadarDetail('${x.symbol}')">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol} <span class="radar-rank">#${i+1}</span></div><div class="asset-desc">${q?q.source:'Fallback'} · Opportunity · TAP DETAILS</div></div><div class="radar-score ${tone}">${x.radarScore}/100</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></button>`}).join('')}<p class="footer-note">Opportunity Score: 35% Momentum · 25% Setup · 20% Entry Readiness · 10% Liquidität · 10% Regime-Fit. Asset antippen für Teil-Scores, Entry-Status und kanonischen Risk Plan.</p>`);
 }
+
+function radarStatus(x){
+ const e=Number(x?.radarParts?.entry||0), score=Number(x?.radarScore||0);
+ if(score>=75 && e>=65)return {label:'READY',cls:'green'};
+ if(score>=60 && e>=55)return {label:'WATCH',cls:'amber'};
+ return {label:'WAIT',cls:'red'};
+}
+function radarDetail(sym){
+ const x=window.MERIDIAN_RADAR_CACHE?.[sym];
+ if(!x)return '';
+ const p=x.radarParts||{}, st=radarStatus(x), q=DATA.livePrices?.[sym];
+ const price=Number(q?.price||DATA.priceFallbacks?.[sym]?.price||0), ch=Number(q?.change24h??x.change24h??0);
+ const plan=typeof canonicalRiskPlan==='function'?canonicalRiskPlan(sym):null;
+ const gate=plan&&typeof entryConfluence==='function'?entryConfluence(sym,plan.rrTp2,plan.entryReadiness):null;
+ const dec=n=>n<0.01?8:n<10?4:2, pf=n=>fmt(Number(n||0),dec(Number(n||0)));
+ const planHtml=plan?`<div class="radar-plan"><div class="section-head"><div class="section-title">RISK PLAN</div><span class="tag ${gate?.cls||'amber'}">${gate?.label||st.label}</span></div>
+   <div class="grid2">${metric('ENTRY','$'+pf(plan.entryLow)+'–$'+pf(plan.entryHigh))}${metric('SL','$'+pf(plan.stopLoss),'red')}${metric('TP1','$'+pf(plan.tp1)+'<div class="muted">R:R '+fmt(plan.rrTp1,2)+'</div>','cyan')}${metric('TP2','$'+pf(plan.tp2)+'<div class="muted">R:R '+fmt(plan.rrTp2,2)+'</div>','green')}</div>
+   <div class="row"><span>INVALIDATION</span><b>Close &lt; $${pf(plan.stopLoss)}</b></div><p class="footer-note">Quelle: ${plan.source}${plan.stale?' · FALLBACK':' · SSOT / 4H'}</p></div>`:
+   `<div class="radar-plan"><div class="section-title">RISK PLAN</div><p class="footer-note">Für ${sym} liegt aktuell kein kanonischer 4H-Risk-Plan vor. MERIDIAN zeigt deshalb bewusst keine erfundene Entry-/SL-/TP-Zone.</p></div>`;
+ return `<div class="detail-overlay radar-overlay" onclick="if(event.target===this)closeRadarDetail()"><div class="asset-detail radar-detail">
+   <div class="detail-head"><button class="detail-close" onclick="closeRadarDetail()">←</button><div>${coinIcon(sym)} <b>${sym} OPPORTUNITY</b></div><span class="tag ${st.cls}">${st.label}</span></div>
+   <div class="radar-detail-hero"><div><span>OPPORTUNITY SCORE</span><b>${x.radarScore}/100</b></div><div><span>LIVE / 24H</span><b>$${fmt(price,price<10?4:2)} · <em class="${ch>=0?'green':'red'}">${ch>=0?'+':''}${fmt(ch,1)}%</em></b></div></div>
+   <div class="section-title detail-section">SCORE BREAKDOWN</div>
+   <div class="radar-parts">
+    <div><span>MOMENTUM <small>35%</small></span><b>${Math.round(p.momentum||0)}/100</b><i><u style="width:${p.momentum||0}%"></u></i></div>
+    <div><span>SETUP <small>25%</small></span><b>${Math.round(p.setup||0)}/100</b><i><u style="width:${p.setup||0}%"></u></i></div>
+    <div><span>ENTRY READINESS <small>20%</small></span><b>${Math.round(p.entry||0)}/100</b><i><u style="width:${p.entry||0}%"></u></i></div>
+    <div><span>LIQUIDITÄT <small>10%</small></span><b>${Math.round(p.liquidity||0)}/100</b><i><u style="width:${p.liquidity||0}%"></u></i></div>
+    <div><span>REGIME-FIT <small>10%</small></span><b>${Math.round(p.regimeFit||0)}/100</b><i><u style="width:${p.regimeFit||0}%"></u></i></div>
+   </div>
+   ${planHtml}
+   <p class="footer-note">Statuslogik: READY ab starkem Gesamtscore + Entry-Bestätigung; WATCH bei brauchbarer Konfluenz; sonst WAIT. Der Score ist ein Modell, keine automatische Order-Freigabe.</p>
+ </div></div>`;
+}
+window.openRadarDetail=sym=>{document.querySelector('.radar-overlay')?.remove();document.body.insertAdjacentHTML('beforeend',radarDetail(sym));};
+window.closeRadarDetail=()=>document.querySelector('.radar-overlay')?.remove();
 
 function currentNadirContext(){
  const n=DATA.nadir||{}, c=n.currentVerifiedContext||{}, q=DATA.livePrices?.BTC||{};

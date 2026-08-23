@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.11.3",
-  "build": "2026-08-23-opportunity-radar",
+  "appVersion": "5.11.4",
+  "build": "2026-08-23-opportunity-radar-drilldown",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -611,13 +611,7 @@
     ],
     "note": "Bot-Aktionen kombinieren Livepreis, 4H-Swing/FIB und bekannten Liquidationspuffer. Keine automatische Bot-Ausführung."
   },
-  "buildNotes": [
-    "DAYTRADE runtime bug fixed: stateLabel restored as a helper function.",
-    "Removed incorrect local stateLabel constant that accessed d before initialization.",
-    "Approved compact UI geometry remains unchanged.",
-    "Bottom navigation remains unchanged.",
-    "v5.10.10: FULL RISK SSOT – canonical active Pionex bot states drive Center, Grid, Dual Hedge, Priority Queue, Decision Quality and BTC-L20 SL/Liquidation display."
-  ],
+  "buildNotes": "Opportunity Radar drill-down: tappable assets, score breakdown, status, canonical risk plan where available.",
   "decisionEngine": {
     "version": "1.0",
     "status": "MODEL",
