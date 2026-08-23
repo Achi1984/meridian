@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.1",
-  "build": "2026-08-23-center-cleanup",
+  "appVersion": "5.10.2",
+  "build": "2026-08-23-bot-state-sync",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -323,150 +323,47 @@
     "decisionNote": "NO ENTRY im Snapshot: starkes Risk-on-Momentum, aber überdehnungsgefährdet. Browser versucht RSI, Funding, OI und VWAP direkt neu zu laden."
   },
   "pionexRisk": {
-    "status": "SCREENSHOT VERIFIED",
-    "snapshotAt": "2026-08-23T11:23:00+02:00",
-    "riskLevel": "HIGH",
-    "netDirection": "BTC DUAL HEDGE · LONG 20x + SHORT 30x",
-    "riskNote": "BTC wird gleichzeitig Long und Short geführt. Beide Liquidationspuffer sind eng; Short ist mit 4,8% aktuell das dringendere Risiko. Keine Auto-Ausführung.",
+    "status": "SNAPSHOT",
+    "snapshotAt": "2026-08-23",
+    "activeCount": 2,
+    "closedCount": 1,
     "bots": [
       {
         "id": "BTC-S30",
-        "name": "BTC/USDT Futures Moon",
         "symbol": "BTC",
-        "side": "Short",
+        "side": "SHORT",
         "leverage": 30,
-        "investment": 52.0,
-        "dynamicMargin": 110.09,
-        "marginCapital": 162.09,
-        "currentPrice": 76528.9,
-        "fundingPct": 0.01,
-        "rangeLow": 59589.2,
-        "rangeHigh": 79671.1,
-        "createdPrice": 69243.5,
-        "breakEven": 71410.0,
-        "liquidation": 80202.9,
-        "liquidationDistancePct": 4.8,
-        "gridProfit": 8.49,
-        "trendPnl": -94.5,
-        "totalProfit": -86.0,
-        "totalProfitPct": -165.38,
-        "status": "CRITICAL",
-        "healthScore": 24,
-        "action": "REDUCE SHORT / NO ADD",
-        "reason": "30x Short mit nur 4,8% Liq.-Puffer. Grid positiv, Trend-Drag stark negativ. Zusatzmargin verbessert den Puffer, ersetzt aber keine Risikoreduktion."
+        "status": "ACTIVE",
+        "investment": 174.76,
+        "dynamicMargin": 159.68,
+        "totalProfit": 55.84,
+        "breakEven": 75887.2,
+        "liquidationPrice": 95720.6
       },
       {
-        "id": "BTC-L20",
-        "name": "BTC/USDT Futures Moon",
+        "id": "ETH-S30",
+        "symbol": "ETH",
+        "side": "SHORT",
+        "leverage": 30,
+        "status": "ACTIVE",
+        "investment": 200.0,
+        "dynamicMargin": 186.35,
+        "totalProfit": -0.75,
+        "breakEven": 2593.84,
+        "liquidationPrice": 3141.22
+      },
+      {
+        "id": "BTC-S30-CLOSED",
         "symbol": "BTC",
-        "side": "Long",
-        "leverage": 20,
-        "investment": 100.0,
-        "dynamicMargin": 0.0,
-        "marginCapital": 100.0,
-        "currentPrice": 76529.3,
-        "fundingPct": 0.01,
-        "rangeLow": 65082.2,
-        "rangeHigh": 180000.0,
-        "createdPrice": 76586.4,
-        "breakEven": 76585.6,
-        "liquidation": 69344.5,
-        "liquidationDistancePct": 9.38,
-        "gridProfit": 0.0,
-        "trendPnl": -0.564,
-        "totalProfit": -0.564,
-        "totalProfitPct": -0.57,
-        "takeProfit": 180000.0,
-        "status": "DANGER",
-        "healthScore": 53,
-        "action": "KEEP LONG / NO ADD",
-        "reason": "Long liegt nahe Break-even, aber 20x und nur 9,38% Liq.-Puffer. Halten ist vertretbar; zusätzliches Long-Risiko erst nach Bestätigung.",
-        "modelStopLoss": 71750,
-        "tp1Model": 80000,
-        "tp2Model": 83000,
-        "rrTp1": 0.71,
-        "rrTp2": 1.33,
-        "invalidation": "4H close below 71.750",
-        "leverageTooHigh": true
-      },
-      {
-        "id": "HBAR-L5",
-        "name": "HBAR COIN-M Futures Grid",
-        "symbol": "HBAR",
-        "side": "Long",
-        "leverage": 5,
-        "investment": 562.54,
-        "currentAssetInvestment": 7122.63,
-        "currentPrice": 0.07628,
-        "fundingPct": 0.01,
-        "rangeLow": 0.06,
-        "rangeHigh": 0.09,
-        "grids": 127,
-        "createdPrice": 0.07888,
-        "breakEven": 0.07823,
-        "liquidation": 0.05854,
-        "liquidationDistancePct": 23.25,
-        "takeProfit": 0.09,
-        "gridProfitAsset": 52.03,
-        "trendPnlAsset": -317.18,
-        "totalProfitAsset": -265.15,
-        "totalProfitPct": -3.73,
-        "status": "WATCH",
-        "healthScore": 58,
-        "action": "WATCH / NO ADD",
-        "reason": "Grid arbeitet positiv, Trend-PnL negativ. 5x mit ~23% Liq.-Puffer; kein aggressives Nachlegen."
-      },
-      {
-        "id": "XRP-L5",
-        "name": "XRP COIN-M Futures Grid",
-        "symbol": "XRP",
-        "side": "Long",
-        "leverage": 5,
-        "investment": 565.92,
-        "currentAssetInvestment": 356.85,
-        "currentPrice": 1.4543,
-        "fundingPct": 0.01,
-        "rangeLow": 0.7,
-        "rangeHigh": 1.9,
-        "grids": 253,
-        "createdPrice": 1.586,
-        "breakEven": 1.5404,
-        "liquidation": 0.8484,
-        "liquidationDistancePct": 41.66,
-        "takeProfit": 1.9,
-        "gridProfitAsset": 2.27,
-        "trendPnlAsset": -12.66,
-        "totalProfitAsset": -10.39,
-        "totalProfitPct": -2.91,
-        "status": "WATCH",
-        "healthScore": 66,
-        "action": "WATCH",
-        "reason": "Großer Liq.-Puffer, aber Kurs unter Break-even und Trend-PnL negativ."
+        "side": "SHORT",
+        "leverage": 30,
+        "status": "CLOSED",
+        "investment": 160.45,
+        "totalProfit": 41.82,
+        "entry": 75870.3
       }
     ],
-    "healthEngine": {
-      "version": "3.0",
-      "factors": [
-        "GRID EDGE",
-        "TREND DRAG",
-        "LIQ BUFFER",
-        "BREAK-EVEN DISTANCE",
-        "FUNDING",
-        "DIRECTION MATCH"
-      ],
-      "actions": [
-        "KEEP",
-        "WATCH",
-        "REDUCE",
-        "EXIT CHECK"
-      ]
-    },
-    "verification": {
-      "BTC-S30": "2026-08-23T11:23:00+02:00",
-      "BTC-L20": "2026-08-23T11:23:00+02:00",
-      "HBAR-L5": "2026-08-23T08:40:00+02:00",
-      "XRP-L5": "2026-08-23T08:40:00+02:00"
-    }
+    "note": "Nur ACTIVE Bots fließen in Risiko-, Hedge- und Action-Center-Logik ein."
   },
   "forecastCoins": [
     "BTC",
@@ -1305,7 +1202,7 @@
     "principle": "Kapitalrisiko zuerst, danach bestehende Positionen, erst danach neue Entries."
   },
   "actionCenter": {
-    "version": "1.1",
+    "version": "1.2",
     "status": "MODEL",
     "labels": {
       "bestChance": "ENTRY POTENZIAL",
@@ -1317,6 +1214,7 @@
       "removeDuplicateNowPanel": true,
       "compactDecisionDetails": true,
       "portfolioImmediatelyAfterMasterDecision": true
-    }
+    },
+    "botStateRule": "ACTIVE_ONLY"
   }
 }

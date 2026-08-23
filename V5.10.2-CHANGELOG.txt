@@ -1,0 +1,7 @@
+ACHI MERIDIAN v5.10.2 — BOT STATE SYNC
+- Pionex inventory auf letzten bestätigten Stand synchronisiert.
+- ACTIVE: BTC Short 30x; ETH Short 30x.
+- CLOSED: früherer BTC Short 30x (+41,82 USDT) archiviert.
+- CLOSED Bots werden aus Risiko-/Action-Logik ausgeschlossen.
+- Stale BTC-L20 Referenzen aus CENTER/Decision Details entfernt.
+- Data Health zeigt 2 ACTIVE · 1 CLOSED.

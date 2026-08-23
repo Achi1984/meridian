@@ -772,7 +772,7 @@ function commandCenter(){
    <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
  card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('5x LONG CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('SHORT STRESS',DATA.pionex?.btcShortPnlPct!=null?fmt(DATA.pionex.btcShortPnlPct,1)+'%':'~−98%','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Risiko wird gemeinsam betrachtet: Spot-Konzentration + gehebelte Long-Bots + Short-Hedge-Stress. Bot-Kapital wird nicht doppelt zum Portfolio addiert.</p>`)+
  compactDecisionDetails()+
- card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">BTC 11:23 · ALT 08:40</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
+ card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">2 ACTIVE · 1 CLOSED</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
  `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
  card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.3</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);const entry=Math.max(0,Math.min(100,Math.round(sc-(sym==='SOL'?20:sym==='ETH'?28:28))));return `<div class="row"><span>${sym} · ${entry>=75?'READY':entry>=60?'WATCH':'WAIT'}</span><b class="${entry>=75?'green':entry>=60?'amber':'red'}">${entry}/100</b></div>`}).join('')}<p class="footer-note">Hier wird Entry Readiness gezeigt; Setup Quality bleibt im GRID-Tab separat sichtbar.</p>`);
 }
@@ -1388,7 +1388,7 @@ function scannerCard(sym){
 }
 function commanderBot(b){
  const guard=liqGuard(b), liq=Number(b.liquidationDistancePct||0);
- const priority=b.id==='BTC-S30'?'REDUCE SHORT':b.id==='BTC-L20'?'KEEP LONG':b.status==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+ const priority=b.id==='BTC-S30'?'REDUCE SHORT':b.id==='ETH-S30'?'KEEP LONG':b.status==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority} · ${b.action}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason}</p></details>`;
@@ -1427,7 +1427,7 @@ function dualBtcHedgePanel(){
  <div class="hedge-bots">
   <div class="hedge-leg long">
     <div class="hedge-leg-head"><span>LONG 20x</span><b>${h.longBuf<8?'CRITICAL':h.longBuf<15?'DANGER':h.longBuf<30?'TIGHT':'SAFE'}</b></div>
-    <strong>BTC-L20</strong>
+    <strong>ETH-S30</strong>
     <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.longBuf,2)}%</b></span><span>BE <b>$${fmt(h.lng.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.lng.liquidation,0)}</b></span><span>INVEST <b>$${fmt(h.lng.investment,0)}</b></span></div>
     <div class="hedge-action">KEEP LONG / NO ADD</div>
   </div>
@@ -1562,7 +1562,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.10.1 — MULTI-ASSET SL ENGINE */
+/* v5.10.2 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1585,7 +1585,7 @@ function multiAssetRiskRow(sym){
   </div>`;
 }
 
-/* v5.10.1 — DECISION QUALITY LAYER */
+/* v5.10.2 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1626,7 +1626,7 @@ function decisionQualityPanel(){
  <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
-/* v5.10.1 — ENTRY CONFLUENCE GATE */
+/* v5.10.2 — ENTRY CONFLUENCE GATE */
 function entryConfluence(sym, rr2){
  const cfg=DATA.entryConfluence?.rules||{};
  const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
@@ -1654,7 +1654,7 @@ function confluenceSummaryPanel(){
  <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
 }
 
-/* v5.10.1 — UNIFIED DECISION ENGINE */
+/* v5.10.2 — UNIFIED DECISION ENGINE */
 function unifiedDecisionQueue(){
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const btcLongRR=Number(DATA.slInvalidationEngine?.btcLong?.rrTp2||1.33);
@@ -1667,7 +1667,7 @@ function unifiedDecisionQueue(){
    why:`Liq.-Puffer ${fmt(shortBuf,1)}% · 30x · Markt RISK-ON`
  });
  acts.push({
-   n:2, cls:'amber', title:'BTC-L20', action:'KEEP / NO ADD',
+   n:2, cls:'amber', title:'ETH-S30', action:'KEEP / NO ADD',
    why:`Entry ${btcEntry}/100 · TP2 R:R ${fmt(btcLongRR,2)} · Leverage hoch`
  });
 
@@ -1700,7 +1700,7 @@ function unifiedDecisionQueue(){
  <p class="footer-note">Priorität: Liquidationsrisiko → bestehende Position → neue Entries → Opportunity Watchlist. Keine automatische Order-Ausführung.</p>`);
 }
 
-/* v5.10.1 — ACTION CENTER */
+/* v5.10.2 — ACTION CENTER */
 function actionCenterPanel(){
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const shortBuf=Number(DATA.dualBotHedge?.short?.liqBufferPct||4.8);
@@ -1709,11 +1709,11 @@ function actionCenterPanel(){
 
  let headline='RISIKO ZUERST';
  let cls='red';
- let next='BTC-S30 absichern';
+ let next='ACTIVE SHORTS prüfen';
  if(shortBuf>=12 && longBuf>=12){
    headline='ENTRY-POTENZIAL PRÜFEN';
    cls='amber';
-   next='BTC-L20 / Day-Trade neu bewerten';
+   next='ETH-S30 / Day-Trade neu bewerten';
  }
 
  return card(`<div class="ac-top">
@@ -1730,23 +1730,23 @@ function actionCenterPanel(){
  </div>
  <div class="ac-grid">
    <div><span>BTC-S30</span><b class="red">${fmt(shortBuf,1)}% LIQ</b><small>CRITICAL</small></div>
-   <div><span>BTC-L20</span><b class="amber">${fmt(longBuf,1)}% LIQ</b><small>KEEP / NO ADD</small></div>
+   <div><span>ETH-S30</span><b class="amber">${fmt(longBuf,1)}% LIQ</b><small>KEEP / NO ADD</small></div>
    <div><span>BTC ENTRY</span><b>${btcEntry}/100</b><small>READINESS</small></div>
    <div><span>DAY-TRADE</span><b>${dayGate}/100</b><small>ENTRY POTENZIAL</small></div>
  </div>
  <div class="ac-chain">
-   <span class="red">1 · BTC-S30 RISK</span>
-   <span class="amber">2 · BTC-L20 KEEP</span>
+   <span class="red">1 · BTC-S30 CHECK</span>
+   <span class="amber">2 · ETH-S30 KEEP</span>
    <span class="cyan">3 · ENTRY CHECK</span>
  </div>
  <p class="footer-note">Ein hoher Entry-Score ist keine Handlungsfreigabe, solange ein kritisches Liquidationsrisiko vorgelagert ist. Keine automatische Order-Ausführung.</p>`);
 }
 
-/* v5.10.1 — CENTER CLEANUP */
+/* v5.10.2 — CENTER CLEANUP */
 function compactDecisionDetails(){
  const r=DATA.pionexRisk||{}, bots=r.bots||[];
  const s=bots.find(b=>b.id==='BTC-S30');
- const l=bots.find(b=>b.id==='BTC-L20');
+ const l=bots.find(b=>b.id==='ETH-S30');
  const gate=Number(DATA.dayTrade?.gateScore||0);
  const risk=commandRisk();
  return `<details class="decision-details">
@@ -1756,7 +1756,7 @@ function compactDecisionDetails(){
    </summary>
    <div class="decision-details-body">
      <div class="dd-row"><span>1 · BTC-S30</span><b class="red">REDUCE / EXIT CHECK</b><small>${s?fmt(s.liquidationDistancePct,1):'—'}% Liq.-Puffer · ${s?.leverage||30}x</small></div>
-     <div class="dd-row"><span>2 · BTC-L20</span><b class="amber">KEEP / NO ADD</b><small>${l?fmt(l.liquidationDistancePct,1):'—'}% Liq.-Puffer · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??'—'}/100</small></div>
+     <div class="dd-row"><span>2 · ETH-S30</span><b class="amber">KEEP / NO ADD</b><small>${l?fmt(l.liquidationDistancePct,1):'—'}% Liq.-Puffer · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??'—'}/100</small></div>
      <div class="dd-row"><span>3 · DAY-TRADE</span><b class="${gate>=75?'green':'amber'}">${gate}/100 ENTRY POTENZIAL</b><small>Kein Vorrang vor kritischem Bot-Risiko</small></div>
      <div class="dd-row"><span>PORTFOLIO</span><b>${risk.score}/100</b><small>${risk.label}</small></div>
      <p class="footer-note">Master-Entscheidung bleibt im ACTION CENTER. Diese Details erklären nur die Gewichtung; keine automatische Order-Ausführung.</p>
