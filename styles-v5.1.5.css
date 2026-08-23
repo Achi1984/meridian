@@ -1261,3 +1261,19 @@ body{background:transparent;letter-spacing:.01em}
 .rc-actions span{display:block;font-size:7px;letter-spacing:1px;color:#8191a4;margin-bottom:6px}
 .rc-actions b{display:block;font-size:12px;line-height:1.3}
 .rc-actions small{display:block;margin-top:5px;font-size:7px;color:#7d8da0}
+
+/* v5.15.0 Dynamic Recovery & Unlock */
+.rc-machine{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}
+.rc-machine>div{padding:10px 5px;border:1px solid #173a50;border-radius:13px;text-align:center;background:#071721}
+.rc-machine>div.active{border-color:#f0b84b;background:rgba(240,184,75,.05)}
+.rc-machine>div.done{border-color:#2fe59a;background:rgba(47,229,154,.05)}
+.rc-machine span{display:block;font-size:8px;color:#a5b2c1}
+.rc-machine b{display:block;margin-top:4px;font-size:7px;letter-spacing:.65px}
+.rc-progress{margin:12px 0 14px}
+.rc-progress>div:first-child{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.rc-progress span{font-size:8px;letter-spacing:1px;color:#8191a4}
+.rc-progress b{font-size:11px}
+.rc-unlock{margin-top:14px;padding:14px;border:1px solid currentColor;border-radius:16px}
+.rc-unlock span{display:block;font-size:8px;letter-spacing:1.2px;color:#8191a4;margin-bottom:6px}
+.rc-unlock b{display:block;font-size:16px}
+.rc-unlock small{display:block;margin-top:7px;color:#8797aa;font-size:8px;line-height:1.45}

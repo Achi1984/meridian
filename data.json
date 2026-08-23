@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.14.1",
-  "build": "2026-08-23-recovery-command-ux",
+  "appVersion": "5.15.0",
+  "build": "2026-08-23-dynamic-recovery-unlock",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1572,14 +1572,31 @@
     "riskLogicChanged": false
   },
   "riskRecoveryEngine": {
-    "version": "1.1",
+    "version": "2.0",
     "status": "ACTIVE",
-    "targetsPct": [
-      8,
-      12,
-      15
+    "stateMachine": [
+      {
+        "state": "CRITICAL",
+        "condition": "buffer < 8%",
+        "next": "RECOVERY"
+      },
+      {
+        "state": "RECOVERY",
+        "condition": "8% <= buffer < 12%",
+        "next": "STABILIZE"
+      },
+      {
+        "state": "STABILIZE",
+        "condition": "12% <= buffer < 15%",
+        "next": "SAFE"
+      },
+      {
+        "state": "SAFE",
+        "condition": "buffer >= 15%",
+        "next": "RECHECK"
+      }
     ],
-    "execution": "MANUAL_ONLY",
-    "note": "Recovery Command is surfaced directly below ACTION CENTER."
+    "unlockPolicy": "SAFE removes only liquidation pre-block; capital and entry require separate recheck.",
+    "execution": "MANUAL_ONLY"
   }
 }

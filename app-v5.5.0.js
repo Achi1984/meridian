@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.14.1';
-let APP_RELEASE='5.14.1 · RECOVERY COMMAND';
+let APP_CODE_VERSION='5.15.0';
+let APP_RELEASE='5.15.0 · DYNAMIC RECOVERY & UNLOCK';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2328,29 +2328,73 @@ function adaptiveRiskPanel(){
 /* v5.14.1 — RECOVERY COMMAND UX
    Compact action card for the highest-priority blocked bot.
    Uses SSOT + adaptiveRiskOption geometry; manual action only. */
+
+function recoveryPhase(buffer){
+ const b=Number(buffer);
+ if(!Number.isFinite(b)) return {key:'NO_DATA',label:'NO DATA',tone:'amber',min:0,max:0,nextTarget:null};
+ if(b<8)  return {key:'CRITICAL',label:'CRITICAL',tone:'red',min:0,max:8,nextTarget:8};
+ if(b<12) return {key:'RECOVERY',label:'RECOVERY',tone:'amber',min:8,max:12,nextTarget:12};
+ if(b<15) return {key:'STABILIZE',label:'STABILIZE',tone:'amber',min:12,max:15,nextTarget:15};
+ return {key:'SAFE',label:'SAFE',tone:'green',min:15,max:100,nextTarget:null};
+}
+
 function recoveryCommandState(){
  const s=decisionSSOT();
  const bot=s.btcShort || s.bots.find(b=>String(b.side||'').toUpperCase()==='SHORT' && Number(b.buffer)<15) || null;
- if(!bot) return {bot:null};
+ if(!bot) return {bot:null,phase:recoveryPhase(NaN)};
 
  const cur=Number(bot.buffer);
- const target=cur<8?8:(cur<12?12:(cur<15?15:15));
- const opt=adaptiveRiskOption(bot,target);
+ const phase=recoveryPhase(cur);
+ const target=phase.nextTarget;
+ const opt=target?adaptiveRiskOption(bot,target):null;
 
- const reduce=Number(opt.reduceEq);
- const margin=Number(opt.marginApprox);
- const targetLiq=Number(opt.targetLiq);
+ const reduce=Number(opt?.reduceEq);
+ const margin=Number(opt?.marginApprox);
+ const targetLiq=Number(opt?.targetLiq);
 
- let stage='RECOVERED', tone='green', action='RECHECK CAPITAL GATE';
- if(cur<8){stage='CRITICAL RECOVERY';tone='red';action=`PUFFER AUF ≥${target}% BRINGEN`;}
- else if(cur<12){stage='RECOVERY';tone='amber';action=`PUFFER AUF ≥${target}% BRINGEN`;}
- else if(cur<15){stage='STABILIZE';tone='amber';action=`PUFFER AUF ≥${target}% BRINGEN`;}
+ const release=capitalReleaseState();
+ const riskBlock=phase.key!=='SAFE';
+ const progress=phase.key==='SAFE'
+   ? 100
+   : Math.max(0,Math.min(100,Math.round(((cur-phase.min)/(phase.max-phase.min))*100)));
+
+ let action='CAPITAL + ENTRY GATE NEU PRÜFEN';
+ let instruction='Recovery-Ziel erreicht. Jetzt Risk Gate, Capital Release und Entry separat neu bewerten.';
+ if(phase.key==='CRITICAL'){
+   action='SOFORT AUF ≥8% PUFFER BRINGEN';
+   instruction='CRITICAL: zuerst Liquidationsabstand herstellen. Kein neues Kapital und kein ADD.';
+ }else if(phase.key==='RECOVERY'){
+   action='AUF ≥12% PUFFER STABILISIEREN';
+   instruction='Minimum erreicht. Noch kein Entry-Unlock; Puffer weiter stabilisieren.';
+ }else if(phase.key==='STABILIZE'){
+   action='AUF ≥15% RECOVERY BRINGEN';
+   instruction='Recovery fortsetzen. Erst ab ≥15% wird der Risk Block aufgehoben und neu geprüft.';
+ }
 
  return {
-   bot,cur,target,opt,stage,tone,action,
-   reduceText:Number.isFinite(reduce)?`~${fmt(reduce,0)}% Exposure reduzieren`:'Exposure reduzieren',
-   marginText:Number.isFinite(margin)?`~$${fmt(margin,0)} Margin-Äquiv.`:'Margin erhöhen',
+   bot,cur,phase,target,opt,progress,release,riskBlock,action,instruction,
+   reduceText:Number.isFinite(reduce)?`~${fmt(reduce,0)}% Exposure reduzieren`:'—',
+   marginText:Number.isFinite(margin)?`~$${fmt(margin,0)} Margin-Äquiv.`:'—',
    targetLiqText:Number.isFinite(targetLiq)?'$'+gridFmt(targetLiq,bot.symbol):'—'
+ };
+}
+
+function dynamicUnlockState(){
+ const r=recoveryCommandState();
+ if(!r.bot) return {status:'NO DATA',tone:'amber',capital:'BLOCKED',entry:'BLOCKED',reason:'Botdaten fehlen'};
+ if(r.phase.key!=='SAFE'){
+   return {
+     status:'RISK BLOCK',tone:'red',capital:'BLOCKED',entry:'BLOCKED',
+     reason:`${r.bot.id} ${fmt(r.cur,1)}% LIQ · nächstes Ziel ${r.target}%`
+   };
+ }
+
+ // SAFE removes the liquidation pre-block only; it does not auto-approve capital or entry.
+ const rel=capitalReleaseState();
+ const capital=rel.blocked?'RECHECK':'CHECK OPEN';
+ return {
+   status:'RISK UNLOCKED',tone:'green',capital,entry:'RECHECK',
+   reason:'≥15% Recovery erreicht · Setup/Entry/Portfolio-Risk separat neu bewerten'
  };
 }
 
@@ -2358,38 +2402,53 @@ function recoveryCommandPanel(){
  const r=recoveryCommandState();
  if(!r.bot) return '';
 
- const blocked=r.cur<15;
- return card(`<div class="section-head"><div>
-   <div class="eyebrow">RECOVERY COMMAND 1.0 ${liveBadge('SSOT')}</div>
-   <div class="forecast-main ${r.tone}">${r.stage}</div>
-   <div class="sub">Aktueller Puffer → Ziel → manuelle Anpassung → Live-Recheck</div>
- </div><span class="tag ${r.tone}">${r.bot.id} ${fmt(r.cur,2)}%</span></div>
+ const u=dynamicUnlockState();
+ const phase=r.phase;
+ const targetText=r.target?`${r.target}%`:'—';
 
- <div class="rc-now ${r.tone}">
-   <span>JETZT</span>
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">DYNAMIC RECOVERY 2.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${phase.tone}">${phase.label}</div>
+   <div class="sub">CRITICAL → RECOVERY → STABILIZE → SAFE → RECHECK</div>
+ </div><span class="tag ${phase.tone}">${r.bot.id} ${fmt(r.cur,2)}%</span></div>
+
+ <div class="rc-now ${phase.tone}">
+   <span>AKTIVE AKTION</span>
    <b>${r.action}</b>
-   <small>${blocked?'Kein neues Kapital, bis der neu synchronisierte Live-Puffer die nächste Stufe bestätigt.':'Risk-Recovery erreicht; Capital Gate separat neu prüfen.'}</small>
+   <small>${r.instruction}</small>
  </div>
 
- <div class="rc-scale">
-   <div class="${r.cur>=8?'done':r.target===8?'active':''}"><span>8%</span><b>MIN</b></div>
-   <div class="${r.cur>=12?'done':r.target===12?'active':''}"><span>12%</span><b>PREFERRED</b></div>
-   <div class="${r.cur>=15?'done':r.target===15?'active':''}"><span>15%</span><b>RECOVERY</b></div>
+ <div class="rc-machine">
+   <div class="${phase.key==='CRITICAL'?'active':r.cur>=8?'done':''}"><span>&lt;8%</span><b>CRITICAL</b></div>
+   <div class="${phase.key==='RECOVERY'?'active':r.cur>=12?'done':''}"><span>8–12%</span><b>RECOVERY</b></div>
+   <div class="${phase.key==='STABILIZE'?'active':r.cur>=15?'done':''}"><span>12–15%</span><b>STABILIZE</b></div>
+   <div class="${phase.key==='SAFE'?'done':''}"><span>≥15%</span><b>SAFE</b></div>
+ </div>
+
+ <div class="rc-progress">
+   <div><span>PHASE PROGRESS</span><b>${r.progress}%</b></div>
+   <div class="bar"><i style="width:${r.progress}%"></i></div>
  </div>
 
  <div class="grid2">
-   ${metric('AKTUELL',fmt(r.cur,2)+'%',r.tone)}
-   ${metric('ZIEL',fmt(r.target,0)+'%',r.tone)}
-   ${metric('ZIEL-LIQ.',r.targetLiqText,r.tone)}
-   ${metric('RECHECK','PIONEX → MERIDIAN','cyan')}
+   ${metric('AKTUELL',fmt(r.cur,2)+'%',phase.tone)}
+   ${metric('NÄCHSTES ZIEL',targetText,phase.tone)}
+   ${metric('ZIEL-LIQ.',r.targetLiqText,phase.tone)}
+   ${metric('RISK GATE',u.status,u.tone)}
  </div>
 
- <div class="rc-actions">
+ ${r.target?`<div class="rc-actions">
    <div><span>OPTION A</span><b>${r.reduceText}</b><small>Modell-Äquivalent</small></div>
    <div><span>OPTION B</span><b>${r.marginText}</b><small>Modell-Äquivalent</small></div>
+ </div>`:''}
+
+ <div class="rc-unlock ${u.tone}">
+   <span>DYNAMIC UNLOCK</span>
+   <b>${u.status}</b>
+   <small>CAPITAL ${u.capital} · ENTRY ${u.entry}<br>${u.reason}</small>
  </div>
 
- <p class="footer-note"><b>Keine Ordergröße.</b> Nach jeder manuellen Änderung in Pionex zuerst den neuen Liquidationspreis prüfen und MERIDIAN synchronisieren. Erst der neue Live-Puffer entscheidet über die nächste Stufe.</p>`,'recovery-command-card');
+ <p class="footer-note"><b>Keine automatische Order-Ausführung.</b> Nach jeder manuellen Änderung zuerst den neuen Pionex-Liquidationspreis prüfen und MERIDIAN synchronisieren. Ein SAFE-Puffer hebt nur den Liquidations-Risk-Block auf; Capital und Entry werden danach separat neu geprüft.</p>`,'recovery-command-card');
 }
 
 /* v5.10.4 — ACTION CENTER */
