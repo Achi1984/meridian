@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.5.1",
-  "build": "2026-08-23-grid-detail-state-fix",
+  "appVersion": "5.7.0",
+  "build": "action-intelligence",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,

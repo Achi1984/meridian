@@ -1446,3 +1446,10 @@ document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.vi
 $('#settingsBtn').onclick=()=>openView('settings',null);
 /* v5.0.4 lazy view recovery: service worker disabled during recovery */
 load();
+
+/* v5.7 Action Intelligence helpers */
+window.MERIDIAN_ACTION_INTELLIGENCE = {
+  readinessLabel(score){ return score>=75?'READY':score>=60?'WATCH':'WAIT'; },
+  readinessClass(score){ return score>=75?'ready':score>=60?'watch':'wait'; },
+  principle:'Forecast → Trigger → Action'
+};
