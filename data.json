@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.16.0",
-  "build": "2026-08-23-live-risk-cockpit",
+  "appVersion": "5.17.0",
+  "build": "2026-08-23-center-compression",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1636,5 +1636,13 @@
       "unlockState"
     ],
     "execution": "MANUAL_ONLY"
+  },
+  "centerCompression": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "primarySurface": "LIVE_RISK_COCKPIT",
+    "actionCenter": "MERGED_INTO_COCKPIT",
+    "dynamicRecovery": "COLLAPSED_BY_DEFAULT",
+    "principle": "ONE_DECISION_ONE_NUMBER_ONE_ACTION"
   }
 }

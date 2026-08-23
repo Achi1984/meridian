@@ -1304,3 +1304,48 @@ body{background:transparent;letter-spacing:.01em}
 @media (max-width:420px){
   .lrc-action-row{grid-template-columns:1fr}
 }
+
+/* v5.17.0 CENTER COMPRESSION */
+.compact-recovery{
+  margin:12px 0;
+  border:1px solid #17425d;
+  border-radius:18px;
+  background:#06151f;
+  overflow:hidden;
+}
+.compact-recovery>summary{
+  list-style:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:15px 16px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.compact-recovery>summary::-webkit-details-marker{display:none}
+.compact-recovery>summary>div{min-width:0}
+.compact-recovery>summary b{
+  display:block;
+  margin-top:5px;
+  font-size:16px;
+  line-height:1.1;
+}
+.compact-recovery>summary small{
+  display:block;
+  margin-top:5px;
+  color:#8292a5;
+  font-size:8px;
+  letter-spacing:.4px;
+}
+.compact-open{
+  flex:0 0 auto;
+  color:#29aef5;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.8px;
+}
+.compact-recovery[open] .compact-open::after{content:" · SCHLIESSEN"}
+.compact-recovery-body{padding:0 8px 8px}
+.compact-recovery-body>.card{margin-top:0}
+.live-risk-cockpit-card{margin-bottom:12px}
