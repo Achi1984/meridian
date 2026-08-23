@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.0",
-  "build": "2026-08-23-action-center-unified",
+  "appVersion": "5.10.1",
+  "build": "2026-08-23-center-cleanup",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -460,6 +460,12 @@
         "REDUCE",
         "EXIT CHECK"
       ]
+    },
+    "verification": {
+      "BTC-S30": "2026-08-23T11:23:00+02:00",
+      "BTC-L20": "2026-08-23T11:23:00+02:00",
+      "HBAR-L5": "2026-08-23T08:40:00+02:00",
+      "XRP-L5": "2026-08-23T08:40:00+02:00"
     }
   },
   "forecastCoins": [
@@ -1299,12 +1305,18 @@
     "principle": "Kapitalrisiko zuerst, danach bestehende Positionen, erst danach neue Entries."
   },
   "actionCenter": {
-    "version": "1.0",
+    "version": "1.1",
     "status": "MODEL",
     "labels": {
       "bestChance": "ENTRY POTENZIAL",
       "nextAction": "NEXT ACTION"
     },
-    "priorityPrinciple": "Risk first: Bot-Risiko > bestehende Position > neuer Entry."
+    "priorityPrinciple": "Risk first: Bot-Risiko > bestehende Position > neuer Entry.",
+    "layout": "MASTER_DECISION_ONLY",
+    "centerCleanup": {
+      "removeDuplicateNowPanel": true,
+      "compactDecisionDetails": true,
+      "portfolioImmediatelyAfterMasterDecision": true
+    }
   }
 }

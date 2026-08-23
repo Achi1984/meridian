@@ -1087,3 +1087,42 @@ body{background:transparent;letter-spacing:.01em}
 .ac-chain span{font-size:7px;text-align:center;padding:9px 6px;border-radius:10px;background:rgba(8,29,43,.62);font-weight:800}
 .ac-chain .red{color:#ff5d68}.ac-chain .amber{color:#f0b84b}.ac-chain .cyan{color:#26b7ff}
 @media(max-width:390px){.ac-chain{grid-template-columns:1fr}.ac-grid{gap:8px}}
+
+
+/* v5.10.1 — CENTER CLEANUP */
+.decision-details{
+  margin:14px 0;
+  border:1px solid rgba(43,101,137,.5);
+  border-radius:18px;
+  background:rgba(7,22,34,.52);
+  overflow:hidden;
+}
+.decision-details summary{
+  list-style:none;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:15px 17px;
+  user-select:none;
+}
+.decision-details summary::-webkit-details-marker{display:none}
+.decision-details summary span b,
+.decision-details summary span small{display:block}
+.decision-details summary span b{font-size:10px;letter-spacing:1.25px}
+.decision-details summary span small{font-size:7px;color:#71879a;margin-top:4px}
+.decision-details summary strong{font-size:8px;color:#26b7ff;letter-spacing:.8px}
+.decision-details[open] summary{border-bottom:1px solid rgba(43,101,137,.28)}
+.decision-details[open] summary strong{font-size:0}
+.decision-details[open] summary strong:after{content:"SCHLIESSEN";font-size:8px}
+.decision-details-body{padding:2px 17px 14px}
+.dd-row{
+  display:grid;
+  grid-template-columns:1fr 1.15fr;
+  gap:5px 12px;
+  padding:11px 0;
+  border-bottom:1px solid rgba(43,101,137,.22);
+}
+.dd-row span{font-size:8px;color:#8598aa}
+.dd-row b{text-align:right;font-size:9px}
+.dd-row small{grid-column:1/-1;font-size:7px;color:#687f92}

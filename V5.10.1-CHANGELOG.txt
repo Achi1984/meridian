@@ -1,0 +1,22 @@
+ACHI MERIDIAN v5.10.1 — CENTER CLEANUP
+
+DESIGN / UX
+- ACTION CENTER bleibt als einzige Master-Entscheidung ganz oben.
+- Doppelter NOW · COMMAND CENTER 2.0 Block entfernt.
+- Portfolio/Performance folgt direkt nach der Master-Entscheidung.
+- Ausführliche ACTION ENGINE im CENTER durch einklappbare DECISION DETAILS ersetzt.
+- GRID bleibt die technische Detail-/Engineering-Ansicht.
+
+DATENINTEGRITÄT
+- Pionex-Verifikation granular gekennzeichnet:
+  BTC-S30 / BTC-L20: 11:23
+  HBAR-L5 / XRP-L5: 08:40
+- Vier aktive Bot-Positionen bleiben korrekt abgebildet:
+  BTC Short 30x, BTC Long 20x, HBAR Long 5x, XRP Long 5x.
+
+LOGIK
+- Risk first bleibt unverändert:
+  1. BTC-S30 Risiko
+  2. BTC-L20 bestehende Position
+  3. neue Entries / Day-Trade
+- Keine automatische Order-Ausführung.
