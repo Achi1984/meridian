@@ -1,0 +1,15 @@
+ACHI MERIDIAN v5.9.6 — DECISION QUALITY LAYER
+
+Neu:
+- sichtbare "LIVE"-Anführungszeichen bereinigt
+- R:R Gate:
+  <1,5 = NO ENTRY / NO ADD
+  1,5–2,0 = WATCH
+  >=2,0 = READY
+  >=2,5 = PREFERRED
+- BTC Long: bestehende Position kann KEEP sein, zusätzlicher Long bleibt bei schlechtem R:R blockiert
+- BTC Short: Liquidationspuffer + Marktregime bestimmen Risk Action
+- bei CRITICAL Short + RISK-ON => REDUCE / EXIT CHECK
+- neue Decision Quality Card im GRID
+- Multi-Asset Risk Plans zeigen Entry-Gate direkt im Header
+- keine automatische Order-Ausführung

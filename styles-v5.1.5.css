@@ -1012,3 +1012,18 @@ body{background:transparent;letter-spacing:.01em}
 .scanner-invalidation{display:grid;grid-template-columns:90px 1fr auto;gap:8px;align-items:center;margin-top:9px;padding-top:9px;border-top:1px solid rgba(43,101,137,.25)}
 .scanner-invalidation span{font-size:7px;letter-spacing:.9px;color:#74899d}.scanner-invalidation b{font-size:9px}.scanner-invalidation em{font-size:8px;font-style:normal;font-weight:900}
 @media(max-width:390px){.scanner-invalidation{grid-template-columns:1fr}.scanner-invalidation em{text-align:left}}
+
+
+/* v5.9.6 — DECISION QUALITY */
+.dq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.dq-card{padding:14px;border:1px solid rgba(43,101,137,.35);border-radius:16px;background:rgba(4,19,30,.58)}
+.dq-card span,.dq-card small{display:block;color:#7b8fa3}.dq-card span{font-size:8px;letter-spacing:1px}.dq-card b{display:block;font-size:15px;margin:7px 0}
+.dq-card.red{border-color:rgba(255,93,104,.45)}.dq-card.red b{color:#ff5d68}
+.dq-card.amber{border-color:rgba(240,184,75,.42)}.dq-card.amber b{color:#f0b84b}
+.dq-card.green{border-color:rgba(47,229,154,.4)}.dq-card.green b{color:#2fe59a}
+.dq-rules{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+.dq-rules span{padding:8px 6px;border-radius:10px;background:rgba(9,31,45,.7);font-size:7px;text-align:center;color:#7e91a4}
+.dq-rules b{display:block;font-size:9px;color:#eef4f8;margin-bottom:3px}
+.scanner-risk-head em{font-style:normal;font-size:7px;margin-left:5px}
+.scanner-risk-head em.red{color:#ff5d68}.scanner-risk-head em.amber{color:#f0b84b}.scanner-risk-head em.green{color:#2fe59a}
+@media(max-width:420px){.dq-grid{grid-template-columns:1fr}.dq-rules{grid-template-columns:1fr 1fr}}

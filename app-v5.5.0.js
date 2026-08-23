@@ -110,7 +110,7 @@ function scheduleLiveRender(){
 function updateHeaderFeedClock(){
  const el=$('#refreshTime');if(!el)return;
  const q=DATA?.livePrices?.BTC, age=q?.updatedAt?Math.max(0,Math.round((Date.now()-q.updatedAt)/1000)):null;
- el.innerHTML=q&&quoteStatus(q)==='LIVE'?`<span class="feed-dot"></span><span>"LIVE"</span><b>${age}s</b>`:`<span>↻</span><b>${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</b>`;
+ el.innerHTML=q&&quoteStatus(q)==='LIVE'?`<span class="feed-dot"></span><span>LIVE</span><b>${age}s</b>`:`<span>↻</span><b>${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</b>`;
 }
 async function refreshBinanceRest(symbols, force=false){
  const supported=symbols.filter(s=>BINANCE_PAIRS[s]); if(!supported.length)return 0;
@@ -197,7 +197,7 @@ async function refreshDayTradeTechnicals(){
   if(Number.isFinite(+oi.openInterest)&&price>0)d.oiB=(+oi.openInterest*price/1e9);
   if(Number.isFinite(vw))d.vwap=vw;
   d.technicalUpdatedAt=new Date().toISOString();
-  d.status={btcPrice:'BROWSER "LIVE" · BINANCE FUTURES',oiB:'BROWSER "LIVE" · BINANCE BTCUSDT CONTRACT OI',rsi4h:'BROWSER "LIVE" · BINANCE FUTURES',rsi1h:'BROWSER "LIVE" · BINANCE FUTURES',fundingPct:'BROWSER "LIVE" · BINANCE BTCUSDT',vwap:'BROWSER "LIVE" · BINANCE FUTURES 1H',fib:'MODEL'};
+  d.status={btcPrice:'BROWSER LIVE · BINANCE FUTURES',oiB:'BROWSER LIVE · BINANCE BTCUSDT CONTRACT OI',rsi4h:'BROWSER LIVE · BINANCE FUTURES',rsi1h:'BROWSER LIVE · BINANCE FUTURES',fundingPct:'BROWSER LIVE · BINANCE BTCUSDT',vwap:'BROWSER LIVE · BINANCE FUTURES 1H',fib:'MODEL'};
   let score=50;
   if(d.rsi4h<70)score+=12; else if(d.rsi4h>78)score-=15;
   if(d.rsi1h<70)score+=8; else if(d.rsi1h>78)score-=8;
@@ -749,7 +749,7 @@ function commandCenter(){
  const bestOpportunity = gate>=75 ? `DAY-TRADE ${gate}/100` : 'SOL WATCH / RETRACEMENT';
  const biggestRisk = critical ? `${critical.id||critical.symbol} · Liq ${fmt(critical.liquidationDistancePct,1)}%` : `MERIDIAN RISK ${risk.score}/100`;
  const changeTrigger = critical
-   ? `Liq.-Puffer > 12% ODER Position reduziert`
+   ? `Liq.-Puffer > 12% ODER Short-Risiko reduziert`
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
  return `<div class="cc-now ${nowTone}">
@@ -881,11 +881,11 @@ function market(){
  const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
  return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${snapshotBadge('MODEL')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
  `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
- card(`<div class="section-title">"LIVE" FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">"LIVE" wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
- card(`<div class="section-head"><div class="section-title">"LIVE" KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
+ card(`<div class="section-title">LIVE FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">LIVE wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
+ card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
  card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
  card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">"LIVE" / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
 }
 
 function currentNadirContext(){
@@ -922,7 +922,7 @@ function dayTrade(){
  const d=DATA.dayTrade, st=d.status||{};
  return card(`<div class="eyebrow">DAY-TRADE 2.2</div><div class="forecast-main">${d.entryAllowed?'ENTRY FREIGEGEBEN':'ENTRY NICHT FREIGEGEBEN'}</div><div class="sub">${d.decisionNote||'Bias ≠ Ausführung'}</div><div class="row"><b>GATE SCORE</b><b class="${d.entryAllowed?'green':'amber'}">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
  `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice)+'<div class="data-state">'+stateLabel(st.btcPrice)+'</div>')}${metric('BTCUSDT OI','$'+fmt(d.oiB,2)+'B<div class="data-state">'+stateLabel(st.oiB)+'</div>')}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="data-state">'+stateLabel(st.rsi4h)+'</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="data-state">'+stateLabel(st.rsi1h)+'</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="data-state">'+stateLabel(st.fundingPct)+'</div>')}${metric('24H VWAP','$'+fmt(d.vwap)+'<div class="data-state">'+stateLabel(st.vwap)+'</div>')}</div>`+
- card(`<div class="section-title">"LIVE"-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
+ card(`<div class="section-title">LIVE-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
  card(`<div class="section-title">FIB LEVELS ${snapshotBadge('MODEL')}</div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`);
 }
 function closes(symbol){
@@ -1104,7 +1104,7 @@ function renderForecast(){
 
    body+=card(`<div class="section-title">1 · TACTICAL NOW <span class="tag cyan">90T</span></div><div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>TACTICAL T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div><div class="row"><span>Position im 90T Swing</span><b>${fmt(f.pos,1)}%</b></div><div class="forecast-separation"><b>LOCAL ≠ CYCLE TOP</b><span>Hoher RSI / 90T-Top-Risk kann taktisch überhitzt sein, ohne dass das nächste Makro-Cycle-Top aktiv ist.</span></div>`);
 
-   body+=card(`<div class="section-title">2 · CYCLE CLOCK <span class="tag ${x.timing.cls}">"LIVE" MODEL</span></div><div class="cycle-master"><span>AKTUELLE MAKRO-PHASE</span><strong class="${x.timing.cls}">${x.timing.phase}</strong><b>${x.timing.daysToHalving>0?x.timing.daysToHalving+' Tage bis Halving':'Halving-Fenster überschritten'}</b></div>${forecast40Roadmap(x)}<div class="row"><span>Nächster Zustandswechsel</span><b>${x.timing.next}</b></div><div class="row"><span>${activeCoin} Major Peak Window</span><b class="green">${x.cfg.peak}</b></div><div class="row"><span>Cycle Exit Gate</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div><p class="footer-note">Cycle-Exit wird erst scharf, wenn Zeitfenster UND Makrostruktur bestätigen. Kalender allein reicht nicht.</p>`);
+   body+=card(`<div class="section-title">2 · CYCLE CLOCK <span class="tag ${x.timing.cls}">LIVE MODEL</span></div><div class="cycle-master"><span>AKTUELLE MAKRO-PHASE</span><strong class="${x.timing.cls}">${x.timing.phase}</strong><b>${x.timing.daysToHalving>0?x.timing.daysToHalving+' Tage bis Halving':'Halving-Fenster überschritten'}</b></div>${forecast40Roadmap(x)}<div class="row"><span>Nächster Zustandswechsel</span><b>${x.timing.next}</b></div><div class="row"><span>${activeCoin} Major Peak Window</span><b class="green">${x.cfg.peak}</b></div><div class="row"><span>Cycle Exit Gate</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div><p class="footer-note">Cycle-Exit wird erst scharf, wenn Zeitfenster UND Makrostruktur bestätigen. Kalender allein reicht nicht.</p>`);
 
    body+=card(`<div class="section-title">3 · NEXT CYCLE ENVELOPE <span class="tag amber">MODEL · NOT ACTIVE</span></div><div class="cycle-envelope"><div><span>DEFENSIVE</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div><div><span>BASE</span><b class="cyan">$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div><div><span>HIGH-BETA</span><b class="green">$${fmt(env.bullLow,dec)}–$${fmt(env.bullHigh,dec)}</b></div></div><div class="row"><span>Modellquelle</span><b>${env.source}</b></div><div class="row"><span>Aktivierung</span><b>TIME + ATH/HH + REGIME</b></div><p class="footer-note">Langfristige Szenario-Zonen, keine aktuellen Targets. Sie ersetzen ausdrücklich nicht die 90T-FIB-Ziele.</p>`);
 
@@ -1393,7 +1393,7 @@ function scannerCard(sym){
  const g=fibFromSwing(sym); if(!g)return '';
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
  return `<details class="commander-detail" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
- <div class="scanner-grid"><div><span>"LIVE"</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
+ <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
  <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)+multiAssetRiskRow(sym)}%</div></details>`;
 }
 function commanderBot(b){
@@ -1409,7 +1409,7 @@ function btcDualHedgeEngine(){
  const lng=bots.find(b=>(b.side||'').toLowerCase()==='long');
  const sht=bots.find(b=>(b.side||'').toLowerCase()==='short');
  if(!lng||!sht)return {ready:false};
- const live=("LIVE"&&"LIVE".BTC&&Number("LIVE".BTC.price))||Number(lng.currentPrice||sht.currentPrice)||0;
+ const live=(DATA.livePrices?.BTC&&Number(DATA.livePrices.BTC.price))||Number(lng.currentPrice||sht.currentPrice)||0;
  const longBuf=Math.abs((live-Number(lng.liquidation))/live*100);
  const shortBuf=Math.abs((Number(sht.liquidation)-live)/live*100);
  const longProxy=Number(lng.investment||0)*Number(lng.leverage||1);
@@ -1484,6 +1484,7 @@ function gridView(){
  <div class="grid2">${metric('FUTURES RISK',r.riskLevel||'—','red')}${metric('BTC BOTS','2 · LONG + SHORT','cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">${r.riskNote||''}</p>`)+
  dualBtcHedgePanel()+
  slInvalidationPanel()+
+ decisionQualityPanel()+
  card(`<div class="section-title">BOT PRIORITY QUEUE</div>${order.map(commanderBot).join('')}<p class="footer-note">SAFE ≥30% · TIGHT 15–30% · DANGER 8–15% · CRITICAL &lt;8% Liq.-Puffer. Details per Tap.</p>`)+
  card(`<div class="section-title">MULTI-ASSET SL MATRIX <span class="tag cyan">MODEL</span></div>
  ${['SOL','ETH','XRP','HBAR','PEPE'].map(s=>multiAssetRiskRow(s)).join('')}
@@ -1493,9 +1494,9 @@ function gridView(){
 
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return card(`<div class="section-title">"LIVE" DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.0 · MODEL</b></div>`)+
- card(`<div class="section-title">v4.9.3 "LIVE" STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">"LIVE" / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
- card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt "LIVE".</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.0 · MODEL</b></div>`)+
+ card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
+ card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
 function renderError(view,e){
  console.error('MERIDIAN view error',view,e);
@@ -1570,7 +1571,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.9.5 — MULTI-ASSET SL ENGINE */
+/* v5.9.6 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1579,10 +1580,10 @@ function multiAssetRiskRow(sym){
  const a=multiAssetSlData(sym); if(!a)return '';
  const dec=(n)=>n<0.01?8:n<10?4:2;
  const f=(n)=>fmt(n,dec(n));
- const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0);
+ const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0), gate=rrDecision(rr2);
  const rrCls=rr2>=2?'green':rr2>=1.3?'amber':'red';
  return `<div class="scanner-risk-panel">
-   <div class="scanner-risk-head"><span>RISK PLAN</span><b>${sym}</b></div>
+   <div class="scanner-risk-head"><span>RISK PLAN</span><b>${sym} · <em class="${gate.cls}">${gate.label}</em></b></div>
    <div class="scanner-risk-grid">
     <div><span>ENTRY</span><b>$${f(a.entryLow)}–$${f(a.entryHigh)}</b></div>
     <div class="sl"><span>SL</span><b>$${f(a.stopLoss)}</b></div>
@@ -1591,4 +1592,45 @@ function multiAssetRiskRow(sym){
    </div>
    <div class="scanner-invalidation"><span>INVALIDATION</span><b>Close &lt; $${f(a.stopLoss)}</b><em class="${rrCls}">R:R2 ${fmt(rr2,2)}</em></div>
   </div>`;
+}
+
+/* v5.9.6 — DECISION QUALITY LAYER */
+function rrDecision(rr){
+ const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
+ rr=Number(rr||0);
+ if(rr<q.noEntryBelow)return {label:'NO ENTRY / NO ADD',cls:'red',score:35};
+ if(rr<q.watchBelow)return {label:'WATCH',cls:'amber',score:58};
+ if(rr>=q.preferredFrom)return {label:'PREFERRED',cls:'green',score:88};
+ return {label:'READY',cls:'green',score:76};
+}
+function botRiskDecision(bot){
+ if(!bot)return {label:'—',cls:'muted'};
+ const buf=Number(bot.liquidationDistancePct||99);
+ const reg=String(DATA.market?.regime||'').toUpperCase();
+ if(buf<8 && reg.includes('RISK-ON'))return {label:'REDUCE / EXIT CHECK',cls:'red'};
+ if(buf<8)return {label:'REDUCE',cls:'red'};
+ if(buf<15)return {label:'WATCH / NO ADD',cls:'amber'};
+ if(buf<30)return {label:'KEEP / TIGHT',cls:'amber'};
+ return {label:'KEEP',cls:'green'};
+}
+function decisionQualityPanel(){
+ const e=DATA.slInvalidationEngine?.btcLong20x;
+ const bots=(DATA.pionexRisk?.bots||[]).filter(b=>b.symbol==='BTC');
+ const lng=bots.find(b=>(b.side||'').toLowerCase()==='long');
+ const sht=bots.find(b=>(b.side||'').toLowerCase()==='short');
+ if(!e||!lng||!sht)return '';
+ const rr=rrDecision(e.rrTp2);
+ const sr=botRiskDecision(sht);
+ return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × LIQ × REGIME</div><div class="sub">Entry-Gate und Bot-Risiko werden getrennt bewertet</div></div></div>
+ <div class="dq-grid">
+  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Mindestwert 1,50</small></div>
+  <div class="dq-card ${sr.cls}"><span>BTC SHORT RISK</span><b>${sr.label}</b><small>Liq.-Puffer ${fmt(sht.liquidationDistancePct,1)}% · ${DATA.market?.regime||'REGIME'}</small></div>
+ </div>
+ <div class="dq-rules">
+   <span><b>&lt;1,5</b> NO ENTRY</span>
+   <span><b>1,5–2,0</b> WATCH</span>
+   <span><b>≥2,0</b> READY</span>
+   <span><b>≥2,5</b> PREFERRED</span>
+ </div>
+ <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: ein Long kann KEEP sein, obwohl ein zusätzlicher Long wegen schlechtem R:R blockiert bleibt.</p>`);
 }
