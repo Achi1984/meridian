@@ -1068,3 +1068,22 @@ body{background:transparent;letter-spacing:.01em}
 .ude-row .amber,.ude-num.amber{color:#f0b84b}
 .ude-row .green,.ude-num.green{color:#2fe59a}
 @media(max-width:390px){.ude-row{grid-template-columns:32px 1fr 1.1fr}.ude-row strong{font-size:8px}}
+
+
+/* v5.10.0 — ACTION CENTER */
+.ac-top{display:flex;justify-content:space-between;align-items:flex-start}
+.ac-next{margin:14px 0;padding:14px 16px;border:1px solid rgba(255,93,104,.42);border-radius:16px;background:rgba(255,93,104,.055)}
+.ac-next span,.ac-next b,.ac-next small{display:block}
+.ac-next span{font-size:7px;letter-spacing:1.2px;color:#7f93a6}
+.ac-next b{font-size:18px;color:#ff5d68;margin-top:5px}
+.ac-next small{font-size:8px;color:#7f93a6;margin-top:6px}
+.ac-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ac-grid>div{padding:13px 14px;border:1px solid rgba(43,101,137,.45);border-radius:15px;background:rgba(7,22,34,.48)}
+.ac-grid span,.ac-grid b,.ac-grid small{display:block}
+.ac-grid span{font-size:7px;color:#8195a8;letter-spacing:.9px}
+.ac-grid b{font-size:13px;margin-top:5px}
+.ac-grid small{font-size:7px;color:#667d91;margin-top:3px}
+.ac-chain{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.ac-chain span{font-size:7px;text-align:center;padding:9px 6px;border-radius:10px;background:rgba(8,29,43,.62);font-weight:800}
+.ac-chain .red{color:#ff5d68}.ac-chain .amber{color:#f0b84b}.ac-chain .cyan{color:#26b7ff}
+@media(max-width:390px){.ac-chain{grid-template-columns:1fr}.ac-grid{gap:8px}}

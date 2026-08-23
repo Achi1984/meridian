@@ -752,14 +752,14 @@ function commandCenter(){
    ? `Liq.-Puffer > 12% ODER Short-Risiko reduziert`
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
- return `<div class="cc-now ${nowTone}">
+ return actionCenterPanel()+`<div class="cc-now ${nowTone}">
    <div class="cc-now-head"><span>NOW · COMMAND CENTER 2.0</span><b>${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</b></div>
    <div class="cc-now-action">${nowAction}</div>
    <div class="cc-now-why">${nowWhy}</div>
    <div class="cc-now-grid">
     <div><span>GRÖSSTES RISIKO</span><b class="red">${biggestRisk}</b></div>
-    <div><span>BESTE CHANCE</span><b class="${gate>=75?'green':'amber'}">${bestOpportunity}</b></div>
-    <div><span>ÄNDERT DIE ENTSCHEIDUNG</span><b class="cyan">${changeTrigger}</b></div>
+    <div><span>ENTRY POTENZIAL</span><b class="${gate>=75?'green':'amber'}">${bestOpportunity}</b></div>
+    <div><span>FREIGABE-BEDINGUNG</span><b class="cyan">${changeTrigger}</b></div>
    </div>
    <div class="cc-now-explain"><b>${marketBullish?'MARKT: RISK-ON':'MARKT: DEFENSIV'}</b><span>Portfolio: ${risk.label} · Bot-Risiko: ${r.riskLevel||'SNAPSHOT'}</span></div>
  </div>`+
@@ -1572,7 +1572,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.9.9 — MULTI-ASSET SL ENGINE */
+/* v5.10.0 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1595,7 +1595,7 @@ function multiAssetRiskRow(sym){
   </div>`;
 }
 
-/* v5.9.9 — DECISION QUALITY LAYER */
+/* v5.10.0 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1636,7 +1636,7 @@ function decisionQualityPanel(){
  <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
-/* v5.9.9 — ENTRY CONFLUENCE GATE */
+/* v5.10.0 — ENTRY CONFLUENCE GATE */
 function entryConfluence(sym, rr2){
  const cfg=DATA.entryConfluence?.rules||{};
  const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
@@ -1664,7 +1664,7 @@ function confluenceSummaryPanel(){
  <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
 }
 
-/* v5.9.9 — UNIFIED DECISION ENGINE */
+/* v5.10.0 — UNIFIED DECISION ENGINE */
 function unifiedDecisionQueue(){
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const btcLongRR=Number(DATA.slInvalidationEngine?.btcLong?.rrTp2||1.33);
@@ -1708,4 +1708,46 @@ function unifiedDecisionQueue(){
    <strong class="${a.cls}">${a.action}</strong>
  </div>`).join('')}
  <p class="footer-note">Priorität: Liquidationsrisiko → bestehende Position → neue Entries → Opportunity Watchlist. Keine automatische Order-Ausführung.</p>`);
+}
+
+/* v5.10.0 — ACTION CENTER */
+function actionCenterPanel(){
+ const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
+ const shortBuf=Number(DATA.dualBotHedge?.short?.liqBufferPct||4.8);
+ const longBuf=Number(DATA.dualBotHedge?.long?.liqBufferPct||9.4);
+ const dayGate=Number(DATA.dayTrade?.gateScore||0);
+
+ let headline='RISIKO ZUERST';
+ let cls='red';
+ let next='BTC-S30 absichern';
+ if(shortBuf>=12 && longBuf>=12){
+   headline='ENTRY-POTENZIAL PRÜFEN';
+   cls='amber';
+   next='BTC-L20 / Day-Trade neu bewerten';
+ }
+
+ return card(`<div class="ac-top">
+   <div>
+     <div class="eyebrow">ACTION CENTER 1.0 ${liveBadge('MODEL')}</div>
+     <div class="forecast-main ${cls}">${headline}</div>
+     <div class="sub">Eine gemeinsame Entscheidungslogik für CENTER + GRID.</div>
+   </div>
+ </div>
+ <div class="ac-next">
+   <span>NEXT ACTION</span>
+   <b>${next}</b>
+   <small>Priorität: Liq.-Risiko → bestehende Position → neuer Entry</small>
+ </div>
+ <div class="ac-grid">
+   <div><span>BTC-S30</span><b class="red">${fmt(shortBuf,1)}% LIQ</b><small>CRITICAL</small></div>
+   <div><span>BTC-L20</span><b class="amber">${fmt(longBuf,1)}% LIQ</b><small>KEEP / NO ADD</small></div>
+   <div><span>BTC ENTRY</span><b>${btcEntry}/100</b><small>READINESS</small></div>
+   <div><span>DAY-TRADE</span><b>${dayGate}/100</b><small>ENTRY POTENZIAL</small></div>
+ </div>
+ <div class="ac-chain">
+   <span class="red">1 · BTC-S30 RISK</span>
+   <span class="amber">2 · BTC-L20 KEEP</span>
+   <span class="cyan">3 · ENTRY CHECK</span>
+ </div>
+ <p class="footer-note">Ein hoher Entry-Score ist keine Handlungsfreigabe, solange ein kritisches Liquidationsrisiko vorgelagert ist. Keine automatische Order-Ausführung.</p>`);
 }
