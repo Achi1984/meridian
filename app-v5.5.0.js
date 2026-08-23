@@ -405,6 +405,37 @@ function botGuardFromBuffer(x){
  if(x<30)return {label:'TIGHT',cls:'amber',rank:2};
  return {label:'SAFE',cls:'green',rank:3};
 }
+
+/* v5.10.10 — FULL RISK SSOT */
+function canonicalBotState(b){
+ if(!b)return null;
+ const liquidation=Number(b.liquidationPrice??b.liquidation);
+ const live=Number(DATA.livePrices?.[b.symbol]?.price || b.currentPrice || 0);
+ const buffer=effectiveBotBuffer(b);
+ const guard=botGuardFromBuffer(buffer);
+ return {...b, liquidation, live, buffer, guard};
+}
+function canonicalBotStates(){
+ return activePionexBots().map(canonicalBotState)
+   .filter(Boolean)
+   .sort((a,b)=>(a.guard.rank-b.guard.rank)||(a.buffer-b.buffer));
+}
+function canonicalBtcLongRiskPlan(){
+ const base=DATA.slInvalidationEngine?.btcLong20x;
+ if(!base)return null;
+ const bot=canonicalBotStates().find(b=>b.id==='BTC-L20') ||
+           canonicalBotStates().find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
+ if(!bot || !Number.isFinite(bot.liquidation)) return {...base};
+ const stopLoss=Number(base.stopLoss);
+ const liquidation=Number(bot.liquidation);
+ return {
+   ...base,
+   liquidation,
+   slToLiqUsd:Number.isFinite(stopLoss)?Math.max(0,stopLoss-liquidation):Number(base.slToLiqUsd||0),
+   liveBotBuffer:bot.buffer,
+   source:'ACTIVE Pionex BTC-L20 + live BTC'
+ };
+}
 function commandRisk(){
  const p=DATA.portfolio||{}, fh=feedHealth(), bots=activePionexBots();
  const states=bots.map(b=>({b,buf:effectiveBotBuffer(b)})).map(x=>({...x,guard:botGuardFromBuffer(x.buf)}));
@@ -1408,28 +1439,27 @@ function scannerCard(sym){
  <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
  <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)+multiAssetRiskRow(sym)}%</div></details>`;
 }
-function commanderBot(b){
- const guard=liqGuard(b), liq=effectiveBotBuffer(b);
- const priority=b.id==='BTC-S30'?'REDUCE / EXIT CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':liqGuard(b).label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+function commanderBot(raw){
+ const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
+ const priority=b.id==='BTC-S30'?'REDUCE / EXIT CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
- <div class="commander-priority ${guard.cls}">${priority}${b.action && b.action!==priority?` · ${b.action}`:""}</div>
- <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason}</p></details>`;
+ <div class="commander-priority ${guard.cls}">${priority}</div>
+ <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason||'SSOT: aktive Pionex-Position + Live-Kurs.'}</p></details>`;
 }
 
 function btcDualHedgeEngine(){
- const cfg=DATA.dualBtcHedge||{}, bots=(DATA.pionexRisk?.bots||[]).filter(b=>b.symbol==='BTC');
- const lng=bots.find(b=>(b.side||'').toLowerCase()==='long');
- const sht=bots.find(b=>(b.side||'').toLowerCase()==='short');
+ const bots=canonicalBotStates().filter(b=>b.symbol==='BTC');
+ const lng=bots.find(b=>String(b.side).toUpperCase()==='LONG');
+ const sht=bots.find(b=>String(b.side).toUpperCase()==='SHORT');
  if(!lng||!sht)return {ready:false};
- const live=(DATA.livePrices?.BTC&&Number(DATA.livePrices.BTC.price))||Number(lng.currentPrice||sht.currentPrice)||0;
- const longBuf=Math.abs((live-Number(lng.liquidation))/live*100);
- const shortBuf=Math.abs((Number(sht.liquidation)-live)/live*100);
+ const live=Number(lng.live||sht.live||0);
+ const longBuf=lng.buffer, shortBuf=sht.buffer;
  const longProxy=Number(lng.investment||0)*Number(lng.leverage||1);
  const shortProxy=Number(sht.investment||0)*Number(sht.leverage||1);
  const netProxy=longProxy-shortProxy;
  const hedge=longProxy?shortProxy/longProxy*100:0;
- const shortCritical=shortBuf<8;
- const longCritical=longBuf<8;
+ const shortCritical=sht.guard.label==='CRITICAL';
+ const longCritical=lng.guard.label==='CRITICAL';
  let decision='WAIT', cls='amber', score=62;
  if(shortCritical&&!longCritical){decision='REDUCE SHORT / KEEP LONG';cls='red';score=86}
  else if(shortCritical&&longCritical){decision='DEFEND BOTH / NO ADD';cls='red';score=94}
@@ -1467,10 +1497,10 @@ function dualBtcHedgePanel(){
 
 
 function slInvalidationPanel(){
- const e=DATA.slInvalidationEngine?.btcLong20x;
+ const e=canonicalBtcLongRiskPlan();
  if(!e)return '';
- const levWarn=(e.slToLiqUsd/Math.max(1,e.entry))*100<4;
- return card(`<div class="section-head"><div><div class="eyebrow">SL & INVALIDATION ENGINE 1.0 ${snapshotBadge('MODEL')}</div><div class="forecast-main">BTC LONG 20x</div><div class="sub">ENTRY → SL → TP1 → TP2 → R:R</div></div><span class="tag ${levWarn?'red':'amber'}">${levWarn?'LEVERAGE TOO HIGH':'HIGH LEVERAGE'}</span></div>
+ const levWarn=(Number(e.slToLiqUsd)/Math.max(1,Number(e.entry)))*100<4;
+ return card(`<div class="section-head"><div><div class="eyebrow">SL & INVALIDATION ENGINE 1.1 ${liveBadge('SSOT')}</div><div class="forecast-main">BTC LONG 20x</div><div class="sub">ENTRY → SL → TP1 → TP2 → R:R</div></div><span class="tag ${levWarn?'red':'amber'}">${levWarn?'LEVERAGE TOO HIGH':'HIGH LEVERAGE'}</span></div>
  <div class="sl-flow">
    <div><span>ENTRY</span><b>$${fmt(e.entry,0)}</b></div>
    <div class="sl-node stop"><span>SL</span><b>$${fmt(e.stopLoss,0)}</b><small>${fmt(e.stopLossPctFromEntry,2)}%</small></div>
@@ -1484,16 +1514,16 @@ function slInvalidationPanel(){
   <div><span>STATUS</span><b class="amber">${e.status}</b></div>
  </div>
  <div class="sl-rule ${levWarn?'red':''}"><b>${levWarn?'LEVERAGE TOO HIGH':'RISK CHECK'}</b><span>Technischer SL und Liquidation liegen zu nahe beieinander. Kein ADD, solange die Struktur nicht bestätigt und der Sicherheitsabstand nicht größer ist.</span></div>
- <p class="footer-note">SL wird aus Struktur/Fibonacci/Short-BE plus Liquidations-Sicherheitsabstand abgeleitet. Kein fixer Prozent-SL und keine automatische Order-Ausführung.</p>`);
+ <p class="footer-note">SSOT: Liquidation und Liq.-Puffer stammen aus der aktiven BTC-L20 Pionex-Position und werden mit dem Live-BTC-Kurs synchronisiert. SL/TP bleiben Modellwerte; keine automatische Order-Ausführung.</p>`);
 }
 
 function gridView(){
- const s=decisionSSOT(), bots=activePionexBots();
- const order=[...bots].sort((a,b)=>(liqGuard(a).rank-liqGuard(b).rank)||(effectiveBotBuffer(a)-effectiveBotBuffer(b)));
+ const s=decisionSSOT(), bots=s.bots;
+ const order=[...bots];
  const critical=s.critical.length, danger=s.danger.length;
  const futuresRisk=critical?'HIGH':danger?'ELEVATED':'NORMAL';
- return card(`<div class="eyebrow">GRID COMMANDER 3.3 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
- <div class="grid2">${metric('FUTURES RISK',futuresRisk,critical?'red':danger?'amber':'green')}${metric('BTC BOTS',bots.filter(b=>b.symbol==='BTC').length+' · LONG + SHORT','cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">SSOT: ACTIVE Pionex Bots; Liq.-Puffer wird mit Live-Kurs neu berechnet, Snapshot ist Fallback.</p>`)+
+ return card(`<div class="eyebrow">GRID COMMANDER 3.4 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
+ <div class="grid2">${metric('FUTURES RISK',futuresRisk,critical?'red':danger?'amber':'green')}${metric('BTC BOTS',bots.filter(b=>b.symbol==='BTC').length+' · '+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG')?'LONG':'')+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT')?' + SHORT':''),'cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">SSOT: ACTIVE Pionex Bots; Liq.-Puffer wird mit Live-Kurs neu berechnet, Snapshot ist Fallback.</p>`)+
  dualBtcHedgePanel()+
  slInvalidationPanel()+
  decisionQualityPanel()+
@@ -1507,7 +1537,7 @@ card(`<div class="eyebrow">FIB GRID ENGINE 1.3 ${liveBadge('LIVE')}</div><div cl
 
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.1 · SSOT</b></div>`)+
+ return card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">1.2 · FULL SSOT</b></div>`)+
  card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><button onclick="location.reload()" class="tab active" style="width:100%;margin-top:16px">FEEDS NEU VERBINDEN</button>`);
 }
@@ -1627,25 +1657,26 @@ function botRiskDecision(bot){
  return {label:'KEEP',cls:'green'};
 }
 function decisionQualityPanel(){
- const e=DATA.slInvalidationEngine?.btcLong20x;
- const bots=(DATA.pionexRisk?.bots||[]).filter(b=>b.symbol==='BTC');
- const lng=bots.find(b=>(b.side||'').toLowerCase()==='long');
- const sht=bots.find(b=>(b.side||'').toLowerCase()==='short');
- if(!e||!lng||!sht)return '';
+ const e=canonicalBtcLongRiskPlan();
+ const s=decisionSSOT();
+ const sht=s.btcShort;
+ if(!e)return '';
  const rr=rrDecision(e.rrTp2);
- const sr=botRiskDecision(sht);
- return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × ENTRY × LIQ × REGIME</div><div class="sub">Entry-Gate nutzt R:R + Entry Readiness; Bot-Risiko bleibt separat</div></div></div>
+ const sr=sht?botRiskDecision({...sht,liquidationDistancePct:sht.buffer}):{label:'—',cls:'muted'};
+ const addLabel=s.entryBlocked?'NO ENTRY / NO ADD':rr.label;
+ const addCls=s.entryBlocked?'red':rr.cls;
+ return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.1 <span class="tag cyan">SSOT</span></div><div class="forecast-main">R:R × ENTRY × LIQ × REGIME</div><div class="sub">Bot-Risiko ist vorgelagert und kann den Entry-Gate blockieren.</div></div></div>
  <div class="dq-grid">
-  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??0}/100</small></div>
-  <div class="dq-card ${sr.cls}"><span>BTC SHORT RISK</span><b>${sr.label}</b><small>Liq.-Puffer ${fmt(sht.liquidationDistancePct,1)}% · ${DATA.market?.regime||'REGIME'}</small></div>
+  <div class="dq-card ${addCls}"><span>BTC LONG ADD-GATE</span><b>${addLabel}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Entry ${s.btcEntry}/100${s.entryBlocked?' · BLOCKED BY BOT RISK':''}</small></div>
+  <div class="dq-card ${sr.cls}"><span>BTC SHORT RISK</span><b>${sr.label}</b><small>Liq.-Puffer ${sht?fmt(sht.buffer,1)+'%':'—'} · ${DATA.market?.regime||'REGIME'}</small></div>
  </div>
  <div class="dq-rules dq-confluence-rules">
-   <span><b>NO ENTRY</b>R:R &lt;2,0 oder Entry &lt;55</span>
+   <span><b>NO ENTRY</b>Bot-Risiko aktiv ODER R:R &lt;2,0 ODER Entry &lt;55</span>
    <span><b>WATCH</b>R:R ≥2,0 + Entry 55–64</span>
-   <span><b>READY</b>R:R ≥2,0 + Entry ≥65</span>
-   <span><b>PREFERRED</b>R:R ≥2,5 + Entry ≥70</span>
+   <span><b>READY</b>R:R ≥2,0 + Entry ≥65 + kein Risk-Block</span>
+   <span><b>PREFERRED</b>R:R ≥2,5 + Entry ≥70 + kein Risk-Block</span>
  </div>
- <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
+ <p class="footer-note">Bestehende Position und neuer Entry bleiben getrennt: KEEP kann bestehen bleiben, während ADD durch Liquidationsrisiko, R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
 /* v5.10.4 — ENTRY CONFLUENCE GATE */
@@ -1679,18 +1710,13 @@ function confluenceSummaryPanel(){
 
 /* v5.10.9 — DECISION SINGLE SOURCE OF TRUTH */
 function decisionSSOT(){
- const bots=activePionexBots();
- const botStates=bots.map(b=>{
-   const buffer=effectiveBotBuffer(b);
-   const guard=botGuardFromBuffer(buffer);
-   return {...b,buffer,guard};
- }).sort((a,b)=>(a.guard.rank-b.guard.rank)||(a.buffer-b.buffer));
-
+ const botStates=canonicalBotStates();
  const btcLong=botStates.find(b=>b.id==='BTC-L20')||botStates.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
  const btcShort=botStates.find(b=>b.id==='BTC-S30')||botStates.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT');
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const dayGate=Number(DATA.dayTrade?.gateScore||0);
- const rr2=Number(DATA.slInvalidationEngine?.btcLong20x?.rrTp2||DATA.slInvalidationEngine?.btcLong?.rrTp2||0);
+ const riskPlan=canonicalBtcLongRiskPlan();
+ const rr2=Number(riskPlan?.rrTp2||0);
  const risk=commandRisk();
 
  const critical=botStates.filter(b=>b.guard.label==='CRITICAL');
@@ -1725,9 +1751,9 @@ function decisionSSOT(){
  const btcEntryState=entryBlocked?'BLOCKED BY BOT RISK':
    (rr2>=2&&btcEntry>=65?'READY':rr2>=2&&btcEntry>=55?'WATCH':'NO ENTRY');
 
- return {version:'1.1',bots:botStates,btcLong,btcShort,btcEntry,dayGate,rr2,risk,
+ return {version:'1.2',bots:botStates,btcLong,btcShort,btcEntry,dayGate,rr2,risk,riskPlan,
    critical,danger,nextAction,nextTone,blocking,queue,entryBlocked,btcEntryState,
-   source:'pionexRisk.bots + livePrices'};
+   source:'ACTIVE Pionex bots + livePrices + canonical BTC-L20 risk plan'};
 }
 
 /* v5.10.4 — UNIFIED DECISION ENGINE */
@@ -1747,7 +1773,7 @@ function unifiedDecisionQueue(){
  }));
 
  return card(`<div class="section-head"><div>
-   <div class="eyebrow">UNIFIED DECISION ENGINE 1.1 <span class="tag cyan">SSOT</span></div>
+   <div class="eyebrow">UNIFIED DECISION ENGINE 1.2 <span class="tag cyan">SSOT</span></div>
    <div class="forecast-main">RISK → POSITION → ENTRY</div>
    <div class="sub">Eine Quelle für CENTER, GRID, Bot Queue und Entry Gate.</div>
  </div></div>
@@ -1769,7 +1795,7 @@ function actionCenterPanel(){
  const longGuard=ll?ll.guard:botGuardFromBuffer(NaN);
 
  return card(`<div class="ac-top"><div>
-   <div class="eyebrow">ACTION CENTER 1.1 ${liveBadge('SSOT')}</div>
+   <div class="eyebrow">ACTION CENTER 1.2 ${liveBadge('SSOT')}</div>
    <div class="forecast-main ${s.nextTone}">${s.entryBlocked?'RISIKO ZUERST':'ENTRY-POTENZIAL'}</div>
    <div class="sub">Single Source of Truth für CENTER + GRID.</div>
  </div></div>
@@ -1779,7 +1805,7 @@ function actionCenterPanel(){
    <div><span>BTC-S30</span><b class="${shortGuard.cls}">${Number.isFinite(shortBuf)?fmt(shortBuf,1)+'% LIQ':'—'}</b><small>${shortGuard.label}</small></div>
    <div><span>BTC-L20</span><b class="${longGuard.cls}">${Number.isFinite(longBuf)?fmt(longBuf,1)+'% LIQ':'—'}</b><small>${longGuard.label==='DANGER'?'KEEP / NO ADD':longGuard.label}</small></div>
    <div><span>BTC ENTRY</span><b>${s.btcEntry}/100</b><small>${s.btcEntryState}</small></div>
-   <div><span>DAY-TRADE</span><b>${s.dayGate}/100</b><small>${s.entryBlocked?'NACHRANGIG':'ENTRY POTENZIAL'}</small></div>
+   <div><span>DAY-TRADE</span><b>${s.dayGate}/100</b><small>${s.entryBlocked?'BLOCKED BY BOT RISK':'ENTRY POTENZIAL'}</small></div>
  </div>
  <div class="ac-chain">
    ${s.queue.slice(0,2).map((q,i)=>`<span class="${q.tone}">${i+1} · ${q.id} ${q.action.split(' / ')[0]}</span>`).join('')}

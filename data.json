@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.9",
-  "build": "2026-08-23-decision-ssot",
+  "appVersion": "5.10.10",
+  "build": "2026-08-23-full-risk-ssot",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -615,7 +615,8 @@
     "DAYTRADE runtime bug fixed: stateLabel restored as a helper function.",
     "Removed incorrect local stateLabel constant that accessed d before initialization.",
     "Approved compact UI geometry remains unchanged.",
-    "Bottom navigation remains unchanged."
+    "Bottom navigation remains unchanged.",
+    "v5.10.10: FULL RISK SSOT – canonical active Pionex bot states drive Center, Grid, Dual Hedge, Priority Queue, Decision Quality and BTC-L20 SL/Liquidation display."
   ],
   "decisionEngine": {
     "version": "1.0",
