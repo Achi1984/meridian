@@ -1,5 +1,6 @@
 {
-  "version": "5.3.1",
-  "build": "forecast-3.3-loader-hardfix",
-  "fix": "index now loads app-v5.3.1.js containing Forecast 3.3"
+  "version": "5.4.0",
+  "build": "forecast-4-time-structure-exit",
+  "runtime": "app-v5.4.0.js",
+  "note": "TACTICAL NOW / CYCLE CLOCK / NEXT CYCLE ENVELOPE / EXIT ENGINE 2.0"
 }

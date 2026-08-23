@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.3.0",
-  "build": "forecast-3.3-tactical-cycle-exit",
+  "appVersion": "5.4.0",
+  "build": "forecast-4-time-structure-exit",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -807,5 +807,45 @@
       }
     ],
     "note": "Exit-Stufen sind Modellregeln, keine automatische Order-Ausführung."
+  },
+  "forecast40": {
+    "name": "Forecast 4.0",
+    "principle": "TACTICAL NOW ≠ NEXT CYCLE TOP. Zeit, Struktur und Exit-Risiko werden separat modelliert.",
+    "cycleWindows": {
+      "reset": "2026–2027",
+      "preHalving": "2027 H2–2028 H1",
+      "halving": "≈ Apr 2028",
+      "expansion": "2028 H2–2029 H1",
+      "btcPeak": "2029 Q2–2030 Q1"
+    },
+    "exitTranches": [
+      {
+        "name": "E1",
+        "pct": 10,
+        "trigger": "Cycle-Risk ≥52 · Vorbereitung / optionaler Trim"
+      },
+      {
+        "name": "E2",
+        "pct": 20,
+        "trigger": "Cycle-Risk ≥66 · Peak-Gate oder bestätigte Schwäche"
+      },
+      {
+        "name": "E3",
+        "pct": 30,
+        "trigger": "Cycle-Risk ≥78 · Distribution + Peak-Fenster"
+      },
+      {
+        "name": "E4",
+        "pct": 40,
+        "trigger": "Cycle-Risk ≥88 · Strukturbruch / finaler Cycle-Exit"
+      }
+    ],
+    "ideas": [
+      "Local Heat vs Cycle Exit strikt trennen",
+      "Cycle Clock mit dynamischem Zeit-Score",
+      "Makro-ATH/HH als Exit-Unlock",
+      "Trigger Matrix statt starrem Top-Datum",
+      "Langfristige Preiszonen standardmäßig NOT ACTIVE"
+    ]
   }
 }

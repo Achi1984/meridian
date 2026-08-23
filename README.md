@@ -1,19 +1,11 @@
-# ACHI MERIDIAN v5.2.2 — Altcoin Cycle Rotation 3.2
+# ACHI MERIDIAN v5.4.0 — Forecast 4.0
 
-Forecast hierarchy:
-1. Tactical 90T structure
-2. BTC Macro Price × Time
-3. Altcoin Cycle Rotation
+Forecast 4.0 trennt vier Ebenen sauber:
+1. TACTICAL NOW: 90T Swing/FIB und Local Heat.
+2. CYCLE CLOCK: aktuelle Makro-Phase, Halving-Countdown und Peak-Fenster.
+3. NEXT CYCLE ENVELOPE: langfristige, noch nicht aktive Szenario-Zonen.
+4. EXIT ENGINE 2.0: Zeit + Struktur + Momentum + relative Schwäche + Local Heat.
 
-Rotation confirmation:
-- BTC dominance falling and sustained below ~55%
-- ETH/BTC strengthening toward/above ~0.048
-- Altcoin Season Index >=75
-2/3 gates = rotation confirmed; 3/3 = high confirmation.
+Wichtig: Ein hoher lokaler Top-Risk ist nicht automatisch ein Makro-Cycle-Exit. Cycle-Exit bleibt gesperrt, bis Zeitfenster und Makrostruktur gemeinsam bestätigen.
 
-Coin peak windows are relative lag models, not guaranteed dates.
-No fabricated long-range token price targets are shown before future structure confirms.
-
-
-## v5.3.0
-Forecast 3.3: TACTICAL / NEXT CYCLE / DYNAMIC EXIT ENGINE. 90T FIB targets are explicitly separated from 2028–2030 cycle model zones.
+Dateihygiene: Das ZIP enthält nur die aktuellen Runtime-Dateien; keine angesammelten alten app-/styles-Versionen.
