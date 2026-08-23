@@ -1157,3 +1157,28 @@ body{background:transparent;letter-spacing:.01em}
  .exec-grid,.exec-sequence{grid-template-columns:1fr}
  .exec-hero b{font-size:22px}
 }
+
+/* v5.11.2 — Adaptive Risk Engine */
+.adaptive-risk-card{border-color:#257ba0}
+.adaptive-current{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;padding:14px;border:1px solid #173e55;border-radius:18px;background:rgba(4,19,29,.42)}
+.adaptive-current.red{border-color:#8c394a}.adaptive-current.amber{border-color:#745e2d}.adaptive-current.green{border-color:#176344}
+.adaptive-current span,.adaptive-zone span,.adaptive-warning span{display:block;color:#8190a0;font-size:9px;letter-spacing:.9px}
+.adaptive-current b{display:block;margin-top:5px;font-size:13px}
+.adaptive-path{display:flex;align-items:center;gap:7px;margin:12px 0 16px;overflow:hidden}
+.adaptive-path span{white-space:nowrap;font-size:8px;font-weight:900;letter-spacing:.65px}
+.adaptive-path i{height:1px;flex:1;min-width:8px;background:#23495f}
+.adaptive-zone{padding:15px;margin:10px 0;border:1px solid #2c5268;border-radius:18px;background:rgba(4,19,29,.42)}
+.adaptive-zone.amber{border-color:#80652b}.adaptive-zone.green{border-color:#176344}
+.adaptive-zone-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid rgba(42,94,124,.28)}
+.adaptive-zone-head b{font-size:13px}.adaptive-zone.amber .adaptive-zone-head b{color:#f0b84b}.adaptive-zone.green .adaptive-zone-head b{color:#2fe59a}
+.adaptive-zone-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.adaptive-zone-grid>div{padding:10px 11px;border:1px solid rgba(31,79,105,.55);border-radius:13px}
+.adaptive-zone-grid b{display:block;margin-top:5px;font-size:12px}
+.adaptive-warning{margin-top:14px;padding:14px 15px;border:1px solid #8c394a;border-radius:16px;background:rgba(88,20,32,.14)}
+.adaptive-warning b{display:block;color:#ff5d68;font-size:10px;letter-spacing:.8px;margin-bottom:7px}
+.adaptive-warning span{line-height:1.45}
+@media(max-width:540px){
+ .adaptive-current{grid-template-columns:1fr 1fr}
+ .adaptive-path{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+ .adaptive-path i{display:none}
+}

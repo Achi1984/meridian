@@ -830,6 +830,7 @@ function commandCenter(){
 
  return actionCenterPanel()+
  executionEnginePanel()+
+ adaptiveRiskPanel()+
  `<div class="cc-hero">
    <div class="cc-kicker">COMMAND CENTER ${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</div>
    <div class="cc-value-row"><div><div class="cc-total">$${fmt(p.total)}</div><div class="cc-eur">≈ €${fmt(p.eurApprox)}</div></div><div class="cc-day ${dayPct>=0?'green':'red'}"><b>${dayPct>=0?'+':''}${fmt(dayPct,2)}%</b><small>${dayAbs>=0?'+':''}$${fmt(dayAbs,0)} · 24H</small></div></div>
@@ -1591,6 +1592,7 @@ function gridView(){
  <div class="grid2">${metric('FUTURES RISK',futuresRisk,critical?'red':danger?'amber':'green')}${metric('BTC BOTS',bots.filter(b=>b.symbol==='BTC').length+' · '+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG')?'LONG':'')+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT')?' + SHORT':''),'cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">SSOT: ACTIVE Pionex Bots; Liq.-Puffer wird mit Live-Kurs neu berechnet, Snapshot ist Fallback.</p>`)+
  dualBtcHedgePanel()+
  executionEnginePanel()+
+ adaptiveRiskPanel()+
  slInvalidationPanel()+
  decisionQualityPanel()+
  card(`<div class="section-title">BOT PRIORITY QUEUE</div>${order.map(commanderBot).join('')}<p class="footer-note">SAFE ≥30% · TIGHT 15–30% · DANGER 8–15% · CRITICAL &lt;8% Liq.-Puffer. Details per Tap.</p>`)+
@@ -2008,6 +2010,81 @@ function executionEnginePanel(){
  </div>
 
  <p class="footer-note">Execution Engine liefert einen manuellen Handlungsplan aus SSOT-Daten. Reduktionsband und Zielpuffer sind Modellregeln, keine automatische Order und keine Garantie für den neuen Liquidationspreis. Nach jeder Änderung muss der Pionex-Liquidationspuffer neu synchronisiert werden.</p>`,'execution-engine-card');
+}
+
+
+/* v5.11.2 — ADAPTIVE RISK ENGINE 1.0
+   Translates the live liquidation buffer into explicit safety targets.
+   Margin/reduction numbers are model-equivalent estimates only; Pionex must be rechecked after any manual change. */
+function adaptiveTargetLiq(bot,targetPct){
+ const live=Number(bot?.live), side=String(bot?.side||'').toUpperCase(), t=Number(targetPct)/100;
+ if(!Number.isFinite(live)||live<=0||!Number.isFinite(t)||t<=0)return NaN;
+ return side==='SHORT'?live*(1+t):live*(1-t);
+}
+function adaptiveExposure(bot){
+ const inv=Number(bot?.investment), lev=Number(bot?.leverage);
+ return Number.isFinite(inv)&&inv>0&&Number.isFinite(lev)&&lev>0?inv*lev:NaN;
+}
+function adaptiveRiskOption(bot,targetPct){
+ const cur=Number(bot?.buffer), target=Number(targetPct), liq=Number(bot?.liquidation), live=Number(bot?.live);
+ const targetLiq=adaptiveTargetLiq(bot,target);
+ const deltaPct=(Number.isFinite(cur)&&Number.isFinite(target))?Math.max(0,target-cur):NaN;
+ const exposure=adaptiveExposure(bot);
+ // Approximation A: extra collateral required if notional stays constant.
+ const marginApprox=Number.isFinite(exposure)&&Number.isFinite(deltaPct)?exposure*(deltaPct/100):NaN;
+ // Approximation B: notional reduction equivalent under inverse risk-distance scaling.
+ const reduceEq=Number.isFinite(cur)&&cur>0&&Number.isFinite(target)&&target>cur?Math.max(0,Math.min(90,(1-cur/target)*100)):0;
+ const liqShift=Number.isFinite(targetLiq)&&Number.isFinite(liq)?Math.abs(targetLiq-liq):NaN;
+ return {target,cur,targetLiq,liqShift,marginApprox,reduceEq,live,exposure};
+}
+function adaptiveRiskEngine(){
+ const x=executionPlan();
+ const cfg=DATA.adaptiveRiskEngine||{};
+ const candidate=x.botPlans.find(b=>String(b.side||'').toUpperCase()==='SHORT'&&Number(b.buffer)<15) || x.botPlans[0] || null;
+ if(!candidate)return {bot:null,zones:[]};
+ const targets=(cfg.targets||[8,12,15]).map(Number).filter(v=>Number.isFinite(v)&&v>Number(candidate.buffer));
+ const zones=targets.map(t=>adaptiveRiskOption(candidate,t));
+ return {bot:candidate,zones,cfg,source:'SSOT live buffer + target-liquidation geometry'};
+}
+function adaptiveRiskPanel(){
+ const a=adaptiveRiskEngine(), b=a.bot;
+ if(!b)return card(`<div class="section-title">ADAPTIVE RISK ENGINE 1.0</div><p class="footer-note">Keine aktive Position für eine adaptive Risikoberechnung vorhanden.</p>`);
+ const current=Number(b.buffer), live=Number(b.live), liq=Number(b.liq);
+ const side=String(b.side||'').toUpperCase();
+ const tone=current<8?'red':current<15?'amber':'green';
+ const zones=a.zones;
+ const zoneHtml=zones.length?zones.map((z,i)=>{
+   const zTone=z.target>=12?'green':'amber';
+   const liqText=Number.isFinite(z.targetLiq)?'$'+gridFmt(z.targetLiq,b.symbol):'—';
+   const shiftText=Number.isFinite(z.liqShift)?'$'+gridFmt(z.liqShift,b.symbol):'—';
+   const marginText=Number.isFinite(z.marginApprox)?'~$'+fmt(z.marginApprox,0):'—';
+   const reduceText=Number.isFinite(z.reduceEq)?'~'+fmt(z.reduceEq,0)+'%':'—';
+   const name=z.target===8?'MINIMUM':z.target===12?'BEVORZUGT':'RECOVERY';
+   return `<div class="adaptive-zone ${zTone}">
+     <div class="adaptive-zone-head"><span>${name}</span><b>${fmt(z.target,0)}% BUFFER</b></div>
+     <div class="adaptive-zone-grid">
+       <div><span>ZIEL-LIQ</span><b>${liqText}</b></div>
+       <div><span>LIQ-SHIFT</span><b>${shiftText}</b></div>
+       <div><span>MARGIN-ÄQUIV.</span><b>${marginText}</b></div>
+       <div><span>REDUCE-ÄQUIV.</span><b>${reduceText}</b></div>
+     </div>
+   </div>`;
+ }).join(''):`<p class="footer-note">Position liegt bereits oberhalb der konfigurierten Zielzonen.</p>`;
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">ADAPTIVE RISK ENGINE 1.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${tone}">${b.id} · ${fmt(current,2)}% → SICHERHEITSZONEN</div>
+   <div class="sub">Live-Puffer → Ziel-Liquidation → Modell-Äquivalent → Recheck</div>
+ </div><span class="tag ${tone}">${current<4?'CRITICAL+':current<8?'CRITICAL':current<15?'DANGER':'WATCH'}</span></div>
+ <div class="adaptive-current ${tone}">
+   <div><span>LIVE</span><b>${Number.isFinite(live)?'$'+gridFmt(live,b.symbol):'—'}</b></div>
+   <div><span>AKTUELLE LIQ.</span><b>${Number.isFinite(liq)?'$'+gridFmt(liq,b.symbol):'—'}</b></div>
+   <div><span>PUFFER</span><b>${fmt(current,2)}%</b></div>
+   <div><span>RICHTUNG</span><b>${side} ${b.leverage||'—'}x</b></div>
+ </div>
+ <div class="adaptive-path"><span class="red">JETZT ${fmt(current,1)}%</span><i></i><span class="amber">8% MIN</span><i></i><span class="green">12% BEVORZUGT</span><i></i><span class="cyan">15% RECOVERY</span></div>
+ ${zoneHtml}
+ <div class="adaptive-warning"><b>MODELL-ÄQUIVALENTE, KEINE ORDERGRÖSSE</b><span>Margin-Äquivalent ≈ Notional × zusätzlicher Puffer. Reduce-Äquivalent skaliert das Risiko invers zum Zielpuffer. Pionex-Futures-Grid, Maintenance Margin und offene Grid-Orders können den echten neuen Liquidationspreis abweichend verschieben.</span></div>
+ <p class="footer-note">Praktische Reihenfolge: 1) in Pionex Position/Margin manuell anpassen, 2) neuen Liquidationspreis prüfen, 3) MERIDIAN neu synchronisieren. Erst der neu berechnete Live-Puffer entscheidet über die nächste Stufe.</p>`,'adaptive-risk-card');
 }
 
 

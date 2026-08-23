@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.11.1",
-  "build": "2026-08-23-ssot-data-integrity-fix",
+  "appVersion": "5.11.2",
+  "build": "2026-08-23-adaptive-risk-engine",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1418,5 +1418,21 @@
       "legacy missing properties ignored"
     ],
     "source": "pionexRisk + exposure.pionexAccountValue"
+  },
+  "adaptiveRiskEngine": {
+    "version": "1.0",
+    "status": "MODEL + SSOT",
+    "targets": [
+      8,
+      12,
+      15
+    ],
+    "principle": "CURRENT BUFFER -> TARGET LIQUIDATION -> MODEL EQUIVALENT -> RECHECK",
+    "notes": [
+      "8% = minimum exit from CRITICAL",
+      "12% = preferred buffer before risk is reconsidered",
+      "15% = recovery zone",
+      "Margin/reduction equivalents are estimates and require Pionex recheck"
+    ]
   }
 }
