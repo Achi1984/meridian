@@ -1182,3 +1182,8 @@ body{background:transparent;letter-spacing:.01em}
  .adaptive-path{display:grid;grid-template-columns:1fr 1fr;gap:7px}
  .adaptive-path i{display:none}
 }
+
+/* v5.11.3 Opportunity Radar */
+.radar-ranked{grid-template-columns:auto 1fr auto auto!important}
+.radar-rank{font-size:9px;color:var(--cyan,#28a9ff);letter-spacing:.8px;margin-left:6px}
+.radar-score{font-weight:900;font-size:13px;min-width:54px;text-align:right}

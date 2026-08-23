@@ -991,14 +991,40 @@ function market(){
   const provider=q?.source||'Referenz-Snapshot'; const ts=q?.updatedAt;
   return `<div class="live-market-row"><div><b>${sym}</b> ${sourceBadge(st)}<small>${provider} · ${ts?ageText(ts):'Fallback'}</small></div><div><b>$${fmt(price,price<10?4:2)}</b><span class="${ch>=0?'green':'red'}">${ch>=0?'+':''}${fmt(ch,2)}%</span></div></div>`;
  }).join('');
- const radar=(DATA.portfolio.topPositions.concat([{symbol:'PEPE',change24h:25},{symbol:'NEAR',change24h:9.1},{symbol:'DOT',change24h:7.5},{symbol:'HBAR',change24h:6.4}])).sort((a,b)=>b.change24h-a.change24h);
+ const radarSymbols=[...new Set([
+   ...(DATA.portfolio.topPositions||[]).map(x=>x.symbol),
+   'PEPE','NEAR','DOT','HBAR','XRP','SOL','BTC','SUI','ADA'
+  ])];
+  const regimeRiskOn=String(b.label||m.regime||'').toUpperCase().includes('RISK-ON');
+  const scannerMap={};
+  ['SOL','ETH','PEPE'].forEach(sym=>{
+   try{
+    const x=typeof scannerSignal==='function'?scannerSignal(sym):null;
+    if(x)scannerMap[sym]=x;
+   }catch(e){}
+  });
+  const clamp=(v,a=0,z=100)=>Math.max(a,Math.min(z,v));
+  const radar=radarSymbols.map(sym=>{
+   const base=(DATA.portfolio.topPositions||[]).find(x=>x.symbol===sym)||{};
+   const q=DATA.livePrices?.[sym];
+   const ch=Number(q?.change24h??base.change24h??0);
+   // Momentum rewards constructive movement, but penalizes obvious 24h overextension.
+   const momentum=clamp(ch<=-8?15:ch<0?45+ch*4:ch<=5?55+ch*7:ch<=10?90-(ch-5)*5:65-(ch-10)*3);
+   const sc=scannerMap[sym]||{};
+   const setup=clamp(Number(sc.setupQuality??sc.setup??(50+Math.min(Math.abs(ch),6)*4)));
+   const entry=clamp(Number(sc.entryReadiness??sc.entry??(ch>=0&&ch<=4?68:ch<0?48:55)));
+   const liquidity=({BTC:100,ETH:98,SOL:92,XRP:90,ADA:82,DOT:76,SUI:76,NEAR:72,HBAR:70,PEPE:68}[sym]||60);
+   const regimeFit=clamp(regimeRiskOn?(sym==='BTC'?88:78+(ch>0?8:0)):sym==='BTC'?80:58);
+   const score=Math.round(momentum*.35+setup*.25+entry*.20+liquidity*.10+regimeFit*.10);
+   return {...base,symbol:sym,change24h:ch,radarScore:score,radarParts:{momentum,setup,entry,liquidity,regimeFit}};
+  }).sort((a,b)=>b.radarScore-a.radarScore);
  return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${snapshotBadge('MODEL')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
  `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
  card(`<div class="section-title">LIVE FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">LIVE wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
  card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
  card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
  card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
- card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map(x=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;return `<div class="asset-row">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol}</div><div class="asset-desc">${q?q.source:'Momentum'}</div></div><div>${q?sourceBadge(quoteStatus(q)):''}</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}`);
+ card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map((x,i)=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;const tone=x.radarScore>=75?'green':x.radarScore>=60?'amber':'red';return `<div class="asset-row radar-ranked">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol} <span class="radar-rank">#${i+1}</span></div><div class="asset-desc">${q?q.source:'Fallback'} · Opportunity</div></div><div class="radar-score ${tone}">${x.radarScore}/100</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></div>`}).join('')}<p class="footer-note">Opportunity Score: 35% Momentum · 25% Setup · 20% Entry Readiness · 10% Liquidität · 10% Regime-Fit. Live-Kurse ändern Ranking dynamisch; Überdehnung wird abgewertet.</p>`);
 }
 
 function currentNadirContext(){

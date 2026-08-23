@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.11.2",
-  "build": "2026-08-23-adaptive-risk-engine",
+  "appVersion": "5.11.3",
+  "build": "2026-08-23-opportunity-radar",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1434,5 +1434,16 @@
       "15% = recovery zone",
       "Margin/reduction equivalents are estimates and require Pionex recheck"
     ]
+  },
+  "radarEngine": {
+    "version": "1.0",
+    "weights": {
+      "momentum": 35,
+      "setupQuality": 25,
+      "entryReadiness": 20,
+      "liquidity": 10,
+      "regimeFit": 10
+    },
+    "note": "Dynamic ranking; 24h overextension is penalized. Live prices retain existing WebSocket/fallback logic."
   }
 }
