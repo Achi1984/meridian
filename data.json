@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.17.0",
-  "build": "2026-08-23-center-compression",
+  "appVersion": "5.17.1",
+  "build": "2026-08-23-details-open-state-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1644,5 +1644,9 @@
     "actionCenter": "MERGED_INTO_COCKPIT",
     "dynamicRecovery": "COLLAPSED_BY_DEFAULT",
     "principle": "ONE_DECISION_ONE_NUMBER_ONE_ACTION"
+  },
+  "detailsOpenStateFix": {
+    "status": "ACTIVE",
+    "reason": "preserve native details state across live rerenders"
   }
 }

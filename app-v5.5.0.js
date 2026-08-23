@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.17.0';
-let APP_RELEASE='5.17.0 · CENTER COMPRESSION';
+let APP_CODE_VERSION='5.17.1';
+let APP_RELEASE='5.17.1 · DETAILS FIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2413,13 +2413,14 @@ function dominantActionSSOT(){
 
 
 function compactRecoveryPanel(){
+ const wasOpen=!!document.querySelector('.compact-recovery[open]');
  const r=recoveryCommandState();
  const act=dominantActionSSOT();
  const bot=r?.bot;
  if(!bot) return '';
  const phase=r.phase||{label:'NO DATA',tone:'amber'};
  const target=Number.isFinite(Number(r.target))?fmt(Number(r.target),0)+'%':'SAFE';
- return `<details class="compact-recovery">
+ return `<details class="compact-recovery"${wasOpen?' open':''}>
    <summary>
      <div>
        <span class="eyebrow">DYNAMIC RECOVERY 2.1 ${liveBadge('SSOT')}</span>
