@@ -1,0 +1,5 @@
+ACHI MERIDIAN v5.9.5 GRID HOTFIX
+Fix: GRID view ReferenceError `Can't find variable: LIVE`.
+Cause: LIVE was referenced as a JavaScript identifier instead of a display/status string.
+The affected bare LIVE reference(s) were converted to the literal "LIVE".
+Version/cache metadata bumped to v5.9.5 where applicable.
