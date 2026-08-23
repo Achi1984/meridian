@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.15.0",
-  "build": "2026-08-23-dynamic-recovery-unlock",
+  "appVersion": "5.15.1",
+  "build": "2026-08-23-action-center-recovery-ssot-sync",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1598,5 +1598,15 @@
     ],
     "unlockPolicy": "SAFE removes only liquidation pre-block; capital and entry require separate recheck.",
     "execution": "MANUAL_ONLY"
+  },
+  "actionSync": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "states": {
+      "CRITICAL": ">=8% buffer",
+      "RECOVERY": ">=12% buffer",
+      "STABILIZE": ">=15% buffer",
+      "SAFE": "capital + entry recheck"
+    }
   }
 }

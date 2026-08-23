@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.15.0';
-let APP_RELEASE='5.15.0 · DYNAMIC RECOVERY & UNLOCK';
+let APP_CODE_VERSION='5.15.1';
+let APP_RELEASE='5.15.1 · ACTION SYNC';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2398,6 +2398,19 @@ function dynamicUnlockState(){
  };
 }
 
+
+function dominantActionSSOT(){
+ const r=recoveryCommandState();
+ if(!r?.bot){
+   return {headline:'RISIKO PRÜFEN',detail:'Keine belastbaren Recovery-Daten',chip:'RECHECK',tone:'amber',botId:'—',target:null};
+ }
+ const p=r.phase?.key;
+ if(p==='CRITICAL') return {headline:`${r.bot.id} → ≥8% PUFFER`,detail:'Liquidationsrisiko zuerst reduzieren',chip:'RECOVER NOW',tone:'red',botId:r.bot.id,target:8};
+ if(p==='RECOVERY') return {headline:`${r.bot.id} → ≥12% PUFFER`,detail:'Minimum erreicht · Recovery fortsetzen',chip:'RECOVERY',tone:'amber',botId:r.bot.id,target:12};
+ if(p==='STABILIZE') return {headline:`${r.bot.id} → ≥15% PUFFER`,detail:'Stabilisieren bis Risk Unlock',chip:'STABILIZE',tone:'amber',botId:r.bot.id,target:15};
+ return {headline:`${r.bot.id} RISK UNLOCKED`,detail:'Capital + Entry Gate separat neu prüfen',chip:'SAFE',tone:'green',botId:r.bot.id,target:null};
+}
+
 function recoveryCommandPanel(){
  const r=recoveryCommandState();
  if(!r.bot) return '';
@@ -2409,7 +2422,7 @@ function recoveryCommandPanel(){
  return card(`<div class="section-head"><div>
    <div class="eyebrow">DYNAMIC RECOVERY 2.0 ${liveBadge('SSOT')}</div>
    <div class="forecast-main ${phase.tone}">${phase.label}</div>
-   <div class="sub">CRITICAL → RECOVERY → STABILIZE → SAFE → RECHECK</div>
+   <div class="sub">Detailansicht derselben SSOT-Aktion wie im ACTION CENTER</div>
  </div><span class="tag ${phase.tone}">${r.bot.id} ${fmt(r.cur,2)}%</span></div>
 
  <div class="rc-now ${phase.tone}">
