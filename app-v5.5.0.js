@@ -1562,7 +1562,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.10.2 — MULTI-ASSET SL ENGINE */
+/* v5.10.4 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1585,7 +1585,7 @@ function multiAssetRiskRow(sym){
   </div>`;
 }
 
-/* v5.10.2 — DECISION QUALITY LAYER */
+/* v5.10.4 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1626,7 +1626,7 @@ function decisionQualityPanel(){
  <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
-/* v5.10.2 — ENTRY CONFLUENCE GATE */
+/* v5.10.4 — ENTRY CONFLUENCE GATE */
 function entryConfluence(sym, rr2){
  const cfg=DATA.entryConfluence?.rules||{};
  const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
@@ -1654,7 +1654,7 @@ function confluenceSummaryPanel(){
  <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
 }
 
-/* v5.10.2 — UNIFIED DECISION ENGINE */
+/* v5.10.4 — UNIFIED DECISION ENGINE */
 function unifiedDecisionQueue(){
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const btcLongRR=Number(DATA.slInvalidationEngine?.btcLong?.rrTp2||1.33);
@@ -1700,7 +1700,7 @@ function unifiedDecisionQueue(){
  <p class="footer-note">Priorität: Liquidationsrisiko → bestehende Position → neue Entries → Opportunity Watchlist. Keine automatische Order-Ausführung.</p>`);
 }
 
-/* v5.10.2 — ACTION CENTER */
+/* v5.10.4 — ACTION CENTER */
 function actionCenterPanel(){
  const btcEntry=Number(DATA.entryConfluence?.entryReadiness?.BTC||0);
  const shortBuf=Number(DATA.dualBotHedge?.short?.liqBufferPct||4.8);
@@ -1742,7 +1742,7 @@ function actionCenterPanel(){
  <p class="footer-note">Ein hoher Entry-Score ist keine Handlungsfreigabe, solange ein kritisches Liquidationsrisiko vorgelagert ist. Keine automatische Order-Ausführung.</p>`);
 }
 
-/* v5.10.2 — CENTER CLEANUP */
+/* v5.10.4 — CENTER CLEANUP */
 function compactDecisionDetails(){
  const r=DATA.pionexRisk||{}, bots=r.bots||[];
  const s=bots.find(b=>b.id==='BTC-S30');

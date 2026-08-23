@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v5.1.5.css?v=5.5.2-logo-header">
 <title>MERIDIAN</title>
+<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version": "5.10.4", "verifiedFrom": "Pionex screenshots 2026-08-23 12:38–12:39", "activeCount": 4, "activeBots": {"BTC-S30": {"symbol": "BTC", "side": "SHORT", "leverage": 30, "investmentUSDT": 52, "dynamicMarginUSDT": 110.09, "currentPrice": 76849.7, "liquidationPrice": 80204.1, "pionexLiqBufferPct": 4.36, "breakEven": 71504.8, "creationPrice": 69243.5, "range": [59589.2, 79671.1], "totalProfitUSDT": -91.4, "totalReturnPct": -175.77, "status": "ACTIVE", "calculatedLiqBufferPct": 4.36, "riskClass": "CRITICAL"}, "BTC-L20": {"symbol": "BTC", "side": "LONG", "leverage": 20, "investmentUSDT": 100, "dynamicMarginUSDT": 0, "currentPrice": 76849.7, "liquidationPrice": 69341.9, "pionexLiqBufferPct": 9.76, "breakEven": 76579.6, "creationPrice": 76586.4, "range": [65082.2, 180000], "totalProfitUSDT": 2.61, "totalReturnPct": 2.61, "status": "ACTIVE", "calculatedLiqBufferPct": 9.77, "riskClass": "DANGER"}, "XRP-L5": {"symbol": "XRP", "side": "LONG", "leverage": 5, "investmentUSDT": 565.92, "currentInvestmentCoin": 356.85, "currentPrice": 1.4887, "liquidationPrice": 0.8483, "pionexLiqBufferPct": 43.01, "breakEven": 1.5473, "creationPrice": 1.586, "range": [0.7, 1.9], "grids": 253, "totalProfitUSDT": -43.91, "totalProfitCoin": -6.11, "coinProfitPct": -1.71, "status": "ACTIVE", "calculatedLiqBufferPct": 43.02, "riskClass": "SAFE"}, "HBAR-L5": {"symbol": "HBAR", "side": "LONG", "leverage": 5, "investmentUSDT": 562.54, "currentInvestmentCoin": 7122.63, "currentPrice": 0.07868, "liquidationPrice": 0.05853, "pionexLiqBufferPct": 25.61, "breakEven": 0.07838, "creationPrice": 0.07888, "range": [0.06, 0.09], "grids": 127, "totalProfitUSDT": 0.264, "totalProfitCoin": 32.34, "coinProfitPct": 0.45, "status": "ACTIVE", "calculatedLiqBufferPct": 25.61, "riskClass": "TIGHT"}}, "priority": ["BTC-S30", "BTC-L20", "HBAR-L5", "XRP-L5"], "sourcePolicy": "Pionex displayed liquidation buffer is source of truth; formula is cross-check."};</script>
 </head>
 <body>
 <div class="app">
@@ -15,7 +16,7 @@
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.10.2 · LIVE</span>
+        <span class="version" id="versionBadge">v5.10.4 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -47,4 +48,49 @@
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
 <script src="app-v5.5.0.js?v=5.5.2-logo-header"></script>
+
+<script id="meridian-dynamic-liq-guard-v5103">
+(function(){
+  const CLASSIFY = b => b < 8 ? ["CRITICAL","#ff5f70"] : b < 15 ? ["DANGER","#ffb84d"] : b < 30 ? ["TIGHT","#ffca55"] : ["SAFE","#35dc93"];
+  // For SHORT positions liquidation is above market: distance = (liq/current - 1)*100.
+  // For LONG positions liquidation is below market: distance = (1 - liq/current)*100.
+  function liqBuffer(side,current,liq){
+    current=Number(current); liq=Number(liq);
+    if(!current||!liq) return null;
+    return Math.max(0, side==="SHORT" ? (liq/current-1)*100 : (1-liq/current)*100);
+  }
+  window.MERIDIAN_LIQ_GUARD={
+    version:"1.0",
+    liqBuffer,
+    classify:CLASSIFY,
+    evaluate(bot,current){
+      if(!bot || bot.status==="CLOSED") return null;
+      const b=liqBuffer(String(bot.side||bot.direction||"").toUpperCase(),current,bot.liquidationPrice||bot.liq);
+      if(b==null) return {state:"SNAPSHOT",buffer:null};
+      const [state,color]=CLASSIFY(b);
+      return {state,buffer:b,color,priority:b<8?1:b<15?2:b<30?3:4};
+    }
+  };
+  function sync(){
+    // Update visible cards when a live price and liquidation price are available in DOM/data attributes.
+    document.querySelectorAll("[data-bot-side][data-liq-price]").forEach(el=>{
+      const side=(el.dataset.botSide||"").toUpperCase();
+      const liq=parseFloat(el.dataset.liqPrice);
+      const current=parseFloat(el.dataset.livePrice || document.body.dataset.btcPrice || document.body.dataset.livePrice);
+      const b=liqBuffer(side,current,liq);
+      if(b==null) return;
+      const [state,color]=CLASSIFY(b);
+      el.dataset.liqBuffer=b.toFixed(2);
+      el.dataset.riskState=state;
+      const out=el.querySelector("[data-dynamic-liq-buffer]");
+      if(out){ out.textContent=b.toFixed(1).replace(".",",")+"% LIQ"; out.style.color=color; }
+      const st=el.querySelector("[data-dynamic-risk-state]");
+      if(st){ st.textContent=state; st.style.color=color; }
+    });
+  }
+  window.addEventListener("load",sync);
+  setInterval(sync,1000);
+})();
+</script>
+
 </body></html>
