@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.13.1",
-  "build": "2026-08-23-decision-ux-cleanup",
+  "appVersion": "5.13.2",
+  "build": "2026-08-23-center-entry-intelligence-hotfix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1564,5 +1564,10 @@
     "version": "1.1",
     "status": "ACTIVE",
     "goal": "One dominant action, one capital gate, one opportunity ranking; technical depth stays collapsible."
+  },
+  "hotfix": {
+    "issue": "CENTER crash: multiAssetRiskPlan not in scope",
+    "status": "FIXED",
+    "scope": "UI dependency/scope only; risk and capital gate logic unchanged"
   }
 }
