@@ -406,26 +406,38 @@ function botGuardFromBuffer(x){
  return {label:'SAFE',cls:'green',rank:3};
 }
 
-/* v5.10.10 — FULL RISK SSOT */
+/* v5.10.11 — SSOT HARDENING / BOT STATE MANAGER */
+function botStateManager(){
+ const active=activePionexBots().map(canonicalBotState).filter(Boolean)
+   .sort((a,b)=>(a.guard.rank-b.guard.rank)||(a.buffer-b.buffer));
+ const closed=((DATA.pionexRisk&&DATA.pionexRisk.closedBots)||[]).filter(b=>String(b.status||'').toUpperCase()==='CLOSED');
+ return {active,closed,activeCount:active.length,closedCount:closed.length,source:'Pionex ACTIVE snapshot + live market prices'};
+}
 function canonicalBotState(b){
  if(!b)return null;
  const liquidation=Number(b.liquidationPrice??b.liquidation);
- const live=Number(DATA.livePrices?.[b.symbol]?.price || b.currentPrice || 0);
+ const liveQuote=Number(DATA.livePrices?.[b.symbol]?.price);
+ const snapQuote=Number(b.currentPrice||0);
+ const live=Number.isFinite(liveQuote)&&liveQuote>0?liveQuote:snapQuote;
  const buffer=effectiveBotBuffer(b);
+ const snapBuffer=Number(b.liquidationDistancePct);
  const guard=botGuardFromBuffer(buffer);
- return {...b, liquidation, live, buffer, guard};
+ const usesLive=Number.isFinite(liveQuote)&&liveQuote>0&&Number.isFinite(liquidation)&&liquidation>0;
+ const stale=usesLive&&Number.isFinite(snapBuffer)&&Math.abs(buffer-snapBuffer)>=0.25;
+ const side=String(b.side||'').toUpperCase();
+ const action=guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'REDUCE / NO ADD'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
+ const reason=`${b.id}: Liq.-Puffer ${Number.isFinite(buffer)?fmt(buffer,2)+'%':'—'} (${usesLive?'LIVE CALC':'SNAPSHOT'}); ${guard.label}.`;
+ return {...b, liquidation, live, buffer, snapBuffer, guard, usesLive, stale, action, reason};
 }
 function canonicalBotStates(){
- return activePionexBots().map(canonicalBotState)
-   .filter(Boolean)
-   .sort((a,b)=>(a.guard.rank-b.guard.rank)||(a.buffer-b.buffer));
+ return botStateManager().active;
 }
 function canonicalBtcLongRiskPlan(){
  const base=DATA.slInvalidationEngine?.btcLong20x;
  if(!base)return null;
  const bot=canonicalBotStates().find(b=>b.id==='BTC-L20') ||
            canonicalBotStates().find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
- if(!bot || !Number.isFinite(bot.liquidation)) return {...base};
+ if(!bot || !Number.isFinite(bot.liquidation)) return {...base,positionDecision:'KEEP',addDecision:'BLOCKED',newEntryDecision:'BLOCKED'};
  const stopLoss=Number(base.stopLoss);
  const liquidation=Number(bot.liquidation);
  return {
@@ -433,6 +445,9 @@ function canonicalBtcLongRiskPlan(){
    liquidation,
    slToLiqUsd:Number.isFinite(stopLoss)?Math.max(0,stopLoss-liquidation):Number(base.slToLiqUsd||0),
    liveBotBuffer:bot.buffer,
+   positionDecision:'KEEP',
+   addDecision:'BLOCKED',
+   newEntryDecision:'BLOCKED',
    source:'ACTIVE Pionex BTC-L20 + live BTC'
  };
 }
@@ -1437,14 +1452,14 @@ function scannerCard(sym){
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
  return `<details class="commander-detail" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
  <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
- <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)+multiAssetRiskRow(sym)}%</div></details>`;
+ <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)}%</div>${multiAssetRiskRow(sym)}</details>`;
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
  const priority=b.id==='BTC-S30'?'REDUCE / EXIT CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority}</div>
- <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason||'SSOT: aktive Pionex-Position + Live-Kurs.'}</p></details>`;
+ <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason} ${b.stale?snapshotBadge('SNAPSHOT STALE'):liveBadge('LIVE CALC')}</p></details>`;
 }
 
 function btcDualHedgeEngine(){
@@ -1511,9 +1526,9 @@ function slInvalidationPanel(){
   <div><span>LIQUIDATION</span><b class="red">$${fmt(e.liquidation,0)}</b></div>
   <div><span>SL → LIQ BUFFER</span><b class="${levWarn?'red':'amber'}">$${fmt(e.slToLiqUsd,0)}</b></div>
   <div><span>INVALIDATION</span><b>4H Close &lt; $${fmt(e.invalidBelow,0)}</b></div>
-  <div><span>STATUS</span><b class="amber">${e.status}</b></div>
+  <div><span>POSITION</span><b class="green">${e.positionDecision||'KEEP'}</b></div>
  </div>
- <div class="sl-rule ${levWarn?'red':''}"><b>${levWarn?'LEVERAGE TOO HIGH':'RISK CHECK'}</b><span>Technischer SL und Liquidation liegen zu nahe beieinander. Kein ADD, solange die Struktur nicht bestätigt und der Sicherheitsabstand nicht größer ist.</span></div>
+ <div class="sl-decision-strip"><span>POSITION <b class="green">${e.positionDecision||'KEEP'}</b></span><span>ADD <b class="red">${e.addDecision||'BLOCKED'}</b></span><span>NEW CAPITAL <b class="red">${e.newEntryDecision||'BLOCKED'}</b></span></div><div class="sl-rule ${levWarn?'red':''}"><b>${levWarn?'LEVERAGE TOO HIGH':'RISK CHECK'}</b><span>Technischer SL und Liquidation liegen zu nahe beieinander. Bestehende Position ≠ Freigabe für ADD oder neues Kapital.</span></div>
  <p class="footer-note">SSOT: Liquidation und Liq.-Puffer stammen aus der aktiven BTC-L20 Pionex-Position und werden mit dem Live-BTC-Kurs synchronisiert. SL/TP bleiben Modellwerte; keine automatische Order-Ausführung.</p>`);
 }
 
@@ -1619,14 +1634,43 @@ function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
 }
+/* v5.10.11 — RISK PLAN STORE: one canonical plan per asset */
+function canonicalRiskPlan(sym){
+ const model=DATA.multiAssetSlEngine?.assets?.[sym]||null;
+ const g=fibFromSwing(sym);
+ if(g && Number.isFinite(g.entryLow) && Number.isFinite(g.entryHigh) && Number.isFinite(g.hi) && Number.isFinite(g.fib?.ext1272)){
+   const entryLow=Number(g.entryLow), entryHigh=Number(g.entryHigh), entryMid=(entryLow+entryHigh)/2;
+   const structuralBase=Number(g.rangeLow);
+   const volBuffer=Math.max((Number(g.atrPct)||1.2)/100*Number(g.px||entryMid)*0.35, Math.abs(entryHigh-entryLow)*0.10);
+   const stopLoss=Math.max(0,structuralBase-volBuffer);
+   const tp1=Number(g.hi), tp2=Number(g.fib.ext1272);
+   const risk=Math.max(1e-12,entryMid-stopLoss);
+   return {
+     symbol:sym,entryLow,entryHigh,entryMid,stopLoss,tp1,tp2,
+     rangeLow:Number(g.rangeLow),rangeHigh:Number(g.rangeHigh),
+     rrTp1:(tp1-entryMid)/risk,rrTp2:(tp2-entryMid)/risk,
+     invalidation:'Close below structural SL',status:'LIVE MODEL',
+     source:g.source||'4H engine',updatedAt:g.updatedAt||Date.now(),
+     entryReadiness:entryReadiness(g,sym),setupQuality:scannerScore(g,sym),
+     stale:false
+   };
+ }
+ if(model)return {...model,source:'MODEL SNAPSHOT FALLBACK',updatedAt:null,stale:true};
+ return null;
+}
+function riskPlanStore(){
+ const assets={};
+ ['SOL','ETH','XRP','HBAR','PEPE'].forEach(sym=>{const p=canonicalRiskPlan(sym);if(p)assets[sym]=p});
+ return {assets,source:'canonicalRiskPlan()',version:'1.1'};
+}
+
 function multiAssetRiskRow(sym){
- const a=multiAssetSlData(sym); if(!a)return '';
+ const a=canonicalRiskPlan(sym); if(!a)return '';
  const dec=(n)=>n<0.01?8:n<10?4:2;
  const f=(n)=>fmt(n,dec(n));
- const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0), gate=entryConfluence(sym,rr2);
- const rrCls=rr2>=2?'green':rr2>=1.3?'amber':'red';
+ const rr1=Number(a.rrTp1||0), rr2=Number(a.rrTp2||0), gate=entryConfluence(sym,rr2,a.entryReadiness);
  return `<div class="scanner-risk-panel">
-   <div class="scanner-risk-head"><span>RISK PLAN</span><b>${sym} · <em class="${gate.cls}">${gate.label}</em></b></div>
+   <div class="scanner-risk-head"><span>RISK PLAN ${a.stale?snapshotBadge('FALLBACK'):liveBadge('SSOT')}</span><b>${sym} · <em class="${gate.cls}">${gate.label}</em></b></div>
    <div class="scanner-risk-grid">
     <div><span>ENTRY</span><b>$${f(a.entryLow)}–$${f(a.entryHigh)}</b></div>
     <div class="sl"><span>SL</span><b>$${f(a.stopLoss)}</b></div>
@@ -1634,6 +1678,7 @@ function multiAssetRiskRow(sym){
     <div class="tp2"><span>TP2</span><b>$${f(a.tp2)}</b><small>R:R ${fmt(rr2,2)}</small></div>
    </div>
    <div class="scanner-invalidation"><span>INVALIDATION</span><b>Close &lt; $${f(a.stopLoss)}</b><em class="${gate.cls}">ENTRY ${gate.entry}/100</em></div>
+   <div class="scanner-plan-source">Quelle: ${a.source}${a.stale?' · STALE/FALLBACK':' · canonical live plan'}</div>
   </div>`;
 }
 
@@ -1680,9 +1725,9 @@ function decisionQualityPanel(){
 }
 
 /* v5.10.4 — ENTRY CONFLUENCE GATE */
-function entryConfluence(sym, rr2){
+function entryConfluence(sym, rr2, readinessOverride=null){
  const cfg=DATA.entryConfluence?.rules||{};
- const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);
+ const er=Number(readinessOverride??canonicalRiskPlan(sym)?.entryReadiness??DATA.entryConfluence?.entryReadiness?.[sym]??0);
  rr2=Number(rr2||0);
  let label='NO ENTRY', cls='red';
  if(rr2>=Number(cfg.preferredRrMin||2.5) && er>=Number(cfg.preferredEntryMin||70)){label='PREFERRED';cls='green';}
@@ -1692,23 +1737,24 @@ function entryConfluence(sym, rr2){
  return {label,cls,entry:er,rr:rr2};
 }
 function confluenceSummaryPanel(){
- const assets=DATA.multiAssetSlEngine?.assets||{};
+ const assets=riskPlanStore().assets;
  const rows=Object.keys(assets).map(sym=>{
-   const a=assets[sym], g=entryConfluence(sym,a.rrTp2);
+   const a=assets[sym], g=entryConfluence(sym,a.rrTp2,a.entryReadiness);
    return `<div class="cf-row">
     <div><b>${sym}</b><span>R:R2 ${fmt(a.rrTp2,2)}</span></div>
     <div><b>${g.entry}/100</b><span>ENTRY</span></div>
     <strong class="${g.cls}">${g.label}</strong>
    </div>`;
  }).join('');
- return card(`<div class="section-head"><div><div class="eyebrow">ENTRY CONFLUENCE 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × ENTRY READINESS</div><div class="sub">Gutes Chance/Risiko ≠ sofortiger Einstieg</div></div></div>
+ return card(`<div class="section-head"><div><div class="eyebrow">ENTRY CONFLUENCE 1.1 <span class="tag cyan">SSOT</span></div><div class="forecast-main">R:R × ENTRY READINESS</div><div class="sub">Ein Risk Plan pro Asset; Scanner und Matrix lesen dieselbe Quelle.</div></div></div>
  ${rows}
  <div class="cf-legend"><span>PREFERRED: R:R ≥2,5 + Entry ≥70</span><span>READY: R:R ≥2,0 + Entry ≥65</span></div>
- <p class="footer-note">Damit kann ein Setup strukturell attraktiv sein, aber trotzdem auf WAIT bleiben, bis der Einstieg zeitlich bestätigt ist.</p>`);
+ <p class="footer-note">Keine parallelen Snapshot-Pläne: Live-4H-Plan gewinnt; Modell-Snapshot ist nur Fallback und wird gekennzeichnet.</p>`);
 }
 
 
-/* v5.10.9 — DECISION SINGLE SOURCE OF TRUTH */
+
+/* v5.10.11 — DECISION SINGLE SOURCE OF TRUTH */
 function decisionSSOT(){
  const botStates=canonicalBotStates();
  const btcLong=botStates.find(b=>b.id==='BTC-L20')||botStates.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
@@ -1751,9 +1797,9 @@ function decisionSSOT(){
  const btcEntryState=entryBlocked?'BLOCKED BY BOT RISK':
    (rr2>=2&&btcEntry>=65?'READY':rr2>=2&&btcEntry>=55?'WATCH':'NO ENTRY');
 
- return {version:'1.2',bots:botStates,btcLong,btcShort,btcEntry,dayGate,rr2,risk,riskPlan,
+ return {version:'1.3',bots:botStates,btcLong,btcShort,btcEntry,dayGate,rr2,risk,riskPlan,
    critical,danger,nextAction,nextTone,blocking,queue,entryBlocked,btcEntryState,
-   source:'ACTIVE Pionex bots + livePrices + canonical BTC-L20 risk plan'};
+   source:'BotStateManager + livePrices + canonical RiskPlanStore'};
 }
 
 /* v5.10.4 — UNIFIED DECISION ENGINE */
@@ -1761,8 +1807,8 @@ function unifiedDecisionQueue(){
  const s=decisionSSOT();
  const acts=[...s.queue];
  const rows=['XRP','HBAR','SOL','ETH','PEPE'].map(sym=>{
-   const a=DATA.multiAssetSlEngine?.assets?.[sym]||{};
-   const g=entryConfluence(sym,a.rrTp2);
+   const a=canonicalRiskPlan(sym)||{};
+   const g=entryConfluence(sym,a.rrTp2,a.entryReadiness);
    return {sym,entry:g.entry,label:g.label,cls:g.cls,rr:Number(a.rrTp2||0)};
  }).sort((a,b)=>b.entry-a.entry);
 
@@ -1773,7 +1819,7 @@ function unifiedDecisionQueue(){
  }));
 
  return card(`<div class="section-head"><div>
-   <div class="eyebrow">UNIFIED DECISION ENGINE 1.2 <span class="tag cyan">SSOT</span></div>
+   <div class="eyebrow">UNIFIED DECISION ENGINE 1.3 <span class="tag cyan">SSOT</span></div>
    <div class="forecast-main">RISK → POSITION → ENTRY</div>
    <div class="sub">Eine Quelle für CENTER, GRID, Bot Queue und Entry Gate.</div>
  </div></div>
@@ -1795,7 +1841,7 @@ function actionCenterPanel(){
  const longGuard=ll?ll.guard:botGuardFromBuffer(NaN);
 
  return card(`<div class="ac-top"><div>
-   <div class="eyebrow">ACTION CENTER 1.2 ${liveBadge('SSOT')}</div>
+   <div class="eyebrow">ACTION CENTER 1.3 ${liveBadge('SSOT')}</div>
    <div class="forecast-main ${s.nextTone}">${s.entryBlocked?'RISIKO ZUERST':'ENTRY-POTENZIAL'}</div>
    <div class="sub">Single Source of Truth für CENTER + GRID.</div>
  </div></div>

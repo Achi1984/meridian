@@ -1127,3 +1127,9 @@ body{background:transparent;letter-spacing:.01em}
 .dd-row b{text-align:right;font-size:9px}
 .dd-row small{grid-column:1/-1;font-size:7px;color:#687f92}
 \n/* v5.10.6 Decision Details persistent state */\n.decision-details summary strong::after{content:""}\n.decision-details[open] summary strong{font-size:0}\n.decision-details[open] summary strong::after{content:"SCHLIESSEN";font-size:12px}\n.decision-details summary{cursor:pointer;touch-action:manipulation}\n
+/* v5.10.11 SSOT hardening */
+.scanner-plan-source{margin-top:10px;font-size:10px;letter-spacing:.55px;color:var(--muted,#74859a)}
+.sl-decision-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.sl-decision-strip span{padding:10px;border:1px solid rgba(38,158,255,.22);border-radius:12px;font-size:10px;letter-spacing:.6px;background:rgba(7,25,38,.55)}
+.sl-decision-strip b{display:block;margin-top:4px;font-size:12px}
+@media(max-width:480px){.sl-decision-strip{grid-template-columns:1fr 1fr}.sl-decision-strip span:first-child{grid-column:1/-1}}

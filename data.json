@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.10",
-  "build": "2026-08-23-full-risk-ssot",
+  "appVersion": "5.10.11",
+  "build": "2026-08-23-ssot-hardening",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -345,7 +345,7 @@
         "fundingPct": 0.01,
         "healthScore": 14,
         "action": "REDUCE / EXIT CHECK",
-        "reason": "BTC Short 30x: Pionex Liq.-Puffer 3,89%; CRITICAL. Priorität #1, kein ADD."
+        "reason": "BTC-S30: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
       },
       {
         "id": "BTC-L20",
@@ -364,7 +364,7 @@
         "fundingPct": 0.01,
         "healthScore": 60,
         "action": "KEEP / NO ADD",
-        "reason": "BTC Long 20x: Pionex Liq.-Puffer 10,14%; DANGER. Bestehende Position, kein ADD."
+        "reason": "BTC-L20: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
       },
       {
         "id": "HBAR-L5",
@@ -383,7 +383,7 @@
         "fundingPct": 0.01,
         "healthScore": 59,
         "action": "WATCH / NO ADD",
-        "reason": "HBAR Long 5x: Pionex Liq.-Puffer 26,51%; TIGHT."
+        "reason": "HBAR-L5: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
       },
       {
         "id": "XRP-L5",
@@ -402,7 +402,7 @@
         "fundingPct": 0.01,
         "healthScore": 66,
         "action": "HOLD",
-        "reason": "XRP Long 5x: Pionex Liq.-Puffer 43,27%; SAFE."
+        "reason": "XRP-L5: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
       }
     ],
     "closedBots": [
@@ -1378,5 +1378,17 @@
     "excludeClosed": true,
     "liveBufferRecalc": true,
     "snapshotFallback": true
+  },
+  "ssotHardening": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "botStateManager": "ACTIVE-only; CLOSED excluded",
+    "riskPlanStore": "one canonical plan per asset; live 4H wins, snapshot fallback",
+    "staleDataGuard": "snapshot/live divergence >=0.25 percentage points flagged stale",
+    "decisionSeparation": [
+      "POSITION",
+      "ADD",
+      "NEW CAPITAL"
+    ]
   }
 }
