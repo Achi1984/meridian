@@ -10,3 +10,10 @@ Die GRID-Ansicht wird weiterhin live aktualisiert, ohne dass ein aufgeklappter <
 - Opportunity Scanner splits Setup Quality from Entry Readiness
 - Existing Pionex snapshot preserved; browser 4H live engine remains active
 - No automatic bot execution
+
+
+## v5.5.2
+- neues hochauflösendes ACHI MERIDIAN Master-Logo im Header
+- Logo exakt zentriert und iPhone-sicher skaliert
+- PWA Icons 192/512 aus demselben Master neu erzeugt
+- Opportunity-Scanner / Grid-Detail-State-Fix aus v5.5.1 unverändert übernommen

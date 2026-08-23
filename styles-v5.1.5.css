@@ -809,3 +809,33 @@ main>section:not(.hidden)>.card:first-child{
 .commander-detail .grid2,.commander-detail .scanner-grid,.commander-detail .footer-note{margin-left:12px;margin-right:12px}
 .commander-priority{margin:12px;border:1px solid currentColor;border-radius:12px;padding:10px;font-weight:900;letter-spacing:.5px}
 .commander-detail.red{border-color:rgba(255,90,96,.5)}.commander-detail.amber{border-color:rgba(232,178,74,.45)}.commander-detail.green{border-color:rgba(47,210,133,.35)}
+
+
+/* v5.5.2 — high-resolution MERIDIAN master logo */
+.logo-btn{
+  width:60px !important;
+  height:60px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  flex:0 0 60px !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+.logo-btn img{
+  width:60px !important;
+  height:60px !important;
+  display:block !important;
+  object-fit:contain !important;
+  object-position:50% 50% !important;
+  image-rendering:auto !important;
+  transform:none !important;
+  border-radius:14px !important;
+}
+@media(max-width:390px){
+  .logo-btn,.logo-btn img{
+    width:56px !important;
+    height:56px !important;
+  }
+  .logo-btn{flex-basis:56px !important;}
+}
