@@ -2,8 +2,8 @@
 const $=s=>document.querySelector(s);
 const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.5.0';
-let APP_RELEASE='5.5.0 · GRID COMMANDER';
+let APP_CODE_VERSION='5.5.1';
+let APP_RELEASE='5.5.1 · GRID COMMANDER DETAIL STATE FIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -1354,14 +1354,14 @@ function entryReadiness(g,sym){
 function scannerCard(sym){
  const g=fibFromSwing(sym); if(!g)return '';
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
- return `<details class="commander-detail"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
+ return `<details class="commander-detail" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
  <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
  <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)}%</div></details>`;
 }
 function commanderBot(b){
  const guard=liqGuard(b), liq=Number(b.liquidationDistancePct||0);
  const priority=b.status==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
- return `<details class="commander-detail ${guard.cls}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
+ return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority} · ${b.action}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason}</p></details>`;
 }
@@ -1406,9 +1406,18 @@ function renderOne(view){
  };
  const item=map[view]; if(!item)return;
  const el=$(item[0]); if(!el)return;
+ // Preserve expanded GRID Commander / Opportunity Scanner details across live WebSocket re-renders.
+ // Without this, renderAll() replaces the DOM every ~1s and native <details> immediately collapses.
+ const openGridDetails=view==='grid'
+   ? [...el.querySelectorAll('details[data-detail-key][open]')].map(d=>d.dataset.detailKey)
+   : [];
  try{
    if(view==='forecast') renderForecast();
    else el.innerHTML=item[1]();
+   if(view==='grid' && openGridDetails.length){
+     const openSet=new Set(openGridDetails);
+     el.querySelectorAll('details[data-detail-key]').forEach(d=>{if(openSet.has(d.dataset.detailKey))d.open=true});
+   }
    el.dataset.rendered='1';
  }catch(e){
    console.error('MERIDIAN render error',view,e);

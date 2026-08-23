@@ -1,3 +1,8 @@
+# ACHI MERIDIAN v5.5.1 — GRID Detail State Fix
+
+Fix: Opportunity Scanner und Bot Priority Details bleiben beim Live-WebSocket-Refresh geöffnet.
+Die GRID-Ansicht wird weiterhin live aktualisiert, ohne dass ein aufgeklappter <details>-Block nach ~1 Sekunde wieder zufällt.
+
 # ACHI MERIDIAN v5.5.0 — GRID COMMANDER
 - Risk-first Bot Priority Queue
 - Liquidation Guard: SAFE / TIGHT / DANGER / CRITICAL
