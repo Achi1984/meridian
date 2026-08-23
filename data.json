@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.13.0",
-  "build": "2026-08-23-entry-intelligence-2.0",
+  "appVersion": "5.13.1",
+  "build": "2026-08-23-decision-ux-cleanup",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1559,5 +1559,10 @@
     "storage": "browser-local",
     "status": "FOUNDATION",
     "note": "Scanner decisions can be recorded locally for later v5.14 validation/backtesting."
+  },
+  "decisionUx": {
+    "version": "1.1",
+    "status": "ACTIVE",
+    "goal": "One dominant action, one capital gate, one opportunity ranking; technical depth stays collapsible."
   }
 }

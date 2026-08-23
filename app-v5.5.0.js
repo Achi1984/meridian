@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.13.0';
-let APP_RELEASE='5.13.0 · ENTRY INTELLIGENCE 2.0';
+let APP_CODE_VERSION='5.13.1';
+let APP_RELEASE='5.13.1 · DECISION UX 1.1';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -850,10 +850,8 @@ function commandCenter(){
    : gate<70 ? 'Day-Gate ≥70 + bestätigte Struktur' : 'Risk Score <65';
 
  return actionCenterPanel()+
- positionLifecyclePanel()+
- capitalReleasePanel()+
- executionEnginePanel()+
- adaptiveRiskPanel()+
+ entryIntelligencePanel()+
+ centerAdvancedRiskDetails()+
  `<div class="cc-hero">
    <div class="cc-kicker">COMMAND CENTER ${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</div>
    <div class="cc-value-row"><div><div class="cc-total">$${fmt(p.total)}</div><div class="cc-eur">≈ €${fmt(p.eurApprox)}</div></div><div class="cc-day ${dayPct>=0?'green':'red'}"><b>${dayPct>=0?'+':''}${fmt(dayPct,2)}%</b><small>${dayAbs>=0?'+':''}$${fmt(dayAbs,0)} · 24H</small></div></div>
@@ -2321,30 +2319,53 @@ function adaptiveRiskPanel(){
 
 /* v5.10.4 — ACTION CENTER */
 function actionCenterPanel(){
- const s=decisionSSOT();
+ const s=decisionSSOT(), c=capitalReleaseState();
  const sl=s.btcShort, ll=s.btcLong;
  const shortBuf=sl?sl.buffer:NaN, longBuf=ll?ll.buffer:NaN;
  const shortGuard=sl?sl.guard:botGuardFromBuffer(NaN);
  const longGuard=ll?ll.guard:botGuardFromBuffer(NaN);
+ const rank=entryIntelRank();
+ const best=rank[0]||null;
+ const actionText=s.entryBlocked ? (s.nextAction||'RISIKO ZUERST') : (best ? `${best.sym} ${best.a.label}` : 'ENTRY CHECK');
+ const actionTone=s.entryBlocked?'red':(best?.a?.cls||'green');
+ const unlock=c.blocked?c.next:'Capital Gate offen · Setup/Entry separat bestätigen';
 
  return card(`<div class="ac-top"><div>
-   <div class="eyebrow">ACTION CENTER 1.3 ${liveBadge('SSOT')}</div>
-   <div class="forecast-main ${s.nextTone}">${s.entryBlocked?'RISIKO ZUERST':'ENTRY-POTENZIAL'}</div>
-   <div class="sub">Single Source of Truth für CENTER + GRID.</div>
- </div></div>
- <div class="ac-next"><span>NEXT ACTION</span><b>${s.nextAction}</b>
-   <small>Priorität: Liquidationsrisiko → bestehende Position → Hedge → neuer Entry</small></div>
+   <div class="eyebrow">ACTION CENTER 1.4 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main ${actionTone}">JETZT TUN</div>
+   <div class="sub">Eine dominante Entscheidung für CENTER + GRID.</div>
+ </div><span class="tag ${c.blocked?'red':'green'}">${c.blocked?'RISK BLOCK':'CAPITAL CHECK'}</span></div>
+
+ <div class="ac-now ${actionTone}">
+   <span>PRIORITÄT #1</span>
+   <b>${actionText}</b>
+   <small>${s.entryBlocked?'Liquidationsrisiko hat Vorrang vor jedem Entry-Score.':'Risk Gate offen; Ausführung bleibt manuell.'}</small>
+ </div>
+
  <div class="ac-grid">
    <div><span>BTC-S30</span><b class="${shortGuard.cls}">${Number.isFinite(shortBuf)?fmt(shortBuf,1)+'% LIQ':'—'}</b><small>${shortGuard.label}</small></div>
    <div><span>${ll?.id||'BTC LONG'}</span><b class="${longGuard.cls}">${Number.isFinite(longBuf)?fmt(longBuf,1)+'% LIQ':'—'}</b><small>${longGuard.label==='DANGER'?'KEEP / NO ADD':longGuard.label}</small></div>
-   <div><span>BTC ENTRY</span><b>${s.btcEntry}/100</b><small>${s.btcEntryState}</small></div>
-   <div><span>DAY-TRADE</span><b>${s.dayGate}/100</b><small>${s.entryBlocked?'BLOCKED BY BOT RISK':'ENTRY POTENZIAL'}</small></div>
+   <div><span>NEW CAPITAL</span><b class="${c.blocked?'red':'green'}">${c.blocked?'$0 · BLOCKED':'CHECK ONLY'}</b><small>${c.stage}</small></div>
+   <div><span>NEXT UNLOCK</span><b class="cyan">${unlock}</b><small>${best?`Best Opportunity ${best.sym} · INTEL ${best.a.total}`:'Opportunity-Daten laden'}</small></div>
  </div>
+
  <div class="ac-chain">
    ${s.queue.slice(0,2).map((q,i)=>`<span class="${q.tone}">${i+1} · ${q.id} ${q.action.split(' / ')[0]}</span>`).join('')}
-   <span class="cyan">3 · ENTRY CHECK</span>
+   <span class="${c.blocked?'red':'cyan'}">3 · ${c.blocked?'ENTRY BLOCKED':'ENTRY CHECK'}</span>
  </div>
- <p class="footer-note">Ein hoher Entry-Score überschreibt kein vorgelagertes Liquidationsrisiko. Alle Module verwenden dieselbe Quelle.</p>`);
+ <p class="footer-note">SETUP und ENTRY bleiben sichtbar, dürfen aber keinen vorgelagerten Risk-Block überschreiben.</p>`);
+}
+
+function centerAdvancedRiskDetails(){
+ return `<details class="center-advanced" data-detail-key="center-advanced-risk">
+   <summary><span><b>RISK & POSITION DETAILS</b><small>Lifecycle · Capital Release · Execution · Adaptive Risk</small></span><strong>ÖFFNEN</strong></summary>
+   <div class="center-advanced-body">
+     ${positionLifecyclePanel()}
+     ${capitalReleasePanel()}
+     ${executionEnginePanel()}
+     ${adaptiveRiskPanel()}
+   </div>
+ </details>`;
 }
 
 /* v5.10.4 — CENTER CLEANUP */
