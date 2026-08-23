@@ -1572,7 +1572,7 @@ window.MERIDIAN_ACTION_INTELLIGENCE = {
   principle:'Forecast → Trigger → Action'
 };
 
-/* v5.9.7 — MULTI-ASSET SL ENGINE */
+/* v5.9.8 — MULTI-ASSET SL ENGINE */
 function multiAssetSlData(sym){
  const a=DATA.multiAssetSlEngine?.assets?.[sym];
  return a||null;
@@ -1595,7 +1595,7 @@ function multiAssetRiskRow(sym){
   </div>`;
 }
 
-/* v5.9.7 — DECISION QUALITY LAYER */
+/* v5.9.8 — DECISION QUALITY LAYER */
 function rrDecision(rr){
  const q=DATA.decisionQuality?.rrGate||{noEntryBelow:1.5,watchBelow:2,readyFrom:2};
  rr=Number(rr||0);
@@ -1622,21 +1622,21 @@ function decisionQualityPanel(){
  if(!e||!lng||!sht)return '';
  const rr=rrDecision(e.rrTp2);
  const sr=botRiskDecision(sht);
- return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × LIQ × REGIME</div><div class="sub">Entry-Gate und Bot-Risiko werden getrennt bewertet</div></div></div>
+ return card(`<div class="section-head"><div><div class="eyebrow">DECISION QUALITY 1.0 <span class="tag cyan">MODEL</span></div><div class="forecast-main">R:R × ENTRY × LIQ × REGIME</div><div class="sub">Entry-Gate nutzt R:R + Entry Readiness; Bot-Risiko bleibt separat</div></div></div>
  <div class="dq-grid">
-  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Mindestwert 1,50</small></div>
+  <div class="dq-card ${rr.cls}"><span>BTC LONG ADD-GATE</span><b>${rr.label}</b><small>TP2 R:R ${fmt(e.rrTp2,2)} · Entry ${DATA.entryConfluence?.entryReadiness?.BTC??'—'}/100</small></div>
   <div class="dq-card ${sr.cls}"><span>BTC SHORT RISK</span><b>${sr.label}</b><small>Liq.-Puffer ${fmt(sht.liquidationDistancePct,1)}% · ${DATA.market?.regime||'REGIME'}</small></div>
  </div>
- <div class="dq-rules">
-   <span><b>&lt;1,5</b> NO ENTRY</span>
-   <span><b>1,5–2,0</b> WATCH</span>
-   <span><b>≥2,0</b> READY</span>
-   <span><b>≥2,5</b> PREFERRED</span>
+ <div class="dq-rules dq-confluence-rules">
+   <span><b>NO ENTRY</b>R:R &lt;2,0 oder Entry &lt;55</span>
+   <span><b>WATCH</b>R:R ≥2,0 + Entry 55–64</span>
+   <span><b>READY</b>R:R ≥2,0 + Entry ≥65</span>
+   <span><b>PREFERRED</b>R:R ≥2,5 + Entry ≥70</span>
  </div>
- <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: ein Long kann KEEP sein, obwohl ein zusätzlicher Long wegen schlechtem R:R blockiert bleibt.</p>`);
+ <p class="footer-note">Bestehende Position und neuer Entry sind getrennt: KEEP kann bestehen bleiben, während ein ADD durch R:R oder fehlende Entry-Bestätigung blockiert wird.</p>`);
 }
 
-/* v5.9.7 — ENTRY CONFLUENCE GATE */
+/* v5.9.8 — ENTRY CONFLUENCE GATE */
 function entryConfluence(sym, rr2){
  const cfg=DATA.entryConfluence?.rules||{};
  const er=Number(DATA.entryConfluence?.entryReadiness?.[sym]||0);

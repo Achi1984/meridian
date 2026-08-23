@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.9.7",
-  "build": "2026-08-23-entry-confluence-gate",
+  "appVersion": "5.9.8",
+  "build": "2026-08-23-confluence-ui-consistency",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1265,6 +1265,25 @@
       "PEPE": 45,
       "XRP": 58,
       "HBAR": 56
-    }
+    },
+    "uiVersion": "1.1",
+    "legend": [
+      {
+        "label": "NO ENTRY",
+        "rule": "R:R < 2,0 ODER Entry < 55"
+      },
+      {
+        "label": "WATCH",
+        "rule": "R:R ≥ 2,0 + Entry 55–64"
+      },
+      {
+        "label": "READY",
+        "rule": "R:R ≥ 2,0 + Entry ≥ 65"
+      },
+      {
+        "label": "PREFERRED",
+        "rule": "R:R ≥ 2,5 + Entry ≥ 70"
+      }
+    ]
   }
 }
