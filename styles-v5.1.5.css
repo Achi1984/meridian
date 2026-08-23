@@ -1349,3 +1349,25 @@ body{background:transparent;letter-spacing:.01em}
 .compact-recovery-body{padding:0 8px 8px}
 .compact-recovery-body>.card{margin-top:0}
 .live-risk-cockpit-card{margin-bottom:12px}
+
+/* v5.17.2 Recovery details toggle polish */
+.compact-open i{font-style:normal}
+.compact-open .when-open{display:none}
+.compact-recovery[open] .compact-open .when-closed{display:none}
+.compact-recovery[open] .compact-open .when-open{display:inline}
+.compact-recovery[open] .compact-open::after{content:""}
+
+/* v5.18.0 Position Intelligence 3.0 */
+.pi-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 18px}
+.pi-summary>div{padding:12px;border:1px solid #173a50;border-radius:14px;background:#071721}
+.pi-summary span,.pi-grid span{display:block;font-size:7px;letter-spacing:.8px;color:#8191a4;margin-bottom:5px}
+.pi-summary b{font-size:12px}
+.pi-row{padding:14px 0;border-top:1px solid #123044}
+.pi-row:first-of-type{border-top:0}
+.pi-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pi-head>b{font-size:16px}
+.pi-head>span{font-size:10px;font-weight:900;letter-spacing:.5px;text-align:right}
+.pi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pi-grid>div{padding:10px;border:1px solid #15374b;border-radius:12px}
+.pi-grid b{font-size:10px;line-height:1.25}
+.pi-row>small{display:block;margin-top:9px;color:#8292a5;font-size:8px;line-height:1.5}

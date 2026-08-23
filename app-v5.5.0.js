@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.17.1';
-let APP_RELEASE='5.17.1 · DETAILS FIX';
+let APP_CODE_VERSION='5.18.0';
+let APP_RELEASE='5.18.0 · POSITION INTELLIGENCE 3.0';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2427,7 +2427,7 @@ function compactRecoveryPanel(){
        <b class="${phase.tone}">${phase.label}</b>
        <small>${bot.id} · ${fmt(Number(r.cur),2)}% → ${target}</small>
      </div>
-     <span class="compact-open">DETAILS ÖFFNEN</span>
+     <span class="compact-open"><i class="when-closed">DETAILS ÖFFNEN →</i><i class="when-open">DETAILS SCHLIESSEN ↑</i></span>
    </summary>
    <div class="compact-recovery-body">${recoveryCommandPanel()}</div>
  </details>`;
@@ -2633,10 +2633,116 @@ function actionCenterPanel(){
  <p class="footer-note">ACTION CENTER und DYNAMIC RECOVERY lesen dieselbe dominante SSOT-Aktion. SETUP und ENTRY bleiben sichtbar, dürfen aber keinen vorgelagerten Risk-Block überschreiben.</p>`);
 }
 
+
+function positionIntelSpotState(p){
+ const s=decisionSSOT();
+ const rank=entryIntelRank();
+ const opp=rank.find(x=>x.sym===p.symbol);
+ const share=Number(p.sharePct||0);
+ const chg=Number(p.change24h||0);
+ const riskImpact=Math.max(0,Math.min(100,Math.round(
+   share*2 + Math.min(25,Math.abs(chg)*1.4) + (share>=20?15:share>=12?7:0)
+ )));
+ let action='HOLD', tone='green', reason='Position innerhalb der Konzentrationsgrenzen.';
+ let next='Struktur beobachten';
+
+ if(share>=25){
+   action='TRIM / REDUCE WATCH'; tone='red';
+   reason='Sehr hohe Portfolio-Konzentration; keine weitere Aufstockung.';
+   next='Anteil <20% bevorzugt';
+ }else if(share>=20){
+   action='HOLD / TRIM WATCH'; tone='amber';
+   reason='Erhöhte Konzentration; Gewinne nicht automatisch in zusätzliches Risiko reinvestieren.';
+   next='Anteil <20%';
+ }else if(chg<=-8){
+   action='EXIT WATCH'; tone='amber';
+   reason='Stark negatives 24H-Momentum; Struktur vor neuem Kapital prüfen.';
+   next='Momentum >−8% / Struktur bestätigt';
+ }else if(!s.entryBlocked && opp && Number(opp.a?.entry)>=65){
+   action='ADD CHECK'; tone='green';
+   reason='Risk Gate offen und Entry-Konfluenz ausreichend; Setup separat bestätigen.';
+   next='Setup + Entry final bestätigen';
+ }else if(s.entryBlocked){
+   action='HOLD / NO ADD'; tone='amber';
+   reason='Portfolio-Risk-Gate blockiert neues Kapital.';
+   next='Risk Unlock abwarten';
+ }
+
+ return {symbol:p.symbol,share,chg,riskImpact,action,tone,reason,next,opp};
+}
+
+function positionIntelBotState(bot){
+ const x=lifecycleDecision(bot);
+ const beDist=(Number.isFinite(x.live)&&Number.isFinite(x.be)&&x.be>0)?(x.live/x.be-1)*100:NaN;
+ let next='Struktur beobachten';
+ if(Number(x.buffer)<8) next='Liq.-Puffer ≥8%';
+ else if(Number(x.buffer)<15) next='Liq.-Puffer ≥15%';
+ else if(Number(x.buffer)<30) next='SAFE ≥30%';
+ else if(!x.addAllowed) next='Entry/Setup separat bestätigen';
+ else next='ADD CHECK möglich';
+
+ return {
+   id:bot.id,symbol:bot.symbol,side:String(bot.side||'').toUpperCase(),
+   leverage:Number(bot.leverage),buffer:Number(x.buffer),health:Number(x.health),
+   action:x.action,tone:x.tone,reason:x.reason,next,beDist
+ };
+}
+
+function positionIntelligencePanel(){
+ const p=DATA.portfolio||{};
+ const spots=(p.topPositions||[]).slice(0,5).map(positionIntelSpotState);
+ const bots=canonicalBotStates().map(positionIntelBotState);
+ const s=decisionSSOT();
+
+ const spotRows=spots.map(x=>`<div class="pi-row">
+   <div class="pi-head"><b>${x.symbol}</b><span class="${x.tone}">${x.action}</span></div>
+   <div class="pi-grid">
+     <div><span>PORTFOLIO</span><b>${fmt(x.share,1)}%</b></div>
+     <div><span>24H</span><b class="${x.chg<0?'red':'green'}">${x.chg>=0?'+':''}${fmt(x.chg,1)}%</b></div>
+     <div><span>RISK IMPACT</span><b>${x.riskImpact}/100</b></div>
+     <div><span>NÄCHSTE SCHWELLE</span><b>${x.next}</b></div>
+   </div>
+   <small>${x.reason}</small>
+ </div>`).join('');
+
+ const botRows=bots.map(x=>`<div class="pi-row">
+   <div class="pi-head"><b>${x.id}</b><span class="${x.tone}">${x.action}</span></div>
+   <div class="pi-grid">
+     <div><span>RICHTUNG</span><b>${x.side} ${Number.isFinite(x.leverage)?x.leverage+'x':'—'}</b></div>
+     <div><span>LIQ.-PUFFER</span><b class="${x.buffer<8?'red':x.buffer<30?'amber':'green'}">${Number.isFinite(x.buffer)?fmt(x.buffer,1)+'%':'—'}</b></div>
+     <div><span>HEALTH</span><b>${x.health||'—'}/100</b></div>
+     <div><span>NÄCHSTE SCHWELLE</span><b>${x.next}</b></div>
+   </div>
+   <small>${x.reason}${Number.isFinite(x.beDist)?` · BE Δ ${x.beDist>=0?'+':''}${fmt(x.beDist,2)}%`:''}</small>
+ </div>`).join('');
+
+ return card(`<div class="section-head"><div>
+   <div class="eyebrow">POSITION INTELLIGENCE 3.0 ${liveBadge('SSOT')}</div>
+   <div class="forecast-main">HOLD · ADD · TRIM · EXIT WATCH</div>
+   <div class="sub">Positionsmanagement nach Konzentration, Momentum, Bot-Risk und Portfolio-Gate.</div>
+ </div><span class="tag ${s.entryBlocked?'red':'green'}">${s.entryBlocked?'NEW CAPITAL BLOCKED':'RISK GATE OPEN'}</span></div>
+
+ <div class="pi-summary">
+   <div><span>SPOT POSITIONEN</span><b>${spots.length}</b></div>
+   <div><span>BOT POSITIONEN</span><b>${bots.length}</b></div>
+   <div><span>GLOBAL GATE</span><b class="${s.entryBlocked?'red':'green'}">${s.entryBlocked?'BLOCKED':'OPEN'}</b></div>
+ </div>
+
+ <div class="section-title">SPOT MANAGEMENT</div>
+ ${spotRows||'<div class="muted">Keine Spot-Positionen im SSOT.</div>'}
+
+ <div class="section-title" style="margin-top:18px">FUTURES / BOT MANAGEMENT</div>
+ ${botRows||'<div class="muted">Keine aktiven Bot-Positionen.</div>'}
+
+ <p class="footer-note">RISK IMPACT ist ein MERIDIAN-Modellwert aus Portfolio-Anteil, 24H-Bewegung und Konzentration; kein P&L und keine Orderfreigabe. Ein globaler Risk-Block kann ADD/NEW CAPITAL sperren, ohne bestehende HOLD-Entscheidungen automatisch zu schließen.</p>`,
+ 'position-intelligence-card');
+}
+
 function centerAdvancedRiskDetails(){
  return `<details class="center-advanced" data-detail-key="center-advanced-risk">
-   <summary><span><b>RISK & POSITION DETAILS</b><small>Lifecycle · Capital Release · Execution · Adaptive Risk</small></span><strong>ÖFFNEN</strong></summary>
+   <summary><span><b>RISK & POSITION DETAILS</b><small>Position Intelligence · Lifecycle · Capital Release · Execution</small></span><strong>ÖFFNEN</strong></summary>
    <div class="center-advanced-body">
+     ${positionIntelligencePanel()}
      ${positionLifecyclePanel()}
      ${capitalReleasePanel()}
      ${executionEnginePanel()}

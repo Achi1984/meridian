@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.17.1",
-  "build": "2026-08-23-details-open-state-fix",
+  "appVersion": "5.18.0",
+  "build": "2026-08-23-position-intelligence-3",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1648,5 +1648,32 @@
   "detailsOpenStateFix": {
     "status": "ACTIVE",
     "reason": "preserve native details state across live rerenders"
+  },
+  "uiPolish": {
+    "detailsToggle": "dynamic OPEN/CLOSE label",
+    "liveRerenderState": "preserved"
+  },
+  "positionIntelligence": {
+    "version": "3.0",
+    "status": "ACTIVE",
+    "spotInputs": [
+      "portfolioShare",
+      "change24h",
+      "globalRiskGate"
+    ],
+    "botInputs": [
+      "liquidationBuffer",
+      "health",
+      "breakEvenDistance",
+      "globalRiskGate"
+    ],
+    "actions": [
+      "HOLD",
+      "NO ADD",
+      "ADD CHECK",
+      "TRIM / REDUCE WATCH",
+      "EXIT WATCH"
+    ],
+    "execution": "MANUAL_ONLY"
   }
 }
