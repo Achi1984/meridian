@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.11.0",
-  "build": "2026-08-23-execution-engine-1-0",
+  "appVersion": "5.11.1",
+  "build": "2026-08-23-ssot-data-integrity-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1408,5 +1408,15 @@
       "Nach jeder manuellen Anpassung muss der Live-Liquidationspuffer neu geprüft werden.",
       "SL bleibt strukturell; Liquidationspreis ist keine Stop-Loss-Empfehlung."
     ]
+  },
+  "depotSSOT": {
+    "version": "1.0",
+    "policy": "FUTURES & EXPOSURE derives summary from pionexRisk.bots ACTIVE only",
+    "guards": [
+      "NaN -> —",
+      "undefined -> —",
+      "legacy missing properties ignored"
+    ],
+    "source": "pionexRisk + exposure.pionexAccountValue"
   }
 }

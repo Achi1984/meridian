@@ -1,6 +1,10 @@
 
 const $=s=>document.querySelector(s);
-const fmt=(n,d=0)=>new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+const fmt=(n,d=0)=>{
+ const v=Number(n);
+ if(!Number.isFinite(v)) return '—';
+ return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+};
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 let APP_CODE_VERSION='5.6.0';
 let APP_RELEASE='5.6.0 · DESIGN SYSTEM 2.0';
@@ -850,12 +854,39 @@ function commandCenter(){
  card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.3</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);const entry=Math.max(0,Math.min(100,Math.round(sc-(sym==='SOL'?20:sym==='ETH'?28:28))));return `<div class="row"><span>${sym} · ${entry>=75?'READY':entry>=60?'WATCH':'WAIT'}</span><b class="${entry>=75?'green':entry>=60?'amber':'red'}">${entry}/100</b></div>`}).join('')}<p class="footer-note">Hier wird Entry Readiness gezeigt; Setup Quality bleibt im GRID-Tab separat sichtbar.</p>`);
 }
 function depot(){
- const p=DATA.portfolio, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
- const venueCards=p.byVenue.map(v=>metric(
+ const p=DATA.portfolio||{}, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
+ const activeBots=(r.bots||[]).filter(b=>(b.status||'ACTIVE').toUpperCase()==='ACTIVE');
+
+ // DEPOT SSOT: all futures summary values are derived from the same active bot array
+ // used by GRID / Action Center. Missing legacy properties can no longer create NaN.
+ const sum=(arr,key)=>arr.reduce((s,x)=>{
+   const v=Number(x?.[key]);
+   return s+(Number.isFinite(v)?v:0);
+ },0);
+ const botCapital=sum(activeBots,'investment');
+ const longBots=activeBots.filter(b=>(b.side||'').toUpperCase()==='LONG');
+ const shortBots=activeBots.filter(b=>(b.side||'').toUpperCase()==='SHORT');
+ const longCapital=sum(longBots,'investment');
+ const shortCapital=sum(shortBots,'investment');
+ const fiveXLongCapital=longBots.filter(b=>Number(b.leverage)===5).reduce((s,b)=>s+(Number(b.investment)||0),0);
+ const fiveXLongCapacity=fiveXLongCapital*5;
+ const accountValue=Number.isFinite(Number(ex.pionexAccountValue)) ? Number(ex.pionexAccountValue) : null;
+ const netDirection=longCapital>shortCapital ? 'NET LONG / BTC HEDGE' : shortCapital>longCapital ? 'NET SHORT' : 'BALANCED';
+ const criticalCount=activeBots.filter(b=>{
+   const d=Number(b.liquidationDistancePct);
+   return (b.status||'').toUpperCase()==='CRITICAL' || (Number.isFinite(d) && d<8);
+ }).length;
+ const riskLevel=criticalCount>0?'HIGH':activeBots.some(b=>Number(b.liquidationDistancePct)<15)?'ELEVATED':'NORMAL';
+ const riskNote=criticalCount>0
+   ? `${criticalCount} kritische Position${criticalCount>1?'en':''}; Futures-Risiko zuerst prüfen.`
+   : 'Keine kritische aktive Futures-Position.';
+
+ const venueCards=(p.byVenue||[]).map(v=>metric(
    v.name,
    `$${fmt(v.value,0)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${sourceBadge(v.source)}</div>`
  )).join('');
- const topRows=p.topPositions.map(x=>`
+
+ const topRows=(p.topPositions||[]).map(x=>`
    <div class="position-row position-click" onclick="openAssetDetail('${x.symbol}')">
      ${coinIcon(x.symbol)}
      <div class="position-asset">
@@ -867,29 +898,47 @@ function depot(){
      <div class="position-value"><b>$${fmt(x.value)}</b><small>${fmt(x.sharePct,1)}% Anteil</small></div>
      <div class="position-change ${x.change24h<0?'red':''}">${x.change24h>=0?'+':''}${fmt(x.change24h,1)}%</div>
    </div>`).join('');
- const botCards=(r.bots||[]).map(b=>{
-   const liq=Number.isFinite(b.liquidation)?`$${fmt(b.liquidation,b.symbol==='HBAR'?5:b.symbol==='XRP'?4:0)}`:'nicht verifiziert';
-   const pnl=Number.isFinite(b.totalProfitUsdt)?`${fmt(b.totalProfitUsdt,2)} USDT`:Number.isFinite(b.totalProfitPct)?`${fmt(b.totalProfitPct,2)}%`:'—';
+
+ const botCards=activeBots.map(b=>{
+   const sym=b.symbol||'—';
+   const side=(b.side||'—').toUpperCase();
+   const lev=Number.isFinite(Number(b.leverage))?Number(b.leverage):null;
+   const liqNum=Number(b.liquidation ?? b.liquidationPrice);
+   const liq=Number.isFinite(liqNum)?`$${fmt(liqNum,sym==='HBAR'?5:sym==='XRP'?4:0)}`:'nicht verifiziert';
+   const profit=Number(b.totalProfit ?? b.totalProfitUsdt);
+   const pnl=Number.isFinite(profit)?`${fmt(profit,2)} USDT`:'—';
+   const pnlClass=Number.isFinite(profit)?(profit<0?'red':'green'):'';
+   const rangeLow=Number(b.rangeLow);
+   const rangeHigh=Number(b.rangeHigh);
+   const range=(Number.isFinite(rangeLow)&&Number.isFinite(rangeHigh))
+      ? `${fmt(rangeLow,sym==='HBAR'?2:sym==='XRP'?2:1)}–${fmt(rangeHigh,sym==='HBAR'?2:sym==='XRP'?2:1)}`
+      : '—';
+   const grids=b.grids||b.orders||'—';
+   const dist=Number(b.liquidationDistancePct);
+   const displayName=b.name||b.id||`${sym}-${side}`;
    return `<div class="pionex-bot">
-    <div class="pionex-bot-head"><div><b>${b.symbol} ${b.side}</b><small>${b.name} · ${b.leverage||'—'}x</small></div>${botStatusBadge(b)}</div>
+    <div class="pionex-bot-head"><div><b>${sym} ${side}</b><small>${displayName} · ${lev??'—'}x</small></div>${botStatusBadge(b)}</div>
     <div class="pionex-grid">
       <div><span>Kapital</span><b>${fmt(b.investment,2)} USDT</b></div>
-      <div><span>P&L</span><b class="${(b.totalProfitPct||0)<0?'red':'green'}">${pnl}</b></div>
-      <div><span>Range</span><b>${Number.isFinite(b.rangeLow)?fmt(b.rangeLow,b.symbol==='HBAR'?2:1)+'–'+fmt(b.rangeHigh,b.symbol==='HBAR'?2:1):'—'}</b></div>
-      <div><span>Grids</span><b>${b.grids||b.orders||'—'}</b></div>
+      <div><span>P&L</span><b class="${pnlClass}">${pnl}</b></div>
+      <div><span>Range</span><b>${range}</b></div>
+      <div><span>Grids</span><b>${grids}</b></div>
       <div><span>Liq.</span><b class="red">${liq}</b></div>
-      <div><span>Liq.-Puffer</span><b class="amber">${Number.isFinite(b.liquidationDistancePct)?fmt(b.liquidationDistancePct,1)+'%':'—'}</b></div>
+      <div><span>Liq.-Puffer</span><b class="amber">${Number.isFinite(dist)?fmt(dist,1)+'%':'—'}</b></div>
     </div>
-    <div class="bot-reason">${b.reason||''}</div>
+    <div class="bot-reason">${b.reason||'Aktive Pionex-Position · SSOT'}</div>
    </div>`;
  }).join('');
+
+ const accountDisplay=accountValue==null?'—':'$'+fmt(accountValue,2);
+
  return card(`<div class="hero">
       <div class="eyebrow">GESAMTPORTFOLIO</div>
       <div class="portfolio-value-line"><div><div class="big">$${fmt(p.total)}</div><div class="sub">≈ €${fmt(p.eurApprox)}</div></div><div class="portfolio-live">${liveBadge('LIVE')}<small>Gesamtwert</small></div></div>
       ${portfolioChart()}
       <div class="grid2 portfolio-summary">
         ${metric('ASSETS',p.assetsCount)}${metric('VERWAHRSTELLEN',p.custodiansCount)}
-        ${metric('GRÖSSTE POSITION',p.largestPosition.symbol+' '+fmt(p.largestPosition.sharePct,1)+'%')}
+        ${metric('GRÖSSTE POSITION',(p.largestPosition?.symbol||'—')+' '+fmt(p.largestPosition?.sharePct,1)+'%')}
         ${metric('DATENMODUS',`Hybrid ${liveBadge('LIVE')}`,'green')}
       </div>
     </div>`,'hero')+
@@ -897,21 +946,21 @@ function depot(){
     `<div class="section-title venue-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2 venue-grid">${venueCards}</div>`+
     card(`<div class="section-head"><div class="section-title">TOP 5 SPOT-POSITIONEN</div><span class="section-note">${liveBadge('LIVE')} ohne Futures-Doppelzählung</span></div>${topRows}`,'positions-card')+
-    card(`<div class="section-head"><div class="section-title">FUTURES & EXPOSURE</div><span class="section-note">${snapshotBadge('09:12')}</span></div>
+    card(`<div class="section-head"><div class="section-title">FUTURES & EXPOSURE</div><span class="section-note">${snapshotBadge('SSOT')}</span></div>
       <div class="grid2 pionex-summary">
-        ${metric('PIONEX KONTO','$'+fmt(r.accountValue,2),'amber')}
-        ${metric('BOT-KAPITAL','$'+fmt(r.botCapital,2))}
-        ${metric('LONG-KAPITAL','$'+fmt(r.longCapital,2),'green')}
-        ${metric('SHORT-HEDGE','$'+fmt(r.shortCapital,2),'red')}
-        ${metric('5x LONG CAPACITY','$'+fmt(r.knownLeveragedLongCapacity,0),'amber')}
-        ${metric('BIAS',r.netDirection||'—','amber')}
+        ${metric('PIONEX KONTO',accountDisplay,'amber')}
+        ${metric('BOT-KAPITAL','$'+fmt(botCapital,2))}
+        ${metric('LONG-KAPITAL','$'+fmt(longCapital,2),'green')}
+        ${metric('SHORT-HEDGE','$'+fmt(shortCapital,2),'red')}
+        ${metric('5x LONG CAPACITY','$'+fmt(fiveXLongCapacity,0),'amber')}
+        ${metric('BIAS',netDirection,'amber')}
       </div>
-      <div class="exposure-callout"><b>${r.riskLevel||'—'} RISK</b><span>${r.riskNote||''}</span></div>
-      <div class="pionex-bots">${botCards}</div>
-      <p class="footer-note">Pionex-Kontowert ist bereits im Gesamtportfolio enthalten. Futures-Bot-Kapital wird hier nur als Risiko-/Exposure-Layer dargestellt und nicht nochmals addiert.</p>
+      <div class="exposure-callout"><b>${riskLevel} RISK</b><span>${riskNote}</span></div>
+      <div class="pionex-bots">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
+      <p class="footer-note">SSOT: Summary, Bot-Cards, GRID und Action Center verwenden dieselben aktiven Pionex-Bots. Fehlende Werte werden als „—“ statt NaN/undefined angezeigt. Pionex-Kontowert wird nicht doppelt zum Gesamtportfolio addiert.</p>
     `,'pionex-card')+
     cashflowPanel()+
-    `<div class="grid2 performance-grid">${metric('24H SPOT-PERF.',(p.performance24hPct>=0?'+':'')+fmt(p.performance24hPct,1)+'%<div class="muted perf-sub">'+(p.performance24hUsd>=0?'+':'')+'$'+fmt(p.performance24hUsd)+'</div>',p.performance24hPct>=0?'green':'red')}${metric('BEST PERFORMER',p.bestPerformer.symbol+'<div class="muted perf-sub">'+(p.bestPerformer.change24h>=0?'+':'')+fmt(p.bestPerformer.change24h,1)+'%</div>')}${metric('WORST PERFORMER',p.worstPerformer.symbol+'<div class="muted perf-sub">'+fmt(p.worstPerformer.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted perf-sub">24h Streuung</div>')}</div>`;
+    `<div class="grid2 performance-grid">${metric('24H SPOT-PERF.',(p.performance24hPct>=0?'+':'')+fmt(p.performance24hPct,1)+'%<div class="muted perf-sub">'+(p.performance24hUsd>=0?'+':'')+'$'+fmt(p.performance24hUsd)+'</div>',p.performance24hPct>=0?'green':'red')}${metric('BEST PERFORMER',(p.bestPerformer?.symbol||'—')+'<div class="muted perf-sub">'+((p.bestPerformer?.change24h||0)>=0?'+':'')+fmt(p.bestPerformer?.change24h,1)+'%</div>')}${metric('WORST PERFORMER',(p.worstPerformer?.symbol||'—')+'<div class="muted perf-sub">'+fmt(p.worstPerformer?.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted perf-sub">24h Streuung</div>')}</div>`;
 }
 function assetDetail(sym){
  const hs=(DATA.portfolio.holdings||[]).filter(h=>h.symbol===sym);
