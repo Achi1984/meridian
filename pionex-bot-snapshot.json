@@ -1,5 +1,5 @@
 {
-  "version": "5.12.0",
+  "version": "5.12.1",
   "verifiedFrom": "Pionex screenshots 2026-08-23 through 19:48",
   "activeCount": 4,
   "activeBots": {
@@ -93,5 +93,5 @@
     "HBAR-L3",
     "XRP-L5"
   ],
-  "sourcePolicy": "Pionex displayed liquidation buffer is source of truth; formula is cross-check."
+  "sourcePolicy": "ACTIVE Pionex bots are SSOT. Live market prices recalculate liquidation buffer. Closed bots are excluded. Position labels/leverage are derived dynamically from the active bot record."
 }

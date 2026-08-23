@@ -437,17 +437,38 @@ function canonicalBotStates(){
  return botStateManager().active;
 }
 function canonicalBtcLongRiskPlan(){
- const base=DATA.slInvalidationEngine?.btcLong20x;
+ const base=DATA.slInvalidationEngine?.btcLongPositionModel || DATA.slInvalidationEngine?.btcLong20x;
  if(!base)return null;
  const bot=canonicalBotStates().find(b=>b.id==='BTC-L5') ||
            canonicalBotStates().find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
- if(!bot || !Number.isFinite(bot.liquidation)) return {...base,positionDecision:'KEEP',addDecision:'BLOCKED',newEntryDecision:'BLOCKED'};
+ if(!bot || !Number.isFinite(bot.liquidation)){
+   const entry=Number(base.entry||0), sl=Number(base.stopLoss), tp1=Number(base.takeProfit1), tp2=Number(base.takeProfit2);
+   const risk=Math.max(1,entry-sl);
+   return {...base,entry,rrTp1:(tp1-entry)/risk,rrTp2:(tp2-entry)/risk,positionDecision:'KEEP',addDecision:'BLOCKED',newEntryDecision:'BLOCKED'};
+ }
+ const entry=Number(bot.breakEven||bot.creationPrice||bot.live||base.entry||0);
+ const creationPrice=Number(bot.creationPrice||0);
  const stopLoss=Number(base.stopLoss);
- const liquidation=Number(bot.liquidation);
+ const takeProfit1=Number(base.takeProfit1);
+ const takeProfit2=Number(base.takeProfit2);
+ const risk=Math.max(1,entry-stopLoss);
+ const rrTp1=(takeProfit1-entry)/risk;
+ const rrTp2=(takeProfit2-entry)/risk;
  return {
    ...base,
-   liquidation,
-   slToLiqUsd:Number.isFinite(stopLoss)?Math.max(0,stopLoss-liquidation):Number(base.slToLiqUsd||0),
+   botId:bot.id,
+   leverage:Number(bot.leverage||1),
+   entry,
+   creationPrice,
+   entryBasis:'PIONEX BREAK-EVEN',
+   stopLoss,
+   takeProfit1,
+   takeProfit2,
+   stopLossPctFromEntry:entry?((stopLoss/entry)-1)*100:0,
+   rrTp1,
+   rrTp2,
+   liquidation:Number(bot.liquidation),
+   slToLiqUsd:Number.isFinite(stopLoss)?Math.max(0,stopLoss-Number(bot.liquidation)):0,
    liveBotBuffer:bot.buffer,
    positionDecision:'KEEP',
    addDecision:'BLOCKED',
@@ -830,6 +851,7 @@ function commandCenter(){
 
  return actionCenterPanel()+
  positionLifecyclePanel()+
+ capitalReleasePanel()+
  executionEnginePanel()+
  adaptiveRiskPanel()+
  `<div class="cc-hero">
@@ -849,7 +871,7 @@ function commandCenter(){
     <div><span>PORTFOLIO RISK</span><b class="${risk.score>=75?'red':'amber'}">${risk.score}/100</b><small>Spot + Leverage + Bots</small></div>
    </div>
    <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
- card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('5x LONG CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('SHORT STRESS',DATA.pionex?.btcShortPnlPct!=null?fmt(DATA.pionex.btcShortPnlPct,1)+'%':'~−98%','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Risiko wird gemeinsam betrachtet: Spot-Konzentration + gehebelte Long-Bots + Short-Hedge-Stress. Bot-Kapital wird nicht doppelt zum Portfolio addiert.</p>`)+
+ card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('NEW RISK CAPACITY',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${metric('SHORT HEDGE STRESS','98/100 · CRITICAL','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
  compactDecisionDetails()+
  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">${DATA.pionexRisk?.activeCount??'—'} ACTIVE · ${DATA.pionexRisk?.closedCount??0} CLOSED</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
  `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
@@ -1562,12 +1584,52 @@ function entryReadiness(g,sym){
  if(g.px>g.entryHigh) s-=10;
  return Math.max(0,Math.min(100,Math.round(s)));
 }
+
+function capitalReleaseState(){
+ const cfg=DATA.capitalReleaseEngine?.rules||{};
+ const states=canonicalBotStates();
+ const short=states.find(b=>b.id==='BTC-S30')||states.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT');
+ const shortBuf=Number(short?.buffer);
+ const crit=Number(cfg.criticalBelowPct||8);
+ const preferred=Number(cfg.preferredUnlockPct||12);
+ const recovery=Number(cfg.recoveryPct||15);
+ const highLev=Number(cfg.blockHighLeverageAtOrAbove||20);
+ const otherHighRisk=states.filter(b=>b.id!==short?.id && Number(b.leverage||0)>=highLev && ['CRITICAL','DANGER'].includes(b.guard?.label));
+ const theoretical=Number(DATA.capitalReleaseEngine?.theoreticalLongCapacityUSD||DATA.pionex?.longCapacity||5642);
+ let stage='CHECK', cls='amber', blocked=true, newRiskCapacity=0, next='Risk-Daten prüfen';
+ if(Number.isFinite(shortBuf)){
+   if(shortBuf<crit){stage='BLOCKED';cls='red';next=`BTC-S30 auf ≥${crit}% Puffer bringen`;}
+   else if(shortBuf<preferred){stage='RECOVERY LOCK';cls='red';next=`BTC-S30 auf ≥${preferred}% Puffer bringen`;}
+   else if(shortBuf<recovery){stage='WATCH LOCK';cls='amber';next=`BTC-S30 auf ≥${recovery}% Puffer bringen`;}
+   else if(otherHighRisk.length){stage='BLOCKED';cls='red';next=`${otherHighRisk[0].id} aus DANGER/CRITICAL lösen`;}
+   else {stage='ENTRY ENGINE CHECK';cls='green';blocked=false;newRiskCapacity=theoretical;next='Setup + Entry Readiness separat bestätigen';}
+ }
+ return {stage,cls,blocked,newRiskCapacity,theoretical,next,shortBuf,otherHighRisk};
+}
+function capitalReleasePanel(){
+ const c=capitalReleaseState();
+ return card(`<div class="section-head"><div><div class="eyebrow">CAPITAL RELEASE ENGINE 1.0 ${liveBadge('SSOT')}</div><div class="forecast-main ${c.cls}">${c.stage}</div><div class="sub">Risk Unlock → Entry Check → Kapitalfreigabe</div></div><span class="tag ${c.cls}">${c.blocked?'NEW CAPITAL $0':'CHECK ONLY'}</span></div>
+ <div class="grid2">
+  ${metric('THEORETICAL 5X CAPACITY','$'+fmt(c.theoretical,0),'amber')}
+  ${metric('NEW RISK CAPACITY',c.blocked?'$0 · BLOCKED':'CHECK ONLY',''+c.cls)}
+  ${metric('BTC-S30 BUFFER',Number.isFinite(c.shortBuf)?fmt(c.shortBuf,1)+'%':'—',c.cls)}
+  ${metric('NEXT UNLOCK',c.next,'cyan')}
+ </div>
+ <div class="capital-release-flow">
+  <span class="${Number(c.shortBuf)<8?'red':''}">&lt;8% BLOCK</span>
+  <span class="${Number(c.shortBuf)>=8&&Number(c.shortBuf)<12?'red':''}">8–12 RECOVERY</span>
+  <span class="${Number(c.shortBuf)>=12&&Number(c.shortBuf)<15?'amber':''}">12–15 WATCH</span>
+  <span class="${Number(c.shortBuf)>=15?'green':''}">≥15 ENTRY CHECK</span>
+ </div>
+ <p class="footer-note">Theoretical Capacity ist nur Rechenkapazität, keine Freigabe. ADD auf bestehende Bots bleibt separat und verlangt weiterhin SAFE ≥30% + Health ≥70 + keinen vorgelagerten Risk-Block.</p>`);
+}
 function scannerCard(sym){
  const g=fibFromSwing(sym); if(!g)return '';
  const setup=scannerScore(g,sym), ready=entryReadiness(g,sym),grids=scannerGrids(sym,g);
- return `<details class="commander-detail" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span></summary>
+ const cap=capitalReleaseState(), riskLabel=cap.blocked?'RISK BLOCK':'RISK OPEN', riskCls=cap.blocked?'red':'green';
+ return `<details class="commander-detail scanner-risk" data-detail-key="scanner-${sym}"><summary><span><b>${sym}</b><small>${g.state} · ${g.source}</small></span><span><b class="${setup>=82?'green':setup>=72?'amber':'red'}">${setup}</b><small>SETUP</small></span><span><b class="${ready>=75?'green':ready>=55?'amber':'red'}">${ready}</b><small>ENTRY</small></span><span><b class="${riskCls}">${riskLabel}</b><small>PORTFOLIO GATE</small></span></summary>
  <div class="scanner-grid"><div><span>LIVE</span><b>$${gridFmt(g.px,sym)}</b></div><div><span>ENTRY</span><b>$${gridFmt(g.entryLow,sym)}–$${gridFmt(g.entryHigh,sym)}</b></div><div><span>RANGE</span><b>$${gridFmt(g.rangeLow,sym)}–$${gridFmt(g.rangeHigh,sym)}</b></div><div><span>GRIDS</span><b>~${grids}</b></div><div><span>TP1</span><b>$${gridFmt(g.hi,sym)}</b></div><div><span>TP2</span><b>$${gridFmt(g.fib.ext1272,sym)}</b></div></div>
- <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · Swing ${fmt(g.ampPct,1)}%</div>${multiAssetRiskRow(sym)}</details>`;
+ <div class="scanner-foot">Setup Quality ${setup}/100 · Entry Readiness ${ready}/100 · <b class="${riskCls}">${riskLabel}</b> · Swing ${fmt(g.ampPct,1)}%</div>${multiAssetRiskRow(sym)}</details>`;
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
@@ -1601,60 +1663,63 @@ function btcDualHedgeEngine(){
 function dualBtcHedgePanel(){
  const h=btcDualHedgeEngine(); if(!h.ready)return '';
  const money=n=>'$'+fmt(Math.abs(n),0);
- return card(`<div class="section-head"><div><div class="eyebrow">DUAL BOT HEDGE ENGINE 1.0 ${snapshotBadge('PIONEX')}</div><div class="forecast-main">BTC LONG ↔ SHORT</div><div class="sub">Net Exposure · Liquidation Guard · Rotation Decision</div></div><span class="tag ${h.cls}">${h.decision}</span></div>
+ const multiple=h.longProxy?h.shortProxy/h.longProxy:0;
+ const dom=multiple>1?'SHORT DOMINANT':multiple<1?'LONG DOMINANT':'BALANCED';
+ const domCls=multiple>1.25?'red':multiple<0.8?'green':'amber';
+ return card(`<div class="section-head"><div><div class="eyebrow">DUAL BOT HEDGE ENGINE 1.1 ${snapshotBadge('PIONEX')}</div><div class="forecast-main">BTC LONG ↔ SHORT</div><div class="sub">Net Exposure · Liquidation Guard · Rotation Decision</div></div><span class="tag ${h.cls}">${h.decision}</span></div>
  <div class="hedge-decision ${h.cls}">
    <div><span>CENTRAL ACTION</span><b>${h.decision}</b><small>Decision Score ${h.score}/100</small></div>
-   <div class="hedge-bias"><span>BIAS</span><b>${h.bias}</b><small>Proxy ${h.netProxy>=0?'+':'−'}${money(h.netProxy)}</small></div>
+   <div class="hedge-bias"><span>NET BTC EXPOSURE</span><b class="${h.netProxy<0?'red':'green'}">${h.bias}</b><small>${h.netProxy>=0?'+':'−'}${money(h.netProxy)} Proxy</small></div>
  </div>
  <div class="hedge-bots">
   <div class="hedge-leg long">
-    <div class="hedge-leg-head"><span>LONG 20x</span><b>${h.longBuf<8?'CRITICAL':h.longBuf<15?'DANGER':h.longBuf<30?'TIGHT':'SAFE'}</b></div>
-    <strong>BTC-L5</strong>
+    <div class="hedge-leg-head"><span>LONG ${h.lng.leverage}x</span><b>${h.longBuf<8?'CRITICAL':h.longBuf<15?'DANGER':h.longBuf<30?'TIGHT':'SAFE'}</b></div>
+    <strong>${h.lng.id}</strong>
     <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.longBuf,2)}%</b></span><span>BE <b>$${fmt(h.lng.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.lng.liquidation,0)}</b></span><span>INVEST <b>$${fmt(h.lng.investment,0)}</b></span></div>
     <div class="hedge-action">KEEP LONG / NO ADD</div>
   </div>
   <div class="hedge-leg short">
-    <div class="hedge-leg-head"><span>SHORT 30x</span><b>${h.shortBuf<8?'CRITICAL':h.shortBuf<15?'DANGER':h.shortBuf<30?'TIGHT':'SAFE'}</b></div>
-    <strong>BTC-S30</strong>
+    <div class="hedge-leg-head"><span>SHORT ${h.sht.leverage}x</span><b>${h.shortBuf<8?'CRITICAL':h.shortBuf<15?'DANGER':h.shortBuf<30?'TIGHT':'SAFE'}</b></div>
+    <strong>${h.sht.id}</strong>
     <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.shortBuf,2)}%</b></span><span>BE <b>$${fmt(h.sht.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.sht.liquidation,0)}</b></span><span>MARGIN <b>$${fmt((h.sht.investment||0)+(h.sht.dynamicMargin||0),0)}</b></span></div>
     <div class="hedge-action red">REDUCE SHORT / NO ADD</div>
   </div>
  </div>
- <div class="hedge-meter"><div><span>SHORT HEDGE RATIO</span><b>${fmt(h.hedge,1)}%</b></div><i><em style="width:${Math.min(100,h.hedge)}%"></em></i></div>
- <div class="grid2">${metric('LONG EXPOSURE PROXY','$'+fmt(h.longProxy,0),'green')}${metric('SHORT EXPOSURE PROXY','$'+fmt(h.shortProxy,0),'red')}${metric('NET PROXY',(h.netProxy>=0?'+':'−')+'$'+fmt(Math.abs(h.netProxy),0),h.netProxy>=0?'green':'red')}${metric('LIVE BTC','$'+fmt(h.live,0),'cyan')}</div>
- <p class="footer-note">Exposure Proxy = Investment × Hebel und dient nur zum Richtungsvergleich. Short-Exit und Long-Add bleiben getrennte Entscheidungen; keine automatische Order-Ausführung.</p>`);
+ <div class="hedge-meter"><div><span>SHORT/LONG EXPOSURE</span><b class="${domCls}">${fmt(multiple,2)}× · ${dom}</b></div><i><em style="width:${Math.min(100,multiple/3*100)}%"></em></i></div>
+ <div class="grid2">${metric('LONG EXPOSURE PROXY','$'+fmt(h.longProxy,0),'green')}${metric('SHORT EXPOSURE PROXY','$'+fmt(h.shortProxy,0),'red')}${metric('NET BTC EXPOSURE',(h.netProxy>=0?'+':'−')+'$'+fmt(Math.abs(h.netProxy),0),h.netProxy>=0?'green':'red')}${metric('LIVE BTC','$'+fmt(h.live,0),'cyan')}</div>
+ <p class="footer-note">Exposure Proxy = Investment × Hebel und dient nur zum Richtungsvergleich. ${multiple>1?'Der Short ist aktuell größer als der Long; dies ist keine neutrale Hedge-Quote.':''} Short-Exit und Long-Add bleiben getrennte Entscheidungen.</p>`);
 }
-
-
 function slInvalidationPanel(){
  const e=canonicalBtcLongRiskPlan();
  if(!e)return '';
- const levWarn=(Number(e.slToLiqUsd)/Math.max(1,Number(e.entry)))*100<4;
- return card(`<div class="section-head"><div><div class="eyebrow">SL & INVALIDATION ENGINE 1.1 ${liveBadge('SSOT')}</div><div class="forecast-main">BTC LONG 20x</div><div class="sub">ENTRY → SL → TP1 → TP2 → R:R</div></div><span class="tag ${levWarn?'red':'amber'}">${levWarn?'LEVERAGE TOO HIGH':'HIGH LEVERAGE'}</span></div>
+ const guard=botGuardFromBuffer(e.liveBotBuffer);
+ const nearLiq=(Number(e.slToLiqUsd)/Math.max(1,Number(e.entry)))*100<4;
+ const creationTxt=Number.isFinite(Number(e.creationPrice))&&Number(e.creationPrice)>0?` · Creation $${fmt(e.creationPrice,0)}`:'';
+ return card(`<div class="section-head"><div><div class="eyebrow">SL & INVALIDATION ENGINE 1.2 ${liveBadge('SSOT')}</div><div class="forecast-main">${e.botId||'BTC LONG'} · ${e.leverage||'—'}x</div><div class="sub">POSITION BASIS → SL → TP1 → TP2 → R:R</div></div><span class="tag ${guard.cls}">${guard.label}</span></div>
  <div class="sl-flow">
-   <div><span>ENTRY</span><b>$${fmt(e.entry,0)}</b></div>
-   <div class="sl-node stop"><span>SL</span><b>$${fmt(e.stopLoss,0)}</b><small>${fmt(e.stopLossPctFromEntry,2)}%</small></div>
-   <div class="sl-node tp"><span>TP1</span><b>$${fmt(e.takeProfit1,0)}</b><small>R:R ${fmt(e.rrTp1,2)}</small></div>
-   <div class="sl-node tp2"><span>TP2</span><b>$${fmt(e.takeProfit2,0)}</b><small>R:R ${fmt(e.rrTp2,2)}</small></div>
+   <div><span>PIONEX BE</span><b>$${fmt(e.entry,0)}</b><small>${creationTxt.replace(' · ','')}</small></div>
+   <div class="sl-node stop"><span>MODEL SL</span><b>$${fmt(e.stopLoss,0)}</b><small>${fmt(e.stopLossPctFromEntry,2)}%</small></div>
+   <div class="sl-node tp"><span>MODEL TP1</span><b>$${fmt(e.takeProfit1,0)}</b><small>R:R ${fmt(e.rrTp1,2)}</small></div>
+   <div class="sl-node tp2"><span>MODEL TP2</span><b>$${fmt(e.takeProfit2,0)}</b><small>R:R ${fmt(e.rrTp2,2)}</small></div>
  </div>
  <div class="sl-riskbox">
   <div><span>LIQUIDATION</span><b class="red">$${fmt(e.liquidation,0)}</b></div>
-  <div><span>SL → LIQ BUFFER</span><b class="${levWarn?'red':'amber'}">$${fmt(e.slToLiqUsd,0)}</b></div>
+  <div><span>SL → LIQ BUFFER</span><b class="${nearLiq?'red':'amber'}">$${fmt(e.slToLiqUsd,0)}</b></div>
   <div><span>INVALIDATION</span><b>4H Close &lt; $${fmt(e.invalidBelow,0)}</b></div>
   <div><span>POSITION</span><b class="green">${e.positionDecision||'KEEP'}</b></div>
  </div>
- <div class="sl-decision-strip"><span>POSITION <b class="green">${e.positionDecision||'KEEP'}</b></span><span>ADD <b class="red">${e.addDecision||'BLOCKED'}</b></span><span>NEW CAPITAL <b class="red">${e.newEntryDecision||'BLOCKED'}</b></span></div><div class="sl-rule ${levWarn?'red':''}"><b>${levWarn?'LEVERAGE TOO HIGH':'RISK CHECK'}</b><span>Technischer SL und Liquidation liegen zu nahe beieinander. Bestehende Position ≠ Freigabe für ADD oder neues Kapital.</span></div>
- <p class="footer-note">SSOT: Liquidation und Liq.-Puffer stammen aus der aktiven BTC-L5 Pionex-Position und werden mit dem Live-BTC-Kurs synchronisiert. SL/TP bleiben Modellwerte; keine automatische Order-Ausführung.</p>`);
+ <div class="sl-decision-strip"><span>POSITION <b class="green">${e.positionDecision||'KEEP'}</b></span><span>ADD <b class="red">${e.addDecision||'BLOCKED'}</b></span><span>NEW CAPITAL <b class="red">${e.newEntryDecision||'BLOCKED'}</b></span></div>
+ <div class="sl-rule ${guard.cls}"><b>${guard.label==='TIGHT'?'TIGHT BUFFER':'POSITION RISK CHECK'}</b><span>Bestehende Position ≠ Freigabe für ADD oder neues Kapital. Positionsbasis kommt aus Pionex; SL/TP sind Modellwerte.</span></div>
+ <p class="footer-note">SSOT: ${e.botId||'BTC-L5'} Break-even/Creation + aktive Liquidation + Live-BTC. R:R wird aus dieser aktuellen Positionsbasis neu berechnet; keine automatische Order-Ausführung.</p>`);
 }
-
 function gridView(){
  const s=decisionSSOT(), bots=s.bots;
  const order=[...bots];
  const critical=s.critical.length, danger=s.danger.length;
  const futuresRisk=critical?'HIGH':danger?'ELEVATED':'NORMAL';
- return card(`<div class="eyebrow">GRID COMMANDER 3.5 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
+ return card(`<div class="eyebrow">GRID COMMANDER 3.6 ${snapshotBadge('PIONEX + LIVE SSOT')}</div><div class="forecast-main">HEDGE FIRST</div><div class="sub">Dual BTC Hedge · Liquidation Guard · Entry Readiness</div>
  <div class="grid2">${metric('FUTURES RISK',futuresRisk,critical?'red':danger?'amber':'green')}${metric('BTC BOTS',bots.filter(b=>b.symbol==='BTC').length+' · '+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG')?'LONG':'')+(bots.some(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT')?' + SHORT':''),'cyan')}${metric('CRITICAL',critical,critical?'red':'green')}${metric('DANGER',danger,danger?'amber':'green')}</div><p class="footer-note">SSOT: ACTIVE Pionex Bots; Liq.-Puffer wird mit Live-Kurs neu berechnet, Snapshot ist Fallback.</p>`)+positionLifecyclePanel()+
-
+ capitalReleasePanel()+
  dualBtcHedgePanel()+
  executionEnginePanel()+
  adaptiveRiskPanel()+
@@ -1951,7 +2016,7 @@ function unifiedDecisionQueue(){
 }
 
 
-/* v5.12.0 — POSITION LIFECYCLE ENGINE 1.0 */
+/* v5.12.1 — POSITION LIFECYCLE + CAPITAL RELEASE */
 function lifecycleDecision(bot){
  const s=decisionSSOT(), cfg=DATA.positionLifecycleEngine?.rules||{};
  const b=Number(bot?.buffer), health=Number(bot?.healthScore||0), side=String(bot?.side||'').toUpperCase();

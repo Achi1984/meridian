@@ -1206,3 +1206,18 @@ body{background:transparent;letter-spacing:.01em}
 
 /* v5.12 Position Lifecycle */
 .life-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:18px 0;padding:12px 14px;border:1px solid rgba(31,169,255,.28);border-radius:14px;background:rgba(6,23,35,.58);font-size:10px;font-weight:900;letter-spacing:.7px}.life-flow i{color:#718297;font-style:normal}.life-row{padding:16px 0;border-top:1px solid rgba(61,117,151,.24)}.life-row:first-of-type{border-top:0}.life-main{display:flex;justify-content:space-between;gap:12px;align-items:center}.life-main b{font-size:17px}.life-main span,.life-meta, .life-row small{color:#7f91a8;font-size:10px}.life-state{font-size:15px;font-weight:950;margin:8px 0}.life-meta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:7px}.lifecycle-card{border-color:rgba(31,169,255,.5)}
+
+
+/* v5.12.1 — Capital Release / Scanner Risk Gate */
+.scanner-risk summary{grid-template-columns:1.15fr .58fr .58fr .85fr}
+.scanner-risk summary span:last-child{text-align:right}
+.capital-release-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0 4px}
+.capital-release-flow span{padding:9px 6px;border:1px solid var(--line2);border-radius:12px;text-align:center;font-size:8px;letter-spacing:.7px;color:var(--muted);font-weight:800}
+.capital-release-flow span.red{color:var(--red);border-color:rgba(255,90,96,.45)}
+.capital-release-flow span.amber{color:var(--amber);border-color:rgba(232,178,74,.45)}
+.capital-release-flow span.green{color:var(--green);border-color:rgba(47,210,133,.4)}
+@media (max-width:520px){
+  .scanner-risk summary{grid-template-columns:1.05fr .5fr .5fr .75fr;gap:5px}
+  .scanner-risk summary b{font-size:11px}
+  .capital-release-flow{grid-template-columns:repeat(2,1fr)}
+}

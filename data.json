@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.12.0",
-  "build": "2026-08-23-position-lifecycle-engine",
+  "appVersion": "5.12.1",
+  "build": "2026-08-23-capital-release-overhedge-ssot-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -427,7 +427,7 @@
         "note": "Historischer geschlossener BTC-Short; darf niemals in aktive Risk-/Decision-Logik einfließen."
       }
     ],
-    "note": "Single Source of Truth refreshed from Pionex screenshots 23.08.2026 14:55–14:56. Four ACTIVE bots: BTC-S30, BTC-L20, HBAR-L5, XRP-L5. Closed/history excluded from active risk logic."
+    "note": "Single Source of Truth refreshed from Pionex screenshots 23.08.2026. Four ACTIVE bots: BTC-S30, BTC-L5, HBAR-L3, XRP-L5. Closed/history excluded from active risk logic."
   },
   "forecastCoins": [
     "BTC",
@@ -1037,8 +1037,8 @@
     ]
   },
   "slInvalidationEngine": {
-    "version": "1.0",
-    "status": "MODEL + PIONEX SNAPSHOT",
+    "version": "1.1",
+    "status": "MODEL TARGETS + ACTIVE PIONEX POSITION SSOT",
     "snapshotAt": "2026-08-23T11:23:00+02:00",
     "principle": "ENTRY → SL → TP1 → TP2 → R:R → INVALIDATION",
     "btcLong20x": {
@@ -1071,7 +1071,14 @@
       "SL combines support/Fibonacci/short break-even with liquidation safety.",
       "If structural SL is too close to liquidation, flag LEVERAGE TOO HIGH.",
       "No automatic order execution."
-    ]
+    ],
+    "btcLongPositionModel": {
+      "stopLoss": 71750,
+      "takeProfit1": 80000,
+      "takeProfit2": 83000,
+      "invalidBelow": 71750,
+      "modelNote": "Entry basis is no longer hard-coded. MERIDIAN uses the active BTC-L5 Pionex break-even/creation price as the position basis and recalculates R:R."
+    }
   },
   "multiAssetSlEngine": {
     "version": "1.0",
@@ -1510,5 +1517,17 @@
       "addRequiresNoRiskBlock": true
     },
     "policy": "Liquidation risk overrides momentum/entry. ADD requires SAFE buffer, health >=70 and no upstream risk block."
+  },
+  "capitalReleaseEngine": {
+    "version": "1.0",
+    "theoreticalLongCapacityUSD": 5642,
+    "rules": {
+      "criticalBelowPct": 8,
+      "preferredUnlockPct": 12,
+      "recoveryPct": 15,
+      "existingPositionSafePct": 30,
+      "blockHighLeverageAtOrAbove": 20
+    },
+    "policy": "New capital is blocked while a CRITICAL high-leverage bot is active. 8-12% = recovery lock, 12-15% = watch lock, >=15% = Entry Engine may check only if no other DANGER/CRITICAL high-leverage bot exists. Existing positions still require >=30% Liq buffer for ADD checks."
   }
 }
