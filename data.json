@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.11.4",
-  "build": "2026-08-23-opportunity-radar-drilldown",
+  "appVersion": "5.12.0",
+  "build": "2026-08-23-position-lifecycle-engine",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -348,42 +348,55 @@
         "reason": "BTC-S30: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
       },
       {
-        "id": "BTC-L20",
+        "id": "BTC-L5",
         "symbol": "BTC",
-        "side": "LONG",
-        "leverage": 20,
-        "status": "ACTIVE",
-        "investment": 100,
-        "dynamicMargin": 0,
-        "totalProfit": 5.7,
-        "breakEven": 76557.3,
-        "liquidation": 69336.5,
-        "liquidationPrice": 69336.5,
-        "liquidationDistancePct": 10.14,
-        "currentPrice": 77163.9,
-        "fundingPct": 0.01,
-        "healthScore": 60,
-        "action": "KEEP / NO ADD",
-        "reason": "BTC-L20: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
-      },
-      {
-        "id": "HBAR-L5",
-        "symbol": "HBAR",
         "side": "LONG",
         "leverage": 5,
         "status": "ACTIVE",
-        "investment": 562.54,
+        "investment": 105.09,
         "dynamicMargin": 0,
-        "totalProfit": 15.55,
-        "breakEven": 0.07827,
-        "liquidation": 0.05853,
-        "liquidationPrice": 0.05853,
-        "liquidationDistancePct": 26.51,
-        "currentPrice": 0.07965,
+        "totalProfit": -0.14,
+        "breakEven": 77263.6,
+        "liquidation": 57879.9,
+        "liquidationPrice": 57879.9,
+        "liquidationDistancePct": 25.05,
+        "currentPrice": 77224.9,
         "fundingPct": 0.01,
-        "healthScore": 59,
+        "healthScore": 72,
         "action": "WATCH / NO ADD",
-        "reason": "HBAR-L5: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
+        "range": [
+          68000,
+          92000
+        ],
+        "grids": 60,
+        "creationPrice": 77225,
+        "reason": "BTC-L5: Pionex verified 2026-08-23 19:48; 5x, 60 grids, range 68k–92k."
+      },
+      {
+        "id": "HBAR-L3",
+        "symbol": "HBAR",
+        "side": "LONG",
+        "leverage": 3,
+        "status": "ACTIVE",
+        "investment": 573.35,
+        "currentInvestmentCoin": 7220.14,
+        "dynamicMargin": 0,
+        "totalProfit": -3.8,
+        "breakEven": 0.07939,
+        "liquidation": 0.05703,
+        "liquidationPrice": 0.05703,
+        "liquidationDistancePct": 27.98,
+        "currentPrice": 0.07919,
+        "fundingPct": 0.01,
+        "healthScore": 70,
+        "action": "WATCH / NO ADD",
+        "range": [
+          0.068,
+          0.105
+        ],
+        "grids": 155,
+        "creationPrice": 0.07936,
+        "reason": "HBAR-L3: new Pionex COIN-M Futures Grid verified 2026-08-23 19:15; old HBAR-L5 closed in profit."
       },
       {
         "id": "XRP-L5",
@@ -1314,22 +1327,55 @@
         "risk": "CRITICAL"
       },
       {
-        "id": "BTC-L20",
+        "id": "BTC-L5",
         "symbol": "BTC",
         "side": "LONG",
-        "leverage": 20,
-        "active": true,
-        "liqBufferPct": 9.76,
-        "risk": "DANGER"
+        "leverage": 5,
+        "status": "ACTIVE",
+        "investment": 105.09,
+        "dynamicMargin": 0,
+        "totalProfit": -0.14,
+        "breakEven": 77263.6,
+        "liquidation": 57879.9,
+        "liquidationPrice": 57879.9,
+        "liquidationDistancePct": 25.05,
+        "currentPrice": 77224.9,
+        "fundingPct": 0.01,
+        "healthScore": 72,
+        "action": "WATCH / NO ADD",
+        "range": [
+          68000,
+          92000
+        ],
+        "grids": 60,
+        "creationPrice": 77225,
+        "reason": "BTC-L5: Pionex verified 2026-08-23 19:48; 5x, 60 grids, range 68k–92k."
       },
       {
-        "id": "HBAR-L5",
+        "id": "HBAR-L3",
         "symbol": "HBAR",
         "side": "LONG",
-        "leverage": 5,
-        "active": true,
-        "liqBufferPct": 25.61,
-        "risk": "TIGHT"
+        "leverage": 3,
+        "status": "ACTIVE",
+        "investment": 573.35,
+        "currentInvestmentCoin": 7220.14,
+        "dynamicMargin": 0,
+        "totalProfit": -3.8,
+        "breakEven": 0.07939,
+        "liquidation": 0.05703,
+        "liquidationPrice": 0.05703,
+        "liquidationDistancePct": 27.98,
+        "currentPrice": 0.07919,
+        "fundingPct": 0.01,
+        "healthScore": 70,
+        "action": "WATCH / NO ADD",
+        "range": [
+          0.068,
+          0.105
+        ],
+        "grids": 155,
+        "creationPrice": 0.07936,
+        "reason": "HBAR-L3: new Pionex COIN-M Futures Grid verified 2026-08-23 19:15; old HBAR-L5 closed in profit."
       },
       {
         "id": "XRP-L5",
@@ -1439,5 +1485,30 @@
       "regimeFit": 10
     },
     "note": "Dynamic ranking; 24h overextension is penalized. Live prices retain existing WebSocket/fallback logic."
+  },
+  "positionLifecycleEngine": {
+    "version": "1.0",
+    "sequence": [
+      "DISCOVER",
+      "ENTRY",
+      "MANAGE",
+      "EXIT",
+      "RE-ENTRY"
+    ],
+    "actions": [
+      "KEEP",
+      "ADD",
+      "REDUCE",
+      "EXIT"
+    ],
+    "rules": {
+      "criticalBufferBelow": 8,
+      "dangerBufferBelow": 15,
+      "tightBufferBelow": 30,
+      "addMinBuffer": 30,
+      "addMinHealth": 70,
+      "addRequiresNoRiskBlock": true
+    },
+    "policy": "Liquidation risk overrides momentum/entry. ADD requires SAFE buffer, health >=70 and no upstream risk block."
   }
 }

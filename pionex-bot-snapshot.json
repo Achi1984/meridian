@@ -1,6 +1,6 @@
 {
-  "version": "5.10.7",
-  "verifiedFrom": "Pionex screenshots 2026-08-23 14:55–14:56",
+  "version": "5.12.0",
+  "verifiedFrom": "Pionex screenshots 2026-08-23 through 19:48",
   "activeCount": 4,
   "activeBots": {
     "BTC-S30": {
@@ -23,27 +23,6 @@
       "status": "ACTIVE",
       "calculatedLiqBufferPct": 3.89,
       "riskClass": "CRITICAL"
-    },
-    "BTC-L20": {
-      "symbol": "BTC",
-      "side": "LONG",
-      "leverage": 20,
-      "investmentUSDT": 100,
-      "dynamicMarginUSDT": 0,
-      "currentPrice": 77163.9,
-      "liquidationPrice": 69336.5,
-      "pionexLiqBufferPct": 10.14,
-      "breakEven": 76557.3,
-      "creationPrice": 76586.4,
-      "range": [
-        65082.2,
-        180000
-      ],
-      "totalProfitUSDT": 5.7,
-      "totalReturnPct": 2.61,
-      "status": "ACTIVE",
-      "calculatedLiqBufferPct": 10.14,
-      "riskClass": "DANGER"
     },
     "XRP-L5": {
       "symbol": "XRP",
@@ -68,34 +47,50 @@
       "calculatedLiqBufferPct": 43.27,
       "riskClass": "SAFE"
     },
-    "HBAR-L5": {
-      "symbol": "HBAR",
+    "BTC-L5": {
+      "symbol": "BTC",
       "side": "LONG",
       "leverage": 5,
-      "investmentUSDT": 562.54,
-      "currentInvestmentCoin": 7122.63,
-      "currentPrice": 0.07965,
-      "liquidationPrice": 0.05853,
-      "pionexLiqBufferPct": 26.51,
-      "breakEven": 0.07827,
-      "creationPrice": 0.07888,
+      "investmentUSDT": 105.09,
+      "currentPrice": 77224.9,
+      "liquidationPrice": 57879.9,
+      "pionexLiqBufferPct": 25.05,
+      "breakEven": 77263.6,
+      "creationPrice": 77225,
       "range": [
-        0.06,
-        0.09
+        68000,
+        92000
       ],
-      "grids": 127,
-      "totalProfitUSDT": 15.55,
-      "totalProfitCoin": 32.34,
-      "coinProfitPct": 0.45,
+      "grids": 60,
+      "totalProfitUSDT": -0.14,
       "status": "ACTIVE",
-      "calculatedLiqBufferPct": 26.51,
+      "riskClass": "TIGHT"
+    },
+    "HBAR-L3": {
+      "symbol": "HBAR",
+      "side": "LONG",
+      "leverage": 3,
+      "investmentUSDT": 573.35,
+      "currentInvestmentCoin": 7220.14,
+      "currentPrice": 0.07919,
+      "liquidationPrice": 0.05703,
+      "pionexLiqBufferPct": 27.98,
+      "breakEven": 0.07939,
+      "creationPrice": 0.07936,
+      "range": [
+        0.068,
+        0.105
+      ],
+      "grids": 155,
+      "totalProfitUSDT": -3.8,
+      "status": "ACTIVE",
       "riskClass": "TIGHT"
     }
   },
   "priority": [
     "BTC-S30",
-    "BTC-L20",
-    "HBAR-L5",
+    "BTC-L5",
+    "HBAR-L3",
     "XRP-L5"
   ],
   "sourcePolicy": "Pionex displayed liquidation buffer is source of truth; formula is cross-check."
