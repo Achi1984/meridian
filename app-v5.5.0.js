@@ -7,7 +7,7 @@ const fmt=(n,d=0)=>{
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
 let APP_CODE_VERSION='5.18.0';
-let APP_RELEASE='5.18.0 · POSITION INTELLIGENCE 3.0';
+let APP_RELEASE='5.19.0 · NET EXPOSURE + HEDGE ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -1706,7 +1706,7 @@ function scannerCard(sym){
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
- const priority=b.id==='BTC-S30'?'REDUCE / EXIT CHECK':b.id==='BTC-L5'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+ const priority=b.id==='BTC-S30'?'KEEP HEDGE / BUFFER CHECK':b.id==='BTC-L5'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason} ${b.stale?snapshotBadge('SNAPSHOT STALE'):liveBadge('LIVE CALC')}</p></details>`;
@@ -1726,7 +1726,7 @@ function btcDualHedgeEngine(){
  const shortCritical=sht.guard.label==='CRITICAL';
  const longCritical=lng.guard.label==='CRITICAL';
  let decision='WAIT', cls='amber', score=62;
- if(shortCritical&&!longCritical){decision='REDUCE SHORT / KEEP LONG';cls='red';score=86}
+ if(shortCritical&&!longCritical){decision='KEEP HEDGE / FIX BUFFER';cls='red';score=86}
  else if(shortCritical&&longCritical){decision='DEFEND BOTH / NO ADD';cls='red';score=94}
  else if(longBuf<15&&shortBuf<15){decision='KEEP HEDGE / NO ADD';cls='amber';score=78}
  else if(shortBuf>=15&&longBuf>=15){decision='HEDGE STABLE';cls='green';score=74}
@@ -1755,7 +1755,7 @@ function dualBtcHedgePanel(){
     <div class="hedge-leg-head"><span>SHORT ${h.sht.leverage}x</span><b>${h.shortBuf<8?'CRITICAL':h.shortBuf<15?'DANGER':h.shortBuf<30?'TIGHT':'SAFE'}</b></div>
     <strong>${h.sht.id}</strong>
     <div class="hedge-kpis"><span>LIQ BUFFER <b>${fmt(h.shortBuf,2)}%</b></span><span>BE <b>$${fmt(h.sht.breakEven,0)}</b></span><span>LIQ <b>$${fmt(h.sht.liquidation,0)}</b></span><span>MARGIN <b>$${fmt((h.sht.investment||0)+(h.sht.dynamicMargin||0),0)}</b></span></div>
-    <div class="hedge-action red">REDUCE SHORT / NO ADD</div>
+    <div class="hedge-action red">KEEP HEDGE / BUFFER CRITICAL</div>
   </div>
  </div>
  <div class="hedge-meter"><div><span>SHORT/LONG EXPOSURE</span><b class="${domCls}">${fmt(multiple,2)}× · ${dom}</b></div><i><em style="width:${Math.min(100,multiple/3*100)}%"></em></i></div>
@@ -2674,18 +2674,47 @@ function positionIntelSpotState(p){
 function positionIntelBotState(bot){
  const x=lifecycleDecision(bot);
  const beDist=(Number.isFinite(x.live)&&Number.isFinite(x.be)&&x.be>0)?(x.live/x.be-1)*100:NaN;
- let next='Struktur beobachten';
+ const isBtcShort=bot.symbol==='BTC'&&String(bot.side||'').toUpperCase()==='SHORT';
+ const hasBtcLong=canonicalBotStates().some(b=>b.symbol==='BTC'&&String(b.side||'').toUpperCase()==='LONG');
+ let next='Struktur beobachten', action=x.action, tone=x.tone, reason=x.reason;
  if(Number(x.buffer)<8) next='Liq.-Puffer ≥8%';
  else if(Number(x.buffer)<15) next='Liq.-Puffer ≥15%';
  else if(Number(x.buffer)<30) next='SAFE ≥30%';
  else if(!x.addAllowed) next='Entry/Setup separat bestätigen';
  else next='ADD CHECK möglich';
+ if(isBtcShort&&hasBtcLong){
+   action=Number(x.buffer)<8?'KEEP HEDGE · BUFFER CRITICAL':'KEEP HEDGE';
+   tone=Number(x.buffer)<8?'red':'green';
+   reason=`HEDGE LEG: Short wird gegen BTC-/Portfolio-Long-Exposure bewertet. ${x.reason} Nicht isoliert wegen negativem P&L schließen.`;
+ }
+ return {id:bot.id,symbol:bot.symbol,side:String(bot.side||'').toUpperCase(),leverage:Number(bot.leverage),buffer:Number(x.buffer),health:Number(x.health),action,tone,reason,next,beDist};
+}
 
- return {
-   id:bot.id,symbol:bot.symbol,side:String(bot.side||'').toUpperCase(),
-   leverage:Number(bot.leverage),buffer:Number(x.buffer),health:Number(x.health),
-   action:x.action,tone:x.tone,reason:x.reason,next,beDist
- };
+function portfolioHedgeState(){
+ const bots=canonicalBotStates();
+ const spotValue=Number(DATA.portfolio?.total||0);
+ const longBotNotional=bots.filter(b=>String(b.side).toUpperCase()==='LONG').reduce((a,b)=>a+Number(b.investment||b.investmentUSDT||0)*Math.max(1,Number(b.leverage||1)),0);
+ const shortBotNotional=bots.filter(b=>String(b.side).toUpperCase()==='SHORT').reduce((a,b)=>a+Number(b.investment||b.investmentUSDT||0)*Math.max(1,Number(b.leverage||1)),0);
+ const grossLong=spotValue+longBotNotional;
+ const net=grossLong-shortBotNotional;
+ const hedgeRatio=grossLong>0?shortBotNotional/grossLong*100:0;
+ const btcShort=bots.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT');
+ const survivability=btcShort?Number(btcShort.buffer):NaN;
+ let hedgeBand='LIGHT HEDGE', bandCls='amber';
+ if(hedgeRatio>=15&&hedgeRatio<=35){hedgeBand='BALANCED HEDGE';bandCls='green'}
+ else if(hedgeRatio>35&&hedgeRatio<=60){hedgeBand='HEAVY HEDGE';bandCls='amber'}
+ else if(hedgeRatio>60){hedgeBand='OVERHEDGE WATCH';bandCls='red'}
+ const survivalLabel=!Number.isFinite(survivability)?'N/A':survivability<8?'CRITICAL':survivability<15?'RECOVERY':survivability<30?'TIGHT':'SAFE';
+ return {spotValue,longBotNotional,shortBotNotional,grossLong,net,hedgeRatio,hedgeBand,bandCls,survivability,survivalLabel};
+}
+
+function hedgeEnginePanel(){
+ const h=portfolioHedgeState();
+ return `<div class="hedge-v519"><div class="section-head"><div><div class="eyebrow">NET EXPOSURE + HEDGE ENGINE 1.0 ${liveBadge('ACTIVE')}</div><div class="forecast-main">${h.hedgeBand}</div><div class="sub">Portfolio-Longs und Futures-Shorts werden gemeinsam bewertet.</div></div><span class="tag ${h.bandCls}">HEDGE ${fmt(h.hedgeRatio,1)}%</span></div>
+ <div class="pi-summary"><div><span>GROSS LONG PROXY</span><b>$${fmt(h.grossLong,0)}</b></div><div><span>SHORT HEDGE</span><b>$${fmt(h.shortBotNotional,0)}</b></div><div><span>NET LONG PROXY</span><b>$${fmt(h.net,0)}</b></div></div>
+ <div class="pi-grid"><div><span>HEDGE RATIO</span><b>${fmt(h.hedgeRatio,1)}%</b></div><div><span>HEDGE SURVIVABILITY</span><b class="${h.survivability<8?'red':h.survivability<30?'amber':'green'}">${h.survivalLabel}${Number.isFinite(h.survivability)?' · '+fmt(h.survivability,2)+'%':''}</b></div><div><span>LONG BOT NOTIONAL</span><b>$${fmt(h.longBotNotional,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${h.survivability<15?'red':'amber'}">${h.survivability<15?'BLOCKED':'REVIEW'}</b></div></div>
+ <div class="hedge-rule"><b>${h.survivability<8?'KEEP HEDGE · INCREASE SURVIVABILITY':'KEEP / REBALANCE BY NET EXPOSURE'}</b><small>Ein Hedge darf gegenläufigen P&L haben. Liquidationspuffer und Hedge-Nutzen werden getrennt bewertet.</small></div>
+ <p class="footer-note">Proxy-Modell: Spotwert + Bot-Investment × Hebel versus Short-Investment × Hebel. Es ist eine Risikoorientierung, kein exaktes Delta und keine automatische Orderfreigabe.</p></div>`;
 }
 
 function positionIntelligencePanel(){
@@ -2717,7 +2746,7 @@ function positionIntelligencePanel(){
  </div>`).join('');
 
  return card(`<div class="section-head"><div>
-   <div class="eyebrow">POSITION INTELLIGENCE 3.0 ${liveBadge('SSOT')}</div>
+   <div class="eyebrow">POSITION INTELLIGENCE 3.1 ${liveBadge('SSOT')}</div>
    <div class="forecast-main">HOLD · ADD · TRIM · EXIT WATCH</div>
    <div class="sub">Positionsmanagement nach Konzentration, Momentum, Bot-Risk und Portfolio-Gate.</div>
  </div><span class="tag ${s.entryBlocked?'red':'green'}">${s.entryBlocked?'NEW CAPITAL BLOCKED':'RISK GATE OPEN'}</span></div>
@@ -2728,6 +2757,7 @@ function positionIntelligencePanel(){
    <div><span>GLOBAL GATE</span><b class="${s.entryBlocked?'red':'green'}">${s.entryBlocked?'BLOCKED':'OPEN'}</b></div>
  </div>
 
+ ${hedgeEnginePanel()}
  <div class="section-title">SPOT MANAGEMENT</div>
  ${spotRows||'<div class="muted">Keine Spot-Positionen im SSOT.</div>'}
 
