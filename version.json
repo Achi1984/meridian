@@ -1,4 +1,4 @@
 {
-  "version": "5.10.4",
-  "build": "bot-state-sync"
+  "version": "5.10.5",
+  "build": "2026-08-23-bot-queue-integrity-fix"
 }

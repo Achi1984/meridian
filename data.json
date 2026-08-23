@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.10.4",
-  "build": "2026-08-23-bot-state-sync",
+  "appVersion": "5.10.5",
+  "build": "2026-08-23-bot-queue-integrity-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1216,5 +1216,99 @@
       "portfolioImmediatelyAfterMasterDecision": true
     },
     "botStateRule": "ACTIVE_ONLY"
+  },
+  "pionexCanonicalBots": [
+    {
+      "id": "BTC-S30",
+      "symbol": "BTC",
+      "side": "SHORT",
+      "leverage": 30,
+      "active": true,
+      "liqBufferPct": 4.36,
+      "risk": "CRITICAL"
+    },
+    {
+      "id": "BTC-L20",
+      "symbol": "BTC",
+      "side": "LONG",
+      "leverage": 20,
+      "active": true,
+      "liqBufferPct": 9.76,
+      "risk": "DANGER"
+    },
+    {
+      "id": "HBAR-L5",
+      "symbol": "HBAR",
+      "side": "LONG",
+      "leverage": 5,
+      "active": true,
+      "liqBufferPct": 25.61,
+      "risk": "TIGHT"
+    },
+    {
+      "id": "XRP-L5",
+      "symbol": "XRP",
+      "side": "LONG",
+      "leverage": 5,
+      "active": true,
+      "liqBufferPct": 43.01,
+      "risk": "SAFE"
+    }
+  ],
+  "pionexBotSnapshot": {
+    "status": "VERIFIED SNAPSHOT",
+    "verifiedAt": "2026-08-23T12:39:00+02:00",
+    "activeCount": 4,
+    "closedCount": 0,
+    "bots": [
+      {
+        "id": "BTC-S30",
+        "symbol": "BTC",
+        "side": "SHORT",
+        "leverage": 30,
+        "active": true,
+        "liqBufferPct": 4.36,
+        "risk": "CRITICAL"
+      },
+      {
+        "id": "BTC-L20",
+        "symbol": "BTC",
+        "side": "LONG",
+        "leverage": 20,
+        "active": true,
+        "liqBufferPct": 9.76,
+        "risk": "DANGER"
+      },
+      {
+        "id": "HBAR-L5",
+        "symbol": "HBAR",
+        "side": "LONG",
+        "leverage": 5,
+        "active": true,
+        "liqBufferPct": 25.61,
+        "risk": "TIGHT"
+      },
+      {
+        "id": "XRP-L5",
+        "symbol": "XRP",
+        "side": "LONG",
+        "leverage": 5,
+        "active": true,
+        "liqBufferPct": 43.01,
+        "risk": "SAFE"
+      }
+    ]
+  },
+  "botRiskDistribution": {
+    "CRITICAL": 1,
+    "DANGER": 1,
+    "TIGHT": 1,
+    "SAFE": 1
+  },
+  "botQueueIntegrity": {
+    "missingBufferBehavior": "N/A / SNAPSHOT MISSING",
+    "excludeClosed": true,
+    "excludeUnverified": true,
+    "singleSource": "pionexCanonicalBots"
   }
 }
