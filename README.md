@@ -1,22 +1,14 @@
-# ACHI MERIDIAN v5.25.2 — HARD REFRESH
+# ACHI MERIDIAN v5.26.0 — Unified Risk Engine + Stability Pass
 
-Wichtig:
-1. Alle Dateien aus dieser ZIP auf den Webspace hochladen und vorhandene Dateien ersetzen.
-2. Danach einmal `/RESET.html` öffnen.
-3. Anschließend muss im Header `v5.25.2 · LIVE` stehen.
+Diese Version vereinheitlicht die Risikologik in CENTER und GRID.
 
-Technische Änderungen:
-- komplett neuer Script-Dateiname `app-v5.25.2.js`
-- CENTER: nicht vorhandener State-Aufruf entfernt
-- GRID: alte `wp`-Referenz entfernt
-- no-cache Header im HTML
-- RESET.html löscht Browser-Caches und registrierte Service Worker
+- Unified Risk State Matrix 2.0 als zentrale Bot-Entscheidungsquelle
+- Canonical Pionex Buffer bleibt SSOT; Browser-Live-Estimate nur Diagnose
+- Break-even-SL neutralisiert den Bot als primären Kapitalverlust-Blocker
+- Stale/Snapshot Guard: alte Werte bleiben sichtbar, blockieren aber ADD/NEW CAPITAL konservativ
+- Closed Bots werden aus aktiver Risk-/Capital-Logik ausgeschlossen
+- Module Isolation: Fehler in einem Teilmodul sollen nicht mehr den ganzen CENTER/GRID-Tab ausfallen lassen
+- Mobile Layout Guard gegen überlappende Karten/Raster auf iPhone-Breite
+- GRID Commander 3.7 / Decision Engine 2.0
 
-
-## v5.25.3 — Recovery Intelligence
-- BTC-S30 management is now graduated: CRITICAL+ / CRITICAL / RECOVERY / SAFE / COMFORT / STRONG.
-- Sub-8% buffer no longer means automatic EXIT. Defense/reduction comes first.
-- EXIT is a separate review only in extreme stress (<4%) and only after hedge utility/thesis is checked.
-- 8–12% = HOLD / NO ADD; 12–15% = HOLD; ≥15% = KEEP.
-- Portfolio Hedge % is explicitly separated from BTC-S30 liquidation-buffer %.
-- BE-protected bots remain excluded as primary capital-loss blockers.
+Keine automatische Order-Ausführung. Nach manuellen Pionex-Änderungen Liquidationspreis/Buffer erneut verifizieren.

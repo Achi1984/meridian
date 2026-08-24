@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.25.3",
-  "build": "2026-08-24-recovery-intelligence",
+  "appVersion": "5.26.0",
+  "build": "2026-08-24-unified-risk-engine-stability",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1880,5 +1880,28 @@
     ],
     "exitRule": "EXIT is not caused by sub-8% buffer alone. At <4%, EXIT is only a separate review after hedge utility/thesis and execution risk are checked.",
     "capitalRule": "New capital / ADD remains governed separately by risk and entry gates."
+  },
+  "riskEngine": {
+    "version": "2.0",
+    "name": "Unified Risk State Matrix",
+    "states": [
+      "CRITICAL+",
+      "CRITICAL",
+      "RECOVERY",
+      "DANGER",
+      "TIGHT",
+      "SAFE",
+      "COMFORT",
+      "STRONG",
+      "PROTECTED",
+      "VERIFY"
+    ],
+    "sourcePriority": [
+      "PIONEX VERIFIED/DISPLAYED BUFFER",
+      "CANONICAL BOT STATE",
+      "LIVE ESTIMATE DIAGNOSTIC ONLY"
+    ],
+    "staleAfterHours": 6,
+    "beProtection": "Valid SL at/beyond break-even neutralizes primary capital-loss blocker; execution/slippage/fees remain."
   }
 }
