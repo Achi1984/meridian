@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.21.1",
-  "build": "2026-08-24-consistency-fix",
+  "appVersion": "5.21.2",
+  "build": "2026-08-24-logic-ux-patch",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1773,5 +1773,9 @@
     "btcLongVerifiedBufferPct": 8.29,
     "btcLongVerifiedLiq": 71499.3,
     "verifiedAt": "2026-08-24T12:32:00+02:00"
+  },
+  "uxPatches": {
+    "decisionDetailsRecoveryNaming": true,
+    "recoveryProgressRange": true
   }
 }

@@ -1414,3 +1414,6 @@ body{background:transparent;letter-spacing:.01em}
 .release-status-box.ready{border-color:#1f9367}
 .release-status-box.ready b{color:#2fe59a}
 .rc-machine{grid-template-columns:repeat(5,1fr)}
+
+/* v5.21.2 Logic/UX patch */
+.recovery-progress-range{display:block;margin-top:4px;font-size:8px;letter-spacing:.5px;color:#8292a5}

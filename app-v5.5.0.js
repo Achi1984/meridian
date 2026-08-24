@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.21.1';
-let APP_RELEASE='5.21.1 · CONSISTENCY FIX';
+let APP_CODE_VERSION='5.21.2';
+let APP_RELEASE='5.21.2 · LOGIC UX PATCH';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -434,7 +434,7 @@ function canonicalBotState(b){
  const guard=botGuardFromBuffer(buffer);
  const stale=verifyRequired;
  const side=String(b.side||'').toUpperCase();
- const action=guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'REDUCE / NO ADD'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
+ const action=guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'KEEP HEDGE / RECOVERY'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
  const reason=`${b.id}: Pionex verified ${Number.isFinite(verifiedBuffer)?fmt(verifiedBuffer,2)+'%':'—'}${usesLive&&Number.isFinite(liveEstimate)?' · Live Estimate '+fmt(liveEstimate,2)+'%':''}${verifyRequired?' · VERIFY PIONEX':''}; ${guard.label}.`;
  return {...b, liquidation, live, buffer, snapBuffer, verifiedBuffer, liveEstimate, verifyRequired, guard, usesLive, stale, action, reason};
 }
@@ -2085,7 +2085,7 @@ function decisionSSOT(){
  const queue=botStates.map(b=>{
    let action='HOLD';
    if(b.guard.label==='CRITICAL') action='REDUCE / EXIT CHECK';
-   else if(b.guard.label==='DANGER') action=String(b.side).toUpperCase()==='LONG'?'KEEP / NO ADD':'REDUCE / NO ADD';
+   else if(b.guard.label==='DANGER') action=String(b.side).toUpperCase()==='LONG'?'KEEP / NO ADD':'KEEP HEDGE / RECOVERY';
    else if(b.guard.label==='TIGHT') action='WATCH / NO ADD';
    return {
      type:'BOT', id:b.id, symbol:b.symbol, tone:b.guard.cls, action,
@@ -2431,7 +2431,7 @@ function recoveryCommandState(){
    instruction='CRITICAL: zuerst Liquidationsabstand herstellen. Kein neues Kapital und kein ADD.';
  }else if(phase.key==='RECOVERY'){
    action='AUF ≥12% PUFFER STABILISIEREN';
-   instruction='Minimum erreicht. Noch kein Entry-Unlock; Puffer weiter stabilisieren.';
+   instruction='Recovery aktiv. Nächstes Safety-Gate bei 12%; bis dahin kein Entry-Unlock.';
  }else if(phase.key==='SAFE'){
    action='SAFE ERREICHT · ≥15% COMFORT ANSTREBEN';
    instruction='SAFE ab 12% erreicht. Neues Kapital nur stufenweise und erst nach Entry-Check.';
@@ -2487,6 +2487,15 @@ function dominantActionSSOT(){
  return {headline:`${r.bot.id} FULL SAFETY`,detail:'100%-Band maximal · Portfolio + Entry Gate bleiben aktiv',chip:'FULL',tone:'green',botId:r.bot.id,target:null};
 }
 
+
+function recoveryProgressLabel(r){
+ const cur=Number(r?.cur);
+ const next=Number(r?.phase?.nextTarget);
+ if(!Number.isFinite(cur)) return 'NO DATA';
+ if(Number.isFinite(next)) return `${fmt(cur,2)}% → ${fmt(next,2)}%`;
+ return `${fmt(cur,2)}% · FULL SAFETY`;
+}
+
 function compactRecoveryPanel(){
  const wasOpen=!!document.querySelector('.compact-recovery[open]');
  const r=recoveryCommandState();
@@ -2536,7 +2545,7 @@ function recoveryCommandPanel(){
  </div>
 
  <div class="rc-progress">
-   <div><span>PHASE PROGRESS</span><b>${r.progress}%</b></div>
+   <div><span>RECOVERY PROGRESS</span><b>${r.progress}%</b><small class="recovery-progress-range">${recoveryProgressLabel(r)}</small></div>
    <div class="bar"><i style="width:${r.progress}%"></i></div>
  </div>
 
