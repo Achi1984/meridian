@@ -1,10 +1,11 @@
-# ACHI MERIDIAN v5.28.1 — Compact Center Stability Fix
+# ACHI MERIDIAN v5.29.0 — Center Focus
 
-Änderungen:
-- Center bleibt radikal kompakt
-- nur Portfolio + Dual Gate + nächste Aktion sofort sichtbar
-- Execution, Risk/Recovery, Opportunities, Portfolio/Markt und Data Health einklappbar
-- fehlende Data-Health-Hilfsfunktion entfernt
-- Data Health jetzt eigenständig und kompakt gerendert
-- zusätzliche Mobile-Overflow-Sicherung für Fold-Header und Gate-Texte
-- alle bestehenden Engines bleiben erhalten
+CENTER wurde auf das Wesentliche reduziert:
+- Portfolio + 24H als Hero
+- eine zentrale Dual-Gate-Entscheidung
+- nur vier kompakte Klappbereiche: Opportunity, Risk, Portfolio, Data Health
+- keine doppelten Dual-Gate-, Recovery-, Cross-Risk- oder Chart-Blöcke im CENTER
+- Detailanalyse bleibt in GRID / DEPOT / MARKT
+- mobile Summary-Aktionen bleiben einzeilig; kein unschöner ÖFFNEN-Umbruch
+
+Keine automatische Order-Ausführung.
