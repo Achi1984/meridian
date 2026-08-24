@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.22.0",
-  "build": "2026-08-24-pionex-reality-engine-2",
+  "appVersion": "5.23.1",
+  "build": "pionex-real-risk",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1807,5 +1807,37 @@
     ],
     "rule": "REAL > LIVE CALC > SNAPSHOT > MODEL",
     "autoExecution": false
+  },
+  "pionexReality": {
+    "verifiedAt": "2026-08-24T16:42:00+02:00",
+    "btcLong": {
+      "id": "BTC-L100",
+      "side": "LONG",
+      "leverage": 100,
+      "rangeLow": 68000,
+      "rangeHigh": 92000,
+      "grids": 60,
+      "investment": 5.26,
+      "dynamicMargin": 11.02,
+      "liqPrice": 73506.8,
+      "liqBufferPct": 7.86,
+      "breakEven": 76938.9,
+      "takeProfit": 92000,
+      "stopLoss": 77000,
+      "status": "SL PROTECTED"
+    },
+    "btcShort": {
+      "id": "BTC-S30",
+      "side": "SHORT",
+      "leverage": 30,
+      "rangeLow": 59589.2,
+      "rangeHigh": 79671.1,
+      "investment": 52,
+      "dynamicMargin": 198.9,
+      "liqPrice": 84764.5,
+      "liqBufferPct": 6.25,
+      "breakEven": 72580.3,
+      "status": "GRID PAUSED / ABOVE RANGE"
+    }
   }
 }

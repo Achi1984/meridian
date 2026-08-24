@@ -1425,3 +1425,10 @@ body{background:transparent;letter-spacing:.01em}
 .reality-engine-v522{border:1px solid #13527a;border-radius:22px;padding:18px;margin:18px 0;background:rgba(4,20,31,.42)}
 .reality-engine-v522 .reality-rows{margin-top:12px}
 .reality-engine-v522 .dd-row{padding:10px 0;border-bottom:1px solid rgba(32,104,148,.28)}
+
+/* v5.23.1 Pionex real risk */
+.pionex-real-risk{margin-top:14px}
+.rr{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:14px 0 8px;border-bottom:1px solid rgba(35,104,139,.28)}
+.rr small{display:block;color:#8295a8;margin-top:4px;font-size:9px}.rl{display:flex;justify-content:space-between;gap:8px;padding:9px 0 14px;color:#8295a8;font-size:9px}.rl b{color:#f4f7fb}
+.ladder{border:1px solid rgba(240,184,75,.55);border-radius:16px;padding:12px;margin-top:8px}.ladder span,.ladder small{display:block;margin-top:5px}.ladder span{color:#f0b84b;font-weight:900}.ladder small{color:#8295a8}
+@media(max-width:760px){.rr{grid-template-columns:1fr auto}.rr .tag{grid-column:1/-1;justify-self:start}.rl{flex-wrap:wrap}}

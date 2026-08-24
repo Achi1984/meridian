@@ -3019,3 +3019,28 @@ function compactDecisionDetails(){
    </div>
  </details>`;
 }
+
+/* v5.23.1 — Pionex real-risk overlay */
+(function(){
+ function M(x){return '$'+Number(x).toLocaleString('de-DE',{maximumFractionDigits:2})}
+ function P(x){return Number(x).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'}
+ function add(){
+  if(document.querySelector('.pionex-real-risk')||typeof DATA==='undefined'||!DATA.pionexReality)return;
+  const R=DATA.pionexReality,L=R.btcLong,S=R.btcShort;
+  const html=`<section class="card pionex-real-risk">
+   <div class="eyebrow">PIONEX REALITY 1.1 <span class="data-state verified">VERIFIED</span></div>
+   <div class="section-title">REAL RISK · BTC BOTS</div>
+   <div class="rr"><div><b>${S.id}</b><small>SHORT ${S.leverage}x</small></div><strong class="red">${P(S.liqBufferPct)}</strong><span class="tag red">${S.status}</span></div>
+   <div class="rl"><span>GRID ${M(S.rangeLow)}–${M(S.rangeHigh)}</span><b>LIQ ${M(S.liqPrice)}</b><span>MARGIN ${M(S.dynamicMargin)}</span></div>
+   <div class="rr"><div><b>${L.id}</b><small>LONG ${L.leverage}x · ${L.grids} GRIDS</small></div><strong class="amber">${P(L.liqBufferPct)}</strong><span class="tag green">${L.status}</span></div>
+   <div class="rl"><span>SL ${M(L.stopLoss)}</span><b>BE ${M(L.breakEven)}</b><span>LIQ ${M(L.liqPrice)}</span></div>
+   <div class="ladder"><b>LONG RISK LADDER</b><span>SL → LIQ → RANGE FLOOR</span><small>SL = operative Schutzschwelle. Liquidation = separate Survivability-Metrik.</small></div>
+   <p class="footer-note">Echte Pionex-Werte ersetzen die älteren BTC-L20/BTC-S30 Proxy-Puffer.</p>
+  </section>`;
+  const els=[...document.querySelectorAll('section,.card,div')];
+  const mark=els.find(e=>(e.textContent||'').includes('RISK & POSITION DETAILS')&&(e.textContent||'').length<12000);
+  if(mark)mark.insertAdjacentHTML('afterend',html);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);else add();
+ new MutationObserver(add).observe(document.documentElement,{childList:true,subtree:true});
+})();
