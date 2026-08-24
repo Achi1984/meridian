@@ -1,9 +1,12 @@
-# ACHI MERIDIAN v5.24.9 — CENTER + GRID HOTFIX
+# ACHI MERIDIAN v5.25.0 — Runtime Fix
 
 Behoben:
-- GRID: `Can't find variable: wp`
-- CENTER: `Can't find variable: positionIntelligenceState`
-- Watchlist Priority aus v5.24.8 bleibt erhalten.
-- Cache/Version auf v5.24.9 erhöht, damit iPhone/PWA den Fix sicher lädt.
+- GRID: verbliebene Runtime-Referenz `wp` vollständig entfernt.
+- CENTER: `positionIntelligenceState()` durch die tatsächlich vorhandene SSOT-Funktion `decisionSSOT()` ersetzt.
+- Watchlist Priority bleibt erhalten.
+- Neuer Cache-Key und Script-Query erzwingen den aktualisierten JS-Build.
 
-Nach Upload bei alter Anzeige einmal RESET.html öffnen bzw. PWA neu laden.
+Prüfungen:
+- keine `wp`-Referenz mehr
+- keine `positionIntelligenceState`-Referenz mehr
+- JavaScript Syntaxcheck OK
