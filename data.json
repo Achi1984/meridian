@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.28.1",
-  "build": "2026-08-24-compact-center-stability-fix",
+  "appVersion": "5.38.0",
+  "build": "2026-08-24-consistency-guard",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1905,5 +1905,38 @@
     "details": "COLLAPSIBLE",
     "stabilityFix": true,
     "dataHealth": "INLINE_COMPACT"
+  },
+  "whatIfSimulator": {
+    "version": "1.0",
+    "mode": "MODEL_ONLY",
+    "automaticExecution": false
+  },
+  "recoveryOptimizer": {
+    "version": "1.0",
+    "targetsPct": [
+      8,
+      12
+    ],
+    "compares": [
+      "EXPOSURE_REDUCTION",
+      "ADDITIONAL_MARGIN",
+      "LOWER_LEVERAGE"
+    ],
+    "mode": "MODEL_ONLY",
+    "automaticExecution": false
+  },
+  "centerRecoveryBridge": {
+    "version": "1.0",
+    "source": "BEST_RECOVERY_ACTION",
+    "automaticExecution": false
+  },
+  "consistencyGuard": {
+    "version": "1.0",
+    "scope": [
+      "CENTER",
+      "GRID",
+      "TRADE"
+    ],
+    "canonical": "DUAL_GATE_SSOT"
   }
 }
