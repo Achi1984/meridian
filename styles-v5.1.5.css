@@ -2011,3 +2011,12 @@ body{background:transparent;letter-spacing:.01em}
 .intel-trigger,.focus-trigger{margin:5px 0 10px 74px;padding:7px 9px;border-left:2px solid #eab84f;color:#aeb9c6;font-size:10px;letter-spacing:.3px}
 .intel-trigger b,.focus-trigger b{color:#eab84f;margin-right:5px}
 @media(max-width:520px){.center-recovery-line{flex-wrap:wrap}.center-recovery-line b{flex-basis:70%}.intel-trigger,.focus-trigger{margin-left:42px}}
+
+/* v5.42.0 CENTER one-screen hierarchy */
+body[data-view="center"] .card{margin-bottom:10px}
+body[data-view="center"] details[data-detail-key="center-opportunity"],
+body[data-view="center"] details[data-detail-key="center-execution"],
+body[data-view="center"] details[data-detail-key="center-risk"]{margin-top:10px;margin-bottom:0}
+body[data-view="center"] details[data-detail-key="center-opportunity"] summary,
+body[data-view="center"] details[data-detail-key="center-execution"] summary,
+body[data-view="center"] details[data-detail-key="center-risk"] summary{min-height:68px;padding-top:12px;padding-bottom:12px}

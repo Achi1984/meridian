@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.41.0",
-  "build": "2026-08-24-center-pure-decision-flow",
+  "appVersion": "5.42.0",
+  "build": "2026-08-24-center-one-screen-hierarchy",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1896,10 +1896,8 @@
     "beProtection": "Valid SL at/beyond break-even neutralizes primary capital-loss blocker; execution/slippage/fees remain."
   },
   "centerUX": {
-    "mode": "PURE_DECISION_FLOW",
-    "visible": [
-      "COMMAND_CENTER",
-      "DUAL_GATE",
+    "mode": "ONE_SCREEN_DECISION_HIERARCHY",
+    "collapsed": [
       "OPPORTUNITY",
       "EXECUTION_BRIDGE",
       "RISK"
@@ -1907,8 +1905,7 @@
     "removed": [
       "PORTFOLIO",
       "DATA_HEALTH"
-    ],
-    "riskDefault": "COLLAPSED"
+    ]
   },
   "whatIfSimulator": {
     "version": "1.0",
