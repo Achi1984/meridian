@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.21.2';
-let APP_RELEASE='5.21.2 · LOGIC UX PATCH';
+let APP_CODE_VERSION='5.21.3';
+let APP_RELEASE='5.21.3 · RECOVERY CONSISTENCY';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2354,15 +2354,15 @@ function adaptiveRiskPanel(){
      <div class="adaptive-zone-grid">
        <div><span>ZIEL-LIQ</span><b>${liqText}</b></div>
        <div><span>LIQ-SHIFT</span><b>${shiftText}</b></div>
-       <div><span>MARGIN-ÄQUIV.</span><b>${marginText}</b></div>
-       <div><span>REDUCE-ÄQUIV.</span><b>${reduceText}</b></div>
+       <div><span>MARGIN-ÄQUIV. · MODEL</span><b>${marginText}</b></div>
+       <div><span>REDUCE-ÄQUIV. · MODEL</span><b>${reduceText}</b></div>
      </div>
    </div>`;
  }).join(''):`<p class="footer-note">Position liegt bereits oberhalb der konfigurierten Zielzonen.</p>`;
  return card(`<div class="section-head"><div>
    <div class="eyebrow">ADAPTIVE RISK ENGINE 1.0 ${liveBadge('SSOT')}</div>
    <div class="forecast-main ${tone}">${b.id} · ${fmt(current,2)}% → SICHERHEITSZONEN</div>
-   <div class="sub">Live-Puffer → Ziel-Liquidation → Modell-Äquivalent → Recheck</div>
+   <div class="sub">Live-Puffer → Ziel-Liquidation → ALTERNATIVE · Modell-Äquivalent → Recheck</div>
  </div><span class="tag ${tone}">${current<4?'CRITICAL+':current<8?'CRITICAL':current<15?'DANGER':'WATCH'}</span></div>
  <div class="adaptive-current ${tone}">
    <div><span>LIVE</span><b>${Number.isFinite(live)?'$'+gridFmt(live,b.symbol):'—'}</b></div>
@@ -2488,6 +2488,17 @@ function dominantActionSSOT(){
 }
 
 
+
+function recoveryPhaseProgress(r){
+ const cur=Number(r?.cur);
+ const target=Number(r?.phase?.nextTarget);
+ if(!Number.isFinite(cur)||!Number.isFinite(target)) return 0;
+ const floor = cur < 8 ? 0 : (cur < 12 ? 8 : (cur < 15 ? 12 : (cur < 20 ? 15 : 20)));
+ const span = target-floor;
+ if(span<=0) return 100;
+ return Math.max(0,Math.min(100,Math.round(((cur-floor)/span)*100)));
+}
+
 function recoveryProgressLabel(r){
  const cur=Number(r?.cur);
  const next=Number(r?.phase?.nextTarget);
@@ -2545,8 +2556,8 @@ function recoveryCommandPanel(){
  </div>
 
  <div class="rc-progress">
-   <div><span>RECOVERY PROGRESS</span><b>${r.progress}%</b><small class="recovery-progress-range">${recoveryProgressLabel(r)}</small></div>
-   <div class="bar"><i style="width:${r.progress}%"></i></div>
+   <div><span>RECOVERY PROGRESS</span><b>${recoveryPhaseProgress(r)}%</b><small class="recovery-progress-range">${recoveryProgressLabel(r)}</small></div>
+   <div class="bar"><i style="width:${recoveryPhaseProgress(r)}%"></i></div>
  </div>
 
  <div class="grid2">
@@ -2557,8 +2568,8 @@ function recoveryCommandPanel(){
  </div>
 
  ${r.target?`<div class="rc-actions">
-   <div><span>OPTION A</span><b>${r.reduceText}</b><small>Modell-Äquivalent</small></div>
-   <div><span>OPTION B</span><b>${r.marginText}</b><small>Modell-Äquivalent</small></div>
+   <div><span>OPTION A</span><b>${r.reduceText}</b><small>ALTERNATIVE · Modell-Äquivalent</small></div>
+   <div><span>OPTION B</span><b>${r.marginText}</b><small>ALTERNATIVE · Modell-Äquivalent</small></div>
  </div>`:''}
 
  <div class="rc-unlock ${u.tone}">
@@ -2647,8 +2658,8 @@ function liveRiskCockpitPanel(){
 
  <div class="lrc-action-row">
    <div><span>ZIEL-LIQ.</span><b>${c.targetLiq}</b></div>
-   <div><span>REDUCE-ÄQUIV.</span><b>${c.reduce}</b></div>
-   <div><span>MARGIN-ÄQUIV.</span><b>${c.margin}</b></div>
+   <div><span>REDUCE-ÄQUIV. · MODEL</span><b>${c.reduce}</b></div>
+   <div><span>MARGIN-ÄQUIV. · MODEL</span><b>${c.margin}</b></div>
  </div>
 
  <div class="lrc-order">

@@ -1417,3 +1417,6 @@ body{background:transparent;letter-spacing:.01em}
 
 /* v5.21.2 Logic/UX patch */
 .recovery-progress-range{display:block;margin-top:4px;font-size:8px;letter-spacing:.5px;color:#8292a5}
+
+/* v5.21.3 Recovery consistency */
+.recovery-progress-range{opacity:.9}

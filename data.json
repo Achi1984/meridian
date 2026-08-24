@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.21.2",
-  "build": "2026-08-24-logic-ux-patch",
+  "appVersion": "5.21.3",
+  "build": "2026-08-24-recovery-consistency",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1776,6 +1776,8 @@
   },
   "uxPatches": {
     "decisionDetailsRecoveryNaming": true,
-    "recoveryProgressRange": true
+    "recoveryProgressRange": true,
+    "phaseRelativeRecoveryProgress": true,
+    "modelAlternativesExplicit": true
   }
 }
