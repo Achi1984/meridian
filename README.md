@@ -1,8 +1,9 @@
-# ACHI MERIDIAN v5.21.4 — Cockpit Progress Hotfix
+# ACHI MERIDIAN v5.21.5 — CENTER Runtime Fix
 
-Gezielter Hotfix:
-- LIVE RISK COCKPIT verwendet jetzt dieselbe phasenbezogene Recovery-Progress-Funktion wie Dynamic Recovery.
-- Beispiel: 8,05% innerhalb der 8–12%-Recovery-Phase => ~1%, nicht 67%.
-- Prozentanzeige und Balkenbreite werden aus derselben SSOT-Funktion gespeist.
-- Keine Änderung an Risk Engine, Capital Release Ladder, Hedge-Logik oder Entry Gates.
-- Keine automatische Order-Ausführung.
+Behoben:
+- Laufzeitfehler `Can't find variable: r` im LIVE RISK COCKPIT.
+- CENTER erzeugt jetzt lokal einen gültigen Recovery-State aus `c.buffer` und `c.target`.
+- Prozentwert und Balken verwenden exakt denselben `progress`-Wert.
+- 8,05% in der 8–12%-Recovery-Phase ergibt rund 1%.
+
+Keine Änderung an Trading-, Hedge-, Risk-Gate- oder Capital-Release-Logik.
