@@ -1,12 +1,11 @@
-// ACHI MERIDIAN v5.26.0 — hard refresh cleanup
-self.addEventListener('install', event => { self.skipWaiting(); });
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+// MERIDIAN v5.47.0 — cache reset / network only
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => {
+  e.waitUntil(Promise.all([
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))),
+    self.registration.unregister()
+  ]).then(()=>self.clients.claim()));
 });
-self.addEventListener('fetch', event => {
-  event.respondWith(fetch(event.request, {cache:'no-store'}).catch(() => fetch(event.request)));
+self.addEventListener('fetch', e => {
+  e.respondWith(fetch(e.request, {cache:'no-store'}));
 });

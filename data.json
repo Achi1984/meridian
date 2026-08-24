@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.46.0",
-  "build": "2026-08-24-grid-compact-ia",
+  "appVersion": "5.47.0",
+  "build": "2026-08-24-grid-clean-hard-refresh",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
