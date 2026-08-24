@@ -1,9 +1,8 @@
-# ACHI MERIDIAN v5.43.0 — CENTER Filled Viewport
+# ACHI MERIDIAN v5.44.0 — Global Fixed Tabbar
 
-Umgesetzt:
-- weißer Bereich unter der Bottom-Navigation auf iPhone entfernt
-- iOS Safe Area / viewport-fit=cover berücksichtigt
-- CENTER nutzt die verfügbare Displayhöhe
-- Opportunity, Execution Bridge und Risk als kompakte, geschlossene Entscheidungszeilen
-- Portfolio und Data Health bleiben aus CENTER entfernt
-- bestehende Trading-/Risk-Logik unverändert
+Layout-Fix:
+- Bottom-Tab-Leiste ist jetzt global fixed
+- identische Position in CENTER, DEPOT, MARKT, BODEN, TRADE, GRID und FCST
+- iPhone Safe Area berücksichtigt
+- alle Views reservieren exakt denselben unteren Platz
+- kein Springen der Navigation zwischen kurzen und langen Seiten

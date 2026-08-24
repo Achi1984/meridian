@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.43.0",
-  "build": "2026-08-24-center-filled-viewport",
+  "appVersion": "5.44.0",
+  "build": "2026-08-24-global-fixed-tabbar",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1940,5 +1940,10 @@
       "TRADE"
     ],
     "canonical": "DUAL_GATE_SSOT"
+  },
+  "layoutFix": {
+    "tabBar": "GLOBAL_FIXED",
+    "samePositionAllViews": true,
+    "safeAreaAware": true
   }
 }

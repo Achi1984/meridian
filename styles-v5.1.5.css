@@ -2070,3 +2070,52 @@ body[data-view="center"] details[data-detail-key="center-risk"] summary{
   padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
   background:#02070c !important;
 }
+
+/* v5.44.0 — global fixed tab bar / identical position in every view */
+:root{
+  --meridian-tabbar-h: 92px;
+}
+html, body{
+  min-height:100%;
+  background:#02070c !important;
+}
+body{
+  min-height:100dvh;
+  margin:0;
+  padding-bottom:calc(var(--meridian-tabbar-h) + env(safe-area-inset-bottom)) !important;
+}
+.bottom-nav,
+.tabbar,
+nav.bottom,
+nav[role="navigation"].bottom-nav{
+  position:fixed !important;
+  left:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  min-height:var(--meridian-tabbar-h) !important;
+  height:calc(var(--meridian-tabbar-h) + env(safe-area-inset-bottom)) !important;
+  padding-bottom:env(safe-area-inset-bottom) !important;
+  margin:0 !important;
+  transform:none !important;
+  background:#02070c !important;
+  z-index:9999 !important;
+}
+
+/* All views reserve the same space above the fixed tab bar */
+main,
+.main,
+.view,
+.content,
+#app{
+  padding-bottom:calc(var(--meridian-tabbar-h) + env(safe-area-inset-bottom) + 12px) !important;
+  box-sizing:border-box;
+}
+
+/* Prevent per-view overrides from moving the nav */
+body[data-view] .bottom-nav,
+body[data-view] .tabbar,
+body[data-view] nav.bottom{
+  bottom:0 !important;
+  top:auto !important;
+}
