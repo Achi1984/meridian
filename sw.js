@@ -1,4 +1,4 @@
-// ACHI MERIDIAN v5.25.2 — hard refresh cleanup
+// ACHI MERIDIAN v5.25.3 — hard refresh cleanup
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {
   event.waitUntil(

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.25.2",
-  "build": "2026-08-24-hard-refresh-runtime-fix",
+  "appVersion": "5.25.3",
+  "build": "2026-08-24-recovery-intelligence",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1834,5 +1834,51 @@
     "recoveryGatePct": 8,
     "gapToRecoveryPctPoints": 0.37,
     "policy": "KEEP HEDGE / NO ADD until recovery gate is passed and risk is rechecked."
+  },
+  "recoveryIntelligence": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "bot": "BTC-S30",
+    "principle": "SURVIVABILITY FIRST, EXIT SEPARATE",
+    "phases": [
+      {
+        "min": 0,
+        "maxExclusive": 4,
+        "label": "CRITICAL+",
+        "action": "REDUCE FIRST · EXIT CHECK"
+      },
+      {
+        "min": 4,
+        "maxExclusive": 8,
+        "label": "CRITICAL",
+        "action": "REDUCE / DEFEND"
+      },
+      {
+        "min": 8,
+        "maxExclusive": 12,
+        "label": "RECOVERY",
+        "action": "HOLD / NO ADD"
+      },
+      {
+        "min": 12,
+        "maxExclusive": 15,
+        "label": "SAFE",
+        "action": "HOLD"
+      },
+      {
+        "min": 15,
+        "maxExclusive": 20,
+        "label": "COMFORT",
+        "action": "KEEP"
+      },
+      {
+        "min": 20,
+        "maxExclusive": null,
+        "label": "STRONG",
+        "action": "KEEP"
+      }
+    ],
+    "exitRule": "EXIT is not caused by sub-8% buffer alone. At <4%, EXIT is only a separate review after hedge utility/thesis and execution risk are checked.",
+    "capitalRule": "New capital / ADD remains governed separately by risk and entry gates."
   }
 }
