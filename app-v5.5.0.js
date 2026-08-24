@@ -490,6 +490,7 @@ function botRealityMeta(bot){
  else if(status==='VERIFIED' && hasLiq) status='VERIFIED';
  else if(status==='SNAPSHOT' && hasLiq && hasLive) status='SNAPSHOT + LIVE CALC';
  const tone=status.includes('VERIFIED')||status==='LIVE CALC'?'green':status.includes('SNAPSHOT')?'amber':'red';
+ const protection=bot.protection || breakEvenProtectionState(bot);
  return {
    id:bot.id,
    status,
@@ -499,7 +500,11 @@ function botRealityMeta(bot){
    bufferBasis:raw.bufferBasis||'MODEL',
    liq:hasLiq?Number(raw.liquidation ?? raw.liquidationPrice):NaN,
    buffer:Number(bot.buffer),
-   leverage:Number(bot.leverage)
+   leverage:Number(bot.leverage),
+   beProtected:!!protection.active,
+   protection,
+   stopLoss:Number(raw.stopLoss ?? raw.sl),
+   breakEven:Number(raw.breakEven)
  };
 }
 function pionexRealityState(){
@@ -511,15 +516,15 @@ function pionexRealityState(){
 }
 function pionexRealityPanel(){
  const r=pionexRealityState();
- const rows=r.rows.map(x=>`<div class="dd-row">
-   <span>${x.id}</span>
-   <b class="${x.tone}">${x.status}</b>
-   <small>${x.bufferBasis}${Number.isFinite(x.buffer)?` · BUFFER ${fmt(x.buffer,2)}%`:''}${x.verifiedAt?` · ${x.verifiedAt.slice(0,16).replace('T',' ')}`:''}</small>
+ const rows=r.rows.map(x=>`<div class="dd-row ${x.beProtected?'be-row-protected':''}">
+   <span>${x.id}${x.beProtected?` <em class="be-protected-badge">BE PROTECTED ✓</em>`:''}</span>
+   <b class="${x.beProtected?'green':x.tone}">${x.beProtected?'LIVE CALC · PROTECTED':x.status}</b>
+   <small>${x.bufferBasis}${Number.isFinite(x.buffer)?` · LIQ ${fmt(x.buffer,2)}%`:''}${x.beProtected&&Number.isFinite(x.stopLoss)&&Number.isFinite(x.breakEven)?` · SL ${fmt(x.stopLoss,2)} ≥ BE ${fmt(x.breakEven,2)}`:''}${x.verifiedAt?` · ${x.verifiedAt.slice(0,16).replace('T',' ')}`:''}</small>
  </div>`).join('');
  return `<div class="reality-engine-v522">
    <div class="section-head"><div>
      <div class="eyebrow">PIONEX REALITY ENGINE 2.0 ${liveBadge('SSOT')}</div>
-     <div class="forecast-main">REAL > LIVE CALC > SNAPSHOT > MODEL</div>
+     <div class="forecast-main">${DATA.pionexReality?.mode==='SINGLE_HEDGE'?'SINGLE HEDGE · REAL > LIVE CALC > SNAPSHOT > MODEL':'REAL > LIVE CALC > SNAPSHOT > MODEL'}</div>
      <div class="sub">Jeder Bot zeigt, worauf sein Risikowert tatsächlich basiert.</div>
    </div><span class="tag ${r.model?'amber':'green'}">${r.verified}/${r.total} LIVE/VERIFIED</span></div>
    <div class="pi-summary">
@@ -527,8 +532,9 @@ function pionexRealityPanel(){
      <div><span>SNAPSHOT</span><b class="${r.snapshot?'amber':'green'}">${r.snapshot}</b></div>
      <div><span>MODEL ONLY</span><b class="${r.model?'red':'green'}">${r.model}</b></div>
    </div>
+   ${r.rows.some(x=>x.beProtected)?`<div class="be-protection-summary"><span>BREAK-EVEN PROTECTION</span><b class="green">${r.rows.filter(x=>x.beProtected).map(x=>x.id).join(' · ')} PROTECTED ✓</b><small>LIQ-Puffer bleibt Monitoring-Metrik, ist für diese Bots aber kein primärer Risk-Blocker.</small></div>`:''}
    <div class="reality-rows">${rows}</div>
-   <div class="verify-box verified"><b>SSOT SOURCE PRIORITY</b><span>Echte Pionex-Werte schlagen Modell-Proxies. Ein Live-Puffer darf nur aus aktuellem Marktpreis plus verifiziertem/fixiertem Liquidationspreis berechnet werden. Snapshot- oder Modellwerte bleiben sichtbar gekennzeichnet.</span></div>
+   <div class="verify-box verified"><b>SSOT SOURCE PRIORITY</b><span>Echte Pionex-Werte schlagen Modell-Proxies. Ein Live-Puffer darf nur aus aktuellem Marktpreis plus verifiziertem/fixiertem Liquidationspreis berechnet werden. <b>BE PROTECTED</b> bedeutet: der Liquidationspuffer bleibt sichtbar, zählt aber nicht mehr als primärer Kapitalverlust-Blocker, solange der Schutz-SL gültig vor der Liquidation liegt. Snapshot- oder Modellwerte bleiben sichtbar gekennzeichnet.</span></div>
  </div>`;
 }
 
@@ -2955,7 +2961,7 @@ function hedgeOptimizerPanel(){
    <details class="auto-safe-v521 reality-calibration-v522">
      <summary><span>PIONEX REALITY · CURRENT</span><b class="red">RISK GATE BLOCKED</b></summary>
      <div class="reality-current-grid">
-       <div><span>BTC LONG</span><b>100x · 7,86%</b><small>LIQ $73.507 · SL $77.000</small></div>
+       <div class="be-protected-tile"><span>BTC LONG · BE PROTECTED ✓</span><b class="green">100x · 7,86% LIQ</b><small>SL $77.000 ≥ BE $76.938,9 · LIQ $73.507</small></div>
        <div><span>BTC SHORT</span><b>30x · 6,25%</b><small>LIQ $84.765 · DYN $198,90</small></div>
      </div>
      <div class="pi-grid"><div><span>NÄCHSTES GATE</span><b>8% RECOVERY</b></div><div><span>NÄCHSTES ZIEL</span><b>12% SAFE</b></div><div><span>CAPITAL / ADD</span><b class="red">BLOCKED</b></div><div><span>QUELLE</span><b class="green">PIONEX VERIFIED</b></div></div>
@@ -3000,7 +3006,7 @@ function positionIntelligencePanel(){
    <div class="pi-head"><b>${x.id}</b><span class="${x.tone}">${x.action}</span></div>
    <div class="pi-grid">
      <div><span>RICHTUNG</span><b>${x.side} ${Number.isFinite(x.leverage)?x.leverage+'x':'—'}</b></div>
-     <div><span>LIQ.-PUFFER</span><b class="${x.buffer<8?'red':x.buffer<30?'amber':'green'}">${Number.isFinite(x.buffer)?fmt(x.buffer,1)+'%':'—'}</b></div>
+     <div><span>LIQ.-PUFFER</span><b class="${x.beProtected?'green':x.buffer<8?'red':x.buffer<30?'amber':'green'}">${Number.isFinite(x.buffer)?fmt(x.buffer,1)+'%':'—'}${x.beProtected?' · BE✓':''}</b></div>
      <div><span>HEALTH</span><b>${x.health||'—'}/100</b></div>
      <div><span>NÄCHSTE SCHWELLE</span><b>${x.next}</b></div>
    </div>
@@ -3064,27 +3070,29 @@ function compactDecisionDetails(){
  </details>`;
 }
 
-/* v5.23.1 — Pionex real-risk overlay */
+/* v5.24.3 — Pionex single-hedge real-risk overlay */
 (function(){
  function M(x){return '$'+Number(x).toLocaleString('de-DE',{maximumFractionDigits:2})}
  function P(x){return Number(x).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'}
  function add(){
   if(document.querySelector('.pionex-real-risk')||typeof DATA==='undefined'||!DATA.pionexReality)return;
-  const R=DATA.pionexReality,L=R.btcLong,S=R.btcShort;
+  const R=DATA.pionexReality,S=R.btcShort,L=R.btcLong;
+  if(!S)return;
+  const longHtml=L
+   ? `<div class="rr ${L.status==='SL PROTECTED'?'be-row-protected':''}"><div><b>${L.id}</b><small>LONG ${L.leverage}x</small></div><strong>${P(L.liqBufferPct)}</strong><span class="tag">${L.status||'ACTIVE'}</span></div>`
+   : `<div class="rr closed-bot-row"><div><b>BTC-L100</b><small>LONG CLOSED · aus Risk-SSOT entfernt</small></div><strong class="muted">CLOSED</strong><span class="tag green">EXCLUDED</span></div>`;
   const html=`<section class="card pionex-real-risk">
-   <div class="eyebrow">PIONEX REALITY 1.1 <span class="data-state verified">VERIFIED</span></div>
-   <div class="section-title">REAL RISK · BTC BOTS</div>
-   <div class="rr"><div><b>${S.id}</b><small>SHORT ${S.leverage}x</small></div><strong class="red">${P(S.liqBufferPct)}</strong><span class="tag red">${S.status}</span></div>
+   <div class="eyebrow">PIONEX REALITY 1.2 <span class="data-state verified">VERIFIED</span></div>
+   <div class="section-title">REAL RISK · SINGLE BTC HEDGE</div>
+   <div class="rr"><div><b>${S.id}</b><small>SHORT ${S.leverage}x · PORTFOLIO HEDGE</small></div><strong class="${S.liqBufferPct<8?'red':'amber'}">${P(S.liqBufferPct)}</strong><span class="tag ${S.liqBufferPct<8?'red':'amber'}">${S.liqBufferPct<8?'CRITICAL':'RECOVERY'}</span></div>
    <div class="rl"><span>GRID ${M(S.rangeLow)}–${M(S.rangeHigh)}</span><b>LIQ ${M(S.liqPrice)}</b><span>MARGIN ${M(S.dynamicMargin)}</span></div>
-   <div class="rr"><div><b>${L.id}</b><small>LONG ${L.leverage}x · ${L.grids} GRIDS</small></div><strong class="amber">${P(L.liqBufferPct)}</strong><span class="tag green">${L.status}</span></div>
-   <div class="rl"><span>SL ${M(L.stopLoss)}</span><b>BE ${M(L.breakEven)}</b><span>LIQ ${M(L.liqPrice)}</span></div>
-   <div class="ladder"><b>LONG RISK LADDER</b><span>SL → LIQ → RANGE FLOOR</span><small>SL = operative Schutzschwelle. Liquidation = separate Survivability-Metrik.</small></div>
-   <p class="footer-note">Echte Pionex-Werte ersetzen die älteren BTC-L20/BTC-S30 Proxy-Puffer.</p>
+   ${longHtml}
+   <div class="ladder"><b>SINGLE HEDGE MODE</b><span>${P(S.liqBufferPct)} → 8% RECOVERY</span><small>Der geschlossene Long beeinflusst weder Risk Gate noch Capital Release. BTC-S30 wird als Portfolio-Hedge separat bewertet.</small></div>
+   <p class="footer-note">Echte Pionex-Werte: Dynamic Margin ${M(S.dynamicMargin)}, Liq. ${M(S.liqPrice)}, Break-even ${M(S.breakEven)}. Keine automatische Order-Ausführung.</p>
   </section>`;
   const els=[...document.querySelectorAll('section,.card,div')];
   const mark=els.find(e=>(e.textContent||'').includes('RISK & POSITION DETAILS')&&(e.textContent||'').length<12000);
   if(mark)mark.insertAdjacentHTML('afterend',html);
  }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);else add();
- new MutationObserver(add).observe(document.documentElement,{childList:true,subtree:true});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);else setTimeout(add,0);
 })();

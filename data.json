@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.24.1",
-  "build": "be-protection-layout-fix",
+  "appVersion": "5.24.3",
+  "build": "single-hedge-pionex-refresh",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -324,9 +324,9 @@
   },
   "pionexRisk": {
     "status": "PIONEX REAL VERIFIED",
-    "snapshotAt": "2026-08-24T16:42:00+02:00",
-    "activeCount": 4,
-    "closedCount": 1,
+    "snapshotAt": "2026-08-24T17:33:00+02:00",
+    "activeCount": 3,
+    "closedCount": 2,
     "bots": [
       {
         "id": "BTC-S30",
@@ -335,64 +335,28 @@
         "leverage": 30,
         "status": "ACTIVE",
         "investment": 52.0,
-        "dynamicMargin": 198.9,
-        "totalProfit": -143.17,
-        "breakEven": 72580.3,
-        "liquidation": 84764.5,
-        "liquidationPrice": 84764.5,
-        "liquidationDistancePct": 6.25,
-        "currentPrice": 79774.6,
+        "dynamicMargin": 224.33,
+        "totalProfit": -146.34,
+        "breakEven": 72585.8,
+        "liquidation": 86041.6,
+        "liquidationPrice": 86041.6,
+        "liquidationDistancePct": 7.63,
+        "currentPrice": 79939.5,
         "fundingPct": 0.01,
-        "healthScore": 32,
+        "healthScore": 39,
         "action": "KEEP HEDGE / NO ADD",
         "range": [
           59589.2,
           79671.1
         ],
         "creationPrice": 69243.5,
-        "gridProfit": 10.45,
-        "trendPnl": -153.62,
+        "gridProfit": 10.56,
+        "trendPnl": -156.91,
         "verificationStatus": "VERIFIED",
-        "verifiedAt": "2026-08-24T16:42:00+02:00",
+        "verifiedAt": "2026-08-24T17:33:00+02:00",
         "verificationSource": "PIONEX SCREENSHOT",
         "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-        "reason": "BTC-S30: Pionex verified 24.08.2026 16:42; 30x, Dynamic Margin 198.9 USDT, Liq. 84,764.5, displayed Liq.-Puffer 6.25%."
-      },
-      {
-        "id": "BTC-L100",
-        "symbol": "BTC",
-        "side": "LONG",
-        "leverage": 100,
-        "status": "ACTIVE",
-        "investment": 5.26,
-        "dynamicMargin": 11.02,
-        "totalProfit": 8.82,
-        "breakEven": 76938.9,
-        "liquidation": 73506.8,
-        "liquidationPrice": 73506.8,
-        "liquidationDistancePct": 7.86,
-        "currentPrice": 79784.5,
-        "fundingPct": 0.01,
-        "healthScore": 38,
-        "action": "KEEP / NO ADD",
-        "range": [
-          68000,
-          92000
-        ],
-        "grids": 60,
-        "creationPrice": 77225.0,
-        "takeProfit": 92000.0,
-        "stopLoss": 77000.0,
-        "gridProfit": 0.608,
-        "trendPnl": 8.21,
-        "verificationStatus": "VERIFIED",
-        "verifiedAt": "2026-08-24T16:41:00+02:00",
-        "verificationSource": "PIONEX SCREENSHOT",
-        "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-        "reason": "BTC-L100: Pionex verified 24.08.2026 16:41; 100x, range 68k–92k, SL 77k, Liq. 73,506.8, displayed Liq.-Puffer 7.86%.",
-        "beProtectionExpected": true,
-        "riskOverride": "BE_PROTECTED_IF_LIVE_SL_VALID",
-        "riskOverrideNote": "SL 77,000 is above BE 76,938.9 and above liquidation 73,506.8; with live price above SL/BE the bot is treated as BE protected."
+        "reason": "BTC-S30 verified 24.08.2026 17:33; 30x, Dynamic Margin 224.33 USDT, Liq. 86,041.6, displayed Liq.-Puffer 7.63%. Long BTC bot was closed; remaining margin was assigned to this hedge."
       },
       {
         "id": "HBAR-L3",
@@ -455,9 +419,21 @@
         "side": "SHORT",
         "status": "CLOSED",
         "note": "Historischer geschlossener BTC-Short; darf niemals in aktive Risk-/Decision-Logik einfließen."
+      },
+      {
+        "id": "BTC-L100",
+        "symbol": "BTC",
+        "side": "LONG",
+        "leverage": 100,
+        "status": "CLOSED",
+        "closedAt": "2026-08-24T17:33:00+02:00",
+        "note": "User closed the BTC-L100 manually. Excluded from all active risk, hedge, capital-release and decision calculations.",
+        "previousStopLoss": 77000.0,
+        "previousBreakEven": 76938.9,
+        "closeReason": "MANUAL CLOSE / CAPITAL CONSOLIDATION TO BTC SHORT HEDGE"
       }
     ],
-    "note": "SSOT refreshed from Pionex screenshots 24.08.2026 16:41–16:42. BTC-L100 7.86% and BTC-S30 6.25% are below the 8% recovery gate; capital release/add remains blocked."
+    "note": "SSOT refreshed from Pionex screenshot 24.08.2026 17:33. BTC-L100 is CLOSED and excluded. BTC-S30 is the only active BTC futures hedge; 7.63% Liq.-Puffer remains below the 8% recovery gate."
   },
   "forecastCoins": [
     "BTC",
@@ -477,7 +453,7 @@
     "XLM",
     "ATOM"
   ],
-  "updatedAt": "2026-08-22T10:55:00+02:00",
+  "updatedAt": "2026-08-24T17:33:00+02:00",
   "historyMode": "browser",
   "priceFallbacks": {
     "FET": {
@@ -904,12 +880,12 @@
   "uiRelease": "5.10.9",
   "botSnapshot": {
     "status": "PIONEX SNAPSHOT",
-    "snapshotAt": "2026-08-24T16:42:00+02:00",
-    "openBtcBots": 2,
+    "snapshotAt": "2026-08-24T17:33:00+02:00",
+    "openBtcBots": 1,
     "btcShorts": 1,
-    "btcLongs": 1,
+    "btcLongs": 0,
     "criticalBots": 1,
-    "dangerBots": 1,
+    "dangerBots": 0,
     "btcShort": {
       "id": "BTC-S30",
       "symbol": "BTC",
@@ -917,67 +893,47 @@
       "leverage": 30,
       "status": "ACTIVE",
       "investment": 52.0,
-      "dynamicMargin": 198.9,
-      "totalProfit": -143.17,
-      "breakEven": 72580.3,
-      "liquidation": 84764.5,
-      "liquidationPrice": 84764.5,
-      "liquidationDistancePct": 6.25,
-      "currentPrice": 79774.6,
+      "dynamicMargin": 224.33,
+      "totalProfit": -146.34,
+      "breakEven": 72585.8,
+      "liquidation": 86041.6,
+      "liquidationPrice": 86041.6,
+      "liquidationDistancePct": 7.63,
+      "currentPrice": 79939.5,
       "fundingPct": 0.01,
-      "healthScore": 32,
+      "healthScore": 39,
       "action": "KEEP HEDGE / NO ADD",
       "range": [
         59589.2,
         79671.1
       ],
       "creationPrice": 69243.5,
-      "gridProfit": 10.45,
-      "trendPnl": -153.62,
+      "gridProfit": 10.56,
+      "trendPnl": -156.91,
       "verificationStatus": "VERIFIED",
-      "verifiedAt": "2026-08-24T16:42:00+02:00",
+      "verifiedAt": "2026-08-24T17:33:00+02:00",
       "verificationSource": "PIONEX SCREENSHOT",
       "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-      "reason": "BTC-S30: Pionex verified 24.08.2026 16:42; 30x, Dynamic Margin 198.9 USDT, Liq. 84,764.5, displayed Liq.-Puffer 6.25%."
+      "reason": "BTC-S30 verified 24.08.2026 17:33; 30x, Dynamic Margin 224.33 USDT, Liq. 86,041.6, displayed Liq.-Puffer 7.63%. Long BTC bot was closed; remaining margin was assigned to this hedge."
     },
-    "btcLong": {
+    "btcLong": null,
+    "closedBtcLong": {
       "id": "BTC-L100",
       "symbol": "BTC",
       "side": "LONG",
       "leverage": 100,
-      "status": "ACTIVE",
-      "investment": 5.26,
-      "dynamicMargin": 11.02,
-      "totalProfit": 8.82,
-      "breakEven": 76938.9,
-      "liquidation": 73506.8,
-      "liquidationPrice": 73506.8,
-      "liquidationDistancePct": 7.86,
-      "currentPrice": 79784.5,
-      "fundingPct": 0.01,
-      "healthScore": 38,
-      "action": "KEEP / NO ADD",
-      "range": [
-        68000,
-        92000
-      ],
-      "grids": 60,
-      "creationPrice": 77225.0,
-      "takeProfit": 92000.0,
-      "stopLoss": 77000.0,
-      "gridProfit": 0.608,
-      "trendPnl": 8.21,
-      "verificationStatus": "VERIFIED",
-      "verifiedAt": "2026-08-24T16:41:00+02:00",
-      "verificationSource": "PIONEX SCREENSHOT",
-      "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-      "reason": "BTC-L100: Pionex verified 24.08.2026 16:41; 100x, range 68k–92k, SL 77k, Liq. 73,506.8, displayed Liq.-Puffer 7.86%."
+      "status": "CLOSED",
+      "closedAt": "2026-08-24T17:33:00+02:00",
+      "note": "User closed the BTC-L100 manually. Excluded from all active risk, hedge, capital-release and decision calculations.",
+      "previousStopLoss": 77000.0,
+      "previousBreakEven": 76938.9,
+      "closeReason": "MANUAL CLOSE / CAPITAL CONSOLIDATION TO BTC SHORT HEDGE"
     }
   },
   "botCapitalUSDT": 262.09,
-  "botRisk": "DANGER",
+  "botRisk": "CRITICAL",
   "criticalBots": 1,
-  "openBots": 4,
+  "openBots": 3,
   "rotationEngine": {
     "name": "BTC DYNAMIC SHORT → LONG ROTATION",
     "status": "LIVE PRICE + DYNAMIC MODEL",
@@ -1054,27 +1010,12 @@
     }
   },
   "dualBtcHedge": {
-    "version": "1.0",
-    "status": "SCREENSHOT VERIFIED + LIVE BTC",
-    "snapshotAt": "2026-08-23T11:23:00+02:00",
-    "longBotId": "BTC-L100",
+    "version": "1.1",
+    "status": "DEACTIVATED — LONG CLOSED",
+    "longBotId": null,
     "shortBotId": "BTC-S30",
-    "longExposureProxyUSDT": 2000.0,
-    "shortExposureProxyUSDT": 1560.0,
-    "netExposureProxyUSDT": 440.0,
-    "hedgeRatioPct": 78.0,
-    "note": "Exposure Proxy = Investment × Hebel. Dies ist eine Vergleichsgröße, kein exaktes Exchange-Notional.",
-    "decision": "REDUCE SHORT / KEEP LONG",
-    "decisionScore": 86,
-    "longAction": "KEEP LONG / NO ADD",
-    "shortAction": "REDUCE SHORT / NO ADD",
-    "priorityRisk": "BTC SHORT LIQ 4,8%",
-    "switchLogic": [
-      "Short <8% Liq.-Puffer → REDUCE SHORT priorisieren",
-      "Long 8–15% Liq.-Puffer → KEEP / NO ADD",
-      "Long-Add erst bei Entry Readiness ≥75 + bestätigtem Reclaim",
-      "Short-Exit und Long-Add werden getrennt entschieden"
-    ]
+    "decision": "SINGLE HEDGE MODE",
+    "note": "BTC-L100 was closed. Dual-bot hedge logic is disabled until a new BTC long futures bot becomes ACTIVE."
   },
   "slInvalidationEngine": {
     "version": "1.1",
@@ -1327,25 +1268,16 @@
       "side": "SHORT",
       "leverage": 30,
       "active": true,
-      "liqBufferPct": 6.25,
+      "liqBufferPct": 7.63,
       "risk": "CRITICAL"
     },
     {
-      "id": "BTC-L100",
-      "symbol": "BTC",
-      "side": "LONG",
-      "leverage": 100,
-      "active": true,
-      "liqBufferPct": 7.86,
-      "risk": "CRITICAL"
-    },
-    {
-      "id": "HBAR-L5",
+      "id": "HBAR-L3",
       "symbol": "HBAR",
       "side": "LONG",
-      "leverage": 5,
+      "leverage": 3,
       "active": true,
-      "liqBufferPct": 26.51,
+      "liqBufferPct": 27.98,
       "risk": "TIGHT"
     },
     {
@@ -1360,9 +1292,9 @@
   ],
   "pionexBotSnapshot": {
     "status": "VERIFIED SNAPSHOT",
-    "verifiedAt": "2026-08-24T16:42:00+02:00",
-    "activeCount": 4,
-    "closedCount": 0,
+    "verifiedAt": "2026-08-24T17:33:00+02:00",
+    "activeCount": 3,
+    "closedCount": 1,
     "bots": [
       {
         "id": "BTC-S30",
@@ -1371,61 +1303,28 @@
         "leverage": 30,
         "status": "ACTIVE",
         "investment": 52.0,
-        "dynamicMargin": 198.9,
-        "totalProfit": -143.17,
-        "breakEven": 72580.3,
-        "liquidation": 84764.5,
-        "liquidationPrice": 84764.5,
-        "liquidationDistancePct": 6.25,
-        "currentPrice": 79774.6,
+        "dynamicMargin": 224.33,
+        "totalProfit": -146.34,
+        "breakEven": 72585.8,
+        "liquidation": 86041.6,
+        "liquidationPrice": 86041.6,
+        "liquidationDistancePct": 7.63,
+        "currentPrice": 79939.5,
         "fundingPct": 0.01,
-        "healthScore": 32,
+        "healthScore": 39,
         "action": "KEEP HEDGE / NO ADD",
         "range": [
           59589.2,
           79671.1
         ],
         "creationPrice": 69243.5,
-        "gridProfit": 10.45,
-        "trendPnl": -153.62,
+        "gridProfit": 10.56,
+        "trendPnl": -156.91,
         "verificationStatus": "VERIFIED",
-        "verifiedAt": "2026-08-24T16:42:00+02:00",
+        "verifiedAt": "2026-08-24T17:33:00+02:00",
         "verificationSource": "PIONEX SCREENSHOT",
         "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-        "reason": "BTC-S30: Pionex verified 24.08.2026 16:42; 30x, Dynamic Margin 198.9 USDT, Liq. 84,764.5, displayed Liq.-Puffer 6.25%."
-      },
-      {
-        "id": "BTC-L100",
-        "symbol": "BTC",
-        "side": "LONG",
-        "leverage": 100,
-        "status": "ACTIVE",
-        "investment": 5.26,
-        "dynamicMargin": 11.02,
-        "totalProfit": 8.82,
-        "breakEven": 76938.9,
-        "liquidation": 73506.8,
-        "liquidationPrice": 73506.8,
-        "liquidationDistancePct": 7.86,
-        "currentPrice": 79784.5,
-        "fundingPct": 0.01,
-        "healthScore": 38,
-        "action": "KEEP / NO ADD",
-        "range": [
-          68000,
-          92000
-        ],
-        "grids": 60,
-        "creationPrice": 77225.0,
-        "takeProfit": 92000.0,
-        "stopLoss": 77000.0,
-        "gridProfit": 0.608,
-        "trendPnl": 8.21,
-        "verificationStatus": "VERIFIED",
-        "verifiedAt": "2026-08-24T16:41:00+02:00",
-        "verificationSource": "PIONEX SCREENSHOT",
-        "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-        "reason": "BTC-L100: Pionex verified 24.08.2026 16:41; 100x, range 68k–92k, SL 77k, Liq. 73,506.8, displayed Liq.-Puffer 7.86%."
+        "reason": "BTC-S30 verified 24.08.2026 17:33; 30x, Dynamic Margin 224.33 USDT, Liq. 86,041.6, displayed Liq.-Puffer 7.63%. Long BTC bot was closed; remaining margin was assigned to this hedge."
       },
       {
         "id": "HBAR-L3",
@@ -1462,6 +1361,20 @@
         "liqBufferPct": 43.01,
         "risk": "SAFE"
       }
+    ],
+    "closedBots": [
+      {
+        "id": "BTC-L100",
+        "symbol": "BTC",
+        "side": "LONG",
+        "leverage": 100,
+        "status": "CLOSED",
+        "closedAt": "2026-08-24T17:33:00+02:00",
+        "note": "User closed the BTC-L100 manually. Excluded from all active risk, hedge, capital-release and decision calculations.",
+        "previousStopLoss": 77000.0,
+        "previousBreakEven": 76938.9,
+        "closeReason": "MANUAL CLOSE / CAPITAL CONSOLIDATION TO BTC SHORT HEDGE"
+      }
     ]
   },
   "botRiskDistribution": {
@@ -1477,10 +1390,11 @@
     "singleSource": "decisionSSOT() → pionexRisk.bots"
   },
   "dualBotHedge": {
-    "longBotId": "BTC-L100",
+    "status": "DEACTIVATED — SINGLE HEDGE",
+    "longBotId": null,
     "shortBotId": "BTC-S30",
-    "source": "decisionSSOT / pionexRisk.bots",
-    "status": "VERIFIED SNAPSHOT + LIVE BUFFER RECALC"
+    "source": "pionexRisk.bots",
+    "note": "No active BTC futures long. BTC-S30 is evaluated as a portfolio hedge, not as one leg of a dual-bot pair."
   },
   "decisionSSOT": {
     "version": "1.1",
@@ -1810,35 +1724,35 @@
   },
   "pionexRealityCalibration": {
     "status": "VERIFIED",
-    "verifiedAt": "2026-08-24T16:42:00+02:00",
+    "verifiedAt": "2026-08-24T17:33:00+02:00",
+    "mode": "SINGLE_HEDGE",
     "long": {
+      "status": "CLOSED",
       "id": "BTC-L100",
-      "leverage": 100,
-      "liquidationPrice": 73506.8,
-      "displayedBufferPct": 7.86,
-      "stopLoss": 77000
+      "excludedFromRisk": true
     },
     "short": {
       "id": "BTC-S30",
       "leverage": 30,
-      "dynamicMarginUSDT": 198.9,
-      "liquidationPrice": 84764.5,
-      "displayedBufferPct": 6.25
+      "dynamicMarginUSDT": 224.33,
+      "liquidationPrice": 86041.6,
+      "displayedBufferPct": 7.63,
+      "breakEven": 72585.8
     },
-    "dualGateMinPct": 8,
-    "nextTargetPct": 12,
-    "dualGatePassed": false,
+    "recoveryGateMinPct": 8,
+    "nextTargetPct": 8,
+    "gatePassed": false,
     "marginRelease": "BLOCKED",
-    "note": "Current Pionex measurements supersede legacy BTC-L20 calibration."
+    "note": "BTC-L100 closed. BTC-S30 is the only active BTC futures hedge and remains the active liquidation-risk blocker until >=8%."
   },
   "realitySSOT": {
-    "policy": "Pionex displayed buffer is VERIFIED SSOT. Browser BTC price creates LIVE ESTIMATE only. Drift >=0.25 percentage points triggers VERIFY PIONEX before margin/leverage action.",
-    "btcShortVerifiedBufferPct": 8.05,
-    "btcShortVerifiedLiq": 84225.6,
-    "btcShortDynamicMarginUSDT": 188.9,
-    "btcLongVerifiedBufferPct": 8.29,
-    "btcLongVerifiedLiq": 71499.3,
-    "verifiedAt": "2026-08-24T12:32:00+02:00"
+    "policy": "Pionex displayed buffer is VERIFIED SSOT. Browser BTC price creates LIVE ESTIMATE only. Closed bots are excluded from active risk calculations.",
+    "mode": "SINGLE_HEDGE",
+    "btcShortVerifiedBufferPct": 7.63,
+    "btcShortVerifiedLiq": 86041.6,
+    "btcShortDynamicMarginUSDT": 224.33,
+    "btcLongStatus": "CLOSED / EXCLUDED",
+    "verifiedAt": "2026-08-24T17:33:00+02:00"
   },
   "uxPatches": {
     "decisionDetailsRecoveryNaming": true,
@@ -1859,35 +1773,34 @@
     "autoExecution": false
   },
   "pionexReality": {
-    "verifiedAt": "2026-08-24T16:42:00+02:00",
-    "btcLong": {
-      "id": "BTC-L100",
-      "side": "LONG",
-      "leverage": 100,
-      "rangeLow": 68000,
-      "rangeHigh": 92000,
-      "grids": 60,
-      "investment": 5.26,
-      "dynamicMargin": 11.02,
-      "liqPrice": 73506.8,
-      "liqBufferPct": 7.86,
-      "breakEven": 76938.9,
-      "takeProfit": 92000,
-      "stopLoss": 77000,
-      "status": "SL PROTECTED"
-    },
+    "verifiedAt": "2026-08-24T17:33:00+02:00",
+    "mode": "SINGLE_HEDGE",
+    "btcLong": null,
     "btcShort": {
       "id": "BTC-S30",
       "side": "SHORT",
       "leverage": 30,
       "rangeLow": 59589.2,
       "rangeHigh": 79671.1,
-      "investment": 52,
-      "dynamicMargin": 198.9,
-      "liqPrice": 84764.5,
-      "liqBufferPct": 6.25,
-      "breakEven": 72580.3,
-      "status": "GRID PAUSED / ABOVE RANGE"
+      "investment": 52.0,
+      "dynamicMargin": 224.33,
+      "liqPrice": 86041.6,
+      "liqBufferPct": 7.63,
+      "breakEven": 72585.8,
+      "currentPrice": 79939.5,
+      "status": "HEDGE ACTIVE / GRID PAUSED ABOVE RANGE"
+    },
+    "closedLong": {
+      "id": "BTC-L100",
+      "symbol": "BTC",
+      "side": "LONG",
+      "leverage": 100,
+      "status": "CLOSED",
+      "closedAt": "2026-08-24T17:33:00+02:00",
+      "note": "User closed the BTC-L100 manually. Excluded from all active risk, hedge, capital-release and decision calculations.",
+      "previousStopLoss": 77000.0,
+      "previousBreakEven": 76938.9,
+      "closeReason": "MANUAL CLOSE / CAPITAL CONSOLIDATION TO BTC SHORT HEDGE"
     }
   },
   "breakEvenProtectionEngine": {
@@ -1899,5 +1812,27 @@
     },
     "effect": "A valid BE-protecting stop removes the bot as a primary CRITICAL/DANGER capital-loss blocker. Residual execution/slippage/fee/gap risk remains.",
     "addRule": "BE protection never auto-enables ADD/new capital."
+  },
+  "beProtectionVisual": {
+    "version": "1.2",
+    "protectedBots": [],
+    "closedProtectedBots": [
+      "BTC-L100"
+    ],
+    "displayRule": "Only ACTIVE bots with a currently valid protective stop may receive BE PROTECTED. Closed bots are excluded."
+  },
+  "singleBtcHedge": {
+    "version": "1.0",
+    "status": "ACTIVE",
+    "verifiedAt": "2026-08-24T17:33:00+02:00",
+    "hedgeBotId": "BTC-S30",
+    "hedgeSide": "SHORT",
+    "liquidationBufferPct": 7.63,
+    "liquidationPrice": 86041.6,
+    "dynamicMarginUSDT": 224.33,
+    "breakEven": 72585.8,
+    "recoveryGatePct": 8,
+    "gapToRecoveryPctPoints": 0.37,
+    "policy": "KEEP HEDGE / NO ADD until recovery gate is passed and risk is rechecked."
   }
 }

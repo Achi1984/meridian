@@ -1,12 +1,12 @@
-# ACHI MERIDIAN v5.24.1 — Break-even Protection + Layout Fix
+# ACHI MERIDIAN v5.24.3 — Single Hedge Refresh
 
-Neu:
-- Break-even Protection Engine 1.0.
-- LONG wird BE PROTECTED, wenn Live > BE, SL >= BE, SL < Live und SL vor der Liquidation liegt.
-- SHORT spiegelbildlich: Live < BE, SL <= BE, SL > Live und SL vor der Liquidation.
-- BE PROTECTED Bots lösen keinen primären CRITICAL/DANGER Capital-Loss-Block mehr aus.
-- Restrisiko bleibt sichtbar: Slippage, Fees, Gap und Execution.
-- BE Protection gibt niemals automatisch ADD oder neues Kapital frei.
-- BTC-L100 mit SL 77,000 / BE 76,938.9 wird bei gültigem Live-Zustand als BE PROTECTED behandelt.
-- BTC-S30 bleibt aktuell unprotected und mit 6.25% Pionex-Puffer der relevante Risk-Blocker.
-- Zusätzlicher iPhone Layout-Fix für alle verbliebenen 3-Spalten Reality/Calibration-Kacheln.
+Pionex update 24.08.2026 17:33:
+- BTC-L100 is CLOSED and excluded from active risk calculations.
+- BTC-S30 remains active as the sole BTC futures portfolio hedge.
+- BTC-S30: 30x, investment 52 USDT, dynamic margin 224.33 USDT.
+- Pionex liquidation 86,041.6 USD; displayed buffer 7.63%.
+- Break-even 72,585.8 USD; grid profit +10.56 USDT; trend PnL -156.91 USDT.
+- Recovery gap to 8%: 0.37 percentage points.
+- No active BE-protected futures bot remains after BTC-L100 closure.
+- Dual-survivability logic is disabled; SINGLE HEDGE mode replaces it.
+- No automatic order execution.
