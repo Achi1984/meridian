@@ -1,12 +1,13 @@
-# ACHI MERIDIAN v5.25.0 — Runtime Fix
+# ACHI MERIDIAN v5.25.2 — HARD REFRESH
 
-Behoben:
-- GRID: verbliebene Runtime-Referenz `wp` vollständig entfernt.
-- CENTER: `positionIntelligenceState()` durch die tatsächlich vorhandene SSOT-Funktion `decisionSSOT()` ersetzt.
-- Watchlist Priority bleibt erhalten.
-- Neuer Cache-Key und Script-Query erzwingen den aktualisierten JS-Build.
+Wichtig:
+1. Alle Dateien aus dieser ZIP auf den Webspace hochladen und vorhandene Dateien ersetzen.
+2. Danach einmal `/RESET.html` öffnen.
+3. Anschließend muss im Header `v5.25.2 · LIVE` stehen.
 
-Prüfungen:
-- keine `wp`-Referenz mehr
-- keine `positionIntelligenceState`-Referenz mehr
-- JavaScript Syntaxcheck OK
+Technische Änderungen:
+- komplett neuer Script-Dateiname `app-v5.25.2.js`
+- CENTER: nicht vorhandener State-Aufruf entfernt
+- GRID: alte `wp`-Referenz entfernt
+- no-cache Header im HTML
+- RESET.html löscht Browser-Caches und registrierte Service Worker

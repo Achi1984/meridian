@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.25.0",
-  "build": "2026-08-24-runtime-center-grid-fix",
+  "appVersion": "5.25.2",
+  "build": "2026-08-24-hard-refresh-runtime-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
