@@ -1,10 +1,12 @@
-# ACHI MERIDIAN v5.24.0 — CENTER UX 2.0
+# ACHI MERIDIAN v5.24.1 — Break-even Protection + Layout Fix
 
-- Current Pionex BTC reality updated from screenshots 24.08.2026 16:41–16:42
-- BTC-L100 active: 100x, range 68k–92k, SL 77k, Liq 73,506.8, displayed buffer 7.86%
-- BTC-S30 active: 30x, Dynamic Margin 198.9, Liq 84,764.5, displayed buffer 6.25%
-- Both are below the 8% Recovery Gate: Capital/Add remains BLOCKED
-- Removed stale BTC-L20 from active decision source
-- Reality calibration converted to compact disclosure
-- Mobile grid collision/overflow hardening for iPhone widths
-- 3-column risk summaries collapse safely to 2 columns, then 1 column on narrow screens
+Neu:
+- Break-even Protection Engine 1.0.
+- LONG wird BE PROTECTED, wenn Live > BE, SL >= BE, SL < Live und SL vor der Liquidation liegt.
+- SHORT spiegelbildlich: Live < BE, SL <= BE, SL > Live und SL vor der Liquidation.
+- BE PROTECTED Bots lösen keinen primären CRITICAL/DANGER Capital-Loss-Block mehr aus.
+- Restrisiko bleibt sichtbar: Slippage, Fees, Gap und Execution.
+- BE Protection gibt niemals automatisch ADD oder neues Kapital frei.
+- BTC-L100 mit SL 77,000 / BE 76,938.9 wird bei gültigem Live-Zustand als BE PROTECTED behandelt.
+- BTC-S30 bleibt aktuell unprotected und mit 6.25% Pionex-Puffer der relevante Risk-Blocker.
+- Zusätzlicher iPhone Layout-Fix für alle verbliebenen 3-Spalten Reality/Calibration-Kacheln.

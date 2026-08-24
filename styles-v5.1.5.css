@@ -1468,3 +1468,30 @@ body{background:transparent;letter-spacing:.01em}
   .pi-summary,.pi-grid,.reality-current-grid{grid-template-columns:1fr}
   .pi-summary>div:nth-child(3):last-child{grid-column:auto}
 }
+
+/* v5.24.1 — final iPhone grid/collision fix */
+@media(max-width:520px){
+  .reality-calibration-v522 .pi-summary,
+  .auto-safe-v521 .pi-summary,
+  .hedge-opt-v520 .pi-summary{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  .reality-calibration-v522 .pi-summary>div,
+  .auto-safe-v521 .pi-summary>div,
+  .hedge-opt-v520 .pi-summary>div{
+    min-width:0 !important;
+    width:auto !important;
+    max-width:100% !important;
+    overflow:hidden;
+  }
+  .reality-calibration-v522 .pi-summary>div:nth-child(3),
+  .auto-safe-v521 .pi-summary>div:nth-child(3),
+  .hedge-opt-v520 .pi-summary>div:nth-child(3){
+    grid-column:1/-1;
+  }
+  .pi-summary b,.pi-summary small,.pi-summary span{
+    white-space:normal !important;
+    overflow-wrap:anywhere !important;
+  }
+}
+.be-protected-badge{color:#2fe59a;border:1px solid #2fe59a;border-radius:999px;padding:2px 7px;font-size:8px;font-weight:900}

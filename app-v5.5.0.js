@@ -417,6 +417,43 @@ function botStateManager(){
  const closed=((DATA.pionexRisk&&DATA.pionexRisk.closedBots)||[]).filter(b=>String(b.status||'').toUpperCase()==='CLOSED');
  return {active,closed,activeCount:active.length,closedCount:closed.length,source:'Pionex ACTIVE snapshot + live market prices'};
 }
+
+/* v5.24.1 — BREAK-EVEN PROTECTION
+   A valid protective SL neutralizes the bot as a primary capital-loss blocker.
+   LONG: live > BE and SL >= BE and SL < live.
+   SHORT: live < BE and SL <= BE and SL > live.
+   SL must also sit before liquidation. Residual execution/slippage risk remains. */
+function breakEvenProtectionState(bot){
+ if(!bot)return {active:false,label:'UNPROTECTED',reason:'Kein Bot'};
+ const side=String(bot.side||'').toUpperCase();
+ const live=Number(bot.live ?? DATA.livePrices?.[bot.symbol]?.price ?? bot.currentPrice);
+ const be=Number(bot.breakEven);
+ const sl=Number(bot.stopLoss ?? bot.sl);
+ const liq=Number(bot.liquidation ?? bot.liquidationPrice);
+ if(![live,be,sl].every(Number.isFinite) || live<=0 || be<=0 || sl<=0){
+   return {active:false,label:'UNPROTECTED',reason:'SL/BE nicht vollständig verifiziert',side,live,be,sl,liq};
+ }
+ let active=false, favorable=false, stopBeforeLiq=true;
+ if(side==='LONG'){
+   favorable=live>be;
+   stopBeforeLiq=!Number.isFinite(liq) || sl>liq;
+   active=favorable && sl>=be && sl<live && stopBeforeLiq;
+ }else if(side==='SHORT'){
+   favorable=live<be;
+   stopBeforeLiq=!Number.isFinite(liq) || sl<liq;
+   active=favorable && sl<=be && sl>live && stopBeforeLiq;
+ }
+ const cushionPct=be>0 ? (side==='SHORT' ? (be-sl)/be*100 : (sl-be)/be*100) : NaN;
+ return {
+   active,
+   label:active?'BE PROTECTED':'UNPROTECTED',
+   side,live,be,sl,liq,favorable,stopBeforeLiq,cushionPct,
+   reason:active
+     ? `SL schützt Break-even (${side==='LONG'?'SL ≥ BE':'SL ≤ BE'}). Primäres Kapitalverlustrisiko dieses Bots wird nicht mehr als CRITICAL/DANGER-Block gewertet; Rest-Risiko: Slippage/Fees/Gap/Execution.`
+     : 'Kein gültiger Break-even-Schutz aktiv.'
+ };
+}
+
 function canonicalBotState(b){
  if(!b)return null;
  const liquidation=Number(b.liquidationPrice??b.liquidation);
@@ -431,12 +468,16 @@ function canonicalBotState(b){
  // v5.20.3 REALITY SSOT: a browser quote can estimate distance to the last verified Liq price,
  // but it must never overwrite the last Pionex-displayed buffer as if it were newly verified.
  const buffer=Number.isFinite(verifiedBuffer)?verifiedBuffer:liveEstimate;
- const guard=botGuardFromBuffer(buffer);
  const stale=verifyRequired;
  const side=String(b.side||'').toUpperCase();
- const action=guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'KEEP HEDGE / RECOVERY'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
- const reason=`${b.id}: Pionex verified ${Number.isFinite(verifiedBuffer)?fmt(verifiedBuffer,2)+'%':'—'}${usesLive&&Number.isFinite(liveEstimate)?' · Live Estimate '+fmt(liveEstimate,2)+'%':''}${verifyRequired?' · VERIFY PIONEX':''}; ${guard.label}.`;
- return {...b, liquidation, live, buffer, snapBuffer, verifiedBuffer, liveEstimate, verifyRequired, guard, usesLive, stale, action, reason};
+ const protection=breakEvenProtectionState({...b,live,liquidation});
+ const rawGuard=botGuardFromBuffer(buffer);
+ const guard=protection.active?{label:'PROTECTED',cls:'green',rank:4,raw:rawGuard}:rawGuard;
+ const action=protection.active?'KEEP · BE PROTECTED':guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'KEEP HEDGE / RECOVERY'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
+ const reason=protection.active
+   ? `${b.id}: BE PROTECTED · SL ${fmt(protection.sl,2)} vs. BE ${fmt(protection.be,2)}. Liq.-Puffer ${Number.isFinite(buffer)?fmt(buffer,2)+'%':'—'} bleibt sichtbar, blockiert aber diesen Bot nicht primär. Rest-Risiko: Execution/Slippage/Fees.`
+   : `${b.id}: Pionex verified ${Number.isFinite(verifiedBuffer)?fmt(verifiedBuffer,2)+'%':'—'}${usesLive&&Number.isFinite(liveEstimate)?' · Live Estimate '+fmt(liveEstimate,2)+'%':''}${verifyRequired?' · VERIFY PIONEX':''}; ${guard.label}.`;
+ return {...b, liquidation, live, buffer, snapBuffer, verifiedBuffer, liveEstimate, verifyRequired, guard, rawGuard, protection, beProtected:protection.active, usesLive, stale, action, reason};
 }
 
 function botRealityMeta(bot){
@@ -887,7 +928,7 @@ function commandCenter(){
  const hedgeCapitalPct=longCapital?100*shortCapital/longCapital:0;
  const gate=Number(DATA.dayTrade?.gateScore||0);
  const marketBullish=(m.label||DATA.market?.regime||'').includes('RISK-ON');
- const criticalCount=bots.filter(b=>(b.status||'').toUpperCase()==='CRITICAL'||Number(b.liquidationDistancePct)<8).length;
+ const criticalCount=canonicalBotStates().filter(b=>!b.beProtected && (b.guard?.label==='CRITICAL')).length;
 
  // NOW layer: separate market opportunity from portfolio risk.
  let nowAction='HALTEN / RISIKO NICHT ERHÖHEN', nowTone='amber';
@@ -953,11 +994,9 @@ function depot(){
  const fiveXLongCapacity=fiveXLongCapital*5;
  const accountValue=Number.isFinite(Number(ex.pionexAccountValue)) ? Number(ex.pionexAccountValue) : null;
  const netDirection=longCapital>shortCapital ? 'NET LONG / BTC HEDGE' : shortCapital>longCapital ? 'NET SHORT' : 'BALANCED';
- const criticalCount=activeBots.filter(b=>{
-   const d=Number(b.liquidationDistancePct);
-   return (b.status||'').toUpperCase()==='CRITICAL' || (Number.isFinite(d) && d<8);
- }).length;
- const riskLevel=criticalCount>0?'HIGH':activeBots.some(b=>Number(b.liquidationDistancePct)<15)?'ELEVATED':'NORMAL';
+ const activeStates=canonicalBotStates();
+ const criticalCount=activeStates.filter(b=>!b.beProtected && b.guard?.label==='CRITICAL').length;
+ const riskLevel=criticalCount>0?'HIGH':activeStates.some(b=>!b.beProtected && ['DANGER','TIGHT'].includes(b.guard?.label))?'ELEVATED':'NORMAL';
  const riskNote=criticalCount>0
    ? `${criticalCount} kritische Position${criticalCount>1?'en':''}; Futures-Risiko zuerst prüfen.`
    : 'Keine kritische aktive Futures-Position.';
@@ -1653,7 +1692,7 @@ function capitalReleaseState(){
  const theoretical=Number(DATA.capitalReleaseEngine?.theoreticalLongCapacityUSD||DATA.pionex?.longCapacity||5642);
  const portfolioRisk=Number(DATA.market?.portfolioRisk ?? DATA.portfolioRisk ?? 68);
  const highLev=Number(cfg.blockHighLeverageAtOrAbove||20);
- const otherHighRisk=states.filter(b=>b.id!==short?.id && Number(b.leverage||0)>=highLev && ['CRITICAL','DANGER'].includes(b.guard?.label));
+ const otherHighRisk=states.filter(b=>b.id!==short?.id && !b.beProtected && Number(b.leverage||0)>=highLev && ['CRITICAL','DANGER'].includes(b.guard?.label));
 
  const ladder=capitalLadderState(shortBuf);
  let tier=ladder.label, cls=ladder.tone, fraction=ladder.releasePct/100;
@@ -2137,7 +2176,8 @@ function decisionSSOT(){
 
  const queue=botStates.map(b=>{
    let action='HOLD';
-   if(b.guard.label==='CRITICAL') action='REDUCE / EXIT CHECK';
+   if(b.beProtected) action='KEEP · BE PROTECTED';
+   else if(b.guard.label==='CRITICAL') action='REDUCE / EXIT CHECK';
    else if(b.guard.label==='DANGER') action=String(b.side).toUpperCase()==='LONG'?'KEEP / NO ADD':'KEEP HEDGE / RECOVERY';
    else if(b.guard.label==='TIGHT') action='WATCH / NO ADD';
    return {
@@ -2192,13 +2232,15 @@ function lifecycleDecision(bot){
  const b=Number(bot?.buffer), health=Number(bot?.healthScore||0), side=String(bot?.side||'').toUpperCase();
  const pnl=Number(bot?.totalProfit||0), be=Number(bot?.breakEven), live=Number(bot?.live);
  let action='KEEP', tone='green', reason='Position stabil; Struktur und Risiko weiter beobachten.';
- if(!Number.isFinite(b)){ action='KEEP'; tone='amber'; reason='Liquidationspuffer nicht belastbar live verfügbar.'; }
+ const protection=bot?.protection || breakEvenProtectionState(bot);
+ if(protection.active){ action='KEEP · BE PROTECTED'; tone='green'; reason='Break-even-Schutz aktiv: gültiger SL liegt auf/über BE (Long) bzw. auf/unter BE (Short). Dieser Bot erzeugt keinen primären Liquidations-Risk-Block mehr; Slippage/Fees/Execution bleiben als Restrisiko.'; }
+ else if(!Number.isFinite(b)){ action='KEEP'; tone='amber'; reason='Liquidationspuffer nicht belastbar live verfügbar.'; }
  else if(b<Number(cfg.criticalBufferBelow||8)){ action='REDUCE / EXIT'; tone='red'; reason='CRITICAL Liquidationspuffer überschreibt Momentum und Entry.'; }
  else if(b<Number(cfg.dangerBufferBelow||15)){ action=side==='SHORT'?'REDUCE':'KEEP / NO ADD'; tone='red'; reason='DANGER: kein zusätzliches Hebelrisiko.'; }
  else if(b<Number(cfg.tightBufferBelow||30)){ action='KEEP / NO ADD'; tone='amber'; reason='TIGHT: Position darf laufen, ADD bleibt gesperrt bis SAFE ≥30%.'; }
  else if(health>=Number(cfg.addMinHealth||70) && !s.entryBlocked){ action='KEEP · ADD CHECK'; tone='green'; reason='SAFE-Puffer; ADD bleibt zusätzlich von Entry/Setup abhängig.'; }
- const addAllowed=action.includes('ADD CHECK') && b>=Number(cfg.addMinBuffer||30) && health>=Number(cfg.addMinHealth||70) && !s.entryBlocked;
- return {action,tone,reason,addAllowed,pnl,be,live,buffer:b,health};
+ const addAllowed=!protection.active && action.includes('ADD CHECK') && b>=Number(cfg.addMinBuffer||30) && health>=Number(cfg.addMinHealth||70) && !s.entryBlocked;
+ return {action,tone,reason,addAllowed,pnl,be,live,buffer:b,health,protection,beProtected:protection.active};
 }
 
 function botNextThreshold(buffer, leverage, side){
@@ -2222,7 +2264,7 @@ function positionLifecyclePanel(){
     <small>${x.reason}</small>
    </div>`;
  }).join('');
- return card(`<div class="section-head"><div><div class="eyebrow">POSITION LIFECYCLE 1.0 ${liveBadge('SSOT')}</div><div class="forecast-main">DISCOVER → ENTRY → MANAGE → EXIT → RE-ENTRY</div><div class="sub">KEEP · ADD · REDUCE · EXIT — Liquidationsrisiko hat immer Vorrang.</div></div></div>
+ return card(`<div class="section-head"><div><div class="eyebrow">POSITION LIFECYCLE 1.0 ${liveBadge('SSOT')}</div><div class="forecast-main">DISCOVER → ENTRY → MANAGE → EXIT → RE-ENTRY</div><div class="sub">KEEP · ADD · REDUCE · EXIT — Liquidationsrisiko hat Vorrang, außer ein gültiger Break-even-SL schützt den Exit davor.</div></div></div>
  <div class="life-flow"><span>DISCOVER</span><i>→</i><span>ENTRY</span><i>→</i><span class="cyan">MANAGE</span><i>→</i><span>EXIT</span><i>→</i><span>RE-ENTRY</span></div>
  ${rows}
  <p class="footer-note">ADD wird nie nur wegen Gewinn freigegeben. Mindestlogik: SAFE ≥30% Liq.-Puffer + Health ≥70 + kein vorgelagerter Risk-Block; Entry/Setup muss danach separat bestätigen.</p>`,'lifecycle-card');
@@ -2276,17 +2318,18 @@ function executionPlan(){
  const primary=bots[0]||null;
 
  const botPlans=bots.map((b,i)=>{
-   const sev=executionSeverity(b.buffer);
+   const sev=b.beProtected?{label:'BE PROTECTED',tone:'green',rank:5}:executionSeverity(b.buffer);
    let action=b.action||'HOLD';
-   if(sev.rank<=1 && String(b.side||'').toUpperCase()==='SHORT') action='REDUCE / EXIT CHECK';
+   if(b.beProtected) action='KEEP · SL ≥ BE';
+   else if(sev.rank<=1 && String(b.side||'').toUpperCase()==='SHORT') action='REDUCE / EXIT CHECK';
    else if(sev.rank<=1) action='DEFEND / REDUCE CHECK';
    else if(sev.label==='DANGER' && String(b.side||'').toUpperCase()==='LONG') action='KEEP / NO ADD';
    return {
      priority:i+1,id:b.id,symbol:b.symbol,side:b.side,leverage:b.leverage,
      buffer:b.buffer,guard:b.guard,severity:sev,action,
-     adjustment:executionReductionBand(b),
-     target:executionTarget(b),
-     trigger:executionTrigger(b),
+     adjustment:b.beProtected?'KEEP · SL NICHT UNTER BREAK-EVEN SENKEN':executionReductionBand(b),
+     target:b.beProtected?'BE PROTECTED':executionTarget(b),
+     trigger:b.beProtected?'SL / BE / EXECUTION STATUS PRÜFEN':executionTrigger(b),
      live:b.live,liq:b.liquidation,breakEven:Number(b.breakEven),
      health:Number(b.healthScore||0),funding:Number(b.fundingPct)
    };
@@ -2301,7 +2344,8 @@ function executionPlan(){
 
  let headline='KEINE AKTION';
  if(primary){
-   if(primary.buffer<8) headline=`${primary.id} ABSICHERN`;
+   if(primary.beProtected) headline=`${primary.id} BE PROTECTED`;
+   else if(primary.buffer<8) headline=`${primary.id} ABSICHERN`;
    else if(primary.buffer<15) headline=`${primary.id} KEIN ADD`;
    else headline='POSITIONEN HALTEN';
  }
@@ -2830,12 +2874,13 @@ function positionIntelBotState(bot){
  const isBtcShort=bot.symbol==='BTC'&&String(bot.side||'').toUpperCase()==='SHORT';
  const hasBtcLong=canonicalBotStates().some(b=>b.symbol==='BTC'&&String(b.side||'').toUpperCase()==='LONG');
  let next='Struktur beobachten', action=x.action, tone=x.tone, reason=x.reason;
- if(Number(x.buffer)<8) next='Liq.-Puffer ≥8%';
+ if(x.beProtected) next='BE PROTECTED · SL/Execution beobachten';
+ else if(Number(x.buffer)<8) next='Liq.-Puffer ≥8%';
  else if(Number(x.buffer)<15) next='Liq.-Puffer ≥12% SAFE';
  else if(Number(x.buffer)<30) next='SAFE ≥30%';
  else if(!x.addAllowed) next='Entry/Setup separat bestätigen';
  else next='ADD CHECK möglich';
- if(isBtcShort&&hasBtcLong){
+ if(isBtcShort&&hasBtcLong&&!x.beProtected){
    action=Number(x.buffer)<8?'KEEP HEDGE · BUFFER CRITICAL':'KEEP HEDGE';
    tone=Number(x.buffer)<8?'red':'green';
    reason=`HEDGE LEG: Short wird gegen BTC-/Portfolio-Long-Exposure bewertet. ${x.reason} Nicht isoliert wegen negativem P&L schließen.`;

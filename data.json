@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.24.0",
-  "build": "2026-08-24-center-ux2-layout-safe",
+  "appVersion": "5.24.1",
+  "build": "be-protection-layout-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -389,7 +389,10 @@
         "verifiedAt": "2026-08-24T16:41:00+02:00",
         "verificationSource": "PIONEX SCREENSHOT",
         "bufferBasis": "PIONEX DISPLAYED · FIXED LIQ",
-        "reason": "BTC-L100: Pionex verified 24.08.2026 16:41; 100x, range 68k–92k, SL 77k, Liq. 73,506.8, displayed Liq.-Puffer 7.86%."
+        "reason": "BTC-L100: Pionex verified 24.08.2026 16:41; 100x, range 68k–92k, SL 77k, Liq. 73,506.8, displayed Liq.-Puffer 7.86%.",
+        "beProtectionExpected": true,
+        "riskOverride": "BE_PROTECTED_IF_LIVE_SL_VALID",
+        "riskOverrideNote": "SL 77,000 is above BE 76,938.9 and above liquidation 73,506.8; with live price above SL/BE the bot is treated as BE protected."
       },
       {
         "id": "HBAR-L3",
@@ -1886,5 +1889,15 @@
       "breakEven": 72580.3,
       "status": "GRID PAUSED / ABOVE RANGE"
     }
+  },
+  "breakEvenProtectionEngine": {
+    "version": "1.0",
+    "enabled": true,
+    "logic": {
+      "LONG": "live > breakEven AND stopLoss >= breakEven AND stopLoss < live AND stopLoss > liquidation",
+      "SHORT": "live < breakEven AND stopLoss <= breakEven AND stopLoss > live AND stopLoss < liquidation"
+    },
+    "effect": "A valid BE-protecting stop removes the bot as a primary CRITICAL/DANGER capital-loss blocker. Residual execution/slippage/fee/gap risk remains.",
+    "addRule": "BE protection never auto-enables ADD/new capital."
   }
 }
