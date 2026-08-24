@@ -2119,3 +2119,54 @@ body[data-view] nav.bottom{
   bottom:0 !important;
   top:auto !important;
 }
+
+/* v5.45.0 — tabbar flush to the physical bottom, using the iPhone safe area */
+:root{
+  --meridian-tab-content-h: 66px;
+}
+html, body{
+  min-height:100%;
+  background:#02070c !important;
+}
+body{
+  min-height:100dvh !important;
+  margin:0 !important;
+  padding-bottom:calc(var(--meridian-tab-content-h) + env(safe-area-inset-bottom)) !important;
+}
+.bottom-nav,
+.tabbar,
+nav.bottom,
+nav[role="navigation"].bottom-nav{
+  position:fixed !important;
+  left:0 !important;
+  right:0 !important;
+  top:auto !important;
+  bottom:0 !important;
+  width:100% !important;
+  height:calc(var(--meridian-tab-content-h) + env(safe-area-inset-bottom)) !important;
+  min-height:0 !important;
+  box-sizing:border-box !important;
+  margin:0 !important;
+  padding-top:0 !important;
+  padding-bottom:env(safe-area-inset-bottom) !important;
+  transform:none !important;
+  background:#02070c !important;
+  z-index:9999 !important;
+  align-items:center !important;
+}
+
+/* Only reserve the actual occupied bottom area — no dead zone above the nav */
+main,
+.main,
+.view,
+.content,
+#app{
+  padding-bottom:calc(var(--meridian-tab-content-h) + env(safe-area-inset-bottom) + 4px) !important;
+  box-sizing:border-box !important;
+}
+body[data-view] .bottom-nav,
+body[data-view] .tabbar,
+body[data-view] nav.bottom{
+  bottom:0 !important;
+  top:auto !important;
+}

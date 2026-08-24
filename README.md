@@ -1,8 +1,7 @@
-# ACHI MERIDIAN v5.44.0 — Global Fixed Tabbar
-
-Layout-Fix:
-- Bottom-Tab-Leiste ist jetzt global fixed
-- identische Position in CENTER, DEPOT, MARKT, BODEN, TRADE, GRID und FCST
-- iPhone Safe Area berücksichtigt
-- alle Views reservieren exakt denselben unteren Platz
-- kein Springen der Navigation zwischen kurzen und langen Seiten
+# ACHI MERIDIAN v5.45.0
+Bottom navigation optimization:
+- navigation stays fixed in every tab
+- moved flush to the bottom of the iPhone viewport
+- home-indicator safe area is part of the navigation background
+- unused dead space below/above navigation removed
+- content can use more vertical viewport space

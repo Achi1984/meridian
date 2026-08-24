@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.44.0",
-  "build": "2026-08-24-global-fixed-tabbar",
+  "appVersion": "5.45.0",
+  "build": "2026-08-24-bottom-safearea-tabbar",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1942,8 +1942,9 @@
     "canonical": "DUAL_GATE_SSOT"
   },
   "layoutFix": {
-    "tabBar": "GLOBAL_FIXED",
+    "tabBar": "FIXED_FLUSH_BOTTOM",
     "samePositionAllViews": true,
-    "safeAreaAware": true
+    "usesSafeArea": true,
+    "deadSpaceRemoved": true
   }
 }
