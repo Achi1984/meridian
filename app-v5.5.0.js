@@ -2708,12 +2708,57 @@ function portfolioHedgeState(){
  return {spotValue,longBotNotional,shortBotNotional,grossLong,net,hedgeRatio,hedgeBand,bandCls,survivability,survivalLabel};
 }
 
+
+function hedgeOptimizerState(){
+ const h=portfolioHedgeState();
+ const bots=canonicalBotStates();
+ const s=bots.find(b=>b.symbol==='BTC'&&String(b.side||'').toUpperCase()==='SHORT');
+ const raw=(DATA.pionexBots?.activeBots?.['BTC-S30']||DATA.bots?.activeBots?.['BTC-S30']||{});
+ const lev=Math.max(1,Number(s?.leverage||raw.leverage||30));
+ const investment=Math.max(0,Number(s?.investment||s?.investmentUSDT||raw.investmentUSDT||52));
+ const dynMargin=Math.max(0,Number(raw.dynamicMarginUSDT||110.09));
+ const notional=Math.max(0,h.shortBotNotional);
+ const buffer=Number(h.survivability);
+ const targetMin=8, targetMax=12;
+ const targetNotionalMin=h.grossLong*targetMin/100;
+ const targetNotionalMax=h.grossLong*targetMax/100;
+ const targetGapMin=Math.max(0,targetNotionalMin-notional);
+ const currentCollateral=investment+dynMargin;
+ const bufferNeed=Number.isFinite(buffer)&&buffer>0?Math.max(0,currentCollateral*(targetMin/buffer-1)):0;
+ const scenarios=[30,20,15,10].map(L=>{
+   const reqBase=notional>0?notional/L:0;
+   const extraBase=Math.max(0,reqBase-investment);
+   const estCollateral=dynMargin+Math.max(investment,reqBase);
+   const estBuffer=Number.isFinite(buffer)&&currentCollateral>0?Math.min(99,buffer*(estCollateral/currentCollateral)):NaN;
+   return {L,reqBase,extraBase,estBuffer};
+ });
+ let action='HOLD / RECHECK';
+ if(Number.isFinite(buffer)&&buffer<8) action='SURVIVABILITY FIRST';
+ else if(h.hedgeRatio<targetMin) action='SIZE HEDGE REVIEW';
+ else if(h.hedgeRatio>targetMax) action='OVERHEDGE REVIEW';
+ else action='TARGET ZONE · HOLD';
+ return {...h,lev,investment,dynMargin,notional,buffer,targetMin,targetMax,targetNotionalMin,targetNotionalMax,targetGapMin,bufferNeed,scenarios,action};
+}
+function hedgeOptimizerPanel(){
+ const o=hedgeOptimizerState();
+ const critical=Number.isFinite(o.buffer)&&o.buffer<8;
+ return `<div class="hedge-opt-v520">
+   <div class="section-head"><div><div class="eyebrow">HEDGE OPTIMIZER 1.0 ${liveBadge('MODEL')}</div><div class="forecast-main">${o.action}</div><div class="sub">SURVIVE → SIZE HEDGE → OPTIMIZE LEVERAGE → RELEASE CAPITAL</div></div><span class="tag ${critical?'red':'amber'}">${critical?'BUFFER FIRST':'TARGET '+o.targetMin+'–'+o.targetMax+'%'}</span></div>
+   <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>TARGET ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
+   <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
+   <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':'HEDGE-ZONE UND SETUP PRÜFEN'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':'Keine automatische Orderfreigabe.'}</small></div>
+   <div class="section-title">LEVERAGE / MARGIN SIMULATOR <span class="tag amber">ESTIMATE</span></div>
+   <div class="hedge-sim">${o.scenarios.map(x=>`<div><span>${x.L}x</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>
+   <p class="footer-note"><b>MODEL / ESTIMATE:</b> Hebel-Szenarien verwenden den MERIDIAN-Proxy und die bekannte Dynamic Margin. Der tatsächliche Pionex-Liquidationspreis kann wegen Grid-Position, Maintenance Margin, Fees und Bot-Mechanik abweichen. Nach jeder manuellen Änderung Pionex-Liq.-Preis neu prüfen und MERIDIAN synchronisieren.</p>
+ </div>`;
+}
 function hedgeEnginePanel(){
  const h=portfolioHedgeState();
  return `<div class="hedge-v519"><div class="section-head"><div><div class="eyebrow">NET EXPOSURE + HEDGE ENGINE 1.0 ${liveBadge('ACTIVE')}</div><div class="forecast-main">${h.hedgeBand}</div><div class="sub">Portfolio-Longs und Futures-Shorts werden gemeinsam bewertet.</div></div><span class="tag ${h.bandCls}">HEDGE ${fmt(h.hedgeRatio,1)}%</span></div>
  <div class="pi-summary"><div><span>GROSS LONG PROXY</span><b>$${fmt(h.grossLong,0)}</b></div><div><span>SHORT HEDGE</span><b>$${fmt(h.shortBotNotional,0)}</b></div><div><span>NET LONG PROXY</span><b>$${fmt(h.net,0)}</b></div></div>
  <div class="pi-grid"><div><span>HEDGE RATIO</span><b>${fmt(h.hedgeRatio,1)}%</b></div><div><span>HEDGE SURVIVABILITY</span><b class="${h.survivability<8?'red':h.survivability<30?'amber':'green'}">${h.survivalLabel}${Number.isFinite(h.survivability)?' · '+fmt(h.survivability,2)+'%':''}</b></div><div><span>LONG BOT NOTIONAL</span><b>$${fmt(h.longBotNotional,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${h.survivability<15?'red':'amber'}">${h.survivability<15?'BLOCKED':'REVIEW'}</b></div></div>
  <div class="hedge-rule"><b>${h.survivability<8?'KEEP HEDGE · INCREASE SURVIVABILITY':'KEEP / REBALANCE BY NET EXPOSURE'}</b><small>Ein Hedge darf gegenläufigen P&L haben. Liquidationspuffer und Hedge-Nutzen werden getrennt bewertet.</small></div>
+ ${hedgeOptimizerPanel()}
  <p class="footer-note">Proxy-Modell: Spotwert + Bot-Investment × Hebel versus Short-Investment × Hebel. Es ist eine Risikoorientierung, kein exaktes Delta und keine automatische Orderfreigabe.</p></div>`;
 }
 
