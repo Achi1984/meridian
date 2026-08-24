@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.20.2';
-let APP_RELEASE='5.20.2 · PIONEX REALITY CALIBRATION';
+let APP_CODE_VERSION='5.21.0';
+let APP_RELEASE='5.21.0 · CAPITAL RELEASE LADDER';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -1593,39 +1593,83 @@ function capitalReleaseState(){
  const cfg=DATA.capitalReleaseEngine?.rules||{};
  const states=canonicalBotStates();
  const short=states.find(b=>b.id==='BTC-S30')||states.find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='SHORT');
- const shortBuf=Number(short?.buffer);
- const crit=Number(cfg.criticalBelowPct||8);
- const preferred=Number(cfg.preferredUnlockPct||12);
- const recovery=Number(cfg.recoveryPct||15);
+ const shortBuf=Number(short?.verifiedBuffer ?? short?.buffer);
+ const liveEst=Number(short?.liveEstimate);
+ const verifyRequired=!!short?.verifyRequired;
+
+ const theoretical=Number(DATA.capitalReleaseEngine?.theoreticalLongCapacityUSD||DATA.pionex?.longCapacity||5642);
+ const portfolioRisk=Number(DATA.market?.portfolioRisk ?? DATA.portfolioRisk ?? 68);
  const highLev=Number(cfg.blockHighLeverageAtOrAbove||20);
  const otherHighRisk=states.filter(b=>b.id!==short?.id && Number(b.leverage||0)>=highLev && ['CRITICAL','DANGER'].includes(b.guard?.label));
- const theoretical=Number(DATA.capitalReleaseEngine?.theoreticalLongCapacityUSD||DATA.pionex?.longCapacity||5642);
- let stage='CHECK', cls='amber', blocked=true, newRiskCapacity=0, next='Risk-Daten prüfen';
+
+ let tier='NO DATA', cls='amber', fraction=0, next='Pionex verifizieren', nextTarget=null;
  if(Number.isFinite(shortBuf)){
-   if(shortBuf<crit){stage='BLOCKED';cls='red';next=`BTC-S30 auf ≥${crit}% Puffer bringen`;}
-   else if(shortBuf<preferred){stage='RECOVERY LOCK';cls='red';next=`BTC-S30 auf ≥${preferred}% Puffer bringen`;}
-   else if(shortBuf<recovery){stage='WATCH LOCK';cls='amber';next=`BTC-S30 auf ≥${recovery}% Puffer bringen`;}
-   else if(otherHighRisk.length){stage='BLOCKED';cls='red';next=`${otherHighRisk[0].id} aus DANGER/CRITICAL lösen`;}
-   else {stage='ENTRY ENGINE CHECK';cls='green';blocked=false;newRiskCapacity=theoretical;next='Setup + Entry Readiness separat bestätigen';}
+   if(shortBuf<8){tier='CRITICAL';cls='red';fraction=0;next='BTC-S30 auf ≥8% bringen';nextTarget=8;}
+   else if(shortBuf<12){tier='RECOVERY';cls='amber';fraction=0;next='BTC-S30 auf ≥12% SAFE bringen';nextTarget=12;}
+   else if(shortBuf<15){tier='SAFE';cls='green';fraction=.10;next='Entry Engine prüfen · Ziel ≥15% COMFORT';nextTarget=15;}
+   else if(shortBuf<20){tier='COMFORT';cls='green';fraction=.25;next='Entry Engine prüfen · Ziel ≥20% STRONG';nextTarget=20;}
+   else if(shortBuf<30){tier='STRONG';cls='green';fraction=.50;next='Entry Engine prüfen · Ziel ≥30% FULL';nextTarget=30;}
+   else {tier='FULL SAFETY';cls='green';fraction=1;next='Entry Engine + Portfolio Gate prüfen';nextTarget=null;}
  }
- return {stage,cls,blocked,newRiskCapacity,theoretical,next,shortBuf,otherHighRisk};
+
+ if(otherHighRisk.length){
+   tier='BLOCKED';
+   cls='red';
+   fraction=0;
+   next=`${otherHighRisk[0].id} aus DANGER/CRITICAL lösen`;
+ }
+
+ let riskThrottle=1;
+ if(portfolioRisk>=80) riskThrottle=.25;
+ else if(portfolioRisk>=70) riskThrottle=.50;
+ else if(portfolioRisk>=60) riskThrottle=.75;
+
+ const ladderCapacity=theoretical*fraction;
+ const riskAdjustedCapacity=ladderCapacity*riskThrottle;
+ const blocked=fraction===0 || otherHighRisk.length>0;
+
+ return {
+   tier,stage:tier,cls,blocked,
+   theoretical,fraction,releasePct:Math.round(fraction*100),
+   ladderCapacity,riskThrottle,riskAdjustedCapacity,
+   newRiskCapacity:blocked?0:riskAdjustedCapacity,
+   next,nextTarget,shortBuf,liveEst,verifyRequired,
+   portfolioRisk,otherHighRisk,entryCheckRequired:fraction>0
+ };
 }
+
 function capitalReleasePanel(){
  const c=capitalReleaseState();
- return card(`<div class="section-head"><div><div class="eyebrow">CAPITAL RELEASE ENGINE 1.0 ${liveBadge('SSOT')}</div><div class="forecast-main ${c.cls}">${c.stage}</div><div class="sub">Risk Unlock → Entry Check → Kapitalfreigabe</div></div><span class="tag ${c.cls}">${c.blocked?'NEW CAPITAL $0':'CHECK ONLY'}</span></div>
+ const capText=c.blocked?'$0 · BLOCKED':'≤ $'+fmt(c.newRiskCapacity,0)+' · ENTRY CHECK';
+ const verifyNote=c.verifyRequired && Number.isFinite(c.liveEst)
+   ? `VERIFIED ${fmt(c.shortBuf,2)}% · LIVE EST. ${fmt(c.liveEst,2)}% · PIONEX VERIFY`
+   : `VERIFIED ${Number.isFinite(c.shortBuf)?fmt(c.shortBuf,2)+'%':'—'}`;
+
+ return card(`<div class="section-head"><div><div class="eyebrow">CAPITAL RELEASE LADDER 2.0 ${liveBadge('SSOT')}</div><div class="forecast-main ${c.cls}">${c.tier}</div><div class="sub">SURVIVABILITY → LADDER → PORTFOLIO THROTTLE → ENTRY CHECK</div></div><span class="tag ${c.cls}">${c.releasePct}% RELEASE BAND</span></div>
  <div class="grid2">
   ${metric('THEORETICAL 5X CAPACITY','$'+fmt(c.theoretical,0),'amber')}
-  ${metric('AVAILABLE NEW RISK',c.blocked?'$0 · BLOCKED':'CHECK ONLY',''+c.cls)}
-  ${metric('BTC-S30 BUFFER',Number.isFinite(c.shortBuf)?fmt(c.shortBuf,1)+'%':'—',c.cls)}
-  ${metric('NEXT UNLOCK',c.next,'cyan')}
+  ${metric('AVAILABLE NEW RISK',capText,c.blocked?'red':'green')}
+  ${metric('BTC-S30 VERIFIED',Number.isFinite(c.shortBuf)?fmt(c.shortBuf,2)+'%':'—',c.cls)}
+  ${metric('NEXT STEP',c.next,'cyan')}
+  ${metric('LADDER CAPACITY','$'+fmt(c.ladderCapacity,0),c.releasePct?'green':'red')}
+  ${metric('PORTFOLIO THROTTLE',fmt(c.riskThrottle*100,0)+'% · RISK '+fmt(c.portfolioRisk,0)+'/100','amber')}
  </div>
- <div class="capital-release-flow">
-  <span class="${Number(c.shortBuf)<8?'red':''}">&lt;8% BLOCK</span>
-  <span class="${Number(c.shortBuf)>=8&&Number(c.shortBuf)<12?'red':''}">8–12 RECOVERY</span>
-  <span class="${Number(c.shortBuf)>=12&&Number(c.shortBuf)<15?'amber':''}">12–15 WATCH</span>
-  <span class="${Number(c.shortBuf)>=15?'green':''}">≥15 ENTRY CHECK</span>
+
+ <div class="capital-release-ladder">
+   <div class="${Number(c.shortBuf)<8?'active red':''}"><b>&lt;8%</b><span>CRITICAL</span><small>0%</small></div>
+   <div class="${Number(c.shortBuf)>=8&&Number(c.shortBuf)<12?'active amber':''}"><b>8–12%</b><span>RECOVERY</span><small>0%</small></div>
+   <div class="${Number(c.shortBuf)>=12&&Number(c.shortBuf)<15?'active green':''}"><b>12–15%</b><span>SAFE</span><small>10%</small></div>
+   <div class="${Number(c.shortBuf)>=15&&Number(c.shortBuf)<20?'active green':''}"><b>15–20%</b><span>COMFORT</span><small>25%</small></div>
+   <div class="${Number(c.shortBuf)>=20&&Number(c.shortBuf)<30?'active green':''}"><b>20–30%</b><span>STRONG</span><small>50%</small></div>
+   <div class="${Number(c.shortBuf)>=30?'active green':''}"><b>≥30%</b><span>FULL</span><small>100%</small></div>
  </div>
- <p class="footer-note">Theoretical Capacity ist nur Rechenkapazität, keine Freigabe. ADD auf bestehende Bots bleibt separat und verlangt weiterhin SAFE ≥30% + Health ≥70 + keinen vorgelagerten Risk-Block.</p>`);
+
+ <div class="release-status-box ${c.blocked?'blocked':'ready'}">
+   <span>CAPITAL STATUS</span>
+   <b>${c.blocked?'NO NEW CAPITAL':'ENTRY CHECK REQUIRED'}</b>
+   <small>${verifyNote}. Freigabe ist ein Maximalbudget, keine automatische Order.</small>
+ </div>
+ <p class="footer-note">ADD auf bestehende Bots bleibt separat: SAFE ≥30% + Health ≥70 + kein vorgelagerter Risk-Block. Die Ladder betrifft nur neues Risikokapital nach erfolgreichem Entry-Check.</p>`);
 }
 
 function entryIntelFactors(g,sym){
@@ -2339,8 +2383,10 @@ function recoveryPhase(buffer){
  if(!Number.isFinite(b)) return {key:'NO_DATA',label:'NO DATA',tone:'amber',min:0,max:0,nextTarget:null};
  if(b<8)  return {key:'CRITICAL',label:'CRITICAL',tone:'red',min:0,max:8,nextTarget:8};
  if(b<12) return {key:'RECOVERY',label:'RECOVERY',tone:'amber',min:8,max:12,nextTarget:12};
- if(b<15) return {key:'STABILIZE',label:'STABILIZE',tone:'amber',min:12,max:15,nextTarget:15};
- return {key:'SAFE',label:'SAFE',tone:'green',min:15,max:100,nextTarget:null};
+ if(b<15) return {key:'SAFE',label:'SAFE',tone:'green',min:12,max:15,nextTarget:15};
+ if(b<20) return {key:'COMFORT',label:'COMFORT',tone:'green',min:15,max:20,nextTarget:20};
+ if(b<30) return {key:'STRONG',label:'STRONG',tone:'green',min:20,max:30,nextTarget:30};
+ return {key:'FULL',label:'FULL SAFETY',tone:'green',min:30,max:100,nextTarget:null};
 }
 
 function recoveryCommandState(){
@@ -2358,8 +2404,8 @@ function recoveryCommandState(){
  const targetLiq=Number(opt?.targetLiq);
 
  const release=capitalReleaseState();
- const riskBlock=phase.key!=='SAFE';
- const progress=phase.key==='SAFE'
+ const riskBlock=['CRITICAL','RECOVERY','NO_DATA'].includes(phase.key);
+ const progress=phase.key==='FULL'
    ? 100
    : Math.max(0,Math.min(100,Math.round(((cur-phase.min)/(phase.max-phase.min))*100)));
 
@@ -2371,9 +2417,15 @@ function recoveryCommandState(){
  }else if(phase.key==='RECOVERY'){
    action='AUF ≥12% PUFFER STABILISIEREN';
    instruction='Minimum erreicht. Noch kein Entry-Unlock; Puffer weiter stabilisieren.';
- }else if(phase.key==='STABILIZE'){
-   action='AUF ≥15% RECOVERY BRINGEN';
-   instruction='Recovery fortsetzen. Erst ab ≥15% wird der Risk Block aufgehoben und neu geprüft.';
+ }else if(phase.key==='SAFE'){
+   action='SAFE ERREICHT · ≥15% COMFORT ANSTREBEN';
+   instruction='SAFE ab 12% erreicht. Neues Kapital nur stufenweise und erst nach Entry-Check.';
+ }else if(phase.key==='COMFORT'){
+   action='COMFORT · ≥20% STRONG ANSTREBEN';
+   instruction='25%-Release-Band möglich; Entry- und Portfolio-Gate bleiben vorgeschaltet.';
+ }else if(phase.key==='STRONG'){
+   action='STRONG · ≥30% FULL SAFETY ANSTREBEN';
+   instruction='50%-Release-Band möglich; bestehende Bot-ADD-Regel bleibt separat.';
  }
 
  return {
@@ -2386,23 +2438,25 @@ function recoveryCommandState(){
 
 function dynamicUnlockState(){
  const r=recoveryCommandState();
+ const c=capitalReleaseState();
  if(!r.bot) return {status:'NO DATA',tone:'amber',capital:'BLOCKED',entry:'BLOCKED',reason:'Botdaten fehlen'};
- if(r.phase.key!=='SAFE'){
+
+ if(c.blocked){
    return {
-     status:'RISK BLOCK',tone:'red',capital:'BLOCKED',entry:'BLOCKED',
-     reason:`${r.bot.id} ${fmt(r.cur,1)}% LIQ · nächstes Ziel ${r.target}%`
+     status:c.tier==='RECOVERY'?'RECOVERY LOCK':'RISK BLOCK',
+     tone:c.cls,capital:'BLOCKED',entry:'BLOCKED',
+     reason:`${r.bot.id} ${fmt(r.cur,2)}% VERIFIED · ${c.next}`
    };
  }
 
- // SAFE removes the liquidation pre-block only; it does not auto-approve capital or entry.
- const rel=capitalReleaseState();
- const capital=rel.blocked?'RECHECK':'CHECK OPEN';
  return {
-   status:'RISK UNLOCKED',tone:'green',capital,entry:'RECHECK',
-   reason:'≥15% Recovery erreicht · Setup/Entry/Portfolio-Risk separat neu bewerten'
+   status:c.tier,
+   tone:'green',
+   capital:`≤$${fmt(c.newRiskCapacity,0)} MAX`,
+   entry:'CHECK REQUIRED',
+   reason:`${c.releasePct}% Ladder-Band · Portfolio-Throttle ${fmt(c.riskThrottle*100,0)}%`
  };
 }
-
 
 function dominantActionSSOT(){
  const r=recoveryCommandState();
@@ -2411,11 +2465,12 @@ function dominantActionSSOT(){
  }
  const p=r.phase?.key;
  if(p==='CRITICAL') return {headline:`${r.bot.id} → ≥8% PUFFER`,detail:'Liquidationsrisiko zuerst reduzieren',chip:'RECOVER NOW',tone:'red',botId:r.bot.id,target:8};
- if(p==='RECOVERY') return {headline:`${r.bot.id} → ≥12% PUFFER`,detail:'Minimum erreicht · Recovery fortsetzen',chip:'RECOVERY',tone:'amber',botId:r.bot.id,target:12};
- if(p==='STABILIZE') return {headline:`${r.bot.id} → ≥15% PUFFER`,detail:'Stabilisieren bis Risk Unlock',chip:'STABILIZE',tone:'amber',botId:r.bot.id,target:15};
- return {headline:`${r.bot.id} RISK UNLOCKED`,detail:'Capital + Entry Gate separat neu prüfen',chip:'SAFE',tone:'green',botId:r.bot.id,target:null};
+ if(p==='RECOVERY') return {headline:`${r.bot.id} → ≥12% SAFE`,detail:'8% Recovery erreicht · nächster Sicherheits-Gate 12%',chip:'RECOVERY',tone:'amber',botId:r.bot.id,target:12};
+ if(p==='SAFE') return {headline:`${r.bot.id} SAFE · ENTRY CHECK`,detail:'12% erreicht · 10%-Release-Band möglich',chip:'SAFE',tone:'green',botId:r.bot.id,target:15};
+ if(p==='COMFORT') return {headline:`${r.bot.id} COMFORT · ENTRY CHECK`,detail:'25%-Release-Band möglich',chip:'COMFORT',tone:'green',botId:r.bot.id,target:20};
+ if(p==='STRONG') return {headline:`${r.bot.id} STRONG · ENTRY CHECK`,detail:'50%-Release-Band möglich',chip:'STRONG',tone:'green',botId:r.bot.id,target:30};
+ return {headline:`${r.bot.id} FULL SAFETY`,detail:'100%-Band maximal · Portfolio + Entry Gate bleiben aktiv',chip:'FULL',tone:'green',botId:r.bot.id,target:null};
 }
-
 
 function compactRecoveryPanel(){
  const wasOpen=!!document.querySelector('.compact-recovery[open]');
@@ -2460,8 +2515,9 @@ function recoveryCommandPanel(){
  <div class="rc-machine">
    <div class="${phase.key==='CRITICAL'?'active':r.cur>=8?'done':''}"><span>&lt;8%</span><b>CRITICAL</b></div>
    <div class="${phase.key==='RECOVERY'?'active':r.cur>=12?'done':''}"><span>8–12%</span><b>RECOVERY</b></div>
-   <div class="${phase.key==='STABILIZE'?'active':r.cur>=15?'done':''}"><span>12–15%</span><b>STABILIZE</b></div>
-   <div class="${phase.key==='SAFE'?'done':''}"><span>≥15%</span><b>SAFE</b></div>
+   <div class="${phase.key==='SAFE'?'active':r.cur>=15?'done':''}"><span>12–15%</span><b>SAFE</b></div>
+   <div class="${phase.key==='COMFORT'?'active':r.cur>=20?'done':''}"><span>15–20%</span><b>COMFORT</b></div>
+   <div class="${['STRONG','FULL'].includes(phase.key)?'active':''}"><span>≥20%</span><b>STRONG+</b></div>
  </div>
 
  <div class="rc-progress">
@@ -2517,7 +2573,7 @@ function liveRiskCockpitState(){
    phase:r.phase?.label||'NO DATA',tone:r.phase?.tone||'amber',
    targetLiq,reduce,margin,
    headline:act.headline,
-   unlock:r.phase?.key==='SAFE'?'RISK UNLOCKED':'BLOCKED'
+   unlock:['SAFE','COMFORT','STRONG','FULL'].includes(r.phase?.key)?'LADDER OPEN':'BLOCKED'
  };
 }
 
@@ -2555,8 +2611,8 @@ function liveRiskCockpitPanel(){
    </div>
    <div>
      <span>UNLOCK</span>
-     <b class="${c.unlock==='RISK UNLOCKED'?'green':'red'}">${c.unlock}</b>
-     <small>${c.target!==null?'Risk Gate aktiv':'Capital + Entry Recheck'}</small>
+     <b class="${c.unlock==='LADDER OPEN'?'green':'red'}">${c.unlock}</b>
+     <small>${c.unlock==='LADDER OPEN'?'Capital Ladder + Entry Check':'Risk Gate aktiv'}</small>
    </div>
  </div>
 
@@ -2709,7 +2765,7 @@ function portfolioHedgeState(){
  if(hedgeRatio>=15&&hedgeRatio<=35){hedgeBand='BALANCED HEDGE';bandCls='green'}
  else if(hedgeRatio>35&&hedgeRatio<=60){hedgeBand='HEAVY HEDGE';bandCls='amber'}
  else if(hedgeRatio>60){hedgeBand='OVERHEDGE WATCH';bandCls='red'}
- const survivalLabel=!Number.isFinite(survivability)?'N/A':survivability<8?'CRITICAL':survivability<15?'RECOVERY':survivability<30?'TIGHT':'SAFE';
+ const survivalLabel=!Number.isFinite(survivability)?'N/A':survivability<8?'CRITICAL':survivability<12?'RECOVERY':survivability<15?'SAFE':survivability<30?'COMFORT':'FULL SAFETY';
  return {spotValue,longBotNotional,shortBotNotional,grossLong,net,hedgeRatio,hedgeBand,bandCls,survivability,survivalLabel};
 }
 
@@ -2770,7 +2826,7 @@ function hedgeOptimizerPanel(){
      <div class="verify-box verified"><b>REAL > MODEL</b><span>Der frühere 7x/≈8,2%-Proxy ist kalibriert und nicht mehr handlungsleitend. Long und Hedge haben das 8%-Recovery-Gate real in Pionex bestätigt. Browser-Livepreis aktualisiert danach den aktuellen Abstand zum fixierten Liq.-Preis.</span></div>
    </div>
 
-   <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':o.buffer<12?'RECOVERY GATE PASSED · NÄCHSTES ZIEL 12%':'12% GATE ERREICHT · REVIEW'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':o.buffer<12?'KEEP HEDGE / KEEP LONG. Kein Margin Release und kein ADD bis zum nächsten Sicherheits-Gate.':'Keine automatische Orderfreigabe; Capital Release separat prüfen.'}</small></div>
+   <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':o.buffer<12?'RECOVERY GATE PASSED · NÄCHSTES ZIEL 12% SAFE':'SAFE GATE ≥12% · CAPITAL LADDER PRÜFEN'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':o.buffer<12?'KEEP HEDGE / KEEP LONG. Kein neues Kapital bis SAFE ≥12%.':'Ab SAFE nur stufenweise Kapitalfreigabe; Entry- und Portfolio-Gate separat prüfen.'}</small></div>
 
    <div class="section-title">LEGACY WHAT-IF <span class="tag amber">MODEL ONLY</span></div>
    <div class="hedge-sim">${o.scenarios.map(x=>`<div><span>${x.L}x</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>

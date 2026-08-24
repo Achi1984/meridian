@@ -1395,3 +1395,22 @@ body{background:transparent;letter-spacing:.01em}
 .verify-box span{display:block;margin-top:6px;color:#8797aa;font-size:8px;line-height:1.5}
 .hedge-sim>div.recommended{border-color:#2fe59a;box-shadow:inset 0 0 0 1px rgba(47,229,154,.15)}
 .hedge-sim>div.recommended>span{color:#2fe59a}
+
+/* v5.21.0 Capital Release Ladder */
+.capital-release-ladder{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:14px 0}
+.capital-release-ladder>div{padding:10px 6px;border:1px solid #173a50;border-radius:12px;text-align:center;background:#071721}
+.capital-release-ladder b{display:block;font-size:10px}
+.capital-release-ladder span{display:block;margin-top:4px;font-size:7px;color:#8292a5;letter-spacing:.6px}
+.capital-release-ladder small{display:block;margin-top:5px;font-size:9px;font-weight:900}
+.capital-release-ladder>div.active.red{border-color:#ff5c6c}
+.capital-release-ladder>div.active.amber{border-color:#e7b951}
+.capital-release-ladder>div.active.green{border-color:#2fe59a;box-shadow:inset 0 0 0 1px rgba(47,229,154,.12)}
+.release-status-box{padding:13px;border:1px solid #173a50;border-radius:14px;margin:12px 0}
+.release-status-box span{display:block;font-size:7px;letter-spacing:.9px;color:#8292a5}
+.release-status-box b{display:block;margin-top:5px;font-size:14px}
+.release-status-box small{display:block;margin-top:6px;font-size:8px;line-height:1.45;color:#8191a4}
+.release-status-box.blocked{border-color:#a43e4d}
+.release-status-box.blocked b{color:#ff5c6c}
+.release-status-box.ready{border-color:#1f9367}
+.release-status-box.ready b{color:#2fe59a}
+.rc-machine{grid-template-columns:repeat(5,1fr)}

@@ -1,10 +1,16 @@
-# ACHI MERIDIAN v5.20.1 — HEDGE OPTIMIZER 1.1
+# ACHI MERIDIAN v5.21.0 — CAPITAL RELEASE LADDER
 
-Neu:
-- AUTO SAFE CONFIG sucht die erste Modellstufe mit geschätztem Liquidationspuffer ≥8%.
-- WHAT IF? erweitert auf 30x / 20x / 15x / 10x / 7x / 5x.
-- RECOMMENDED wird automatisch markiert.
-- Zeigt Gesamt-Basis, Extra-Basis, Hedge Proxy und geschätzten Puffer.
-- PIONEX VERIFY REQUIRED: kein automatischer Statuswechsel auf Basis des Modells.
-- Erst der echte neue Pionex-Liquidationspreis darf RECOVERY / SAFE auslösen.
+Recovery-/Kapitalstufen:
+- <8% CRITICAL → 0%
+- 8–12% RECOVERY → 0%
+- 12–15% SAFE → 10%
+- 15–20% COMFORT → 25%
+- 20–30% STRONG → 50%
+- >=30% FULL SAFETY → 100%
+
+Zusätzlich:
+- Portfolio-Risk-Throttle: bei erhöhtem Gesamtrisiko wird das Maximalbudget reduziert.
+- Jede Kapitalfreigabe bleibt Entry-Check-pflichtig.
 - Keine automatische Order-Ausführung.
+- ADD auf bestehende Bots bleibt separat: >=30% Puffer + Health >=70 + kein vorgelagerter Risk-Block.
+- Pionex VERIFIED bleibt SSOT; Live Estimate überschreibt keine verifizierten Werte.

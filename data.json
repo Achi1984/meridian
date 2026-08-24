@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.20.3",
-  "build": "2026-08-24-reality-ssot",
+  "appVersion": "5.21.0",
+  "build": "2026-08-24-capital-release-ladder",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1523,7 +1523,7 @@
     "policy": "Liquidation risk overrides momentum/entry. ADD requires SAFE buffer, health >=70 and no upstream risk block."
   },
   "capitalReleaseEngine": {
-    "version": "1.0",
+    "version": "2.0",
     "theoreticalLongCapacityUSD": 5642,
     "rules": {
       "criticalBelowPct": 8,
@@ -1532,7 +1532,53 @@
       "existingPositionSafePct": 30,
       "blockHighLeverageAtOrAbove": 20
     },
-    "policy": "New capital is blocked while a CRITICAL high-leverage bot is active. 8-12% = recovery lock, 12-15% = watch lock, >=15% = Entry Engine may check only if no other DANGER/CRITICAL high-leverage bot exists. Existing positions still require >=30% Liq buffer for ADD checks."
+    "policy": "New capital is blocked while a CRITICAL high-leverage bot is active. 8-12% = recovery lock, 12-15% = watch lock, >=15% = Entry Engine may check only if no other DANGER/CRITICAL high-leverage bot exists. Existing positions still require >=30% Liq buffer for ADD checks.",
+    "mode": "LADDER",
+    "execution": "MANUAL_ONLY",
+    "verifiedSource": "PIONEX_REALITY_SSOT",
+    "ladder": [
+      {
+        "minPct": 0,
+        "maxPct": 8,
+        "label": "CRITICAL",
+        "releasePct": 0
+      },
+      {
+        "minPct": 8,
+        "maxPct": 12,
+        "label": "RECOVERY",
+        "releasePct": 0
+      },
+      {
+        "minPct": 12,
+        "maxPct": 15,
+        "label": "SAFE",
+        "releasePct": 10
+      },
+      {
+        "minPct": 15,
+        "maxPct": 20,
+        "label": "COMFORT",
+        "releasePct": 25
+      },
+      {
+        "minPct": 20,
+        "maxPct": 30,
+        "label": "STRONG",
+        "releasePct": 50
+      },
+      {
+        "minPct": 30,
+        "maxPct": 100,
+        "label": "FULL SAFETY",
+        "releasePct": 100
+      }
+    ],
+    "portfolioRiskThrottle": {
+      "risk60to69": 0.75,
+      "risk70to79": 0.5,
+      "risk80plus": 0.25
+    }
   },
   "entryIntelligence": {
     "version": "2.0",
