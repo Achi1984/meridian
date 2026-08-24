@@ -1,16 +1,10 @@
-# ACHI MERIDIAN v5.21.0 — CAPITAL RELEASE LADDER
+# ACHI MERIDIAN v5.21.1 — CONSISTENCY FIX
 
-Recovery-/Kapitalstufen:
-- <8% CRITICAL → 0%
-- 8–12% RECOVERY → 0%
-- 12–15% SAFE → 10%
-- 15–20% COMFORT → 25%
-- 20–30% STRONG → 50%
-- >=30% FULL SAFETY → 100%
-
-Zusätzlich:
-- Portfolio-Risk-Throttle: bei erhöhtem Gesamtrisiko wird das Maximalbudget reduziert.
-- Jede Kapitalfreigabe bleibt Entry-Check-pflichtig.
-- Keine automatische Order-Ausführung.
-- ADD auf bestehende Bots bleibt separat: >=30% Puffer + Health >=70 + kein vorgelagerter Risk-Block.
-- Pionex VERIFIED bleibt SSOT; Live Estimate überschreibt keine verifizierten Werte.
+Korrigiert:
+- Alle Recovery-/Safety-Schwellen lesen jetzt dieselbe zentrale Ladder-Logik.
+- BTC-S30 bei 8–12% zeigt korrekt: nächstes Ziel >=12% SAFE.
+- BTC-L20 bei 8–12% zeigt ebenfalls korrekt: nächstes Ziel >=12% SAFE.
+- Hedge Optimizer benennt 8–12% eindeutig als RECOVERY ZONE und >=12% als SAFE Gate.
+- Alte >=15%-Texte aus Bot-Management wurden entfernt.
+- ADD-Regel für bestehende Bots bleibt unverändert separat bei SAFE >=30% + Health >=70.
+- Pionex VERIFIED bleibt SSOT.

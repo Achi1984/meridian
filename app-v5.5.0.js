@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.21.0';
-let APP_RELEASE='5.21.0 · CAPITAL RELEASE LADDER';
+let APP_CODE_VERSION='5.21.1';
+let APP_RELEASE='5.21.1 · CONSISTENCY FIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -1602,15 +1602,9 @@ function capitalReleaseState(){
  const highLev=Number(cfg.blockHighLeverageAtOrAbove||20);
  const otherHighRisk=states.filter(b=>b.id!==short?.id && Number(b.leverage||0)>=highLev && ['CRITICAL','DANGER'].includes(b.guard?.label));
 
- let tier='NO DATA', cls='amber', fraction=0, next='Pionex verifizieren', nextTarget=null;
- if(Number.isFinite(shortBuf)){
-   if(shortBuf<8){tier='CRITICAL';cls='red';fraction=0;next='BTC-S30 auf ≥8% bringen';nextTarget=8;}
-   else if(shortBuf<12){tier='RECOVERY';cls='amber';fraction=0;next='BTC-S30 auf ≥12% SAFE bringen';nextTarget=12;}
-   else if(shortBuf<15){tier='SAFE';cls='green';fraction=.10;next='Entry Engine prüfen · Ziel ≥15% COMFORT';nextTarget=15;}
-   else if(shortBuf<20){tier='COMFORT';cls='green';fraction=.25;next='Entry Engine prüfen · Ziel ≥20% STRONG';nextTarget=20;}
-   else if(shortBuf<30){tier='STRONG';cls='green';fraction=.50;next='Entry Engine prüfen · Ziel ≥30% FULL';nextTarget=30;}
-   else {tier='FULL SAFETY';cls='green';fraction=1;next='Entry Engine + Portfolio Gate prüfen';nextTarget=null;}
- }
+ const ladder=capitalLadderState(shortBuf);
+ let tier=ladder.label, cls=ladder.tone, fraction=ladder.releasePct/100;
+ let next=ladder.nextLabel, nextTarget=ladder.nextTarget;
 
  if(otherHighRisk.length){
    tier='BLOCKED';
@@ -2153,6 +2147,16 @@ function lifecycleDecision(bot){
  const addAllowed=action.includes('ADD CHECK') && b>=Number(cfg.addMinBuffer||30) && health>=Number(cfg.addMinHealth||70) && !s.entryBlocked;
  return {action,tone,reason,addAllowed,pnl,be,live,buffer:b,health};
 }
+
+function botNextThreshold(buffer, leverage, side){
+ const b=Number(buffer), lev=Number(leverage||0), s=String(side||'').toUpperCase();
+ if(!Number.isFinite(b)) return 'VERIFY PIONEX';
+ const ladder=capitalLadderState(b);
+ if(ladder.nextTarget!==null) return `Liq.-Puffer ${ladder.nextLabel}`;
+ if(s==='LONG' && lev<=5) return 'Entry/Setup separat bestätigen';
+ return 'FULL SAFETY';
+}
+
 function positionLifecyclePanel(){
  const bots=canonicalBotStates();
  const rows=bots.map(bot=>{
@@ -2378,15 +2382,26 @@ function adaptiveRiskPanel(){
    Compact action card for the highest-priority blocked bot.
    Uses SSOT + adaptiveRiskOption geometry; manual action only. */
 
-function recoveryPhase(buffer){
+
+function capitalLadderState(buffer){
  const b=Number(buffer);
- if(!Number.isFinite(b)) return {key:'NO_DATA',label:'NO DATA',tone:'amber',min:0,max:0,nextTarget:null};
- if(b<8)  return {key:'CRITICAL',label:'CRITICAL',tone:'red',min:0,max:8,nextTarget:8};
- if(b<12) return {key:'RECOVERY',label:'RECOVERY',tone:'amber',min:8,max:12,nextTarget:12};
- if(b<15) return {key:'SAFE',label:'SAFE',tone:'green',min:12,max:15,nextTarget:15};
- if(b<20) return {key:'COMFORT',label:'COMFORT',tone:'green',min:15,max:20,nextTarget:20};
- if(b<30) return {key:'STRONG',label:'STRONG',tone:'green',min:20,max:30,nextTarget:30};
- return {key:'FULL',label:'FULL SAFETY',tone:'green',min:30,max:100,nextTarget:null};
+ if(!Number.isFinite(b)) return {key:'NO_DATA',label:'NO DATA',tone:'amber',nextTarget:null,nextLabel:'VERIFY PIONEX',releasePct:0};
+ if(b<8)  return {key:'CRITICAL',label:'CRITICAL',tone:'red',nextTarget:8,nextLabel:'≥8% RECOVERY',releasePct:0};
+ if(b<12) return {key:'RECOVERY',label:'RECOVERY',tone:'amber',nextTarget:12,nextLabel:'≥12% SAFE',releasePct:0};
+ if(b<15) return {key:'SAFE',label:'SAFE',tone:'green',nextTarget:15,nextLabel:'≥15% COMFORT',releasePct:10};
+ if(b<20) return {key:'COMFORT',label:'COMFORT',tone:'green',nextTarget:20,nextLabel:'≥20% STRONG',releasePct:25};
+ if(b<30) return {key:'STRONG',label:'STRONG',tone:'green',nextTarget:30,nextLabel:'≥30% FULL SAFETY',releasePct:50};
+ return {key:'FULL',label:'FULL SAFETY',tone:'green',nextTarget:null,nextLabel:'FULL SAFETY',releasePct:100};
+}
+
+function recoveryPhase(buffer){
+ const s=capitalLadderState(buffer);
+ const ranges={
+  NO_DATA:[0,0], CRITICAL:[0,8], RECOVERY:[8,12], SAFE:[12,15],
+  COMFORT:[15,20], STRONG:[20,30], FULL:[30,100]
+ };
+ const [min,max]=ranges[s.key]||[0,0];
+ return {...s,min,max};
 }
 
 function recoveryCommandState(){
@@ -2739,7 +2754,7 @@ function positionIntelBotState(bot){
  const hasBtcLong=canonicalBotStates().some(b=>b.symbol==='BTC'&&String(b.side||'').toUpperCase()==='LONG');
  let next='Struktur beobachten', action=x.action, tone=x.tone, reason=x.reason;
  if(Number(x.buffer)<8) next='Liq.-Puffer ≥8%';
- else if(Number(x.buffer)<15) next='Liq.-Puffer ≥15%';
+ else if(Number(x.buffer)<15) next='Liq.-Puffer ≥12% SAFE';
  else if(Number(x.buffer)<30) next='SAFE ≥30%';
  else if(!x.addAllowed) next='Entry/Setup separat bestätigen';
  else next='ADD CHECK möglich';
@@ -2802,7 +2817,7 @@ function hedgeOptimizerState(){
  if(Number.isFinite(buffer)&&buffer<8) action='SURVIVABILITY FIRST';
  else if(h.hedgeRatio<targetMin) action='SIZE HEDGE REVIEW';
  else if(h.hedgeRatio>targetMax) action='OVERHEDGE REVIEW';
- else action='TARGET ZONE · HOLD';
+ else action='RECOVERY ZONE · HOLD';
 
  return {...h,lev,investment,dynMargin,notional,buffer,targetMin,targetMax,targetNotionalMin,targetNotionalMax,targetGapMin,bufferNeed,scenarios,autoSafe,action};
 }
@@ -2812,7 +2827,7 @@ function hedgeOptimizerPanel(){
  const a=o.autoSafe||{};
  return `<div class="hedge-opt-v520">
    <div class="section-head"><div><div class="eyebrow">HEDGE OPTIMIZER 1.1 ${liveBadge('MODEL')}</div><div class="forecast-main">${o.action}</div><div class="sub">SURVIVE → SIZE HEDGE → OPTIMIZE LEVERAGE → RELEASE CAPITAL</div></div><span class="tag ${critical?'red':'amber'}">${critical?'BUFFER FIRST':'TARGET '+o.targetMin+'–'+o.targetMax+'%'}</span></div>
-   <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>TARGET ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
+   <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>RECOVERY ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
    <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
 
    <div class="auto-safe-v521 reality-calibration-v522">
