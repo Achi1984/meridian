@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.21.3';
-let APP_RELEASE='5.21.3 · RECOVERY CONSISTENCY';
+let APP_CODE_VERSION='5.21.4';
+let APP_RELEASE='5.21.4 · COCKPIT PROGRESS HOTFIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2652,7 +2652,7 @@ function liveRiskCockpitPanel(){
  </div>
 
  <div class="lrc-progress">
-   <div><span>WEG ZUM NÄCHSTEN ZIEL</span><b>${progress}%</b></div>
+   <div><span>WEG ZUM NÄCHSTEN ZIEL</span><b>${recoveryPhaseProgress(r)}%</b></div>
    <div class="bar"><i style="width:${progress}%"></i></div>
  </div>
 

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.21.3",
-  "build": "2026-08-24-recovery-consistency",
+  "appVersion": "5.21.4",
+  "build": "2026-08-24-cockpit-progress-hotfix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1778,6 +1778,7 @@
     "decisionDetailsRecoveryNaming": true,
     "recoveryProgressRange": true,
     "phaseRelativeRecoveryProgress": true,
-    "modelAlternativesExplicit": true
+    "modelAlternativesExplicit": true,
+    "cockpitUsesCanonicalRecoveryProgress": true
   }
 }

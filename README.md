@@ -1,8 +1,8 @@
-# ACHI MERIDIAN v5.21.3 — Recovery Consistency
+# ACHI MERIDIAN v5.21.4 — Cockpit Progress Hotfix
 
-- Recovery-Fortschritt ist jetzt phasenbezogen.
-- Beispiel: 8,05% innerhalb der 8–12%-Phase ≈ 1% Fortschritt, nicht 67%.
-- Die Range 8,05% → 12,00% bleibt sichtbar.
-- REDUCE-ÄQUIV. und MARGIN-ÄQUIV. sind ausdrücklich MODEL / ALTERNATIVE.
-- Hauptaktion bleibt KEEP HEDGE / RECOVERY.
+Gezielter Hotfix:
+- LIVE RISK COCKPIT verwendet jetzt dieselbe phasenbezogene Recovery-Progress-Funktion wie Dynamic Recovery.
+- Beispiel: 8,05% innerhalb der 8–12%-Recovery-Phase => ~1%, nicht 67%.
+- Prozentanzeige und Balkenbreite werden aus derselben SSOT-Funktion gespeist.
+- Keine Änderung an Risk Engine, Capital Release Ladder, Hedge-Logik oder Entry Gates.
 - Keine automatische Order-Ausführung.
