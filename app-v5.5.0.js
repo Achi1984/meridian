@@ -1756,6 +1756,11 @@ function capitalReleasePanel(){
    <div class="${Number(c.shortBuf)>=30?'active green':''}"><b>≥30%</b><span>FULL</span><small>100%</small></div>
  </div>
 
+ <div class="gate-strip ${c.blocked?'blocked':'open'} capital-gate-strip">
+   <div><span>RISK GATE</span><b>${c.blocked?'BLOCKED':'OPEN'}</b></div>
+   <div><span>RELEASE BAND</span><b>${c.releasePct}%</b></div>
+   <div><span>ENTRY</span><b>${c.blocked?'BLOCKED':'CHECK REQUIRED'}</b></div>
+ </div>
  <div class="release-status-box ${c.blocked?'blocked':'ready'}">
    <span>CAPITAL STATUS</span>
    <b>${c.blocked?'NO NEW CAPITAL':'ENTRY CHECK REQUIRED'}</b>
@@ -1795,12 +1800,42 @@ function entryIntelScore(g,sym){
 function entryIntelAction(g,sym){
  const setup=scannerScore(g,sym), entry=entryReadiness(g,sym), total=entryIntelScore(g,sym);
  const cap=capitalReleaseState(), f=entryIntelFactors(g,sym);
- if(cap.blocked) return {label:'BLOCKED',cls:'red',reason:'PORTFOLIO RISK GATE',setup,entry,total,rr:f.rr};
- if(f.rr && f.rr<2) return {label:'NO TRADE',cls:'red',reason:'R:R < 2,0',setup,entry,total,rr:f.rr};
- if(setup>=70 && entry>=70 && f.rr>=2.5) return {label:'PREFERRED',cls:'green',reason:'Setup + Timing + R:R bestätigt',setup,entry,total,rr:f.rr};
- if(setup>=65 && entry>=65 && f.rr>=2) return {label:'READY',cls:'green',reason:'Entry Check freigegeben',setup,entry,total,rr:f.rr};
- if(entry>=55 || setup>=65) return {label:'WATCH',cls:'amber',reason:'Setup vorhanden, Trigger noch nicht vollständig',setup,entry,total,rr:f.rr};
- return {label:'WAIT',cls:'red',reason:'Entry Timing noch zu schwach',setup,entry,total,rr:f.rr};
+
+ // First determine the asset-specific signal WITHOUT the portfolio gate.
+ // The capital gate may suppress execution, but must not erase a good setup.
+ let base;
+ if(f.rr && f.rr<2) base={label:'NO TRADE',cls:'red',reason:'R:R < 2,0'};
+ else if(setup>=70 && entry>=70 && f.rr>=2.5) base={label:'PREFERRED',cls:'green',reason:'Setup + Timing + R:R bestätigt'};
+ else if(setup>=65 && entry>=65 && f.rr>=2) base={label:'READY',cls:'green',reason:'Entry Check grundsätzlich bestätigt'};
+ else if(entry>=55 || setup>=65) base={label:'WATCH',cls:'amber',reason:'Setup vorhanden, Trigger noch nicht vollständig'};
+ else base={label:'WAIT',cls:'red',reason:'Entry Timing noch zu schwach'};
+
+ // Portfolio gate overlay:
+ // opportunity remains visible, but execution is converted to WATCHLIST.
+ if(cap.blocked){
+   const watchReason = base.label==='NO TRADE'
+     ? `WATCHLIST · ${base.reason}`
+     : `CAPITAL GATE BLOCKED · Signal ${base.label}`;
+   return {
+     label:'WATCHLIST',
+     cls:'amber',
+     reason:watchReason,
+     setup,entry,total,rr:f.rr,
+     executionBlocked:true,
+     signalLabel:base.label,
+     signalCls:base.cls,
+     signalReason:base.reason
+   };
+ }
+
+ return {
+   label:base.label,cls:base.cls,reason:base.reason,
+   setup,entry,total,rr:f.rr,
+   executionBlocked:false,
+   signalLabel:base.label,
+   signalCls:base.cls,
+   signalReason:base.reason
+ };
 }
 function entryIntelRank(){
  return ['SOL','ETH','XRP','HBAR','PEPE'].map(sym=>{
@@ -1817,21 +1852,65 @@ function saveDecisionJournal(sym){
  const btn=document.querySelector(`[data-journal="${sym}"]`);
  if(btn){btn.textContent='GESPEICHERT ✓';setTimeout(()=>btn.textContent='DECISION LOGGEN',1200);}
 }
+
+function watchlistPriorityState(a){
+ if(!a)return {label:'IGNORE',cls:'red',rank:3,reason:'No signal'};
+ const rr=Number(a.rr||0);
+ const setup=Number(a.setup||0), entry=Number(a.entry||0), total=Number(a.total||0);
+ const basis=String(a.signalLabel||a.label||'').toUpperCase();
+
+ if(basis==='NO TRADE' || rr>0 && rr<2 || total<50)
+   return {label:'IGNORE',cls:'red',rank:3,reason:'Setup/R:R nicht ausreichend'};
+
+ if(['PREFERRED','READY'].includes(basis) && setup>=65 && entry>=65 && total>=65 && rr>=2)
+   return {label:'READY WHEN UNLOCKED',cls:'green',rank:0,reason:'Signalqualität ausreichend; nur Portfolio-Gate fehlt'};
+
+ if(basis==='WATCH' || setup>=60 || entry>=55 || total>=60)
+   return {label:'WAIT FOR TRIGGER',cls:'amber',rank:1,reason:'Setup vorhanden, Trigger/Timing noch offen'};
+
+ return {label:'WATCH',cls:'amber',rank:2,reason:'Beobachten, aber aktuell keine Priorität'};
+}
+function watchlistPriorityRank(){
+ return entryIntelRank()
+   .map(x=>({...x,w:watchlistPriorityState(x.a)}))
+   .sort((a,b)=>a.w.rank-b.w.rank || b.a.total-a.a.total || b.a.entry-a.a.entry);
+}
+
 function entryIntelligencePanel(){
- const rank=entryIntelRank(), cap=capitalReleaseState();
- return card(`<div class="section-head"><div><div class="eyebrow">ENTRY INTELLIGENCE 2.0 ${liveBadge('ACTIVE')}</div>
- <div class="forecast-main">OPPORTUNITY RANKING</div><div class="sub">SETUP ≠ ENTRY · Risk Gate hat immer Vorrang.</div></div>
- <span class="tag ${cap.blocked?'red':'green'}">${cap.blocked?'CAPITAL BLOCKED':'ENTRY CHECK'}</span></div>
- ${rank.map((x,i)=>`<div class="intel-rank"><span class="intel-pos">#${i+1}</span><b>${x.sym}</b>
- <span>SETUP <b>${x.a.setup}</b></span><span>ENTRY <b>${x.a.entry}</b></span><span>INTEL <b>${x.a.total}</b></span>
- <strong class="${x.a.cls}">${x.a.label}</strong></div>
- <div class="intel-why">${x.a.reason}${x.a.rr?` · R:R ${fmt(x.a.rr,2)}`:''}</div>`).join('')||'<p class="footer-note">4H-Daten werden geladen …</p>'}
- <p class="footer-note">Kein automatischer BUY/SELL. Asset-spezifisches Funding/OI bleibt neutral gewichtet, bis frische verifizierte Daten vorliegen.</p>`);
+ const cap=capitalReleaseState();
+ const watchMode=cap.blocked;
+ const rank=watchMode?watchlistPriorityRank():entryIntelRank();
+
+ return card(`<div class="section-head"><div><div class="eyebrow">ENTRY INTELLIGENCE 2.2 ${liveBadge('ACTIVE')}</div>
+ <div class="forecast-main">OPPORTUNITY RANKING</div>
+ <div class="sub">${watchMode?'Watchlist priorisiert nach Umsetzbarkeit nach Risk-Unlock.':'SETUP ≠ ENTRY · Risk Gate hat immer Vorrang.'}</div></div>
+ <span class="tag ${watchMode?'amber':'green'}">${watchMode?'WATCHLIST PRIORITY':'ENTRY CHECK'}</span></div>
+
+ ${watchMode?`<div class="watchlist-gate-banner">
+   <div><span>CAPITAL GATE</span><b>BLOCKED</b></div>
+   <div><span>SCANNER MODE</span><b>PRIORITY WATCHLIST</b></div>
+   <p>MERIDIAN trennt jetzt automatisch READY WHEN UNLOCKED, WAIT FOR TRIGGER und IGNORE.</p>
+ </div>`:''}
+
+ ${rank.map((x,i)=>{
+   const w=watchMode?x.w:null;
+   return `<div class="intel-rank ${watchMode?'watchlist-row':''}">
+     <span class="intel-pos">#${i+1}</span><b>${x.sym}</b>
+     <span>SETUP <b>${x.a.setup}</b></span><span>ENTRY <b>${x.a.entry}</b></span><span>INTEL <b>${x.a.total}</b></span>
+     <strong class="${watchMode?w.cls:x.a.cls}">${watchMode?w.label:x.a.label}</strong></div>
+   <div class="intel-why">${watchMode?`${w.reason} · BASIS ${x.a.signalLabel||x.a.label}`:x.a.reason}${x.a.rr?` · R:R ${fmt(x.a.rr,2)}`:''}</div>`;
+ }).join('')||'<p class="footer-note">4H-Daten werden geladen …</p>'}
+
+ ${watchMode?`<div class="watchlist-legend">
+   <span class="green">READY WHEN UNLOCKED</span><span class="amber">WAIT FOR TRIGGER</span><span class="red">IGNORE</span>
+ </div>`:''}
+
+ <p class="footer-note">${watchMode?'WATCHLIST ≠ ORDERFREIGABE. ':'Kein automatischer BUY/SELL. '}Asset-spezifisches Funding/OI bleibt neutral gewichtet, bis frische verifizierte Daten vorliegen.</p>`);
 }
 function scannerCard(sym){
  const g=fibFromSwing(sym); if(!g)return '';
  const a=entryIntelAction(g,sym), f=entryIntelFactors(g,sym), grids=scannerGrids(sym,g);
- const cap=capitalReleaseState(), riskLabel=cap.blocked?'RISK BLOCK':'RISK OPEN', riskCls=cap.blocked?'red':'green';
+ const cap=capitalReleaseState(), riskLabel=cap.blocked?'CAPITAL BLOCK':'RISK OPEN', riskCls=cap.blocked?'red':'green';
  return `<details class="commander-detail scanner-risk" data-detail-key="scanner-${sym}"><summary>
  <span><b>${sym}</b><small>${g.state} · ${g.source}</small></span>
  <span><b class="${a.setup>=70?'green':a.setup>=60?'amber':'red'}">${a.setup}</b><small>SETUP</small></span>
@@ -1841,7 +1920,7 @@ function scannerCard(sym){
  <div><span>R:R TP2</span><b>${f.rr?fmt(f.rr,2):'—'}</b></div><div><span>GRIDS</span><b>~${grids}</b></div>
  <div><span>PORTFOLIO GATE</span><b class="${riskCls}">${riskLabel}</b></div><div><span>ACTION</span><b class="${a.cls}">${a.label}</b></div></div>
  <div class="intel-factors"><span>Trend ${f.trend}</span><span>Momentum ${f.momentum}</span><span>Vol ${f.volume}</span><span>R:R ${f.riskReward}</span><span>Regime ${f.regime}</span><span>Timing ${f.timing}</span></div>
- <div class="scanner-foot"><b class="${a.cls}">${a.reason}</b> · Setup ${a.setup}/100 · Entry ${a.entry}/100 · Intelligence ${a.total}/100</div>
+ <div class="scanner-foot"><b class="${a.cls}">${a.reason}</b>${a.executionBlocked?` · ${wp.label} · Basis ${a.signalLabel||a.label}`:''} · Setup ${a.setup}/100 · Entry ${a.entry}/100 · Intelligence ${a.total}/100</div>
  <button class="mini-grid-btn" data-journal="${sym}" onclick="event.preventDefault();event.stopPropagation();saveDecisionJournal('${sym}')">DECISION LOGGEN</button>
  ${multiAssetRiskRow(sym)}</details>`;
 }
@@ -2958,21 +3037,24 @@ function hedgeOptimizerPanel(){
    <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>RECOVERY ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
    <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
 
-   <details class="auto-safe-v521 reality-calibration-v522">
+   <details class="auto-safe-v521 reality-calibration-v522" data-detail-key="center-pionex-reality-current">
      <summary><span>PIONEX REALITY · CURRENT</span><b class="red">RISK GATE BLOCKED</b></summary>
-     <div class="reality-current-grid">
-       <div class="be-protected-tile"><span>BTC LONG · BE PROTECTED ✓</span><b class="green">100x · 7,86% LIQ</b><small>SL $77.000 ≥ BE $76.938,9 · LIQ $73.507</small></div>
-       <div><span>BTC SHORT</span><b>30x · 6,25%</b><small>LIQ $84.765 · DYN $198,90</small></div>
+     <div class="reality-current-grid reality-current-grid-single">
+       <div><span>BTC-S30 · SINGLE HEDGE</span><b>${fmt(o.lev,0)}x · ${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'} LIQ</b><small>DYN $${fmt(o.dynMargin,0)} · aktive Pionex-Position</small></div>
      </div>
-     <div class="pi-grid"><div><span>NÄCHSTES GATE</span><b>8% RECOVERY</b></div><div><span>NÄCHSTES ZIEL</span><b>12% SAFE</b></div><div><span>CAPITAL / ADD</span><b class="red">BLOCKED</b></div><div><span>QUELLE</span><b class="green">PIONEX VERIFIED</b></div></div>
-     <div class="verify-box verified"><b>REAL > MODEL</b><span>Aktive Pionex-Werte sind handlungsleitend. Legacy BTC-L20 ist aus der aktiven Entscheidung entfernt.</span></div>
+     <div class="pi-grid"><div><span>NÄCHSTES GATE</span><b>${o.targetMin}% RECOVERY</b></div><div><span>NÄCHSTES ZIEL</span><b>${o.targetMax}% SAFE</b></div><div><span>CAPITAL / ADD</span><b class="red">BLOCKED</b></div><div><span>QUELLE</span><b class="green">PIONEX VERIFIED</b></div></div>
+     <div class="verify-box verified"><b>REAL > MODEL</b><span>BTC-L100 ist geschlossen und aus der aktiven Risikoentscheidung entfernt. BTC-S30 ist der einzige aktive BTC-Futures-Hedge.</span></div>
    </details>
 
    <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':o.buffer<12?'RECOVERY GATE PASSED · NÄCHSTES ZIEL 12% SAFE':'SAFE GATE ≥12% · CAPITAL LADDER PRÜFEN'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':o.buffer<12?'KEEP HEDGE / KEEP LONG. Kein neues Kapital bis SAFE ≥12%.':'Ab SAFE nur stufenweise Kapitalfreigabe; Entry- und Portfolio-Gate separat prüfen.'}</small></div>
 
-   <div class="section-title">LEGACY WHAT-IF <span class="tag amber">MODEL ONLY</span></div>
-   <div class="hedge-sim">${o.scenarios.map(x=>`<div><span>${x.L}x</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>
-   <p class="footer-note"><b>MODEL / ESTIMATE:</b> Hebel-Szenarien verwenden den MERIDIAN-Proxy und die bekannte Dynamic Margin. Der tatsächliche Pionex-Liquidationspreis kann wegen Grid-Position, Maintenance Margin, Fees und Bot-Mechanik abweichen. Nach jeder manuellen Änderung Pionex-Liq.-Preis neu prüfen und MERIDIAN synchronisieren.</p>
+   <details class="legacy-whatif compact-module" data-detail-key="center-legacy-whatif">
+     <summary><span><b>LEGACY WHAT-IF</b><small>nur Modell-Szenarien · nicht handlungsleitend</small></span><strong>MODEL ONLY</strong></summary>
+     <div class="legacy-whatif-body">
+       <div class="hedge-sim">${o.scenarios.map(x=>`<div><span>${x.L}x</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>
+       <p class="footer-note"><b>MODEL / ESTIMATE:</b> Hebel-Szenarien verwenden den MERIDIAN-Proxy und die bekannte Dynamic Margin. Der tatsächliche Pionex-Liquidationspreis kann wegen Grid-Position, Maintenance Margin, Fees und Bot-Mechanik abweichen. Nach jeder manuellen Änderung Pionex-Liq.-Preis neu prüfen und MERIDIAN synchronisieren.</p>
+     </div>
+   </details>
  </div>`;
 }
 function hedgeEnginePanel(){
@@ -2983,6 +3065,102 @@ function hedgeEnginePanel(){
  <div class="hedge-rule"><b>${h.survivability<8?'KEEP HEDGE · INCREASE SURVIVABILITY':'KEEP / REBALANCE BY NET EXPOSURE'}</b><small>Ein Hedge darf gegenläufigen P&L haben. Liquidationspuffer und Hedge-Nutzen werden getrennt bewertet.</small></div>
  ${hedgeOptimizerPanel()}
  <p class="footer-note">Proxy-Modell: Spotwert + Bot-Investment × Hebel versus Short-Investment × Hebel. Es ist eine Risikoorientierung, kein exaktes Delta und keine automatische Orderfreigabe.</p></div>`;
+}
+
+
+function beProtectionMatrixPanel(){
+ const bots=canonicalBotStates();
+ const rows=bots.map(b=>{
+   const p=b.protection||breakEvenProtectionState(b);
+   const be=Number(b.breakEven), sl=Number(b.stopLoss??b.sl), liq=Number(b.liquidation??b.liquidationPrice);
+   const protectedNow=!!p.active;
+   const state=protectedNow?'BE PROTECTED':(Number.isFinite(sl)&&sl>0?'SL CHECK':'NO VALID SL');
+   const tone=protectedNow?'green':(Number.isFinite(sl)&&sl>0?'amber':'red');
+   const risk=protectedNow?'PRIMARY RISK NEUTRALIZED':'COUNTS TO RISK GATE';
+   return `<div class="be-matrix-row ${protectedNow?'protected':''}">
+     <div class="be-matrix-id"><b>${b.id}</b><small>${String(b.side||'').toUpperCase()} ${Number.isFinite(Number(b.leverage))?Number(b.leverage)+'x':'—'}</small></div>
+     <div><span>BE</span><b>${Number.isFinite(be)&&be>0?fmt(be,be<10?4:1):'—'}</b></div>
+     <div><span>SL</span><b>${Number.isFinite(sl)&&sl>0?fmt(sl,sl<10?4:1):'—'}</b></div>
+     <div class="be-matrix-state"><b class="${tone}">${state}</b><small>${risk}</small></div>
+   </div>`;
+ }).join('');
+ return `<details class="be-matrix-panel compact-module" data-detail-key="center-be-protection-matrix">
+   <summary><span><b>BOT SL / BE PROTECTION</b><small>SL ≥ BE (Long) bzw. SL ≤ BE (Short) reduziert primären Kapitalverlust-Risk</small></span><strong>${bots.some(b=>(b.protection||breakEvenProtectionState(b)).active)?'PROTECTED':'CHECK'}</strong></summary>
+   <div class="be-matrix-body">${rows||'<p class="footer-note">Keine aktiven Bots.</p>'}
+   <div class="verify-box verified"><b>LOGIK</b><span>Ein gültiger Schutz-SL muss auf der gewinnsichernden Seite des Break-even liegen und vor der Liquidation auslösen. Dann bleibt der Liq.-Puffer sichtbar, der Bot zählt aber nicht mehr als primärer CRITICAL/DANGER-Kapitalverlust-Blocker. Slippage, Fees, Gaps und Ausführungsrisiko bleiben bestehen.</span></div></div>
+ </details>`;
+}
+
+
+function centerPriorityStack(){
+ const s=positionIntelligenceState();
+ const bots=canonicalBotStates();
+ const crit=[...s.critical];
+ const danger=[...s.danger];
+ const protectedBots=bots.filter(b=>(b.protection||breakEvenProtectionState(b)).active);
+ const currentRisk=crit.length?`${crit[0].id} CRITICAL`:danger.length?`${danger[0].id} DANGER`:'NO CRITICAL BOT';
+ const nextGate=crit.length||danger.length?'BOT RISK CLEAR':'ENTRY / CAPITAL CHECK';
+ const action=crit.length?`REDUCE / PROTECT ${crit[0].id}`:
+              danger.length?`STABILIZE ${danger[0].id}`:
+              s.entryBlocked?'WAIT FOR CAPITAL GATE':'ENTRY CHECK';
+ const tone=crit.length?'red':danger.length?'amber':'green';
+ const protectedTxt=protectedBots.length?`${protectedBots.length} BE PROTECTED`:'0 BE PROTECTED';
+
+ return `<section class="card center-priority-card">
+   <div class="section-head compact-head">
+     <div>
+       <div class="eyebrow">CENTER PRIORITY 1.0 ${liveBadge('SSOT')}</div>
+       <div class="forecast-main">JETZT · RISK · NEXT GATE</div>
+       <div class="sub">Nur die entscheidungsrelevante Reihenfolge. Details bleiben darunter.</div>
+     </div>
+     <span class="tag ${tone}">${s.entryBlocked?'BLOCKED':'OPEN'}</span>
+   </div>
+
+   <div class="priority-grid">
+     <div class="priority-box priority-now">
+       <span>JETZT</span>
+       <b class="${tone}">${action}</b>
+       <small>${crit.length?'Liquidationsrisiko hat Vorrang.':danger.length?'Puffer stabilisieren.':'Keine akute Bot-Gefahr.'}</small>
+     </div>
+     <div class="priority-box">
+       <span>RISK</span>
+       <b class="${tone}">${currentRisk}</b>
+       <small>${protectedTxt}</small>
+     </div>
+     <div class="priority-box">
+       <span>NEXT GATE</span>
+       <b>${nextGate}</b>
+       <small>${s.entryBlocked?'Capital / Entry bleibt gesperrt.':'Danach Entry-Setup separat prüfen.'}</small>
+     </div>
+   </div>
+
+   <div class="priority-lane">
+     <div class="${crit.length||danger.length?'active danger':'done'}"><i>1</i><span>BOT RISK</span></div>
+     <div class="${!(crit.length||danger.length)&&s.entryBlocked?'active':'wait'}"><i>2</i><span>CAPITAL</span></div>
+     <div class="${!s.entryBlocked?'active':'wait'}"><i>3</i><span>ENTRY</span></div>
+   </div>
+
+   <details class="priority-bots compact-module" data-detail-key="center-priority-bots">
+     <summary><span><b>BOT PRIORITIES</b><small>aktive Bots nach Risikorelevanz</small></span><strong>ÖFFNEN</strong></summary>
+     <div class="priority-bot-list">
+       ${bots.map(b=>{
+         const p=b.protection||breakEvenProtectionState(b);
+         const liq=Number(b.liqBufferPct??b.calculatedLiqBufferPct??b.pionexLiqBufferPct);
+         let cls='green', state='KEEP';
+         if(p.active){state='BE PROTECTED';cls='green'}
+         else if(Number.isFinite(liq)&&liq<8){state='CRITICAL';cls='red'}
+         else if(Number.isFinite(liq)&&liq<15){state='RECOVERY';cls='amber'}
+         else if(Number.isFinite(liq)&&liq<30){state='TIGHT';cls='amber'}
+         return `<div class="priority-bot-row">
+           <b>${b.id}</b>
+           <span>${String(b.side||'').toUpperCase()} ${Number.isFinite(Number(b.leverage))?Number(b.leverage)+'x':'—'}</span>
+           <span>${Number.isFinite(liq)?fmt(liq,2)+'% LIQ':'—'}</span>
+           <strong class="${cls}">${state}</strong>
+         </div>`;
+       }).join('')}
+     </div>
+   </details>
+ </section>`;
 }
 
 function positionIntelligencePanel(){
@@ -3024,8 +3202,14 @@ function positionIntelligencePanel(){
    <div><span>BOT POSITIONEN</span><b>${bots.length}</b></div>
    <div><span>GLOBAL GATE</span><b class="${s.entryBlocked?'red':'green'}">${s.entryBlocked?'BLOCKED':'OPEN'}</b></div>
  </div>
+ <div class="gate-strip ${s.entryBlocked?'blocked':'open'}">
+   <div><span>RISK GATE</span><b>${s.entryBlocked?'BLOCKED':'OPEN'}</b></div>
+   <div><span>CAPITAL</span><b>${s.entryBlocked?'$0 NEW RISK':'ENTRY CHECK'}</b></div>
+   <div><span>BOT GUARD</span><b>${s.critical.length?'CRITICAL':s.danger.length?'DANGER':'CLEAR'}</b></div>
+ </div>
 
  ${pionexRealityPanel()}
+ ${beProtectionMatrixPanel()}
  ${hedgeEnginePanel()}
  <div class="section-title">SPOT MANAGEMENT</div>
  ${spotRows||'<div class="muted">Keine Spot-Positionen im SSOT.</div>'}
@@ -3041,7 +3225,7 @@ function centerAdvancedRiskDetails(){
  return `<details class="center-advanced" data-detail-key="center-advanced-risk">
    <summary><span><b>RISK & POSITION DETAILS</b><small>Position Intelligence · Lifecycle · Capital Release · Execution</small></span><strong>ÖFFNEN</strong></summary>
    <div class="center-advanced-body">
-     ${positionIntelligencePanel()}
+     ${centerPriorityStack()+positionIntelligencePanel()}
      ${positionLifecyclePanel()}
      ${capitalReleasePanel()}
      ${executionEnginePanel()}
@@ -3081,7 +3265,7 @@ function compactDecisionDetails(){
   const longHtml=L
    ? `<div class="rr ${L.status==='SL PROTECTED'?'be-row-protected':''}"><div><b>${L.id}</b><small>LONG ${L.leverage}x</small></div><strong>${P(L.liqBufferPct)}</strong><span class="tag">${L.status||'ACTIVE'}</span></div>`
    : `<div class="rr closed-bot-row"><div><b>BTC-L100</b><small>LONG CLOSED · aus Risk-SSOT entfernt</small></div><strong class="muted">CLOSED</strong><span class="tag green">EXCLUDED</span></div>`;
-  const html=`<section class="card pionex-real-risk">
+  const html=`<details class="card pionex-real-risk compact-module" data-detail-key="center-real-risk-compact"><summary><span><b>PIONEX REAL RISK</b><small>SINGLE BTC HEDGE · verifiziert</small></span><strong>${P(S.liqBufferPct)}</strong></summary><div class="pionex-real-risk-body">
    <div class="eyebrow">PIONEX REALITY 1.2 <span class="data-state verified">VERIFIED</span></div>
    <div class="section-title">REAL RISK · SINGLE BTC HEDGE</div>
    <div class="rr"><div><b>${S.id}</b><small>SHORT ${S.leverage}x · PORTFOLIO HEDGE</small></div><strong class="${S.liqBufferPct<8?'red':'amber'}">${P(S.liqBufferPct)}</strong><span class="tag ${S.liqBufferPct<8?'red':'amber'}">${S.liqBufferPct<8?'CRITICAL':'RECOVERY'}</span></div>
@@ -3089,7 +3273,7 @@ function compactDecisionDetails(){
    ${longHtml}
    <div class="ladder"><b>SINGLE HEDGE MODE</b><span>${P(S.liqBufferPct)} → 8% RECOVERY</span><small>Der geschlossene Long beeinflusst weder Risk Gate noch Capital Release. BTC-S30 wird als Portfolio-Hedge separat bewertet.</small></div>
    <p class="footer-note">Echte Pionex-Werte: Dynamic Margin ${M(S.dynamicMargin)}, Liq. ${M(S.liqPrice)}, Break-even ${M(S.breakEven)}. Keine automatische Order-Ausführung.</p>
-  </section>`;
+  </div></details>`;
   const els=[...document.querySelectorAll('section,.card,div')];
   const mark=els.find(e=>(e.textContent||'').includes('RISK & POSITION DETAILS')&&(e.textContent||'').length<12000);
   if(mark)mark.insertAdjacentHTML('afterend',html);

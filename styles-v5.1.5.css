@@ -1523,3 +1523,279 @@ body{background:transparent;letter-spacing:.01em}
   .pionex-real-risk .rr,.pionex-real-risk .rl{min-width:0}
   .pionex-real-risk .rr>*{min-width:0;overflow-wrap:anywhere}
 }
+
+/* v5.24.4 — persistent Pionex Reality CURRENT accordion */
+.reality-current-grid-single{grid-template-columns:1fr}
+.reality-calibration-v522>summary{position:relative;z-index:1}
+
+
+/* v5.24.5 — CENTER COMPACT / GATE SYSTEM / BE MATRIX */
+.center-advanced-body .card{margin-top:14px}
+.position-intelligence-card{padding:20px 18px}
+.position-intelligence-card .section-head{gap:10px}
+.position-intelligence-card .forecast-main{font-size:27px;line-height:1.02}
+.position-intelligence-card .pi-summary,
+.position-intelligence-card .pi-grid{gap:10px}
+.position-intelligence-card .pi-row{padding:14px 0}
+.position-intelligence-card .reality-engine-v522,
+.position-intelligence-card .hedge-v519,
+.position-intelligence-card .hedge-opt-v520{margin-top:16px;padding:18px}
+
+.compact-module{
+  border:1px solid rgba(46,164,230,.52);
+  border-radius:20px;
+  overflow:hidden;
+  margin:14px 0;
+  background:rgba(5,22,33,.46)
+}
+.compact-module>summary{
+  list-style:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 18px
+}
+.compact-module>summary::-webkit-details-marker{display:none}
+.compact-module>summary span{display:grid;gap:3px;min-width:0}
+.compact-module>summary b{letter-spacing:1.3px}
+.compact-module>summary small{font-size:10px;color:var(--muted);line-height:1.35}
+.compact-module>summary strong{font-size:11px;color:var(--cyan);white-space:nowrap}
+.compact-module[open]>summary{border-bottom:1px solid rgba(46,164,230,.28)}
+.legacy-whatif-body,.be-matrix-body,.pionex-real-risk-body{padding:14px 16px 18px}
+
+.gate-strip{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;margin:14px 0;
+  padding:10px;border:1px solid rgba(88,162,205,.32);
+  border-radius:16px;background:rgba(5,17,27,.55)
+}
+.gate-strip>div{min-width:0;padding:10px;border-radius:12px;background:rgba(8,28,40,.75)}
+.gate-strip span{display:block;color:var(--muted);font-size:9px;letter-spacing:1.1px;margin-bottom:5px}
+.gate-strip b{font-size:12px;line-height:1.2;overflow-wrap:anywhere}
+.gate-strip.blocked{border-color:rgba(255,82,96,.45)}
+.gate-strip.blocked b{color:var(--red)}
+.gate-strip.open{border-color:rgba(45,213,143,.45)}
+.gate-strip.open b{color:var(--green)}
+
+.be-matrix-row{
+  display:grid;
+  grid-template-columns:1.2fr .8fr .8fr 1.5fr;
+  gap:8px;align-items:center;
+  padding:12px 0;border-bottom:1px solid rgba(72,142,183,.25)
+}
+.be-matrix-row:last-child{border-bottom:0}
+.be-matrix-row>div{min-width:0}
+.be-matrix-row span,.be-matrix-row small{display:block;color:var(--muted);font-size:9px;letter-spacing:.8px}
+.be-matrix-row b{font-size:12px;overflow-wrap:anywhere}
+.be-matrix-row.protected{background:rgba(30,188,126,.05)}
+.be-matrix-id small{margin-top:3px}
+.be-matrix-state small{margin-top:4px;line-height:1.25}
+
+.pionex-real-risk{padding:0!important}
+.pionex-real-risk .rr,.pionex-real-risk .rl,.pionex-real-risk .ladder,.pionex-real-risk .footer-note{margin-left:0;margin-right:0}
+
+@media (max-width:430px){
+  .position-intelligence-card{padding:18px 14px}
+  .position-intelligence-card .reality-engine-v522,
+  .position-intelligence-card .hedge-v519,
+  .position-intelligence-card .hedge-opt-v520{padding:15px 12px}
+  .gate-strip{grid-template-columns:1fr}
+  .be-matrix-row{grid-template-columns:1fr 1fr}
+  .be-matrix-state{grid-column:1/-1}
+  .compact-module>summary{padding:14px}
+  .legacy-whatif .hedge-sim{grid-template-columns:1fr 1fr}
+}
+
+
+/* v5.24.6 — CENTER PRIORITY STACK */
+.center-priority-card{
+  margin-top:14px;
+  padding:18px;
+  border-color:rgba(34,166,236,.72);
+  background:linear-gradient(180deg,rgba(4,24,36,.98),rgba(4,19,29,.96))
+}
+.center-priority-card .compact-head{margin-bottom:14px}
+.center-priority-card .forecast-main{font-size:25px;line-height:1.05}
+.priority-grid{
+  display:grid;
+  grid-template-columns:1.15fr 1fr 1fr;
+  gap:10px
+}
+.priority-box{
+  min-width:0;
+  border:1px solid rgba(53,126,170,.45);
+  border-radius:16px;
+  padding:13px;
+  background:rgba(5,21,31,.7)
+}
+.priority-box span{
+  display:block;
+  font-size:9px;
+  color:var(--muted);
+  letter-spacing:1.2px;
+  margin-bottom:6px
+}
+.priority-box b{
+  display:block;
+  font-size:14px;
+  line-height:1.2;
+  overflow-wrap:anywhere
+}
+.priority-box small{
+  display:block;
+  margin-top:6px;
+  font-size:9px;
+  line-height:1.35;
+  color:var(--muted)
+}
+.priority-now{
+  border-color:rgba(255,180,62,.52);
+  box-shadow:inset 0 0 0 1px rgba(255,180,62,.08)
+}
+.priority-lane{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin:12px 0 2px
+}
+.priority-lane>div{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  padding:9px 10px;
+  border:1px solid rgba(71,130,165,.3);
+  border-radius:14px;
+  color:var(--muted);
+  background:rgba(4,17,25,.6)
+}
+.priority-lane i{
+  display:grid;
+  place-items:center;
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  font-style:normal;
+  font-size:10px;
+  border:1px solid currentColor
+}
+.priority-lane span{
+  font-size:10px;
+  letter-spacing:.8px;
+  font-weight:800
+}
+.priority-lane .active{color:var(--cyan);border-color:rgba(50,174,241,.5)}
+.priority-lane .danger{color:var(--red);border-color:rgba(255,82,96,.5)}
+.priority-lane .done{color:var(--green);border-color:rgba(45,213,143,.45)}
+.priority-lane .wait{opacity:.6}
+
+.priority-bot-list{padding:8px 16px 14px}
+.priority-bot-row{
+  display:grid;
+  grid-template-columns:1fr .8fr .9fr 1fr;
+  gap:8px;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid rgba(64,125,159,.22)
+}
+.priority-bot-row:last-child{border-bottom:0}
+.priority-bot-row>*{min-width:0}
+.priority-bot-row span{font-size:9px;color:var(--muted)}
+.priority-bot-row strong{font-size:10px;text-align:right;overflow-wrap:anywhere}
+
+.center-advanced-body > .opportunity-card,
+.center-advanced-body > .position-intelligence-card{
+  margin-top:12px
+}
+
+@media (max-width:430px){
+  .center-priority-card{padding:16px 14px}
+  .priority-grid{grid-template-columns:1fr}
+  .priority-lane{grid-template-columns:1fr 1fr 1fr}
+  .priority-lane span{font-size:8px}
+  .priority-bot-row{
+    grid-template-columns:1fr 1fr;
+    row-gap:4px
+  }
+  .priority-bot-row strong{text-align:left}
+}
+
+
+/* v5.24.7 — Capital Gate x Opportunity Scanner */
+.watchlist-gate-banner{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:12px 0 8px;
+  padding:12px;
+  border:1px solid rgba(242,184,75,.58);
+  border-radius:16px;
+  background:rgba(242,184,75,.055)
+}
+.watchlist-gate-banner>div{
+  min-width:0;
+  padding:10px 11px;
+  border:1px solid rgba(242,184,75,.22);
+  border-radius:12px;
+  background:rgba(4,18,27,.65)
+}
+.watchlist-gate-banner span{
+  display:block;
+  font-size:8px;
+  letter-spacing:1.1px;
+  color:var(--muted);
+  margin-bottom:4px
+}
+.watchlist-gate-banner b{
+  color:var(--amber);
+  font-size:13px;
+  overflow-wrap:anywhere
+}
+.watchlist-gate-banner p{
+  grid-column:1/-1;
+  margin:0;
+  font-size:9px;
+  line-height:1.45;
+  color:var(--muted)
+}
+.intel-rank.watchlist-row strong{
+  color:var(--amber)!important
+}
+.intel-rank.watchlist-row{
+  background:linear-gradient(90deg,rgba(242,184,75,.025),transparent)
+}
+@media(max-width:430px){
+  .watchlist-gate-banner{grid-template-columns:1fr 1fr;padding:10px;gap:8px}
+  .watchlist-gate-banner>div{padding:9px}
+}
+
+
+/* v5.24.8 — Watchlist Priority */
+.watchlist-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:12px 0 4px;
+}
+.watchlist-legend span{
+  border:1px solid currentColor;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.7px;
+}
+.intel-rank.watchlist-row strong{
+  max-width:160px;
+  text-align:right;
+}
+@media(max-width:430px){
+  .intel-rank.watchlist-row{
+    grid-template-columns:auto 1fr auto;
+    row-gap:6px;
+  }
+  .intel-rank.watchlist-row strong{
+    grid-column:2/-1;
+    justify-self:end;
+    max-width:100%;
+    white-space:normal;
+  }
+}

@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.24.3",
-  "build": "single-hedge-pionex-refresh",
+  "appVersion": "5.24.8",
+  "build": "2026-08-24-watchlist-priority",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
