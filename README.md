@@ -1,14 +1,12 @@
-# ACHI MERIDIAN v5.26.0 — Unified Risk Engine + Stability Pass
+# ACHI MERIDIAN v5.27.0 — Dual-Gate + Execution Readiness
 
-Diese Version vereinheitlicht die Risikologik in CENTER und GRID.
+Neu:
+- Technical Gate und Portfolio Risk Gate strikt getrennt
+- Execution nur bei 2/2 OPEN
+- gutes Setup bleibt sichtbar, auch wenn Kapital blockiert ist
+- Execution Preview für höchstpriorisierte Watchlist-Position
+- Entry Zone, Invalidation/SL, TP1–TP3, R:R und maximal freigegebenes neues Risikobudget
+- DAY-TRADE zeigt jetzt ausdrücklich TECHNICAL READY statt irreführend ENTRY FREIGEGEBEN
+- keine automatische Order-Ausführung
 
-- Unified Risk State Matrix 2.0 als zentrale Bot-Entscheidungsquelle
-- Canonical Pionex Buffer bleibt SSOT; Browser-Live-Estimate nur Diagnose
-- Break-even-SL neutralisiert den Bot als primären Kapitalverlust-Blocker
-- Stale/Snapshot Guard: alte Werte bleiben sichtbar, blockieren aber ADD/NEW CAPITAL konservativ
-- Closed Bots werden aus aktiver Risk-/Capital-Logik ausgeschlossen
-- Module Isolation: Fehler in einem Teilmodul sollen nicht mehr den ganzen CENTER/GRID-Tab ausfallen lassen
-- Mobile Layout Guard gegen überlappende Karten/Raster auf iPhone-Breite
-- GRID Commander 3.7 / Decision Engine 2.0
-
-Keine automatische Order-Ausführung. Nach manuellen Pionex-Änderungen Liquidationspreis/Buffer erneut verifizieren.
+Bestehende SSOT-, Recovery-, Pionex-, GRID-, Forecast- und Livefeed-Logik bleibt erhalten.

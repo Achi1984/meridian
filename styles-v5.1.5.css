@@ -1826,3 +1826,16 @@ body{background:transparent;letter-spacing:.01em}
   .reality-current-grid, .reality-current-grid-single, .pi-summary, .hedge-kpis,
   .priority-grid, .exec-grid, .sl-riskbox, .grid2 { grid-template-columns:1fr!important; }
 }
+
+/* v5.27.0 Dual-Gate + Execution Readiness */
+.dual-gate-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+.dual-gate{border:1px solid #173e55;border-radius:18px;padding:16px;background:#071722}
+.dual-gate span,.execution-lock span{display:block;color:#8296a8;font-size:10px;letter-spacing:1.4px;margin-bottom:8px}
+.dual-gate b,.execution-lock b{display:block;font-size:18px}
+.dual-gate small,.execution-lock small{display:block;color:#8296a8;margin-top:8px;line-height:1.45}
+.dual-gate.open{border-color:#22d98a}.dual-gate.open b{color:#22d98a}
+.dual-gate.blocked{border-color:#ff5964}.dual-gate.blocked b{color:#ff5964}
+.execution-lock{border:1px solid #ff5964;border-radius:18px;padding:16px;margin:14px 0}
+.execution-lock.locked b{color:#ff5964}.execution-lock.ready{border-color:#22d98a}.execution-lock.ready b{color:#22d98a}
+.execution-preview{margin-top:20px;padding-top:18px;border-top:1px solid #173e55}
+@media(max-width:520px){.dual-gate-grid{grid-template-columns:1fr}}

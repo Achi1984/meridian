@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.26.0",
-  "build": "2026-08-24-unified-risk-engine-stability",
+  "appVersion": "5.27.0",
+  "build": "2026-08-24-dual-gate-execution-readiness",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1422,22 +1422,11 @@
     ]
   },
   "executionEngine": {
-    "version": "1.0",
-    "status": "MODEL + SSOT",
-    "principle": "RISK -> ACTION -> TARGET -> RECHECK",
-    "bufferTargets": {
-      "criticalMinimumPct": 8,
-      "preferredSafetyPct": 12,
-      "dangerRecoveryPct": 15,
-      "safePct": 30
-    },
-    "rules": [
-      "Bot-Liquidationsrisiko hat Vorrang vor neuem Kapital.",
-      "Bestehende Position und neuer Entry werden getrennt bewertet.",
-      "Bei CRITICAL wird ein Reduktions-/Margin-Band ausgegeben, keine automatische Order.",
-      "Nach jeder manuellen Anpassung muss der Live-Liquidationspuffer neu geprüft werden.",
-      "SL bleibt strukturell; Liquidationspreis ist keine Stop-Loss-Empfehlung."
-    ]
+    "version": "3.0",
+    "mode": "DUAL_GATE",
+    "technicalGateThreshold": 70,
+    "rule": "Execution only when Technical Gate AND Portfolio Risk Gate are simultaneously OPEN.",
+    "automaticOrderExecution": false
   },
   "depotSSOT": {
     "version": "1.0",
