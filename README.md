@@ -1,16 +1,10 @@
-# ACHI MERIDIAN v5.22.0 — Pionex Reality Engine 2.0
+# ACHI MERIDIAN v5.24.0 — CENTER UX 2.0
 
-Neu:
-- Klare Quellenhierarchie: REAL/VERIFIED > LIVE CALC > SNAPSHOT > MODEL.
-- Pro Bot wird sichtbar, ob Liq.-Puffer aus echten Pionex-Werten, Live-Berechnung oder Snapshot/Modell stammt.
-- BTC-S30, BTC-L20 und HBAR-L3 sind explizit mit ihren letzten Pionex-Verifikationen hinterlegt.
-- XRP-L5 bleibt bewusst SNAPSHOT + LIVE CALC.
-- DATA HEALTH zeigt jetzt LIVE/VERIFIED vs. SNAPSHOT statt nur Bot-Anzahl.
-- Alte Reality Calibration bleibt nur noch als Legacy-Hinweis sichtbar.
-
-Unverändert:
-- Recovery-/Safety-Ladder
-- Capital Release Gate
-- Hedge-Logik
-- Entry Gates
-- Keine automatische Order-Ausführung
+- Current Pionex BTC reality updated from screenshots 24.08.2026 16:41–16:42
+- BTC-L100 active: 100x, range 68k–92k, SL 77k, Liq 73,506.8, displayed buffer 7.86%
+- BTC-S30 active: 30x, Dynamic Margin 198.9, Liq 84,764.5, displayed buffer 6.25%
+- Both are below the 8% Recovery Gate: Capital/Add remains BLOCKED
+- Removed stale BTC-L20 from active decision source
+- Reality calibration converted to compact disclosure
+- Mobile grid collision/overflow hardening for iPhone widths
+- 3-column risk summaries collapse safely to 2 columns, then 1 column on narrow screens

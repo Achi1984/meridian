@@ -2907,16 +2907,15 @@ function hedgeOptimizerPanel(){
    <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>RECOVERY ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
    <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
 
-   <div class="auto-safe-v521 reality-calibration-v522">
-     <div class="section-head"><div><div class="eyebrow">PIONEX REALITY CALIBRATION · LEGACY <span class="tag green">VERIFIED</span></div><div class="forecast-main">DUAL SURVIVABILITY GATE PASSED</div><div class="sub">Legacy-Kalibrierung; Reality Engine 2.0 ist die aktuelle Quelleninstanz.</div></div></div>
-     <div class="pi-summary">
-       <div><span>BTC-L20 REAL</span><b class="green">8,29%</b><small>20x · LIQ $71.499</small></div>
-       <div><span>BTC-S30 VERIFIED</span><b class="green">${fmt(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifiedBuffer)||8.05,2)}%</b><small>30x · LIQ $84.226</small></div>
-       <div><span>BTC-S30 LIVE EST.</span><b class="${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'amber':'green'}">${Number.isFinite(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).liveEstimate))?fmt(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).liveEstimate),2)+'%':'—'}</b><small>${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'VERIFY PIONEX':'within tolerance'}</small></div>
+   <details class="auto-safe-v521 reality-calibration-v522">
+     <summary><span>PIONEX REALITY · CURRENT</span><b class="red">RISK GATE BLOCKED</b></summary>
+     <div class="reality-current-grid">
+       <div><span>BTC LONG</span><b>100x · 7,86%</b><small>LIQ $73.507 · SL $77.000</small></div>
+       <div><span>BTC SHORT</span><b>30x · 6,25%</b><small>LIQ $84.765 · DYN $198,90</small></div>
      </div>
-     <div class="pi-grid"><div><span>NÄCHSTES ZIEL</span><b>12%</b></div><div><span>SHORT DYN. MARGIN</span><b>$188,90</b></div><div><span>PIONEX STATUS</span><b class="${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'amber':'green'}">${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'VERIFY REQUIRED':'VERIFIED'}</b></div><div><span>MARGIN RELEASE</span><b class="red">BLOCKED</b></div></div>
-     <div class="verify-box verified"><b>REAL > MODEL</b><span>Der frühere 7x/≈8,2%-Proxy ist kalibriert und nicht mehr handlungsleitend. Long und Hedge haben das 8%-Recovery-Gate real in Pionex bestätigt. Browser-Livepreis aktualisiert danach den aktuellen Abstand zum fixierten Liq.-Preis.</span></div>
-   </div>
+     <div class="pi-grid"><div><span>NÄCHSTES GATE</span><b>8% RECOVERY</b></div><div><span>NÄCHSTES ZIEL</span><b>12% SAFE</b></div><div><span>CAPITAL / ADD</span><b class="red">BLOCKED</b></div><div><span>QUELLE</span><b class="green">PIONEX VERIFIED</b></div></div>
+     <div class="verify-box verified"><b>REAL > MODEL</b><span>Aktive Pionex-Werte sind handlungsleitend. Legacy BTC-L20 ist aus der aktiven Entscheidung entfernt.</span></div>
+   </details>
 
    <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':o.buffer<12?'RECOVERY GATE PASSED · NÄCHSTES ZIEL 12% SAFE':'SAFE GATE ≥12% · CAPITAL LADDER PRÜFEN'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':o.buffer<12?'KEEP HEDGE / KEEP LONG. Kein neues Kapital bis SAFE ≥12%.':'Ab SAFE nur stufenweise Kapitalfreigabe; Entry- und Portfolio-Gate separat prüfen.'}</small></div>
 
