@@ -1,8 +1,8 @@
-# ACHI MERIDIAN v5.38.0 — Consistency Guard
+# ACHI MERIDIAN v5.39.0 — Entry Integrity + GRID Compact
 
-- CENTER, GRID und TRADE lesen denselben kanonischen Dual-Gate-State.
-- Kein EXECUTION READY ohne Technical + Risk Gate.
-- Kein New Risk bei geschlossenem Risk Gate.
-- Settings enthält einen Consistency Guard mit PASS/CHECK.
-- zusätzliche Mobile-/Overflow-Härtung.
-- Recovery Optimizer und Execution Bridge bleiben erhalten.
+- Zero-price guard: HBAR/altcoin Entry-Zonen behalten assetgerechte Dezimalstellen statt $0.
+- Invalid-plan guard: 0, NaN, negative oder logisch inkonsistente Entry/SL/TP-Pläne werden nicht gerankt oder als Execution Preview ausgegeben.
+- Entry Intelligence 2.3 rankt nur valide Preispläne.
+- GRID Commander 3.9: Best Setup bleibt primär sichtbar; Lifecycle, Recovery, What-If, Bot Management und Legacy sind standardmäßig eingeklappt.
+- CENTER/DUAL-GATE verwendet dieselbe Execution-Plan-Validierung.
+- Keine automatische Order-Ausführung.

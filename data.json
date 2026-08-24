@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.38.0",
-  "build": "2026-08-24-consistency-guard",
+  "appVersion": "5.39.0",
+  "build": "2026-08-24-entry-integrity-grid-compact",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1550,7 +1550,7 @@
     "singleSourceThresholds": true
   },
   "entryIntelligence": {
-    "version": "2.0",
+    "version": "2.3",
     "status": "ACTIVE",
     "principle": "Risk Gate -> Capital Release -> Setup Quality -> Entry Timing -> R:R -> Opportunity Rank -> Action",
     "weights": {
@@ -1571,7 +1571,9 @@
       "watchEntry": 55
     },
     "hardGate": "Upstream portfolio risk block always overrides Entry/Day-Trade scores.",
-    "autoExecution": false
+    "autoExecution": false,
+    "planIntegrity": "Invalid, zero or incomplete price zones are excluded from ranking and execution previews.",
+    "zeroPriceGuard": true
   },
   "decisionJournal": {
     "version": "1.0",
