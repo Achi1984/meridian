@@ -2002,3 +2002,12 @@ body{background:transparent;letter-spacing:.01em}
 @media(max-width:350px){
  .grid2,.cc-grid,.dual-gate-grid,.compact-gates{grid-template-columns:1fr}
 }
+
+/* v5.40.0 — compact CENTER recovery + Entry Intelligence 2.4 */
+.center-recovery-line{width:100%;margin-top:14px;padding:13px 15px;border:1px solid #b88725;border-radius:14px;background:rgba(184,135,37,.06);display:flex;align-items:center;gap:7px;text-align:left;color:#f2f5f8;font:inherit;cursor:pointer}
+.center-recovery-line span{font-size:11px;letter-spacing:.4px;color:#8fa0b2}
+.center-recovery-line b{font-size:13px;color:#eab84f;flex:1}
+.center-recovery-line em{font-size:10px;font-style:normal;color:#29aef3;font-weight:800;white-space:nowrap}
+.intel-trigger,.focus-trigger{margin:5px 0 10px 74px;padding:7px 9px;border-left:2px solid #eab84f;color:#aeb9c6;font-size:10px;letter-spacing:.3px}
+.intel-trigger b,.focus-trigger b{color:#eab84f;margin-right:5px}
+@media(max-width:520px){.center-recovery-line{flex-wrap:wrap}.center-recovery-line b{flex-basis:70%}.intel-trigger,.focus-trigger{margin-left:42px}}
