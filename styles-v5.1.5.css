@@ -2020,3 +2020,53 @@ body[data-view="center"] details[data-detail-key="center-risk"]{margin-top:10px;
 body[data-view="center"] details[data-detail-key="center-opportunity"] summary,
 body[data-view="center"] details[data-detail-key="center-execution"] summary,
 body[data-view="center"] details[data-detail-key="center-risk"] summary{min-height:68px;padding-top:12px;padding-bottom:12px}
+
+/* v5.43.0 — CENTER filled viewport / iPhone bottom fix */
+html,body{
+  min-height:100%;
+  background:#02070c !important;
+}
+body{
+  min-height:100dvh;
+  margin:0;
+  overscroll-behavior-y:none;
+}
+#app,.app-shell,main,.main,.view,.content{
+  background:#02070c;
+}
+body::after{
+  content:"";
+  position:fixed;
+  left:0;right:0;bottom:0;
+  height:max(34px, env(safe-area-inset-bottom));
+  background:#02070c;
+  z-index:-1;
+}
+
+/* CENTER: full decision chain visible as compact rows */
+body[data-view="center"] main,
+body[data-view="center"] .main,
+body[data-view="center"] .view,
+body[data-view="center"] .content{
+  min-height:calc(100dvh - 118px);
+  padding-bottom:calc(92px + env(safe-area-inset-bottom)) !important;
+}
+body[data-view="center"] details[data-detail-key="center-opportunity"],
+body[data-view="center"] details[data-detail-key="center-execution"],
+body[data-view="center"] details[data-detail-key="center-risk"]{
+  display:block !important;
+  margin:10px 24px 0 !important;
+  border-radius:22px;
+}
+body[data-view="center"] details[data-detail-key="center-opportunity"] summary,
+body[data-view="center"] details[data-detail-key="center-execution"] summary,
+body[data-view="center"] details[data-detail-key="center-risk"] summary{
+  min-height:74px !important;
+  padding:14px 18px !important;
+}
+
+/* bottom navigation owns the complete safe area */
+.bottom-nav,.tabbar,nav.bottom{
+  padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
+  background:#02070c !important;
+}
