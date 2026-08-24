@@ -1,4 +1,4 @@
-// MERIDIAN v5.47.0 — cache reset / network only
+// MERIDIAN v5.48.0 — cache reset / network only
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(Promise.all([
