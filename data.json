@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.21.5",
-  "build": "2026-08-24-center-runtime-scope-fix",
+  "appVersion": "5.22.0",
+  "build": "2026-08-24-pionex-reality-engine-2",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -347,7 +347,11 @@
         "action": "KEEP HEDGE / RECOVERY",
         "reason": "BTC-S30: Pionex REAL verified 2026-08-24 12:32; 30x, Dynamic Margin 188.9 USDT, displayed Liq.-Puffer 8.05%.",
         "gridProfit": 9.7,
-        "trendPnl": -118.79
+        "trendPnl": -118.79,
+        "verificationStatus": "VERIFIED",
+        "verifiedAt": "2026-08-24T12:32:00+02:00",
+        "verificationSource": "PIONEX SCREENSHOT",
+        "bufferBasis": "LIVE CALC · BTC LIVE + FIXED PIONEX LIQ"
       },
       {
         "id": "BTC-L20",
@@ -374,7 +378,11 @@
         "creationPrice": 77225,
         "reason": "BTC-L20: Pionex REAL verified 2026-08-24 12:32; 20x, 60 grids, range 68k–92k, displayed Liq.-Puffer 8.29%.",
         "gridProfit": 0.264,
-        "trendPnl": 2.41
+        "trendPnl": 2.41,
+        "verificationStatus": "VERIFIED",
+        "verifiedAt": "2026-08-24T12:32:00+02:00",
+        "verificationSource": "PIONEX SCREENSHOT",
+        "bufferBasis": "LIVE CALC · BTC LIVE + FIXED PIONEX LIQ"
       },
       {
         "id": "HBAR-L3",
@@ -400,7 +408,11 @@
         ],
         "grids": 155,
         "creationPrice": 0.07936,
-        "reason": "HBAR-L3: new Pionex COIN-M Futures Grid verified 2026-08-23 19:15; old HBAR-L5 closed in profit."
+        "reason": "HBAR-L3: new Pionex COIN-M Futures Grid verified 2026-08-23 19:15; old HBAR-L5 closed in profit.",
+        "verificationStatus": "VERIFIED",
+        "verifiedAt": "2026-08-23T19:15:00+02:00",
+        "verificationSource": "PIONEX SCREENSHOT",
+        "bufferBasis": "LIVE CALC · HBAR LIVE + FIXED PIONEX LIQ"
       },
       {
         "id": "XRP-L5",
@@ -419,7 +431,11 @@
         "fundingPct": 0.01,
         "healthScore": 66,
         "action": "HOLD",
-        "reason": "XRP-L5: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
+        "reason": "XRP-L5: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis.",
+        "verificationStatus": "SNAPSHOT",
+        "verifiedAt": null,
+        "verificationSource": "LAST CONFIRMED SNAPSHOT",
+        "bufferBasis": "LIVE CALC · XRP LIVE + SNAPSHOT LIQ"
       }
     ],
     "closedBots": [
@@ -1780,5 +1796,16 @@
     "phaseRelativeRecoveryProgress": true,
     "modelAlternativesExplicit": true,
     "cockpitUsesCanonicalRecoveryProgress": true
+  },
+  "pionexRealityEngine": {
+    "version": "2.0",
+    "sourcePriority": [
+      "VERIFIED",
+      "LIVE CALC",
+      "SNAPSHOT",
+      "MODEL"
+    ],
+    "rule": "REAL > LIVE CALC > SNAPSHOT > MODEL",
+    "autoExecution": false
   }
 }

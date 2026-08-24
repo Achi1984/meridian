@@ -1420,3 +1420,8 @@ body{background:transparent;letter-spacing:.01em}
 
 /* v5.21.3 Recovery consistency */
 .recovery-progress-range{opacity:.9}
+
+/* v5.22.0 Pionex Reality Engine */
+.reality-engine-v522{border:1px solid #13527a;border-radius:22px;padding:18px;margin:18px 0;background:rgba(4,20,31,.42)}
+.reality-engine-v522 .reality-rows{margin-top:12px}
+.reality-engine-v522 .dd-row{padding:10px 0;border-bottom:1px solid rgba(32,104,148,.28)}

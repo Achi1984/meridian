@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.21.5';
-let APP_RELEASE='5.21.5 · CENTER RUNTIME FIX';
+let APP_CODE_VERSION='5.22.0';
+let APP_RELEASE='5.22.0 · PIONEX REALITY ENGINE 2.0';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -438,6 +438,59 @@ function canonicalBotState(b){
  const reason=`${b.id}: Pionex verified ${Number.isFinite(verifiedBuffer)?fmt(verifiedBuffer,2)+'%':'—'}${usesLive&&Number.isFinite(liveEstimate)?' · Live Estimate '+fmt(liveEstimate,2)+'%':''}${verifyRequired?' · VERIFY PIONEX':''}; ${guard.label}.`;
  return {...b, liquidation, live, buffer, snapBuffer, verifiedBuffer, liveEstimate, verifyRequired, guard, usesLive, stale, action, reason};
 }
+
+function botRealityMeta(bot){
+ const raw=(DATA.pionexRisk?.bots||[]).find(x=>x.id===bot.id)||bot||{};
+ const explicit=String(raw.verificationStatus||'').toUpperCase();
+ const hasLiq=Number.isFinite(Number(raw.liquidation ?? raw.liquidationPrice));
+ const hasLive=Number.isFinite(Number(bot.live ?? raw.currentPrice));
+ let status=explicit||'MODEL';
+ if(status==='VERIFIED' && hasLiq && hasLive) status='LIVE CALC';
+ else if(status==='VERIFIED' && hasLiq) status='VERIFIED';
+ else if(status==='SNAPSHOT' && hasLiq && hasLive) status='SNAPSHOT + LIVE CALC';
+ const tone=status.includes('VERIFIED')||status==='LIVE CALC'?'green':status.includes('SNAPSHOT')?'amber':'red';
+ return {
+   id:bot.id,
+   status,
+   tone,
+   source:raw.verificationSource||'MERIDIAN MODEL',
+   verifiedAt:raw.verifiedAt||null,
+   bufferBasis:raw.bufferBasis||'MODEL',
+   liq:hasLiq?Number(raw.liquidation ?? raw.liquidationPrice):NaN,
+   buffer:Number(bot.buffer),
+   leverage:Number(bot.leverage)
+ };
+}
+function pionexRealityState(){
+ const rows=canonicalBotStates().map(botRealityMeta);
+ const verified=rows.filter(x=>x.status==='VERIFIED'||x.status==='LIVE CALC').length;
+ const snapshot=rows.filter(x=>x.status.includes('SNAPSHOT')).length;
+ const model=rows.filter(x=>x.status==='MODEL').length;
+ return {rows,verified,snapshot,model,total:rows.length};
+}
+function pionexRealityPanel(){
+ const r=pionexRealityState();
+ const rows=r.rows.map(x=>`<div class="dd-row">
+   <span>${x.id}</span>
+   <b class="${x.tone}">${x.status}</b>
+   <small>${x.bufferBasis}${Number.isFinite(x.buffer)?` · BUFFER ${fmt(x.buffer,2)}%`:''}${x.verifiedAt?` · ${x.verifiedAt.slice(0,16).replace('T',' ')}`:''}</small>
+ </div>`).join('');
+ return `<div class="reality-engine-v522">
+   <div class="section-head"><div>
+     <div class="eyebrow">PIONEX REALITY ENGINE 2.0 ${liveBadge('SSOT')}</div>
+     <div class="forecast-main">REAL > LIVE CALC > SNAPSHOT > MODEL</div>
+     <div class="sub">Jeder Bot zeigt, worauf sein Risikowert tatsächlich basiert.</div>
+   </div><span class="tag ${r.model?'amber':'green'}">${r.verified}/${r.total} LIVE/VERIFIED</span></div>
+   <div class="pi-summary">
+     <div><span>LIVE / VERIFIED</span><b class="green">${r.verified}</b></div>
+     <div><span>SNAPSHOT</span><b class="${r.snapshot?'amber':'green'}">${r.snapshot}</b></div>
+     <div><span>MODEL ONLY</span><b class="${r.model?'red':'green'}">${r.model}</b></div>
+   </div>
+   <div class="reality-rows">${rows}</div>
+   <div class="verify-box verified"><b>SSOT SOURCE PRIORITY</b><span>Echte Pionex-Werte schlagen Modell-Proxies. Ein Live-Puffer darf nur aus aktuellem Marktpreis plus verifiziertem/fixiertem Liquidationspreis berechnet werden. Snapshot- oder Modellwerte bleiben sichtbar gekennzeichnet.</span></div>
+ </div>`;
+}
+
 function canonicalBotStates(){
  return botStateManager().active;
 }
@@ -877,7 +930,7 @@ function commandCenter(){
    <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
  card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('AVAILABLE NEW RISK',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${(()=>{const bs=canonicalBotStates().find(b=>b.id==='BTC-S30');const est=Number(bs?.liveEstimate),ver=Number(bs?.verifiedBuffer);const vr=!!bs?.verifyRequired;const stress=Number.isFinite(ver)?Math.max(0,Math.min(100,Math.round(100-ver*6))):98;return metric('SHORT HEDGE STRESS',(vr?'VERIFY · ':'')+stress+'/100'+(Number.isFinite(est)?' · EST '+fmt(est,1)+'%':''),vr?'amber':stress>=70?'red':'amber')})()}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
  compactDecisionDetails()+
- card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">${DATA.pionexRisk?.activeCount??'—'} ACTIVE · ${DATA.pionexRisk?.closedCount??0} CLOSED</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
+ card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">${(()=>{const r=pionexRealityState();return `${r.verified} LIVE/VERIFIED · ${r.snapshot} SNAPSHOT`})()}</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
  `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
  card(`<div class="section-head"><div class="section-title">COIN-M SCANNER</div><span class="section-note">GRID ENGINE 1.3</span></div>${['SOL','ETH','PEPE'].map(sym=>{const g=fibFromSwing(sym);if(!g)return `<div class="row"><span>${sym}</span><b>LÄDT</b></div>`;const sc=scannerScore(g,sym);const entry=Math.max(0,Math.min(100,Math.round(sc-(sym==='SOL'?20:sym==='ETH'?28:28))));return `<div class="row"><span>${sym} · ${entry>=75?'READY':entry>=60?'WATCH':'WAIT'}</span><b class="${entry>=75?'green':entry>=60?'amber':'red'}">${entry}/100</b></div>`}).join('')}<p class="footer-note">Hier wird Entry Readiness gezeigt; Setup Quality bleibt im GRID-Tab separat sichtbar.</p>`);
 }
@@ -2855,7 +2908,7 @@ function hedgeOptimizerPanel(){
    <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
 
    <div class="auto-safe-v521 reality-calibration-v522">
-     <div class="section-head"><div><div class="eyebrow">PIONEX REALITY CALIBRATION 1.0 <span class="tag green">VERIFIED</span></div><div class="forecast-main">DUAL SURVIVABILITY GATE PASSED</div><div class="sub">Echte Pionex-Messwerte ersetzen die alte 7x-Proxy-Empfehlung.</div></div></div>
+     <div class="section-head"><div><div class="eyebrow">PIONEX REALITY CALIBRATION · LEGACY <span class="tag green">VERIFIED</span></div><div class="forecast-main">DUAL SURVIVABILITY GATE PASSED</div><div class="sub">Legacy-Kalibrierung; Reality Engine 2.0 ist die aktuelle Quelleninstanz.</div></div></div>
      <div class="pi-summary">
        <div><span>BTC-L20 REAL</span><b class="green">8,29%</b><small>20x · LIQ $71.499</small></div>
        <div><span>BTC-S30 VERIFIED</span><b class="green">${fmt(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifiedBuffer)||8.05,2)}%</b><small>30x · LIQ $84.226</small></div>
@@ -2922,6 +2975,7 @@ function positionIntelligencePanel(){
    <div><span>GLOBAL GATE</span><b class="${s.entryBlocked?'red':'green'}">${s.entryBlocked?'BLOCKED':'OPEN'}</b></div>
  </div>
 
+ ${pionexRealityPanel()}
  ${hedgeEnginePanel()}
  <div class="section-title">SPOT MANAGEMENT</div>
  ${spotRows||'<div class="muted">Keine Spot-Positionen im SSOT.</div>'}
