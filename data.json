@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.27.0",
-  "build": "2026-08-24-dual-gate-execution-readiness",
+  "appVersion": "5.28.1",
+  "build": "2026-08-24-compact-center-stability-fix",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1892,5 +1892,18 @@
     ],
     "staleAfterHours": 6,
     "beProtection": "Valid SL at/beyond break-even neutralizes primary capital-loss blocker; execution/slippage/fees remain."
+  },
+  "centerUX": {
+    "mode": "COMPACT_DECISION_CENTER",
+    "defaultExpanded": [],
+    "visibleCore": [
+      "portfolio",
+      "24h",
+      "dualGate",
+      "nextAction"
+    ],
+    "details": "COLLAPSIBLE",
+    "stabilityFix": true,
+    "dataHealth": "INLINE_COMPACT"
   }
 }
