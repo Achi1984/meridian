@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.20.0",
-  "build": "2026-08-23-position-intelligence-3",
+  "appVersion": "5.20.1",
+  "build": "2026-08-24-hedge-optimizer-auto-safe",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1674,6 +1674,22 @@
       "TRIM / REDUCE WATCH",
       "EXIT WATCH"
     ],
+    "execution": "MANUAL_ONLY"
+  },
+  "hedgeOptimizer": {
+    "version": "1.1",
+    "status": "ACTIVE",
+    "targetBufferPct": 8,
+    "scenarios": [
+      30,
+      20,
+      15,
+      10,
+      7,
+      5
+    ],
+    "autoSafeConfig": true,
+    "verification": "PIONEX_REQUIRED",
     "execution": "MANUAL_ONLY"
   }
 }
