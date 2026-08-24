@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.20.2",
-  "build": "2026-08-24-pionex-reality-calibration",
+  "appVersion": "5.20.3",
+  "build": "2026-08-24-reality-ssot",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -1717,5 +1717,14 @@
     "dualGatePassed": true,
     "marginRelease": "BLOCKED",
     "note": "Real Pionex measurements supersede prior leverage/buffer proxy recommendation."
+  },
+  "realitySSOT": {
+    "policy": "Pionex displayed buffer is VERIFIED SSOT. Browser BTC price creates LIVE ESTIMATE only. Drift >=0.25 percentage points triggers VERIFY PIONEX before margin/leverage action.",
+    "btcShortVerifiedBufferPct": 8.05,
+    "btcShortVerifiedLiq": 84225.6,
+    "btcShortDynamicMarginUSDT": 188.9,
+    "btcLongVerifiedBufferPct": 8.29,
+    "btcLongVerifiedLiq": 71499.3,
+    "verifiedAt": "2026-08-24T12:32:00+02:00"
   }
 }

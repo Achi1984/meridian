@@ -423,15 +423,20 @@ function canonicalBotState(b){
  const liveQuote=Number(DATA.livePrices?.[b.symbol]?.price);
  const snapQuote=Number(b.currentPrice||0);
  const live=Number.isFinite(liveQuote)&&liveQuote>0?liveQuote:snapQuote;
- const buffer=effectiveBotBuffer(b);
+ const liveEstimate=effectiveBotBuffer(b);
  const snapBuffer=Number(b.liquidationDistancePct);
- const guard=botGuardFromBuffer(buffer);
+ const verifiedBuffer=Number.isFinite(snapBuffer)?snapBuffer:NaN;
  const usesLive=Number.isFinite(liveQuote)&&liveQuote>0&&Number.isFinite(liquidation)&&liquidation>0;
- const stale=usesLive&&Number.isFinite(snapBuffer)&&Math.abs(buffer-snapBuffer)>=0.25;
+ const verifyRequired=usesLive&&Number.isFinite(verifiedBuffer)&&Number.isFinite(liveEstimate)&&Math.abs(liveEstimate-verifiedBuffer)>=0.25;
+ // v5.20.3 REALITY SSOT: a browser quote can estimate distance to the last verified Liq price,
+ // but it must never overwrite the last Pionex-displayed buffer as if it were newly verified.
+ const buffer=Number.isFinite(verifiedBuffer)?verifiedBuffer:liveEstimate;
+ const guard=botGuardFromBuffer(buffer);
+ const stale=verifyRequired;
  const side=String(b.side||'').toUpperCase();
  const action=guard.label==='CRITICAL'?'REDUCE / EXIT CHECK':guard.label==='DANGER'?(side==='LONG'?'KEEP / NO ADD':'REDUCE / NO ADD'):guard.label==='TIGHT'?'WATCH / NO ADD':'KEEP';
- const reason=`${b.id}: Liq.-Puffer ${Number.isFinite(buffer)?fmt(buffer,2)+'%':'—'} (${usesLive?'LIVE CALC':'SNAPSHOT'}); ${guard.label}.`;
- return {...b, liquidation, live, buffer, snapBuffer, guard, usesLive, stale, action, reason};
+ const reason=`${b.id}: Pionex verified ${Number.isFinite(verifiedBuffer)?fmt(verifiedBuffer,2)+'%':'—'}${usesLive&&Number.isFinite(liveEstimate)?' · Live Estimate '+fmt(liveEstimate,2)+'%':''}${verifyRequired?' · VERIFY PIONEX':''}; ${guard.label}.`;
+ return {...b, liquidation, live, buffer, snapBuffer, verifiedBuffer, liveEstimate, verifyRequired, guard, usesLive, stale, action, reason};
 }
 function canonicalBotStates(){
  return botStateManager().active;
@@ -870,7 +875,7 @@ function commandCenter(){
     <div><span>PORTFOLIO RISK</span><b class="${risk.score>=75?'red':'amber'}">${risk.score}/100</b><small>Spot + Leverage + Bots</small></div>
    </div>
    <p class="footer-note">Ein bullischer Markt kann gleichzeitig mit erhöhtem persönlichem Portfolio-Risiko auftreten. MERIDIAN trennt diese Ebenen bewusst.</p>`)+
- card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('AVAILABLE NEW RISK',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${metric('SHORT HEDGE STRESS','98/100 · CRITICAL','red')}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
+ card(`<div class="section-title">CROSS-RISK ENGINE <span class="tag amber">MODEL</span></div><div class="grid2">${metric('SPOT KONZENTRATION',((DATA.portfolio?.topPositions?.[0]?.share||21.4))+'%')}${metric('THEORETICAL 5X CAPACITY','$'+fmt(DATA.pionex?.longCapacity||5642,0),'amber')}${metric('AVAILABLE NEW RISK',capitalReleaseState().blocked?'$0 · BLOCKED':'CHECK ONLY',capitalReleaseState().blocked?'red':'green')}${(()=>{const bs=canonicalBotStates().find(b=>b.id==='BTC-S30');const est=Number(bs?.liveEstimate),ver=Number(bs?.verifiedBuffer);const vr=!!bs?.verifyRequired;const stress=Number.isFinite(ver)?Math.max(0,Math.min(100,Math.round(100-ver*6))):98;return metric('SHORT HEDGE STRESS',(vr?'VERIFY · ':'')+stress+'/100'+(Number.isFinite(est)?' · EST '+fmt(est,1)+'%':''),vr?'amber':stress>=70?'red':'amber')})()}${metric('REGIME',DATA.btcRegime?.label||DATA.market?.regime||'—','cyan')}</div><p class="footer-note">Theoretical Capacity ist keine Kapitalfreigabe. Neues Risiko bleibt bis zum Capital-Release-Gate gesperrt; Spot-Konzentration, Long-Bots und Short-Stress werden gemeinsam bewertet.</p>`)+
  compactDecisionDetails()+
  card(`<div class="section-head"><div class="section-title">DATA HEALTH</div><span class="section-note">Transparenz</span></div><div class="cc-health"><div><span class="feed-dot"></span><b>BTC Livefeed</b></div><strong class="${fh.status==='LIVE'?'green':'amber'}">${fh.status} · ${fh.age??'—'}s</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>Pionex Bots</b></div><strong class="amber">${DATA.pionexRisk?.activeCount??'—'} ACTIVE · ${DATA.pionexRisk?.closedCount??0} CLOSED</strong></div><div class="cc-health"><div><span class="status-dot snapshot"></span><b>NADIR</b></div><strong class="amber">MODEL SNAPSHOT</strong></div>`,'cc-health-card')+
  `<button class="cc-open-depot" onclick="document.querySelector('.nav[data-view=depot]').click()">DEPOT & POSITIONEN ÖFFNEN →</button>`+
@@ -2758,10 +2763,10 @@ function hedgeOptimizerPanel(){
      <div class="section-head"><div><div class="eyebrow">PIONEX REALITY CALIBRATION 1.0 <span class="tag green">VERIFIED</span></div><div class="forecast-main">DUAL SURVIVABILITY GATE PASSED</div><div class="sub">Echte Pionex-Messwerte ersetzen die alte 7x-Proxy-Empfehlung.</div></div></div>
      <div class="pi-summary">
        <div><span>BTC-L20 REAL</span><b class="green">8,29%</b><small>20x · LIQ $71.499</small></div>
-       <div><span>BTC-S30 REAL</span><b class="green">8,05%</b><small>30x · LIQ $84.226</small></div>
-       <div><span>NÄCHSTES ZIEL</span><b>12%</b><small>beide BTC-Legs</small></div>
+       <div><span>BTC-S30 VERIFIED</span><b class="green">${fmt(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifiedBuffer)||8.05,2)}%</b><small>30x · LIQ $84.226</small></div>
+       <div><span>BTC-S30 LIVE EST.</span><b class="${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'amber':'green'}">${Number.isFinite(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).liveEstimate))?fmt(Number((canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).liveEstimate),2)+'%':'—'}</b><small>${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'VERIFY PIONEX':'within tolerance'}</small></div>
      </div>
-     <div class="pi-grid"><div><span>SHORT DYN. MARGIN</span><b>$188,90</b></div><div><span>MARGIN RELEASE</span><b class="red">BLOCKED</b></div></div>
+     <div class="pi-grid"><div><span>NÄCHSTES ZIEL</span><b>12%</b></div><div><span>SHORT DYN. MARGIN</span><b>$188,90</b></div><div><span>PIONEX STATUS</span><b class="${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'amber':'green'}">${(canonicalBotStates().find(b=>b.id==='BTC-S30')||{}).verifyRequired?'VERIFY REQUIRED':'VERIFIED'}</b></div><div><span>MARGIN RELEASE</span><b class="red">BLOCKED</b></div></div>
      <div class="verify-box verified"><b>REAL > MODEL</b><span>Der frühere 7x/≈8,2%-Proxy ist kalibriert und nicht mehr handlungsleitend. Long und Hedge haben das 8%-Recovery-Gate real in Pionex bestätigt. Browser-Livepreis aktualisiert danach den aktuellen Abstand zum fixierten Liq.-Preis.</span></div>
    </div>
 
