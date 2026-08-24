@@ -1,6 +1,6 @@
 {
-  "appVersion": "5.20.1",
-  "build": "2026-08-24-hedge-optimizer-auto-safe",
+  "appVersion": "5.20.2",
+  "build": "2026-08-24-pionex-reality-calibration",
   "currency": "USD",
   "portfolio": {
     "total": 27055.7,
@@ -323,8 +323,8 @@
     "decisionNote": "NO ENTRY im Snapshot: starkes Risk-on-Momentum, aber überdehnungsgefährdet. Browser versucht RSI, Funding, OI und VWAP direkt neu zu laden."
   },
   "pionexRisk": {
-    "status": "PIONEX VERIFIED SNAPSHOT",
-    "snapshotAt": "2026-08-23T14:56:00+02:00",
+    "status": "PIONEX REAL VERIFIED",
+    "snapshotAt": "2026-08-24T12:32:00+02:00",
     "activeCount": 4,
     "closedCount": 1,
     "bots": [
@@ -335,42 +335,46 @@
         "leverage": 30,
         "status": "ACTIVE",
         "investment": 52,
-        "dynamicMargin": 110.09,
-        "totalProfit": -97.33,
-        "breakEven": 71636.1,
-        "liquidation": 80207.5,
-        "liquidationPrice": 80207.5,
-        "liquidationDistancePct": 3.89,
-        "currentPrice": 77197.6,
+        "dynamicMargin": 188.9,
+        "totalProfit": -109.08,
+        "breakEven": 71952.1,
+        "liquidation": 84225.6,
+        "liquidationPrice": 84225.6,
+        "liquidationDistancePct": 8.05,
+        "currentPrice": 77945.4,
         "fundingPct": 0.01,
-        "healthScore": 14,
-        "action": "REDUCE / EXIT CHECK",
-        "reason": "BTC-S30: Snapshotbasis; UI berechnet Liq.-Puffer kanonisch aus Live-Kurs + Liquidationspreis."
+        "healthScore": 42,
+        "action": "KEEP HEDGE / RECOVERY",
+        "reason": "BTC-S30: Pionex REAL verified 2026-08-24 12:32; 30x, Dynamic Margin 188.9 USDT, displayed Liq.-Puffer 8.05%.",
+        "gridProfit": 9.7,
+        "trendPnl": -118.79
       },
       {
-        "id": "BTC-L5",
+        "id": "BTC-L20",
         "symbol": "BTC",
         "side": "LONG",
-        "leverage": 5,
+        "leverage": 20,
         "status": "ACTIVE",
-        "investment": 105.09,
+        "investment": 26.28,
         "dynamicMargin": 0,
-        "totalProfit": -0.14,
-        "breakEven": 77263.6,
-        "liquidation": 57879.9,
-        "liquidationPrice": 57879.9,
-        "liquidationDistancePct": 25.05,
-        "currentPrice": 77224.9,
+        "totalProfit": 2.67,
+        "breakEven": 77201,
+        "liquidation": 71499.3,
+        "liquidationPrice": 71499.3,
+        "liquidationDistancePct": 8.29,
+        "currentPrice": 77965.8,
         "fundingPct": 0.01,
-        "healthScore": 72,
-        "action": "WATCH / NO ADD",
+        "healthScore": 45,
+        "action": "KEEP / NO ADD",
         "range": [
           68000,
           92000
         ],
         "grids": 60,
         "creationPrice": 77225,
-        "reason": "BTC-L5: Pionex verified 2026-08-23 19:48; 5x, 60 grids, range 68k–92k."
+        "reason": "BTC-L20: Pionex REAL verified 2026-08-24 12:32; 20x, 60 grids, range 68k–92k, displayed Liq.-Puffer 8.29%.",
+        "gridProfit": 0.264,
+        "trendPnl": 2.41
       },
       {
         "id": "HBAR-L3",
@@ -427,7 +431,7 @@
         "note": "Historischer geschlossener BTC-Short; darf niemals in aktive Risk-/Decision-Logik einfließen."
       }
     ],
-    "note": "Single Source of Truth refreshed from Pionex screenshots 23.08.2026. Four ACTIVE bots: BTC-S30, BTC-L5, HBAR-L3, XRP-L5. Closed/history excluded from active risk logic."
+    "note": "SSOT refreshed from Pionex screenshots 24.08.2026 12:32. BTC-L20 and BTC-S30 both passed the first 8% survivability gate. Margin release remains blocked until next safety gate."
   },
   "forecastCoins": [
     "BTC",
@@ -1077,7 +1081,7 @@
       "takeProfit1": 80000,
       "takeProfit2": 83000,
       "invalidBelow": 71750,
-      "modelNote": "Entry basis is no longer hard-coded. MERIDIAN uses the active BTC-L5 Pionex break-even/creation price as the position basis and recalculates R:R."
+      "modelNote": "Entry basis is no longer hard-coded. MERIDIAN uses the active BTC-L20 Pionex break-even/creation price as the position basis and recalculates R:R."
     }
   },
   "multiAssetSlEngine": {
@@ -1287,8 +1291,8 @@
       "side": "SHORT",
       "leverage": 30,
       "active": true,
-      "liqBufferPct": 3.89,
-      "risk": "CRITICAL"
+      "liqBufferPct": 8.05,
+      "risk": "RECOVERY"
     },
     {
       "id": "BTC-L20",
@@ -1296,8 +1300,8 @@
       "side": "LONG",
       "leverage": 20,
       "active": true,
-      "liqBufferPct": 10.14,
-      "risk": "DANGER"
+      "liqBufferPct": 8.29,
+      "risk": "RECOVERY"
     },
     {
       "id": "HBAR-L5",
@@ -1320,7 +1324,7 @@
   ],
   "pionexBotSnapshot": {
     "status": "VERIFIED SNAPSHOT",
-    "verifiedAt": "2026-08-23T12:39:00+02:00",
+    "verifiedAt": "2026-08-24T12:32:00+02:00",
     "activeCount": 4,
     "closedCount": 0,
     "bots": [
@@ -1330,33 +1334,33 @@
         "side": "SHORT",
         "leverage": 30,
         "active": true,
-        "liqBufferPct": 4.36,
-        "risk": "CRITICAL"
+        "liqBufferPct": 8.05,
+        "risk": "RECOVERY"
       },
       {
-        "id": "BTC-L5",
+        "id": "BTC-L20",
         "symbol": "BTC",
         "side": "LONG",
-        "leverage": 5,
+        "leverage": 20,
         "status": "ACTIVE",
-        "investment": 105.09,
+        "investment": 26.28,
         "dynamicMargin": 0,
-        "totalProfit": -0.14,
-        "breakEven": 77263.6,
-        "liquidation": 57879.9,
-        "liquidationPrice": 57879.9,
-        "liquidationDistancePct": 25.05,
-        "currentPrice": 77224.9,
+        "totalProfit": 2.67,
+        "breakEven": 77201,
+        "liquidation": 71499.3,
+        "liquidationPrice": 71499.3,
+        "liquidationDistancePct": 8.29,
+        "currentPrice": 77965.8,
         "fundingPct": 0.01,
-        "healthScore": 72,
-        "action": "WATCH / NO ADD",
+        "healthScore": 45,
+        "action": "KEEP / NO ADD",
         "range": [
           68000,
           92000
         ],
         "grids": 60,
         "creationPrice": 77225,
-        "reason": "BTC-L5: Pionex verified 2026-08-23 19:48; 5x, 60 grids, range 68k–92k."
+        "reason": "Pionex REAL verified 2026-08-24 12:32."
       },
       {
         "id": "HBAR-L3",
@@ -1691,5 +1695,27 @@
     "autoSafeConfig": true,
     "verification": "PIONEX_REQUIRED",
     "execution": "MANUAL_ONLY"
+  },
+  "pionexRealityCalibration": {
+    "status": "VERIFIED",
+    "verifiedAt": "2026-08-24T12:32:00+02:00",
+    "long": {
+      "id": "BTC-L20",
+      "leverage": 20,
+      "liquidationPrice": 71499.3,
+      "displayedBufferPct": 8.29
+    },
+    "short": {
+      "id": "BTC-S30",
+      "leverage": 30,
+      "dynamicMarginUSDT": 188.9,
+      "liquidationPrice": 84225.6,
+      "displayedBufferPct": 8.05
+    },
+    "dualGateMinPct": 8,
+    "nextTargetPct": 12,
+    "dualGatePassed": true,
+    "marginRelease": "BLOCKED",
+    "note": "Real Pionex measurements supersede prior leverage/buffer proxy recommendation."
   }
 }

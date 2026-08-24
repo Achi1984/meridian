@@ -6,8 +6,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[];
-let APP_CODE_VERSION='5.20.1';
-let APP_RELEASE='5.20.1 · HEDGE OPTIMIZER AUTO SAFE';
+let APP_CODE_VERSION='5.20.2';
+let APP_RELEASE='5.20.2 · PIONEX REALITY CALIBRATION';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -439,7 +439,7 @@ function canonicalBotStates(){
 function canonicalBtcLongRiskPlan(){
  const base=DATA.slInvalidationEngine?.btcLongPositionModel || DATA.slInvalidationEngine?.btcLong20x;
  if(!base)return null;
- const bot=canonicalBotStates().find(b=>b.id==='BTC-L5') ||
+ const bot=canonicalBotStates().find(b=>b.id==='BTC-L20') ||
            canonicalBotStates().find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
  if(!bot || !Number.isFinite(bot.liquidation)){
    const entry=Number(base.entry||0), sl=Number(base.stopLoss), tp1=Number(base.takeProfit1), tp2=Number(base.takeProfit2);
@@ -1706,7 +1706,7 @@ function scannerCard(sym){
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
- const priority=b.id==='BTC-S30'?'KEEP HEDGE / BUFFER CHECK':b.id==='BTC-L5'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+ const priority=b.id==='BTC-S30'?'KEEP HEDGE / BUFFER CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason} ${b.stale?snapshotBadge('SNAPSHOT STALE'):liveBadge('LIVE CALC')}</p></details>`;
@@ -1783,7 +1783,7 @@ function slInvalidationPanel(){
  </div>
  <div class="sl-decision-strip"><span>POSITION <b class="green">${e.positionDecision||'KEEP'}</b></span><span>ADD <b class="red">${e.addDecision||'BLOCKED'}</b></span><span>NEW CAPITAL <b class="red">${e.newEntryDecision||'BLOCKED'}</b></span></div>
  <div class="sl-rule ${guard.cls}"><b>${guard.label==='TIGHT'?'TIGHT BUFFER':'POSITION RISK CHECK'}</b><span>Bestehende Position ≠ Freigabe für ADD oder neues Kapital. Positionsbasis kommt aus Pionex; SL/TP sind Modellwerte.</span></div>
- <p class="footer-note">SSOT: ${e.botId||'BTC-L5'} Break-even/Creation + aktive Liquidation + Live-BTC. R:R wird aus dieser aktuellen Positionsbasis neu berechnet; keine automatische Order-Ausführung.</p>`);
+ <p class="footer-note">SSOT: ${e.botId||'BTC-L20'} Break-even/Creation + aktive Liquidation + Live-BTC. R:R wird aus dieser aktuellen Positionsbasis neu berechnet; keine automatische Order-Ausführung.</p>`);
 }
 function gridView(){
  const s=decisionSSOT(), bots=s.bots;
@@ -2716,7 +2716,7 @@ function hedgeOptimizerState(){
  const raw=(DATA.pionexBots?.activeBots?.['BTC-S30']||DATA.bots?.activeBots?.['BTC-S30']||{});
  const lev=Math.max(1,Number(s?.leverage||raw.leverage||30));
  const investment=Math.max(0,Number(s?.investment||s?.investmentUSDT||raw.investmentUSDT||52));
- const dynMargin=Math.max(0,Number(raw.dynamicMarginUSDT||110.09));
+ const dynMargin=Math.max(0,Number(s?.dynamicMargin??raw.dynamicMarginUSDT??0));
  const notional=Math.max(0,h.shortBotNotional);
  const buffer=Number(h.survivability);
  const targetMin=8, targetMax=12;
@@ -2754,24 +2754,21 @@ function hedgeOptimizerPanel(){
    <div class="pi-summary"><div><span>CURRENT HEDGE</span><b>${fmt(o.hedgeRatio,1)}%</b></div><div><span>TARGET ZONE</span><b>${o.targetMin}–${o.targetMax}%</b></div><div><span>SURVIVABILITY</span><b class="${critical?'red':'amber'}">${Number.isFinite(o.buffer)?fmt(o.buffer,2)+'%':'—'}</b></div></div>
    <div class="pi-grid"><div><span>TARGET HEDGE PROXY</span><b>$${fmt(o.targetNotionalMin,0)}–$${fmt(o.targetNotionalMax,0)}</b></div><div><span>GAP TO 8%</span><b>$${fmt(o.targetGapMin,0)}</b></div><div><span>DYNAMIC MARGIN</span><b>$${fmt(o.dynMargin,0)}</b></div><div><span>MARGIN RELEASE</span><b class="${critical?'red':'amber'}">${critical?'BLOCKED':'REVIEW'}</b></div></div>
 
-   <div class="auto-safe-v521">
-     <div class="section-head"><div><div class="eyebrow">AUTO SAFE CONFIG 1.1 <span class="tag amber">ESTIMATE</span></div><div class="forecast-main">${a.meets?'MODEL SAFE CONFIG FOUND':'NO MODEL SAFE CONFIG'}</div><div class="sub">erste Modellstufe mit geschätztem Puffer ≥${o.targetMin}%</div></div></div>
+   <div class="auto-safe-v521 reality-calibration-v522">
+     <div class="section-head"><div><div class="eyebrow">PIONEX REALITY CALIBRATION 1.0 <span class="tag green">VERIFIED</span></div><div class="forecast-main">DUAL SURVIVABILITY GATE PASSED</div><div class="sub">Echte Pionex-Messwerte ersetzen die alte 7x-Proxy-Empfehlung.</div></div></div>
      <div class="pi-summary">
-       <div><span>RECOMMENDED</span><b>${a.L||'—'}x</b></div>
-       <div><span>GESAMT-BASIS</span><b>${Number.isFinite(a.reqBase)?'~$'+fmt(a.reqBase,0):'—'}</b></div>
-       <div><span>EST. BUFFER</span><b class="${a.meets?'green':'amber'}">${Number.isFinite(a.estBuffer)?'~'+fmt(a.estBuffer,1)+'%':'—'}</b></div>
+       <div><span>BTC-L20 REAL</span><b class="green">8,29%</b><small>20x · LIQ $71.499</small></div>
+       <div><span>BTC-S30 REAL</span><b class="green">8,05%</b><small>30x · LIQ $84.226</small></div>
+       <div><span>NÄCHSTES ZIEL</span><b>12%</b><small>beide BTC-Legs</small></div>
      </div>
-     <div class="pi-grid">
-       <div><span>EXTRA BASIS</span><b>${Number.isFinite(a.extraBase)?'~$'+fmt(a.extraBase,0):'—'}</b></div>
-       <div><span>HEDGE PROXY</span><b>$${fmt(o.notional,0)}</b></div>
-     </div>
-     <div class="verify-box"><b>PIONEX VERIFY REQUIRED</b><span>Diese Konfiguration ist nur ein Modell. Nach jeder manuellen Änderung zuerst den echten neuen Liquidationspreis prüfen und MERIDIAN synchronisieren. Erst der Live-Puffer darf RECOVERY/SAFE auslösen.</span></div>
+     <div class="pi-grid"><div><span>SHORT DYN. MARGIN</span><b>$188,90</b></div><div><span>MARGIN RELEASE</span><b class="red">BLOCKED</b></div></div>
+     <div class="verify-box verified"><b>REAL > MODEL</b><span>Der frühere 7x/≈8,2%-Proxy ist kalibriert und nicht mehr handlungsleitend. Long und Hedge haben das 8%-Recovery-Gate real in Pionex bestätigt. Browser-Livepreis aktualisiert danach den aktuellen Abstand zum fixierten Liq.-Preis.</span></div>
    </div>
 
-   <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':'HEDGE-ZONE UND SETUP PRÜFEN'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':'Keine automatische Orderfreigabe.'}</small></div>
+   <div class="hedge-opt-callout ${critical?'critical':''}"><span>SSOT ACTION</span><b>${critical?'BTC-S30 PUFFER ZUERST AUF ≥8%':o.buffer<12?'RECOVERY GATE PASSED · NÄCHSTES ZIEL 12%':'12% GATE ERREICHT · REVIEW'}</b><small>${critical?'Short nicht wegen gegenläufigem P&L isoliert schließen und kein Margin herausziehen. Erst neuen Pionex-Liquidationspreis synchronisieren.':o.buffer<12?'KEEP HEDGE / KEEP LONG. Kein Margin Release und kein ADD bis zum nächsten Sicherheits-Gate.':'Keine automatische Orderfreigabe; Capital Release separat prüfen.'}</small></div>
 
-   <div class="section-title">WHAT IF? 30x → 5x <span class="tag amber">ESTIMATE</span></div>
-   <div class="hedge-sim">${o.scenarios.map(x=>`<div class="${a.L===x.L?'recommended':''}"><span>${x.L}x${a.L===x.L?' · RECOMMENDED':''}</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>
+   <div class="section-title">LEGACY WHAT-IF <span class="tag amber">MODEL ONLY</span></div>
+   <div class="hedge-sim">${o.scenarios.map(x=>`<div><span>${x.L}x</span><b>Base ~$${fmt(x.reqBase,0)}</b><small>+~$${fmt(x.extraBase,0)} Base · Puffer-Modell ~${Number.isFinite(x.estBuffer)?fmt(x.estBuffer,1)+'%':'—'}</small></div>`).join('')}</div>
    <p class="footer-note"><b>MODEL / ESTIMATE:</b> Hebel-Szenarien verwenden den MERIDIAN-Proxy und die bekannte Dynamic Margin. Der tatsächliche Pionex-Liquidationspreis kann wegen Grid-Position, Maintenance Margin, Fees und Bot-Mechanik abweichen. Nach jeder manuellen Änderung Pionex-Liq.-Preis neu prüfen und MERIDIAN synchronisieren.</p>
  </div>`;
 }
