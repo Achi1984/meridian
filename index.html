@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.70">
+<link rel="manifest" href="manifest.webmanifest?v=5.71">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.70.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.71.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.70 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.71 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.70 compact bot action cards */
+/* v5.71 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2494,7 +2494,7 @@ img{max-width:100%;height:auto}
   display:block;color:#8296a8;font-size:8px;margin-top:2px
 }
 .depot-futures-details>summary strong{font-size:8px;color:#24aef2;letter-spacing:.7px}
-.depot-futures-details[open]>summary strong::after{content:" · SCHLIESSEN"}
+.depot-futures-details[open]>summary strong::after{content:""}
 .depot-futures-details-body{padding:0 10px 10px}
 .depot-futures-secondary{margin-bottom:10px}
 .pionex-bot{margin-top:8px}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.70 DEPOT cleanup — no navigation changes */
+/* v5.71 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2816,6 +2816,38 @@ main>section{
 }
 </style>
 
+
+<style id="v571-cleanup-css">
+/* DEPOT bot details: tighter cards */
+.pionex-bots.compact{gap:6px!important}
+.bot-compact{padding:8px 9px!important;border-radius:12px!important}
+.bot-compact-head{margin-bottom:5px!important}
+.bot-compact-head b{font-size:10px!important}
+.bot-compact-head small{font-size:6.5px!important}
+.bot-compact-grid{grid-template-columns:repeat(4,1fr)!important;gap:5px!important;margin-top:6px!important}
+.bot-compact-grid>div{padding-top:4px!important}
+.bot-compact-grid span{font-size:5.5px!important;margin-bottom:2px!important}
+.bot-compact-grid b{font-size:7.5px!important}
+.depot-futures-details-body{padding:0 8px 8px!important}
+
+/* TRADE/GRID hierarchy */
+.grid-primary-stack{display:grid;gap:10px}
+.grid-primary-stack>.card{margin:0!important}
+.grid-secondary-title{margin:14px 2px 7px;color:#8296a8;font-size:8px;letter-spacing:1.2px;font-weight:900}
+.grid-focus.compact-focus>summary{padding:13px 15px!important;min-height:0!important}
+.grid-focus.compact-focus>summary b{font-size:13px!important}
+.grid-focus.compact-focus>summary small{font-size:8px!important;margin-top:3px!important}
+.grid-focus.compact-focus>summary strong{font-size:8px!important}
+.bot-compact-list{gap:7px!important}
+.bot-v551>summary{padding:10px 12px!important}
+.bot-v551 .bot-main b{font-size:12px!important}
+.bot-v551 .bot-buffer b,.bot-v551 .bot-action b{font-size:11px!important}
+
+@media(max-width:430px){
+ .bot-compact-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2823,7 +2855,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.70 · LIVE</span>
+        <span class="version" id="versionBadge">v5.71 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2855,7 +2887,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.70.js?v=20260824-2315"></script>
+<script src="app-v5.71.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2926,8 +2958,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.70';
-let APP_RELEASE='5.70 · DEPOT CLEANUP';
+let APP_CODE_VERSION='5.71';
+let APP_RELEASE='5.71 · TRADE / GRID CLEANUP';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3397,7 +3429,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.70 — UNIFIED RISK STATE MATRIX
+/* v5.71 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4012,7 +4044,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.70 — ONE ACTION SSOT */
+/* v5.71 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4091,7 +4123,7 @@ function commandCenter(){
 }
 
 
-/* v5.70 — PORTFOLIO INTELLIGENCE */
+/* v5.71 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -4271,7 +4303,7 @@ function depot(){
         <p>${riskNote} Operative Ausführung ausschließlich über GRID/Pionex-Recheck.</p>
       </div>
       <details class="depot-futures-details" data-detail-key="depot-bots">
-        <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>ÖFFNEN</strong></summary>
+        <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>DETAILS</strong></summary>
         <div class="depot-futures-details-body">
           <div class="depot-bot-meta"><span>${netDirection}</span><b>5x CAP. $${fmt(fiveXLongCapacity,0)}</b></div>
           <div class="pionex-bots compact">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
@@ -5689,9 +5721,12 @@ function gridView(){
    moduleSafe('SL INVALIDATION',()=>slInvalidationPanel())+
    moduleSafe('DECISION QUALITY',()=>decisionQualityPanel());
 
- return summary+
-   botRows+
+ return `<div class="grid-primary-stack">`+
+   summary+
+   recovery+
    focus('grid-best','SETUP & ENTRY',p?`${p.sym} · R:R ${fmt(p.rr,2)}:1`:'PENDING',best+entryPlan,false)+
+   botRows+
+   `</div><div class="grid-secondary-title">ERWEITERTE WERKZEUGE</div>`+
    focus('grid-recovery-best','RECOVERY OPTIMIZER',topBot?`${topBot.id} · Ziel 8% / 12%`:'Kein kritischer Bot',moduleSafe('RECOVERY OPTIMIZER',()=>recoveryOptimizerPanel()),false)+
    focus('grid-whatif','WHAT-IF','Exposure · Margin · Hebel',moduleSafe('WHAT-IF',()=>whatIfSimulatorPanel()),false)+
    focus('grid-lifecycle','BOT LIFECYCLE','KEEP · REDUCE · REBUILD',moduleSafe('BOT LIFECYCLE',()=>lifecycleActionPanel()),false)+
@@ -5805,7 +5840,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.70 — FIVE TAB UX */
+/* v5.71 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW='trade';
 
@@ -5887,7 +5922,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.70: make the navigation itself immediate.
+ // v5.71: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
