@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.62.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.63.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.62.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.63.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.62.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.63.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.62.0 compact bot action cards */
+/* v5.63.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2506,6 +2506,14 @@ img{max-width:100%;height:auto}
 }
 </style>
 
+
+<style id="v563-integrity">
+.live-price,.live-quote,.quote-price,.asset-price{white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important}
+.feed-details{margin-top:10px;border-top:1px solid rgba(60,170,255,.18);padding-top:8px}
+.feed-details summary{cursor:pointer;color:#42b8ff;font-size:10px;font-weight:800;letter-spacing:1.5px;list-style:none}
+.feed-details summary::-webkit-details-marker{display:none}
+@media(max-width:430px){.live-price,.live-quote,.quote-price{font-size:clamp(20px,5.5vw,28px)!important}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -2513,7 +2521,7 @@ img{max-width:100%;height:auto}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.62.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.63.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2544,7 +2552,7 @@ img{max-width:100%;height:auto}
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.62.0.js?v=20260824-2315"></script>
+<script src="app-v5.63.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2615,8 +2623,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.62.0';
-let APP_RELEASE='5.62.0 · DEPOT FOCUS';
+let APP_CODE_VERSION='5.63.0';
+let APP_RELEASE='5.63.0 · DEPOT FOCUS';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3072,7 +3080,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.62.0 — UNIFIED RISK STATE MATRIX
+/* v5.63.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3719,7 +3727,7 @@ function commandCenter(){
 }
 
 
-/* v5.62.0 — PORTFOLIO INTELLIGENCE */
+/* v5.63.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -3973,10 +3981,10 @@ function market(){
   window.MERIDIAN_RADAR_CACHE=Object.fromEntries(radar.map(x=>[x.symbol,x]));
  return card(`<div class="market-hero"><div><div class="eyebrow">MARKTREGIME ${snapshotBadge('MODEL')}</div><div class="forecast-main" style="font-size:27px">${b.label||m.regime}</div><div class="sub">${b.risk||'BTC als Filter'}</div><div class="bar"><i style="width:${b.score||76}%"></i></div></div></div>`)+
  `<div class="grid2">${metric('FEAR & GREED',(s.crypto?.fearGreed??'—')+' '+(s.crypto?.fearGreedLabel||''),'amber')}${metric('BTC DOM.',fmt(s.crypto?.btcDominancePct||0,2)+'%','cyan')}${metric('TOTAL CAP','$'+fmt(s.crypto?.totalMarketCapT||0,2)+'T')}${metric('BTC 7T','+'+fmt(s.crypto?.btc7dPct||0,2)+'%','green')}</div>`+
- card(`<div class="section-title">LIVE FEED HEALTH</div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'noch kein Tick':fh.age+'s alt'}</span></div><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko Fallback</span><b>${FEED.coinGecko}</b></div><p class="footer-note">LIVE wird nur angezeigt, wenn tatsächlich ein aktueller API-/WebSocket-Kurs vorliegt. Nach 45 Sekunden ohne Update wird der Status STALE/FALLBACK.</p>`)+
+ card(`<div class="section-head"><div class="section-title">DATA FEED</div><span class="tag ${fh.status==='LIVE'?'green':fh.status==='STALE'?'amber':'red'}">${fh.status}</span></div><div class="feed-health ${fh.status.toLowerCase()}"><b>${sourceBadge(fh.status)} ${fh.source}</b><span>${fh.age==null?'kein Tick':fh.age+'s'}</span></div><details class="feed-details"><summary>DIAGNOSE</summary><div class="row"><span>Binance WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'muted'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div></details>`)+
  card(`<div class="section-head"><div class="section-title">LIVE KURSE</div><span class="section-note">WebSocket → REST → CoinGecko</span></div>${liveRows}`)+
- card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'—'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'—'}</b></div><p class="footer-note">Live-Kurse fließen automatisch in Depotwerte und Positionsanteile ein. Futures-Snapshotdaten bleiben davon getrennt.</p>`)+
- card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
+ card(`<div class="section-title">PORTFOLIO-IMPLIKATION</div><div class="row"><span>Spot-Regime</span><b class="green">RISK-ON</b></div><div class="row"><span>Futures-Bias</span><b class="amber">${r.netDirection||'NET LONG / BTC HEDGE'}</b></div><div class="row"><span>Bot-Risiko</span><b class="red">${r.riskLevel||'HIGH · BTC-S30'}</b></div><p class="footer-note">SSOT: Spot-Livekurse und Futures-Snapshot bleiben getrennt, werden für die Risk-Entscheidung aber gemeinsam ausgewertet.</p>`)+
+ card(`<div class="section-title">MACRO ${snapshotBadge('VERIFIED SNAPSHOT')}</div><div class="row"><span>Fed Funds · 29 JUL</span><b>${mac.fedFunds||'—'}</b></div><div class="row"><span>US CPI / Core · JUL</span><b>${fmt(mac.cpiHeadlineYoY,1)}% / ${fmt(mac.cpiCoreYoY,1)}%</b></div><div class="row"><span>Arbeitslosenquote · JUL</span><b>${fmt(mac.unemploymentPct,1)}%</b></div><div class="row"><span>US 10Y · 21 AUG</span><b>${fmt(mac.us10yPct,3)}%</b></div><p class="footer-note">${mac.summary||''}</p>`)+
  card(`<div class="section-title">RADAR <span class="muted" style="float:right;font-size:9px">LIVE / FALLBACK</span></div>${radar.map((x,i)=>{const q=DATA.livePrices?.[x.symbol],ch=q?.change24h??x.change24h;const tone=x.radarScore>=75?'green':x.radarScore>=60?'amber':'red';return `<button class="asset-row radar-ranked radar-click" onclick="openRadarDetail('${x.symbol}')">${coinIcon(x.symbol)}<div><div class="asset-name">${x.symbol} <span class="radar-rank">#${i+1}</span></div><div class="asset-desc">${q?q.source:'Fallback'} · Opportunity · TAP DETAILS</div></div><div class="radar-score ${tone}">${x.radarScore}/100</div><div class="asset-change ${ch<0?'red':'green'}">${ch>=0?'+':''}${fmt(ch,1)}%</div></button>`}).join('')}<p class="footer-note">Opportunity Score: 35% Momentum · 25% Setup · 20% Entry Readiness · 10% Liquidität · 10% Regime-Fit. Asset antippen für Teil-Scores, Entry-Status und kanonischen Risk Plan.</p>`);
 }
 
@@ -4039,11 +4047,11 @@ function currentNadirContext(){
 function bottomView(){
  const n=DATA.nadir,c=n.currentVerifiedContext||{},q=DATA.livePrices?.BTC,btc=q?.price||c.btcPrice||0,now=currentNadirContext();
  return card(`<div class="eyebrow">NADIR 2.2 ${snapshotBadge('MODEL')}</div><div class="forecast-main">${n.label}</div><div class="sub">Bewertung · Kapitulation · Holder · Timing</div><p class="footer-note">${n.note||''}</p>`)+
- card(`<div class="section-title">CURRENT NADIR CONTEXT <span class="tag ${now.cls}">MODEL NOW</span></div><div class="forecast-main ${now.cls}" style="font-size:22px">${now.label}</div><div class="row"><span>Current Context Score</span><b class="${now.cls}">${now.score}/100</b></div><div class="bar"><i style="width:${now.score}%"></i></div><p class="footer-note">${now.drivers.join(' · ')}. Dieser Context-Score nutzt nur aktuelle Markt-/Momentumdaten und ersetzt NICHT den On-Chain-NADIR-Snapshot.</p>`)+
+ card(`<div class="section-title">NADIR NOW <span class="tag ${now.cls}">MODEL NOW</span></div><div class="forecast-main ${now.cls}" style="font-size:22px">${now.label}</div><div class="row"><span>CURRENT SCORE</span><b class="${now.cls}">${now.score}/100</b></div><div class="bar"><i style="width:${now.score}%"></i></div><p class="footer-note">${now.drivers.join(' · ')}. Dieser Context-Score nutzt nur aktuelle Markt-/Momentumdaten und ersetzt NICHT den On-Chain-NADIR-Snapshot.</p>`)+
  card(`<div class="section-title">MARKTKONTEXT</div><div class="grid2">${metric('BTC','$'+fmt(btc)+(q?'<div class="data-state">'+sourceBadge(quoteStatus(q))+'</div>':''))}${metric('BTC 7T',(Number(c.btc7dPct)>=0?'+':'')+fmt(c.btc7dPct||0,2)+'%',Number(c.btc7dPct)>=0?'green':'red')}${metric('FEAR & GREED',c.fearGreed||'—','amber')}${metric('BTC DOM.',fmt(c.btcDominancePct||0,2)+'%')}</div>`)+
- card(`<div class="row"><span class="eyebrow">NADIR GESAMTSCORE</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">${snapshotBadge('LAST CONFIRMED')} ${n.snapshotAt||''}</p><p class="footer-note">Der historische Gesamtscore bleibt unverändert, bis frische On-Chain-/Kapitulationsdaten verifiziert sind.</p>`)+
+ card(`<div class="row"><span class="eyebrow">ON-CHAIN SNAPSHOT</span><span class="score amber">${n.score}/100</span></div><div class="bar"><i style="width:${n.score}%"></i></div><p class="muted">${snapshotBadge('LAST CONFIRMED')} ${n.snapshotAt||''}</p><p class="footer-note">Sekundärer On-Chain-Snapshot; bleibt unverändert, bis frische On-Chain-/Kapitulationsdaten verifiziert sind.</p>`)+
  `<div class="grid2">${metric('BEWERTUNG',n.valuation+'/100')}${metric('KAPITULATION',n.capitulation+'/100')}${metric('HOLDER',n.holder+'/100')}${metric('TIMING',n.timing+'/100')}</div>`+
- card(`<div class="section-title">BTC BODEN-SZENARIEN ${snapshotBadge('MODEL')}</div>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
+ card(`<div class="section-title">BTC CYCLE-STRESS-SZENARIEN ${snapshotBadge('MODEL')}</div><p class="footer-note">Stresspfade des Zyklusmodells – keine aktuelle Kursprognose.</p>${Object.entries(n.btcScenarios).map(([k,v])=>`<div class="row"><span class="${k==='Base Case'?'amber':''}">${k}</span><b class="${k==='Base Case'?'amber':''}">${v}</b></div>`).join('')}`);
 }
 function stateLabel(v){return (v||'').includes('LIVE')?liveBadge('LIVE'):snapshotBadge('SNAPSHOT')}
 
