@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.64.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.66.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.64.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.66.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.64.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.66.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.64.0 compact bot action cards */
+/* v5.66.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2544,6 +2544,58 @@ img{max-width:100%;height:auto}
 .depot-risk-control>p{margin:8px 0 0;color:#7d91a3;font-size:8px;line-height:1.35}
 </style>
 
+
+<style id="v566-five-tab-css">
+.bottom .inner.five-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(5,1fr)!important;
+  gap:4px!important;
+}
+.bottom .inner.five-tabs .nav{min-width:0!important}
+.segment-nav{
+  position:sticky;
+  top:0;
+  z-index:14;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  padding:7px;
+  margin:0 0 12px;
+  border:1px solid #173e55;
+  border-radius:15px;
+  background:rgba(2,12,18,.94);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.segment-nav button{
+  border:1px solid transparent;
+  border-radius:11px;
+  padding:9px 8px;
+  background:transparent;
+  color:#8296a8;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.8px;
+}
+.segment-nav button.active{
+  color:#24aef2;
+  border-color:#1b76a7;
+  background:rgba(14,65,92,.28);
+}
+#view-depot .pi-scenarios{margin-top:2px}
+#view-depot .depot-futures-details[open]>summary{
+  border-bottom:1px solid #173e55;
+}
+#view-depot .depot-futures-details[open] .depot-futures-details-body{
+  animation:v566open .14s ease-out;
+}
+@keyframes v566open{from{opacity:.4;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(max-width:430px){
+  .bottom .inner.five-tabs .nav{font-size:8px!important}
+  .bottom .inner.five-tabs .nav span{font-size:14px!important}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2551,7 +2603,7 @@ img{max-width:100%;height:auto}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.64.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.66.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2573,16 +2625,14 @@ img{max-width:100%;height:auto}
   </main>
 </div>
 
-<nav class="bottom"><div class="inner">
+<nav class="bottom"><div class="inner five-tabs">
   <button class="nav active" data-view="center"><span>⌾</span>CENTER</button>
   <button class="nav" data-view="depot"><span>◔</span>DEPOT</button>
   <button class="nav" data-view="market"><span>▥</span>MARKT</button>
-  <button class="nav" data-view="bottom"><span>◎</span>BODEN</button>
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
-  <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
-<button class="nav" data-view="forecast"><span>↗</span>FCST</button>
+  <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.64.0.js?v=20260824-2315"></script>
+<script src="app-v5.66.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2653,8 +2703,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.64.0';
-let APP_RELEASE='5.64.0 · ACTION ENGINE';
+let APP_CODE_VERSION='5.66.0';
+let APP_RELEASE='5.66.0 · FIVE TAB UX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3110,7 +3160,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.64.0 — UNIFIED RISK STATE MATRIX
+/* v5.66.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3725,7 +3775,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.64.0 — ONE ACTION SSOT */
+/* v5.66.0 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -3798,13 +3848,13 @@ function commandCenter(){
      <div class="center-one-route"><span>${one.action}</span><i>→</i><strong>${one.targetText}</strong></div>
      <small>${one.route}</small>
      <p>${one.note}</p>
-     ${!x.riskOpen?`<button onclick="document.querySelector('.nav[data-view=grid]')?.click()">IM GRID PRÜFEN →</button>`:''}
+     ${!x.riskOpen?`<button onclick="openExecutionGrid()">IM GRID PRÜFEN →</button>`:''}
    </div>
  </section>`;
 }
 
 
-/* v5.64.0 — PORTFOLIO INTELLIGENCE */
+/* v5.66.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -3996,7 +4046,7 @@ function depot(){
         </div>
         <p>${riskNote} Operative Ausführung ausschließlich über GRID/Pionex-Recheck.</p>
       </div>
-      <details class="depot-futures-details">
+      <details class="depot-futures-details" data-detail-key="depot-bots">
         <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>ÖFFNEN</strong></summary>
         <div class="depot-futures-details-body">
           <div class="grid2 depot-futures-secondary">
@@ -4224,7 +4274,7 @@ function centerExecutionBridge(){
        <div><span>RISK / ENTRY</span><b>${fmt(b.riskPct,2)}%</b></div>
      </div>
      ${x.open&&b.maxNotional>0?`<div class="bridge-sizing"><span>MAX POSITION · MODELL</span><b>$${fmt(b.maxNotional,0)}</b><small>Aus freigegebenem Max-Risk ÷ Abstand Entry→SL. Keine automatische Order.</small></div>`:''}
-     <button class="bridge-grid-link" onclick="event.preventDefault();event.stopPropagation();document.querySelector('.nav[data-view=grid]')?.click()">IM GRID ÖFFNEN →</button>
+     <button class="bridge-grid-link" onclick="event.preventDefault();event.stopPropagation();openExecutionGrid()">IM GRID ÖFFNEN →</button>
    </div>
  </details>`;
 }
@@ -5472,32 +5522,70 @@ function bindCenterSmartFocus(el){
    });
  });
 }
+
+/* v5.66.0 — FIVE TAB UX */
+let MARKET_SUBVIEW='market';
+let EXEC_SUBVIEW='trade';
+
+function segmentNav(kind,active){
+ const isMarket=kind==='market';
+ const items=isMarket
+   ? [['market','MARKT'],['nadir','NADIR']]
+   : [['trade','SETUP'],['grid','GRID']];
+ return `<div class="segment-nav">${items.map(([id,label])=>`<button class="${active===id?'active':''}" onclick="${isMarket?'selectMarketSubview':'selectExecutionSubview'}('${id}')">${label}</button>`).join('')}</div>`;
+}
+function marketUnified(){
+ return segmentNav('market',MARKET_SUBVIEW)+(MARKET_SUBVIEW==='nadir'?bottomView():market());
+}
+function executionUnified(){
+ return segmentNav('execution',EXEC_SUBVIEW)+(EXEC_SUBVIEW==='grid'?gridView():dayTrade());
+}
+function selectMarketSubview(v){
+ MARKET_SUBVIEW=v==='nadir'?'nadir':'market';
+ renderOne('market');
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function selectExecutionSubview(v){
+ EXEC_SUBVIEW=v==='grid'?'grid':'trade';
+ renderOne('daytrade');
+ if(EXEC_SUBVIEW==='grid' && typeof refreshGridEngine==='function') refreshGridEngine(false);
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function openExecutionGrid(){
+ EXEC_SUBVIEW='grid';
+ const b=document.querySelector('.nav[data-view="daytrade"]');
+ openView('daytrade',b);
+}
+
 function renderOne(view){
  const map={
   center:['#view-center',commandCenter],
   depot:['#view-depot',depot],
-  market:['#view-market',market],
+  market:['#view-market',marketUnified],
   bottom:['#view-bottom',bottomView],
-  daytrade:['#view-daytrade',dayTrade],
+  daytrade:['#view-daytrade',executionUnified],
   grid:['#view-grid',gridView],
   forecast:['#view-forecast',null],
   settings:['#view-settings',settings]
  };
  const item=map[view]; if(!item)return;
  const el=$(item[0]); if(!el)return;
+ if(window.MERIDIAN_DETAILS_STATE) window.MERIDIAN_DETAILS_STATE.capture(el);
  // Preserve expanded GRID Commander / Opportunity Scanner details across live WebSocket re-renders.
  // Without this, renderAll() replaces the DOM every ~1s and native <details> immediately collapses.
- const preserveDetails=(view==='grid'||view==='center')
-   ? [...el.querySelectorAll('details[data-detail-key][open]')].map(d=>d.dataset.detailKey)
-   : [];
+ const preserveDetails=[...el.querySelectorAll('details[open]')].map((d,i)=>d.dataset.detailKey||d.id||`native-${i}`);
  try{
    if(view==='forecast') renderForecast();
    else el.innerHTML=item[1]();
-   if((view==='grid'||view==='center') && preserveDetails.length){
+   if(preserveDetails.length){
      const openSet=new Set(preserveDetails);
-     el.querySelectorAll('details[data-detail-key]').forEach(d=>{if(openSet.has(d.dataset.detailKey))d.open=true});
+     [...el.querySelectorAll('details')].forEach((d,i)=>{
+       const key=d.dataset.detailKey||d.id||`native-${i}`;
+       if(openSet.has(key)) d.open=true;
+     });
    }
    if(view==='center')bindCenterSmartFocus(el);
+   if(window.MERIDIAN_DETAILS_STATE) window.MERIDIAN_DETAILS_STATE.restore(el);
    el.dataset.rendered='1';
  }catch(e){
    console.error('MERIDIAN render error',view,e);
@@ -5507,7 +5595,7 @@ function renderOne(view){
  }
 }
 function renderAll(){
- ['center','depot','market','bottom','daytrade','grid','forecast','settings'].forEach(renderOne);
+ ['center','depot','market','daytrade','forecast','settings'].forEach(renderOne);
 }
 function openView(view,button){
  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
@@ -5520,7 +5608,7 @@ function openView(view,button){
  el.classList.remove('hidden');
  window.scrollTo({top:0,behavior:'smooth'});
  if(view==='forecast') selectCoin(activeCoin);
- if(view==='grid') refreshGridEngine(false);
+ if(view==='daytrade' && EXEC_SUBVIEW==='grid') refreshGridEngine(false);
 }
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.view,b));
 $('#settingsBtn').onclick=()=>openView('settings',null);
@@ -6792,6 +6880,41 @@ function compactDecisionDetails(){
  document.addEventListener('click',()=>setTimeout(run,100));
  window.addEventListener('load',()=>setTimeout(run,400));
  setInterval(run,60000);
+})();
+</script>
+
+
+<script id="v565-details-persistence">
+(function(){
+ const state=new Map();
+ function key(d,i){
+   const label=(d.querySelector('summary')?.textContent||'').trim().replace(/\s+/g,' ').slice(0,48);
+   return d.dataset.detailKey||d.id||('details-'+i+'-'+label);
+ }
+ function capture(root=document){
+   [...root.querySelectorAll('details')].forEach((d,i)=>state.set(key(d,i),d.open));
+ }
+ function restore(root=document){
+   [...root.querySelectorAll('details')].forEach((d,i)=>{
+     const k=key(d,i);
+     if(state.has(k)) d.open=!!state.get(k);
+     const label=d.querySelector('summary strong,summary span:last-child');
+     if(d.classList.contains('depot-futures-details')){
+       const strong=d.querySelector('summary>strong');
+       if(strong) strong.textContent=d.open?'SCHLIESSEN':'ÖFFNEN';
+     }
+   });
+ }
+ document.addEventListener('toggle',e=>{
+   const d=e.target;if(!(d instanceof HTMLDetailsElement))return;
+   const all=[...document.querySelectorAll('details')],i=all.indexOf(d);
+   state.set(key(d,Math.max(0,i)),d.open);
+   if(d.classList.contains('depot-futures-details')){
+     const strong=d.querySelector('summary>strong');
+     if(strong) strong.textContent=d.open?'SCHLIESSEN':'ÖFFNEN';
+   }
+ },true);
+ window.MERIDIAN_DETAILS_STATE={capture,restore,state};
 })();
 </script>
 
