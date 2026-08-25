@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.71.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.73.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.71.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.73.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.71.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.73.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.71.0 compact bot action cards */
+/* v5.73.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2818,6 +2818,28 @@ body{
 }
 </style>
 
+
+<style id="v572-tab-state-css">
+#primaryBottomNav .nav[aria-current="page"]{
+  color:#24aef2!important;
+  background:rgba(8,27,42,.94)!important;
+  border-color:rgba(36,174,242,.25)!important;
+}
+#primaryBottomNav .nav:not([aria-current="page"]){
+  color:#8092a6!important;
+  background:transparent!important;
+  border-color:transparent!important;
+}
+</style>
+
+
+<style id="v573-view-engine-css">
+main>section.hidden{display:none!important}
+#primaryBottomNav .nav{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#primaryBottomNav .nav:focus{outline:none}
+.segment-nav button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2825,7 +2847,7 @@ body{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.71.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.73.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2854,7 +2876,7 @@ body{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.71.0.js?v=20260824-2315"></script>
+<script src="app-v5.73.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2925,8 +2947,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.71.0';
-let APP_RELEASE='5.71.0 · DECISION DEPTH';
+let APP_CODE_VERSION='5.73.0';
+let APP_RELEASE='5.73.0 · VIEW ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3382,7 +3404,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.71.0 — UNIFIED RISK STATE MATRIX
+/* v5.73.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3997,7 +4019,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.71.0 — ONE ACTION SSOT */
+/* v5.73.0 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4076,7 +4098,7 @@ function commandCenter(){
 }
 
 
-/* v5.71.0 — PORTFOLIO INTELLIGENCE */
+/* v5.73.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -5744,7 +5766,7 @@ function gridView(){
 }
 function settings(){
  const cached=DATA.forecastCoins.filter(c=>loadCache(c)).length,r=DATA.pionexRisk||{},fh=feedHealth();
- return moduleSafe('CONSISTENCY GUARD',()=>consistencyDiagnostics())+card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">3.0 · DUAL-GATE EXECUTION SSOT</b></div>`)+
+ return moduleSafe('CONSISTENCY GUARD',()=>consistencyDiagnostics())+card(`<div class="section-title">LIVE DATA STATUS</div><div class="row"><span>App-Version</span><b>${DATA.appVersion}</b></div><div class="row"><span>Build</span><b>${DATA.build}</b></div><div class="row"><span>BTC Feed</span><b>${sourceBadge(fh.status)} ${fh.source}</b></div><div class="row"><span>Feed-Alter</span><b>${fh.age==null?'—':fh.age+' Sek.'}</b></div><div class="row"><span>WebSocket</span><b class="${FEED.ws==='CONNECTED'?'green':'amber'}">${FEED.ws}</b></div><div class="row"><span>Binance REST</span><b>${FEED.binanceRest}</b></div><div class="row"><span>CoinGecko</span><b>${FEED.coinGecko}</b></div><div class="row"><span>Day-Trade Technik</span><b>${DATA.dayTrade.technicalUpdatedAt?'Binance Futures Browser Live':'Fallback / Snapshot'}</b></div><div class="row"><span>Pionex</span><b>${r.status||'—'} · 09:12</b></div><div class="row"><span>History-Cache</span><b>${cached}/${DATA.forecastCoins.length}</b></div><div class="row"><span>Portfolio-Historie</span><b>${PORTFOLIO_SERIES.length} Punkte</b></div><div class="row"><span>Cashflows</span><b>${CASHFLOWS.length} Einträge</b></div><div class="row"><span>Decision Engine</span><b class="cyan">3.0 · DUAL-GATE EXECUTION SSOT</b></div><div class="row"><span>View Engine</span><b class="green">2.0 · ACTIVE VIEW ONLY</b></div>`)+
  card(`<div class="section-title">v4.9.3 LIVE STREAM</div><div class="row"><span>Primärfeed</span><b class="green">Binance WebSocket</b></div><div class="row"><span>Fallback 1</span><b>Binance REST · 15s Health</b></div><div class="row"><span>Fallback 2</span><b>CoinGecko REST</b></div><div class="row"><span>Portfolio-Recalc</span><b class="green">automatisch</b></div><div class="row"><span>Statuslogik</span><b class="green">LIVE / STALE / FALLBACK / SNAPSHOT</b></div><div class="row"><span>UI Drosselung</span><b>max. 1 Refresh/Sek.</b></div>`)+
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><p class="footer-note">Feed-Reconnect ist jetzt direkt im Header über LIVE ↻ erreichbar.</p>`);
 }
@@ -5837,9 +5859,9 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.71.0 — FIVE TAB UX */
-let MARKET_SUBVIEW='market';
-let EXEC_SUBVIEW='trade';
+/* v5.73.0 — FIVE TAB UX */
+let MARKET_SUBVIEW=(()=>{try{return sessionStorage.getItem('meridian_market_subview')||'market'}catch(e){return 'market'}})();
+let EXEC_SUBVIEW=(()=>{try{return sessionStorage.getItem('meridian_exec_subview')||'trade'}catch(e){return 'trade'}})();
 
 function segmentNav(kind,active){
  const isMarket=kind==='market';
@@ -5856,19 +5878,28 @@ function executionUnified(){
 }
 function selectMarketSubview(v){
  MARKET_SUBVIEW=v==='nadir'?'nadir':'market';
+ try{sessionStorage.setItem('meridian_market_subview',MARKET_SUBVIEW)}catch(e){}
+ ACTIVE_PRIMARY_VIEW='market';
+ try{sessionStorage.setItem('meridian_primary_view','market')}catch(e){}
+ syncPrimaryNav('market');
+ showOnlyView('market');
  renderOne('market');
- window.scrollTo({top:0,behavior:'smooth'});
+ window.scrollTo({top:0,left:0,behavior:'auto'});
 }
 function selectExecutionSubview(v){
  EXEC_SUBVIEW=v==='grid'?'grid':'trade';
+ try{sessionStorage.setItem('meridian_exec_subview',EXEC_SUBVIEW)}catch(e){}
+ ACTIVE_PRIMARY_VIEW='daytrade';
+ try{sessionStorage.setItem('meridian_primary_view','daytrade')}catch(e){}
+ syncPrimaryNav('daytrade');
+ showOnlyView('daytrade');
  renderOne('daytrade');
  if(EXEC_SUBVIEW==='grid' && typeof refreshGridEngine==='function') refreshGridEngine(false);
- window.scrollTo({top:0,behavior:'smooth'});
+ window.scrollTo({top:0,left:0,behavior:'auto'});
 }
 function openExecutionGrid(){
  EXEC_SUBVIEW='grid';
- const b=document.querySelector('.nav[data-view="daytrade"]');
- openView('daytrade',b);
+ activatePrimaryView('daytrade',{resetScroll:true});
 }
 
 function renderOne(view){
@@ -5909,23 +5940,110 @@ function renderOne(view){
  }
 }
 function renderAll(){
- ['center','depot','market','daytrade','forecast','settings'].forEach(renderOne);
+ // v5.73: Live ticks must not rebuild every hidden tab.
+ // Render the active primary view plus settings only when settings is actually visible.
+ const v=(typeof ACTIVE_PRIMARY_VIEW!=='undefined' && PRIMARY_VIEWS.includes(ACTIVE_PRIMARY_VIEW))
+   ? ACTIVE_PRIMARY_VIEW : 'center';
+ renderOne(v);
+ const settings=document.getElementById('view-settings');
+ if(settings && !settings.classList.contains('hidden')) renderOne('settings');
 }
+const PRIMARY_VIEWS=['center','depot','market','daytrade','forecast'];
+let ACTIVE_PRIMARY_VIEW=(()=>{
+ try{
+   const v=sessionStorage.getItem('meridian_primary_view');
+   return PRIMARY_VIEWS.includes(v)?v:'center';
+ }catch(e){return 'center'}
+})();
+const TAB_SCROLL_POS={};
+
+function syncPrimaryNav(view=ACTIVE_PRIMARY_VIEW){
+ const nav=document.getElementById('primaryBottomNav');
+ if(!nav)return;
+ nav.querySelectorAll('.nav[data-view]').forEach(b=>{
+   const active=b.dataset.view===view;
+   b.classList.toggle('active',active);
+   b.setAttribute('aria-current',active?'page':'false');
+ });
+}
+
+function showOnlyView(view){
+ document.querySelectorAll('main>section').forEach(sec=>{
+   sec.classList.toggle('hidden',sec.id!==`view-${view}`);
+ });
+}
+
+function activatePrimaryView(view,{resetScroll=false}={}){
+ if(!PRIMARY_VIEWS.includes(view)) return false;
+
+ // Store scroll position of the outgoing primary tab.
+ if(PRIMARY_VIEWS.includes(ACTIVE_PRIMARY_VIEW)){
+   TAB_SCROLL_POS[ACTIVE_PRIMARY_VIEW]=window.scrollY||0;
+ }
+
+ ACTIVE_PRIMARY_VIEW=view;
+ try{sessionStorage.setItem('meridian_primary_view',view)}catch(e){}
+ syncPrimaryNav(view);
+ showOnlyView(view);
+ renderOne(view);
+
+ if(view==='forecast') selectCoin(activeCoin);
+ if(view==='daytrade' && EXEC_SUBVIEW==='grid' && typeof refreshGridEngine==='function'){
+   refreshGridEngine(false);
+ }
+
+ // A primary-tab press intentionally returns to the top. Sub-tabs do not alter primary state.
+ const y=resetScroll?0:(TAB_SCROLL_POS[view]||0);
+ requestAnimationFrame(()=>{
+   window.scrollTo({top:y,left:0,behavior:'auto'});
+   // Re-assert state after the DOM/render frame to prevent active-tab/view drift.
+   syncPrimaryNav(view);
+   showOnlyView(view);
+ });
+ return true;
+}
+
 function openView(view,button){
- document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
- if(button)button.classList.add('active');
+ if(PRIMARY_VIEWS.includes(view)){
+   return activatePrimaryView(view,{resetScroll:true});
+ }
  document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
  const el=$('#view-'+view);
- if(!el)return;
- // Critical fix: render the requested view at click-time, not only during boot.
+ if(!el)return false;
  renderOne(view);
  el.classList.remove('hidden');
- window.scrollTo({top:0,behavior:'smooth'});
- if(view==='forecast') selectCoin(activeCoin);
- if(view==='daytrade' && EXEC_SUBVIEW==='grid') refreshGridEngine(false);
+ if(view==='settings') syncPrimaryNav(ACTIVE_PRIMARY_VIEW);
+ window.scrollTo({top:0,left:0,behavior:'auto'});
+ return true;
 }
-document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.view,b));
-$('#settingsBtn').onclick=()=>openView('settings',null);
+
+// Event delegation: one listener survives all live re-renders and cannot desync button/view state.
+const primaryNav=document.getElementById('primaryBottomNav');
+if(primaryNav){
+ primaryNav.addEventListener('click',e=>{
+   const b=e.target.closest('.nav[data-view]');
+   if(!b || !primaryNav.contains(b))return;
+   e.preventDefault();
+   e.stopPropagation();
+   activatePrimaryView(b.dataset.view,{resetScroll:true});
+ },{passive:false});
+}
+const settingsBtn=$('#settingsBtn');
+if(settingsBtn) settingsBtn.onclick=()=>openView('settings',null);
+
+// Self-correct tab/view state after iOS resume/back-forward lifecycle events.
+function repairPrimaryViewState(){
+ if(!PRIMARY_VIEWS.includes(ACTIVE_PRIMARY_VIEW)) ACTIVE_PRIMARY_VIEW='center';
+ try{sessionStorage.setItem('meridian_primary_view',ACTIVE_PRIMARY_VIEW)}catch(e){}
+ syncPrimaryNav(ACTIVE_PRIMARY_VIEW);
+ showOnlyView(ACTIVE_PRIMARY_VIEW);
+ const el=document.getElementById('view-'+ACTIVE_PRIMARY_VIEW);
+ if(el && el.dataset.rendered!=='1') renderOne(ACTIVE_PRIMARY_VIEW);
+}
+window.addEventListener('pageshow',repairPrimaryViewState);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)repairPrimaryViewState()});
+/* v5.73: restore the last primary tab before data boot to avoid a CENTER flash. */
+repairPrimaryViewState();
 /* v5.0.4 lazy view recovery: service worker disabled during recovery */
 load();
 
@@ -7281,6 +7399,20 @@ function compactDecisionDetails(){
  window.addEventListener('pageshow',healNav);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)healNav()});
  setInterval(healNav,5000);
+})();
+</script>
+
+
+<script id="v572-tab-state-guard">
+(function(){
+ function guard(){
+   try{
+     if(typeof repairPrimaryViewState==='function') repairPrimaryViewState();
+   }catch(e){}
+ }
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(guard,0));
+ window.addEventListener('load',()=>setTimeout(guard,50));
+ setTimeout(guard,800);
 })();
 </script>
 
