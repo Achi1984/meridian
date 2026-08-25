@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.56.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.58.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.56.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.58.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.56.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.58.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.56.0 compact bot action cards */
+/* v5.58.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2357,7 +2357,7 @@ body[data-view] nav.bottom{
 </style>
 
 <style id="v555-grid-compact">
-/* v5.56.0: GRID-only compression — no global layout changes */
+/* v5.58.0: GRID-only compression — no global layout changes */
 .grid-command-compact{gap:10px!important}
 .grid-command-compact .section-head{margin-bottom:2px!important}
 .grid-kpi-strip{gap:7px!important}
@@ -2379,7 +2379,7 @@ body[data-view] nav.bottom{
 
 
 <style id="v556-grid-focus">
-/* v5.56.0 — GRID only. No CENTER/global layout changes. */
+/* v5.58.0 — GRID only. No CENTER/global layout changes. */
 .grid-command-v556{display:flex;flex-direction:column;gap:10px}
 .grid-command-v556-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .grid-command-v556-head .forecast-main{font-size:24px;line-height:1.05;margin-top:7px}
@@ -2411,6 +2411,59 @@ body[data-view] nav.bottom{
 }
 </style>
 
+<style id="v557-decision-css">
+.v557-decision{border-top:1px solid #173e55;padding-top:10px;margin-top:1px}
+.v557-label{font-size:8px;letter-spacing:1.25px;color:#8296a8;font-weight:900}
+.v557-action{font-size:13px;font-weight:950;margin-top:5px;line-height:1.25}
+.v557-scores{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.v557-scores span{border:1px solid #173e55;border-radius:999px;padding:5px 8px;font-size:8px}
+.v557-scores b{font-size:10px;margin-left:3px}
+</style>
+
+<style id="v558-forecast-cycle-css">
+/* v5.58 — Forecast/Cycle only */
+.forecast-v558-price .forecast-price{margin-bottom:12px}
+.forecast-v558-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.forecast-v558-strip>div,.cycle-clock-v558-grid>div,.forecast-v558-exit>div{
+  border:1px solid #173e55;border-radius:13px;padding:10px;min-width:0
+}
+.forecast-v558-strip span,.cycle-clock-v558-grid span,.forecast-v558-exit span{
+  display:block;color:#8296a8;font-size:8px;letter-spacing:1px;margin-bottom:4px
+}
+.forecast-v558-strip b,.cycle-clock-v558-grid b,.forecast-v558-exit b{font-size:13px;overflow-wrap:anywhere}
+.cycle-clock-v558{display:flex;flex-direction:column;gap:10px}
+.cycle-clock-v558-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-end}
+.cycle-clock-v558-top span{display:block;color:#8296a8;font-size:8px;letter-spacing:1px}
+.cycle-clock-v558-top b{display:block;font-size:17px;margin-top:4px}
+.cycle-clock-v558-top strong{font-size:24px}
+.cycle-clock-v558-bar{height:10px;border-radius:999px;background:#071923;overflow:hidden;border:1px solid #173e55}
+.cycle-clock-v558-bar i{display:block;height:100%;background:linear-gradient(90deg,#24aef2,#2fe59a);border-radius:999px}
+.cycle-clock-v558-axis{display:flex;justify-content:space-between;color:#647789;font-size:7px;letter-spacing:.5px}
+.cycle-clock-v558-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.forecast-v558-route{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;border-top:1px solid #173e55;padding-top:11px;margin-top:11px}
+.forecast-v558-route span{color:#8296a8;font-size:8px;letter-spacing:1px}
+.forecast-v558-route i{font-style:normal;color:#24aef2;font-weight:900}
+.forecast-v558-scenarios{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.forecast-v558-scenarios>div{border:1px solid #173e55;border-radius:14px;padding:11px 9px;min-width:0}
+.forecast-v558-scenarios span{display:block;color:#8296a8;font-size:7px;letter-spacing:.5px;margin-bottom:6px}
+.forecast-v558-scenarios b{font-size:12px;line-height:1.25;overflow-wrap:anywhere}
+.forecast-v558-scenarios .bear{border-color:#71303d}.forecast-v558-scenarios .base{border-color:#185a7e}.forecast-v558-scenarios .bull{border-color:#1d6c4a}
+.forecast-v558-scenarios .bear b{color:#ff5b6b}.forecast-v558-scenarios .base b{color:#24aef2}.forecast-v558-scenarios .bull b{color:#2fe59a}
+.forecast-v558-exit{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.forecast-v558-decision{display:flex;justify-content:space-between;align-items:center;border:1px solid #19577a;border-radius:13px;padding:10px 12px;margin-top:10px}
+.forecast-v558-decision.red{border-color:#8f3445}.forecast-v558-decision.amber{border-color:#8c6726}.forecast-v558-decision.green{border-color:#1e744e}
+.forecast-v558-decision span{color:#8296a8;font-size:8px;letter-spacing:1px}.forecast-v558-decision b{font-size:14px}
+.forecast-v558-details{border:1px solid #173e55;border-radius:18px;margin:12px 0;overflow:hidden}
+.forecast-v558-details>summary{list-style:none;padding:15px 16px;display:flex;justify-content:space-between;gap:12px;font-weight:900;letter-spacing:.8px}
+.forecast-v558-details>summary::-webkit-details-marker{display:none}
+.forecast-v558-details>summary span{color:#24aef2;font-size:9px}
+.forecast-v558-details>div{padding:0 10px 10px}
+@media(max-width:430px){
+ .forecast-v558-scenarios{grid-template-columns:1fr}
+ .forecast-v558-strip{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2418,7 +2471,7 @@ body[data-view] nav.bottom{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.56.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.58.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2449,7 +2502,7 @@ body[data-view] nav.bottom{
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.56.0.js?v=20260824-2315"></script>
+<script src="app-v5.58.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2520,8 +2573,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.39.0';
-let APP_RELEASE='5.39.0 · ENTRY INTEGRITY + GRID COMPACT';
+let APP_CODE_VERSION='5.58.0';
+let APP_RELEASE='5.58.0 · FORECAST + CYCLE CLOCK';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -2977,7 +3030,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.56.0 — UNIFIED RISK STATE MATRIX
+/* v5.58.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4152,30 +4205,70 @@ function renderForecast(){
  const x=f.ready?cycle40Exit(activeCoin,f,state):null;
  const env=f.ready?cycle40Envelope(activeCoin,f):null;
  const conf=f.ready?forecast40Confidence(f,x):0;
- let body=card(`<div class="forecast-kicker"><div class="eyebrow">ACHI MERIDIAN FORECAST 4.0</div><div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div></div><div class="forecast-main">TIME × STRUCTURE<br>× EXIT</div><div class="sub forecast-sub">TACTICAL NOW · NEXT CYCLE · EXIT ENGINE 2.0</div><p class="footer-note">90T-Ziele sind taktisch. Das nächste große Cycle-Peak-Fenster wird zeitlich separat bewertet.</p>`);
+ let body=card(`<div class="forecast-kicker"><div class="eyebrow">ACHI MERIDIAN FORECAST 4.1</div><div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div></div><div class="forecast-main">TIME × STRUCTURE<br>× EXIT</div><div class="sub forecast-sub">TACTICAL NOW · CYCLE CLOCK · SCENARIOS · EXIT</div><p class="footer-note">Taktische 90T-Struktur und Makro-Zyklus werden bewusst getrennt bewertet.</p>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
  if(!f.ready){
    body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button>`);
  }else{
    const dec=activeCoin==='PEPE'?8:(f.last<1?4:2);
-   body+=card(`<div class="forecast-price-card"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last,dec)}</div><div class="grid2">${metric('LOCAL HEAT',x.localHeat+'/100',x.localHeat>80?'red':x.localHeat>65?'amber':'green')}${metric('CYCLE EXIT RISK',x.cycleRisk+'/100',x.cycleRisk>77?'red':x.cycleRisk>51?'amber':'green')}${metric('DAILY RSI',f.dailyRsi?fmt(f.dailyRsi,1):'—')}${metric('90T MOMENTUM',(f.ret90>=0?'+':'')+fmt(f.ret90,1)+'%')}</div></div>`);
+   const cyc=f.cycle||{};
+   const pct=Math.max(0,Math.min(100,Number(cyc.pct)||0));
+   const timingTone=x.timing?.cls||'cyan';
+   const tacticalTone=x.localHeat>80?'red':x.localHeat>65?'amber':'green';
 
-   body+=card(`<div class="section-title">1 · TACTICAL NOW <span class="tag cyan">90T</span></div><div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>TACTICAL T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div><div class="row"><span>Position im 90T Swing</span><b>${fmt(f.pos,1)}%</b></div><div class="forecast-separation"><b>LOCAL ≠ CYCLE TOP</b><span>Hoher RSI / 90T-Top-Risk kann taktisch überhitzt sein, ohne dass das nächste Makro-Cycle-Top aktiv ist.</span></div>`);
+   // Transparent scenario weights: model-only, derived from current confidence/risk.
+   const baseP=Math.max(40,Math.min(68,Math.round(48+conf*.18-x.cycleRisk*.08)));
+   const bearP=Math.max(12,Math.min(38,Math.round(22+x.cycleRisk*.14+(f.ret90<0?5:0))));
+   const bullP=Math.max(12,100-baseP-bearP);
+   const norm=baseP+bearP+bullP;
+   const bp=Math.round(baseP/norm*100), brp=Math.round(bearP/norm*100), blp=100-bp-brp;
 
-   body+=card(`<div class="section-title">2 · CYCLE CLOCK <span class="tag ${x.timing.cls}">LIVE MODEL</span></div><div class="cycle-master"><span>AKTUELLE MAKRO-PHASE</span><strong class="${x.timing.cls}">${x.timing.phase}</strong><b>${x.timing.daysToHalving>0?x.timing.daysToHalving+' Tage bis Halving':'Halving-Fenster überschritten'}</b></div>${forecast40Roadmap(x)}<div class="row"><span>Nächster Zustandswechsel</span><b>${x.timing.next}</b></div><div class="row"><span>${activeCoin} Major Peak Window</span><b class="green">${x.cfg.peak}</b></div><div class="row"><span>Cycle Exit Gate</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div><p class="footer-note">Cycle-Exit wird erst scharf, wenn Zeitfenster UND Makrostruktur bestätigen. Kalender allein reicht nicht.</p>`);
+   body+=card(`<div class="forecast-price-card forecast-v558-price"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last,dec)}</div><div class="forecast-v558-strip"><div><span>LOCAL</span><b class="${tacticalTone}">${x.localHeat}/100</b></div><div><span>CYCLE EXIT</span><b class="${x.cls}">${x.cycleRisk}/100</b></div><div><span>90T</span><b>${f.ret90>=0?'+':''}${fmt(f.ret90,1)}%</b></div></div></div>`);
 
-   body+=card(`<div class="section-title">3 · NEXT CYCLE ENVELOPE <span class="tag amber">MODEL · NOT ACTIVE</span></div><div class="cycle-envelope"><div><span>DEFENSIVE</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div><div><span>BASE</span><b class="cyan">$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div><div><span>HIGH-BETA</span><b class="green">$${fmt(env.bullLow,dec)}–$${fmt(env.bullHigh,dec)}</b></div></div><div class="row"><span>Modellquelle</span><b>${env.source}</b></div><div class="row"><span>Aktivierung</span><b>TIME + ATH/HH + REGIME</b></div><p class="footer-note">Langfristige Szenario-Zonen, keine aktuellen Targets. Sie ersetzen ausdrücklich nicht die 90T-FIB-Ziele.</p>`);
+   body+=card(`<div class="section-title">CYCLE CLOCK <span class="tag ${timingTone}">LIVE MODEL</span></div>
+     <div class="cycle-clock-v558">
+       <div class="cycle-clock-v558-top"><div><span>MAKRO-PHASE</span><b class="${timingTone}">${x.timing.phase}</b></div><strong>${fmt(pct,1)}%</strong></div>
+       <div class="cycle-clock-v558-bar"><i style="width:${pct}%"></i></div>
+       <div class="cycle-clock-v558-axis"><span>HALVING 2024</span><span>MID</span><span>RESET / NEXT HALVING</span></div>
+       <div class="cycle-clock-v558-grid">
+         <div><span>NÄCHSTER WECHSEL</span><b>${x.timing.next}</b></div>
+         <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b></div>
+         <div><span>EXIT GATE</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div>
+         <div><span>REFERENZ</span><b>${cyc.daysFromReference>=0?'+':''}${cyc.daysFromReference||0} T</b></div>
+       </div>
+     </div>
+     <p class="footer-note">Die Uhr ist ein Zeitmodell. Ein Exit wird erst ausgelöst, wenn Zeit + Struktur + Regime gemeinsam bestätigen.</p>`);
 
-   body+=card(`<div class="section-title">4 · EXIT ENGINE 2.0 <span class="tag ${x.cls}">${x.stage}</span></div><div class="exit-master"><span>CYCLE EXIT RISK</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${x.action}</strong></div><div class="grid2 exit-inputs">${metric('TIME',x.timing.timeScore+'/100')}${metric('STRUCTURE',x.structureScore+'/100')}${metric('MOMENTUM',x.momentumExhaustion+'/100')}${metric('RELATIVE WEAKNESS',x.relativeWeak+'/100')}</div>${(DATA.forecast40?.exitTranches||DATA.forecast33?.exitTranches||[]).map(t=>`<div class="row"><span>${t.name} · ${t.pct}%</span><b>${t.trigger}</b></div>`).join('')}<p class="footer-note">Wichtig: LOCAL HEAT und CYCLE EXIT RISK sind getrennt. Ein taktisch heißer Markt kann im Makro-Cycle weiterhin weit vor dem Exit-Fenster liegen.</p>`);
+   body+=card(`<div class="section-title">TACTICAL NOW <span class="tag cyan">90T</span></div>
+     <div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div>
+     <div class="forecast-v558-route"><span>SWING POSITION</span><b>${fmt(f.pos,1)}%</b><i>→</i><strong class="${state.cls}">${state.label}</strong></div>
+     <div class="row"><span>Daily RSI</span><b>${f.dailyRsi?fmt(f.dailyRsi,1):'—'}</b></div>`);
 
-   body+=card(`<div class="section-title">5 · TRIGGER MATRIX</div><div class="trigger-grid"><div><span class="green">UNLOCKS</span><b>Peak Window aktiv</b><b>BTC neues Makro-ATH + HH</b><b>Liquidität / Breadth bestätigt</b></div><div><span class="red">RISK FLAGS</span><b>Momentum-Divergenz</b><b>Relative Stärke bricht</b><b>Distribution + Strukturbruch</b></div></div><div class="row"><span>Aktueller Makro-ATH Gate</span><b class="${x.macroStructure?'green':'amber'}">${x.macroStructure?'BESTÄTIGT':'NICHT BESTÄTIGT'}</b></div>`);
+   body+=card(`<div class="section-title">NEXT CYCLE SCENARIOS <span class="tag amber">MODEL</span></div>
+     <div class="forecast-v558-scenarios">
+       <div class="bear"><span>DEFENSIVE · ${brp}%</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div>
+       <div class="base"><span>BASE · ${bp}%</span><b>$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div>
+       <div class="bull"><span>HIGH-BETA · ${blp}%</span><b>$${fmt(env.bullLow,dec)}–$${fmt(env.bullHigh,dec)}</b></div>
+     </div>
+     <p class="footer-note">Wahrscheinlichkeiten sind relative Modellgewichte, keine statistisch garantierten Trefferquoten. Aktivierung erst mit TIME + ATH/HH + REGIME.</p>`);
 
-   body+=card(`<div class="section-title">TACTICAL FORWARD WINDOW <span class="tag cyan">CONDITIONAL</span></div><div class="row"><span>Breakout</span><b>$${fmt(fw.breakout,dec)}</b></div><div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,dec)}</b></div><div class="row"><span>Pullback</span><b>$${fmt(fw.pullbackLow,dec)}–$${fmt(fw.pullbackHigh,dec)}</b></div><div class="row"><span>T1 / T2</span><b class="cyan">$${fmt(fw.t1,dec)} / $${fmt(fw.t2,dec)}</b></div>`);
-   body+=altRotationBlock();
+   body+=card(`<div class="section-title">EXIT ENGINE 2.1 <span class="tag ${x.cls}">${x.stage}</span></div>
+     <div class="exit-master"><span>CYCLE EXIT RISK</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${x.action}</strong></div>
+     <div class="forecast-v558-exit"><div><span>TIME</span><b>${x.timing.timeScore}/100</b></div><div><span>STRUCTURE</span><b>${x.structureScore}/100</b></div><div><span>MOMENTUM</span><b>${x.momentumExhaustion}/100</b></div><div><span>REL. WEAKNESS</span><b>${x.relativeWeak}/100</b></div></div>
+     <div class="forecast-v558-decision ${x.cls}"><span>AKTION</span><b>${x.action}</b></div>`);
+
+   body+=card(`<div class="section-title">FORWARD WINDOW <span class="tag cyan">CONDITIONAL</span></div>
+     <div class="row"><span>Breakout</span><b>$${fmt(fw.breakout,dec)}</b></div>
+     <div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,dec)}</b></div>
+     <div class="row"><span>Pullback</span><b>$${fmt(fw.pullbackLow,dec)}–$${fmt(fw.pullbackHigh,dec)}</b></div>
+     <div class="row"><span>T1 / T2</span><b class="cyan">$${fmt(fw.t1,dec)} / $${fmt(fw.t2,dec)}</b></div>`);
+
+   body+=`<details class="forecast-v558-details"><summary>ROTATION & MODELLDETAILS <span>ÖFFNEN</span></summary><div>${altRotationBlock()}</div></details>`;
    body+=card(`<button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%">HISTORIE AKTUALISIEREN</button>`);
  }
  $('#view-forecast').innerHTML=body;
 }
+
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 
@@ -5010,7 +5103,7 @@ function gridView(){
 
  const summary=card(`<div class="grid-command-v556">
    <div class="grid-command-v556-head">
-     <div><div class="eyebrow">GRID COMMANDER 4.1 ${liveBadge('SSOT')}</div><div class="forecast-main ${statusTone}">${statusLabel}</div></div>
+     <div><div class="eyebrow">GRID COMMANDER 4.2 ${liveBadge('SSOT')}</div><div class="forecast-main ${statusTone}">${statusLabel}</div></div>
      <span class="tag ${statusTone}">${bots.length} ACTIVE</span>
    </div>
    <div class="grid-command-v556-state">
@@ -6380,4 +6473,25 @@ function compactDecisionDetails(){
 })();
 </script>
 
+<script id="v557-decision-engine">
+(function(){
+ function n(v,f=0){let x=Number(String(v??'').replace(',','.').replace(/[^\d.-]/g,''));return Number.isFinite(x)?x:f}
+ function score(b,h,p){let bs=Math.max(0,Math.min(100,b/30*100)),ps=p>=0?85:Math.max(20,65-Math.min(45,Math.abs(p)/5));return Math.round(bs*.55+h*.35+ps*.10)}
+ function run(){
+  let g=document.querySelector('.grid-command-v556'); if(!g)return;
+  let rows=[...document.querySelectorAll('.bot-compact-row')], bots=[];
+  rows.forEach(r=>{let t=r.innerText||'',m=t.match(/(BTC-S30|HBAR-L3|XRP-L5)/);if(!m)return;
+   let bm=t.match(/BUFFER\s*([\d,.]+)%/i)||t.match(/([\d,.]+)%/),hm=t.match(/HEALTH\s*(\d+)/i),pm=t.match(/P&L\s*\$?\s*([+\-−]?\d+(?:[.,]\d+)?)/i);
+   let b=bm?n(bm[1]):0,h=hm?n(hm[1],50):50,p=pm?n(pm[1].replace('−','-')):0,s=score(b,h,p);
+   bots.push({sym:m[1],buffer:b,score:s,tone:b<8||s<45?'red':b<30||s<70?'amber':'green'});
+  });
+  if(!bots.length)return; bots.sort((a,b)=>a.score-b.score); let w=bots[0],blocked=w.buffer<8;
+  let box=document.getElementById('v557-decision');if(!box){box=document.createElement('div');box.id='v557-decision';box.className='v557-decision';g.appendChild(box)}
+  let action=blocked?`KEIN NEUER ENTRY · ${w.sym} ZUERST ≥8%`:w.buffer<12?`${w.sym} RECOVERY → ≥12%`:'PORTFOLIO RISK OK · SETUPS PRÜFEN';
+  box.innerHTML=`<div class="v557-label">DECISION ENGINE 1.0</div><div class="v557-action ${blocked?'red':'green'}">${action}</div><div class="v557-scores">${bots.map(b=>`<span class="${b.tone}">${b.sym} <b>${b.score}</b></span>`).join('')}</div>`;
+ }
+ new MutationObserver(()=>requestAnimationFrame(run)).observe(document.documentElement,{subtree:true,childList:true});
+ document.addEventListener('click',()=>setTimeout(run,80));setTimeout(run,300);
+})();
+</script>
 </body></html>
