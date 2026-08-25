@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.67.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.68.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.67.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.68.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.67.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.68.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.67.0 compact bot action cards */
+/* v5.68.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2610,6 +2610,51 @@ img{max-width:100%;height:auto}
 .header-feed-btn.feed-warn{color:#f0b84b!important}
 </style>
 
+
+<style id="v568-nav-restore">
+html,body{min-height:100%;background:#03070c!important}
+body{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+.bottom{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:fixed!important;
+  left:0!important;right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  min-height:58px!important;
+  z-index:2147483000!important;
+  transform:translateZ(0);
+  -webkit-transform:translateZ(0);
+  background:rgba(3,7,12,.985)!important;
+  border-top:1px solid #17354f!important;
+  pointer-events:auto!important;
+}
+.bottom .inner.five-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  width:100%!important;
+  max-width:900px!important;
+  margin:0 auto!important;
+  padding:5px 5px calc(6px + env(safe-area-inset-bottom))!important;
+  gap:3px!important;
+}
+.bottom .nav{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  min-height:46px!important;
+  color:#8193a8!important;
+  background:transparent!important;
+  border:0!important;
+}
+.bottom .nav.active{color:#20a4ff!important;background:#07131e!important}
+.bottom .nav span{display:block!important}
+@supports(height:100dvh){
+  .bottom{bottom:max(0px,env(safe-area-inset-bottom,0px))!important}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2617,7 +2662,7 @@ img{max-width:100%;height:auto}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.67.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.68.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2639,14 +2684,14 @@ img{max-width:100%;height:auto}
   </main>
 </div>
 
-<nav class="bottom"><div class="inner five-tabs">
+<nav class="bottom" id="primaryBottomNav"><div class="inner five-tabs">
   <button class="nav active" data-view="center"><span>⌾</span>CENTER</button>
   <button class="nav" data-view="depot"><span>◔</span>DEPOT</button>
   <button class="nav" data-view="market"><span>▥</span>MARKT</button>
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.67.0.js?v=20260824-2315"></script>
+<script src="app-v5.68.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2717,8 +2762,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.67.0';
-let APP_RELEASE='5.67.0 · FIVE TAB UX';
+let APP_CODE_VERSION='5.68.0';
+let APP_RELEASE='5.68.0 · NAV RESTORE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3174,7 +3219,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.67.0 — UNIFIED RISK STATE MATRIX
+/* v5.68.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3789,7 +3834,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.67.0 — ONE ACTION SSOT */
+/* v5.68.0 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -3868,7 +3913,7 @@ function commandCenter(){
 }
 
 
-/* v5.67.0 — PORTFOLIO INTELLIGENCE */
+/* v5.68.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -5585,7 +5630,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.67.0 — FIVE TAB UX */
+/* v5.68.0 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW='trade';
 
@@ -6977,6 +7022,29 @@ function compactDecisionDetails(){
    }
  },true);
  window.MERIDIAN_DETAILS_STATE={capture,restore,state};
+})();
+</script>
+
+
+<script id="v568-nav-self-heal">
+(function(){
+ function healNav(){
+   const n=document.getElementById('primaryBottomNav')||document.querySelector('nav.bottom');
+   if(!n)return;
+   n.style.setProperty('display','block','important');
+   n.style.setProperty('visibility','visible','important');
+   n.style.setProperty('opacity','1','important');
+   n.style.setProperty('position','fixed','important');
+   n.style.setProperty('left','0','important');
+   n.style.setProperty('right','0','important');
+   n.style.setProperty('bottom','0','important');
+   n.style.setProperty('z-index','2147483000','important');
+ }
+ document.addEventListener('DOMContentLoaded',healNav);
+ window.addEventListener('load',healNav);
+ window.addEventListener('pageshow',healNav);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)healNav()});
+ setInterval(healNav,5000);
 })();
 </script>
 
