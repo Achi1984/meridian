@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.58.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.61.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.58.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.61.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.58.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.61.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.58.0 compact bot action cards */
+/* v5.61.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2354,61 +2354,6 @@ body[data-view] nav.bottom{
 .bot-mini-action.red{border-color:#8f3445}.bot-mini-action.amber{border-color:#8c6726}.bot-mini-action.green{border-color:#1e744e}
 .bot-mini-action span{font-size:7px;color:#8296a8;letter-spacing:1px}.bot-mini-action b{font-size:13px;text-align:right}
 
-</style>
-
-<style id="v555-grid-compact">
-/* v5.58.0: GRID-only compression — no global layout changes */
-.grid-command-compact{gap:10px!important}
-.grid-command-compact .section-head{margin-bottom:2px!important}
-.grid-kpi-strip{gap:7px!important}
-.grid-kpi-strip>div{padding:10px 10px!important;border-radius:14px!important}
-.grid-kpi-strip span{font-size:8px!important;margin-bottom:5px!important}
-.grid-kpi-strip b{font-size:14px!important}
-.grid-next-action{padding:10px 12px!important;border-radius:14px!important}
-.grid-next-action b{font-size:15px!important}
-.bot-compact-list{gap:7px!important}
-.bot-compact-row summary{padding:11px 12px!important}
-.bot-main b{font-size:16px!important}
-.bot-main small{margin-top:2px!important;font-size:9px!important}
-.bot-buffer b,.bot-action b{font-size:13px!important}
-.bot-v551 .bot-mini-card{padding:8px 10px 10px!important;gap:6px!important}
-.bot-mini-market span,.bot-mini-health span{padding:7px!important}
-.bot-mini-action{padding:8px 9px!important}
-.compact-focus{margin-top:9px!important}
-</style>
-
-
-<style id="v556-grid-focus">
-/* v5.58.0 — GRID only. No CENTER/global layout changes. */
-.grid-command-v556{display:flex;flex-direction:column;gap:10px}
-.grid-command-v556-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.grid-command-v556-head .forecast-main{font-size:24px;line-height:1.05;margin-top:7px}
-.grid-command-v556-state{display:grid;grid-template-columns:1.5fr .8fr;gap:8px}
-.grid-command-v556-state>div{
-  border:1px solid #173e55;border-radius:14px;padding:11px 13px;min-width:0
-}
-.grid-command-v556-state span{
-  display:block;color:#8296a8;font-size:8px;letter-spacing:1.05px;margin-bottom:5px
-}
-.grid-command-v556-state b{font-size:14px;line-height:1.2;overflow-wrap:anywhere}
-.grid-command-v556-action{
-  display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;
-  gap:9px;border:1px solid #19577a;border-radius:14px;padding:11px 13px
-}
-.grid-command-v556-action.red{border-color:#8f3445}
-.grid-command-v556-action.amber{border-color:#8c6726}
-.grid-command-v556-action.green{border-color:#1e744e}
-.grid-command-v556-action span{
-  color:#8296a8;font-size:8px;letter-spacing:1px
-}
-.grid-command-v556-action b{font-size:14px;text-align:right}
-.grid-command-v556-action i{color:#24aef2;font-style:normal;font-weight:900}
-.grid-command-v556-action strong{font-size:12px;white-space:nowrap}
-@media(max-width:430px){
-  .grid-command-v556-head .forecast-main{font-size:22px}
-  .grid-command-v556-action{grid-template-columns:auto 1fr auto}
-  .grid-command-v556-action strong{grid-column:2/4;text-align:right;font-size:11px}
-}
 </style>
 
 <style id="v557-decision-css">
@@ -2464,6 +2409,51 @@ body[data-view] nav.bottom{
 }
 </style>
 
+
+<style id="v559-portfolio-intelligence-css">
+/* v5.59 — DEPOT only */
+.pi-one-action{border:1px solid #19577a;border-radius:15px;padding:12px 13px;margin:12px 0}
+.pi-one-action.red{border-color:#8f3445}.pi-one-action.amber{border-color:#8c6726}.pi-one-action.green{border-color:#1e744e}
+.pi-one-action span{display:block;color:#8296a8;font-size:8px;letter-spacing:1.1px;margin-bottom:5px}
+.pi-one-action b{font-size:15px;line-height:1.25}
+.pi-scenarios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pi-scenarios>div{border:1px solid #173e55;border-radius:14px;padding:11px 9px;min-width:0}
+.pi-scenarios span{display:block;color:#8296a8;font-size:7px;letter-spacing:.6px;margin-bottom:6px}
+.pi-scenarios b{font-size:13px;overflow-wrap:anywhere}
+.pi-scenarios .bear{border-color:#71303d}.pi-scenarios .base{border-color:#185a7e}.pi-scenarios .bull{border-color:#1d6c4a}
+.pi-scenarios .bear b{color:#ff5b6b}.pi-scenarios .base b{color:#24aef2}.pi-scenarios .bull b{color:#2fe59a}
+.pi-details{margin-top:12px;border:1px solid #173e55;border-radius:14px;overflow:hidden}
+.pi-details>summary{list-style:none;padding:12px 13px;display:flex;justify-content:space-between;font-size:10px;font-weight:900;letter-spacing:.7px}
+.pi-details>summary::-webkit-details-marker{display:none}.pi-details>summary span{color:#24aef2;font-size:8px}
+.pi-details>div{padding:0 12px 10px}
+.pi-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #173e55}
+.pi-row:last-child{border-bottom:0}.pi-row>div{min-width:0}.pi-row span{color:#647789;font-size:8px;margin-right:6px}
+.pi-row b{font-size:12px}.pi-row small{display:block;color:#8296a8;font-size:8px;margin-top:3px;overflow-wrap:anywhere}
+.pi-row strong{font-size:11px}.pi-row em{font-style:normal;font-size:9px;font-weight:900;text-align:right}
+@media(max-width:430px){.pi-scenarios{grid-template-columns:1fr 1fr 1fr}.pi-row{grid-template-columns:1fr auto}.pi-row em{grid-column:2;text-align:right}}
+</style>
+
+
+<style id="v560-stable-css">
+/* v5.60 stable: consistency only */
+.card{contain:layout style}
+details>summary{cursor:pointer}
+button,.tab,.nav{-webkit-tap-highlight-color:transparent}
+img{max-width:100%;height:auto}
+</style>
+
+
+<style id="v561-alert-css">
+/* v5.61 — compact alert strip, CENTER only */
+.v561-alert-host{display:flex;flex-direction:column;gap:7px;margin:10px 0}
+.v561-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #173e55;border-radius:14px;padding:10px 12px;background:rgba(2,14,21,.45)}
+.v561-alert.red{border-color:#8f3445}.v561-alert.amber{border-color:#8c6726}.v561-alert.green{border-color:#1e744e}
+.v561-alert b{display:block;font-size:10px;letter-spacing:.6px}
+.v561-alert span{display:block;color:#8296a8;font-size:8px;margin-top:3px}
+.v561-alert i{font-style:normal;font-size:15px;font-weight:950}
+.v561-alert.red i{color:#ff5b6b}.v561-alert.amber i{color:#f0b84b}.v561-alert.green i{color:#2fe59a}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2471,7 +2461,7 @@ body[data-view] nav.bottom{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.58.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.61.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2502,7 +2492,7 @@ body[data-view] nav.bottom{
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.58.0.js?v=20260824-2315"></script>
+<script src="app-v5.61.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2573,8 +2563,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.58.0';
-let APP_RELEASE='5.58.0 · FORECAST + CYCLE CLOCK';
+let APP_CODE_VERSION='5.61.0';
+let APP_RELEASE='5.61.0 · ALERT ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3030,7 +3020,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.58.0 — UNIFIED RISK STATE MATRIX
+/* v5.61.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3676,6 +3666,87 @@ function commandCenter(){
  </section>`;
 }
 
+
+/* v5.61.0 — PORTFOLIO INTELLIGENCE */
+function portfolioIntelligenceState(){
+ const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
+ holdings.forEach(h=>{
+   const sym=String(h.symbol||'').toUpperCase();
+   if(!sym)return;
+   grouped[sym]=(grouped[sym]||0)+Number(h.quantity||0);
+ });
+
+ const alt=DATA.altRotation?.coins||{}, fall=DATA.priceFallbacks||{};
+ const topMap=Object.fromEntries((p.topPositions||[]).map(x=>[x.symbol,x]));
+ const betaMult=beta=>{
+   beta=String(beta||'').toUpperCase();
+   if(beta.includes('VERY HIGH'))return {bear:1.10,base:2.60,bull:4.50};
+   if(beta.includes('HIGH'))return {bear:1.08,base:2.20,bull:3.60};
+   if(beta.includes('MEDIUM'))return {bear:1.05,base:1.80,bull:2.80};
+   return {bear:1.03,base:1.55,bull:2.20};
+ };
+
+ const positions=Object.entries(grouped).map(([sym,qty])=>{
+   const q=DATA.livePrices?.[sym], top=topMap[sym], fb=fall?.[sym];
+   const px=Number(q?.price??top?.price??fb?.price??0);
+   const current=px>0?qty*px:Number(top?.value||0);
+   let mult=betaMult(alt?.[sym]?.beta|| (sym==='BTC'?'BASE':'MEDIUM'));
+   // BTC uses the macro cycle zones when available, otherwise conservative multiples.
+   if(sym==='BTC'){
+     const z=DATA.macroForecast?.btcZones||{};
+     if(px>0&&z.base?.low&&z.base?.high){
+       mult={
+         bear:(((Number(z.bear?.low||px)+Number(z.bear?.high||px))/2)/px),
+         base:(((Number(z.base.low)+Number(z.base.high))/2)/px),
+         bull:(((Number(z.bull?.low||z.base.high)+Number(z.bull?.high||z.base.high))/2)/px)
+       };
+     }
+   }
+   let f=null, fs=null, exit=null;
+   try{f=forecast(sym); if(f?.ready){fs=forecastState(f);exit=cycle40Exit(sym,f,fs)}}catch(e){}
+   let action='HOLD', tone='green', reason='Kein bestätigtes Exit-Signal';
+   if(exit?.cycleGate && exit.cycleRisk>=78){action='REDUCE';tone='red';reason=`Cycle Exit ${exit.cycleRisk}/100`}
+   else if(exit?.cycleRisk>=52){action='WATCH / TRIM';tone='amber';reason=`Exit Risk ${exit.cycleRisk}/100`}
+   else if(fs?.label==='DISTRIBUTION RISK'){action='WATCH';tone='amber';reason='Lokales Distribution-Risiko'}
+   return {
+     sym,qty,px,current,mult,action,tone,reason,
+     bear:current*mult.bear,base:current*mult.base,bull:current*mult.bull,
+     peak:alt?.[sym]?.peakWindow||(sym==='BTC'?`${DATA.macroForecast?.peakWindow?.from||'2029 Q2'}–${DATA.macroForecast?.peakWindow?.to||'2030 Q1'}`:'MODEL')
+   };
+ }).filter(x=>x.current>0).sort((a,b)=>b.current-a.current);
+
+ const modeledNow=positions.reduce((s,x)=>s+x.current,0);
+ const fixed=Math.max(0,Number(p.total||0)-modeledNow);
+ const bear=fixed+positions.reduce((s,x)=>s+x.bear,0);
+ const base=fixed+positions.reduce((s,x)=>s+x.base,0);
+ const bull=fixed+positions.reduce((s,x)=>s+x.bull,0);
+ const gate=executionReadinessState();
+ const weakest=canonicalBotStates().filter(b=>!b.beProtected).sort((a,b)=>Number(a.buffer)-Number(b.buffer))[0];
+ let oneAction='HOLD · KEIN NEUES RISIKO', oneTone='amber';
+ if(gate?.open){oneAction='RISK OPEN · BESTES SETUP PRÜFEN';oneTone='green'}
+ else if(weakest&&Number(weakest.buffer)<8){oneAction=`${weakest.id} ZUERST ≥8% BUFFER`;oneTone='red'}
+ const reduce=positions.filter(x=>x.action==='REDUCE').length;
+ if(reduce>0){oneAction=`${reduce} SPOT-EXIT${reduce>1?'S':''} PRÜFEN · KEIN ADD`;oneTone='red'}
+ return {positions,modeledNow,fixed,bear,base,bull,oneAction,oneTone};
+}
+function portfolioIntelligencePanel(){
+ const x=portfolioIntelligenceState();
+ const rows=x.positions.slice(0,8).map((p,i)=>`<div class="pi-row">
+   <div><span>#${i+1}</span><b>${p.sym}</b><small>${p.reason} · Peak ${p.peak}</small></div>
+   <strong>$${fmt(p.current,0)}</strong>
+   <em class="${p.tone}">${p.action}</em>
+ </div>`).join('');
+ return card(`<div class="section-head"><div><div class="section-title">PORTFOLIO INTELLIGENCE 1.0</div><div class="section-note">Forecast × Bestand × Exit</div></div><span class="tag cyan">MODEL</span></div>
+   <div class="pi-one-action ${x.oneTone}"><span>ONE ACTION</span><b>${x.oneAction}</b></div>
+   <div class="pi-scenarios">
+     <div class="bear"><span>DEFENSIVE</span><b>$${fmt(x.bear,0)}</b></div>
+     <div class="base"><span>BASE</span><b>$${fmt(x.base,0)}</b></div>
+     <div class="bull"><span>HIGH-BETA</span><b>$${fmt(x.bull,0)}</b></div>
+   </div>
+   <p class="footer-note">Szenario-Gesamtwerte sind langfristige Modellpfade aus aktuellen Beständen und Cycle-/Beta-Envelopes. Sie sind keine garantierten Kursziele und enthalten unveränderte Rest-/Cashwerte.</p>
+   <details class="pi-details"><summary>PORTFOLIO EXIT MAP <span>ÖFFNEN</span></summary><div>${rows||'<div class="muted">Keine modellierbaren Spot-Positionen.</div>'}</div></details>`);
+}
+
 function depot(){
  const p=DATA.portfolio||{}, r=DATA.pionexRisk||{}, ex=DATA.exposure||{};
  const activeBots=(r.bots||[]).filter(b=>(b.status||'ACTIVE').toUpperCase()==='ACTIVE');
@@ -3763,6 +3834,7 @@ function depot(){
         ${metric('DATENMODUS',`Hybrid ${liveBadge('LIVE')}`,'green')}
       </div>
     </div>`,'hero')+
+    portfolioIntelligencePanel()+
     donutVenue()+
     `<div class="section-title venue-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2 venue-grid">${venueCards}</div>`+
@@ -6494,4 +6566,79 @@ function compactDecisionDetails(){
  document.addEventListener('click',()=>setTimeout(run,80));setTimeout(run,300);
 })();
 </script>
+
+<script id="v560-stability-guard">
+(function(){
+ let pending=false;
+ window.meridianStableRefresh=function(fn){
+   if(pending)return;
+   pending=true;
+   requestAnimationFrame(()=>{pending=false;try{fn&&fn()}catch(e){console.warn('MERIDIAN refresh',e)}});
+ };
+ window.addEventListener('error',e=>{
+   const b=document.getElementById('versionBadge');
+   if(b && !String(b.textContent).includes('ERROR')) b.title='Runtime warning: '+String(e.message||'unknown');
+ });
+})();
+</script>
+
+
+<script id="v561-alert-engine">
+(function(){
+ const KEY='meridian_alert_state_v561';
+ function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return {}}}
+ function save(x){try{localStorage.setItem(KEY,JSON.stringify(x))}catch(e){}}
+ function evaluate(){
+   if(typeof canonicalBotStates!=='function') return [];
+   const alerts=[], bots=canonicalBotStates()||[];
+   bots.forEach(b=>{
+     const buf=Number(b.buffer), id=b.id||b.symbol||'BOT';
+     if(Number.isFinite(buf)&&buf<8) alerts.push({id:'liq-'+id,level:'red',title:id+' CRITICAL',text:`Liquidationspuffer ${buf.toFixed(1)}% · Ziel ≥8%`});
+     else if(Number.isFinite(buf)&&buf<12) alerts.push({id:'watch-'+id,level:'amber',title:id+' WATCH',text:`Puffer ${buf.toFixed(1)}% · Recovery ≥12%`});
+   });
+   try{
+     const g=executionReadinessState();
+     if(g && !g.open) alerts.push({id:'risk-gate',level:'amber',title:'RISK GATE BLOCKED',text:'Keine neue Risiko-Position eröffnen.'});
+   }catch(e){}
+   return alerts;
+ }
+ function render(){
+   const alerts=evaluate(), host=document.getElementById('v561-alert-host');
+   if(!host)return;
+   host.innerHTML=alerts.length?alerts.slice(0,3).map(a=>`<div class="v561-alert ${a.level}"><div><b>${a.title}</b><span>${a.text}</span></div><i>!</i></div>`).join(''):
+     `<div class="v561-alert green"><div><b>NO CRITICAL ALERT</b><span>Aktuell kein lokaler Schwellenwert ausgelöst.</span></div><i>✓</i></div>`;
+ }
+ function inject(){
+   if(document.getElementById('v561-alert-host')){render();return}
+   const center=document.getElementById('view-center')||document.querySelector('[id*="center"]');
+   if(!center)return;
+   const cards=center.querySelectorAll('.card');
+   const anchor=cards.length?cards[0]:center.firstElementChild;
+   const wrap=document.createElement('div');
+   wrap.id='v561-alert-host'; wrap.className='v561-alert-host';
+   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(wrap,anchor.nextSibling); else center.prepend(wrap);
+   render();
+ }
+ function maybeNotify(){
+   const st=load(), now=Date.now();
+   evaluate().filter(a=>a.level==='red').forEach(a=>{
+     if(st[a.id] && now-st[a.id]<3600000)return;
+     st[a.id]=now;
+     if('Notification'in window && Notification.permission==='granted'){
+       try{new Notification('MERIDIAN · '+a.title,{body:a.text})}catch(e){}
+     }
+   });
+   save(st);
+ }
+ function run(){inject();render();maybeNotify()}
+ window.meridianAlerts={evaluate,refresh:run,requestNotifications:async function(){
+   if(!('Notification'in window))return 'unsupported';
+   try{return await Notification.requestPermission()}catch(e){return 'error'}
+ }};
+ document.addEventListener('click',()=>setTimeout(run,100));
+ window.addEventListener('load',()=>setTimeout(run,400));
+ setInterval(run,60000);
+})();
+</script>
+
 </body></html>
