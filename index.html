@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.71">
+<link rel="manifest" href="manifest.webmanifest?v=5.73">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.71.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.73.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.71 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.73 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.71 compact bot action cards */
+/* v5.73 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.71 DEPOT cleanup — no navigation changes */
+/* v5.73 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2848,6 +2848,78 @@ main>section{
 }
 </style>
 
+
+<style id="v572-decision-cleanup-css">
+/* v5.73 Decision Cleanup — navigation/feed architecture untouched */
+.trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
+.trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.trade-decision-grid>div{border:1px solid #173e55;border-radius:13px;padding:10px 11px;background:rgba(4,18,28,.35)}
+.trade-decision-grid span{display:block;color:#8395a8;font-size:7px;letter-spacing:.9px;margin-bottom:5px}
+.trade-decision-grid b{font-size:10px}
+.trade-gate-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:11px;padding-top:9px;border-top:1px solid rgba(34,72,96,.45);font-size:8px}
+.trade-gate-line i{font-style:normal;color:#5d7187}
+.trade-gate-line b{margin-left:auto}
+.trade-data-engine>summary{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;cursor:pointer;list-style:none}
+.trade-data-engine>summary::-webkit-details-marker{display:none}
+.trade-data-engine>summary b{display:block;font-size:11px}
+.trade-data-engine>summary small{display:block;color:#8193a8;font-size:7px;margin-top:3px}
+.trade-data-engine>summary strong{font-size:8px;color:#24aef2}
+.trade-data-engine[open]>summary strong::after{content:" · SCHLIESSEN"}
+.trade-data-engine-body{padding:0 15px 12px}
+
+.grid-command-v572{display:grid;gap:12px}
+.grid-command-v572-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.grid-command-v572-head .forecast-main{font-size:22px;margin-top:5px}
+.grid-command-matrix{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid-command-matrix>div{border:1px solid #173e55;border-radius:13px;padding:10px 11px;background:rgba(4,18,28,.35);min-width:0}
+.grid-command-matrix span{display:block;color:#8193a8;font-size:7px;letter-spacing:.9px;margin-bottom:5px}
+.grid-command-matrix b{font-size:11px;word-break:break-word}
+.grid-command-target{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid rgba(36,174,242,.55);border-radius:13px;padding:10px 12px}
+.grid-command-target span{color:#8193a8;font-size:7px;letter-spacing:.9px}
+.grid-command-target b{font-size:11px}
+.grid-decision-line{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid rgba(34,72,96,.45);padding-top:9px}
+.grid-decision-line span{font-size:7px;color:#8193a8;letter-spacing:.9px}
+.grid-decision-line b{font-size:9px}
+.next-action-strip{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px;align-items:center;border:1px solid #173e55;border-radius:13px;padding:11px 12px}
+.next-action-strip span{text-align:center;color:#24aef2}
+.next-action-strip strong{text-align:center;font-size:10px}
+.next-action-strip b{font-size:10px}
+@media(max-width:390px){
+ .trade-decision-grid,.grid-command-matrix{gap:6px}
+ .trade-decision-grid>div,.grid-command-matrix>div{padding:9px}
+ .trade-gate-line b{margin-left:0;width:100%}
+}
+</style>
+
+
+<style id="v573-forecast-exit-css">
+.forecast-decision-card{display:grid;gap:12px}
+.forecast-decision-top{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.forecast-decision-top>div{border:1px solid #173e55;border-radius:13px;padding:10px;min-width:0}
+.forecast-decision-top span{display:block;color:#8193a8;font-size:6px;letter-spacing:.9px;margin-bottom:5px}
+.forecast-decision-top b{font-size:9px;word-break:break-word}
+.forecast-price-line{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid rgba(34,72,96,.45);padding-top:10px}
+.forecast-price-line strong{font-size:20px}
+.forecast-price-line span{color:#8193a8;font-size:8px}
+.exit-ladder{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.exit-ladder>div{border:1px solid #173e55;border-radius:13px;padding:10px;background:rgba(4,18,28,.35)}
+.exit-ladder>div.active{box-shadow:0 0 0 1px currentColor inset}
+.exit-ladder span{display:block;font-size:7px;color:#8193a8}
+.exit-ladder b{display:block;font-size:12px;margin:5px 0}
+.exit-ladder small{font-size:7px;color:#8193a8}
+.exit-score-strip{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:center;margin-top:10px;border:1px solid #173e55;border-radius:13px;padding:10px 12px}
+.exit-score-strip span{font-size:7px;color:#8193a8}
+.exit-score-strip b{font-size:12px}
+.exit-score-strip strong{text-align:right;font-size:9px}
+.forecast-detail-pad{padding:0 12px 12px}
+.cycle-roadmap{margin-bottom:12px}
+@media(max-width:430px){
+ .forecast-decision-top{grid-template-columns:1fr}
+ .forecast-price-line{gap:8px}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2855,7 +2927,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.71 · LIVE</span>
+        <span class="version" id="versionBadge">v5.73 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2887,7 +2959,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.71.js?v=20260824-2315"></script>
+<script src="app-v5.73.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2958,8 +3030,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.71';
-let APP_RELEASE='5.71 · TRADE / GRID CLEANUP';
+let APP_CODE_VERSION='5.73';
+let APP_RELEASE='5.73 · FORECAST / EXIT ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3429,7 +3501,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.71 — UNIFIED RISK STATE MATRIX
+/* v5.73 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4044,7 +4116,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.71 — ONE ACTION SSOT */
+/* v5.73 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4123,7 +4195,7 @@ function commandCenter(){
 }
 
 
-/* v5.71 — PORTFOLIO INTELLIGENCE */
+/* v5.73 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -4560,11 +4632,37 @@ function dualGatePanel(){
 function dayTrade(){
  const consistency=meridianConsistencyState();
  const d=DATA.dayTrade, st=d.status||{};
- return card(`<div class="eyebrow">DAY-TRADE 2.3 · TECHNICAL GATE</div><div class="forecast-main">${consistency.headline}</div><div class="sub">${d.entryAllowed?'Setup technisch bestätigt · Portfolio-Gate separat prüfen.':(d.decisionNote||'Bias ≠ Ausführung')}</div><div class="row"><b>GATE SCORE</b><b class="${d.entryAllowed?'green':'amber'}">${d.gateScore}/100</b></div><div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
+ const bridge=executionBridgeState();
+ const p=bridge.plan, gate=bridge.gate;
+ const techOpen=!!d.entryAllowed, riskOpen=!!gate?.riskOpen;
+ const decision=(techOpen&&riskOpen)?'ENTRY READY':techOpen?'WAIT · RISK BLOCK':'WAIT';
+ const decisionTone=(techOpen&&riskOpen)?'green':techOpen?'amber':'red';
+ const action=techOpen&&!riskOpen?'RISIKO ZUERST':techOpen&&riskOpen?'SETUP AUSFÜHREN':'KEIN ENTRY';
+ const entry=p?executionPrice(p.low,p.sym)+' – '+executionPrice(p.high,p.sym):'—';
+ const sl=p?executionPrice(p.stop,p.sym):'—';
+ const tp=p?executionPrice(p.tp1,p.sym)+' / '+executionPrice(p.tp2,p.sym):'—';
+ const rr=p?fmt(p.rr,2)+' : 1':'—';
+
+ return card(`<div class="eyebrow">DAY-TRADE 2.4 · TECHNICAL GATE</div>
+   <div class="forecast-main">${consistency.headline}</div>
+   <div class="sub">${techOpen?'Technik bestätigt · Portfolio-Risiko separat.':(d.decisionNote||'Bias ≠ Ausführung')}</div>
+   <div class="row"><b>GATE SCORE</b><b class="${techOpen?'green':'amber'}">${d.gateScore}/100</b></div>
+   <div class="bar"><i style="width:${d.gateScore}%"></i></div>`)+
+ card(`<div class="trade-decision-head"><div><div class="eyebrow">TRADE DECISION</div><div class="forecast-main ${decisionTone}">${decision}</div></div><span class="tag ${decisionTone}">${action}</span></div>
+   <div class="trade-decision-grid">
+     <div><span>ENTRY</span><b class="cyan">${entry}</b></div>
+     <div><span>SL</span><b class="red">${sl}</b></div>
+     <div><span>TP1 / TP2</span><b class="green">${tp}</b></div>
+     <div><span>R:R</span><b>${rr}</b></div>
+   </div>
+   <div class="trade-gate-line"><span>TECH ${techOpen?'OPEN':'BLOCKED'}</span><i>×</i><span>RISK ${riskOpen?'OPEN':'BLOCKED'}</span><b class="${decisionTone}">→ ${decision}</b></div>`)+
  `<div class="grid2">${metric('BTC PREIS','$'+fmt(d.btcPrice)+'<div class="data-state">'+stateLabel(st.btcPrice)+'</div>')}${metric('BTCUSDT OI','$'+fmt(d.oiB,2)+'B<div class="data-state">'+stateLabel(st.oiB)+'</div>')}${metric('4H RSI',fmt(d.rsi4h,2)+'<div class="data-state">'+stateLabel(st.rsi4h)+'</div>')}${metric('1H RSI',fmt(d.rsi1h,2)+'<div class="data-state">'+stateLabel(st.rsi1h)+'</div>')}${metric('FUNDING',fmt(d.fundingPct,4)+'%<div class="data-state">'+stateLabel(st.fundingPct)+'</div>')}${metric('24H VWAP','$'+fmt(d.vwap)+'<div class="data-state">'+stateLabel(st.vwap)+'</div>')}</div>`+
- card(`<div class="section-title">LIVE-DATEN ENGINE</div><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${d.entryAllowed?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Wenn Binance im Browser blockiert ist, bleiben die zuletzt bestätigten Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p>`)+
+ `<details class="card trade-data-engine" data-detail-key="trade-data-engine"><summary><span><b>LIVE-DATEN ENGINE</b><small>${d.technicalUpdatedAt?'Refresh '+new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</small></span><strong>DETAILS</strong></summary>
+   <div class="trade-data-engine-body"><div class="row"><span>Quelle</span><b>Binance Futures Browser API</b></div><div class="row"><span>Letzter Technik-Refresh</span><b>${d.technicalUpdatedAt?new Date(d.technicalUpdatedAt).toLocaleTimeString('de-DE'):'Fallback aktiv'}</b></div><div class="row"><span>Gate</span><b>${techOpen?'≥70 · erfüllt':'<70 · blockiert'}</b></div><p class="footer-note">Bei Browser-Blockade bleiben zuletzt bestätigte Snapshot-Werte sichtbar und werden nicht als live ausgegeben.</p></div>
+ </details>`+
  card(`<div class="section-title">FIB LEVELS ${snapshotBadge('MODEL')}</div>${d.fib.levels.map(l=>`<div class="row fib-row"><span>${fmt(l.ratio,1)}%<br><span class="tag ${l.tag==='RESIST'?'red':l.tag==='SUPPORT'?'green':'cyan'}">${l.tag}</span></span><b>$${fmt(l.price)}</b><span class="muted">${l.price>d.btcPrice?'-':'+'}${fmt(Math.abs((l.price/d.btcPrice-1)*100),1)}%</span></div>`).join('')}`);
 }
+
 function closes(symbol){
  const c=HISTORY?.coins?.[symbol]?.candles||[];
  return c.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4]})).filter(x=>Number.isFinite(x.c));
@@ -4734,8 +4832,13 @@ function renderForecast(){
  const x=f.ready?cycle40Exit(activeCoin,f,state):null;
  const env=f.ready?cycle40Envelope(activeCoin,f):null;
  const conf=f.ready?forecast40Confidence(f,x):0;
- let body=card(`<div class="forecast-kicker"><div class="eyebrow">ACHI MERIDIAN FORECAST 4.1</div><div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div></div><div class="forecast-main">TIME × STRUCTURE<br>× EXIT</div><div class="sub forecast-sub">TACTICAL NOW · CYCLE CLOCK · SCENARIOS · EXIT</div><p class="footer-note">Taktische 90T-Struktur und Makro-Zyklus werden bewusst getrennt bewertet.</p>`);
+
+ let body=card(`<div class="forecast-kicker">
+   <div><div class="eyebrow">ACHI MERIDIAN FORECAST 4.2</div><div class="forecast-main">MODEL → SIGNAL → ACTION</div><div class="sub forecast-sub">Cycle · Tactical · Exit Ladder</div></div>
+   <div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div>
+ </div>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
+
  if(!f.ready){
    body+=card(`<div class="loading">Lade ${activeCoin}-Historie direkt auf dem iPhone…</div><button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%;margin-top:16px">DATEN NEU LADEN</button>`);
  }else{
@@ -4745,59 +4848,88 @@ function renderForecast(){
    const timingTone=x.timing?.cls||'cyan';
    const tacticalTone=x.localHeat>80?'red':x.localHeat>65?'amber':'green';
 
-   // Transparent scenario weights: model-only, derived from current confidence/risk.
    const baseP=Math.max(40,Math.min(68,Math.round(48+conf*.18-x.cycleRisk*.08)));
    const bearP=Math.max(12,Math.min(38,Math.round(22+x.cycleRisk*.14+(f.ret90<0?5:0))));
    const bullP=Math.max(12,100-baseP-bearP);
    const norm=baseP+bearP+bullP;
    const bp=Math.round(baseP/norm*100), brp=Math.round(bearP/norm*100), blp=100-bp-brp;
 
-   body+=card(`<div class="forecast-price-card forecast-v558-price"><div class="eyebrow">${activeCoin}</div><div class="big forecast-price">$${fmt(f.last,dec)}</div><div class="forecast-v558-strip"><div><span>LOCAL</span><b class="${tacticalTone}">${x.localHeat}/100</b></div><div><span>CYCLE EXIT</span><b class="${x.cls}">${x.cycleRisk}/100</b></div><div><span>90T</span><b>${f.ret90>=0?'+':''}${fmt(f.ret90,1)}%</b></div></div></div>`);
+   const exitStage=x.cycleRisk>=88?'E4':x.cycleRisk>=78?'E3':x.cycleRisk>=66?'E2':x.cycleRisk>=52?'E1':'E0';
+   const currentSignal=x.cycleGate
+     ? (x.cycleRisk>=78?'DISTRIBUTION / EXIT':x.cycleRisk>=66?'DE-RISK':x.cycleRisk>=52?'PREPARE':'HOLD')
+     : (x.localHeat>=80?'LOCAL OVERHEAT':state.label);
+   const signalTone=x.cycleGate?x.cls:tacticalTone;
+   const action=x.cycleGate?x.action:(x.cycleRisk>=66?'LOCAL DE-RISK ONLY':x.cycleRisk>=52?'WATCH / PREPARE':'HOLD / NO CYCLE EXIT');
 
-   body+=card(`<div class="section-title">CYCLE CLOCK <span class="tag ${timingTone}">LIVE MODEL</span></div>
+   body+=card(`<div class="forecast-decision-card">
+     <div class="forecast-decision-top">
+       <div><span>MODEL</span><b>${activeCoin} · ${x.timing.phase}</b></div>
+       <div><span>SIGNAL</span><b class="${signalTone}">${currentSignal}</b></div>
+       <div><span>ACTION</span><b class="${x.cls}">${action}</b></div>
+     </div>
+     <div class="forecast-price-line"><strong>$${fmt(f.last,dec)}</strong><span>90T ${f.ret90>=0?'+':''}${fmt(f.ret90,1)}%</span><span>EXIT RISK ${x.cycleRisk}/100</span></div>
+   </div>`);
+
+   body+=card(`<div class="section-title">CYCLE TIMELINE <span class="tag ${timingTone}">MODEL</span></div>
+     ${forecast40Roadmap(x)}
      <div class="cycle-clock-v558">
-       <div class="cycle-clock-v558-top"><div><span>MAKRO-PHASE</span><b class="${timingTone}">${x.timing.phase}</b></div><strong>${fmt(pct,1)}%</strong></div>
+       <div class="cycle-clock-v558-top"><div><span>AKTUELLE PHASE</span><b class="${timingTone}">${x.timing.phase}</b></div><strong>${fmt(pct,1)}%</strong></div>
        <div class="cycle-clock-v558-bar"><i style="width:${pct}%"></i></div>
-       <div class="cycle-clock-v558-axis"><span>HALVING 2024</span><span>MID</span><span>RESET / NEXT HALVING</span></div>
        <div class="cycle-clock-v558-grid">
          <div><span>NÄCHSTER WECHSEL</span><b>${x.timing.next}</b></div>
          <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b></div>
          <div><span>EXIT GATE</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div>
          <div><span>REFERENZ</span><b>${cyc.daysFromReference>=0?'+':''}${cyc.daysFromReference||0} T</b></div>
        </div>
+     </div>`);
+
+   body+=card(`<div class="section-title">EXIT LADDER <span class="tag ${x.cls}">${exitStage}</span></div>
+     <div class="exit-ladder">
+       <div class="${exitStage==='E1'?'active amber':''}"><span>E1 · PREPARE</span><b>52–65</b><small>Watch / kleiner Trim</small></div>
+       <div class="${exitStage==='E2'?'active amber':''}"><span>E2 · DE-RISK</span><b>66–77</b><small>Teilrisiko reduzieren</small></div>
+       <div class="${exitStage==='E3'?'active red':''}"><span>E3 · DISTRIBUTE</span><b>78–87</b><small>Deutlich reduzieren</small></div>
+       <div class="${exitStage==='E4'?'active red':''}"><span>E4 · FINAL</span><b>≥88</b><small>Finale Reduktion</small></div>
      </div>
-     <p class="footer-note">Die Uhr ist ein Zeitmodell. Ein Exit wird erst ausgelöst, wenn Zeit + Struktur + Regime gemeinsam bestätigen.</p>`);
+     <div class="exit-score-strip"><span>CURRENT</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${action}</strong></div>
+     <p class="footer-note">Cycle-Exit bleibt gesperrt, solange TIME + STRUCTURE + REGIME nicht gemeinsam bestätigen.</p>`);
 
    body+=card(`<div class="section-title">TACTICAL NOW <span class="tag cyan">90T</span></div>
      <div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div>
      <div class="forecast-v558-route"><span>SWING POSITION</span><b>${fmt(f.pos,1)}%</b><i>→</i><strong class="${state.cls}">${state.label}</strong></div>
      <div class="row"><span>Daily RSI</span><b>${f.dailyRsi?fmt(f.dailyRsi,1):'—'}</b></div>`);
 
-   body+=card(`<div class="section-title">NEXT CYCLE SCENARIOS <span class="tag amber">MODEL</span></div>
+   body+=card(`<div class="section-title">CYCLE SCENARIOS <span class="tag amber">MODEL</span></div>
      <div class="forecast-v558-scenarios">
        <div class="bear"><span>DEFENSIVE · ${brp}%</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div>
        <div class="base"><span>BASE · ${bp}%</span><b>$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div>
        <div class="bull"><span>HIGH-BETA · ${blp}%</span><b>$${fmt(env.bullLow,dec)}–$${fmt(env.bullHigh,dec)}</b></div>
+     </div>`);
+
+   body+=`<details class="forecast-v558-details" data-detail-key="fcst-forward"><summary>FORWARD WINDOW <span>ÖFFNEN</span></summary>
+     <div class="forecast-detail-pad">
+       <div class="row"><span>Breakout</span><b>$${fmt(fw.breakout,dec)}</b></div>
+       <div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,dec)}</b></div>
+       <div class="row"><span>Pullback</span><b>$${fmt(fw.pullbackLow,dec)}–$${fmt(fw.pullbackHigh,dec)}</b></div>
+       <div class="row"><span>T1 / T2</span><b class="cyan">$${fmt(fw.t1,dec)} / $${fmt(fw.t2,dec)}</b></div>
      </div>
-     <p class="footer-note">Wahrscheinlichkeiten sind relative Modellgewichte, keine statistisch garantierten Trefferquoten. Aktivierung erst mit TIME + ATH/HH + REGIME.</p>`);
+   </details>`;
 
-   body+=card(`<div class="section-title">EXIT ENGINE 2.1 <span class="tag ${x.cls}">${x.stage}</span></div>
-     <div class="exit-master"><span>CYCLE EXIT RISK</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${x.action}</strong></div>
-     <div class="forecast-v558-exit"><div><span>TIME</span><b>${x.timing.timeScore}/100</b></div><div><span>STRUCTURE</span><b>${x.structureScore}/100</b></div><div><span>MOMENTUM</span><b>${x.momentumExhaustion}/100</b></div><div><span>REL. WEAKNESS</span><b>${x.relativeWeak}/100</b></div></div>
-     <div class="forecast-v558-decision ${x.cls}"><span>AKTION</span><b>${x.action}</b></div>`);
+   body+=`<details class="forecast-v558-details" data-detail-key="fcst-model-details"><summary>MODELLDETAILS & ROTATION <span>ÖFFNEN</span></summary>
+     <div class="forecast-detail-pad">
+       <div class="forecast-v558-exit">
+         <div><span>TIME</span><b>${x.timing.timeScore}/100</b></div>
+         <div><span>STRUCTURE</span><b>${x.structureScore}/100</b></div>
+         <div><span>MOMENTUM</span><b>${x.momentumExhaustion}/100</b></div>
+         <div><span>REL. WEAKNESS</span><b>${x.relativeWeak}/100</b></div>
+       </div>
+       ${altRotationBlock()}
+     </div>
+   </details>`;
 
-   body+=card(`<div class="section-title">FORWARD WINDOW <span class="tag cyan">CONDITIONAL</span></div>
-     <div class="row"><span>Breakout</span><b>$${fmt(fw.breakout,dec)}</b></div>
-     <div class="row"><span>Bestätigung</span><b>Close &gt; $${fmt(fw.confirm,dec)}</b></div>
-     <div class="row"><span>Pullback</span><b>$${fmt(fw.pullbackLow,dec)}–$${fmt(fw.pullbackHigh,dec)}</b></div>
-     <div class="row"><span>T1 / T2</span><b class="cyan">$${fmt(fw.t1,dec)} / $${fmt(fw.t2,dec)}</b></div>`);
-
-   body+=`<details class="forecast-v558-details"><summary>ROTATION & MODELLDETAILS <span>ÖFFNEN</span></summary><div>${altRotationBlock()}</div></details>`;
    body+=card(`<button class="tab active" onclick="forceCoin('${activeCoin}')" style="width:100%">HISTORIE AKTUALISIEREN</button>`);
  }
  $('#view-forecast').innerHTML=body;
 }
-
 window.selectCoin=async c=>{activeCoin=c;renderForecast();try{await loadCoinHistory(c); if(c!=='BTC')await loadCoinHistory('BTC');}catch(e){}renderForecast()}
 window.forceCoin=async c=>{try{await loadCoinHistory(c,true); if(c!=='BTC')await loadCoinHistory('BTC',true);}catch(e){alert('Live-Historie konnte nicht geladen werden. Cache wird verwendet, falls vorhanden.')}renderForecast()}
 
@@ -5630,23 +5762,25 @@ function gridView(){
  const statusLabel=critical.length?'CRITICAL':danger.length?'DANGER':tight.length?'TIGHT':'STABLE';
  const headline=topBot?`${topBot.id} · ${fmt(topBot.buffer,1)}%`:'KEIN AKTIVER BOT';
 
- const summary=card(`<div class="grid-command-v556">
-   <div class="grid-command-v556-head">
-     <div><div class="eyebrow">GRID COMMANDER 4.2 ${liveBadge('SSOT')}</div><div class="forecast-main ${statusTone}">${statusLabel}</div></div>
+ const summary=card(`<div class="grid-command-v572">
+   <div class="grid-command-v572-head">
+     <div><div class="eyebrow">GRID COMMANDER 4.3 ${liveBadge('SSOT')}</div><div class="forecast-main ${statusTone}">${statusLabel}</div></div>
      <span class="tag ${statusTone}">${bots.length} ACTIVE</span>
    </div>
-   <div class="grid-command-v556-state">
-     <div><span>PRIORITÄT</span><b class="${statusTone}">${headline}</b></div>
-     <div><span>GATE</span><b class="${riskOpen?'green':'red'}">${riskOpen?'OPEN':'BLOCKED'}</b></div>
+   <div class="grid-command-matrix">
+     <div><span>PRIORITÄT</span><b class="${statusTone}">${topBot?.id||'—'}</b></div>
+     <div><span>PUFFER</span><b class="${statusTone}">${topBot&&Number.isFinite(Number(topBot.buffer))?fmt(topBot.buffer,2)+'%':'—'}</b></div>
+     <div><span>RISK GATE</span><b class="${riskOpen?'green':'red'}">${riskOpen?'OPEN':'BLOCKED'}</b></div>
+     <div><span>AKTION</span><b class="${statusTone}">${bestAction}</b></div>
    </div>
-   <div class="grid-command-v556-action ${statusTone}">
-     <span>JETZT</span>
-     <b>${bestAction}</b>
-     <i>→</i>
-     <strong>${topBot&&Number(topBot.buffer)<8?'≥8% RECOVERY':'MONITOR'}</strong>
+   <div class="grid-command-target">
+     <span>NÄCHSTES ZIEL</span>
+     <b>${topBot&&Number(topBot.buffer)<8?'≥8% RECOVERY':'MONITOR'}</b>
+   </div>
+   <div class="grid-decision-line">
+     <span>DECISION ENGINE</span><b class="${riskOpen?'green':'red'}">${riskOpen?'ENTRY CHECK':'KEIN NEUER ENTRY'}</b>
    </div>
  </div>`);
-
  const botRows=card(`<div class="section-head compact-head"><div><div class="section-title">AKTIVE BOTS</div><div class="section-note">Risiko zuerst · Details antippen</div></div></div>
    <div class="bot-compact-list">
    ${bots.map(b=>{
@@ -5697,14 +5831,14 @@ function gridView(){
         </div>
         <span class="tag ${statusTone}">${topBot.guard?.label||statusLabel}</span>
       </div>
-      <div class="next-action-flow">
-        <div><span>JETZT</span><b class="${statusTone}">${fmt(topBot.buffer,2)}%</b></div>
-        <div class="next-action-arrow">→</div>
-        <div><span>AKTION</span><b>${bestAction}</b></div>
-        <div class="next-action-arrow">→</div>
-        <div><span>MODELL</span><b class="green">${best8?fmt(best8.after,2)+'%':'—'}</b></div>
+      <div class="next-action-strip">
+        <b class="${statusTone}">${fmt(topBot.buffer,2)}%</b>
+        <span>→</span>
+        <strong>${bestAction}</strong>
+        <span>→</span>
+        <b class="green">${best8?fmt(best8.after,2)+'%':'—'}</b>
       </div>
-      <div class="next-action-foot">Nach manueller Änderung in Pionex: neuen Liquidationspreis synchronisieren. Modellwert ≠ Ordergröße.</div>
+      <div class="next-action-foot">Pionex manuell ändern → Liquidationspreis neu synchronisieren. Modellwert ≠ Ordergröße.</div>
    </div>`)
    : '';
 
@@ -5840,7 +5974,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.71 — FIVE TAB UX */
+/* v5.73 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW='trade';
 
@@ -5922,7 +6056,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.71: make the navigation itself immediate.
+ // v5.73: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
