@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.63.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.64.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.63.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.64.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.63.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.64.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.63.0 compact bot action cards */
+/* v5.64.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2514,6 +2514,36 @@ img{max-width:100%;height:auto}
 .feed-details summary::-webkit-details-marker{display:none}
 @media(max-width:430px){.live-price,.live-quote,.quote-price{font-size:clamp(20px,5.5vw,28px)!important}}
 </style>
+
+<style id="v564-action-engine-css">
+/* v5.64 — Center owns operational ONE ACTION */
+.center-one-action{margin-top:13px;border:1px solid #19577a;border-radius:17px;padding:13px 14px}
+.center-one-action.red{border-color:#9a3546}.center-one-action.amber{border-color:#8c6726}.center-one-action.green{border-color:#1e744e}
+.center-one-kicker{display:flex;justify-content:space-between;gap:10px;margin-bottom:7px}
+.center-one-kicker span,.center-one-kicker strong{font-size:8px;letter-spacing:1.15px;color:#8296a8}
+.center-one-action>b{display:block;font-size:16px;line-height:1.2;margin-bottom:8px}
+.center-one-route{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.center-one-route span{font-size:14px;font-weight:950}.center-one-route i{font-style:normal;color:#24aef2;font-weight:950}
+.center-one-route strong{font-size:11px;white-space:nowrap}
+.center-one-action>small{display:block;color:#a5b3c0;font-size:9px;margin-top:7px}
+.center-one-action>p{color:#718699;font-size:8px;line-height:1.35;margin:7px 0 0}
+.center-one-action>button{width:100%;margin-top:10px;border:1px solid #1b76a7;border-radius:12px;padding:9px;background:transparent;color:#24aef2;font-weight:900;font-size:9px;letter-spacing:.6px}
+
+/* Depot explains risk; no duplicated ONE ACTION */
+.pi-one-action{display:none!important}
+.depot-risk-control{border:1px solid #173e55;border-radius:15px;padding:11px 12px;margin-top:9px}
+.depot-risk-control.red{border-color:#71303d}.depot-risk-control.amber{border-color:#705724}.depot-risk-control.green{border-color:#1d6346}
+.depot-risk-control-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.depot-risk-control-head span{display:block;color:#8296a8;font-size:7px;letter-spacing:1px;margin-bottom:4px}
+.depot-risk-control-head b{font-size:13px}.depot-risk-control-head>strong{font-size:11px}
+.depot-risk-control-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.depot-risk-control-grid>div{border:1px solid #173e55;border-radius:11px;padding:8px 9px}
+.depot-risk-control-grid .wide{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;align-items:end;gap:5px}
+.depot-risk-control-grid span{display:block;color:#8296a8;font-size:7px;letter-spacing:.7px;margin-bottom:4px}
+.depot-risk-control-grid b{font-size:11px}.depot-risk-control-grid small{font-size:8px;color:#2fe59a}
+.depot-risk-control>p{margin:8px 0 0;color:#7d91a3;font-size:8px;line-height:1.35}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2521,7 +2551,7 @@ img{max-width:100%;height:auto}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.63.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.64.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2552,7 +2582,7 @@ img{max-width:100%;height:auto}
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.63.0.js?v=20260824-2315"></script>
+<script src="app-v5.64.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2623,8 +2653,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.63.0';
-let APP_RELEASE='5.63.0 · DEPOT FOCUS';
+let APP_CODE_VERSION='5.64.0';
+let APP_RELEASE='5.64.0 · ACTION ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3080,7 +3110,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.63.0 — UNIFIED RISK STATE MATRIX
+/* v5.64.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3694,8 +3724,49 @@ function consistencyDiagnostics(){
  <p class="footer-note">CENTER, GRID und TRADE verwenden denselben Gate-State; Diagnose verändert keine Orders.</p>`);
 }
 
+
+/* v5.64.0 — ONE ACTION SSOT */
+function oneActionState(){
+ const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
+ const b=opt?.bot, best=opt?.best8;
+ const buf=Number(b?.buffer ?? cap.shortBuf);
+
+ if(!x.riskOpen && Number.isFinite(buf) && buf<8){
+   const route=best?recoveryActionLabel(best):'PUFFER ≥8% HERSTELLEN';
+   const after=best&&Number.isFinite(Number(best.after))?Number(best.after):NaN;
+   return {
+     tone:'red',
+     target:b?.symbol||'BTC-S30',
+     headline:`${b?.symbol||'BTC-S30'} · RISIKO ZUERST`,
+     action:route,
+     route:`${fmt(buf,2)}% → ${Number.isFinite(after)?'Modell '+fmt(after,2)+'%':'Ziel ≥8%'}`,
+     targetText:'RISK GATE ≥8%',
+     note:'Manuell in Pionex anpassen → neuen Liquidationspreis prüfen → MERIDIAN synchronisieren.',
+     execution:'NO NEW ENTRY'
+   };
+ }
+ if(!x.riskOpen && Number.isFinite(buf) && buf<12){
+   return {
+     tone:'amber', target:b?.symbol||'BTC-S30',
+     headline:`${b?.symbol||'BTC-S30'} · RECOVERY`,
+     action:'RICHTUNG ≥12% STABILISIEREN',
+     route:`${fmt(buf,2)}% → ≥12%`,
+     targetText:'RECOVERY',
+     note:'Bestehende Position stabilisieren; neues Risiko bleibt separat gegated.',
+     execution:'NO ADD'
+   };
+ }
+ if(x.riskOpen && !x.technicalOpen){
+   return {tone:'amber',target:'MARKET',headline:'RISK OPEN · SIGNAL FEHLT',action:'AUF TECHNISCHEN TRIGGER WARTEN',route:`TECH ${x.technicalScore}/100`,targetText:'TECH ≥70',note:'Kein Entry ohne bestätigten technischen Trigger.',execution:'WAIT'};
+ }
+ if(x.open){
+   return {tone:'green',target:'ENTRY',headline:'2/2 GATES OPEN',action:'BESTES SETUP PRÜFEN',route:`TECH ${x.technicalScore}/100 · RISK OPEN`,targetText:'EXECUTION CHECK',note:'Nur innerhalb der freigegebenen Risk-Grenze ausführen.',execution:'ENTRY CHECK'};
+ }
+ return {tone:'amber',target:'SYSTEM',headline:'WAIT / BLOCKED',action:'GATES NEU PRÜFEN',route:'TECH + RISK',targetText:'NO EXECUTION',note:'Keine neue Position bis zur eindeutigen Freigabe.',execution:'WAIT'};
+}
+
 function commandCenter(){
- const consistency=meridianConsistencyState();
+ const consistency=meridianConsistencyState(), one=oneActionState();
  const p=DATA.portfolio||{}, m=DATA.btcRegime||{}, fh=feedHealth(), risk=commandRisk();
  const perf=performanceSince(Date.now()-86400000,p.total);
  const hasHist=PORTFOLIO_SERIES.length>2;
@@ -3721,13 +3792,19 @@ function commandCenter(){
  `<section class="card compact-now">
    <div class="section-head"><div><div class="eyebrow">JETZT · DUAL GATE ${liveBadge('SSOT')}</div><div class="forecast-main ${gateTone}">${gateText}</div></div><span class="tag ${gateTone}">${x.open?'2/2':x.technicalOpen?'1/2':'0/2'} OPEN</span></div>
    <div class="compact-gates"><div><span>TECH</span><b class="${x.technicalOpen?'green':'red'}">${x.technicalOpen?'OPEN':'BLOCKED'}</b><small>${x.technicalScore}/100</small></div><div><span>RISK</span><b class="${x.riskOpen?'green':'red'}">${x.riskOpen?'OPEN':'BLOCKED'}</b><small>${Number.isFinite(shortBuf)?fmt(shortBuf,2)+'% BTC-S30':'—'}</small></div></div>
-   <div class="compact-action">NÄCHSTER SCHRITT: ${consistency.next}</div>
-   ${!x.riskOpen?`<button class="center-recovery-line ${recoveryRec.tone}" onclick="document.querySelector('.nav[data-view=grid]')?.click()"><span>RISK BLOCK · ${Number.isFinite(shortBuf)?'BTC-S30 '+fmt(shortBuf,2)+'% → ':''}</span><b>${recoveryRec.text}</b><em>GRID →</em></button>`:''}
+   <div class="center-one-action ${one.tone}">
+     <div class="center-one-kicker"><span>ONE ACTION</span><strong>${one.execution}</strong></div>
+     <b>${one.headline}</b>
+     <div class="center-one-route"><span>${one.action}</span><i>→</i><strong>${one.targetText}</strong></div>
+     <small>${one.route}</small>
+     <p>${one.note}</p>
+     ${!x.riskOpen?`<button onclick="document.querySelector('.nav[data-view=grid]')?.click()">IM GRID PRÜFEN →</button>`:''}
+   </div>
  </section>`;
 }
 
 
-/* v5.63.0 — PORTFOLIO INTELLIGENCE */
+/* v5.64.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -3796,14 +3873,13 @@ function portfolioIntelligencePanel(){
    <strong>$${fmt(p.current,0)}</strong>
    <em class="${p.tone}">${p.action}</em>
  </div>`).join('');
- return card(`<div class="section-head"><div><div class="section-title">PORTFOLIO INTELLIGENCE 1.0</div><div class="section-note">Forecast × Bestand × Exit</div></div><span class="tag cyan">MODEL</span></div>
-   <div class="pi-one-action ${x.oneTone}"><span>ONE ACTION</span><b>${x.oneAction}</b></div>
+ return card(`<div class="section-head"><div><div class="section-title">PORTFOLIO INTELLIGENCE 1.1</div><div class="section-note">Bestand × Cycle Exit × Szenarien</div></div><span class="tag cyan">CYCLE MODEL</span></div>
    <div class="pi-scenarios">
-     <div class="bear"><span>DEFENSIVE</span><b>$${fmt(x.bear,0)}</b></div>
-     <div class="base"><span>BASE</span><b>$${fmt(x.base,0)}</b></div>
-     <div class="bull"><span>HIGH-BETA</span><b>$${fmt(x.bull,0)}</b></div>
+     <div class="bear"><span>DEFENSIVE · CYCLE</span><b>$${fmt(x.bear,0)}</b></div>
+     <div class="base"><span>BASE · CYCLE</span><b>$${fmt(x.base,0)}</b></div>
+     <div class="bull"><span>HIGH-BETA · CYCLE</span><b>$${fmt(x.bull,0)}</b></div>
    </div>
-   <p class="footer-note">Szenario-Gesamtwerte sind langfristige Modellpfade aus aktuellen Beständen und Cycle-/Beta-Envelopes. Sie sind keine garantierten Kursziele und enthalten unveränderte Rest-/Cashwerte.</p>
+   <p class="footer-note">Langfristige Cycle-Exit-Modellpfade aus aktuellen Beständen. Keine aktuelle Kursprognose und keine garantierten Zielwerte. Die operative ONE ACTION steht ausschließlich im CENTER.</p>
    <details class="pi-details"><summary>PORTFOLIO EXIT MAP <span>ÖFFNEN</span></summary><div>${rows||'<div class="muted">Keine modellierbaren Spot-Positionen.</div>'}</div></details>`);
 }
 
@@ -3832,6 +3908,11 @@ function depot(){
  const riskNote=criticalCount>0
    ? `${criticalCount} kritische Position${criticalCount>1?'en':''}; Futures-Risiko zuerst prüfen.`
    : 'Keine kritische aktive Futures-Position.';
+ const depotCritical=activeStates.filter(b=>!b.beProtected).sort((a,b)=>Number(a.buffer)-Number(b.buffer))[0]||null;
+ const depotOpt=recoveryOptimizerState(), depotBest=depotOpt?.best8||null;
+ const depotBuffer=Number(depotCritical?.buffer);
+ const depotAction=depotBest?recoveryActionLabel(depotBest):(Number.isFinite(depotBuffer)&&depotBuffer<8?'PUFFER ≥8% HERSTELLEN':'MONITOR');
+ const depotAfter=depotBest&&Number.isFinite(Number(depotBest.after))?Number(depotBest.after):NaN;
 
  const venueCards=(p.byVenue||[]).map(v=>metric(
    v.name,
@@ -3906,9 +3987,14 @@ function depot(){
         <div><span>LONG</span><b class="green">$${fmt(longCapital,0)}</b></div>
         <div><span>HEDGE</span><b class="red">$${fmt(shortCapital,0)}</b></div>
       </div>
-      <div class="depot-risk-line ${riskLevel==='HIGH'?'red':riskLevel==='ELEVATED'?'amber':'green'}">
-        <div><span>RISK</span><b>${riskLevel}</b></div>
-        <p>${riskNote}</p>
+      <div class="depot-risk-control ${riskLevel==='HIGH'?'red':riskLevel==='ELEVATED'?'amber':'green'}">
+        <div class="depot-risk-control-head"><div><span>RISK CONTROL</span><b>${depotCritical?.id||depotCritical?.symbol||'FUTURES'} ${Number.isFinite(depotBuffer)?'· '+fmt(depotBuffer,2)+'%':''}</b></div><strong>${riskLevel}</strong></div>
+        <div class="depot-risk-control-grid">
+          <div><span>AKTUELL</span><b class="${Number.isFinite(depotBuffer)&&depotBuffer<8?'red':'amber'}">${Number.isFinite(depotBuffer)?fmt(depotBuffer,2)+'%':'—'}</b></div>
+          <div><span>ZIEL</span><b>≥8% GATE</b></div>
+          <div class="wide"><span>MODELL-AKTION</span><b>${depotAction}</b>${Number.isFinite(depotAfter)?`<small>→ Modell ${fmt(depotAfter,2)}%</small>`:''}</div>
+        </div>
+        <p>${riskNote} Operative Ausführung ausschließlich über GRID/Pionex-Recheck.</p>
       </div>
       <details class="depot-futures-details">
         <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>ÖFFNEN</strong></summary>
