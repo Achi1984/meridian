@@ -1,10 +1,8 @@
-# ACHI MERIDIAN v5.50.0 — Bot Detail / Action Card
-
-GRID:
-- aktive Bots bleiben als kompakte Ampel-Zeilen sichtbar
-- Tap auf einen Bot öffnet eine einzige Action Card
-- Action Card zeigt: LIVE, Break-even, Liquidation, Buffer, P&L, Health
-- BE-Protection Status wird explizit angezeigt
-- gültiger SL auf/über Break-even neutralisiert den Bot als primären Kapitalverlust-Blocker
-- klare Aktion + nächstes Ziel
-- keine zusätzliche Modulwand im Standardzustand
+# ACHI MERIDIAN v5.51.0
+GRID Bot Cards compressed:
+- route line: current buffer → next target
+- LIVE / BE / LIQ in one row
+- P&L / Health / BE protection in one row
+- source reduced to LIVE/VERIFY badge
+- action shown once
+- long explanatory text removed from expanded bot card
