@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.61.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.62.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.61.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.62.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.61.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.62.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.61.0 compact bot action cards */
+/* v5.62.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2454,6 +2454,58 @@ img{max-width:100%;height:auto}
 .v561-alert.red i{color:#ff5b6b}.v561-alert.amber i{color:#f0b84b}.v561-alert.green i{color:#2fe59a}
 </style>
 
+
+<style id="v562-depot-focus-css">
+/* v5.62 — DEPOT readability pass */
+.depot-futures-focus{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px
+}
+.depot-futures-focus>div{
+  border:1px solid #173e55;border-radius:13px;padding:10px 9px;min-width:0
+}
+.depot-futures-focus span{
+  display:block;color:#8296a8;font-size:7px;letter-spacing:.8px;margin-bottom:5px
+}
+.depot-futures-focus b{font-size:12px;overflow-wrap:anywhere}
+.depot-risk-line{
+  display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;
+  border:1px solid #173e55;border-radius:14px;padding:10px 12px;margin-top:9px
+}
+.depot-risk-line.red{border-color:#71303d}
+.depot-risk-line.amber{border-color:#705724}
+.depot-risk-line.green{border-color:#1d6346}
+.depot-risk-line span{
+  display:block;color:#8296a8;font-size:7px;letter-spacing:1px
+}
+.depot-risk-line b{font-size:14px}
+.depot-risk-line p{
+  margin:0;color:#91a2b2;font-size:9px;line-height:1.35;text-align:right
+}
+.depot-futures-details{
+  border:1px solid #173e55;border-radius:14px;overflow:hidden;margin-top:10px
+}
+.depot-futures-details>summary{
+  list-style:none;display:flex;justify-content:space-between;align-items:center;
+  gap:10px;padding:11px 12px
+}
+.depot-futures-details>summary::-webkit-details-marker{display:none}
+.depot-futures-details>summary b{font-size:10px;letter-spacing:.7px}
+.depot-futures-details>summary span{
+  display:block;color:#8296a8;font-size:8px;margin-top:2px
+}
+.depot-futures-details>summary strong{font-size:8px;color:#24aef2;letter-spacing:.7px}
+.depot-futures-details[open]>summary strong::after{content:" · SCHLIESSEN"}
+.depot-futures-details-body{padding:0 10px 10px}
+.depot-futures-secondary{margin-bottom:10px}
+.pionex-bot{margin-top:8px}
+.exposure-callout{display:none!important}
+.cashflow-card,.performance-grid{display:none!important}
+@media(max-width:430px){
+  .depot-futures-focus{grid-template-columns:1fr 1fr}
+  .depot-risk-line{grid-template-columns:auto 1fr}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2461,7 +2513,7 @@ img{max-width:100%;height:auto}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.61.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.62.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2492,7 +2544,7 @@ img{max-width:100%;height:auto}
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.61.0.js?v=20260824-2315"></script>
+<script src="app-v5.62.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2563,8 +2615,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.61.0';
-let APP_RELEASE='5.61.0 · ALERT ENGINE';
+let APP_CODE_VERSION='5.62.0';
+let APP_RELEASE='5.62.0 · DEPOT FOCUS';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3020,7 +3072,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.61.0 — UNIFIED RISK STATE MATRIX
+/* v5.62.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3667,7 +3719,7 @@ function commandCenter(){
 }
 
 
-/* v5.61.0 — PORTFOLIO INTELLIGENCE */
+/* v5.62.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -3839,21 +3891,29 @@ function depot(){
     `<div class="section-title venue-title">WERT NACH BÖRSE / WALLET</div>`+
     `<div class="grid2 venue-grid">${venueCards}</div>`+
     card(`<div class="section-head"><div class="section-title">TOP 5 SPOT-POSITIONEN</div><span class="section-note">${liveBadge('LIVE')} ohne Futures-Doppelzählung</span></div>${topRows}`,'positions-card')+
-    card(`<div class="section-head"><div class="section-title">FUTURES & EXPOSURE</div><span class="section-note">${snapshotBadge('SSOT')}</span></div>
-      <div class="grid2 pionex-summary">
-        ${metric('PIONEX KONTO',accountDisplay,'amber')}
-        ${metric('BOT-KAPITAL','$'+fmt(botCapital,2))}
-        ${metric('LONG-KAPITAL','$'+fmt(longCapital,2),'green')}
-        ${metric('SHORT-HEDGE','$'+fmt(shortCapital,2),'red')}
-        ${metric('5x LONG CAPACITY','$'+fmt(fiveXLongCapacity,0),'amber')}
-        ${metric('BIAS',netDirection,'amber')}
+    card(`<div class="section-head"><div><div class="section-title">FUTURES & EXPOSURE</div><div class="section-note">${activeBots.length} aktive Bots · ${snapshotBadge('SSOT')}</div></div><span class="tag ${riskLevel==='HIGH'?'red':riskLevel==='ELEVATED'?'amber':'green'}">${riskLevel}</span></div>
+      <div class="depot-futures-focus">
+        <div><span>PIONEX</span><b class="amber">${accountDisplay}</b></div>
+        <div><span>BOT-KAPITAL</span><b>$${fmt(botCapital,0)}</b></div>
+        <div><span>LONG</span><b class="green">$${fmt(longCapital,0)}</b></div>
+        <div><span>HEDGE</span><b class="red">$${fmt(shortCapital,0)}</b></div>
       </div>
-      <div class="exposure-callout"><b>${riskLevel} RISK</b><span>${riskNote}</span></div>
-      <div class="pionex-bots">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
-      <p class="footer-note">SSOT: Summary, Bot-Cards, GRID und Action Center verwenden dieselben aktiven Pionex-Bots. Fehlende Werte werden als „—“ statt NaN/undefined angezeigt. Pionex-Kontowert wird nicht doppelt zum Gesamtportfolio addiert.</p>
-    `,'pionex-card')+
-    cashflowPanel()+
-    `<div class="grid2 performance-grid">${metric('24H SPOT-PERF.',(p.performance24hPct>=0?'+':'')+fmt(p.performance24hPct,1)+'%<div class="muted perf-sub">'+(p.performance24hUsd>=0?'+':'')+'$'+fmt(p.performance24hUsd)+'</div>',p.performance24hPct>=0?'green':'red')}${metric('BEST PERFORMER',(p.bestPerformer?.symbol||'—')+'<div class="muted perf-sub">'+((p.bestPerformer?.change24h||0)>=0?'+':'')+fmt(p.bestPerformer?.change24h,1)+'%</div>')}${metric('WORST PERFORMER',(p.worstPerformer?.symbol||'—')+'<div class="muted perf-sub">'+fmt(p.worstPerformer?.change24h,1)+'%</div>')}${metric('VOLATILITÄT',fmt(p.volatility24hPct,2)+'%<div class="muted perf-sub">24h Streuung</div>')}</div>`;
+      <div class="depot-risk-line ${riskLevel==='HIGH'?'red':riskLevel==='ELEVATED'?'amber':'green'}">
+        <div><span>RISK</span><b>${riskLevel}</b></div>
+        <p>${riskNote}</p>
+      </div>
+      <details class="depot-futures-details">
+        <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>ÖFFNEN</strong></summary>
+        <div class="depot-futures-details-body">
+          <div class="grid2 depot-futures-secondary">
+            ${metric('5x LONG CAPACITY','$'+fmt(fiveXLongCapacity,0),'amber')}
+            ${metric('BIAS',netDirection,'amber')}
+          </div>
+          <div class="pionex-bots">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
+          <p class="footer-note">SSOT: Summary, Bot-Cards, GRID und Center verwenden dieselben aktiven Pionex-Bots. Pionex wird nicht doppelt zum Gesamtportfolio addiert.</p>
+        </div>
+      </details>
+    `,'pionex-card');
 }
 function assetDetail(sym){
  const hs=(DATA.portfolio.holdings||[]).filter(h=>h.symbol===sym);
