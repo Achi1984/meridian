@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.74.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.75.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.74.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.75.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.74.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.75.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.74.0 compact bot action cards */
+/* v5.75.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2856,6 +2856,21 @@ main>section.hidden{display:none!important}
 #primaryBottomNav .nav span{pointer-events:none!important}
 </style>
 
+
+<style id="v575-hash-router-css">
+#primaryBottomNav a.nav{
+  text-decoration:none!important;
+  -webkit-tap-highlight-color:transparent!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+/* CSS-level routing fallback: if JS routing ever misses a tap, the hash target still becomes visible. */
+main>section:target{
+  display:block!important;
+  visibility:visible!important;
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2863,7 +2878,7 @@ main>section.hidden{display:none!important}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.74.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.75.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2886,11 +2901,11 @@ main>section.hidden{display:none!important}
 </div>
 
 <nav class="bottom" id="primaryBottomNav"><div class="inner five-tabs">
-  <button type="button" class="nav active" data-view="center" onclick="return primaryTabTap('center',event)"><span>⌾</span>CENTER</button>
-  <button type="button" class="nav" data-view="depot" onclick="return primaryTabTap('depot',event)"><span>◔</span>DEPOT</button>
-  <button type="button" class="nav" data-view="market" onclick="return primaryTabTap('market',event)"><span>▥</span>MARKT</button>
-  <button type="button" class="nav" data-view="daytrade" onclick="return primaryTabTap('daytrade',event)"><span>⌁</span>TRADE</button>
-  <button type="button" class="nav" data-view="forecast" onclick="return primaryTabTap('forecast',event)"><span>↗</span>FCST</button>
+  <a class="nav active" data-view="center" href="#view-center"><span>⌾</span>CENTER</a>
+  <a class="nav" data-view="depot" href="#view-depot"><span>◔</span>DEPOT</a>
+  <a class="nav" data-view="market" href="#view-market"><span>▥</span>MARKT</a>
+  <a class="nav" data-view="daytrade" href="#view-daytrade"><span>⌁</span>TRADE</a>
+  <a class="nav" data-view="forecast" href="#view-forecast"><span>↗</span>FCST</a>
 </div></nav>
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2961,8 +2976,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.74.0';
-let APP_RELEASE='5.74.0 · TAB CLICK ROOTFIX';
+let APP_CODE_VERSION='5.75.0';
+let APP_RELEASE='5.75.0 · HASH ROUTER';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3418,7 +3433,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.74.0 — UNIFIED RISK STATE MATRIX
+/* v5.75.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4033,7 +4048,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.74.0 — ONE ACTION SSOT */
+/* v5.75.0 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4112,7 +4127,7 @@ function commandCenter(){
 }
 
 
-/* v5.74.0 — PORTFOLIO INTELLIGENCE */
+/* v5.75.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -5873,7 +5888,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.74.0 — FIVE TAB UX */
+/* v5.75.0 — FIVE TAB UX */
 let MARKET_SUBVIEW=(()=>{try{return sessionStorage.getItem('meridian_market_subview')||'market'}catch(e){return 'market'}})();
 let EXEC_SUBVIEW=(()=>{try{return sessionStorage.getItem('meridian_exec_subview')||'trade'}catch(e){return 'trade'}})();
 
@@ -6018,26 +6033,22 @@ function activatePrimaryView(view,{resetScroll=false}={}){
 }
 
 
-function primaryTabTap(view,e){
- try{
-   if(e){e.preventDefault();e.stopPropagation();}
-   activatePrimaryView(view,{resetScroll:true});
-   return false;
- }catch(err){
-   console.error('Primary tab tap failed',view,err);
-   // Last-resort DOM fallback: switch visible section and active button even if renderer failed.
-   try{
-     ACTIVE_PRIMARY_VIEW=view;
-     syncPrimaryNav(view);
-     showOnlyView(view);
-     const el=document.getElementById('view-'+view);
-     if(el && el.dataset.rendered!=='1') renderOne(view);
-     window.scrollTo(0,0);
-   }catch(e2){console.error('Primary tab fallback failed',e2)}
-   return false;
- }
+
+
+function routeFromHash({resetScroll=true}={}){
+ const map={
+   '#view-center':'center',
+   '#view-depot':'depot',
+   '#view-market':'market',
+   '#view-daytrade':'daytrade',
+   '#view-forecast':'forecast'
+ };
+ const view=map[location.hash]||ACTIVE_PRIMARY_VIEW||'center';
+ if(!PRIMARY_VIEWS.includes(view)) return false;
+ return activatePrimaryView(view,{resetScroll});
 }
-window.primaryTabTap=primaryTabTap;
+window.addEventListener('hashchange',()=>routeFromHash({resetScroll:true}));
+window.addEventListener('popstate',()=>routeFromHash({resetScroll:false}));
 
 function openView(view,button){
  if(PRIMARY_VIEWS.includes(view)){
@@ -6064,6 +6075,19 @@ if(primaryNav){
    activatePrimaryView(b.dataset.view,{resetScroll:true});
  },{passive:false});
 }
+
+const nativePrimaryNav=document.getElementById('primaryBottomNav');
+if(nativePrimaryNav){
+ nativePrimaryNav.addEventListener('click',e=>{
+   const a=e.target.closest('a.nav[data-view]');
+   if(!a || !nativePrimaryNav.contains(a)) return;
+   // Intentionally NO preventDefault/stopPropagation: Safari performs the native hash navigation.
+   const view=a.dataset.view;
+   ACTIVE_PRIMARY_VIEW=view;
+   syncPrimaryNav(view);
+ },true);
+}
+
 const settingsBtn=$('#settingsBtn');
 if(settingsBtn) settingsBtn.onclick=()=>openView('settings',null);
 
@@ -6079,7 +6103,10 @@ function repairPrimaryViewState(){
 window.addEventListener('pageshow',repairPrimaryViewState);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)repairPrimaryViewState()});
 /* v5.73: restore the last primary tab before data boot to avoid a CENTER flash. */
-repairPrimaryViewState();
+if(!location.hash || !/^#view-(center|depot|market|daytrade|forecast)$/.test(location.hash)){
+  history.replaceState(null,'','#view-'+ACTIVE_PRIMARY_VIEW);
+}
+routeFromHash({resetScroll:false});
 /* v5.0.4 lazy view recovery: service worker disabled during recovery */
 load();
 
