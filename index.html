@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.68.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.69.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.68.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.69.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.68.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.69.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.68.0 compact bot action cards */
+/* v5.69.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2655,6 +2655,67 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
 }
 </style>
 
+
+<style id="v569-nav-width-rootfix">
+#primaryBottomNav{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:fixed!important;
+  left:0!important;right:0!important;bottom:0!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:58px!important;
+  padding:0!important;
+  margin:0!important;
+  z-index:2147483640!important;
+  background:#03070c!important;
+}
+#primaryBottomNav>.five-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  width:100%!important;
+  max-width:900px!important;
+  height:auto!important;
+  min-height:58px!important;
+  margin:0 auto!important;
+  padding:5px 5px calc(6px + env(safe-area-inset-bottom))!important;
+  gap:3px!important;
+  flex:none!important;
+}
+#primaryBottomNav .nav{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:auto!important;
+  min-height:46px!important;
+  flex:none!important;
+  overflow:visible!important;
+  white-space:normal!important;
+  text-overflow:clip!important;
+  padding:7px 2px!important;
+  margin:0!important;
+  font-size:8px!important;
+  letter-spacing:0!important;
+  line-height:1.05!important;
+  color:#8193a8!important;
+}
+#primaryBottomNav .nav span{
+  display:block!important;
+  font-size:14px!important;
+  margin:0 0 3px!important;
+}
+#primaryBottomNav .nav.active{
+  color:#20a4ff!important;
+  background:#07131e!important;
+}
+body{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2662,7 +2723,7 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.68.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.69.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2691,7 +2752,7 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.68.0.js?v=20260824-2315"></script>
+<script src="app-v5.69.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2762,8 +2823,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.68.0';
-let APP_RELEASE='5.68.0 · NAV RESTORE';
+let APP_CODE_VERSION='5.69.0';
+let APP_RELEASE='5.69.0 · NAV WIDTH FIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3219,7 +3280,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.68.0 — UNIFIED RISK STATE MATRIX
+/* v5.69.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3834,7 +3895,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.68.0 — ONE ACTION SSOT */
+/* v5.69.0 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -3913,7 +3974,7 @@ function commandCenter(){
 }
 
 
-/* v5.68.0 — PORTFOLIO INTELLIGENCE */
+/* v5.69.0 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -5630,7 +5691,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.68.0 — FIVE TAB UX */
+/* v5.69.0 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW='trade';
 
@@ -7038,7 +7099,24 @@ function compactDecisionDetails(){
    n.style.setProperty('left','0','important');
    n.style.setProperty('right','0','important');
    n.style.setProperty('bottom','0','important');
-   n.style.setProperty('z-index','2147483000','important');
+   n.style.setProperty('z-index','2147483640','important');
+   const inner=n.querySelector('.five-tabs');
+   if(inner){
+     inner.style.setProperty('display','grid','important');
+     inner.style.setProperty('grid-template-columns','repeat(5,minmax(0,1fr))','important');
+     inner.style.setProperty('width','100%','important');
+     inner.style.setProperty('height','auto','important');
+     inner.style.setProperty('flex','none','important');
+   }
+   n.querySelectorAll('.nav').forEach(b=>{
+     b.style.setProperty('display','block','important');
+     b.style.setProperty('width','auto','important');
+     b.style.setProperty('min-width','0','important');
+     b.style.setProperty('flex','none','important');
+     b.style.setProperty('overflow','visible','important');
+     b.style.setProperty('visibility','visible','important');
+     b.style.setProperty('opacity','1','important');
+   });
  }
  document.addEventListener('DOMContentLoaded',healNav);
  window.addEventListener('load',healNav);
