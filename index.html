@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.69.2">
+<link rel="manifest" href="manifest.webmanifest?v=5.70">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.69.2.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.70.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.69.2 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.70 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.69.2 compact bot action cards */
+/* v5.70 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2764,6 +2764,58 @@ body{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
 }
 </style>
 
+
+<style id="v570-stability-speed-css">
+.bottom .nav{
+  -webkit-tap-highlight-color:transparent!important;
+  touch-action:manipulation!important;
+}
+main>section{
+  contain:layout style;
+}
+</style>
+
+
+<style id="v570-depot-cleanup-css">
+/* v5.70 DEPOT cleanup — no navigation changes */
+.venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
+.venue-donut-wrap{position:relative;min-height:140px}
+.venue-compact-list{display:grid;gap:0}
+.venue-compact-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(34,72,96,.45)}
+.venue-compact-row:last-child{border-bottom:0}
+.venue-compact-row span{font-size:9px}.venue-compact-row span small{display:block;margin-top:3px}
+.venue-compact-row b{font-size:10px}.venue-compact-row em{font-style:normal;font-size:9px;font-weight:900;color:#31e3a0}
+
+.pi-scenarios.compact{gap:7px;margin:10px 0 12px}
+.pi-scenarios.compact>div{padding:10px 8px}
+.pi-scenarios.compact span{font-size:6px}
+.pi-scenarios.compact b{font-size:10px}
+.pi-row.compact{padding:10px 0}
+.pi-row.compact small{font-size:6.5px}
+
+.depot-bot-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0 10px;color:#8395a8;font-size:8px}
+.depot-bot-meta b{color:#f0b84b}
+.pionex-bots.compact{display:grid;gap:8px}
+.bot-compact{border:1px solid #173e55;border-radius:14px;padding:10px 11px;background:rgba(5,20,30,.46)}
+.bot-compact.red{border-color:#71303d}.bot-compact.amber{border-color:#705724}.bot-compact.green{border-color:#1d6346}
+.bot-compact-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.bot-compact-head b{font-size:11px}.bot-compact-head small{display:block;color:#8193a8;font-size:7px;margin-top:3px}
+.bot-compact-head strong{font-size:8px}
+.bot-compact-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}
+.bot-compact-grid>div{border-top:1px solid rgba(23,62,85,.55);padding-top:6px;min-width:0}
+.bot-compact-grid span{display:block;color:#8193a8;font-size:6px;margin-bottom:3px}
+.bot-compact-grid b{font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.depot-futures-details>summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+@media(max-width:430px){
+ .venue-compact{grid-template-columns:128px 1fr;gap:12px}
+ .venue-donut-wrap{min-height:128px}
+ .venue-compact-row{grid-template-columns:1fr auto;gap:6px}
+ .venue-compact-row em{grid-column:2;grid-row:2;text-align:right}
+ .bot-compact-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2771,7 +2823,7 @@ body{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.69.2 · LIVE</span>
+        <span class="version" id="versionBadge">v5.70 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2803,7 +2855,7 @@ body{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.69.2.js?v=20260824-2315"></script>
+<script src="app-v5.70.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2874,8 +2926,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.69.2';
-let APP_RELEASE='5.69.2 · MANUAL FEED';
+let APP_CODE_VERSION='5.70';
+let APP_RELEASE='5.70 · DEPOT CLEANUP';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3195,7 +3247,16 @@ function metric(label,value,cls=''){return `<div class="metric"><div class="labe
 function venueGradient(vs){let at=0;const cs=['#22aaff','#4a90ff','#9b7cff','#ff5b5b'];return 'conic-gradient('+vs.map((v,i)=>{const a=at;at+=v.sharePct;return `${cs[i%cs.length]} ${a}% ${at}%`}).join(',')+')'}
 function donutVenue(){
  const p=DATA.portfolio;
- return card(`<div class="section-title">BÖRSE / WALLET</div><div class="grid2"><div style="position:relative"><div class="donut" style="background:${venueGradient(p.byVenue)}"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div><div>${p.byVenue.map(v=>`<div class="row"><span>● ${v.name}</span><b>${fmt(v.sharePct,1)}%</b></div>`).join('')}</div></div>`);
+ const rows=(p.byVenue||[]).map(v=>`<div class="venue-compact-row">
+   <span>● ${v.name}<small>${sourceBadge(v.source)}</small></span>
+   <b>$${fmt(v.value,0)}</b>
+   <em>${fmt(v.sharePct,1)}%</em>
+ </div>`).join('');
+ return card(`<div class="section-head"><div class="section-title">BÖRSE / WALLET</div><span class="section-note">Wert · Anteil · Quelle</span></div>
+   <div class="venue-compact">
+     <div class="venue-donut-wrap"><div class="donut" style="background:${venueGradient(p.byVenue)}"></div><div class="donut-label">100%<small class="muted">Verteilung</small></div></div>
+     <div class="venue-compact-list">${rows}</div>
+   </div>`);
 }
 function liveBadge(label='LIVE'){return `<span class="live-badge"><span class="live-dot"></span>${label}</span>`}
 function snapshotBadge(label='SNAPSHOT'){return `<span class="snapshot-badge">${label}</span>`}
@@ -3336,7 +3397,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.69.2 — UNIFIED RISK STATE MATRIX
+/* v5.70 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -3951,7 +4012,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.69.2 — ONE ACTION SSOT */
+/* v5.70 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4030,7 +4091,7 @@ function commandCenter(){
 }
 
 
-/* v5.69.2 — PORTFOLIO INTELLIGENCE */
+/* v5.70 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -4094,19 +4155,18 @@ function portfolioIntelligenceState(){
 }
 function portfolioIntelligencePanel(){
  const x=portfolioIntelligenceState();
- const rows=x.positions.slice(0,8).map((p,i)=>`<div class="pi-row">
-   <div><span>#${i+1}</span><b>${p.sym}</b><small>${p.reason} · Peak ${p.peak}</small></div>
+ const rows=x.positions.slice(0,8).map((p,i)=>`<div class="pi-row compact">
+   <div><span>#${i+1}</span><b>${p.sym}</b><small>${p.reason} · ${p.peak}</small></div>
    <strong>$${fmt(p.current,0)}</strong>
    <em class="${p.tone}">${p.action}</em>
  </div>`).join('');
- return card(`<div class="section-head"><div><div class="section-title">PORTFOLIO INTELLIGENCE 1.1</div><div class="section-note">Bestand × Cycle Exit × Szenarien</div></div><span class="tag cyan">CYCLE MODEL</span></div>
-   <div class="pi-scenarios">
-     <div class="bear"><span>DEFENSIVE · CYCLE</span><b>$${fmt(x.bear,0)}</b></div>
-     <div class="base"><span>BASE · CYCLE</span><b>$${fmt(x.base,0)}</b></div>
-     <div class="bull"><span>HIGH-BETA · CYCLE</span><b>$${fmt(x.bull,0)}</b></div>
+ return card(`<div class="section-head"><div><div class="section-title">PORTFOLIO INTELLIGENCE 1.2</div><div class="section-note">Cycle Exit · Szenarien</div></div><span class="tag cyan">MODEL</span></div>
+   <div class="pi-scenarios compact">
+     <div class="bear"><span>DEFENSIVE</span><b>$${fmt(x.bear,0)}</b></div>
+     <div class="base"><span>BASE</span><b>$${fmt(x.base,0)}</b></div>
+     <div class="bull"><span>HIGH-BETA</span><b>$${fmt(x.bull,0)}</b></div>
    </div>
-   <p class="footer-note">Langfristige Cycle-Exit-Modellpfade aus aktuellen Beständen. Keine aktuelle Kursprognose und keine garantierten Zielwerte. Die operative ONE ACTION steht ausschließlich im CENTER.</p>
-   <details class="pi-details"><summary>PORTFOLIO EXIT MAP <span>ÖFFNEN</span></summary><div>${rows||'<div class="muted">Keine modellierbaren Spot-Positionen.</div>'}</div></details>`);
+   <details class="pi-details" data-detail-key="portfolio-exit-map"><summary>PORTFOLIO EXIT MAP <span>ÖFFNEN</span></summary><div>${rows||'<div class="muted">Keine modellierbaren Spot-Positionen.</div>'}<p class="footer-note">Langfristige Modellpfade; operative ONE ACTION bleibt im CENTER.</p></div></details>`);
 }
 
 function depot(){
@@ -4140,11 +4200,6 @@ function depot(){
  const depotAction=depotBest?recoveryActionLabel(depotBest):(Number.isFinite(depotBuffer)&&depotBuffer<8?'PUFFER ≥8% HERSTELLEN':'MONITOR');
  const depotAfter=depotBest&&Number.isFinite(Number(depotBest.after))?Number(depotBest.after):NaN;
 
- const venueCards=(p.byVenue||[]).map(v=>metric(
-   v.name,
-   `$${fmt(v.value,0)}<div class="${v.name==='Pionex'?'amber':'green'} venue-share">${fmt(v.sharePct,1)}%</div><div class="venue-source">${sourceBadge(v.source)}</div>`
- )).join('');
-
  const topRows=(p.topPositions||[]).map(x=>`
    <div class="position-row position-click" onclick="openAssetDetail('${x.symbol}')">
      ${coinIcon(x.symbol)}
@@ -4163,29 +4218,24 @@ function depot(){
    const side=(b.side||'—').toUpperCase();
    const lev=Number.isFinite(Number(b.leverage))?Number(b.leverage):null;
    const liqNum=Number(b.liquidation ?? b.liquidationPrice);
-   const liq=Number.isFinite(liqNum)?`$${fmt(liqNum,sym==='HBAR'?5:sym==='XRP'?4:0)}`:'nicht verifiziert';
+   const liq=Number.isFinite(liqNum)?`$${fmt(liqNum,sym==='HBAR'?5:sym==='XRP'?4:0)}`:'—';
    const profit=Number(b.totalProfit ?? b.totalProfitUsdt);
-   const pnl=Number.isFinite(profit)?`${fmt(profit,2)} USDT`:'—';
+   const pnl=Number.isFinite(profit)?`${profit>=0?'+':''}${fmt(profit,2)}`:'—';
    const pnlClass=Number.isFinite(profit)?(profit<0?'red':'green'):'';
-   const rangeLow=Number(b.rangeLow);
-   const rangeHigh=Number(b.rangeHigh);
-   const range=(Number.isFinite(rangeLow)&&Number.isFinite(rangeHigh))
-      ? `${fmt(rangeLow,sym==='HBAR'?2:sym==='XRP'?2:1)}–${fmt(rangeHigh,sym==='HBAR'?2:sym==='XRP'?2:1)}`
-      : '—';
-   const grids=b.grids||b.orders||'—';
    const dist=Number(b.liquidationDistancePct);
-   const displayName=b.name||b.id||`${sym}-${side}`;
-   return `<div class="pionex-bot">
-    <div class="pionex-bot-head"><div><b>${sym} ${side}</b><small>${displayName} · ${lev??'—'}x</small></div>${botStatusBadge(b)}</div>
-    <div class="pionex-grid">
-      <div><span>Kapital</span><b>${fmt(b.investment,2)} USDT</b></div>
-      <div><span>P&L</span><b class="${pnlClass}">${pnl}</b></div>
-      <div><span>Range</span><b>${range}</b></div>
-      <div><span>Grids</span><b>${grids}</b></div>
-      <div><span>Liq.</span><b class="red">${liq}</b></div>
-      <div><span>Liq.-Puffer</span><b class="amber">${Number.isFinite(dist)?fmt(dist,1)+'%':'—'}</b></div>
-    </div>
-    <div class="bot-reason">${b.reason||'Aktive Pionex-Position · SSOT'}</div>
+   const guard=Number.isFinite(dist)?botGuardFromBuffer(dist):null;
+   const action=guard?.label==='CRITICAL'?'DEFEND':guard?.label==='DANGER'?'REDUCE':guard?.label==='TIGHT'?'NO ADD':'KEEP';
+   return `<div class="bot-compact ${guard?.cls||''}">
+     <div class="bot-compact-head">
+       <div><b>${sym} ${side}</b><small>${lev??'—'}x · ${b.name||b.id||'Pionex'}</small></div>
+       <strong class="${guard?.cls||''}">${action}</strong>
+     </div>
+     <div class="bot-compact-grid">
+       <div><span>Kapital</span><b>${fmt(b.investment,2)}</b></div>
+       <div><span>P&L</span><b class="${pnlClass}">${pnl}</b></div>
+       <div><span>Liq.</span><b>${liq}</b></div>
+       <div><span>Puffer</span><b class="${guard?.cls||'amber'}">${Number.isFinite(dist)?fmt(dist,1)+'%':'—'}</b></div>
+     </div>
    </div>`;
  }).join('');
 
@@ -4203,8 +4253,6 @@ function depot(){
     </div>`,'hero')+
     portfolioIntelligencePanel()+
     donutVenue()+
-    `<div class="section-title venue-title">WERT NACH BÖRSE / WALLET</div>`+
-    `<div class="grid2 venue-grid">${venueCards}</div>`+
     card(`<div class="section-head"><div class="section-title">TOP 5 SPOT-POSITIONEN</div><span class="section-note">${liveBadge('LIVE')} ohne Futures-Doppelzählung</span></div>${topRows}`,'positions-card')+
     card(`<div class="section-head"><div><div class="section-title">FUTURES & EXPOSURE</div><div class="section-note">${activeBots.length} aktive Bots · ${snapshotBadge('SSOT')}</div></div><span class="tag ${riskLevel==='HIGH'?'red':riskLevel==='ELEVATED'?'amber':'green'}">${riskLevel}</span></div>
       <div class="depot-futures-focus">
@@ -4225,12 +4273,9 @@ function depot(){
       <details class="depot-futures-details" data-detail-key="depot-bots">
         <summary><div><b>BOT-DETAILS</b><span>${netDirection}</span></div><strong>ÖFFNEN</strong></summary>
         <div class="depot-futures-details-body">
-          <div class="grid2 depot-futures-secondary">
-            ${metric('5x LONG CAPACITY','$'+fmt(fiveXLongCapacity,0),'amber')}
-            ${metric('BIAS',netDirection,'amber')}
-          </div>
-          <div class="pionex-bots">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
-          <p class="footer-note">SSOT: Summary, Bot-Cards, GRID und Center verwenden dieselben aktiven Pionex-Bots. Pionex wird nicht doppelt zum Gesamtportfolio addiert.</p>
+          <div class="depot-bot-meta"><span>${netDirection}</span><b>5x CAP. $${fmt(fiveXLongCapacity,0)}</b></div>
+          <div class="pionex-bots compact">${botCards||'<div class="muted">Keine aktiven Futures-Bots im SSOT.</div>'}</div>
+          <p class="footer-note">SSOT mit GRID/CENTER · keine Futures-Doppelzählung im Gesamtportfolio.</p>
         </div>
       </details>
     `,'pionex-card');
@@ -5659,6 +5704,13 @@ function settings(){
  card(`<div class="section-title">WEG ZU v5.0</div><div class="row"><span>Pionex Bot Auto-Sync</span><b class="amber">API nötig</b></div><div class="row"><span>On-Chain NADIR</span><b class="amber">Quelle/API nötig</b></div><div class="row"><span>BTC-Short Liq./Notional</span><b class="red">frische Bot-Daten nötig</b></div><p class="footer-note">Live-Spotpreise sind jetzt von Snapshotdaten getrennt. Wenn alle Livequellen ausfallen, zeigt MERIDIAN ausdrücklich FALLBACK oder SNAPSHOT statt LIVE.</p><p class="footer-note">Feed-Reconnect ist jetzt direkt im Header über LIVE ↻ erreichbar.</p>`);
 }
 
+function currentVisibleView(){
+ const active=document.querySelector('.bottom .nav.active[data-view]');
+ if(active?.dataset?.view) return active.dataset.view;
+ const sec=[...document.querySelectorAll('main>section')].find(x=>!x.classList.contains('hidden'));
+ return sec?.id?.replace('view-','')||'center';
+}
+
 let HEADER_FEED_BUSY=false;
 async function manualFeedRefresh(){
  const b=document.getElementById('feedRefreshBtn');
@@ -5690,7 +5742,8 @@ async function manualFeedRefresh(){
    }catch(e){}
 
    recalcPortfolio();
-   renderAll();
+   const visible=currentVisibleView();
+   renderOne(visible);
    updateHeaderFeedClock();
    if(b){b.classList.add('ok');b.textContent='✓';}
  }catch(e){
@@ -5752,7 +5805,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.69.2 — FIVE TAB UX */
+/* v5.70 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW='trade';
 
@@ -5816,6 +5869,7 @@ function renderOne(view){
    if(view==='center')bindCenterSmartFocus(el);
    if(window.MERIDIAN_DETAILS_STATE) window.MERIDIAN_DETAILS_STATE.restore(el);
    el.dataset.rendered='1';
+   el.dataset.renderedAt=String(Date.now());
  }catch(e){
    console.error('MERIDIAN render error',view,e);
    el.innerHTML='<div class="card render-fallback"><div class="eyebrow">VIEW FEHLER · '+view.toUpperCase()+
@@ -5832,12 +5886,23 @@ function openView(view,button){
  document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
  const el=$('#view-'+view);
  if(!el)return;
- // Critical fix: render the requested view at click-time, not only during boot.
- renderOne(view);
+
+ // v5.70: make the navigation itself immediate.
+ // Every main view is rendered during boot, so reveal the cached DOM first,
+ // then refresh that single view after Safari has painted the tab switch.
+ if(el.dataset.rendered!=='1') renderOne(view);
  el.classList.remove('hidden');
- window.scrollTo({top:0,behavior:'smooth'});
- if(view==='forecast') selectCoin(activeCoin);
- if(view==='daytrade' && EXEC_SUBVIEW==='grid') refreshGridEngine(false);
+ window.scrollTo({top:0,left:0,behavior:'auto'});
+
+ requestAnimationFrame(()=>{
+   setTimeout(()=>{
+     try{
+       renderOne(view);
+       if(view==='forecast') selectCoin(activeCoin);
+       if(view==='daytrade' && EXEC_SUBVIEW==='grid') refreshGridEngine(false);
+     }catch(e){console.error('Deferred view refresh failed',view,e)}
+   },0);
+ });
 }
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>openView(b.dataset.view,b));
 $('#settingsBtn').onclick=()=>openView('settings',null);
