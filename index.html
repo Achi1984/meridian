@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.55.0">
+<link rel="manifest" href="manifest.webmanifest?v=5.56.0">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.55.0.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.56.0.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.55.0 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.56.0 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.55.0 compact bot action cards */
+/* v5.56.0 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2357,7 +2357,7 @@ body[data-view] nav.bottom{
 </style>
 
 <style id="v555-grid-compact">
-/* v5.55.0: GRID-only compression — no global layout changes */
+/* v5.56.0: GRID-only compression — no global layout changes */
 .grid-command-compact{gap:10px!important}
 .grid-command-compact .section-head{margin-bottom:2px!important}
 .grid-kpi-strip{gap:7px!important}
@@ -2377,6 +2377,40 @@ body[data-view] nav.bottom{
 .compact-focus{margin-top:9px!important}
 </style>
 
+
+<style id="v556-grid-focus">
+/* v5.56.0 — GRID only. No CENTER/global layout changes. */
+.grid-command-v556{display:flex;flex-direction:column;gap:10px}
+.grid-command-v556-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.grid-command-v556-head .forecast-main{font-size:24px;line-height:1.05;margin-top:7px}
+.grid-command-v556-state{display:grid;grid-template-columns:1.5fr .8fr;gap:8px}
+.grid-command-v556-state>div{
+  border:1px solid #173e55;border-radius:14px;padding:11px 13px;min-width:0
+}
+.grid-command-v556-state span{
+  display:block;color:#8296a8;font-size:8px;letter-spacing:1.05px;margin-bottom:5px
+}
+.grid-command-v556-state b{font-size:14px;line-height:1.2;overflow-wrap:anywhere}
+.grid-command-v556-action{
+  display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;
+  gap:9px;border:1px solid #19577a;border-radius:14px;padding:11px 13px
+}
+.grid-command-v556-action.red{border-color:#8f3445}
+.grid-command-v556-action.amber{border-color:#8c6726}
+.grid-command-v556-action.green{border-color:#1e744e}
+.grid-command-v556-action span{
+  color:#8296a8;font-size:8px;letter-spacing:1px
+}
+.grid-command-v556-action b{font-size:14px;text-align:right}
+.grid-command-v556-action i{color:#24aef2;font-style:normal;font-weight:900}
+.grid-command-v556-action strong{font-size:12px;white-space:nowrap}
+@media(max-width:430px){
+  .grid-command-v556-head .forecast-main{font-size:22px}
+  .grid-command-v556-action{grid-template-columns:auto 1fr auto}
+  .grid-command-v556-action strong{grid-column:2/4;text-align:right;font-size:11px}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2384,7 +2418,7 @@ body[data-view] nav.bottom{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.55.0 · LIVE</span>
+        <span class="version" id="versionBadge">v5.56.0 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -2415,7 +2449,7 @@ body[data-view] nav.bottom{
   <button class="nav" data-view="grid"><span>⌗</span><b>GRID</b></button>
 <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.55.0.js?v=20260824-2315"></script>
+<script src="app-v5.56.0.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -2943,7 +2977,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.55.0 — UNIFIED RISK STATE MATRIX
+/* v5.56.0 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4974,18 +5008,20 @@ function gridView(){
  const statusLabel=critical.length?'CRITICAL':danger.length?'DANGER':tight.length?'TIGHT':'STABLE';
  const headline=topBot?`${topBot.id} · ${fmt(topBot.buffer,1)}%`:'KEIN AKTIVER BOT';
 
- const summary=card(`<div class="grid-command-compact">
-   <div class="section-head compact-head">
-     <div><div class="eyebrow">GRID COMMANDER 4.0 ${liveBadge('SSOT')}</div><div class="forecast-main">${statusLabel}</div></div>
+ const summary=card(`<div class="grid-command-v556">
+   <div class="grid-command-v556-head">
+     <div><div class="eyebrow">GRID COMMANDER 4.1 ${liveBadge('SSOT')}</div><div class="forecast-main ${statusTone}">${statusLabel}</div></div>
      <span class="tag ${statusTone}">${bots.length} ACTIVE</span>
    </div>
-   <div class="grid-kpi-strip">
+   <div class="grid-command-v556-state">
      <div><span>PRIORITÄT</span><b class="${statusTone}">${headline}</b></div>
-     <div><span>RISK GATE</span><b class="${riskOpen?'green':'red'}">${riskOpen?'OPEN':'BLOCKED'}</b></div>
-     <div><span>NÄCHSTES ZIEL</span><b>${topBot&&Number(topBot.buffer)<8?'≥8% RECOVERY':'MONITOR'}</b></div>
+     <div><span>GATE</span><b class="${riskOpen?'green':'red'}">${riskOpen?'OPEN':'BLOCKED'}</b></div>
    </div>
-   <div class="grid-next-action ${statusTone}">
-     <span>JETZT</span><b>${bestAction}</b>
+   <div class="grid-command-v556-action ${statusTone}">
+     <span>JETZT</span>
+     <b>${bestAction}</b>
+     <i>→</i>
+     <strong>${topBot&&Number(topBot.buffer)<8?'≥8% RECOVERY':'MONITOR'}</strong>
    </div>
  </div>`);
 
