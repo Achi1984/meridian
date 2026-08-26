@@ -7,9 +7,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.77">
+<link rel="manifest" href="manifest.webmanifest?v=5.78">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.77.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.78.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.63,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.63,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.77 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.78 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.77 compact bot action cards */
+/* v5.78 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.77 DEPOT cleanup — no navigation changes */
+/* v5.78 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2850,7 +2850,7 @@ main>section{
 
 
 <style id="v572-decision-cleanup-css">
-/* v5.77 Decision Cleanup — navigation/feed architecture untouched */
+/* v5.78 Decision Cleanup — navigation/feed architecture untouched */
 .trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
 .trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -2980,6 +2980,14 @@ main>section{
 .shadow-card.red .shadow-verdict strong{letter-spacing:.4px}
 </style>
 
+
+<style id="v578-isolated-paper-css">
+.paper-isolation-banner{margin-top:12px;border:1px solid #1d6346;border-radius:13px;padding:10px 11px;background:rgba(20,73,52,.12)}
+.paper-isolation-banner span{display:block;color:#31e3a0;font-size:6px;letter-spacing:1px;margin-bottom:4px}
+.paper-isolation-banner b{display:block;font-size:9px}
+.paper-isolation-banner small{display:block;color:#8193a8;font-size:6.5px;margin-top:5px;line-height:1.4}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -2987,7 +2995,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.77 · LIVE</span>
+        <span class="version" id="versionBadge">v5.78 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3019,7 +3027,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.77.js?v=20260824-2315"></script>
+<script src="app-v5.78.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -3090,8 +3098,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.77';
-let APP_RELEASE='5.77 · PAPER DATA QUALITY';
+let APP_CODE_VERSION='5.78';
+let APP_RELEASE='5.78 · ISOLATED PAPER ENGINE';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3561,7 +3569,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.77 — UNIFIED RISK STATE MATRIX
+/* v5.78 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4176,7 +4184,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.77 — ONE ACTION SSOT */
+/* v5.78 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4255,7 +4263,7 @@ function commandCenter(){
 }
 
 
-/* v5.77 — PORTFOLIO INTELLIGENCE */
+/* v5.78 — PORTFOLIO INTELLIGENCE */
 function portfolioIntelligenceState(){
  const p=DATA.portfolio||{}, holdings=p.holdings||[], grouped={};
  holdings.forEach(h=>{
@@ -4700,6 +4708,7 @@ function paperDefaultState(){
  return {
    startBalance:10000,balance:10000,
    feePct:0.0005,slippagePct:0.0003,riskPerTradePct:1,
+   maxOpenPositions:3,maxPortfolioRiskPct:3,
    autoMode:true,open:[],trades:[],shadow:[],signals:[],
    seen:{official:{},shadow:{}},createdAt:new Date().toISOString()
  };
@@ -4742,29 +4751,77 @@ function paperLevelsValid(x){
 function paperMigrateState(s){
  s.shadow=(s.shadow||[]).map(t=>{
    const valid=paperLevelsValid(t);
-   return {...t,dataQuality:valid?'VALID':'INVALID',status:valid?(t.status||'WAIT_ZONE'):'INVALID'};
+   const sourceMode=t.sourceMode||'LEGACY_EXTERNAL';
+   const x={...t,sourceMode,dataQuality:valid?'VALID':'INVALID'};
+   if(!valid){
+     x.status='INVALID';x.resolved=false;x.outcome=null;x.exit=null;x.hypotheticalR=null;
+     return x;
+   }
+   // Strict state machine: WAIT_ZONE -> ACTIVE -> RESOLVED.
+   // A signal without a real entry-zone touch can never be SL/TP or "gate protected".
+   if(x.shadowEntry==null){
+     x.status='WAIT_ZONE';x.resolved=false;x.outcome=null;x.exit=null;x.hypotheticalR=null;x.resolvedAt=null;
+   }else if(x.resolved && ['SL','TP1','TP2'].includes(x.outcome)){
+     x.status='RESOLVED';
+   }else{
+     x.status='ACTIVE';x.resolved=false;x.outcome=null;x.exit=null;x.hypotheticalR=null;
+   }
+   return x;
  });
  s.open=(s.open||[]).filter(t=>paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side}));
  s.trades=(s.trades||[]).map(t=>({...t,dataQuality:paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side})?'VALID':'INVALID'}));
  return s;
 }
+
+function paperIndependentPlan(){
+ try{
+   // IMPORTANT: uses technical Entry Intelligence directly.
+   // No watchlistPriorityState(), capitalReleaseState(), GRID bot or Pionex gate.
+   const rank=entryIntelRank().filter(r=>validExecutionPlan(executionPlanFor(r.sym)));
+   const preferred=rank.find(r=>Number(r.a?.setup||0)>=70) || rank[0] || null;
+   const plan=preferred?executionPlanFor(preferred.sym):null;
+   return {rank,preferred,plan};
+ }catch(e){return {rank:[],preferred:null,plan:null}}
+}
+function paperRiskGate(s,x){
+ const equity=paperStatsRawEquity(s);
+ const maxOpen=Math.max(1,Number(s.maxOpenPositions||3));
+ const maxRiskPct=Math.max(Number(s.riskPerTradePct||1),Number(s.maxPortfolioRiskPct||3));
+ const openRisk=(s.open||[]).reduce((a,t)=>a+Math.max(0,Number(t.riskUsd||0)),0);
+ const openRiskPct=equity>0?openRisk/equity*100:100;
+ const duplicate=!!x&&(s.open||[]).some(t=>t.sym===x.sym&&t.side===x.side);
+ const capacity=(s.open||[]).length<maxOpen && openRiskPct+Number(s.riskPerTradePct||1)<=maxRiskPct+0.0001;
+ const open=equity>0 && !duplicate && capacity;
+ const reason=duplicate?'SAME PAPER POSITION OPEN':(s.open||[]).length>=maxOpen?'MAX PAPER POSITIONS':openRiskPct+Number(s.riskPerTradePct||1)>maxRiskPct?'PAPER RISK CAP':'PAPER RISK OPEN';
+ return {open,reason,equity,maxOpen,maxRiskPct,openRiskPct,duplicate};
+}
+function paperStatsRawEquity(s){
+ const openPnl=(s.open||[]).reduce((a,t)=>{const px=paperQuote(t.sym);return a+(Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0)},0);
+ return Number(s.balance||0)+openPnl;
+}
 function paperSignal(){
  try{
-   const bridge=executionBridgeState(), p=bridge?.plan, gate=bridge?.gate, d=DATA.dayTrade||{};
+   const src=paperIndependentPlan(),p=src.plan,d=DATA.dayTrade||{},s=paperState();
    if(!p)return null;
-   const techOpen=!!d.entryAllowed, riskOpen=!!gate?.riskOpen;
    const live=paperQuote(p.sym);
    const lo=Math.min(Number(p.low),Number(p.high)), hi=Math.max(Number(p.low),Number(p.high));
+   const techScore=Number(d.gateScore||0);
+   const candidateScore=Number(src.preferred?.a?.setup||techScore);
+   const techOpen=techScore>=70 && !!d.entryAllowed && candidateScore>=60;
    const x={
      sym:p.sym,side:(p.side||'LONG').toUpperCase(),entryLow:lo,entryHigh:hi,
      stop:Number(p.stop),tp1:Number(p.tp1),tp2:Number(p.tp2),rr:Number(p.rr),
-     gateScore:Number(d.gateScore||0),techOpen,riskOpen,live,
+     gateScore:techScore,candidateScore,techOpen,live,
+     sourceMode:'PAPER_ISOLATED',externalPortfolioIgnored:true,
      ts:new Date().toISOString()
    };
    x.levelsValid=paperLevelsValid(x);
    x.inZone=x.levelsValid&&Number.isFinite(live)&&live>=lo&&live<=hi;
-   x.allowed=x.levelsValid&&techOpen&&riskOpen&&x.inZone;
-   x.reason=!x.levelsValid?'INVALID PLAN DATA':!techOpen?'TECH BLOCK':!riskOpen?'RISK BLOCK':!x.inZone?'WAIT ENTRY ZONE':'TECH + RISK + ZONE OPEN';
+   const pg=paperRiskGate(s,x);
+   x.paperRiskOpen=pg.open;
+   x.paperRiskReason=pg.reason;
+   x.allowed=x.levelsValid&&techOpen&&pg.open&&x.inZone;
+   x.reason=!x.levelsValid?'INVALID PLAN DATA':!techOpen?'TECH BLOCK':!pg.open?pg.reason:!x.inZone?'WAIT ENTRY ZONE':'TECH + PAPER RISK + ZONE OPEN';
    return x;
  }catch(e){return null}
 }
@@ -4812,7 +4869,8 @@ function paperAddShadow(s,x){
    shadowEntry:inZone?x.live:null,
    enteredAt:inZone?new Date().toISOString():null,
    mfeR:0,maeR:0,tp1Touched:false,
-   blockReason:!x.riskOpen?'PORTFOLIO RISK GATE':'OTHER BLOCK'
+   sourceMode:'PAPER_INTERNAL',
+   blockReason:x.paperRiskReason||'PAPER RISK GATE'
  });
  s.shadow=s.shadow.slice(0,150);
  paperRecordSignal(s,x,'SHADOW');
@@ -4827,7 +4885,8 @@ function paperEngineScan(force=false){
    if((s.autoMode||force)&&!already){
      if(paperOpenSignal(s,x))s.seen.official[k]=Date.now();
    }
- }else if(x.levelsValid && x.techOpen && !x.riskOpen){
+ }else if(x.levelsValid && x.techOpen && !x.paperRiskOpen){
+   // Shadow means: MERIDIAN technical setup existed, but PAPER'S OWN risk engine blocked it.
    if(!s.seen.shadow[k]){
      if(paperAddShadow(s,x))s.seen.shadow[k]=Date.now();
    }
@@ -4842,7 +4901,7 @@ function paperManualCapture(){
    if(!s.open.some(t=>t.sym===x.sym&&t.side===x.side)){
      paperOpenSignal(s,x);s.seen.official[k]=Date.now();
    }
- }else if(x.levelsValid){
+ }else if(x.levelsValid && x.techOpen && !x.paperRiskOpen){
    if(!s.seen.shadow[k]){if(paperAddShadow(s,x))s.seen.shadow[k]=Date.now();}
  }
  savePaperState(s);renderOne('daytrade');
@@ -4874,8 +4933,9 @@ function paperTick(){
    if(tp1&&!t.tp1Touched){t.tp1Touched=true;t.tp1TouchedAt=new Date().toISOString()}
  }
  for(const t of s.shadow){
-   if(!paperLevelsValid(t)){t.dataQuality='INVALID';t.status='INVALID';continue}
+   if(!paperLevelsValid(t)){t.dataQuality='INVALID';t.status='INVALID';t.resolved=false;t.outcome=null;t.hypotheticalR=null;continue}
    t.dataQuality='VALID';
+   if(t.shadowEntry==null && t.resolved){t.resolved=false;t.outcome=null;t.exit=null;t.hypotheticalR=null;t.status='WAIT_ZONE'}
    if(t.resolved)continue;
    const px=paperQuote(t.sym); if(!Number.isFinite(px))continue;
 
@@ -4925,18 +4985,20 @@ function paperTick(){
 
 function paperShadowStats(s){
  const raw=s.shadow||[];
- const valid=raw.filter(t=>paperLevelsValid(t));
- const invalid=raw.length-valid.length;
+ const legacy=raw.filter(t=>(t.sourceMode||'LEGACY_EXTERNAL')!=='PAPER_INTERNAL');
+ const isolated=raw.filter(t=>t.sourceMode==='PAPER_INTERNAL');
+ const valid=isolated.filter(t=>paperLevelsValid(t));
+ const invalid=isolated.length-valid.length;
  const active=valid.filter(t=>!t.resolved && t.shadowEntry!=null);
  const waiting=valid.filter(t=>!t.resolved && t.shadowEntry==null);
- const resolved=valid.filter(t=>t.resolved && ['SL','TP1','TP2'].includes(t.outcome));
+ const resolved=valid.filter(t=>t.shadowEntry!=null && t.resolved && ['SL','TP1','TP2'].includes(t.outcome));
  const losses=resolved.filter(t=>t.outcome==='SL');
  const winners=resolved.filter(t=>t.outcome==='TP1'||t.outcome==='TP2');
  const rs=resolved.map(t=>Number(t.hypotheticalR)).filter(Number.isFinite);
  const avgR=rs.length?rs.reduce((a,b)=>a+b,0)/rs.length:0;
- const gatePrecision=resolved.length?losses.length/resolved.length*100:0;
+ const gatePrecision=resolved.length?losses.length/resolved.length*100:null;
  return {
-   total:valid.length,invalid,active:active.length,waiting:waiting.length,resolved:resolved.length,
+   total:valid.length,legacy:legacy.length,invalid,active:active.length,waiting:waiting.length,resolved:resolved.length,
    avoidedLosses:losses.length,missedWinners:winners.length,avgR,gatePrecision
  };
 }
@@ -4946,84 +5008,79 @@ function paperStats(s){
  const gw=wins.reduce((a,t)=>a+Number(t.net||0),0);
  const gl=Math.abs(loss.reduce((a,t)=>a+Number(t.net||0),0));
  const avgR=ts.length?ts.reduce((a,t)=>a+Number(t.r||0),0)/ts.length:0;
- const openPnl=(s.open||[]).reduce((a,t)=>{const px=paperQuote(t.sym);return a+(Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0)},0);
- return {count:ts.length,net,winRate:ts.length?wins.length/ts.length*100:0,pf:gl?gw/gl:(gw>0?99:0),avgR,equity:s.balance+openPnl};
+ return {count:ts.length,net,winRate:ts.length?wins.length/ts.length*100:0,pf:gl?gw/gl:(gw>0?99:0),avgR,equity:paperStatsRawEquity(s)};
 }
 function paperTradeView(){
  paperTick();paperEngineScan(false);
- const s=paperState(),st=paperStats(s),xs=paperShadowStats(s),x=paperSignal();
+ const s=paperState(),st=paperStats(s),xs=paperShadowStats(s),x=paperSignal(),pg=paperRiskGate(s,x);
 
  const open=(s.open||[]).map(t=>{
    const px=paperQuote(t.sym),pnl=Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0,r=t.riskUsd?pnl/t.riskUsd:0;
-   return `<div class="paper-pos"><div><b>${t.sym} ${t.side}</b><small>Gate ${t.gateScore}/100</small></div><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>P&L</span><b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)} · ${fmt(r,2)}R</b></div><div><span>SL</span><b>${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1/TP2</span><b>${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div></div>`;
+   return `<div class="paper-pos"><div><b>${t.sym} ${t.side}</b><small>PAPER · Gate ${t.gateScore}/100</small></div><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>P&L</span><b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)} · ${fmt(r,2)}R</b></div><div><span>SL</span><b>${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1/TP2</span><b>${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div></div>`;
  }).join('');
 
  const journal=(s.trades||[]).slice(0,15).map(t=>`<div class="paper-journal-row"><span>${t.sym} ${t.side}</span><span>${t.exitReason}</span><b class="${t.net>=0?'green':'red'}">${t.net>=0?'+':''}$${fmt(t.net,2)}</b><em>${fmt(t.r,2)}R</em></div>`).join('');
 
- const shadow=(s.shadow||[]).slice(0,20).map(t=>{
-   const pp=(n,sym)=>paperPrice(n,sym);
-   const px=paperQuote(t.sym);
-   const valid=paperLevelsValid(t);
-   const status=!valid?'INVALID DATA':t.resolved?t.outcome:(t.shadowEntry!=null?'ACTIVE':'WAIT ZONE');
-   const tone=!valid?'red':t.resolved?(t.outcome==='SL'?'green':'red'):(t.shadowEntry!=null?'cyan':'amber');
-   const verdict=!valid?'NICHT GEWERTET':t.resolved?(t.outcome==='SL'?'GATE SCHÜTZTE':'GATE BLOCKTE GEWINNER'):(t.shadowEntry!=null?'HYPOTHETISCH AKTIV':'NOCH KEIN THEOR. ENTRY');
-   const result=Number.isFinite(Number(t.hypotheticalR))?`${Number(t.hypotheticalR)>=0?'+':''}${fmt(t.hypotheticalR,2)}R`:'—';
+ const isolatedShadow=(s.shadow||[]).filter(t=>t.sourceMode==='PAPER_INTERNAL');
+ const legacyShadow=(s.shadow||[]).filter(t=>t.sourceMode!=='PAPER_INTERNAL');
+ const shadow=isolatedShadow.slice(0,20).map(t=>{
+   const px=paperQuote(t.sym),valid=paperLevelsValid(t);
+   const status=!valid?'INVALID DATA':t.shadowEntry==null?'WAIT ZONE':t.resolved?t.outcome:'ACTIVE';
+   const tone=!valid?'red':t.shadowEntry==null?'amber':t.resolved?(t.outcome==='SL'?'green':'red'):'cyan';
+   const verdict=!valid?'NICHT GEWERTET':t.shadowEntry==null?'NICHT EINGESTIEGEN':t.resolved?(t.outcome==='SL'?'PAPER GATE SCHÜTZTE':'PAPER GATE BLOCKTE GEWINNER'):'HYPOTHETISCH AKTIV';
+   const result=t.shadowEntry!=null&&Number.isFinite(Number(t.hypotheticalR))?`${Number(t.hypotheticalR)>=0?'+':''}${fmt(t.hypotheticalR,2)}R`:'—';
    return `<div class="shadow-card ${tone}">
-     <div class="shadow-head"><div><b>${t.sym} ${t.side}</b><small>${t.blockReason||'PORTFOLIO RISK GATE'} · Gate ${t.gateScore||0}/100</small></div><strong class="${tone}">${status}</strong></div>
+     <div class="shadow-head"><div><b>${t.sym} ${t.side}</b><small>${t.blockReason||'PAPER RISK GATE'} · Gate ${t.gateScore||0}/100</small></div><strong class="${tone}">${status}</strong></div>
      <div class="shadow-grid">
-       <div><span>ENTRY ZONE</span><b>${pp(t.entryLow,t.sym)}–${pp(t.entryHigh,t.sym)}</b></div>
-       <div><span>THEOR. ENTRY</span><b>${t.shadowEntry!=null?pp(t.shadowEntry,t.sym):'wartet auf Zone'}</b></div>
-       <div><span>SL</span><b class="red">${pp(t.stop,t.sym)}</b></div>
-       <div><span>TP1 / TP2</span><b class="green">${pp(t.tp1,t.sym)} / ${pp(t.tp2,t.sym)}</b></div>
-       <div><span>LIVE</span><b>${Number.isFinite(px)?pp(px,t.sym):'—'}</b></div>
+       <div><span>ENTRY ZONE</span><b>${paperPrice(t.entryLow,t.sym)}–${paperPrice(t.entryHigh,t.sym)}</b></div>
+       <div><span>THEOR. ENTRY</span><b>${t.shadowEntry!=null?paperPrice(t.shadowEntry,t.sym):'wartet auf Zone'}</b></div>
+       <div><span>SL</span><b class="red">${paperPrice(t.stop,t.sym)}</b></div>
+       <div><span>TP1 / TP2</span><b class="green">${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div>
+       <div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div>
        <div><span>HYPOTHETISCH</span><b class="${tone}">${result}</b></div>
      </div>
-     <div class="shadow-verdict"><span>WARUM KEIN TRADE?</span><b>${t.reason||'RISK BLOCK'}</b><strong class="${tone}">${verdict}</strong></div>
+     <div class="shadow-verdict"><span>WARUM KEIN TRADE?</span><b>${t.paperRiskReason||t.reason||'PAPER RISK BLOCK'}</b><strong class="${tone}">${verdict}</strong></div>
    </div>`;
  }).join('');
 
- const state=!x?.levelsValid&&x?'DATA INVALID':x?.allowed?'ENTRY READY':x?.techOpen&&!x?.riskOpen?'SHADOW ONLY':x?.techOpen&&!x?.inZone?'WAIT ZONE':'NO ENTRY';
+ const state=!x?.levelsValid&&x?'DATA INVALID':x?.allowed?'ENTRY READY':x?.techOpen&&!x?.paperRiskOpen?'PAPER RISK BLOCK':x?.techOpen&&!x?.inZone?'WAIT ZONE':'NO ENTRY';
  const tone=!x?.levelsValid&&x?'red':x?.allowed?'green':x?.techOpen?'amber':'red';
- const ppCurrent=(n,sym)=>paperPrice(n,sym);
+ const currentWhy=x?(!x.levelsValid?'INVALID PLAN DATA':!x.techOpen?'TECHNICAL GATE BLOCKED':!x.paperRiskOpen?x.paperRiskReason:!x.inZone?'PREIS AUSSERHALB ENTRY-ZONE':'PAPER ENTRY FREI'):'KEIN AKTIVES SETUP';
 
- const currentWhy=x?(
-   !x.techOpen?'TECHNICAL GATE BLOCKED':
-   !x.riskOpen?'PORTFOLIO RISK GATE BLOCKED':
-   !x.inZone?'PREIS AUSSERHALB ENTRY-ZONE':
-   'ALLE GATES OFFEN'
- ):'KEIN AKTIVES SETUP';
-
- return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 1.2</div><div class="forecast-main">FORWARD TEST</div><div class="sub">Official + Shadow · keine rückwirkenden Fills</div></div><span class="tag cyan paper-tag">PAPER</span></div>
+ return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 2.0</div><div class="forecast-main">ISOLATED FORWARD TEST</div><div class="sub">Eigenes $10k-Konto · Pionex/GRID-Bots beeinflussen KEINE Paper-Entries.</div></div><span class="tag green paper-tag">ISOLATED</span></div>
+   <div class="paper-isolation-banner"><span>PAPER SSOT</span><b>TECH SIGNAL × PAPER RISK × ENTRY ZONE</b><small>Pionex Exposure · Bot Buffer · Portfolio Risk Gate = ignoriert</small></div>
    <div class="paper-kpis"><div><span>EQUITY</span><b>$${fmt(st.equity,2)}</b></div><div><span>TOTAL P&L</span><b class="${st.net>=0?'green':'red'}">${st.net>=0?'+':''}$${fmt(st.net,2)}</b></div><div><span>WIN RATE</span><b>${fmt(st.winRate,1)}%</b></div><div><span>EXPECTANCY</span><b>${fmt(st.avgR,2)}R</b></div></div>`)+
 
  card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${tone}">${state}</span></div>
-   <div class="paper-signal"><div><b>${x?.sym||'—'} ${x?.side||''}</b><strong class="${tone}">${x?.reason||'NO SETUP'}</strong></div><small>Gate ${x?.gateScore||0}/100 · ${x?.inZone?'ENTRY ZONE':'außerhalb Entry-Zone'}</small></div>
-   <div class="why-no-trade">
-     <span>WARUM KEIN TRADE?</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>
-     ${x?`<small>Entry ${ppCurrent(x.entryLow,x.sym)}–${ppCurrent(x.entryHigh,x.sym)} · SL ${ppCurrent(x.stop,x.sym)} · TP1 ${ppCurrent(x.tp1,x.sym)} · TP2 ${ppCurrent(x.tp2,x.sym)}</small>`:''}
-   </div>
-   <button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.riskOpen?'SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
+   <div class="paper-signal"><div><b>${x?.sym||'—'} ${x?.side||''}</b><strong class="${tone}">${x?.reason||'NO SETUP'}</strong></div><small>Technical ${x?.gateScore||0}/100 · Candidate ${x?.candidateScore||0}/100 · ${x?.inZone?'ENTRY ZONE':'außerhalb Entry-Zone'}</small></div>
+   <div class="why-no-trade"><span>PAPER DECISION</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>${x?`<small>Entry ${paperPrice(x.entryLow,x.sym)}–${paperPrice(x.entryHigh,x.sym)} · SL ${paperPrice(x.stop,x.sym)} · TP1 ${paperPrice(x.tp1,x.sym)} · TP2 ${paperPrice(x.tp2,x.sym)}</small>`:''}</div>
+   <button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.paperRiskOpen?'PAPER SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
+
+ card(`<div class="section-title">PAPER RISK ENGINE <span class="tag green">INDEPENDENT</span></div>
+   <div class="paper-stats"><div><span>OPEN</span><b>${s.open.length}/${pg.maxOpen}</b></div><div><span>OPEN RISK</span><b>${fmt(pg.openRiskPct,2)}%</b></div><div><span>RISK / TRADE</span><b>${fmt(s.riskPerTradePct,1)}%</b></div><div><span>MAX PORTFOLIO RISK</span><b>${fmt(pg.maxRiskPct,1)}%</b></div></div>
+   <div class="row"><span>Pionex/GRID Risk Gate</span><b class="green">IGNORED</b></div>`)+
 
  card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${s.open.length}</span></div>${open||'<div class="muted">Keine offenen Paper-Positionen.</div>'}`)+
 
- card(`<div class="section-title">PERFORMANCE</div><div class="paper-stats"><div><span>TRADES</span><b>${st.count}</b></div><div><span>PROFIT FACTOR</span><b>${st.pf>=99?'∞':fmt(st.pf,2)}</b></div><div><span>RISK / TRADE</span><b>${fmt(s.riskPerTradePct,1)}%</b></div><div><span>AUTO MODE</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div></div><button class="paper-toggle" onclick="paperToggleAuto()">AUTO MODE ${s.autoMode?'AUS':'EIN'}</button>`)+
+ card(`<div class="section-title">PERFORMANCE</div><div class="paper-stats"><div><span>TRADES</span><b>${st.count}</b></div><div><span>PROFIT FACTOR</span><b>${st.pf>=99?'∞':fmt(st.pf,2)}</b></div><div><span>AUTO MODE</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div><div><span>MODE</span><b class="green">ISOLATED</b></div></div><button class="paper-toggle" onclick="paperToggleAuto()">AUTO MODE ${s.autoMode?'AUS':'EIN'}</button>`)+
 
- card(`<div class="section-title">RISK GATE VALIDATION <span class="tag cyan">SHADOW</span></div>
+ card(`<div class="section-title">PAPER GATE VALIDATION <span class="tag cyan">SHADOW</span></div>
    <div class="shadow-kpis">
-     <div><span>BLOCKED</span><b>${xs.total}</b></div>
+     <div><span>INTERNAL BLOCKED</span><b>${xs.total}</b></div>
      <div><span>WAIT ZONE</span><b class="amber">${xs.waiting}</b></div>
      <div><span>AVOIDED LOSSES</span><b class="green">${xs.avoidedLosses}</b></div>
      <div><span>MISSED WINNERS</span><b class="red">${xs.missedWinners}</b></div>
-     <div><span>GATE PRECISION</span><b>${xs.resolved?fmt(xs.gatePrecision,1)+'%':'—'}</b></div>
+     <div><span>GATE PRECISION</span><b>${xs.resolved&&xs.gatePrecision!=null?fmt(xs.gatePrecision,1)+'%':'—'}</b></div>
      <div><span>SHADOW EXP.</span><b>${xs.resolved?fmt(xs.avgR,2)+'R':'—'}</b></div>
-     <div><span>DATA INVALID</span><b class="${xs.invalid?'red':'green'}">${xs.invalid}</b></div>
+     <div><span>LEGACY EXTERNAL</span><b class="muted">${xs.legacy}</b></div>
    </div>
-   <p class="footer-note">Nur Shadow-Signale mit gültigem Entry, SL, TP1/TP2 und Live-Kurs dürfen die Gate-Statistik beeinflussen. Entry-Zone muss vor einer hypothetischen Ausführung real erreicht werden.</p>`)+
+   <p class="footer-note">Nur PAPER-eigene Risk-Blocks fließen in diese Statistik. Alte Pionex/Portfolio-Shadow-Signale bleiben archiviert, werden aber nicht mehr gewertet.</p>`)+
 
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-shadow" open><summary>SHADOW SIGNALS <strong>${s.shadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine blockierten Signale.</div>'}</div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.78 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
 
- card(`<div class="section-title">SIMULATION</div><div class="row"><span>Startkapital</span><b>$${fmt(s.startBalance,0)}</b></div><div class="row"><span>Gebühr</span><b>${fmt(s.feePct*100,3)}%</b></div><div class="row"><span>Slippage</span><b>${fmt(s.slippagePct*100,3)}%</b></div><div class="row"><span>Shadow-Regel</span><b>ENTRY-ZONE FIRST</b></div><div class="row"><span>Low-Price Precision</span><b>ASSET-AWARE</b></div><button class="paper-reset" onclick="paperReset()">PAPER-KONTO ZURÜCKSETZEN</button>`);
+ card(`<div class="section-title">SIMULATION</div><div class="row"><span>Startkapital</span><b>$${fmt(s.startBalance,0)}</b></div><div class="row"><span>Gebühr</span><b>${fmt(s.feePct*100,3)}%</b></div><div class="row"><span>Slippage</span><b>${fmt(s.slippagePct*100,3)}%</b></div><div class="row"><span>Paper-Modus</span><b>100% ISOLATED</b></div><div class="row"><span>Shadow State</span><b>WAIT → ACTIVE → RESULT</b></div><button class="paper-reset" onclick="paperReset()">PAPER-KONTO ZURÜCKSETZEN</button>`);
 }
 setInterval(()=>{try{paperTick();paperEngineScan(false)}catch(e){}},5000);
 
@@ -6372,7 +6429,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.77 — FIVE TAB UX */
+/* v5.78 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW=(()=>{try{const v=sessionStorage.getItem('meridian_exec_subview');return ['trade','grid','paper'].includes(v)?v:'trade'}catch(e){return 'trade'}})();
 
@@ -6458,7 +6515,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.77: make the navigation itself immediate.
+ // v5.78: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
