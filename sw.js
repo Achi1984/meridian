@@ -1,11 +1,11 @@
-// MERIDIAN v5.90 cache reset
+// MERIDIAN v5.91 cache reset
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil((async()=>{
 for(const k of await caches.keys())await caches.delete(k);
 await self.registration.unregister();await self.clients.claim();
 })()));
 
-/* MERIDIAN v5.90 — Dual Liquidation Risk Transparency
+/* MERIDIAN v5.91 — Dual Liquidation Risk Transparency
    Display/risk-observability only. Frozen entry/SL/TP rules remain unchanged. */
 window.MERIDIAN_DUAL_LIQ_RISK = {
   updatedAt: "2026-08-26T19:11:00+02:00",

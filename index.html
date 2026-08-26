@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#05080d">
 <link rel="manifest" href="manifest.webmanifest?v=5.80">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.90.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.91.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.33,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.33,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.90 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.91 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.90 compact bot action cards */
+/* v5.91 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.90 DEPOT cleanup — no navigation changes */
+/* v5.91 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2850,7 +2850,7 @@ main>section{
 
 
 <style id="v572-decision-cleanup-css">
-/* v5.90 Decision Cleanup — navigation/feed architecture untouched */
+/* v5.91 Decision Cleanup — navigation/feed architecture untouched */
 .trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
 .trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -3119,7 +3119,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.90 · LIVE</span>
+        <span class="version" id="versionBadge">v5.91 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3151,7 +3151,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.90.js?v=20260824-2315"></script>
+<script src="app-v5.91.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -3222,8 +3222,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.90';
-let APP_RELEASE='5.90 · CENTER RISK CLEANUP';
+let APP_CODE_VERSION='5.91';
+let APP_RELEASE='5.91 · CENTER HOTFIX';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3693,7 +3693,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.90 — UNIFIED RISK STATE MATRIX
+/* v5.91 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4308,7 +4308,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.90 — ONE ACTION SSOT */
+/* v5.91 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{}, opt=recoveryOptimizerState();
  const b=opt?.bot, best=opt?.best8;
@@ -4483,7 +4483,7 @@ function centerRiskTransparency(){
 }
 
 
-/* MERIDIAN v5.90 — LIQUIDATION FIRST
+/* MERIDIAN v5.91 — LIQUIDATION FIRST
    Facts first: current liquidation price -> buffer -> gate.
    No exposure-% recommendation is emitted as a primary action. */
 function currentBtcRiskSnapshot(){
@@ -4550,47 +4550,44 @@ function primaryRiskActionCard(){
     <button class="risk-grid-btn" onclick="setTradeSub('grid');setTab('trade')">IM GRID PRÜFEN →</button>`);
 }
 
-function centerRiskSummaryCard(){
-  const r=currentBtcRiskSnapshot();
-  const b=r.worst;
-  if(!b){
-    return card(`<div class="eyebrow">JETZT · DUAL GATE <span class="tag green">2/2 OPEN</span></div>
-      <div class="forecast-main green">SETUP READY · RISK OPEN</div>
-      <div class="grid2">
-        ${metric('TECH','OPEN<div class="data-state verified">78/100</div>','green')}
-        ${metric('RISK','OPEN<div class="data-state verified">BTC LIQ GATE</div>','green')}
-      </div>
-      <div class="center-risk-primary ok">
-        <div><span>ONE ACTION</span><b>KEINE RISIKO-MASSNAHME NÖTIG</b></div>
-        <strong>GATE ≥${fmt(r.gate,0)}%</strong>
-      </div>`);
-  }
-  const missing=Math.max(0,r.gate-b.pionexBuffer);
-  return card(`<div class="eyebrow">JETZT · DUAL GATE <span class="tag amber">1/2 OPEN</span></div>
-    <div class="forecast-main amber">SETUP READY · RISK BLOCK</div>
-    <div class="grid2">
-      ${metric('TECH','OPEN<div class="data-state verified">78/100</div>','green')}
-      ${metric('RISK',`BLOCKED<div class="data-state snapshot">${fmt(b.pionexBuffer,2)}% ${b.id}</div>`,'red')}
-    </div>
-    <div class="center-risk-primary bad">
-      <div>
-        <span>ONE ACTION · NO NEW ENTRY</span>
-        <b>${b.id} · ${b.side} LIQ ${fmt(b.liq,1)}</b>
-        <small>PUFFER ${fmt(b.pionexBuffer,2)}% · FEHLT ${fmt(missing,2)} %-PKT. BIS ZIEL ≥${fmt(r.gate,2)}%</small>
-      </div>
-      <strong>RISK BLOCK</strong>
-    </div>
-    <button class="risk-grid-btn" onclick="setTradeSub('grid');setTab('trade')">IM GRID PRÜFEN →</button>`);
-}
+
 function commandCenter(){
- const total=portfolioTotal();
- const day=portfolio24h();
- const eur=total*0.859;
- return card(`<div class="eyebrow">COMMAND CENTER ${liveBadge('LIVE')}</div>
-   <div class="command-total-row">
-     <div><div class="command-total">$${fmt(total,0)}</div><div class="sub">≈ €${fmt(eur,0)}</div></div>
-     <div class="command-day ${day.pct>=0?'green':'red'}">${day.pct>=0?'+':''}${fmt(day.pct,2)}%<small>${day.usd>=0?'+':''}$${fmt(day.usd,0)} · 24H</small></div>
-   </div>`)+centerRiskSummaryCard()+btcRiskStatusCard();
+ const consistency=meridianConsistencyState(), one=oneActionState();
+ const p=DATA.portfolio||{}, m=DATA.btcRegime||{}, fh=feedHealth(), risk=commandRisk();
+ const perf=performanceSince(Date.now()-86400000,p.total);
+ const hasHist=PORTFOLIO_SERIES.length>2;
+ const dayPct=hasHist?perf.pct:(p.performance24hPct||0);
+ const dayAbs=hasHist?perf.abs:(p.performance24hUsd||0);
+ const x=executionReadinessState(), cap=x.cap||{}, rank=watchlistPriorityRank(), best=rank[0];
+ const bots=activePionexBots(), botCapital=bots.reduce((s,b)=>s+Number(b.investment||0),0);
+ const shortBuf=Number(cap.shortBuf);
+ const isCritical=Number.isFinite(shortBuf)&&shortBuf<8;
+ const gateTone=x.open?'green':x.technicalOpen?'amber':'red';
+ const gateText=consistency.headline;
+ const oppRows=rank.slice(0,3).map((q,i)=>`<div class="focus-row"><span>#${i+1} <b>${q.sym}</b></span><small>Setup ${q.a.setup} · Entry ${q.a.entry}</small><strong class="${q.w?.cls||q.a.cls||'amber'}">${q.w?.label||q.a.label||'WATCH'}</strong></div>${q.w?.label==='WAIT FOR TRIGGER'?`<div class="focus-trigger"><b>TRIGGER</b> ${entryTriggerCondition(q)}</div>`:''}`).join('');
+ const riskAction=isCritical?'BTC-S30 auf ≥8% Puffer bringen.':Number.isFinite(shortBuf)&&shortBuf<12?'BTC-S30 Richtung 12% SAFE stabilisieren.':'Risk Gate neu prüfen.';
+ const recoveryRec=centerRecoveryRecommendation();
+ const bestStatus=best?(best.w?.label||best.a?.label||'WATCH'):'—';
+ const bestTone=best?(best.w?.cls||best.a?.cls||'amber'):'amber';
+ const healthWarn=fh.status!=='LIVE'||bots.length===0;
+ const healthLabel=healthWarn?'WARN':'LIVE';
+ return `<div class="cc-hero compact-center-hero">
+   <div class="cc-kicker">COMMAND CENTER ${liveBadge(fh.status==='LIVE'?'LIVE':fh.status)}</div>
+   <div class="cc-value-row"><div><div class="cc-total">$${fmt(p.total)}</div><div class="cc-eur">≈ €${fmt(p.eurApprox)}</div></div><div class="cc-day ${dayPct>=0?'green':'red'}"><b>${dayPct>=0?'+':''}${fmt(dayPct,2)}%</b><small>${dayAbs>=0?'+':''}$${fmt(dayAbs,0)} · 24H</small></div></div>
+ </div>`+
+ `<section class="card compact-now">
+   <div class="section-head"><div><div class="eyebrow">JETZT · DUAL GATE ${liveBadge('SSOT')}</div><div class="forecast-main ${gateTone}">${gateText}</div></div><span class="tag ${gateTone}">${x.open?'2/2':x.technicalOpen?'1/2':'0/2'} OPEN</span></div>
+   <div class="compact-gates"><div><span>TECH</span><b class="${x.technicalOpen?'green':'red'}">${x.technicalOpen?'OPEN':'BLOCKED'}</b><small>${x.technicalScore}/100</small></div><div><span>RISK</span><b class="${x.riskOpen?'green':'red'}">${x.riskOpen?'OPEN':'BLOCKED'}</b><small>${Number.isFinite(shortBuf)?fmt(shortBuf,2)+'% BTC-S30':'—'}</small></div></div>
+   <div class="center-one-action ${one.tone}">
+     <div class="center-one-kicker"><span>ONE ACTION</span><strong>${one.execution}</strong></div>
+     <b>${one.headline}</b>
+     <div class="center-one-route"><span>${one.action}</span><i>→</i><strong>${one.targetText}</strong></div>
+     <small>${one.route}</small>
+     <p>${one.note}</p>
+     ${!x.riskOpen?`<button onclick="openExecutionGrid()">IM GRID PRÜFEN →</button>`:''}
+   </div>
+ </section>`+
+ btcRiskStatusCard()+primaryRiskActionCard()+btcRiskStatusCard();
 }
 
 
@@ -5747,7 +5744,7 @@ function paperTradeView(){
 
  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
    <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.90 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
+   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.91 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
 
  card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
    <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
@@ -5770,7 +5767,7 @@ function paperTradeView(){
 
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
  `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.90 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.91 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
 
  card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
    const a=paperAnalytics(s);
@@ -5780,7 +5777,7 @@ function paperTradeView(){
      a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
  })()}</div>`)+
 
- card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.90</span></div>${(()=>{
+ card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.91</span></div>${(()=>{
    const trades=(s.trades||[]),n=trades.length;
    const clean=trades.filter(t=>Number(t.r)>=1).length;
    const direct=trades.filter(t=>t.exitReason==='SL'&&Number(t.mfeR||0)<0.25).length;
@@ -7172,7 +7169,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.90 — FIVE TAB UX */
+/* v5.91 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW=(()=>{try{const v=sessionStorage.getItem('meridian_exec_subview');return ['trade','grid','paper'].includes(v)?v:'trade'}catch(e){return 'trade'}})();
 
@@ -7258,7 +7255,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.90: make the navigation itself immediate.
+ // v5.91: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
