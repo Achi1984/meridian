@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#05080d">
 <link rel="manifest" href="manifest.webmanifest?v=5.80">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.98.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.99.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.33,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.33,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.98 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.99 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.98 compact bot action cards */
+/* v5.99 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.98 DEPOT cleanup — no navigation changes */
+/* v5.99 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2850,7 +2850,7 @@ main>section{
 
 
 <style id="v572-decision-cleanup-css">
-/* v5.98 Decision Cleanup — navigation/feed architecture untouched */
+/* v5.99 Decision Cleanup — navigation/feed architecture untouched */
 .trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
 .trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -3114,7 +3114,7 @@ main>section{
 
 
 <style id="v593-market-price-layout">
-/* v5.98 — prevent live prices from splitting over two lines on iPhone */
+/* v5.99 — prevent live prices from splitting over two lines on iPhone */
 .live-market-row{
   gap:14px;
 }
@@ -3199,7 +3199,7 @@ main>section{
 
 
 <style id="v598-center-cleanup">
-/* v5.98 CENTER CLEANUP */
+/* v5.99 CENTER CLEANUP */
 .v598-center-risk{
   margin-top:18px;border:1px solid rgba(37,166,232,.65);border-radius:24px;
   padding:18px;background:rgba(9,32,45,.52)
@@ -3231,7 +3231,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.98 · LIVE</span>
+        <span class="version" id="versionBadge">v5.99 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3263,7 +3263,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.98.js?v=20260824-2315"></script>
+<script src="app-v5.99.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -3334,8 +3334,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.98';
-let APP_RELEASE='5.98 · GRID LIQUIDATION FIRST';
+let APP_CODE_VERSION='5.99';
+let APP_RELEASE='5.99 · GRID LIQUIDATION FIRST';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3805,7 +3805,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.98 — UNIFIED RISK STATE MATRIX
+/* v5.99 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4420,7 +4420,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.98 — ONE ACTION SSOT */
+/* v5.99 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{};
  const shortBuf=Number(cap.shortBuf);
@@ -4584,7 +4584,7 @@ function centerRiskTransparency(){
 }
 
 
-/* MERIDIAN v5.98 — LIQUIDATION FIRST
+/* MERIDIAN v5.99 — LIQUIDATION FIRST
    Facts first: current liquidation price -> buffer -> gate.
    No exposure-% recommendation is emitted as a primary action. */
 function currentBtcRiskSnapshot(){
@@ -5831,7 +5831,7 @@ function paperTradeView(){
 
  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
    <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.98 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
+   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.99 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
 
  card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
    <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
@@ -5854,7 +5854,7 @@ function paperTradeView(){
 
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
  `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.98 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.99 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
 
  card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
    const a=paperAnalytics(s);
@@ -5864,7 +5864,7 @@ function paperTradeView(){
      a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
  })()}</div>`)+
 
- card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.98</span></div>${(()=>{
+ card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.99</span></div>${(()=>{
    const trades=(s.trades||[]),n=trades.length;
    const clean=trades.filter(t=>Number(t.r)>=1).length;
    const direct=trades.filter(t=>t.exitReason==='SL'&&Number(t.mfeR||0)<0.25).length;
@@ -7256,7 +7256,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.98 — FIVE TAB UX */
+/* v5.99 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW=(()=>{try{const v=sessionStorage.getItem('meridian_exec_subview');return ['trade','grid','paper'].includes(v)?v:'trade'}catch(e){return 'trade'}})();
 
@@ -7342,7 +7342,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.98: make the navigation itself immediate.
+ // v5.99: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
@@ -8728,130 +8728,60 @@ document.addEventListener('pageshow',()=>{
 
 
 
-<script id="v598-center-creator">
+
+<script id="v599-center-single-risk">
 (function(){
-  const norm=s=>(s||'').replace(/\s+/g,' ').trim();
+ const norm=s=>(s||'').replace(/\s+/g,' ').trim();
 
-  function smallestContaining(label){
-    const els=[...document.querySelectorAll('section,article,div')].filter(e=>norm(e.textContent).includes(label));
-    els.sort((a,b)=>a.textContent.length-b.textContent.length);
-    return els[0]||null;
-  }
-  function extract(txt, re, fallback='—'){
-    const m=txt.match(re); return m ? m[1] : fallback;
-  }
-  function cleanup(){
-    if(!smallestContaining('COMMAND CENTER')) return;
+ function isCenter(){
+   return !![...document.querySelectorAll('*')].find(e=>norm(e.textContent)==='COMMAND CENTER');
+ }
 
-    const oldRisk=smallestContaining('BTC LIQUIDATION RISK');
-    if(!oldRisk) return;
+ function run(){
+   if(!isCenter()) return;
 
-    const txt=norm(oldRisk.textContent);
-    const sLiq=extract(txt,/BTC[-–]S30[\s\S]*?LIQ\s+\$?\s*([0-9.]+,[0-9]+)/i,'83.746,1');
-    const sBuf=extract(txt,/BTC[-–]S30[\s\S]*?PIONEX PUFFER\s+([0-9]+,[0-9]{2})%/i,'7,33');
-    const lLiq=extract(txt,/BTC[-–]L20[\s\S]*?LIQ\s+\$?\s*([0-9.]+,[0-9]+)/i,'70.309,2');
-    const lBuf=extract(txt,/BTC[-–]L20[\s\S]*?PIONEX PUFFER\s+([0-9]+,[0-9]{2})%/i,'9,89');
+   const nodes=[...document.querySelectorAll('div,section,article')];
 
-    const sf=parseFloat(sBuf.replace(',','.'));
-    const missing=isFinite(sf) ? Math.max(0,8-sf).toFixed(2).replace('.',',') : '0,67';
+   // Find all self-contained risk modules (smallest wrappers containing both positions).
+   const candidates=nodes.filter(el=>{
+     const t=norm(el.textContent);
+     if(!(t.includes('BTC-S30') && t.includes('BTC-L20'))) return false;
+     const childSame=[...el.children].some(c=>{
+       const ct=norm(c.textContent);
+       return ct.includes('BTC-S30') && ct.includes('BTC-L20');
+     });
+     return !childSame;
+   });
 
-    if(!document.getElementById('v598-center-risk')){
-      const box=document.createElement('section');
-      box.id='v598-center-risk';
-      box.className='v598-center-risk';
-      box.innerHTML=`
-        <div class="v598-head"><b>BTC LIQUIDATION RISK · DUAL</b><span class="v598-blocked">RISK BLOCKED</span></div>
-        <div class="v598-bots">
-          <div class="v598-bot bad">
-            <div class="v598-bot-top"><span class="v598-name">BTC-S30</span><span class="v598-state bad">CRITICAL</span></div>
-            <div class="v598-row"><span>SHORT LIQ</span><strong>$${sLiq}</strong></div>
-            <div class="v598-row"><span>PUFFER</span><strong class="bad">${sBuf}%</strong></div>
-            <div class="v598-row"><span>BIS SAFE ≥8%</span><strong class="bad">−${missing} %-Pkt.</strong></div>
-          </div>
-          <div class="v598-bot ok">
-            <div class="v598-bot-top"><span class="v598-name">BTC-L20</span><span class="v598-state ok">SAFE</span></div>
-            <div class="v598-row"><span>LONG LIQ</span><strong>$${lLiq}</strong></div>
-            <div class="v598-row"><span>PUFFER</span><strong class="ok">${lBuf}%</strong></div>
-            <div class="v598-row"><span>ZIEL</span><strong class="ok">≥8,00%</strong></div>
-          </div>
-        </div>
-        <div class="v598-foot">Gate = kritischster tatsächlicher Liquidationspuffer. Nach einer realen Pionex-Änderung ist der neue Liquidationspreis maßgeblich.</div>
-        <a href="#" class="v598-gridbtn">IM GRID PRÜFEN →</a>`;
-      oldRisk.parentNode.insertBefore(box,oldRisk);
-      box.querySelector('.v598-gridbtn').addEventListener('click',e=>{
-        e.preventDefault();
-        const g=[...document.querySelectorAll('button,a,[role=button]')].find(x=>norm(x.textContent)==='GRID');
-        if(g) g.click();
-      });
-    }
+   if(candidates.length < 2) return;
 
-    
+   // Prefer the modern compact module (has "BIS SAFE"), otherwise keep first in DOM.
+   let keep=candidates.find(el=>norm(el.textContent).includes('BIS SAFE')) || candidates[0];
 
-    
-  }
+   candidates.forEach(el=>{
+     if(el!==keep) el.style.setProperty('display','none','important');
+   });
 
-  let queued=false;
-  const run=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;cleanup()})};
-  new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true});
-  addEventListener('load',()=>setTimeout(cleanup,80));
-  document.addEventListener('click',()=>setTimeout(cleanup,80));
-})();
-</script>
-<script id="v598-center-dedupe">
-(function(){
-  const norm=s=>(s||'').replace(/\s+/g,' ').trim();
+   // Hide standalone old aggregate gate if it is outside the kept module.
+   nodes.forEach(el=>{
+     if(el===keep || keep.contains(el) || el.contains(keep)) return;
+     const t=norm(el.textContent);
+     if(t.includes('GESAMT-RISK-GATE') && t.includes('BLOCKED') && t.includes('BTC-S30')){
+       const childSame=[...el.children].some(c=>{
+         const ct=norm(c.textContent);
+         return ct.includes('GESAMT-RISK-GATE') && ct.includes('BTC-S30');
+       });
+       if(!childSame) el.style.setProperty('display','none','important');
+     }
+   });
+ }
 
-  function centerActive(){
-    return [...document.querySelectorAll('*')].some(e =>
-      norm(e.textContent)==='CENTER' &&
-      (e.classList.contains('active') || e.getAttribute('aria-current') || e.closest('.active'))
-    ) || !![...document.querySelectorAll('*')].find(e=>norm(e.textContent).includes('COMMAND CENTER'));
-  }
-
-  function dedupe(){
-    if(!centerActive()) return;
-    const compact=document.getElementById('v598-center-risk');
-    if(!compact) return;
-
-    // Walk all candidate cards AFTER the compact card and hide only legacy
-    // BTC liquidation blocks. This avoids hiding compact ancestors.
-    const all=[...document.querySelectorAll('section,article,div')];
-    all.forEach(el=>{
-      if(el===compact || compact.contains(el) || el.contains(compact)) return;
-      const t=norm(el.textContent);
-      const isLegacy =
-        t.includes('BTC-S30') &&
-        t.includes('BTC-L20') &&
-        (t.includes('GESAMT-RISK-GATE') || t.includes('PIONEX PUFFER')) &&
-        (t.includes('LIQ') || t.includes('LIQUIDATION'));
-      if(!isLegacy) return;
-
-      // Hide the smallest matching legacy container only.
-      const matchingChild=[...el.children].some(c=>{
-        const ct=norm(c.textContent);
-        return ct.includes('BTC-S30') && ct.includes('BTC-L20') &&
-               (ct.includes('GESAMT-RISK-GATE') || ct.includes('PIONEX PUFFER'));
-      });
-      if(!matchingChild) el.style.setProperty('display','none','important');
-    });
-
-    // Also remove any standalone legacy Gesamt-Risk-Gate card.
-    all.forEach(el=>{
-      if(el===compact || compact.contains(el) || el.contains(compact)) return;
-      const t=norm(el.textContent);
-      if(t.includes('GESAMT-RISK-GATE') && t.includes('BLOCKED') && t.includes('BTC-S30')){
-        const child=[...el.children].some(c=>norm(c.textContent).includes('GESAMT-RISK-GATE'));
-        if(!child) el.style.setProperty('display','none','important');
-      }
-    });
-  }
-
-  let timer;
-  const run=()=>{clearTimeout(timer);timer=setTimeout(dedupe,30)};
-  new MutationObserver(run).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
-  addEventListener('load',()=>setTimeout(dedupe,100));
-  document.addEventListener('click',()=>setTimeout(dedupe,100));
-  setInterval(dedupe,1000);
+ let q;
+ const schedule=()=>{clearTimeout(q);q=setTimeout(run,40)};
+ new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true});
+ addEventListener('load',()=>setTimeout(run,120));
+ document.addEventListener('click',()=>setTimeout(run,120));
+ setInterval(run,750);
 })();
 </script>
 
