@@ -1,4 +1,4 @@
-// MERIDIAN v5.78 cache reset
+// MERIDIAN v5.79 cache reset
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil((async()=>{
 for(const k of await caches.keys())await caches.delete(k);
