@@ -3021,6 +3021,17 @@ main>section{
 .paper-time-step span{display:block;color:#8093a8;font-size:5.5px}.paper-time-step b{display:block;font-size:5.5px;margin-top:3px}
 .candidate-history-row.observatory{display:block}.candidate-title{display:flex;justify-content:space-between;gap:8px}.candidate-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;border-top:1px solid rgba(34,72,96,.4);padding-top:7px}
 .candidate-kpis span{font-size:5.5px;color:#8193a8}.candidate-kpis b{display:block;color:#eef5fb;margin-top:2px;font-size:6.5px}
+
+/* v5.82 PAPER EQUITY / COMPACT FORWARD TEST */
+.paper-accounting{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin-top:12px;border:1px solid #173e55;border-radius:14px;overflow:hidden;background:rgba(4,18,28,.38)}
+.paper-accounting>div{padding:10px 8px;border-right:1px solid rgba(35,76,101,.55);min-width:0}.paper-accounting>div:last-child{border-right:0}.paper-accounting span{display:block;color:#8193a8;font-size:5.4px;letter-spacing:.7px}.paper-accounting b{display:block;font-size:9px;margin-top:5px;white-space:nowrap}.paper-accounting small{display:block;color:#708297;font-size:5.3px;margin-top:3px}
+.paper-equity-card{padding-bottom:10px}.paper-chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.paper-chart-head small{color:#8193a8;font-size:6px}.paper-range{display:flex;gap:4px}.paper-range button{border:1px solid #1a4b68;background:transparent;color:#8193a8;border-radius:7px;padding:5px 7px;font:700 6px ui-monospace,monospace}.paper-range button.active{color:#32b8ff;border-color:#32b8ff;background:rgba(26,139,205,.12)}
+.paper-equity-svg{width:100%;height:148px;margin-top:8px;overflow:visible}.paper-eq-base{stroke:#527083;stroke-width:.7;stroke-dasharray:3 3;opacity:.65}.paper-eq-area{fill:url(#paperEqFill)}.paper-eq-line{fill:none;stroke:#24a9ff;stroke-width:1.7;vector-effect:non-scaling-stroke}.paper-eq-dot{fill:#24a9ff;stroke:#aee7ff;stroke-width:.8}.paper-chart-foot{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;color:#6f8297;font-size:5.5px}.paper-chart-foot span:last-child{text-align:right}.paper-chart-foot b{font-size:7px}
+.paper-current-head{display:flex;justify-content:space-between;gap:12px}.paper-current-head>div:first-child{min-width:0}.paper-current-title{font-size:11px;margin-right:6px}.paper-current-head small{display:block;color:#8193a8;font-size:6px;margin-top:4px}.paper-current-pnl{border:1px solid #173e55;border-radius:10px;padding:8px 10px;text-align:right;min-width:70px}.paper-current-pnl span,.paper-current-pnl small{display:block;color:#8193a8;font-size:5.5px}.paper-current-pnl b{font-size:9px;display:block;margin:3px 0}
+.paper-level-grid{display:grid;grid-template-columns:repeat(5,1fr);margin-top:12px;border-top:1px solid rgba(35,76,101,.45);padding-top:9px}.paper-level-grid>div{padding:0 8px;border-right:1px solid rgba(35,76,101,.45)}.paper-level-grid>div:last-child{border-right:0}.paper-level-grid span{display:block;color:#8193a8;font-size:5.5px}.paper-level-grid b{font-size:8px}
+.paper-level-track{position:relative;height:5px;border-radius:999px;background:#294052;margin:12px 12px 4px;overflow:visible}.paper-level-track .risk{position:absolute;left:0;width:35%;top:0;bottom:0;background:#ff5265;border-radius:999px 0 0 999px}.paper-level-track .reward{position:absolute;left:35%;right:0;top:0;bottom:0;background:#35cf83;border-radius:0 999px 999px 0}.paper-level-track em{position:absolute;top:-4px;width:2px;height:13px;background:#fff;box-shadow:0 0 5px #fff}.paper-track-labels{display:flex;justify-content:space-between;padding:0 8px;font-size:5.5px}
+.paper-scan-row.compact-row{grid-template-columns:1.25fr 1fr;align-items:center;padding:9px 10px}.paper-scan-row.compact-row>div:last-child{text-align:right}.paper-scan-row.compact-row small{font-size:5.5px}
+@media(max-width:600px){.paper-accounting{grid-template-columns:repeat(3,1fr)}.paper-accounting>div:nth-child(3){border-right:0}.paper-accounting>div:nth-child(-n+3){border-bottom:1px solid rgba(35,76,101,.55)}.paper-level-grid{grid-template-columns:repeat(5,1fr)}.paper-equity-svg{height:130px}}
 </style>
 
 </head>
@@ -3030,7 +3041,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.81 · LIVE</span>
+        <span class="version" id="versionBadge">v5.82 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3133,8 +3144,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.81';
-let APP_RELEASE='5.81 · OBSERVATORY';
+let APP_CODE_VERSION='5.82';
+let APP_RELEASE='5.82 · PAPER EQUITY';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -4744,7 +4755,7 @@ function paperDefaultState(){
    startBalance:10000,balance:10000,
    feePct:0.0005,slippagePct:0.0003,riskPerTradePct:1,
    maxOpenPositions:3,maxPortfolioRiskPct:3,minCandidateScore:60,
-   autoMode:true,open:[],trades:[],shadow:[],signals:[],watch:[],candidateHistory:{},ruleSet:'5.80-FROZEN',
+   autoMode:true,open:[],trades:[],shadow:[],signals:[],watch:[],candidateHistory:{},equityHistory:[],ruleSet:'5.80-FROZEN',
    seen:{official:{},shadow:{}},createdAt:new Date().toISOString()
  };
 }
@@ -4805,6 +4816,7 @@ function paperMigrateState(s){
  });
  s.open=(s.open||[]).filter(t=>paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side}));
  s.trades=(s.trades||[]).map(t=>({...t,dataQuality:paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side})?'VALID':'INVALID'}));
+ s.equityHistory=Array.isArray(s.equityHistory)?s.equityHistory:[];
  return s;
 }
 
@@ -5176,100 +5188,76 @@ function paperAnalytics(s){
  const assetRows=Object.entries(byAsset).sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>[k,calc(v)]);
  return {assetRows,long:calc(bySide.LONG||[]),short:calc(bySide.SHORT||[]),g70:calc(byGate['70–79']),g80:calc(byGate['80+'])};
 }
+function paperRecordEquity(s){
+ const equity=paperStatsRawEquity(s), now=Date.now();
+ if(!Number.isFinite(equity))return;
+ s.equityHistory=Array.isArray(s.equityHistory)?s.equityHistory:[];
+ const last=s.equityHistory[s.equityHistory.length-1];
+ // one persisted sample per minute; trade/price changes remain visible without bloating localStorage
+ if(!last || now-Number(last.t||0)>=60000){
+   s.equityHistory.push({t:now,v:equity});
+   if(s.equityHistory.length>5000)s.equityHistory=s.equityHistory.slice(-5000);
+   savePaperState(s);
+ }
+}
+function paperSetChartRange(r){try{localStorage.setItem('meridian_paper_chart_range',r)}catch(e){} renderOne('daytrade')}
+function paperChartRange(){try{return localStorage.getItem('meridian_paper_chart_range')||'1D'}catch(e){return '1D'}}
+function paperEquityChart(s){
+ const range=paperChartRange(), now=Date.now();
+ const ms={"1D":86400000,"7D":604800000,"30D":2592000000,"ALL":Infinity}[range]||86400000;
+ let pts=(s.equityHistory||[]).filter(x=>Number.isFinite(Number(x?.v))&&Number.isFinite(Number(x?.t))&&(ms===Infinity||now-Number(x.t)<=ms));
+ const live=paperStatsRawEquity(s);
+ if(!pts.length)pts=[{t:Number(new Date(s.createdAt||now)),v:Number(s.startBalance||10000)}];
+ if(!pts.some(x=>Math.abs(Number(x.t)-now)<30000))pts.push({t:now,v:live});
+ if(pts.length===1)pts.unshift({t:pts[0].t-60000,v:Number(s.startBalance||pts[0].v)});
+ const W=320,H=118,L=8,R=8,T=10,B=20, vals=pts.map(x=>Number(x.v));
+ let lo=Math.min(...vals,Number(s.startBalance||10000)),hi=Math.max(...vals,Number(s.startBalance||10000));
+ const pad=Math.max((hi-lo)*.22,2); lo-=pad;hi+=pad;
+ const t0=pts[0].t,t1=pts[pts.length-1].t||t0+1;
+ const xy=pts.map(x=>({x:L+(Number(x.t)-t0)/Math.max(1,t1-t0)*(W-L-R),y:T+(hi-Number(x.v))/Math.max(.0001,hi-lo)*(H-T-B),v:Number(x.v),t:Number(x.t)}));
+ const line=xy.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+ const area=line+` L ${xy.at(-1).x.toFixed(1)} ${H-B} L ${xy[0].x.toFixed(1)} ${H-B} Z`;
+ const baseY=T+(hi-Number(s.startBalance||10000))/Math.max(.0001,hi-lo)*(H-T-B);
+ const first=new Date(pts[0].t), last=new Date(pts.at(-1).t);
+ const label=d=>d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+ return `<article class="card paper-equity-card"><div class="paper-chart-head"><div><div class="section-title">PAPER PORTFOLIO / EQUITY</div><small>Start $${fmt(s.startBalance,0)} · Live $${fmt(live,2)}</small></div><div class="paper-range">${['1D','7D','30D','ALL'].map(r=>`<button class="${range===r?'active':''}" onclick="paperSetChartRange('${r}')">${r}</button>`).join('')}</div></div>
+ <svg class="paper-equity-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Paper Portfolio Equity Verlauf"><defs><linearGradient id="paperEqFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#24a9ff" stop-opacity=".28"/><stop offset="1" stop-color="#24a9ff" stop-opacity="0"/></linearGradient></defs><line x1="${L}" x2="${W-R}" y1="${baseY.toFixed(1)}" y2="${baseY.toFixed(1)}" class="paper-eq-base"/><path d="${area}" class="paper-eq-area"/><path d="${line}" class="paper-eq-line"/><circle cx="${xy.at(-1).x.toFixed(1)}" cy="${xy.at(-1).y.toFixed(1)}" r="3.2" class="paper-eq-dot"/></svg>
+ <div class="paper-chart-foot"><span>${label(first)}</span><b class="${live>=Number(s.startBalance||0)?'green':'red'}">${live>=Number(s.startBalance||0)?'+':''}$${fmt(live-Number(s.startBalance||0),2)}</b><span>${label(last)}</span></div></article>`;
+}
+function paperPositionCard(t){
+ if(!t)return card(`<div class="section-title">CURRENT POSITION</div><div class="muted">Keine offene Paper-Position.</div>`);
+ const px=paperQuote(t.sym), pnl=Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0, r=t.riskUsd?pnl/t.riskUsd:0;
+ const side=String(t.side||'LONG').toUpperCase(), risk=Math.abs(t.entry-t.stop)||1;
+ const marker=Number.isFinite(px)?Math.max(0,Math.min(100,((px-t.stop)/(Math.max(t.tp2,t.entry)-t.stop))*100)):50;
+ return card(`<div class="paper-current-head"><div><div class="section-title">CURRENT POSITION</div><b class="paper-current-title">${t.sym} ${side}</b><span class="tag green">IN POSITION</span><small>Gate ${t.gateScore||0}/100 · PAPER</small></div><div class="paper-current-pnl"><span>P&L</span><b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)}</b><small>${fmt(r,2)}R</small></div></div>
+ <div class="paper-level-grid"><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>SL</span><b class="red">${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1</span><b class="green">${paperPrice(t.tp1,t.sym)}</b></div><div><span>TP2</span><b class="green">${paperPrice(t.tp2,t.sym)}</b></div></div>
+ <div class="paper-level-track"><i class="risk"></i><i class="reward"></i><em style="left:${marker}%"></em></div><div class="paper-track-labels"><span class="red">SL</span><span>ENTRY</span><span class="green">TP1</span><span class="green">TP2</span></div>`);
+}
 function paperTradeView(){
  paperTick();paperEngineScan(false);
- const s=paperState(),st=paperStats(s),xs=paperShadowStats(s),x=paperSignal(),pg=paperRiskGate(s,x);
-
- const open=(s.open||[]).map(t=>{
-   const px=paperQuote(t.sym),pnl=Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0,r=t.riskUsd?pnl/t.riskUsd:0;
-   return `<div class="paper-pos"><div><b>${t.sym} ${t.side}</b><small>PAPER · Gate ${t.gateScore}/100</small></div><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>P&L</span><b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)} · ${fmt(r,2)}R</b></div><div><span>SL</span><b>${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1/TP2</span><b>${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div></div>`;
- }).join('');
-
- const journal=(s.trades||[]).slice(0,20).map(t=>`<div class="trade-observe-card">
-   <div class="trade-observe-head"><b>${t.sym} ${t.side}</b><strong class="${t.net>=0?'green':'red'}">${t.exitReason} · ${t.net>=0?'+':''}${fmt(t.r,2)}R</strong></div>
-   <div class="trade-observe-grid">
-    <div><span>SIGNAL</span><b>${paperIsoShort(t.firstSignalAt)}</b></div><div><span>ZONE</span><b>${paperIsoShort(t.zoneTouchedAt)}</b></div>
-    <div><span>ENTRY</span><b>${paperIsoShort(t.openedAt)}</b></div><div><span>EXIT</span><b>${paperIsoShort(t.closedAt)}</b></div>
-    <div><span>MFE</span><b class="green">${fmt(t.mfeR||0,2)}R</b></div><div><span>MAE</span><b class="red">${fmt(t.maeR||0,2)}R</b></div>
-    <div><span>DAUER</span><b>${t.duration||paperAge(t.openedAt,t.closedAt)}</b></div><div><span>ENTRY DELAY</span><b>${t.entryDelay||paperAge(t.firstSignalAt,t.openedAt)}</b></div><div><span>ZONE TOUCHES</span><b>${t.zoneTouchCount||1}</b></div><div><span>NET</span><b class="${t.net>=0?'green':'red'}">${t.net>=0?'+':''}$${fmt(t.net,2)}</b></div>
-   </div>
-  </div>`).join('');
-
- const isolatedShadow=(s.shadow||[]).filter(t=>t.sourceMode==='PAPER_INTERNAL');
- const legacyShadow=(s.shadow||[]).filter(t=>t.sourceMode!=='PAPER_INTERNAL');
- const shadow=isolatedShadow.slice(0,20).map(t=>{
-   const px=paperQuote(t.sym),valid=paperLevelsValid(t);
-   const status=!valid?'INVALID DATA':t.shadowEntry==null?'WAIT ZONE':t.resolved?t.outcome:'ACTIVE';
-   const tone=!valid?'red':t.shadowEntry==null?'amber':t.resolved?(t.outcome==='SL'?'green':'red'):'cyan';
-   const verdict=!valid?'NICHT GEWERTET':t.shadowEntry==null?'NICHT EINGESTIEGEN':t.resolved?(t.outcome==='SL'?'PAPER GATE SCHÜTZTE':'PAPER GATE BLOCKTE GEWINNER'):'HYPOTHETISCH AKTIV';
-   const result=t.shadowEntry!=null&&Number.isFinite(Number(t.hypotheticalR))?`${Number(t.hypotheticalR)>=0?'+':''}${fmt(t.hypotheticalR,2)}R`:'—';
-   return `<div class="shadow-card ${tone}">
-     <div class="shadow-head"><div><b>${t.sym} ${t.side}</b><small>${t.blockReason||'PAPER RISK GATE'} · Gate ${t.gateScore||0}/100</small></div><strong class="${tone}">${status}</strong></div>
-     <div class="shadow-grid">
-       <div><span>ENTRY ZONE</span><b>${paperPrice(t.entryLow,t.sym)}–${paperPrice(t.entryHigh,t.sym)}</b></div>
-       <div><span>THEOR. ENTRY</span><b>${t.shadowEntry!=null?paperPrice(t.shadowEntry,t.sym):'wartet auf Zone'}</b></div>
-       <div><span>SL</span><b class="red">${paperPrice(t.stop,t.sym)}</b></div>
-       <div><span>TP1 / TP2</span><b class="green">${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div>
-       <div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div>
-       <div><span>HYPOTHETISCH</span><b class="${tone}">${result}</b></div>
-     </div>
-     <div class="shadow-verdict"><span>WARUM KEIN TRADE?</span><b>${t.paperRiskReason||t.reason||'PAPER RISK BLOCK'}</b><strong class="${tone}">${verdict}</strong></div>
-   </div>`;
- }).join('');
-
+ const s=paperState(); paperRecordEquity(s);
+ const st=paperStats(s),xs=paperShadowStats(s),x=paperSignal(),pg=paperRiskGate(s,x);
+ const openPnl=st.equity-Number(s.balance||0), realized=Number(s.balance||0)-Number(s.startBalance||0), total=st.equity-Number(s.startBalance||0);
+ const isolatedShadow=(s.shadow||[]).filter(t=>t.sourceMode==='PAPER_INTERNAL'), legacyShadow=(s.shadow||[]).filter(t=>t.sourceMode!=='PAPER_INTERNAL');
  const state=!x?.levelsValid&&x?'DATA INVALID':x?.allowed?'ENTRY READY':x?.techOpen&&!x?.paperRiskOpen?'PAPER RISK BLOCK':x?.techOpen&&!x?.inZone?'WAIT ZONE':'NO ENTRY';
  const tone=!x?.levelsValid&&x?'red':x?.allowed?'green':x?.techOpen?'amber':'red';
  const currentWhy=x?(!x.levelsValid?'INVALID PLAN DATA':!x.techOpen?'TECHNICAL GATE BLOCKED':!x.paperRiskOpen?x.paperRiskReason:!x.inZone?'PREIS AUSSERHALB ENTRY-ZONE':'PAPER ENTRY FREI'):'KEIN AKTIVES SETUP';
-
- return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 2.3</div><div class="forecast-main">ISOLATED FORWARD TEST</div><div class="sub">Multi-Asset Forward Test · Ruleset 5.80 eingefroren · nur Beobachtbarkeit erweitert.</div></div><span class="tag green paper-tag">ISOLATED</span></div>
+ const scanner=paperMultiSignals();
+ const current=(s.open||[])[0];
+ const journal=(s.trades||[]).slice(0,20).map(t=>`<div class="trade-observe-card"><div class="trade-observe-head"><b>${t.sym} ${t.side}</b><strong class="${t.net>=0?'green':'red'}">${t.exitReason} · ${t.net>=0?'+':''}${fmt(t.r,2)}R</strong></div><div class="trade-observe-grid"><div><span>ENTRY</span><b>${paperIsoShort(t.openedAt)}</b></div><div><span>EXIT</span><b>${paperIsoShort(t.closedAt)}</b></div><div><span>MFE</span><b class="green">${fmt(t.mfeR||0,2)}R</b></div><div><span>MAE</span><b class="red">${fmt(t.maeR||0,2)}R</b></div><div><span>NET</span><b class="${t.net>=0?'green':'red'}">${t.net>=0?'+':''}$${fmt(t.net,2)}</b></div></div></div>`).join('');
+ return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 2.4</div><div class="forecast-main">ISOLATED FORWARD TEST</div><div class="sub">Ruleset 5.80 FROZEN · Equity & Accounting erweitert.</div></div><span class="tag green paper-tag">ISOLATED</span></div>
    <div class="paper-isolation-banner"><span>PAPER SSOT</span><b>TECH SIGNAL × PAPER RISK × ENTRY ZONE</b><small>Pionex Exposure · Bot Buffer · Portfolio Risk Gate = ignoriert</small></div>
-   <div class="paper-kpis"><div><span>EQUITY</span><b>$${fmt(st.equity,2)}</b></div><div><span>TOTAL P&L</span><b class="${st.net>=0?'green':'red'}">${st.net>=0?'+':''}$${fmt(st.net,2)}</b></div><div><span>WIN RATE</span><b>${fmt(st.winRate,1)}%</b></div><div><span>EXPECTANCY</span><b>${fmt(st.avgR,2)}R</b></div></div>`)+
-
- card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${tone}">${state}</span></div>
-   <div class="paper-signal"><div><b>${x?.sym||'—'} ${x?.side||''}</b><strong class="${tone}">${x?.reason||'NO SETUP'}</strong></div><small>Technical ${x?.gateScore||0}/100 · Candidate ${x?.candidateScore||0}/100 · ${x?.inZone?'ENTRY ZONE':'außerhalb Entry-Zone'}</small></div>
-   <div class="why-no-trade"><span>PAPER DECISION</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>${x?`<small>Entry ${paperPrice(x.entryLow,x.sym)}–${paperPrice(x.entryHigh,x.sym)} · SL ${paperPrice(x.stop,x.sym)} · TP1 ${paperPrice(x.tp1,x.sym)} · TP2 ${paperPrice(x.tp2,x.sym)}</small>`:''}</div>
-   <button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.paperRiskOpen?'PAPER SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
-
- card(`<div class="section-title">PAPER RISK ENGINE <span class="tag green">INDEPENDENT</span></div>
-   <div class="paper-stats"><div><span>OPEN</span><b>${s.open.length}/${pg.maxOpen}</b></div><div><span>OPEN RISK</span><b>${fmt(pg.openRiskPct,2)}%</b></div><div><span>RISK / TRADE</span><b>${fmt(s.riskPerTradePct,1)}%</b></div><div><span>MAX PORTFOLIO RISK</span><b>${fmt(pg.maxRiskPct,1)}%</b></div></div>
-   <div class="row"><span>Pionex/GRID Risk Gate</span><b class="green">IGNORED</b></div>`)+
-
- card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
-   <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.81 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
-
- card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
-   <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
-
- card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${s.open.length}</span></div>${open||'<div class="muted">Keine offenen Paper-Positionen.</div>'}`)+
-
- card(`<div class="section-title">PERFORMANCE</div><div class="paper-stats"><div><span>TRADES</span><b>${st.count}</b></div><div><span>PROFIT FACTOR</span><b>${st.pf>=99?'∞':fmt(st.pf,2)}</b></div><div><span>AUTO MODE</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div><div><span>MODE</span><b class="green">ISOLATED</b></div></div><button class="paper-toggle" onclick="paperToggleAuto()">AUTO MODE ${s.autoMode?'AUS':'EIN'}</button>`)+
-
- card(`<div class="section-title">PAPER GATE VALIDATION <span class="tag cyan">SHADOW</span></div>
-   <div class="shadow-kpis">
-     <div><span>INTERNAL BLOCKED</span><b>${xs.total}</b></div>
-     <div><span>WAIT ZONE</span><b class="amber">${xs.waiting}</b></div>
-     <div><span>AVOIDED LOSSES</span><b class="green">${xs.avoidedLosses}</b></div>
-     <div><span>MISSED WINNERS</span><b class="red">${xs.missedWinners}</b></div>
-     <div><span>GATE PRECISION</span><b>${xs.resolved&&xs.gatePrecision!=null?fmt(xs.gatePrecision,1)+'%':'—'}</b></div>
-     <div><span>SHADOW EXP.</span><b>${xs.resolved?fmt(xs.avgR,2)+'R':'—'}</b></div>
-     <div><span>LEGACY EXTERNAL</span><b class="muted">${xs.legacy}</b></div>
-   </div>
-   <p class="footer-note">Nur PAPER-eigene Risk-Blocks fließen in diese Statistik. Alte Pionex/Portfolio-Shadow-Signale bleiben archiviert, werden aber nicht mehr gewertet.</p>`)+
-
+   <div class="paper-accounting"><div><span>EQUITY</span><b>$${fmt(st.equity,2)}</b><small>Start $${fmt(s.startBalance,0)}</small></div><div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}$${fmt(total,2)}</b><small>${fmt(total/Number(s.startBalance||1)*100,2)}%</small></div><div><span>REALIZED</span><b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}$${fmt(realized,2)}</b></div><div><span>UNREALIZED</span><b class="${openPnl>=0?'green':'red'}">${openPnl>=0?'+':''}$${fmt(openPnl,2)}</b></div><div><span>TRADES</span><b>${st.count}</b><small>${fmt(st.winRate,0)}% WR</small></div><div><span>RISK OPEN</span><b>${s.open.length}/${pg.maxOpen}</b><small>${fmt(pg.openRiskPct,2)}%</small></div></div>`)+
+ paperEquityChart(s)+
+ paperPositionCard(current)+
+ card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${scanner.length} SETUPS</span></div><div class="paper-scanner compact">${scanner.slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};const inPos=(s.open||[]).some(t=>t.sym===q.sym&&t.side===q.side);return `<div class="paper-scan-row compact-row"><div><b>${q.sym} ${q.side}</b><small>Tech ${q.gateScore}/100 · Candidate ${q.candidateScore}/100</small></div><div><b class="${inPos?'green':q.allowed?'green':q.techOpen?'amber':'red'}">${inPos?'IN POSITION':paperWhy(q)}</b><small>${inPos?'—':Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'% TO ZONE':'—'}</small></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>`)+
+ card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${tone}">${state}</span></div><div class="paper-signal"><div><b>${x?.sym||'—'} ${x?.side||''}</b><strong class="${tone}">${x?.reason||'NO SETUP'}</strong></div><small>Technical ${x?.gateScore||0}/100 · Candidate ${x?.candidateScore||0}/100</small></div><div class="why-no-trade"><span>PAPER DECISION</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>${x?`<small>Entry ${paperPrice(x.entryLow,x.sym)}–${paperPrice(x.entryHigh,x.sym)} · SL ${paperPrice(x.stop,x.sym)} · TP1 ${paperPrice(x.tp1,x.sym)} · TP2 ${paperPrice(x.tp2,x.sym)}</small>`:''}</div><button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.paperRiskOpen?'PAPER SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
+ card(`<div class="section-title">PAPER RISK ENGINE <span class="tag green">INDEPENDENT</span></div><div class="paper-stats"><div><span>OPEN</span><b>${s.open.length}/${pg.maxOpen}</b></div><div><span>OPEN RISK</span><b>${fmt(pg.openRiskPct,2)}%</b></div><div><span>RISK / TRADE</span><b>${fmt(s.riskPerTradePct,1)}%</b></div><div><span>MAX PORTFOLIO RISK</span><b>${fmt(pg.maxRiskPct,1)}%</b></div></div><div class="row"><span>Pionex/GRID Risk Gate</span><b class="green">IGNORED</b></div>`)+
+ `<details class="card paper-details" data-detail-key="paper-history"><summary>CANDIDATE HISTORY <strong>${paperHistoryRows(s).length}</strong></summary><div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-performance"><summary>PERFORMANCE & ANALYTICS <strong>${st.count}</strong></summary><div class="paper-stats"><div><span>PROFIT FACTOR</span><b>${st.pf>=99?'∞':fmt(st.pf,2)}</b></div><div><span>EXPECTANCY</span><b>${fmt(st.avgR,2)}R</b></div><div><span>AUTO MODE</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div><div><span>MODE</span><b class="green">ISOLATED</b></div></div><button class="paper-toggle" onclick="paperToggleAuto()">AUTO MODE ${s.autoMode?'AUS':'EIN'}</button></details>`+
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.81 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
-
- card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
-   const a=paperAnalytics(s);
-   if(!st.count)return '<div class="muted">Auswertung startet nach dem ersten abgeschlossenen Paper-Trade.</div>';
-   const row=(n,v)=>`<div class="row analytics-row"><span>${n} · ${v.n} Trades</span><b>${fmt(v.wr,1)}% WR · ${fmt(v.r,2)}R <small>MFE ${fmt(v.mfe,2)}R / MAE ${fmt(v.mae,2)}R</small></b></div>`;
-   return row('LONG',a.long)+row('SHORT',a.short)+row('GATE 70–79',a.g70)+row('GATE 80+',a.g80)+
-     a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
- })()}</div>`)+
-
- card(`<div class="section-title">SIMULATION</div><div class="row"><span>Startkapital</span><b>$${fmt(s.startBalance,0)}</b></div><div class="row"><span>Gebühr</span><b>${fmt(s.feePct*100,3)}%</b></div><div class="row"><span>Slippage</span><b>${fmt(s.slippagePct*100,3)}%</b></div><div class="row"><span>Paper-Modus</span><b>100% ISOLATED</b></div><div class="row"><span>Ruleset</span><b>5.80 · FROZEN</b></div><div class="row"><span>Shadow State</span><b>WAIT → ACTIVE → RESULT</b></div><button class="paper-reset" onclick="paperReset()">PAPER-KONTO ZURÜCKSETZEN</button>`);
+ `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW VALIDATION <strong>${isolatedShadow.length}</strong></summary><div class="shadow-kpis"><div><span>INTERNAL BLOCKED</span><b>${xs.total}</b></div><div><span>WAIT ZONE</span><b class="amber">${xs.waiting}</b></div><div><span>AVOIDED LOSSES</span><b class="green">${xs.avoidedLosses}</b></div><div><span>MISSED WINNERS</span><b class="red">${xs.missedWinners}</b></div><div><span>GATE PRECISION</span><b>${xs.resolved&&xs.gatePrecision!=null?fmt(xs.gatePrecision,1)+'%':'—'}</b></div><div><span>LEGACY</span><b class="muted">${legacyShadow.length}</b></div></div></details>`+
+ card(`<div class="section-title">SIMULATION & SETTINGS</div><div class="row"><span>Startkapital</span><b>$${fmt(s.startBalance,0)}</b></div><div class="row"><span>Gebühr</span><b>${fmt(s.feePct*100,3)}%</b></div><div class="row"><span>Slippage</span><b>${fmt(s.slippagePct*100,3)}%</b></div><div class="row"><span>Ruleset</span><b>5.80 · FROZEN</b></div><button class="paper-reset" onclick="paperReset()">PAPER-KONTO ZURÜCKSETZEN</button>`);
 }
 setInterval(()=>{try{paperTick();paperEngineScan(false)}catch(e){}},5000);
 
