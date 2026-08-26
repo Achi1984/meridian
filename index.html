@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#05080d">
 <link rel="manifest" href="manifest.webmanifest?v=5.80">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v5.94.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v5.95.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.33,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.33,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v5.94 — MOBILE LAYOUT / COLLISION GUARD */
+/* v5.95 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v5.94 compact bot action cards */
+/* v5.95 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v5.94 DEPOT cleanup — no navigation changes */
+/* v5.95 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2850,7 +2850,7 @@ main>section{
 
 
 <style id="v572-decision-cleanup-css">
-/* v5.94 Decision Cleanup — navigation/feed architecture untouched */
+/* v5.95 Decision Cleanup — navigation/feed architecture untouched */
 .trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
 .trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -3114,7 +3114,7 @@ main>section{
 
 
 <style id="v593-market-price-layout">
-/* v5.94 — prevent live prices from splitting over two lines on iPhone */
+/* v5.95 — prevent live prices from splitting over two lines on iPhone */
 .live-market-row{
   gap:14px;
 }
@@ -3185,6 +3185,15 @@ main>section{
 }
 </style>
 
+
+<style id="v595-grid-liq-first">
+.liq-first-action .section-title{letter-spacing:1.2px}
+.liq-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.liq-action-grid>div{border:1px solid #173f55;border-radius:13px;padding:10px}
+.liq-action-grid span{display:block;color:#8293a5;font-size:6px;letter-spacing:1px}
+.liq-action-grid b{display:block;margin-top:4px;font-size:9px}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3192,7 +3201,7 @@ main>section{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v5.94 · LIVE</span>
+        <span class="version" id="versionBadge">v5.95 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3224,7 +3233,7 @@ main>section{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v5.94.js?v=20260824-2315"></script>
+<script src="app-v5.95.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -3295,8 +3304,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='5.94';
-let APP_RELEASE='5.94 · CENTER + TOP TABS CLEANUP';
+let APP_CODE_VERSION='5.95';
+let APP_RELEASE='5.95 · GRID LIQUIDATION FIRST';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3766,7 +3775,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v5.94 — UNIFIED RISK STATE MATRIX
+/* v5.95 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4381,7 +4390,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v5.94 — ONE ACTION SSOT */
+/* v5.95 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{};
  const shortBuf=Number(cap.shortBuf);
@@ -4545,7 +4554,7 @@ function centerRiskTransparency(){
 }
 
 
-/* MERIDIAN v5.94 — LIQUIDATION FIRST
+/* MERIDIAN v5.95 — LIQUIDATION FIRST
    Facts first: current liquidation price -> buffer -> gate.
    No exposure-% recommendation is emitted as a primary action. */
 function currentBtcRiskSnapshot(){
@@ -5792,7 +5801,7 @@ function paperTradeView(){
 
  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
    <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.94 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
+   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v5.95 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
 
  card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
    <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
@@ -5815,7 +5824,7 @@ function paperTradeView(){
 
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
  `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.94 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v5.95 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
 
  card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
    const a=paperAnalytics(s);
@@ -5825,7 +5834,7 @@ function paperTradeView(){
      a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
  })()}</div>`)+
 
- card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.94</span></div>${(()=>{
+ card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v5.95</span></div>${(()=>{
    const trades=(s.trades||[]),n=trades.length;
    const clean=trades.filter(t=>Number(t.r)>=1).length;
    const direct=trades.filter(t=>t.exitReason==='SL'&&Number(t.mfeR||0)<0.25).length;
@@ -6996,9 +7005,10 @@ function gridView(){
  const bridge=executionBridgeState(), p=bridge.plan, gate=bridge.gate;
  const riskOpen=!!gate.riskOpen;
  const topBot=critical[0]||danger[0]||tight[0]||bots[0]||null;
- const optimizer=recoveryOptimizerState();
- const best8=optimizer?.best8||null;
- const bestAction=best8?recoveryActionLabel(best8):(topBot?.guard?.label==='CRITICAL'?'PUFFER ≥8% HERSTELLEN':'KEINE AKTION');
+ const targetBuffer=8;
+ const bestAction=topBot&&Number.isFinite(Number(topBot.buffer))&&Number(topBot.buffer)<targetBuffer
+   ? `LIQ-PUFFER AUF ≥${fmt(targetBuffer,0)}%`
+   : 'MONITOR';
  const focus=(key,title,sub,body,open=false)=>`<details class="card grid-focus compact-focus" data-detail-key="${key}" ${open?'open':''}><summary><span><b>${title}</b><small>${sub}</small></span><strong>${open?'SCHLIESSEN':'ÖFFNEN'}</strong></summary><div class="grid-focus-body">${body}</div></details>`;
 
  const statusTone=critical.length?'red':danger.length?'red':tight.length?'amber':'green';
@@ -7066,22 +7076,21 @@ function gridView(){
    </div>`);
 
  const recovery=topBot&&Number.isFinite(Number(topBot.buffer))&&Number(topBot.buffer)<12
-   ? card(`<div class="next-action-compact">
+   ? card(`<div class="next-action-compact liq-first-action">
       <div class="section-head compact-head">
         <div>
-          <div class="section-title">NEXT ACTION</div>
-          <div class="section-note">${topBot.id} · ${fmt(topBot.buffer,2)}% → Ziel ≥8%</div>
+          <div class="section-title">NEXT ACTION · LIQUIDATION FIRST</div>
+          <div class="section-note">${topBot.id} · ${String(topBot.side||'').toUpperCase()} ${topBot.leverage}x</div>
         </div>
         <span class="tag ${statusTone}">${topBot.guard?.label||statusLabel}</span>
       </div>
-      <div class="next-action-strip">
-        <b class="${statusTone}">${fmt(topBot.buffer,2)}%</b>
-        <span>→</span>
-        <strong>${bestAction}</strong>
-        <span>→</span>
-        <b class="green">${best8?fmt(best8.after,2)+'%':'—'}</b>
+      <div class="liq-action-grid">
+        <div><span>LIQ</span><b>$${gridFmt(topBot.liquidation,topBot.symbol)}</b></div>
+        <div><span>PUFFER</span><b class="${statusTone}">${fmt(topBot.buffer,2)}%</b></div>
+        <div><span>ZIEL</span><b>≥${fmt(targetBuffer,2)}%</b></div>
+        <div><span>FEHLT</span><b class="${Number(topBot.buffer)<targetBuffer?'red':'green'}">${Number(topBot.buffer)<targetBuffer?fmt(targetBuffer-Number(topBot.buffer),2)+' %-Pkt.':'0,00 %-Pkt.'}</b></div>
       </div>
-      <div class="next-action-foot">Pionex manuell ändern → Liquidationspreis neu synchronisieren. Modellwert ≠ Ordergröße.</div>
+      <div class="next-action-foot">Keine automatische Exposure-%-Empfehlung. Nach einer realen Änderung in Pionex ist ausschließlich der neue Liquidationspreis maßgeblich.</div>
    </div>`)
    : '';
 
@@ -7104,8 +7113,8 @@ function gridView(){
    focus('grid-best','SETUP & ENTRY',p?`${p.sym} · R:R ${fmt(p.rr,2)}:1`:'PENDING',best+entryPlan,false)+
    botRows+
    `</div><div class="grid-secondary-title">ERWEITERTE WERKZEUGE</div>`+
-   focus('grid-recovery-best','RECOVERY OPTIMIZER',topBot?`${topBot.id} · Ziel 8% / 12%`:'Kein kritischer Bot',moduleSafe('RECOVERY OPTIMIZER',()=>recoveryOptimizerPanel()),false)+
-   focus('grid-whatif','WHAT-IF','Exposure · Margin · Hebel',moduleSafe('WHAT-IF',()=>whatIfSimulatorPanel()),false)+
+   focus('grid-recovery-best','RISK SIMULATOR · DIAGNOSE',topBot?`${topBot.id} · nur Modellvergleich`:'Kein kritischer Bot',moduleSafe('RISK SIMULATOR',()=>recoveryOptimizerPanel()),false)+
+   focus('grid-whatif','WHAT-IF · DIAGNOSE','Margin · Hebel · Modell',moduleSafe('WHAT-IF',()=>whatIfSimulatorPanel()),false)+
    focus('grid-lifecycle','BOT LIFECYCLE','KEEP · REDUCE · REBUILD',moduleSafe('BOT LIFECYCLE',()=>lifecycleActionPanel()),false)+
    focus('grid-models','ERWEITERTE RISIKO-MODELLE','Hedge · Capital · SL · Decision',legacy,false);
 }
@@ -7217,7 +7226,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v5.94 — FIVE TAB UX */
+/* v5.95 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW=(()=>{try{const v=sessionStorage.getItem('meridian_exec_subview');return ['trade','grid','paper'].includes(v)?v:'trade'}catch(e){return 'trade'}})();
 
@@ -7303,7 +7312,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v5.94: make the navigation itself immediate.
+ // v5.95: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
