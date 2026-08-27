@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.20">
+<link rel="manifest" href="manifest.webmanifest?v=6.25">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3566,14 +3566,50 @@ window.addEventListener('load', async () => {
 .cloud-equity-v2 .eq-mark.bad circle{fill:#ff5b6b}.cloud-equity-v2 .eq-mark.bad text{fill:#ff7a87}
 .eq-legend{display:flex;gap:10px;flex-wrap:wrap;padding:2px 4px 0;color:#8193a8;font-size:5.5px;letter-spacing:.08em}
 .eq-legend span:first-child{color:#26b8ff}
-</style>\n</head>
+</style>\n
+<script id="v625-stray-text-cleanup">
+window.addEventListener('DOMContentLoaded',()=>{
+  try{
+    [...document.body.childNodes].forEach(n=>{
+      if(n.nodeType===Node.TEXT_NODE && /^(\s|\\n|\\r)+$/.test(n.textContent||'')){
+        if((n.textContent||'').includes('\\n')) n.remove();
+      }
+    });
+  }catch(e){}
+});
+</script>
+
+
+<style id="v625-chart-polish">
+.cloud-equity-v2{position:relative}
+.paper-equity-svg{height:154px;overflow:visible}
+.eq-time line{stroke:#274b61;stroke-width:1}
+.eq-time text{fill:#70879a;font-size:8px;letter-spacing:.04em}
+.eq-mark .eq-label-bg{fill:#06141f;stroke:#1aaeff;stroke-width:.8;opacity:.96}
+.eq-mark.good .eq-label-bg{stroke:#29d98b}
+.eq-mark.bad .eq-label-bg{stroke:#ff6170}
+.eq-mark .eq-label{fill:#bfefff;font-size:7px;font-weight:700;letter-spacing:.03em}
+.eq-mark.good .eq-label{fill:#54e6a5}
+.eq-mark.bad .eq-label{fill:#ff8290}
+.eq-mark line{stroke-dasharray:4 5;opacity:.65}
+.eq-mark circle{stroke:#06141f;stroke-width:2}
+.eq-legend{display:flex;gap:12px;flex-wrap:wrap}
+.eq-legend span{white-space:nowrap}
+@media(max-width:430px){
+  .paper-equity-svg{height:150px}
+  .eq-mark .eq-label{font-size:6.4px}
+  .eq-time text{font-size:7px}
+}
+</style>
+
+</head>
 <body>
 <div class="app">
   <header class="topbar">
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.24 · LIVE</span>
+        <span class="version" id="versionBadge">v6.25 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6733,7 +6769,8 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     realized:Number(x?.realizedEquity??x?.closedEquity??x?.balance)
   })).filter(x=>Number.isFinite(x.equity));
   if(rows.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
-  const w=560,h=170,l=8,r=8,top=12,bottom=22;
+
+  const w=560,h=188,l=10,r=10,top=18,bottom=36;
   const start=Number(startEquity||10000);
   const vals=rows.map(x=>x.equity).concat([start]);
   const min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.000001,max-min);
@@ -6742,38 +6779,109 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
   const line=rows.map((q,i)=>`${x(i).toFixed(1)},${y(q.equity).toFixed(1)}`).join(' ');
   const baseline=y(start).toFixed(1);
   const timeRows=rows.map((q,i)=>({i,ms:q.t?new Date(q.t).getTime():NaN}));
+
   function nearestIndex(iso){
     const ms=iso?new Date(iso).getTime():NaN;
     if(!Number.isFinite(ms))return -1;
     let best=-1,dist=Infinity;
-    for(const q of timeRows){if(Number.isFinite(q.ms)&&Math.abs(q.ms-ms)<dist){best=q.i;dist=Math.abs(q.ms-ms)}}
+    for(const q of timeRows){
+      if(Number.isFinite(q.ms)&&Math.abs(q.ms-ms)<dist){best=q.i;dist=Math.abs(q.ms-ms)}
+    }
     return best;
   }
+  function fmtAxisTime(v){
+    if(!v)return '';
+    const d=new Date(v); if(Number.isNaN(d.getTime()))return '';
+    return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  }
+  function eventPrice(m){
+    const n=Number(m.price);
+    return Number.isFinite(n)?cloudPrice(n,m.symbol):'';
+  }
+
   const marks=[];
-  (Array.isArray(positions)?positions:[]).forEach(t=>marks.push({type:'ENTRY',t:t.openedAt||t.createdAt||t.opened_at,symbol:t.symbol}));
+  (Array.isArray(positions)?positions:[]).forEach(t=>marks.push({
+    type:'ENTRY',t:t.openedAt||t.createdAt||t.opened_at,
+    symbol:t.symbol,side:t.side,price:t.entry,pnl:t.unrealized
+  }));
   (Array.isArray(trades)?trades:[]).forEach(t=>{
-    marks.push({type:'ENTRY',t:t.openedAt||t.opened_at,symbol:t.symbol});
-    marks.push({type:t.exitReason||'EXIT',t:t.closedAt||t.closed_at,symbol:t.symbol});
+    marks.push({type:'ENTRY',t:t.openedAt||t.opened_at,symbol:t.symbol,side:t.side,price:t.entry});
+    marks.push({
+      type:t.exitReason||'EXIT',t:t.closedAt||t.closed_at,symbol:t.symbol,side:t.side,
+      price:t.exit,pnl:t.realized
+    });
   });
   (Array.isArray(events)?events:[]).forEach(e=>{
     const type=String(e.type||'').toUpperCase();
-    if(/ENTRY|OPEN|TP1|TP2|STOP|SL|EXIT|CLOSE/.test(type)) marks.push({type,t:e.created_at||e.createdAt||e.t,symbol:e.payload?.symbol});
+    if(/ENTRY|OPEN|TP1|TP2|STOP|SL|EXIT|CLOSE/.test(type)){
+      marks.push({
+        type,
+        t:e.created_at||e.createdAt||e.t,
+        symbol:e.payload?.symbol,
+        side:e.payload?.side,
+        price:e.payload?.price??e.payload?.entry??e.payload?.exit,
+        pnl:e.payload?.pnl??e.payload?.realized
+      });
+    }
   });
+
   const seen=new Set();
   const markerSvg=marks.map(m=>{
     const i=nearestIndex(m.t); if(i<0)return '';
-    const key=i+'|'+m.type; if(seen.has(key))return ''; seen.add(key);
-    const cx=x(i),cy=y(rows[i].equity), bad=/SL|STOP/.test(m.type), good=/TP/.test(m.type);
+    const key=i+'|'+m.type+'|'+(m.symbol||'');
+    if(seen.has(key))return ''; seen.add(key);
+
+    const cx=x(i),cy=y(rows[i].equity);
+    const bad=/SL|STOP/.test(m.type), good=/TP/.test(m.type);
     const cls=bad?'eq-mark bad':good?'eq-mark good':'eq-mark';
-    const label=String(m.type).replaceAll('_',' ').slice(0,8);
-    return `<g class="${cls}"><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="4"/><text x="${Math.min(w-48,cx+5)}" y="${Math.max(12,cy-7)}">${label}</text></g>`;
+    const asset=String(m.symbol||'').replace('USDT','');
+    const side=m.side?(' '+m.side):'';
+    const rawType=String(m.type).replaceAll('_',' ');
+    const label=/ENTRY|OPEN/.test(m.type)
+      ? `${asset||''}${side} ENTRY`.trim()
+      : `${asset?asset+' ':''}${rawType}`.trim();
+    const shown=label.slice(0,20);
+    const price=eventPrice(m);
+    const pnl=Number(m.pnl);
+    const tooltip=[
+      label,
+      price?`Preis ${price}`:'',
+      Number.isFinite(pnl)?`P&L ${pnl>=0?'+':''}${cloudMoney(pnl)}`:'',
+      m.t?new Date(m.t).toLocaleString('de-DE'):''
+    ].filter(Boolean).join(' · ');
+
+    // Keep labels inside chart and stagger labels if close to the top.
+    const tx=Math.min(w-112,Math.max(l+4,cx+6));
+    const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
+
+    return `<g class="${cls}" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
+      <title>${tooltip}</title>
+      <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
+      <circle cx="${cx}" cy="${cy}" r="4.5"/>
+      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(106,Math.max(46,shown.length*5.3))}" height="14" rx="4"/>
+      <text class="eq-label" x="${tx}" y="${ty}">${shown}</text>
+    </g>`;
   }).join('');
+
+  // Three time ticks: start / middle / latest.
+  const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1];
+  const ticks=tickIdx.map(i=>{
+    const xx=x(i), label=fmtAxisTime(rows[i]?.t);
+    return label?`<g class="eq-time"><line x1="${xx}" y1="${h-bottom+2}" x2="${xx}" y2="${h-bottom+6}"/><text x="${xx}" y="${h-8}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}">${label}</text></g>`:'';
+  }).join('');
+
   return `<div class="cloud-equity-v2">
     <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
       <line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>
-      <polyline class="eq-line" fill="none" points="${line}"></polyline>${markerSvg}
+      <polyline class="eq-line" fill="none" points="${line}"></polyline>
+      ${markerSvg}
+      ${ticks}
     </svg>
-    <div class="eq-legend"><span>● LIVE EQUITY</span><span>┄ START ${cloudMoney(start)}</span><span>│ TRADE EVENTS</span></div>
+    <div class="eq-legend">
+      <span>● LIVE EQUITY</span>
+      <span>┄ START ${cloudMoney(start)}</span>
+      <span>│ ENTRY / TP / SL / EXIT</span>
+    </div>
   </div>`;
 }
 function cloudPaperTradeView(){
@@ -6850,7 +6958,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.24 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.25 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
