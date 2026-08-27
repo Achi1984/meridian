@@ -3554,14 +3554,26 @@ window.addEventListener('load', async () => {
 }
 </style>
 
-</head>
+\n<style id="v624-equity-chart-v2">
+.cloud-equity-v2{border:1px solid #173f55;border-radius:12px;background:rgba(5,20,31,.45);overflow:hidden;padding:5px 6px 7px}
+.cloud-equity-v2 .paper-equity-svg{border:0;background:transparent;padding:0;border-radius:0;height:142px}
+.cloud-equity-v2 .eq-line{stroke:currentColor;stroke-width:4;vector-effect:non-scaling-stroke}
+.cloud-equity-v2 .eq-start{stroke:#718096;stroke-width:1;stroke-dasharray:5 5;opacity:.65;vector-effect:non-scaling-stroke}
+.cloud-equity-v2 .eq-mark line{stroke:#26b8ff;stroke-width:1;stroke-dasharray:3 4;opacity:.45;vector-effect:non-scaling-stroke}
+.cloud-equity-v2 .eq-mark circle{fill:#26b8ff;stroke:#06131d;stroke-width:2;vector-effect:non-scaling-stroke}
+.cloud-equity-v2 .eq-mark text{fill:#9ddfff;font-size:7px;font-weight:800;letter-spacing:.06em}
+.cloud-equity-v2 .eq-mark.good circle{fill:#31d78a}.cloud-equity-v2 .eq-mark.good text{fill:#31d78a}
+.cloud-equity-v2 .eq-mark.bad circle{fill:#ff5b6b}.cloud-equity-v2 .eq-mark.bad text{fill:#ff7a87}
+.eq-legend{display:flex;gap:10px;flex-wrap:wrap;padding:2px 4px 0;color:#8193a8;font-size:5.5px;letter-spacing:.08em}
+.eq-legend span:first-child{color:#26b8ff}
+</style>\n</head>
 <body>
 <div class="app">
   <header class="topbar">
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.23 · LIVE</span>
+        <span class="version" id="versionBadge">v6.24 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6713,12 +6725,56 @@ function cloudAge(iso){
   if(!iso)return '—'; const sec=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
   if(sec<60)return Math.floor(sec)+'s'; if(sec<3600)return Math.floor(sec/60)+'m'; return Math.floor(sec/3600)+'h';
 }
-function cloudEquitySvg(points){
-  const vals=(points||[]).map(x=>Number(x.equity)).filter(Number.isFinite);
-  if(vals.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
-  const w=560,h=150,pad=8,min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.000001,max-min);
-  const pts=vals.map((v,i)=>`${(pad+(w-2*pad)*(i/(vals.length-1))).toFixed(1)},${(h-pad-(h-2*pad)*((v-min)/span)).toFixed(1)}`).join(' ');
-  return `<svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="currentColor" stroke-width="4" points="${pts}"></polyline></svg>`;
+function cloudEquitySvg(points,events,positions,trades,startEquity){
+  const raw=Array.isArray(points)?points:[];
+  const rows=raw.map((x,i)=>({
+    t:x?.t||x?.ts||x?.created_at||x?.createdAt||null,
+    equity:Number(x?.equity),
+    realized:Number(x?.realizedEquity??x?.closedEquity??x?.balance)
+  })).filter(x=>Number.isFinite(x.equity));
+  if(rows.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
+  const w=560,h=170,l=8,r=8,top=12,bottom=22;
+  const start=Number(startEquity||10000);
+  const vals=rows.map(x=>x.equity).concat([start]);
+  const min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.000001,max-min);
+  const x=i=>l+(w-l-r)*(i/Math.max(1,rows.length-1));
+  const y=v=>top+(h-top-bottom)*(1-(v-min)/span);
+  const line=rows.map((q,i)=>`${x(i).toFixed(1)},${y(q.equity).toFixed(1)}`).join(' ');
+  const baseline=y(start).toFixed(1);
+  const timeRows=rows.map((q,i)=>({i,ms:q.t?new Date(q.t).getTime():NaN}));
+  function nearestIndex(iso){
+    const ms=iso?new Date(iso).getTime():NaN;
+    if(!Number.isFinite(ms))return -1;
+    let best=-1,dist=Infinity;
+    for(const q of timeRows){if(Number.isFinite(q.ms)&&Math.abs(q.ms-ms)<dist){best=q.i;dist=Math.abs(q.ms-ms)}}
+    return best;
+  }
+  const marks=[];
+  (Array.isArray(positions)?positions:[]).forEach(t=>marks.push({type:'ENTRY',t:t.openedAt||t.createdAt||t.opened_at,symbol:t.symbol}));
+  (Array.isArray(trades)?trades:[]).forEach(t=>{
+    marks.push({type:'ENTRY',t:t.openedAt||t.opened_at,symbol:t.symbol});
+    marks.push({type:t.exitReason||'EXIT',t:t.closedAt||t.closed_at,symbol:t.symbol});
+  });
+  (Array.isArray(events)?events:[]).forEach(e=>{
+    const type=String(e.type||'').toUpperCase();
+    if(/ENTRY|OPEN|TP1|TP2|STOP|SL|EXIT|CLOSE/.test(type)) marks.push({type,t:e.created_at||e.createdAt||e.t,symbol:e.payload?.symbol});
+  });
+  const seen=new Set();
+  const markerSvg=marks.map(m=>{
+    const i=nearestIndex(m.t); if(i<0)return '';
+    const key=i+'|'+m.type; if(seen.has(key))return ''; seen.add(key);
+    const cx=x(i),cy=y(rows[i].equity), bad=/SL|STOP/.test(m.type), good=/TP/.test(m.type);
+    const cls=bad?'eq-mark bad':good?'eq-mark good':'eq-mark';
+    const label=String(m.type).replaceAll('_',' ').slice(0,8);
+    return `<g class="${cls}"><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="4"/><text x="${Math.min(w-48,cx+5)}" y="${Math.max(12,cy-7)}">${label}</text></g>`;
+  }).join('');
+  return `<div class="cloud-equity-v2">
+    <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
+      <line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>
+      <polyline class="eq-line" fill="none" points="${line}"></polyline>${markerSvg}
+    </svg>
+    <div class="eq-legend"><span>● LIVE EQUITY</span><span>┄ START ${cloudMoney(start)}</span><span>│ TRADE EVENTS</span></div>
+  </div>`;
 }
 function cloudPaperTradeView(){
   const C=MERIDIAN_CLOUD, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
@@ -6794,7 +6850,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.23 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.24 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -6817,9 +6873,9 @@ function cloudPaperTradeView(){
         <small class="${totalPct>=0?'green':'red'}">${totalPct>=0?'+':''}${fmt(totalPct,2)}%</small>
       </div>
       <div class="kpi-card">
-        <span>REALIZED</span>
+        <span>REALIZED P&L</span>
         <b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b>
-        <small>geschlossen</small>
+        <small>inkl. Fees/Partials</small>
       </div>
       <div class="kpi-card">
         <span>UNREALIZED</span>
@@ -6827,7 +6883,7 @@ function cloudPaperTradeView(){
         <small>offene Positionen</small>
       </div>
       <div class="kpi-card">
-        <span>TRADES</span>
+        <span>CLOSED TRADES</span>
         <b>${trades.length}</b>
         <small>Winrate ${fmt(winRate,0)}%</small>
       </div>
@@ -6862,7 +6918,7 @@ function cloudPaperTradeView(){
         <div><span>P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b></div>
         <div><span>DRAWDOWN</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
       </div>
-      ${cloudEquitySvg(p.equityCurve||[])}
+      ${cloudEquitySvg(p.equityCurve||[],events,positions,trades,start)}
       <div class="paper-stats">
         <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
         <div><span>DAY START</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>

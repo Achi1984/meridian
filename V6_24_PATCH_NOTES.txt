@@ -1,0 +1,7 @@
+ACHI MERIDIAN v6.24
+- Equity Chart V2: PostgreSQL equity history remains the chart source.
+- Start-equity reference line added.
+- ENTRY / TP / SL / EXIT event markers rendered when timestamps exist in cloud data.
+- KPI wording clarified: CLOSED TRADES counts completed trades only.
+- REALIZED P&L explicitly includes backend-realized effects such as fees/partials.
+- No trading rules, risk gates, engine logic, or live-trading safety settings changed.
