@@ -3336,6 +3336,24 @@ main,.app-main,.content,.page-content{
 }
 </style>
 
+
+<script>
+/* MERIDIAN v6.21 — remove legacy PWA cache / service worker.
+   The cloud dashboard must always load the current GitHub Pages build. */
+window.addEventListener('load', async () => {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { console.warn('MERIDIAN legacy cache cleanup', e); }
+});
+</script>
+
 </head>
 <body>
 <div class="app">
@@ -3343,7 +3361,7 @@ main,.app-main,.content,.page-content{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.20 · LIVE</span>
+        <span class="version" id="versionBadge">v6.21 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3447,7 +3465,7 @@ const fmt=(n,d=0)=>{
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
 let APP_CODE_VERSION='6.20';
-let APP_RELEASE='6.20 · CLOUD PAPER UI';
+let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3731,7 +3749,7 @@ async function load(){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
    APP_CODE_VERSION=runtimeVersion.version||'5.1.9a';
-   APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER UI';
+   APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
    $('#versionBadge').textContent='v'+APP_CODE_VERSION+' · LIVE';
@@ -6452,7 +6470,7 @@ function paperAnalytics(s){
  return {assetRows,long:calc(bySide.LONG||[]),short:calc(bySide.SHORT||[]),g70:calc(byGate['70–79']),g80:calc(byGate['80+'])};
 }
 
-/* ===== MERIDIAN v6.20 — NORTHFLANK CLOUD PAPER UI ===== */
+/* ===== MERIDIAN v6.21 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
 const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
 let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],updatedAt:null,error:null,loading:false};
 
@@ -6508,237 +6526,166 @@ function cloudPaperTradeView(){
   const positions=Array.isArray(p.positions)?p.positions:[];
   const trades=Array.isArray(p.trades)?p.trades:[];
   const events=Array.isArray(C.events)?C.events:[];
-  const equity=Number(a.equity||0), start=Number(a.startEquity||10000), realized=Number(a.realizedPnl||0), unreal=Number(a.unrealizedPnl||0);
-  const total=equity-start, totalPct=start?total/start*100:0;
-  const wins=trades.filter(t=>Number(t.realized)>0).length, winRate=trades.length?wins/trades.length*100:0;
-  const openRisk=positions.reduce((q,z)=>q+Number(z.riskPct||0),0);
   const eng=st.engine||{}, db=st.db||{}, safety=st.safety||{};
+
+  const equity=Number(a.equity||0), start=Number(a.startEquity||10000);
+  const realized=Number(a.realizedPnl||0), unreal=Number(a.unrealizedPnl||0);
+  const total=equity-start, totalPct=start?total/start*100:0;
+  const wins=trades.filter(t=>Number(t.realized)>0).length;
+  const winRate=trades.length?wins/trades.length*100:0;
+  const openRisk=positions.reduce((q,z)=>q+Number(z.riskPct||0),0);
   const best=assets[0]||null;
   const updated=C.updatedAt?cloudAge(C.updatedAt):'—';
-  const scannerRows=assets.map(q=>`<div class="paper-scan-row observe"><div><b>${String(q.symbol||'').replace('USDT','')} ${q.side||''}</b><small>Technical ${q.technical??'—'}/100 · Candidate ${q.candidate??'—'}/100</small><em>Preis ${cloudPrice(q.price,q.symbol)} · ${q.frames?.['1h']?.adx!=null?'1H ADX '+fmt(q.frames['1h'].adx,1):'Multi-TF'}</em></div><div><span>${cloudStatusLabel(q.status)}</span><b class="${cloudStatusTone(q.status)}">${q.distanceAtr!=null?fmt(q.distanceAtr,2)+' ATR':'—'}</b><em>${(q.reasons||[]).join(' · ')||'alle Gates erfüllt'}</em></div></div>`).join('');
-  const openRows=positions.map(t=>`<div class="paper-pos"><div><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><small>CLOUD PAPER · ${t.ruleset||'6.2'}</small></div><div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div><div><span>LIVE</span><b>${cloudPrice(t.livePrice,t.symbol)}</b></div><div><span>P&L</span><b class="${Number(t.unrealized||0)>=0?'green':'red'}">${Number(t.unrealized||0)>=0?'+':''}${cloudMoney(t.unrealized||0)}</b></div><div><span>SL</span><b>${cloudPrice(t.sl,t.symbol)}</b></div><div><span>TP1 / TP2</span><b>${cloudPrice(t.tp1,t.symbol)} / ${cloudPrice(t.tp2,t.symbol)}</b></div></div>`).join('');
-  const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`<div class="trade-observe-card"><div class="trade-observe-head"><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><strong class="${Number(t.realized||0)>=0?'green':'red'}">${t.exitReason||'CLOSED'} · ${Number(t.realized||0)>=0?'+':''}${cloudMoney(t.realized||0)}</strong></div><div class="trade-observe-grid"><div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div><div><span>EXIT</span><b>${cloudPrice(t.exit,t.symbol)}</b></div><div><span>OPEN</span><b>${cloudTime(t.openedAt)}</b></div><div><span>CLOSE</span><b>${cloudTime(t.closedAt)}</b></div><div><span>QTY</span><b>${fmt(Number(t.qty||0),5)}</b></div><div><span>RISK</span><b>${fmt(Number(t.riskPct||0),2)}%</b></div></div></div>`).join('');
-  const eventRows=events.slice(0,20).map(e=>`<div class="row"><span>${cloudTime(e.created_at)} · ${String(e.type||'EVENT').replaceAll('_',' ')}</span><b>${e.payload?.symbol||e.payload?.assets?.[0]?.symbol||''}</b></div>`).join('');
-  const why=best?(best.status==='READY'?'Alle Signal- und Entry-Gates erfüllt.':best.status==='WAIT_ENTRY_ZONE'?'Setup stark, Preis noch außerhalb der ATR-Entry-Zone.':(best.reasons||[]).join(' · ')):'Scanner lädt …';
-  return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 6.2 · CLOUD</div><div class="forecast-main">24/7 FORWARD TEST</div><div class="sub">Northflank Runtime · PostgreSQL persistent · automatische Multi-Timeframe-Signale</div></div><span class="tag ${eng.state==='RUNNING'?'green':'red'} paper-tag">${eng.state||'CONNECTING'}</span></div>
-    <div class="paper-isolation-banner"><span>CLOUD SSOT</span><b>API × SIGNAL ENGINE × PAPER BROKER × POSTGRES</b><small>${db.mode||'—'} · persistent ${db.persistent?'YES':'NO'} · UI Sync ${updated}</small></div>
-    <div class="paper-kpis harden"><div><span>EQUITY</span><b>${cloudMoney(equity)}</b><small>Start ${cloudMoney(start)}</small></div><div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b><small>${cloudPct(totalPct)}</small></div><div><span>REALIZED</span><b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b></div><div><span>UNREALIZED</span><b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b></div><div><span>TRADES</span><b>${trades.length}</b><small>Winrate ${fmt(winRate,0)}%</small></div><div><span>RISK OPEN</span><b>${fmt(openRisk,2)}%</b><small>${positions.length}/3 Positionen</small></div></div>`)+
-  card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${best?cloudStatusTone(best.status):'muted'}">${best?cloudStatusLabel(best.status):'LOADING'}</span></div>${best?`<div class="paper-signal"><div><b>${String(best.symbol||'').replace('USDT','')} ${best.side}</b><strong class="${cloudStatusTone(best.status)}">${best.technical}/100 · ${best.candidate}/100</strong></div><small>Technical / Candidate · Distanz ${fmt(best.distanceAtr||0,2)} ATR</small></div><div class="why-no-trade"><span>PAPER DECISION</span><b class="${best.status==='READY'?'green':'amber'}">${why}</b><small>Entry ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small></div>`:'<div class="muted">Scanner lädt.</div>'}`)+
-  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div><div class="paper-scanner">${scannerRows||'<div class="muted">Noch keine Cloud-Signale.</div>'}</div>`)+
-  card(`<div class="section-title">ENGINE HEALTH <span class="tag ${eng.errors===0?'green':'red'}">${eng.errors||0} ERRORS</span></div><div class="paper-stats"><div><span>STATE</span><b class="${eng.state==='RUNNING'?'green':'red'}">${eng.state||'—'}</b></div><div><span>MARKET</span><b class="${eng.marketFresh?'green':'red'}">${eng.marketFresh?'FRESH':'STALE'}</b></div><div><span>CYCLES</span><b>${eng.cycles??'—'}</b></div><div><span>SIGNAL SCANS</span><b>${eng.signalScans??'—'}</b></div><div><span>CYCLE</span><b>${Math.round(Number(eng.intervalMs||0)/1000)}s</b></div><div><span>SCAN</span><b>${Math.round(Number(eng.signalIntervalMs||0)/1000)}s</b></div></div><div class="row"><span>PostgreSQL</span><b class="${db.persistent?'green':'red'}">${db.persistent?'PERSISTENT':'NOT PERSISTENT'}</b></div><div class="row"><span>Safety</span><b class="${safety.paperTrading&&!safety.liveTrading?'green':'red'}">${safety.paperTrading?'PAPER ON':'PAPER OFF'} · ${safety.liveTrading?'LIVE ON':'LIVE OFF'}</b></div>`)+
-  card(`<div class="section-title">PAPER EQUITY <span class="tag cyan">POSTGRES</span></div>${cloudEquitySvg(p.equityCurve||[])}<div class="row"><span>Peak Equity</span><b>${cloudMoney(a.peakEquity||equity)}</b></div><div class="row"><span>Day Start</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>`)+
-  card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${positions.length}</span></div>${openRows||'<div class="muted">Keine offenen Cloud-Paper-Positionen.</div>'}`)+
-  `<details class="card paper-details" data-detail-key="cloud-trades"><summary>TRADE HISTORY <strong>${trades.length}</strong></summary><div>${tradeRows||'<div class="muted">Noch keine abgeschlossenen Cloud-Paper-Trades.</div>'}</div></details>`+
-  `<details class="card paper-details" data-detail-key="cloud-events"><summary>CLOUD EVENTS <strong>${events.length}</strong></summary><div>${eventRows||'<div class="muted">Noch keine Events.</div>'}</div></details>`+
-  card(`<div class="section-title">CLOUD CONNECTION</div><div class="row"><span>Backend</span><b class="green">Northflank</b></div><div class="row"><span>API</span><b>${MERIDIAN_CLOUD_API.replace('https://','')}</b></div><div class="row"><span>DB</span><b class="${db.persistent?'green':'red'}">${db.mode||'—'}</b></div><button class="paper-action green" onclick="meridianCloudSync(true)">CLOUD DATEN AKTUALISIEREN</button><p class="footer-note">Dashboard ist nur Anzeige/Monitoring. LIVE_TRADING bleibt serverseitig deaktiviert.</p>`);
+
+  const scannerRows=assets.map(q=>`
+    <div class="paper-scan-row observe" style="margin-bottom:10px">
+      <div>
+        <b>${String(q.symbol||'').replace('USDT','')} ${q.side||''}</b>
+        <small>TECH ${q.technical??'—'}/100 · CAND ${q.candidate??'—'}/100</small>
+        <em>${cloudPrice(q.price,q.symbol)} · ${q.distanceAtr!=null?fmt(q.distanceAtr,2)+' ATR':'—'}</em>
+      </div>
+      <div>
+        <span>${cloudStatusLabel(q.status)}</span>
+        <b class="${cloudStatusTone(q.status)}">${q.status==='READY'?'TRADE':'WATCH'}</b>
+        <em>${(q.reasons||[]).join(' · ')||'alle Gates erfüllt'}</em>
+      </div>
+    </div>`).join('');
+
+  const openRows=positions.map(t=>`
+    <div class="paper-pos">
+      <div><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><small>${t.ruleset||'6.2'} · CLOUD PAPER</small></div>
+      <div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div>
+      <div><span>LIVE</span><b>${cloudPrice(t.livePrice,t.symbol)}</b></div>
+      <div><span>P&L</span><b class="${Number(t.unrealized||0)>=0?'green':'red'}">${Number(t.unrealized||0)>=0?'+':''}${cloudMoney(t.unrealized||0)}</b></div>
+      <div><span>SL</span><b>${cloudPrice(t.sl,t.symbol)}</b></div>
+      <div><span>TP1 / TP2</span><b>${cloudPrice(t.tp1,t.symbol)} / ${cloudPrice(t.tp2,t.symbol)}</b></div>
+    </div>`).join('');
+
+  const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`
+    <div class="trade-observe-card">
+      <div class="trade-observe-head">
+        <b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b>
+        <strong class="${Number(t.realized||0)>=0?'green':'red'}">${t.exitReason||'CLOSED'} · ${Number(t.realized||0)>=0?'+':''}${cloudMoney(t.realized||0)}</strong>
+      </div>
+      <div class="trade-observe-grid">
+        <div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div>
+        <div><span>EXIT</span><b>${cloudPrice(t.exit,t.symbol)}</b></div>
+        <div><span>OPEN</span><b>${cloudTime(t.openedAt)}</b></div>
+        <div><span>CLOSE</span><b>${cloudTime(t.closedAt)}</b></div>
+      </div>
+    </div>`).join('');
+
+  const eventRows=events.slice(0,20).map(e=>`
+    <div class="row"><span>${cloudTime(e.created_at)} · ${String(e.type||'EVENT').replaceAll('_',' ')}</span><b>${e.payload?.symbol||e.payload?.assets?.[0]?.symbol||''}</b></div>`).join('');
+
+  const why=best
+    ? (best.status==='READY'
+        ? 'ALLE GATES ERFÜLLT · PAPER ENTRY FREIGEGEBEN'
+        : best.status==='WAIT_ENTRY_ZONE'
+          ? 'SETUP STARK · AUF ENTRY-ZONE WARTEN'
+          : (best.reasons||[]).join(' · ') || 'KEIN SETUP')
+    : 'SCANNER LÄDT';
+
+  return (
+    card(`<div class="paper-head">
+      <div>
+        <div class="eyebrow">UI 6.21 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="forecast-main">CLOUD PAPER COCKPIT</div>
+        <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
+      </div>
+      <span class="tag ${eng.state==='RUNNING'?'green':'red'} paper-tag">${eng.state||'CONNECTING'}</span>
+    </div>
+    <div class="paper-isolation-banner">
+      <span>${safety.paperTrading&&!safety.liveTrading?'PAPER ONLY':'SAFETY CHECK'}</span>
+      <b>${db.persistent?'POSTGRES PERSISTENT':'DB NOT PERSISTENT'} · MARKET ${eng.marketFresh?'FRESH':'STALE'}</b>
+      <small>Cycle ${Math.round(Number(eng.intervalMs||0)/1000)}s · Scan ${Math.round(Number(eng.signalIntervalMs||0)/1000)}s · Sync ${updated}</small>
+    </div>
+    <div class="paper-kpis harden">
+      <div><span>EQUITY</span><b>${cloudMoney(equity)}</b><small>Start ${cloudMoney(start)}</small></div>
+      <div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b><small>${cloudPct(totalPct)}</small></div>
+      <div><span>REALIZED</span><b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b></div>
+      <div><span>UNREALIZED</span><b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b></div>
+      <div><span>TRADES</span><b>${trades.length}</b><small>Winrate ${fmt(winRate,0)}%</small></div>
+      <div><span>OPEN RISK</span><b>${fmt(openRisk,2)}%</b><small>${positions.length}/3 Positionen</small></div>
+    </div>`)
+
+    + card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${best?cloudStatusTone(best.status):'muted'}">${best?cloudStatusLabel(best.status):'LOADING'}</span></div>
+      ${best?`
+        <div class="paper-signal">
+          <div><b>${String(best.symbol||'').replace('USDT','')} ${best.side}</b><strong class="${cloudStatusTone(best.status)}">${best.technical}/100 · ${best.candidate}/100</strong></div>
+          <small>Technical / Candidate · ${fmt(best.distanceAtr||0,2)} ATR zur Entry-Zone</small>
+        </div>
+        <div class="why-no-trade">
+          <span>PAPER DECISION</span>
+          <b class="${best.status==='READY'?'green':'amber'}">${why}</b>
+          <small>ENTRY ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small>
+        </div>`:'<div class="muted">Scanner lädt.</div>'}`)
+
+    + card(`<div class="section-title">LIVE SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div>
+      <div class="paper-scanner">${scannerRows||'<div class="muted">Noch keine Cloud-Signale.</div>'}</div>`)
+
+    + card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${positions.length}</span></div>
+      ${openRows||'<div class="muted">Keine offenen Cloud-Paper-Positionen.</div>'}`)
+
+    + card(`<div class="section-title">EQUITY & PERFORMANCE <span class="tag cyan">POSTGRES</span></div>
+      ${cloudEquitySvg(p.equityCurve||[])}
+      <div class="paper-stats">
+        <div><span>PEAK</span><b>${cloudMoney(a.peakEquity||equity)}</b></div>
+        <div><span>DAY START</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>
+        <div><span>WINRATE</span><b>${fmt(winRate,0)}%</b></div>
+        <div><span>ERRORS</span><b class="${Number(eng.errors||0)===0?'green':'red'}">${eng.errors||0}</b></div>
+      </div>`)
+
+    + `<details class="card paper-details" data-detail-key="cloud-trades">
+        <summary>TRADE HISTORY <strong>${trades.length}</strong></summary>
+        <div>${tradeRows||'<div class="muted">Noch keine abgeschlossenen Cloud-Paper-Trades.</div>'}</div>
+      </details>`
+
+    + `<details class="card paper-details" data-detail-key="cloud-diagnostics">
+        <summary>ENGINE / DIAGNOSTIK <strong>${eng.state||'—'}</strong></summary>
+        <div>
+          <div class="paper-stats">
+            <div><span>STATE</span><b class="${eng.state==='RUNNING'?'green':'red'}">${eng.state||'—'}</b></div>
+            <div><span>MARKET</span><b class="${eng.marketFresh?'green':'red'}">${eng.marketFresh?'FRESH':'STALE'}</b></div>
+            <div><span>CYCLES</span><b>${eng.cycles??'—'}</b></div>
+            <div><span>SCANS</span><b>${eng.signalScans??'—'}</b></div>
+          </div>
+          <div class="row"><span>Database</span><b class="${db.persistent?'green':'red'}">${db.mode||'—'} · ${db.persistent?'persistent':'volatile'}</b></div>
+          <div class="row"><span>Safety</span><b class="${safety.paperTrading&&!safety.liveTrading?'green':'red'}">PAPER ${safety.paperTrading?'ON':'OFF'} · LIVE ${safety.liveTrading?'ON':'OFF'}</b></div>
+          <div class="row"><span>Backend</span><b>Northflank</b></div>
+          <button class="paper-action green" onclick="meridianCloudSync(true)">CLOUD DATEN AKTUALISIEREN</button>
+        </div>
+      </details>`
+
+    + `<details class="card paper-details" data-detail-key="cloud-events">
+        <summary>CLOUD EVENTS <strong>${events.length}</strong></summary>
+        <div>${eventRows||'<div class="muted">Noch keine Events.</div>'}</div>
+      </details>`
+  );
 }
-setInterval(()=>meridianCloudSync(true),15000);
-window.addEventListener('pageshow',()=>setTimeout(()=>meridianCloudSync(false),500));
+setInterval(()=>meridianCloudSync(true),10000);
+window.addEventListener('pageshow',()=>setTimeout(()=>meridianCloudSync(true),150));
+setTimeout(()=>meridianCloudSync(false),50);
 
 function paperTradeView(){
- if(MERIDIAN_CLOUD.paper)return cloudPaperTradeView();
- if(!MERIDIAN_CLOUD.loading)setTimeout(()=>meridianCloudSync(true),0);
- paperTick();paperEngineScan(false);
- const s=paperState(),st=paperStats(s),xs=paperShadowStats(s),x=paperSignal(),pg=paperRiskGate(s,x);
+  if(MERIDIAN_CLOUD.paper)return cloudPaperTradeView();
+  if(!MERIDIAN_CLOUD.loading)setTimeout(()=>meridianCloudSync(true),0);
 
- const open=(s.open||[]).map(t=>{
-   const px=paperQuote(t.sym),pnl=Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*t.qty:0,r=t.riskUsd?pnl/t.riskUsd:0;
-   return `<div class="paper-pos"><div><b>${t.sym} ${t.side}</b><small>PAPER · Gate ${t.gateScore}/100</small></div><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>P&L</span><b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)} · ${fmt(r,2)}R</b></div><div><span>SL</span><b>${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1/TP2</span><b>${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div></div>`;
- }).join('');
-
- const journal=(s.trades||[]).slice(0,20).map(t=>`<div class="trade-observe-card">
-   <div class="trade-observe-head"><b>${t.sym} ${t.side}</b><strong class="${t.net>=0?'green':'red'}">${t.exitReason} · ${t.net>=0?'+':''}${fmt(t.r,2)}R</strong></div>
-   <div class="trade-observe-grid">
-    <div><span>SIGNAL</span><b>${paperIsoShort(t.firstSignalAt)}</b></div><div><span>ZONE</span><b>${paperIsoShort(t.zoneTouchedAt)}</b></div>
-    <div><span>ENTRY</span><b>${paperIsoShort(t.openedAt)}</b></div><div><span>EXIT</span><b>${paperIsoShort(t.closedAt)}</b></div>
-    <div><span>MFE</span><b class="green">${fmt(t.mfeR||0,2)}R</b></div><div><span>MAE</span><b class="red">${fmt(t.maeR||0,2)}R</b></div>
-    <div><span>DAUER</span><b>${t.duration||paperAge(t.openedAt,t.closedAt)}</b></div><div><span>ENTRY DELAY</span><b>${t.entryDelay||paperAge(t.firstSignalAt,t.openedAt)}</b></div><div><span>ZONE TOUCHES</span><b>${t.zoneTouchCount||1}</b></div><div><span>NET</span><b class="${t.net>=0?'green':'red'}">${t.net>=0?'+':''}$${fmt(t.net,2)}</b></div>
-   </div>
-  </div>`).join('');
-
- const isolatedShadow=(s.shadow||[]).filter(t=>t.sourceMode==='PAPER_INTERNAL');
- const legacyShadow=(s.shadow||[]).filter(t=>t.sourceMode!=='PAPER_INTERNAL');
- const shadow=isolatedShadow.slice(0,20).map(t=>{
-   const px=paperQuote(t.sym),valid=paperLevelsValid(t);
-   const status=!valid?'INVALID DATA':t.shadowEntry==null?'WAIT ZONE':t.resolved?t.outcome:'ACTIVE';
-   const tone=!valid?'red':t.shadowEntry==null?'amber':t.resolved?(t.outcome==='SL'?'green':'red'):'cyan';
-   const verdict=!valid?'NICHT GEWERTET':t.shadowEntry==null?'NICHT EINGESTIEGEN':t.resolved?(t.outcome==='SL'?'PAPER GATE SCHÜTZTE':'PAPER GATE BLOCKTE GEWINNER'):'HYPOTHETISCH AKTIV';
-   const result=t.shadowEntry!=null&&Number.isFinite(Number(t.hypotheticalR))?`${Number(t.hypotheticalR)>=0?'+':''}${fmt(t.hypotheticalR,2)}R`:'—';
-   return `<div class="shadow-card ${tone}">
-     <div class="shadow-head"><div><b>${t.sym} ${t.side}</b><small>${t.blockReason||'PAPER RISK GATE'} · Gate ${t.gateScore||0}/100</small></div><strong class="${tone}">${status}</strong></div>
-     <div class="shadow-grid">
-       <div><span>ENTRY ZONE</span><b>${paperPrice(t.entryLow,t.sym)}–${paperPrice(t.entryHigh,t.sym)}</b></div>
-       <div><span>THEOR. ENTRY</span><b>${t.shadowEntry!=null?paperPrice(t.shadowEntry,t.sym):'wartet auf Zone'}</b></div>
-       <div><span>SL</span><b class="red">${paperPrice(t.stop,t.sym)}</b></div>
-       <div><span>TP1 / TP2</span><b class="green">${paperPrice(t.tp1,t.sym)} / ${paperPrice(t.tp2,t.sym)}</b></div>
-       <div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div>
-       <div><span>HYPOTHETISCH</span><b class="${tone}">${result}</b></div>
-     </div>
-     <div class="shadow-verdict"><span>WARUM KEIN TRADE?</span><b>${t.paperRiskReason||t.reason||'PAPER RISK BLOCK'}</b><strong class="${tone}">${verdict}</strong></div>
-   </div>`;
- }).join('');
-
- const state=!x?.levelsValid&&x?'DATA INVALID':x?.allowed?'ENTRY READY':x?.techOpen&&!x?.paperRiskOpen?'PAPER RISK BLOCK':x?.techOpen&&!x?.inZone?'WAIT ZONE':'NO ENTRY';
- const tone=!x?.levelsValid&&x?'red':x?.allowed?'green':x?.techOpen?'amber':'red';
- const currentWhy=x?(!x.levelsValid?'INVALID PLAN DATA':!x.techOpen?'TECHNICAL GATE BLOCKED':!x.paperRiskOpen?x.paperRiskReason:!x.inZone?'PREIS AUSSERHALB ENTRY-ZONE':'PAPER ENTRY FREI'):'KEIN AKTIVES SETUP';
-
- return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 2.9</div><div class="forecast-main">ISOLATED FORWARD TEST</div><div class="sub">Multi-Asset Forward Test · Ruleset 5.80 eingefroren · nur Beobachtbarkeit erweitert.</div></div><span class="tag green paper-tag">ISOLATED</span></div>
-   <div class="paper-isolation-banner"><span>PAPER SSOT</span><b>TECH SIGNAL × PAPER RISK × ENTRY ZONE</b><small>Pionex Exposure · Bot Buffer · Portfolio Risk Gate = ignoriert</small></div>
-   ${(()=>{const la=paperLiveAccount(s);return `<div class="paper-kpis harden"><div><span>EQUITY</span><b>$${fmt(la.equity,2)}</b></div><div><span>TOTAL P&L</span><b class="${(la.realized+la.unreal)>=0?'green':'red'}">${(la.realized+la.unreal)>=0?'+':''}$${fmt(la.realized+la.unreal,2)}</b></div><div><span>REALIZED</span><b class="${la.realized>=0?'green':'red'}">${la.realized>=0?'+':''}$${fmt(la.realized,2)}</b></div><div><span>UNREALIZED</span><b class="${la.unreal>=0?'green':'red'}">${la.unreal>=0?'+':''}$${fmt(la.unreal,2)}</b></div><div><span>TRADES</span><b>${st.count}</b></div><div><span>RISK OPEN</span><b>${s.open.length}/${s.maxOpenPositions}</b></div></div>`})()}`)+
-
- card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${tone}">${state}</span></div>
-   <div class="paper-signal"><div><b>${x?.sym||'—'} ${x?.side||''}</b><strong class="${tone}">${x?.reason||'NO SETUP'}</strong></div><small>Technical ${x?.gateScore||0}/100 · Candidate ${x?.candidateScore||0}/100 · ${x?.inZone?'ENTRY ZONE':'außerhalb Entry-Zone'}</small></div>
-   <div class="why-no-trade"><span>PAPER DECISION</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>${x?`<small>Entry ${paperPrice(x.entryLow,x.sym)}–${paperPrice(x.entryHigh,x.sym)} · SL ${paperPrice(x.stop,x.sym)} · TP1 ${paperPrice(x.tp1,x.sym)} · TP2 ${paperPrice(x.tp2,x.sym)}</small>`:''}</div>
-   <button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.paperRiskOpen?'PAPER SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
-
- card(`<div class="section-title">ENGINE OBSERVABILITY <span class="tag cyan">v6.06</span></div>${(()=>{
-   const o=paperObsEnsure(s),c=paperCoverageSummary(s);
-   const last=o.lastScanAt?paperIsoShort(o.lastScanAt):'—';
-   const tone=o.lastResult==='ENTRY_READY'?'green':o.lastResult==='WAIT_ZONE'?'amber':o.lastResult==='NO_SETUP'?'muted':o.lastResult?.includes('BLOCK')?'red':'cyan';
-   const transitions=(o.transitions||[]).slice(0,6);
-   return `<div class="paper-stats">
-     <div><span>LAST SCAN</span><b>${last}</b></div>
-     <div><span>RESULT</span><b class="${tone}">${o.lastResult||'—'}</b></div>
-     <div><span>TOTAL SCANS</span><b>${Number(o.totalScans||0)}</b></div>
-     <div><span>24H MINUTES</span><b>${c.minutesTracked}</b></div>
-   </div>
-   <div class="paper-stats">
-     <div><span>NO SETUP</span><b>${Number(o.noSetupScans||0)}</b></div>
-     <div><span>WAIT ZONE</span><b class="amber">${Number(o.waitZoneScans||0)}</b></div>
-     <div><span>RISK BLOCK</span><b class="red">${Number(o.riskBlockScans||0)}</b></div>
-     <div><span>ENTRY READY</span><b class="green">${Number(o.entryReadyScans||0)}</b></div>
-   </div>
-   <div class="scan-proof"><span>SCAN PROOF</span><b>${c.activeMinutes}/${c.minutesTracked||0} aktive Minuten · ${c.totalScans} Scans</b><small>NO SETUP wird explizit protokolliert. So ist unterscheidbar: kein Signal vs. Engine lief nicht.</small></div>
-   ${transitions.length?`<details class="paper-mini-details"><summary>LETZTE STATE-TRANSITIONS <strong>${transitions.length}</strong></summary>${transitions.map(t=>`<div class="row"><span>${paperIsoShort(t.at)} · ${t.entity}${t.sym?' · '+t.sym:''}</span><b>${t.from} → ${t.to}</b></div>`).join('')}</details>`:'<div class="muted">Noch keine State-Transition.</div>'}
-   <p class="footer-note">Ruleset 5.80 FROZEN. Dieses Modul ändert keine Entry-, Gate-, SL- oder TP-Regel; es protokolliert nur Ausführung und Zustandswechsel.</p>`;
- })()}</div>`)+
-
-  card(`<div class="section-title">24/7 PAPER RUNNER <span class="tag green">SERVER</span></div>${(()=>{
-   const cfg=paperRunnerConfig(),st=PAPER_RUNNER_LAST_STATUS;
-   const connected=!!st?.connected;
-   const tone=!cfg.enabled?'muted':connected?'green':'amber';
-   const state=!cfg.enabled?'NICHT KONFIGURIERT':connected?(st.state||'ONLINE'):'STATUS PRÜFEN';
-   const last=st?.lastHeartbeatAt?paperIsoShort(st.lastHeartbeatAt):'—';
-   const ver=st?.appVersion||'—';
-   const loops=Number(st?.loops||0);
-   return `<div class="paper-stats">
-     <div><span>RUNNER</span><b class="${tone}">${state}</b></div>
-     <div><span>HEARTBEAT</span><b>${last}</b></div>
-     <div><span>ENGINE</span><b>${ver}</b></div>
-     <div><span>LOOPS</span><b>${loops}</b></div>
-   </div>
-   <div class="row"><span>Modus</span><b class="${cfg.enabled?'green':'muted'}">${cfg.enabled?'24/7 REMOTE':'LOCAL / RESUME'}</b></div>
-   <div class="row"><span>State Sync</span><b>${cfg.enabled&&cfg.autoSync?'AUTO · 60s':'AUS'}</b></div>
-   <div class="paper-runner-actions">
-     <button class="paper-toggle" onclick="paperRunnerConfigure()">${cfg.enabled?'RUNNER ÄNDERN':'RUNNER VERBINDEN'}</button>
-     ${cfg.enabled?`<button class="paper-toggle" onclick="paperRunnerPullState(true)">STATE HOLEN</button><button class="paper-toggle" onclick="paperRunnerPushState('MANUAL')">STATE SENDEN</button><button class="paper-toggle danger" onclick="paperRunnerDisable()">TRENNEN</button>`:''}
-   </div>
-   <p class="footer-note">Der Server-Runner lädt die exakt deployte MERIDIAN-App in Chromium und führt dieselben eingefrorenen Paper-Funktionen dauerhaft aus. Dadurch entstehen auch neue Kandidaten und Entries bei gesperrtem iPhone. Das iPhone synchronisiert nur den Paper-State.</p>`;
- })()}</div>`)+
-
- card(`<div class="section-title">OVERNIGHT ENGINE <span class="tag cyan">RESUME REPLAY</span></div>${(()=>{
-   const m=paperEngineMeta(s);
-   const gap=Number(m.lastGapMs||0);
-   const mins=gap/60000;
-   const tone=m.coverage==='LIVE'?'green':m.coverage==='RECOVERED'?'cyan':'amber';
-   return `<div class="paper-stats">
-     <div><span>COVERAGE</span><b class="${tone}">${m.coverage||'LIVE'}</b></div>
-     <div><span>LETZTE LÜCKE</span><b>${gap?fmt(mins,0)+' min':'—'}</b></div>
-     <div><span>REPLAY BARS</span><b>${Number(m.lastReplayBars||0)}</b></div>
-     <div><span>RECOVERED EVENTS</span><b>${Number(m.lastReplayEvents||0)}</b></div>
-   </div>
-   <div class="row"><span>Candidate Replay TTL</span><b>${Number(m.candidateReplayTtlMin||90)} min</b></div>
-   <button class="paper-toggle" onclick="paperResumeReplay(true)">OVERNIGHT REPLAY JETZT</button>
-   <p class="footer-note">iOS pausiert Browser/PWAs im Hintergrund. MERIDIAN rekonstruiert beim Öffnen bekannte Kandidaten und offene Paper-Positionen aus 5-Minuten-Kerzen. Nicht zuvor beobachtete Signale werden bewusst nicht rückwirkend erfunden. Für echte 24/7-Signalerzeugung wäre ein externer Server-Runner nötig.</p>`;
- })()}</div>`)+
-
- card(`<div class="section-title">PAPER RISK ENGINE <span class="tag green">INDEPENDENT</span></div>
-   <div class="paper-stats"><div><span>OPEN</span><b>${s.open.length}/${pg.maxOpen}</b></div><div><span>OPEN RISK</span><b>${fmt(pg.openRiskPct,2)}%</b></div><div><span>RISK / TRADE</span><b>${fmt(s.riskPerTradePct,1)}%</b></div><div><span>MAX PORTFOLIO RISK</span><b>${fmt(pg.maxRiskPct,1)}%</b></div></div>
-   <div class="row"><span>Pionex/GRID Risk Gate</span><b class="green">IGNORED</b></div>`)+
-
- card(`<div class="section-title">CURRENT POSITION <span class="tag ${s.open.length?'green':'muted'}">${s.open.length?'LIVE PAPER':'FLAT'}</span></div>${s.open.length?s.open.map(t=>{const px=paperQuote(t.sym),qty=Number(t.remainingQty||t.qty||0),pnl=Number.isFinite(px)?(t.side==='SHORT'?(t.entry-px):(px-t.entry))*qty+Number(t.realizedPartial||0):0,r=t.riskUsd?pnl/t.riskUsd:0;return `<div class="current-paper-pos"><div class="current-paper-head"><div><b>${t.sym} ${t.side}</b><small>Gate ${t.gateScore}/100 · PAPER · ${t.ruleSet}</small></div><strong class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}$${fmt(pnl,2)}<small>${fmt(r,2)}R</small></strong></div><div class="current-paper-grid"><div><span>ENTRY</span><b>${paperPrice(t.entry,t.sym)}</b></div><div><span>LIVE</span><b>${Number.isFinite(px)?paperPrice(px,t.sym):'—'}</b></div><div><span>SL</span><b class="red">${paperPrice(t.stop,t.sym)}</b></div><div><span>TP1</span><b class="green">${paperPrice(t.tp1,t.sym)}</b></div><div><span>TP2</span><b class="green">${paperPrice(t.tp2,t.sym)}</b></div><div><span>TP1 STATUS</span><b class="${t.tp1PartialDone?'green':'muted'}">${t.tp1PartialDone?'50% REALIZED':'WAIT'}</b></div></div><div class="position-track"><i style="left:38%"></i><b>SL</b><b>ENTRY</b><b>TP1</b><b>TP2</b></div></div>`}).join(''):'<div class="muted">Keine offene Paper-Position.</div>'}`)+
-
- `<details class="card paper-details" data-detail-key="execution-control"><summary>EXECUTION CONTROL <strong>${s.autoMode?'AUTO':'MANUAL'}</strong></summary><div><div class="row"><span>Auto Entry</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div><div class="row"><span>Duplicate Guard</span><b class="green">ON</b></div><div class="row"><span>Persistence Backup</span><b class="green">ON</b></div><div class="row"><span>TP1 Handling</span><b>50% PARTIAL</b></div><div class="row"><span>Ruleset</span><b>5.80 FROZEN</b></div></div></details>`+
-
- card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
-   <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v6.06 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
-
- card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
-   <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
-
- card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${s.open.length}</span></div>${open||'<div class="muted">Keine offenen Paper-Positionen.</div>'}`)+
-
- card(`<div class="section-title">PERFORMANCE</div><div class="paper-stats"><div><span>TRADES</span><b>${st.count}</b></div><div><span>PROFIT FACTOR</span><b>${st.pf>=99?'∞':fmt(st.pf,2)}</b></div><div><span>AUTO MODE</span><b class="${s.autoMode?'green':'amber'}">${s.autoMode?'ON':'OFF'}</b></div><div><span>MODE</span><b class="green">ISOLATED</b></div></div><button class="paper-toggle" onclick="paperToggleAuto()">AUTO MODE ${s.autoMode?'AUS':'EIN'}</button>`)+
-
- card(`<div class="section-title">PAPER SHADOW VALIDATION <span class="tag cyan">SHADOW</span></div>
-   <div class="shadow-kpis">
-     <div><span>INTERNAL BLOCKED</span><b>${xs.total}</b></div>
-     <div><span>WAIT ZONE</span><b class="amber">${xs.waiting}</b></div>
-     <div><span>AVOIDED LOSSES</span><b class="green">${xs.avoidedLosses}</b></div>
-     <div><span>MISSED WINNERS</span><b class="red">${xs.missedWinners}</b></div>
-     <div><span>GATE PRECISION</span><b>${xs.resolved&&xs.gatePrecision!=null?fmt(xs.gatePrecision,1)+'%':'—'}</b></div>
-     <div><span>SHADOW EXP.</span><b>${xs.resolved?fmt(xs.avgR,2)+'R':'—'}</b></div>
-     <div><span>LEGACY EXTERNAL</span><b class="muted">${xs.legacy}</b></div>
-   </div>
-   <p class="footer-note">Nur PAPER-eigene Risk-Blocks fließen in diese Statistik. Alte Pionex/Portfolio-Shadow-Signale bleiben archiviert, werden aber nicht mehr gewertet.</p>`)+
-
- `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v6.06 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
-
- card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
-   const a=paperAnalytics(s);
-   if(!st.count)return '<div class="muted">Auswertung startet nach dem ersten abgeschlossenen Paper-Trade.</div>';
-   const row=(n,v)=>`<div class="row analytics-row"><span>${n} · ${v.n} Trades</span><b>${fmt(v.wr,1)}% WR · ${fmt(v.r,2)}R · ${v.net>=0?'+':''}$${fmt(v.net,2)}<small>MFE ${fmt(v.mfe,2)}R / MAE ${fmt(v.mae,2)}R</small></b></div>`;
-   return row('LONG',a.long)+row('SHORT',a.short)+row('GATE 70–79',a.g70)+row('GATE 80+',a.g80)+
-     a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
- })()}</div>`)+
-
- card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v6.06</span></div>${(()=>{
-   const trades=(s.trades||[]),n=trades.length;
-   const clean=trades.filter(t=>Number(t.r)>=1).length;
-   const direct=trades.filter(t=>t.exitReason==='SL'&&Number(t.mfeR||0)<0.25).length;
-   const give=trades.filter(t=>Number(t.mfeR||0)>=1&&Number(t.r||0)<=0).length;
-   const tp1=trades.filter(t=>t.tp1Touched||t.tp1PartialDone).length;
-   const avg=(k)=>n?trades.reduce((a,t)=>a+Number(t[k]||0),0)/n:0;
-   return `<div class="intel-status"><span>EDGE STATUS</span><b class="${n>=20?'green':'amber'}">${n>=20?'BASELINE READY':'LEARNING'}</b><small>${n}/20 closed trades</small></div><div class="paper-stats intel-grid"><div><span>CLEAN WINS</span><b class="green">${clean}</b></div><div><span>DIRECT FAIL</span><b class="red">${direct}</b></div><div><span>GIVEBACKS</span><b class="amber">${give}</b></div><div><span>TP1 TOUCH</span><b>${n?fmt(tp1/n*100,0):0}%</b></div><div><span>AVG MFE</span><b class="green">${fmt(avg('mfeR'),2)}R</b></div><div><span>AVG MAE</span><b class="red">${fmt(avg('maeR'),2)}R</b></div></div><p class="footer-note">Diagnose only. Kein Entry-, SL- oder TP-Parameter wird automatisch verändert. Ruleset 5.80 bleibt FROZEN.</p>`;
- })()}</div>`)+
-
- card(`<div class="section-title">EQUITY & DRAWDOWN <span class="tag cyan">FORWARD</span></div>${(()=>{
-   const e=paperEquityCurve(s),la=paperLiveAccount(s),cd=paperCurrentDrawdown(s),vals=[...e.pts.map(x=>x.equity),la.equity];
-   return `<div class="equity-kpis"><div><span>LIVE EQUITY</span><b>$${fmt(la.equity,2)}</b><small>inkl. Floating P&L</small></div><div><span>CURRENT DD</span><b class="${cd.dd>5?'red':cd.dd>2?'amber':'green'}">${fmt(cd.dd,2)}%</b><small>Peak $${fmt(cd.peak,2)}</small></div><div><span>CLOSED EQUITY</span><b>$${fmt(e.equity,2)}</b><small>nur abgeschlossene Trades</small></div><div><span>CLOSED MAX DD</span><b>${fmt(e.maxDD,2)}%</b></div></div>${paperSparklineSvg(vals)}`;
- })()}</div>`)+
-
- card(`<div class="section-title">ENTRY QUALITY</div>${(()=>{
-   const q=paperEntryQuality(s);
-   return `<div class="paper-stats">
-    <div><span>TRADES</span><b>${q.n}</b></div>
-    <div><span>SIGNAL→ENTRY</span><b>${q.n?fmt(q.avgDelayMin,1)+'m':'—'}</b></div>
-    <div><span>ZONE→ENTRY</span><b>${q.n?fmt(q.avgZoneToEntryMin,1)+'m':'—'}</b></div>
-    <div><span>ENTRY OFFSET</span><b>${q.n?fmt(q.avgSlipPct,3)+'%':'—'}</b></div>
-   </div>`;
- })()}</div>`)+
-
- card(`<div class="section-title">EXIT BREAKDOWN</div>${(()=>{
-   const rows=paperExitStats(s);
-   return rows.length?rows.map(r=>`<div class="row"><span>${r.reason} · ${r.n}</span><b class="${r.net>=0?'green':'red'}">${r.net>=0?'+':''}$${fmt(r.net,2)} · ${fmt(r.avgR,2)}R</b></div>`).join(''):'<div class="muted">Noch keine abgeschlossenen Trades.</div>';
- })()}</div>`)+
-
-  card(`<div class="section-title">PAPER PERSISTENCE <span class="tag green">UPDATE-SAFE</span></div>${(()=>{
-   const sid=paperStateId(s),snaps=paperSnapshotList();
-   return `<div class="paper-persist-grid">
-     <div><span>STATE ID</span><b>${sid}</b><small>ändert sich nur bei Zustandsänderung</small></div>
-     <div><span>SNAPSHOTS</span><b>${snaps.length}</b><small>max. 12 lokale Versionen</small></div>
-   </div>
-   <div class="paper-persist-actions">
-     <button onclick="paperExportState()">STATE EXPORTIEREN</button>
-     <button onclick="paperImportPrompt()">STATE IMPORTIEREN</button>
-   </div>
-   <p class="footer-note">Vor Updates empfiehlt sich ein Export. MERIDIAN legt zusätzlich lokale Snapshots an, sobald Paper-Trades, offene Positionen oder Candidate-History vorhanden sind.</p>`;
- })()}</div>`)+
-
-card(`<div class="section-title">SIMULATION</div><div class="row"><span>Startkapital</span><b>$${fmt(s.startBalance,0)}</b></div><div class="row"><span>Gebühr</span><b>${fmt(s.feePct*100,3)}%</b></div><div class="row"><span>Slippage</span><b>${fmt(s.slippagePct*100,3)}%</b></div><div class="row"><span>Paper-Modus</span><b>100% ISOLATED</b></div><div class="row"><span>Ruleset</span><b>5.80 · FROZEN</b></div><div class="row"><span>Shadow State</span><b>WAIT → ACTIVE → RESULT</b></div><button class="paper-reset" onclick="paperReset()">PAPER-KONTO ZURÜCKSETZEN</button>`);
+  const err=MERIDIAN_CLOUD.error;
+  return card(`<div class="paper-head">
+    <div>
+      <div class="eyebrow">UI 6.21 · CLOUD PAPER</div>
+      <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
+      <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
+    </div>
+    <span class="tag ${err?'red':'amber'}">${err?'OFFLINE':'SYNC'}</span>
+  </div>
+  <div class="paper-isolation-banner">
+    <span>CLOUD SSOT</span>
+    <b>${err?String(err):'Status, Signale, Paper-Konto und Events werden geladen.'}</b>
+    <small>Die alte lokale Browser-/Runner-Engine wird in v6.21 nicht mehr als Datenquelle verwendet.</small>
+  </div>
+  <button class="paper-action green" onclick="meridianCloudSync(true)">ERNEUT VERBINDEN</button>`);
 }
 setInterval(()=>{try{paperTick();paperEngineScan(false)}catch(e){}},5000);
 window.addEventListener('pageshow',()=>setTimeout(()=>paperResumeReplay(false),300));
