@@ -3338,7 +3338,7 @@ main,.app-main,.content,.page-content{
 
 
 <script>
-/* MERIDIAN v6.22 — remove legacy PWA cache / service worker.
+/* MERIDIAN v6.23 — remove legacy PWA cache / service worker.
    The cloud dashboard must always load the current GitHub Pages build. */
 window.addEventListener('load', async () => {
   try {
@@ -3497,6 +3497,63 @@ window.addEventListener('load', async () => {
 }
 </style>
 
+
+<style id="v623-kpi-structural-fix">
+.v623-kpis{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.v623-kpis .kpi-card{
+  box-sizing:border-box;
+  min-width:0!important;
+  min-height:88px!important;
+  padding:12px 11px!important;
+  overflow:hidden;
+}
+.v623-kpis .kpi-card>span{
+  display:block!important;
+  margin:0 0 8px!important;
+  font-size:6px!important;
+  line-height:1.1!important;
+  letter-spacing:.15em;
+}
+.v623-kpis .kpi-card>b{
+  display:block!important;
+  width:100%!important;
+  margin:0!important;
+  font-size:11px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.v623-kpis .kpi-card>small{
+  display:block!important;
+  width:100%!important;
+  margin-top:7px!important;
+  font-size:6px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+@media (max-width:380px){
+  .v623-kpis{
+    gap:8px!important;
+  }
+  .v623-kpis .kpi-card{
+    padding:10px 9px!important;
+  }
+  .v623-kpis .kpi-card>b{
+    font-size:10px!important;
+  }
+  .v623-kpis .kpi-card>small{
+    font-size:5.6px!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3504,7 +3561,7 @@ window.addEventListener('load', async () => {
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.22 · LIVE</span>
+        <span class="version" id="versionBadge">v6.23 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6613,7 +6670,7 @@ function paperAnalytics(s){
  return {assetRows,long:calc(bySide.LONG||[]),short:calc(bySide.SHORT||[]),g70:calc(byGate['70–79']),g80:calc(byGate['80+'])};
 }
 
-/* ===== MERIDIAN v6.22 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
+/* ===== MERIDIAN v6.23 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
 const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
 let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],updatedAt:null,error:null,loading:false};
 
@@ -6737,7 +6794,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.22 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.23 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -6748,13 +6805,37 @@ function cloudPaperTradeView(){
       <b>${db.persistent?'POSTGRES PERSISTENT':'DB NOT PERSISTENT'} · MARKET ${eng.marketFresh?'FRESH':'STALE'}</b>
       <small>Cycle ${Math.round(Number(eng.intervalMs||0)/1000)}s · Scan ${Math.round(Number(eng.signalIntervalMs||0)/1000)}s · Sync ${updated}</small>
     </div>
-    <div class="paper-kpis harden">
-      <div><span>EQUITY</span><b>${cloudMoney(equity)}</b><small>Start ${cloudMoney(start)}</small></div>
-      <div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b><small>${cloudPct(totalPct)}</small></div>
-      <div><span>REALIZED</span><b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b></div>
-      <div><span>UNREALIZED</span><b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b></div>
-      <div><span>TRADES</span><b>${trades.length}</b><small>Winrate ${fmt(winRate,0)}%</small></div>
-      <div><span>OPEN RISK</span><b>${fmt(openRisk,2)}%</b><small>${positions.length}/3 Positionen</small></div>
+    <div class="paper-kpis harden v623-kpis">
+      <div class="kpi-card">
+        <span>EQUITY</span>
+        <b>${cloudMoney(equity)}</b>
+        <small>Start ${cloudMoney(start)}</small>
+      </div>
+      <div class="kpi-card">
+        <span>TOTAL P&L</span>
+        <b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b>
+        <small class="${totalPct>=0?'green':'red'}">${totalPct>=0?'+':''}${fmt(totalPct,2)}%</small>
+      </div>
+      <div class="kpi-card">
+        <span>REALIZED</span>
+        <b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b>
+        <small>geschlossen</small>
+      </div>
+      <div class="kpi-card">
+        <span>UNREALIZED</span>
+        <b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b>
+        <small>offene Positionen</small>
+      </div>
+      <div class="kpi-card">
+        <span>TRADES</span>
+        <b>${trades.length}</b>
+        <small>Winrate ${fmt(winRate,0)}%</small>
+      </div>
+      <div class="kpi-card">
+        <span>OPEN RISK</span>
+        <b>${fmt(openRisk,2)}%</b>
+        <small>${positions.length}/3 Positionen</small>
+      </div>
     </div>`)
 
     + card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${best?cloudStatusTone(best.status):'muted'}">${best?cloudStatusLabel(best.status):'LOADING'}</span></div>
@@ -6827,7 +6908,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.22 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.23 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -6836,7 +6917,7 @@ function paperTradeView(){
   <div class="paper-isolation-banner">
     <span>CLOUD SSOT</span>
     <b>${err?String(err):'Status, Signale, Paper-Konto und Events werden geladen.'}</b>
-    <small>Die alte lokale Browser-/Runner-Engine wird in v6.22 nicht mehr als Datenquelle verwendet.</small>
+    <small>Die alte lokale Browser-/Runner-Engine wird in v6.23 nicht mehr als Datenquelle verwendet.</small>
   </div>
   <button class="paper-action green" onclick="meridianCloudSync(true)">ERNEUT VERBINDEN</button>`);
 }
