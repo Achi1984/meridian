@@ -1,0 +1,9 @@
+ACHI MERIDIAN v6.04
+- Risk State and Data State are now independent.
+- BTC-L20 at 9.89% is WATCH (amber), even when live BTC feed is unavailable.
+- Paper Engine detects iOS/background gaps.
+- On resume, known candidates and open positions are replayed with Binance 5m candles.
+- Conservative intrabar policy: SL first when candle ordering is ambiguous.
+- Previously unseen signals are NOT created with hindsight.
+- True 24/7 signal generation still requires an external server runner.
+- Ruleset 5.80 remains FROZEN.

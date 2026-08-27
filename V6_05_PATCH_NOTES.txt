@@ -1,0 +1,7 @@
+ACHI MERIDIAN v6.05
+- Added deployable 24/7 Paper Runner (Node + Playwright + Docker).
+- Runner executes the deployed MERIDIAN app itself: no duplicated strategy implementation.
+- New paper signals can be generated while the iPhone is locked/offline.
+- Paper state persisted server-side and synchronized with iPhone.
+- Bearer-token API; no exchange trading keys and no real orders.
+- v5.80 paper ruleset remains FROZEN.
