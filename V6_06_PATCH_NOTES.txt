@@ -1,0 +1,13 @@
+ACHI MERIDIAN v6.06 — PRE-RUNNER FINAL
+
+- Paper scan observability added.
+- Every engine cycle increments total scan counters.
+- Minute-level ledger retains up to 24h of execution proof without exhausting iPhone localStorage.
+- NO_SETUP is explicitly recorded, so "no signal" is distinguishable from "engine did not run".
+- Candidate reason changes are logged as state transitions.
+- Shadow WAIT_ZONE -> ACTIVE -> RESOLVED transitions are logged.
+- Shadow outcomes remain AVOIDED LOSS / MISSED WINNER evaluable.
+- Observability is part of the persistent paper state and is export/import safe.
+- No Entry/Gate/SL/TP threshold changed.
+- Ruleset 5.80 remains FROZEN.
+- 24/7 runner remains included but deployment is intentionally deferred until local optimization is validated.

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#05080d">
 <link rel="manifest" href="manifest.webmanifest?v=5.80">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.05.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.33,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.33,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
 
@@ -1816,7 +1816,7 @@ body{background:transparent;letter-spacing:.01em}
   }
 }
 
-/* v6.05 — MOBILE LAYOUT / COLLISION GUARD */
+/* v6.06 — MOBILE LAYOUT / COLLISION GUARD */
 .card, .cc-hero, .center-advanced, .position-intelligence-card, .reality-engine-v522,
 .hedge-v519, .hedge-opt-v520, .auto-safe-v521, .reality-calibration-v522,
 .priority-grid, .pi-summary, .grid2, .exec-grid, .sl-riskbox, .reality-current-grid,
@@ -2341,7 +2341,7 @@ body[data-view] nav.bottom{
   .bot-action-head,.bot-protection-row{grid-template-columns:1fr 1fr}
 }
 
-/* v6.05 compact bot action cards */
+/* v6.06 compact bot action cards */
 .bot-v551 .bot-mini-card{border-top:1px solid #173e55;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(2,14,21,.3)}
 .bot-mini-route{display:flex;align-items:center;gap:8px;min-width:0}
 .bot-mini-route>b{font-size:16px}.bot-mini-route>span{color:#24aef2;font-weight:900}.bot-mini-route>strong{font-size:13px;overflow-wrap:anywhere}
@@ -2777,7 +2777,7 @@ main>section{
 
 
 <style id="v570-depot-cleanup-css">
-/* v6.05 DEPOT cleanup — no navigation changes */
+/* v6.06 DEPOT cleanup — no navigation changes */
 .venue-compact{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:center}
 .venue-donut-wrap{position:relative;min-height:140px}
 .venue-compact-list{display:grid;gap:0}
@@ -2850,7 +2850,7 @@ main>section{
 
 
 <style id="v572-decision-cleanup-css">
-/* v6.05 Decision Cleanup — navigation/feed architecture untouched */
+/* v6.06 Decision Cleanup — navigation/feed architecture untouched */
 .trade-decision-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .trade-decision-head .forecast-main{font-size:22px;margin-top:4px}
 .trade-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -3114,7 +3114,7 @@ main>section{
 
 
 <style id="v593-market-price-layout">
-/* v6.05 — prevent live prices from splitting over two lines on iPhone */
+/* v6.06 — prevent live prices from splitting over two lines on iPhone */
 .live-market-row{
   gap:14px;
 }
@@ -3252,7 +3252,7 @@ main>section{
 
 
 <style id="v603-center-safearea">
-/* MERIDIAN v6.05 — durable iPhone safe-area + compact CENTER */
+/* MERIDIAN v6.06 — durable iPhone safe-area + compact CENTER */
 :root{
   --meridian-safe-top: env(safe-area-inset-top, 0px);
   --meridian-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -3318,6 +3318,24 @@ main,.app-main,.content,.page-content{
 @media(max-width:520px){.paper-runner-actions{grid-template-columns:1fr 1fr}}
 </style>
 
+
+<style id="v606-pre-runner-final">
+.scan-proof{margin-top:10px;padding:12px;border:1px solid #173f55;border-radius:14px;display:grid;gap:4px}
+.scan-proof span{font-size:8px;letter-spacing:1.2px;color:#7f92a7}
+.scan-proof b{font-size:12px}
+.scan-proof small{font-size:8px;line-height:1.45;color:#75879a}
+.paper-mini-details{margin-top:10px;border-top:1px solid #17384b;padding-top:8px}
+.paper-mini-details summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;font-size:9px;letter-spacing:1px;color:#8da0b5}
+.paper-mini-details summary::-webkit-details-marker{display:none}
+.paper-details{padding:0!important;overflow:hidden}
+.paper-details summary{padding:15px 18px}
+.paper-details>div{padding:0 18px 16px}
+@media(max-width:480px){
+  .paper-stats{gap:8px}
+  .paper-stats>div{min-height:74px}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3325,7 +3343,7 @@ main,.app-main,.content,.page-content{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.05 · LIVE</span>
+        <span class="version" id="versionBadge">v6.06 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3357,7 +3375,7 @@ main,.app-main,.content,.page-content{
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v6.05.js?v=20260824-2315"></script>
+<script src="app-v6.06.js?v=20260824-2315"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -3428,8 +3446,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.05';
-let APP_RELEASE='6.05 · 24/7 PAPER RUNNER';
+let APP_CODE_VERSION='6.06';
+let APP_RELEASE='6.06 · PRE-RUNNER FINAL';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3899,7 +3917,7 @@ function managementDecision(bot){
  return {phase:'SAFE',action:'KEEP',tone:'green',rank:4,next:'ENTRY/SETUP separat',reason:'Liquidationspuffer stabil.'};
 }
 
-/* v6.05 — UNIFIED RISK STATE MATRIX
+/* v6.06 — UNIFIED RISK STATE MATRIX
    One deterministic state object drives CENTER, GRID, lifecycle and capital gating.
    BE protection neutralizes the bot as a primary capital-loss blocker, but never removes
    execution/slippage risk. Stale data can block ADD / new capital without inventing a new buffer. */
@@ -4514,7 +4532,7 @@ function consistencyDiagnostics(){
 }
 
 
-/* v6.05 — ONE ACTION SSOT */
+/* v6.06 — ONE ACTION SSOT */
 function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{};
  const shortBuf=Number(cap.shortBuf);
@@ -4678,7 +4696,7 @@ function centerRiskTransparency(){
 }
 
 
-/* MERIDIAN v6.05 — LIQUIDATION FIRST
+/* MERIDIAN v6.06 — LIQUIDATION FIRST
    Facts first: current liquidation price -> buffer -> gate.
    No exposure-% recommendation is emitted as a primary action. */
 function btcRiskConfig(){
@@ -5449,6 +5467,108 @@ function paperImportPrompt(){
 function paperSnapshotList(){
  try{return JSON.parse(localStorage.getItem(PAPER_SNAPSHOT_INDEX_KEY)||'[]')}catch(e){return []}
 }
+
+function paperObsEnsure(s){
+  s.observability=s.observability||{};
+  const o=s.observability;
+  if(!Number.isFinite(Number(o.totalScans)))o.totalScans=0;
+  if(!Number.isFinite(Number(o.noSetupScans)))o.noSetupScans=0;
+  if(!Number.isFinite(Number(o.entryReadyScans)))o.entryReadyScans=0;
+  if(!Number.isFinite(Number(o.waitZoneScans)))o.waitZoneScans=0;
+  if(!Number.isFinite(Number(o.techBlockScans)))o.techBlockScans=0;
+  if(!Number.isFinite(Number(o.riskBlockScans)))o.riskBlockScans=0;
+  if(!Array.isArray(o.minuteBuckets))o.minuteBuckets=[];
+  if(!Array.isArray(o.transitions))o.transitions=[];
+  if(!o.stateCounts||typeof o.stateCounts!=='object')o.stateCounts={};
+  return o;
+}
+
+function paperDecisionState(x){
+  if(!x)return 'NO_SETUP';
+  if(!x.levelsValid)return 'DATA_INVALID';
+  if(!x.techOpen)return 'TECH_BLOCK';
+  if(!x.paperRiskOpen)return 'PAPER_RISK_BLOCK';
+  if(!x.inZone)return 'WAIT_ZONE';
+  if(x.allowed)return 'ENTRY_READY';
+  return 'NO_ENTRY';
+}
+
+function paperRecordTransition(s,entity,key,from,to,meta={}){
+  if(!from||!to||from===to)return;
+  const o=paperObsEnsure(s);
+  o.transitions.unshift({
+    at:new Date().toISOString(),
+    entity:String(entity||'ENGINE'),
+    key:String(key||''),
+    from:String(from),
+    to:String(to),
+    ...meta
+  });
+  o.transitions=o.transitions.slice(0,160);
+}
+
+function paperRecordScan(s,signals){
+  const o=paperObsEnsure(s), now=new Date(), iso=now.toISOString();
+  const states=(signals||[]).map(x=>paperDecisionState(x));
+  const result=states.includes('ENTRY_READY')?'ENTRY_READY':
+    states.includes('PAPER_RISK_BLOCK')?'PAPER_RISK_BLOCK':
+    states.includes('WAIT_ZONE')?'WAIT_ZONE':
+    states.includes('TECH_BLOCK')?'TECH_BLOCK':
+    states.includes('DATA_INVALID')?'DATA_INVALID':
+    (signals||[]).length?'NO_ENTRY':'NO_SETUP';
+
+  const prior=o.lastResult||null;
+  o.totalScans++;
+  o.lastScanAt=iso;
+  o.lastResult=result;
+  o.lastSignalCount=(signals||[]).length;
+  o.stateCounts[result]=Number(o.stateCounts[result]||0)+1;
+  if(result==='NO_SETUP'){o.noSetupScans++;o.lastNoSetupAt=iso}
+  if(result==='ENTRY_READY')o.entryReadyScans++;
+  if(result==='WAIT_ZONE')o.waitZoneScans++;
+  if(result==='TECH_BLOCK')o.techBlockScans++;
+  if(result==='PAPER_RISK_BLOCK')o.riskBlockScans++;
+
+  // Minute ledger: proves the engine was running without exploding localStorage.
+  const minute=iso.slice(0,16);
+  let b=o.minuteBuckets[0];
+  if(!b||b.minute!==minute){
+    b={minute,scans:0,noSetup:0,entryReady:0,waitZone:0,techBlock:0,riskBlock:0,signalsMax:0,lastResult:result};
+    o.minuteBuckets.unshift(b);
+    o.minuteBuckets=o.minuteBuckets.slice(0,1440); // up to 24h minute-level history
+  }
+  b.scans++;
+  b.lastResult=result;
+  b.signalsMax=Math.max(Number(b.signalsMax||0),(signals||[]).length);
+  if(result==='NO_SETUP')b.noSetup++;
+  if(result==='ENTRY_READY')b.entryReady++;
+  if(result==='WAIT_ZONE')b.waitZone++;
+  if(result==='TECH_BLOCK')b.techBlock++;
+  if(result==='PAPER_RISK_BLOCK')b.riskBlock++;
+
+  if(prior&&prior!==result)paperRecordTransition(s,'ENGINE','SCAN',prior,result,{signals:(signals||[]).length});
+  return result;
+}
+
+function paperCoverageSummary(s){
+  const o=paperObsEnsure(s), rows=o.minuteBuckets||[];
+  const latest=rows[0];
+  const oldest=rows[rows.length-1];
+  const mins=rows.length;
+  const total=rows.reduce((a,b)=>a+Number(b.scans||0),0);
+  const noSetup=rows.reduce((a,b)=>a+Number(b.noSetup||0),0);
+  const active=rows.filter(b=>Number(b.scans||0)>0).length;
+  return {
+    minutesTracked:mins,
+    activeMinutes:active,
+    totalScans:total,
+    noSetupScans:noSetup,
+    latest:latest?.minute||null,
+    oldest:oldest?.minute||null,
+    coveragePct:mins?active/mins*100:0
+  };
+}
+
 function paperDefaultState(){
  return {
    startBalance:10000,balance:10000,
@@ -5511,6 +5631,10 @@ function paperMigrateState(s){
  });
  s.open=(s.open||[]).filter(t=>paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side}));
  s.trades=(s.trades||[]).map(t=>({...t,dataQuality:paperLevelsValid({entryLow:t.entry,entryHigh:t.entry,stop:t.stop,tp1:t.tp1,tp2:t.tp2,side:t.side})?'VALID':'INVALID'}));
+ return s;
+
+ paperObsEnsure(s);
+ s.ruleSet=s.ruleSet||'5.80-FROZEN';
  return s;
 }
 
@@ -5598,6 +5722,7 @@ function paperTrackCandidates(s,signals){
      h.reasonChanges=Number(old.reasonChanges||0)+1;
      h.previousReason=old.lastReason;
      h.lastReasonChangeAt=now;
+     paperRecordTransition(s,'CANDIDATE',key,old.lastReason,reason,{sym:x.sym,side:x.side,live:x.live});
    }
    s.candidateHistory[key]=h;
  }
@@ -6103,6 +6228,7 @@ function paperEngineScan(force=false){
      }
    }
  }
+ paperRecordScan(s,signals);
  savePaperState(s);
 
  paperMarkEvaluation();
@@ -6183,6 +6309,7 @@ function paperTick(){
  }
  // strict shadow state machine remains unchanged in concept
  for(const t of (s.shadow||[])){
+   const prevShadowStatus=t.status||null;
    if(!paperLevelsValid(t)){t.dataQuality='INVALID';t.status='INVALID';t.resolved=false;t.outcome=null;t.hypotheticalR=null;continue}
    t.dataQuality='VALID';
    if(t.shadowEntry==null && t.resolved){t.resolved=false;t.outcome=null;t.exit=null;t.hypotheticalR=null;t.status='WAIT_ZONE'}
@@ -6191,7 +6318,7 @@ function paperTick(){
    if(!Number.isFinite(px))continue;
    const lo=Math.min(Number(t.entryLow),Number(t.entryHigh)),hi=Math.max(Number(t.entryLow),Number(t.entryHigh));
    if(t.shadowEntry==null){
-     if(px>=lo&&px<=hi){t.shadowEntry=px;t.shadowStartedAt=new Date().toISOString();t.status='ACTIVE'}
+     if(px>=lo&&px<=hi){t.shadowEntry=px;t.shadowStartedAt=new Date().toISOString();t.status='ACTIVE';paperRecordTransition(s,'SHADOW',t.id,prevShadowStatus||'WAIT_ZONE','ACTIVE',{sym:t.sym,entry:px})}
      else {t.status='WAIT_ZONE';continue}
    }
    const risk=Math.abs(Number(t.shadowEntry)-Number(t.stop));
@@ -6199,9 +6326,9 @@ function paperTick(){
    const hitSL=t.side==='SHORT'?px>=t.stop:px<=t.stop;
    const hitTP2=t.side==='SHORT'?px<=t.tp2:px>=t.tp2;
    const hitTP1=t.side==='SHORT'?px<=t.tp1:px>=t.tp1;
-   if(hitSL){t.resolved=true;t.status='RESOLVED';t.outcome='SL';t.exit=t.stop;t.hypotheticalR=-1;t.resolvedAt=new Date().toISOString()}
-   else if(hitTP2){t.resolved=true;t.status='RESOLVED';t.outcome='TP2';t.exit=t.tp2;t.hypotheticalR=Math.abs(t.tp2-t.shadowEntry)/risk;t.resolvedAt=new Date().toISOString()}
-   else if(hitTP1){t.resolved=true;t.status='RESOLVED';t.outcome='TP1';t.exit=t.tp1;t.hypotheticalR=Math.abs(t.tp1-t.shadowEntry)/risk;t.resolvedAt=new Date().toISOString()}
+   if(hitSL){t.resolved=true;t.status='RESOLVED';t.outcome='SL';t.exit=t.stop;t.hypotheticalR=-1;t.resolvedAt=new Date().toISOString();paperRecordTransition(s,'SHADOW',t.id,prevShadowStatus||'ACTIVE','RESOLVED',{sym:t.sym,outcome:'SL',r:-1})}
+   else if(hitTP2){t.resolved=true;t.status='RESOLVED';t.outcome='TP2';t.exit=t.tp2;t.hypotheticalR=Math.abs(t.tp2-t.shadowEntry)/risk;t.resolvedAt=new Date().toISOString();paperRecordTransition(s,'SHADOW',t.id,prevShadowStatus||'ACTIVE','RESOLVED',{sym:t.sym,outcome:'TP2',r:t.hypotheticalR})}
+   else if(hitTP1){t.resolved=true;t.status='RESOLVED';t.outcome='TP1';t.exit=t.tp1;t.hypotheticalR=Math.abs(t.tp1-t.shadowEntry)/risk;t.resolvedAt=new Date().toISOString();paperRecordTransition(s,'SHADOW',t.id,prevShadowStatus||'ACTIVE','RESOLVED',{sym:t.sym,outcome:'TP1',r:t.hypotheticalR})}
  }
  savePaperState(s);
 
@@ -6378,7 +6505,29 @@ function paperTradeView(){
    <div class="why-no-trade"><span>PAPER DECISION</span><b class="${x?.allowed?'green':'amber'}">${currentWhy}</b>${x?`<small>Entry ${paperPrice(x.entryLow,x.sym)}–${paperPrice(x.entryHigh,x.sym)} · SL ${paperPrice(x.stop,x.sym)} · TP1 ${paperPrice(x.tp1,x.sym)} · TP2 ${paperPrice(x.tp2,x.sym)}</small>`:''}</div>
    <button class="paper-action ${tone}" onclick="paperManualCapture()">${x?.allowed?'PAPER ENTRY JETZT':x?.techOpen&&!x?.paperRiskOpen?'PAPER SHADOW SPEICHERN':'SIGNAL PRÜFEN'}</button>`)+
 
- card(`<div class="section-title">24/7 PAPER RUNNER <span class="tag green">SERVER</span></div>${(()=>{
+ card(`<div class="section-title">ENGINE OBSERVABILITY <span class="tag cyan">v6.06</span></div>${(()=>{
+   const o=paperObsEnsure(s),c=paperCoverageSummary(s);
+   const last=o.lastScanAt?paperIsoShort(o.lastScanAt):'—';
+   const tone=o.lastResult==='ENTRY_READY'?'green':o.lastResult==='WAIT_ZONE'?'amber':o.lastResult==='NO_SETUP'?'muted':o.lastResult?.includes('BLOCK')?'red':'cyan';
+   const transitions=(o.transitions||[]).slice(0,6);
+   return `<div class="paper-stats">
+     <div><span>LAST SCAN</span><b>${last}</b></div>
+     <div><span>RESULT</span><b class="${tone}">${o.lastResult||'—'}</b></div>
+     <div><span>TOTAL SCANS</span><b>${Number(o.totalScans||0)}</b></div>
+     <div><span>24H MINUTES</span><b>${c.minutesTracked}</b></div>
+   </div>
+   <div class="paper-stats">
+     <div><span>NO SETUP</span><b>${Number(o.noSetupScans||0)}</b></div>
+     <div><span>WAIT ZONE</span><b class="amber">${Number(o.waitZoneScans||0)}</b></div>
+     <div><span>RISK BLOCK</span><b class="red">${Number(o.riskBlockScans||0)}</b></div>
+     <div><span>ENTRY READY</span><b class="green">${Number(o.entryReadyScans||0)}</b></div>
+   </div>
+   <div class="scan-proof"><span>SCAN PROOF</span><b>${c.activeMinutes}/${c.minutesTracked||0} aktive Minuten · ${c.totalScans} Scans</b><small>NO SETUP wird explizit protokolliert. So ist unterscheidbar: kein Signal vs. Engine lief nicht.</small></div>
+   ${transitions.length?`<details class="paper-mini-details"><summary>LETZTE STATE-TRANSITIONS <strong>${transitions.length}</strong></summary>${transitions.map(t=>`<div class="row"><span>${paperIsoShort(t.at)} · ${t.entity}${t.sym?' · '+t.sym:''}</span><b>${t.from} → ${t.to}</b></div>`).join('')}</details>`:'<div class="muted">Noch keine State-Transition.</div>'}
+   <p class="footer-note">Ruleset 5.80 FROZEN. Dieses Modul ändert keine Entry-, Gate-, SL- oder TP-Regel; es protokolliert nur Ausführung und Zustandswechsel.</p>`;
+ })()}</div>`)+
+
+  card(`<div class="section-title">24/7 PAPER RUNNER <span class="tag green">SERVER</span></div>${(()=>{
    const cfg=paperRunnerConfig(),st=PAPER_RUNNER_LAST_STATUS;
    const connected=!!st?.connected;
    const tone=!cfg.enabled?'muted':connected?'green':'amber';
@@ -6427,7 +6576,7 @@ function paperTradeView(){
 
  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${paperMultiSignals().length} SETUPS</span></div>
    <div class="paper-scanner">${paperMultiSignals().slice(0,10).map(q=>{const h=s.candidateHistory?.[paperCandidateKey(q)]||{};return `<div class="paper-scan-row observe"><div><b>${q.sym} ${q.side}</b><small>Candidate ${q.candidateScore}/100 · Tech ${q.gateScore}/100</small><em>gesehen ${paperAge(h.firstSeenAt)} · Zone ${h.zoneTouchedAt?paperIsoShort(h.zoneTouchedAt):'—'}</em></div><div><span>${q.inZone?'IN ZONE':'WAIT ZONE'}</span><b class="${q.allowed?'green':q.techOpen?'amber':'red'}">${paperWhy(q)}</b><em>WHY: ${paperWhy(q)}${Number.isFinite(h.distanceToZonePct)?' · Distanz '+fmt(Math.abs(h.distanceToZonePct),2)+'%':''}</em></div></div>`}).join('')||'<div class="muted">Keine qualifizierten Setups.</div>'}</div>
-   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v6.05 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
+   <p class="footer-note">Signalregeln sind ab v5.79 eingefroren. v6.06 verändert keine Entry-/Gate-Schwelle, sondern protokolliert nur Verlauf und Qualität.</p>`)+
 
  card(`<div class="section-title">CANDIDATE HISTORY <span class="tag green">PERSISTENT</span></div>
    <div class="candidate-history">${paperHistoryRows(s).slice(0,20).map(h=>`<div class="candidate-history-row observatory"><div class="candidate-title"><b>${h.sym} ${h.side}</b><small>${h.ruleSet||'5.80-FROZEN'} · Zone Touches ${h.zoneTouchCount||0}</small></div>${paperTimeline(h)}<div class="candidate-kpis"><span>Signal→Zone <b>${paperAge(h.firstSeenAt,h.zoneTouchedAt)}</b></span><span>Signal→Entry <b>${paperAge(h.firstSeenAt,h.entryAt)}</b></span><span>Distanz <b>${Number.isFinite(h.distanceToZonePct)?fmt(Math.abs(h.distanceToZonePct),2)+'%':'—'}</b></span></div><div class="why"><span>WHY / STATUS</span><b>${h.lastReason||'—'}</b></div></div>`).join('')||'<div class="muted">Noch keine Kandidatenhistorie.</div>'}</div>`)+
@@ -6450,7 +6599,7 @@ function paperTradeView(){
 
  `<details class="card paper-details" data-detail-key="paper-journal"><summary>TRADE JOURNAL <strong>${st.count}</strong></summary><div>${journal||'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}</div></details>`+
  `<details class="card paper-details" data-detail-key="paper-shadow"><summary>PAPER SHADOW SIGNALS <strong>${isolatedShadow.length}</strong></summary><div>${shadow||'<div class="muted">Noch keine PAPER-intern geblockten Signale.</div>'}</div></details>`+
- `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v6.05 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
+ `<details class="card paper-details" data-detail-key="paper-legacy"><summary>LEGACY EXTERNAL SHADOWS <strong>${legacyShadow.length}</strong></summary><div><p class="footer-note">Archiv aus v5.75–5.77. Diese Signale waren vom echten Portfolio-/Pionex-Risk-Gate abhängig und werden in v6.06 nicht mehr für Paper-Statistiken verwendet.</p></div></details>`+
 
  card(`<div class="section-title">FORWARD TEST ANALYTICS</div>${(()=>{
    const a=paperAnalytics(s);
@@ -6460,7 +6609,7 @@ function paperTradeView(){
      a.assetRows.slice(0,8).map(([k,v])=>row(k,v)).join('');
  })()}</div>`)+
 
- card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v6.05</span></div>${(()=>{
+ card(`<div class="section-title">TRADE INTELLIGENCE <span class="tag cyan">v6.06</span></div>${(()=>{
    const trades=(s.trades||[]),n=trades.length;
    const clean=trades.filter(t=>Number(t.r)>=1).length;
    const direct=trades.filter(t=>t.exitReason==='SL'&&Number(t.mfeR||0)<0.25).length;
@@ -7864,7 +8013,7 @@ function bindCenterSmartFocus(el){
  });
 }
 
-/* v6.05 — FIVE TAB UX */
+/* v6.06 — FIVE TAB UX */
 let MARKET_SUBVIEW='market';
 let EXEC_SUBVIEW=(()=>{try{const v=sessionStorage.getItem('meridian_exec_subview');return ['trade','grid','paper'].includes(v)?v:'trade'}catch(e){return 'trade'}})();
 
@@ -7950,7 +8099,7 @@ function openView(view,button){
  const el=$('#view-'+view);
  if(!el)return;
 
- // v6.05: make the navigation itself immediate.
+ // v6.06: make the navigation itself immediate.
  // Every main view is rendered during boot, so reveal the cached DOM first,
  // then refresh that single view after Safari has painted the tab switch.
  if(el.dataset.rendered!=='1') renderOne(view);
