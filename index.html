@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=5.80">
+<link rel="manifest" href="manifest.webmanifest?v=6.20">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3343,7 +3343,7 @@ main,.app-main,.content,.page-content{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.06 · LIVE</span>
+        <span class="version" id="versionBadge">v6.20 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3446,8 +3446,8 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.06';
-let APP_RELEASE='6.06 · PRE-RUNNER FINAL';
+let APP_CODE_VERSION='6.20';
+let APP_RELEASE='6.20 · CLOUD PAPER UI';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
 
@@ -3731,7 +3731,7 @@ async function load(){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
    APP_CODE_VERSION=runtimeVersion.version||'5.1.9a';
-   APP_RELEASE=APP_CODE_VERSION+' · ACTION ENGINE';
+   APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER UI';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
    $('#versionBadge').textContent='v'+APP_CODE_VERSION+' · LIVE';
@@ -6451,7 +6451,93 @@ function paperAnalytics(s){
  const assetRows=Object.entries(byAsset).sort((a,b)=>b[1].length-a[1].length).map(([k,v])=>[k,calc(v)]);
  return {assetRows,long:calc(bySide.LONG||[]),short:calc(bySide.SHORT||[]),g70:calc(byGate['70–79']),g80:calc(byGate['80+'])};
 }
+
+/* ===== MERIDIAN v6.20 — NORTHFLANK CLOUD PAPER UI ===== */
+const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
+let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],updatedAt:null,error:null,loading:false};
+
+async function meridianCloudFetch(path){
+  const r=await fetch(MERIDIAN_CLOUD_API+path,{cache:'no-store',headers:{'accept':'application/json'}});
+  if(!r.ok)throw new Error(path+' HTTP '+r.status);
+  return await r.json();
+}
+async function meridianCloudSync(forceRender=true){
+  if(MERIDIAN_CLOUD.loading)return;
+  MERIDIAN_CLOUD.loading=true;
+  try{
+    const [status,signals,paper,events]=await Promise.all([
+      meridianCloudFetch('/api/status'),
+      meridianCloudFetch('/api/signals'),
+      meridianCloudFetch('/api/paper'),
+      meridianCloudFetch('/api/events?limit=80')
+    ]);
+    MERIDIAN_CLOUD={status,signals,paper,events:Array.isArray(events)?events:[],updatedAt:new Date().toISOString(),error:null,loading:false};
+  }catch(e){
+    MERIDIAN_CLOUD.error=String(e?.message||e);MERIDIAN_CLOUD.loading=false;
+  }
+  if(forceRender&&typeof EXEC_SUBVIEW!=='undefined'&&EXEC_SUBVIEW==='paper'){
+    try{render()}catch(e){}
+  }
+}
+function cloudMoney(v){return '$'+fmt(Number(v||0),2)}
+function cloudPrice(v,sym){
+  const n=Number(v); if(!Number.isFinite(n))return '—';
+  return n>=1000?'$'+fmt(n,2):n>=1?'$'+fmt(n,3):'$'+fmt(n,6);
+}
+function cloudPct(v,d=2){const n=Number(v||0);return (n>=0?'+':'')+fmt(n,d)+'%'}
+function cloudStatusTone(x){return x==='READY'?'green':x==='WAIT_ENTRY_ZONE'?'amber':x==='NO_SETUP'?'muted':'red'}
+function cloudStatusLabel(x){return ({READY:'ENTRY READY',WAIT_ENTRY_ZONE:'WAIT ENTRY ZONE',NO_SETUP:'NO SETUP'})[x]||String(x||'—').replaceAll('_',' ')}
+function cloudTime(iso){
+  if(!iso)return '—'; const d=new Date(iso); if(Number.isNaN(d.getTime()))return '—';
+  return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function cloudAge(iso){
+  if(!iso)return '—'; const sec=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+  if(sec<60)return Math.floor(sec)+'s'; if(sec<3600)return Math.floor(sec/60)+'m'; return Math.floor(sec/3600)+'h';
+}
+function cloudEquitySvg(points){
+  const vals=(points||[]).map(x=>Number(x.equity)).filter(Number.isFinite);
+  if(vals.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
+  const w=560,h=150,pad=8,min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.000001,max-min);
+  const pts=vals.map((v,i)=>`${(pad+(w-2*pad)*(i/(vals.length-1))).toFixed(1)},${(h-pad-(h-2*pad)*((v-min)/span)).toFixed(1)}`).join(' ');
+  return `<svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="currentColor" stroke-width="4" points="${pts}"></polyline></svg>`;
+}
+function cloudPaperTradeView(){
+  const C=MERIDIAN_CLOUD, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
+  const assets=Array.isArray(scan.assets)?scan.assets:[];
+  const positions=Array.isArray(p.positions)?p.positions:[];
+  const trades=Array.isArray(p.trades)?p.trades:[];
+  const events=Array.isArray(C.events)?C.events:[];
+  const equity=Number(a.equity||0), start=Number(a.startEquity||10000), realized=Number(a.realizedPnl||0), unreal=Number(a.unrealizedPnl||0);
+  const total=equity-start, totalPct=start?total/start*100:0;
+  const wins=trades.filter(t=>Number(t.realized)>0).length, winRate=trades.length?wins/trades.length*100:0;
+  const openRisk=positions.reduce((q,z)=>q+Number(z.riskPct||0),0);
+  const eng=st.engine||{}, db=st.db||{}, safety=st.safety||{};
+  const best=assets[0]||null;
+  const updated=C.updatedAt?cloudAge(C.updatedAt):'—';
+  const scannerRows=assets.map(q=>`<div class="paper-scan-row observe"><div><b>${String(q.symbol||'').replace('USDT','')} ${q.side||''}</b><small>Technical ${q.technical??'—'}/100 · Candidate ${q.candidate??'—'}/100</small><em>Preis ${cloudPrice(q.price,q.symbol)} · ${q.frames?.['1h']?.adx!=null?'1H ADX '+fmt(q.frames['1h'].adx,1):'Multi-TF'}</em></div><div><span>${cloudStatusLabel(q.status)}</span><b class="${cloudStatusTone(q.status)}">${q.distanceAtr!=null?fmt(q.distanceAtr,2)+' ATR':'—'}</b><em>${(q.reasons||[]).join(' · ')||'alle Gates erfüllt'}</em></div></div>`).join('');
+  const openRows=positions.map(t=>`<div class="paper-pos"><div><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><small>CLOUD PAPER · ${t.ruleset||'6.2'}</small></div><div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div><div><span>LIVE</span><b>${cloudPrice(t.livePrice,t.symbol)}</b></div><div><span>P&L</span><b class="${Number(t.unrealized||0)>=0?'green':'red'}">${Number(t.unrealized||0)>=0?'+':''}${cloudMoney(t.unrealized||0)}</b></div><div><span>SL</span><b>${cloudPrice(t.sl,t.symbol)}</b></div><div><span>TP1 / TP2</span><b>${cloudPrice(t.tp1,t.symbol)} / ${cloudPrice(t.tp2,t.symbol)}</b></div></div>`).join('');
+  const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`<div class="trade-observe-card"><div class="trade-observe-head"><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><strong class="${Number(t.realized||0)>=0?'green':'red'}">${t.exitReason||'CLOSED'} · ${Number(t.realized||0)>=0?'+':''}${cloudMoney(t.realized||0)}</strong></div><div class="trade-observe-grid"><div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div><div><span>EXIT</span><b>${cloudPrice(t.exit,t.symbol)}</b></div><div><span>OPEN</span><b>${cloudTime(t.openedAt)}</b></div><div><span>CLOSE</span><b>${cloudTime(t.closedAt)}</b></div><div><span>QTY</span><b>${fmt(Number(t.qty||0),5)}</b></div><div><span>RISK</span><b>${fmt(Number(t.riskPct||0),2)}%</b></div></div></div>`).join('');
+  const eventRows=events.slice(0,20).map(e=>`<div class="row"><span>${cloudTime(e.created_at)} · ${String(e.type||'EVENT').replaceAll('_',' ')}</span><b>${e.payload?.symbol||e.payload?.assets?.[0]?.symbol||''}</b></div>`).join('');
+  const why=best?(best.status==='READY'?'Alle Signal- und Entry-Gates erfüllt.':best.status==='WAIT_ENTRY_ZONE'?'Setup stark, Preis noch außerhalb der ATR-Entry-Zone.':(best.reasons||[]).join(' · ')):'Scanner lädt …';
+  return card(`<div class="paper-head"><div><div class="eyebrow">PAPER ENGINE 6.2 · CLOUD</div><div class="forecast-main">24/7 FORWARD TEST</div><div class="sub">Northflank Runtime · PostgreSQL persistent · automatische Multi-Timeframe-Signale</div></div><span class="tag ${eng.state==='RUNNING'?'green':'red'} paper-tag">${eng.state||'CONNECTING'}</span></div>
+    <div class="paper-isolation-banner"><span>CLOUD SSOT</span><b>API × SIGNAL ENGINE × PAPER BROKER × POSTGRES</b><small>${db.mode||'—'} · persistent ${db.persistent?'YES':'NO'} · UI Sync ${updated}</small></div>
+    <div class="paper-kpis harden"><div><span>EQUITY</span><b>${cloudMoney(equity)}</b><small>Start ${cloudMoney(start)}</small></div><div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b><small>${cloudPct(totalPct)}</small></div><div><span>REALIZED</span><b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b></div><div><span>UNREALIZED</span><b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b></div><div><span>TRADES</span><b>${trades.length}</b><small>Winrate ${fmt(winRate,0)}%</small></div><div><span>RISK OPEN</span><b>${fmt(openRisk,2)}%</b><small>${positions.length}/3 Positionen</small></div></div>`)+
+  card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${best?cloudStatusTone(best.status):'muted'}">${best?cloudStatusLabel(best.status):'LOADING'}</span></div>${best?`<div class="paper-signal"><div><b>${String(best.symbol||'').replace('USDT','')} ${best.side}</b><strong class="${cloudStatusTone(best.status)}">${best.technical}/100 · ${best.candidate}/100</strong></div><small>Technical / Candidate · Distanz ${fmt(best.distanceAtr||0,2)} ATR</small></div><div class="why-no-trade"><span>PAPER DECISION</span><b class="${best.status==='READY'?'green':'amber'}">${why}</b><small>Entry ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small></div>`:'<div class="muted">Scanner lädt.</div>'}`)+
+  card(`<div class="section-title">MULTI-ASSET SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div><div class="paper-scanner">${scannerRows||'<div class="muted">Noch keine Cloud-Signale.</div>'}</div>`)+
+  card(`<div class="section-title">ENGINE HEALTH <span class="tag ${eng.errors===0?'green':'red'}">${eng.errors||0} ERRORS</span></div><div class="paper-stats"><div><span>STATE</span><b class="${eng.state==='RUNNING'?'green':'red'}">${eng.state||'—'}</b></div><div><span>MARKET</span><b class="${eng.marketFresh?'green':'red'}">${eng.marketFresh?'FRESH':'STALE'}</b></div><div><span>CYCLES</span><b>${eng.cycles??'—'}</b></div><div><span>SIGNAL SCANS</span><b>${eng.signalScans??'—'}</b></div><div><span>CYCLE</span><b>${Math.round(Number(eng.intervalMs||0)/1000)}s</b></div><div><span>SCAN</span><b>${Math.round(Number(eng.signalIntervalMs||0)/1000)}s</b></div></div><div class="row"><span>PostgreSQL</span><b class="${db.persistent?'green':'red'}">${db.persistent?'PERSISTENT':'NOT PERSISTENT'}</b></div><div class="row"><span>Safety</span><b class="${safety.paperTrading&&!safety.liveTrading?'green':'red'}">${safety.paperTrading?'PAPER ON':'PAPER OFF'} · ${safety.liveTrading?'LIVE ON':'LIVE OFF'}</b></div>`)+
+  card(`<div class="section-title">PAPER EQUITY <span class="tag cyan">POSTGRES</span></div>${cloudEquitySvg(p.equityCurve||[])}<div class="row"><span>Peak Equity</span><b>${cloudMoney(a.peakEquity||equity)}</b></div><div class="row"><span>Day Start</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>`)+
+  card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${positions.length}</span></div>${openRows||'<div class="muted">Keine offenen Cloud-Paper-Positionen.</div>'}`)+
+  `<details class="card paper-details" data-detail-key="cloud-trades"><summary>TRADE HISTORY <strong>${trades.length}</strong></summary><div>${tradeRows||'<div class="muted">Noch keine abgeschlossenen Cloud-Paper-Trades.</div>'}</div></details>`+
+  `<details class="card paper-details" data-detail-key="cloud-events"><summary>CLOUD EVENTS <strong>${events.length}</strong></summary><div>${eventRows||'<div class="muted">Noch keine Events.</div>'}</div></details>`+
+  card(`<div class="section-title">CLOUD CONNECTION</div><div class="row"><span>Backend</span><b class="green">Northflank</b></div><div class="row"><span>API</span><b>${MERIDIAN_CLOUD_API.replace('https://','')}</b></div><div class="row"><span>DB</span><b class="${db.persistent?'green':'red'}">${db.mode||'—'}</b></div><button class="paper-action green" onclick="meridianCloudSync(true)">CLOUD DATEN AKTUALISIEREN</button><p class="footer-note">Dashboard ist nur Anzeige/Monitoring. LIVE_TRADING bleibt serverseitig deaktiviert.</p>`);
+}
+setInterval(()=>meridianCloudSync(true),15000);
+window.addEventListener('pageshow',()=>setTimeout(()=>meridianCloudSync(false),500));
+
 function paperTradeView(){
+ if(MERIDIAN_CLOUD.paper)return cloudPaperTradeView();
+ if(!MERIDIAN_CLOUD.loading)setTimeout(()=>meridianCloudSync(true),0);
  paperTick();paperEngineScan(false);
  const s=paperState(),st=paperStats(s),xs=paperShadowStats(s),x=paperSignal(),pg=paperRiskGate(s,x);
 
