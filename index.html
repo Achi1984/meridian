@@ -3338,7 +3338,7 @@ main,.app-main,.content,.page-content{
 
 
 <script>
-/* MERIDIAN v6.21 — remove legacy PWA cache / service worker.
+/* MERIDIAN v6.22 — remove legacy PWA cache / service worker.
    The cloud dashboard must always load the current GitHub Pages build. */
 window.addEventListener('load', async () => {
   try {
@@ -3354,6 +3354,149 @@ window.addEventListener('load', async () => {
 });
 </script>
 
+
+<style id="v622-cloud-paper-polish">
+/* MERIDIAN 6.22 — iPhone-first Cloud Paper cockpit polish */
+.paper-kpis.harden{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+.paper-kpis.harden>div{
+  min-width:0;
+  min-height:82px;
+  padding:11px 10px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+}
+.paper-kpis.harden span{
+  font-size:6px;
+  line-height:1.2;
+  margin-bottom:7px;
+}
+.paper-kpis.harden b{
+  display:block;
+  font-size:11px;
+  line-height:1.18;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.paper-kpis.harden small{
+  display:block;
+  margin-top:5px;
+  color:#8193a8;
+  font-size:6px;
+  line-height:1.25;
+  white-space:nowrap;
+}
+.paper-performance-strip{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:10px;
+}
+.paper-performance-strip>div{
+  min-width:0;
+  border:1px solid #173f55;
+  border-radius:11px;
+  padding:9px 10px;
+  background:rgba(4,18,28,.35);
+}
+.paper-performance-strip span{
+  display:block;
+  color:#8193a8;
+  font-size:5.5px;
+  margin-bottom:4px;
+}
+.paper-performance-strip b{
+  display:block;
+  font-size:8px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.paper-pos.cloud-compact{
+  display:grid;
+  grid-template-columns:1.25fr 1fr 1fr;
+  gap:8px;
+  border:1px solid #173f55;
+  border-radius:13px;
+  padding:11px;
+  margin:8px 0 0;
+  background:rgba(4,18,28,.3);
+}
+.paper-pos.cloud-compact>div{
+  min-width:0;
+}
+.paper-pos.cloud-compact>div:first-child{
+  grid-column:1/-1;
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  align-items:flex-start;
+  border-bottom:1px solid rgba(34,72,96,.45);
+  padding-bottom:8px;
+}
+.paper-pos.cloud-compact>div:first-child b{font-size:9px}
+.paper-pos.cloud-compact>div:first-child small{
+  text-align:right;
+  margin:0;
+  font-size:5.5px;
+}
+.paper-pos.cloud-compact span{font-size:5.5px}
+.paper-pos.cloud-compact b{font-size:7.5px}
+.paper-scan-row.observe{
+  gap:10px;
+  min-height:65px;
+}
+.paper-scan-row.observe>div:first-child{min-width:0}
+.paper-scan-row.observe>div:last-child{
+  min-width:120px;
+  align-items:flex-end;
+}
+.paper-scan-row.observe b{font-size:8px}
+.paper-scan-row.observe small{line-height:1.35}
+.paper-scan-row.observe em{
+  max-width:160px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.paper-equity-svg{
+  height:132px;
+}
+.paper-details{
+  overflow:hidden;
+}
+.paper-details>summary strong{
+  white-space:nowrap;
+}
+@media(max-width:430px){
+  .paper-kpis.harden{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+  .paper-kpis.harden>div{
+    min-height:78px;
+  }
+  .paper-kpis.harden b{
+    font-size:10.5px;
+  }
+  .paper-performance-strip{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .paper-pos.cloud-compact{
+    grid-template-columns:1fr 1fr;
+  }
+  .paper-pos.cloud-compact>div:first-child{
+    grid-column:1/-1;
+  }
+  .paper-scan-row.observe>div:last-child{
+    min-width:105px;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3361,7 +3504,7 @@ window.addEventListener('load', async () => {
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.21 · LIVE</span>
+        <span class="version" id="versionBadge">v6.22 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6470,7 +6613,7 @@ function paperAnalytics(s){
  return {assetRows,long:calc(bySide.LONG||[]),short:calc(bySide.SHORT||[]),g70:calc(byGate['70–79']),g80:calc(byGate['80+'])};
 }
 
-/* ===== MERIDIAN v6.21 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
+/* ===== MERIDIAN v6.22 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
 const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
 let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],updatedAt:null,error:null,loading:false};
 
@@ -6534,6 +6677,7 @@ function cloudPaperTradeView(){
   const wins=trades.filter(t=>Number(t.realized)>0).length;
   const winRate=trades.length?wins/trades.length*100:0;
   const openRisk=positions.reduce((q,z)=>q+Number(z.riskPct||0),0);
+  const peak=Number(a.peakEquity||equity||start), drawdownPct=peak>0?Math.max(0,(peak-equity)/peak*100):0;
   const best=assets[0]||null;
   const updated=C.updatedAt?cloudAge(C.updatedAt):'—';
 
@@ -6552,13 +6696,17 @@ function cloudPaperTradeView(){
     </div>`).join('');
 
   const openRows=positions.map(t=>`
-    <div class="paper-pos">
-      <div><b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b><small>${t.ruleset||'6.2'} · CLOUD PAPER</small></div>
+    <div class="paper-pos cloud-compact">
+      <div>
+        <b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b>
+        <small>${t.ruleset||'6.2'} · CLOUD PAPER</small>
+      </div>
       <div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div>
       <div><span>LIVE</span><b>${cloudPrice(t.livePrice,t.symbol)}</b></div>
       <div><span>P&L</span><b class="${Number(t.unrealized||0)>=0?'green':'red'}">${Number(t.unrealized||0)>=0?'+':''}${cloudMoney(t.unrealized||0)}</b></div>
       <div><span>SL</span><b>${cloudPrice(t.sl,t.symbol)}</b></div>
-      <div><span>TP1 / TP2</span><b>${cloudPrice(t.tp1,t.symbol)} / ${cloudPrice(t.tp2,t.symbol)}</b></div>
+      <div><span>TP1</span><b>${cloudPrice(t.tp1,t.symbol)}</b></div>
+      <div><span>TP2</span><b>${cloudPrice(t.tp2,t.symbol)}</b></div>
     </div>`).join('');
 
   const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`
@@ -6589,7 +6737,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.21 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.22 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -6628,9 +6776,14 @@ function cloudPaperTradeView(){
       ${openRows||'<div class="muted">Keine offenen Cloud-Paper-Positionen.</div>'}`)
 
     + card(`<div class="section-title">EQUITY & PERFORMANCE <span class="tag cyan">POSTGRES</span></div>
+      <div class="paper-performance-strip">
+        <div><span>LIVE EQUITY</span><b>${cloudMoney(equity)}</b></div>
+        <div><span>P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b></div>
+        <div><span>DRAWDOWN</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
+      </div>
       ${cloudEquitySvg(p.equityCurve||[])}
       <div class="paper-stats">
-        <div><span>PEAK</span><b>${cloudMoney(a.peakEquity||equity)}</b></div>
+        <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
         <div><span>DAY START</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>
         <div><span>WINRATE</span><b>${fmt(winRate,0)}%</b></div>
         <div><span>ERRORS</span><b class="${Number(eng.errors||0)===0?'green':'red'}">${eng.errors||0}</b></div>
@@ -6674,7 +6827,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.21 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.22 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -6683,7 +6836,7 @@ function paperTradeView(){
   <div class="paper-isolation-banner">
     <span>CLOUD SSOT</span>
     <b>${err?String(err):'Status, Signale, Paper-Konto und Events werden geladen.'}</b>
-    <small>Die alte lokale Browser-/Runner-Engine wird in v6.21 nicht mehr als Datenquelle verwendet.</small>
+    <small>Die alte lokale Browser-/Runner-Engine wird in v6.22 nicht mehr als Datenquelle verwendet.</small>
   </div>
   <button class="paper-action green" onclick="meridianCloudSync(true)">ERNEUT VERBINDEN</button>`);
 }
