@@ -3733,6 +3733,21 @@ window.addEventListener('DOMContentLoaded',()=>{
 .be-protected-card{border-color:#1e744e!important}
 @media(max-width:430px){.vision2-strip{grid-template-columns:1fr 1fr}.vision2-gates{grid-template-columns:1fr 1fr}}
 </style>
+
+<style id="v636-css">
+.model-disclaimer{margin-top:10px;border-top:1px solid #173e55;padding:10px 3px 0}
+.model-disclaimer b{display:block;color:#f3bd53;font-size:8px;letter-spacing:1px}
+.model-disclaimer span{display:block;color:#8193a8;font-size:8px;line-height:1.4;margin-top:5px}
+.exit-components{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:10px}
+.exit-components>div{border:1px solid #173e55;border-radius:10px;padding:7px 4px;text-align:center}
+.exit-components span,.exit-components small{display:block;color:#8193a8;font-size:6px}
+.exit-components b{display:block;font-size:11px;margin:3px 0}
+.portfolio-risk-intel{margin-top:10px;border:1px solid #806329;border-radius:12px;padding:10px}
+.portfolio-risk-intel span{display:block;color:#8193a8;font-size:7px;letter-spacing:1px}
+.portfolio-risk-intel b{display:block;color:#f3bd53;font-size:13px;margin-top:5px}
+.portfolio-risk-intel small{display:block;color:#8193a8;font-size:8px;line-height:1.4;margin-top:5px}
+@media(max-width:430px){.exit-components{grid-template-columns:repeat(5,1fr);gap:4px}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3740,7 +3755,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.35 · LIVE</span>
+        <span class="version" id="versionBadge">v6.36 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -4152,12 +4167,13 @@ async function load(){
          knownLongCapital:1149.27,btcShortCapital:52,directionalBias:'NET LONG / BTC HEDGE'};
      }
      if(window.MERIDIAN_VISION2_SNAPSHOT) DATA.vision2=window.MERIDIAN_VISION2_SNAPSHOT;
+     DATA.futuresRiskIntelligence={"version":"1.0","asOf":"2026-08-28T11:22:00+02:00","singleBot":{"id":"BTC-S30","level":"HIGH","bufferPct":7.76,"gatePct":8.0,"gapToGatePctPoints":0.24,"reason":"Unprotected BTC short remains just below the 8% liquidation-buffer gate."},"portfolio":{"level":"ELEVATED","score":61,"protectedBots":["BTC-L100"],"primaryBlocker":"BTC-S30","reason":"One critical unprotected bot; BTC-L100 is BE-protected and HBAR/XRP have substantially wider buffers.","action":"NO NEW FUTURES RISK UNTIL BTC-S30 BUFFER ≥ 8%; protected long is not treated as primary capital-loss blocker."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.35'};
+   let runtimeVersion={version:'6.36'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.35';
+   APP_CODE_VERSION=runtimeVersion.version||'6.36';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -7218,7 +7234,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.35 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.36 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7341,7 +7357,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.35 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.36 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -7655,7 +7671,7 @@ function renderForecast(){
      <div class="forecast-v558-route"><span>SWING POSITION</span><b>${fmt(f.pos,1)}%</b><i>→</i><strong class="${state.cls}">${state.label}</strong></div>
      <div class="row"><span>Daily RSI</span><b>${f.dailyRsi?fmt(f.dailyRsi,1):'—'}</b></div>`);
 
-   body+=card(`<div class="section-title">CYCLE SCENARIOS <span class="tag amber">MODEL</span></div>
+   body+=card(`<div class="section-title">CYCLE SCENARIOS <span class="tag amber">CALIBRATED 2.1</span></div>
      <div class="forecast-v558-scenarios">
        <div class="bear"><span>DEFENSIVE · ${brp}%</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div>
        <div class="base"><span>BASE · ${bp}%</span><b>$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div>
@@ -10222,4 +10238,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.35'))b.textContent='v6.35 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.36'))b.textContent='v6.36 · LIVE';},1200)}catch(e){}</script>
