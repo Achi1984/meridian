@@ -2361,6 +2361,8 @@ body[data-view] nav.bottom{
 .bot-mini-action.red{border-color:#8f3445}.bot-mini-action.amber{border-color:#8c6726}.bot-mini-action.green{border-color:#1e744e}
 .bot-mini-action span{font-size:7px;color:#8296a8;letter-spacing:1px}.bot-mini-action b{font-size:13px;text-align:right}
 
+
+.peak-timing-row{display:block;margin-top:7px;line-height:1.25;letter-spacing:.08em;color:var(--dim);white-space:normal}
 </style>
 
 <style id="v557-decision-css">
@@ -3762,7 +3764,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.37 · LIVE</span>
+        <span class="version" id="versionBadge">v6.38 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -5268,20 +5270,18 @@ function btcRiskStatusCard(){
     <div class="v602-riskhead">
       <div>
         <div class="section-title">BTC LIQUIDATION RISK <span class="tag cyan">SSOT</span></div>
-        <div class="section-note">Single Bot Gate ≥${fmt(r.gate,2)}% · BE Protection berücksichtigt</div>
+        <div class="section-note">Aktiver Risk Blocker · Gate ≥${fmt(r.gate,2)}% · geschützte Bots ausgeblendet</div>
       </div>
       <span class="tag ${r.dataOk?(r.open?'green':'red'):'amber'}">${r.status}</span>
     </div>
     <div class="v602-headroom">
-      <span>S30 <b class="${r.short.tone}">${pct(r.short.effectiveBuffer)}</b> <small>${r.short.riskBand}</small></span>
-      <i>·</i>
-      <span>${r.long.id} <b class="${r.long.tone}">${pct(r.long.effectiveBuffer)}</b> <small>${r.long.beProtected?'BE PROTECTED':r.long.riskBand}</small></span>
+      <span>${r.short.id} <b class="${r.short.tone}">${pct(r.short.effectiveBuffer)}</b> <small>${r.short.riskBand}</small></span>
       <i>·</i>
       <span>GATE <b class="${r.limiting.tone}">${pct(r.limiting.effectiveBuffer)}</b></span>
       <i>·</i>
       <span class="${r.dataOk?'green':'amber'}">${r.dataState}${Number.isFinite(r.quoteAge)?' '+r.quoteAge+'s':''}</span>
     </div>
-    <div class="v602-risklines">${bot(r.short)}${bot(r.long)}</div>
+    <div class="v602-risklines">${bot(r.short)}</div>
     <div class="v602-legend"><span class="green">≥10 SAFE</span><span class="amber">8–10 WATCH</span><span class="red">6–8 CRITICAL · &lt;6 DANGER</span></div>
     <button onclick="openExecutionGrid()" class="v602-gridbtn">IM GRID PRÜFEN →</button>
   </section>`;
@@ -5317,7 +5317,7 @@ function commandCenter(){
  </div>`+
  `<section class="card v602-gate">
    <div class="v602-gate-top">
-     <div><div class="eyebrow">JETZT · DUAL GATE ${liveBadge(dataOpen?'SSOT':'STALE')}</div><div class="forecast-main ${gateTone}">${gateText}</div></div>
+     <div><div class="eyebrow">JETZT · EXECUTION GATE ${liveBadge(dataOpen?'SSOT':'STALE')}</div><div class="forecast-main ${gateTone}">${gateText}</div></div>
      <span class="tag ${gateTone}">${gateOpen?'2/2':technicalOpen||riskOpen?'1/2':'0/2'} OPEN</span>
    </div>
    <div class="v602-gates">
@@ -7595,14 +7595,14 @@ function renderForecast(){
  const conf=f.ready?forecast40Confidence(f,x):0;
 
  let body=card(`<div class="forecast-kicker">
-   <div><div class="eyebrow">ACHI MERIDIAN VISION 2.0</div><div class="forecast-main">MODEL → SIGNAL → ACTION</div><div class="sub forecast-sub">Cycle · Tactical · Exit Ladder</div></div>
+   <div><div class="eyebrow">ACHI MERIDIAN VISION 2.1</div><div class="forecast-main">MODEL → SIGNAL → ACTION</div><div class="sub forecast-sub">Cycle · Tactical · Exit Ladder</div></div>
    <div class="confidence-pill"><span>CONFIDENCE</span><b>${f.ready?conf:'—'}/100</b><i><em style="width:${f.ready?conf:0}%"></em></i></div>
  </div>`);
  body+=`<div class="tabs">${coins.map(c=>`<button class="tab ${c===activeCoin?'active':''}" onclick="selectCoin('${c}')">${c}</button>`).join('')}</div>`;
  const v2=DATA.vision2||{};
  if(activeCoin==='BTC' && v2.version){
    const vg=v2.gatesDetail||[];
-   body+=card(`<div class="section-head"><div><div class="section-title">VISION REGIME <span class="tag cyan">2.0</span></div><div class="section-note">${v2.asOf||'—'} · market + macro</div></div><span class="tag amber">${v2.cycle?.confidence||'—'}/100</span></div>
+   body+=card(`<div class="section-head"><div><div class="section-title">VISION REGIME <span class="tag cyan">2.1</span></div><div class="section-note">${v2.asOf||'—'} · market + macro</div></div><span class="tag amber">${v2.cycle?.confidence||'—'}/100</span></div>
      <div class="forecast-main cyan" style="font-size:18px">${v2.marketRegime||'—'}</div>
      <div class="vision2-strip">
        <div><span>BTC DOM</span><b>${fmt(v2.btcDominancePct,1)}%</b></div>
@@ -7656,7 +7656,7 @@ function renderForecast(){
        <div class="cycle-clock-v558-bar"><i style="width:${pct}%"></i></div>
        <div class="cycle-clock-v558-grid">
          <div><span>NÄCHSTER WECHSEL</span><b>${x.timing.next}</b></div>
-         <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b><small>${activeCoin==='BTC'?'Timing '+(DATA.vision2?.calibration?.peakWindow?.confidence||58)+'/100':'Model window'}</small></div>
+         <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b><small class="peak-timing-row">${activeCoin==='BTC'?'TIMING '+(DATA.vision2?.calibration?.peakWindow?.confidence||58)+'/100':'MODEL WINDOW'}</small></div>
          <div><span>EXIT GATE</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div>
          <div><span>REFERENZ</span><b>${cyc.daysFromReference>=0?'+':''}${cyc.daysFromReference||0} T</b></div>
        </div>
@@ -10246,4 +10246,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.37'))b.textContent='v6.37 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.37'))b.textContent='v6.38 · LIVE';},1200)}catch(e){}</script>
