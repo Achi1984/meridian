@@ -1,0 +1,4 @@
+v6.32
+- Depot chart: HIGH/LOW numeric labels in active range
+- Trade tab: PAPER default when no prior session choice exists
+- Engine/ruleset unchanged
