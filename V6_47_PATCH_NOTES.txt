@@ -1,0 +1,17 @@
+ACHI MERIDIAN v6.47 — EQUITY TIMEFRAME FILTER FIX
+
+- 15M / 1H / 4H / 1D / 1W filter the actual equity points.
+- Robust ISO/PostgreSQL/Unix timestamp parsing.
+- Chronological sorting before filtering.
+- Exact cutoff interpolation at the selected range boundary.
+- No fallback to full history for short windows.
+- Trade/event markers use the same filtered window.
+- Visible RANGE + point count + minutes confirms the active filter.
+- Selected range persists for the current browser session.
+- Short-window Y-axis scales to visible data.
+- Missing timestamps produce an explicit warning.
+
+UNCHANGED:
+- Paper Engine 6.29.1
+- Ruleset 6.2-SIGNAL-V1
+- Signal / Entry / SL / TP / Risk logic

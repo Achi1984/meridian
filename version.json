@@ -1,1 +1,6 @@
-{"version":"6.46","build":"2026-08-28","release":"VERSION SYNC + EQUITY TIMEFRAMES","notes":"Release identifiers synchronized across app, data, manifest and embedded SSOT. Equity timeframe selector remains iOS-touch enabled."}
+{
+  "version": "6.47",
+  "build": "2026-08-28-equity-timeframe-filter-fix",
+  "release": "VERSION SYNC + EQUITY TIMEFRAMES",
+  "notes": "Release identifiers synchronized across app, data, manifest and embedded SSOT. Equity timeframe selector remains iOS-touch enabled."
+}

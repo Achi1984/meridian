@@ -3792,6 +3792,12 @@ window.addEventListener('DOMContentLoaded',()=>{
   .v641-direction b,.v641-evidence-grid b{font-size:8px}
 }
 </style>
+
+<style id="v647-equity-filter-fix">
+.eq-filter-meta{margin:0 2px 5px;color:#6f91a8;font-size:7px;letter-spacing:.08em;text-align:right}
+.eq-filter-warning{border:1px solid rgba(232,178,74,.55);background:rgba(232,178,74,.08);color:#e8b24a;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:8px;line-height:1.45}
+.eq-timeframes button[aria-pressed="true"]{color:#fff!important;border-color:#20a4ff!important;background:rgba(32,164,255,.18)!important;box-shadow:0 0 0 1px rgba(32,164,255,.08) inset}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3799,7 +3805,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.43 · LIVE</span>
+        <span class="version" id="versionBadge">v6.47 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3902,7 +3908,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.46';
+let APP_CODE_VERSION='6.47';
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
@@ -4228,11 +4234,11 @@ async function load(){
 
      DATA.futuresRiskIntelligence={"version":"1.1","asOf":"2026-08-28T15:10:00+02:00","singleBot":{"id":"BTC-S30","level":"WATCH","bufferPct":8.99,"gatePct":8.0,"gapToGatePctPoints":0.99,"reason":"BTC short is now above the 8% critical liquidation-buffer gate after margin increase, but remains below the 12% watch threshold."},"portfolio":{"level":"WATCH","score":52,"protectedBots":[],"primaryBlocker":null,"reason":"No active bot is below the 8% critical gate. BTC-L100 is closed; BTC-S30 remains the closest liquidation risk at 8.99%.","action":"WATCH BTC-S30; critical risk gate reopens only if displayed buffer falls below 8%."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.46'};
+   let runtimeVersion={version:'6.47'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.46';
+   APP_CODE_VERSION=runtimeVersion.version||'6.47';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -6982,49 +6988,134 @@ function cloudAge(iso){
 }
 let CLOUD_EQUITY_RANGE='1D';
 const CLOUD_EQUITY_RANGES={'15M':900000,'1H':3600000,'4H':14400000,'1D':86400000,'1W':604800000};
+
+function cloudEpoch(v){
+  if(v===null||v===undefined||v==='')return NaN;
+  if(v instanceof Date)return v.getTime();
+  if(typeof v==='number'){
+    if(!Number.isFinite(v))return NaN;
+    if(v>1e14)return Math.round(v/1000);
+    if(v>1e12)return v;
+    if(v>1e9)return v*1000;
+  }
+  const s=String(v).trim();
+  if(!s)return NaN;
+  if(/^\d+(\.\d+)?$/.test(s)){
+    const n=Number(s);
+    if(n>1e14)return Math.round(n/1000);
+    if(n>1e12)return n;
+    if(n>1e9)return n*1000;
+  }
+  const parsed=Date.parse(s);
+  return Number.isFinite(parsed)?parsed:NaN;
+}
+
+function cloudEquityPointTime(x){
+  if(!x||typeof x!=='object')return NaN;
+  for(const v of [
+    x.t,x.ts,x.timestamp,x.time,x.at,x.date,
+    x.created_at,x.createdAt,x.updated_at,x.updatedAt,
+    x.recorded_at,x.recordedAt,x.captured_at,x.capturedAt
+  ]){
+    const ms=cloudEpoch(v);
+    if(Number.isFinite(ms))return ms;
+  }
+  return NaN;
+}
+
 function setCloudEquityRange(range){
   if(!CLOUD_EQUITY_RANGES[range])return false;
   CLOUD_EQUITY_RANGE=range;
-  // Immediate visual feedback on iOS before the app re-renders.
-  document.querySelectorAll('.eq-timeframes button[data-equity-range]').forEach(btn=>btn.classList.toggle('active',btn.dataset.equityRange===range));
-  try{ if(typeof render==='function') render(); }catch(e){console.error('Equity range render',e)}
+  try{sessionStorage.setItem('meridian_cloud_equity_range',range)}catch(e){}
+  document.querySelectorAll('.eq-timeframes button[data-equity-range]').forEach(btn=>{
+    const active=btn.dataset.equityRange===range;
+    btn.classList.toggle('active',active);
+    btn.setAttribute('aria-pressed',active?'true':'false');
+  });
+  try{if(typeof render==='function')render()}catch(e){console.error('Equity range render',e)}
   return false;
 }
+try{
+  const saved=sessionStorage.getItem('meridian_cloud_equity_range');
+  if(CLOUD_EQUITY_RANGES[saved])CLOUD_EQUITY_RANGE=saved;
+}catch(e){}
 window.setCloudEquityRange=setCloudEquityRange;
+
 function cloudEquitySvg(points,events,positions,trades,startEquity){
   const raw=Array.isArray(points)?points:[];
-  let rows=raw.map((x,i)=>({
-    t:x?.t||x?.ts||x?.created_at||x?.createdAt||null,
-    equity:Number(x?.equity),
-    realized:Number(x?.realizedEquity??x?.closedEquity??x?.balance)
-  })).filter(x=>Number.isFinite(x.equity));
-  const allRows=rows;
-  const validTimes=allRows.map(x=>x.t?new Date(x.t).getTime():NaN).filter(Number.isFinite);
-  const latestMs=validTimes.length?Math.max(...validTimes):NaN;
+  let parsedRows=raw.map((q,i)=>{
+    const ms=cloudEquityPointTime(q);
+    return {
+      _i:i, ms,
+      t:Number.isFinite(ms)?new Date(ms).toISOString():null,
+      equity:Number(q?.equity),
+      realized:Number(q?.realizedEquity??q?.closedEquity??q?.balance)
+    };
+  }).filter(x=>Number.isFinite(x.equity));
+
+  const timed=parsedRows.filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
+  let rows=timed.length>=2?timed:parsedRows;
+  const latestMs=timed.length?timed[timed.length-1].ms:NaN;
   const rangeMs=CLOUD_EQUITY_RANGES[CLOUD_EQUITY_RANGE]||CLOUD_EQUITY_RANGES['1D'];
-  if(Number.isFinite(latestMs)){
+  let filterState='FULL';
+
+  if(Number.isFinite(latestMs)&&timed.length>=2){
     const cutoff=latestMs-rangeMs;
-    const inRange=allRows.filter(x=>{const ms=x.t?new Date(x.t).getTime():NaN;return Number.isFinite(ms)&&ms>=cutoff});
-    if(inRange.length>=2)rows=inRange;
-    else if(inRange.length===1){const idx=allRows.indexOf(inRange[0]);rows=idx>0?[allRows[idx-1],inRange[0]]:inRange;}
+    let clipped=timed.filter(x=>x.ms>=cutoff&&x.ms<=latestMs);
+    const before=[...timed].reverse().find(x=>x.ms<cutoff);
+    const after=timed.find(x=>x.ms>=cutoff);
+
+    if(before&&after&&after.ms>before.ms&&after.ms>cutoff){
+      const f=(cutoff-before.ms)/(after.ms-before.ms);
+      const eq=before.equity+(after.equity-before.equity)*f;
+      clipped.unshift({ms:cutoff,t:new Date(cutoff).toISOString(),equity:eq,realized:NaN,_synthetic:true});
+    }
+
+    if(clipped.length>=2){
+      rows=clipped;
+      filterState='FILTERED';
+    }else if(clipped.length===1){
+      rows=[
+        {ms:cutoff,t:new Date(cutoff).toISOString(),equity:clipped[0].equity,realized:NaN,_synthetic:true},
+        clipped[0]
+      ];
+      filterState='FILTERED';
+    }else{
+      rows=[];
+      filterState='NO_DATA';
+    }
+  }else{
+    filterState='NO_TIMESTAMPS';
   }
-  if(rows.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
+
+  const rangeButtons=`<div class="eq-timeframes">${Object.keys(CLOUD_EQUITY_RANGES).map(k=>`<button type="button" aria-pressed="${k===CLOUD_EQUITY_RANGE?'true':'false'}" data-equity-range="${k}" class="${k===CLOUD_EQUITY_RANGE?'active':''}" onclick="return setCloudEquityRange('${k}')">${k}</button>`).join('')}</div>`;
+
+  if(filterState==='NO_TIMESTAMPS'){
+    return `${rangeButtons}<div class="eq-filter-warning">ZEITFILTER NICHT VERFÜGBAR · Equity-Punkte enthalten keinen lesbaren Zeitstempel.</div>`;
+  }
+  if(rows.length<2){
+    return `${rangeButtons}<div class="muted">Keine Equity-Daten im gewählten ${CLOUD_EQUITY_RANGE}-Fenster.</div>`;
+  }
 
   const w=560,h=188,l=10,r=10,top=18,bottom=36;
   const start=Number(startEquity||10000);
-  const vals=rows.map(x=>x.equity).concat([start]);
-  const min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.000001,max-min);
+  const rowVals=rows.map(x=>x.equity);
+  let min=Math.min(...rowVals),max=Math.max(...rowVals);
+  let span=Math.max(.000001,max-min);
+  const padY=Math.max(span*.12,1);
+  min-=padY; max+=padY; span=Math.max(.000001,max-min);
+
   const x=i=>l+(w-l-r)*(i/Math.max(1,rows.length-1));
   const y=v=>top+(h-top-bottom)*(1-(v-min)/span);
   const line=rows.map((q,i)=>`${x(i).toFixed(1)},${y(q.equity).toFixed(1)}`).join(' ');
-  const baseline=y(start).toFixed(1);
-  const timeRows=rows.map((q,i)=>({i,ms:q.t?new Date(q.t).getTime():NaN}));
+  const baselineVisible=start>=min&&start<=max;
+  const baseline=baselineVisible?y(start).toFixed(1):null;
+  const timeRows=rows.map((q,i)=>({i,ms:q.ms}));
 
-  function nearestIndex(iso){
-    const ms=iso?new Date(iso).getTime():NaN;
+  function nearestIndex(v){
+    const ms=cloudEpoch(v);
     if(!Number.isFinite(ms))return -1;
-    const firstMs=timeRows.find(q=>Number.isFinite(q.ms))?.ms;
-    const lastMs=[...timeRows].reverse().find(q=>Number.isFinite(q.ms))?.ms;
+    const firstMs=timeRows[0]?.ms,lastMs=timeRows[timeRows.length-1]?.ms;
     if(Number.isFinite(firstMs)&&Number.isFinite(lastMs)&&(ms<firstMs||ms>lastMs))return -1;
     let best=-1,dist=Infinity;
     for(const q of timeRows){
@@ -7032,10 +7123,14 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     }
     return best;
   }
+
   function fmtAxisTime(v){
-    if(!v)return '';
-    const d=new Date(v); if(Number.isNaN(d.getTime()))return '';
-    return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const ms=cloudEpoch(v);
+    if(!Number.isFinite(ms))return '';
+    const d=new Date(ms);
+    return CLOUD_EQUITY_RANGE==='1W'
+      ? d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
+      : d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   }
   function eventPrice(m){
     const n=Number(m.price);
@@ -7044,100 +7139,83 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
 
   const marks=[];
   (Array.isArray(positions)?positions:[]).forEach(t=>marks.push({
-    type:'ENTRY',t:t.openedAt||t.createdAt||t.opened_at,
+    type:'ENTRY',t:t.openedAt||t.createdAt||t.opened_at||t.created_at,
     symbol:t.symbol,side:t.side,price:t.entry,pnl:t.unrealized
   }));
   (Array.isArray(trades)?trades:[]).forEach(t=>{
-    marks.push({type:'ENTRY',t:t.openedAt||t.opened_at,symbol:t.symbol,side:t.side,price:t.entry});
-    marks.push({
-      type:t.exitReason||'EXIT',t:t.closedAt||t.closed_at,symbol:t.symbol,side:t.side,
-      price:t.exit,pnl:t.realized
-    });
+    marks.push({type:'ENTRY',t:t.openedAt||t.opened_at||t.createdAt||t.created_at,symbol:t.symbol,side:t.side,price:t.entry});
+    marks.push({type:t.exitReason||'EXIT',t:t.closedAt||t.closed_at||t.updatedAt||t.updated_at,symbol:t.symbol,side:t.side,price:t.exit,pnl:t.realized});
   });
   (Array.isArray(events)?events:[]).forEach(e=>{
     const type=String(e.type||'').toUpperCase();
     if(/ENTRY|OPEN|TP1|TP2|STOP|SL|EXIT|CLOSE/.test(type)){
       marks.push({
-        type,
-        t:e.created_at||e.createdAt||e.t,
-        symbol:e.payload?.symbol,
-        side:e.payload?.side,
+        type,t:e.created_at||e.createdAt||e.t||e.ts||e.timestamp||e.at,
+        symbol:e.payload?.symbol,side:e.payload?.side,
         price:e.payload?.price??e.payload?.entry??e.payload?.exit,
         pnl:e.payload?.pnl??e.payload?.realized
       });
     }
   });
 
-  const seen=new Set();
-  const markerSvg=marks.map(m=>{
-    const i=nearestIndex(m.t); if(i<0)return '';
-    const key=i+'|'+m.type+'|'+(m.symbol||'');
-    if(seen.has(key))return ''; seen.add(key);
-
-    const cx=x(i),cy=y(rows[i].equity);
-    const bad=/SL|STOP/.test(m.type), good=/TP/.test(m.type);
-    const isEntry=/ENTRY|OPEN/.test(m.type);
-    const isExit=/EXIT|CLOSE/.test(m.type);
-    const cls=bad?'eq-mark bad':good?'eq-mark good':'eq-mark';
-    const asset=String(m.symbol||'').replace('USDT','');
-    const rawType=String(m.type).replaceAll('_',' ');
-    const label=isEntry
-      ? `${asset||''} ENTRY`.trim()
-      : isExit
-        ? `${asset||''} EXIT`.trim()
-        : `${asset?asset+' ':''}${rawType}`.trim();
-
-    const price=eventPrice(m);
+  const eventRows=marks.map((m,idx)=>{
+    const i=nearestIndex(m.t);
+    if(i<0)return null;
+    const rawType=String(m.type||'EVENT').toUpperCase();
+    const exitLike=/TP|SL|STOP|EXIT|CLOSE/.test(rawType);
     const pnl=Number(m.pnl);
-    const tooltip=[
-      label,
-      price?`Preis ${price}`:'',
-      Number.isFinite(pnl)?`P&L ${pnl>=0?'+':''}${cloudMoney(pnl)}`:'',
-      m.t?new Date(m.t).toLocaleString('de-DE'):''
-    ].filter(Boolean).join(' · ');
+    const good=exitLike&&Number.isFinite(pnl)&&pnl>=0;
+    const bad=exitLike&&Number.isFinite(pnl)&&pnl<0;
+    const sym=String(m.symbol||'').replace('USDT','');
+    const label=(sym?`${sym} `:'')+(exitLike?rawType:'ENTRY');
+    return {...m,idx,i,rawType,exitLike,good,bad,label};
+  }).filter(Boolean);
 
-    if(!(isEntry||isExit)){
-      return `<g class="${cls} eq-dot-only" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
-        <title>${tooltip}</title>
-        <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
-        <circle cx="${cx}" cy="${cy}" r="${good?4.2:bad?4.2:3.6}"/>
-      </g>`;
+  const occupied=[];
+  function showLabel(m){
+    if(m.exitLike)return true;
+    const xi=x(m.i);
+    if(occupied.some(v=>Math.abs(v-xi)<48))return false;
+    occupied.push(xi);
+    return true;
+  }
+
+  const markerSvg=eventRows.map(m=>{
+    const cx=x(m.i),cy=y(rows[m.i].equity);
+    const cls=m.good?'eq-good':m.bad?'eq-bad':m.exitLike?'eq-exit':'eq-entry';
+    const tooltip=`${m.label}${m.side?' · '+m.side:''}${m.price?' · '+eventPrice(m):''}${Number.isFinite(Number(m.pnl))?' · P&L '+cloudMoney(Number(m.pnl)):''}`;
+    if(!showLabel(m)){
+      return `<g class="${cls} eq-dot-only"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="${m.good||m.bad?4.2:3.6}"/></g>`;
     }
-
-    const shown=label.slice(0,11);
+    const shown=m.label.slice(0,11);
     const tx=Math.min(w-78,Math.max(l+4,cx+7));
     const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
-    return `<g class="${cls} eq-labeled" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
-      <title>${tooltip}</title>
-      <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
-      <circle cx="${cx}" cy="${cy}" r="4.5"/>
-      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(74,Math.max(42,shown.length*5.0))}" height="14" rx="4"/>
-      <text class="eq-label" x="${tx}" y="${ty}">${shown}</text>
-    </g>`;
+    return `<g class="${cls} eq-labeled"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="4.5"/><rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(74,Math.max(42,shown.length*5.0))}" height="14" rx="4"/><text class="eq-label" x="${tx}" y="${ty}">${shown}</text></g>`;
   }).join('');
 
-  // Three time ticks: start / middle / latest.
   const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1];
   const ticks=tickIdx.map(i=>{
-    const xx=x(i), label=fmtAxisTime(rows[i]?.t);
+    const xx=x(i),label=fmtAxisTime(rows[i]?.ms);
     return label?`<g class="eq-time"><line x1="${xx}" y1="${h-bottom+2}" x2="${xx}" y2="${h-bottom+6}"/><text x="${xx}" y="${h-8}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}">${label}</text></g>`:'';
   }).join('');
 
-  const rangeButtons=`<div class="eq-timeframes">${Object.keys(CLOUD_EQUITY_RANGES).map(k=>`<button type="button" data-equity-range="${k}" class="${k===CLOUD_EQUITY_RANGE?'active':''}" onclick="return setCloudEquityRange('${k}')">${k}</button>`).join('')}</div>`;
+  const firstMs=rows[0]?.ms,lastMs=rows[rows.length-1]?.ms;
+  const visibleMinutes=(Number.isFinite(firstMs)&&Number.isFinite(lastMs))?Math.max(0,Math.round((lastMs-firstMs)/60000)):null;
+  const meta=`${CLOUD_EQUITY_RANGE} · ${rows.length} PTS${visibleMinutes!==null?' · '+visibleMinutes+' MIN':''}`;
+
   return `${rangeButtons}<div class="cloud-equity-v2">
-    <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
-      <line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>
+    <div class="eq-filter-meta">${meta}</div>
+    <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      ${baselineVisible?`<line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>`:''}
       <polyline class="eq-line" fill="none" points="${line}"></polyline>
-      ${markerSvg}
-      ${ticks}
+      ${markerSvg}${ticks}
     </svg>
     <div class="eq-legend">
-      <span>● LIVE EQUITY</span>
-      <span>┄ START ${cloudMoney(start)}</span>
-      <span>│ ENTRY / TP / SL / EXIT</span>
+      <span>● LIVE EQUITY</span><span>RANGE ${CLOUD_EQUITY_RANGE}</span><span>│ ENTRY / TP / SL / EXIT</span>
     </div>
   </div>`;
 }
+
 function cloudPerformanceAnalytics(trades){
   const arr=(Array.isArray(trades)?trades:[]).map(t=>{
     const pnl=Number(t.realized??t.pnl??t.realizedPnl??0);
@@ -7385,7 +7463,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.41 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.47 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7508,7 +7586,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.41 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.47 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10400,4 +10478,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.41'))b.textContent='v6.43 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.47'))b.textContent='v6.47 · LIVE';},1200)}catch(e){}</script>
