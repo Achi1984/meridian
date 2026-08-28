@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.29">
+<link rel="manifest" href="manifest.webmanifest?v=6.30">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3690,6 +3690,17 @@ window.addEventListener('DOMContentLoaded',()=>{
 }
 </style>
 
+
+<style id="v630-dynamic-analytics">
+.pa-assets-head{
+  display:grid;grid-template-columns:.7fr 1fr 1fr .8fr;gap:8px;
+  padding:8px 12px;border-bottom:1px solid rgba(34,72,96,.55);
+  color:#667f92;font-size:5.4px;letter-spacing:.12em
+}
+.pa-assets-head span:nth-child(3),.pa-assets-head span:nth-child(4){text-align:right}
+.pa-empty{padding:12px;color:#7890a3;font-size:6.5px}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3697,7 +3708,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.29 · LIVE</span>
+        <span class="version" id="versionBadge">v6.30 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7009,15 +7020,21 @@ function cloudAnalyticsBlock(trades){
   const n=a.arr.length;
   const stage=n>=100?'100+':n>=50?'50–99':n>=20?'20–49':'<20';
   const pf=Number.isFinite(a.pf)?a.pf.toFixed(2):'∞';
-  const assets=['BTC','ETH','SOL'].map(sym=>{
+  const preferred=['BTC','ETH','SOL','XRP','SUI','DOGE','LINK','AVAX','ADA','NEAR'];
+  const tradedSymbols=Object.keys(a.bySymbol).filter(sym=>(a.bySymbol[sym]?.n||0)>0);
+  const orderedSymbols=[
+    ...preferred.filter(sym=>tradedSymbols.includes(sym)),
+    ...tradedSymbols.filter(sym=>!preferred.includes(sym)).sort()
+  ];
+  const assets=orderedSymbols.map(sym=>{
     const q=a.bySymbol[sym]||{n:0,pnl:0,wins:0};
     const wr=q.n?q.wins/q.n*100:0;
     return `<div class="pa-row">
-      <span>${sym}</span><b>${q.n} Trades</b>
+      <span>${sym}</span><b>${q.n} ${q.n===1?'Trade':'Trades'}</b>
       <em class="${q.pnl>=0?'green':'red'}">${q.pnl>=0?'+':''}${cloudMoney(q.pnl)}</em>
       <small>${fmt(wr,0)}% WR</small>
     </div>`;
-  }).join('');
+  }).join('') || `<div class="pa-empty">Noch keine abgeschlossenen Trades.</div>`;
   return `<div class="performance-analytics">
     <div class="section-title">FORWARD TEST ANALYTICS <span class="tag cyan">${n<20?'LEARNING':'EVALUATION'}</span></div>
     <div class="pa-top">
@@ -7031,7 +7048,10 @@ function cloudAnalyticsBlock(trades){
       <div><span>SHORT</span><b>${a.bySide.SHORT.n}</b><small class="${a.bySide.SHORT.pnl>=0?'green':'red'}">${a.bySide.SHORT.pnl>=0?'+':''}${cloudMoney(a.bySide.SHORT.pnl)}</small></div>
       <div><span>SAMPLE</span><b>${n}</b><small>${stage} Trades</small></div>
     </div>
-    <div class="pa-assets">${assets}</div>
+    <div class="pa-assets">
+      <div class="pa-assets-head"><span>ASSET</span><span>TRADES</span><span>P&L</span><span>WR</span></div>
+      ${assets}
+    </div>
     <div class="pa-note">${n<20
       ? 'Ruleset bleibt eingefroren. Erste belastbare Zwischenbewertung ab 20 abgeschlossenen Trades.'
       : 'Zwischenbewertung möglich. Änderungen erst nach dokumentierter Review.'}</div>
@@ -7112,7 +7132,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.29 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.30 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7235,7 +7255,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.29 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.30 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
