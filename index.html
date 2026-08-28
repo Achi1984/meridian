@@ -3587,6 +3587,11 @@ window.addEventListener('DOMContentLoaded',()=>{
 </script>
 
 
+<style id="v643-equity-timeframes">
+.eq-timeframes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 2px 7px}
+.eq-timeframes button{appearance:none;border:1px solid rgba(35,83,110,.72);background:rgba(5,20,31,.58);color:#7893a7;border-radius:999px;padding:7px 2px;font:inherit;font-size:7px;font-weight:800;letter-spacing:.08em;cursor:pointer}
+.eq-timeframes button.active{color:#dff5ff;border-color:#20a4ff;background:rgba(32,164,255,.16)}
+</style>
 <style id="v625-chart-polish">
 .cloud-equity-v2{position:relative}
 .paper-equity-svg{height:154px;overflow:visible}
@@ -3794,7 +3799,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.42 · LIVE</span>
+        <span class="version" id="versionBadge">v6.43 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -4197,7 +4202,7 @@ async function load(){
        DATA.pionexRisk={...(DATA.pionexRisk||{}),snapshotAt:'2026-08-28T15:10:00+02:00',
          activeCount:normalized.length,bots:normalized,
          closedBots:(DATA.pionexRisk?.closedBots||[]).filter(x=>x.id!=='BTC-L100'),
-         note:'v6.42 embedded SSOT: 3 active bots; BTC-L100 closed; BTC-S30 WATCH at 8.99% buffer.'};
+         note:'v6.43 embedded SSOT: 3 active bots; BTC-L100 closed; BTC-S30 WATCH at 8.99% buffer.'};
        DATA.pionexReality={verifiedAt:'2026-08-28T15:10:00+02:00',mode:'BTC_SHORT_PLUS_ALT_GRIDS',activeCount:3,btcShort:{id:'BTC-S30',liqBufferPct:8.99,status:'ACTIVE / WATCH'},btcLong:{id:'BTC-L100',status:'CLOSED'},note:'Embedded verified SSOT wins over legacy metadata.'};
        DATA.exposure={...(DATA.exposure||{}),pionexAccountValue:1277.70,btcShortCapital:52,directionalBias:'BTC SHORT HEDGE + ALT LONG GRIDS'};
      }
@@ -6975,13 +6980,26 @@ function cloudAge(iso){
   if(!iso)return '—'; const sec=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
   if(sec<60)return Math.floor(sec)+'s'; if(sec<3600)return Math.floor(sec/60)+'m'; return Math.floor(sec/3600)+'h';
 }
+let CLOUD_EQUITY_RANGE='1D';
+const CLOUD_EQUITY_RANGES={'15M':900000,'1H':3600000,'4H':14400000,'1D':86400000,'1W':604800000};
+function setCloudEquityRange(range){if(!CLOUD_EQUITY_RANGES[range])return;CLOUD_EQUITY_RANGE=range;try{render()}catch(e){}}
 function cloudEquitySvg(points,events,positions,trades,startEquity){
   const raw=Array.isArray(points)?points:[];
-  const rows=raw.map((x,i)=>({
+  let rows=raw.map((x,i)=>({
     t:x?.t||x?.ts||x?.created_at||x?.createdAt||null,
     equity:Number(x?.equity),
     realized:Number(x?.realizedEquity??x?.closedEquity??x?.balance)
   })).filter(x=>Number.isFinite(x.equity));
+  const allRows=rows;
+  const validTimes=allRows.map(x=>x.t?new Date(x.t).getTime():NaN).filter(Number.isFinite);
+  const latestMs=validTimes.length?Math.max(...validTimes):NaN;
+  const rangeMs=CLOUD_EQUITY_RANGES[CLOUD_EQUITY_RANGE]||CLOUD_EQUITY_RANGES['1D'];
+  if(Number.isFinite(latestMs)){
+    const cutoff=latestMs-rangeMs;
+    const inRange=allRows.filter(x=>{const ms=x.t?new Date(x.t).getTime():NaN;return Number.isFinite(ms)&&ms>=cutoff});
+    if(inRange.length>=2)rows=inRange;
+    else if(inRange.length===1){const idx=allRows.indexOf(inRange[0]);rows=idx>0?[allRows[idx-1],inRange[0]]:inRange;}
+  }
   if(rows.length<2)return '<div class="muted">Equity-Historie wird aufgebaut.</div>';
 
   const w=560,h=188,l=10,r=10,top=18,bottom=36;
@@ -6997,6 +7015,9 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
   function nearestIndex(iso){
     const ms=iso?new Date(iso).getTime():NaN;
     if(!Number.isFinite(ms))return -1;
+    const firstMs=timeRows.find(q=>Number.isFinite(q.ms))?.ms;
+    const lastMs=[...timeRows].reverse().find(q=>Number.isFinite(q.ms))?.ms;
+    if(Number.isFinite(firstMs)&&Number.isFinite(lastMs)&&(ms<firstMs||ms>lastMs))return -1;
     let best=-1,dist=Infinity;
     for(const q of timeRows){
       if(Number.isFinite(q.ms)&&Math.abs(q.ms-ms)<dist){best=q.i;dist=Math.abs(q.ms-ms)}
@@ -7094,8 +7115,9 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     return label?`<g class="eq-time"><line x1="${xx}" y1="${h-bottom+2}" x2="${xx}" y2="${h-bottom+6}"/><text x="${xx}" y="${h-8}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}">${label}</text></g>`:'';
   }).join('');
 
-  return `<div class="cloud-equity-v2">
-    <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
+  const rangeButtons=`<div class="eq-timeframes">${Object.keys(CLOUD_EQUITY_RANGES).map(k=>`<button class="${k===CLOUD_EQUITY_RANGE?'active':''}" onclick="setCloudEquityRange('${k}')">${k}</button>`).join('')}</div>`;
+  return `${rangeButtons}<div class="cloud-equity-v2">
+    <svg class="paper-equity-svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
       <line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>
       <polyline class="eq-line" fill="none" points="${line}"></polyline>
       ${markerSvg}
@@ -10370,4 +10392,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.41'))b.textContent='v6.42 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.41'))b.textContent='v6.43 · LIVE';},1200)}catch(e){}</script>
