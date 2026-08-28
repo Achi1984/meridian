@@ -1,0 +1,9 @@
+MERIDIAN v6.27
+- Equity-Chart entschlackt
+- Entry/Exit bleiben beschriftet
+- TP/SL nur noch als farbige Punkte
+- Peak direkt im Performance-Header
+- Total P&L statt doppelter Peak-Kachel
+- Zeitachse bleibt erhalten
+- Northflank / PostgreSQL / Engine 6.2.0 / Ruleset unverändert
+- keine Änderungen an Paper-Trading-, Risk-, Entry- oder Exit-Logik

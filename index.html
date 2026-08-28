@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.26">
+<link rel="manifest" href="manifest.webmanifest?v=6.27">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3624,6 +3624,17 @@ window.addEventListener('DOMContentLoaded',()=>{
 .eq-mark circle{r:4}
 </style>
 
+
+<style id="v627-chart-ux">
+.eq-dot-only .eq-label-bg,.eq-dot-only .eq-label{display:none!important}
+.eq-dot-only line{opacity:.24!important;stroke-dasharray:3 6}
+.eq-dot-only.good circle{fill:#29d98b!important}
+.eq-dot-only.bad circle{fill:#ff6170!important}
+.eq-labeled line{opacity:.45}
+.eq-labeled .eq-label-bg{opacity:.98}
+.eq-legend span:last-child::after{content:" · TP/SL = Punkte";color:#6f879b}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3631,7 +3642,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.26 · LIVE</span>
+        <span class="version" id="versionBadge">v6.27 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6855,14 +6866,17 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
 
     const cx=x(i),cy=y(rows[i].equity);
     const bad=/SL|STOP/.test(m.type), good=/TP/.test(m.type);
+    const isEntry=/ENTRY|OPEN/.test(m.type);
+    const isExit=/EXIT|CLOSE/.test(m.type);
     const cls=bad?'eq-mark bad':good?'eq-mark good':'eq-mark';
     const asset=String(m.symbol||'').replace('USDT','');
-    const side=m.side?(' '+m.side):'';
     const rawType=String(m.type).replaceAll('_',' ');
-    const label=/ENTRY|OPEN/.test(m.type)
+    const label=isEntry
       ? `${asset||''} ENTRY`.trim()
-      : `${asset?asset+' ':''}${rawType}`.trim();
-    const shown=label.slice(0,12);
+      : isExit
+        ? `${asset||''} EXIT`.trim()
+        : `${asset?asset+' ':''}${rawType}`.trim();
+
     const price=eventPrice(m);
     const pnl=Number(m.pnl);
     const tooltip=[
@@ -6872,15 +6886,22 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
       m.t?new Date(m.t).toLocaleString('de-DE'):''
     ].filter(Boolean).join(' · ');
 
-    // Keep labels inside chart and stagger labels if close to the top.
-    const tx=Math.min(w-82,Math.max(l+4,cx+7));
-    const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
+    if(!(isEntry||isExit)){
+      return `<g class="${cls} eq-dot-only" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
+        <title>${tooltip}</title>
+        <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
+        <circle cx="${cx}" cy="${cy}" r="${good?4.2:bad?4.2:3.6}"/>
+      </g>`;
+    }
 
-    return `<g class="${cls}" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
+    const shown=label.slice(0,11);
+    const tx=Math.min(w-78,Math.max(l+4,cx+7));
+    const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
+    return `<g class="${cls} eq-labeled" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
       <title>${tooltip}</title>
       <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
       <circle cx="${cx}" cy="${cy}" r="4.5"/>
-      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(78,Math.max(42,shown.length*5.0))}" height="14" rx="4"/>
+      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(74,Math.max(42,shown.length*5.0))}" height="14" rx="4"/>
       <text class="eq-label" x="${tx}" y="${ty}">${shown}</text>
     </g>`;
   }).join('');
@@ -6980,7 +7001,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.26 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.27 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7045,12 +7066,12 @@ function cloudPaperTradeView(){
     + card(`<div class="section-title">EQUITY & PERFORMANCE <span class="tag cyan">POSTGRES</span></div>
       <div class="paper-performance-strip">
         <div><span>LIVE EQUITY</span><b>${cloudMoney(equity)}</b></div>
-        <div><span>P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b></div>
+        <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
         <div><span>DRAWDOWN</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
       </div>
       ${cloudEquitySvg(p.equityCurve||[],events,positions,trades,start)}
       <div class="paper-stats">
-        <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
+        <div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b></div>
         <div><span>DAY START</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>
         <div><span>WINRATE</span><b>${fmt(winRate,0)}%</b></div>
         <div><span>ERRORS</span><b class="${Number(eng.errors||0)===0?'green':'red'}">${eng.errors||0}</b></div>
@@ -7094,7 +7115,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.26 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.27 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
