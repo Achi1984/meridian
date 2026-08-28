@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.28">
+<link rel="manifest" href="manifest.webmanifest?v=6.29">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3653,6 +3653,43 @@ window.addEventListener('DOMContentLoaded',()=>{
 .pa-note{margin-top:12px;padding:10px 12px;border:1px solid #294b5f;border-radius:11px;color:#8ea2b4;font-size:6.5px;line-height:1.45}
 </style>
 
+
+<style id="v629-dashboard">
+.v629-limits{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+  margin-top:10px
+}
+.v629-limits span{
+  min-width:0;
+  border:1px solid rgba(34,99,126,.55);
+  border-radius:9px;
+  padding:7px 5px;
+  color:#7894a8;
+  font-size:5.5px;
+  letter-spacing:.08em;
+  text-align:center;
+  white-space:nowrap
+}
+.v629-limits b{
+  display:block;
+  color:#e2edf5;
+  font-size:8px;
+  margin-top:4px
+}
+.v629-scanner-universe{
+  margin:-2px 0 10px;
+  color:#73899b;
+  font-size:5.8px;
+  letter-spacing:.055em;
+  line-height:1.55
+}
+@media(max-width:430px){
+  .v629-limits{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3660,7 +3697,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.28 · LIVE</span>
+        <span class="version" id="versionBadge">v6.29 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7075,7 +7112,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.28 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.29 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7085,6 +7122,12 @@ function cloudPaperTradeView(){
       <span>${safety.paperTrading&&!safety.liveTrading?'PAPER ONLY':'SAFETY CHECK'}</span>
       <b>${db.persistent?'POSTGRES PERSISTENT':'DB NOT PERSISTENT'} · MARKET ${eng.marketFresh?'FRESH':'STALE'}</b>
       <small>Cycle ${Math.round(Number(eng.intervalMs||0)/1000)}s · Scan ${Math.round(Number(eng.signalIntervalMs||0)/1000)}s · Sync ${updated}</small>
+      <div class="v629-limits">
+        <span>MAX POS<b>${Number(status?.limits?.maxOpenPositions||5)}</b></span>
+        <span>RISK CAP<b>${fmt(Number(status?.limits?.maxPortfolioRiskPct||4),0)}%</b></span>
+        <span>CORR GUARD<b>${Number(status?.limits?.maxCorrelatedSameDirection||3)}</b></span>
+        <span>TRADES/DAY<b>${Number(status?.limits?.maxTradesPerDay||20)}</b></span>
+      </div>
     </div>
     <div class="paper-kpis harden v623-kpis">
       <div class="kpi-card">
@@ -7115,7 +7158,7 @@ function cloudPaperTradeView(){
       <div class="kpi-card">
         <span>OPEN RISK</span>
         <b>${fmt(openRisk,2)}%</b>
-        <small>${positions.length}/3 Positionen</small>
+        <small>${positions.length}/${Number(status?.limits?.maxOpenPositions||5)} Positionen</small>
       </div>
     </div>`)
 
@@ -7132,6 +7175,7 @@ function cloudPaperTradeView(){
         </div>`:'<div class="muted">Scanner lädt.</div>'}`)
 
     + card(`<div class="section-title">LIVE SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div>
+      <div class="v629-scanner-universe">BTC · ETH · SOL · XRP · SUI · DOGE · LINK · AVAX · ADA · NEAR</div>
       <div class="paper-scanner">${scannerRows||'<div class="muted">Noch keine Cloud-Signale.</div>'}</div>`)
 
     + card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${positions.length}</span></div>
@@ -7191,7 +7235,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.28 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.29 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>

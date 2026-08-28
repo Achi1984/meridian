@@ -1,0 +1,12 @@
+MERIDIAN Dashboard v6.29
+
+- Dashboard target: Paperbot backend v6.29.1
+- Live Scanner remains dynamic and now displays the 10-asset universe:
+  BTC, ETH, SOL, XRP, SUI, DOGE, LINK, AVAX, ADA, NEAR
+- Open Positions capacity reads backend maxOpenPositions (5)
+- Paper-only status banner shows:
+  MAX POS / RISK CAP / CORR GUARD / TRADES-DAY
+- Forward Test Analytics retained
+- Equity Chart retained
+- Ruleset 6.2-SIGNAL-V1 unchanged
+- No trading logic changes in this dashboard package
