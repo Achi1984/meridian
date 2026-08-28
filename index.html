@@ -3757,14 +3757,14 @@ window.addEventListener('DOMContentLoaded',()=>{
 .ssot-note b{display:block;color:#29b6ff;font-size:11px;margin-top:4px}
 .v602-riskline.green .v602-state{color:#2fe59a}
 </style>
-</head>
+\n<style id="v640-learning-decision">\n.learning-decision-layer{margin:4px 0 20px}\n.ldl-head,.ldl-gates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}\n.ldl-head>div,.ldl-gates>div,.ldl-evidence{border:1px solid rgba(35,81,106,.65);border-radius:12px;padding:11px;background:rgba(5,22,32,.34)}\n.ldl-head span,.ldl-gates span,.ldl-title{display:block;color:#7890a2;font-size:6px;letter-spacing:.11em}\n.ldl-head b,.ldl-gates b{display:block;margin-top:5px;font-size:10px}.ldl-head small{display:block;color:#7890a2;margin-top:4px;font-size:6px}\n.ldl-flow{display:flex;align-items:center;justify-content:space-between;gap:4px;margin:12px 0;padding:9px;border:1px solid rgba(34,169,255,.35);border-radius:12px;font-size:6px;letter-spacing:.08em;color:#8da2b2}\n.ldl-flow i{color:#22a9ff}.ldl-flow strong{color:#36d492}\n.ldl-evidence{margin:10px 0}.ldl-row{display:flex;gap:7px;padding:7px 0;border-bottom:1px solid rgba(35,81,106,.35)}.ldl-row:last-child{border-bottom:0}.ldl-row span{color:#22a9ff}.ldl-row b{font-size:8px;font-weight:600}\n@media(max-width:430px){.ldl-flow{font-size:5.4px}.ldl-head b,.ldl-gates b{font-size:9px}}\n</style>\n</head>
 <body>
 <div class="app">
   <header class="topbar">
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.39 · LIVE</span>
+        <span class="version" id="versionBadge">v6.40 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7104,6 +7104,46 @@ function cloudPerformanceAnalytics(trades){
   return {arr,wins,losses,gp,gl,pf,avgWin,avgLoss,expectancy,bySymbol,bySide};
 }
 
+function cloudLearningDecisionLayer(trades){
+  const a=cloudPerformanceAnalytics(trades);
+  const n=a.arr.length, target=20;
+  const completion=Math.min(100,n/target*100);
+  const long=a.bySide.LONG, short=a.bySide.SHORT;
+  const symbols=Object.entries(a.bySymbol).filter(([,q])=>q.n>0);
+  const best=symbols.length?[...symbols].sort((x,y)=>y[1].pnl-x[1].pnl)[0]:null;
+  const worst=symbols.length?[...symbols].sort((x,y)=>x[1].pnl-y[1].pnl)[0]:null;
+  const sideGap=Math.abs((long?.pnl||0)-(short?.pnl||0));
+  const readiness=n>=20?100:Math.round(completion);
+  const state=n>=20?'REVIEW READY':n>=12?'BUILDING EVIDENCE':n>=6?'EARLY PATTERN':'COLLECTING DATA';
+  const tone=n>=20?'green':n>=12?'cyan':'amber';
+  const sideLeader=(short?.pnl||0)>(long?.pnl||0)?'SHORT':(long?.pnl||0)>(short?.pnl||0)?'LONG':'BALANCED';
+  const evidence=[];
+  if(n) evidence.push(`${sideLeader} aktuell stärker · Gap ${cloudMoney(sideGap)}`);
+  if(best) evidence.push(`${best[0]} führt · ${best[1].pnl>=0?'+':''}${cloudMoney(best[1].pnl)} / ${best[1].n} Trades`);
+  if(worst && (!best || worst[0]!==best[0])) evidence.push(`${worst[0]} schwächste Probe · ${worst[1].pnl>=0?'+':''}${cloudMoney(worst[1].pnl)} / ${worst[1].n} Trades`);
+  const remaining=Math.max(0,target-n);
+  return `<div class="learning-decision-layer">
+    <div class="section-title">LEARNING / DECISION LAYER <span class="tag ${tone}">${state}</span></div>
+    <div class="ldl-head">
+      <div><span>REVIEW READINESS</span><b>${readiness}/100</b><small>${n}/${target} CLOSED · ${remaining?remaining+' BIS REVIEW':'REVIEW-SCHWELLE ERREICHT'}</small></div>
+      <div><span>RULESET</span><b class="green">FROZEN</b><small>6.2-SIGNAL-V1 · KEINE AUTO-ÄNDERUNG</small></div>
+    </div>
+    <div class="lm-progress"><i style="width:${completion}%"></i></div>
+    <div class="ldl-flow"><span>MARKT</span><i>→</i><span>SIGNAL</span><i>→</i><span>PAPER</span><i>→</i><span>LEARNING</span><i>→</i><strong>${n>=20?'REVIEW':'WAIT'}</strong></div>
+    <div class="ldl-evidence">
+      <div class="ldl-title">OBSERVATIONS · NO RULE CHANGE</div>
+      ${evidence.length?evidence.map(x=>`<div class="ldl-row"><span>•</span><b>${x}</b></div>`).join(''):'<div class="muted">Noch keine abgeschlossenen Trades.</div>'}
+    </div>
+    <div class="ldl-gates">
+      <div><span>SAMPLE GATE</span><b class="${n>=20?'green':'amber'}">${n>=20?'OPEN':'LOCKED'} · ${n}/${target}</b></div>
+      <div><span>SIDE EVIDENCE</span><b>${sideLeader}</b></div>
+      <div><span>ASSET EVIDENCE</span><b>${symbols.length} ASSETS</b></div>
+      <div><span>ACTION</span><b class="${n>=20?'cyan':'green'}">${n>=20?'MANUAL REVIEW':'KEEP FROZEN'}</b></div>
+    </div>
+    <div class="lm-note">MERIDIAN sammelt Evidenz nach Richtung und Asset. Erst ab 20 abgeschlossenen Trades wird eine dokumentierte Review freigeschaltet; das Ruleset wird niemals automatisch verändert.</div>
+  </div>`;
+}
+
 function cloudAnalyticsBlock(trades){
   const a=cloudPerformanceAnalytics(trades);
   const n=a.arr.length;
@@ -7141,7 +7181,7 @@ function cloudAnalyticsBlock(trades){
     </div>
     <div class="lm-note">Ruleset 6.2-SIGNAL-V1 bleibt eingefroren · Review ab 20 abgeschlossenen Trades.</div>
   </div>`;
-  return learningMonitor+`<div class="performance-analytics">
+  return learningMonitor+cloudLearningDecisionLayer(trades)+`<div class="performance-analytics">
     <div class="section-title">FORWARD TEST ANALYTICS <span class="tag cyan">${n<20?'LEARNING':'EVALUATION'}</span></div>
     <div class="pa-top">
       <div><span>PROFIT FACTOR</span><b class="${a.pf>1?'green':a.pf>0&&a.pf<1?'red':''}">${pf}</b></div>
@@ -7238,7 +7278,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.37 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.40 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7361,7 +7401,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.37 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.40 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10253,4 +10293,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.37'))b.textContent='v6.39 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.37'))b.textContent='v6.40 · LIVE';},1200)}catch(e){}</script>

@@ -1,0 +1,12 @@
+ACHI MERIDIAN v6.40 — LEARNING / DECISION LAYER
+
+- New dynamic Learning / Decision Layer in Cloud Paper.
+- Review Readiness tracks progress to 20 closed trades.
+- Evidence is grouped by LONG/SHORT and traded asset.
+- Best/worst observed asset samples are surfaced without changing strategy.
+- Sample Gate stays LOCKED until 20 closed trades.
+- At 20 trades, action changes to MANUAL REVIEW.
+- Ruleset 6.2-SIGNAL-V1 remains FROZEN; no automatic strategy changes.
+- Engine remains 6.29.1.
+- Paper-only safety unchanged.
+- UI version labels aligned to 6.40.
