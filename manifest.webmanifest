@@ -1,7 +1,7 @@
 {
   "name": "ACHI MERIDIAN",
   "short_name": "MERIDIAN",
-  "start_url": "./index.html?v=6.42",
+  "start_url": "./index.html?v=6.45",
   "display": "standalone",
   "background_color": "#03070c",
   "theme_color": "#05080d"

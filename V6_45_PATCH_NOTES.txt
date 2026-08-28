@@ -1,0 +1,7 @@
+ACHI MERIDIAN v6.45 — VERSION SYNC
+
+- App version synchronized to 6.45 in version.json and data.json.
+- PWA manifest start_url cache-buster updated to v6.45.
+- Embedded Pionex SSOT release identifier updated to 6.45.
+- Hardcoded runtime fallback updated to 6.45.
+- Equity 15M / 1H / 4H / 1D / 1W selector retained with iOS touch fix.

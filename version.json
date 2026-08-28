@@ -1,1 +1,1 @@
-{"version":"6.44","build":"2026-08-28","notes":"Fix: Equity timeframe buttons are touch/click selectable on iOS."}
+{"version":"6.45","build":"2026-08-28","release":"VERSION SYNC + EQUITY TIMEFRAMES","notes":"Release identifiers synchronized across app, data, manifest and embedded SSOT. Equity timeframe selector remains iOS-touch enabled."}

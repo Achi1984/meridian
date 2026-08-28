@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
-<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.42","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.66,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
+<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.45","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.66,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
 <style id="meridian-inline-main-css">
 
@@ -3902,7 +3902,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.20';
+let APP_CODE_VERSION='6.45';
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
@@ -4228,11 +4228,11 @@ async function load(){
 
      DATA.futuresRiskIntelligence={"version":"1.1","asOf":"2026-08-28T15:10:00+02:00","singleBot":{"id":"BTC-S30","level":"WATCH","bufferPct":8.99,"gatePct":8.0,"gapToGatePctPoints":0.99,"reason":"BTC short is now above the 8% critical liquidation-buffer gate after margin increase, but remains below the 12% watch threshold."},"portfolio":{"level":"WATCH","score":52,"protectedBots":[],"primaryBlocker":null,"reason":"No active bot is below the 8% critical gate. BTC-L100 is closed; BTC-S30 remains the closest liquidation risk at 8.99%.","action":"WATCH BTC-S30; critical risk gate reopens only if displayed buffer falls below 8%."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.37'};
+   let runtimeVersion={version:'6.45'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.37';
+   APP_CODE_VERSION=runtimeVersion.version||'6.45';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
