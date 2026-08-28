@@ -1,0 +1,36 @@
+ACHI MERIDIAN v6.37 — SSOT CONSOLIDATION
+
+ONE SOURCE → ALL VIEWS
+
+CENTER
+- BTC risk no longer reads bot facts from localStorage.
+- BTC-S30 comes from canonical Pionex SSOT: Liq 85,808.2 / buffer 7.76%.
+- BTC-L100 replaces legacy BTC-L20 everywhere.
+- BTC-L100 remains visible as BE PROTECTED (SL 78,800 >= BE 78,653.3).
+- BE-protected long does not block the 8% liquidation gate.
+- Single-bot blocker remains BTC-S30.
+- Overall Futures portfolio risk remains separately classified ELEVATED.
+
+DEPOT / GRID
+- Continue to consume pionexRisk.bots canonical active set.
+- 4 active bots remain canonical.
+- No futures double counting in spot portfolio.
+
+FCST
+- BTC Cycle Scenarios now read directly from vision2.calibration.btcBands:
+  Defensive $150k–$220k
+  Base $220k–$340k
+  High-Beta $340k–$500k
+- Legacy macroForecast BTC zones are mirrored from VISION for backward compatibility only.
+- Exit Ladder now renders VISION exit components:
+  TIME / STRUCTURE / REGIME / EUPHORIA / MACRO.
+- Peak Window shows timing confidence.
+- Tactical overheat remains separate from macro cycle exit.
+
+CACHE / LEGACY
+- Known BTC-L20 / old BTC-S30 risk constants removed from runtime path.
+- Browser-local bot config is no longer authoritative.
+
+UNCHANGED
+- Paper Engine 6.29.1
+- Ruleset 6.2-SIGNAL-V1

@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
-<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.35","verifiedFrom":"Pionex screenshots 2026-08-28 10:34","activeCount":4,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":214.53,"currentPrice":79627.0,"liquidationPrice":85808.2,"pionexLiqBufferPct":7.76,"breakEven":72809.4,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-134.99,"gridProfit":14.36,"trendPnl":-149.36,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":null,"takeProfit":null,"beProtected":false,"status":"ACTIVE","riskClass":"CRITICAL"},"BTC-L100":{"symbol":"BTC","side":"LONG","leverage":100,"investmentUSDT":10.0,"dynamicMarginUSDT":0,"currentPrice":79766.7,"liquidationPrice":76745.2,"pionexLiqBufferPct":3.78,"breakEven":78653.3,"creationPrice":78875.6,"range":[63000,88000],"totalProfitUSDT":3.89,"gridProfit":0.996,"trendPnl":2.9,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":78800.0,"takeProfit":88000.0,"beProtected":true,"status":"ACTIVE","riskClass":"PROTECTED"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","BTC-L100","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Valid BE-protecting SL removes a bot as primary critical capital-loss blocker; residual execution/slippage risk remains."};</script>
+<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.35","verifiedFrom":"Pionex screenshots 2026-08-28 10:34","activeCount":4,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":214.53,"currentPrice":79627.0,"liquidationPrice":85808.2,"pionexLiqBufferPct":7.76,"breakEven":72809.4,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-134.99,"gridProfit":14.36,"trendPnl":-149.36,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":null,"takeProfit":null,"beProtected":false,"status":"ACTIVE","riskClass":"CRITICAL"},"BTC-L100":{"symbol":"BTC","side":"LONG","leverage":100,"investmentUSDT":10.0,"dynamicMarginUSDT":0,"currentPrice":79766.7,"liquidationPrice":76745.2,"pionexLiqBufferPct":3.78,"breakEven":78653.3,"creationPrice":78875.6,"range":[63000,88000],"totalProfitUSDT":3.89,"gridProfit":0.996,"trendPnl":2.9,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":78800.0,"takeProfit":88000.0,"beProtected":true,"status":"ACTIVE","riskClass":"PROTECTED"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.76,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","BTC-L100","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Valid BE-protecting SL removes a bot as primary critical capital-loss blocker; residual execution/slippage risk remains."};</script>
 
 <style id="meridian-inline-main-css">
 
@@ -3748,6 +3748,13 @@ window.addEventListener('DOMContentLoaded',()=>{
 .portfolio-risk-intel small{display:block;color:#8193a8;font-size:8px;line-height:1.4;margin-top:5px}
 @media(max-width:430px){.exit-components{grid-template-columns:repeat(5,1fr);gap:4px}}
 </style>
+
+<style id="v637-ssot-css">
+.ssot-note{border:1px solid #1a6188;border-radius:12px;padding:9px;margin-top:9px;background:rgba(10,51,77,.18)}
+.ssot-note span{display:block;color:#8193a8;font-size:7px;letter-spacing:1px}
+.ssot-note b{display:block;color:#29b6ff;font-size:11px;margin-top:4px}
+.v602-riskline.green .v602-state{color:#2fe59a}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3755,7 +3762,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.36 · LIVE</span>
+        <span class="version" id="versionBadge">v6.37 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -4167,13 +4174,32 @@ async function load(){
          knownLongCapital:1149.27,btcShortCapital:52,directionalBias:'NET LONG / BTC HEDGE'};
      }
      if(window.MERIDIAN_VISION2_SNAPSHOT) DATA.vision2=window.MERIDIAN_VISION2_SNAPSHOT;
+     // v6.37 SSOT: legacy forecast readers are fed from VISION instead of independent constants.
+     try{
+       const vb=DATA.vision2?.calibration?.btcBands;
+       if(vb){
+         DATA.macroForecast=DATA.macroForecast||{};
+         DATA.macroForecast.btcZones={
+           bear:{low:vb.defensive.low,high:vb.defensive.high},
+           base:{low:vb.base.low,high:vb.base.high},
+           bull:{low:vb.highBeta.low,high:vb.highBeta.high},
+           source:'VISION_2_1_SSOT'
+         };
+         DATA.macroForecast.peakWindow={
+           from:'2029 Q2',to:'2030 Q1',
+           confidence:DATA.vision2?.calibration?.peakWindow?.confidence||58,
+           source:'VISION_2_1_SSOT'
+         };
+       }
+     }catch(e){console.warn('v6.37 forecast SSOT overlay failed',e)}
+
      DATA.futuresRiskIntelligence={"version":"1.0","asOf":"2026-08-28T11:22:00+02:00","singleBot":{"id":"BTC-S30","level":"HIGH","bufferPct":7.76,"gatePct":8.0,"gapToGatePctPoints":0.24,"reason":"Unprotected BTC short remains just below the 8% liquidation-buffer gate."},"portfolio":{"level":"ELEVATED","score":61,"protectedBots":["BTC-L100"],"primaryBlocker":"BTC-S30","reason":"One critical unprotected bot; BTC-L100 is BE-protected and HBAR/XRP have substantially wider buffers.","action":"NO NEW FUTURES RISK UNTIL BTC-S30 BUFFER ≥ 8%; protected long is not treated as primary capital-loss blocker."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.36'};
+   let runtimeVersion={version:'6.37'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.36';
+   APP_CODE_VERSION=runtimeVersion.version||'6.37';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -4562,7 +4588,7 @@ function canonicalBufferSource(bot){
 function canonicalBtcLongRiskPlan(){
  const base=DATA.slInvalidationEngine?.btcLongPositionModel || DATA.slInvalidationEngine?.btcLong20x;
  if(!base)return null;
- const bot=canonicalBotStates().find(b=>b.id==='BTC-L20') ||
+ const bot=canonicalBotStates().find(b=>b.id==='BTC-L100') ||
            canonicalBotStates().find(b=>b.symbol==='BTC'&&String(b.side).toUpperCase()==='LONG');
  if(!bot || !Number.isFinite(bot.liquidation)){
    const entry=Number(base.entry||0), sl=Number(base.stopLoss), tp1=Number(base.takeProfit1), tp2=Number(base.takeProfit2);
@@ -4982,7 +5008,7 @@ function oneActionState(){
  const x=executionReadinessState(), cap=x.cap||{};
  const shortBuf=Number(cap.shortBuf);
  const gate=8;
- const liq=83746.1;
+ const liq=85808.2;
  const missing=Number.isFinite(shortBuf)?Math.max(0,gate-shortBuf):null;
  if(x.riskOpen){
    return {
@@ -5145,36 +5171,29 @@ function centerRiskTransparency(){
    Facts first: current liquidation price -> buffer -> gate.
    No exposure-% recommendation is emitted as a primary action. */
 function btcRiskConfig(){
-  const defaults={
-    short:{id:'BTC-S30',side:'SHORT',leverage:30,liq:83746.1,investment:52,dynamicMargin:174.53,range:[59589.2,79671.1],breakEven:72246.6,verifiedBuffer:7.33},
-    long:{id:'BTC-L20',side:'LONG',leverage:20,liq:70309.2,investment:50,dynamicMargin:0,range:[63000,88000],breakEven:78825.2,verifiedBuffer:9.89},
-    gate:8.0
+  const bots=canonicalBotStates().filter(b=>String(b.symbol).toUpperCase()==='BTC');
+  const sht=bots.find(b=>String(b.side).toUpperCase()==='SHORT' && b.id==='BTC-S30') ||
+            bots.find(b=>String(b.side).toUpperCase()==='SHORT');
+  const lng=bots.find(b=>String(b.side).toUpperCase()==='LONG' && b.id==='BTC-L100') ||
+            bots.find(b=>String(b.side).toUpperCase()==='LONG');
+  const mapBot=(b,fallback)=>b?{
+    id:b.id, side:String(b.side).toUpperCase(), leverage:Number(b.leverage||1),
+    liq:Number(b.liquidation), investment:Number(b.investment||0),
+    dynamicMargin:Number(b.dynamicMargin||0), range:b.range||[],
+    breakEven:Number(b.breakEven), stopLoss:Number(b.stopLoss),
+    verifiedBuffer:Number(b.buffer), beProtected:!!b.beProtected,
+    bufferBasis:b.bufferBasis||'CANONICAL SSOT'
+  }:fallback;
+  return {
+    gate:8.0,
+    short:mapBot(sht,{id:'BTC-S30',side:'SHORT',leverage:30,liq:85808.2,verifiedBuffer:7.76,beProtected:false}),
+    long:mapBot(lng,{id:'BTC-L100',side:'LONG',leverage:100,liq:76745.2,verifiedBuffer:3.78,breakEven:78653.3,stopLoss:78800,beProtected:true})
   };
-  try{
-    const saved=JSON.parse(localStorage.getItem('meridian-btc-risk-config-v2')||'null');
-    if(saved&&saved.short&&saved.long){
-      return {
-        gate:Number(saved.gate)||defaults.gate,
-        short:{...defaults.short,...saved.short},
-        long:{...defaults.long,...saved.long}
-      };
-    }
-  }catch(_){}
-  try{ localStorage.setItem('meridian-btc-risk-config-v2',JSON.stringify(defaults)); }catch(_){}
-  return defaults;
 }
-
 function saveBtcRiskConfig(next){
-  const cur=btcRiskConfig();
-  const merged={
-    gate:Number(next?.gate)||cur.gate,
-    short:{...cur.short,...(next?.short||{})},
-    long:{...cur.long,...(next?.long||{})}
-  };
-  try{ localStorage.setItem('meridian-btc-risk-config-v2',JSON.stringify(merged)); }catch(_){}
-  return merged;
+  // v6.37: gate may be UI-configurable later; bot facts are read-only SSOT.
+  return btcRiskConfig();
 }
-
 function currentBtcRiskSnapshot(){
   const cfg=btcRiskConfig();
   const quote=DATA?.livePrices?.BTC;
@@ -5185,62 +5204,40 @@ function currentBtcRiskSnapshot(){
   const gate=Number(cfg.gate)||8.0;
 
   const calc=(b)=>{
-    let liveBuffer=NaN, distance=NaN, safeBtc=NaN;
-    if(dataOk&&Number.isFinite(Number(b.liq))&&Number(b.liq)>0){
-      const liq=Number(b.liq);
+    let liveEstimate=NaN, distance=NaN, safeBtc=NaN;
+    const liq=Number(b.liq);
+    if(dataOk&&Number.isFinite(liq)&&liq>0){
       distance=Math.abs(liq-live);
-      liveBuffer=b.side==='SHORT'
-        ? ((liq-live)/live*100)
-        : ((live-liq)/live*100);
-      safeBtc=b.side==='SHORT'
-        ? liq/(1+gate/100)
-        : liq/(1-gate/100);
+      liveEstimate=b.side==='SHORT'?((liq-live)/live*100):((live-liq)/live*100);
+      safeBtc=b.side==='SHORT'?liq/(1+gate/100):liq/(1-gate/100);
     }
-
-    // Fallback buffer is allowed for risk context, but data quality is separate.
-    const effectiveBuffer=Number.isFinite(liveBuffer)?liveBuffer:Number(b.verifiedBuffer);
+    // SSOT rule: Pionex displayed/verified buffer wins. Live calculation is diagnostic only.
+    const verified=Number(b.verifiedBuffer);
+    const effectiveBuffer=Number.isFinite(verified)?verified:liveEstimate;
     const reserve=Number.isFinite(effectiveBuffer)?effectiveBuffer-gate:NaN;
-
-    // Risk classification NEVER gets overwritten by DATA BLOCK.
-    const riskBand=!Number.isFinite(effectiveBuffer)?'UNKNOWN':
-      effectiveBuffer<6?'DANGER':
-      effectiveBuffer<gate?'CRITICAL':
-      effectiveBuffer<10?'WATCH':'SAFE';
-
-    const tone=riskBand==='SAFE'?'green':
-      riskBand==='WATCH'?'amber':
-      riskBand==='UNKNOWN'?'muted':'red';
-
-    const dataState=dataOk?'LIVE':'DATA BLOCK';
-
+    const protectedBot=!!b.beProtected;
+    const riskBand=protectedBot?'PROTECTED':!Number.isFinite(effectiveBuffer)?'UNKNOWN':
+      effectiveBuffer<6?'DANGER':effectiveBuffer<gate?'CRITICAL':effectiveBuffer<10?'WATCH':'SAFE';
+    const tone=protectedBot?'green':riskBand==='SAFE'?'green':riskBand==='WATCH'?'amber':riskBand==='UNKNOWN'?'muted':'red';
     return {
-      ...b,
-      liq:Number(b.liq),
-      liveBuffer,
-      effectiveBuffer,
-      distance,
-      safeBtc,
-      reserve,
-      band:riskBand,
-      riskBand,
-      dataState,
-      tone,
-      dataOk,
-      ok:dataOk && Number.isFinite(effectiveBuffer) && effectiveBuffer>=gate,
-      source:dataOk?'LIVE BTC ↔ LIQ':'FALLBACK BUFFER'
+      ...b,liq,liveEstimate,effectiveBuffer,distance,safeBtc,reserve,
+      band:riskBand,riskBand,tone,dataOk,beProtected:protectedBot,
+      ok:protectedBot || (Number.isFinite(effectiveBuffer)&&effectiveBuffer>=gate),
+      source:Number.isFinite(verified)?'PIONEX VERIFIED':'LIVE ESTIMATE'
     };
   };
 
   const short=calc(cfg.short), long=calc(cfg.long);
-  const bots=[short,long];
-  const limiting=bots.slice().sort((a,b)=>(a.effectiveBuffer??999)-(b.effectiveBuffer??999))[0]||short;
-  const open=dataOk && bots.every(b=>b.ok);
-
+  const blockers=[short,long].filter(b=>!b.beProtected);
+  const limiting=(blockers.length?blockers:[short,long]).slice()
+    .sort((a,b)=>(a.effectiveBuffer??999)-(b.effectiveBuffer??999))[0]||short;
+  const open=blockers.every(b=>b.ok);
   return {
     live,gate,short,long,limiting,open,dataOk,
     quoteStatus:qStatus,quoteAge:qAge,
     dataState:dataOk?'LIVE':'DATA BLOCK',
-    status:!dataOk?'DATA BLOCK':open?'RISK OPEN':'RISK BLOCKED'
+    status:open?'RISK OPEN':'RISK BLOCKED',
+    portfolioLevel:DATA.futuresRiskIntelligence?.portfolio?.level||'ELEVATED'
   };
 }
 function btcRiskStatusCard(){
@@ -5264,21 +5261,21 @@ function btcRiskStatusCard(){
     <div class="v602-metric"><small>PUFFER</small><b class="${b.tone}">${pct(b.effectiveBuffer)}</b></div>
     <div class="v602-metric"><small>HEADROOM</small><b class="${b.tone}">${pp(b.reserve)}</b></div>
     <div class="v602-state ${b.tone}">${b.riskBand}</div>
-    <div class="v602-trigger"><small>8%-BTC-GRENZE</small><b>${trigger(b)}</b>${!r.dataOk?'<em class="amber">DATA BLOCK · Fallback-Puffer, kein Live-Trigger</em>':''}</div>
+    <div class="v602-trigger"><small>${b.beProtected?'PROTECTION':'8%-BTC-GRENZE'}</small><b>${b.beProtected?`SL ${usd(b.stopLoss)} ≥ BE ${usd(b.breakEven)}`:trigger(b)}</b>${!r.dataOk&&!b.beProtected?'<em class="amber">DATA BLOCK · kein Live-Trigger</em>':''}</div>
   </div>`;
 
   return `<section class="card v602-riskcard">
     <div class="v602-riskhead">
       <div>
-        <div class="section-title">BTC LIQUIDATION RISK <span class="tag cyan">DUAL</span></div>
-        <div class="section-note">Risk State ≠ Data State · Gate ≥${fmt(r.gate,2)}%</div>
+        <div class="section-title">BTC LIQUIDATION RISK <span class="tag cyan">SSOT</span></div>
+        <div class="section-note">Single Bot Gate ≥${fmt(r.gate,2)}% · BE Protection berücksichtigt</div>
       </div>
       <span class="tag ${r.dataOk?(r.open?'green':'red'):'amber'}">${r.status}</span>
     </div>
     <div class="v602-headroom">
       <span>S30 <b class="${r.short.tone}">${pct(r.short.effectiveBuffer)}</b> <small>${r.short.riskBand}</small></span>
       <i>·</i>
-      <span>L20 <b class="${r.long.tone}">${pct(r.long.effectiveBuffer)}</b> <small>${r.long.riskBand}</small></span>
+      <span>${r.long.id} <b class="${r.long.tone}">${pct(r.long.effectiveBuffer)}</b> <small>${r.long.beProtected?'BE PROTECTED':r.long.riskBand}</small></span>
       <i>·</i>
       <span>GATE <b class="${r.limiting.tone}">${pct(r.limiting.effectiveBuffer)}</b></span>
       <i>·</i>
@@ -7234,7 +7231,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.36 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.37 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7357,7 +7354,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.36 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.37 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -7536,7 +7533,16 @@ function cycle40Timing(){
 }
 function cycle40Envelope(sym,f){
  const cfg=cycle40Config(sym), m=DATA.macroForecast||{}, z=m.btcZones||{};
- if(sym==='BTC' && z.base){return {bearLow:z.bear?.low,bearHigh:z.bear?.high,baseLow:z.base.low,baseHigh:z.base.high,bullLow:z.bull?.low,bullHigh:z.bull?.high,source:'MACRO PRICE × TIME 3.1'}}
+ const vb=DATA.vision2?.calibration?.btcBands;
+ if(sym==='BTC' && vb){
+   return {
+     bearLow:vb.defensive.low,bearHigh:vb.defensive.high,
+     baseLow:vb.base.low,baseHigh:vb.base.high,
+     bullLow:vb.highBeta.low,bullHigh:vb.highBeta.high,
+     source:'VISION 2.1 SSOT'
+   };
+ }
+ if(sym==='BTC' && z.base){return {bearLow:z.bear?.low,bearHigh:z.bear?.high,baseLow:z.base.low,baseHigh:z.base.high,bullLow:z.bull?.low,bullHigh:z.bull?.high,source:'LEGACY FALLBACK'}}
  const anchor=f?.high||f?.last||0;
  const beta=cfg.beta;
  const mult=beta.includes('VERY HIGH')?[1.5,2.6,4.5]:beta.includes('HIGH')?[1.4,2.3,3.7]:beta.includes('MEDIUM')?[1.3,2.0,3.0]:[1.25,1.8,2.6];
@@ -7650,7 +7656,7 @@ function renderForecast(){
        <div class="cycle-clock-v558-bar"><i style="width:${pct}%"></i></div>
        <div class="cycle-clock-v558-grid">
          <div><span>NÄCHSTER WECHSEL</span><b>${x.timing.next}</b></div>
-         <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b></div>
+         <div><span>${activeCoin} PEAK WINDOW</span><b class="green">${x.cfg.peak}</b><small>${activeCoin==='BTC'?'Timing '+(DATA.vision2?.calibration?.peakWindow?.confidence||58)+'/100':'Model window'}</small></div>
          <div><span>EXIT GATE</span><b class="${x.cycleGate?'red':'green'}">${x.cycleGate?'AKTIV':'LOCKED'}</b></div>
          <div><span>REFERENZ</span><b>${cyc.daysFromReference>=0?'+':''}${cyc.daysFromReference||0} T</b></div>
        </div>
@@ -7664,19 +7670,21 @@ function renderForecast(){
        <div class="${exitStage==='E4'?'active red':''}"><span>E4 · FINAL</span><b>≥88</b><small>Finale Reduktion</small></div>
      </div>
      <div class="exit-score-strip"><span>CURRENT</span><b class="${x.cls}">${x.cycleRisk}/100</b><strong class="${x.cls}">${action}</strong></div>
-     <p class="footer-note">Cycle-Exit bleibt gesperrt, solange TIME + STRUCTURE + REGIME nicht gemeinsam bestätigen.</p>`);
+     ${DATA.vision2?.exitModel?.components?`<div class="exit-components">${DATA.vision2.exitModel.components.map(c=>`<div><span>${c.name}</span><b>${c.score}</b><small>${c.status}</small></div>`).join('')}</div>`:''}
+     <p class="footer-note">Cycle-Exit bleibt gesperrt, solange TIME + STRUCTURE + REGIME nicht gemeinsam bestätigen. Tactical Overheat allein entsperrt keinen Makro-Exit.</p>`);
 
    body+=card(`<div class="section-title">TACTICAL NOW <span class="tag cyan">90T</span></div>
      <div class="scenario-grid"><div><span>SWING LOW</span><b>$${fmt(f.low,dec)}</b></div><div><span>BREAKOUT</span><b class="cyan">$${fmt(f.high,dec)}</b></div><div><span>T2</span><b class="green">$${fmt(f.fib[1],dec)}</b></div></div>
      <div class="forecast-v558-route"><span>SWING POSITION</span><b>${fmt(f.pos,1)}%</b><i>→</i><strong class="${state.cls}">${state.label}</strong></div>
      <div class="row"><span>Daily RSI</span><b>${f.dailyRsi?fmt(f.dailyRsi,1):'—'}</b></div>`);
 
-   body+=card(`<div class="section-title">CYCLE SCENARIOS <span class="tag amber">CALIBRATED 2.1</span></div>
+   body+=card(`<div class="section-title">CYCLE SCENARIOS <span class="tag amber">VISION 2.1 · SSOT</span></div>
      <div class="forecast-v558-scenarios">
        <div class="bear"><span>DEFENSIVE · ${brp}%</span><b>$${fmt(env.bearLow,dec)}–$${fmt(env.bearHigh,dec)}</b></div>
        <div class="base"><span>BASE · ${bp}%</span><b>$${fmt(env.baseLow,dec)}–$${fmt(env.baseHigh,dec)}</b></div>
        <div class="bull"><span>HIGH-BETA · ${blp}%</span><b>$${fmt(env.bullLow,dec)}–$${fmt(env.bullHigh,dec)}</b></div>
-     </div>`);
+     </div>
+     <div class="model-disclaimer"><b>${env.source}</b><span>2029/30 model bands · dynamic ranges, not guaranteed price targets.</span></div>`);
 
    body+=`<details class="forecast-v558-details" data-detail-key="fcst-forward"><summary>FORWARD WINDOW <span>ÖFFNEN</span></summary>
      <div class="forecast-detail-pad">
@@ -8250,7 +8258,7 @@ function scannerCard(sym){
 }
 function commanderBot(raw){
  const b=canonicalBotState(raw), guard=b.guard, liq=b.buffer;
- const priority=b.id==='BTC-S30'?'KEEP HEDGE / BUFFER CHECK':b.id==='BTC-L20'?'KEEP / NO ADD':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
+ const priority=b.id==='BTC-S30'?'KEEP HEDGE / BUFFER CHECK':b.beProtected?'BE PROTECTED / KEEP':guard.label==='CRITICAL'?'RISK ACTION':b.id.includes('HBAR')?'NO ADD':b.id.includes('XRP')?'HOLD':'WATCH';
  return `<details class="commander-detail ${guard.cls}" data-detail-key="bot-${b.id}"><summary><span><b>${b.id}</b><small>${b.side.toUpperCase()} ${b.leverage}x</small></span><span><b class="${guard.cls}">${guard.label}</b><small>LIQ GUARD</small></span><span><b>${fmt(liq,1)}%</b><small>BUFFER</small></span></summary>
  <div class="commander-priority ${guard.cls}">${priority}</div>
  <div class="grid2">${metric('HEALTH',b.healthScore+'/100',guard.cls)}${metric('BREAK-EVEN','$'+gridFmt(b.breakEven,b.symbol))}${metric('LIQ.','$'+gridFmt(b.liquidation,b.symbol),'red')}${metric('FUNDING',fmt(b.fundingPct||0,4)+'%')}</div><p class="footer-note">${b.reason} ${b.stale?snapshotBadge('SNAPSHOT STALE'):liveBadge('LIVE CALC')}</p></details>`;
@@ -8327,7 +8335,7 @@ function slInvalidationPanel(){
  </div>
  <div class="sl-decision-strip"><span>POSITION <b class="green">${e.positionDecision||'KEEP'}</b></span><span>ADD <b class="red">${e.addDecision||'BLOCKED'}</b></span><span>NEW CAPITAL <b class="red">${e.newEntryDecision||'BLOCKED'}</b></span></div>
  <div class="sl-rule ${guard.cls}"><b>${guard.label==='TIGHT'?'TIGHT BUFFER':'POSITION RISK CHECK'}</b><span>Bestehende Position ≠ Freigabe für ADD oder neues Kapital. Positionsbasis kommt aus Pionex; SL/TP sind Modellwerte.</span></div>
- <p class="footer-note">SSOT: ${e.botId||'BTC-L20'} Break-even/Creation + aktive Liquidation + Live-BTC. R:R wird aus dieser aktuellen Positionsbasis neu berechnet; keine automatische Order-Ausführung.</p>`);
+ <p class="footer-note">SSOT: ${e.botId||'BTC-L100'} Break-even/Creation + aktive Liquidation + Live-BTC. R:R wird aus dieser aktuellen Positionsbasis neu berechnet; keine automatische Order-Ausführung.</p>`);
 }
 
 function botLifecycleIntelligence(){
@@ -10238,4 +10246,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.36'))b.textContent='v6.36 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.37'))b.textContent='v6.37 · LIVE';},1200)}catch(e){}</script>
