@@ -3798,6 +3798,19 @@ window.addEventListener('DOMContentLoaded',()=>{
 .eq-filter-warning{border:1px solid rgba(232,178,74,.55);background:rgba(232,178,74,.08);color:#e8b24a;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:8px;line-height:1.45}
 .eq-timeframes button[aria-pressed="true"]{color:#fff!important;border-color:#20a4ff!important;background:rgba(32,164,255,.18)!important;box-shadow:0 0 0 1px rgba(32,164,255,.08) inset}
 </style>
+
+<style id="v648-equity-stable-css">
+.cloud-equity-v2 .eq-mark .eq-label-bg{fill:#06141f;stroke:#1aaeff;stroke-width:.8;opacity:.96}
+.cloud-equity-v2 .eq-mark .eq-label{fill:#bfefff;font-size:7px;font-weight:700;letter-spacing:.03em}
+.cloud-equity-v2 .eq-mark.good .eq-label-bg{stroke:#29d98b}
+.cloud-equity-v2 .eq-mark.good .eq-label{fill:#54e6a5}
+.cloud-equity-v2 .eq-mark.bad .eq-label-bg{stroke:#ff6170}
+.cloud-equity-v2 .eq-mark.bad .eq-label{fill:#ff8290}
+.cloud-equity-v2 .eq-dot-only .eq-label-bg,
+.cloud-equity-v2 .eq-dot-only .eq-label{display:none!important}
+.cloud-equity-v2 .eq-time text{fill:#6f8498;font-size:7px}
+.cloud-equity-v2 .eq-time line{stroke:#315268;stroke-width:.7}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3805,7 +3818,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.47 · LIVE</span>
+        <span class="version" id="versionBadge">v6.48 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3908,7 +3921,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.47';
+let APP_CODE_VERSION='6.48';
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
@@ -4234,11 +4247,11 @@ async function load(){
 
      DATA.futuresRiskIntelligence={"version":"1.1","asOf":"2026-08-28T15:10:00+02:00","singleBot":{"id":"BTC-S30","level":"WATCH","bufferPct":8.99,"gatePct":8.0,"gapToGatePctPoints":0.99,"reason":"BTC short is now above the 8% critical liquidation-buffer gate after margin increase, but remains below the 12% watch threshold."},"portfolio":{"level":"WATCH","score":52,"protectedBots":[],"primaryBlocker":null,"reason":"No active bot is below the 8% critical gate. BTC-L100 is closed; BTC-S30 remains the closest liquidation risk at 8.99%.","action":"WATCH BTC-S30; critical risk gate reopens only if displayed buffer falls below 8%."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.47'};
+   let runtimeVersion={version:'6.48'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.47';
+   APP_CODE_VERSION=runtimeVersion.version||'6.48';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -7027,12 +7040,28 @@ function setCloudEquityRange(range){
   if(!CLOUD_EQUITY_RANGES[range])return false;
   CLOUD_EQUITY_RANGE=range;
   try{sessionStorage.setItem('meridian_cloud_equity_range',range)}catch(e){}
-  document.querySelectorAll('.eq-timeframes button[data-equity-range]').forEach(btn=>{
-    const active=btn.dataset.equityRange===range;
-    btn.classList.toggle('active',active);
-    btn.setAttribute('aria-pressed',active?'true':'false');
+
+  // v6.48: single source of truth is CLOUD_EQUITY_RANGE.
+  // Never fake a switch by styling the old DOM. Rebuild the active PAPER view itself.
+  try{
+    if(typeof renderOne==='function'){
+      renderOne('daytrade');
+    }else{
+      const host=document.getElementById('view-daytrade');
+      if(host && typeof executionUnified==='function') host.innerHTML=executionUnified();
+    }
+  }catch(e){
+    console.error('Equity timeframe re-render failed',e);
+  }
+
+  // Confirm DOM state after the actual chart has been rebuilt.
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.eq-timeframes button[data-equity-range]').forEach(btn=>{
+      const active=btn.dataset.equityRange===CLOUD_EQUITY_RANGE;
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-pressed',active?'true':'false');
+    });
   });
-  try{if(typeof render==='function')render()}catch(e){console.error('Equity range render',e)}
   return false;
 }
 try{
@@ -7173,9 +7202,11 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
 
   const occupied=[];
   function showLabel(m){
-    if(m.exitLike)return true;
     const xi=x(m.i);
-    if(occupied.some(v=>Math.abs(v-xi)<48))return false;
+    // v6.48: labels are informational, dots are authoritative.
+    // Enforce collision spacing for ENTRY and EXIT alike, especially on 1D/1W.
+    const spacing=CLOUD_EQUITY_RANGE==='15M'?34:CLOUD_EQUITY_RANGE==='1H'?42:CLOUD_EQUITY_RANGE==='4H'?50:58;
+    if(occupied.some(v=>Math.abs(v-xi)<spacing))return false;
     occupied.push(xi);
     return true;
   }
@@ -7185,12 +7216,12 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     const cls=m.good?'eq-good':m.bad?'eq-bad':m.exitLike?'eq-exit':'eq-entry';
     const tooltip=`${m.label}${m.side?' · '+m.side:''}${m.price?' · '+eventPrice(m):''}${Number.isFinite(Number(m.pnl))?' · P&L '+cloudMoney(Number(m.pnl)):''}`;
     if(!showLabel(m)){
-      return `<g class="${cls} eq-dot-only"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="${m.good||m.bad?4.2:3.6}"/></g>`;
+      return `<g class="eq-mark ${m.good?'good':m.bad?'bad':''} ${cls} eq-dot-only"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="${m.good||m.bad?4.2:3.6}"/></g>`;
     }
     const shown=m.label.slice(0,11);
     const tx=Math.min(w-78,Math.max(l+4,cx+7));
     const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
-    return `<g class="${cls} eq-labeled"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="4.5"/><rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(74,Math.max(42,shown.length*5.0))}" height="14" rx="4"/><text class="eq-label" x="${tx}" y="${ty}">${shown}</text></g>`;
+    return `<g class="eq-mark ${m.good?'good':m.bad?'bad':''} ${cls} eq-labeled"><title>${tooltip}</title><line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/><circle cx="${cx}" cy="${cy}" r="4.5"/><rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(74,Math.max(42,shown.length*5.0))}" height="14" rx="4"/><text class="eq-label" x="${tx}" y="${ty}">${shown}</text></g>`;
   }).join('');
 
   const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1];
@@ -7463,7 +7494,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.47 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.48 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7586,7 +7617,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.47 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.48 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10478,4 +10509,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.47'))b.textContent='v6.47 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.48'))b.textContent='v6.48 · LIVE';},1200)}catch(e){}</script>
