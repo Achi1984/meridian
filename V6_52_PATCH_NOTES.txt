@@ -1,0 +1,8 @@
+MERIDIAN v6.52
+- Adaptive Equity Chart: flat windows show explicit NO EQUITY CHANGE state with start/end/delta.
+- Chart meta now shows samples and equity delta.
+- Existing event labels remain collision-managed; events in-range remain visible.
+- Shadow 6.3 Evidence Board added: compact H1-H5 TEST/DATA/TREND view.
+- Detailed H1-H5 explanations are collapsible on mobile.
+- H5 explicitly marks server-side regime snapshots as required.
+- Engine 6.29.1 unchanged. Ruleset 6.2-SIGNAL-V1 unchanged/frozen.

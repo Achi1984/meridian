@@ -3840,6 +3840,14 @@ window.addEventListener('DOMContentLoaded',()=>{
 <style>
 .shadow63{margin:22px 0;padding:20px;border:1px solid #14557a;border-radius:24px;background:linear-gradient(180deg,rgba(6,28,42,.92),rgba(3,17,27,.96))}.shadow63-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.shadow63-head b{font-size:18px;letter-spacing:2px}.shadow63-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.shadow63-card{border:1px solid #164b68;border-radius:18px;padding:15px;min-height:112px}.shadow63-card span,.shadow63-meta{display:block;color:#7890a5;font-size:10px;letter-spacing:1.5px}.shadow63-card b{display:block;margin:8px 0 6px;font-size:15px}.shadow63-card small{color:#8da0b1;line-height:1.45}.shadow63-card.good{border-color:#247957}.shadow63-card.warn{border-color:#8a6a28}.shadow63-card.bad{border-color:#8e3d4a}.shadow63-policy{margin-top:14px;border:1px solid #246d54;border-radius:16px;padding:13px;color:#8fa7b7;font-size:11px;line-height:1.5}.shadow63-policy b{color:#4ce19a}.shadow63-ref{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.shadow63-ref>div{border:1px solid #164b68;border-radius:14px;padding:12px}.shadow63-ref span{display:block;color:#7890a5;font-size:9px;letter-spacing:1.2px}.shadow63-ref b{display:block;margin-top:6px;font-size:14px}@media(max-width:520px){.shadow63-grid{grid-template-columns:1fr}.shadow63-ref{grid-template-columns:1fr 1fr 1fr}.shadow63{padding:16px}}
 </style>
+
+<style id="v652-adaptive-equity-shadow">
+.eq-flat-state{margin:8px 0 0;border:1px solid #173f55;border-radius:12px;padding:14px;text-align:center;background:rgba(5,20,31,.45)}
+.eq-flat-state b{display:block;font-size:11px;color:#dce9f3;letter-spacing:.08em}.eq-flat-state span{display:block;margin-top:5px;color:#7890a2;font-size:7px}.eq-flat-state strong{color:#27b9ff}
+.shadow63-board{display:grid;gap:6px;margin:14px 0}.shadow63-board-row{display:grid;grid-template-columns:34px 1.25fr .8fr .8fr;gap:7px;align-items:center;border:1px solid #164b68;border-radius:11px;padding:9px 10px;background:rgba(4,18,28,.38)}
+.shadow63-board-row span{font-size:8px;color:#8095a7}.shadow63-board-row b{font-size:9px}.shadow63-board-row .ok{color:#4ce19a}.shadow63-board-row .warn{color:#e8b24a}.shadow63-board-row .bad{color:#ff6977}.shadow63-details{margin-top:10px}.shadow63-details summary{cursor:pointer;color:#27b9ff;font-size:9px;letter-spacing:.08em;padding:9px 0}.shadow63-details[open] summary{margin-bottom:8px}
+@media(max-width:520px){.shadow63-board-row{grid-template-columns:28px 1.15fr .75fr .75fr;padding:8px}.shadow63-board-row span,.shadow63-board-row b{font-size:7px}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3847,7 +3855,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.51 · LIVE</span>
+        <span class="version" id="versionBadge">v6.52 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7261,7 +7269,13 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
 
   const firstMs=rows[0]?.ms,lastMs=rows[rows.length-1]?.ms;
   const visibleMinutes=(Number.isFinite(firstMs)&&Number.isFinite(lastMs))?Math.max(0,Math.round((lastMs-firstMs)/60000)):null;
-  const meta=`${CLOUD_EQUITY_RANGE} · ${rows.length} PTS${visibleMinutes!==null?' · '+visibleMinutes+' MIN':''}`;
+  const delta=rows.length?rows[rows.length-1].equity-rows[0].equity:0;
+  const deltaPct=rows.length&&rows[0].equity?delta/rows[0].equity*100:0;
+  const flat=Math.abs(max-min)<2.05 || Math.abs(delta)<0.005;
+  const meta=`${CLOUD_EQUITY_RANGE} · ${rows.length} SAMPLES · Δ ${delta>=0?'+':''}${cloudMoney(delta)}`;
+  if(flat && eventRows.length===0){
+    return `${rangeButtons}<div class="eq-filter-meta">${meta}</div><div class="eq-flat-state"><b>NO EQUITY CHANGE IN RANGE</b><span>START ${cloudMoney(rows[0].equity)} · END ${cloudMoney(rows[rows.length-1].equity)} · <strong>Δ ${delta>=0?'+':''}${cloudMoney(delta)} · ${deltaPct>=0?'+':''}${fmt(deltaPct,2)}%</strong></span></div>`;
+  }
 
   return `${rangeButtons}<div class="cloud-equity-v2">
     <div class="eq-filter-meta">${meta}</div>
@@ -7457,14 +7471,21 @@ function cloudShadowRuleset63(trades){
       <div><span>LONG</span><b class="${long.pnl>=0?'green':'red'}">${long.n} · ${long.pnl>=0?'+':''}${cloudMoney(long.pnl)}</b></div>
       <div><span>SHORT</span><b class="${short.pnl>=0?'green':'red'}">${short.n} · ${short.pnl>=0?'+':''}${cloudMoney(short.pnl)}</b></div>
     </div>
-    <div class="shadow63-grid">
+    <div class="shadow63-board">
+      <div class="shadow63-board-row"><b>H1</b><span>LONG REGIME</span><b class="${scoreCoverage>=80?'ok':'warn'}">${scoreCoverage>=80?'TESTABLE':'DATA '+scoreCoverage+'%'}</b><b class="${long.pnl<0?'bad':'ok'}">${long.pnl<0?'WEAK':'OK'}</b></div>
+      <div class="shadow63-board-row"><b>H2</b><span>ENTRY QUALITY</span><b class="${zoneCoverage>=80?'ok':'warn'}">DATA ${zoneCoverage}%</b><b class="warn">PENDING</b></div>
+      <div class="shadow63-board-row"><b>H3</b><span>ASSET QUALITY</span><b class="${evidence.length>=5?'ok':'warn'}">${evidence.length} ASSETS</b><b class="${watch.length?'warn':'ok'}">${watch.length?'WATCH':'CLEAR'}</b></div>
+      <div class="shadow63-board-row"><b>H4</b><span>DIRECTION SPLIT</span><b class="ok">${long.n}/${short.n}</b><b class="${short.pnl>long.pnl?'ok':'warn'}">${short.pnl>long.pnl?'SHORT ↑':'EVEN'}</b></div>
+      <div class="shadow63-board-row"><b>H5</b><span>REGIME LINK</span><b class="warn">DATA GAP</b><b class="warn">PENDING</b></div>
+    </div>
+    <details class="shadow63-details"><summary>H1–H5 DETAILS ANZEIGEN</summary><div class="shadow63-grid">
       <div class="shadow63-card ${long.pnl<short.pnl?'warn':''}"><span>H1 · LONG REGIME FILTER</span><b>Long selektiver prüfen</b><small>Aktuell ${long.n} Trades · ${fmt(longWr,0)}% WR · ${long.pnl>=0?'+':''}${cloudMoney(long.pnl)}. Shadow-Vorschlag: Long erst ab TECH ≥80 + CAND ≥75 bewerten. ${scoreRows.length?`Backcheck: ${shadowLong.length}/${scoredLong.length} scored Longs bestanden · vermiedene Trades ${avoidedPnl>=0?'+':''}${cloudMoney(avoidedPnl)}.`:'Noch keine belastbare Rückrechnung, da historische Scores fehlen.'}</small></div>
       <div class="shadow63-card ${zoneCoverage<80?'warn':''}"><span>H2 · ENTRY QUALITY</span><b>Entry-Zone quantifizieren</b><small>${zoneText}. Ziel: Ergebnis gegen ATR-Distanz zur Entry-Zone auswerten und A+ Entries von Grenz-Entries trennen. Coverage ${zoneCoverage}%.</small></div>
       <div class="shadow63-card"><span>H3 · ASSET QUALITY</span><b>${watch.length?watch.slice(0,3).map(([s])=>s).join(' · ')+' WATCH':'Noch kein Watch-Kandidat'}</b><small>${evidence.length} Assets haben ≥3 Trades. Watch bleibt Beobachtung; keine Coin-Sperre und keine automatische Gewichtung.</small></div>
       <div class="shadow63-card ${short.pnl>long.pnl?'good':''}"><span>H4 · DIRECTION SPLIT</span><b>${short.pnl>long.pnl?'SHORT LEADS':'NO CLEAR LEADER'}</b><small>Long ${fmt(longWr,0)}% WR vs. Short ${fmt(shortWr,0)}% WR. PF/Expectancy werden weiter getrennt beobachtet; keine automatische Richtungsabschaltung.</small></div>
-      <div class="shadow63-card"><span>H5 · REGIME LINK</span><b>BULL / BEAR / RANGE</b><small>Vorgemerkt für 6.3. Historische Regime-Snapshots müssen pro Entry gespeichert werden, bevor ein seriöser Counterfactual-Test möglich ist.</small></div>
+      <div class="shadow63-card"><span>H5 · REGIME LINK</span><b>BULL / BEAR / RANGE</b><small>Historische Regime-Snapshots müssen serverseitig pro Entry gespeichert werden, bevor ein seriöser Counterfactual-Test möglich ist.</small></div>
       <div class="shadow63-card ${gateReady?'good':'warn'}"><span>DECISION GATE · 30</span><b>${gateReady?'MANUAL REVIEW':'Noch '+Math.max(0,30-n)+' Trades'}</b><small>${scoreText}. Erst am Gate dokumentierte Hypothesen vergleichen; Promotion eines neuen Rulesets bleibt manuell.</small></div>
-    </div>
+    </div></details>
     <div class="shadow63-policy"><b>SHADOW ONLY.</b> Engine 6.29.1 und Ruleset 6.2-SIGNAL-V1 werden nicht verändert. 6.3 sammelt Evidenz und zeigt Gegenproben; es eröffnet, schließt oder blockiert keine Trades.</div>
   </div>`;
 }
@@ -7605,7 +7626,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.51 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.52 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7728,7 +7749,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.51 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.52 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10620,4 +10641,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.51'))b.textContent='v6.51 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.51'))b.textContent='v6.52 · LIVE';},1200)}catch(e){}</script>
