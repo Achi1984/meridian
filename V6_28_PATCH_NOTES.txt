@@ -1,0 +1,10 @@
+MERIDIAN v6.28
+- Forward Test Analytics ergänzt
+- Profit Factor
+- Expectancy pro Trade
+- Average Win / Average Loss
+- LONG vs SHORT Performance
+- BTC / ETH / SOL getrennt
+- Sample-Stufen <20 / 20-49 / 50-99 / 100+
+- Drawdown als DD FROM PEAK bezeichnet
+- Tradinglogik unverändert

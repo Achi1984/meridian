@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.27">
+<link rel="manifest" href="manifest.webmanifest?v=6.28">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -3635,6 +3635,24 @@ window.addEventListener('DOMContentLoaded',()=>{
 .eq-legend span:last-child::after{content:" · TP/SL = Punkte";color:#6f879b}
 </style>
 
+
+<style id="v628-performance-analytics">
+.pa-top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.pa-top>div,.pa-side>div{min-width:0;border:1px solid #173f55;border-radius:13px;padding:12px;background:rgba(4,18,28,.3)}
+.pa-top span,.pa-side span{display:block;color:#8193a8;font-size:6px;letter-spacing:.14em;margin-bottom:8px}
+.pa-top b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pa-side{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.pa-side b{display:block;font-size:10px;margin-bottom:4px}
+.pa-side small{font-size:6px}
+.pa-assets{margin-top:12px;border:1px solid #173f55;border-radius:13px;overflow:hidden}
+.pa-row{display:grid;grid-template-columns:.7fr 1fr 1fr .8fr;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(34,72,96,.42)}
+.pa-row:last-child{border-bottom:none}
+.pa-row span{font-size:7px;font-weight:800}
+.pa-row b,.pa-row em,.pa-row small{font-size:6.5px;font-style:normal;white-space:nowrap}
+.pa-row em,.pa-row small{text-align:right}
+.pa-note{margin-top:12px;padding:10px 12px;border:1px solid #294b5f;border-radius:11px;color:#8ea2b4;font-size:6.5px;line-height:1.45}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3642,7 +3660,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.27 · LIVE</span>
+        <span class="version" id="versionBadge">v6.28 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6927,6 +6945,62 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     </div>
   </div>`;
 }
+function cloudPerformanceAnalytics(trades){
+  const arr=(Array.isArray(trades)?trades:[]).map(t=>{
+    const pnl=Number(t.realized??t.pnl??t.realizedPnl??0);
+    return {...t,_pnl:Number.isFinite(pnl)?pnl:0,_side:String(t.side||'').toUpperCase(),_symbol:String(t.symbol||'').replace('USDT','')};
+  });
+  const wins=arr.filter(t=>t._pnl>0), losses=arr.filter(t=>t._pnl<0);
+  const gp=wins.reduce((s,t)=>s+t._pnl,0);
+  const gl=Math.abs(losses.reduce((s,t)=>s+t._pnl,0));
+  const pf=gl>0?gp/gl:(gp>0?Infinity:0);
+  const avgWin=wins.length?gp/wins.length:0;
+  const avgLoss=losses.length?gl/losses.length:0;
+  const expectancy=arr.length?arr.reduce((s,t)=>s+t._pnl,0)/arr.length:0;
+  const bySymbol={}, bySide={LONG:{n:0,pnl:0},SHORT:{n:0,pnl:0}};
+  arr.forEach(t=>{
+    const s=t._symbol||'OTHER';
+    bySymbol[s] ||= {n:0,pnl:0,wins:0};
+    bySymbol[s].n++; bySymbol[s].pnl+=t._pnl; if(t._pnl>0)bySymbol[s].wins++;
+    if(bySide[t._side]){bySide[t._side].n++; bySide[t._side].pnl+=t._pnl}
+  });
+  return {arr,wins,losses,gp,gl,pf,avgWin,avgLoss,expectancy,bySymbol,bySide};
+}
+
+function cloudAnalyticsBlock(trades){
+  const a=cloudPerformanceAnalytics(trades);
+  const n=a.arr.length;
+  const stage=n>=100?'100+':n>=50?'50–99':n>=20?'20–49':'<20';
+  const pf=Number.isFinite(a.pf)?a.pf.toFixed(2):'∞';
+  const assets=['BTC','ETH','SOL'].map(sym=>{
+    const q=a.bySymbol[sym]||{n:0,pnl:0,wins:0};
+    const wr=q.n?q.wins/q.n*100:0;
+    return `<div class="pa-row">
+      <span>${sym}</span><b>${q.n} Trades</b>
+      <em class="${q.pnl>=0?'green':'red'}">${q.pnl>=0?'+':''}${cloudMoney(q.pnl)}</em>
+      <small>${fmt(wr,0)}% WR</small>
+    </div>`;
+  }).join('');
+  return `<div class="performance-analytics">
+    <div class="section-title">FORWARD TEST ANALYTICS <span class="tag cyan">${n<20?'LEARNING':'EVALUATION'}</span></div>
+    <div class="pa-top">
+      <div><span>PROFIT FACTOR</span><b class="${a.pf>1?'green':a.pf>0&&a.pf<1?'red':''}">${pf}</b></div>
+      <div><span>EXPECTANCY / TRADE</span><b class="${a.expectancy>0?'green':a.expectancy<0?'red':''}">${a.expectancy>=0?'+':''}${cloudMoney(a.expectancy)}</b></div>
+      <div><span>AVG WIN</span><b class="green">+${cloudMoney(a.avgWin)}</b></div>
+      <div><span>AVG LOSS</span><b class="red">-${cloudMoney(a.avgLoss)}</b></div>
+    </div>
+    <div class="pa-side">
+      <div><span>LONG</span><b>${a.bySide.LONG.n}</b><small class="${a.bySide.LONG.pnl>=0?'green':'red'}">${a.bySide.LONG.pnl>=0?'+':''}${cloudMoney(a.bySide.LONG.pnl)}</small></div>
+      <div><span>SHORT</span><b>${a.bySide.SHORT.n}</b><small class="${a.bySide.SHORT.pnl>=0?'green':'red'}">${a.bySide.SHORT.pnl>=0?'+':''}${cloudMoney(a.bySide.SHORT.pnl)}</small></div>
+      <div><span>SAMPLE</span><b>${n}</b><small>${stage} Trades</small></div>
+    </div>
+    <div class="pa-assets">${assets}</div>
+    <div class="pa-note">${n<20
+      ? 'Ruleset bleibt eingefroren. Erste belastbare Zwischenbewertung ab 20 abgeschlossenen Trades.'
+      : 'Zwischenbewertung möglich. Änderungen erst nach dokumentierter Review.'}</div>
+  </div>`;
+}
+
 function cloudPaperTradeView(){
   const C=MERIDIAN_CLOUD, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
   const assets=Array.isArray(scan.assets)?scan.assets:[];
@@ -7001,7 +7075,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.27 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.28 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7067,7 +7141,7 @@ function cloudPaperTradeView(){
       <div class="paper-performance-strip">
         <div><span>LIVE EQUITY</span><b>${cloudMoney(equity)}</b></div>
         <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
-        <div><span>DRAWDOWN</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
+        <div><span>DD FROM PEAK</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
       </div>
       ${cloudEquitySvg(p.equityCurve||[],events,positions,trades,start)}
       <div class="paper-stats">
@@ -7076,6 +7150,8 @@ function cloudPaperTradeView(){
         <div><span>WINRATE</span><b>${fmt(winRate,0)}%</b></div>
         <div><span>ERRORS</span><b class="${Number(eng.errors||0)===0?'green':'red'}">${eng.errors||0}</b></div>
       </div>`)
+
+    + card(cloudAnalyticsBlock(trades))
 
     + `<details class="card paper-details" data-detail-key="cloud-trades">
         <summary>TRADE HISTORY <strong>${trades.length}</strong></summary>
@@ -7115,7 +7191,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.27 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.28 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
