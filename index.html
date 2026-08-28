@@ -3701,6 +3701,22 @@ window.addEventListener('DOMContentLoaded',()=>{
 .pa-empty{padding:12px;color:#7890a3;font-size:6.5px}
 </style>
 
+
+<style id="v631-learning-monitor">
+.learning-monitor{margin-bottom:18px}
+.lm-state{font-size:8px;font-weight:800;letter-spacing:.12em;margin:4px 0 10px}
+.lm-state.green{color:#38d996}.lm-state.amber{color:#e8b75d}.lm-state.muted{color:#8093a3}
+.lm-progress{height:8px;border-radius:8px;background:rgba(31,69,91,.55);overflow:hidden;border:1px solid rgba(39,92,121,.55)}
+.lm-progress i{display:block;height:100%;background:#24b8ff;border-radius:8px}
+.lm-scale{display:flex;justify-content:space-between;margin-top:6px;color:#6f8798;font-size:5.5px;letter-spacing:.08em}
+.lm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.lm-grid>div{border:1px solid rgba(35,81,106,.65);border-radius:12px;padding:10px}
+.lm-grid span{display:block;color:#7890a2;font-size:5.5px;letter-spacing:.1em}
+.lm-grid b{display:block;margin-top:5px;color:#e5eef5;font-size:10px}
+.lm-grid b.green{color:#36d492}.lm-grid b.red{color:#f05e66}
+.lm-note{margin-top:11px;color:#7c91a0;font-size:6px;line-height:1.55}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3708,7 +3724,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.30 · LIVE</span>
+        <span class="version" id="versionBadge">v6.31 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7020,6 +7036,10 @@ function cloudAnalyticsBlock(trades){
   const n=a.arr.length;
   const stage=n>=100?'100+':n>=50?'50–99':n>=20?'20–49':'<20';
   const pf=Number.isFinite(a.pf)?a.pf.toFixed(2):'∞';
+  const reviewTarget=20;
+  const progress=Math.min(100,(n/reviewTarget)*100);
+  const learningState=n>=20?'REVIEW READY':n>=10?'EARLY SIGNAL':'INSUFFICIENT DATA';
+  const learningClass=n>=20?'green':n>=10?'amber':'muted';
   const preferred=['BTC','ETH','SOL','XRP','SUI','DOGE','LINK','AVAX','ADA','NEAR'];
   const tradedSymbols=Object.keys(a.bySymbol).filter(sym=>(a.bySymbol[sym]?.n||0)>0);
   const orderedSymbols=[
@@ -7035,7 +7055,20 @@ function cloudAnalyticsBlock(trades){
       <small>${fmt(wr,0)}% WR</small>
     </div>`;
   }).join('') || `<div class="pa-empty">Noch keine abgeschlossenen Trades.</div>`;
-  return `<div class="performance-analytics">
+  const learningMonitor=`<div class="learning-monitor">
+    <div class="section-title">LEARNING MONITOR <span class="tag cyan">${n}/20 TRADES</span></div>
+    <div class="lm-state ${learningClass}">${learningState}</div>
+    <div class="lm-progress"><i style="width:${progress}%"></i></div>
+    <div class="lm-scale"><span>0</span><span>FIRST REVIEW · 20</span><span>${fmt(progress,0)}%</span></div>
+    <div class="lm-grid">
+      <div><span>CLOSED</span><b>${n}</b></div>
+      <div><span>LONG / SHORT</span><b>${a.bySide.LONG.n} / ${a.bySide.SHORT.n}</b></div>
+      <div><span>PROFIT FACTOR</span><b>${pf}</b></div>
+      <div><span>EXPECTANCY</span><b class="${a.expectancy>=0?'green':'red'}">${a.expectancy>=0?'+':''}${cloudMoney(a.expectancy)}</b></div>
+    </div>
+    <div class="lm-note">Ruleset 6.2-SIGNAL-V1 bleibt eingefroren · Review ab 20 abgeschlossenen Trades.</div>
+  </div>`;
+  return learningMonitor+`<div class="performance-analytics">
     <div class="section-title">FORWARD TEST ANALYTICS <span class="tag cyan">${n<20?'LEARNING':'EVALUATION'}</span></div>
     <div class="pa-top">
       <div><span>PROFIT FACTOR</span><b class="${a.pf>1?'green':a.pf>0&&a.pf<1?'red':''}">${pf}</b></div>
@@ -7132,7 +7165,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.30 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.31 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7255,7 +7288,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.30 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.31 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
