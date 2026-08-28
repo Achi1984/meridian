@@ -1,4 +1,1 @@
-{
-  "version": "6.43",
-  "build": "2026-08-28-equity-timeframe-selector"
-}
+{"version":"6.44","build":"2026-08-28","notes":"Fix: Equity timeframe buttons are touch/click selectable on iOS."}

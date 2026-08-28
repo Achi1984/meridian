@@ -3587,9 +3587,9 @@ window.addEventListener('DOMContentLoaded',()=>{
 </script>
 
 
-<style id="v643-equity-timeframes">
-.eq-timeframes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 2px 7px}
-.eq-timeframes button{appearance:none;border:1px solid rgba(35,83,110,.72);background:rgba(5,20,31,.58);color:#7893a7;border-radius:999px;padding:7px 2px;font:inherit;font-size:7px;font-weight:800;letter-spacing:.08em;cursor:pointer}
+<style id="v644-equity-timeframes">
+.eq-timeframes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 2px 7px;position:relative;z-index:50;pointer-events:auto!important}
+.eq-timeframes button{appearance:none;-webkit-appearance:none;border:1px solid rgba(35,83,110,.72);background:rgba(5,20,31,.58);color:#7893a7;border-radius:999px;padding:10px 2px;font:inherit;font-size:7px;font-weight:800;letter-spacing:.08em;cursor:pointer;pointer-events:auto!important;touch-action:manipulation;-webkit-tap-highlight-color:rgba(32,164,255,.18);position:relative;z-index:51}
 .eq-timeframes button.active{color:#dff5ff;border-color:#20a4ff;background:rgba(32,164,255,.16)}
 </style>
 <style id="v625-chart-polish">
@@ -6982,7 +6982,8 @@ function cloudAge(iso){
 }
 let CLOUD_EQUITY_RANGE='1D';
 const CLOUD_EQUITY_RANGES={'15M':900000,'1H':3600000,'4H':14400000,'1D':86400000,'1W':604800000};
-function setCloudEquityRange(range){if(!CLOUD_EQUITY_RANGES[range])return;CLOUD_EQUITY_RANGE=range;try{render()}catch(e){}}
+function setCloudEquityRange(range){if(!CLOUD_EQUITY_RANGES[range])return;CLOUD_EQUITY_RANGE=range;try{render()}catch(e){console.error(e)}}
+document.addEventListener('click',function(e){const b=e.target.closest&&e.target.closest('.eq-timeframes button[data-equity-range]');if(!b)return;e.preventDefault();e.stopPropagation();setCloudEquityRange(b.dataset.equityRange);},true);
 function cloudEquitySvg(points,events,positions,trades,startEquity){
   const raw=Array.isArray(points)?points:[];
   let rows=raw.map((x,i)=>({
@@ -7115,9 +7116,9 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     return label?`<g class="eq-time"><line x1="${xx}" y1="${h-bottom+2}" x2="${xx}" y2="${h-bottom+6}"/><text x="${xx}" y="${h-8}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}">${label}</text></g>`:'';
   }).join('');
 
-  const rangeButtons=`<div class="eq-timeframes">${Object.keys(CLOUD_EQUITY_RANGES).map(k=>`<button class="${k===CLOUD_EQUITY_RANGE?'active':''}" onclick="setCloudEquityRange('${k}')">${k}</button>`).join('')}</div>`;
+  const rangeButtons=`<div class="eq-timeframes">${Object.keys(CLOUD_EQUITY_RANGES).map(k=>`<button type="button" data-equity-range="${k}" class="${k===CLOUD_EQUITY_RANGE?'active':''}">${k}</button>`).join('')}</div>`;
   return `${rangeButtons}<div class="cloud-equity-v2">
-    <svg class="paper-equity-svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
+    <svg class="paper-equity-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Paper Equity Verlauf mit Trade Events">
       <line class="eq-start" x1="${l}" y1="${baseline}" x2="${w-r}" y2="${baseline}"/>
       <polyline class="eq-line" fill="none" points="${line}"></polyline>
       ${markerSvg}
