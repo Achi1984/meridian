@@ -1,0 +1,7 @@
+MERIDIAN v6.26
+- sichtbares \n\n-Artefakt oberhalb des Dashboards direkt im HTML behoben
+- Versionsanzeige überall auf UI 6.26 vereinheitlicht
+- Equity-Chart Event-Marker vereinfacht (z.B. BTC ENTRY)
+- kleinere Marker-Labels, damit nichts mehr überlappt
+- Northflank / PostgreSQL / Engine 6.2.0 / Ruleset unverändert
+- keine Änderung an Paper-Trading-, Risk- oder Entry-Logik

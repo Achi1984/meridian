@@ -7,7 +7,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.25">
+<link rel="manifest" href="manifest.webmanifest?v=6.26">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
@@ -399,7 +399,8 @@ button{font:inherit}
  .gear{width:42px;height:42px}.pill{min-width:84px;padding:7px 8px}
  .portfolio-chart svg{height:125px}.chart-head small{display:none}
 }
-\n/* v4.9.5 performance history + cashflow */
+
+/* v4.9.5 performance history + cashflow */
 .chart-range{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
 .chart-range button{appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:9px;padding:7px 4px;border-radius:999px}
 .chart-range button.active{color:#fff;background:rgba(32,164,255,.14);border:1px solid rgba(32,164,255,.3)}
@@ -1142,7 +1143,13 @@ body{background:transparent;letter-spacing:.01em}
 .dd-row span{font-size:8px;color:#8598aa}
 .dd-row b{text-align:right;font-size:9px}
 .dd-row small{grid-column:1/-1;font-size:7px;color:#687f92}
-\n/* v5.10.6 Decision Details persistent state */\n.decision-details summary strong::after{content:""}\n.decision-details[open] summary strong{font-size:0}\n.decision-details[open] summary strong::after{content:"SCHLIESSEN";font-size:12px}\n.decision-details summary{cursor:pointer;touch-action:manipulation}\n
+
+/* v5.10.6 Decision Details persistent state */
+.decision-details summary strong::after{content:""}
+.decision-details[open] summary strong{font-size:0}
+.decision-details[open] summary strong::after{content:"SCHLIESSEN";font-size:12px}
+.decision-details summary{cursor:pointer;touch-action:manipulation}
+
 /* v5.10.11 SSOT hardening */
 .scanner-plan-source{margin-top:10px;font-size:10px;letter-spacing:.55px;color:var(--muted,#74859a)}
 .sl-decision-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
@@ -3554,7 +3561,7 @@ window.addEventListener('load', async () => {
 }
 </style>
 
-\n<style id="v624-equity-chart-v2">
+<style id="v624-equity-chart-v2">
 .cloud-equity-v2{border:1px solid #173f55;border-radius:12px;background:rgba(5,20,31,.45);overflow:hidden;padding:5px 6px 7px}
 .cloud-equity-v2 .paper-equity-svg{border:0;background:transparent;padding:0;border-radius:0;height:142px}
 .cloud-equity-v2 .eq-line{stroke:currentColor;stroke-width:4;vector-effect:non-scaling-stroke}
@@ -3566,14 +3573,12 @@ window.addEventListener('load', async () => {
 .cloud-equity-v2 .eq-mark.bad circle{fill:#ff5b6b}.cloud-equity-v2 .eq-mark.bad text{fill:#ff7a87}
 .eq-legend{display:flex;gap:10px;flex-wrap:wrap;padding:2px 4px 0;color:#8193a8;font-size:5.5px;letter-spacing:.08em}
 .eq-legend span:first-child{color:#26b8ff}
-</style>\n
+</style>
 <script id="v625-stray-text-cleanup">
 window.addEventListener('DOMContentLoaded',()=>{
   try{
     [...document.body.childNodes].forEach(n=>{
-      if(n.nodeType===Node.TEXT_NODE && /^(\s|\\n|\\r)+$/.test(n.textContent||'')){
-        if((n.textContent||'').includes('\\n')) n.remove();
-      }
+      if(n.nodeType===Node.TEXT_NODE && /\\\\n|\\\\r/.test(n.textContent||'')) n.remove();
     });
   }catch(e){}
 });
@@ -3602,6 +3607,23 @@ window.addEventListener('DOMContentLoaded',()=>{
 }
 </style>
 
+
+<style id="v626-final-ui-fix">
+.eq-mark .eq-label-bg{
+  fill:#06141f;
+  stroke:#1aaeff;
+  stroke-width:.8;
+  opacity:.98;
+}
+.eq-mark .eq-label{
+  font-size:6.3px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.eq-mark line{opacity:.5}
+.eq-mark circle{r:4}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -3609,7 +3631,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.25 · LIVE</span>
+        <span class="version" id="versionBadge">v6.26 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -6838,9 +6860,9 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     const side=m.side?(' '+m.side):'';
     const rawType=String(m.type).replaceAll('_',' ');
     const label=/ENTRY|OPEN/.test(m.type)
-      ? `${asset||''}${side} ENTRY`.trim()
+      ? `${asset||''} ENTRY`.trim()
       : `${asset?asset+' ':''}${rawType}`.trim();
-    const shown=label.slice(0,20);
+    const shown=label.slice(0,12);
     const price=eventPrice(m);
     const pnl=Number(m.pnl);
     const tooltip=[
@@ -6851,14 +6873,14 @@ function cloudEquitySvg(points,events,positions,trades,startEquity){
     ].filter(Boolean).join(' · ');
 
     // Keep labels inside chart and stagger labels if close to the top.
-    const tx=Math.min(w-112,Math.max(l+4,cx+6));
+    const tx=Math.min(w-82,Math.max(l+4,cx+7));
     const ty=Math.max(14,Math.min(h-bottom-8,cy-9));
 
     return `<g class="${cls}" role="img" aria-label="${tooltip.replaceAll('"','&quot;')}">
       <title>${tooltip}</title>
       <line x1="${cx}" y1="${top}" x2="${cx}" y2="${h-bottom}"/>
       <circle cx="${cx}" cy="${cy}" r="4.5"/>
-      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(106,Math.max(46,shown.length*5.3))}" height="14" rx="4"/>
+      <rect class="eq-label-bg" x="${tx-3}" y="${ty-10}" width="${Math.min(78,Math.max(42,shown.length*5.0))}" height="14" rx="4"/>
       <text class="eq-label" x="${tx}" y="${ty}">${shown}</text>
     </g>`;
   }).join('');
@@ -6958,7 +6980,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.25 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.26 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7072,7 +7094,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.23 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.26 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
