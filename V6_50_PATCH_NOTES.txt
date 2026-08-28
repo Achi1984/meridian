@@ -1,0 +1,6 @@
+ACHI MERIDIAN v6.50 HOTFIX
+- Fixed DAYTRADE crash: nextTarget is now declared in cloudAnalyticsBlock.
+- Dynamic review milestones remain 20 / 30 / 50 / 100.
+- Engine 6.29.1 unchanged.
+- Ruleset 6.2-SIGNAL-V1 unchanged/frozen.
+- No signal, entry, SL/TP or risk logic changed.
