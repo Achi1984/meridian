@@ -1,0 +1,17 @@
+ACHI MERIDIAN v6.49 — REVIEW ROADMAP
+
+LEARNING / REVIEW
+- Review roadmap expanded from one threshold to 20 / 30 / 50 / 100 trades.
+- 20 = FIRST REVIEW: document hypotheses only.
+- 30 = DECISION GATE: manual decision proposals may be evaluated.
+- 50 = VALIDATION: validate any proposed change against the frozen baseline.
+- 100 = STRONG EVIDENCE: formal Ruleset review.
+- Learning Monitor no longer shows stale 'NO ACTION <20' once the threshold is passed.
+- Long/Short evidence remains visible and dynamic.
+- Weak/strong asset watchlists require at least 2 trades.
+- No automatic Ruleset modifications.
+
+UNCHANGED
+- Paper Engine 6.29.1
+- Ruleset 6.2-SIGNAL-V1 remains frozen.
+- Signal / Entry / SL / TP / Risk logic unchanged.

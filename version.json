@@ -1,6 +1,6 @@
 {
-  "version": "6.48",
-  "build": "2026-08-28-equity-filter-stable-rerender",
+  "version": "6.49",
+  "build": "2026-08-28-review-roadmap-20-30-50-100",
   "release": "VERSION SYNC + EQUITY TIMEFRAMES",
   "notes": "Release identifiers synchronized across app, data, manifest and embedded SSOT. Equity timeframe selector remains iOS-touch enabled."
 }
