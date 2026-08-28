@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
 <title>MERIDIAN</title>
-<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"5.24.5","verifiedFrom":"Pionex screenshot 2026-08-24 17:33","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52,"dynamicMarginUSDT":224.33,"currentPrice":79939.5,"liquidationPrice":86041.6,"pionexLiqBufferPct":7.33,"breakEven":72585.8,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-146.34,"status":"ACTIVE","calculatedLiqBufferPct":7.33,"riskClass":"CRITICAL"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"currentInvestmentCoin":356.85,"currentPrice":1.4952,"liquidationPrice":0.8482,"pionexLiqBufferPct":43.27,"breakEven":1.5463,"creationPrice":1.586,"range":[0.7,1.9],"grids":253,"status":"ACTIVE","riskClass":"SAFE"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"currentInvestmentCoin":7220.14,"currentPrice":0.07919,"liquidationPrice":0.05703,"pionexLiqBufferPct":27.98,"breakEven":0.07939,"creationPrice":0.07936,"range":[0.068,0.105],"grids":155,"status":"ACTIVE","riskClass":"TIGHT"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex REAL liquidation price + displayed buffer are calibration SSOT; browser live price may estimate current distance, but never overwrites Pionex VERIFIED buffer; material drift triggers VERIFY PIONEX."};</script>
+<script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.33","verifiedFrom":"Pionex screenshots 2026-08-28 10:34","activeCount":4,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":214.53,"currentPrice":79627.0,"liquidationPrice":85808.2,"pionexLiqBufferPct":7.76,"breakEven":72809.4,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-134.99,"gridProfit":14.36,"trendPnl":-149.36,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":null,"takeProfit":null,"beProtected":false,"status":"ACTIVE","riskClass":"CRITICAL"},"BTC-L100":{"symbol":"BTC","side":"LONG","leverage":100,"investmentUSDT":10.0,"dynamicMarginUSDT":0,"currentPrice":79766.7,"liquidationPrice":76745.2,"pionexLiqBufferPct":3.78,"breakEven":78653.3,"creationPrice":78875.6,"range":[63000,88000],"totalProfitUSDT":3.89,"gridProfit":0.996,"trendPnl":2.9,"gridRounds24h":null,"gridRoundsTotal":null,"stopLoss":78800.0,"takeProfit":88000.0,"beProtected":true,"status":"ACTIVE","riskClass":"PROTECTED"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","BTC-L100","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Valid BE-protecting SL removes a bot as primary critical capital-loss blocker; residual execution/slippage risk remains."};</script>
 
 <style id="meridian-inline-main-css">
 
@@ -3724,7 +3724,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.32 · LIVE</span>
+        <span class="version" id="versionBadge">v6.34 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -5414,6 +5414,9 @@ function depot(){
        <div><span>P&L</span><b class="${pnlClass}">${pnl}</b></div>
        <div><span>Liq.</span><b>${liq}</b></div>
        <div><span>Puffer</span><b class="${guard?.cls||'amber'}">${Number.isFinite(dist)?fmt(dist,1)+'%':'—'}</b></div>
+       ${Number.isFinite(Number(b.gridProfit))?`<div><span>Grid Profit</span><b class="green">+${fmt(Number(b.gridProfit),sym==='HBAR'?2:3)} ${sym}</b></div>`:''}
+       ${Number.isFinite(Number(b.trendPnl))?`<div><span>Trend P&L</span><b class="${Number(b.trendPnl)<0?'red':'green'}">${Number(b.trendPnl)>=0?'+':''}${fmt(Number(b.trendPnl),sym==='HBAR'?2:3)} ${sym}</b></div>`:''}
+       ${Number.isFinite(Number(b.gridRoundsTotal))?`<div><span>Grid Runden</span><b>${Number(b.gridRoundsTotal)}</b></div>`:''}
      </div>
    </div>`;
  }).join('');
@@ -7167,7 +7170,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.32 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.34 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7290,7 +7293,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.32 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.34 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
