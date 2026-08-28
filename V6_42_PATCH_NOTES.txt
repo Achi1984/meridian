@@ -1,0 +1,11 @@
+ACHI MERIDIAN v6.42 — PIONEX SHORT MARGIN UPDATE
+
+- BTC-L100 manually closed; removed from active SSOT.
+- BTC-S30 dynamic margin: 226.66 USDT.
+- BTC-S30 liquidation: 86,429.9 USDT; displayed buffer: 8.99%.
+- BTC-S30 break-even: 72,722.7; current screenshot price: 79,300.5.
+- Total P&L: -128.27 USDT; grid profit: +14.51 USDT; derived trend P&L: -142.78 USDT.
+- Grid rounds: 27 / 1,434.
+- Risk classification: WATCH (8–12%), no longer CRITICAL (<8%).
+- HBAR-L3 and XRP-L5 unchanged.
+- Paper Engine 6.29.1 and Ruleset 6.2-SIGNAL-V1 unchanged.
