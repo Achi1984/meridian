@@ -3836,6 +3836,10 @@ window.addEventListener('DOMContentLoaded',()=>{
 .v649-data-warning{margin:9px 0;padding:8px 10px;border:1px solid rgba(240,181,74,.45);border-radius:10px;color:#f0b54a;font-size:7px;line-height:1.4}
 @media(max-width:430px){.v649-roadmap{grid-template-columns:repeat(4,1fr);gap:4px}.v649-roadmap b{font-size:7px}}
 </style>
+
+<style>
+.shadow63{margin:22px 0;padding:20px;border:1px solid #14557a;border-radius:24px;background:linear-gradient(180deg,rgba(6,28,42,.92),rgba(3,17,27,.96))}.shadow63-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.shadow63-head b{font-size:18px;letter-spacing:2px}.shadow63-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.shadow63-card{border:1px solid #164b68;border-radius:18px;padding:15px;min-height:112px}.shadow63-card span,.shadow63-meta{display:block;color:#7890a5;font-size:10px;letter-spacing:1.5px}.shadow63-card b{display:block;margin:8px 0 6px;font-size:15px}.shadow63-card small{color:#8da0b1;line-height:1.45}.shadow63-card.good{border-color:#247957}.shadow63-card.warn{border-color:#8a6a28}.shadow63-card.bad{border-color:#8e3d4a}.shadow63-policy{margin-top:14px;border:1px solid #246d54;border-radius:16px;padding:13px;color:#8fa7b7;font-size:11px;line-height:1.5}.shadow63-policy b{color:#4ce19a}.shadow63-ref{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.shadow63-ref>div{border:1px solid #164b68;border-radius:14px;padding:12px}.shadow63-ref span{display:block;color:#7890a5;font-size:9px;letter-spacing:1.2px}.shadow63-ref b{display:block;margin-top:6px;font-size:14px}@media(max-width:520px){.shadow63-grid{grid-template-columns:1fr}.shadow63-ref{grid-template-columns:1fr 1fr 1fr}.shadow63{padding:16px}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3843,7 +3847,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.50 · LIVE</span>
+        <span class="version" id="versionBadge">v6.51 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -3946,7 +3950,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-let APP_CODE_VERSION='6.50';
+let APP_CODE_VERSION='6.51';
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
 let GRID_SWINGS={},GRID_LOADING={},GRID_ENGINE_STATUS={};
@@ -4272,11 +4276,11 @@ async function load(){
 
      DATA.futuresRiskIntelligence={"version":"1.1","asOf":"2026-08-28T15:10:00+02:00","singleBot":{"id":"BTC-S30","level":"WATCH","bufferPct":8.99,"gatePct":8.0,"gapToGatePctPoints":0.99,"reason":"BTC short is now above the 8% critical liquidation-buffer gate after margin increase, but remains below the 12% watch threshold."},"portfolio":{"level":"WATCH","score":52,"protectedBots":[],"primaryBlocker":null,"reason":"No active bot is below the 8% critical gate. BTC-L100 is closed; BTC-S30 remains the closest liquidation risk at 8.99%.","action":"WATCH BTC-S30; critical risk gate reopens only if displayed buffer falls below 8%."}};
    }catch(e){console.warn('v6.35 SSOT overlay failed',e)}
-   let runtimeVersion={version:'6.50'};
+   let runtimeVersion={version:'6.51'};
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=runtimeVersion.version||'6.50';
+   APP_CODE_VERSION=runtimeVersion.version||'6.51';
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -7425,6 +7429,46 @@ function cloudLearningDecisionLayer(trades){
     </div>
   </div>`;
 }
+
+function cloudShadowRuleset63(trades){
+  const a=cloudPerformanceAnalytics(trades), n=a.arr.length;
+  const long=a.bySide.LONG||{n:0,pnl:0,wins:0}, short=a.bySide.SHORT||{n:0,pnl:0,wins:0};
+  const baseline=a.arr.reduce((q,t)=>q+t._pnl,0);
+  const scoreRows=a.arr.filter(t=>Number.isFinite(Number(t.gateScore??t.technicalScore))&&Number.isFinite(Number(t.candidateScore)));
+  const zoneRows=a.arr.filter(t=>Number.isFinite(Number(t.entryDistanceAtr??t.distanceToEntryAtr??t.entryZoneDistanceAtr)));
+  const scoreCoverage=n?Math.round(scoreRows.length/n*100):0, zoneCoverage=n?Math.round(zoneRows.length/n*100):0;
+  const longWr=long.n?long.wins/long.n*100:0, shortWr=short.n?short.wins/short.n*100:0;
+  const symbols=Object.entries(a.bySymbol).filter(([,q])=>q.n>0);
+  const watch=symbols.filter(([,q])=>q.n>=2&&q.pnl<0).sort((x,y)=>x[1].pnl-y[1].pnl);
+  const evidence=symbols.filter(([,q])=>q.n>=3);
+  const scoredLong=scoreRows.filter(t=>t._side==='LONG');
+  const shadowLong=scoredLong.filter(t=>Number(t.gateScore??t.technicalScore)>=80&&Number(t.candidateScore)>=75);
+  const shadowLongPnl=shadowLong.reduce((q,t)=>q+t._pnl,0);
+  const avoidedLong=scoredLong.filter(t=>!shadowLong.includes(t));
+  const avoidedPnl=avoidedLong.reduce((q,t)=>q+t._pnl,0);
+  const gateReady=n>=30;
+  const scoreText=scoreRows.length?`${scoreRows.length}/${n} Trades mit Score-Snapshot`:'Historische Score-Snapshots fehlen';
+  const zoneText=zoneRows.length?`${zoneRows.length}/${n} Trades mit Entry-Distanz`:'Entry-Distanz wird historisch nicht geliefert';
+  return `<div class="shadow63">
+    <div class="shadow63-head"><b>SHADOW RULESET 6.3</b><span class="tag ${gateReady?'green':'amber'}">${gateReady?'DECISION READY':'OBSERVE · '+n+'/30'}</span></div>
+    <div class="shadow63-meta">COUNTERFACTUAL LAB · KEINE AUSWIRKUNG AUF ORDERS · BASELINE 6.2 BLEIBT FROZEN</div>
+    <div class="shadow63-ref">
+      <div><span>BASELINE P&L</span><b class="${baseline>=0?'green':'red'}">${baseline>=0?'+':''}${cloudMoney(baseline)}</b></div>
+      <div><span>LONG</span><b class="${long.pnl>=0?'green':'red'}">${long.n} · ${long.pnl>=0?'+':''}${cloudMoney(long.pnl)}</b></div>
+      <div><span>SHORT</span><b class="${short.pnl>=0?'green':'red'}">${short.n} · ${short.pnl>=0?'+':''}${cloudMoney(short.pnl)}</b></div>
+    </div>
+    <div class="shadow63-grid">
+      <div class="shadow63-card ${long.pnl<short.pnl?'warn':''}"><span>H1 · LONG REGIME FILTER</span><b>Long selektiver prüfen</b><small>Aktuell ${long.n} Trades · ${fmt(longWr,0)}% WR · ${long.pnl>=0?'+':''}${cloudMoney(long.pnl)}. Shadow-Vorschlag: Long erst ab TECH ≥80 + CAND ≥75 bewerten. ${scoreRows.length?`Backcheck: ${shadowLong.length}/${scoredLong.length} scored Longs bestanden · vermiedene Trades ${avoidedPnl>=0?'+':''}${cloudMoney(avoidedPnl)}.`:'Noch keine belastbare Rückrechnung, da historische Scores fehlen.'}</small></div>
+      <div class="shadow63-card ${zoneCoverage<80?'warn':''}"><span>H2 · ENTRY QUALITY</span><b>Entry-Zone quantifizieren</b><small>${zoneText}. Ziel: Ergebnis gegen ATR-Distanz zur Entry-Zone auswerten und A+ Entries von Grenz-Entries trennen. Coverage ${zoneCoverage}%.</small></div>
+      <div class="shadow63-card"><span>H3 · ASSET QUALITY</span><b>${watch.length?watch.slice(0,3).map(([s])=>s).join(' · ')+' WATCH':'Noch kein Watch-Kandidat'}</b><small>${evidence.length} Assets haben ≥3 Trades. Watch bleibt Beobachtung; keine Coin-Sperre und keine automatische Gewichtung.</small></div>
+      <div class="shadow63-card ${short.pnl>long.pnl?'good':''}"><span>H4 · DIRECTION SPLIT</span><b>${short.pnl>long.pnl?'SHORT LEADS':'NO CLEAR LEADER'}</b><small>Long ${fmt(longWr,0)}% WR vs. Short ${fmt(shortWr,0)}% WR. PF/Expectancy werden weiter getrennt beobachtet; keine automatische Richtungsabschaltung.</small></div>
+      <div class="shadow63-card"><span>H5 · REGIME LINK</span><b>BULL / BEAR / RANGE</b><small>Vorgemerkt für 6.3. Historische Regime-Snapshots müssen pro Entry gespeichert werden, bevor ein seriöser Counterfactual-Test möglich ist.</small></div>
+      <div class="shadow63-card ${gateReady?'good':'warn'}"><span>DECISION GATE · 30</span><b>${gateReady?'MANUAL REVIEW':'Noch '+Math.max(0,30-n)+' Trades'}</b><small>${scoreText}. Erst am Gate dokumentierte Hypothesen vergleichen; Promotion eines neuen Rulesets bleibt manuell.</small></div>
+    </div>
+    <div class="shadow63-policy"><b>SHADOW ONLY.</b> Engine 6.29.1 und Ruleset 6.2-SIGNAL-V1 werden nicht verändert. 6.3 sammelt Evidenz und zeigt Gegenproben; es eröffnet, schließt oder blockiert keine Trades.</div>
+  </div>`;
+}
+
 function cloudAnalyticsBlock(trades){
   const a=cloudPerformanceAnalytics(trades);
   const n=a.arr.length;
@@ -7464,7 +7508,7 @@ function cloudAnalyticsBlock(trades){
     </div>
     <div class="lm-note"><b>${n<20?'NO ACTION < 20 TRADES':n<30?'FIRST REVIEW · DOCUMENT ONLY':n<50?'DECISION GATE OPEN · MANUAL ONLY':n<100?'VALIDATION PHASE':'STRONG EVIDENCE REVIEW'}</b> · Ruleset 6.2-SIGNAL-V1 bleibt eingefroren · keine automatische Regeländerung.</div>
   </div>`;
-  return learningMonitor+cloudLearningDecisionLayer(trades)+`<div class="performance-analytics">
+  return learningMonitor+cloudLearningDecisionLayer(trades)+cloudShadowRuleset63(trades)+`<div class="performance-analytics">
     <div class="section-title">FORWARD TEST ANALYTICS <span class="tag cyan">${n<20?'LEARNING':'EVALUATION'}</span></div>
     <div class="pa-top">
       <div><span>PROFIT FACTOR</span><b class="${a.pf>1?'green':a.pf>0&&a.pf<1?'red':''}">${pf}</b></div>
@@ -7561,7 +7605,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.50 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.51 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7684,7 +7728,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.50 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.51 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10576,4 +10620,4 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.50'))b.textContent='v6.50 · LIVE';},1200)}catch(e){}</script>
+<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.51'))b.textContent='v6.51 · LIVE';},1200)}catch(e){}</script>

@@ -1,6 +1,6 @@
 {
-  "version": "6.50",
-  "build": "2026-08-28-nexttarget-hotfix",
-  "release": "VERSION SYNC + EQUITY TIMEFRAMES",
-  "notes": "Release identifiers synchronized across app, data, manifest and embedded SSOT. Equity timeframe selector remains iOS-touch enabled."
+  "version": "6.51",
+  "build": "2026-08-28-shadow-ruleset-63",
+  "release": "SHADOW RULESET 6.3 LAB",
+  "notes": "Adds non-executing counterfactual hypothesis lab for Long filter, entry quality, asset quality, direction split and regime linkage. Engine 6.29.1 and Ruleset 6.2-SIGNAL-V1 remain unchanged."
 }

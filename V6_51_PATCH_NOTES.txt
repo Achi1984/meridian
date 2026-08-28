@@ -1,0 +1,12 @@
+MERIDIAN v6.51 — SHADOW RULESET 6.3 LAB
+
+- Adds Shadow Ruleset 6.3 hypothesis lab to Cloud Paper analytics.
+- H1 Long regime filter candidate: TECH >=80 + CAND >=75, only backtested when historical score snapshots exist.
+- H2 Entry quality coverage / ATR-distance readiness.
+- H3 Asset quality watch with minimum sample safeguards.
+- H4 Long/Short evidence split.
+- H5 Regime-link readiness.
+- Decision Gate remains 30 trades; all changes remain manual.
+- Engine 6.29.1 unchanged.
+- Ruleset 6.2-SIGNAL-V1 remains frozen and executing.
+- Shadow 6.3 never opens, closes or blocks trades.
