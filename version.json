@@ -1,5 +1,5 @@
 {
-  "version": "6.58",
-  "build": "2026-08-29-decision-lab-h6",
-  "notes": "Shadow-only Decision Lab: fractional Kelly H6, opportunity cost, regime-direction matrix, effective leverage evidence. No execution/risk/ruleset changes."
+  "version": "6.59",
+  "build": "2026-08-29-adaptive-risk-shadow-h7",
+  "notes": "Adds H7 Adaptive Risk Shadow: soft regime confidence modifier layered on H6 fractional-Kelly research sizing. Zero execution impact; no entry filters; Base Risk 1.00% and Ruleset 6.2-SIGNAL-V1 remain frozen."
 }

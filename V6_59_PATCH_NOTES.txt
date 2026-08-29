@@ -1,0 +1,11 @@
+ACHI MERIDIAN v6.59 — Adaptive Risk Shadow
+
+- Adds H7 Adaptive Risk Shadow to Decision Lab.
+- Regime is used only as a SOFT sizing observation, never as an entry gate.
+- Shows Execution Base Risk, H6 Kelly Shadow, average Regime Modifier, H7 Adaptive Shadow Risk.
+- Per-regime rows show outcomes, confidence, modifier and hypothetical H7 risk.
+- Small samples are strongly shrunk toward neutral 1.00x; learning confidence rises slowly to 20 outcomes/regime.
+- No trade is blocked or filtered by H7. Trade frequency is unchanged.
+- ZERO EXECUTION IMPACT.
+- Base execution risk remains 1.00%.
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 remain frozen.

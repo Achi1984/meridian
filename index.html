@@ -3863,6 +3863,11 @@ window.addEventListener('DOMContentLoaded',()=>{
 .decision658-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.decision658-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.decision658-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.decision658-grid b{display:block;margin-top:4px;font-size:9px}
 .decision658-section{margin-top:8px;border-top:1px solid rgba(28,82,97,.55);padding-top:7px}.decision658-title{font-size:7px;letter-spacing:.1em;color:#b7c8d2;margin-bottom:5px}.decision658-matrix{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.decision658-cell{border:1px solid #174555;border-radius:8px;padding:6px}.decision658-cell span{display:block;font-size:6px;color:#7f99a5}.decision658-cell b{display:block;font-size:7px;margin-top:3px}.decision658-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.decision658-lock{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.decision658-lock.ok{border-color:#247957;color:#4ce19a}
 @media(max-width:520px){.decision658-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.adaptive659{margin-top:9px;border:1px solid rgba(76,225,154,.48);border-radius:12px;padding:8px;background:rgba(4,28,27,.36)}
+.adaptive659-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.adaptive659-head b{font-size:8px;letter-spacing:.09em;color:#4ce19a}.adaptive659-head span{font-size:5.7px;color:#789a91;text-align:right}
+.adaptive659-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:6px}.adaptive659-grid>div{border:1px solid #1d5a55;border-radius:8px;padding:6px}.adaptive659-grid span{display:block;font-size:5.7px;color:#789b96}.adaptive659-grid b{display:block;font-size:8px;margin-top:3px}
+.adaptive659-regimes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:6px}.adaptive659-regime{border:1px solid #174d4a;border-radius:8px;padding:6px}.adaptive659-regime span{display:block;font-size:5.8px;color:#789b96}.adaptive659-regime b{display:block;font-size:7px;margin-top:3px}.adaptive659-note{font-size:5.7px;color:#7890a2;line-height:1.4;margin-top:6px}
+@media(max-width:520px){.adaptive659-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .research657{margin:10px 0 4px;border:1px solid rgba(94,227,173,.42);border-radius:14px;padding:10px;background:rgba(4,22,29,.58)}
 .research657-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.research657-head b{font-size:10px;letter-spacing:.08em}.research657-head span{font-size:6px;color:#7e9a9c;text-align:right}.research657-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.research657-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.research657-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.research657-grid b{display:block;margin-top:4px;font-size:9px}.research657-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.research657-gate{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.research657-gate.ok{border-color:#247957;color:#4ce19a}.research657-details{margin-top:6px}.research657-details summary{cursor:pointer;color:#4ce19a;font-size:6px;letter-spacing:.08em;list-style:none}.research657-details summary::-webkit-details-marker{display:none}.research657-rows{margin-top:6px;display:grid;gap:4px}.research657-row{display:grid;grid-template-columns:1fr .7fr .7fr .8fr;gap:5px;border-top:1px solid rgba(28,82,97,.55);padding-top:5px;font-size:6.4px}.research657-row span{color:#8aa0ab}.research657-row b{font-size:6.5px}
@@ -3876,7 +3881,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.58 · LIVE</span>
+        <span class="version" id="versionBadge">v6.59 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7565,6 +7570,37 @@ function cloudCounterfactualLab(evidencePayload, totalClosedTrades){
   </div>`;
 }
 
+function cloudAdaptiveRisk659(evidencePayload,h6Risk){
+  const e=cloudEvidenceAnalytics(evidencePayload), closed=e.closed;
+  const baseRisk=1.00;
+  // H7 research-only soft sizing modifier. No trade is blocked. Small samples are shrunk hard toward 1.00x.
+  const groups={};
+  closed.forEach(x=>{const k=x.regime||'UNKNOWN';const q=groups[k]||(groups[k]={n:0,w:0,pnl:0,abs:0});q.n++;q.w+=x.realized>0?1:0;q.pnl+=x.realized;q.abs+=Math.abs(x.realized||0)});
+  const calc=q=>{
+    if(!q||!q.n)return {modifier:1,confidence:0,wr:0};
+    const wr=q.w/q.n;
+    const pnlQuality=q.abs>0?q.pnl/q.abs:0; // -1..+1
+    const observed=Math.max(.50,Math.min(1.20,1 + .35*pnlQuality + .30*(wr-.50)));
+    const confidence=Math.min(1,q.n/20); // deliberately slow learning
+    const modifier=1+(observed-1)*confidence;
+    return {modifier,confidence,wr};
+  };
+  const rows=Object.entries(groups).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>{const z=calc(q);const risk=Math.max(.25,Math.min(1.00,h6Risk*z.modifier));return `<div class="adaptive659-regime"><span>${k} · ${q.n} OUT · ${Math.round(z.confidence*100)}% CONF</span><b class="${z.modifier<.98?'amber':z.modifier>1.02?'green':''}">${fmt(z.modifier,2)}× MOD · ${fmt(risk,2)}% H7 RISK</b></div>`}).join('')||'<div class="adaptive659-regime"><span>NO OUTCOMES</span><b>1,00× MOD</b></div>';
+  const weighted=closed.length?closed.reduce((a,x)=>{const z=calc(groups[x.regime||'UNKNOWN']);return a+z.modifier},0)/closed.length:1;
+  const adaptive=Math.max(.25,Math.min(1.00,h6Risk*weighted));
+  return `<div class="adaptive659">
+    <div class="adaptive659-head"><b>H7 · ADAPTIVE RISK SHADOW · 6.59</b><span>SOFT MODIFIER · ZERO EXECUTION IMPACT</span></div>
+    <div class="adaptive659-grid">
+      <div><span>EXECUTION BASE RISK</span><b>${fmt(baseRisk,2)}%</b></div>
+      <div><span>H6 KELLY SHADOW</span><b>${fmt(h6Risk,2)}%</b></div>
+      <div><span>AVG REGIME MOD</span><b>${fmt(weighted,2)}×</b></div>
+      <div><span>H7 ADAPTIVE SHADOW</span><b>${fmt(adaptive,2)}%</b></div>
+    </div>
+    <div class="adaptive659-regimes">${rows}</div>
+    <div class="adaptive659-note">Regime is a soft sizing observation, never an entry gate. Modifier range is deliberately bounded and shrunk toward 1.00× until each regime has more outcomes. Trade frequency is unchanged; opportunity cost remains visible. Base execution risk remains 1.00%.</div>
+  </div>`;
+}
+
 function cloudDecisionLab658(evidencePayload,totalClosedTrades){
   const e=cloudEvidenceAnalytics(evidencePayload), closed=e.closed;
   const sum=a=>a.reduce((q,x)=>q+(Number(x.realized)||0),0);
@@ -7606,6 +7642,7 @@ function cloudDecisionLab658(evidencePayload,totalClosedTrades){
       <div><span>WIN SACRIFICED</span><b class="${sacrificedWin>0?'red':'green'}">${sacrificedWin>0?'-':''}${cloudMoney(sacrificedWin)}</b></div>
     </div>
     <div class="decision658-section"><div class="decision658-title">REGIME × DIRECTION · DESCRIPTIVE ONLY</div><div class="decision658-matrix">${matrixHtml}</div></div>
+    ${cloudAdaptiveRisk659(evidencePayload,shadowRisk)}
     <div class="decision658-lock ${ready?'ok':''}">${ready?'DECISION SAMPLE OPEN':'COLLECTING'} · ${totalClosedTrades||0} baseline trades · ${closed.length} Evidence outcomes. Kelly, leverage and regime matrix remain research-only; Base Risk stays 1.00%.</div>
     <div class="decision658-note">H6 uses conservative fractional Kelly only as a shadow comparison: ¼-Kelly, small-sample shrinkage, and a research band of 0.25–1.00%. It does not size live Paper positions. Opportunity Cost prevents over-filtering by showing both avoided losses and sacrificed winners. Effective leverage is derived from risk budget ÷ stop distance where the Evidence snapshot contains Entry/SL.</div>
   </div>`;
@@ -7794,7 +7831,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.58 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.59 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7917,7 +7954,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.58 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.59 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
