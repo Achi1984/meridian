@@ -1,0 +1,9 @@
+MERIDIAN v6.57 — Research Lab / Counterfactual Preview
+
+- Added Research Lab inside Shadow Ruleset 6.3.
+- Compares captured closed Evidence outcomes against the frozen H1 hypothesis.
+- Hypothesis only: SHORT unchanged; LONG kept only with TECH >=80 and CAND >=75.
+- Shows Evidence outcomes, kept/filtered count and counterfactual P&L delta.
+- Research lock requires both 30 baseline closed trades and at least 5 Evidence outcomes.
+- No execution, signal, risk or Ruleset logic changed.
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Evidence 6.53 remain unchanged.

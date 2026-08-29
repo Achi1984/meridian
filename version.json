@@ -1,1 +1,6 @@
-{"version":"6.56","release":"VERSION SSOT HOTFIX","build":"2026-08-29-version-ssot","notes":"Header version synchronized to UI 6.56; visible UI version uses a single source; no strategy, signal, execution, or risk logic changes."}
+{
+  "version": "6.57",
+  "release": "VERSION SSOT HOTFIX",
+  "build": "2026-08-29-research-lab",
+  "notes": "Counterfactual Research Lab; no execution impact."
+}

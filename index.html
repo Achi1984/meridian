@@ -3856,6 +3856,11 @@ window.addEventListener('DOMContentLoaded',()=>{
 .evidence654-regimes{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.evidence654-regimes span{border:1px solid #164b68;border-radius:999px;padding:5px 7px;color:#8da0b1;font-size:6px}.evidence654-regimes b{color:#dce9f3}
 .evidence654-latest{margin-top:6px;display:grid;gap:4px}.evidence654-row{display:grid;grid-template-columns:1fr .75fr .75fr .8fr;gap:6px;align-items:center;border-top:1px solid rgba(22,75,104,.55);padding-top:6px;font-size:7px}.evidence654-row span{color:#8da0b1}.evidence654-row b{font-size:7px}.evidence654-note{margin-top:6px;color:#6f8498;font-size:5.7px;line-height:1.35}.evidence654-more{margin-top:6px}.evidence654-more summary{cursor:pointer;color:#22a9ff;font-size:6px;letter-spacing:.08em;list-style:none}.evidence654-more summary::-webkit-details-marker{display:none}
 @media(max-width:520px){.evidence654-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence654-row{grid-template-columns:1fr .75fr .72fr .85fr;font-size:6.3px}.evidence654-row b{font-size:6.5px}}
+/* v6.57 Research Lab / Counterfactual Preview */
+.research657{margin:10px 0 4px;border:1px solid rgba(94,227,173,.42);border-radius:14px;padding:10px;background:rgba(4,22,29,.58)}
+.research657-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.research657-head b{font-size:10px;letter-spacing:.08em}.research657-head span{font-size:6px;color:#7e9a9c;text-align:right}.research657-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.research657-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.research657-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.research657-grid b{display:block;margin-top:4px;font-size:9px}.research657-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.research657-gate{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.research657-gate.ok{border-color:#247957;color:#4ce19a}.research657-details{margin-top:6px}.research657-details summary{cursor:pointer;color:#4ce19a;font-size:6px;letter-spacing:.08em;list-style:none}.research657-details summary::-webkit-details-marker{display:none}.research657-rows{margin-top:6px;display:grid;gap:4px}.research657-row{display:grid;grid-template-columns:1fr .7fr .7fr .8fr;gap:5px;border-top:1px solid rgba(28,82,97,.55);padding-top:5px;font-size:6.4px}.research657-row span{color:#8aa0ab}.research657-row b{font-size:6.5px}
+@media(max-width:520px){.research657-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.research657-row{grid-template-columns:1fr .65fr .7fr .9fr}}
+
 </style>
 </head>
 <body>
@@ -3864,7 +3869,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.56 · LIVE</span>
+        <span class="version" id="versionBadge">v6.57 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7512,6 +7517,40 @@ function cloudEvidenceMonitor(payload){
   </div>`;
 }
 
+
+function cloudCounterfactualLab(evidencePayload, totalClosedTrades){
+  const e=cloudEvidenceAnalytics(evidencePayload);
+  const completed=e.closed;
+  // Frozen research hypothesis only: Shorts pass unchanged; Longs require TECH >=80 and CAND >=75.
+  // This does not alter execution and is evaluated only on captured Evidence outcomes.
+  const scored=completed.map(x=>{
+    const eligible=x.side==='SHORT' || (x.side==='LONG' && Number(x.technical)>=80 && Number(x.candidate)>=75);
+    return {...x,eligible};
+  });
+  const kept=scored.filter(x=>x.eligible), filtered=scored.filter(x=>!x.eligible);
+  const sum=arr=>arr.reduce((q,x)=>q+(Number(x.realized)||0),0);
+  const keptPnl=sum(kept), filteredPnl=sum(filtered), baselinePnl=sum(scored);
+  const shadowPnl=keptPnl;
+  const delta=shadowPnl-baselinePnl;
+  const outcomes=scored.length;
+  const gate30=Number(totalClosedTrades||0)>=30;
+  const enoughOutcomes=outcomes>=5;
+  const reviewReady=gate30&&enoughOutcomes;
+  const rows=scored.slice().sort((a,b)=>(cloudEpoch(b.closedAt)||0)-(cloudEpoch(a.closedAt)||0)).slice(0,5).map(x=>`<div class="research657-row"><b>${x.symbol} ${x.side}</b><span>${x.regime}</span><span>${x.technical??'—'}/${x.candidate??'—'}</span><b class="${x.eligible?'green':'amber'}">${x.eligible?'KEEP':'FILTER'} · ${(x.realized>=0?'+':'')+cloudMoney(x.realized)}</b></div>`).join('');
+  return `<div class="research657">
+    <div class="research657-head"><b>RESEARCH LAB · COUNTERFACTUAL 6.3</b><span>SHADOW ONLY · EXECUTION IMPACT OFF</span></div>
+    <div class="research657-grid">
+      <div><span>EVIDENCE OUTCOMES</span><b>${outcomes}</b></div>
+      <div><span>SHADOW KEPT</span><b>${kept.length}</b></div>
+      <div><span>SHADOW FILTERED</span><b>${filtered.length}</b></div>
+      <div><span>CF Δ vs BASELINE</span><b class="${delta>=0?'green':'red'}">${delta>=0?'+':''}${cloudMoney(delta)}</b></div>
+    </div>
+    <div class="research657-gate ${reviewReady?'ok':''}">${reviewReady?'REVIEW READY':'RESEARCH LOCKED'} · ${totalClosedTrades||0}/30 closed baseline trades · ${outcomes}/5 Evidence outcomes minimum. ${reviewReady?'Manual review is allowed; no automatic promotion.':'No Ruleset change from this sample.'}</div>
+    <details class="research657-details"><summary>▶ COUNTERFACTUAL DETAILS ANZEIGEN</summary><div class="research657-rows">${rows||'<div class="research657-note">Noch keine abgeschlossenen Evidence-Trades.</div>'}</div></details>
+    <div class="research657-note">Frozen test hypothesis: SHORT unchanged; LONG is hypothetically kept only when TECH ≥80 and CAND ≥75. H2/H3/H5 remain observational until enough outcomes exist. Counterfactual P&L uses only trades with captured Evidence and cannot reconstruct the first historical baseline trades.</div>
+  </div>`;
+}
+
 function cloudShadowRuleset63(trades,evidencePayload){
   const a=cloudPerformanceAnalytics(trades), n=a.arr.length;
   const ev=cloudEvidenceAnalytics(evidencePayload);
@@ -7538,6 +7577,7 @@ function cloudShadowRuleset63(trades,evidencePayload){
       <div><span>SHORT</span><b class="${short.pnl>=0?'green':'red'}">${short.n} · ${short.pnl>=0?'+':''}${cloudMoney(short.pnl)}</b></div>
     </div>
     ${cloudEvidenceMonitor(evidencePayload)}
+    ${cloudCounterfactualLab(evidencePayload,n)}
     <div class="shadow63-board">
       <div class="shadow63-board-row"><b>H1</b><span>LONG REGIME</span><b class="${h1Long?'ok':'warn'}">${h1Long} LONG</b><b class="warn">${h1Long?'COLLECT':'WAIT'}</b></div>
       <div class="shadow63-board-row"><b>H2</b><span>ENTRY QUALITY</span><b class="${h2Captured?'ok':'warn'}">${h2Captured} DIST</b><b class="${h2Outcomes?'ok':'warn'}">${h2Outcomes} OUT</b></div>
@@ -7693,7 +7733,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.56 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.57 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7816,7 +7856,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.56 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.57 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10709,8 +10749,8 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 
 </body></html>
 <script>
-// v6.56: single UI version source for visible version labels.
-window.MERIDIAN_UI_VERSION='6.56';
+// v6.57: Research Lab counterfactual preview; single UI version source.
+window.MERIDIAN_UI_VERSION='6.57';
 try{setTimeout(()=>{
   const v=window.MERIDIAN_UI_VERSION;
   const b=document.getElementById('versionBadge');
