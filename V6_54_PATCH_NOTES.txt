@@ -1,0 +1,11 @@
+MERIDIAN v6.54 — LIVE EVIDENCE MONITOR
+
+- Adds /api/evidence?limit=100 to cloud sync.
+- Adds compact Live Evidence Monitor inside Shadow Ruleset 6.3.
+- H1 now shows captured Long regime evidence.
+- H2 now shows captured ATR distances and completed outcomes.
+- H5 now shows captured regimes and completed outcomes.
+- Shows latest evidence trades and outcome P&L without raw JSON.
+- Historical pre-6.53 trades remain baseline; no synthetic backfill.
+- executionImpact remains false; no trade logic, risk logic or Ruleset thresholds changed.
+- Dashboard engine label follows /api/status engine.version to avoid display mismatch.
