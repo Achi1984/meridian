@@ -3864,7 +3864,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.54 · LIVE</span>
+        <span class="version" id="versionBadge">v6.56 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7693,7 +7693,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.55 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.56 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7816,7 +7816,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.55 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.56 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10708,4 +10708,13 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 </script>
 
 </body></html>
-<script>try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b&&!String(b.textContent).includes('6.51'))b.textContent='v6.54 · LIVE';},1200)}catch(e){}</script>
+<script>
+// v6.56: single UI version source for visible version labels.
+window.MERIDIAN_UI_VERSION='6.56';
+try{setTimeout(()=>{
+  const v=window.MERIDIAN_UI_VERSION;
+  const b=document.getElementById('versionBadge');
+  if(b)b.textContent=`v${v} · LIVE`;
+  document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent=v);
+},1200)}catch(e){}
+</script>

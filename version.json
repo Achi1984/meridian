@@ -1,1 +1,1 @@
-{"version":"6.55","release":"EVIDENCE COMPACT","build":"2026-08-29-evidence-compact","notes":"Compact mobile Evidence Monitor; explicit UI/Engine/Ruleset/Evidence version separation; no strategy or risk logic changes."}
+{"version":"6.56","release":"VERSION SSOT HOTFIX","build":"2026-08-29-version-ssot","notes":"Header version synchronized to UI 6.56; visible UI version uses a single source; no strategy, signal, execution, or risk logic changes."}

@@ -1,0 +1,9 @@
+MERIDIAN v6.56 — VERSION SSOT HOTFIX
+
+- Fixed stale header badge v6.54 -> v6.56.
+- Cockpit UI version updated to 6.56.
+- Added one UI version source for the header badge.
+- Engine 6.2.0 unchanged.
+- Ruleset 6.2-SIGNAL-V1 unchanged.
+- Evidence 6.53-EVIDENCE unchanged.
+- No strategy, signal, execution, or risk logic changes.
