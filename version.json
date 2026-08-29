@@ -1,6 +1,5 @@
 {
-  "version": "6.57",
-  "release": "VERSION SSOT HOTFIX",
-  "build": "2026-08-29-research-lab",
-  "notes": "Counterfactual Research Lab; no execution impact."
+  "version": "6.58",
+  "build": "2026-08-29-decision-lab-h6",
+  "notes": "Shadow-only Decision Lab: fractional Kelly H6, opportunity cost, regime-direction matrix, effective leverage evidence. No execution/risk/ruleset changes."
 }

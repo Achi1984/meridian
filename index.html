@@ -3857,6 +3857,13 @@ window.addEventListener('DOMContentLoaded',()=>{
 .evidence654-latest{margin-top:6px;display:grid;gap:4px}.evidence654-row{display:grid;grid-template-columns:1fr .75fr .75fr .8fr;gap:6px;align-items:center;border-top:1px solid rgba(22,75,104,.55);padding-top:6px;font-size:7px}.evidence654-row span{color:#8da0b1}.evidence654-row b{font-size:7px}.evidence654-note{margin-top:6px;color:#6f8498;font-size:5.7px;line-height:1.35}.evidence654-more{margin-top:6px}.evidence654-more summary{cursor:pointer;color:#22a9ff;font-size:6px;letter-spacing:.08em;list-style:none}.evidence654-more summary::-webkit-details-marker{display:none}
 @media(max-width:520px){.evidence654-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence654-row{grid-template-columns:1fr .75fr .72fr .85fr;font-size:6.3px}.evidence654-row b{font-size:6.5px}}
 /* v6.57 Research Lab / Counterfactual Preview */
+/* v6.58 Decision Lab: H6 Kelly + opportunity cost + regime-direction + effective leverage (shadow only) */
+.decision658{margin:10px 0 4px;border:1px solid rgba(54,184,255,.42);border-radius:14px;padding:10px;background:rgba(3,18,28,.64)}
+.decision658-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.decision658-head b{font-size:10px;letter-spacing:.08em}.decision658-head span{font-size:6px;color:#7e9a9c;text-align:right}
+.decision658-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.decision658-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.decision658-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.decision658-grid b{display:block;margin-top:4px;font-size:9px}
+.decision658-section{margin-top:8px;border-top:1px solid rgba(28,82,97,.55);padding-top:7px}.decision658-title{font-size:7px;letter-spacing:.1em;color:#b7c8d2;margin-bottom:5px}.decision658-matrix{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.decision658-cell{border:1px solid #174555;border-radius:8px;padding:6px}.decision658-cell span{display:block;font-size:6px;color:#7f99a5}.decision658-cell b{display:block;font-size:7px;margin-top:3px}.decision658-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.decision658-lock{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.decision658-lock.ok{border-color:#247957;color:#4ce19a}
+@media(max-width:520px){.decision658-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 .research657{margin:10px 0 4px;border:1px solid rgba(94,227,173,.42);border-radius:14px;padding:10px;background:rgba(4,22,29,.58)}
 .research657-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.research657-head b{font-size:10px;letter-spacing:.08em}.research657-head span{font-size:6px;color:#7e9a9c;text-align:right}.research657-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.research657-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.research657-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.research657-grid b{display:block;margin-top:4px;font-size:9px}.research657-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.research657-gate{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.research657-gate.ok{border-color:#247957;color:#4ce19a}.research657-details{margin-top:6px}.research657-details summary{cursor:pointer;color:#4ce19a;font-size:6px;letter-spacing:.08em;list-style:none}.research657-details summary::-webkit-details-marker{display:none}.research657-rows{margin-top:6px;display:grid;gap:4px}.research657-row{display:grid;grid-template-columns:1fr .7fr .7fr .8fr;gap:5px;border-top:1px solid rgba(28,82,97,.55);padding-top:5px;font-size:6.4px}.research657-row span{color:#8aa0ab}.research657-row b{font-size:6.5px}
 @media(max-width:520px){.research657-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.research657-row{grid-template-columns:1fr .65fr .7fr .9fr}}
@@ -3869,7 +3876,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.57 · LIVE</span>
+        <span class="version" id="versionBadge">v6.58 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7467,6 +7474,11 @@ function cloudEvidenceAnalytics(payload){
     const distance=Number(x?.distance_atr??x?.distanceAtr??x?.snapshot?.distanceAtr);
     const technical=Number(x?.technical??x?.snapshot?.technical);
     const candidate=Number(x?.candidate??x?.snapshot?.candidate);
+    const entry=Number(x?.snapshot?.entry??x?.snapshot?.signalEntry??x?.entry);
+    const stop=Number(x?.snapshot?.s1??x?.snapshot?.sl??x?.sl);
+    const riskPct=Number(x?.snapshot?.configAtEntry?.riskPerTradePct??1);
+    const stopPct=(Number.isFinite(entry)&&entry!==0&&Number.isFinite(stop))?Math.abs(entry-stop)/Math.abs(entry)*100:null;
+    const effectiveLeverage=(stopPct&&Number.isFinite(riskPct))?riskPct/stopPct:null;
     return {
       raw:x,
       id:x?.position_id||x?.positionId||String(i),
@@ -7476,6 +7488,8 @@ function cloudEvidenceAnalytics(payload){
       technical:Number.isFinite(technical)?technical:null,
       candidate:Number.isFinite(candidate)?candidate:null,
       distance:Number.isFinite(distance)?distance:null,
+      entry:Number.isFinite(entry)?entry:null, stop:Number.isFinite(stop)?stop:null, riskPct:Number.isFinite(riskPct)?riskPct:1,
+      stopPct:Number.isFinite(stopPct)?stopPct:null, effectiveLeverage:Number.isFinite(effectiveLeverage)?effectiveLeverage:null,
       result,
       realized:result&&Number.isFinite(realized)?realized:null,
       exitReason:result?.exitReason||result?.exit_reason||null,
@@ -7551,6 +7565,52 @@ function cloudCounterfactualLab(evidencePayload, totalClosedTrades){
   </div>`;
 }
 
+function cloudDecisionLab658(evidencePayload,totalClosedTrades){
+  const e=cloudEvidenceAnalytics(evidencePayload), closed=e.closed;
+  const sum=a=>a.reduce((q,x)=>q+(Number(x.realized)||0),0);
+  const wins=closed.filter(x=>x.realized>0), losses=closed.filter(x=>x.realized<0);
+  const p=closed.length?wins.length/closed.length:0;
+  const avgWin=wins.length?sum(wins)/wins.length:0;
+  const avgLoss=losses.length?Math.abs(sum(losses)/losses.length):0;
+  const b=avgLoss>0?avgWin/avgLoss:0;
+  const rawKelly=(b>0)?Math.max(0,p-(1-p)/b):0;
+  // Research-only: quarter Kelly, strongly shrunk toward 0.50% while evidence is small; hard shadow bounds 0.25–1.00%.
+  const quarterKelly=rawKelly*0.25*100;
+  const confidence=Math.min(1,closed.length/50);
+  const shadowRisk=Math.max(.25,Math.min(1.00,.50*(1-confidence)+quarterKelly*confidence));
+  const avgLev=e.items.filter(x=>Number.isFinite(x.effectiveLeverage));
+  const levMean=avgLev.length?avgLev.reduce((q,x)=>q+x.effectiveLeverage,0)/avgLev.length:null;
+  const highLev=avgLev.filter(x=>x.effectiveLeverage>=4).length;
+
+  // Same frozen 6.3 counterfactual used by Research Lab; opportunity cost makes filtering cost explicit.
+  const scored=closed.map(x=>({...x,eligible:x.side==='SHORT'||(x.side==='LONG'&&Number(x.technical)>=80&&Number(x.candidate)>=75)}));
+  const filtered=scored.filter(x=>!x.eligible), filteredWins=filtered.filter(x=>x.realized>0), filteredLosses=filtered.filter(x=>x.realized<0);
+  const preventedLoss=Math.abs(sum(filteredLosses));
+  const sacrificedWin=sum(filteredWins);
+  const keepRate=scored.length?100*(scored.length-filtered.length)/scored.length:100;
+
+  const matrix={};
+  closed.forEach(x=>{const k=(x.regime||'UNKNOWN')+'|'+x.side;const q=matrix[k]||(matrix[k]={n:0,pnl:0,w:0});q.n++;q.pnl+=x.realized;q.w+=x.realized>0?1:0});
+  const matrixHtml=Object.entries(matrix).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>{const [r,d]=k.split('|');return `<div class="decision658-cell"><span>${r} · ${d}</span><b class="${q.pnl>=0?'green':'red'}">${q.n} OUT · ${q.pnl>=0?'+':''}${cloudMoney(q.pnl)} · ${q.n?Math.round(q.w/q.n*100):0}% WR</b></div>`}).join('')||'<div class="decision658-note">Noch keine abgeschlossenen Regime×Direction-Outcomes.</div>';
+  const ready=Number(totalClosedTrades||0)>=30&&closed.length>=5;
+  return `<div class="decision658">
+    <div class="decision658-head"><b>DECISION LAB · 6.58</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
+    <div class="decision658-grid">
+      <div><span>H6 SHADOW RISK</span><b>${fmt(shadowRisk,2)}%</b></div>
+      <div><span>RAW KELLY</span><b>${fmt(rawKelly*100,1)}%</b></div>
+      <div><span>AVG EFF. LEVERAGE</span><b>${levMean!=null?fmt(levMean,2)+'×':'—'}</b></div>
+      <div><span>≥4× LEVERAGE</span><b>${highLev}/${avgLev.length}</b></div>
+      <div><span>KEEP RATE</span><b>${fmt(keepRate,0)}%</b></div>
+      <div><span>FILTERED</span><b>${filtered.length}</b></div>
+      <div><span>LOSS PREVENTED</span><b class="green">+${cloudMoney(preventedLoss)}</b></div>
+      <div><span>WIN SACRIFICED</span><b class="${sacrificedWin>0?'red':'green'}">${sacrificedWin>0?'-':''}${cloudMoney(sacrificedWin)}</b></div>
+    </div>
+    <div class="decision658-section"><div class="decision658-title">REGIME × DIRECTION · DESCRIPTIVE ONLY</div><div class="decision658-matrix">${matrixHtml}</div></div>
+    <div class="decision658-lock ${ready?'ok':''}">${ready?'DECISION SAMPLE OPEN':'COLLECTING'} · ${totalClosedTrades||0} baseline trades · ${closed.length} Evidence outcomes. Kelly, leverage and regime matrix remain research-only; Base Risk stays 1.00%.</div>
+    <div class="decision658-note">H6 uses conservative fractional Kelly only as a shadow comparison: ¼-Kelly, small-sample shrinkage, and a research band of 0.25–1.00%. It does not size live Paper positions. Opportunity Cost prevents over-filtering by showing both avoided losses and sacrificed winners. Effective leverage is derived from risk budget ÷ stop distance where the Evidence snapshot contains Entry/SL.</div>
+  </div>`;
+}
+
 function cloudShadowRuleset63(trades,evidencePayload){
   const a=cloudPerformanceAnalytics(trades), n=a.arr.length;
   const ev=cloudEvidenceAnalytics(evidencePayload);
@@ -7578,6 +7638,7 @@ function cloudShadowRuleset63(trades,evidencePayload){
     </div>
     ${cloudEvidenceMonitor(evidencePayload)}
     ${cloudCounterfactualLab(evidencePayload,n)}
+    ${cloudDecisionLab658(evidencePayload,n)}
     <div class="shadow63-board">
       <div class="shadow63-board-row"><b>H1</b><span>LONG REGIME</span><b class="${h1Long?'ok':'warn'}">${h1Long} LONG</b><b class="warn">${h1Long?'COLLECT':'WAIT'}</b></div>
       <div class="shadow63-board-row"><b>H2</b><span>ENTRY QUALITY</span><b class="${h2Captured?'ok':'warn'}">${h2Captured} DIST</b><b class="${h2Outcomes?'ok':'warn'}">${h2Outcomes} OUT</b></div>
@@ -7733,7 +7794,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.57 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.58 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7856,7 +7917,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.57 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.58 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
@@ -10749,8 +10810,8 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 
 </body></html>
 <script>
-// v6.57: Research Lab counterfactual preview; single UI version source.
-window.MERIDIAN_UI_VERSION='6.57';
+// v6.58: Decision Lab shadow research; single UI version source.
+window.MERIDIAN_UI_VERSION='6.58';
 try{setTimeout(()=>{
   const v=window.MERIDIAN_UI_VERSION;
   const b=document.getElementById('versionBadge');

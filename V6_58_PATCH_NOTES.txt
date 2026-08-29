@@ -1,0 +1,9 @@
+MERIDIAN v6.58 — Decision Lab
+
+SHADOW ONLY / no execution impact.
+- H6 Fractional Kelly research sizing (quarter-Kelly + small-sample shrinkage, shadow band 0.25–1.00%)
+- Opportunity Cost: keep rate, filtered trades, prevented losses, sacrificed winners
+- Regime × Direction outcome matrix
+- Effective leverage derived from Evidence Entry/SL and risk budget
+- Baseline remains Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Base Risk 1.00%
+- No signal, entry, exit, risk, or order logic changed.
