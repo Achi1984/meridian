@@ -1,0 +1,8 @@
+MERIDIAN v6.55 — EVIDENCE COMPACT
+
+- Live Evidence Monitor on mobile made more compact.
+- Latest Evidence rows moved behind a collapsed disclosure.
+- Version line now explicitly separates UI, Engine, Ruleset and Evidence.
+- Shadow policy text simplified.
+- No changes to trading, risk, signal thresholds or Ruleset 6.2-SIGNAL-V1.
+- Evidence remains observation-only / executionImpact=false.

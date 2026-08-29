@@ -3849,12 +3849,12 @@ window.addEventListener('DOMContentLoaded',()=>{
 @media(max-width:520px){.shadow63-board-row{grid-template-columns:28px 1.15fr .75fr .75fr;padding:8px}.shadow63-board-row span,.shadow63-board-row b{font-size:7px}}
 </style>
 
-<style id="v654-evidence-monitor">
-.evidence654{margin:14px 0 4px;border:1px solid rgba(39,185,255,.42);border-radius:16px;padding:13px;background:rgba(4,20,31,.56)}
-.evidence654-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px}.evidence654-head b{font-size:11px;letter-spacing:.08em}.evidence654-head span{font-size:7px;color:#7890a2}
-.evidence654-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.evidence654-grid>div{border:1px solid #164b68;border-radius:10px;padding:8px}.evidence654-grid span{display:block;color:#7890a2;font-size:6px;letter-spacing:.08em}.evidence654-grid b{display:block;margin-top:4px;font-size:9px}
-.evidence654-regimes{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.evidence654-regimes span{border:1px solid #164b68;border-radius:999px;padding:5px 7px;color:#8da0b1;font-size:6px}.evidence654-regimes b{color:#dce9f3}
-.evidence654-latest{margin-top:8px;display:grid;gap:5px}.evidence654-row{display:grid;grid-template-columns:1fr .75fr .75fr .8fr;gap:6px;align-items:center;border-top:1px solid rgba(22,75,104,.55);padding-top:6px;font-size:7px}.evidence654-row span{color:#8da0b1}.evidence654-row b{font-size:7px}.evidence654-note{margin-top:8px;color:#6f8498;font-size:6px;line-height:1.4}
+<style id="v655-evidence-monitor">
+.evidence654{margin:12px 0 4px;border:1px solid rgba(39,185,255,.42);border-radius:14px;padding:10px;background:rgba(4,20,31,.56)}
+.evidence654-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}.evidence654-head b{font-size:10px;letter-spacing:.08em}.evidence654-head span{font-size:6px;color:#7890a2;text-align:right}
+.evidence654-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.evidence654-grid>div{border:1px solid #164b68;border-radius:9px;padding:6px}.evidence654-grid span{display:block;color:#7890a2;font-size:6px;letter-spacing:.08em}.evidence654-grid b{display:block;margin-top:4px;font-size:9px}
+.evidence654-regimes{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.evidence654-regimes span{border:1px solid #164b68;border-radius:999px;padding:5px 7px;color:#8da0b1;font-size:6px}.evidence654-regimes b{color:#dce9f3}
+.evidence654-latest{margin-top:6px;display:grid;gap:4px}.evidence654-row{display:grid;grid-template-columns:1fr .75fr .75fr .8fr;gap:6px;align-items:center;border-top:1px solid rgba(22,75,104,.55);padding-top:6px;font-size:7px}.evidence654-row span{color:#8da0b1}.evidence654-row b{font-size:7px}.evidence654-note{margin-top:6px;color:#6f8498;font-size:5.7px;line-height:1.35}.evidence654-more{margin-top:6px}.evidence654-more summary{cursor:pointer;color:#22a9ff;font-size:6px;letter-spacing:.08em;list-style:none}.evidence654-more summary::-webkit-details-marker{display:none}
 @media(max-width:520px){.evidence654-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence654-row{grid-template-columns:1fr .75fr .72fr .85fr;font-size:6.3px}.evidence654-row b{font-size:6.5px}}
 </style>
 </head>
@@ -7507,8 +7507,8 @@ function cloudEvidenceMonitor(payload){
       <div><span>CAPTURED</span><b>${total}</b></div><div><span>OPEN</span><b>${open}</b></div><div><span>OUTCOMES</span><b>${closed}</b></div><div><span>REALIZED</span><b class="${e.totalPnl>=0?'green':'red'}">${e.totalPnl>=0?'+':''}${cloudMoney(e.totalPnl)}</b></div>
     </div>
     <div class="evidence654-regimes">${regimeHtml}</div>
-    ${latest?`<div class="evidence654-latest">${latest}</div>`:''}
-    <div class="evidence654-note">Evidence startet ab Backend 6.53. Frühere Trades bleiben Baseline ohne nachträglich erfundene Entry-Snapshots.</div>
+    ${(latest)?`<details class="evidence654-more"><summary>▶ LETZTE EVIDENCE ANZEIGEN</summary><div class="evidence654-latest">${latest}</div></details>`:''}
+    <div class="evidence654-note">Ab Backend 6.53 · frühere Trades bleiben Baseline ohne nachträgliche Entry-Snapshots.</div>
   </div>`;
 }
 
@@ -7553,7 +7553,7 @@ function cloudShadowRuleset63(trades,evidencePayload){
       <div class="shadow63-card ${h5Outcomes?'good':'warn'}"><span>H5 · REGIME LINK</span><b>${h5Captured} Captures · ${h5Outcomes} Outcomes</b><small>${regimeText}${latestClosed?`. Latest: ${latestClosed.symbol} ${latestClosed.side} · ${latestClosed.regime} · ${(latestClosed.realized>=0?'+':'')+cloudMoney(latestClosed.realized)} ${latestClosed.exitReason||''}.`:'.'} Regime-Auswertung bleibt bis zu größerer Stichprobe deskriptiv.</small></div>
       <div class="shadow63-card ${gateReady?'good':'warn'}"><span>DECISION GATE · 30</span><b>${gateReady?'MANUAL REVIEW':'Noch '+Math.max(0,30-n)+' Trades'}</b><small>${ev.items.length} Evidence-Captures seit Backend 6.53. Am Gate Hypothesen dokumentiert prüfen; Promotion eines neuen Rulesets bleibt manuell.</small></div>
     </div></details>
-    <div class="shadow63-policy"><b>SHADOW ONLY.</b> Backend Engine ${engineVersion} und Ruleset 6.2-SIGNAL-V1 werden durch dieses UI nicht verändert. Evidence ${ev.captureVersion} sammelt Daten mit executionImpact=false.</div>
+    <div class="shadow63-policy"><b>SHADOW ONLY.</b> Engine ${engineVersion} · Ruleset 6.2-SIGNAL-V1 · Evidence ${ev.captureVersion}. Dieses UI verändert keine Ausführung; Evidence sammelt Daten mit executionImpact=false.</div>
   </div>`;
 }
 
@@ -7693,7 +7693,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.54 · ENGINE ${eng.version||'6.29.1'} · RULESET 6.2-SIGNAL-V1</div>
+        <div class="eyebrow">UI 6.55 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7816,7 +7816,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.54 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.55 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>

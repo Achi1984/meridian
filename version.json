@@ -1,6 +1,1 @@
-{
-  "version": "6.54",
-  "build": "2026-08-29-live-evidence-monitor",
-  "release": "EVIDENCE MONITOR",
-  "notes": "Frontend integration for backend 6.53-EVIDENCE. Fetches /api/evidence, shows captured/open/outcome counts and live H1/H2/H5 evidence without changing execution. Ruleset 6.2-SIGNAL-V1 remains frozen."
-}
+{"version":"6.55","release":"EVIDENCE COMPACT","build":"2026-08-29-evidence-compact","notes":"Compact mobile Evidence Monitor; explicit UI/Engine/Ruleset/Evidence version separation; no strategy or risk logic changes."}
