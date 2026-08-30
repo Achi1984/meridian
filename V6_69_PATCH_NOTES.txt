@@ -1,0 +1,8 @@
+MERIDIAN v6.69
+- Fresh backtest state key/schema; old v6.67/v6.68 cached results are not reused.
+- Train/Validation/OOS fixed to strict chronological trade order: oldest 60%, next 20%, newest 20%.
+- Split cards show actual first/last trade dates.
+- Elliott diagnostics added: EW coverage, pivot-ready coverage, aligned count, confidence >=60/70, phase counts.
+- Each trade stores EW confirmed-pivot count and score.
+- Elliott matrix always shows BASE on a fresh run; empty state explicitly asks for a new backtest.
+- No changes to 6.2 signal, execution, risk, or cloud Paperbot.

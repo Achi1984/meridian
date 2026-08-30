@@ -1,5 +1,5 @@
 {
-  "version": "6.68",
-  "build": "2026-08-30-elliott-shadow-v1",
-  "notes": "Backtest Lab V3 adds an objective no-look-ahead Elliott Shadow classifier using confirmed 1h pivots, wave-phase diagnostics and filter-only comparisons. Paperbot execution and 6.2 rules remain unchanged."
+  "version": "6.69",
+  "build": "2026-08-30-elliott-diagnostics-split-fix",
+  "notes": "Backtest Lab V3.1 resets stale backtest state, uses strict chronological trade-count 60/20/20 Train/Validation/OOS, adds Elliott coverage/pivot diagnostics, and stores EW pivot metadata. Paperbot execution and 6.2 rules remain unchanged."
 }
