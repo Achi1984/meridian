@@ -1,5 +1,5 @@
 {
-  "version": "6.62",
-  "build": "2026-08-30-minimal-ui",
-  "notes": "Minimal UI pass: removes most nested rounded frames in Shadow, Evidence, Research, Decision Lab, H7, Decision Journal and Forward Analytics. Replaces them with flat metric matrices and subtle separators. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
+  "version": "6.63",
+  "build": "2026-08-30-trade-minimal-ui-version-lock",
+  "notes": "Full TRADE-tab minimal UI pass: flattens Cloud Cockpit, signal, scanner, open positions, learning monitor and review roadmap into section-based layouts with subtle separators. Keeps functional chart frame. Fixes legacy literal \\n text leak and locks visible UI version to the code-owned 6.63 constant so stale version.json cannot show an older badge. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
 }

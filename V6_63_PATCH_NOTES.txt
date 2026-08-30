@@ -1,0 +1,20 @@
+MERIDIAN v6.63 — Full TRADE Minimal UI + Version Lock
+
+UI ONLY
+- Flattens top-level TRADE cards into section bands with thin separators.
+- Cloud Paper Cockpit limits/KPIs are matrices rather than nested cards.
+- Current Signal uses a single decision accent stripe.
+- Live Scanner and Open Positions render visually as rows.
+- Learning Monitor and Review Roadmap use flat status rails/matrices.
+- Equity chart keeps its functional frame; surrounding KPIs are flat.
+- Shadow/Decision areas remain compact from v6.62.
+- Removes legacy literal \n text that could leak above the app.
+- Visible UI version is now locked to the in-code UI_VERSION constant (6.63); version.json is metadata only.
+
+UNCHANGED
+- Engine 6.2.0
+- Ruleset 6.2-SIGNAL-V1
+- Evidence 6.53-EVIDENCE
+- Base risk 1.00%
+- H6/H7 research logic
+- Signal/entry/exit/risk/execution logic
