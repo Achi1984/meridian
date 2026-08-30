@@ -4104,7 +4104,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.63 · LIVE</span>
+        <span class="version" id="versionBadge">v6.64 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -4207,7 +4207,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='6.63';
+const UI_VERSION='6.64';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -4538,7 +4538,7 @@ async function load(){
    if(versionRes.ok){
      try{runtimeVersion=await versionRes.json()}catch(e){}
    }
-   APP_CODE_VERSION=UI_VERSION; // v6.63: visible UI version is code-owned; runtime JSON is metadata only
+   APP_CODE_VERSION=UI_VERSION; // v6.64: visible UI version is code-owned; runtime JSON is metadata only
    APP_RELEASE=runtimeVersion.release ? APP_CODE_VERSION+' · '+runtimeVersion.release : APP_CODE_VERSION+' · CLOUD PAPER COCKPIT';
    DATA.appVersion=APP_CODE_VERSION;
    try{loadPortfolioSeries()}catch(e){}
@@ -7869,7 +7869,7 @@ function cloudDecisionJournal660(evidencePayload){
   const latest=rows.slice().reverse().slice(0,5).map(x=>`<div class="decisionjournal660-row"><b>${x.symbol} ${x.side}</b><span>${x.regime}</span><span>BASE ${x.base>=0?'+':''}${cloudMoney(x.base)}</span><span>H6 ${fmt(x.h6Risk,2)}% · ${x.h6Pnl>=0?'+':''}${cloudMoney(x.h6Pnl)}</span><span>H7 ${fmt(x.h7Risk,2)}% · ${x.h7Pnl>=0?'+':''}${cloudMoney(x.h7Pnl)}</span></div>`).join('');
   const d6=h6.pnl-base.pnl,d7=h7.pnl-base.pnl,dd6=base.maxDd-h6.maxDd,dd7=base.maxDd-h7.maxDd;
   return `<div class="decisionjournal660">
-    <div class="decisionjournal660-head"><b>DECISION JOURNAL · 6.63</b><span>SEQUENTIAL SHADOW · NO LOOK-AHEAD · ZERO EXECUTION IMPACT</span></div>
+    <div class="decisionjournal660-head"><b>DECISION JOURNAL · 6.64</b><span>SEQUENTIAL SHADOW · NO LOOK-AHEAD · ZERO EXECUTION IMPACT</span></div>
     <div class="decisionjournal660-grid">${cardCol('6.2 EVIDENCE BASELINE',base,base.pnl>=0?'green':'red')}${cardCol('H6 FRACTIONAL KELLY',h6,h6.pnl>=0?'green':'red')}${cardCol('H7 KELLY + REGIME',h7,h7.pnl>=0?'green':'red')}</div>
     <div class="decisionjournal660-delta"><div><span>H6 Δ P&L / DD REDUCTION</span><b class="${d6>=0?'green':'red'}">${d6>=0?'+':''}${cloudMoney(d6)} · ${dd6>=0?'+':''}${fmt(dd6,2)} %-Pkt.</b></div><div><span>H7 Δ P&L / DD REDUCTION</span><b class="${d7>=0?'green':'red'}">${d7>=0?'+':''}${cloudMoney(d7)} · ${dd7>=0?'+':''}${fmt(dd7,2)} %-Pkt.</b></div></div>
     <details class="evidence654-more"><summary>▶ LETZTE JOURNAL-TRADES ANZEIGEN</summary><div class="decisionjournal660-rows">${latest||'<div class="decisionjournal660-note">Noch keine abgeschlossenen Evidence-Outcomes.</div>'}</div></details>
@@ -7906,7 +7906,7 @@ function cloudDecisionLab658(evidencePayload,totalClosedTrades){
   const matrixHtml=Object.entries(matrix).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>{const [r,d]=k.split('|');return `<div class="decision658-cell"><span>${r} · ${d}</span><b class="${q.pnl>=0?'green':'red'}">${q.n} OUT · ${q.pnl>=0?'+':''}${cloudMoney(q.pnl)} · ${q.n?Math.round(q.w/q.n*100):0}% WR</b></div>`}).join('')||'<div class="decision658-note">Noch keine abgeschlossenen Regime×Direction-Outcomes.</div>';
   const ready=Number(totalClosedTrades||0)>=30&&closed.length>=5;
   return `<div class="decision658">
-    <div class="decision658-head"><b>DECISION LAB · 6.63</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
+    <div class="decision658-head"><b>DECISION LAB · 6.64</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
     <div class="decision658-grid">
       <div><span>H6 SHADOW RISK</span><b>${fmt(shadowRisk,2)}%</b></div>
       <div><span>RAW KELLY</span><b>${fmt(rawKelly*100,1)}%</b></div>
@@ -11122,14 +11122,58 @@ window.meridianRegressionGuard=function(){
 addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250));
 </script>
 
-</body></html>
-<script>
-// v6.58: Decision Lab shadow research; single UI version source.
-window.MERIDIAN_UI_VERSION='6.58';
-try{setTimeout(()=>{
-  const v=window.MERIDIAN_UI_VERSION;
-  const b=document.getElementById('versionBadge');
-  if(b)b.textContent=`v${v} · LIVE`;
-  document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent=v);
-},1200)}catch(e){}
+
+<style id="v664-final-ui-cleanup">
+/* v6.64 final TRADE cleanup — presentation only, no trading logic changes. */
+#view-daytrade > .card,
+#view-daytrade > details.card{
+  border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;
+  margin:0!important;padding:18px 14px!important;border-bottom:1px solid rgba(31,73,96,.46)!important;
+}
+#view-daytrade > .card:before,#view-daytrade > details.card:before{display:none!important}
+
+/* Current signal, scanner and open positions: remove the remaining container-card look. */
+#view-daytrade .paper-signal{border:0!important;border-radius:0!important;background:transparent!important;padding:10px 0!important;margin:0!important;border-bottom:1px solid rgba(31,73,96,.38)!important}
+#view-daytrade .why-no-trade{border:0!important;border-radius:0!important;background:linear-gradient(90deg,rgba(232,178,74,.055),transparent)!important;border-left:2px solid rgba(232,178,74,.65)!important;padding:10px 12px!important;margin:6px 0 0!important}
+#view-daytrade .paper-scanner{gap:0!important}
+#view-daytrade .paper-scan-row,#view-daytrade .paper-scan-row.observe,#view-daytrade .paper-pos,#view-daytrade .paper-pos.cloud-compact{
+  border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;
+  padding:11px 0!important;margin:0!important;border-bottom:1px solid rgba(31,73,96,.36)!important;
+}
+#view-daytrade .paper-scan-row:last-child,#view-daytrade .paper-pos:last-child{border-bottom:0!important}
+
+/* Cloud cockpit top: turn nested KPI cards into compact matrix. */
+#view-daytrade .paper-isolation-banner{border:0!important;border-radius:0!important;background:linear-gradient(90deg,rgba(47,210,133,.05),transparent)!important;border-left:2px solid rgba(47,210,133,.62)!important;padding:10px 12px!important}
+#view-daytrade .paper-kpis.harden,#view-daytrade .v629-limits{gap:0!important}
+#view-daytrade .paper-kpis.harden>div,#view-daytrade .v629-limits>span{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+
+/* Review roadmap and evidence/watch blocks: rail + table, no rounded tiles. */
+#view-daytrade .v649-roadmap{gap:0!important;border-top:1px solid rgba(31,73,96,.44)!important;border-bottom:1px solid rgba(31,73,96,.44)!important}
+#view-daytrade .v649-roadmap>div{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:9px 4px!important;border-right:1px solid rgba(31,73,96,.34)!important}
+#view-daytrade .v649-roadmap>div:last-child{border-right:0!important}
+#view-daytrade .v649-review-hero,#view-daytrade .v649-direction,#view-daytrade .v649-evidence-grid,#view-daytrade .v649-watchlist{gap:0!important;border-top:1px solid rgba(31,73,96,.36)!important}
+#view-daytrade .v649-review-hero>div,#view-daytrade .v649-direction>div,#view-daytrade .v649-evidence-grid>div,#view-daytrade .v649-watchlist>div{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:10px 9px!important;border-right:1px solid rgba(31,73,96,.32)!important;border-bottom:1px solid rgba(31,73,96,.32)!important}
+#view-daytrade .v649-review-hero>div:nth-child(2n),#view-daytrade .v649-direction>div:nth-child(2n),#view-daytrade .v649-evidence-grid>div:nth-child(2n),#view-daytrade .v649-watchlist>div:nth-child(2n){border-right:0!important}
+#view-daytrade .v649-watch{box-shadow:inset 2px 0 0 rgba(240,94,102,.55)!important}
+#view-daytrade .v649-policy{border:0!important;border-radius:0!important;background:linear-gradient(90deg,rgba(34,169,255,.035),transparent)!important;border-left:2px solid rgba(34,169,255,.48)!important}
+
+/* Learning monitor and forward analytics: table-like, denser. */
+#view-daytrade .lm-grid,#view-daytrade .paper-performance-strip,#view-daytrade .paper-stats{gap:0!important}
+#view-daytrade .lm-grid>div,#view-daytrade .paper-performance-strip>div,#view-daytrade .paper-stats>div{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+
+/* Keep only functional outlines. */
+#view-daytrade .cloud-equity-v2{border:1px solid rgba(31,73,96,.52)!important;border-radius:9px!important}
+#view-daytrade .tag,#view-daytrade .pill,#view-daytrade button{border-radius:999px}
+
+@media(max-width:430px){
+  #view-daytrade > .card,#view-daytrade > details.card{padding:16px 12px!important}
+  #view-daytrade .section-title{margin-bottom:8px!important}
+  #view-daytrade .v649-roadmap>div{padding:8px 2px!important}
+}
+</style>
+<script id="v664-version-lock">
+window.MERIDIAN_UI_VERSION='6.64';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.64 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.64');},250)}catch(e){}
 </script>
+
+</body></html>

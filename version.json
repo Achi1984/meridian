@@ -1,5 +1,5 @@
 {
-  "version": "6.63",
-  "build": "2026-08-30-trade-minimal-ui-version-lock",
-  "notes": "Full TRADE-tab minimal UI pass: flattens Cloud Cockpit, signal, scanner, open positions, learning monitor and review roadmap into section-based layouts with subtle separators. Keeps functional chart frame. Fixes legacy literal \\n text leak and locks visible UI version to the code-owned 6.63 constant so stale version.json cannot show an older badge. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
+  "version": "6.64",
+  "build": "2026-08-30-final-trade-ui-cleanup",
+  "notes": "Final TRADE-tab UI cleanup. Removes remaining rounded container-card styling from Current Signal, Live Scanner, Open Positions, Review Roadmap and learning/review metric blocks; keeps only functional chart outline and subtle section dividers. Fixes stale v6.58 header override and hard-locks visible UI version to 6.64. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
 }

@@ -1,0 +1,16 @@
+MERIDIAN v6.64 — FINAL TRADE UI CLEANUP
+
+UI only:
+- Current Signal, Live Scanner and Open Positions flattened into section rows.
+- Review Roadmap and review metrics converted to divider/table layout.
+- Cloud cockpit KPI tiles further reduced.
+- Functional Equity chart frame retained.
+- Stale v6.58 header override removed; visible version locked to 6.64.
+
+UNCHANGED:
+- Engine 6.2.0
+- Ruleset 6.2-SIGNAL-V1
+- Evidence 6.53-EVIDENCE
+- Base execution risk 1.00%
+- H6/H7 remain Shadow only
+- No trading / execution / signal / risk logic changes
