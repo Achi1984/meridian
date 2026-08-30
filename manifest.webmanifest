@@ -1,7 +1,7 @@
 {
-  "name": "ACHI MERIDIAN",
-  "short_name": "MERIDIAN",
-  "start_url": "./index.html?v=6.66",
+  "name": "ACHI MERIDIAN v6.87",
+  "short_name": "MERIDIAN 6.87",
+  "start_url": "./?build=6.87-20260830",
   "display": "standalone",
   "background_color": "#03070c",
   "theme_color": "#05080d"

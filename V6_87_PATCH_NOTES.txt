@@ -1,0 +1,21 @@
+MERIDIAN v6.87 — CACHE / VERSION SYNC HOTFIX
+
+UI 6.87
+Backtest Lab V3.18
+Engine 6.2.0 unchanged
+Ruleset 6.2-SIGNAL-V1 unchanged
+Paperbot / Shadow logic unchanged
+
+FIXES
+- Forces all visible legacy version labels to v6.87 / UI 6.87.
+- Adds build signature 6.87-20260830.
+- Unregisters stale Service Workers once per build.
+- Clears MERIDIAN-related browser caches once per build.
+- Reloads once with ?build=6.87-20260830 to break old PWA/browser cache.
+- Updates manifest start_url with the same build signature.
+- Keeps Paper Cockpit, Shadow 6.3A, Edge Map and all research logic unchanged.
+
+EXPECTED AFTER UPLOAD
+Top header: v6.87 · LIVE
+Paper cockpit: UI 6.87
+Execution Risk Gate: v6.87

@@ -1,9 +1,1 @@
-{
-  "version": "6.86",
-  "ui": "6.86",
-  "backtest_lab": "V3.17",
-  "engine": "6.2.0",
-  "ruleset": "6.2-SIGNAL-V1",
-  "evidence": "6.53",
-  "research": "Paper cockpit compact accordions + Shadow 6.3A forward observation lane; no execution change"
-}
+{"version":"6.87","ui":"6.87","backtest_lab":"V3.18","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","build":"6.87-20260830","research":"Cache/PWA invalidation + forced runtime version synchronization; Paper/Shadow behavior unchanged"}
