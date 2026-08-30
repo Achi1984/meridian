@@ -1,5 +1,5 @@
 {
-  "version": "6.66",
-  "build": "2026-08-30-backtest-lab-v2",
+  "version": "6.67",
+  "build": "2026-08-30-backtest-strict-split",
   "notes": "Backtest Lab V2: multi-asset batch research, 30/90/180/365d, temporal Train/Validation/OOS diagnostics, regime outcomes and filter-only research matrix; research-only, no execution changes."
 }

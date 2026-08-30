@@ -1,0 +1,7 @@
+MERIDIAN v6.67 — Backtest V2 split repair
+
+- Strict chronological 60/20/20 split based on the requested backtest interval.
+- Normalizes closedAt timestamps before partitioning.
+- Boundaries are non-overlapping: [start,60%), [60%,80%), [80%,end].
+- Adds Split × Regime × Direction diagnostics for Train, Validation and OOS.
+- Research/UI only. No change to Paper Engine 6.2.0, Ruleset 6.2-SIGNAL-V1, Evidence 6.53 or execution.
