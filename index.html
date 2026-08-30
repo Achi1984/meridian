@@ -4124,6 +4124,26 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
 }
 </style>
 
+
+<style id="v677-risk-gate-diagnostics">
+.v677-gate-lock{border:1px solid rgba(255,91,107,.65);background:linear-gradient(180deg,rgba(76,18,27,.34),rgba(11,25,36,.5));border-radius:12px;padding:10px 11px;margin-top:10px}
+.v677-gate-lock.ok{border-color:rgba(49,215,138,.45);background:linear-gradient(180deg,rgba(17,67,52,.22),rgba(11,25,36,.5))}
+.v677-gate-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.v677-gate-head span{font-size:8px;letter-spacing:.12em;color:#8ea7b8;font-weight:900}
+.v677-gate-head b{font-size:10px;letter-spacing:.08em}
+.v677-gate-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.v677-gate-grid>div{border:1px solid rgba(54,99,124,.42);border-radius:9px;padding:7px;background:rgba(3,14,22,.34)}
+.v677-gate-grid span{display:block;font-size:6.5px;color:#71899a;letter-spacing:.09em}
+.v677-gate-grid b{display:block;font-size:11px;margin-top:2px}
+.v677-gate-note{display:block;margin-top:7px;font-size:7px;line-height:1.45;color:#8299aa}
+.v677-gate-note strong{color:#dcebf4}
+.bt-v677-gates{margin-top:8px;border:1px solid rgba(255,172,65,.45);border-radius:10px;overflow:hidden}
+.bt-v677-gates .head,.bt-v677-gates>div{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;gap:6px;padding:6px 8px;align-items:center}
+.bt-v677-gates .head{background:rgba(17,37,50,.72);font-size:6px;color:#7890a2;letter-spacing:.08em}
+.bt-v677-gates>div:not(.head){border-top:1px solid rgba(45,82,103,.32);font-size:7px}
+@media(max-width:700px){.v677-gate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -8061,6 +8081,37 @@ function cloudAnalyticsBlock(trades){
   </div>`;
 }
 
+
+function cloudExecutionGateBlock(events,drawdownPct){
+  const xs=(Array.isArray(events)?events:[]).filter(e=>e?.type==='SIGNAL_REJECTED'&&e?.payload?.gate);
+  const latest=xs[0]||null;
+  const gate=latest?.payload?.gate||{};
+  const reasons=Array.isArray(gate.reasons)?gate.reasons:[];
+  const locked=gate.ok===false&&reasons.length>0;
+  const maxDD=reasons.includes('MAX_DRAWDOWN');
+  const daily=reasons.includes('DAILY_LOSS');
+  const dd=Number.isFinite(Number(gate.drawdownPct))?Number(gate.drawdownPct):Number(drawdownPct||0);
+  const dl=Number(gate.dailyLossPct||0);
+  const risk=Number(gate.openRiskPct||0);
+  const reason=maxDD?'MAX DRAWDOWN':daily?'DAILY LOSS':reasons.join(' · ')||'ALL GATES OPEN';
+  const last=latest?.created_at?cloudAge(latest.created_at):'—';
+  return `<div class="v677-gate-lock ${locked?'':'ok'}">
+    <div class="v677-gate-head">
+      <span>EXECUTION RISK GATE · v6.77</span>
+      <b class="${locked?'red':'green'}">${locked?'LOCKED · '+reason:'OPEN'}</b>
+    </div>
+    <div class="v677-gate-grid">
+      <div><span>DRAWDOWN</span><b class="${maxDD?'red':''}">${fmt(dd,2)}%</b></div>
+      <div><span>DAILY LOSS</span><b class="${daily?'red':''}">${fmt(dl,2)}%</b></div>
+      <div><span>OPEN RISK</span><b>${fmt(risk,2)}%</b></div>
+      <div><span>LAST GATE EVENT</span><b>${last}</b></div>
+    </div>
+    <small class="v677-gate-note">${locked
+      ? `<strong>Scanner remains active, but new entries are rejected by the frozen 6.2 safety gate.</strong> This is a protection state, not an engine error.`
+      : `No active execution lock detected in the loaded event window.`}</small>
+  </div>`;
+}
+
 function cloudPaperTradeView(){
   const C=MERIDIAN_CLOUD, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
   const assets=Array.isArray(scan.assets)?scan.assets:[];
@@ -8152,6 +8203,7 @@ function cloudPaperTradeView(){
         <span>TRADES/DAY<b>${Number(status?.limits?.maxTradesPerDay||20)}</b></span>
       </div>
     </div>
+    ${cloudExecutionGateBlock(events,drawdownPct)}
     <div class="paper-kpis harden v623-kpis">
       <div class="kpi-card">
         <span>EQUITY</span>
@@ -11605,6 +11657,36 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 const DAY=86400000;
 const dshort=ts=>Number.isFinite(Number(ts))?new Date(Number(ts)).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
 function tradeTime(t){return Number(t?.openedAt??t?.entryTime??t?.closedAt)}
+
+function btRiskGateTelemetry(r){
+  const xs=(r?.tradeList||[]).slice().filter(t=>Number.isFinite(Number(t.closedAt))).sort((a,b)=>Number(a.closedAt)-Number(b.closedAt));
+  const cfg=r?.config||BT_CONFIG||{}, startEq=Number(cfg.startEquity||10000);
+  let eq=startEq,peak=startEq,dayStart=startEq,day='',maxLock=null,dailyLock=null;
+  for(const t of xs){
+    const dk=btDayKey(Number(t.closedAt));
+    if(dk!==day){day=dk;dayStart=eq}
+    eq+=Number(t.realized||0);
+    peak=Math.max(peak,eq);
+    const dd=peak>0?(peak-eq)/peak*100:0;
+    const dl=dayStart>0?(dayStart-eq)/dayStart*100:0;
+    if(!maxLock && dd>=Number(cfg.maxDrawdownPct||Infinity)) maxLock={at:Number(t.closedAt),dd,eq,symbol:t.symbol};
+    if(!dailyLock && dl>=Number(cfg.maxDailyLossPct||Infinity)) dailyLock={at:Number(t.closedAt),dl,eq,symbol:t.symbol};
+  }
+  return {maxLock,dailyLock,thresholdDD:Number(cfg.maxDrawdownPct||0),thresholdDaily:Number(cfg.maxDailyLossPct||0),finalEq:eq};
+}
+function btRiskGateHtml(r){
+  const rows=r?.mode==='BATCH'?(r.assetResults||[]):[r];
+  const data=rows.map(x=>({symbol:x.symbol,...btRiskGateTelemetry(x)}));
+  return `<div class="bt-v2-title">RISK GATE TELEMETRY · CAUSAL</div>
+    <div class="bt-v677-gates"><div class="head"><span>ASSET</span><span>MAX DD GATE</span><span>DAILY LOSS GATE</span><span>INTERPRETATION</span></div>
+    ${data.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b>
+      <span class="${x.maxLock?'red':'green'}">${x.maxLock?dshort(x.maxLock.at)+' · '+fmt(x.maxLock.dd,1)+'%':'NOT HIT'}</span>
+      <span class="${x.dailyLock?'amber':'green'}">${x.dailyLock?dshort(x.dailyLock.at)+' · '+fmt(x.dailyLock.dl,1)+'%':'NOT HIT'}</span>
+      <b class="${x.maxLock?'red':x.dailyLock?'amber':'green'}">${x.maxLock?'PERMANENT DD LOCK':x.dailyLock?'DAY LOCK':'OPEN'}</b>
+    </div>`).join('')}</div>
+    <div class="bt-note">V3.9 derives the first causal risk-gate breach from the historical equity path. MAX_DRAWDOWN is persistent because peak equity is not reset; DAILY_LOSS resets with the next UTC day. No replay thresholds or execution rules are changed.</div>`;
+}
+
 function replayDiagOne(r){
  const st=Number(r?.start),en=Number(r?.end),xs=(r?.tradeList||[]).filter(t=>Number.isFinite(tradeTime(t))&&Number.isFinite(Number(t.closedAt))).slice().sort((a,b)=>tradeTime(a)-tradeTime(b));
  const outside=xs.filter(t=>tradeTime(t)<st||Number(t.closedAt)>en||Number(t.closedAt)<tradeTime(t));
@@ -11616,9 +11698,9 @@ function replayDiagOne(r){
  return{symbol:r?.symbol,st,en,trades:xs.length,outside,first,last,activeDays,tailDays,halted,validTime:outside.length===0};
 }
 function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(replayDiagOne):[replayDiagOne(r)];return{items,validTime:items.every(x=>x.validTime),halted:items.filter(x=>x.halted).length};}
-function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.8 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
+function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.9 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
 const oldBlock=window.backtestLabBlock||backtestLabBlock;
-window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.8</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker);if(p>=0)h=h.slice(0,p)+riHtml(BT_STATE.result)+h.slice(p);else h+=riHtml(BT_STATE.result)}return h};
+window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.9</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
 window.MERIDIAN_UI_VERSION='6.76';
 const apply=()=>{window.MERIDIAN_UI_VERSION='6.76';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.76 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.76')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();

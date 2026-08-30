@@ -1,0 +1,21 @@
+MERIDIAN v6.77 — RISK GATE DIAGNOSTICS
+
+- UI: 6.77
+- Backtest Lab: V3.9
+- Engine remains 6.2.0
+- Ruleset remains 6.2-SIGNAL-V1
+- NO execution/risk threshold changes
+
+NEW
+1) Cloud Paper Cockpit: explicit EXECUTION RISK GATE banner.
+   - Reads SIGNAL_REJECTED gate telemetry from /api/events
+   - Shows MAX_DRAWDOWN / DAILY_LOSS / OPEN_RISK
+   - Makes it obvious when scanner is running but entries are locked.
+
+2) Backtest Lab V3.9: causal risk-gate telemetry.
+   - Derives first MAX_DRAWDOWN breach from historical equity path
+   - Derives first DAILY_LOSS breach by UTC day
+   - Labels persistent DD lock vs day lock
+   - Does not reset or bypass the baseline risk gate.
+
+Purpose: distinguish strategy/risk-stop behavior from data/timestamp defects.
