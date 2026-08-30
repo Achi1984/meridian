@@ -1,5 +1,5 @@
 {
-  "version": "6.67",
-  "build": "2026-08-30-backtest-strict-split",
-  "notes": "Backtest Lab V2: multi-asset batch research, 30/90/180/365d, temporal Train/Validation/OOS diagnostics, regime outcomes and filter-only research matrix; research-only, no execution changes."
+  "version": "6.68",
+  "build": "2026-08-30-elliott-shadow-v1",
+  "notes": "Backtest Lab V3 adds an objective no-look-ahead Elliott Shadow classifier using confirmed 1h pivots, wave-phase diagnostics and filter-only comparisons. Paperbot execution and 6.2 rules remain unchanged."
 }

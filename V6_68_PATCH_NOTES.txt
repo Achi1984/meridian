@@ -1,0 +1,8 @@
+MERIDIAN v6.68 — Elliott Shadow Lab V1
+- Research-only; Engine 6.2 / Ruleset 6.2-SIGNAL-V1 unchanged.
+- Confirmed 1h pivot detection with left/right confirmation bars (no look-ahead).
+- Mechanical bullish/bearish impulse heuristic with W3/W4/W5 phase, direction and confidence.
+- Elliott metrics stored on historical baseline trades only.
+- New comparison rows: EW ALIGN 60, EW ALIGN 70, EW W3 ALIGN, EW + Q72/66, EW NO W5.
+- New phase outcome diagnostics.
+- No automatic strategy promotion or live/paper execution effect.

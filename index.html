@@ -2364,7 +2364,7 @@ body[data-view] nav.bottom{
 
 .peak-timing-row{display:block;margin-top:7px;line-height:1.25;letter-spacing:.08em;color:var(--dim);white-space:normal}
 
-/* MERIDIAN v6.67 — Backtest Lab v2 */
+/* MERIDIAN v6.68 — Backtest Lab v3 · Elliott Shadow */
 .bt-lab{margin-top:16px;padding-top:14px;border-top:1px solid rgba(31,73,96,.52)}
 .bt-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
 .bt-head h3{margin:0;font-size:15px;letter-spacing:.11em}.bt-head small{color:#7690a1;font-size:8px;letter-spacing:.08em;text-align:right}
@@ -2385,6 +2385,9 @@ body[data-view] nav.bottom{
 
 /* v6.67 — strict chronological 60/20/20 split + regime/direction diagnostics */
 .bt-srd{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.25);margin:8px 0 14px}.bt-srd-col{padding:10px 8px;border-right:1px solid rgba(31,73,96,.22)}.bt-srd-col:last-child{border-right:0}.bt-srd-col>b{display:block;font-size:8px;letter-spacing:.09em;margin-bottom:7px}.bt-srd-col>span{display:block;color:#7891a2;font-size:7px;padding:5px 0;border-top:1px solid rgba(31,73,96,.14)}.bt-srd-col em{display:block;font-style:normal;margin-top:3px;font-size:7px}@media(max-width:520px){.bt-srd{grid-template-columns:1fr}.bt-srd-col{border-right:0;border-bottom:1px solid rgba(31,73,96,.2)}.bt-srd-col:last-child{border-bottom:0}}
+
+/* v6.68 Elliott Shadow Lab */
+.bt-regimes+.bt-note{margin-top:7px}
 </style>
 
 <style id="v557-decision-css">
@@ -4126,7 +4129,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.67 · LIVE</span>
+        <span class="version" id="versionBadge">v6.68 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -4229,7 +4232,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='6.67';
+const UI_VERSION='6.68';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -8249,7 +8252,7 @@ window.addEventListener('pageshow',()=>setTimeout(()=>meridianCloudSync(true),15
 setTimeout(()=>meridianCloudSync(false),50);
 
 
-// MERIDIAN v6.67 — Historical Backtest Lab v2 (research-only, browser-side)
+// MERIDIAN v6.68 — Historical Backtest Lab v3 · Elliott Shadow (research-only, browser-side)
 const BT_CONFIG=Object.freeze({
   feeBps:5,slippageBps:3,minTechnicalScore:68,minCandidateScore:62,maxEntryDistanceAtr:.75,
   atrStopMult:1.6,tp1R:1.4,tp2R:2.2,riskPerTradePct:1,cooldownMinutes:30,startEquity:10000,
@@ -8276,8 +8279,71 @@ async function btFetchKlines(symbol,interval,start,end){const key=`${symbol}|${i
 function btSlip(p,side,entry,cfg){return p*(side==='LONG'?(entry?1+cfg.slippageBps/10000:1-cfg.slippageBps/10000):(entry?1-cfg.slippageBps/10000:1+cfg.slippageBps/10000))}
 function btDayKey(ts){return new Date(ts).toISOString().slice(0,10)}
 function btTradeStats(trades,startEquity=10000){let eq=startEquity,pk=eq,maxDD=0,gp=0,gl=0,wins=0,longP=0,shortP=0;for(const tr of trades){eq+=tr.realized;pk=Math.max(pk,eq);maxDD=Math.max(maxDD,pk>0?(pk-eq)/pk*100:0);if(tr.realized>0){gp+=tr.realized;wins++}else gl+=Math.abs(tr.realized);if(tr.side==='LONG')longP+=tr.realized;else shortP+=tr.realized}const pnl=trades.reduce((a,b)=>a+b.realized,0),pf=gl>0?gp/gl:(gp>0?99:0);return{trades:trades.length,wins,winRate:trades.length?wins/trades.length*100:0,pnl,endEquity:startEquity+pnl,pf,maxDD,expectancy:trades.length?pnl/trades.length:0,longP,shortP}}
+// Elliott Shadow V1 — objective confirmed-pivot heuristic, research-only.
+// Every pivot needs RIGHT bars to close before it exists, so the classifier never sees future candles.
+function btConfirmedPivots(c,left=3,right=3,maxPivots=12){
+  const out=[];
+  if(!Array.isArray(c)||c.length<left+right+3)return out;
+  for(let i=left;i<c.length-right;i++){
+    const x=c[i]; let hi=true,lo=true;
+    for(let j=i-left;j<=i+right;j++){if(j===i)continue;if(c[j].high>=x.high)hi=false;if(c[j].low<=x.low)lo=false}
+    if(hi)out.push({i,type:'H',price:x.high,ts:x.closeTime,confirmedAt:c[i+right].closeTime});
+    if(lo)out.push({i,type:'L',price:x.low,ts:x.closeTime,confirmedAt:c[i+right].closeTime});
+  }
+  out.sort((a,b)=>a.i-b.i||a.type.localeCompare(b.type));
+  // Collapse adjacent same-type pivots to the more extreme one.
+  const z=[]; for(const q of out){const prev=z[z.length-1];if(prev&&prev.type===q.type){if((q.type==='H'&&q.price>prev.price)||(q.type==='L'&&q.price<prev.price))z[z.length-1]=q}else z.push(q)}
+  return z.slice(-maxPivots);
+}
+function btFibNear(v,target,tol=.14){return Math.abs(v-target)<=tol}
+function btElliottShadow(w15,w1,side){
+  const p=btConfirmedPivots(w1,2,2,14), cur=btLast(w15)?.close??btLast(w1)?.close;
+  const none={phase:'UNKNOWN',direction:'NONE',confidence:0,align:false,pivots:p.length,retrace:null,extension:null,score:0};
+  if(p.length<4||!Number.isFinite(cur))return none;
+  let best={...none};
+  // Scan recent alternating 4/5/6-pivot structures. Rules are deliberately conservative and mechanical.
+  for(let n=Math.max(0,p.length-8);n<p.length-3;n++){
+    const a=p[n],b=p[n+1],c=p[n+2],d=p[n+3],e=p[n+4],f=p[n+5];
+    // bullish: L-H-L-H(-L-H)
+    if(a&&b&&c&&d&&a.type==='L'&&b.type==='H'&&c.type==='L'&&d.type==='H'){
+      const w1=b.price-a.price,w2=b.price-c.price,w3=d.price-c.price,retr=w1>0?w2/w1:null,ext=w1>0?w3/w1:null;
+      const rules=w1>0&&c.price>a.price&&d.price>b.price;
+      let phase='W3',conf=rules?55:25;
+      if(rules&&retr!=null){if(retr>=.236&&retr<=.786)conf+=18;if(btFibNear(retr,.382)||btFibNear(retr,.5)||btFibNear(retr,.618))conf+=8}
+      if(ext!=null&&ext>=1)conf+=8;
+      if(e&&e.type==='L'&&e.price>b.price&&e.price<d.price){phase='W5';conf+=8;if(f&&f.type==='H'&&f.price>d.price)conf+=6}
+      else if(cur<d.price&&cur>b.price){phase='W4';conf+=5}
+      const cand={phase,direction:'LONG',confidence:btClamp(Math.round(conf),0,100),align:side==='LONG',pivots:p.length,retrace:retr,extension:ext,score:0};cand.score=cand.confidence+(cand.align?10:-10);if(cand.score>best.score)best=cand;
+    }
+    // bearish mirror: H-L-H-L(-H-L)
+    if(a&&b&&c&&d&&a.type==='H'&&b.type==='L'&&c.type==='H'&&d.type==='L'){
+      const w1=a.price-b.price,w2=c.price-b.price,w3=c.price-d.price,retr=w1>0?w2/w1:null,ext=w1>0?w3/w1:null;
+      const rules=w1>0&&c.price<a.price&&d.price<b.price;
+      let phase='W3',conf=rules?55:25;
+      if(rules&&retr!=null){if(retr>=.236&&retr<=.786)conf+=18;if(btFibNear(retr,.382)||btFibNear(retr,.5)||btFibNear(retr,.618))conf+=8}
+      if(ext!=null&&ext>=1)conf+=8;
+      if(e&&e.type==='H'&&e.price<b.price&&e.price>d.price){phase='W5';conf+=8;if(f&&f.type==='L'&&f.price<d.price)conf+=6}
+      else if(cur>d.price&&cur<b.price){phase='W4';conf+=5}
+      const cand={phase,direction:'SHORT',confidence:btClamp(Math.round(conf),0,100),align:side==='SHORT',pivots:p.length,retrace:retr,extension:ext,score:0};cand.score=cand.confidence+(cand.align?10:-10);if(cand.score>best.score)best=cand;
+    }
+  }
+  return best;
+}
+function btElliottStats(trades){
+  const defs=[
+    ['BASE',()=>true],
+    ['EW ALIGN 60',t=>t.ewAlign&&t.ewConfidence>=60],
+    ['EW ALIGN 70',t=>t.ewAlign&&t.ewConfidence>=70],
+    ['EW W3 ALIGN',t=>t.ewAlign&&t.ewPhase==='W3'&&t.ewConfidence>=60],
+    ['EW + Q72/66',t=>t.ewAlign&&t.ewConfidence>=60&&t.technical>=72&&t.candidate>=66],
+    ['EW NO W5',t=>(!t.ewAlign||t.ewPhase!=='W5')]
+  ];
+  return defs.map(([name,fn])=>({name,...btTradeStats((trades||[]).filter(fn))}));
+}
+function btElliottPhaseStats(trades){return ['W3','W4','W5','UNKNOWN'].map(phase=>({phase,...btTradeStats((trades||[]).filter(t=>(t.ewPhase||'UNKNOWN')===phase))})).filter(x=>x.trades)}
+
 function btReplay(symbol,days,k15,k1,k4,cfg){const end=Date.now(),start=end-days*86400000;let equity=cfg.startEquity,peak=equity,dayStart=equity,dayKey='',pos=null,lastClose=0,trades=[],curve=[{ts:start,equity}],fees=0,idx1=0,idx4=0;const closed1=k1.filter(x=>x.closeTime<=end),closed4=k4.filter(x=>x.closeTime<=end);for(let i=0;i<k15.length;i++){const c=k15[i],t=c.closeTime;if(t<start||t>end)continue;const dk=btDayKey(t);if(dk!==dayKey){dayKey=dk;dayStart=equity}if(pos){let reason=null,px=null;const adverse=pos.side==='LONG'?c.low<=pos.sl:c.high>=pos.sl,hit2=pos.side==='LONG'?c.high>=pos.tp2:c.low<=pos.tp2,hit1=pos.side==='LONG'?c.high>=pos.tp1:c.low<=pos.tp1;if(adverse){reason='SL';px=pos.sl}else if(hit2){reason='TP2';px=pos.tp2}else if(hit1){reason='TP1';px=pos.tp1}if(reason){const exit=btSlip(px,pos.side,false,cfg),d=pos.side==='LONG'?1:-1,g=(exit-pos.entry)*pos.qty*d,fee=exit*pos.qty*cfg.feeBps/10000,realized=g-pos.feeOpen-fee;fees+=fee;equity+=realized;trades.push({...pos,exit,closedAt:t,exitReason:reason,realized});lastClose=t;pos=null;peak=Math.max(peak,equity);curve.push({ts:t,equity})}}
-if(pos)continue;const dd=peak>0?(peak-equity)/peak*100:0,dl=dayStart>0?(dayStart-equity)/dayStart*100:0;if(dd>=cfg.maxDrawdownPct||dl>=cfg.maxDailyLossPct||t-lastClose<cfg.cooldownMinutes*60000)continue;while(idx1+1<closed1.length&&closed1[idx1+1].closeTime<=t)idx1++;while(idx4+1<closed4.length&&closed4[idx4+1].closeTime<=t)idx4++;const w15=k15.slice(Math.max(0,i-179),i+1).filter(x=>x.closeTime<=t),w1=closed1.slice(Math.max(0,idx1-179),idx1+1),w4=closed4.slice(Math.max(0,idx4-179),idx4+1);if(w15.length<60||w1.length<60||w4.length<60)continue;const sig=btCandidate(symbol,{"15m":btMetrics(w15),"1h":btMetrics(w1),"4h":btMetrics(w4)},cfg);if(sig.status!=='READY')continue;const entry=btSlip(sig.entry,sig.side,true,cfg),dist=Math.abs(entry-sig.sl);if(!(dist>0))continue;const qty=equity*(cfg.riskPerTradePct/100)/dist,feeOpen=qty*entry*cfg.feeBps/10000;fees+=feeOpen;equity-=feeOpen;pos={symbol,side:sig.side,regime:sig.regime,entry,sl:sig.sl,tp1:sig.tp1,tp2:sig.tp2,qty,feeOpen,openedAt:t,technical:sig.technical,candidate:sig.candidate,distanceAtr:sig.distanceAtr};curve.push({ts:t,equity})}
+if(pos)continue;const dd=peak>0?(peak-equity)/peak*100:0,dl=dayStart>0?(dayStart-equity)/dayStart*100:0;if(dd>=cfg.maxDrawdownPct||dl>=cfg.maxDailyLossPct||t-lastClose<cfg.cooldownMinutes*60000)continue;while(idx1+1<closed1.length&&closed1[idx1+1].closeTime<=t)idx1++;while(idx4+1<closed4.length&&closed4[idx4+1].closeTime<=t)idx4++;const w15=k15.slice(Math.max(0,i-179),i+1).filter(x=>x.closeTime<=t),w1=closed1.slice(Math.max(0,idx1-179),idx1+1),w4=closed4.slice(Math.max(0,idx4-179),idx4+1);if(w15.length<60||w1.length<60||w4.length<60)continue;const sig=btCandidate(symbol,{"15m":btMetrics(w15),"1h":btMetrics(w1),"4h":btMetrics(w4)},cfg);if(sig.status!=='READY')continue;const ew=btElliottShadow(w15,w1,sig.side);const entry=btSlip(sig.entry,sig.side,true,cfg),dist=Math.abs(entry-sig.sl);if(!(dist>0))continue;const qty=equity*(cfg.riskPerTradePct/100)/dist,feeOpen=qty*entry*cfg.feeBps/10000;fees+=feeOpen;equity-=feeOpen;pos={symbol,side:sig.side,regime:sig.regime,entry,sl:sig.sl,tp1:sig.tp1,tp2:sig.tp2,qty,feeOpen,openedAt:t,technical:sig.technical,candidate:sig.candidate,distanceAtr:sig.distanceAtr,ewPhase:ew.phase,ewDirection:ew.direction,ewConfidence:ew.confidence,ewAlign:ew.align,ewRetrace:ew.retrace,ewExtension:ew.extension};curve.push({ts:t,equity})}
 if(pos){const c=k15.filter(x=>x.closeTime<=end).at(-1);if(c){const exit=btSlip(c.close,pos.side,false,cfg),d=pos.side==='LONG'?1:-1,g=(exit-pos.entry)*pos.qty*d,fee=exit*pos.qty*cfg.feeBps/10000,realized=g-pos.feeOpen-fee;fees+=fee;equity+=realized;trades.push({...pos,exit,closedAt:c.closeTime,exitReason:'EOD',realized});curve.push({ts:c.closeTime,equity})}}
 const stats=btTradeStats(trades,cfg.startEquity);return{symbol,days,start,end,...stats,fees,curve,config:cfg,tradeList:trades}}
 function btEsc(s){return String(s??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -8294,14 +8360,16 @@ function btRegimeDirectionStats(trades){const out={};for(const t of trades||[]){
 function btSplitRegimeHtml(r){return `<div class="bt-v2-title">SPLIT × REGIME × DIRECTION</div><div class="bt-srd">${r.split.map(x=>`<div class="bt-srd-col"><b>${x.name}</b>${Object.entries(x.regimeDirection||{}).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>`<span>${k}<em class="${q.pnl>=0?'green':'red'}">${q.n} TR · PF ${fmt(q.pf,2)} · ${q.pnl>=0?'+':''}$${fmt(q.pnl,0)}</em></span>`).join('')||'<span>NO TRADES</span>'}</div>`).join('')}</div>`}
 function btRegimeStats(trades){return['BULL','BEAR','RANGE','TRANSITION'].map(regime=>({regime,...btTradeStats(trades.filter(t=>t.regime===regime))})).filter(x=>x.trades)}
 function btFilterMatrix(trades){const defs=[['BASE',68,62,.75],['Q72/66',72,66,.75],['Q75/70',75,70,.75],['DIST≤0.50',68,62,.50],['STRONG',75,70,.50]];return defs.map(([name,t,c,d])=>({name,tech:t,cand:c,dist:d,...btTradeStats(trades.filter(x=>x.technical>=t&&x.candidate>=c&&x.distanceAtr<=d))}))}
-function btAggregate(results,days){const allTrades=results.flatMap(r=>r.tradeList),pnl=results.reduce((a,r)=>a+r.pnl,0),trades=allTrades.length,wins=allTrades.filter(t=>t.realized>0).length,gp=allTrades.filter(t=>t.realized>0).reduce((a,t)=>a+t.realized,0),gl=Math.abs(allTrades.filter(t=>t.realized<=0).reduce((a,t)=>a+t.realized,0)),longP=allTrades.filter(t=>t.side==='LONG').reduce((a,t)=>a+t.realized,0),shortP=allTrades.filter(t=>t.side==='SHORT').reduce((a,t)=>a+t.realized,0);return{mode:'BATCH',symbol:'ALL',days,assetResults:results,tradeList:allTrades,pnl,trades,wins,winRate:trades?wins/trades*100:0,pf:gl?gp/gl:(gp?99:0),expectancy:trades?pnl/trades:0,longP,shortP,maxDD:Math.max(...results.map(r=>r.maxDD),0),avgDD:results.reduce((a,r)=>a+r.maxDD,0)/Math.max(1,results.length),avgPF:results.reduce((a,r)=>a+r.pf,0)/Math.max(1,results.length),start:Math.min(...results.map(r=>r.start)),end:Math.max(...results.map(r=>r.end)),split:btSplitStats(allTrades,Math.min(...results.map(r=>r.start)),Math.max(...results.map(r=>r.end))),regimes:btRegimeStats(allTrades),matrix:btFilterMatrix(allTrades)}}
-function btSingleDecorate(r){return{...r,mode:'SINGLE',split:btSplitStats(r.tradeList,r.start,r.end),regimes:btRegimeStats(r.tradeList),matrix:btFilterMatrix(r.tradeList)}}
+function btAggregate(results,days){const allTrades=results.flatMap(r=>r.tradeList),pnl=results.reduce((a,r)=>a+r.pnl,0),trades=allTrades.length,wins=allTrades.filter(t=>t.realized>0).length,gp=allTrades.filter(t=>t.realized>0).reduce((a,t)=>a+t.realized,0),gl=Math.abs(allTrades.filter(t=>t.realized<=0).reduce((a,t)=>a+t.realized,0)),longP=allTrades.filter(t=>t.side==='LONG').reduce((a,t)=>a+t.realized,0),shortP=allTrades.filter(t=>t.side==='SHORT').reduce((a,t)=>a+t.realized,0);return{mode:'BATCH',symbol:'ALL',days,assetResults:results,tradeList:allTrades,pnl,trades,wins,winRate:trades?wins/trades*100:0,pf:gl?gp/gl:(gp?99:0),expectancy:trades?pnl/trades:0,longP,shortP,maxDD:Math.max(...results.map(r=>r.maxDD),0),avgDD:results.reduce((a,r)=>a+r.maxDD,0)/Math.max(1,results.length),avgPF:results.reduce((a,r)=>a+r.pf,0)/Math.max(1,results.length),start:Math.min(...results.map(r=>r.start)),end:Math.max(...results.map(r=>r.end)),split:btSplitStats(allTrades,Math.min(...results.map(r=>r.start)),Math.max(...results.map(r=>r.end))),regimes:btRegimeStats(allTrades),matrix:btFilterMatrix(allTrades),elliott:btElliottStats(allTrades),elliottPhases:btElliottPhaseStats(allTrades)}}
+function btSingleDecorate(r){return{...r,mode:'SINGLE',split:btSplitStats(r.tradeList,r.start,r.end),regimes:btRegimeStats(r.tradeList),matrix:btFilterMatrix(r.tradeList),elliott:btElliottStats(r.tradeList),elliottPhases:btElliottPhaseStats(r.tradeList)}}
 function btStatsCell(label,v,cls=''){return `<div><span>${label}</span><b class="${cls}">${v}</b></div>`}
 function btAssetTable(r){if(r.mode!=='BATCH')return'';return `<div class="bt-v2-title">ASSET MATRIX · INDEPENDENT LEDGERS</div><div class="bt-asset-table"><div class="head"><span>ASSET</span><span>TR</span><span>PF</span><span>P&L</span><span>DD</span></div>${r.assetResults.map(x=>`<div><b>${x.symbol.replace('USDT','')}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span><span>${fmt(x.maxDD,1)}%</span></div>`).join('')}</div>`}
 function btSplitTable(r){return `<div class="bt-v2-title">TRAIN / VALIDATION / OUT-OF-SAMPLE</div><div class="bt-split">${r.split.map(x=>`<div><span>${x.name}</span><b class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</b><small>${x.trades} TR · PF ${fmt(x.pf,2)} · WR ${fmt(x.winRate,0)}%</small></div>`).join('')}</div>`}
 function btRegimeTable(r){return `<div class="bt-v2-title">REGIME × OUTCOME</div><div class="bt-regimes">${r.regimes.length?r.regimes.map(x=>`<div><span>${x.regime}</span><b class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</b><small>${x.trades} TR · PF ${fmt(x.pf,2)}</small></div>`).join(''):'<div class="muted">Noch keine Regime-Trades.</div>'}</div>`}
 function btMatrixTable(r){return `<div class="bt-v2-title">FILTER-ONLY RESEARCH MATRIX</div><div class="bt-matrix"><div class="head"><span>VARIANTE</span><span>TR</span><span>PF</span><span>EXP</span><span>P&L</span></div>${r.matrix.map(x=>`<div><b>${x.name}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span></div>`).join('')}</div><div class="bt-note">Matrix ist bewusst nur eine Filter-Gegenprobe auf Baseline-Trades. Sie kann keine Trades rekonstruieren, die 6.2 nie eröffnet hätte, und ist keine automatische Strategie-Promotion.</div>`}
-function backtestLabBlock(){const r=BT_STATE.result,st=BT_STATE.running?BT_STATE.progress:(BT_STATE.error||'Research-only · historische Binance Spot-Kerzen · kein Einfluss auf Paperbot.');const selected=r?.symbol||'ALL';return `<div class="bt-lab"><div class="bt-head"><div><div class="section-title">BACKTEST LAB <span class="tag cyan">V2</span></div><h3>6.2 MULTI-ASSET RESEARCH</h3></div><small>NO LOOK-AHEAD<br>RESEARCH ONLY</small></div><div class="bt-controls"><div class="bt-control"><label>ASSET</label><select id="bt-symbol"><option value="ALL" ${selected==='ALL'?'selected':''}>ALL ASSETS</option>${BT_ASSETS.map(s=>`<option ${selected===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="bt-control"><label>TESTZEITRAUM</label><select id="bt-days">${[30,90,180,365].map(d=>`<option value="${d}" ${Number(r?.days||30)===d?'selected':''}>${d} TAGE</option>`).join('')}</select></div></div><div class="bt-param-row"><div class="bt-param"><span>TECH / CAND</span><b>68 / 62</b></div><div class="bt-param"><span>ENTRY DIST</span><b>≤0,75 ATR</b></div><div class="bt-param"><span>RISK</span><b>1,00%</b></div></div><button class="bt-run" ${BT_STATE.running?'disabled':''} onclick="runMeridianBacktest()">${BT_STATE.running?'BACKTEST LÄUFT …':'BACKTEST STARTEN'}</button><div class="bt-status ${BT_STATE.error?'err':r?'ok':''}">${btEsc(st)}</div>${r?`<div class="bt-results"><div class="bt-summary">${btStatsCell('P&L',`${r.pnl>=0?'+':''}$${fmt(r.pnl,2)}`,r.pnl>=0?'green':'red')}${btStatsCell(r.mode==='BATCH'?'AVG PROFIT FACTOR':'PROFIT FACTOR',fmt(r.mode==='BATCH'?r.avgPF:r.pf,2),(r.mode==='BATCH'?r.avgPF:r.pf)>=1?'green':'red')}${btStatsCell(r.mode==='BATCH'?'WORST DD':'MAX DD',`${fmt(r.maxDD,2)}%`,r.maxDD>8?'red':r.maxDD>4?'amber':'green')}${btStatsCell('TRADES / WR',`${r.trades} · ${fmt(r.winRate,0)}%`)}${btStatsCell('EXPECTANCY',`${r.expectancy>=0?'+':''}$${fmt(r.expectancy,2)}`,r.expectancy>=0?'green':'red')}${btStatsCell('LONG / SHORT P&L',`${r.longP>=0?'+':''}$${fmt(r.longP,0)} / ${r.shortP>=0?'+':''}$${fmt(r.shortP,0)}`)}</div>${r.mode==='SINGLE'?btEquitySvg(r.curve):''}${btAssetTable(r)}${btSplitTable(r)}${btSplitRegimeHtml(r)}${btRegimeTable(r)}${btMatrixTable(r)}<div class="bt-note">${r.mode==='BATCH'?'ALL ASSETS · unabhängige 10k-Ledger je Asset; P&L ist Summe der Einzel-Replays, kein gemeinsames Portfolio.':' '+r.symbol.replace('USDT','')+' · Single-Asset-Replay.'} ${r.days} Tage · Fees + Slippage berücksichtigt · SL-first bei SL/TP in derselben 15m-Kerze. Train/Valid/OOS sind zeitliche Diagnose-Splits der unveränderten 6.2-Baseline; V2 optimiert noch keine Parameter auf Train und wendet sie danach automatisch an.</div></div>`:''}</div>`}
+function btElliottTable(r){return `<div class="bt-v2-title">ELLIOTT SHADOW LAB · CONFIRMED PIVOTS</div><div class="bt-matrix"><div class="head"><span>VARIANTE</span><span>TR</span><span>PF</span><span>EXP</span><span>P&L</span></div>${(r.elliott||[]).map(x=>`<div><b>${x.name}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span></div>`).join('')}</div><div class="bt-regimes">${(r.elliottPhases||[]).map(x=>`<div><span>${x.phase}</span><b class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</b><small>${x.trades} TR · PF ${fmt(x.pf,2)} · WR ${fmt(x.winRate,0)}%</small></div>`).join('')}</div><div class="bt-note">EW V1 ist ein objektiver Shadow-Filter auf bestätigten 1h-Pivots. Pivot-Rechtskerzen müssen bereits geschlossen sein; dadurch kein Look-ahead. Elliott verändert weder Entries noch den laufenden Paperbot.</div>`}
+
+function backtestLabBlock(){const r=BT_STATE.result,st=BT_STATE.running?BT_STATE.progress:(BT_STATE.error||'Research-only · historische Binance Spot-Kerzen · kein Einfluss auf Paperbot.');const selected=r?.symbol||'ALL';return `<div class="bt-lab"><div class="bt-head"><div><div class="section-title">BACKTEST LAB <span class="tag cyan">V3</span></div><h3>6.2 + ELLIOTT SHADOW RESEARCH</h3></div><small>NO LOOK-AHEAD<br>RESEARCH ONLY</small></div><div class="bt-controls"><div class="bt-control"><label>ASSET</label><select id="bt-symbol"><option value="ALL" ${selected==='ALL'?'selected':''}>ALL ASSETS</option>${BT_ASSETS.map(s=>`<option ${selected===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="bt-control"><label>TESTZEITRAUM</label><select id="bt-days">${[30,90,180,365].map(d=>`<option value="${d}" ${Number(r?.days||30)===d?'selected':''}>${d} TAGE</option>`).join('')}</select></div></div><div class="bt-param-row"><div class="bt-param"><span>TECH / CAND</span><b>68 / 62</b></div><div class="bt-param"><span>ENTRY DIST</span><b>≤0,75 ATR</b></div><div class="bt-param"><span>RISK</span><b>1,00%</b></div></div><button class="bt-run" ${BT_STATE.running?'disabled':''} onclick="runMeridianBacktest()">${BT_STATE.running?'BACKTEST LÄUFT …':'BACKTEST STARTEN'}</button><div class="bt-status ${BT_STATE.error?'err':r?'ok':''}">${btEsc(st)}</div>${r?`<div class="bt-results"><div class="bt-summary">${btStatsCell('P&L',`${r.pnl>=0?'+':''}$${fmt(r.pnl,2)}`,r.pnl>=0?'green':'red')}${btStatsCell(r.mode==='BATCH'?'AVG PROFIT FACTOR':'PROFIT FACTOR',fmt(r.mode==='BATCH'?r.avgPF:r.pf,2),(r.mode==='BATCH'?r.avgPF:r.pf)>=1?'green':'red')}${btStatsCell(r.mode==='BATCH'?'WORST DD':'MAX DD',`${fmt(r.maxDD,2)}%`,r.maxDD>8?'red':r.maxDD>4?'amber':'green')}${btStatsCell('TRADES / WR',`${r.trades} · ${fmt(r.winRate,0)}%`)}${btStatsCell('EXPECTANCY',`${r.expectancy>=0?'+':''}$${fmt(r.expectancy,2)}`,r.expectancy>=0?'green':'red')}${btStatsCell('LONG / SHORT P&L',`${r.longP>=0?'+':''}$${fmt(r.longP,0)} / ${r.shortP>=0?'+':''}$${fmt(r.shortP,0)}`)}</div>${r.mode==='SINGLE'?btEquitySvg(r.curve):''}${btAssetTable(r)}${btSplitTable(r)}${btSplitRegimeHtml(r)}${btRegimeTable(r)}${btMatrixTable(r)}${btElliottTable(r)}<div class="bt-note">${r.mode==='BATCH'?'ALL ASSETS · unabhängige 10k-Ledger je Asset; P&L ist Summe der Einzel-Replays, kein gemeinsames Portfolio.':' '+r.symbol.replace('USDT','')+' · Single-Asset-Replay.'} ${r.days} Tage · Fees + Slippage berücksichtigt · SL-first bei SL/TP in derselben 15m-Kerze. Train/Valid/OOS sind zeitliche Diagnose-Splits der unveränderten 6.2-Baseline; V3 ergänzt Elliott nur als Shadow-Research; keine automatische Strategie-Promotion.</div></div>`:''}</div>`}
 async function btRunOne(sym,days,index,total){const end=Date.now(),warm=34*86400000,start=end-days*86400000-warm;BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · Daten laden …`;renderOne('daytrade');const k15=await btFetchKlines(sym,'15m',start,end),k1=await btFetchKlines(sym,'1h',start,end),k4=await btFetchKlines(sym,'4h',start,end);BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · Replay …`;renderOne('daytrade');await new Promise(r=>setTimeout(r,20));return btReplay(sym,days,k15,k1,k4,{...BT_CONFIG})}
 async function runMeridianBacktest(){if(BT_STATE.running)return;const sym=document.getElementById('bt-symbol')?.value||'ALL',days=Number(document.getElementById('bt-days')?.value||30),assets=sym==='ALL'?BT_ASSETS:[sym];BT_STATE={running:true,result:null,error:null,progress:'Research Run wird vorbereitet …'};renderOne('daytrade');try{const results=[];for(let i=0;i<assets.length;i++)results.push(await btRunOne(assets[i],days,i+1,assets.length));const result=sym==='ALL'?btAggregate(results,days):btSingleDecorate(results[0]);BT_STATE={running:false,result,error:null,progress:`${sym==='ALL'?'ALL ASSETS':sym.replace('USDT','')} · ${days} Tage abgeschlossen`};btSave()}catch(e){BT_STATE={running:false,result:null,error:String(e?.message||e),progress:''};btSave()}renderOne('daytrade')}
 
@@ -11252,7 +11320,7 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
   #view-daytrade .v649-roadmap>div{padding:8px 2px!important}
 }
 
-/* MERIDIAN v6.67 — Backtest Lab V2 */
+/* MERIDIAN v6.68 — Backtest Lab V3 · Elliott Shadow */
 .bt-v2-title{margin-top:18px;padding-top:14px;border-top:1px solid rgba(31,73,96,.45);font-size:9px;letter-spacing:.16em;color:#9fb2c0;font-weight:800}
 .bt-asset-table,.bt-matrix{margin-top:8px;font-size:9px}.bt-asset-table>div,.bt-matrix>div{display:grid;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(31,73,96,.26)}
 .bt-asset-table>div{grid-template-columns:1.2fr .45fr .55fr .9fr .6fr}.bt-matrix>div{grid-template-columns:1.3fr .4fr .55fr .75fr .8fr}.bt-asset-table .head,.bt-matrix .head{color:#6f8798;font-size:7px;letter-spacing:.12em}
@@ -11261,8 +11329,8 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 @media(max-width:520px){.bt-asset-table>div{grid-template-columns:1fr .35fr .5fr .8fr .5fr}.bt-matrix>div{grid-template-columns:1fr .35fr .5fr .6fr .7fr}.bt-split{grid-template-columns:1fr}.bt-split>div{border-right:0;border-bottom:1px solid rgba(31,73,96,.2)}.bt-split>div:last-child{border-bottom:0}}
 </style>
 <script id="v664-version-lock">
-window.MERIDIAN_UI_VERSION='6.67';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.67 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.67');},250)}catch(e){}
+window.MERIDIAN_UI_VERSION='6.68';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.68 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.68');},250)}catch(e){}
 </script>
 
 </body></html>
