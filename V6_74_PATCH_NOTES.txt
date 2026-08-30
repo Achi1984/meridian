@@ -1,0 +1,7 @@
+MERIDIAN v6.74 FULL
+- Backtest Lab V3.6 Regime Validation Lab
+- W1-W3 development vs W4-W5 held-out OOS diagnostics
+- OOS comparison by regime, LONG/SHORT, asset, Elliott W3/W4/W5, EW70, EW+Q
+- PASS requires >=10 OOS trades, PF >= 1 and positive expectancy; WATCH for small samples
+- Version badge/UI locked to 6.74
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Paperbot unchanged
