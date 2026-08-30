@@ -1,0 +1,12 @@
+MERIDIAN v6.81 — HOTFIX
+
+Fix:
+- Daytrade module crash: "Can't find variable: money"
+- Research Continuous now uses its own globally scoped P&L formatter.
+
+Unchanged:
+- Engine 6.2.0
+- Ruleset 6.2-SIGNAL-V1
+- Paperbot execution
+- Baseline risk gates
+- Research Continuous methodology

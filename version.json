@@ -1,1 +1,1 @@
-{"version":"6.80","ui":"6.80","backtest_lab":"V3.12","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Baseline vs Research Continuous: fresh ledger each 20% calendar window for genuine later-regime observation; execution unchanged"}
+{"version":"6.81","ui":"6.81","backtest_lab":"V3.13","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Fixes Research Continuous formatter scope error; baseline and execution unchanged"}
