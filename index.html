@@ -4200,6 +4200,62 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
 }
 .daytrade-compact .v680-note{font-size:11px;line-height:1.35}
 </style>
+
+<style id="v684-unified-ui">
+:root{--m-line:rgba(42,103,136,.42);--m-line-soft:rgba(42,103,136,.22);--m-panel:rgba(5,18,27,.64);--m-panel2:rgba(7,25,36,.78)}
+/* consistent main cards: one border per section, fewer nested boxes */
+.card{border:1px solid var(--m-line)!important;border-radius:18px!important;background:linear-gradient(180deg,rgba(5,18,27,.72),rgba(2,11,17,.72))!important;box-shadow:none!important}
+.paper-isolation-banner,.v677-gate-lock{border-radius:14px!important}
+.paper-kpis .kpi-card{border:0!important;border-top:1px solid var(--m-line-soft)!important;border-radius:0!important;background:transparent!important}
+.paper-kpis .kpi-card:nth-child(-n+2){border-top:0!important}
+.paper-performance-strip,.paper-stats{border-color:var(--m-line-soft)!important}
+.trade-observe-card,.paper-pos,.paper-scan-row{border-color:var(--m-line-soft)!important;border-radius:12px!important}
+.bt-lab{border:1px solid var(--m-line)!important;border-radius:18px!important;padding:14px!important;background:rgba(2,12,18,.55)!important}
+.bt-v2-title{margin-top:0!important}
+/* remove old floating compact control */
+.daytrade-compact-toggle{display:none!important}
+.daytrade-compact .v680-cont,.daytrade-compact .bt-di,.daytrade-compact .bt-rv-grid,.daytrade-compact .bt-wf,.daytrade-compact .bt-rs,.daytrade-compact .bt-ew{max-height:none!important;overflow:visible!important}
+/* accordion research sections */
+.mer-accordion{border-top:1px solid var(--m-line-soft);margin-top:10px}
+.mer-accordion>summary{list-style:none;cursor:pointer;padding:13px 4px;font-size:10px;font-weight:900;letter-spacing:.12em;color:#a7b8c5;display:flex;align-items:center;justify-content:space-between}
+.mer-accordion>summary::-webkit-details-marker{display:none}
+.mer-accordion>summary:after{content:'+';font-size:17px;color:#38bdf8}
+.mer-accordion[open]>summary:after{content:'−'}
+.mer-accordion-body{padding:0 0 10px}
+.v684-edge{margin-top:12px;border:1px solid rgba(79,127,194,.48);border-radius:14px;overflow:hidden;background:rgba(5,17,29,.58)}
+.v684-edge-head{padding:10px 11px;background:rgba(11,27,51,.72);display:flex;justify-content:space-between;gap:8px}
+.v684-edge-head span,.v684-edge-head small{font-size:7px;color:#8299aa;letter-spacing:.1em}
+.v684-edge-head b{display:block;font-size:10px;margin-top:3px}
+.v684-edge-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--m-line-soft);border-bottom:1px solid var(--m-line-soft)}
+.v684-edge-summary>div{padding:9px;border-right:1px solid var(--m-line-soft)}
+.v684-edge-summary>div:last-child{border-right:0}
+.v684-edge-summary span{font-size:6px;color:#71889a;display:block}.v684-edge-summary b{font-size:10px;display:block;margin-top:2px}
+.v684-edge-table>div{display:grid;grid-template-columns:1.3fr .45fr repeat(5,1fr);gap:6px;padding:7px 9px;border-top:1px solid var(--m-line-soft);align-items:center;font-size:6.5px}
+.v684-edge-table .head{color:#71889a;font-size:5.8px}.v684-edge-table b small{display:block;color:#60798c;font-size:5.5px}
+.v684-edge-note{padding:9px 10px;border-top:1px solid var(--m-line-soft);font-size:7px;line-height:1.5;color:#8096a7}
+@media(max-width:700px){
+ .v684-edge-summary{grid-template-columns:repeat(2,1fr)}
+ .v684-edge-table{overflow-x:auto}
+ .v684-edge-table>div{min-width:720px}
+ .card{border-radius:15px!important}
+}
+</style>
+
+
+<style id="v685-shadow-style">
+.v685-shadow{margin-top:12px;border:1px solid rgba(42,103,136,.42);border-radius:14px;overflow:hidden;background:rgba(4,16,24,.64)}
+.v685-shadow-head{padding:11px;display:flex;justify-content:space-between;gap:10px;background:rgba(7,25,36,.78);align-items:center}
+.v685-shadow-head span{display:block;font-size:7px;color:#7f96a7;letter-spacing:.11em}.v685-shadow-head b{font-size:10px;display:block;margin-top:3px}
+.v685-shadow-head strong{font-size:11px}
+.v685-shadow-grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--m-line-soft);border-bottom:1px solid var(--m-line-soft)}
+.v685-shadow-grid>div{padding:9px;border-right:1px solid var(--m-line-soft)}.v685-shadow-grid>div:last-child{border-right:0}
+.v685-shadow-grid span,.v685-shadow-grid small{font-size:6px;color:#71889a;display:block}.v685-shadow-grid b{font-size:9px;display:block;margin:2px 0}
+.v685-shadow-list>div{display:grid;grid-template-columns:24px 1.3fr .45fr 1.4fr;gap:8px;align-items:center;padding:9px 11px;border-top:1px solid var(--m-line-soft);font-size:7px}
+.v685-shadow-list span small{display:block;color:#667f91;font-size:5.5px}.v685-shadow-list strong{font-size:10px}.v685-shadow-list em{font-style:normal;color:#8ba0af}
+.v685-shadow-note{padding:10px 11px;border-top:1px solid var(--m-line-soft);font-size:7px;line-height:1.5;color:#8096a7}
+@media(max-width:700px){.v685-shadow-grid{grid-template-columns:repeat(2,1fr)}.v685-shadow-list>div{grid-template-columns:22px 1fr .4fr}.v685-shadow-list em{grid-column:2/4}}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -4207,7 +4263,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.83 · LIVE</span>
+        <span class="version" id="versionBadge">v6.85 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -8153,7 +8209,7 @@ function cloudExecutionGateBlock(events,drawdownPct){
   const last=latest?.created_at?cloudAge(latest.created_at):'—';
   return `<div class="v677-gate-lock ${locked?'':'ok'}">
     <div class="v677-gate-head">
-      <span>EXECUTION RISK GATE · v6.83</span>
+      <span>EXECUTION RISK GATE · v6.85</span>
       <b class="${locked?'red':'green'}">${locked?'LOCKED · '+reason:'OPEN'}</b>
     </div>
     <div class="v677-gate-grid">
@@ -8664,7 +8720,7 @@ function btPipelineHtml(r){
   const assets=r?.mode==='BATCH'?(r.assetResults||[]):[r];
   const ds=x=>btDateShort(x);
   return `<div class="v679-pipe">
-    <div class="v679-pipe-title">SIGNAL PIPELINE TIMELINE · 5 EQUAL CALENDAR WINDOWS · V3.15</div>
+    <div class="v679-pipe-title">SIGNAL PIPELINE TIMELINE · 5 EQUAL CALENDAR WINDOWS · V3.17</div>
     <div class="v679-pipe-row head"><span>WINDOW</span><span>BARS</span><span>TECH</span><span>CAND</span><span>DIST</span><span>READY</span><span>RISK BLOCK</span><span>ENTRIES</span></div>
     ${w.map(q=>{
       const blocked=q.blockDD+q.blockDaily+q.blockCooldown;
@@ -8709,29 +8765,42 @@ function btContinuousWindowReplay(asset,result,k15,k1,k4,cfg){
   }
   return windows;
 }
+
+const BT_CONT_WINDOW_CACHE=window.BT_CONT_WINDOW_CACHE||{};
+window.BT_CONT_WINDOW_CACHE=BT_CONT_WINDOW_CACHE;
+
+function btContKey(result,symbol){
+  return `${Number(result?.start)||0}:${Number(result?.end)||0}:${symbol}`;
+}
 function btContinuousBatch(result){
   const assets=result?.mode==='BATCH'?(result.assetResults||[]):[result];
-  const out=Array.from({length:5},(_,i)=>({i:i+1,from:null,to:null,trades:0,pnl:0,grossWin:0,grossLoss:0,wins:0,longPnl:0,shortPnl:0,missing:0}));
+  const out=Array.from({length:5},(_,i)=>({i:i+1,from:null,to:null,trades:0,pnl:0,gp:0,gl:0,wins:0,longPnl:0,shortPnl:0,missing:0,tradeList:[]}));
   for(const a of assets){
     const ks=BT_CONT_CACHE[a.symbol]||null;
     if(!ks){for(const z of out)z.missing++;continue}
-    const ww=btContinuousWindowReplay(a.symbol,result,ks.k15,ks.k1,ks.k4,a.config||BT_CONFIG);
+    const key=btContKey(result,a.symbol);
+    const ww=BT_CONT_WINDOW_CACHE[key]||(BT_CONT_WINDOW_CACHE[key]=btContinuousWindowReplay(a.symbol,result,ks.k15,ks.k1,ks.k4,a.config||BT_CONFIG));
     for(const w of ww){
       const z=out[w.i-1];
-      z.from=z.from==null?w.from:Math.min(z.from,w.from);
-      z.to=z.to==null?w.to:Math.max(z.to,w.to);
-      z.trades+=w.trades||0;z.pnl+=w.pnl||0;z.grossWin+=w.grossWin||0;z.grossLoss+=w.grossLoss||0;z.wins+=w.wins||0;
-      z.longPnl+=w.longPnl||0;z.shortPnl+=w.shortPnl||0;
+      z.from=z.from==null?w.from:Math.min(z.from,w.from); z.to=z.to==null?w.to:Math.max(z.to,w.to);
+      const tl=w.tradeList||[];
+      z.tradeList.push(...tl);
+      z.trades+=tl.length;
+      z.pnl+=tl.reduce((s,t)=>s+Number(t.realized||0),0);
+      z.gp+=tl.filter(t=>Number(t.realized)>0).reduce((s,t)=>s+Number(t.realized||0),0);
+      z.gl+=Math.abs(tl.filter(t=>Number(t.realized)<=0).reduce((s,t)=>s+Number(t.realized||0),0));
+      z.wins+=tl.filter(t=>Number(t.realized)>0).length;
+      z.longPnl+=tl.filter(t=>t.side==='LONG').reduce((s,t)=>s+Number(t.realized||0),0);
+      z.shortPnl+=tl.filter(t=>t.side==='SHORT').reduce((s,t)=>s+Number(t.realized||0),0);
     }
   }
-  // Always use verified backtest range for labels, even if cache is missing.
   const rs=Number(result?.start),re=Number(result?.end);
   if(Number.isFinite(rs)&&Number.isFinite(re)&&re>rs){
     const span=(re-rs)/5;
     for(let i=0;i<5;i++){out[i].from=rs+i*span;out[i].to=i===4?re:rs+(i+1)*span}
   }
   for(const z of out){
-    z.pf=z.grossLoss>0?z.grossWin/z.grossLoss:(z.grossWin>0?99:0);
+    z.pf=z.gl>0?z.gp/z.gl:(z.gp>0?99:0);
     z.wr=z.trades?z.wins/z.trades*100:0;
     z.exp=z.trades?z.pnl/z.trades:0;
   }
@@ -8744,11 +8813,11 @@ function v682Money(n){
 function btContinuousHtml(r){
   const w=btContinuousBatch(r);
   const missing=Math.max(...w.map(x=>x.missing||0),0);
-  const total=w.reduce((s,x)=>({trades:s.trades+x.trades,pnl:s.pnl+x.pnl,grossWin:s.grossWin+x.grossWin,grossLoss:s.grossLoss+x.grossLoss,longPnl:s.longPnl+x.longPnl,shortPnl:s.shortPnl+x.shortPnl}),{trades:0,pnl:0,grossWin:0,grossLoss:0,longPnl:0,shortPnl:0});
-  const pf=total.grossLoss>0?total.grossWin/total.grossLoss:(total.grossWin>0?99:0),exp=total.trades?total.pnl/total.trades:0;
+  const total=w.reduce((s,x)=>({trades:s.trades+x.trades,pnl:s.pnl+x.pnl,gp:s.gp+x.gp,gl:s.gl+x.gl,longPnl:s.longPnl+x.longPnl,shortPnl:s.shortPnl+x.shortPnl}),{trades:0,pnl:0,gp:0,gl:0,longPnl:0,shortPnl:0});
+  const pf=total.gl>0?total.gp/total.gl:(total.gp>0?99:0),exp=total.trades?total.pnl/total.trades:0;
   return `<div class="v680-cont">
-    <div class="v680-cont-title">RESEARCH CONTINUOUS · FRESH LEDGER EACH 20% CALENDAR WINDOW · V3.15</div>
-    ${missing?`<div class="v680-note"><strong>RESEARCH CACHE MISSING FOR ${missing} ASSET(S).</strong> Start this 90-day run once in v6.83 so the in-memory historical candle cache is populated.</div>`:''}
+    <div class="v680-cont-title">RESEARCH CONTINUOUS · FRESH LEDGER EACH 20% CALENDAR WINDOW · V3.17</div>
+    ${missing?`<div class="v680-note"><strong>RESEARCH CACHE MISSING FOR ${missing} ASSET(S).</strong> Start this 90-day run once in v6.85 so the in-memory historical candle cache is populated.</div>`:''}
     <div class="v680-cont-grid head"><span>WINDOW</span><span>TRADES</span><span>PF</span><span>EXP</span><span>P&L</span><span>LONG</span><span>SHORT</span></div>
     ${w.map(x=>`<div class="v680-cont-grid">
       <b>W${x.i}<br><small>${btDateShort(x.from)}→${btDateShort(x.to)}</small></b>
@@ -8766,6 +8835,82 @@ function btContinuousHtml(r){
       <div><span>CONT P&L</span><b class="${total.pnl>=0?'v680-good':'v680-bad'}">${v682Money(total.pnl)}</b></div>
     </div>
     <div class="v680-note"><strong>BASELINE and RESEARCH CONTINUOUS are intentionally different experiments.</strong> Calendar windows are anchored to the verified requested backtest range (${btDateShort(r?.start)}→${btDateShort(r?.end)}), not the device clock. Each window receives a fresh independent research ledger. Baseline 6.2 and Paperbot execution remain unchanged.</div>
+  </div>`;
+}
+
+
+
+function v684SegStats(trades){
+  const s=btTradeStats(trades||[],10000);
+  return {trades:s.trades,pf:s.pf,exp:s.expectancy,pnl:s.pnl};
+}
+function v685Stability(windowStats){
+  const adequate=windowStats.filter(x=>x.trades>=8).length;
+  const positive=windowStats.filter(x=>x.trades>=8&&x.exp>0&&x.pf>=1).length;
+  const severe=windowStats.filter(x=>x.trades>=8&&(x.pf<0.75||x.exp<-20)).length;
+  const score=Math.max(0,Math.min(100,Math.round(100*(0.55*positive/5+0.25*adequate/5+0.20*(1-severe/5)))));
+  return {score,positive,adequate,severe};
+}
+function v684QualityBand(t){
+  const c=Number(t.candidate||0);
+  return c>=80?'C80+':c>=70?'C70-79':'C62-69';
+}
+function v685EdgeRows(r){
+  const windows=btContinuousBatch(r);
+  const all=windows.flatMap(w=>w.tradeList||[]);
+  const definitions=[];
+  for(const regime of ['BULL','BEAR','RANGE','TRANSITION'])
+    for(const side of ['LONG','SHORT'])
+      definitions.push({type:'REGIME×DIR',name:`${regime} · ${side}`,fn:t=>t.regime===regime&&t.side===side});
+  for(const side of ['LONG','SHORT']) for(const q of ['C62-69','C70-79','C80+'])
+    definitions.push({type:'QUALITY×DIR',name:`${q} · ${side}`,fn:t=>v684QualityBand(t)===q&&t.side===side});
+  const assetNames=[...new Set(all.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];
+  for(const asset of assetNames) definitions.push({type:'ASSET',name:asset,fn:t=>String(t.symbol||'').replace('USDT','')===asset});
+  return definitions.map(d=>{
+    const ws=windows.map(w=>v684SegStats((w.tradeList||[]).filter(d.fn)));
+    const st=v685Stability(ws),total=v684SegStats(all.filter(d.fn));
+    return {...d,ws,...st,total};
+  }).filter(x=>x.total.trades>=10).sort((x,y)=>y.score-x.score||y.total.pf-x.total.pf||y.total.exp-x.total.exp);
+}
+function btEdgeMapHtml(r){
+  const windows=btContinuousBatch(r);
+  if(!windows.some(w=>w.trades))return '';
+  const ranked=v685EdgeRows(r),stable=ranked.filter(x=>x.adequate>=3).slice(0,12);
+  const cls=s=>s>=70?'green':s>=45?'amber':'red';
+  const winCell=x=>`${x.trades?`${x.trades} · ${fmt(x.pf,2)} · ${x.exp>=0?'+':''}$${fmt(x.exp,0)}`:'—'}`;
+  return `<div class="v684-edge">
+    <div class="v684-edge-head"><div><span>EDGE MAP LAB · V3.17</span><b>STABILITY ACROSS REAL CALENDAR WINDOWS</b></div><small>RESEARCH ONLY · NO PROMOTION</small></div>
+    <div class="v684-edge-summary">
+      <div><span>SEGMENTS TESTED</span><b>${ranked.length}</b></div>
+      <div><span>ROBUST ≥70</span><b class="${ranked.filter(x=>x.score>=70).length?'green':'amber'}">${ranked.filter(x=>x.score>=70).length}</b></div>
+      <div><span>BEST SCORE</span><b class="${cls(ranked[0]?.score||0)}">${ranked[0]?.score||0}/100</b></div>
+      <div><span>RULE</span><b>SHADOW FIRST</b></div>
+    </div>
+    <div class="v684-edge-table">
+      <div class="head"><span>SEGMENT</span><span>STAB</span><span>W1</span><span>W2</span><span>W3</span><span>W4</span><span>W5</span></div>
+      ${(stable.length?stable:ranked.slice(0,10)).map(x=>`<div><b><small>${x.type}</small>${x.name}</b><span class="${cls(x.score)}">${x.score}</span>${x.ws.map(w=>`<span class="${w.trades>=8?(w.exp>0&&w.pf>=1?'green':'red'):'muted'}">${winCell(w)}</span>`).join('')}</div>`).join('')}
+    </div>
+    <div class="v684-edge-note">Stability rewards repeated positive PF/expectancy across W1–W5 and penalizes thin or severe-loss windows. Candidate quality bands use the existing candidate score. No hard gate is added to 6.2.</div>
+  </div>`;
+}
+function btShadow63Html(r){
+  const rows=v685EdgeRows(r);
+  if(!rows.length)return '';
+  const eligible=rows.filter(x=>x.adequate>=3 && x.positive>=3 && x.score>=55 && x.total.pf>=1.05 && x.total.exp>0);
+  const leaders=(eligible.length?eligible:rows.filter(x=>x.adequate>=3).slice(0,3)).slice(0,3);
+  const ready=eligible.length>0;
+  return `<div class="v685-shadow">
+    <div class="v685-shadow-head"><div><span>SHADOW 6.3A · READINESS</span><b>${ready?'CANDIDATE READY FOR PARALLEL PAPER OBSERVATION':'HOLD · MORE STABILITY NEEDED'}</b></div><strong class="${ready?'green':'amber'}">${ready?'READY':'HOLD'}</strong></div>
+    <div class="v685-shadow-grid">
+      <div><span>BASELINE</span><b>6.2 UNCHANGED</b><small>reference ledger</small></div>
+      <div><span>SHADOW MODE</span><b>SOFT SCORE ONLY</b><small>no extra hard entry gate</small></div>
+      <div><span>PROMOTION</span><b>MANUAL</b><small>never automatic</small></div>
+      <div><span>LIVE ORDERS</span><b>OFF</b><small>paper research only</small></div>
+    </div>
+    <div class="v685-shadow-list">
+      ${(leaders.length?leaders:[{type:'—',name:'NO STABLE SEGMENT',score:0,total:{trades:0,pf:0,exp:0}}]).map((x,i)=>`<div><b>${i+1}</b><span><small>${x.type}</small>${x.name}</span><strong>${x.score}/100</strong><em>${x.total.trades} TR · PF ${fmt(x.total.pf,2)} · EXP ${x.total.exp>=0?'+':''}$${fmt(x.total.exp,0)}</em></div>`).join('')}
+    </div>
+    <div class="v685-shadow-note">6.3A is a prepared shadow specification, not a promoted ruleset: qualifying Edge-Map segments would add confidence weight only. The frozen 6.2 signal/risk gates remain the execution reference until enough forward shadow evidence exists.</div>
   </div>`;
 }
 
@@ -11775,7 +11920,7 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 .bt-ewdiag{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.25);margin:8px 0 10px}.bt-ewdiag>div{padding:10px 8px;border-right:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.18)}.bt-ewdiag>div:nth-child(2n){border-right:0}.bt-ewdiag span,.bt-ewdiag small{display:block;color:#7891a2;font-size:7px;letter-spacing:.07em}.bt-ewdiag b{display:block;font-size:12px;margin:4px 0}.bt-ewphase{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.bt-ewphase span{border:1px solid rgba(31,73,96,.28);padding:6px 8px;font-size:7px;color:#7891a2}.bt-ewphase b{color:#e7edf2;margin-left:6px}.bt-empty-row{grid-column:1/-1;display:flex!important;justify-content:space-between!important;padding:10px 4px!important}.bt-empty-row span{color:#7891a2!important}
 </style>
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
 </script>
 
 
@@ -11801,7 +11946,7 @@ window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),bes
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
 })();
 </script>
 
@@ -11836,13 +11981,13 @@ window.btRegimeShiftTable=function(r){const xs=rsBuild(r?.tradeList||[]);if(xs.l
 const old672=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old672();h=h.replace('V3.3</span>','V3.5</span>').replace('V3.4</span>','V3.5</span>').replace('6.2 + WALK-FORWARD RESEARCH','6.2 + REGIME SHIFT RESEARCH').replace('V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research','V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeShiftTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',btRegimeShiftTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
 })();
 </script>
 
 <script id="v673-final-version-lock">
 (function(){
- const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
+ const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
  apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1100);setTimeout(apply,2500);
 })();
 </script>
@@ -11862,11 +12007,11 @@ function rvTable(title,rows){return `<div class="bt-rv-sub">${title}</div><div c
 window.btRegimeValidationTable=function(r){const xs=rvSorted(r?.tradeList||[]);if(xs.length<25)return'';const ws=rvWindows(xs,5);if(ws.length<5)return'';const train=btTradeStats(ws.slice(0,3).flat()),oos=btTradeStats(ws.slice(3).flat());const regimes=rvRows(ws,['BULL','BEAR','RANGE','TRANSITION'].map(k=>[k,t=>t.regime===k]));const dirs=rvRows(ws,[['LONG',t=>t.side==='LONG'],['SHORT',t=>t.side==='SHORT']]);const ews=rvRows(ws,[['EW W3',t=>t.ewAlign&&t.ewPhase==='W3'],['EW W4',t=>t.ewAlign&&t.ewPhase==='W4'],['EW W5',t=>t.ewAlign&&t.ewPhase==='W5'],['EW70',t=>t.ewAlign&&Number(t.ewConfidence)>=70],['EW+Q',t=>t.ewAlign&&Number(t.ewConfidence)>=60&&Number(t.technical)>=72&&Number(t.candidate)>=66]]);const syms=[...new Set(xs.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];const assets=rvRows(ws,syms.map(k=>[k,t=>String(t.symbol||'').replace('USDT','')===k])).sort((a,b)=>b.oos.trades-a.oos.trades);const pass=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='PASS').length;const fail=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='FAIL').length;return `<div class="bt-v2-title">REGIME VALIDATION LAB · W1–W3 → W4–W5 OOS</div><div class="bt-rv-summary"><div><span>TRAIN</span><b class="${train.pf>=1?'green':'red'}">PF ${fmt(train.pf,2)} · EXP ${train.expectancy>=0?'+':''}$${fmt(train.expectancy,0)}</b><small>W1–W3 · ${train.trades} trades</small></div><div><span>OOS</span><b class="${oos.pf>=1?'green':'red'}">PF ${fmt(oos.pf,2)} · EXP ${oos.expectancy>=0?'+':''}$${fmt(oos.expectancy,0)}</b><small>W4–W5 · ${oos.trades} trades</small></div><div><span>SEGMENT CHECK</span><b>${pass} PASS · ${fail} FAIL</b><small>PASS requires ≥10 OOS trades, PF≥1, EXP&gt;0</small></div></div>${rvTable('REGIME',regimes)}${rvTable('DIRECTION',dirs)}${rvTable('ELLIOTT / QUALITY',ews)}${rvTable('ASSET',assets)}<div class="bt-note">VALIDATION RULE: W1–W3 are the development sample; W4–W5 are held-out OOS diagnostics. No parameter is promoted from this table. WATCH means the OOS sample has fewer than 10 trades. PASS/FAIL is descriptive only and does not alter Engine 6.2.0 or the Paperbot.</div>`}
 const old674=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old674();h=h.replace('V3.5</span>','V3.6</span>').replace('6.2 + REGIME SHIFT RESEARCH','6.2 + REGIME VALIDATION RESEARCH').replace('V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research','V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeValidationTable(BT_STATE.result)+h.slice(pos);else h+=btRegimeValidationTable(BT_STATE.result)}return h};
-const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply674();document.addEventListener('DOMContentLoaded',apply674,{once:true});setTimeout(apply674,350);setTimeout(apply674,1200);setTimeout(apply674,2600);
 })();
 </script>
-<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
+<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
 
 
 <style id="v675-data-integrity-style">
@@ -11928,11 +12073,11 @@ const oldBlock675=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock675();h=h.replace('V3.6</span>','V3.7</span>').replace('6.2 + REGIME VALIDATION RESEARCH','6.2 + DATA INTEGRITY VALIDATION').replace('V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research','V3.7 verifies full historical coverage and uses equal calendar-time Walk-Forward/OOS windows; all research-only');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+v675IntegrityHtml(BT_STATE.result)+h.slice(pos);else h+=v675IntegrityHtml(BT_STATE.result)}return h};
 // Old saved research results do not contain integrity proof: remove them once on v6.75.
 try{if(BT_STATE?.result&&!BT_STATE.result.dataIntegrity){BT_STATE={schema:70,running:false,result:null,error:null,progress:'v6.75: alter Backtest ohne Coverage-Nachweis verworfen · bitte neu starten.'};btSave();btClearCheckpoint()}}catch(e){}
-const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});setTimeout(apply675,400);setTimeout(apply675,1800);setTimeout(apply675,4200);
 })();
 </script>
-<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.83 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
+<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.85 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 
 <script>
@@ -11950,6 +12095,54 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
   setTimeout(installCompact,300);
 })();
 </script>
+
+<script id="v684-accordionizer">
+(function(){
+  function accordionize(){
+    document.querySelectorAll('.bt-results').forEach(root=>{
+      if(root.dataset.v684==='1')return;
+      root.dataset.v684='1';
+      const titles=[...root.querySelectorAll(':scope > .bt-v2-title')];
+      titles.forEach((title,idx)=>{
+        if(!title.parentNode || title.closest('details'))return;
+        const details=document.createElement('details');
+        details.className='mer-accordion';
+        const text=(title.textContent||'RESEARCH').trim();
+        details.open=/TRAIN|ASSET MATRIX/.test(text);
+        const summary=document.createElement('summary');summary.textContent=text;
+        const body=document.createElement('div');body.className='mer-accordion-body';
+        root.insertBefore(details,title);details.appendChild(summary);details.appendChild(body);
+        let n=title; 
+        while(n){
+          const next=n.nextSibling;
+          if(n!==title && n.nodeType===1 && n.classList?.contains('bt-v2-title'))break;
+          body.appendChild(n);
+          n=next;
+        }
+        title.style.display='none';
+      });
+      const specials=[
+        ['.v678-gate-timeline','GATE STATE TIMELINE',false],
+        ['.v679-pipe','SIGNAL PIPELINE',false],
+        ['.v680-cont','RESEARCH CONTINUOUS',true],
+        ['.v684-edge','EDGE MAP LAB',true],
+        ['.v685-shadow','SHADOW 6.3A',true]
+      ];
+      specials.forEach(([sel,label,open])=>{
+        const node=root.querySelector(`:scope > ${sel}`);
+        if(!node||node.closest('details'))return;
+        const d=document.createElement('details');d.className='mer-accordion';d.open=open;
+        const s=document.createElement('summary');s.textContent=label;
+        const b=document.createElement('div');b.className='mer-accordion-body';
+        root.insertBefore(d,node);d.append(s,b);b.appendChild(node);
+      });
+    });
+  }
+  new MutationObserver(()=>setTimeout(accordionize,20)).observe(document.body,{childList:true,subtree:true});
+  setTimeout(accordionize,200);
+})();
+</script>
+
 </body></html>
 
 <style id="v676-replay-integrity-style">
@@ -12008,7 +12201,7 @@ function btGateStateTimelineHtml(r){
   const data=rows.map(x=>({symbol:x.symbol,...btGateStateTimeline(x)}));
   const f=(o,k)=>o?dshort(o.at):'—';
   return `<div class="v678-gate-timeline">
-    <div class="title">GATE STATE TIMELINE · DAILY RESET VALIDATION · V3.15</div>
+    <div class="title">GATE STATE TIMELINE · DAILY RESET VALIDATION · V3.17</div>
     <div class="v678-gate-row head"><span>ASSET</span><span>FIRST DAY LOCK</span><span>UTC RESET / UNLOCK</span><span>TRADE AFTER RESET</span><span>FINAL STATE</span></div>
     ${data.map(x=>{
       const final=x.maxLock?'PERMANENT DD LOCK':(x.firstDayLock?(x.firstUnlock?'RESET OBSERVED':'NO RESET OBSERVED'):'NO DAY LOCK');
@@ -12051,7 +12244,7 @@ function btRiskGateHtml(r){
       <span class="${x.dailyLock?'amber':'green'}">${x.dailyLock?dshort(x.dailyLock.at)+' · '+fmt(x.dailyLock.dl,1)+'%':'NOT HIT'}</span>
       <b class="${x.maxLock?'red':x.dailyLock?'amber':'green'}">${x.maxLock?'PERMANENT DD LOCK':x.dailyLock?'DAY LOCK':'OPEN'}</b>
     </div>`).join('')}</div>
-    <div class="bt-note">V3.15 derives the first causal risk-gate breach from the historical equity path. MAX_DRAWDOWN is persistent because peak equity is not reset; DAILY_LOSS resets with the next UTC day. No replay thresholds or execution rules are changed.</div>`;
+    <div class="bt-note">V3.17 derives the first causal risk-gate breach from the historical equity path. MAX_DRAWDOWN is persistent because peak equity is not reset; DAILY_LOSS resets with the next UTC day. No replay thresholds or execution rules are changed.</div>`;
 }
 
 function replayDiagOne(r){
@@ -12065,9 +12258,9 @@ function replayDiagOne(r){
  return{symbol:r?.symbol,st,en,trades:xs.length,outside,first,last,activeDays,tailDays,halted,validTime:outside.length===0};
 }
 function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(replayDiagOne):[replayDiagOne(r)];return{items,validTime:items.every(x=>x.validTime),halted:items.filter(x=>x.halted).length};}
-function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.15 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
+function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.17 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
 const oldBlock=window.backtestLabBlock||backtestLabBlock;
-window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.15</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
+window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.17</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result)+btEdgeMapHtml(BT_STATE.result)+btShadow63Html(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
 window.MERIDIAN_UI_VERSION='6.76';
 const apply=()=>{window.MERIDIAN_UI_VERSION='6.76';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.76 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.76')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();

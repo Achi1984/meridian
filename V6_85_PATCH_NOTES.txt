@@ -1,0 +1,7 @@
+MERIDIAN v6.85
+- Adds SHADOW 6.3A readiness card.
+- Candidate selection is based on Edge Map stability across W1-W5.
+- Shadow specification uses soft confidence weighting only; no new hard entry gate.
+- Baseline Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 remains unchanged.
+- No live orders, no automatic promotion.
+- Keeps unified accordion dashboard from v6.84.
