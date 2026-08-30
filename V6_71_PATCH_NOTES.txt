@@ -1,0 +1,8 @@
+MERIDIAN v6.71 — Backtest Lab V3.3
+- 5 chronological walk-forward windows (20% each)
+- Stability Score across BASE, Q72/66, Q75/70, EW60, EW70, EW+Q, W3, W4, W5
+- Per-window trades, PF and expectancy
+- Research-only; no strategy promotion
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 unchanged
+- Paperbot execution/risk unchanged
+- v6.70 resumable multi-asset checkpoints retained

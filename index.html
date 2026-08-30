@@ -11392,4 +11392,31 @@ window.MERIDIAN_UI_VERSION='6.70';
 try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.70 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.70');},250)}catch(e){}
 </script>
 
+
+<style id="v671-walkforward-style">
+.bt-wf-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.25);margin:8px 0 12px}.bt-wf-summary>div{padding:9px 7px;border-right:1px solid rgba(31,73,96,.22)}.bt-wf-summary>div:last-child{border-right:0}.bt-wf-summary span,.bt-wf-summary small{display:block;color:#7891a2;font-size:7px}.bt-wf-summary b{display:block;font-size:12px;margin:4px 0}.bt-wf{font-size:8px}.bt-wf>div{display:grid;grid-template-columns:1.15fr .42fr .48fr .55fr .58fr;gap:7px;padding:8px 2px;border-bottom:1px solid rgba(31,73,96,.24);align-items:center}.bt-wf .head{color:#6f8798;font-size:7px;letter-spacing:.09em}.bt-windows{margin-top:10px}.bt-window{padding:8px 2px;border-bottom:1px solid rgba(31,73,96,.2)}.bt-window>b{display:block;font-size:8px;margin-bottom:5px}.bt-window span{display:flex;justify-content:space-between;gap:8px;color:#7891a2;font-size:7px;padding:2px 0}.bt-window em{font-style:normal}.score-hi{color:#22d998}.score-mid{color:#e8b84d}.score-low{color:#ff5964}@media(max-width:520px){.bt-wf-summary{grid-template-columns:1fr}.bt-wf-summary>div{border-right:0;border-bottom:1px solid rgba(31,73,96,.18)}.bt-wf-summary>div:last-child{border-bottom:0}.bt-wf>div{grid-template-columns:1fr .36fr .42fr .5fr .5fr}}
+</style>
+<script id="v671-walkforward">
+(function(){
+const V671_VARIANTS=[
+ ['BASE',t=>true],
+ ['Q72/66',t=>t.technical>=72&&t.candidate>=66&&t.distanceAtr<=.75],
+ ['Q75/70',t=>t.technical>=75&&t.candidate>=70&&t.distanceAtr<=.75],
+ ['EW60',t=>t.ewAlign&&t.ewConfidence>=60],
+ ['EW70',t=>t.ewAlign&&t.ewConfidence>=70],
+ ['EW+Q',t=>t.ewAlign&&t.ewConfidence>=60&&t.technical>=72&&t.candidate>=66],
+ ['W3',t=>t.ewAlign&&t.ewPhase==='W3'],
+ ['W4',t=>t.ewAlign&&t.ewPhase==='W4'],
+ ['W5',t=>t.ewAlign&&t.ewPhase==='W5']
+];
+function v671Windows(trades,n=5){const xs=(trades||[]).filter(t=>Number.isFinite(Number(t.closedAt))).slice().sort((a,b)=>Number(a.closedAt)-Number(b.closedAt));if(!xs.length)return[];const out=[];for(let i=0;i<n;i++){const a=Math.floor(xs.length*i/n),b=Math.floor(xs.length*(i+1)/n),q=xs.slice(a,b);if(q.length)out.push({name:`W${i+1}`,trades:q,from:q[0].closedAt,to:q[q.length-1].closedAt})}return out}
+function v671Research(trades){const windows=v671Windows(trades,5);const variants=V671_VARIANTS.map(([name,fn])=>{const ws=windows.map(w=>({name:w.name,from:w.from,to:w.to,...btTradeStats(w.trades.filter(fn))}));const all=btTradeStats((trades||[]).filter(fn));const pos=ws.filter(x=>x.expectancy>0).length,pf1=ws.filter(x=>x.pf>=1).length,adequate=ws.filter(x=>x.trades>=10).length;const score=Math.round(100*(.50*(pos/Math.max(1,ws.length))+.30*(pf1/Math.max(1,ws.length))+.20*(adequate/Math.max(1,ws.length))));return{name,...all,windows:ws,positive:pos,score}});return{windows,variants}}
+window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),best=z.variants.slice().sort((a,b)=>b.score-a.score||b.expectancy-a.expectancy)[0];if(!z.windows.length)return'';const sc=x=>x>=70?'score-hi':x>=50?'score-mid':'score-low';return `<div class="bt-v2-title">WALK-FORWARD · 5 CHRONO WINDOWS</div><div class="bt-wf-summary"><div><span>BEST STABILITY</span><b class="${sc(best.score)}">${best.name} · ${best.score}/100</b><small>${best.positive}/5 positive windows</small></div><div><span>RULE</span><b>NO PROMOTION</b><small>research-only · OOS discipline</small></div><div><span>WINDOWS</span><b>5 × 20%</b><small>strict chronological trades</small></div></div><div class="bt-wf"><div class="head"><span>VARIANTE</span><span>SCORE</span><span>POS</span><span>PF</span><span>EXP</span></div>${z.variants.map(x=>`<div><b>${x.name}</b><span class="${sc(x.score)}">${x.score}</span><span>${x.positive}/5</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span></div>`).join('')}</div><div class="bt-windows">${z.windows.map((w,i)=>`<div class="bt-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b>${z.variants.map(v=>{const x=v.windows[i];return `<span>${v.name}<em class="${x.expectancy>=0?'green':'red'}">${x.trades} TR · PF ${fmt(x.pf,2)} · EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</em></span>`}).join('')}</div>`).join('')}</div><div class="bt-note">STABILITY SCORE: 50% Anteil positiver Expectancy-Fenster + 30% Anteil PF≥1 + 20% Anteil Fenster mit ≥10 Trades. Der Score dient nur zum Vergleich der Robustheit; er verändert weder 6.2 noch den Paperbot.</div>`}
+const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
+window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
+window.MERIDIAN_UI_VERSION='6.71';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.71 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.71');},300)}catch(e){}
+})();
+</script>
+
 </body></html>

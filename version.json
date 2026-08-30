@@ -1,5 +1,1 @@
-{
-  "version": "6.70",
-  "build": "2026-08-30-resumable-multi-asset-backtest",
-  "notes": "Backtest Lab V3.2 adds resumable multi-asset historical backtests with per-asset checkpoints and a fixed run end timestamp. Elliott diagnostics and chronological 60/20/20 research splits remain active. Paperbot execution and 6.2 rules remain unchanged."
-}
+{"version":"6.71","ui":"6.71","backtestLab":"V3.3","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","paperTrading":true,"liveTrading":false}
