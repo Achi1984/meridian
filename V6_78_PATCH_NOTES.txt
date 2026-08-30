@@ -1,0 +1,24 @@
+MERIDIAN v6.78 — GATE STATE TIMELINE
+
+UI 6.78
+Backtest Lab V3.10
+Engine 6.2.0 unchanged
+Ruleset 6.2-SIGNAL-V1 unchanged
+Paperbot execution unchanged
+
+NEW
+- Corrected visible version labels to v6.78 / UI 6.78.
+- Added GATE STATE TIMELINE to Backtest Lab:
+  * first DAILY_LOSS lock
+  * next UTC reset / unlock
+  * first trade after unlock
+  * permanent MAX_DRAWDOWN state
+- Purpose: verify whether a temporary daily-loss lock actually resets causally in replay.
+- No risk threshold, entry rule, exit rule, sizing rule or live/paper execution behavior is changed.
+
+RUN
+ALL ASSETS -> 90 DAYS
+Then inspect:
+1) GATE STATE TIMELINE
+2) RISK GATE TELEMETRY
+3) WALK-FORWARD / OOS

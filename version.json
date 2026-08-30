@@ -1,1 +1,1 @@
-{"version":"6.77","ui":"6.77","backtest_lab":"V3.9","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Execution Risk Gate diagnostics: live lock banner + causal backtest MAX_DD/DAILY_LOSS telemetry; no execution change"}
+{"version":"6.78","ui":"6.78","backtest_lab":"V3.10","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Gate State Timeline: daily-loss UTC reset/unlock validation + first trade after reset; no execution change"}
