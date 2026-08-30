@@ -1,0 +1,12 @@
+MERIDIAN v6.61 — UI FRAME CLEANUP
+
+- Fewer nested frames in Shadow Ruleset / Evidence / Research / Decision Lab.
+- Compact separator-based metric layout.
+- H6/H7 Decision Journal visually flattened.
+- H1-H5 board simplified.
+- Main section boundaries remain visible.
+- NO execution changes.
+- Engine 6.2.0 unchanged.
+- Ruleset 6.2-SIGNAL-V1 remains frozen.
+- Base Risk 1.00% unchanged.
+- H6/H7 remain Shadow only.

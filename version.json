@@ -1,5 +1,5 @@
 {
-  "version": "6.60",
-  "build": "2026-08-30-decision-journal-sequential-shadow",
-  "notes": "Adds Decision Journal 6.60: sequential evidence-only comparison of 6.2 Base Risk vs H6 Fractional Kelly vs H7 Kelly+Regime, with P&L, PF, max drawdown, end equity and per-trade shadow sizing. Zero execution impact; Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 remain frozen."
+  "version": "6.61",
+  "build": "2026-08-30-ui-frame-cleanup",
+  "notes": "Visual cleanup: removes nested card frames in Shadow/Evidence/Decision Lab and replaces them with subtle separators. No execution, engine, ruleset, risk, Kelly, H6 or H7 logic changes."
 }
