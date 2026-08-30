@@ -1,0 +1,26 @@
+MERIDIAN v6.79 — SIGNAL PIPELINE TIMELINE
+
+UI 6.79
+Backtest Lab V3.11
+Engine 6.2.0 unchanged
+Ruleset 6.2-SIGNAL-V1 unchanged
+Paperbot unchanged
+
+NEW
+- Five equal calendar-window pipeline diagnostics:
+  BARS -> TECH -> CAND -> DIST -> READY -> RISK BLOCK -> ENTRY
+- Risk blocks split into:
+  D = DAILY_LOSS
+  M = MAX_DRAWDOWN
+  C = cooldown
+- READY counts by LONG/SHORT and market regime.
+- Per-asset W1-W5 READY/ENTRY matrix.
+- Candidate evaluation remains causal (closed candles only) and is diagnostic even while execution is risk-locked.
+- Actual entry/risk logic and thresholds are unchanged.
+
+PURPOSE
+Locate exactly where W2-W5 fall to zero despite complete candle coverage.
+
+RUN
+ALL ASSETS -> 90 DAYS
+Send the SIGNAL PIPELINE TIMELINE block.
