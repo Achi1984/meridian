@@ -1,0 +1,12 @@
+MERIDIAN v6.66 — BACKTEST LAB V2
+
+- Adds ALL ASSETS batch research across BTC, ETH, SOL, XRP, SUI, ADA, LINK, AVAX, DOGE and NEAR.
+- Supports 30 / 90 / 180 / 365 day research windows.
+- Uses the same 6.2-SIGNAL-V1 browser-side signal replay with closed 15m/1h/4h candles and no look-ahead.
+- Keeps fees, slippage, 1% risk sizing and conservative SL-first same-candle handling.
+- Adds per-asset matrix for Trades, PF, P&L and Max DD.
+- Adds chronological TRAIN 60% / VALIDATION 20% / OUT-OF-SAMPLE 20% diagnostics.
+- Adds BULL / BEAR / RANGE / TRANSITION outcome breakdown.
+- Adds filter-only research matrix for quality and Entry-ATR hypotheses. This only filters trades already taken by 6.2 and does not reconstruct missed trades.
+- ALL ASSETS uses independent 10k ledgers per asset; aggregate P&L is not presented as a shared portfolio backtest.
+- Research only: Engine 6.2.0, Ruleset 6.2-SIGNAL-V1, Evidence 6.53 and live Paper execution remain unchanged.
