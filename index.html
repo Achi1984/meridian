@@ -12410,3 +12410,126 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
 })();
 </script>
 <script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
+
+
+<style id="v6881-cloud-ui-style">
+/* v6.88.1 stable overlay — presentation only */
+#v688-cloudbt-card{border:1px solid rgba(42,103,136,.5)!important;border-radius:16px!important;overflow:hidden!important;background:rgba(4,16,24,.72)!important}
+#v688-cloudbt-card .v688-cloudbt-h{background:rgba(7,25,36,.82)!important}
+#v688-cloudbt-card.v6881-primary{box-shadow:0 0 0 1px rgba(56,189,248,.08)!important}
+.v6881-jobline{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:9px 11px;border-top:1px solid rgba(42,103,136,.22)}
+.v6881-jobline>div{min-width:0}.v6881-jobline small{display:block;font-size:6px;color:#71889a;letter-spacing:.08em}.v6881-jobline b{display:block;margin-top:3px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v6881-local-wrap{margin-top:10px;border-top:1px solid rgba(42,103,136,.22)}
+.v6881-local-wrap>summary{list-style:none;cursor:pointer;padding:10px 4px;color:#7f96a7;font-size:8px;font-weight:900;letter-spacing:.08em;display:flex;justify-content:space-between;align-items:center}
+.v6881-local-wrap>summary::-webkit-details-marker{display:none}.v6881-local-wrap>summary:after{content:'+';color:#38bdf8;font-size:16px}.v6881-local-wrap[open]>summary:after{content:'−'}
+.v6881-local-note{font-size:7px;line-height:1.45;color:#8aa0af;padding:0 4px 8px}
+.v6881-modebadge{display:inline-flex;align-items:center;padding:4px 7px;border:1px solid rgba(56,189,248,.42);border-radius:999px;font-size:6px;letter-spacing:.08em;color:#7dd3fc;margin-left:7px}
+</style>
+
+
+<script id="v6881-cloud-ui-patch">
+(function(){
+  'use strict';
+  const PATCH='6.88.1';
+  let lastJobId='—';
+
+  function txt(el,s){ if(el) el.textContent=s; }
+
+  function enhanceCloud(){
+    const card=document.getElementById('v688-cloudbt-card');
+    if(!card || card.dataset.v6881==='1') return;
+    card.dataset.v6881='1';
+    card.classList.add('v6881-primary');
+
+    const head=card.querySelector('.v688-cloudbt-h > div');
+    if(head && !head.querySelector('.v6881-modebadge')){
+      const badge=document.createElement('span');
+      badge.className='v6881-modebadge';
+      badge.textContent='PRIMARY';
+      head.appendChild(badge);
+    }
+
+    const body=card.querySelector('.v688-cloudbt-body');
+    if(body){
+      const line=document.createElement('div');
+      line.className='v6881-jobline';
+      line.innerHTML='<div><small>JOB ID</small><b id="v6881-jobid">—</b></div><div><small>EXECUTION</small><b>NORTHFLANK SERVER</b></div>';
+      const actions=body.querySelector('.v688-cloudbt-actions');
+      if(actions) body.insertBefore(line,actions);
+      else body.prepend(line);
+    }
+
+    const start=card.querySelector('#v688-cb-start');
+    if(start) start.textContent='☁ CLOUD 90D STARTEN · IPHONE DARF GESPERRT WERDEN';
+
+    const note=card.querySelector('.v688-cloudbt-note');
+    if(note) note.textContent='Cloud ist der primäre Backtest. Erst nach bestätigter Job-ID läuft der Test unabhängig vom iPhone. Der lokale Browser-Test bleibt nur als Fallback erhalten.';
+  }
+
+  function enhanceLocal(){
+    const buttons=[...document.querySelectorAll('button')];
+    const local=buttons.find(b=>{
+      const t=(b.textContent||'').trim();
+      return /BACKTEST STARTEN/i.test(t) && b.id!=='v688-cb-start';
+    });
+    if(!local || local.dataset.v6881==='1') return;
+    local.dataset.v6881='1';
+    local.textContent='LOKALER BACKTEST STARTEN · IPHONE MUSS AKTIV BLEIBEN';
+
+    const parent=local.parentElement;
+    if(!parent || parent.closest('.v6881-local-wrap')) return;
+
+    const details=document.createElement('details');
+    details.className='v6881-local-wrap';
+    const summary=document.createElement('summary');
+    summary.textContent='LOKALER BACKTEST · FALLBACK';
+    const note=document.createElement('div');
+    note.className='v6881-local-note';
+    note.textContent='Nur verwenden, wenn Cloud nicht verfügbar ist. iOS pausiert diesen Browser-Backtest beim Sperrbildschirm.';
+    parent.parentNode.insertBefore(details,parent);
+    details.append(summary,note,parent);
+  }
+
+  function captureJobId(){
+    // If the cloud backend response is painted anywhere in the card, keep the UI ready
+    // for a job id without changing the existing v6.88 request logic.
+    const card=document.getElementById('v688-cloudbt-card');
+    if(!card) return;
+    const idEl=document.getElementById('v6881-jobid');
+    if(idEl && lastJobId!=='—') txt(idEl,lastJobId);
+  }
+
+  // Safe wrapper around fetch: observe successful POST /api/backtests response only.
+  if(!window.__MERIDIAN_V6881_FETCH_WRAP__){
+    window.__MERIDIAN_V6881_FETCH_WRAP__=true;
+    const nativeFetch=window.fetch.bind(window);
+    window.fetch=async function(input,init){
+      const res=await nativeFetch(input,init);
+      try{
+        const url=typeof input==='string'?input:(input&&input.url)||'';
+        const method=String((init&&init.method)||'GET').toUpperCase();
+        if(method==='POST' && /\/api\/backtests(?:\?|$)/.test(url) && res.ok){
+          const clone=res.clone();
+          const data=await clone.json();
+          const id=data?.id ?? data?.jobId ?? data?.job_id ?? data?.job?.id;
+          if(id!=null){
+            lastJobId=String(id);
+            setTimeout(captureJobId,0);
+          }
+        }
+      }catch(e){}
+      return res;
+    };
+  }
+
+  function install(){
+    enhanceCloud();
+    enhanceLocal();
+    captureJobId();
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));
+  new MutationObserver(()=>setTimeout(install,20)).observe(document.documentElement,{childList:true,subtree:true});
+  setTimeout(install,500);
+})();
+</script>
+
