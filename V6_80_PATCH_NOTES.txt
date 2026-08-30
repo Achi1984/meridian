@@ -1,0 +1,21 @@
+MERIDIAN v6.80 — RESEARCH CONTINUOUS
+
+UI 6.80
+Backtest Lab V3.12
+Engine 6.2.0 unchanged
+Ruleset 6.2-SIGNAL-V1 unchanged
+Paperbot unchanged
+
+NEW
+- Keeps BASELINE exactly frozen with persistent MAX_DRAWDOWN.
+- Adds RESEARCH CONTINUOUS:
+  * 5 equal calendar windows
+  * fresh independent ledger per window
+  * same 6.2 signal/entry/exit/risk settings inside each window
+  * reports Trades, PF, Expectancy, P&L, Long P&L, Short P&L
+- Purpose: observe W2-W5 market regimes that baseline cannot reach after an earlier permanent DD lock.
+- No strategy promotion and no live/paper execution change.
+
+RUN
+ALL ASSETS -> 90 DAYS
+Send the RESEARCH CONTINUOUS block.
