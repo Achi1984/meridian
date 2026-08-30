@@ -1,1 +1,1 @@
-{"version":"6.88","ui":"6.88","backtest_lab":"V3.19","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Persistent Northflank Cloud Backtest Jobs; iPhone-independent; no execution change","dashboard_patch":"6.88.1","cloud_ui":"primary-cloud-with-job-id-and-local-fallback"}
+{"version":"6.89","ui":"6.89","backtest_lab":"V3.20","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","cloud_backtest":"1.1","research":"Cloud-first backtest UI with confirmed job ID; local replay retained as explicit fallback"}

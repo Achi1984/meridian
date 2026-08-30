@@ -4282,7 +4282,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.88 · LIVE</span>
+        <span class="version" id="versionBadge">v6.89 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -8228,7 +8228,7 @@ function cloudExecutionGateBlock(events,drawdownPct){
   const last=latest?.created_at?cloudAge(latest.created_at):'—';
   return `<div class="v677-gate-lock ${locked?'':'ok'}">
     <div class="v677-gate-head">
-      <span>EXECUTION RISK GATE · v6.88</span>
+      <span>EXECUTION RISK GATE · v6.89</span>
       <b class="${locked?'red':'green'}">${locked?'LOCKED · '+reason:'OPEN'}</b>
     </div>
     <div class="v677-gate-grid">
@@ -8943,7 +8943,7 @@ function btMatrixTable(r){return `<div class="bt-v2-title">FILTER-ONLY RESEARCH 
 function btElliottTable(r){const d=r.elliottDiag||btElliottDiagnostics(r.tradeList||[]);const phase=Object.entries(d.phase||{}).sort((a,b)=>b[1]-a[1]);return `<div class="bt-v2-title">ELLIOTT SHADOW LAB · DIAGNOSTICS</div><div class="bt-ewdiag"><div><span>EW COVERAGE</span><b class="${d.coverage>=50?'green':d.coverage>0?'amber':'red'}">${fmt(d.coverage,1)}%</b><small>${d.classified}/${d.total} classified</small></div><div><span>PIVOT READY</span><b>${fmt(d.pivotCoverage,1)}%</b><small>${d.pivotReady}/${d.total} · ≥4 confirmed pivots</small></div><div><span>ALIGNED</span><b>${d.aligned}</b><small>same direction as 6.2</small></div><div><span>CONF ≥60 / ≥70</span><b>${d.conf60} / ${d.conf70}</b><small>eligible shadow samples</small></div></div><div class="bt-ewphase">${phase.map(([k,n])=>`<span>${k}<b>${n}</b></span>`).join('')||'<span>NO EW STATES<b>0</b></span>'}</div><div class="bt-matrix"><div class="head"><span>VARIANTE</span><span>TR</span><span>PF</span><span>EXP</span><span>P&L</span></div>${(r.elliott||[]).map(x=>`<div><b>${x.name}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span></div>`).join('')||'<div class="bt-empty-row"><b>NO FRESH EW RESULT</b><span>Backtest neu starten</span></div>'}</div><div class="bt-regimes">${(r.elliottPhases||[]).map(x=>`<div><span>${x.phase}</span><b class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</b><small>${x.trades} TR · PF ${fmt(x.pf,2)} · WR ${fmt(x.winRate,0)}%</small></div>`).join('')}</div><div class="bt-note">v6.70 zeigt zuerst die Coverage. Ein Elliott-Filter wird erst bewertet, wenn bestätigte 1h-Pivots einem Baseline-Trade ohne Look-ahead zugeordnet werden konnten. 6.2/Paperbot bleiben unverändert.</div>`}
 
 
-function backtestLabBlock(){const r=BT_STATE.result,st=BT_STATE.running?BT_STATE.progress:(BT_STATE.error||'Research-only · historische Binance Spot-Kerzen · kein Einfluss auf Paperbot.');const cp=btLoadCheckpoint();const selected=r?.symbol||cp?.symbol||'ALL',daysSel=Number(r?.days||cp?.days||30),resume=btCheckpointLabel(selected,daysSel);return `<div class="bt-lab"><div class="bt-head"><div><div class="section-title">BACKTEST LAB <span class="tag cyan">V3.2</span></div><h3>6.2 + ELLIOTT DIAGNOSTIC RESEARCH</h3></div><small>NO LOOK-AHEAD<br>RESEARCH ONLY</small></div><div class="bt-controls"><div class="bt-control"><label>ASSET</label><select id="bt-symbol"><option value="ALL" ${selected==='ALL'?'selected':''}>ALL ASSETS</option>${BT_ASSETS.map(s=>`<option ${selected===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="bt-control"><label>TESTZEITRAUM</label><select id="bt-days">${[30,90,180,365].map(d=>`<option value="${d}" ${daysSel===d?'selected':''}>${d} TAGE</option>`).join('')}</select></div></div><div class="bt-param-row"><div class="bt-param"><span>TECH / CAND</span><b>68 / 62</b></div><div class="bt-param"><span>ENTRY DIST</span><b>≤0,75 ATR</b></div><div class="bt-param"><span>RISK</span><b>1,00%</b></div></div><button class="bt-run" ${BT_STATE.running?'disabled':''} onclick="runMeridianBacktest()">${BT_STATE.running?'BACKTEST LÄUFT …':(resume||'BACKTEST STARTEN')}</button>${resume?`<button class="bt-reset" onclick="btDiscardCheckpoint()">CHECKPOINT VERWERFEN</button>`:''}<div class="bt-status ${BT_STATE.error?'err':r?'ok':''}">${btEsc(st)}</div>${r?`<div class="bt-results"><div class="bt-summary">${btStatsCell('P&L',`${r.pnl>=0?'+':''}$${fmt(r.pnl,2)}`,r.pnl>=0?'green':'red')}${btStatsCell(r.mode==='BATCH'?'AVG PROFIT FACTOR':'PROFIT FACTOR',fmt(r.mode==='BATCH'?r.avgPF:r.pf,2),(r.mode==='BATCH'?r.avgPF:r.pf)>=1?'green':'red')}${btStatsCell(r.mode==='BATCH'?'WORST DD':'MAX DD',`${fmt(r.maxDD,2)}%`,r.maxDD>8?'red':r.maxDD>4?'amber':'green')}${btStatsCell('TRADES / WR',`${r.trades} · ${fmt(r.winRate,0)}%`)}${btStatsCell('EXPECTANCY',`${r.expectancy>=0?'+':''}$${fmt(r.expectancy,2)}`,r.expectancy>=0?'green':'red')}${btStatsCell('LONG / SHORT P&L',`${r.longP>=0?'+':''}$${fmt(r.longP,0)} / ${r.shortP>=0?'+':''}$${fmt(r.shortP,0)}`)}</div>${r.mode==='SINGLE'?btEquitySvg(r.curve):''}${btAssetTable(r)}${btSplitTable(r)}${btSplitRegimeHtml(r)}${btRegimeTable(r)}${btMatrixTable(r)}${btElliottTable(r)}<div class="bt-note">${r.mode==='BATCH'?'ALL ASSETS · unabhängige 10k-Ledger je Asset; P&L ist Summe der Einzel-Replays, kein gemeinsames Portfolio.':' '+r.symbol.replace('USDT','')+' · Single-Asset-Replay.'} ${r.days} Tage · Fees + Slippage berücksichtigt · SL-first bei SL/TP in derselben 15m-Kerze. Train/Valid/OOS sind chronologisch nach Trade-Reihenfolge 60/20/20 getrennt; V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead; keine automatische Strategie-Promotion.</div></div>`:''}</div>`}
+function backtestLabBlock(){const r=BT_STATE.result,st=BT_STATE.running?BT_STATE.progress:(BT_STATE.error||'Research-only · historische Binance Spot-Kerzen · kein Einfluss auf Paperbot.');const cp=btLoadCheckpoint();const selected=r?.symbol||cp?.symbol||'ALL',daysSel=Number(r?.days||cp?.days||30),resume=btCheckpointLabel(selected,daysSel);return `<div class="bt-lab"><div class="bt-head"><div><div class="section-title">BACKTEST LAB <span class="tag cyan">V3.2</span></div><h3>6.2 + ELLIOTT DIAGNOSTIC RESEARCH</h3></div><small>NO LOOK-AHEAD<br>RESEARCH ONLY</small></div><div class="bt-controls"><div class="bt-control"><label>ASSET</label><select id="bt-symbol"><option value="ALL" ${selected==='ALL'?'selected':''}>ALL ASSETS</option>${BT_ASSETS.map(s=>`<option ${selected===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="bt-control"><label>TESTZEITRAUM</label><select id="bt-days">${[30,90,180,365].map(d=>`<option value="${d}" ${daysSel===d?'selected':''}>${d} TAGE</option>`).join('')}</select></div></div><div class="bt-param-row"><div class="bt-param"><span>TECH / CAND</span><b>68 / 62</b></div><div class="bt-param"><span>ENTRY DIST</span><b>≤0,75 ATR</b></div><div class="bt-param"><span>RISK</span><b>1,00%</b></div></div><button class="bt-run" ${BT_STATE.running?'disabled':''} onclick="runMeridianBacktest()">${BT_STATE.running?'BACKTEST LÄUFT …':(resume||'LOKALER BACKTEST · IPHONE AKTIV')}</button>${resume?`<button class="bt-reset" onclick="btDiscardCheckpoint()">CHECKPOINT VERWERFEN</button>`:''}<div class="bt-status ${BT_STATE.error?'err':r?'ok':''}">${btEsc(st)}</div>${r?`<div class="bt-results"><div class="bt-summary">${btStatsCell('P&L',`${r.pnl>=0?'+':''}$${fmt(r.pnl,2)}`,r.pnl>=0?'green':'red')}${btStatsCell(r.mode==='BATCH'?'AVG PROFIT FACTOR':'PROFIT FACTOR',fmt(r.mode==='BATCH'?r.avgPF:r.pf,2),(r.mode==='BATCH'?r.avgPF:r.pf)>=1?'green':'red')}${btStatsCell(r.mode==='BATCH'?'WORST DD':'MAX DD',`${fmt(r.maxDD,2)}%`,r.maxDD>8?'red':r.maxDD>4?'amber':'green')}${btStatsCell('TRADES / WR',`${r.trades} · ${fmt(r.winRate,0)}%`)}${btStatsCell('EXPECTANCY',`${r.expectancy>=0?'+':''}$${fmt(r.expectancy,2)}`,r.expectancy>=0?'green':'red')}${btStatsCell('LONG / SHORT P&L',`${r.longP>=0?'+':''}$${fmt(r.longP,0)} / ${r.shortP>=0?'+':''}$${fmt(r.shortP,0)}`)}</div>${r.mode==='SINGLE'?btEquitySvg(r.curve):''}${btAssetTable(r)}${btSplitTable(r)}${btSplitRegimeHtml(r)}${btRegimeTable(r)}${btMatrixTable(r)}${btElliottTable(r)}<div class="bt-note">${r.mode==='BATCH'?'ALL ASSETS · unabhängige 10k-Ledger je Asset; P&L ist Summe der Einzel-Replays, kein gemeinsames Portfolio.':' '+r.symbol.replace('USDT','')+' · Single-Asset-Replay.'} ${r.days} Tage · Fees + Slippage berücksichtigt · SL-first bei SL/TP in derselben 15m-Kerze. Train/Valid/OOS sind chronologisch nach Trade-Reihenfolge 60/20/20 getrennt; V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead; keine automatische Strategie-Promotion.</div></div>`:''}</div>`}
 async function btRunOne(sym,days,index,total,fixedEnd){const end=Number(fixedEnd)||Date.now(),warm=34*86400000,start=end-days*86400000-warm;BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · Daten laden …`;renderOne('daytrade');const k15=await btFetchKlines(sym,'15m',start,end),k1=await btFetchKlines(sym,'1h',start,end),k4=await btFetchKlines(sym,'4h',start,end);BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · Replay …`;renderOne('daytrade');await new Promise(r=>setTimeout(r,20));return btReplay(sym,days,k15,k1,k4,{...BT_CONFIG})}
 async function runMeridianBacktest(){
   if(BT_STATE.running)return;
@@ -11939,7 +11939,7 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 .bt-ewdiag{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.25);margin:8px 0 10px}.bt-ewdiag>div{padding:10px 8px;border-right:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.18)}.bt-ewdiag>div:nth-child(2n){border-right:0}.bt-ewdiag span,.bt-ewdiag small{display:block;color:#7891a2;font-size:7px;letter-spacing:.07em}.bt-ewdiag b{display:block;font-size:12px;margin:4px 0}.bt-ewphase{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.bt-ewphase span{border:1px solid rgba(31,73,96,.28);padding:6px 8px;font-size:7px;color:#7891a2}.bt-ewphase b{color:#e7edf2;margin-left:6px}.bt-empty-row{grid-column:1/-1;display:flex!important;justify-content:space-between!important;padding:10px 4px!important}.bt-empty-row span{color:#7891a2!important}
 </style>
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
 </script>
 
 
@@ -11965,7 +11965,7 @@ window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),bes
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
 })();
 </script>
 
@@ -12000,13 +12000,13 @@ window.btRegimeShiftTable=function(r){const xs=rsBuild(r?.tradeList||[]);if(xs.l
 const old672=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old672();h=h.replace('V3.3</span>','V3.5</span>').replace('V3.4</span>','V3.5</span>').replace('6.2 + WALK-FORWARD RESEARCH','6.2 + REGIME SHIFT RESEARCH').replace('V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research','V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeShiftTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',btRegimeShiftTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
 })();
 </script>
 
 <script id="v673-final-version-lock">
 (function(){
- const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
+ const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
  apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1100);setTimeout(apply,2500);
 })();
 </script>
@@ -12026,11 +12026,11 @@ function rvTable(title,rows){return `<div class="bt-rv-sub">${title}</div><div c
 window.btRegimeValidationTable=function(r){const xs=rvSorted(r?.tradeList||[]);if(xs.length<25)return'';const ws=rvWindows(xs,5);if(ws.length<5)return'';const train=btTradeStats(ws.slice(0,3).flat()),oos=btTradeStats(ws.slice(3).flat());const regimes=rvRows(ws,['BULL','BEAR','RANGE','TRANSITION'].map(k=>[k,t=>t.regime===k]));const dirs=rvRows(ws,[['LONG',t=>t.side==='LONG'],['SHORT',t=>t.side==='SHORT']]);const ews=rvRows(ws,[['EW W3',t=>t.ewAlign&&t.ewPhase==='W3'],['EW W4',t=>t.ewAlign&&t.ewPhase==='W4'],['EW W5',t=>t.ewAlign&&t.ewPhase==='W5'],['EW70',t=>t.ewAlign&&Number(t.ewConfidence)>=70],['EW+Q',t=>t.ewAlign&&Number(t.ewConfidence)>=60&&Number(t.technical)>=72&&Number(t.candidate)>=66]]);const syms=[...new Set(xs.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];const assets=rvRows(ws,syms.map(k=>[k,t=>String(t.symbol||'').replace('USDT','')===k])).sort((a,b)=>b.oos.trades-a.oos.trades);const pass=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='PASS').length;const fail=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='FAIL').length;return `<div class="bt-v2-title">REGIME VALIDATION LAB · W1–W3 → W4–W5 OOS</div><div class="bt-rv-summary"><div><span>TRAIN</span><b class="${train.pf>=1?'green':'red'}">PF ${fmt(train.pf,2)} · EXP ${train.expectancy>=0?'+':''}$${fmt(train.expectancy,0)}</b><small>W1–W3 · ${train.trades} trades</small></div><div><span>OOS</span><b class="${oos.pf>=1?'green':'red'}">PF ${fmt(oos.pf,2)} · EXP ${oos.expectancy>=0?'+':''}$${fmt(oos.expectancy,0)}</b><small>W4–W5 · ${oos.trades} trades</small></div><div><span>SEGMENT CHECK</span><b>${pass} PASS · ${fail} FAIL</b><small>PASS requires ≥10 OOS trades, PF≥1, EXP&gt;0</small></div></div>${rvTable('REGIME',regimes)}${rvTable('DIRECTION',dirs)}${rvTable('ELLIOTT / QUALITY',ews)}${rvTable('ASSET',assets)}<div class="bt-note">VALIDATION RULE: W1–W3 are the development sample; W4–W5 are held-out OOS diagnostics. No parameter is promoted from this table. WATCH means the OOS sample has fewer than 10 trades. PASS/FAIL is descriptive only and does not alter Engine 6.2.0 or the Paperbot.</div>`}
 const old674=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old674();h=h.replace('V3.5</span>','V3.6</span>').replace('6.2 + REGIME SHIFT RESEARCH','6.2 + REGIME VALIDATION RESEARCH').replace('V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research','V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeValidationTable(BT_STATE.result)+h.slice(pos);else h+=btRegimeValidationTable(BT_STATE.result)}return h};
-const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply674();document.addEventListener('DOMContentLoaded',apply674,{once:true});setTimeout(apply674,350);setTimeout(apply674,1200);setTimeout(apply674,2600);
 })();
 </script>
-<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
+<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
 
 
 <style id="v675-data-integrity-style">
@@ -12092,11 +12092,11 @@ const oldBlock675=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock675();h=h.replace('V3.6</span>','V3.7</span>').replace('6.2 + REGIME VALIDATION RESEARCH','6.2 + DATA INTEGRITY VALIDATION').replace('V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research','V3.7 verifies full historical coverage and uses equal calendar-time Walk-Forward/OOS windows; all research-only');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+v675IntegrityHtml(BT_STATE.result)+h.slice(pos);else h+=v675IntegrityHtml(BT_STATE.result)}return h};
 // Old saved research results do not contain integrity proof: remove them once on v6.75.
 try{if(BT_STATE?.result&&!BT_STATE.result.dataIntegrity){BT_STATE={schema:70,running:false,result:null,error:null,progress:'v6.75: alter Backtest ohne Coverage-Nachweis verworfen · bitte neu starten.'};btSave();btClearCheckpoint()}}catch(e){}
-const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});setTimeout(apply675,400);setTimeout(apply675,1800);setTimeout(apply675,4200);
 })();
 </script>
-<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
+<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 
 <script>
@@ -12172,9 +12172,9 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
   function stamp(){
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
     const repl=[
-      [/v6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)\s*·\s*LIVE/g,'v6.88 · LIVE'],
-      [/UI\s+6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)/g,'UI 6.88'],
-      [/EXECUTION RISK GATE\s*·\s*v6\.(?:77|78|79|80|81|82|83|84|85|86)/g,'EXECUTION RISK GATE · v6.88']
+      [/v6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)\s*·\s*LIVE/g,'v6.89 · LIVE'],
+      [/UI\s+6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)/g,'UI 6.89'],
+      [/EXECUTION RISK GATE\s*·\s*v6\.(?:77|78|79|80|81|82|83|84|85|86)/g,'EXECUTION RISK GATE · v6.89']
     ];
     let n;
     while((n=walker.nextNode())){
@@ -12224,7 +12224,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  let timer=null,busy=false;
  const money=n=>{n=Number(n)||0;return (n<0?'-$':'+$')+Math.abs(n).toLocaleString('de-DE',{maximumFractionDigits:0})};
  function findLab(){return [...document.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'))?.parentElement?.parentElement||null}
- function card(){let el=document.getElementById('v688-cloudbt-card');if(el)return el;const lab=findLab();if(!lab)return null;el=document.createElement('div');el.id='v688-cloudbt-card';el.className='v688-cloudbt';el.innerHTML=`<div class="v688-cloudbt-h"><div><span>CLOUD BACKTEST JOB</span><b>SERVER · SURVIVES IPHONE LOCK</b></div><strong id="v688-cb-state" class="amber">IDLE</strong></div><div class="v688-cloudbt-body"><div class="v688-cloudbt-grid"><div><small>PROGRESS</small><strong id="v688-cb-pct">0%</strong></div><div><small>ASSET</small><strong id="v688-cb-asset">—</strong></div><div><small>TRADES</small><strong id="v688-cb-tr">—</strong></div><div><small>P&L / PF</small><strong id="v688-cb-res">—</strong></div></div><div class="v688-cloudbt-actions"><button id="v688-cb-start">☁ CLOUD 90D STARTEN</button><button id="v688-cb-refresh">STATUS LADEN</button></div><div class="v688-cloudbt-note">Der Job läuft auf Northflank weiter, auch wenn Safari geschlossen oder das iPhone gesperrt wird. Ergebnisse bleiben in PostgreSQL gespeichert. Paperbot 6.2 läuft getrennt weiter.</div></div>`;const btn=[...lab.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'));btn?.parentElement?.insertAdjacentElement('afterend',el);el.querySelector('#v688-cb-start').onclick=start;el.querySelector('#v688-cb-refresh').onclick=latest;latest();return el}
+ function card(){let el=document.getElementById('v688-cloudbt-card');if(el)return el;const lab=findLab();if(!lab)return null;el=document.createElement('div');el.id='v688-cloudbt-card';el.className='v688-cloudbt';el.innerHTML=`<div class="v688-cloudbt-h"><div><span>CLOUD BACKTEST · NORTHFLANK</span><b>24/7 SERVER · IPHONE DARF GESPERRT WERDEN</b></div><strong id="v688-cb-state" class="amber">IDLE</strong></div><div class="v688-cloudbt-body"><div class="v688-cloudbt-grid"><div><small>PROGRESS</small><strong id="v688-cb-pct">0%</strong></div><div><small>ASSET</small><strong id="v688-cb-asset">—</strong></div><div><small>TRADES</small><strong id="v688-cb-tr">—</strong></div><div><small>P&L / PF</small><strong id="v688-cb-res">—</strong></div></div><div class="v688-cloudbt-actions"><button id="v688-cb-start">☁ CLOUD BACKTEST STARTEN</button><button id="v688-cb-refresh">STATUS LADEN</button></div><div class="v688-cloudbt-note">Der Job läuft auf Northflank weiter, auch wenn Safari geschlossen oder das iPhone gesperrt wird. Ergebnisse bleiben in PostgreSQL gespeichert. Paperbot 6.2 läuft getrennt weiter.</div></div>`;const btn=[...lab.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'));btn?.parentElement?.insertAdjacentElement('afterend',el);el.querySelector('#v688-cb-start').onclick=start;el.querySelector('#v688-cb-refresh').onclick=latest;latest();return el}
  async function req(path,opt){const r=await fetch(API+path,{cache:'no-store',headers:{'content-type':'application/json'},...opt});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
  function paint(j){const el=card();if(!el)return;const st=String(j?.status||'NONE').toUpperCase(),p=j?.progress||{},sum=j?.result?.summary||{};const state=el.querySelector('#v688-cb-state');state.textContent=st;state.className=st==='DONE'?'ok':st==='ERROR'?'bad':'amber';el.querySelector('#v688-cb-pct').textContent=(p.pct??(st==='DONE'?100:0))+'%';el.querySelector('#v688-cb-asset').textContent=(p.asset||'—').replace('USDT','');el.querySelector('#v688-cb-tr').textContent=sum.trades??'—';el.querySelector('#v688-cb-res').textContent=st==='DONE'?`${money(sum.pnl)} · PF ${Number(sum.pf||0).toFixed(2)}`:(j.error||'—');el.querySelector('#v688-cb-start').disabled=st==='RUNNING'||st==='QUEUED';if(st==='RUNNING'||st==='QUEUED')poll();}
  async function latest(){try{paint(await req('/api/backtests/latest'))}catch(e){const el=card();if(el){el.querySelector('#v688-cb-state').textContent='BACKEND UPDATE NEEDED';el.querySelector('#v688-cb-state').className='bad'}}}
@@ -12404,132 +12404,9 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
    if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
    cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
    host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
-   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 6.88');
+   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 6.89');
  }
  new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
 })();
 </script>
-<script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.88 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
-
-
-<style id="v6881-cloud-ui-style">
-/* v6.88.1 stable overlay — presentation only */
-#v688-cloudbt-card{border:1px solid rgba(42,103,136,.5)!important;border-radius:16px!important;overflow:hidden!important;background:rgba(4,16,24,.72)!important}
-#v688-cloudbt-card .v688-cloudbt-h{background:rgba(7,25,36,.82)!important}
-#v688-cloudbt-card.v6881-primary{box-shadow:0 0 0 1px rgba(56,189,248,.08)!important}
-.v6881-jobline{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:9px 11px;border-top:1px solid rgba(42,103,136,.22)}
-.v6881-jobline>div{min-width:0}.v6881-jobline small{display:block;font-size:6px;color:#71889a;letter-spacing:.08em}.v6881-jobline b{display:block;margin-top:3px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.v6881-local-wrap{margin-top:10px;border-top:1px solid rgba(42,103,136,.22)}
-.v6881-local-wrap>summary{list-style:none;cursor:pointer;padding:10px 4px;color:#7f96a7;font-size:8px;font-weight:900;letter-spacing:.08em;display:flex;justify-content:space-between;align-items:center}
-.v6881-local-wrap>summary::-webkit-details-marker{display:none}.v6881-local-wrap>summary:after{content:'+';color:#38bdf8;font-size:16px}.v6881-local-wrap[open]>summary:after{content:'−'}
-.v6881-local-note{font-size:7px;line-height:1.45;color:#8aa0af;padding:0 4px 8px}
-.v6881-modebadge{display:inline-flex;align-items:center;padding:4px 7px;border:1px solid rgba(56,189,248,.42);border-radius:999px;font-size:6px;letter-spacing:.08em;color:#7dd3fc;margin-left:7px}
-</style>
-
-
-<script id="v6881-cloud-ui-patch">
-(function(){
-  'use strict';
-  const PATCH='6.88.1';
-  let lastJobId='—';
-
-  function txt(el,s){ if(el) el.textContent=s; }
-
-  function enhanceCloud(){
-    const card=document.getElementById('v688-cloudbt-card');
-    if(!card || card.dataset.v6881==='1') return;
-    card.dataset.v6881='1';
-    card.classList.add('v6881-primary');
-
-    const head=card.querySelector('.v688-cloudbt-h > div');
-    if(head && !head.querySelector('.v6881-modebadge')){
-      const badge=document.createElement('span');
-      badge.className='v6881-modebadge';
-      badge.textContent='PRIMARY';
-      head.appendChild(badge);
-    }
-
-    const body=card.querySelector('.v688-cloudbt-body');
-    if(body){
-      const line=document.createElement('div');
-      line.className='v6881-jobline';
-      line.innerHTML='<div><small>JOB ID</small><b id="v6881-jobid">—</b></div><div><small>EXECUTION</small><b>NORTHFLANK SERVER</b></div>';
-      const actions=body.querySelector('.v688-cloudbt-actions');
-      if(actions) body.insertBefore(line,actions);
-      else body.prepend(line);
-    }
-
-    const start=card.querySelector('#v688-cb-start');
-    if(start) start.textContent='☁ CLOUD 90D STARTEN · IPHONE DARF GESPERRT WERDEN';
-
-    const note=card.querySelector('.v688-cloudbt-note');
-    if(note) note.textContent='Cloud ist der primäre Backtest. Erst nach bestätigter Job-ID läuft der Test unabhängig vom iPhone. Der lokale Browser-Test bleibt nur als Fallback erhalten.';
-  }
-
-  function enhanceLocal(){
-    const buttons=[...document.querySelectorAll('button')];
-    const local=buttons.find(b=>{
-      const t=(b.textContent||'').trim();
-      return /BACKTEST STARTEN/i.test(t) && b.id!=='v688-cb-start';
-    });
-    if(!local || local.dataset.v6881==='1') return;
-    local.dataset.v6881='1';
-    local.textContent='LOKALER BACKTEST STARTEN · IPHONE MUSS AKTIV BLEIBEN';
-
-    const parent=local.parentElement;
-    if(!parent || parent.closest('.v6881-local-wrap')) return;
-
-    const details=document.createElement('details');
-    details.className='v6881-local-wrap';
-    const summary=document.createElement('summary');
-    summary.textContent='LOKALER BACKTEST · FALLBACK';
-    const note=document.createElement('div');
-    note.className='v6881-local-note';
-    note.textContent='Nur verwenden, wenn Cloud nicht verfügbar ist. iOS pausiert diesen Browser-Backtest beim Sperrbildschirm.';
-    parent.parentNode.insertBefore(details,parent);
-    details.append(summary,note,parent);
-  }
-
-  function captureJobId(){
-    // If the cloud backend response is painted anywhere in the card, keep the UI ready
-    // for a job id without changing the existing v6.88 request logic.
-    const card=document.getElementById('v688-cloudbt-card');
-    if(!card) return;
-    const idEl=document.getElementById('v6881-jobid');
-    if(idEl && lastJobId!=='—') txt(idEl,lastJobId);
-  }
-
-  // Safe wrapper around fetch: observe successful POST /api/backtests response only.
-  if(!window.__MERIDIAN_V6881_FETCH_WRAP__){
-    window.__MERIDIAN_V6881_FETCH_WRAP__=true;
-    const nativeFetch=window.fetch.bind(window);
-    window.fetch=async function(input,init){
-      const res=await nativeFetch(input,init);
-      try{
-        const url=typeof input==='string'?input:(input&&input.url)||'';
-        const method=String((init&&init.method)||'GET').toUpperCase();
-        if(method==='POST' && /\/api\/backtests(?:\?|$)/.test(url) && res.ok){
-          const clone=res.clone();
-          const data=await clone.json();
-          const id=data?.id ?? data?.jobId ?? data?.job_id ?? data?.job?.id;
-          if(id!=null){
-            lastJobId=String(id);
-            setTimeout(captureJobId,0);
-          }
-        }
-      }catch(e){}
-      return res;
-    };
-  }
-
-  function install(){
-    enhanceCloud();
-    enhanceLocal();
-    captureJobId();
-  }
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));
-  new MutationObserver(()=>setTimeout(install,20)).observe(document.documentElement,{childList:true,subtree:true});
-  setTimeout(install,500);
-})();
-</script>
-
+<script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.89 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
