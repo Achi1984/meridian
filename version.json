@@ -1,5 +1,5 @@
 {
-  "version": "6.61",
-  "build": "2026-08-30-ui-frame-cleanup",
-  "notes": "Visual cleanup: removes nested card frames in Shadow/Evidence/Decision Lab and replaces them with subtle separators. No execution, engine, ruleset, risk, Kelly, H6 or H7 logic changes."
+  "version": "6.62",
+  "build": "2026-08-30-minimal-ui",
+  "notes": "Minimal UI pass: removes most nested rounded frames in Shadow, Evidence, Research, Decision Lab, H7, Decision Journal and Forward Analytics. Replaces them with flat metric matrices and subtle separators. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
 }

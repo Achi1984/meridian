@@ -1,0 +1,16 @@
+MERIDIAN v6.62 — MINIMAL UI
+
+VISUAL ONLY
+- Significantly fewer nested rounded frames.
+- Shadow 6.3 remains the primary outer research container.
+- Evidence, Research Lab, Decision Lab, H7 and Decision Journal are flat subsections separated by thin lines.
+- H1-H5 converted visually to a compact table style.
+- H6/H7/Journal metrics use flat comparison matrices instead of cards-in-cards.
+- Forward Test Analytics KPI blocks and asset statistics are flattened for faster mobile scanning.
+
+NO LOGIC CHANGE
+- Engine 6.2.0 unchanged.
+- Ruleset 6.2-SIGNAL-V1 unchanged.
+- Evidence 6.53-EVIDENCE unchanged.
+- Base Risk 1.00% unchanged.
+- H6/H7 remain Shadow Only / zero execution impact.

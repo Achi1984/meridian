@@ -3908,6 +3908,53 @@ window.addEventListener('DOMContentLoaded',()=>{
  .decisionjournal660-grid{grid-template-columns:1fr}.decisionjournal660-col+.decisionjournal660-col{border-left:0!important}
 }
 </style>
+
+<style id="v662-minimal-ui">
+/* v6.62 MINIMAL UI — visual-only. Keep only primary section boundaries. */
+.shadow63{border:1px solid rgba(20,85,122,.82)!important;border-radius:22px!important;padding:18px!important;background:linear-gradient(180deg,rgba(6,28,42,.78),rgba(3,17,27,.88))!important}
+.shadow63-ref{border:0!important;border-top:1px solid rgba(36,82,105,.38)!important;border-bottom:1px solid rgba(36,82,105,.38)!important}
+.shadow63-ref>div{border:0!important;padding:12px 10px!important}
+.shadow63-ref>div+div{border-left:1px solid rgba(36,82,105,.28)!important}
+
+/* Evidence / Research / Decision / H7 / Journal become flat subsections */
+.evidence654,.research657,.decision658,.adaptive659,.decisionjournal660{border:0!important;border-radius:0!important;background:transparent!important;padding:14px 0!important;margin:0!important;border-top:1px solid rgba(36,82,105,.38)!important}
+.research657,.adaptive659{border-top-color:rgba(76,225,154,.28)!important}
+.evidence654-grid,.research657-grid,.decision658-grid,.adaptive659-grid{gap:0!important}
+.evidence654-grid>div,.research657-grid>div,.decision658-grid>div,.adaptive659-grid>div{border:0!important;border-radius:0!important;background:transparent!important;padding:9px 10px!important;border-bottom:1px solid rgba(36,82,105,.22)!important}
+.evidence654-grid>div:nth-child(even),.research657-grid>div:nth-child(even),.decision658-grid>div:nth-child(even),.adaptive659-grid>div:nth-child(even){border-left:1px solid rgba(36,82,105,.22)!important}
+.evidence654-regimes span{border:0!important;background:rgba(22,75,104,.14)!important}
+
+/* H1-H5 = one simple table, no pills */
+.shadow63-board{border:0!important;border-top:1px solid rgba(36,82,105,.38)!important;border-bottom:1px solid rgba(36,82,105,.38)!important;gap:0!important}
+.shadow63-board-row{border:0!important;border-radius:0!important;background:transparent!important;padding:10px 4px!important}
+.shadow63-board-row+.shadow63-board-row{border-top:1px solid rgba(36,82,105,.24)!important}
+.shadow63-card{border:0!important;border-radius:0!important;background:transparent!important;padding:11px 2px!important;min-height:0!important;border-bottom:1px solid rgba(36,82,105,.22)!important}
+
+/* H7 + journal: compact comparison matrix, no cards inside cards */
+.decision658-cell,.adaptive659-regime,.decisionjournal660-col,.decisionjournal660-delta>div{border:0!important;border-radius:0!important;background:transparent!important;padding:8px 9px!important;border-bottom:1px solid rgba(36,82,105,.22)!important}
+.adaptive659-grid,.adaptive659-regimes,.decisionjournal660-grid,.decisionjournal660-delta{gap:0!important}
+.adaptive659-regime:nth-child(even),.decisionjournal660-delta>div+div{border-left:1px solid rgba(36,82,105,.22)!important}
+.decisionjournal660-grid{border-top:1px solid rgba(36,82,105,.26)!important}
+.decisionjournal660-col+.decisionjournal660-col{border-left:1px solid rgba(36,82,105,.22)!important}
+.decision658-lock,.research657-gate,.shadow63-policy{border:0!important;border-radius:0!important;border-left:2px solid #247957!important;background:rgba(36,121,87,.055)!important;padding:9px 10px!important}
+
+/* Forward analytics: numbers in a dashboard matrix instead of separate rounded cards */
+.pa-top,.pa-side,.lm-grid{gap:0!important;border-top:1px solid rgba(36,82,105,.34)!important;border-bottom:1px solid rgba(36,82,105,.34)!important}
+.pa-top>div,.pa-side>div,.lm-grid>div{border:0!important;border-radius:0!important;background:transparent!important;padding:11px 10px!important}
+.pa-top>div:nth-child(even),.lm-grid>div:nth-child(even){border-left:1px solid rgba(36,82,105,.22)!important}
+.pa-top>div:nth-child(n+3),.lm-grid>div:nth-child(n+3){border-top:1px solid rgba(36,82,105,.22)!important}
+.pa-side>div+div{border-left:1px solid rgba(36,82,105,.22)!important}
+.pa-assets{border:0!important;border-radius:0!important;border-top:1px solid rgba(36,82,105,.34)!important;border-bottom:1px solid rgba(36,82,105,.34)!important}
+.pa-note{border:0!important;border-left:2px solid rgba(39,185,255,.35)!important;border-radius:0!important;background:transparent!important}
+
+/* Less visual noise from status blocks */
+.shadow63-policy,.decision658-lock,.research657-gate{margin-top:9px!important}
+@media(max-width:520px){
+ .shadow63{padding:14px!important}
+ .decisionjournal660-grid{grid-template-columns:1fr!important}
+ .decisionjournal660-col+.decisionjournal660-col{border-left:0!important;border-top:1px solid rgba(36,82,105,.22)!important}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -3915,7 +3962,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.61 · LIVE</span>
+        <span class="version" id="versionBadge">v6.62 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7679,7 +7726,7 @@ function cloudDecisionJournal660(evidencePayload){
   const latest=rows.slice().reverse().slice(0,5).map(x=>`<div class="decisionjournal660-row"><b>${x.symbol} ${x.side}</b><span>${x.regime}</span><span>BASE ${x.base>=0?'+':''}${cloudMoney(x.base)}</span><span>H6 ${fmt(x.h6Risk,2)}% · ${x.h6Pnl>=0?'+':''}${cloudMoney(x.h6Pnl)}</span><span>H7 ${fmt(x.h7Risk,2)}% · ${x.h7Pnl>=0?'+':''}${cloudMoney(x.h7Pnl)}</span></div>`).join('');
   const d6=h6.pnl-base.pnl,d7=h7.pnl-base.pnl,dd6=base.maxDd-h6.maxDd,dd7=base.maxDd-h7.maxDd;
   return `<div class="decisionjournal660">
-    <div class="decisionjournal660-head"><b>DECISION JOURNAL · 6.61</b><span>SEQUENTIAL SHADOW · NO LOOK-AHEAD · ZERO EXECUTION IMPACT</span></div>
+    <div class="decisionjournal660-head"><b>DECISION JOURNAL · 6.62</b><span>SEQUENTIAL SHADOW · NO LOOK-AHEAD · ZERO EXECUTION IMPACT</span></div>
     <div class="decisionjournal660-grid">${cardCol('6.2 EVIDENCE BASELINE',base,base.pnl>=0?'green':'red')}${cardCol('H6 FRACTIONAL KELLY',h6,h6.pnl>=0?'green':'red')}${cardCol('H7 KELLY + REGIME',h7,h7.pnl>=0?'green':'red')}</div>
     <div class="decisionjournal660-delta"><div><span>H6 Δ P&L / DD REDUCTION</span><b class="${d6>=0?'green':'red'}">${d6>=0?'+':''}${cloudMoney(d6)} · ${dd6>=0?'+':''}${fmt(dd6,2)} %-Pkt.</b></div><div><span>H7 Δ P&L / DD REDUCTION</span><b class="${d7>=0?'green':'red'}">${d7>=0?'+':''}${cloudMoney(d7)} · ${dd7>=0?'+':''}${fmt(dd7,2)} %-Pkt.</b></div></div>
     <details class="evidence654-more"><summary>▶ LETZTE JOURNAL-TRADES ANZEIGEN</summary><div class="decisionjournal660-rows">${latest||'<div class="decisionjournal660-note">Noch keine abgeschlossenen Evidence-Outcomes.</div>'}</div></details>
@@ -7716,7 +7763,7 @@ function cloudDecisionLab658(evidencePayload,totalClosedTrades){
   const matrixHtml=Object.entries(matrix).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>{const [r,d]=k.split('|');return `<div class="decision658-cell"><span>${r} · ${d}</span><b class="${q.pnl>=0?'green':'red'}">${q.n} OUT · ${q.pnl>=0?'+':''}${cloudMoney(q.pnl)} · ${q.n?Math.round(q.w/q.n*100):0}% WR</b></div>`}).join('')||'<div class="decision658-note">Noch keine abgeschlossenen Regime×Direction-Outcomes.</div>';
   const ready=Number(totalClosedTrades||0)>=30&&closed.length>=5;
   return `<div class="decision658">
-    <div class="decision658-head"><b>DECISION LAB · 6.61</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
+    <div class="decision658-head"><b>DECISION LAB · 6.62</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
     <div class="decision658-grid">
       <div><span>H6 SHADOW RISK</span><b>${fmt(shadowRisk,2)}%</b></div>
       <div><span>RAW KELLY</span><b>${fmt(rawKelly*100,1)}%</b></div>
@@ -7918,7 +7965,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.61 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.62 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -8041,7 +8088,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.61 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.62 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>
