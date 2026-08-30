@@ -1,5 +1,5 @@
 {
-  "version": "6.64",
-  "build": "2026-08-30-final-trade-ui-cleanup",
-  "notes": "Final TRADE-tab UI cleanup. Removes remaining rounded container-card styling from Current Signal, Live Scanner, Open Positions, Review Roadmap and learning/review metric blocks; keeps only functional chart outline and subtle section dividers. Fixes stale v6.58 header override and hard-locks visible UI version to 6.64. No execution, engine, ruleset, signal, risk, Kelly, H6 or H7 logic changes."
+  "version": "6.65",
+  "build": "2026-08-30-backtest-lab-v1",
+  "notes": "Backtest Lab V1: browser-side historical Binance OHLCV replay of 6.2 signal logic; research-only, no execution changes."
 }

@@ -1,0 +1,10 @@
+MERIDIAN v6.65 — BACKTEST LAB V1
+
+- Adds research-only historical Backtest Lab to PAPER tab.
+- Replays 6.2-SIGNAL-V1 scoring from historical Binance Spot 15m/1h/4h OHLCV.
+- No look-ahead: only closed higher-timeframe candles are used.
+- Includes fees/slippage and 1% risk sizing.
+- Conservative same-candle ambiguity: SL wins if SL and TP are both touched.
+- Supports 7/30/90 day single-asset tests.
+- Shows P&L, PF, Max DD, trades, winrate, expectancy, long/short P&L and equity trace.
+- Research only: Engine 6.2.0, Ruleset 6.2-SIGNAL-V1 and live Paper execution remain unchanged.
