@@ -1,0 +1,16 @@
+ACHI MERIDIAN v6.60 — Decision Journal
+
+- Adds Decision Journal 6.60 inside the Decision Lab.
+- Compares three evidence-only paths:
+  1) 6.2 Evidence Baseline at 1.00% execution risk
+  2) H6 Fractional Kelly Shadow
+  3) H7 Fractional Kelly + Regime Soft Modifier Shadow
+- Calculates sequentially with NO LOOK-AHEAD: each hypothetical H6/H7 risk uses only outcomes already closed before that trade.
+- Shows P&L, Profit Factor, Max Drawdown, End Equity and Win Rate for each path.
+- Shows H6/H7 P&L delta and drawdown reduction versus Evidence Baseline.
+- Expandable latest journal trades show Base P&L, H6 risk/P&L and H7 risk/P&L.
+- Evidence-only by design; historical trades before Backend Evidence 6.53 are not reconstructed.
+- Linear P&L scaling assumes the same trade/exit with position size proportional to risk budget.
+- ZERO EXECUTION IMPACT. No trade is blocked, opened, closed or resized by this UI.
+- Base execution risk remains 1.00%.
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 remain frozen.

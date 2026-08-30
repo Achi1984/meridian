@@ -3868,6 +3868,12 @@ window.addEventListener('DOMContentLoaded',()=>{
 .adaptive659-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:6px}.adaptive659-grid>div{border:1px solid #1d5a55;border-radius:8px;padding:6px}.adaptive659-grid span{display:block;font-size:5.7px;color:#789b96}.adaptive659-grid b{display:block;font-size:8px;margin-top:3px}
 .adaptive659-regimes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:6px}.adaptive659-regime{border:1px solid #174d4a;border-radius:8px;padding:6px}.adaptive659-regime span{display:block;font-size:5.8px;color:#789b96}.adaptive659-regime b{display:block;font-size:7px;margin-top:3px}.adaptive659-note{font-size:5.7px;color:#7890a2;line-height:1.4;margin-top:6px}
 @media(max-width:520px){.adaptive659-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.decisionjournal660{margin-top:9px;border:1px solid rgba(54,184,255,.48);border-radius:12px;padding:8px;background:rgba(4,20,31,.46)}
+.decisionjournal660-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.decisionjournal660-head b{font-size:8px;letter-spacing:.09em;color:#36b8ff}.decisionjournal660-head span{font-size:5.7px;color:#7897a6;text-align:right}
+.decisionjournal660-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:7px}.decisionjournal660-col{border:1px solid #174d60;border-radius:9px;padding:7px}.decisionjournal660-col>span{display:block;font-size:5.6px;color:#7897a6;letter-spacing:.06em}.decisionjournal660-col>b{display:block;font-size:9px;margin:3px 0 5px}.decisionjournal660-metrics{display:grid;grid-template-columns:1fr 1fr;gap:3px}.decisionjournal660-metrics div{font-size:5.5px;color:#7890a2}.decisionjournal660-metrics b{display:block;font-size:6.8px;color:#d7e5eb;margin-top:1px}
+.decisionjournal660-delta{margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px}.decisionjournal660-delta>div{border:1px solid #174555;border-radius:8px;padding:6px}.decisionjournal660-delta span{display:block;font-size:5.6px;color:#7897a6}.decisionjournal660-delta b{display:block;font-size:7.5px;margin-top:3px}
+.decisionjournal660-rows{margin-top:6px;border-top:1px solid rgba(28,82,97,.55);padding-top:5px}.decisionjournal660-row{display:grid;grid-template-columns:1.15fr .65fr .7fr .7fr .7fr;gap:4px;align-items:center;padding:4px 1px;border-bottom:1px solid rgba(28,82,97,.35);font-size:5.7px}.decisionjournal660-row span{color:#7897a6}.decisionjournal660-note{font-size:5.7px;color:#7890a2;line-height:1.4;margin-top:6px}
+@media(max-width:520px){.decisionjournal660-grid{grid-template-columns:1fr}.decisionjournal660-row{grid-template-columns:1.05fr .6fr .7fr .7fr .7fr}}
 
 .research657{margin:10px 0 4px;border:1px solid rgba(94,227,173,.42);border-radius:14px;padding:10px;background:rgba(4,22,29,.58)}
 .research657-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.research657-head b{font-size:10px;letter-spacing:.08em}.research657-head span{font-size:6px;color:#7e9a9c;text-align:right}.research657-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.research657-grid>div{border:1px solid #1c5261;border-radius:9px;padding:6px}.research657-grid span{display:block;color:#76909b;font-size:6px;letter-spacing:.08em}.research657-grid b{display:block;margin-top:4px;font-size:9px}.research657-note{margin-top:7px;color:#7890a2;font-size:5.7px;line-height:1.4}.research657-gate{margin-top:7px;border:1px solid #695426;border-radius:9px;padding:7px;color:#d8ad4e;font-size:6.2px;line-height:1.35}.research657-gate.ok{border-color:#247957;color:#4ce19a}.research657-details{margin-top:6px}.research657-details summary{cursor:pointer;color:#4ce19a;font-size:6px;letter-spacing:.08em;list-style:none}.research657-details summary::-webkit-details-marker{display:none}.research657-rows{margin-top:6px;display:grid;gap:4px}.research657-row{display:grid;grid-template-columns:1fr .7fr .7fr .8fr;gap:5px;border-top:1px solid rgba(28,82,97,.55);padding-top:5px;font-size:6.4px}.research657-row span{color:#8aa0ab}.research657-row b{font-size:6.5px}
@@ -3881,7 +3887,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.59 · LIVE</span>
+        <span class="version" id="versionBadge">v6.60 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -7601,6 +7607,58 @@ function cloudAdaptiveRisk659(evidencePayload,h6Risk){
   </div>`;
 }
 
+function cloudDecisionJournal660(evidencePayload){
+  const e=cloudEvidenceAnalytics(evidencePayload);
+  const seq=e.closed.slice().sort((a,b)=>(cloudEpoch(a.closedAt)||0)-(cloudEpoch(b.closedAt)||0));
+  const sum=a=>a.reduce((q,x)=>q+(Number(x)||0),0);
+  const calcKellyRisk=hist=>{
+    const wins=hist.filter(x=>x.realized>0), losses=hist.filter(x=>x.realized<0);
+    const p=hist.length?wins.length/hist.length:0;
+    const aw=wins.length?sum(wins.map(x=>x.realized))/wins.length:0;
+    const al=losses.length?Math.abs(sum(losses.map(x=>x.realized))/losses.length):0;
+    const b=al>0?aw/al:0;
+    const raw=(b>0)?Math.max(0,p-(1-p)/b):0;
+    const quarter=raw*.25*100;
+    const conf=Math.min(1,hist.length/50);
+    return Math.max(.25,Math.min(1.00,.50*(1-conf)+quarter*conf));
+  };
+  const calcRegimeMod=(hist,regime)=>{
+    const g=hist.filter(x=>(x.regime||'UNKNOWN')===(regime||'UNKNOWN'));
+    if(!g.length)return 1;
+    const wins=g.filter(x=>x.realized>0).length, pnl=sum(g.map(x=>x.realized)), abs=sum(g.map(x=>Math.abs(x.realized||0)));
+    const wr=wins/g.length, quality=abs>0?pnl/abs:0;
+    const observed=Math.max(.50,Math.min(1.20,1+.35*quality+.30*(wr-.50)));
+    const conf=Math.min(1,g.length/20);
+    return 1+(observed-1)*conf;
+  };
+  const rows=[]; const prior=[];
+  seq.forEach(x=>{
+    const h6=calcKellyRisk(prior);
+    const mod=calcRegimeMod(prior,x.regime);
+    const h7=Math.max(.25,Math.min(1.00,h6*mod));
+    const base=Number(x.realized)||0;
+    rows.push({...x,base,h6Risk:h6,h7Risk:h7,h6Pnl:base*h6,h7Pnl:base*h7});
+    prior.push(x);
+  });
+  const stats=(vals)=>{
+    let equity=10000,peak=10000,maxDd=0,grossWin=0,grossLoss=0,wins=0;
+    vals.forEach(v=>{equity+=v;if(v>0){grossWin+=v;wins++}else if(v<0)grossLoss+=Math.abs(v);peak=Math.max(peak,equity);maxDd=Math.max(maxDd,peak?100*(peak-equity)/peak:0)});
+    return {pnl:equity-10000,equity,maxDd,pf:grossLoss?grossWin/grossLoss:(grossWin>0?Infinity:0),wr:vals.length?100*wins/vals.length:0};
+  };
+  const base=stats(rows.map(x=>x.base)), h6=stats(rows.map(x=>x.h6Pnl)), h7=stats(rows.map(x=>x.h7Pnl));
+  const pf=v=>Number.isFinite(v)?fmt(v,2):(v===Infinity?'∞':'—');
+  const cardCol=(name,z,tone)=>`<div class="decisionjournal660-col"><span>${name}</span><b class="${tone||''}">${z.pnl>=0?'+':''}${cloudMoney(z.pnl)}</b><div class="decisionjournal660-metrics"><div>MAX DD<b>${fmt(z.maxDd,2)}%</b></div><div>PF<b>${pf(z.pf)}</b></div><div>END EQ<b>${cloudMoney(z.equity)}</b></div><div>WR<b>${fmt(z.wr,0)}%</b></div></div></div>`;
+  const latest=rows.slice().reverse().slice(0,5).map(x=>`<div class="decisionjournal660-row"><b>${x.symbol} ${x.side}</b><span>${x.regime}</span><span>BASE ${x.base>=0?'+':''}${cloudMoney(x.base)}</span><span>H6 ${fmt(x.h6Risk,2)}% · ${x.h6Pnl>=0?'+':''}${cloudMoney(x.h6Pnl)}</span><span>H7 ${fmt(x.h7Risk,2)}% · ${x.h7Pnl>=0?'+':''}${cloudMoney(x.h7Pnl)}</span></div>`).join('');
+  const d6=h6.pnl-base.pnl,d7=h7.pnl-base.pnl,dd6=base.maxDd-h6.maxDd,dd7=base.maxDd-h7.maxDd;
+  return `<div class="decisionjournal660">
+    <div class="decisionjournal660-head"><b>DECISION JOURNAL · 6.60</b><span>SEQUENTIAL SHADOW · NO LOOK-AHEAD · ZERO EXECUTION IMPACT</span></div>
+    <div class="decisionjournal660-grid">${cardCol('6.2 EVIDENCE BASELINE',base,base.pnl>=0?'green':'red')}${cardCol('H6 FRACTIONAL KELLY',h6,h6.pnl>=0?'green':'red')}${cardCol('H7 KELLY + REGIME',h7,h7.pnl>=0?'green':'red')}</div>
+    <div class="decisionjournal660-delta"><div><span>H6 Δ P&L / DD REDUCTION</span><b class="${d6>=0?'green':'red'}">${d6>=0?'+':''}${cloudMoney(d6)} · ${dd6>=0?'+':''}${fmt(dd6,2)} %-Pkt.</b></div><div><span>H7 Δ P&L / DD REDUCTION</span><b class="${d7>=0?'green':'red'}">${d7>=0?'+':''}${cloudMoney(d7)} · ${dd7>=0?'+':''}${fmt(dd7,2)} %-Pkt.</b></div></div>
+    <details class="evidence654-more"><summary>▶ LETZTE JOURNAL-TRADES ANZEIGEN</summary><div class="decisionjournal660-rows">${latest||'<div class="decisionjournal660-note">Noch keine abgeschlossenen Evidence-Outcomes.</div>'}</div></details>
+    <div class="decisionjournal660-note">Journal calculations are evidence-only and sequential: each H6/H7 risk for a trade uses only outcomes that were already closed before that trade. Baseline realized P&L is scaled linearly from the 1.00% execution risk to the hypothetical H6/H7 risk. This avoids look-ahead bias and does not reconstruct pre-6.53 trades.</div>
+  </div>`;
+}
+
 function cloudDecisionLab658(evidencePayload,totalClosedTrades){
   const e=cloudEvidenceAnalytics(evidencePayload), closed=e.closed;
   const sum=a=>a.reduce((q,x)=>q+(Number(x.realized)||0),0);
@@ -7630,7 +7688,7 @@ function cloudDecisionLab658(evidencePayload,totalClosedTrades){
   const matrixHtml=Object.entries(matrix).sort((a,b)=>b[1].n-a[1].n).map(([k,q])=>{const [r,d]=k.split('|');return `<div class="decision658-cell"><span>${r} · ${d}</span><b class="${q.pnl>=0?'green':'red'}">${q.n} OUT · ${q.pnl>=0?'+':''}${cloudMoney(q.pnl)} · ${q.n?Math.round(q.w/q.n*100):0}% WR</b></div>`}).join('')||'<div class="decision658-note">Noch keine abgeschlossenen Regime×Direction-Outcomes.</div>';
   const ready=Number(totalClosedTrades||0)>=30&&closed.length>=5;
   return `<div class="decision658">
-    <div class="decision658-head"><b>DECISION LAB · 6.58</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
+    <div class="decision658-head"><b>DECISION LAB · 6.60</b><span>SHADOW ONLY · NO EXECUTION CHANGE</span></div>
     <div class="decision658-grid">
       <div><span>H6 SHADOW RISK</span><b>${fmt(shadowRisk,2)}%</b></div>
       <div><span>RAW KELLY</span><b>${fmt(rawKelly*100,1)}%</b></div>
@@ -7643,6 +7701,7 @@ function cloudDecisionLab658(evidencePayload,totalClosedTrades){
     </div>
     <div class="decision658-section"><div class="decision658-title">REGIME × DIRECTION · DESCRIPTIVE ONLY</div><div class="decision658-matrix">${matrixHtml}</div></div>
     ${cloudAdaptiveRisk659(evidencePayload,shadowRisk)}
+    ${cloudDecisionJournal660(evidencePayload)}
     <div class="decision658-lock ${ready?'ok':''}">${ready?'DECISION SAMPLE OPEN':'COLLECTING'} · ${totalClosedTrades||0} baseline trades · ${closed.length} Evidence outcomes. Kelly, leverage and regime matrix remain research-only; Base Risk stays 1.00%.</div>
     <div class="decision658-note">H6 uses conservative fractional Kelly only as a shadow comparison: ¼-Kelly, small-sample shrinkage, and a research band of 0.25–1.00%. It does not size live Paper positions. Opportunity Cost prevents over-filtering by showing both avoided losses and sacrificed winners. Effective leverage is derived from risk budget ÷ stop distance where the Evidence snapshot contains Entry/SL.</div>
   </div>`;
@@ -7831,7 +7890,7 @@ function cloudPaperTradeView(){
   return (
     card(`<div class="paper-head">
       <div>
-        <div class="eyebrow">UI 6.59 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
+        <div class="eyebrow">UI 6.60 · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
@@ -7954,7 +8013,7 @@ function paperTradeView(){
   const err=MERIDIAN_CLOUD.error;
   return card(`<div class="paper-head">
     <div>
-      <div class="eyebrow">UI 6.59 · CLOUD PAPER</div>
+      <div class="eyebrow">UI 6.60 · CLOUD PAPER</div>
       <div class="forecast-main">${err?'CLOUD VERBINDUNG FEHLER':'VERBINDE MIT PAPER ENGINE …'}</div>
       <div class="sub">Northflank → PostgreSQL → MERIDIAN Dashboard</div>
     </div>

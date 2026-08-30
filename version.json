@@ -1,5 +1,5 @@
 {
-  "version": "6.59",
-  "build": "2026-08-29-adaptive-risk-shadow-h7",
-  "notes": "Adds H7 Adaptive Risk Shadow: soft regime confidence modifier layered on H6 fractional-Kelly research sizing. Zero execution impact; no entry filters; Base Risk 1.00% and Ruleset 6.2-SIGNAL-V1 remain frozen."
+  "version": "6.60",
+  "build": "2026-08-30-decision-journal-sequential-shadow",
+  "notes": "Adds Decision Journal 6.60: sequential evidence-only comparison of 6.2 Base Risk vs H6 Fractional Kelly vs H7 Kelly+Regime, with P&L, PF, max drawdown, end equity and per-trade shadow sizing. Zero execution impact; Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 remain frozen."
 }
