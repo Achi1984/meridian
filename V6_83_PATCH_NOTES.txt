@@ -1,0 +1,5 @@
+MERIDIAN v6.83
+- Fixes Safari/iPhone error: Can't find variable v675ReplayAtEnd.
+- Explicitly exports the historical replay helper to window and calls it through window.
+- Adds compact Daytrade mode with KOMPAKT/VOLL toggle for large research panels.
+- Engine 6.2.0, ruleset, Paperbot and risk execution unchanged.

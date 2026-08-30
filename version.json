@@ -1,1 +1,1 @@
-{"version":"6.82","ui":"6.82","backtest_lab":"V3.14","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Research Continuous fixed-range hotfix: verified backtest start/end + in-memory OHLCV cache; no Date.now mutation; execution unchanged"}
+{"version":"6.83","ui":"6.83","backtest_lab":"V3.15","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Safari-safe replay helper export + compact Daytrade research panels; execution unchanged"}
