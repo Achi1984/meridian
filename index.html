@@ -4198,7 +4198,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <div class="brand">
       <div class="brandline">
         <div class="brandword"><span class="achi">ACHI</span><span class="meridian">MERIDIAN</span></div>
-        <span class="version" id="versionBadge">v6.81 · LIVE</span>
+        <span class="version" id="versionBadge">v6.82 · LIVE</span>
       </div>
       <div class="live"><span class="dot"></span>LIVE DASHBOARD</div>
     </div>
@@ -8144,7 +8144,7 @@ function cloudExecutionGateBlock(events,drawdownPct){
   const last=latest?.created_at?cloudAge(latest.created_at):'—';
   return `<div class="v677-gate-lock ${locked?'':'ok'}">
     <div class="v677-gate-head">
-      <span>EXECUTION RISK GATE · v6.81</span>
+      <span>EXECUTION RISK GATE · v6.82</span>
       <b class="${locked?'red':'green'}">${locked?'LOCKED · '+reason:'OPEN'}</b>
     </div>
     <div class="v677-gate-grid">
@@ -8655,7 +8655,7 @@ function btPipelineHtml(r){
   const assets=r?.mode==='BATCH'?(r.assetResults||[]):[r];
   const ds=x=>btDateShort(x);
   return `<div class="v679-pipe">
-    <div class="v679-pipe-title">SIGNAL PIPELINE TIMELINE · 5 EQUAL CALENDAR WINDOWS · V3.13</div>
+    <div class="v679-pipe-title">SIGNAL PIPELINE TIMELINE · 5 EQUAL CALENDAR WINDOWS · V3.14</div>
     <div class="v679-pipe-row head"><span>WINDOW</span><span>BARS</span><span>TECH</span><span>CAND</span><span>DIST</span><span>READY</span><span>RISK BLOCK</span><span>ENTRIES</span></div>
     ${w.map(q=>{
       const blocked=q.blockDD+q.blockDaily+q.blockCooldown;
@@ -8680,38 +8680,46 @@ function btPipelineHtml(r){
 }
 
 
-function btContinuousWindowReplay(asset,days,k15,k1,k4,cfg){
-  const globalEnd=Date.now(),globalStart=globalEnd-days*86400000,span=(globalEnd-globalStart)/5,windows=[];
+const BT_CONT_CACHE=window.BT_CONT_CACHE||{};
+window.BT_CONT_CACHE=BT_CONT_CACHE;
+
+function btContinuousWindowReplay(asset,result,k15,k1,k4,cfg){
+  const globalStart=Number(result?.start),globalEnd=Number(result?.end);
+  if(!Number.isFinite(globalStart)||!Number.isFinite(globalEnd)||globalEnd<=globalStart)return [];
+  const span=(globalEnd-globalStart)/5,windows=[];
   for(let i=0;i<5;i++){
     const wStart=globalStart+i*span,wEnd=i===4?globalEnd:globalStart+(i+1)*span;
-    const oldNow=Date.now;
-    try{
-      Date.now=()=>wEnd;
-      const wDays=(wEnd-wStart)/86400000;
-      const rr=btReplay(asset,wDays,k15,k1,k4,{...cfg,startEquity:cfg.startEquity});
-      // keep only trades actually inside this calendar window; fresh ledger per window
-      const tl=(rr.tradeList||[]).filter(t=>Number(t.openedAt)>=wStart && Number(t.closedAt)<=wEnd);
-      const st=btTradeStats(tl,cfg.startEquity);
-      windows.push({i:i+1,from:wStart,to:wEnd,...st,tradeList:tl,
-        longPnl:tl.filter(t=>t.side==='LONG').reduce((s,t)=>s+Number(t.realized||0),0),
-        shortPnl:tl.filter(t=>t.side==='SHORT').reduce((s,t)=>s+Number(t.realized||0),0)});
-    }finally{Date.now=oldNow}
+    const wDays=(wEnd-wStart)/86400000;
+    // Fixed historical end, no Date.now mutation.
+    const rr=v675ReplayAtEnd(asset,wDays,k15,k1,k4,{...cfg,startEquity:cfg.startEquity},wEnd);
+    const tl=(rr.tradeList||[]).filter(t=>Number(t.openedAt)>=wStart && Number(t.closedAt)<=wEnd);
+    const st=btTradeStats(tl,cfg.startEquity);
+    windows.push({i:i+1,from:wStart,to:wEnd,...st,tradeList:tl,
+      longPnl:tl.filter(t=>t.side==='LONG').reduce((s,t)=>s+Number(t.realized||0),0),
+      shortPnl:tl.filter(t=>t.side==='SHORT').reduce((s,t)=>s+Number(t.realized||0),0)});
   }
   return windows;
 }
 function btContinuousBatch(result){
   const assets=result?.mode==='BATCH'?(result.assetResults||[]):[result];
-  const out=Array.from({length:5},(_,i)=>({i:i+1,from:null,to:null,trades:0,pnl:0,grossWin:0,grossLoss:0,wins:0,longPnl:0,shortPnl:0}));
+  const out=Array.from({length:5},(_,i)=>({i:i+1,from:null,to:null,trades:0,pnl:0,grossWin:0,grossLoss:0,wins:0,longPnl:0,shortPnl:0,missing:0}));
   for(const a of assets){
-    const ks=BT_STATE?.cache?.[a.symbol]||null;
-    if(!ks)continue;
-    const ww=btContinuousWindowReplay(a.symbol,result.days,ks.k15,ks.k1,ks.k4,a.config||BT_CONFIG);
+    const ks=BT_CONT_CACHE[a.symbol]||null;
+    if(!ks){for(const z of out)z.missing++;continue}
+    const ww=btContinuousWindowReplay(a.symbol,result,ks.k15,ks.k1,ks.k4,a.config||BT_CONFIG);
     for(const w of ww){
       const z=out[w.i-1];
-      z.from=z.from==null?w.from:Math.min(z.from,w.from);z.to=z.to==null?w.to:Math.max(z.to,w.to);
+      z.from=z.from==null?w.from:Math.min(z.from,w.from);
+      z.to=z.to==null?w.to:Math.max(z.to,w.to);
       z.trades+=w.trades||0;z.pnl+=w.pnl||0;z.grossWin+=w.grossWin||0;z.grossLoss+=w.grossLoss||0;z.wins+=w.wins||0;
       z.longPnl+=w.longPnl||0;z.shortPnl+=w.shortPnl||0;
     }
+  }
+  // Always use verified backtest range for labels, even if cache is missing.
+  const rs=Number(result?.start),re=Number(result?.end);
+  if(Number.isFinite(rs)&&Number.isFinite(re)&&re>rs){
+    const span=(re-rs)/5;
+    for(let i=0;i<5;i++){out[i].from=rs+i*span;out[i].to=i===4?re:rs+(i+1)*span}
   }
   for(const z of out){
     z.pf=z.grossLoss>0?z.grossWin/z.grossLoss:(z.grossWin>0?99:0);
@@ -8720,33 +8728,35 @@ function btContinuousBatch(result){
   }
   return out;
 }
-function v681Money(n){
+function v682Money(n){
   n=Number(n)||0;
   return (n<0?'-$':'+$')+fmt(Math.abs(n),0);
 }
 function btContinuousHtml(r){
   const w=btContinuousBatch(r);
+  const missing=Math.max(...w.map(x=>x.missing||0),0);
   const total=w.reduce((s,x)=>({trades:s.trades+x.trades,pnl:s.pnl+x.pnl,grossWin:s.grossWin+x.grossWin,grossLoss:s.grossLoss+x.grossLoss,longPnl:s.longPnl+x.longPnl,shortPnl:s.shortPnl+x.shortPnl}),{trades:0,pnl:0,grossWin:0,grossLoss:0,longPnl:0,shortPnl:0});
   const pf=total.grossLoss>0?total.grossWin/total.grossLoss:(total.grossWin>0?99:0),exp=total.trades?total.pnl/total.trades:0;
   return `<div class="v680-cont">
-    <div class="v680-cont-title">RESEARCH CONTINUOUS · FRESH LEDGER EACH 20% CALENDAR WINDOW · V3.13</div>
+    <div class="v680-cont-title">RESEARCH CONTINUOUS · FRESH LEDGER EACH 20% CALENDAR WINDOW · V3.14</div>
+    ${missing?`<div class="v680-note"><strong>RESEARCH CACHE MISSING FOR ${missing} ASSET(S).</strong> Start this 90-day run once in v6.82 so the in-memory historical candle cache is populated.</div>`:''}
     <div class="v680-cont-grid head"><span>WINDOW</span><span>TRADES</span><span>PF</span><span>EXP</span><span>P&L</span><span>LONG</span><span>SHORT</span></div>
     ${w.map(x=>`<div class="v680-cont-grid">
       <b>W${x.i}<br><small>${btDateShort(x.from)}→${btDateShort(x.to)}</small></b>
       <span>${x.trades}</span>
       <b class="${x.pf>=1?'v680-good':'v680-bad'}">${fmt(x.pf,2)}</b>
-      <span class="${x.exp>=0?'v680-good':'v680-bad'}">${v681Money(x.exp)}</span>
-      <b class="${x.pnl>=0?'v680-good':'v680-bad'}">${v681Money(x.pnl)}</b>
-      <span class="${x.longPnl>=0?'v680-good':'v680-bad'}">${v681Money(x.longPnl)}</span>
-      <span class="${x.shortPnl>=0?'v680-good':'v680-bad'}">${v681Money(x.shortPnl)}</span>
+      <span class="${x.exp>=0?'v680-good':'v680-bad'}">${v682Money(x.exp)}</span>
+      <b class="${x.pnl>=0?'v680-good':'v680-bad'}">${v682Money(x.pnl)}</b>
+      <span class="${x.longPnl>=0?'v680-good':'v680-bad'}">${v682Money(x.longPnl)}</span>
+      <span class="${x.shortPnl>=0?'v680-good':'v680-bad'}">${v682Money(x.shortPnl)}</span>
     </div>`).join('')}
     <div class="v680-summary">
       <div><span>CONT TRADES</span><b>${total.trades}</b></div>
       <div><span>CONT PF</span><b class="${pf>=1?'v680-good':'v680-bad'}">${fmt(pf,2)}</b></div>
-      <div><span>CONT EXP</span><b class="${exp>=0?'v680-good':'v680-bad'}">${v681Money(exp)}</b></div>
-      <div><span>CONT P&L</span><b class="${total.pnl>=0?'v680-good':'v680-bad'}">${v681Money(total.pnl)}</b></div>
+      <div><span>CONT EXP</span><b class="${exp>=0?'v680-good':'v680-bad'}">${v682Money(exp)}</b></div>
+      <div><span>CONT P&L</span><b class="${total.pnl>=0?'v680-good':'v680-bad'}">${v682Money(total.pnl)}</b></div>
     </div>
-    <div class="v680-note"><strong>BASELINE and RESEARCH CONTINUOUS are intentionally different experiments.</strong> Baseline preserves the frozen 6.2 persistent MAX_DRAWDOWN gate. Research Continuous starts a fresh independent ledger at the beginning of each 20% calendar window so later market regimes can be observed instead of being hidden by an earlier permanent DD lock. No Paperbot or live execution rule is changed.</div>
+    <div class="v680-note"><strong>BASELINE and RESEARCH CONTINUOUS are intentionally different experiments.</strong> Calendar windows are anchored to the verified requested backtest range (${btDateShort(r?.start)}→${btDateShort(r?.end)}), not the device clock. Each window receives a fresh independent research ledger. Baseline 6.2 and Paperbot execution remain unchanged.</div>
   </div>`;
 }
 
@@ -11756,7 +11766,7 @@ addEventListener('load',()=>setTimeout(()=>window.meridianRegressionGuard(),250)
 .bt-ewdiag{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.25);margin:8px 0 10px}.bt-ewdiag>div{padding:10px 8px;border-right:1px solid rgba(31,73,96,.25);border-bottom:1px solid rgba(31,73,96,.18)}.bt-ewdiag>div:nth-child(2n){border-right:0}.bt-ewdiag span,.bt-ewdiag small{display:block;color:#7891a2;font-size:7px;letter-spacing:.07em}.bt-ewdiag b{display:block;font-size:12px;margin:4px 0}.bt-ewphase{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.bt-ewphase span{border:1px solid rgba(31,73,96,.28);padding:6px 8px;font-size:7px;color:#7891a2}.bt-ewphase b{color:#e7edf2;margin-left:6px}.bt-empty-row{grid-column:1/-1;display:flex!important;justify-content:space-between!important;padding:10px 4px!important}.bt-empty-row span{color:#7891a2!important}
 </style>
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},250)}catch(e){}
 </script>
 
 
@@ -11782,7 +11792,7 @@ window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),bes
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},300)}catch(e){}
 })();
 </script>
 
@@ -11817,13 +11827,13 @@ window.btRegimeShiftTable=function(r){const xs=rsBuild(r?.tradeList||[]);if(xs.l
 const old672=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old672();h=h.replace('V3.3</span>','V3.5</span>').replace('V3.4</span>','V3.5</span>').replace('6.2 + WALK-FORWARD RESEARCH','6.2 + REGIME SHIFT RESEARCH').replace('V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research','V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeShiftTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',btRegimeShiftTable(BT_STATE.result)+'</div></div>')}return h};
 window.MERIDIAN_UI_VERSION='6.75';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');},350)}catch(e){}
 })();
 </script>
 
 <script id="v673-final-version-lock">
 (function(){
- const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
+ const apply=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75');};
  apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1100);setTimeout(apply,2500);
 })();
 </script>
@@ -11843,11 +11853,11 @@ function rvTable(title,rows){return `<div class="bt-rv-sub">${title}</div><div c
 window.btRegimeValidationTable=function(r){const xs=rvSorted(r?.tradeList||[]);if(xs.length<25)return'';const ws=rvWindows(xs,5);if(ws.length<5)return'';const train=btTradeStats(ws.slice(0,3).flat()),oos=btTradeStats(ws.slice(3).flat());const regimes=rvRows(ws,['BULL','BEAR','RANGE','TRANSITION'].map(k=>[k,t=>t.regime===k]));const dirs=rvRows(ws,[['LONG',t=>t.side==='LONG'],['SHORT',t=>t.side==='SHORT']]);const ews=rvRows(ws,[['EW W3',t=>t.ewAlign&&t.ewPhase==='W3'],['EW W4',t=>t.ewAlign&&t.ewPhase==='W4'],['EW W5',t=>t.ewAlign&&t.ewPhase==='W5'],['EW70',t=>t.ewAlign&&Number(t.ewConfidence)>=70],['EW+Q',t=>t.ewAlign&&Number(t.ewConfidence)>=60&&Number(t.technical)>=72&&Number(t.candidate)>=66]]);const syms=[...new Set(xs.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];const assets=rvRows(ws,syms.map(k=>[k,t=>String(t.symbol||'').replace('USDT','')===k])).sort((a,b)=>b.oos.trades-a.oos.trades);const pass=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='PASS').length;const fail=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='FAIL').length;return `<div class="bt-v2-title">REGIME VALIDATION LAB · W1–W3 → W4–W5 OOS</div><div class="bt-rv-summary"><div><span>TRAIN</span><b class="${train.pf>=1?'green':'red'}">PF ${fmt(train.pf,2)} · EXP ${train.expectancy>=0?'+':''}$${fmt(train.expectancy,0)}</b><small>W1–W3 · ${train.trades} trades</small></div><div><span>OOS</span><b class="${oos.pf>=1?'green':'red'}">PF ${fmt(oos.pf,2)} · EXP ${oos.expectancy>=0?'+':''}$${fmt(oos.expectancy,0)}</b><small>W4–W5 · ${oos.trades} trades</small></div><div><span>SEGMENT CHECK</span><b>${pass} PASS · ${fail} FAIL</b><small>PASS requires ≥10 OOS trades, PF≥1, EXP&gt;0</small></div></div>${rvTable('REGIME',regimes)}${rvTable('DIRECTION',dirs)}${rvTable('ELLIOTT / QUALITY',ews)}${rvTable('ASSET',assets)}<div class="bt-note">VALIDATION RULE: W1–W3 are the development sample; W4–W5 are held-out OOS diagnostics. No parameter is promoted from this table. WATCH means the OOS sample has fewer than 10 trades. PASS/FAIL is descriptive only and does not alter Engine 6.2.0 or the Paperbot.</div>`}
 const old674=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old674();h=h.replace('V3.5</span>','V3.6</span>').replace('6.2 + REGIME SHIFT RESEARCH','6.2 + REGIME VALIDATION RESEARCH').replace('V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research','V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeValidationTable(BT_STATE.result)+h.slice(pos);else h+=btRegimeValidationTable(BT_STATE.result)}return h};
-const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply674=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply674();document.addEventListener('DOMContentLoaded',apply674,{once:true});setTimeout(apply674,350);setTimeout(apply674,1200);setTimeout(apply674,2600);
 })();
 </script>
-<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
+<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
 
 
 <style id="v675-data-integrity-style">
@@ -11883,6 +11893,7 @@ window.btRunOne=btRunOne=async function(sym,days,index,total,fixedEnd){
   const end=Number(fixedEnd)||Date.now(),warm=34*86400000,warmStart=end-days*86400000-warm;
   BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · vollständige Daten laden …`;renderOne('daytrade');
   const k15=await btFetchKlines(sym,'15m',warmStart,end),k1=await btFetchKlines(sym,'1h',warmStart,end),k4=await btFetchKlines(sym,'4h',warmStart,end);
+  BT_CONT_CACHE[sym]={k15,k1,k4,start:end-days*86400000,end};
   const integrity=v675Integrity(sym,days,k15,k1,k4,end,warmStart);
   if(!integrity.valid){const x=integrity.tf.map(q=>`${q.interval} ${q.coverage.toFixed(1)}%`).join(' · ');throw new Error(`DATA INVALID ${sym.replace('USDT','')} · ${x} · benötigt ≥98%`)}
   BT_STATE.progress=`${index}/${total} ${sym.replace('USDT','')} · DATA VALID ${integrity.minCoverage.toFixed(1)}% · Replay …`;renderOne('daytrade');await new Promise(r=>setTimeout(r,20));
@@ -11907,11 +11918,11 @@ const oldBlock675=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock675();h=h.replace('V3.6</span>','V3.7</span>').replace('6.2 + REGIME VALIDATION RESEARCH','6.2 + DATA INTEGRITY VALIDATION').replace('V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research','V3.7 verifies full historical coverage and uses equal calendar-time Walk-Forward/OOS windows; all research-only');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+v675IntegrityHtml(BT_STATE.result)+h.slice(pos);else h+=v675IntegrityHtml(BT_STATE.result)}return h};
 // Old saved research results do not contain integrity proof: remove them once on v6.75.
 try{if(BT_STATE?.result&&!BT_STATE.result.dataIntegrity){BT_STATE={schema:70,running:false,result:null,error:null,progress:'v6.75: alter Backtest ohne Coverage-Nachweis verworfen · bitte neu starten.'};btSave();btClearCheckpoint()}}catch(e){}
-const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
+const apply675=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};
 apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});setTimeout(apply675,400);setTimeout(apply675,1800);setTimeout(apply675,4200);
 })();
 </script>
-<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.81 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
+<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.82 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 </body></html>
 
@@ -11971,7 +11982,7 @@ function btGateStateTimelineHtml(r){
   const data=rows.map(x=>({symbol:x.symbol,...btGateStateTimeline(x)}));
   const f=(o,k)=>o?dshort(o.at):'—';
   return `<div class="v678-gate-timeline">
-    <div class="title">GATE STATE TIMELINE · DAILY RESET VALIDATION · V3.13</div>
+    <div class="title">GATE STATE TIMELINE · DAILY RESET VALIDATION · V3.14</div>
     <div class="v678-gate-row head"><span>ASSET</span><span>FIRST DAY LOCK</span><span>UTC RESET / UNLOCK</span><span>TRADE AFTER RESET</span><span>FINAL STATE</span></div>
     ${data.map(x=>{
       const final=x.maxLock?'PERMANENT DD LOCK':(x.firstDayLock?(x.firstUnlock?'RESET OBSERVED':'NO RESET OBSERVED'):'NO DAY LOCK');
@@ -12014,7 +12025,7 @@ function btRiskGateHtml(r){
       <span class="${x.dailyLock?'amber':'green'}">${x.dailyLock?dshort(x.dailyLock.at)+' · '+fmt(x.dailyLock.dl,1)+'%':'NOT HIT'}</span>
       <b class="${x.maxLock?'red':x.dailyLock?'amber':'green'}">${x.maxLock?'PERMANENT DD LOCK':x.dailyLock?'DAY LOCK':'OPEN'}</b>
     </div>`).join('')}</div>
-    <div class="bt-note">V3.13 derives the first causal risk-gate breach from the historical equity path. MAX_DRAWDOWN is persistent because peak equity is not reset; DAILY_LOSS resets with the next UTC day. No replay thresholds or execution rules are changed.</div>`;
+    <div class="bt-note">V3.14 derives the first causal risk-gate breach from the historical equity path. MAX_DRAWDOWN is persistent because peak equity is not reset; DAILY_LOSS resets with the next UTC day. No replay thresholds or execution rules are changed.</div>`;
 }
 
 function replayDiagOne(r){
@@ -12028,9 +12039,9 @@ function replayDiagOne(r){
  return{symbol:r?.symbol,st,en,trades:xs.length,outside,first,last,activeDays,tailDays,halted,validTime:outside.length===0};
 }
 function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(replayDiagOne):[replayDiagOne(r)];return{items,validTime:items.every(x=>x.validTime),halted:items.filter(x=>x.halted).length};}
-function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.13 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
+function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.14 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
 const oldBlock=window.backtestLabBlock||backtestLabBlock;
-window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.13</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
+window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.14</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
 window.MERIDIAN_UI_VERSION='6.76';
 const apply=()=>{window.MERIDIAN_UI_VERSION='6.76';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.76 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.76')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();

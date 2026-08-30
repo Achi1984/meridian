@@ -1,0 +1,19 @@
+MERIDIAN v6.82 — RESEARCH CONTINUOUS RANGE FIX
+
+UI 6.82
+Backtest Lab V3.14
+Engine 6.2.0 unchanged
+Ruleset 6.2-SIGNAL-V1 unchanged
+Paperbot unchanged
+
+FIXED
+- Removed the fragile Date.now-based calendar construction from Research Continuous.
+- Windows are now anchored to the verified backtest result.start/result.end.
+- Effective historical loader now keeps the fetched 15m/1h/4h candles in an in-memory research cache.
+- Research Continuous replays each 20% window against that exact historical range.
+- Prevents 01.01.1970 window labels / zero-trade false result.
+
+IMPORTANT
+After uploading v6.82, RUN ALL ASSETS -> 90 DAYS once.
+The research cache is intentionally in-memory and is populated during that run.
+No 6.2 execution or risk logic is changed.
