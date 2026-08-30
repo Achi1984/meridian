@@ -1,0 +1,6 @@
+MERIDIAN v6.73
+- UI version source corrected: header/cockpit now 6.73
+- Backtest V3.5 robust loader: request timeout + up to 7 retries + backoff for network/429/5xx
+- Checkpoint selection persists after failure (asset + 30/90/180/365 days)
+- Resume remains asset-level and keeps the fixed historical end timestamp
+- Engine 6.2 / ruleset / risk / paper execution unchanged

@@ -1,1 +1,1 @@
-{"version":"6.72","ui":"6.72","backtest_lab":"V3.4","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Regime Shift Lab V1"}
+{"version":"6.73","ui":"6.73","backtest_lab":"V3.5","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Regime Shift Lab V1 + Robust Retry/Resume Loader"}
