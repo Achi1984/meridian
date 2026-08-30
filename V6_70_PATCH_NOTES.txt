@@ -1,0 +1,9 @@
+MERIDIAN v6.70
+- Based on the user's uploaded MERIDIAN v6.69 package; existing data.json and manifest are preserved.
+- Backtest Lab V3.2 adds resumable ALL ASSETS backtests.
+- A checkpoint is stored after each completed asset.
+- Re-running the same asset/timeframe resumes from the last completed asset instead of restarting at BTC.
+- The historical test end timestamp is frozen for the whole resumed run so results remain chronologically consistent.
+- Added checkpoint discard/reset control for a deliberate clean restart.
+- Elliott diagnostics, confirmed-pivot logic and chronological 60/20/20 Train/Validation/OOS remain intact.
+- No changes to Engine 6.2 signal logic, execution logic, risk logic, or cloud Paperbot.

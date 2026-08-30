@@ -1,5 +1,5 @@
 {
-  "version": "6.69",
-  "build": "2026-08-30-elliott-diagnostics-split-fix",
-  "notes": "Backtest Lab V3.1 resets stale backtest state, uses strict chronological trade-count 60/20/20 Train/Validation/OOS, adds Elliott coverage/pivot diagnostics, and stores EW pivot metadata. Paperbot execution and 6.2 rules remain unchanged."
+  "version": "6.70",
+  "build": "2026-08-30-resumable-multi-asset-backtest",
+  "notes": "Backtest Lab V3.2 adds resumable multi-asset historical backtests with per-asset checkpoints and a fixed run end timestamp. Elliott diagnostics and chronological 60/20/20 research splits remain active. Paperbot execution and 6.2 rules remain unchanged."
 }
