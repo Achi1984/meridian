@@ -12265,3 +12265,58 @@ window.MERIDIAN_UI_VERSION='6.76';
 const apply=()=>{window.MERIDIAN_UI_VERSION='6.76';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.76 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.76')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();
 </script>
+
+<style id="v686-paper-cockpit-style">
+/* v6.86 — unified compact Paper cockpit; presentation only */
+body[data-view="daytrade"] .v686-paper-shell{border:1px solid rgba(39,112,151,.45);border-radius:18px;padding:12px;margin:12px 0;background:rgba(2,12,18,.38)}
+body[data-view="daytrade"] .v686-paper-quick{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid rgba(39,112,151,.32);border-radius:14px;overflow:hidden;margin:10px 0 14px;background:rgba(5,18,27,.72)}
+body[data-view="daytrade"] .v686-paper-quick>div{padding:10px;border-right:1px solid rgba(39,112,151,.22)}
+body[data-view="daytrade"] .v686-paper-quick>div:last-child{border-right:0}
+body[data-view="daytrade"] .v686-paper-quick span,body[data-view="daytrade"] .v686-paper-quick small{display:block;color:#7890a2;font-size:6px;letter-spacing:.08em}
+body[data-view="daytrade"] .v686-paper-quick b{display:block;font-size:11px;margin:3px 0}
+body[data-view="daytrade"] .v686-paper-section{border:1px solid rgba(39,112,151,.28)!important;border-radius:14px!important;margin:10px 0!important;padding:0!important;background:rgba(2,12,18,.32)!important;overflow:hidden}
+body[data-view="daytrade"] .v686-paper-section>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px!important;list-style:none;cursor:pointer;color:#a9bac7;font-weight:800;letter-spacing:.10em;font-size:8px}
+body[data-view="daytrade"] .v686-paper-section>summary::-webkit-details-marker{display:none}
+body[data-view="daytrade"] .v686-paper-section>summary:after{content:'+';color:#38bdf8;font-size:15px}
+body[data-view="daytrade"] .v686-paper-section[open]>summary:after{content:'−'}
+body[data-view="daytrade"] .v686-paper-section[open]>summary{border-bottom:1px solid rgba(39,112,151,.25)}
+body[data-view="daytrade"] .v686-paper-section>.v686-body{padding:12px}
+body[data-view="daytrade"] .v686-shadow-forward{border:1px solid rgba(39,112,151,.42);border-radius:14px;overflow:hidden;margin:10px 0;background:rgba(4,16,24,.72)}
+body[data-view="daytrade"] .v686-shadow-forward .head{display:flex;justify-content:space-between;gap:10px;padding:11px 12px;background:rgba(7,25,36,.8)}
+body[data-view="daytrade"] .v686-shadow-forward .head span{font-size:7px;color:#7e96a8;letter-spacing:.1em}.v686-shadow-forward .head b{font-size:10px}.v686-shadow-forward .head strong{font-size:10px}
+body[data-view="daytrade"] .v686-shadow-forward .grid{display:grid;grid-template-columns:repeat(4,1fr)}
+body[data-view="daytrade"] .v686-shadow-forward .grid>div{padding:10px;border-right:1px solid rgba(39,112,151,.2)}.v686-shadow-forward .grid>div:last-child{border-right:0}
+body[data-view="daytrade"] .v686-shadow-forward .grid span,.v686-shadow-forward .grid small{display:block;color:#758d9e;font-size:6px}.v686-shadow-forward .grid b{font-size:10px;display:block;margin:3px 0}
+body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-top:1px solid rgba(39,112,151,.2);font-size:7px;color:#7f95a5;line-height:1.5}
+@media(max-width:700px){body[data-view="daytrade"] .v686-paper-quick,body[data-view="daytrade"] .v686-shadow-forward .grid{grid-template-columns:repeat(2,1fr)}body[data-view="daytrade"] .v686-paper-quick>div:nth-child(2){border-right:0}body[data-view="daytrade"] .v686-paper-quick>div:nth-child(-n+2){border-bottom:1px solid rgba(39,112,151,.22)}}
+</style>
+<script id="v686-paper-cockpit">
+(function(){
+ function money(v){v=Number(v||0);return (v>=0?'+':'−')+'$'+Math.abs(v).toLocaleString('de-DE',{maximumFractionDigits:0})}
+ function shadowReady(){
+   try{
+     const r=window.BT_STATE?.result||BT_STATE?.result;if(!r)return {ready:false,label:'NO BACKTEST',trades:0,pf:0,exp:0};
+     const xs=r.tradeList||[]; const s=typeof btTradeStats==='function'?btTradeStats(xs):null;
+     const ready=!!(r.mode==='BATCH' && Number(r.days)>=90 && xs.length>=200 && Number(s?.pf||r.avgPF||0)>=1.1 && Number(s?.expectancy||r.expectancy||0)>0);
+     return {ready,label:ready?'BACKTEST CANDIDATE':'HOLD',trades:xs.length||r.trades||0,pf:Number(s?.pf||r.avgPF||0),exp:Number(s?.expectancy||r.expectancy||0)};
+   }catch(e){return {ready:false,label:'HOLD',trades:0,pf:0,exp:0}}
+ }
+ function makeShadow(){const x=shadowReady();const d=document.createElement('div');d.className='v686-shadow-forward';d.innerHTML=`<div class="head"><div><span>SHADOW 6.3A · PARALLEL OBSERVATION</span><b>SOFT-SCORE RESEARCH · 6.2 EXECUTION UNCHANGED</b></div><strong class="${x.ready?'green':'amber'}">${x.label}</strong></div><div class="grid"><div><span>BACKTEST SAMPLE</span><b>${x.trades}</b><small>latest saved run</small></div><div><span>BACKTEST PF</span><b class="${x.pf>=1?'green':'red'}">${x.pf.toFixed(2).replace('.',',')}</b><small>diagnostic only</small></div><div><span>EXPECTANCY</span><b class="${x.exp>=0?'green':'red'}">${money(x.exp)}</b><small>per baseline trade</small></div><div><span>FORWARD SHADOW</span><b class="amber">0 TR</b><small>starts with new observations</small></div></div><div class="note">6.3A does not unlock the frozen 6.2 MAX-DD gate and does not place Paper trades. It is the comparison lane for future candidate scoring, trade frequency and opportunity cost before any separate Paper ledger is considered.</div>`;return d}
+ function wrapCard(card,label,open){if(!card||card.dataset.v686==='1')return;card.dataset.v686='1';const d=document.createElement('details');d.className='v686-paper-section';d.open=!!open;const s=document.createElement('summary');s.textContent=label;const b=document.createElement('div');b.className='v686-body';card.parentNode.insertBefore(d,card);d.append(s,b);b.appendChild(card);card.style.border='0';card.style.margin='0';card.style.padding='0';card.style.background='transparent'}
+ function apply(){
+   if(document.body.dataset.view!=='daytrade')return;
+   const main=[...document.querySelectorAll('.forecast-main')].find(x=>/CLOUD PAPER COCKPIT/.test(x.textContent||''));if(!main)return;
+   const first=main.closest('.card');if(!first)return;
+   const host=first.parentElement;if(host.dataset.v686paper==='1')return;host.dataset.v686paper='1';
+   const cards=[...host.children].filter(x=>x.classList?.contains('card'));
+   const title=c=>((c.querySelector('.section-title')?.textContent||c.querySelector('summary')?.textContent||'').trim());
+   const kpi=first.querySelector('.paper-kpis'); if(kpi){const vals=[...kpi.querySelectorAll('.kpi-card')];const q=document.createElement('div');q.className='v686-paper-quick';q.innerHTML=vals.slice(0,4).map(v=>`<div>${v.innerHTML}</div>`).join('');first.appendChild(q);kpi.style.display='none'}
+   if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
+   cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
+   host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
+   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 6.86');
+ }
+ new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
+})();
+</script>
+<script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v6.86 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>

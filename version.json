@@ -1,1 +1,9 @@
-{"version":"6.85","ui":"6.85","backtest_lab":"V3.17","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Shadow 6.3A readiness spec driven by Edge Map stability; soft-score only; no execution change"}
+{
+  "version": "6.86",
+  "ui": "6.86",
+  "backtest_lab": "V3.17",
+  "engine": "6.2.0",
+  "ruleset": "6.2-SIGNAL-V1",
+  "evidence": "6.53",
+  "research": "Paper cockpit compact accordions + Shadow 6.3A forward observation lane; no execution change"
+}

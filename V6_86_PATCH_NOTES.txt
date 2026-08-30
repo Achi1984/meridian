@@ -1,0 +1,6 @@
+MERIDIAN v6.86
+- Compact unified Paper cockpit with restrained borders and accordions
+- Shadow 6.3A parallel-observation status lane
+- Forward shadow starts at 0 trades; no retroactive forward evidence
+- Frozen Engine 6.2.0 / ruleset 6.2-SIGNAL-V1 unchanged
+- MAX-DD lock unchanged; no Paper/live execution change
