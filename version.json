@@ -1,1 +1,1 @@
-{"version":"6.87","ui":"6.87","backtest_lab":"V3.18","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","build":"6.87-20260830","research":"Cache/PWA invalidation + forced runtime version synchronization; Paper/Shadow behavior unchanged"}
+{"version":"6.88","ui":"6.88","backtest_lab":"V3.19","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Persistent Northflank Cloud Backtest Jobs; iPhone-independent; no execution change"}
