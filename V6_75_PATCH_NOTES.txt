@@ -1,0 +1,9 @@
+MERIDIAN v6.75 FULL
+- Data Integrity Layer: requested vs loaded coverage for 15m / 1h / 4h per asset
+- Backtest requires >=98% historical coverage and 4h warmup coverage before replay
+- Replay is pinned to checkpoint endTs on resume; no Date.now drift
+- 5 Walk-Forward windows now use equal CALENDAR TIME, not equal trade counts
+- Regime Validation W1-W3 vs W4-W5 now uses held-out calendar time
+- Old backtests without integrity proof are invalidated once
+- UI version hard-locked to 6.75
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Paperbot unchanged
