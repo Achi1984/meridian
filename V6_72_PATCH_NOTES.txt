@@ -1,0 +1,11 @@
+MERIDIAN v6.72 FULL
+- Backtest Lab V3.4: Regime Shift Lab V1 (research-only)
+- Causal GREEN / CAUTION / RED shadow-state from PRIOR closed trades only
+- Rolling PF + expectancy: 24-trade context and latest 12-trade context
+- Shift detection via recent-vs-prior expectancy change
+- Prior performance by current regime and direction included
+- GREEN-only / GREEN+CAUTION counterfactual performance
+- Blocked-losses vs sacrificed-winners diagnostics
+- Five-window regime-gate walk-forward readout
+- Elliott / Walk-Forward / Checkpoints retained
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Paperbot unchanged
