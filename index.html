@@ -12224,7 +12224,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  let timer=null,busy=false;
  const money=n=>{n=Number(n)||0;return (n<0?'-$':'+$')+Math.abs(n).toLocaleString('de-DE',{maximumFractionDigits:0})};
  function findLab(){return [...document.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'))?.parentElement?.parentElement||null}
- function card(){let el=document.getElementById('v688-cloudbt-card');if(el)return el;const lab=findLab();if(!lab)return null;el=document.createElement('div');el.id='v688-cloudbt-card';el.className='v688-cloudbt';el.innerHTML=`<div class="v688-cloudbt-h"><div><span>CLOUD BACKTEST · NORTHFLANK</span><b>24/7 SERVER · IPHONE DARF GESPERRT WERDEN</b></div><strong id="v688-cb-state" class="amber">IDLE</strong></div><div class="v688-cloudbt-body"><div class="v688-cloudbt-grid"><div><small>PROGRESS</small><strong id="v688-cb-pct">0%</strong></div><div><small>ASSET</small><strong id="v688-cb-asset">—</strong></div><div><small>TRADES</small><strong id="v688-cb-tr">—</strong></div><div><small>P&L / PF</small><strong id="v688-cb-res">—</strong></div></div><div class="v688-cloudbt-actions"><button id="v688-cb-start">☁ CLOUD BACKTEST STARTEN</button><button id="v688-cb-refresh">STATUS LADEN</button></div><div class="v688-cloudbt-note">Der Job läuft auf Northflank weiter, auch wenn Safari geschlossen oder das iPhone gesperrt wird. Ergebnisse bleiben in PostgreSQL gespeichert. Paperbot 6.2 läuft getrennt weiter.</div></div>`;const btn=[...lab.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'));btn?.parentElement?.insertAdjacentElement('afterend',el);el.querySelector('#v688-cb-start').onclick=start;el.querySelector('#v688-cb-refresh').onclick=latest;latest();return el}
+ window.v688CloudCard=card;function card(){let el=document.getElementById('v688-cloudbt-card');if(el)return el;const lab=findLab();if(!lab)return null;el=document.createElement('div');el.id='v688-cloudbt-card';el.className='v688-cloudbt';el.innerHTML=`<div class="v688-cloudbt-h"><div><span>CLOUD BACKTEST · NORTHFLANK</span><b>24/7 SERVER · IPHONE DARF GESPERRT WERDEN</b></div><strong id="v688-cb-state" class="amber">IDLE</strong></div><div class="v688-cloudbt-body"><div class="v688-cloudbt-grid"><div><small>PROGRESS</small><strong id="v688-cb-pct">0%</strong></div><div><small>ASSET</small><strong id="v688-cb-asset">—</strong></div><div><small>TRADES</small><strong id="v688-cb-tr">—</strong></div><div><small>P&L / PF</small><strong id="v688-cb-res">—</strong></div></div><div class="v688-cloudbt-actions"><button id="v688-cb-start">☁ CLOUD BACKTEST STARTEN</button><button id="v688-cb-refresh">STATUS LADEN</button></div><div class="v688-cloudbt-note">Der Job läuft auf Northflank weiter, auch wenn Safari geschlossen oder das iPhone gesperrt wird. Ergebnisse bleiben in PostgreSQL gespeichert. Paperbot 6.2 läuft getrennt weiter.</div></div>`;const btn=[...lab.querySelectorAll('button')].find(b=>(b.textContent||'').includes('BACKTEST STARTEN'));btn?.parentElement?.insertAdjacentElement('afterend',el);el.querySelector('#v688-cb-start').onclick=start;el.querySelector('#v688-cb-refresh').onclick=latest;latest();return el}
  async function req(path,opt){const r=await fetch(API+path,{cache:'no-store',headers:{'content-type':'application/json'},...opt});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
  function paint(j){const el=card();if(!el)return;const st=String(j?.status||'NONE').toUpperCase(),p=j?.progress||{},sum=j?.result?.summary||{};const state=el.querySelector('#v688-cb-state');state.textContent=st;state.className=st==='DONE'?'ok':st==='ERROR'?'bad':'amber';el.querySelector('#v688-cb-pct').textContent=(p.pct??(st==='DONE'?100:0))+'%';el.querySelector('#v688-cb-asset').textContent=(p.asset||'—').replace('USDT','');el.querySelector('#v688-cb-tr').textContent=sum.trades??'—';el.querySelector('#v688-cb-res').textContent=st==='DONE'?`${money(sum.pnl)} · PF ${Number(sum.pf||0).toFixed(2)}`:(j.error||'—');el.querySelector('#v688-cb-start').disabled=st==='RUNNING'||st==='QUEUED';if(st==='RUNNING'||st==='QUEUED')poll();}
  async function latest(){try{paint(await req('/api/backtests/latest'))}catch(e){const el=card();if(el){el.querySelector('#v688-cb-state').textContent='BACKEND UPDATE NEEDED';el.querySelector('#v688-cb-state').className='bad'}}}
@@ -12233,7 +12233,49 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  function install(){card()}
  new MutationObserver(()=>setTimeout(install,30)).observe(document.body,{childList:true,subtree:true});setTimeout(install,500);
 })();
-</script></body></html>
+</script>
+<style id="v690-cloud-first-fix">
+#v688-cloudbt-card{margin:14px 0!important;border:1px solid rgba(56,189,248,.55)!important;box-shadow:0 0 0 1px rgba(56,189,248,.08) inset}
+#v690-local-label{margin:10px 0 5px;color:#71889a;font-size:7px;letter-spacing:.12em;text-align:center}
+</style>
+<script id="v690-cloud-first-fix-script">
+(function(){
+ const apply=()=>{
+  const vb=document.getElementById('versionBadge'); if(vb) vb.textContent='v6.90 · LIVE';
+  document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.90');
+  // Backtest badge: make deployed UI unmistakable.
+  document.querySelectorAll('*').forEach(el=>{if(el.children.length===0 && el.textContent?.trim()==='V3.19') el.textContent='V3.20';});
+  if(document.body.dataset.view!=='daytrade') return;
+  let lab=[...document.querySelectorAll('.card,details,.v686-paper-section')].find(x=>/BACKTEST LAB/.test(x.textContent||'') && /REPLAY INTEGRITY/.test(x.textContent||''));
+  if(!lab) return;
+  // Existing cloud controller from 6.89; force creation even when a local checkpoint changed the old button to FORTSETZEN.
+  let cloud=document.getElementById('v688-cloudbt-card');
+  if(!cloud && typeof window.v688CloudCard==='function'){try{cloud=window.v688CloudCard()}catch(e){}}
+  if(!cloud){
+    // Trigger the 6.89 card builder by temporarily providing the label it expects.
+    const buttons=[...lab.querySelectorAll('button')];
+    const local=buttons.find(b=>/FORTSETZEN|LOKALER BACKTEST|BACKTEST STARTEN/.test(b.textContent||''));
+    if(local){const old=local.textContent;local.textContent='BACKTEST STARTEN';try{document.dispatchEvent(new Event('meridian-cloud-card-refresh'))}catch(e){};setTimeout(()=>{local.textContent=old},0)}
+  }
+  cloud=document.getElementById('v688-cloudbt-card');
+  const local=[...lab.querySelectorAll('button')].find(b=>/FORTSETZEN|LOKALER BACKTEST|BACKTEST STARTEN/.test(b.textContent||'') && !/CLOUD/.test(b.textContent||''));
+  if(local){
+    const m=(local.textContent||'').match(/(\d+\/\d+)/); local.textContent='LOKALER FALLBACK'+(m?' · '+m[1]:'');
+    local.title='Nur lokaler Fallback – stoppt bei iPhone-Sperre';
+    if(!document.getElementById('v690-local-label')){const n=document.createElement('div');n.id='v690-local-label';n.textContent='LOKALER FALLBACK · IPHONE MUSS AKTIV BLEIBEN';local.insertAdjacentElement('beforebegin',n)}
+  }
+  if(cloud){
+    // Put cloud control before local fallback, regardless of checkpoint state.
+    const anchor=document.getElementById('v690-local-label')||local;
+    if(anchor && cloud.nextElementSibling!==anchor) anchor.insertAdjacentElement('beforebegin',cloud);
+  }
+ };
+ new MutationObserver(()=>setTimeout(apply,20)).observe(document.body,{subtree:true,childList:true});
+ document.addEventListener('DOMContentLoaded',apply,{once:true}); setTimeout(apply,200);setTimeout(apply,800);setTimeout(apply,1800);setInterval(apply,4000);
+})();
+</script>
+
+</body></html>
 
 <style id="v676-replay-integrity-style">
 .bt-ri{margin:10px 0 14px;border-top:1px solid rgba(31,73,96,.35);border-bottom:1px solid rgba(31,73,96,.35)}

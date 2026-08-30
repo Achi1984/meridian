@@ -1,1 +1,1 @@
-{"version":"6.89","ui":"6.89","backtest_lab":"V3.20","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","cloud_backtest":"1.1","research":"Cloud-first backtest UI with confirmed job ID; local replay retained as explicit fallback"}
+{"version":"6.90","ui":"6.90","backtest_lab":"V3.20","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","cloud_backtest":"1.2","research":"Cloud-first dashboard fix: cloud control survives local checkpoint/resume state; local replay explicit fallback"}
