@@ -11593,3 +11593,33 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 <script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='6.75';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.75 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.75')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 </body></html>
+
+<style id="v676-replay-integrity-style">
+.bt-ri{margin:10px 0 14px;border-top:1px solid rgba(31,73,96,.35);border-bottom:1px solid rgba(31,73,96,.35)}
+.bt-ri-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.bt-ri-summary>div{padding:10px 8px;border-right:1px solid rgba(31,73,96,.22)}.bt-ri-summary>div:last-child{border-right:0}.bt-ri-summary span,.bt-ri-summary small{display:block;color:#7891a2;font-size:7px}.bt-ri-summary b{display:block;font-size:11px;margin:4px 0}.ri-ok{color:#22d998}.ri-bad{color:#ff5964}.ri-warn{color:#e8b84d}
+.bt-ri-assets{font-size:8px;margin-top:8px}.bt-ri-assets>div{display:grid;grid-template-columns:.8fr .8fr .8fr .7fr;gap:7px;padding:7px 2px;border-bottom:1px solid rgba(31,73,96,.2)}.bt-ri-assets .head{color:#6f8798;font-size:7px;letter-spacing:.08em}
+@media(max-width:520px){.bt-ri-summary{grid-template-columns:1fr}.bt-ri-summary>div{border-right:0;border-bottom:1px solid rgba(31,73,96,.18)}}
+</style>
+<script id="v676-replay-integrity">
+(function(){
+const DAY=86400000;
+const dshort=ts=>Number.isFinite(Number(ts))?new Date(Number(ts)).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
+function tradeTime(t){return Number(t?.openedAt??t?.entryTime??t?.closedAt)}
+function replayDiagOne(r){
+ const st=Number(r?.start),en=Number(r?.end),xs=(r?.tradeList||[]).filter(t=>Number.isFinite(tradeTime(t))&&Number.isFinite(Number(t.closedAt))).slice().sort((a,b)=>tradeTime(a)-tradeTime(b));
+ const outside=xs.filter(t=>tradeTime(t)<st||Number(t.closedAt)>en||Number(t.closedAt)<tradeTime(t));
+ const first=xs.length?tradeTime(xs[0]):null,last=xs.length?Number(xs.at(-1).closedAt):null;
+ const activeDays=first!=null&&last!=null?Math.max(0,(last-first)/DAY):0;
+ const tailDays=last!=null?Math.max(0,(en-last)/DAY):(en-st)/DAY;
+ // Baseline 6.2 contains an 8% max-drawdown stop. A long empty tail after trades have already occurred is therefore a HALT diagnostic, not a timestamp error.
+ const halted=xs.length>0&&tailDays>Math.max(2,(en-st)/DAY*.10);
+ return{symbol:r?.symbol,st,en,trades:xs.length,outside,first,last,activeDays,tailDays,halted,validTime:outside.length===0};
+}
+function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(replayDiagOne):[replayDiagOne(r)];return{items,validTime:items.every(x=>x.validTime),halted:items.filter(x=>x.halted).length};}
+function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.8 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
+const oldBlock=window.backtestLabBlock||backtestLabBlock;
+window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.8</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker);if(p>=0)h=h.slice(0,p)+riHtml(BT_STATE.result)+h.slice(p);else h+=riHtml(BT_STATE.result)}return h};
+window.MERIDIAN_UI_VERSION='6.76';
+const apply=()=>{window.MERIDIAN_UI_VERSION='6.76';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.76 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.76')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
+})();
+</script>
