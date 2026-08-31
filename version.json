@@ -1,1 +1,1 @@
-{"version":"7.09","ui":"7.09","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"V3.21 validation gate: fresh-window coverage, OOS W4-W5, stability and halt diagnostics; no execution change"}
+{"version":"7.10","ui":"7.10","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Minimal deployment package; v7.09 validation gate retained; no execution change"}
