@@ -5,11 +5,12 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
+<meta name="meridian-build" content="7.17-20260831-R1">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=6.30">
+<link rel="manifest" href="manifest.webmanifest?v=7.17-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=20260824-2315">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.17-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -3237,7 +3238,7 @@ main>section{
 
 <script id="v601-cache-migration">
 (function(){
-  const BUILD='6.01';
+  const BUILD='7.17-20260831-R1';
   try{
     const last=localStorage.getItem('meridian-active-build');
     if(last!==BUILD){
@@ -4316,7 +4317,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
   <button class="nav" data-view="paper"><span>◫</span>PAPER</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
-<script src="app-v6.06.js?v=20260824-2315"></script>
+<script src="app-v6.06.js?v=7.17-R1"></script>
 
 <script id="meridian-dynamic-liq-guard-v5103">
 (function(){
@@ -4387,7 +4388,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='7.15';
+const UI_VERSION='7.17';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -11984,8 +11985,8 @@ function v671Research(trades){const windows=v671Windows(trades,5);const variants
 window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),best=z.variants.slice().sort((a,b)=>b.score-a.score||b.expectancy-a.expectancy)[0];if(!z.windows.length)return'';const sc=x=>x>=70?'score-hi':x>=50?'score-mid':'score-low';return `<div class="bt-v2-title">WALK-FORWARD · 5 CHRONO WINDOWS</div><div class="bt-wf-summary"><div><span>BEST STABILITY</span><b class="${sc(best.score)}">${best.name} · ${best.score}/100</b><small>${best.positive}/5 positive windows</small></div><div><span>RULE</span><b>NO PROMOTION</b><small>research-only · OOS discipline</small></div><div><span>WINDOWS</span><b>5 × 20%</b><small>strict chronological trades</small></div></div><div class="bt-wf"><div class="head"><span>VARIANTE</span><span>SCORE</span><span>POS</span><span>PF</span><span>EXP</span></div>${z.variants.map(x=>`<div><b>${x.name}</b><span class="${sc(x.score)}">${x.score}</span><span>${x.positive}/5</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span></div>`).join('')}</div><div class="bt-windows">${z.windows.map((w,i)=>`<div class="bt-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b>${z.variants.map(v=>{const x=v.windows[i];return `<span>${v.name}<em class="${x.expectancy>=0?'green':'red'}">${x.trades} TR · PF ${fmt(x.pf,2)} · EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</em></span>`}).join('')}</div>`).join('')}</div><div class="bt-note">STABILITY SCORE: 50% Anteil positiver Expectancy-Fenster + 30% Anteil PF≥1 + 20% Anteil Fenster mit ≥10 Trades. Der Score dient nur zum Vergleich der Robustheit; er verändert weder 6.2 noch den Paperbot.</div>`}
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
-window.MERIDIAN_UI_VERSION='7.16';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15');},300)}catch(e){}
+window.MERIDIAN_UI_VERSION='7.17';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17');},300)}catch(e){}
 })();
 </script>
 
@@ -12019,14 +12020,14 @@ function rsBlocked(xs,fn){const blocked=xs.filter(t=>!fn(t));return{n:blocked.le
 window.btRegimeShiftTable=function(r){const xs=rsBuild(r?.tradeList||[]);if(xs.length<10)return'';const base=rsStats(xs),g=rsGateStats(xs,t=>t._rs.state==='GREEN'),gc=rsGateStats(xs,t=>t._rs.state!=='RED'),states=['GREEN','CAUTION','RED'].map(s=>({name:s,...rsStateStats(xs,s)}));const bg=rsBlocked(xs,t=>t._rs.state==='GREEN'),bgc=rsBlocked(xs,t=>t._rs.state!=='RED');const wins=rsWindowData(xs,5);const last=xs.at(-1)?._rs||{};const stateCls=s=>s==='GREEN'?'state-green':s==='RED'?'state-red':'state-caution';return `<div class="bt-v2-title">REGIME SHIFT LAB · NO LOOK-AHEAD SHADOW</div><div class="bt-rs-summary"><div><span>LATEST STATE</span><b class="${stateCls(last.state)}">${last.state||'—'} · ${last.score??'—'}/100</b><small>based on prior closed trades</small></div><div><span>GREEN ONLY</span><b class="${g.pf>=1?'green':'red'}">PF ${fmt(g.pf,2)} · ${g.expectancy>=0?'+':''}$${fmt(g.expectancy,0)}</b><small>${g.trades} trades</small></div><div><span>NO RED</span><b class="${gc.pf>=1?'green':'red'}">PF ${fmt(gc.pf,2)} · ${gc.expectancy>=0?'+':''}$${fmt(gc.expectancy,0)}</b><small>${gc.trades} trades</small></div><div><span>BASE</span><b class="${base.pf>=1?'green':'red'}">PF ${fmt(base.pf,2)} · ${base.expectancy>=0?'+':''}$${fmt(base.expectancy,0)}</b><small>${base.trades} trades</small></div></div><div class="bt-rs-state">${states.map(x=>`<div><span>${x.name}</span><b class="${stateCls(x.name)}">${x.trades} TR · PF ${fmt(x.pf,2)}</b><small>EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)} · P&L ${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</small></div>`).join('')}</div><div class="bt-rs-table"><div class="head"><span>VARIANTE</span><span>TR</span><span>PF</span><span>EXP</span><span>P&L</span></div>${[['BASE',base],['GREEN ONLY',g],['GREEN+CAUTION',gc]].map(([n,x])=>`<div><b>${n}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span></div>`).join('')}</div><div class="bt-rs-windows">${wins.map(w=>`<div class="bt-rs-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b><span>BASE<em class="${w.base.expectancy>=0?'green':'red'}">PF ${fmt(w.base.pf,2)} · EXP ${w.base.expectancy>=0?'+':''}$${fmt(w.base.expectancy,0)}</em></span><span>GREEN ONLY<em class="${w.green.expectancy>=0?'green':'red'}">${w.green.trades} TR · PF ${fmt(w.green.pf,2)} · EXP ${w.green.expectancy>=0?'+':''}$${fmt(w.green.expectancy,0)}</em></span><span>NO RED<em class="${w.greenCaution.expectancy>=0?'green':'red'}">${w.greenCaution.trades} TR · PF ${fmt(w.greenCaution.pf,2)} · EXP ${w.greenCaution.expectancy>=0?'+':''}$${fmt(w.greenCaution.expectancy,0)}</em></span></div>`).join('')}</div><div class="bt-note">SHIFT SCORE V1 nutzt ausschließlich bereits geschlossene vorherige Trades: Rolling PF/Expectancy (24 + 12 Trades), Veränderung gegenüber dem vorherigen 12er-Fenster sowie bisherige Performance des aktuell bekannten Regimes und der Richtung. GREEN ≥65, RED &lt;40, sonst CAUTION. GREEN-only hätte ${bg.n} Trades blockiert (${bg.losses} Verlierer / ${bg.wins} Gewinner; blockiertes P&L ${bg.pnl>=0?'+':''}$${fmt(bg.pnl,0)}). NO-RED hätte ${bgc.n} Trades blockiert (${bgc.losses}/${bgc.wins}; ${bgc.pnl>=0?'+':''}$${fmt(bgc.pnl,0)}). Research-only: kein Entry-Gate, keine Änderung an 6.2/Paperbot.</div>`}
 const old672=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old672();h=h.replace('V3.3</span>','V3.5</span>').replace('V3.4</span>','V3.5</span>').replace('6.2 + WALK-FORWARD RESEARCH','6.2 + REGIME SHIFT RESEARCH').replace('V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research','V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeShiftTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',btRegimeShiftTable(BT_STATE.result)+'</div></div>')}return h};
-window.MERIDIAN_UI_VERSION='7.16';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15');},350)}catch(e){}
+window.MERIDIAN_UI_VERSION='7.17';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17');},350)}catch(e){}
 })();
 </script>
 
 <script id="v673-final-version-lock">
 (function(){
- const apply=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15');};
+ const apply=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17');};
  apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1100);setTimeout(apply,2500);
 })();
 </script>
@@ -12046,11 +12047,11 @@ function rvTable(title,rows){return `<div class="bt-rv-sub">${title}</div><div c
 window.btRegimeValidationTable=function(r){const xs=rvSorted(r?.tradeList||[]);if(xs.length<25)return'';const ws=rvWindows(xs,5);if(ws.length<5)return'';const train=btTradeStats(ws.slice(0,3).flat()),oos=btTradeStats(ws.slice(3).flat());const regimes=rvRows(ws,['BULL','BEAR','RANGE','TRANSITION'].map(k=>[k,t=>t.regime===k]));const dirs=rvRows(ws,[['LONG',t=>t.side==='LONG'],['SHORT',t=>t.side==='SHORT']]);const ews=rvRows(ws,[['EW W3',t=>t.ewAlign&&t.ewPhase==='W3'],['EW W4',t=>t.ewAlign&&t.ewPhase==='W4'],['EW W5',t=>t.ewAlign&&t.ewPhase==='W5'],['EW70',t=>t.ewAlign&&Number(t.ewConfidence)>=70],['EW+Q',t=>t.ewAlign&&Number(t.ewConfidence)>=60&&Number(t.technical)>=72&&Number(t.candidate)>=66]]);const syms=[...new Set(xs.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];const assets=rvRows(ws,syms.map(k=>[k,t=>String(t.symbol||'').replace('USDT','')===k])).sort((a,b)=>b.oos.trades-a.oos.trades);const pass=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='PASS').length;const fail=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='FAIL').length;return `<div class="bt-v2-title">REGIME VALIDATION LAB · W1–W3 → W4–W5 OOS</div><div class="bt-rv-summary"><div><span>TRAIN</span><b class="${train.pf>=1?'green':'red'}">PF ${fmt(train.pf,2)} · EXP ${train.expectancy>=0?'+':''}$${fmt(train.expectancy,0)}</b><small>W1–W3 · ${train.trades} trades</small></div><div><span>OOS</span><b class="${oos.pf>=1?'green':'red'}">PF ${fmt(oos.pf,2)} · EXP ${oos.expectancy>=0?'+':''}$${fmt(oos.expectancy,0)}</b><small>W4–W5 · ${oos.trades} trades</small></div><div><span>SEGMENT CHECK</span><b>${pass} PASS · ${fail} FAIL</b><small>PASS requires ≥10 OOS trades, PF≥1, EXP&gt;0</small></div></div>${rvTable('REGIME',regimes)}${rvTable('DIRECTION',dirs)}${rvTable('ELLIOTT / QUALITY',ews)}${rvTable('ASSET',assets)}<div class="bt-note">VALIDATION RULE: W1–W3 are the development sample; W4–W5 are held-out OOS diagnostics. No parameter is promoted from this table. WATCH means the OOS sample has fewer than 10 trades. PASS/FAIL is descriptive only and does not alter Engine 6.2.0 or the Paperbot.</div>`}
 const old674=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old674();h=h.replace('V3.5</span>','V3.6</span>').replace('6.2 + REGIME SHIFT RESEARCH','6.2 + REGIME VALIDATION RESEARCH').replace('V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research','V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeValidationTable(BT_STATE.result)+h.slice(pos);else h+=btRegimeValidationTable(BT_STATE.result)}return h};
-const apply674=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15')};
+const apply674=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17')};
 apply674();document.addEventListener('DOMContentLoaded',apply674,{once:true});setTimeout(apply674,350);setTimeout(apply674,1200);setTimeout(apply674,2600);
 })();
 </script>
-<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
+<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
 
 
 <style id="v675-data-integrity-style">
@@ -12112,11 +12113,11 @@ const oldBlock675=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock675();h=h.replace('V3.6</span>','V3.7</span>').replace('6.2 + REGIME VALIDATION RESEARCH','6.2 + DATA INTEGRITY VALIDATION').replace('V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research','V3.7 verifies full historical coverage and uses equal calendar-time Walk-Forward/OOS windows; all research-only');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+v675IntegrityHtml(BT_STATE.result)+h.slice(pos);else h+=v675IntegrityHtml(BT_STATE.result)}return h};
 // Old saved research results do not contain integrity proof: remove them once on v6.75.
 try{if(BT_STATE?.result&&!BT_STATE.result.dataIntegrity){BT_STATE={schema:70,running:false,result:null,error:null,progress:'v6.75: alter Backtest ohne Coverage-Nachweis verworfen · bitte neu starten.'};btSave();btClearCheckpoint()}}catch(e){}
-const apply675=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15')};
+const apply675=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17')};
 apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});setTimeout(apply675,400);setTimeout(apply675,1800);setTimeout(apply675,4200);
 })();
 </script>
-<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
+<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 
 <script>
@@ -12185,14 +12186,14 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 
 <script id="v687-cache-bust">
 (function(){
-  const BUILD='7.15-20260831';
+  const BUILD='7.17-20260831';
   window.__MERIDIAN_BUILD__=BUILD;
 
   // Force visible version labels if any legacy static text survived older patches.
   function stamp(){
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
     const repl=[
-      [/v6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)\s*·\s*LIVE/g,'v7.16 · LIVE'],
+      [/v6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)\s*·\s*LIVE/g,'v7.17 · LIVE'],
       [/UI\s+6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)/g,'UI 7.02'],
       [/EXECUTION RISK GATE\s*·\s*v6\.(?:77|78|79|80|81|82|83|84|85|86)/g,'EXECUTION RISK GATE · v6.94']
     ];
@@ -12262,7 +12263,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 (function(){
  'use strict';
  function apply(){
-   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v7.16 · LIVE';
+   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v7.17 · LIVE';
    if(document.body.dataset.view!=='paper' && document.body.dataset.view!=='daytrade') return;
    const lab=[...document.querySelectorAll('.bt-lab')].find(Boolean); if(!lab) return;
    const head=lab.querySelector('.bt-head .tag'); if(head) head.textContent='V3.20';
@@ -12463,8 +12464,8 @@ function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(re
 function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.19 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
 const oldBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.19</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result)+btEdgeMapHtml(BT_STATE.result)+btShadow63Html(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
-window.MERIDIAN_UI_VERSION='7.16';
-const apply=()=>{window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.15')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
+window.MERIDIAN_UI_VERSION='7.17';
+const apply=()=>{window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.17')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();
 </script>
 
@@ -12516,13 +12517,13 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
    if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
    cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
    host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
-   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 7.15');
+   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 7.17');
    setTimeout(()=>window.MERIDIAN_PAPER_VALIDATE_UI?.(),0);
  }
  new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
 })();
 </script>
-<script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
+<script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
 
 
 
@@ -12552,7 +12553,7 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 (function(){
  'use strict';
  function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
- function version(){window.MERIDIAN_UI_VERSION='7.16';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.16 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.15');}
+ function version(){window.MERIDIAN_UI_VERSION='7.17';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.17 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.17');}
  function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
  function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
    const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
@@ -12585,7 +12586,7 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 
 
 
-<!-- v7.15 FORWARD A/B COMPARISON DASHBOARD -->
+<!-- v7.17 FORWARD A/B COMPARISON DASHBOARD -->
 <style id="v714-ab-dashboard-style">
 body[data-view="paper"] .v708-abdash{margin:14px 0 18px;border:1px solid #236486;border-radius:19px;padding:14px;background:linear-gradient(180deg,rgba(5,26,38,.88),rgba(2,13,20,.72))}.v708-abhead{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:7px}.v708-abhead span{font-size:10px;font-weight:900;letter-spacing:.16em;color:#a8bac7}.v708-abhead b{font-size:8px;color:#38bdf8;border:1px solid #1787bd;border-radius:999px;padding:4px 8px;letter-spacing:.12em}.v714-start{font-size:7px;color:#718b9d;letter-spacing:.08em;margin-bottom:11px}.v708-cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}.v708-bot{border:1px solid #1c4359;border-radius:15px;padding:11px;min-width:0}.v708-bot.base{border-color:#71343c}.v708-bot.shadow{border-color:#17684a}.v708-bot h4{margin:0 0 3px;font-size:11px;letter-spacing:.08em}.v708-bot small{display:block;font-size:7px;letter-spacing:.09em;color:#7f95a5;min-height:18px}.v708-kpis{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-kpis div{border-top:1px solid #173748;padding-top:6px}.v708-kpis span,.v714-deltas span,.v714-counts span{display:block;font-size:6.5px;color:#718b9d;letter-spacing:.1em}.v708-kpis strong{display:block;margin-top:2px;font-size:11px}.v708-red{color:#ff5964}.v708-green{color:#22d98a}.v708-blue{color:#38bdf8}.v708-amber{color:#f0b84b}.v714-deltas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}.v714-deltas div,.v714-counts div{border:1px solid #173d52;border-radius:10px;padding:7px;min-width:0}.v714-deltas b,.v714-counts b{display:block;font-size:8px;margin-top:3px}.v714-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.v708-verdict{margin-top:10px;border-top:1px solid #1b4359;padding-top:10px}.v708-verdict-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.v708-verdict-top span{font-size:7px;color:#7f96a7;letter-spacing:.12em}.v708-verdict-top b{font-size:9px;color:#f0b84b}.v708-bar{height:5px;border:1px solid #1d455d;border-radius:999px;overflow:hidden;margin:7px 0;background:#07131e}.v708-bar i{display:block;height:100%;background:#20a4ff}.v708-note{font-size:7px;line-height:1.45;color:#8197a7}.v708-diverge{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-diverge div{border:1px solid #173d52;border-radius:11px;padding:7px}.v708-diverge span{display:block;font-size:6px;color:#718b9d;letter-spacing:.08em}.v708-diverge b{font-size:8px;display:block;margin-top:3px;white-space:normal}@media(max-width:390px){.v708-kpis{grid-template-columns:1fr}.v708-bot{padding:9px}.v708-kpis strong{font-size:10px}.v714-deltas,.v714-counts{grid-template-columns:1fr 1fr}}
 </style>
@@ -12629,7 +12630,7 @@ main>section:not(.hidden){content-visibility:visible}
 <script id="v705-nav-js">
 (function(){
  'use strict';
- const VER='7.16';
+ const VER='7.17';
  const rawRenderOne=(typeof renderOne==='function')?renderOne:null;
  let lastPointer={view:'',ts:0};
  function stamp(){
@@ -12723,7 +12724,7 @@ body[data-view="paper"] .v686-paper-quick{display:none!important}
 <script id="v706-paper-validation-js">
 (function(){
  'use strict';
- const VER='7.16';
+ const VER='7.17';
  function stamp(){try{window.MERIDIAN_UI_VERSION=VER;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+VER+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER)}catch(_e){}}
  function n(v){const x=Number(v);return Number.isFinite(x)?x:0}
  function norm(v){return String(v||'').toUpperCase()}
@@ -12824,14 +12825,14 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 
 
 
-<!-- v7.15 ROBUST PAPER A/B DASHBOARD MOUNT -->
+<!-- v7.17 ROBUST PAPER A/B DASHBOARD MOUNT -->
 <style id="v713-ab-mount-style">
 #v713-ab-dashboard{margin:0 0 14px}
 </style>
 <script id="v713-ab-mount-js">
 (function(){
  'use strict';
- const VER='7.16';
+ const VER='7.17';
  function stamp(){
    try{window.MERIDIAN_UI_VERSION=VER;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+VER+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER)}catch(_e){}
  }
@@ -12858,7 +12859,7 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 })();
 </script>
 
-<!-- v7.15 PAPER LAB COMPACT HEADER / STATUS DENSITY — UI ONLY -->
+<!-- v7.17 PAPER LAB COMPACT HEADER / STATUS DENSITY — UI ONLY -->
 <style id="v715-paper-compact-style">
 /* Intro becomes a slim status ribbon; detailed explanation is already available below. */
 #view-paper .v697-paper-intro{margin:0 0 10px!important;padding:9px 13px!important;border-radius:14px!important;display:grid!important;grid-template-columns:1fr auto!important;align-items:center!important;column-gap:10px!important;min-height:0!important}
@@ -12876,7 +12877,7 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 <script id="v715-paper-compact-js">
 (function(){
  'use strict';
- const VER='7.16';
+ const VER='7.17';
  function apply(){
    window.MERIDIAN_UI_VERSION=VER;
    const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v'+VER+' · LIVE';
@@ -12898,7 +12899,7 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 
 
 
-<!-- v7.16 A/B DECISION INTELLIGENCE — RESEARCH ONLY -->
+<!-- v7.17 A/B DECISION INTELLIGENCE — RESEARCH ONLY -->
 <style id="v716-ab-intel-style">
 #v716-ab-intel{margin:10px 0 0;border-top:1px solid #1b4359;padding-top:10px}.v716-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.v716-title span{font-size:7px;color:#8aa1b1;letter-spacing:.14em}.v716-title b{font-size:7px;color:#38bdf8;border:1px solid #1c5a79;border-radius:999px;padding:3px 7px}.v716-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.v716-grid>div{border:1px solid #173d52;border-radius:10px;padding:7px;min-width:0}.v716-grid span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v716-grid strong{display:block;font-size:8px;margin-top:3px;overflow-wrap:anywhere}.v716-why{margin-top:7px;border:1px solid #173d52;border-radius:10px;padding:8px}.v716-why span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v716-why b{display:block;font-size:8px;line-height:1.45;margin-top:3px}.v716-foot{font-size:6.5px;line-height:1.4;color:#7e95a6;margin-top:7px}.v716-good{color:#22d98a}.v716-warn{color:#f0b84b}.v716-bad{color:#ff5964}.v716-blue{color:#38bdf8}@media(max-width:390px){.v716-grid{grid-template-columns:1fr 1fr}}
 </style>
@@ -12918,6 +12919,40 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
   el.innerHTML='<div class="v716-title"><span>DECISION INTELLIGENCE</span><b>RESEARCH ONLY</b></div><div class="v716-grid"><div><span>DIVERGENZ</span><strong class="'+dc+'">'+divergence+'</strong></div><div><span>REGIME</span><strong>'+regime+'</strong></div><div><span>TECH / CAND</span><strong>'+tech.toFixed(0)+' / '+cand.toFixed(0)+'</strong></div><div><span>ENTRY DIST</span><strong>'+dist+'</strong></div></div><div class="v716-why"><span>'+sym+' '+side+' · WHY NO TRADE / FILTER</span><b class="'+(rs.length?'v716-warn':'v716-good')+'">'+why+'</b></div><div class="v716-foot">TOP REJECTS · '+topTxt+' · Opportunity Cost wird erst nach abgeschlossenen, vergleichbaren Forward-Events bewertet — keine erfundene Gegenrechnung.</div>';
  }
  setInterval(render,2500);document.addEventListener('DOMContentLoaded',()=>setTimeout(render,1000));window.addEventListener('pageshow',()=>setTimeout(render,300));window.MERIDIAN_AB_INTEL_RENDER=render;
+})();
+</script>
+
+<script id="meridian-version-authority-v717">
+(function(){
+  'use strict';
+  const CODE_VERSION='7.17';
+  const BUILD_ID='7.17-20260831-R1';
+  window.MERIDIAN_UI_VERSION=CODE_VERSION;
+  window.__MERIDIAN_BUILD__=BUILD_ID;
+  function paint(ok=true){
+    const b=document.getElementById('versionBadge');
+    if(b)b.textContent='v'+CODE_VERSION+(ok?' · LIVE':' · FILE MISMATCH');
+    document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent=CODE_VERSION);
+  }
+  async function verify(){
+    paint(true);
+    try{
+      const r=await fetch('version.json?build='+encodeURIComponent(BUILD_ID)+'&t='+Date.now(),{cache:'no-store'});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const v=await r.json();
+      const ok=String(v.version||v.ui||'')===CODE_VERSION && String(v.buildId||BUILD_ID)===BUILD_ID;
+      paint(ok);
+      if(!ok)console.error('MERIDIAN deploy mismatch',{code:CODE_VERSION,build:BUILD_ID,versionJson:v});
+    }catch(e){
+      // Keep code version visible; network failure is not a revision rollback.
+      paint(true);
+      console.warn('MERIDIAN version verify unavailable',e);
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',verify,{once:true});else verify();
+  window.addEventListener('pageshow',verify);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)verify()});
+  setInterval(paint,4000);
 })();
 </script>
 </body>
