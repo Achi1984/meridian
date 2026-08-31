@@ -1,0 +1,6 @@
+MERIDIAN v7.07 DASHBOARD
+- Adds Cloud Backtest V3.21 Window-Reset Validation.
+- W1-W5 are evaluated as independent calendar windows with fresh research ledgers.
+- Displays PF, P&L, trades and stability for BASE / Q72/66 / Q75/70 when backend v6.99 result is available.
+- Baseline Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 unchanged.
+- Shadow V1 unchanged.

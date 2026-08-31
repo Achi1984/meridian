@@ -1,1 +1,1 @@
-{"version":"7.06","ui":"7.06","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Paper validation clarity: Baseline vs Shadow V1 decisions, separate forward sample, duplicate KPI cleanup; no execution change"}
+{"version":"7.07","ui":"7.07","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Cloud Backtest V3.21: fresh independent 10k ledger for each 20% calendar window; server-side W1-W5 stability; no execution change"}
