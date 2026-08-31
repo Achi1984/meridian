@@ -4301,6 +4301,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
     <section id="view-market" class="hidden"></section>
     <section id="view-bottom" class="hidden"></section>
     <section id="view-daytrade" class="hidden"></section>
+    <section id="view-paper" class="hidden"></section>
     <section id="view-grid" class="hidden"></section>
 <section id="view-forecast" class="hidden"></section>
     <section id="view-settings" class="hidden"></section>
@@ -4312,6 +4313,7 @@ body[data-view="daytrade"] .trade-observe-card{border:0!important;border-radius:
   <button class="nav" data-view="depot"><span>◔</span>DEPOT</button>
   <button class="nav" data-view="market"><span>▥</span>MARKT</button>
   <button class="nav" data-view="daytrade"><span>⌁</span>TRADE</button>
+  <button class="nav" data-view="paper"><span>◫</span>PAPER</button>
   <button class="nav" data-view="forecast"><span>↗</span>FCST</button>
 </div></nav>
 <script src="app-v6.06.js?v=20260824-2315"></script>
@@ -10394,16 +10396,16 @@ function segmentNav(kind,active){
  const isMarket=kind==='market';
  const items=isMarket
    ? [['market','MARKT'],['nadir','NADIR']]
-   : [['trade','SETUP'],['grid','GRID'],['paper','PAPER']];
+   : [['trade','SETUP'],['grid','GRID']];
  const cls=isMarket?'segment-nav market-segment-nav':'segment-nav execution-segment-nav';
- const style=isMarket?'':' style="grid-template-columns:repeat(3,minmax(0,1fr))"';
+ const style=isMarket?'':' style="grid-template-columns:repeat(2,minmax(0,1fr))"';
  return `<div class="${cls}"${style}>${items.map(([id,label])=>`<button data-subview="${id}" class="${active===id?'active':''}" onclick="${isMarket?'selectMarketSubview':'selectExecutionSubview'}('${id}')">${label}</button>`).join('')}</div>`;
 }
 function marketUnified(){
  return segmentNav('market',MARKET_SUBVIEW)+(MARKET_SUBVIEW==='nadir'?bottomView():market());
 }
 function executionUnified(){
- const content=EXEC_SUBVIEW==='grid'?gridView():EXEC_SUBVIEW==='paper'?paperTradeView():dayTrade();
+ const content=EXEC_SUBVIEW==='grid'?gridView():dayTrade();
  return segmentNav('execution',EXEC_SUBVIEW)+content;
 }
 function selectMarketSubview(v){
@@ -10412,7 +10414,7 @@ function selectMarketSubview(v){
  window.scrollTo({top:0,behavior:'smooth'});
 }
 function selectExecutionSubview(v){
- EXEC_SUBVIEW=['grid','paper'].includes(v)?v:'trade';
+ EXEC_SUBVIEW=v==='grid'?'grid':'trade';
  try{sessionStorage.setItem('meridian_exec_subview',EXEC_SUBVIEW)}catch(e){}
  renderOne('daytrade');
  if(EXEC_SUBVIEW==='grid' && typeof refreshGridEngine==='function') refreshGridEngine(false);
@@ -10431,6 +10433,7 @@ function renderOne(view){
   market:['#view-market',marketUnified],
   bottom:['#view-bottom',bottomView],
   daytrade:['#view-daytrade',executionUnified],
+  paper:['#view-paper',paperTradeView],
   grid:['#view-grid',gridView],
   forecast:['#view-forecast',null],
   settings:['#view-settings',settings]
@@ -10463,9 +10466,10 @@ function renderOne(view){
  }
 }
 function renderAll(){
- ['center','depot','market','daytrade','forecast','settings'].forEach(renderOne);
+ ['center','depot','market','daytrade','paper','forecast','settings'].forEach(renderOne);
 }
 function openView(view,button){
+ document.body.dataset.view=view;
  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
  if(button)button.classList.add('active');
  document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));
@@ -11814,7 +11818,7 @@ function compactDecisionDetails(){
    const inner=n.querySelector('.five-tabs');
    if(inner){
      inner.style.setProperty('display','grid','important');
-     inner.style.setProperty('grid-template-columns','repeat(5,minmax(0,1fr))','important');
+     inner.style.setProperty('grid-template-columns','repeat(6,minmax(0,1fr))','important');
      inner.style.setProperty('width','100%','important');
      inner.style.setProperty('height','auto','important');
      inner.style.setProperty('flex','none','important');
@@ -12173,7 +12177,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
     const repl=[
       [/v6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)\s*·\s*LIVE/g,'v6.88 · LIVE'],
-      [/UI\s+6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)/g,'UI 6.96'],
+      [/UI\s+6\.(?:73|75|77|78|79|80|81|82|83|84|85|86)/g,'UI 6.97'],
       [/EXECUTION RISK GATE\s*·\s*v6\.(?:77|78|79|80|81|82|83|84|85|86)/g,'EXECUTION RISK GATE · v6.94']
     ];
     let n;
@@ -12242,8 +12246,8 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 (function(){
  'use strict';
  function apply(){
-   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v6.96 · LIVE';
-   if(document.body.dataset.view!=='daytrade') return;
+   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v6.97 · LIVE';
+   if(document.body.dataset.view!=='paper' && document.body.dataset.view!=='daytrade') return;
    const lab=[...document.querySelectorAll('.bt-lab')].find(Boolean); if(!lab) return;
    const head=lab.querySelector('.bt-head .tag'); if(head) head.textContent='V3.20';
    const title=lab.querySelector('.bt-head h3'); if(title) title.textContent='6.2 + REPLAY INTEGRITY VALIDATION';
@@ -12285,7 +12289,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  }
  function findAnchor(){return document.querySelector('.v677-gate-lock') || document.querySelector('[class*="gate-lock"]');}
  function mount(){
-   if(document.body && document.body.dataset && document.body.dataset.view && document.body.dataset.view!=='daytrade') return;
+   if(document.body && document.body.dataset && document.body.dataset.view && document.body.dataset.view!=='paper') return;
    const anchor=findAnchor(); if(!anchor) return;
    let host=document.getElementById('shadow-v1-mount-v696');
    if(!host){host=document.createElement('div');host.id='shadow-v1-mount-v696';anchor.insertAdjacentElement('afterend',host);lastMarkup='';}
@@ -12304,6 +12308,25 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 })();
 </script>
 
+
+<style id="v697-paper-tab-style">
+#primaryBottomNav>.five-tabs{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+#primaryBottomNav .nav{font-size:7px!important;padding-left:2px!important;padding-right:2px!important}
+#view-paper{padding-bottom:96px}
+.v697-paper-intro{margin:0 0 12px;padding:13px 15px;border:1px solid rgba(56,189,248,.32);border-radius:16px;background:rgba(5,20,30,.7)}
+.v697-paper-intro .eyebrow{margin-bottom:5px}.v697-paper-intro b{font-size:15px}.v697-paper-intro small{display:block;color:#8197a8;margin-top:6px;line-height:1.45}
+</style>
+<script id="v697-paper-tab">
+(function(){
+ const base=window.paperTradeView;
+ if(typeof base==='function'){
+   window.paperTradeView=function(){
+     const intro='<div class="v697-paper-intro"><div class="eyebrow">PAPER LAB · BOT DEVELOPMENT</div><b>BASELINE 6.2 ↔ SHADOW V1</b><small>Forward-Test, A/B-Vergleich, Why No Trade, Scanner, Performance, Backtest und Diagnostik. Research-only; keine Änderung an Execution-Regeln.</small></div>';
+     return intro+base();
+   };
+ }
+})();
+</script>
 </body></html>
 
 <style id="v676-replay-integrity-style">
@@ -12465,7 +12488,7 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
  function makeShadow(){const x=shadowReady();const d=document.createElement('div');d.className='v686-shadow-forward';d.innerHTML=`<div class="head"><div><span>SHADOW 6.3A · PARALLEL OBSERVATION</span><b>SOFT-SCORE RESEARCH · 6.2 EXECUTION UNCHANGED</b></div><strong class="${x.ready?'green':'amber'}">${x.label}</strong></div><div class="grid"><div><span>BACKTEST SAMPLE</span><b>${x.trades}</b><small>latest saved run</small></div><div><span>BACKTEST PF</span><b class="${x.pf>=1?'green':'red'}">${x.pf.toFixed(2).replace('.',',')}</b><small>diagnostic only</small></div><div><span>EXPECTANCY</span><b class="${x.exp>=0?'green':'red'}">${money(x.exp)}</b><small>per baseline trade</small></div><div><span>FORWARD SHADOW</span><b class="amber">0 TR</b><small>starts with new observations</small></div></div><div class="note">6.3A does not unlock the frozen 6.2 MAX-DD gate and does not place Paper trades. It is the comparison lane for future candidate scoring, trade frequency and opportunity cost before any separate Paper ledger is considered.</div>`;return d}
  function wrapCard(card,label,open){if(!card||card.dataset.v686==='1')return;card.dataset.v686='1';const d=document.createElement('details');d.className='v686-paper-section';d.open=!!open;const s=document.createElement('summary');s.textContent=label;const b=document.createElement('div');b.className='v686-body';card.parentNode.insertBefore(d,card);d.append(s,b);b.appendChild(card);card.style.border='0';card.style.margin='0';card.style.padding='0';card.style.background='transparent'}
  function apply(){
-   if(document.body.dataset.view!=='daytrade')return;
+   if(document.body.dataset.view!=='paper')return;
    const main=[...document.querySelectorAll('.forecast-main')].find(x=>/CLOUD PAPER COCKPIT/.test(x.textContent||''));if(!main)return;
    const first=main.closest('.card');if(!first)return;
    const host=first.parentElement;if(host.dataset.v686paper==='1')return;host.dataset.v686paper='1';
@@ -12475,7 +12498,7 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
    if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
    cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
    host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
-   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 6.96');
+   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 6.97');
  }
  new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
 })();

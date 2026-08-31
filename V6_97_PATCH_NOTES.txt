@@ -1,0 +1,7 @@
+MERIDIAN v6.97 DASHBOARD
+- New dedicated PAPER main tab
+- TRADE reduced to SETUP + GRID
+- PAPER hosts Cloud Paper cockpit, Shadow V1 A/B, performance, backtest and diagnostics
+- Six-tab mobile bottom navigation
+- Engine 6.2.0 / ruleset unchanged
+- Northflank unchanged
