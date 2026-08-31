@@ -1,0 +1,9 @@
+MERIDIAN v7.00
+- PAPER cockpit initialization hardened.
+- Last valid cloud Paper state is cached locally and restored immediately after reload.
+- Temporary API/network failures no longer blank the PAPER cockpit.
+- Optional status/signals/events/evidence endpoint failures no longer invalidate Paper SSOT.
+- STALE badge marks cached/last-good data.
+- UI version unified to 7.00 in core render path and badge.
+- PAPER cockpit cleanup from v6.99 retained.
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / execution and risk rules unchanged.

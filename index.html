@@ -4387,7 +4387,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='6.73';
+const UI_VERSION='7.00';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -7426,6 +7426,18 @@ function paperAnalytics(s){
 /* ===== MERIDIAN v6.23 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
 const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
 let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],evidence:null,updatedAt:null,error:null,loading:false};
+const MERIDIAN_CLOUD_CACHE_KEY='meridian-cloud-last-good-v700';
+(function hydrateMeridianCloudCache(){
+  try{
+    const raw=localStorage.getItem(MERIDIAN_CLOUD_CACHE_KEY); if(!raw)return;
+    const c=JSON.parse(raw); if(!c||!c.paper)return;
+    MERIDIAN_CLOUD={...MERIDIAN_CLOUD,...c,loading:false,error:null,cached:true};
+  }catch(e){}
+})();
+function meridianCloudPersist(){
+  try{localStorage.setItem(MERIDIAN_CLOUD_CACHE_KEY,JSON.stringify({status:MERIDIAN_CLOUD.status,signals:MERIDIAN_CLOUD.signals,paper:MERIDIAN_CLOUD.paper,events:MERIDIAN_CLOUD.events,evidence:MERIDIAN_CLOUD.evidence,updatedAt:MERIDIAN_CLOUD.updatedAt}))}catch(e){}
+}
+
 
 async function meridianCloudFetch(path){
   const r=await fetch(MERIDIAN_CLOUD_API+path,{cache:'no-store',headers:{'accept':'application/json'}});
@@ -7436,19 +7448,28 @@ async function meridianCloudSync(forceRender=true){
   if(MERIDIAN_CLOUD.loading)return;
   MERIDIAN_CLOUD.loading=true;
   try{
-    const [status,signals,paper,events,evidence]=await Promise.all([
-      meridianCloudFetch('/api/status'),
-      meridianCloudFetch('/api/signals'),
-      meridianCloudFetch('/api/paper'),
-      meridianCloudFetch('/api/events?limit=80'),
-      meridianCloudFetch('/api/evidence?limit=100')
-    ]);
-    MERIDIAN_CLOUD={status,signals,paper,events:Array.isArray(events)?events:[],evidence:evidence||null,updatedAt:new Date().toISOString(),error:null,loading:false};
+    const paths=['/api/status','/api/signals','/api/paper','/api/events?limit=80','/api/evidence?limit=100'];
+    const out=await Promise.allSettled(paths.map(meridianCloudFetch));
+    const val=i=>out[i].status==='fulfilled'?out[i].value:null;
+    const status=val(0),signals=val(1),paper=val(2),events=val(3),evidence=val(4);
+    // Paper is the critical SSOT. Optional endpoint failures must not blank the cockpit.
+    if(!paper && !MERIDIAN_CLOUD.paper) throw new Error(out[2].reason?.message||'Paper API nicht erreichbar');
+    MERIDIAN_CLOUD={
+      status:status||MERIDIAN_CLOUD.status,
+      signals:signals||MERIDIAN_CLOUD.signals,
+      paper:paper||MERIDIAN_CLOUD.paper,
+      events:Array.isArray(events)?events:MERIDIAN_CLOUD.events,
+      evidence:evidence||MERIDIAN_CLOUD.evidence,
+      updatedAt:paper?new Date().toISOString():MERIDIAN_CLOUD.updatedAt,
+      error:paper?null:'STALE · letzter gültiger Paper-Stand',loading:false,cached:!paper
+    };
+    if(paper)meridianCloudPersist();
   }catch(e){
-    MERIDIAN_CLOUD.error=String(e?.message||e);MERIDIAN_CLOUD.loading=false;
+    // Never destroy the last valid cockpit on a transient API/network failure.
+    MERIDIAN_CLOUD.error=String(e?.message||e);MERIDIAN_CLOUD.loading=false;MERIDIAN_CLOUD.cached=!!MERIDIAN_CLOUD.paper;
   }
   if(forceRender&&typeof EXEC_SUBVIEW!=='undefined'&&EXEC_SUBVIEW==='paper'){
-    try{render()}catch(e){}
+    try{renderOne('paper')}catch(e){}
   }
 }
 function cloudMoney(v){return '$'+fmt(Number(v||0),2)}
@@ -8323,7 +8344,7 @@ function cloudPaperTradeView(){
         <div class="forecast-main">CLOUD PAPER COCKPIT</div>
         <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
       </div>
-      <span class="tag ${eng.state==='RUNNING'?'green':'red'} paper-tag">${eng.state||'CONNECTING'}</span>
+      <span class="tag ${C.cached?'amber':(eng.state==='RUNNING'?'green':'red')} paper-tag">${C.cached?'STALE':(eng.state||'CONNECTING')}</span>
     </div>
     <div class="paper-isolation-banner">
       <span>${safety.paperTrading&&!safety.liveTrading?'PAPER ONLY':'SAFETY CHECK'}</span>
@@ -12511,8 +12532,8 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
 
 
 
-<!-- v6.99 PAPER COCKPIT CLEANUP · presentation only -->
-<style id="v699-paper-cleanup-style">
+<!-- v7.00 PAPER COCKPIT + RESILIENT CLOUD · presentation only -->
+<style id="v700-paper-cleanup-style">
 body[data-view="paper"] #view-paper{padding-bottom:105px}
 body[data-view="paper"] .v699-research{border:1px solid rgba(39,112,151,.34);border-radius:16px;margin:14px 0;background:rgba(3,14,22,.54);overflow:hidden}
 body[data-view="paper"] .v699-research>summary{list-style:none;padding:14px 15px;display:flex;justify-content:space-between;align-items:center;gap:10px;color:#9fb2c0;font-size:9px;font-weight:900;letter-spacing:.12em;cursor:pointer}
@@ -12531,11 +12552,11 @@ body[data-view="paper"] .v699-ab-note{grid-column:1/-1;color:#7f96a7;font-size:7
 body[data-view="paper"] .v686-shadow-forward{display:none!important}
 @media(max-width:520px){body[data-view="paper"] .v699-ab-strip{grid-template-columns:1fr 1fr}}
 </style>
-<script id="v699-paper-cleanup-js">
+<script id="v700-paper-cleanup-js">
 (function(){
  'use strict';
  function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
- function version(){window.MERIDIAN_UI_VERSION='6.99';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.99 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='6.99');}
+ function version(){window.MERIDIAN_UI_VERSION='7.00';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.00 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.00');}
  function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
  function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
    const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
