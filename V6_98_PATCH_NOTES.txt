@@ -1,0 +1,7 @@
+MERIDIAN v6.98 DASHBOARD
+
+- PAPER tab stays the bot-development workspace.
+- Shadow V1 card now shows LAST DECISION / WHY NO TRADE.
+- Explicitly shows separate ledger and baseline MAX-DD independence.
+- Supports v6.98 Northflank telemetry: lastDecision, lastEvaluations, lastScanAt.
+- Engine 6.2.0 / Baseline rules unchanged.

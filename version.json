@@ -1,11 +1,9 @@
 {
-  "version": "6.97",
-  "ui": "6.97",
+  "version": "6.98",
+  "ui": "6.98",
   "backtest_lab": "V3.20",
   "engine": "6.2.0",
   "ruleset": "6.2-SIGNAL-V1",
-  "evidence": "6.53",
-  "research": "Dedicated PAPER main tab; Baseline 6.2 + Shadow V1 lab; no execution change",
-  "dashboard_patch": "6.88.1",
-  "cloud_ui": "primary-cloud-with-job-id-and-local-fallback"
+  "evidence": "6.53-EVIDENCE",
+  "research": "Shadow V1 independent forward ledger diagnostics + Why No Trade; baseline execution unchanged"
 }
