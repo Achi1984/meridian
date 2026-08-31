@@ -1,1 +1,1 @@
-{"version":"7.14","ui":"7.14","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Forward A/B dashboard: shared start, delta KPIs, persistent divergence counters, 20-trade verdict; no execution change"}
+{"version":"7.15","ui":"7.15","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Paper Lab compact header + denser diagnostics; A/B dashboard remains primary; no execution or Shadow rule change"}
