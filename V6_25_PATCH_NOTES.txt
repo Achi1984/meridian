@@ -1,7 +1,0 @@
-MERIDIAN v6.25
-- sichtbare \n\n-Artefakte defensiv entfernt
-- Equity-Chart mit Zeitachse
-- klarere Trade-Event-Marker (z.B. BTC LONG ENTRY)
-- Event-Tooltip enthält Symbol, Preis, P&L und Zeitpunkt
-- Marker-Labels innerhalb des Charts begrenzt
-- Trading Engine / Ruleset / Risk-Logik unverändert
