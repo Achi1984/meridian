@@ -4387,7 +4387,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='7.06';
+const UI_VERSION='7.07';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -11984,8 +11984,8 @@ function v671Research(trades){const windows=v671Windows(trades,5);const variants
 window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),best=z.variants.slice().sort((a,b)=>b.score-a.score||b.expectancy-a.expectancy)[0];if(!z.windows.length)return'';const sc=x=>x>=70?'score-hi':x>=50?'score-mid':'score-low';return `<div class="bt-v2-title">WALK-FORWARD · 5 CHRONO WINDOWS</div><div class="bt-wf-summary"><div><span>BEST STABILITY</span><b class="${sc(best.score)}">${best.name} · ${best.score}/100</b><small>${best.positive}/5 positive windows</small></div><div><span>RULE</span><b>NO PROMOTION</b><small>research-only · OOS discipline</small></div><div><span>WINDOWS</span><b>5 × 20%</b><small>strict chronological trades</small></div></div><div class="bt-wf"><div class="head"><span>VARIANTE</span><span>SCORE</span><span>POS</span><span>PF</span><span>EXP</span></div>${z.variants.map(x=>`<div><b>${x.name}</b><span class="${sc(x.score)}">${x.score}</span><span>${x.positive}/5</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span></div>`).join('')}</div><div class="bt-windows">${z.windows.map((w,i)=>`<div class="bt-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b>${z.variants.map(v=>{const x=v.windows[i];return `<span>${v.name}<em class="${x.expectancy>=0?'green':'red'}">${x.trades} TR · PF ${fmt(x.pf,2)} · EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</em></span>`}).join('')}</div>`).join('')}</div><div class="bt-note">STABILITY SCORE: 50% Anteil positiver Expectancy-Fenster + 30% Anteil PF≥1 + 20% Anteil Fenster mit ≥10 Trades. Der Score dient nur zum Vergleich der Robustheit; er verändert weder 6.2 noch den Paperbot.</div>`}
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
-window.MERIDIAN_UI_VERSION='7.06';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06');},300)}catch(e){}
+window.MERIDIAN_UI_VERSION='7.07';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07');},300)}catch(e){}
 })();
 </script>
 
@@ -12019,14 +12019,14 @@ function rsBlocked(xs,fn){const blocked=xs.filter(t=>!fn(t));return{n:blocked.le
 window.btRegimeShiftTable=function(r){const xs=rsBuild(r?.tradeList||[]);if(xs.length<10)return'';const base=rsStats(xs),g=rsGateStats(xs,t=>t._rs.state==='GREEN'),gc=rsGateStats(xs,t=>t._rs.state!=='RED'),states=['GREEN','CAUTION','RED'].map(s=>({name:s,...rsStateStats(xs,s)}));const bg=rsBlocked(xs,t=>t._rs.state==='GREEN'),bgc=rsBlocked(xs,t=>t._rs.state!=='RED');const wins=rsWindowData(xs,5);const last=xs.at(-1)?._rs||{};const stateCls=s=>s==='GREEN'?'state-green':s==='RED'?'state-red':'state-caution';return `<div class="bt-v2-title">REGIME SHIFT LAB · NO LOOK-AHEAD SHADOW</div><div class="bt-rs-summary"><div><span>LATEST STATE</span><b class="${stateCls(last.state)}">${last.state||'—'} · ${last.score??'—'}/100</b><small>based on prior closed trades</small></div><div><span>GREEN ONLY</span><b class="${g.pf>=1?'green':'red'}">PF ${fmt(g.pf,2)} · ${g.expectancy>=0?'+':''}$${fmt(g.expectancy,0)}</b><small>${g.trades} trades</small></div><div><span>NO RED</span><b class="${gc.pf>=1?'green':'red'}">PF ${fmt(gc.pf,2)} · ${gc.expectancy>=0?'+':''}$${fmt(gc.expectancy,0)}</b><small>${gc.trades} trades</small></div><div><span>BASE</span><b class="${base.pf>=1?'green':'red'}">PF ${fmt(base.pf,2)} · ${base.expectancy>=0?'+':''}$${fmt(base.expectancy,0)}</b><small>${base.trades} trades</small></div></div><div class="bt-rs-state">${states.map(x=>`<div><span>${x.name}</span><b class="${stateCls(x.name)}">${x.trades} TR · PF ${fmt(x.pf,2)}</b><small>EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)} · P&L ${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</small></div>`).join('')}</div><div class="bt-rs-table"><div class="head"><span>VARIANTE</span><span>TR</span><span>PF</span><span>EXP</span><span>P&L</span></div>${[['BASE',base],['GREEN ONLY',g],['GREEN+CAUTION',gc]].map(([n,x])=>`<div><b>${n}</b><span>${x.trades}</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span><span class="${x.pnl>=0?'green':'red'}">${x.pnl>=0?'+':''}$${fmt(x.pnl,0)}</span></div>`).join('')}</div><div class="bt-rs-windows">${wins.map(w=>`<div class="bt-rs-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b><span>BASE<em class="${w.base.expectancy>=0?'green':'red'}">PF ${fmt(w.base.pf,2)} · EXP ${w.base.expectancy>=0?'+':''}$${fmt(w.base.expectancy,0)}</em></span><span>GREEN ONLY<em class="${w.green.expectancy>=0?'green':'red'}">${w.green.trades} TR · PF ${fmt(w.green.pf,2)} · EXP ${w.green.expectancy>=0?'+':''}$${fmt(w.green.expectancy,0)}</em></span><span>NO RED<em class="${w.greenCaution.expectancy>=0?'green':'red'}">${w.greenCaution.trades} TR · PF ${fmt(w.greenCaution.pf,2)} · EXP ${w.greenCaution.expectancy>=0?'+':''}$${fmt(w.greenCaution.expectancy,0)}</em></span></div>`).join('')}</div><div class="bt-note">SHIFT SCORE V1 nutzt ausschließlich bereits geschlossene vorherige Trades: Rolling PF/Expectancy (24 + 12 Trades), Veränderung gegenüber dem vorherigen 12er-Fenster sowie bisherige Performance des aktuell bekannten Regimes und der Richtung. GREEN ≥65, RED &lt;40, sonst CAUTION. GREEN-only hätte ${bg.n} Trades blockiert (${bg.losses} Verlierer / ${bg.wins} Gewinner; blockiertes P&L ${bg.pnl>=0?'+':''}$${fmt(bg.pnl,0)}). NO-RED hätte ${bgc.n} Trades blockiert (${bgc.losses}/${bgc.wins}; ${bgc.pnl>=0?'+':''}$${fmt(bgc.pnl,0)}). Research-only: kein Entry-Gate, keine Änderung an 6.2/Paperbot.</div>`}
 const old672=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old672();h=h.replace('V3.3</span>','V3.5</span>').replace('V3.4</span>','V3.5</span>').replace('6.2 + WALK-FORWARD RESEARCH','6.2 + REGIME SHIFT RESEARCH').replace('V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research','V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeShiftTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',btRegimeShiftTable(BT_STATE.result)+'</div></div>')}return h};
-window.MERIDIAN_UI_VERSION='7.06';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06');},350)}catch(e){}
+window.MERIDIAN_UI_VERSION='7.07';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07');},350)}catch(e){}
 })();
 </script>
 
 <script id="v673-final-version-lock">
 (function(){
- const apply=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06');};
+ const apply=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07');};
  apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1100);setTimeout(apply,2500);
 })();
 </script>
@@ -12046,11 +12046,11 @@ function rvTable(title,rows){return `<div class="bt-rv-sub">${title}</div><div c
 window.btRegimeValidationTable=function(r){const xs=rvSorted(r?.tradeList||[]);if(xs.length<25)return'';const ws=rvWindows(xs,5);if(ws.length<5)return'';const train=btTradeStats(ws.slice(0,3).flat()),oos=btTradeStats(ws.slice(3).flat());const regimes=rvRows(ws,['BULL','BEAR','RANGE','TRANSITION'].map(k=>[k,t=>t.regime===k]));const dirs=rvRows(ws,[['LONG',t=>t.side==='LONG'],['SHORT',t=>t.side==='SHORT']]);const ews=rvRows(ws,[['EW W3',t=>t.ewAlign&&t.ewPhase==='W3'],['EW W4',t=>t.ewAlign&&t.ewPhase==='W4'],['EW W5',t=>t.ewAlign&&t.ewPhase==='W5'],['EW70',t=>t.ewAlign&&Number(t.ewConfidence)>=70],['EW+Q',t=>t.ewAlign&&Number(t.ewConfidence)>=60&&Number(t.technical)>=72&&Number(t.candidate)>=66]]);const syms=[...new Set(xs.map(t=>String(t.symbol||'').replace('USDT','')).filter(Boolean))];const assets=rvRows(ws,syms.map(k=>[k,t=>String(t.symbol||'').replace('USDT','')===k])).sort((a,b)=>b.oos.trades-a.oos.trades);const pass=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='PASS').length;const fail=[...regimes,...dirs,...ews,...assets].filter(x=>x.status==='FAIL').length;return `<div class="bt-v2-title">REGIME VALIDATION LAB · W1–W3 → W4–W5 OOS</div><div class="bt-rv-summary"><div><span>TRAIN</span><b class="${train.pf>=1?'green':'red'}">PF ${fmt(train.pf,2)} · EXP ${train.expectancy>=0?'+':''}$${fmt(train.expectancy,0)}</b><small>W1–W3 · ${train.trades} trades</small></div><div><span>OOS</span><b class="${oos.pf>=1?'green':'red'}">PF ${fmt(oos.pf,2)} · EXP ${oos.expectancy>=0?'+':''}$${fmt(oos.expectancy,0)}</b><small>W4–W5 · ${oos.trades} trades</small></div><div><span>SEGMENT CHECK</span><b>${pass} PASS · ${fail} FAIL</b><small>PASS requires ≥10 OOS trades, PF≥1, EXP&gt;0</small></div></div>${rvTable('REGIME',regimes)}${rvTable('DIRECTION',dirs)}${rvTable('ELLIOTT / QUALITY',ews)}${rvTable('ASSET',assets)}<div class="bt-note">VALIDATION RULE: W1–W3 are the development sample; W4–W5 are held-out OOS diagnostics. No parameter is promoted from this table. WATCH means the OOS sample has fewer than 10 trades. PASS/FAIL is descriptive only and does not alter Engine 6.2.0 or the Paperbot.</div>`}
 const old674=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=old674();h=h.replace('V3.5</span>','V3.6</span>').replace('6.2 + REGIME SHIFT RESEARCH','6.2 + REGIME VALIDATION RESEARCH').replace('V3.5 ergänzt robusten Retry/Resume-Loader; Regime Shift, Walk-Forward + Elliott bleiben Shadow Research','V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btRegimeValidationTable(BT_STATE.result)+h.slice(pos);else h+=btRegimeValidationTable(BT_STATE.result)}return h};
-const apply674=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06')};
+const apply674=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07')};
 apply674();document.addEventListener('DOMContentLoaded',apply674,{once:true});setTimeout(apply674,350);setTimeout(apply674,1200);setTimeout(apply674,2600);
 })();
 </script>
-<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
+<script id="v674-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07')};a();setTimeout(a,500);setTimeout(a,1600);setTimeout(a,3200)})();</script>
 
 
 <style id="v675-data-integrity-style">
@@ -12112,11 +12112,11 @@ const oldBlock675=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock675();h=h.replace('V3.6</span>','V3.7</span>').replace('6.2 + REGIME VALIDATION RESEARCH','6.2 + DATA INTEGRITY VALIDATION').replace('V3.6 ergänzt W1–W3 → W4–W5 OOS-Regime-/Direction-/Asset-/Elliott-Validation; alles bleibt Shadow Research','V3.7 verifies full historical coverage and uses equal calendar-time Walk-Forward/OOS windows; all research-only');if(BT_STATE?.result){const marker='<div class="bt-note">ALL ASSETS';const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+v675IntegrityHtml(BT_STATE.result)+h.slice(pos);else h+=v675IntegrityHtml(BT_STATE.result)}return h};
 // Old saved research results do not contain integrity proof: remove them once on v6.75.
 try{if(BT_STATE?.result&&!BT_STATE.result.dataIntegrity){BT_STATE={schema:70,running:false,result:null,error:null,progress:'v6.75: alter Backtest ohne Coverage-Nachweis verworfen · bitte neu starten.'};btSave();btClearCheckpoint()}}catch(e){}
-const apply675=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06')};
+const apply675=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07')};
 apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});setTimeout(apply675,400);setTimeout(apply675,1800);setTimeout(apply675,4200);
 })();
 </script>
-<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
+<script id="v675-final-version-lock">(function(){const a=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07')};a();setTimeout(a,600);setTimeout(a,2200);setTimeout(a,5200)})();</script>
 
 
 <script>
@@ -12185,7 +12185,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 
 <script id="v687-cache-bust">
 (function(){
-  const BUILD='7.06-20260831';
+  const BUILD='7.07-20260831';
   window.__MERIDIAN_BUILD__=BUILD;
 
   // Force visible version labels if any legacy static text survived older patches.
@@ -12463,8 +12463,8 @@ function replayDiag(r){const items=r?.mode==='BATCH'?(r.assetResults||[]).map(re
 function riHtml(r){const d=replayDiag(r),n=d.items.length,allHalted=d.halted===n&&n>0;const state=!d.validTime?'TIMESTAMP INVALID':d.halted?`${d.halted}/${n} HALTED`:'REPLAY VALID';const cls=!d.validTime?'ri-bad':d.halted?'ri-warn':'ri-ok';return `<div class="bt-v2-title">REPLAY INTEGRITY · TRADE TIMESTAMPS / HALT</div><div class="bt-ri"><div class="bt-ri-summary"><div><span>TRADE TIME</span><b class="${d.validTime?'ri-ok':'ri-bad'}">${d.validTime?'VALID':'INVALID'}</b><small>entry/exit inside requested period</small></div><div><span>BASELINE STATUS</span><b class="${cls}">${state}</b><small>${d.halted?'long empty tail detected after baseline risk stop':'calendar replay spans requested period'}</small></div><div><span>INTERPRETATION</span><b class="${allHalted?'ri-bad':d.halted?'ri-warn':'ri-ok'}">${allHalted?'RISK GATE STOP':'NO TIME BUG'}</b><small>6.2 logic remains unchanged</small></div></div><div class="bt-ri-assets"><div class="head"><span>ASSET</span><span>FIRST TRADE</span><span>LAST TRADE</span><span>STATUS</span></div>${d.items.map(x=>`<div><b>${String(x.symbol||'').replace('USDT','')}</b><span>${dshort(x.first)}</span><span>${dshort(x.last)}</span><b class="${!x.validTime?'ri-bad':x.halted?'ri-warn':'ri-ok'}">${!x.validTime?'BAD TS':x.halted?'HALTED':'VALID'}</b></div>`).join('')}</div></div><div class="bt-note">V3.19 distinguishes DATA coverage from EXECUTION coverage. Historical candles can cover the full period while the frozen 6.2 replay stops opening new trades after its max-drawdown/daily-loss protection is reached. Empty later calendar windows are therefore retained as evidence of a halted baseline, not filled or re-bucketed. Entry/exit timestamps are checked explicitly; no 6.2/Paperbot rule is changed.</div>`}
 const oldBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBlock();h=h.replace('V3.7</span>','V3.19</span>').replace('6.2 + DATA INTEGRITY VALIDATION','6.2 + REPLAY INTEGRITY VALIDATION');if(BT_STATE?.result){const marker='<div class="bt-v2-title">DATA INTEGRITY';const p=h.indexOf(marker),diag=riHtml(BT_STATE.result)+btRiskGateHtml(BT_STATE.result)+btGateStateTimelineHtml(BT_STATE.result)+btPipelineHtml(BT_STATE.result)+btContinuousHtml(BT_STATE.result)+btEdgeMapHtml(BT_STATE.result)+btShadow63Html(BT_STATE.result);if(p>=0)h=h.slice(0,p)+diag+h.slice(p);else h+=diag}return h};
-window.MERIDIAN_UI_VERSION='7.06';
-const apply=()=>{window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.06')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
+window.MERIDIAN_UI_VERSION='7.07';
+const apply=()=>{window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07')};apply();document.addEventListener('DOMContentLoaded',apply,{once:true});setTimeout(apply,300);setTimeout(apply,1200);setTimeout(apply,2600);
 })();
 </script>
 
@@ -12516,7 +12516,7 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
    if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
    cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
    host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
-   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 7.06');
+   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI 7.07');
    setTimeout(()=>window.MERIDIAN_PAPER_VALIDATE_UI?.(),0);
  }
  new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
@@ -12552,7 +12552,7 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 (function(){
  'use strict';
  function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
- function version(){window.MERIDIAN_UI_VERSION='7.06';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.06');}
+ function version(){window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.07');}
  function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
  function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
    const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
@@ -12584,7 +12584,7 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 
 
 
-<!-- v7.06 CONSOLIDATED IOS NAV · single owner · no prewarm · no busy lock -->
+<!-- v7.07 CONSOLIDATED IOS NAV · single owner · no prewarm · no busy lock -->
 <style id="v705-nav-style">
 #primaryBottomNav .nav{touch-action:manipulation!important;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent!important;transition:none!important}
 #primaryBottomNav .nav:active{transform:scale(.985)}
@@ -12597,7 +12597,7 @@ main>section:not(.hidden){content-visibility:visible}
 <script id="v705-nav-js">
 (function(){
  'use strict';
- const VER='7.06';
+ const VER='7.07';
  const rawRenderOne=(typeof renderOne==='function')?renderOne:null;
  let lastPointer={view:'',ts:0};
  function stamp(){
@@ -12639,7 +12639,7 @@ main>section:not(.hidden){content-visibility:visible}
    if(el.dataset.rendered!=='1')el.innerHTML='<div class="v705-view-loading"><b>'+String(view).toUpperCase()+'</b>&nbsp; wird geladen …</div>';
    requestAnimationFrame(()=>setTimeout(()=>{
      if(current()!==view)return;
-     try{rawRenderOne(view);paint(view);postRender(view);}catch(e){console.error('v7.06 render',view,e)}
+     try{rawRenderOne(view);paint(view);postRender(view);}catch(e){console.error('v7.07 render',view,e)}
    },0));
  }
  function activate(view){
@@ -12670,7 +12670,7 @@ main>section:not(.hidden){content-visibility:visible}
  // Data pushes only rebuild the visible view. This prevents background PAPER renders from blocking navigation.
  window.renderAll=function(){
    const v=current();
-   if(rawRenderOne){try{rawRenderOne(v);postRender(v)}catch(e){console.error('v7.06 active render',v,e)}}
+   if(rawRenderOne){try{rawRenderOne(v);postRender(v)}catch(e){console.error('v7.07 active render',v,e)}}
  };
  try{renderAll=window.renderAll}catch(_e){}
  window.MERIDIAN_SAFE_OPEN_VIEW=activate;
@@ -12681,7 +12681,7 @@ main>section:not(.hidden){content-visibility:visible}
 })();
 </script>
 
-<!-- v7.06 PAPER VALIDATION CLARITY · baseline/shadow separation · duplicate KPI cleanup -->
+<!-- v7.07 PAPER VALIDATION CLARITY · baseline/shadow separation · duplicate KPI cleanup -->
 <style id="v706-paper-validation-style">
 body[data-view="paper"] .v686-paper-quick{display:none!important}
 .shadowv1-progress{margin-top:12px;padding-top:10px;border-top:1px solid #17394d}.shadowv1-progress>div{display:flex;justify-content:space-between;gap:12px;align-items:center}.shadowv1-progress span,.shadowv1-progress small{color:#7891a3;font-size:7px;letter-spacing:.1em}.shadowv1-progress b{font-size:9px;color:#38bdf8}.shadowv1-progress i{display:block;height:5px;margin:7px 0;border:1px solid #1d455d;border-radius:999px;overflow:hidden;background:#07131e}.shadowv1-progress u{display:block;height:100%;background:#20a4ff;text-decoration:none}
@@ -12691,7 +12691,7 @@ body[data-view="paper"] .v686-paper-quick{display:none!important}
 <script id="v706-paper-validation-js">
 (function(){
  'use strict';
- const VER='7.06';
+ const VER='7.07';
  function stamp(){try{window.MERIDIAN_UI_VERSION=VER;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+VER+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER)}catch(_e){}}
  function n(v){const x=Number(v);return Number.isFinite(x)?x:0}
  function norm(v){return String(v||'').toUpperCase()}
