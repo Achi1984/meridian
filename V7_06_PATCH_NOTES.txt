@@ -1,0 +1,10 @@
+MERIDIAN v7.06 — PAPER VALIDATION CLARITY
+
+- Baseline 6.2 and Shadow V1 decisions are shown separately.
+- LIVE SCANNER now labels BASE 6.2 and adds SHADOW V1 decision/why.
+- CURRENT SIGNAL shows separate Shadow V1 eligibility/block reason.
+- Shadow V1 card now has its own 0/20 forward-validation sample progress.
+- Baseline Learning Monitor is explicitly labeled BASELINE 6.2; its 30 trades are not attributed to Shadow.
+- Removed legacy v686 PAPER KPI clone that could render duplicated/unformatted Equity/P&L text.
+- UI version normalized to 7.06.
+- Engine 6.2.0, ruleset 6.2-SIGNAL-V1, risk gates, Baseline and Shadow V1 execution logic unchanged.
