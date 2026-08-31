@@ -1,0 +1,7 @@
+MERIDIAN v7.03
+- iOS navigation now switches visual tab state on pointer-down before rendering.
+- Replaces accumulated legacy nav handlers to prevent double renders.
+- Pre-warms hidden views sequentially during idle time.
+- Fixes stale TRADE subtab state: old EXEC_SUBVIEW=paper migrates to SETUP/trade.
+- Keeps bottom-nav active state and TRADE subnav synchronized.
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 unchanged.

@@ -12716,3 +12716,136 @@ main>section:not(.hidden){content-visibility:visible}
  setInterval(stamp,10000);
 })();
 </script>
+
+<!-- v7.03 iOS INSTANT NAV + SUBTAB STATE MIGRATION -->
+<style id="v703-instant-nav-style">
+#primaryBottomNav .nav{touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;transition:none!important}
+#primaryBottomNav .nav.active{color:#20a4ff!important;background:#07131e!important}
+#primaryBottomNav .nav.v703-tap{transform:scale(.98)}
+</style>
+<script id="v703-instant-nav-js">
+(function(){
+ 'use strict';
+ const VER='7.03';
+ const baseRenderOne=window.renderOne||renderOne;
+ let nav=null, lastTap=0, prewarmStarted=false;
+
+ function stamp(){
+   try{
+     window.MERIDIAN_UI_VERSION=VER;
+     if(typeof APP_CODE_VERSION!=='undefined') APP_CODE_VERSION=VER;
+     const b=document.getElementById('versionBadge'); if(b)b.textContent='v'+VER+' · LIVE';
+     document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER);
+     document.querySelectorAll('.eyebrow,.paper-version,.ui-version').forEach(el=>{
+       const t=el.textContent||''; if(/UI\s+[0-9.]+/.test(t))el.textContent=t.replace(/UI\s+[0-9.]+/,'UI '+VER);
+     });
+   }catch(_e){}
+ }
+
+ function migrateSubtabs(){
+   // PAPER is a main tab since v6.97. Old sessions could still store EXEC_SUBVIEW=paper,
+   // leaving SETUP/GRID with no active state. Migrate that stale value once.
+   try{
+     if(typeof EXEC_SUBVIEW!=='undefined' && !['trade','grid'].includes(EXEC_SUBVIEW)){
+       EXEC_SUBVIEW='trade';
+       sessionStorage.setItem('meridian_exec_subview','trade');
+     }
+   }catch(_e){}
+ }
+
+ function paintState(view){
+   document.body.dataset.view=view;
+   if(nav){
+     nav.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+   }
+   document.querySelectorAll('main>section').forEach(sec=>sec.classList.toggle('hidden',sec.id!=='view-'+view));
+   // Keep the TRADE secondary bar deterministic.
+   if(view==='daytrade'){
+     migrateSubtabs();
+     document.querySelectorAll('#view-daytrade .execution-segment-nav button[data-subview]').forEach(b=>{
+       b.classList.toggle('active',b.dataset.subview===EXEC_SUBVIEW);
+     });
+   }
+ }
+
+ function renderLater(view){
+   const el=document.getElementById('view-'+view); if(!el)return;
+   const render=()=>{
+     if(document.body.dataset.view!==view)return;
+     try{baseRenderOne(view)}catch(e){console.error('v7.03 render',view,e)}
+     paintState(view);
+   };
+   // Critical: never block the tap with a large PAPER/TRADE render.
+   if(el.dataset.rendered!=='1'){
+     requestAnimationFrame(()=>setTimeout(render,0));
+     return;
+   }
+   const age=Date.now()-Number(el.dataset.renderedAt||0);
+   if(age>30000)setTimeout(render,450);
+ }
+
+ function activate(view){
+   if(!view)return;
+   migrateSubtabs();
+   // Visual state first; Safari can paint this before any expensive DOM work.
+   paintState(view);
+   window.scrollTo(0,0);
+   renderLater(view);
+ }
+
+ function installNav(){
+   const old=document.getElementById('primaryBottomNav'); if(!old)return;
+   // Clone removes every accumulated anonymous legacy click/pointer handler.
+   const fresh=old.cloneNode(true);
+   fresh.removeAttribute('data-v702');
+   old.replaceWith(fresh);
+   nav=fresh;
+   nav.dataset.v703='1';
+   nav.querySelectorAll('.nav[data-view]').forEach(b=>{ b.onclick=null; b.removeAttribute('onclick'); });
+
+   const onPointerDown=(ev)=>{
+     const btn=ev.target.closest('.nav[data-view]'); if(!btn||!nav.contains(btn))return;
+     const now=Date.now(); if(now-lastTap<180)return; lastTap=now;
+     ev.preventDefault();
+     btn.classList.add('v703-tap'); setTimeout(()=>btn.classList.remove('v703-tap'),90);
+     activate(btn.dataset.view);
+   };
+   nav.addEventListener('pointerdown',onPointerDown,{capture:true,passive:false});
+   // Suppress synthetic click so legacy document handlers cannot trigger a second render.
+   nav.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();},{capture:true});
+   paintState(document.body.dataset.view||'center');
+ }
+
+ function prewarm(){
+   if(prewarmStarted)return; prewarmStarted=true;
+   const current=document.body.dataset.view||'center';
+   const queue=['depot','market','daytrade','paper','forecast'].filter(v=>v!==current);
+   const step=()=>{
+     const v=queue.shift(); if(!v)return;
+     const el=document.getElementById('view-'+v);
+     if(el && el.dataset.rendered!=='1'){
+       try{baseRenderOne(v)}catch(e){console.warn('v7.03 prewarm',v,e)}
+       // rendering hidden views must not alter selected nav/view state
+       paintState(current);
+     }
+     if(queue.length){
+       if('requestIdleCallback' in window) requestIdleCallback(step,{timeout:1200});
+       else setTimeout(step,180);
+     }
+   };
+   setTimeout(()=>{ if('requestIdleCallback' in window)requestIdleCallback(step,{timeout:1000}); else step(); },700);
+ }
+
+ // Replace public openView so in-app links use the same immediate path.
+ window.openView=function(view){activate(view)};
+ try{openView=window.openView}catch(_e){}
+
+ function boot(){migrateSubtabs();installNav();stamp();prewarm()}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+ // Legacy pageshow code runs before this listener; reinstall afterwards and clear its handlers again.
+ window.addEventListener('pageshow',()=>setTimeout(()=>{installNav();stamp()},0));
+ setTimeout(()=>{installNav();stamp()},350);
+ setTimeout(stamp,1500);
+ setInterval(stamp,10000);
+})();
+</script>
