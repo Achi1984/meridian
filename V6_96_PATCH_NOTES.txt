@@ -1,0 +1,7 @@
+MERIDIAN v6.96 DASHBOARD
+
+Basis: stable v6.94 dashboard.
+- Restores SHADOW V1 · A/B PAPER TEST card.
+- Shadow UI is isolated: no MutationObserver, no wrapper around fetch, no navigation hooks, no Paper-init hooks.
+- Polls /api/shadow-v1 independently every 15s.
+- Engine 6.2.0 / ruleset / Northflank execution unchanged.

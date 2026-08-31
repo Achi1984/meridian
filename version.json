@@ -1,11 +1,1 @@
-{
-  "version": "6.95",
-  "ui": "6.95",
-  "backtest_lab": "V3.20",
-  "engine": "6.2.0",
-  "ruleset": "6.2-SIGNAL-V1",
-  "evidence": "6.53",
-  "research": "Stable 6.94 + restored SHADOW V1 A/B PAPER TEST card; no navigation, engine, ruleset, or execution changes",
-  "dashboard_patch": "6.95-shadow-v1-card",
-  "cloud_ui": "primary-cloud-with-job-id-and-local-fallback"
-}
+{"version":"6.96","ui":"6.96","backtest_lab":"V3.20","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53","research":"Stable v6.94 base + isolated SHADOW V1 A/B card; no core Paper init/navigation/engine changes","dashboard_patch":"6.88.1","cloud_ui":"primary-cloud-with-job-id-and-local-fallback"}
