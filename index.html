@@ -12241,7 +12241,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 <script id="v690-cloud-first-fix-script">
 (function(){
  const apply=()=>{
-  const vb=document.getElementById('versionBadge'); if(vb) vb.textContent='v6.92 · LIVE';
+  const vb=document.getElementById('versionBadge'); if(vb) vb.textContent='v6.93 · LIVE';
   document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='6.90');
   // Backtest badge: make deployed UI unmistakable.
   document.querySelectorAll('*').forEach(el=>{if(el.children.length===0 && el.textContent?.trim()==='V3.19') el.textContent='V3.20';});
@@ -12299,6 +12299,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 })();
 </script>
 
+\n<style id="v693-nav-touch-fix">\n#primaryBottomNav,#primaryBottomNav *{pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(32,164,255,.16)}\n#primaryBottomNav{isolation:isolate!important}\n#primaryBottomNav .nav{position:relative!important;z-index:2!important;cursor:pointer!important}\n</style>\n<script id="v693-nav-touch-fix-js">\n(function(){\n  function go(btn){\n    if(!btn)return;\n    const view=btn.getAttribute('data-view');\n    if(!view)return;\n    try{\n      document.body.dataset.view=view;\n      if(typeof openView==='function'){ openView(view,btn); return; }\n      document.querySelectorAll('#primaryBottomNav .nav').forEach(x=>x.classList.toggle('active',x===btn));\n      document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));\n      const el=document.getElementById('view-'+view);\n      if(el) el.classList.remove('hidden');\n      window.scrollTo(0,0);\n    }catch(e){ console.error('v6.93 nav',e); }\n  }\n  function bind(){\n    const nav=document.getElementById('primaryBottomNav');\n    if(!nav)return;\n    nav.querySelectorAll('.nav[data-view]').forEach(btn=>{\n      btn.onclick=function(e){e.preventDefault();e.stopPropagation();go(btn)};\n    });\n  }\n  document.addEventListener('DOMContentLoaded',bind);\n  window.addEventListener('load',bind);\n  window.addEventListener('pageshow',bind);\n  // Delegated capture survives any later DOM/event rebinding.\n  document.addEventListener('click',function(e){\n    const btn=e.target.closest&&e.target.closest('#primaryBottomNav .nav[data-view]');\n    if(!btn)return; e.preventDefault(); e.stopImmediatePropagation(); go(btn);\n  },true);\n})();\n</script>\n
 </body></html>
 
 <style id="v676-replay-integrity-style">

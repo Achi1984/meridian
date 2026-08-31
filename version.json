@@ -1,1 +1,10 @@
-{"version":"6.92","ui":"6.92","backtest_lab":"V3.20","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","cloud_backtest":"1.2","research":"Cloud-first dashboard fix: cloud control survives local checkpoint/resume state; local replay explicit fallback","shadow":"6.92-SHADOW-V1"}
+{
+  "version": "6.93",
+  "ui": "6.93",
+  "backtest_lab": "V3.20",
+  "engine": "6.2.0",
+  "ruleset": "6.2-SIGNAL-V1",
+  "cloud_backtest": "1.2",
+  "research": "Navigation touch/click hotfix; Shadow V1 and engine logic unchanged",
+  "shadow": "6.92-SHADOW-V1"
+}
