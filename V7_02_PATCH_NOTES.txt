@@ -1,0 +1,8 @@
+MERIDIAN v7.02
+- Tab switching moved to capture-phase pointer handling
+- Legacy click handlers cannot double-render on a tab tap
+- renderAll now refreshes only the currently visible main view
+- Cached views are shown instantly; stale view refresh is deferred
+- Hidden views use content-visibility:hidden
+- Version labels locked to 7.02
+- Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / execution logic unchanged
