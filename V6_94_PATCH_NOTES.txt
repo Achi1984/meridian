@@ -1,0 +1,9 @@
+MERIDIAN v6.94
+Basis: v6.88.1 STABLE DASHBOARD
+- Keine Änderung an Engine 6.2 / Ruleset 6.2-SIGNAL-V1
+- Tab-Navigation der stabilen Basis unverändert
+- Backtest Lab Anzeige V3.20
+- Cloud-Backtest als serverseitige Option sichtbar
+- Lokaler Backtest klar als iPhone-aktiver Fallback markiert
+- Riskante DOM-Reparenting- und fetch-Monkeypatches aus dem letzten UI-Hotfix entfernt
+- Keine literal \n Escape-Ausgabe eingefügt

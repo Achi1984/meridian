@@ -1,10 +1,11 @@
 {
-  "version": "6.93",
-  "ui": "6.93",
+  "version": "6.94",
+  "ui": "6.94",
   "backtest_lab": "V3.20",
   "engine": "6.2.0",
   "ruleset": "6.2-SIGNAL-V1",
-  "cloud_backtest": "1.2",
-  "research": "Navigation touch/click hotfix; Shadow V1 and engine logic unchanged",
-  "shadow": "6.92-SHADOW-V1"
+  "evidence": "6.53",
+  "research": "Stable 6.88 rebuild; cloud-first backtest UI; iPhone-safe presentation patch; navigation untouched; no execution change",
+  "dashboard_patch": "6.88.1",
+  "cloud_ui": "primary-cloud-with-job-id-and-local-fallback"
 }
