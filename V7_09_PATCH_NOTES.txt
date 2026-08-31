@@ -1,0 +1,5 @@
+MERIDIAN v7.09
+- Adds V3.21 Validation Gate below Cloud Backtest.
+- Checks 5/5 fresh-ledger calendar windows, positive-window count, W4-W5 OOS trades/P&L and stability.
+- Explicit INCOMPLETE/PASS/FAIL verdict; no promotion from incomplete replay.
+- Baseline 6.2 / execution unchanged.

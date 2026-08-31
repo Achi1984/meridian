@@ -1,0 +1,6 @@
+MERIDIAN v7.08
+- Compact live Paperbot A/B dashboard: Baseline 6.2 vs Shadow V1
+- Side-by-side Trades, Equity, P&L, WR/PF, Max DD and current decision
+- Forward progress / NO VERDICT until 20 Shadow trades
+- No changes to Engine 6.2.0, Ruleset 6.2-SIGNAL-V1 or execution logic
+- Backtest V3.21 remains unchanged

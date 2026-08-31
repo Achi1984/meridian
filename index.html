@@ -11984,8 +11984,8 @@ function v671Research(trades){const windows=v671Windows(trades,5);const variants
 window.btWalkForwardTable=function(r){const z=v671Research(r?.tradeList||[]),best=z.variants.slice().sort((a,b)=>b.score-a.score||b.expectancy-a.expectancy)[0];if(!z.windows.length)return'';const sc=x=>x>=70?'score-hi':x>=50?'score-mid':'score-low';return `<div class="bt-v2-title">WALK-FORWARD · 5 CHRONO WINDOWS</div><div class="bt-wf-summary"><div><span>BEST STABILITY</span><b class="${sc(best.score)}">${best.name} · ${best.score}/100</b><small>${best.positive}/5 positive windows</small></div><div><span>RULE</span><b>NO PROMOTION</b><small>research-only · OOS discipline</small></div><div><span>WINDOWS</span><b>5 × 20%</b><small>strict chronological trades</small></div></div><div class="bt-wf"><div class="head"><span>VARIANTE</span><span>SCORE</span><span>POS</span><span>PF</span><span>EXP</span></div>${z.variants.map(x=>`<div><b>${x.name}</b><span class="${sc(x.score)}">${x.score}</span><span>${x.positive}/5</span><span class="${x.pf>=1?'green':'red'}">${fmt(x.pf,2)}</span><span class="${x.expectancy>=0?'green':'red'}">${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</span></div>`).join('')}</div><div class="bt-windows">${z.windows.map((w,i)=>`<div class="bt-window"><b>${w.name} · ${btDateShort(w.from)} → ${btDateShort(w.to)}</b>${z.variants.map(v=>{const x=v.windows[i];return `<span>${v.name}<em class="${x.expectancy>=0?'green':'red'}">${x.trades} TR · PF ${fmt(x.pf,2)} · EXP ${x.expectancy>=0?'+':''}$${fmt(x.expectancy,0)}</em></span>`}).join('')}</div>`).join('')}</div><div class="bt-note">STABILITY SCORE: 50% Anteil positiver Expectancy-Fenster + 30% Anteil PF≥1 + 20% Anteil Fenster mit ≥10 Trades. Der Score dient nur zum Vergleich der Robustheit; er verändert weder 6.2 noch den Paperbot.</div>`}
 const oldBacktestLabBlock=window.backtestLabBlock||backtestLabBlock;
 window.backtestLabBlock=backtestLabBlock=function(){let h=oldBacktestLabBlock();h=h.replace('V3.2</span>','V3.3</span>').replace('6.2 + ELLIOTT DIAGNOSTIC RESEARCH','6.2 + WALK-FORWARD RESEARCH').replace('V3.2 diagnostiziert Elliott-Coverage und bestätigt Pivots ohne Look-ahead','V3.3 ergänzt 5-fach Walk-Forward + Stability Score; Elliott bleibt Shadow Research');if(BT_STATE?.result){const marker='<div class="bt-note">'+(BT_STATE.result.mode==='BATCH'?'ALL ASSETS':' '+BT_STATE.result.symbol.replace('USDT',''));const pos=h.lastIndexOf(marker);if(pos>=0)h=h.slice(0,pos)+btWalkForwardTable(BT_STATE.result)+h.slice(pos);else h=h.replace('</div></div>',''+btWalkForwardTable(BT_STATE.result)+'</div></div>')}return h};
-window.MERIDIAN_UI_VERSION='7.07';
-try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07');},300)}catch(e){}
+window.MERIDIAN_UI_VERSION='7.08';
+try{setTimeout(()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v7.08 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(el=>el.textContent='7.07');},300)}catch(e){}
 })();
 </script>
 
@@ -12262,7 +12262,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 (function(){
  'use strict';
  function apply(){
-   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v7.07 · LIVE';
+   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v7.09 · LIVE';
    if(document.body.dataset.view!=='paper' && document.body.dataset.view!=='daytrade') return;
    const lab=[...document.querySelectorAll('.bt-lab')].find(Boolean); if(!lab) return;
    const head=lab.querySelector('.bt-head .tag'); if(head) head.textContent='V3.20';
@@ -12552,7 +12552,7 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 (function(){
  'use strict';
  function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
- function version(){window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.07');}
+ function version(){window.MERIDIAN_UI_VERSION='7.07';const b=document.getElementById('versionBadge');if(b)b.textContent='v7.07 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='7.08');}
  function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
  function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
    const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
@@ -12582,6 +12582,47 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 
 
 
+
+
+
+<!-- v7.08 PAPER A/B COMPARISON DASHBOARD -->
+<style id="v708-ab-dashboard-style">
+body[data-view="paper"] .v708-abdash{margin:14px 0 18px;border:1px solid #236486;border-radius:19px;padding:14px;background:linear-gradient(180deg,rgba(5,26,38,.88),rgba(2,13,20,.72))}
+.v708-abhead{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:11px}.v708-abhead span{font-size:10px;font-weight:900;letter-spacing:.16em;color:#a8bac7}.v708-abhead b{font-size:8px;color:#38bdf8;border:1px solid #1787bd;border-radius:999px;padding:4px 8px;letter-spacing:.12em}
+.v708-cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}.v708-bot{border:1px solid #1c4359;border-radius:15px;padding:11px;min-width:0}.v708-bot.base{border-color:#71343c}.v708-bot.shadow{border-color:#17684a}.v708-bot h4{margin:0 0 3px;font-size:11px;letter-spacing:.08em}.v708-bot small{display:block;font-size:7px;letter-spacing:.09em;color:#7f95a5;min-height:18px}.v708-kpis{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-kpis div{border-top:1px solid #173748;padding-top:6px}.v708-kpis span{display:block;font-size:6.5px;color:#718b9d;letter-spacing:.1em}.v708-kpis strong{display:block;margin-top:2px;font-size:11px}.v708-red{color:#ff5964}.v708-green{color:#22d98a}.v708-blue{color:#38bdf8}.v708-amber{color:#f0b84b}
+.v708-verdict{margin-top:10px;border-top:1px solid #1b4359;padding-top:10px}.v708-verdict-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.v708-verdict-top span{font-size:7px;color:#7f96a7;letter-spacing:.12em}.v708-verdict-top b{font-size:9px;color:#f0b84b}.v708-bar{height:5px;border:1px solid #1d455d;border-radius:999px;overflow:hidden;margin:7px 0;background:#07131e}.v708-bar i{display:block;height:100%;background:#20a4ff}.v708-note{font-size:7px;line-height:1.45;color:#8197a7}.v708-diverge{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-diverge div{border:1px solid #173d52;border-radius:11px;padding:7px}.v708-diverge span{display:block;font-size:6px;color:#718b9d;letter-spacing:.08em}.v708-diverge b{font-size:8px;display:block;margin-top:3px;white-space:normal}
+@media(max-width:390px){.v708-kpis{grid-template-columns:1fr}.v708-bot{padding:9px}.v708-kpis strong{font-size:10px}}
+</style>
+<script id="v708-ab-dashboard-js">
+(function(){
+ 'use strict';
+ const money=n=>{n=Number(n||0);return (n<0?'−':n>0?'+':'')+'$'+Math.abs(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})};
+ const pct=n=>Number(n||0).toFixed(2).replace('.',',')+'%';
+ function calcPF(ts){let w=0,l=0;(ts||[]).forEach(t=>{const x=Number(t.realized||t.pnl||0);if(x>0)w+=x;else if(x<0)l+=Math.abs(x)});return l?w/l:(w>0?99:0)}
+ function cls(n){return Number(n)>=0?'v708-green':'v708-red'}
+ function render(){
+   if(document.body?.dataset?.view!=='paper')return;
+   const cloud=window.MERIDIAN_CLOUD||{}, p=cloud.paper||{}, a=p.account||{}, trades=Array.isArray(p.trades)?p.trades:[];
+   const shadow=window.MERIDIAN_SHADOW_V1_STATE||null;if(!shadow)return;
+   const sa=shadow.account||{};
+   const beq=Number(a.equity||a.startEquity||10000), bstart=Number(a.startEquity||10000), bpnl=beq-bstart, bpeak=Number(a.peakEquity||beq), bdd=bpeak?Math.max(0,(bpeak-beq)/bpeak*100):0;
+   const bw=trades.filter(t=>Number(t.realized||0)>0).length, bwr=trades.length?bw/trades.length*100:0, bpf=calcPF(trades);
+   const seq=Number(sa.equity||sa.startEquity||10000), sstart=Number(sa.startEquity||10000), spnl=seq-sstart, sc=Number(shadow.closedCount||0), swr=Number(shadow.winRate||0), spf=Number(shadow.profitFactor||0), sdd=Number(sa.drawdownPct||shadow.drawdownPct||0);
+   const target=20, progress=Math.min(100,sc/target*100), enough=sc>=target;
+   const sd=shadow.lastDecision||shadow.lastSignal||{}, scan=cloud.signals||{}, best=(Array.isArray(scan.assets)?scan.assets:[])[0]||{};
+   const bdec=best.status==='READY'?'ENTRY READY':best.status==='WAIT_ENTRY_ZONE'?'WAIT':'NO SETUP';
+   const sdec=String(sd.decision||((sd.reasons||[]).length?'REJECT':'ELIGIBLE')).toUpperCase();
+   let el=document.getElementById('v708-ab-dashboard');
+   if(!el){el=document.createElement('div');el.id='v708-ab-dashboard';el.className='v708-abdash';const anchor=document.querySelector('#shadow-v1-mount-v696');if(anchor)anchor.insertAdjacentElement('beforebegin',el);else return;}
+   el.innerHTML='<div class="v708-abhead"><span>PAPERBOT A/B · LIVE</span><b>BASELINE ↔ SHADOW</b></div><div class="v708-cols">'+
+   '<div class="v708-bot base"><h4>BASELINE 6.2</h4><small>LOCKED · MAX DD · REFERENZ</small><div class="v708-kpis"><div><span>TRADES</span><strong>'+trades.length+'</strong></div><div><span>EQUITY</span><strong>$'+beq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div><div><span>P&L</span><strong class="'+cls(bpnl)+'">'+money(bpnl)+'</strong></div><div><span>WR / PF</span><strong>'+bwr.toFixed(0)+'% · '+bpf.toFixed(2)+'</strong></div><div><span>MAX DD</span><strong class="v708-red">'+pct(bdd)+'</strong></div><div><span>JETZT</span><strong class="v708-amber">'+bdec+'</strong></div></div></div>'+
+   '<div class="v708-bot shadow"><h4>SHADOW V1</h4><small>ACTIVE · EIGENER LEDGER · '+sc+'/'+target+'</small><div class="v708-kpis"><div><span>TRADES</span><strong>'+sc+'</strong></div><div><span>EQUITY</span><strong>$'+seq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div><div><span>P&L</span><strong class="'+cls(spnl)+'">'+money(spnl)+'</strong></div><div><span>WR / PF</span><strong>'+swr.toFixed(0)+'% · '+spf.toFixed(2)+'</strong></div><div><span>MAX DD</span><strong class="'+(sdd>bdfSafe(bdd)?'v708-red':'v708-green')+'">'+pct(sdd)+'</strong></div><div><span>JETZT</span><strong class="'+(sdec==='REJECT'||sdec==='BLOCK'?'v708-red':'v708-amber')+'">'+sdec+'</strong></div></div></div></div>'+
+   '<div class="v708-verdict"><div class="v708-verdict-top"><span>FORWARD VALIDATION</span><b>'+(enough?'20/20 · REVIEW READY':'NO VERDICT · '+sc+'/'+target)+'</b></div><div class="v708-bar"><i style="width:'+progress+'%"></i></div><div class="v708-diverge"><div><span>CURRENT BASELINE</span><b>'+bdec+'</b></div><div><span>CURRENT SHADOW</span><b>'+sdec+'</b></div></div><div class="v708-note">Noch keine automatische Siegerwertung vor 20 Shadow-Trades. Divergenz wird live sichtbar; historische Reject-/Shadow-only-Zähler folgen erst, wenn das Backend diese Events explizit persistiert.</div></div>';
+ }
+ function bdfSafe(n){return Number.isFinite(Number(n))?Number(n):0}
+ setInterval(render,2500);window.addEventListener('pageshow',()=>setTimeout(render,500));document.addEventListener('DOMContentLoaded',()=>setTimeout(render,900));window.MERIDIAN_AB_RENDER=render;
+})();
+</script>
 
 
 <!-- v7.07 CONSOLIDATED IOS NAV · single owner · no prewarm · no busy lock -->
@@ -12775,5 +12816,20 @@ body[data-view="paper"] .v686-paper-quick{display:none!important}
  setInterval(load,8000);new MutationObserver(()=>{if(!document.getElementById('v707-window-reset'))setTimeout(mount,50)}).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
+
+<!-- v7.09: V3.21 validation gate / OOS + halt diagnostics -->
+<style id="v709-validation-style">
+#v709-validation{margin:12px 0 0;border-top:1px solid rgba(42,103,136,.38);padding-top:12px}.v709-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.v709-head span{display:block;color:#9aafbf;font-size:9px;letter-spacing:1.4px;font-weight:900}.v709-head b{display:block;margin-top:3px;font-size:11px}.v709-badge{font-size:8px;border:1px solid #28617f;border-radius:999px;padding:4px 7px;color:#38bdf8;white-space:nowrap}.v709-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.v709-grid>div{border:1px solid #17394d;border-radius:11px;padding:9px}.v709-grid small{display:block;color:#7891a3;font-size:7px;letter-spacing:1px}.v709-grid strong{display:block;margin-top:4px;font-size:10px}.v709-good{color:#22d98a}.v709-bad{color:#ff5964}.v709-watch{color:#f0b84b}.v709-note{font-size:7.5px;line-height:1.5;color:#849aaa;margin-top:9px}.v709-verdict{margin-top:10px;border:1px solid #17394d;border-radius:12px;padding:10px;font-size:9px;font-weight:900;letter-spacing:.08em}
+</style>
+<script id="v709-validation-js">
+(function(){'use strict';const API=window.MERIDIAN_CLOUD_API||'https://p01--achi-meridian--ttvk44grdlp7.code.run';let busy=false,last='';
+const n=x=>Number(x||0),fmt=(x,d=2)=>n(x).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+function host(){const c=document.getElementById('v688-cloudbt-card');if(!c)return null;let h=document.getElementById('v709-validation');if(!h){h=document.createElement('div');h.id='v709-validation';c.querySelector('.v688-cloudbt-body')?.appendChild(h)}return h}
+function render(j){const h=host();if(!h)return;const r=j?.result,rc=r?.researchContinuous;if(!rc){const x='<div class="v709-head"><div><span>VALIDATION GATE · V3.21</span><b>OOS · WINDOW RESET · HALT CHECK</b></div><i class="v709-badge">WAITING</i></div><div class="v709-note">Für eine belastbare Bewertung fehlen noch serverseitige Fresh-Ledger-W1–W5-Daten. Keine Strategie-Promotion auf Basis des alten kumulativen Replays.</div>';if(x!==last){h.innerHTML=x;last=x}return}
+const ws=Array.isArray(rc.windows)?rc.windows:[],q=(rc.variants||[]).find(v=>v.name==='Q75/70')||(rc.variants||[])[0]||{};const active=ws.filter(w=>n(w.trades)>0),pos=ws.filter(w=>n(w.pnl)>0).length,empty=ws.length-active.length;const oos=ws.slice(-2),oosTrades=oos.reduce((a,w)=>a+n(w.trades),0),oosPnl=oos.reduce((a,w)=>a+n(w.pnl),0);const stability=n(q.stability);const enough=ws.length===5&&empty===0&&oosTrades>0;const pass=enough&&pos>=3&&stability>=60&&oosPnl>0;const verdict=!enough?'INCOMPLETE':pass?'VALIDATION PASS':'VALIDATION FAIL';const cls=!enough?'v709-watch':pass?'v709-good':'v709-bad';
+const x=`<div class="v709-head"><div><span>VALIDATION GATE · V3.21</span><b>OOS · WINDOW RESET · HALT CHECK</b></div><i class="v709-badge">NO LOOK-AHEAD</i></div><div class="v709-grid"><div><small>WINDOW COVERAGE</small><strong class="${empty?'v709-bad':'v709-good'}">${active.length}/5 ACTIVE</strong></div><div><small>POSITIVE WINDOWS</small><strong class="${pos>=3?'v709-good':'v709-bad'}">${pos}/5</strong></div><div><small>OOS W4–W5</small><strong class="${oosPnl>0?'v709-good':'v709-bad'}">${oosTrades} TR · ${oosPnl>=0?'+':''}$${fmt(oosPnl,0)}</strong></div><div><small>STABILITY</small><strong class="${stability>=60?'v709-good':stability>=40?'v709-watch':'v709-bad'}">${fmt(stability,0)}/100</strong></div></div><div class="v709-verdict ${cls}">${verdict}</div><div class="v709-note">Gate ist bewusst streng: alle 5 Kalenderfenster müssen eigene Trades enthalten, W4–W5 müssen echte OOS-Trades liefern. Ein früher Max-DD-Stopp darf spätere Research-Fenster nicht leeren. Baseline 6.2 bleibt unabhängig davon frozen.</div>`;if(x!==last){h.innerHTML=x;last=x}}
+async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api/backtests/latest',{cache:'no-store'});if(r.ok)render(await r.json())}catch(e){}finally{busy=false}}function mount(){host();load()}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,500),{once:true});else setTimeout(mount,100);setInterval(load,8000);new MutationObserver(()=>{if(!document.getElementById('v709-validation'))setTimeout(mount,80)}).observe(document.body,{childList:true,subtree:true});})();
+</script>
+
 </body>
 </html>
