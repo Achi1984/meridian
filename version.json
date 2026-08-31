@@ -1,1 +1,1 @@
-{"version":"7.17","ui":"7.17","buildId":"7.17-20260831-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"A/B Decision Intelligence; canonical deploy filenames + single version authority; no execution or Shadow rule change"}
+{"version":"7.18","ui":"7.18","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"A/B dashboard: cloud freshness mapping, regime/why-no-trade context, 20-trade PROMOTE/MODIFY/REJECT verdict; execution unchanged"}
