@@ -1,0 +1,14 @@
+ACHI MERIDIAN v7.05
+
+Stability review before patching:
+- removed stacked v7.01 navigation handler layer
+- v7.05 is the single owner of bottom-tab navigation
+- no busy lock; rapid tab changes are accepted
+- cached view is shown immediately; heavy first render waits one paint
+- only visible view is rebuilt on live data pushes
+- PAPER presentation cleanup is event-driven instead of a document-wide MutationObserver
+- Safe UI patch is event-driven instead of a document-wide MutationObserver
+- fixed malformed legacy v6.64 script/style block
+- unified visible version stamping
+- cache build key + manifest moved to 7.05
+- no changes to Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 / Paper execution

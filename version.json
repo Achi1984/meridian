@@ -1,1 +1,1 @@
-{"version":"7.03","ui":"7.03","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"iOS instant nav + legacy subtab migration; no execution change"}
+{"version":"7.05","ui":"7.05","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"iOS navigation consolidation; single nav owner; stale version/cache conflict cleanup; global mutation observers removed from Paper presentation; execution unchanged"}

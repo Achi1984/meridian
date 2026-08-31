@@ -1,0 +1,7 @@
+MERIDIAN v7.04
+- Reverted the risky v7.03 hidden-view prewarming that could blank iOS Safari.
+- Navigation changes visual tab/view state immediately.
+- First visit to a heavy view shows a lightweight loader, then renders after Safari can paint.
+- Only the visible view is refreshed by renderAll().
+- TRADE subview state is migrated to SETUP when old PAPER/stale values are found.
+- No hidden mass pre-render, no cloned navigation DOM, no execution/risk/ruleset changes.
