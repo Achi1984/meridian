@@ -12510,3 +12510,53 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
 
 
 
+
+<!-- v6.99 PAPER COCKPIT CLEANUP · presentation only -->
+<style id="v699-paper-cleanup-style">
+body[data-view="paper"] #view-paper{padding-bottom:105px}
+body[data-view="paper"] .v699-research{border:1px solid rgba(39,112,151,.34);border-radius:16px;margin:14px 0;background:rgba(3,14,22,.54);overflow:hidden}
+body[data-view="paper"] .v699-research>summary{list-style:none;padding:14px 15px;display:flex;justify-content:space-between;align-items:center;gap:10px;color:#9fb2c0;font-size:9px;font-weight:900;letter-spacing:.12em;cursor:pointer}
+body[data-view="paper"] .v699-research>summary::-webkit-details-marker{display:none}
+body[data-view="paper"] .v699-research>summary:after{content:'+';font-size:16px;color:#38bdf8}
+body[data-view="paper"] .v699-research[open]>summary:after{content:'−'}
+body[data-view="paper"] .v699-research[open]>summary{border-bottom:1px solid rgba(39,112,151,.24)}
+body[data-view="paper"] .v699-research-body{padding:10px}
+body[data-view="paper"] .v699-research-body>*{margin-top:8px!important;margin-bottom:8px!important}
+body[data-view="paper"] .v699-ab-strip{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+body[data-view="paper"] .v699-ab-box{border:1px solid #1d455d;border-radius:14px;padding:11px;background:rgba(4,18,27,.72)}
+body[data-view="paper"] .v699-ab-box span{display:block;color:#7891a3;font-size:7px;letter-spacing:.12em}
+body[data-view="paper"] .v699-ab-box b{display:block;margin-top:4px;font-size:12px}
+body[data-view="paper"] .v699-ab-box small{display:block;color:#8196a6;font-size:7px;line-height:1.35;margin-top:4px}
+body[data-view="paper"] .v699-ab-note{grid-column:1/-1;color:#7f96a7;font-size:7px;line-height:1.45;padding:0 2px}
+body[data-view="paper"] .v686-shadow-forward{display:none!important}
+@media(max-width:520px){body[data-view="paper"] .v699-ab-strip{grid-template-columns:1fr 1fr}}
+</style>
+<script id="v699-paper-cleanup-js">
+(function(){
+ 'use strict';
+ function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
+ function version(){window.MERIDIAN_UI_VERSION='6.99';const b=document.getElementById('versionBadge');if(b)b.textContent='v6.99 · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent='6.99');}
+ function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
+ function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
+   const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
+   const d=document.createElement('div');d.className='v699-ab-strip';d.innerHTML='<div class="v699-ab-box"><span>BASELINE 6.2</span><b class="red">LOCKED · MAX DD '+dd+'</b><small>30 Closed Trades · Execution bleibt eingefroren</small></div><div class="v699-ab-box"><span>SHADOW V1</span><b class="green">'+seq+' · '+spnl+'</b><small>'+str+' · separater Forward-Ledger</small></div><div class="v699-ab-note">A/B STATUS · Baseline bleibt Referenz. Shadow darf unabhängig vom Baseline-Max-DD neue Research-Trades eröffnen, sobald V1-Regeln und Entry-Zone erfüllt sind.</div>';
+   shadow.insertAdjacentElement('afterend',d);
+ }
+ function cleanup(){version();if(document.body?.dataset?.view!=='paper')return;
+   const main=[...document.querySelectorAll('.forecast-main')].find(x=>/CLOUD PAPER COCKPIT/.test(txt(x)));if(!main)return;const first=main.closest('.card');if(!first)return;const host=first.parentElement;
+   const shadow=document.getElementById('shadow-v1-mount-v696');if(shadow){addAB(first,shadow)}
+   let research=host.querySelector(':scope > .v699-research');if(!research){research=document.createElement('details');research.className='v699-research';research.innerHTML='<summary>RESEARCH & DIAGNOSTICS</summary><div class="v699-research-body"></div>';host.appendChild(research)}
+   const rb=research.querySelector('.v699-research-body');
+   [...host.children].forEach(el=>{if(el===first||el===shadow||el===research||el.classList?.contains('v697-paper-intro')||el.classList?.contains('v699-ab-strip'))return;if(researchCandidate(el))rb.appendChild(el)});
+   // Also collect legacy research modules nested in generic PAPER ANALYTICS wrappers.
+   [...host.querySelectorAll(':scope > details.v686-paper-section')].forEach(el=>{if(researchCandidate(el)&&el.parentElement!==rb)rb.appendChild(el)});
+   // Core order: cockpit -> shadow -> A/B -> current signal -> scanner -> positions -> performance -> research.
+   const order=[];if(first)order.push(first);if(shadow)order.push(shadow);const ab=shadow?.nextElementSibling?.classList?.contains('v699-ab-strip')?shadow.nextElementSibling:null;if(ab)order.push(ab);
+   const core=[...host.children].filter(el=>el!==research&&!order.includes(el));
+   ['CURRENT SIGNAL','LIVE SCANNER','OPEN POSITIONS','EQUITY & PERFORMANCE'].forEach(label=>{const e=core.find(x=>txt(x).toUpperCase().startsWith(label)||txt(x).toUpperCase().includes(label));if(e&&!order.includes(e))order.push(e)});
+   order.forEach(el=>host.insertBefore(el,research));host.appendChild(research);
+ }
+ const mo=new MutationObserver(()=>setTimeout(cleanup,35));mo.observe(document.documentElement,{childList:true,subtree:true});
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(cleanup,120),{once:true});setTimeout(cleanup,400);setTimeout(cleanup,1400);setInterval(version,1200);setInterval(cleanup,5000);
+})();
+</script>

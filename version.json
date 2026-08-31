@@ -1,9 +1,9 @@
 {
-  "version": "6.98",
-  "ui": "6.98",
+  "version": "6.99",
+  "ui": "6.99",
   "backtest_lab": "V3.20",
   "engine": "6.2.0",
   "ruleset": "6.2-SIGNAL-V1",
   "evidence": "6.53-EVIDENCE",
-  "research": "Shadow V1 independent forward ledger diagnostics + Why No Trade; baseline execution unchanged"
+  "research": "PAPER cockpit cleanup: core A/B workflow + collapsed research diagnostics; no execution change"
 }

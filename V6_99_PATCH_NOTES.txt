@@ -1,0 +1,6 @@
+MERIDIAN v6.99
+- PAPER cockpit cleanup
+- Core order: Baseline/Shadow, A/B status, Current Signal, Live Scanner, Open Positions, Equity & Performance
+- Legacy Evidence/Counterfactual/Decision/H7/Learning/Backtest moved into collapsed RESEARCH & DIAGNOSTICS
+- Duplicate legacy Shadow 6.3A forward card hidden
+- No Engine 6.2 / Ruleset / risk / execution changes
