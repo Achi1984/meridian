@@ -1,1 +1,1 @@
-{"version":"7.11","ui":"7.11","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Rebuilt from user v7.07 stable base; Paperbot A/B dashboard + Shadow V1 forward sample + V3.21 window-reset validation gate; no execution change"}
+{"version":"7.12","ui":"7.12","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"A/B Paperbot comparison dashboard mount fix; baseline 6.2 unchanged"}
