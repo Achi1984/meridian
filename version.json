@@ -1,11 +1,11 @@
 {
-  "version": "6.94",
-  "ui": "6.94",
+  "version": "6.95",
+  "ui": "6.95",
   "backtest_lab": "V3.20",
   "engine": "6.2.0",
   "ruleset": "6.2-SIGNAL-V1",
   "evidence": "6.53",
-  "research": "Stable 6.88 rebuild; cloud-first backtest UI; iPhone-safe presentation patch; navigation untouched; no execution change",
-  "dashboard_patch": "6.88.1",
+  "research": "Stable 6.94 + restored SHADOW V1 A/B PAPER TEST card; no navigation, engine, ruleset, or execution changes",
+  "dashboard_patch": "6.95-shadow-v1-card",
   "cloud_ui": "primary-cloud-with-job-id-and-local-fallback"
 }

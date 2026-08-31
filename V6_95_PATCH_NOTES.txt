@@ -1,0 +1,7 @@
+MERIDIAN v6.95 DASHBOARD
+- Base: stable v6.94 dashboard
+- Restored SHADOW V1 · A/B PAPER TEST card in TRADE/PAPER
+- Reads /api/shadow-v1 every 15s
+- Baseline Engine 6.2 / ruleset unchanged
+- Navigation unchanged
+- No Northflank package changes
