@@ -1,1 +1,1 @@
-{"version":"7.12","ui":"7.12","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"A/B Paperbot comparison dashboard mount fix; baseline 6.2 unchanged"}
+{"version":"7.13","ui":"7.13","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Robust A/B Paperbot comparison dashboard mounted inside live Paper re-renders; baseline 6.2 unchanged"}
