@@ -1,8 +1,0 @@
-ACHI MERIDIAN v5.88 — DUAL LIQUIDATION RISK
-
-- BTC-S30: Short 30x, LIQ 83,746.1, Pionex buffer 7.33% => CRITICAL (<8%)
-- BTC-L20: Long 20x, LIQ 70,309.2, Pionex buffer 9.89% => OK (>8%)
-- Overall Risk Gate: BLOCKED by BTC-S30
-- Removes “Exposure -3%” as the primary risk message.
-- Risk display is based on actual liquidation buffers per bot.
-- Frozen trading Entry/SL/TP rules are not modified.
