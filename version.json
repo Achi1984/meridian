@@ -1,1 +1,1 @@
-{"version":"7.00","ui":"7.00","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","paper":"Shadow V1 A/B","research":"PAPER cockpit resilient cloud sync + last-good cache; no execution change"}
+{"version":"7.01","ui":"7.01","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"PAPER tab navigation performance + definitive UI version lock; no execution change"}

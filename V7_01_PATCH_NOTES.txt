@@ -1,0 +1,7 @@
+MERIDIAN v7.01
+- fixes stale v6.98/v6.96 UI labels fighting the v7 version badge
+- definitive UI version stamping = 7.01
+- faster bottom-tab switching: cached view is revealed immediately
+- expensive view rebuild deferred and only performed when stale >15s
+- PAPER/Backtest/Engine/Ruleset logic unchanged
+- Execution Risk Gate v6.88 intentionally unchanged
