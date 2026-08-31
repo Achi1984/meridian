@@ -12982,5 +12982,31 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
   setInterval(paint,4000);
 })();
 </script>
+
+
+<!-- v7.19 FORWARD TELEMETRY / EVIDENCE — RESEARCH ONLY -->
+<style id="v719-telemetry-style">
+#v719-telemetry{margin:10px 0 0;border-top:1px solid #1b4359;padding-top:10px}.v719-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.v719-head span{font-size:7px;color:#8aa1b1;letter-spacing:.14em}.v719-head b{font-size:7px;color:#38bdf8}.v719-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.v719-grid>div{border:1px solid #173d52;border-radius:10px;padding:7px}.v719-grid span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v719-grid strong{display:block;font-size:8px;margin-top:3px}.v719-foot{font-size:6.5px;line-height:1.45;color:#7e95a6;margin-top:7px}@media(max-width:390px){.v719-grid{grid-template-columns:1fr 1fr}}
+</style>
+<script id="v719-telemetry-js">
+(function(){'use strict';
+ const K='meridian_v719_forward_evidence',MAX=500,norm=x=>String(x??'').toUpperCase();
+ const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'[]')}catch(e){return []}},save=a=>{try{localStorage.setItem(K,JSON.stringify(a.slice(-MAX)))}catch(e){}};
+ function capture(){if(document.body?.dataset?.view!=='paper')return;const sh=window.MERIDIAN_SHADOW_V1_STATE||{},d=sh.lastDecision||sh.lastSignal||{},c=window.MERIDIAN_CLOUD||{},a=Array.isArray(c.signals?.assets)?c.signals.assets:[],best=a[0]||{};if(!Object.keys(d).length&&!Object.keys(best).length)return;
+  const reasons=Array.isArray(d.reasons)?d.reasons:[],sym=String(d.symbol||best.symbol||'—').replace('USDT',''),side=norm(d.side||best.side||''),regime=norm(d.regime||best.regime||'—'),shadow=norm(d.decision||((reasons.length)?'REJECT':'ELIGIBLE')),base=best.status==='READY'?'TRADE':best.status==='WAIT_ENTRY_ZONE'?'WAIT':'NO SETUP';
+  const ev={at:d.createdAt||d.ts||d.timestamp||new Date().toISOString(),symbol:sym,side,regime,technical:Number(d.technical??best.technical??best.tech??0),candidate:Number(d.candidate??best.candidate??best.cand??0),distanceAtr:Number.isFinite(Number(d.distanceAtr))?Number(d.distanceAtr):null,baseline:base,shadow,reasons};
+  const fp=[ev.at,sym,side,base,shadow,reasons.join(',')].join('|'),arr=load();if(arr.length&&arr[arr.length-1].fp===fp)return;ev.fp=fp;arr.push(ev);save(arr);window.MERIDIAN_FORWARD_EVIDENCE=arr;
+ }
+ function render(){capture();const dash=document.getElementById('v708-ab-dashboard');if(!dash)return;let el=document.getElementById('v719-telemetry');if(!el){el=document.createElement('div');el.id='v719-telemetry';const intel=document.getElementById('v716-ab-intel');(intel||dash.querySelector('.v714-counts'))?.insertAdjacentElement('afterend',el)}if(!el)return;const arr=load(),last=arr[arr.length-1]||{},rej=arr.filter(x=>x.shadow==='REJECT').length,wait=arr.filter(x=>x.shadow==='WAIT').length,div=arr.filter(x=>(x.baseline==='TRADE')!==(['ENTER','ELIGIBLE','TRADE'].includes(x.shadow))).length;
+  el.innerHTML='<div class="v719-head"><span>FORWARD EVIDENCE</span><b>'+arr.length+' EVENTS</b></div><div class="v719-grid"><div><span>REGIME</span><strong>'+String(last.regime||'—')+'</strong></div><div><span>ASSET / SIDE</span><strong>'+String(last.symbol||'—')+' '+String(last.side||'')+'</strong></div><div><span>REJECT / WAIT</span><strong>'+rej+' / '+wait+'</strong></div><div><span>DIVERGENZ</span><strong>'+div+'</strong></div></div><div class="v719-foot">Persistiert lokal bis 500 eindeutige Forward-Entscheidungen: Zeit · Asset · Richtung · Regime · Tech/Cand · Entry-Distanz · Baseline · Shadow · Reject/Wait-Grund. Research-only; keine Execution-Änderung.</div>';
+ }
+ setInterval(render,2500);document.addEventListener('DOMContentLoaded',()=>setTimeout(render,900));window.addEventListener('pageshow',()=>setTimeout(render,250));window.MERIDIAN_V719_EVIDENCE=()=>load();
+})();
+</script>
+
+<script id="meridian-version-authority-v719">
+(function(){'use strict';const V='7.19',B='7.19-20260831-R1';window.MERIDIAN_UI_VERSION=V;window.__MERIDIAN_BUILD__=B;function paint(ok=true){const b=document.getElementById('versionBadge');if(b)b.textContent='v'+V+(ok?' · LIVE':' · FILE MISMATCH');document.querySelectorAll('[data-ui-version]').forEach(e=>e.textContent=V)}async function verify(){paint(true);try{const r=await fetch('version.json?build='+B+'&t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();paint(String(j.version||j.ui||'')===V&&String(j.buildId||'')===B)}catch(e){paint(true)}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',verify,{once:true});else verify();window.addEventListener('pageshow',verify);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verify()});setInterval(()=>paint(true),3500)})();
+</script>
+
 </body>
 </html>

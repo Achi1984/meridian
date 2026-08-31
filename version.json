@@ -1,1 +1,1 @@
-{"version":"7.18","ui":"7.18","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"A/B dashboard: cloud freshness mapping, regime/why-no-trade context, 20-trade PROMOTE/MODIFY/REJECT verdict; execution unchanged"}
+{"version":"7.19","ui":"7.19","buildId":"7.19-20260831-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"Forward telemetry/evidence: asset, side, regime, tech/candidate, entry distance, baseline/shadow decision and reject/wait reasons; local persistent ledger; execution unchanged"}
