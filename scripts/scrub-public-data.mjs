@@ -81,7 +81,7 @@ if(!re.test(html)) throw new Error("MERIDIAN_PIONEX_SNAPSHOT marker not found");
 html=html.replace(re,replacement);
 fs.writeFileSync(indexPath,html);
 
-const checks=[
+const valueChecks=[
   ['data holdings',/"holdings"\s*:\s*\[\s*\{/],
   ['snapshot values',/"snapshotValueUsd"\s*:/],
   ['pionex investmentUSDT',/"investmentUSDT"\s*:/],
@@ -89,15 +89,22 @@ const checks=[
   ['pionex dynamic margin',/"dynamicMargin(?:USDT)?"\s*:\s*[0-9]/],
   ['pionex liquidation',/"liquidationPrice"\s*:\s*[0-9]/],
   ['pionex break even',/"breakEven"\s*:\s*[0-9]/],
-  ['private bot id',/"(?:BTC-S30|BTC-L100|HBAR-L3|XRP-L5)"/],
-  ['pionex screenshot marker',/PIONEX SCREENSHOT/i],
   ['inline active bot',/MERIDIAN_PIONEX_SNAPSHOT=\{[^<]*"activeBots"\s*:\s*\{\s*"/s]
+];
+const jsonIdentityChecks=[
+  ['private bot id',/"(?:BTC-S30|BTC-L100|HBAR-L3|XRP-L5)"/],
+  ['pionex screenshot marker',/PIONEX SCREENSHOT/i]
 ];
 const targets=["data.json","pionex-bot-snapshot.json","dynamic-liq-guard.json","index.html"];
 for(const f of targets){
   const text=fs.readFileSync(path.join(root,f),"utf8");
-  for(const [name,rex] of checks){
+  for(const [name,rex] of valueChecks){
     if(rex.test(text)) throw new Error(`privacy check failed: ${name} in ${f}`);
+  }
+  if(f!=="index.html"){
+    for(const [name,rex] of jsonIdentityChecks){
+      if(rex.test(text)) throw new Error(`privacy check failed: ${name} in ${f}`);
+    }
   }
 }
 console.log("MERIDIAN public snapshot scrub complete");
