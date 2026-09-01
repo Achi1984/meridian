@@ -29,6 +29,35 @@ data.cashflows={
   note:"Private cashflow data removed from public repository."
 };
 if(data.manualVenueBalances) data.manualVenueBalances=[];
+
+// Remove historical user-specific trading/risk snapshots that accumulated in data.json.
+// General model policies remain public; current/private state comes from /api/private/dashboard after unlock.
+const privateLegacyKeys=[
+  "botSnapshot","botCapitalUSDT","botRisk","rotationEngine","slInvalidationEngine",
+  "pionexCanonicalBots","pionexBotSnapshot","botRiskDistribution","dualBotHedge",
+  "pionexRealityCalibration","realitySSOT","pionexReality","singleBtcHedge",
+  "btcRiskSnapshot","futuresRiskIntelligence"
+];
+for(const k of privateLegacyKeys) delete data[k];
+
+if(data.gridModule&&typeof data.gridModule==="object") data.gridModule.activeBots=[];
+if(data.decisionQuality&&typeof data.decisionQuality==="object"){
+  delete data.decisionQuality.btcLong;
+  delete data.decisionQuality.btcShort;
+}
+if(data.capitalReleaseEngine&&typeof data.capitalReleaseEngine==="object"){
+  data.capitalReleaseEngine.theoreticalLongCapacityUSD=null;
+}
+if(data.beProtectionVisual&&typeof data.beProtectionVisual==="object"){
+  data.beProtectionVisual.protectedBots=[];
+  data.beProtectionVisual.closedProtectedBots=[];
+}
+if(data.recoveryIntelligence&&typeof data.recoveryIntelligence==="object") data.recoveryIntelligence.bot=null;
+if(data.vision2?.portfolioRead){
+  data.vision2.portfolioRead={private:true,note:"Private portfolio context is available only after authenticated unlock."};
+}
+if(data.ssot&&typeof data.ssot==="object") data.ssot.legacyBotIdsRemoved=[];
+
 writeJson("data.json",data);
 
 writeJson("pionex-bot-snapshot.json",{
@@ -55,8 +84,13 @@ fs.writeFileSync(indexPath,html);
 const checks=[
   ['data holdings',/"holdings"\s*:\s*\[\s*\{/],
   ['snapshot values',/"snapshotValueUsd"\s*:/],
-  ['pionex investment',/"investmentUSDT"\s*:/],
+  ['pionex investmentUSDT',/"investmentUSDT"\s*:/],
+  ['pionex investment',/"investment"\s*:\s*[0-9]/],
+  ['pionex dynamic margin',/"dynamicMargin(?:USDT)?"\s*:\s*[0-9]/],
   ['pionex liquidation',/"liquidationPrice"\s*:\s*[0-9]/],
+  ['pionex break even',/"breakEven"\s*:\s*[0-9]/],
+  ['private bot id',/"(?:BTC-S30|BTC-L100|HBAR-L3|XRP-L5)"/],
+  ['pionex screenshot marker',/PIONEX SCREENSHOT/i],
   ['inline active bot',/MERIDIAN_PIONEX_SNAPSHOT=\{[^<]*"activeBots"\s*:\s*\{\s*"/s]
 ];
 const targets=["data.json","pionex-bot-snapshot.json","dynamic-liq-guard.json","index.html"];
