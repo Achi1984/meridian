@@ -5,12 +5,12 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
-<meta name="meridian-build" content="7.23-20260901-R1">
+<meta name="meridian-build" content="7.24-20260901-R1">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=7.23-R1">
+<link rel="manifest" href="manifest.webmanifest?v=7.24-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=7.23-R1">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.24-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -3238,7 +3238,7 @@ main>section{
 
 <script id="v601-cache-migration">
 (function(){
-  const BUILD='7.23-20260901-R1';
+  const BUILD='7.24-20260901-R1';
   try{
     const last=localStorage.getItem('meridian-active-build');
     if(last!==BUILD){
@@ -4394,7 +4394,7 @@ const fmt=(n,d=0)=>{
  return new Intl.NumberFormat('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
 };
 let DATA=null,HISTORY={status:'browser-live',coins:{}},activeCoin='BTC',LAST_PRICE_UPDATE=null,PRICE_WS=null,UI_RENDER_TIMER=null,PORTFOLIO_SERIES=[],ACTIVE_PORTFOLIO_RANGE='1D',CASHFLOWS=[],CENTER_FOCUS_OPEN=null,CENTER_CRITICAL_ACTIVE=null;
-const UI_VERSION='7.20';
+const UI_VERSION='7.24';
 let APP_CODE_VERSION=UI_VERSION;
 let APP_RELEASE='6.20 · CLOUD PAPER COCKPIT';
 let FEED={ws:'OFFLINE',binanceRest:'UNKNOWN',coinGecko:'UNKNOWN',lastWsAt:null,lastRestAt:null,lastCgAt:null,lastError:null};
@@ -5814,7 +5814,7 @@ function btcRiskStatusCard(){
 
 
 function cloudBackendFresh(){
-  const c=window.MERIDIAN_CLOUD||{};
+  const c=(typeof MERIDIAN_CLOUD!=='undefined'&&MERIDIAN_CLOUD)?MERIDIAN_CLOUD:(window.MERIDIAN_CLOUD||{});
   const p=c.paper||{};
   const st=(c.status && typeof c.status==='object')?c.status:{};
   const eng=(st.engine && typeof st.engine==='object')?st.engine:{};
@@ -7471,6 +7471,7 @@ let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],evidence:null,
 const MERIDIAN_ENGINE_MIRROR_URL='https://raw.githubusercontent.com/Achi1984/meridian/telemetry/research-snapshot.json';
 MERIDIAN_CLOUD.mirrorStatus=null;
 MERIDIAN_CLOUD.mirrorFetchedAt=null;
+window.MERIDIAN_CLOUD=MERIDIAN_CLOUD;
 async function meridianEngineMirrorSync(){
   try{
     const r=await fetch(MERIDIAN_ENGINE_MIRROR_URL+'?t='+Date.now(),{cache:'no-store'});
@@ -7480,6 +7481,7 @@ async function meridianEngineMirrorSync(){
     if(!e||!e.lastCycleAt)throw new Error('mirror engine missing');
     MERIDIAN_CLOUD.mirrorStatus=e;
     MERIDIAN_CLOUD.mirrorFetchedAt=new Date().toISOString();
+    window.MERIDIAN_CLOUD=MERIDIAN_CLOUD;
   }catch(e){
     // Read-only fallback only; never destroy last valid direct cloud state.
   }
@@ -12990,7 +12992,7 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 (function(){
   'use strict';
   const CODE_VERSION='7.21';
-  const BUILD_ID='7.23-20260901-R1';
+  const BUILD_ID='7.24-20260901-R1';
   window.MERIDIAN_UI_VERSION=CODE_VERSION;
   window.__MERIDIAN_BUILD__=BUILD_ID;
   function paint(ok=true){
@@ -13042,7 +13044,7 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 </script>
 
 <script id="meridian-version-authority-v719">
-(function(){'use strict';const V='7.21',B='7.23-20260901-R1';window.MERIDIAN_UI_VERSION=V;window.__MERIDIAN_BUILD__=B;function paint(ok=true){const b=document.getElementById('versionBadge');if(b)b.textContent='v'+V+(ok?' · LIVE':' · FILE MISMATCH');document.querySelectorAll('[data-ui-version]').forEach(e=>e.textContent=V)}async function verify(){paint(true);try{const r=await fetch('version.json?build='+B+'&t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();paint(String(j.version||j.ui||'')===V&&String(j.buildId||'')===B)}catch(e){paint(true)}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',verify,{once:true});else verify();window.addEventListener('pageshow',verify);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verify()});setInterval(()=>paint(true),3500)})();
+(function(){'use strict';const V='7.21',B='7.24-20260901-R1';window.MERIDIAN_UI_VERSION=V;window.__MERIDIAN_BUILD__=B;function paint(ok=true){const b=document.getElementById('versionBadge');if(b)b.textContent='v'+V+(ok?' · LIVE':' · FILE MISMATCH');document.querySelectorAll('[data-ui-version]').forEach(e=>e.textContent=V)}async function verify(){paint(true);try{const r=await fetch('version.json?build='+B+'&t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();paint(String(j.version||j.ui||'')===V&&String(j.buildId||'')===B)}catch(e){paint(true)}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',verify,{once:true});else verify();window.addEventListener('pageshow',verify);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verify()});setInterval(()=>paint(true),3500)})();
 </script>
 
 
@@ -13055,7 +13057,7 @@ letter-spacing:.08em;line-height:1.4}
 <script id="v720-source-clarity-script">
 (function(){
   'use strict';
-  const V='7.21', B='7.23-20260901-R1';
+  const V='7.21', B='7.24-20260901-R1';
   window.MERIDIAN_UI_VERSION=V; window.__MERIDIAN_BUILD__=B;
 
   function markStaticPionex(){
@@ -13113,7 +13115,7 @@ letter-spacing:.08em;line-height:1.4}
 (function(){
 'use strict';
 const URL='https://raw.githubusercontent.com/Achi1984/meridian/telemetry/research-snapshot.json';
-const V='7.21', BUILD='7.23-20260901-R1';
+const V='7.21', BUILD='7.24-20260901-R1';
 let TF='15m', lastJson=null, lastFetch=0;
 window.MERIDIAN_UI_VERSION=V; window.__MERIDIAN_BUILD__=BUILD;
 
