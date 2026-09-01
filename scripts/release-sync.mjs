@@ -60,7 +60,7 @@ apply('manifest.webmanifest',()=>JSON.stringify({
 apply('package.json',src=>{
   const p=JSON.parse(src);
   p.version=version+'.0';
-  p.scripts={...(p.scripts||{}),start:'node server-gateway.js','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs'};
+  p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs'};
   return JSON.stringify(p)+'\n';
 });
 

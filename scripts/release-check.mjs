@@ -37,7 +37,7 @@ must(manifest.start_url===`./?build=${build}`,'manifest start_url mismatch');
 
 const pkg=json('package.json');
 must(pkg.version===v+'.0','package version mismatch');
-must(pkg.scripts?.start==='node server-gateway.js','package start must use gateway');
+must(pkg.scripts?.start==='node scripts/start-gateway.mjs','package start must use password-safe gateway launcher');
 must(pkg.scripts?.test==='node --test test/*.test.js','test script mismatch');
 
 must(fs.existsSync('package-lock.json'),'package-lock.json missing');
@@ -47,7 +47,7 @@ must(lock.packages?.['']?.version===v+'.0','package-lock root version mismatch')
 
 const docker=read('Dockerfile');
 must(docker.includes('RUN npm ci --omit=dev'),'Docker must use npm ci --omit=dev');
-must(docker.includes('CMD ["node", "server-gateway.js"]'),'Docker must start security gateway');
+must(docker.includes('CMD ["node", "scripts/start-gateway.mjs"]'),'Docker must start password-safe security gateway launcher');
 
 const sw=read('sw.js');
 must(sw.includes('MERIDIAN_SW_RETIRE'),'service worker retirement sentinel missing');

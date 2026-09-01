@@ -26,12 +26,14 @@ jobs:
           node --check server.js
           node --check server-gateway.js
           node --check cloud-backtest.js
+          node --check scripts/read-token-auth.mjs
+          node --check scripts/start-gateway.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
           node --check app-v7.32-legacy.js
           node --check app-v7.33-hardening.js
-      - name: Research regression tests
+      - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Release authority consistency
         run: |
