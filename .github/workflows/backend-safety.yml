@@ -35,6 +35,7 @@ jobs:
           node --check app-v7.32-legacy.js
           node --check app-v7.33-hardening.js
           node --check app-runtime-monitor.js
+          node --check app-v7.37-ui-polish.js
       - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Release authority consistency
