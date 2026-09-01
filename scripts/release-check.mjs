@@ -14,6 +14,7 @@ must(release.ruleset==='6.2-SIGNAL-V1','Ruleset must remain 6.2-SIGNAL-V1');
 must(release.research==='7.34-RESEARCH-V2','Research engine version mismatch');
 must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
+must(release.uiPolish==='7.37-MOBILE','Mobile UI polish version mismatch');
 
 const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
@@ -27,6 +28,7 @@ const loader=read('app-v6.06.js');
 must(loader.includes(`app-v7.32-legacy.js?v=${tag}`),'legacy loader cache tag mismatch');
 must(loader.includes(`app-v7.33-hardening.js?v=${tag}`),'hardening loader cache tag mismatch');
 must(loader.includes(`app-runtime-monitor.js?v=${tag}`),'runtime monitor cache tag mismatch');
+must(loader.includes(`app-v7.37-ui-polish.js?v=${tag}`),'mobile UI polish loader cache tag mismatch');
 
 const hardening=read('app-v7.33-hardening.js');
 must(hardening.includes(`const VERSION='${v}';`),'hardening VERSION mismatch');
@@ -36,6 +38,12 @@ must(hardening.includes(`manifest.webmanifest?v=${tag}`),'hardening manifest tag
 const runtime=read('app-runtime-monitor.js');
 must(runtime.includes('/gateway-health'),'runtime monitor must use gateway health');
 must(runtime.includes('MERIDIAN_RUNTIME_STATUS'),'runtime monitor status export missing');
+
+const uiPolish=read('app-v7.37-ui-polish.js');
+must(uiPolish.includes('meridian-release-status-row'),'mobile release status row missing');
+must(uiPolish.includes("document.getElementById('versionBadge')"),'mobile UI polish must relocate version badge');
+must(uiPolish.includes("document.getElementById('meridian-runtime-badge')"),'mobile UI polish must relocate runtime badge');
+must(uiPolish.includes('@media(max-width:390px)'),'narrow iPhone header guard missing');
 
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
