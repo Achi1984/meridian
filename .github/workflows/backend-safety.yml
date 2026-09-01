@@ -28,11 +28,13 @@ jobs:
           node --check cloud-backtest.js
           node --check scripts/read-token-auth.mjs
           node --check scripts/start-gateway.mjs
+          node --check scripts/runtime-smoke.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
           node --check app-v7.32-legacy.js
           node --check app-v7.33-hardening.js
+          node --check app-runtime-monitor.js
       - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Release authority consistency
