@@ -1,3 +1,4 @@
+// MERIDIAN v7.39 — unified A/B/C/D Paper overview; presentation only.
 (function(){
   'use strict';
   const n=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
