@@ -2,20 +2,20 @@
   "apiVersion": "6.54-PUBLIC-STATUS",
   "app": "ACHI MERIDIAN Paperbot",
   "engine": {
-    "cycles": 178,
+    "cycles": 11,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-01T08:34:05.467Z",
-    "lastGoodMarketAt": "2026-09-01T08:34:05.374Z",
-    "lastSignalScanAt": "2026-09-01T08:33:36.244Z",
+    "lastCycleAt": "2026-09-01T08:50:37.208Z",
+    "lastGoodMarketAt": "2026-09-01T08:50:36.945Z",
+    "lastSignalScanAt": "2026-09-01T08:50:37.458Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 89,
-    "startedAt": "2026-09-01T07:05:28.750Z",
+    "signalScans": 6,
+    "startedAt": "2026-09-01T08:45:31.724Z",
     "state": "RUNNING",
     "version": "6.2.0"
   },
@@ -1674,7 +1674,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-01T08:34:34.141Z",
+  "generatedAt": "2026-09-01T08:50:39.513Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -2032,34 +2032,34 @@
     "assets": [
       {
         "candidate": 88,
-        "distanceAtr": 2.713,
-        "price": 102.18,
+        "distanceAtr": 2.574,
+        "price": 102.06,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
         "technical": 80
       },
       {
+        "candidate": 77,
+        "distanceAtr": 3.102,
+        "price": 77898.43,
+        "side": "SHORT",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "BTCUSDT",
+        "technical": 74
+      },
+      {
         "candidate": 72,
-        "distanceAtr": 2.759,
-        "price": 2448.35,
+        "distanceAtr": 2.383,
+        "price": 2449.01,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
         "technical": 69
-      },
-      {
-        "candidate": 65,
-        "distanceAtr": 3.313,
-        "price": 77922,
-        "side": "SHORT",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "BTCUSDT",
-        "technical": 73
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-01T08:33:35.944Z"
+    "updatedAt": "2026-09-01T08:50:37.445Z"
   },
   "shadowV1": {
     "account": {
@@ -2090,8 +2090,8 @@
       "baselineGateIndependent": true,
       "candidate": 88,
       "decision": "WAIT",
-      "distanceAtr": 2.713,
-      "evaluatedAt": "2026-09-01T08:33:36.159Z",
+      "distanceAtr": 2.574,
+      "evaluatedAt": "2026-09-01T08:50:37.451Z",
       "maxEntryDistanceAtr": 0.75,
       "reasons": [
         "WAIT_ENTRY_ZONE",
@@ -2109,8 +2109,8 @@
         "baselineGateIndependent": true,
         "candidate": 88,
         "decision": "WAIT",
-        "distanceAtr": 2.713,
-        "evaluatedAt": "2026-09-01T08:33:36.159Z",
+        "distanceAtr": 2.574,
+        "evaluatedAt": "2026-09-01T08:50:37.451Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "WAIT_ENTRY_ZONE",
@@ -2125,10 +2125,27 @@
       },
       {
         "baselineGateIndependent": true,
+        "candidate": 77,
+        "decision": "WAIT",
+        "distanceAtr": 3.102,
+        "evaluatedAt": "2026-09-01T08:50:37.451Z",
+        "maxEntryDistanceAtr": 0.75,
+        "reasons": [
+          "WAIT_ENTRY_ZONE",
+          "SHADOW_TECH_LT_75"
+        ],
+        "regime": "RANGE",
+        "side": "SHORT",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "BTCUSDT",
+        "technical": 74
+      },
+      {
+        "baselineGateIndependent": true,
         "candidate": 72,
         "decision": "WAIT",
-        "distanceAtr": 2.759,
-        "evaluatedAt": "2026-09-01T08:33:36.159Z",
+        "distanceAtr": 2.383,
+        "evaluatedAt": "2026-09-01T08:50:37.451Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "WAIT_ENTRY_ZONE",
@@ -2141,27 +2158,9 @@
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
         "technical": 69
-      },
-      {
-        "baselineGateIndependent": true,
-        "candidate": 65,
-        "decision": "WAIT",
-        "distanceAtr": 3.313,
-        "evaluatedAt": "2026-09-01T08:33:36.159Z",
-        "maxEntryDistanceAtr": 0.75,
-        "reasons": [
-          "WAIT_ENTRY_ZONE",
-          "SHADOW_TECH_LT_75",
-          "SHADOW_CAND_LT_70"
-        ],
-        "regime": "RANGE",
-        "side": "SHORT",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "BTCUSDT",
-        "technical": 73
       }
     ],
-    "lastScanAt": "2026-09-01T08:33:36.159Z",
+    "lastScanAt": "2026-09-01T08:50:37.451Z",
     "lastSignal": {
       "atr": 6.0700828335379615,
       "candidate": 72,
@@ -2832,7 +2831,7 @@
     ],
     "researchOnly": true,
     "ruleset": "6.98-SHADOW-V1",
-    "updatedAt": "2026-09-01T08:34:05.461Z",
+    "updatedAt": "2026-09-01T08:50:37.451Z",
     "winRate": 20
   }
 }
