@@ -10,4 +10,4 @@ COPY . .
 ENV NODE_ENV=production
 EXPOSE 10000
 
-CMD ["node", "server-gateway.js"]
+CMD ["node", "scripts/start-gateway.mjs"]
