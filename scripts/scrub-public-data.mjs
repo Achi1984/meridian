@@ -34,7 +34,7 @@ if(data.manualVenueBalances) data.manualVenueBalances=[];
 // General model policies remain public; current/private state comes from /api/private/dashboard after unlock.
 const privateLegacyKeys=[
   "botSnapshot","botCapitalUSDT","botRisk","rotationEngine","slInvalidationEngine",
-  "pionexCanonicalBots","pionexBotSnapshot","botRiskDistribution","dualBotHedge",
+  "pionexCanonicalBots","pionexBotSnapshot","botRiskDistribution","dualBotHedge","dualBtcHedge",
   "pionexRealityCalibration","realitySSOT","pionexReality","singleBtcHedge",
   "btcRiskSnapshot","futuresRiskIntelligence"
 ];
