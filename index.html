@@ -5,16 +5,16 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
-<meta name="meridian-build" content="7.29-20260901-R1">
+<meta name="meridian-build" content="7.30-20260901-R1">
 <script id="meridian-release-authority">
-window.MERIDIAN_RELEASE_VERSION='7.29';
-window.MERIDIAN_RELEASE_BUILD='7.29-20260901-R1';
+window.MERIDIAN_RELEASE_VERSION='7.30';
+window.MERIDIAN_RELEASE_BUILD='7.30-20260901-R1';
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=7.29-R1">
+<link rel="manifest" href="manifest.webmanifest?v=7.30-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=7.29-R1">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.30-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -4287,17 +4287,31 @@ body[data-view="paper"] .shadowv1-card{margin-top:12px}
 @media(max-width:390px){.v718-context{grid-template-columns:1fr}}
 </style>
 
-<style id="v729-paper-single-research-owner">
-/* v7.29: v721 is the single owner of Paper research comparison.
-   Old parallel Shadow/A-B renderers remain in source for compatibility but never render visibly. */
-body[data-view="paper"] #v708-ab-dashboard,
-body[data-view="paper"] .v699-ab-strip,
-body[data-view="paper"] .v686-shadow-forward,
-body[data-view="paper"] #shadow-v1-mount-v696{
-  display:none!important;
+<style id="v730-paper-canonical-owner">
+/* v7.30: cloudPaperTradeView() is the canonical Paper research owner.
+   Research telemetry is fetched in the central MERIDIAN_CLOUD sync. */
+.v730-research-lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.v730-lane,.v730-current-lane{border:1px solid #173e55;border-radius:14px;padding:10px 11px;min-width:0;background:rgba(5,19,29,.58)}
+.v730-lane.base,.v730-current-lane.base{border-color:#71303d}
+.v730-lane.shadow,.v730-current-lane.shadow{border-color:#1d6c4a}
+.v730-lane.challenger,.v730-current-lane.challenger{border-color:#245f93}
+.v730-lane span,.v730-current-lane span{display:block;color:#8197a8;font-size:7px;letter-spacing:1.05px;margin-bottom:5px}
+.v730-lane b,.v730-current-lane b{display:block;font-size:11px;line-height:1.3;overflow-wrap:anywhere}
+.v730-lane small,.v730-current-lane small{display:block;color:#879cad;font-size:7.5px;line-height:1.45;margin-top:5px;overflow-wrap:anywhere}
+.v730-current-research{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.v730-challenger-scan{margin-top:7px;padding-top:7px;border-top:1px solid rgba(36,95,147,.28);font-size:7px;line-height:1.45;color:#879cad}
+.v730-challenger-scan b{font-size:8px!important;margin-right:5px}.v730-challenger-scan span{display:block;margin-top:2px}
+@media(max-width:720px){
+  .v730-research-lanes,.v730-current-research{grid-template-columns:1fr}
 }
-body[data-view="paper"] #v721-shadow-research{
-  display:block!important;
+/* Legacy parallel Paper research dashboards are non-owners from v7.30 onward. */
+body[data-view="paper"] #v708-ab-dashboard,
+body[data-view="paper"] #v713-ab-dashboard,
+body[data-view="paper"] #v721-shadow-research,
+body[data-view="paper"] #shadow-v1-mount-v696,
+body[data-view="paper"] .v699-ab-strip,
+body[data-view="paper"] .v686-shadow-forward{
+  display:none!important;
 }
 </style>
 
@@ -7486,7 +7500,7 @@ function paperAnalytics(s){
 
 /* ===== MERIDIAN v6.23 — NORTHFLANK CLOUD PAPER COCKPIT ===== */
 const MERIDIAN_CLOUD_API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
-let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],evidence:null,updatedAt:null,error:null,loading:false};
+let MERIDIAN_CLOUD={status:null,signals:null,paper:null,events:[],evidence:null,shadow:null,challenger:null,updatedAt:null,error:null,loading:false};
 const MERIDIAN_ENGINE_MIRROR_URL='https://raw.githubusercontent.com/Achi1984/meridian/telemetry/research-snapshot.json';
 MERIDIAN_CLOUD.mirrorStatus=null;
 MERIDIAN_CLOUD.mirrorFetchedAt=null;
@@ -7500,6 +7514,8 @@ async function meridianEngineMirrorSync(){
     if(!e||!e.lastCycleAt)throw new Error('mirror engine missing');
     MERIDIAN_CLOUD.mirrorStatus=e;
     MERIDIAN_CLOUD.mirrorFetchedAt=new Date().toISOString();
+    if(j?.challengerV2) MERIDIAN_CLOUD.challenger=j.challengerV2;
+    if(j?.shadowV1) MERIDIAN_CLOUD.shadow=j.shadowV1;
     window.MERIDIAN_CLOUD=MERIDIAN_CLOUD;
   }catch(e){
     // Read-only fallback only; never destroy last valid direct cloud state.
@@ -7514,7 +7530,7 @@ const MERIDIAN_CLOUD_CACHE_KEY='meridian-cloud-last-good-v700';
   }catch(e){}
 })();
 function meridianCloudPersist(){
-  try{localStorage.setItem(MERIDIAN_CLOUD_CACHE_KEY,JSON.stringify({status:MERIDIAN_CLOUD.status,signals:MERIDIAN_CLOUD.signals,paper:MERIDIAN_CLOUD.paper,events:MERIDIAN_CLOUD.events,evidence:MERIDIAN_CLOUD.evidence,updatedAt:MERIDIAN_CLOUD.updatedAt}))}catch(e){}
+  try{localStorage.setItem(MERIDIAN_CLOUD_CACHE_KEY,JSON.stringify({status:MERIDIAN_CLOUD.status,signals:MERIDIAN_CLOUD.signals,paper:MERIDIAN_CLOUD.paper,events:MERIDIAN_CLOUD.events,evidence:MERIDIAN_CLOUD.evidence,shadow:MERIDIAN_CLOUD.shadow,challenger:MERIDIAN_CLOUD.challenger,updatedAt:MERIDIAN_CLOUD.updatedAt}))}catch(e){}
 }
 
 
@@ -7527,10 +7543,10 @@ async function meridianCloudSync(forceRender=true){
   if(MERIDIAN_CLOUD.loading)return;
   MERIDIAN_CLOUD.loading=true;
   try{
-    const paths=['/api/status','/api/signals','/api/paper','/api/events?limit=80','/api/evidence?limit=100'];
+    const paths=['/api/status','/api/signals','/api/paper','/api/events?limit=80','/api/evidence?limit=100','/api/shadow-v1','/api/challenger-v2'];
     const out=await Promise.allSettled(paths.map(meridianCloudFetch));
     const val=i=>out[i].status==='fulfilled'?out[i].value:null;
-    const status=val(0),signals=val(1),paper=val(2),events=val(3),evidence=val(4);
+    const status=val(0),signals=val(1),paper=val(2),events=val(3),evidence=val(4),shadow=val(5),challenger=val(6);
     // Paper is the critical SSOT. Optional endpoint failures must not blank the cockpit.
     if(!paper && !MERIDIAN_CLOUD.paper) throw new Error(out[2].reason?.message||'Paper API nicht erreichbar');
     MERIDIAN_CLOUD={
@@ -7539,6 +7555,8 @@ async function meridianCloudSync(forceRender=true){
       paper:paper||MERIDIAN_CLOUD.paper,
       events:Array.isArray(events)?events:MERIDIAN_CLOUD.events,
       evidence:evidence||MERIDIAN_CLOUD.evidence,
+      shadow:shadow||MERIDIAN_CLOUD.shadow,
+      challenger:challenger||MERIDIAN_CLOUD.challenger,
       updatedAt:paper?new Date().toISOString():MERIDIAN_CLOUD.updatedAt,
       error:paper?null:'STALE · letzter gültiger Paper-Stand',loading:false,cached:!paper
     };
@@ -8352,6 +8370,8 @@ function cloudPaperTradeView(){
   const trades=Array.isArray(p.trades)?p.trades:[];
   const events=Array.isArray(C.events)?C.events:[];
   const eng=st.engine||{}, db=st.db||{}, safety=st.safety||{};
+  const shadow=C.shadow||window.MERIDIAN_SHADOW_V1_STATE||{}, challenger=C.challenger||{};
+  const sha=shadow.account||{}, cha=challenger.account||{};
 
   const equity=Number(a.equity||0), start=Number(a.startEquity||10000);
   const realized=Number(a.realizedPnl||0), unreal=Number(a.unrealizedPnl||0);
@@ -8373,7 +8393,7 @@ function cloudPaperTradeView(){
       <div>
         <span>BASE 6.2 · ${cloudStatusLabel(q.status)}</span>
         <b class="${cloudStatusTone(q.status)}">${q.status==='READY'?'TRADE':'WATCH'}</b>
-        <em>${(q.reasons||[]).join(' · ')||'Baseline-Gates erfüllt'}</em><div class="v706-shadow-scan"></div>
+        <em>${(q.reasons||[]).join(' · ')||'Baseline-Gates erfüllt'}</em><div class="v706-shadow-scan"></div><div class="v730-challenger-scan"></div>
       </div>
     </div>`).join('');
 
@@ -8416,6 +8436,50 @@ function cloudPaperTradeView(){
           : (best.reasons||[]).join(' · ') || 'KEIN SETUP')
     : 'SCANNER LÄDT';
 
+  const shStart=Number(sha.startEquity||10000), shEq=Number(sha.equity||shStart),
+        shPnl=shEq-shStart, shClosed=Number(shadow.closedCount||0), shWr=Number(shadow.winRate||0),
+        shPf=Number(shadow.profitFactor||0), shDd=Number(sha.drawdownPct||shadow.drawdownPct||0);
+  const chStart=Number(cha.startEquity||10000), chEq=Number(cha.equity||chStart),
+        chPnl=('realizedPnl' in cha||'unrealizedPnl' in cha)?Number(cha.realizedPnl||0)+Number(cha.unrealizedPnl||0):chEq-chStart,
+        chClosed=Number(challenger.closedCount||0), chOpen=Number(challenger.openCount||0),
+        chWr=Number(challenger.winRate||0), chPf=Number(challenger.profitFactor||0), chDd=Number(cha.drawdownPct||0);
+
+  function paperResearchMatch(state,b){
+    if(!state||!b)return null;
+    const sym=String(b.symbol||'').toUpperCase(), side=String(b.side||'').toUpperCase();
+    const xs=[...(Array.isArray(state.lastEvaluations)?state.lastEvaluations:[]),state.lastDecision,state.lastSignal].filter(Boolean);
+    return xs.find(x=>String(x.symbol||'').toUpperCase()===sym&&String(x.side||'').toUpperCase()===side)||null;
+  }
+  function paperShadowForBest(b){
+    if(!b)return {decision:'WAIT',tone:'amber',why:'KEIN CURRENT SIGNAL'};
+    const m=paperResearchMatch(shadow,b);
+    if(m){
+      const rs=Array.isArray(m.reasons)?m.reasons:[];
+      const raw=String(m.decision||((rs.length)?'REJECT':'ELIGIBLE')).toUpperCase();
+      const decision=(raw==='ENTER'||raw==='ELIGIBLE')?'ELIGIBLE':raw==='WAIT'?'WAIT':'REJECT';
+      return {decision,tone:decision==='ELIGIBLE'?'green':decision==='WAIT'?'amber':'red',why:rs.join(' · ')||'V1-GATES ERFÜLLT'};
+    }
+    const tech=Number(b.technical||0), cand=Number(b.candidate||0), regime=String(b.regime||'').toUpperCase(), side=String(b.side||'').toUpperCase(), rs=[];
+    if(tech<75)rs.push('TECH < 75'); if(cand<70)rs.push('CAND < 70');
+    if(regime==='TRANSITION')rs.push('TRANSITION BLOCK');
+    else if(side==='LONG'&&regime!=='BULL')rs.push('LONG NUR BULL');
+    else if(side==='SHORT'&&!['BEAR','RANGE'].includes(regime))rs.push('SHORT NUR BEAR/RANGE');
+    if(b.status==='WAIT_ENTRY_ZONE')rs.push('WAIT ENTRY ZONE');
+    else if(b.status!=='READY'&&!rs.length)rs.push('BASE NOT READY');
+    const decision=rs.some(r=>/TECH|CAND|TRANSITION|NUR /.test(r))?'REJECT':b.status==='READY'?'ELIGIBLE':'WAIT';
+    return {decision,tone:decision==='ELIGIBLE'?'green':decision==='WAIT'?'amber':'red',why:rs.join(' · ')||'V1-GATES ERFÜLLT'};
+  }
+  function paperChallengerForBest(b){
+    if(!b)return {decision:'WAIT',tone:'amber',why:'KEIN CURRENT SIGNAL',confidence:'—',risk:'—'};
+    const m=paperResearchMatch(challenger,b);
+    if(!m)return {decision:'NO MATCH',tone:'muted',why:'Noch keine Challenger-Auswertung für genau dieses Signal.',confidence:'—',risk:'—'};
+    const d=String(m.decision||'SKIP').toUpperCase(), rs=Array.isArray(m.reasons)?m.reasons:[];
+    return {decision:d,tone:d==='TRADE'?'green':d==='CAUTION'?'amber':d==='SKIP'?'red':'muted',
+      why:rs.join(' · ')||String(m.status||'').replaceAll('_',' ')||'SOFT-SCORE AUSWERTUNG',
+      confidence:m.confidence??'—',risk:m.riskPct==null?'—':Number(m.riskPct).toFixed(1)+'%'};
+  }
+  const shBest=paperShadowForBest(best), chBest=paperChallengerForBest(best);
+
   return (
     card(`<div class="paper-head">
       <div>
@@ -8437,6 +8501,23 @@ function cloudPaperTradeView(){
       </div>
     </div>
     ${cloudExecutionGateBlock(events,drawdownPct)}
+    <div class="v730-research-lanes">
+      <div class="v730-lane base">
+        <span>BASELINE 6.2 · FROZEN REFERENCE</span>
+        <b>${cloudMoney(equity)} · ${total>=0?'+':''}${cloudMoney(total)}</b>
+        <small>${trades.length} closed · WR ${fmt(winRate,0)}% · DD ${fmt(drawdownPct,2)}% · MAX-DD Gate bleibt produktiv unverändert</small>
+      </div>
+      <div class="v730-lane shadow">
+        <span>SHADOW V1 · RESEARCH LEDGER</span>
+        <b class="${shPnl>=0?'green':'red'}">$${shEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} · ${shPnl>=0?'+':''}$${fmt(shPnl,2)}</b>
+        <small>${shClosed} closed · WR ${fmt(shWr,0)}% · PF ${fmt(shPf,2)} · DD ${fmt(shDd,2)}%</small>
+      </div>
+      <div class="v730-lane challenger">
+        <span>CHALLENGER V2 · ADAPTIVE · RESEARCH ONLY</span>
+        <b class="${chPnl>=0?'green':'red'}">$${chEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} · ${chPnl>=0?'+':''}$${fmt(chPnl,2)}</b>
+        <small>${chClosed} closed · ${chOpen} open · WR ${fmt(chWr,0)}% · PF ${fmt(chPf,2)} · DD ${fmt(chDd,2)}%</small>
+      </div>
+    </div>
     <div class="paper-kpis harden v623-kpis">
       <div class="kpi-card">
         <span>EQUITY</span>
@@ -8476,10 +8557,22 @@ function cloudPaperTradeView(){
           <div><b>${String(best.symbol||'').replace('USDT','')} ${best.side}</b><strong class="${cloudStatusTone(best.status)}">${best.technical}/100 · ${best.candidate}/100</strong></div>
           <small>Technical / Candidate · ${fmt(best.distanceAtr||0,2)} ATR zur Entry-Zone</small>
         </div>
-        <div class="why-no-trade v706-current-decision" data-symbol="${String(best.symbol||'').replace('USDT','')}" data-side="${best.side||''}" data-tech="${best.technical??''}" data-cand="${best.candidate??''}" data-status="${best.status||''}" data-regime="${best.regime||''}">
-          <span>BASE 6.2 DECISION</span>
-          <b class="${best.status==='READY'?'green':'amber'}">${why}</b>
-          <small>ENTRY ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small><div class="v706-current-shadow"></div>
+        <div class="v730-current-research">
+          <div class="v730-current-lane base">
+            <span>BASELINE 6.2</span>
+            <b class="${best.status==='READY'?'green':'amber'}">${why}</b>
+            <small>ENTRY ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small>
+          </div>
+          <div class="v730-current-lane shadow">
+            <span>SHADOW V1</span>
+            <b class="${shBest.tone}">${shBest.decision}</b>
+            <small>${shBest.why}</small>
+          </div>
+          <div class="v730-current-lane challenger">
+            <span>CHALLENGER V2</span>
+            <b class="${chBest.tone}">${chBest.decision} · CONF ${chBest.confidence}</b>
+            <small>${chBest.why} · RISK ${chBest.risk}</small>
+          </div>
         </div>`:'<div class="muted">Scanner lädt.</div>'}`)
 
     + card(`<div class="section-title">LIVE SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div>
@@ -12420,7 +12513,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  const base=window.paperTradeView;
  if(typeof base==='function'){
    window.paperTradeView=function(){
-     const intro='<div class="v697-paper-intro"><div class="eyebrow">PAPER LAB · BOT DEVELOPMENT</div><b>BASELINE 6.2 ↔ SHADOW V1</b><small>Forward-Test, A/B-Vergleich, Why No Trade, Scanner, Performance, Backtest und Diagnostik. Research-only; keine Änderung an Execution-Regeln.</small></div>';
+     const intro='<div class="v697-paper-intro"><div class="eyebrow">PAPER LAB · BOT DEVELOPMENT</div><b>BASELINE 6.2 ↔ SHADOW V1 ↔ CHALLENGER V2</b><small>A/B/C · FORWARD · RESEARCH ONLY · NO EXECUTION CHANGE</small></div>';
      return intro+base();
    };
  }
@@ -12841,14 +12934,25 @@ body[data-view="paper"] .v686-paper-quick{display:none!important}
    const dec=norm(x.decision||((rs.length)?'BLOCK':'ELIGIBLE'));
    return {state:(dec==='ENTER'||dec==='ELIGIBLE')?'ELIGIBLE':(dec==='WAIT'?'WAIT':'REJECT'),cls:(dec==='ENTER'||dec==='ELIGIBLE')?'green':(dec==='WAIT'?'amber':'red'),why:rs.length?rs.map(r=>map[r]||r).join(' · '):'V1-GATES ERFÜLLT'};
  }
+ function challengerEval(d){
+   const st=window.MERIDIAN_CLOUD?.challenger||{}, xs=[...(Array.isArray(st.lastEvaluations)?st.lastEvaluations:[]),st.lastDecision,st.lastSignal].filter(Boolean);
+   const sym=norm(d.symbol), side=norm(d.side);
+   const x=xs.find(z=>norm(String(z.symbol||'').replace('USDT',''))===sym&&norm(z.side)===side);
+   if(!x)return null;
+   const dec=norm(x.decision||'SKIP'), cls=dec==='TRADE'?'green':dec==='CAUTION'?'amber':'red';
+   const rs=Array.isArray(x.reasons)?x.reasons:[];
+   return {state:dec,cls,why:'CONF '+(x.confidence??'—')+' · '+(rs.join(' · ')||norm(x.status).replaceAll('_',' ')||'SOFT SCORE')+' · RISK '+(x.riskPct==null?'—':n(x.riskPct).toFixed(1)+'%')};
+ }
  function decorate(){
    stamp(); if(document.body?.dataset?.view!=='paper')return;
    document.querySelectorAll('.v686-paper-quick').forEach(x=>x.remove());
    document.querySelectorAll('.paper-kpis').forEach(x=>x.style.display='');
    document.querySelectorAll('.paper-scan-row[data-symbol]').forEach(row=>{
      const d={symbol:row.dataset.symbol,side:row.dataset.side,tech:row.dataset.tech,cand:row.dataset.cand,status:row.dataset.status,regime:row.dataset.regime};
-     const r=useShadowLast(d)||assess(d), host=row.querySelector('.v706-shadow-scan'); if(!host)return;
-     host.innerHTML='<b class="'+r.cls+'">SHADOW V1 · '+r.state+'</b><span>'+r.why+'</span>';
+     const r=useShadowLast(d)||assess(d), host=row.querySelector('.v706-shadow-scan');
+     if(host)host.innerHTML='<b class="'+r.cls+'">SHADOW V1 · '+r.state+'</b><span>'+r.why+'</span>';
+     const cr=challengerEval(d), ch=row.querySelector('.v730-challenger-scan');
+     if(ch)ch.innerHTML=cr?'<b class="'+cr.cls+'">CHALLENGER V2 · '+cr.state+'</b><span>'+cr.why+'</span>':'<b class="muted">CHALLENGER V2 · NO MATCH</b><span>Noch keine Auswertung für dieses Signal.</span>';
    });
    document.querySelectorAll('.v706-current-decision').forEach(box=>{
      const d={symbol:box.dataset.symbol,side:box.dataset.side,tech:box.dataset.tech,cand:box.dataset.cand,status:box.dataset.status,regime:box.dataset.regime};
@@ -12971,8 +13075,8 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
    if(intro){
      const e=intro.querySelector('.eyebrow'), b=intro.querySelector('b'), sm=intro.querySelector('small');
      if(e)e.textContent='PAPER LAB · RESEARCH ONLY';
-     if(b)b.textContent='BASELINE 6.2 ↔ SHADOW V1';
-     if(sm)sm.textContent='A/B · FORWARD · NO EXECUTION CHANGE';
+     if(b)b.textContent='BASELINE 6.2 ↔ SHADOW V1 ↔ CHALLENGER V2';
+     if(sm)sm.textContent='A/B/C · FORWARD · NO EXECUTION CHANGE';
    }
  }
  window.MERIDIAN_V715_APPLY=apply;
