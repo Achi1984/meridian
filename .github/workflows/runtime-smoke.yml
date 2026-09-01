@@ -1,0 +1,32 @@
+name: MERIDIAN Runtime Smoke
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meridian-runtime-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify GitHub Pages and Northflank runtime
+        env:
+          MERIDIAN_SMOKE_RETRIES: ${{ github.event_name == 'push' && '30' || '3' }}
+          MERIDIAN_SMOKE_DELAY_MS: ${{ github.event_name == 'push' && '20000' || '10000' }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/runtime-smoke.mjs
