@@ -1,0 +1,28 @@
+name: MERIDIAN v7.37 Cleanup Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-37-mobile-ui-polish
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-37-mobile-ui-polish
+          fetch-depth: 0
+      - name: Remove accidentally tracked dependencies
+        run: |
+          rm -rf node_modules
+          rm .github/workflows/v737-cleanup.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'MERIDIAN v7.37: remove tracked dependency artifacts'
+          git push origin HEAD:codex/meridian-v7-37-mobile-ui-polish
