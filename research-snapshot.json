@@ -2,325 +2,67 @@
   "apiVersion": "6.54-PUBLIC-STATUS",
   "app": "ACHI MERIDIAN Paperbot",
   "engine": {
-    "cycles": 122,
+    "cycles": 164,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-01T11:53:28.204Z",
-    "lastGoodMarketAt": "2026-09-01T11:53:28.152Z",
-    "lastSignalScanAt": "2026-09-01T11:52:58.791Z",
+    "lastCycleAt": "2026-09-01T12:14:28.729Z",
+    "lastGoodMarketAt": "2026-09-01T12:14:28.633Z",
+    "lastSignalScanAt": "2026-09-01T12:14:00.004Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 61,
+    "signalScans": 82,
     "startedAt": "2026-09-01T10:52:51.097Z",
     "state": "RUNNING",
     "version": "6.2.0"
   },
   "events": [
     {
-      "created_at": "2026-09-01T11:52:58.716Z",
-      "id": "5977",
+      "created_at": "2026-09-01T12:13:59.921Z",
+      "id": "6027",
       "payload": {
-        "atr": 0.3780758623391322,
-        "candidate": 87,
-        "distanceAtr": 0.314,
-        "entry": 102.43,
-        "entryAnchor": 102.54871668742767,
-        "evaluatedAt": "2026-09-01T11:52:58.429Z",
+        "atr": 191.6410894205773,
+        "candidate": 74,
+        "distanceAtr": 0.691,
+        "entry": 78022,
+        "entryAnchor": 78154.38813697835,
+        "evaluatedAt": "2026-09-01T12:13:58.499Z",
         "frames": {
           "15m": {
-            "adx": 29.76,
-            "atr": 0.37807586,
-            "ema20": 102.54871669,
-            "ema50": 102.92486174,
-            "macdHist": 0.04758756,
-            "price": 102.43,
-            "rsi": 44.45,
-            "score": 76,
-            "volumeRatio": 0.69
-          },
-          "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.05545781,
-            "ema50": 103.49247437,
-            "macdHist": -0.11774178,
-            "price": 102.43,
-            "rsi": 42.93,
-            "score": 88,
-            "volumeRatio": 1.19
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.47888554,
-            "ema50": 100.959598,
-            "macdHist": -0.37346419,
-            "price": 102.43,
-            "rsi": 46.46,
-            "score": 70,
-            "volumeRatio": 1.43
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.43,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:52:58.602Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 103.03492137974261,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 79,
-        "tp1": 101.58311006836036,
-        "tp2": 101.09917296456628
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:52:58.507Z",
-      "id": "5976",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 87,
-            "price": 102.43,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 79
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
-    },
-    {
-      "created_at": "2026-09-01T11:51:59.197Z",
-      "id": "5975",
-      "payload": {
-        "atr": 0.3780758623391322,
-        "candidate": 84,
-        "distanceAtr": 0.338,
-        "entry": 102.42,
-        "entryAnchor": 102.54776430647529,
-        "evaluatedAt": "2026-09-01T11:51:58.913Z",
-        "frames": {
-          "15m": {
-            "adx": 29.76,
-            "atr": 0.37807586,
-            "ema20": 102.54776431,
-            "ema50": 102.92446958,
-            "macdHist": 0.04694939,
-            "price": 102.42,
-            "rsi": 44.27,
+            "adx": 27.83,
+            "atr": 191.64108942,
+            "ema20": 78154.38813698,
+            "ema50": 78363.75646125,
+            "macdHist": 23.21486713,
+            "price": 78022,
+            "rsi": 41.97,
             "score": 73,
-            "volumeRatio": 0.54
+            "volumeRatio": 0.62
           },
           "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.05450543,
-            "ema50": 103.49208222,
-            "macdHist": -0.11837996,
-            "price": 102.42,
-            "rsi": 42.82,
-            "score": 83,
-            "volumeRatio": 1.13
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.47793316,
-            "ema50": 100.95920584,
-            "macdHist": -0.37410237,
-            "price": 102.42,
-            "rsi": 46.42,
-            "score": 70,
-            "volumeRatio": 1.42
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.42,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:51:59.019Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 103.02492137974261,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.57311006836035,
-        "tp2": 101.08917296456627
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:51:59.006Z",
-      "id": "5974",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 84,
-            "price": 102.42,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
-    },
-    {
-      "created_at": "2026-09-01T11:50:58.918Z",
-      "id": "5973",
-      "payload": {
-        "atr": 0.3780758623391322,
-        "candidate": 84,
-        "distanceAtr": 0.362,
-        "entry": 102.41,
-        "entryAnchor": 102.5468119255229,
-        "evaluatedAt": "2026-09-01T11:50:58.729Z",
-        "frames": {
-          "15m": {
-            "adx": 29.76,
-            "atr": 0.37807586,
-            "ema20": 102.54681193,
-            "ema50": 102.92407742,
-            "macdHist": 0.04631121,
-            "price": 102.41,
-            "rsi": 44.08,
-            "score": 73,
-            "volumeRatio": 0.5
-          },
-          "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.05355305,
-            "ema50": 103.49169006,
-            "macdHist": -0.11901813,
-            "price": 102.41,
-            "rsi": 42.72,
-            "score": 83,
-            "volumeRatio": 1.12
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.47698078,
-            "ema50": 100.95881368,
-            "macdHist": -0.37474055,
-            "price": 102.41,
-            "rsi": 46.38,
-            "score": 70,
-            "volumeRatio": 1.42
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.41,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:50:58.815Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 103.0149213797426,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.56311006836034,
-        "tp2": 101.07917296456627
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:50:58.803Z",
-      "id": "5972",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 84,
-            "price": 102.41,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
-    },
-    {
-      "created_at": "2026-09-01T11:49:59.816Z",
-      "id": "5971",
-      "payload": {
-        "atr": 184.29781845983902,
-        "candidate": 71,
-        "distanceAtr": 0.371,
-        "entry": 78100.01,
-        "entryAnchor": 78168.42277587335,
-        "evaluatedAt": "2026-09-01T11:49:58.810Z",
-        "frames": {
-          "15m": {
-            "adx": 28.52,
-            "atr": 184.29781846,
-            "ema20": 78168.42277587,
-            "ema50": 78377.64863464,
-            "macdHist": 22.68637425,
-            "price": 78100.01,
-            "rsi": 44.54,
-            "score": 73,
-            "volumeRatio": 0.18
-          },
-          "1h": {
-            "adx": 14.07,
-            "atr": 426.68020067,
-            "ema20": 78425.9718492,
-            "ema50": 78427.53476492,
-            "macdHist": -96.55167017,
-            "price": 78104.01,
-            "rsi": 43.77,
+            "adx": 13.76,
+            "atr": 410.63170439,
+            "ema20": 78387.06405536,
+            "ema50": 78411.50718857,
+            "macdHist": -94.27840516,
+            "price": 78022,
+            "rsi": 42.45,
             "score": 80,
-            "volumeRatio": 0.53
+            "volumeRatio": 0.19
           },
           "4h": {
-            "adx": 12.26,
-            "atr": 821.85596604,
-            "ema20": 78406.4841584,
-            "ema50": 77634.75102848,
-            "macdHist": 9.13283763,
-            "price": 78104.01,
-            "rsi": 46.88,
-            "score": 44,
-            "volumeRatio": 1.47
+            "adx": 11.99,
+            "atr": 777.58057356,
+            "ema20": 78369.43233899,
+            "ema50": 77650.00608614,
+            "macdHist": -20.73124313,
+            "price": 78022,
+            "rsi": 45.97,
+            "score": 56,
+            "volumeRatio": 0.05
           }
         },
         "gate": {
@@ -332,158 +74,81 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 78100.01,
+        "price": 78022,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:49:59.705Z",
+        "receivedAt": "2026-09-01T12:13:59.898Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 78394.88650953573,
+        "sl": 78328.62574307292,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
         "symbol": "BTCUSDT",
-        "technical": 68,
-        "tp1": 77687.18288664996,
-        "tp2": 77451.28167902137
+        "technical": 71,
+        "tp1": 77592.72395969792,
+        "tp2": 77347.42336523958
       },
       "type": "SIGNAL_REJECTED"
     },
     {
-      "created_at": "2026-09-01T11:49:59.622Z",
-      "id": "5970",
-      "payload": {
-        "atr": 0.3780758623391322,
-        "candidate": 84,
-        "distanceAtr": 0.649,
-        "entry": 102.29,
-        "entryAnchor": 102.53538335409434,
-        "evaluatedAt": "2026-09-01T11:49:59.299Z",
-        "frames": {
-          "15m": {
-            "adx": 29.76,
-            "atr": 0.37807586,
-            "ema20": 102.53538335,
-            "ema50": 102.91937154,
-            "macdHist": 0.03865309,
-            "price": 102.29,
-            "rsi": 41.97,
-            "score": 73,
-            "volumeRatio": 0.38
-          },
-          "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.04212448,
-            "ema50": 103.48698418,
-            "macdHist": -0.12667625,
-            "price": 102.29,
-            "rsi": 41.75,
-            "score": 83,
-            "volumeRatio": 1.07
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.4655522,
-            "ema50": 100.9541078,
-            "macdHist": -0.38239867,
-            "price": 102.29,
-            "rsi": 45.91,
-            "score": 70,
-            "volumeRatio": 1.4
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.29,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:49:59.518Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 102.89492137974261,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.44311006836035,
-        "tp2": 100.95917296456628
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:49:59.505Z",
-      "id": "5969",
+      "created_at": "2026-09-01T12:13:59.806Z",
+      "id": "6026",
       "payload": {
         "assets": [
           {
-            "candidate": 84,
-            "price": 102.29,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          },
-          {
-            "candidate": 71,
-            "price": 78100.01,
+            "candidate": 74,
+            "price": 78022,
             "side": "SHORT",
             "status": "READY",
             "symbol": "BTCUSDT",
-            "technical": 68
+            "technical": 71
           }
         ]
       },
       "type": "SIGNAL_SCAN_READY"
     },
     {
-      "created_at": "2026-09-01T11:48:58.797Z",
-      "id": "5968",
+      "created_at": "2026-09-01T12:12:59.097Z",
+      "id": "6025",
       "payload": {
-        "atr": 184.29781845983902,
-        "candidate": 71,
-        "distanceAtr": 0.307,
-        "entry": 78113.06,
-        "entryAnchor": 78169.66563301621,
-        "evaluatedAt": "2026-09-01T11:48:57.898Z",
+        "atr": 191.6410894205773,
+        "candidate": 74,
+        "distanceAtr": 0.615,
+        "entry": 78038,
+        "entryAnchor": 78155.91194650215,
+        "evaluatedAt": "2026-09-01T12:12:58.300Z",
         "frames": {
           "15m": {
-            "adx": 28.52,
-            "atr": 184.29781846,
-            "ema20": 78169.66563302,
-            "ema50": 78378.16039935,
-            "macdHist": 23.51919476,
-            "price": 78113.06,
-            "rsi": 45.01,
+            "adx": 27.83,
+            "atr": 191.64108942,
+            "ema20": 78155.9119465,
+            "ema50": 78364.38391224,
+            "macdHist": 24.23594975,
+            "price": 78038,
+            "rsi": 42.47,
             "score": 73,
-            "volumeRatio": 0.15
+            "volumeRatio": 0.59
           },
           "1h": {
-            "adx": 14.07,
-            "atr": 426.68020067,
-            "ema20": 78426.83375397,
-            "ema50": 78427.88966688,
-            "macdHist": -95.97412032,
-            "price": 78113.06,
-            "rsi": 43.95,
+            "adx": 13.76,
+            "atr": 410.63170439,
+            "ema20": 78388.58786489,
+            "ema50": 78412.13463955,
+            "macdHist": -93.25732254,
+            "price": 78038,
+            "rsi": 42.7,
             "score": 80,
-            "volumeRatio": 0.52
+            "volumeRatio": 0.18
           },
           "4h": {
-            "adx": 12.26,
-            "atr": 821.85596604,
-            "ema20": 78407.34606316,
-            "ema50": 77635.10593044,
-            "macdHist": 9.71038749,
-            "price": 78113.06,
-            "rsi": 46.98,
-            "score": 44,
-            "volumeRatio": 1.47
+            "adx": 11.99,
+            "atr": 777.58057356,
+            "ema20": 78370.95614852,
+            "ema50": 77650.63353712,
+            "macdHist": -19.7101605,
+            "price": 78038,
+            "rsi": 46.15,
+            "score": 56,
+            "volumeRatio": 0.05
           }
         },
         "gate": {
@@ -495,64 +160,570 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 78113.06,
+        "price": 78038,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:48:58.615Z",
+        "receivedAt": "2026-09-01T12:12:58.998Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 78407.93650953574,
+        "sl": 78344.62574307292,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
         "symbol": "BTCUSDT",
-        "technical": 68,
-        "tp1": 77700.23288664996,
-        "tp2": 77464.33167902137
+        "technical": 71,
+        "tp1": 77608.72395969792,
+        "tp2": 77363.42336523958
       },
       "type": "SIGNAL_REJECTED"
     },
     {
-      "created_at": "2026-09-01T11:48:58.520Z",
-      "id": "5967",
+      "created_at": "2026-09-01T12:12:58.913Z",
+      "id": "6024",
       "payload": {
-        "atr": 0.3780758623391322,
-        "candidate": 84,
-        "distanceAtr": 0.482,
-        "entry": 102.36,
-        "entryAnchor": 102.542050020761,
-        "evaluatedAt": "2026-09-01T11:48:58.363Z",
+        "assets": [
+          {
+            "candidate": 74,
+            "price": 78038,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "BTCUSDT",
+            "technical": 71
+          }
+        ]
+      },
+      "type": "SIGNAL_SCAN_READY"
+    },
+    {
+      "created_at": "2026-09-01T12:11:59.404Z",
+      "id": "6023",
+      "payload": {
+        "atr": 0.3882132735354142,
+        "candidate": 74,
+        "distanceAtr": 0.525,
+        "entry": 102.31,
+        "entryAnchor": 102.51391827695286,
+        "evaluatedAt": "2026-09-01T12:11:58.899Z",
         "frames": {
           "15m": {
-            "adx": 29.76,
-            "atr": 0.37807586,
-            "ema20": 102.54205002,
-            "ema50": 102.92211664,
-            "macdHist": 0.04312033,
-            "price": 102.36,
-            "rsi": 43.17,
+            "adx": 28.78,
+            "atr": 0.38821327,
+            "ema20": 102.51391828,
+            "ema50": 102.89568346,
+            "macdHist": 0.04252139,
+            "price": 102.31,
+            "rsi": 42.46,
+            "score": 73,
+            "volumeRatio": 0.52
+          },
+          "1h": {
+            "adx": 13.35,
+            "atr": 0.82693188,
+            "ema20": 102.97239832,
+            "ema50": 103.43985831,
+            "macdHist": -0.1186313,
+            "price": 102.31,
+            "rsi": 41.97,
+            "score": 80,
+            "volumeRatio": 0.18
+          },
+          "4h": {
+            "adx": 17.46,
+            "atr": 1.87019387,
+            "ema20": 103.35549962,
+            "ema50": 101.00779469,
+            "macdHist": -0.37986719,
+            "price": 102.31,
+            "rsi": 46.01,
+            "score": 56,
+            "volumeRatio": 0.05
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 102.31,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:11:59.112Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 102.93114123765666,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "SOLUSDT",
+        "technical": 71,
+        "tp1": 101.44040226728067,
+        "tp2": 100.94348927715535
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:11:59.020Z",
+      "id": "6022",
+      "payload": {
+        "atr": 191.6410894205773,
+        "candidate": 74,
+        "distanceAtr": 0.267,
+        "entry": 78111.84,
+        "entryAnchor": 78162.94432745453,
+        "evaluatedAt": "2026-09-01T12:11:58.401Z",
+        "frames": {
+          "15m": {
+            "adx": 27.83,
+            "atr": 191.64108942,
+            "ema20": 78162.94432745,
+            "ema50": 78367.27959851,
+            "macdHist": 28.94824604,
+            "price": 78111.84,
+            "rsi": 45.06,
+            "score": 73,
+            "volumeRatio": 0.55
+          },
+          "1h": {
+            "adx": 13.76,
+            "atr": 410.63170439,
+            "ema20": 78395.62024584,
+            "ema50": 78415.03032582,
+            "macdHist": -88.54502624,
+            "price": 78111.84,
+            "rsi": 43.94,
+            "score": 80,
+            "volumeRatio": 0.17
+          },
+          "4h": {
+            "adx": 11.99,
+            "atr": 777.58057356,
+            "ema20": 78377.98852947,
+            "ema50": 77653.52922339,
+            "macdHist": -14.99786421,
+            "price": 78111.84,
+            "rsi": 47,
+            "score": 56,
+            "volumeRatio": 0.05
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 78111.84,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:11:58.997Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 78418.46574307291,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "BTCUSDT",
+        "technical": 71,
+        "tp1": 77682.56395969792,
+        "tp2": 77437.26336523957
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:11:58.915Z",
+      "id": "6021",
+      "payload": {
+        "assets": [
+          {
+            "candidate": 74,
+            "price": 78111.84,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "BTCUSDT",
+            "technical": 71
+          },
+          {
+            "candidate": 74,
+            "price": 102.31,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "SOLUSDT",
+            "technical": 71
+          }
+        ]
+      },
+      "type": "SIGNAL_SCAN_READY"
+    },
+    {
+      "created_at": "2026-09-01T12:10:59.713Z",
+      "id": "6020",
+      "payload": {
+        "atr": 0.3882132735354142,
+        "candidate": 74,
+        "distanceAtr": 0.479,
+        "entry": 102.33,
+        "entryAnchor": 102.51582303885762,
+        "evaluatedAt": "2026-09-01T12:10:58.943Z",
+        "frames": {
+          "15m": {
+            "adx": 28.78,
+            "atr": 0.38821327,
+            "ema20": 102.51582304,
+            "ema50": 102.89646778,
+            "macdHist": 0.04379775,
+            "price": 102.33,
+            "rsi": 42.95,
+            "score": 73,
+            "volumeRatio": 0.51
+          },
+          "1h": {
+            "adx": 13.35,
+            "atr": 0.82693188,
+            "ema20": 102.97430308,
+            "ema50": 103.44064262,
+            "macdHist": -0.11735495,
+            "price": 102.33,
+            "rsi": 42.19,
+            "score": 80,
+            "volumeRatio": 0.18
+          },
+          "4h": {
+            "adx": 17.46,
+            "atr": 1.87019387,
+            "ema20": 103.35740439,
+            "ema50": 101.00857901,
+            "macdHist": -0.37859084,
+            "price": 102.33,
+            "rsi": 46.11,
+            "score": 56,
+            "volumeRatio": 0.05
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 102.33,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:10:59.597Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 102.95114123765666,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "SOLUSDT",
+        "technical": 71,
+        "tp1": 101.46040226728067,
+        "tp2": 100.96348927715535
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:10:59.199Z",
+      "id": "6019",
+      "payload": {
+        "atr": 191.6410894205773,
+        "candidate": 74,
+        "distanceAtr": 0.161,
+        "entry": 78134.29,
+        "entryAnchor": 78165.08242269263,
+        "evaluatedAt": "2026-09-01T12:10:58.397Z",
+        "frames": {
+          "15m": {
+            "adx": 27.83,
+            "atr": 191.64108942,
+            "ema20": 78165.08242269,
+            "ema50": 78368.15999067,
+            "macdHist": 30.3809526,
+            "price": 78134.29,
+            "rsi": 46,
+            "score": 73,
+            "volumeRatio": 0.52
+          },
+          "1h": {
+            "adx": 13.76,
+            "atr": 410.63170439,
+            "ema20": 78397.75834108,
+            "ema50": 78415.91071798,
+            "macdHist": -87.11231969,
+            "price": 78134.29,
+            "rsi": 44.41,
+            "score": 80,
+            "volumeRatio": 0.16
+          },
+          "4h": {
+            "adx": 11.99,
+            "atr": 777.58057356,
+            "ema20": 78380.12662471,
+            "ema50": 77654.40961555,
+            "macdHist": -13.56515766,
+            "price": 78134.29,
+            "rsi": 47.28,
+            "score": 56,
+            "volumeRatio": 0.04
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 78134.29,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:10:59.096Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 78440.91574307291,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "BTCUSDT",
+        "technical": 71,
+        "tp1": 77705.01395969791,
+        "tp2": 77459.71336523957
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:10:59.007Z",
+      "id": "6018",
+      "payload": {
+        "assets": [
+          {
+            "candidate": 74,
+            "price": 78134.29,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "BTCUSDT",
+            "technical": 71
+          },
+          {
+            "candidate": 74,
+            "price": 102.33,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "SOLUSDT",
+            "technical": 71
+          }
+        ]
+      },
+      "type": "SIGNAL_SCAN_READY"
+    },
+    {
+      "created_at": "2026-09-01T12:09:59.712Z",
+      "id": "6017",
+      "payload": {
+        "atr": 0.3882132735354142,
+        "candidate": 74,
+        "distanceAtr": 0.549,
+        "entry": 102.3,
+        "entryAnchor": 102.51296589600048,
+        "evaluatedAt": "2026-09-01T12:09:59.031Z",
+        "frames": {
+          "15m": {
+            "adx": 28.78,
+            "atr": 0.38821327,
+            "ema20": 102.5129659,
+            "ema50": 102.8952913,
+            "macdHist": 0.04188322,
+            "price": 102.3,
+            "rsi": 42.21,
+            "score": 73,
+            "volumeRatio": 0.49
+          },
+          "1h": {
+            "adx": 13.35,
+            "atr": 0.82693188,
+            "ema20": 102.97144594,
+            "ema50": 103.43946615,
+            "macdHist": -0.11926948,
+            "price": 102.3,
+            "rsi": 41.86,
+            "score": 80,
+            "volumeRatio": 0.17
+          },
+          "4h": {
+            "adx": 17.46,
+            "atr": 1.87019387,
+            "ema20": 103.35454724,
+            "ema50": 101.00740254,
+            "macdHist": -0.38050537,
+            "price": 102.3,
+            "rsi": 45.96,
+            "score": 56,
+            "volumeRatio": 0.04
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 102.3,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:09:59.605Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 102.92114123765666,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "SOLUSDT",
+        "technical": 71,
+        "tp1": 101.43040226728067,
+        "tp2": 100.93348927715535
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:09:59.516Z",
+      "id": "6016",
+      "payload": {
+        "atr": 191.6410894205773,
+        "candidate": 74,
+        "distanceAtr": 0.407,
+        "entry": 78082.01,
+        "entryAnchor": 78160.10337507358,
+        "evaluatedAt": "2026-09-01T12:09:58.504Z",
+        "frames": {
+          "15m": {
+            "adx": 27.83,
+            "atr": 191.64108942,
+            "ema20": 78160.10337507,
+            "ema50": 78366.10979459,
+            "macdHist": 27.04456513,
+            "price": 78082.01,
+            "rsi": 43.92,
+            "score": 73,
+            "volumeRatio": 0.48
+          },
+          "1h": {
+            "adx": 13.76,
+            "atr": 410.63170439,
+            "ema20": 78392.77929346,
+            "ema50": 78413.8605219,
+            "macdHist": -90.44870715,
+            "price": 78082.01,
+            "rsi": 43.4,
+            "score": 80,
+            "volumeRatio": 0.14
+          },
+          "4h": {
+            "adx": 11.99,
+            "atr": 777.58057356,
+            "ema20": 78375.14757709,
+            "ema50": 77652.35941947,
+            "macdHist": -16.90154512,
+            "price": 78082.01,
+            "rsi": 46.64,
+            "score": 56,
+            "volumeRatio": 0.04
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 78082.01,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:09:59.396Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 78388.63574307291,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "BTCUSDT",
+        "technical": 71,
+        "tp1": 77652.73395969791,
+        "tp2": 77407.43336523957
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:09:59.105Z",
+      "id": "6015",
+      "payload": {
+        "assets": [
+          {
+            "candidate": 74,
+            "price": 78082.01,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "BTCUSDT",
+            "technical": 71
+          },
+          {
+            "candidate": 74,
+            "price": 102.3,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "SOLUSDT",
+            "technical": 71
+          }
+        ]
+      },
+      "type": "SIGNAL_SCAN_READY"
+    },
+    {
+      "created_at": "2026-09-01T12:08:59.416Z",
+      "id": "6014",
+      "payload": {
+        "atr": 0.38392755924970073,
+        "candidate": 74,
+        "distanceAtr": 0.319,
+        "entry": 102.4,
+        "entryAnchor": 102.5224897055243,
+        "evaluatedAt": "2026-09-01T12:08:58.999Z",
+        "frames": {
+          "15m": {
+            "adx": 28.78,
+            "atr": 0.38392756,
+            "ema20": 102.52248971,
+            "ema50": 102.89921287,
+            "macdHist": 0.04826498,
+            "price": 102.4,
+            "rsi": 44.59,
             "score": 73,
             "volumeRatio": 0.35
           },
           "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.04879114,
-            "ema50": 103.48972928,
-            "macdHist": -0.12220902,
-            "price": 102.36,
-            "rsi": 42.27,
-            "score": 83,
-            "volumeRatio": 1.06
+            "adx": 13.35,
+            "atr": 0.82264616,
+            "ema20": 102.98096975,
+            "ema50": 103.44338772,
+            "macdHist": -0.11288771,
+            "price": 102.4,
+            "rsi": 42.93,
+            "score": 80,
+            "volumeRatio": 0.12
           },
           "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.47221887,
-            "ema50": 100.9568529,
-            "macdHist": -0.37793143,
-            "price": 102.36,
-            "rsi": 46.19,
-            "score": 70,
-            "volumeRatio": 1.4
+            "adx": 17.46,
+            "atr": 1.86590816,
+            "ema20": 103.36407105,
+            "ema50": 101.01132411,
+            "macdHist": -0.3741236,
+            "price": 102.4,
+            "rsi": 46.45,
+            "score": 56,
+            "volumeRatio": 0.03
           }
         },
         "gate": {
@@ -564,89 +735,158 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 102.36,
+        "price": 102.4,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:48:58.421Z",
+        "receivedAt": "2026-09-01T12:08:59.316Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 102.9649213797426,
+        "sl": 103.01428409479952,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
         "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.51311006836035,
-        "tp2": 101.02917296456627
+        "technical": 71,
+        "tp1": 101.54000226728068,
+        "tp2": 101.04857499144107
       },
       "type": "SIGNAL_REJECTED"
     },
     {
-      "created_at": "2026-09-01T11:48:58.408Z",
-      "id": "5966",
+      "created_at": "2026-09-01T12:08:59.220Z",
+      "id": "6013",
+      "payload": {
+        "atr": 189.26537513486338,
+        "candidate": 74,
+        "distanceAtr": 0.245,
+        "entry": 78117.04,
+        "entryAnchor": 78163.43956554976,
+        "evaluatedAt": "2026-09-01T12:08:58.100Z",
+        "frames": {
+          "15m": {
+            "adx": 27.83,
+            "atr": 189.26537513,
+            "ema20": 78163.43956555,
+            "ema50": 78367.48352008,
+            "macdHist": 29.2800979,
+            "price": 78117.04,
+            "rsi": 45.28,
+            "score": 73,
+            "volumeRatio": 0.41
+          },
+          "1h": {
+            "adx": 13.76,
+            "atr": 408.2559901,
+            "ema20": 78396.11548393,
+            "ema50": 78415.23424739,
+            "macdHist": -88.21317439,
+            "price": 78117.04,
+            "rsi": 44.05,
+            "score": 80,
+            "volumeRatio": 0.12
+          },
+          "4h": {
+            "adx": 11.99,
+            "atr": 775.20485927,
+            "ema20": 78378.48376757,
+            "ema50": 77653.73314496,
+            "macdHist": -14.66601236,
+            "price": 78117.04,
+            "rsi": 47.06,
+            "score": 56,
+            "volumeRatio": 0.03
+          }
+        },
+        "gate": {
+          "dailyLossPct": 0,
+          "drawdownPct": 11.349541513804333,
+          "ok": false,
+          "openRiskPct": 0,
+          "reasons": [
+            "MAX_DRAWDOWN"
+          ]
+        },
+        "price": 78117.04,
+        "reasons": [],
+        "receivedAt": "2026-09-01T12:08:59.197Z",
+        "ruleset": "6.2-SIGNAL-V1",
+        "side": "SHORT",
+        "sl": 78419.86460021578,
+        "source": "MERIDIAN-6.2-AUTO",
+        "status": "READY",
+        "symbol": "BTCUSDT",
+        "technical": 71,
+        "tp1": 77693.0855596979,
+        "tp2": 77450.82587952528
+      },
+      "type": "SIGNAL_REJECTED"
+    },
+    {
+      "created_at": "2026-09-01T12:08:59.106Z",
+      "id": "6012",
       "payload": {
         "assets": [
           {
-            "candidate": 84,
-            "price": 102.36,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          },
-          {
-            "candidate": 71,
-            "price": 78113.06,
+            "candidate": 74,
+            "price": 78117.04,
             "side": "SHORT",
             "status": "READY",
             "symbol": "BTCUSDT",
-            "technical": 68
+            "technical": 71
+          },
+          {
+            "candidate": 74,
+            "price": 102.4,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "SOLUSDT",
+            "technical": 71
           }
         ]
       },
       "type": "SIGNAL_SCAN_READY"
     },
     {
-      "created_at": "2026-09-01T11:47:58.801Z",
-      "id": "5965",
+      "created_at": "2026-09-01T12:07:59.205Z",
+      "id": "6011",
       "payload": {
-        "atr": 184.29781845983902,
-        "candidate": 71,
-        "distanceAtr": 0.342,
-        "entry": 78105.99,
-        "entryAnchor": 78168.99229968287,
-        "evaluatedAt": "2026-09-01T11:47:57.803Z",
+        "atr": 0.3817847021068435,
+        "candidate": 74,
+        "distanceAtr": 0.368,
+        "entry": 102.38,
+        "entryAnchor": 102.52058494361953,
+        "evaluatedAt": "2026-09-01T12:07:58.864Z",
         "frames": {
           "15m": {
-            "adx": 28.52,
-            "atr": 184.29781846,
-            "ema20": 78168.99229968,
-            "ema50": 78377.88314445,
-            "macdHist": 23.06800388,
-            "price": 78105.99,
-            "rsi": 44.73,
+            "adx": 28.78,
+            "atr": 0.3817847,
+            "ema20": 102.52058494,
+            "ema50": 102.89842856,
+            "macdHist": 0.04698863,
+            "price": 102.38,
+            "rsi": 44.13,
             "score": 73,
+            "volumeRatio": 0.32
+          },
+          "1h": {
+            "adx": 13.35,
+            "atr": 0.8205033,
+            "ema20": 102.97906498,
+            "ema50": 103.4426034,
+            "macdHist": -0.11416406,
+            "price": 102.38,
+            "rsi": 42.72,
+            "score": 80,
             "volumeRatio": 0.11
           },
-          "1h": {
-            "adx": 14.07,
-            "atr": 426.68020067,
-            "ema20": 78426.16042063,
-            "ema50": 78427.61241198,
-            "macdHist": -96.4253112,
-            "price": 78105.99,
-            "rsi": 43.81,
-            "score": 80,
-            "volumeRatio": 0.51
-          },
           "4h": {
-            "adx": 12.26,
-            "atr": 821.85596604,
-            "ema20": 78406.67272983,
-            "ema50": 77634.82867554,
-            "macdHist": 9.2591966,
-            "price": 78105.99,
-            "rsi": 46.9,
-            "score": 44,
-            "volumeRatio": 1.47
+            "adx": 17.46,
+            "atr": 1.8637653,
+            "ema20": 103.36216629,
+            "ema50": 101.01053979,
+            "macdHist": -0.37539995,
+            "price": 102.38,
+            "rsi": 46.35,
+            "score": 56,
+            "volumeRatio": 0.03
           }
         },
         "gate": {
@@ -658,158 +898,64 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 78105.99,
+        "price": 102.38,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:47:58.513Z",
+        "receivedAt": "2026-09-01T12:07:59.112Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 78400.86650953574,
+        "sl": 102.99085552337094,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
-        "symbol": "BTCUSDT",
-        "technical": 68,
-        "tp1": 77693.16288664997,
-        "tp2": 77457.26167902138
+        "symbol": "SOLUSDT",
+        "technical": 71,
+        "tp1": 101.52480226728068,
+        "tp2": 101.03611784858391
       },
       "type": "SIGNAL_REJECTED"
     },
     {
-      "created_at": "2026-09-01T11:47:58.418Z",
-      "id": "5964",
+      "created_at": "2026-09-01T12:07:58.997Z",
+      "id": "6010",
       "payload": {
-        "atr": 0.3680758623391322,
-        "candidate": 84,
+        "atr": 187.56751799200592,
+        "candidate": 74,
         "distanceAtr": 0.372,
-        "entry": 102.41,
-        "entryAnchor": 102.5468119255229,
-        "evaluatedAt": "2026-09-01T11:47:58.270Z",
+        "entry": 78091.2,
+        "entryAnchor": 78160.97861316882,
+        "evaluatedAt": "2026-09-01T12:07:58.303Z",
         "frames": {
           "15m": {
-            "adx": 29.76,
-            "atr": 0.36807586,
-            "ema20": 102.54681193,
-            "ema50": 102.92407742,
-            "macdHist": 0.04631121,
-            "price": 102.41,
-            "rsi": 44.08,
-            "score": 73,
-            "volumeRatio": 0.23
-          },
-          "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.05355305,
-            "ema50": 103.49169006,
-            "macdHist": -0.11901813,
-            "price": 102.41,
-            "rsi": 42.72,
-            "score": 83,
-            "volumeRatio": 1.02
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.47698078,
-            "ema50": 100.95881368,
-            "macdHist": -0.37474055,
-            "price": 102.41,
-            "rsi": 46.38,
-            "score": 70,
-            "volumeRatio": 1.39
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.41,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:47:58.320Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 102.99892137974261,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.58551006836034,
-        "tp2": 101.11437296456624
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:47:58.308Z",
-      "id": "5963",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 84,
-            "price": 102.41,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          },
-          {
-            "candidate": 71,
-            "price": 78105.99,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "BTCUSDT",
-            "technical": 68
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
-    },
-    {
-      "created_at": "2026-09-01T11:46:59.122Z",
-      "id": "5962",
-      "payload": {
-        "atr": 183.7578184598392,
-        "candidate": 71,
-        "distanceAtr": 0.234,
-        "entry": 78128,
-        "entryAnchor": 78171.08849015906,
-        "evaluatedAt": "2026-09-01T11:46:57.897Z",
-        "frames": {
-          "15m": {
-            "adx": 28.52,
-            "atr": 183.75781846,
-            "ema20": 78171.08849016,
-            "ema50": 78378.7462817,
-            "macdHist": 24.47263066,
-            "price": 78128,
-            "rsi": 45.61,
-            "score": 73,
-            "volumeRatio": 0.05
-          },
-          "1h": {
-            "adx": 14.07,
-            "atr": 426.68020067,
-            "ema20": 78428.25756349,
-            "ema50": 78428.47594139,
-            "macdHist": -95.02004624,
-            "price": 78128.01,
+            "adx": 27.83,
+            "atr": 187.56751799,
+            "ema20": 78160.97861317,
+            "ema50": 78366.47018675,
+            "macdHist": 27.63104946,
+            "price": 78091.2,
             "rsi": 44.24,
+            "score": 73,
+            "volumeRatio": 0.38
+          },
+          "1h": {
+            "adx": 13.76,
+            "atr": 406.55813296,
+            "ema20": 78393.65453155,
+            "ema50": 78414.22091406,
+            "macdHist": -89.86222282,
+            "price": 78091.2,
+            "rsi": 43.55,
             "score": 80,
-            "volumeRatio": 0.49
+            "volumeRatio": 0.11
           },
           "4h": {
-            "adx": 12.26,
-            "atr": 821.85596604,
-            "ema20": 78408.76987269,
-            "ema50": 77635.69220495,
-            "macdHist": 10.66446156,
-            "price": 78128.01,
-            "rsi": 47.14,
-            "score": 44,
-            "volumeRatio": 1.46
+            "adx": 11.99,
+            "atr": 773.50700213,
+            "ema20": 78376.02281519,
+            "ema50": 77652.71981163,
+            "macdHist": -16.31506079,
+            "price": 78091.2,
+            "rsi": 46.74,
+            "score": 56,
+            "volumeRatio": 0.03
           }
         },
         "gate": {
@@ -821,158 +967,89 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 78128,
+        "price": 78091.2,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:46:59.098Z",
+        "receivedAt": "2026-09-01T12:07:58.915Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 78422.01250953574,
+        "sl": 78391.3080287872,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
         "symbol": "BTCUSDT",
-        "technical": 68,
-        "tp1": 77716.38248664996,
-        "tp2": 77481.17247902138
+        "technical": 71,
+        "tp1": 77671.04875969791,
+        "tp2": 77430.96233666815
       },
       "type": "SIGNAL_REJECTED"
     },
     {
-      "created_at": "2026-09-01T11:46:58.700Z",
-      "id": "5961",
-      "payload": {
-        "atr": 0.3630758623391327,
-        "candidate": 84,
-        "distanceAtr": 0.202,
-        "entry": 102.48,
-        "entryAnchor": 102.55347859218958,
-        "evaluatedAt": "2026-09-01T11:46:58.436Z",
-        "frames": {
-          "15m": {
-            "adx": 29.76,
-            "atr": 0.36307586,
-            "ema20": 102.55347859,
-            "ema50": 102.92682252,
-            "macdHist": 0.05077844,
-            "price": 102.48,
-            "rsi": 45.49,
-            "score": 73,
-            "volumeRatio": 0.18
-          },
-          "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.06021972,
-            "ema50": 103.49443516,
-            "macdHist": -0.1145509,
-            "price": 102.48,
-            "rsi": 43.42,
-            "score": 83,
-            "volumeRatio": 1
-          },
-          "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.48364744,
-            "ema50": 100.96155878,
-            "macdHist": -0.37027331,
-            "price": 102.48,
-            "rsi": 46.66,
-            "score": 70,
-            "volumeRatio": 1.39
-          }
-        },
-        "gate": {
-          "dailyLossPct": 0,
-          "drawdownPct": 11.349541513804333,
-          "ok": false,
-          "openRiskPct": 0,
-          "reasons": [
-            "MAX_DRAWDOWN"
-          ]
-        },
-        "price": 102.48,
-        "reasons": [],
-        "receivedAt": "2026-09-01T11:46:58.519Z",
-        "ruleset": "6.2-SIGNAL-V1",
-        "side": "SHORT",
-        "sl": 103.06092137974261,
-        "source": "MERIDIAN-6.2-AUTO",
-        "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.66671006836036,
-        "tp2": 101.20197296456627
-      },
-      "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:46:58.506Z",
-      "id": "5960",
+      "created_at": "2026-09-01T12:07:58.903Z",
+      "id": "6009",
       "payload": {
         "assets": [
           {
-            "candidate": 84,
-            "price": 102.48,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          },
-          {
-            "candidate": 71,
-            "price": 78128,
+            "candidate": 74,
+            "price": 78091.2,
             "side": "SHORT",
             "status": "READY",
             "symbol": "BTCUSDT",
-            "technical": 68
+            "technical": 71
+          },
+          {
+            "candidate": 74,
+            "price": 102.38,
+            "side": "SHORT",
+            "status": "READY",
+            "symbol": "SOLUSDT",
+            "technical": 71
           }
         ]
       },
       "type": "SIGNAL_SCAN_READY"
     },
     {
-      "created_at": "2026-09-01T11:45:58.918Z",
-      "id": "5959",
+      "created_at": "2026-09-01T12:06:59.919Z",
+      "id": "6008",
       "payload": {
-        "atr": 0.3630758623391327,
-        "candidate": 84,
-        "distanceAtr": 0.153,
-        "entry": 102.5,
-        "entryAnchor": 102.55538335409433,
-        "evaluatedAt": "2026-09-01T11:45:58.699Z",
+        "atr": 0.3782132735354141,
+        "candidate": 74,
+        "distanceAtr": 0.467,
+        "entry": 102.34,
+        "entryAnchor": 102.51677541981,
+        "evaluatedAt": "2026-09-01T12:06:59.640Z",
         "frames": {
           "15m": {
-            "adx": 29.76,
-            "atr": 0.36307586,
-            "ema20": 102.55538335,
-            "ema50": 102.92760684,
-            "macdHist": 0.0520548,
-            "price": 102.5,
-            "rsi": 45.95,
+            "adx": 28.78,
+            "atr": 0.37821327,
+            "ema20": 102.51677542,
+            "ema50": 102.89685993,
+            "macdHist": 0.04443592,
+            "price": 102.34,
+            "rsi": 43.19,
             "score": 73,
-            "volumeRatio": 0.15
+            "volumeRatio": 0.29
           },
           "1h": {
-            "adx": 13.89,
-            "atr": 0.86054233,
-            "ema20": 103.06212448,
-            "ema50": 103.49521947,
-            "macdHist": -0.11327454,
-            "price": 102.5,
-            "rsi": 43.62,
-            "score": 83,
-            "volumeRatio": 0.99
+            "adx": 13.35,
+            "atr": 0.81693188,
+            "ema20": 102.97525546,
+            "ema50": 103.44103478,
+            "macdHist": -0.11671677,
+            "price": 102.34,
+            "rsi": 42.29,
+            "score": 80,
+            "volumeRatio": 0.1
           },
           "4h": {
-            "adx": 18.75,
-            "atr": 1.98405494,
-            "ema20": 103.4855522,
-            "ema50": 100.96234309,
-            "macdHist": -0.36899696,
-            "price": 102.5,
-            "rsi": 46.74,
-            "score": 70,
-            "volumeRatio": 1.38
+            "adx": 17.46,
+            "atr": 1.86019387,
+            "ema20": 103.35835677,
+            "ema50": 101.00897116,
+            "macdHist": -0.37795266,
+            "price": 102.34,
+            "rsi": 46.16,
+            "score": 56,
+            "volumeRatio": 0.03
           }
         },
         "gate": {
@@ -984,37 +1061,20 @@
             "MAX_DRAWDOWN"
           ]
         },
-        "price": 102.5,
+        "price": 102.34,
         "reasons": [],
-        "receivedAt": "2026-09-01T11:45:58.810Z",
+        "receivedAt": "2026-09-01T12:06:59.897Z",
         "ruleset": "6.2-SIGNAL-V1",
         "side": "SHORT",
-        "sl": 103.0809213797426,
+        "sl": 102.94514123765667,
         "source": "MERIDIAN-6.2-AUTO",
         "status": "READY",
         "symbol": "SOLUSDT",
-        "technical": 76,
-        "tp1": 101.68671006836036,
-        "tp2": 101.22197296456626
+        "technical": 71,
+        "tp1": 101.49280226728067,
+        "tp2": 101.00868927715534
       },
       "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-01T11:45:58.797Z",
-      "id": "5958",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 84,
-            "price": 102.5,
-            "side": "SHORT",
-            "status": "READY",
-            "symbol": "SOLUSDT",
-            "technical": 76
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
     }
   ],
   "evidence": {
@@ -1815,7 +1875,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-01T11:53:31.105Z",
+  "generatedAt": "2026-09-01T12:14:49.504Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -2172,35 +2232,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 87,
-        "distanceAtr": 0.314,
-        "price": 102.43,
+        "candidate": 74,
+        "distanceAtr": 0.691,
+        "price": 78022,
         "side": "SHORT",
         "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 79
+        "symbol": "BTCUSDT",
+        "technical": 71
       },
       {
-        "candidate": 61,
-        "distanceAtr": 0.525,
-        "price": 2463.22,
-        "side": "LONG",
-        "status": "NO_SETUP",
-        "symbol": "ETHUSDT",
-        "technical": 58
+        "candidate": 74,
+        "distanceAtr": 0.828,
+        "price": 102.18,
+        "side": "SHORT",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "SOLUSDT",
+        "technical": 71
       },
       {
         "candidate": 46,
-        "distanceAtr": 0.031,
-        "price": 78182,
+        "distanceAtr": 0.592,
+        "price": 2454.84,
         "side": "SHORT",
         "status": "NO_SETUP",
-        "symbol": "BTCUSDT",
+        "symbol": "ETHUSDT",
         "technical": 54
       }
     ],
     "readyCount": 1,
-    "updatedAt": "2026-09-01T11:52:58.429Z"
+    "updatedAt": "2026-09-01T12:13:59.696Z"
   },
   "shadowV1": {
     "account": {
@@ -2229,63 +2289,60 @@
     "independentLedger": true,
     "lastDecision": {
       "baselineGateIndependent": true,
-      "candidate": 87,
+      "candidate": 74,
       "decision": "BLOCK",
-      "distanceAtr": 0.314,
-      "evaluatedAt": "2026-09-01T11:52:58.491Z",
+      "distanceAtr": 0.691,
+      "evaluatedAt": "2026-09-01T12:13:59.704Z",
       "maxEntryDistanceAtr": 0.75,
       "reasons": [
-        "SHADOW_BLOCK_TRANSITION",
-        "SHADOW_SHORT_ONLY_BEAR_RANGE"
+        "SHADOW_TECH_LT_75"
       ],
-      "regime": "TRANSITION",
+      "regime": "RANGE",
       "side": "SHORT",
       "status": "READY",
-      "symbol": "SOLUSDT",
-      "technical": 79
+      "symbol": "BTCUSDT",
+      "technical": 71
     },
     "lastEvaluations": [
       {
         "baselineGateIndependent": true,
-        "candidate": 87,
+        "candidate": 74,
         "decision": "BLOCK",
-        "distanceAtr": 0.314,
-        "evaluatedAt": "2026-09-01T11:52:58.491Z",
+        "distanceAtr": 0.691,
+        "evaluatedAt": "2026-09-01T12:13:59.704Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
-          "SHADOW_BLOCK_TRANSITION",
-          "SHADOW_SHORT_ONLY_BEAR_RANGE"
+          "SHADOW_TECH_LT_75"
         ],
-        "regime": "TRANSITION",
+        "regime": "RANGE",
         "side": "SHORT",
         "status": "READY",
-        "symbol": "SOLUSDT",
-        "technical": 79
+        "symbol": "BTCUSDT",
+        "technical": 71
       },
       {
         "baselineGateIndependent": true,
-        "candidate": 61,
-        "decision": "BLOCK",
-        "distanceAtr": 0.525,
-        "evaluatedAt": "2026-09-01T11:52:58.491Z",
+        "candidate": 74,
+        "decision": "WAIT",
+        "distanceAtr": 0.828,
+        "evaluatedAt": "2026-09-01T12:13:59.704Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
-          "BASE_NOT_READY",
-          "SHADOW_TECH_LT_75",
-          "SHADOW_CAND_LT_70"
+          "WAIT_ENTRY_ZONE",
+          "SHADOW_TECH_LT_75"
         ],
-        "regime": "BULL",
-        "side": "LONG",
-        "status": "NO_SETUP",
-        "symbol": "ETHUSDT",
-        "technical": 58
+        "regime": "RANGE",
+        "side": "SHORT",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "SOLUSDT",
+        "technical": 71
       },
       {
         "baselineGateIndependent": true,
         "candidate": 46,
         "decision": "BLOCK",
-        "distanceAtr": 0.031,
-        "evaluatedAt": "2026-09-01T11:52:58.491Z",
+        "distanceAtr": 0.592,
+        "evaluatedAt": "2026-09-01T12:13:59.704Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "BASE_NOT_READY",
@@ -2295,80 +2352,78 @@
         "regime": "RANGE",
         "side": "SHORT",
         "status": "NO_SETUP",
-        "symbol": "BTCUSDT",
+        "symbol": "ETHUSDT",
         "technical": 54
       }
     ],
-    "lastScanAt": "2026-09-01T11:52:58.491Z",
+    "lastScanAt": "2026-09-01T12:13:59.704Z",
     "lastSignal": {
-      "atr": 0.3780758623391322,
-      "candidate": 87,
+      "atr": 191.6410894205773,
+      "candidate": 74,
       "decision": "BLOCK",
-      "distanceAtr": 0.314,
-      "entry": 102.43,
-      "entryAnchor": 102.54871668742767,
-      "evaluatedAt": "2026-09-01T11:52:58.429Z",
+      "distanceAtr": 0.691,
+      "entry": 78022,
+      "entryAnchor": 78154.38813697835,
+      "evaluatedAt": "2026-09-01T12:13:58.499Z",
       "frames": {
         "15m": {
-          "adx": 29.76,
-          "atr": 0.37807586,
-          "ema20": 102.54871669,
-          "ema50": 102.92486174,
-          "macdHist": 0.04758756,
-          "price": 102.43,
-          "rsi": 44.45,
-          "score": 76,
-          "volumeRatio": 0.69
+          "adx": 27.83,
+          "atr": 191.64108942,
+          "ema20": 78154.38813698,
+          "ema50": 78363.75646125,
+          "macdHist": 23.21486713,
+          "price": 78022,
+          "rsi": 41.97,
+          "score": 73,
+          "volumeRatio": 0.62
         },
         "1h": {
-          "adx": 13.89,
-          "atr": 0.86054233,
-          "ema20": 103.05545781,
-          "ema50": 103.49247437,
-          "macdHist": -0.11774178,
-          "price": 102.43,
-          "rsi": 42.93,
-          "score": 88,
-          "volumeRatio": 1.19
+          "adx": 13.76,
+          "atr": 410.63170439,
+          "ema20": 78387.06405536,
+          "ema50": 78411.50718857,
+          "macdHist": -94.27840516,
+          "price": 78022,
+          "rsi": 42.45,
+          "score": 80,
+          "volumeRatio": 0.19
         },
         "4h": {
-          "adx": 18.75,
-          "atr": 1.98405494,
-          "ema20": 103.47888554,
-          "ema50": 100.959598,
-          "macdHist": -0.37346419,
-          "price": 102.43,
-          "rsi": 46.46,
-          "score": 70,
-          "volumeRatio": 1.43
+          "adx": 11.99,
+          "atr": 777.58057356,
+          "ema20": 78369.43233899,
+          "ema50": 77650.00608614,
+          "macdHist": -20.73124313,
+          "price": 78022,
+          "rsi": 45.97,
+          "score": 56,
+          "volumeRatio": 0.05
         }
       },
-      "price": 102.43,
+      "price": 78022,
       "reasons": [
-        "SHADOW_BLOCK_TRANSITION",
-        "SHADOW_SHORT_ONLY_BEAR_RANGE"
+        "SHADOW_TECH_LT_75"
       ],
-      "receivedAt": "2026-09-01T11:52:58.722Z",
+      "receivedAt": "2026-09-01T12:13:59.926Z",
       "ruleset": "6.98-SHADOW-V1",
-      "shadowRegime": "TRANSITION",
+      "shadowRegime": "RANGE",
       "shadowRule": {
-        "candidate": 87,
+        "candidate": 74,
         "ok": false,
         "reasons": [
-          "SHADOW_BLOCK_TRANSITION",
-          "SHADOW_SHORT_ONLY_BEAR_RANGE"
+          "SHADOW_TECH_LT_75"
         ],
-        "regime": "TRANSITION",
-        "technical": 79
+        "regime": "RANGE",
+        "technical": 71
       },
       "side": "SHORT",
-      "sl": 103.03492137974261,
+      "sl": 78328.62574307292,
       "source": "MERIDIAN-SHADOW-V1",
       "status": "READY",
-      "symbol": "SOLUSDT",
-      "technical": 79,
-      "tp1": 101.58311006836036,
-      "tp2": 101.09917296456628
+      "symbol": "BTCUSDT",
+      "technical": 71,
+      "tp1": 77592.72395969792,
+      "tp2": 77347.42336523958
     },
     "openCount": 0,
     "openPositions": [],
@@ -2972,7 +3027,7 @@
     ],
     "researchOnly": true,
     "ruleset": "6.98-SHADOW-V1",
-    "updatedAt": "2026-09-01T11:53:28.196Z",
+    "updatedAt": "2026-09-01T12:14:28.721Z",
     "winRate": 20
   }
 }
