@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const must=(s,a,b,label)=>{if(!s.includes(a))throw new Error('missing '+label);return s.replace(a,b)};
+let sync=fs.readFileSync('scripts/release-sync.mjs','utf8');
+sync=must(sync,"s=required(s,/app-v7\\.38-regime-ui\\.js\\?v=[^\"'<>\\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');","s=required(s,/app-v7\\.38-regime-ui\\.js\\?v=[^\"'<>\\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');\n  s=required(s,/app-v7\\.39-paper-overview\\.js\\?v=[^\"'<>\\s]+/g,`app-v7.39-paper-overview.js?v=${cacheTag}`,'paper overview loader tag');",'release sync overview');
+fs.writeFileSync('scripts/release-sync.mjs',sync);
+let check=fs.readFileSync('scripts/release-check.mjs','utf8');
+check=must(check,"must(loader.includes(`app-v7.38-regime-ui.js?v=${tag}`),'regime UI loader cache tag mismatch');","must(loader.includes(`app-v7.38-regime-ui.js?v=${tag}`),'regime UI loader cache tag mismatch');\nmust(loader.includes(`app-v7.39-paper-overview.js?v=${tag}`),'paper overview loader cache tag mismatch');",'release check loader');
+check=must(check,"must(read('regime-v1.js').includes(\"REGIME_V1_RULESET='7.38-REGIME-V1'\"),'regime model ruleset missing');","must(read('regime-v1.js').includes(\"REGIME_V1_RULESET='7.38-REGIME-V1'\"),'regime model ruleset missing');\nconst overview=read('app-v7.39-paper-overview.js');\nmust(overview.includes('A/B/C/D BOT ÜBERSICHT'),'ABCD overview heading missing');\nmust(overview.includes('REGIME Δ P&L vs BASE'),'Regime delta missing');\nmust(overview.includes(\"compareButton.textContent='ÜBERSICHT'\"),'overview tab rename missing');",'release check overview');
+fs.writeFileSync('scripts/release-check.mjs',check);
+console.log('v7.39 release checks extended');
