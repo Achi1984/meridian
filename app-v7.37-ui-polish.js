@@ -1,3 +1,4 @@
+/* MERIDIAN v7.37 — collision-safe mobile header status layout. */
 (function(){
   'use strict';
 
