@@ -39,6 +39,7 @@ apply('app-v6.06.js',src=>{
   s=required(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/g,`app-v7.33-hardening.js?v=${cacheTag}`,'compat hardening loader tag');
   s=required(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/g,`app-runtime-monitor.js?v=${cacheTag}`,'runtime monitor loader tag');
   s=required(s,/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/g,`app-v7.37-ui-polish.js?v=${cacheTag}`,'ui polish loader tag');
+  s=required(s,/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');
   return s;
 });
 

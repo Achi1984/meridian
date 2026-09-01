@@ -1,13 +1,13 @@
 (function(){
   'use strict';
 
-  const VERSION='7.37';
-  const BUILD='7.37-20260901-R1';
+  const VERSION='7.38';
+  const BUILD='7.38-20260901-R1';
   const API=window.MERIDIAN_CLOUD_API||'https://p01--achi-meridian--ttvk44grdlp7.code.run';
   const TOKEN_KEY='meridian_read_token_v1';
   const PROTECTED=[
     '/api/status','/api/paper','/api/events','/api/signals','/api/evidence',
-    '/api/shadow-v1','/api/challenger-v2','/api/backtests','/api/activity-summary','/api/private/'
+    '/api/shadow-v1','/api/challenger-v2','/api/regime-v1','/api/backtests','/api/activity-summary','/api/private/'
   ];
   let activitySummary=null;
   let privateState='UNKNOWN';
@@ -49,7 +49,7 @@
       const meta=document.querySelector('meta[name="meridian-build"]');
       if(meta)meta.content=BUILD;
       const manifest=document.querySelector('link[rel="manifest"]');
-      if(manifest)manifest.href='manifest.webmanifest?v=7.37-R1';
+      if(manifest)manifest.href='manifest.webmanifest?v=7.38-R1';
       const badge=document.getElementById('versionBadge');
       if(badge)badge.textContent='v'+VERSION+' · LIVE';
     }catch(_e){}
@@ -143,7 +143,7 @@
     if(!s.coverageComplete||!w||!w.ledgers){
       return '<div class="v731-section v733-activity"><div class="v731-title"><b>ACTIVITY / OPPORTUNITY COST</b><span>v7.33 · COVERAGE LIMITED</span></div><div class="v732-note">Keine Overfilter-Wertung ohne vollständige Server-Coverage.</div></div>';
     }
-    const b=w.ledgers.baseline||{}, sh=w.ledgers.shadow||{}, ch=w.ledgers.challenger||{};
+    const b=w.ledgers.baseline||{}, sh=w.ledgers.shadow||{}, ch=w.ledgers.challenger||{}, rg=w.ledgers.regime||{};
     const days=Math.max(Number(w.days)||0,1/24);
     const baseClosed=Number(b.closed)||0;
     const row=(name,x,key)=>{
@@ -169,6 +169,7 @@
       ${row('BASELINE 6.2',b,'baseline')}
       ${row('SHADOW V1',sh,'shadow')}
       ${row('CHALLENGER V2',ch,'challenger')}
+      ${row('REGIME V1',rg,'regime')}
       <div class="v732-note">v7.33 nutzt serverseitige Vollhistorie statt des alten 500-Event-Fensters. Overfilter bleibt rein diagnostisch und verändert keine Execution.</div>
     </div>`;
   }

@@ -18,7 +18,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const PUBLIC_PATHS = new Set(["/","/health","/api/public-status","/api/assistant"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
-  "/api/shadow-v1","/api/challenger-v2","/api/backtests","/api/activity-summary",
+  "/api/shadow-v1","/api/challenger-v2","/api/regime-v1","/api/backtests","/api/activity-summary",
   "/api/private/"
 ];
 
@@ -102,7 +102,8 @@ async function activitySummary(){
   const defs={
     baseline:["POSITION_OPENED","POSITION_CLOSED"],
     shadow:["SHADOW_V1_POSITION_OPENED","SHADOW_V1_POSITION_CLOSED"],
-    challenger:["CHALLENGER_V2_POSITION_OPENED","CHALLENGER_V2_POSITION_CLOSED"]
+    challenger:["CHALLENGER_V2_POSITION_OPENED","CHALLENGER_V2_POSITION_CLOSED"],
+    regime:["REGIME_V1_POSITION_OPENED","REGIME_V1_POSITION_CLOSED"]
   };
   if(!p){
     return {coverageComplete:false,source:"NO_DATABASE",generatedAt:new Date().toISOString(),ledgers:{}};
@@ -127,8 +128,8 @@ async function activitySummary(){
   }
   const starts=Object.values(out).map(x=>x.firstEvent?Date.parse(x.firstEvent):NaN).filter(Number.isFinite);
   const ends=Object.values(out).map(x=>x.lastEvent?Date.parse(x.lastEvent):NaN).filter(Number.isFinite);
-  const commonStart=starts.length===3?Math.max(...starts):null;
-  const commonEnd=ends.length===3?Math.min(...ends):null;
+  const commonStart=starts.length===Object.keys(defs).length?Math.max(...starts):null;
+  const commonEnd=ends.length===Object.keys(defs).length?Math.min(...ends):null;
   const common={};
   if(Number.isFinite(commonStart)&&Number.isFinite(commonEnd)&&commonEnd>commonStart){
     for(const [key,[openType,closeType]] of Object.entries(defs)){
