@@ -1,0 +1,70 @@
+name: MERIDIAN v7.33 Privacy Gate
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-33-scrub
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-scrub:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout scrub branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for v7.33 gateway migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://p01--achi-meridian--ttvk44grdlp7.code.run/gateway-health"
+          ok=0
+          for i in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 12 "$URL" -o /tmp/gateway.json; then
+              if python - <<'PY'
+          import json
+          with open('/tmp/gateway.json', encoding='utf-8') as f:
+              j=json.load(f)
+          assert j.get('ok') is True, j
+          assert str(j.get('version')) == '7.33', j
+          assert j.get('privateData') is True, j
+          print('gateway migration confirmed')
+          PY
+              then ok=1; break; fi
+            fi
+            echo "Gateway not ready yet ($i/30)"
+            sleep 15
+          done
+          test "$ok" = "1"
+
+      - name: Verify protected API rejects anonymous reads
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --output /tmp/anon.json --write-out '%{http_code}' --max-time 12 \
+            "https://p01--achi-meridian--ttvk44grdlp7.code.run/api/status")
+          test "$code" = "401"
+
+      - name: Scrub public financial snapshots
+        run: node scripts/scrub-public-data.mjs
+
+      - name: Commit scrub only after migration gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data.json index.html pionex-bot-snapshot.json dynamic-liq-guard.json
+          if git diff --cached --quiet; then
+            echo "Nothing to scrub"
+            exit 0
+          fi
+          git commit -m "MERIDIAN v7.33: scrub public financial snapshots"
+          git push origin HEAD:codex/meridian-v7-33-scrub

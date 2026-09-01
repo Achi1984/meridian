@@ -1,5 +1,5 @@
 {
-  "version": "5.10.7",
+  "version": "7.33",
   "module": "Dynamic Liquidation Guard 1.0",
   "policy": {
     "sourceOfTruth": "Use exchange/Pionex displayed liquidation price when available; do not estimate it from leverage if an exact venue value exists.",
@@ -16,39 +16,7 @@
     "closedBotsExcluded": true,
     "priority": "lowest liquidation buffer first; existing-position risk before new entry"
   },
-  "activeBotInputs": {
-    "BTC-S30": {
-      "side": "SHORT",
-      "liquidationPrice": 80207.5,
-      "currentPrice": 77197.6,
-      "pionexLiqBufferPct": 3.89,
-      "riskClass": "CRITICAL",
-      "status": "ACTIVE"
-    },
-    "BTC-L20": {
-      "side": "LONG",
-      "liquidationPrice": 69336.5,
-      "currentPrice": 77163.9,
-      "pionexLiqBufferPct": 10.14,
-      "riskClass": "DANGER",
-      "status": "ACTIVE"
-    },
-    "XRP-L5": {
-      "side": "LONG",
-      "liquidationPrice": 0.8482,
-      "currentPrice": 1.4952,
-      "pionexLiqBufferPct": 43.27,
-      "riskClass": "SAFE",
-      "status": "ACTIVE"
-    },
-    "HBAR-L5": {
-      "side": "LONG",
-      "liquidationPrice": 0.05853,
-      "currentPrice": 0.07965,
-      "pionexLiqBufferPct": 26.51,
-      "riskClass": "TIGHT",
-      "status": "ACTIVE"
-    }
-  },
-  "note": "Synced from Pionex screenshots 23.08.2026 14:55–14:56. Pionex-displayed buffer authoritative."
+  "activeBotInputs": {},
+  "note": "Private live bot inputs removed from public repository. Policy-only module remains public.",
+  "private": true
 }
