@@ -20,7 +20,10 @@ must(index.includes(`window.MERIDIAN_RELEASE_BUILD='${build}';`),'index release 
 must(index.includes(`manifest.webmanifest?v=${tag}`),'manifest cache tag mismatch');
 must(index.includes(`styles-v6.06.css?v=${tag}`),'CSS cache tag mismatch');
 must(index.includes(`app-v6.06.js?v=${tag}`),'core app cache tag mismatch');
-must(index.includes(`app-v7.33-hardening.js?v=${tag}`),'hardening app cache tag mismatch');
+
+const loader=read('app-v6.06.js');
+must(loader.includes(`app-v7.32-legacy.js?v=${tag}`),'legacy loader cache tag mismatch');
+must(loader.includes(`app-v7.33-hardening.js?v=${tag}`),'hardening loader cache tag mismatch');
 
 const hardening=read('app-v7.33-hardening.js');
 must(hardening.includes(`const VERSION='${v}';`),'hardening VERSION mismatch');
@@ -39,7 +42,7 @@ must(pkg.scripts?.test==='node --test test/*.test.js','test script mismatch');
 
 must(fs.existsSync('package-lock.json'),'package-lock.json missing');
 const lock=json('package-lock.json');
-must(lock.version>=2,'package lock format too old');
+must(lock.lockfileVersion>=2,'package lock format too old');
 must(lock.packages?.['']?.version===v+'.0','package-lock root version mismatch');
 
 const docker=read('Dockerfile');
