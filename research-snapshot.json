@@ -4,12 +4,12 @@
   "challengerV2": {
     "account": {
       "cash": 10364.15,
-      "drawdownPct": 0.08,
-      "equity": 10373.32,
-      "peakEquity": 10382.01,
+      "drawdownPct": 0.1,
+      "equity": 10483.35,
+      "peakEquity": 10494.35,
       "realizedPnl": 364.15,
       "startEquity": 10000,
-      "unrealizedPnl": 9.17
+      "unrealizedPnl": 119.2
     },
     "closedCount": 3,
     "counterfactual": {
@@ -163,12 +163,12 @@
     "executionImpact": false,
     "independentLedger": true,
     "lastDecision": {
-      "candidate": 85,
-      "confidence": 80,
+      "candidate": 89,
+      "confidence": 78,
       "decision": "SKIP",
-      "distanceAtr": 1.142,
-      "distanceQuality": 46.7,
-      "evaluatedAt": "2026-09-01T17:44:10.148Z",
+      "distanceAtr": 1.75,
+      "distanceQuality": 18.3,
+      "evaluatedAt": "2026-09-01T17:57:10.356Z",
       "reasons": [
         "WAIT_ENTRY_ZONE"
       ],
@@ -179,16 +179,16 @@
       "side": "SHORT",
       "status": "WAIT_ENTRY_ZONE",
       "symbol": "SOLUSDT",
-      "technical": 82
+      "technical": 86
     },
     "lastEvaluations": [
       {
-        "candidate": 85,
-        "confidence": 80,
+        "candidate": 89,
+        "confidence": 78,
         "decision": "SKIP",
-        "distanceAtr": 1.142,
-        "distanceQuality": 46.7,
-        "evaluatedAt": "2026-09-01T17:44:10.148Z",
+        "distanceAtr": 1.75,
+        "distanceQuality": 18.3,
+        "evaluatedAt": "2026-09-01T17:57:10.356Z",
         "reasons": [
           "WAIT_ENTRY_ZONE"
         ],
@@ -199,15 +199,15 @@
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 82
+        "technical": 86
       },
       {
-        "candidate": 82,
-        "confidence": 79,
+        "candidate": 84,
+        "confidence": 74,
         "decision": "SKIP",
-        "distanceAtr": 0.966,
-        "distanceQuality": 54.9,
-        "evaluatedAt": "2026-09-01T17:44:10.148Z",
+        "distanceAtr": 1.71,
+        "distanceQuality": 20.2,
+        "evaluatedAt": "2026-09-01T17:57:10.356Z",
         "reasons": [
           "WAIT_ENTRY_ZONE"
         ],
@@ -218,27 +218,29 @@
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 79
+        "technical": 81
       },
       {
-        "candidate": 82,
-        "confidence": 82,
-        "decision": "TRADE",
-        "distanceAtr": 0.695,
-        "distanceQuality": 67.6,
-        "evaluatedAt": "2026-09-01T17:44:10.148Z",
-        "reasons": [],
+        "candidate": 84,
+        "confidence": 73,
+        "decision": "SKIP",
+        "distanceAtr": 1.783,
+        "distanceQuality": 16.8,
+        "evaluatedAt": "2026-09-01T17:57:10.356Z",
+        "reasons": [
+          "WAIT_ENTRY_ZONE"
+        ],
         "regime": "RANGE",
         "regimeAdjustment": 4,
         "researchOnly": true,
-        "riskPct": 1,
+        "riskPct": 0,
         "side": "SHORT",
-        "status": "READY",
+        "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 79
+        "technical": 81
       }
     ],
-    "lastScanAt": "2026-09-01T17:44:10.148Z",
+    "lastScanAt": "2026-09-01T17:57:10.356Z",
     "lastSignal": {
       "atr": 241.05074740106278,
       "candidate": 82,
@@ -341,7 +343,7 @@
         "entry": 2435.958993,
         "feeOpen": 8.033052014183077,
         "id": "fabda61d-46e2-4333-9e85-92070eb1c2b6",
-        "livePrice": 2433.63,
+        "livePrice": 2423.4,
         "openedAt": "2026-09-01T17:21:11.352Z",
         "qty": 6.595391824958423,
         "riskPct": 1,
@@ -354,7 +356,7 @@
         "technical": 79,
         "tp1": 2415.675578854252,
         "tp2": 2403.667338199539,
-        "unrealized": -0.6978023250839271
+        "unrealized": 66.8067914734255
       },
       {
         "candidate": 82,
@@ -365,7 +367,7 @@
         "entry": 77660.614824,
         "feeOpen": 9.82355744163915,
         "id": "4710a2a8-c420-4dbc-9bed-f4c2aafeb7f8",
-        "livePrice": 77544,
+        "livePrice": 77375.99,
         "openedAt": "2026-09-01T17:35:10.945Z",
         "qty": 0.2529868573382272,
         "riskPct": 1,
@@ -378,7 +380,7 @@
         "technical": 79,
         "tp1": 77143.96632582163,
         "tp2": 76835.42136914827,
-        "unrealized": 9.869653968454555
+        "unrealized": 52.39522803079947
       }
     ],
     "profitFactor": 99,
@@ -473,23 +475,23 @@
     ],
     "researchOnly": true,
     "ruleset": "6.99-CHALLENGER-V2",
-    "updatedAt": "2026-09-01T17:44:39.693Z",
+    "updatedAt": "2026-09-01T17:57:39.752Z",
     "winRate": 100
   },
   "engine": {
-    "cycles": 52,
+    "cycles": 78,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-01T17:44:39.698Z",
-    "lastGoodMarketAt": "2026-09-01T17:44:39.576Z",
-    "lastSignalScanAt": "2026-09-01T17:44:11.100Z",
+    "lastCycleAt": "2026-09-01T17:57:39.847Z",
+    "lastGoodMarketAt": "2026-09-01T17:57:39.674Z",
+    "lastSignalScanAt": "2026-09-01T17:57:10.361Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 26,
+    "signalScans": 39,
     "startedAt": "2026-09-01T17:19:01.259Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2274,7 +2276,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-01T17:44:55.248Z",
+  "generatedAt": "2026-09-01T17:57:43.353Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -2631,45 +2633,45 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 85,
-        "distanceAtr": 1.142,
-        "price": 101.02,
+        "candidate": 89,
+        "distanceAtr": 1.75,
+        "price": 100.6,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 82
+        "technical": 86
       },
       {
-        "candidate": 82,
-        "distanceAtr": 0.966,
-        "price": 77572.01,
+        "candidate": 84,
+        "distanceAtr": 1.71,
+        "price": 77352.88,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 79
+        "technical": 81
       },
       {
-        "candidate": 82,
-        "distanceAtr": 0.695,
-        "price": 2434.99,
+        "candidate": 84,
+        "distanceAtr": 1.783,
+        "price": 2422.73,
         "side": "SHORT",
-        "status": "READY",
+        "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 79
+        "technical": 81
       }
     ],
-    "readyCount": 1,
-    "updatedAt": "2026-09-01T17:44:09.791Z"
+    "readyCount": 0,
+    "updatedAt": "2026-09-01T17:57:10.315Z"
   },
   "shadowV1": {
     "account": {
       "cash": 9672.75,
-      "drawdownPct": 3.45,
-      "equity": 9681.31,
+      "drawdownPct": 2.42,
+      "equity": 9784,
       "peakEquity": 10026.91,
       "realizedPnl": -327.25,
       "startEquity": 10000,
-      "unrealizedPnl": 8.56
+      "unrealizedPnl": 111.25
     },
     "baselineRiskGateIgnored": true,
     "closedCount": 8,
@@ -2688,10 +2690,10 @@
     "independentLedger": true,
     "lastDecision": {
       "baselineGateIndependent": true,
-      "candidate": 85,
+      "candidate": 89,
       "decision": "WAIT",
-      "distanceAtr": 0.903,
-      "evaluatedAt": "2026-09-01T17:43:09.960Z",
+      "distanceAtr": 1.75,
+      "evaluatedAt": "2026-09-01T17:57:10.327Z",
       "maxEntryDistanceAtr": 0.75,
       "reasons": [
         "WAIT_ENTRY_ZONE"
@@ -2700,15 +2702,15 @@
       "side": "SHORT",
       "status": "WAIT_ENTRY_ZONE",
       "symbol": "SOLUSDT",
-      "technical": 82
+      "technical": 86
     },
     "lastEvaluations": [
       {
         "baselineGateIndependent": true,
-        "candidate": 85,
+        "candidate": 89,
         "decision": "WAIT",
-        "distanceAtr": 0.903,
-        "evaluatedAt": "2026-09-01T17:43:09.960Z",
+        "distanceAtr": 1.75,
+        "evaluatedAt": "2026-09-01T17:57:10.327Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "WAIT_ENTRY_ZONE"
@@ -2717,14 +2719,14 @@
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 82
+        "technical": 86
       },
       {
         "baselineGateIndependent": true,
-        "candidate": 82,
+        "candidate": 84,
         "decision": "WAIT",
-        "distanceAtr": 0.798,
-        "evaluatedAt": "2026-09-01T17:43:09.960Z",
+        "distanceAtr": 1.71,
+        "evaluatedAt": "2026-09-01T17:57:10.327Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "WAIT_ENTRY_ZONE"
@@ -2733,24 +2735,26 @@
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 79
+        "technical": 81
       },
       {
         "baselineGateIndependent": true,
-        "candidate": 82,
-        "decision": "ELIGIBLE",
-        "distanceAtr": 0.524,
-        "evaluatedAt": "2026-09-01T17:43:09.960Z",
+        "candidate": 84,
+        "decision": "WAIT",
+        "distanceAtr": 1.783,
+        "evaluatedAt": "2026-09-01T17:57:10.327Z",
         "maxEntryDistanceAtr": 0.75,
-        "reasons": [],
+        "reasons": [
+          "WAIT_ENTRY_ZONE"
+        ],
         "regime": "RANGE",
         "side": "SHORT",
-        "status": "READY",
+        "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 79
+        "technical": 81
       }
     ],
-    "lastScanAt": "2026-09-01T17:43:09.960Z",
+    "lastScanAt": "2026-09-01T17:57:10.327Z",
     "lastSignal": {
       "atr": 241.05074740106278,
       "candidate": 82,
@@ -2915,7 +2919,7 @@
         },
         "feeOpen": 7.497157086369944,
         "id": "a63e6a91-6b12-4fa3-a8fb-f2519def811e",
-        "livePrice": 2433.63,
+        "livePrice": 2423.4,
         "openedAt": "2026-09-01T17:21:11.254Z",
         "qty": 6.155405003051251,
         "riskPct": 1,
@@ -2929,7 +2933,7 @@
         "technical": 79,
         "tp1": 2415.675578854252,
         "tp2": 2403.667338199539,
-        "unrealized": -0.6512510608859028
+        "unrealized": 62.35002701691912
       },
       {
         "candidate": 82,
@@ -3029,7 +3033,7 @@
         },
         "feeOpen": 9.168215661608274,
         "id": "cb12798f-b9c6-4fec-a5c9-9dac409b8ef0",
-        "livePrice": 77544,
+        "livePrice": 77375.99,
         "openedAt": "2026-09-01T17:35:10.546Z",
         "qty": 0.2361097882726253,
         "riskPct": 1,
@@ -3043,7 +3047,7 @@
         "technical": 79,
         "tp1": 77143.96632582163,
         "tp2": 76835.42136914827,
-        "unrealized": 9.211237031575871
+        "unrealized": 48.89987696202225
       }
     ],
     "profitFactor": 0.54,
@@ -4003,7 +4007,7 @@
     ],
     "researchOnly": true,
     "ruleset": "6.98-SHADOW-V1",
-    "updatedAt": "2026-09-01T17:44:39.669Z",
+    "updatedAt": "2026-09-01T17:57:39.706Z",
     "winRate": 37.5
   }
 }
