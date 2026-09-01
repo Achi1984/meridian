@@ -29,8 +29,14 @@ apply('index.html',src=>{
   s=s.replace(/manifest\.webmanifest\?v=[^"'<>\s]+/g,`manifest.webmanifest?v=${cacheTag}`);
   s=s.replace(/styles-v6\.06\.css\?v=[^"'<>\s]+/g,`styles-v6.06.css?v=${cacheTag}`);
   s=s.replace(/app-v6\.06\.js(?:\?v=[^"'<>\s]+)?/g,`app-v6.06.js?v=${cacheTag}`);
-  s=s.replace(/app-v7\.33-hardening\.js(?:\?v=[^"'<>\s]+)?/g,`app-v7.33-hardening.js?v=${cacheTag}`);
   s=s.replace(/window\.MERIDIAN_RELEASE_BUILD\|\|'[^']+'/g,`window.MERIDIAN_RELEASE_BUILD||'${build}'`);
+  return s;
+});
+
+apply('app-v6.06.js',src=>{
+  let s=src;
+  s=required(s,/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/g,`app-v7.32-legacy.js?v=${cacheTag}`,'compat legacy loader tag');
+  s=required(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/g,`app-v7.33-hardening.js?v=${cacheTag}`,'compat hardening loader tag');
   return s;
 });
 
