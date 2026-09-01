@@ -1,8 +1,0 @@
-MERIDIAN Dashboard v6.31
-- Learning Monitor: progress to 20-trade first review
-- States: INSUFFICIENT DATA / EARLY SIGNAL / REVIEW READY
-- Closed, Long/Short, Profit Factor, Expectancy quick view
-- Dynamic 10-asset analytics retained
-- Backend 6.29.1 unchanged
-- Ruleset 6.2-SIGNAL-V1 frozen
-- No trading/risk logic changes
