@@ -1,5 +1,6 @@
 name: MERIDIAN Runtime Smoke
 
+# Public smoke checks only: this workflow never reads or uses MERIDIAN_READ_TOKEN.
 on:
   push:
     branches:
