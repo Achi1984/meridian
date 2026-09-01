@@ -7,14 +7,14 @@
 <meta charset="utf-8">
 <meta name="meridian-build" content="7.25-20260901-R1">
 <script id="meridian-release-authority">
-window.MERIDIAN_RELEASE_VERSION='7.25';
-window.MERIDIAN_RELEASE_BUILD='7.25-20260901-R1';
+window.MERIDIAN_RELEASE_VERSION='7.26';
+window.MERIDIAN_RELEASE_BUILD='7.26-20260901-R1';
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=7.25-R1">
+<link rel="manifest" href="manifest.webmanifest?v=7.26-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=7.25-R1">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.26-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -13222,6 +13222,66 @@ setInterval(()=>fetchTelemetry(false),60000);
   else apply();
   window.addEventListener('pageshow',apply);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)apply()});
+})();
+</script>
+
+
+<style id="meridian-challenger-v2-ui">
+#challenger-v2-card{margin-top:10px;border:1px solid rgba(86,156,255,.25);border-radius:14px;padding:12px;background:rgba(7,17,29,.72)}
+#challenger-v2-card .cv2-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+#challenger-v2-card .cv2-title{font-weight:800;font-size:13px;letter-spacing:.02em}
+#challenger-v2-card .cv2-badge{font-size:10px;padding:4px 7px;border-radius:999px;border:1px solid rgba(86,156,255,.35)}
+#challenger-v2-card .cv2-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+#challenger-v2-card .cv2-k{font-size:9px;opacity:.62;text-transform:uppercase}
+#challenger-v2-card .cv2-v{font-size:13px;font-weight:800;margin-top:2px}
+#challenger-v2-card .cv2-decision{margin-top:9px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#challenger-v2-card .cv2-cf{margin-top:7px;font-size:10px;opacity:.76}
+@media(max-width:700px){#challenger-v2-card .cv2-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+<script id="meridian-challenger-v2-ui-script">
+(function(){
+  const API=(typeof MERIDIAN_CLOUD_API!=="undefined"&&MERIDIAN_CLOUD_API)||"https://p01--achi-meridian--ttvk44grdlp7.code.run";
+  function money(n){n=Number(n||0);return (n<0?"-":"")+"$"+Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2});}
+  function pct(n){return Number(n||0).toFixed(1)+"%";}
+  function pf(n){return Number(n||0).toFixed(2);}
+  function host(){
+    let el=document.getElementById("challenger-v2-card"); if(el)return el;
+    const paper=document.querySelector('[data-view="paper"],#paper-view,#paperView,.paper-view')||document.querySelector("main")||document.body;
+    el=document.createElement("section");el.id="challenger-v2-card";
+    el.innerHTML='<div class="cv2-head"><div class="cv2-title">Challenger V2 · Research</div><div class="cv2-badge">LOADING</div></div><div class="cv2-body">Warte auf Telemetrie …</div>';
+    paper.appendChild(el);return el;
+  }
+  function render(c){
+    if(!c)return;
+    const el=host(),a=c.account||{},d=c.lastDecision||{},cf=c.counterfactual||{};
+    const pnl=Number(a.equity||10000)-Number(a.startEquity||10000);
+    el.querySelector(".cv2-badge").textContent=(c.researchOnly?"RESEARCH · ":"")+String(d.decision||"WAIT");
+    el.querySelector(".cv2-body").innerHTML=
+      '<div class="cv2-grid">'+
+      '<div><div class="cv2-k">Equity</div><div class="cv2-v">'+money(a.equity)+'</div></div>'+
+      '<div><div class="cv2-k">P&L</div><div class="cv2-v">'+money(pnl)+'</div></div>'+
+      '<div><div class="cv2-k">WR</div><div class="cv2-v">'+pct(c.winRate)+'</div></div>'+
+      '<div><div class="cv2-k">PF</div><div class="cv2-v">'+pf(c.profitFactor)+'</div></div>'+
+      '<div><div class="cv2-k">DD</div><div class="cv2-v">'+pct(a.drawdownPct)+'</div></div>'+
+      '<div><div class="cv2-k">Closed</div><div class="cv2-v">'+Number(c.closedCount||0)+'</div></div>'+
+      '<div><div class="cv2-k">Open</div><div class="cv2-v">'+Number(c.openCount||0)+'</div></div>'+
+      '<div><div class="cv2-k">Confidence</div><div class="cv2-v">'+(d.confidence==null?"—":d.confidence)+'</div></div>'+
+      '<div><div class="cv2-k">Regime</div><div class="cv2-v">'+String(d.regime||"—")+'</div></div>'+
+      '<div><div class="cv2-k">Risk</div><div class="cv2-v">'+(d.riskPct==null?"—":pct(d.riskPct))+'</div></div>'+
+      '</div>'+
+      '<div class="cv2-decision"><b>'+String(d.symbol||"—")+' '+String(d.side||"")+'</b><span>'+String(d.decision||"WAIT")+' · Score '+(d.confidence==null?"—":d.confidence)+'</span></div>'+
+      '<div class="cv2-cf">Counterfactual: '+Number(cf.tracked||0)+' tracked · '+Number(cf.open||0)+' open · '+Number(cf.positiveR||0)+' positive · '+Number(cf.negativeR||0)+' negative</div>';
+  }
+  async function sync(){
+    try{
+      let c=null;
+      if(window.MERIDIAN_CLOUD&&window.MERIDIAN_CLOUD.assistant&&window.MERIDIAN_CLOUD.assistant.challengerV2)c=window.MERIDIAN_CLOUD.assistant.challengerV2;
+      if(!c){const r=await fetch(API+"/api/challenger-v2",{cache:"no-store"});if(r.ok)c=await r.json();}
+      if(c)render(c);
+    }catch(e){const el=host();el.querySelector(".cv2-badge").textContent="OFFLINE";}
+  }
+  function boot(){host();sync();setInterval(sync,60000);}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
 })();
 </script>
 

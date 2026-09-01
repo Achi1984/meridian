@@ -1,1 +1,1 @@
-{"version":"7.25","ui":"7.25","buildId":"7.25-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.25 consolidates all legacy UI version setters into one release authority; fixes inconsistent 7.20/7.21/7.23 badge state; engine/shadow execution unchanged"}
+{"version":"7.26","ui":"7.26","buildId":"7.26-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.26 adds Challenger V2 research telemetry card; Baseline 6.2 and Shadow V1 execution unchanged"}
