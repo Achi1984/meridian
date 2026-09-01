@@ -1,8 +1,0 @@
-ACHI MERIDIAN v6.33 — GRID BOT UPDATE
-- Pionex SSOT auf Screenshots vom 28.08.2026 aktualisiert
-- BTC Short 30x aktualisiert
-- BTC Long 100x als BE PROTECTED durch SL 78.800 klassifiziert
-- HBAR Long 3x und XRP Long 5x aktualisiert
-- Grid Profit, Trend P&L und kumulierte Grid-Runden in Bot-Details ergänzt
-- HBAR/XRP als GRID ACTIVE geführt
-- Paper Engine 6.29.1 und Ruleset 6.2-SIGNAL-V1 unverändert
