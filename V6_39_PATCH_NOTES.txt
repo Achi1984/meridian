@@ -1,9 +1,0 @@
-ACHI MERIDIAN v6.39 — CENTER FIX + MARKET INTELLIGENCE
-
-- CENTER: protected BTC-L100 is excluded from operational risk rendering; BTC-S30 remains the actionable blocker.
-- CENTER: EXECUTION GATE wording retained; protected bots stay in GRID/DEPOT/SSOT.
-- MARKET Radar: adds READY / SETUP BUILDING / WATCH / AVOID status directly to each asset.
-- MARKET Radar detail: existing score breakdown and canonical risk-plan drilldown retained.
-- Portfolio implication: adds dynamic market action, alt-breadth gate and BTC-dominance gate.
-- MARKET → VISION → CENTER decision framing tightened without changing trading strategy.
-- Paper Engine 6.29.1 and Ruleset 6.2-SIGNAL-V1 unchanged.
