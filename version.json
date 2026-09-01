@@ -1,1 +1,1 @@
-{"version":"7.26","ui":"7.26","buildId":"7.26-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.26 adds Challenger V2 research telemetry card; Baseline 6.2 and Shadow V1 execution unchanged"}
+{"version":"7.27","ui":"7.27","buildId":"7.27-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.27 fixes Challenger V2 mobile placement: Paper A/B cockpit only; responsive 3-bot comparison; no backend/execution changes"}
