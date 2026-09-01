@@ -1,7 +1,0 @@
-ACHI MERIDIAN v6.43 — EQUITY TIMEFRAME OVERVIEW
-
-- Equity & Performance chart now has direct timeframe switching: 15M / 1H / 4H / 1D / 1W.
-- Default view: 1D.
-- Chart data is filtered to the selected timeframe using the latest available Postgres equity timestamp.
-- Trade/event markers outside the selected timeframe are hidden to reduce clutter.
-- Existing cloud paper engine, scanner, trading logic and API endpoint are unchanged.
