@@ -1,4 +1,4 @@
-name: MERIDIAN Backend Safety
+name: MERIDIAN Release Safety
 
 on:
   pull_request:
@@ -18,11 +18,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --ignore-scripts
-      - run: node --check server.js
-      - run: node --check server-gateway.js
-      - run: node --check cloud-backtest.js
-      - run: node --test test/*.test.js
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Backend syntax
+        run: |
+          node --check server.js
+          node --check server-gateway.js
+          node --check cloud-backtest.js
+      - name: Frontend module syntax
+        run: |
+          node --check app-v6.06.js
+          node --check app-v7.32-legacy.js
+          node --check app-v7.33-hardening.js
+      - name: Research regression tests
+        run: node --test test/*.test.js
+      - name: Release authority consistency
+        run: |
+          node scripts/release-sync.mjs --check
+          node scripts/release-check.mjs
+      - name: Public privacy regression
+        run: node scripts/privacy-check.mjs
+      - name: High-confidence secret scan
+        run: node scripts/secret-check.mjs
       - name: Assert paper-only invariant
         run: |
           grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
