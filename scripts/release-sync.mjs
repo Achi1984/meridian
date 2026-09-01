@@ -40,6 +40,7 @@ apply('app-v6.06.js',src=>{
   s=required(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/g,`app-runtime-monitor.js?v=${cacheTag}`,'runtime monitor loader tag');
   s=required(s,/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/g,`app-v7.37-ui-polish.js?v=${cacheTag}`,'ui polish loader tag');
   s=required(s,/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');
+  s=required(s,/app-v7\.39-paper-overview\.js\?v=[^"'<>\s]+/g,`app-v7.39-paper-overview.js?v=${cacheTag}`,'paper overview loader tag');
   return s;
 });
 
