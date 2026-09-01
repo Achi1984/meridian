@@ -43,4 +43,4 @@ jobs:
           git add -A
           git commit -m 'MERIDIAN v7.38: integrate Regime V1 research bot'
           git push origin HEAD:codex/meridian-v7-38-regime-v1
-# rerun after release-sync anchor alignment
+# rerun after release-check anchor alignment
