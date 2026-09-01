@@ -1,8 +1,0 @@
-MERIDIAN Dashboard v6.30
-- Forward Test Analytics jetzt dynamisch nach tatsächlich abgeschlossenen Trades
-- Keine festen BTC/ETH/SOL-Zeilen mehr
-- Neue Assets wie XRP/SUI/DOGE/LINK/AVAX/ADA/NEAR erscheinen automatisch sobald Trades geschlossen wurden
-- Sortierung folgt dem 10-Asset-Scanner
-- Header ASSET / TRADES / P&L / WR ergänzt
-- Backend 6.29.1 und Ruleset 6.2-SIGNAL-V1 unverändert
-- Keine Änderung an Tradinglogik oder Risk Engine
