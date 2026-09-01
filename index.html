@@ -5,16 +5,16 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
-<meta name="meridian-build" content="7.25-20260901-R1">
+<meta name="meridian-build" content="7.28-20260901-R1">
 <script id="meridian-release-authority">
-window.MERIDIAN_RELEASE_VERSION='7.27';
-window.MERIDIAN_RELEASE_BUILD='7.27-20260901-R1';
+window.MERIDIAN_RELEASE_VERSION='7.28';
+window.MERIDIAN_RELEASE_BUILD='7.28-20260901-R1';
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=7.27-R1">
+<link rel="manifest" href="manifest.webmanifest?v=7.28-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=7.27-R1">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.28-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -13229,110 +13229,111 @@ setInterval(()=>fetchTelemetry(false),60000);
 
 
 
-<style id="v727-challenger-paper-style">
-/* v7.27 — Challenger V2 belongs only to the existing Paper A/B cockpit. */
-body:not([data-view="paper"]) #v727-challenger-v2{display:none!important}
-body[data-view="paper"] #v708-ab-dashboard .v708-cols{
+
+
+
+<style id="v728-challenger-paper-style">
+/* v7.28: Challenger is physically mounted inside the existing Paper A/B dashboard.
+   No body/data-view dependency: if the Paper dashboard is absent, the card cannot exist. */
+#v708-ab-dashboard .v708-cols.v728-three{
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
 }
-body[data-view="paper"] #v727-challenger-v2{border-color:#245f93}
-body[data-view="paper"] #v727-challenger-v2 .v727-cf{
+#v708-ab-dashboard #v728-challenger-v2{
+  position:static!important; width:auto!important; max-width:none!important;
+  min-width:0!important; inset:auto!important; transform:none!important;
+  border-color:#245f93!important;
+}
+#v728-challenger-v2 .v728-note{
   margin-top:8px;padding-top:7px;border-top:1px solid #173748;
-  font-size:6.5px;line-height:1.45;color:#718b9d
+  font-size:7px;line-height:1.45;color:#718b9d;overflow-wrap:anywhere
 }
-body[data-view="paper"] #v727-challenger-v2 .v727-cf b{color:#38bdf8;font-size:7.5px}
-@media(max-width:700px){
-  body[data-view="paper"] #v708-ab-dashboard .v708-cols{
-    grid-template-columns:1fr!important;
-  }
-  body[data-view="paper"] #v708-ab-dashboard .v708-bot{
-    padding:11px!important;
-  }
-  body[data-view="paper"] #v708-ab-dashboard .v708-kpis{
-    grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  }
-  body[data-view="paper"] #v708-ab-dashboard .v708-kpis strong{
-    font-size:10px!important;
-  }
-}
-@media(max-width:390px){
-  body[data-view="paper"] #v708-ab-dashboard .v708-kpis{
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  }
+#v728-challenger-v2 .v728-note b{color:#38bdf8;font-size:8px}
+@media(max-width:760px){
+ #v708-ab-dashboard .v708-cols.v728-three{grid-template-columns:1fr!important}
+ #v708-ab-dashboard .v708-bot{width:100%!important;min-width:0!important}
 }
 </style>
-<script id="v727-challenger-paper-js">
+<script id="v728-challenger-paper-js">
 (function(){
- 'use strict';
- const API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
- const money=n=>{
-   n=Number(n||0);
-   return (n<0?'−':n>0?'+':'')+'$'+Math.abs(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
- };
- const pct=n=>Number(n||0).toFixed(2).replace('.',',')+'%';
- function removeWrongMounts(){
-   document.querySelectorAll('#challenger-v2-card').forEach(x=>x.remove());
- }
- async function getState(){
-   try{
-     const a=window.MERIDIAN_CLOUD?.assistant?.challengerV2;
-     if(a)return a;
-   }catch(_e){}
-   try{
-     const r=await fetch(API+'/api/challenger-v2',{cache:'no-store'});
-     if(r.ok)return await r.json();
-   }catch(_e){}
-   return null;
- }
- function paint(c){
-   removeWrongMounts();
-   if(document.body?.dataset?.view!=='paper')return;
-   const dash=document.getElementById('v708-ab-dashboard');
-   const cols=dash?.querySelector('.v708-cols');
-   if(!cols)return;
-   const head=dash.querySelector('.v708-abhead b');
-   if(head)head.textContent='BASELINE ↔ SHADOW ↔ CHALLENGER';
-   let el=document.getElementById('v727-challenger-v2');
-   if(!el){
-     el=document.createElement('div');
-     el.id='v727-challenger-v2';
-     el.className='v708-bot challenger';
-     cols.appendChild(el);
-   }
-   if(!c){
-     el.innerHTML='<h4>CHALLENGER V2</h4><small>RESEARCH-ONLY · TELEMETRY WIRD GELADEN</small>';
-     return;
-   }
-   const a=c.account||{},d=c.lastDecision||{},cf=c.counterfactual||{};
-   const start=Number(a.startEquity||10000),eq=Number(a.equity||start),pnl=eq-start;
-   const dec=String(d.decision||'WAIT').toUpperCase();
-   const cls=pnl>=0?'v708-green':'v708-red';
-   el.innerHTML=
-     '<h4>CHALLENGER V2</h4>'+
-     '<small>ADAPTIVE · EIGENER LEDGER · RESEARCH ONLY</small>'+
-     '<div class="v708-kpis">'+
-       '<div><span>TRADES</span><strong>'+Number(c.closedCount||0)+'</strong></div>'+
-       '<div><span>EQUITY</span><strong>$'+eq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div>'+
-       '<div><span>P&L</span><strong class="'+cls+'">'+money(pnl)+'</strong></div>'+
-       '<div><span>WR / PF</span><strong>'+Number(c.winRate||0).toFixed(0)+'% · '+Number(c.profitFactor||0).toFixed(2)+'</strong></div>'+
-       '<div><span>MAX DD</span><strong>'+pct(a.drawdownPct||0)+'</strong></div>'+
-       '<div><span>JETZT</span><strong class="v708-blue">'+dec+'</strong></div>'+
-     '</div>'+
-     '<div class="v727-cf"><b>CONF '+(d.confidence??'—')+' · '+String(d.regime||'—')+' · RISK '+(d.riskPct==null?'—':Number(d.riskPct).toFixed(1)+'%')+'</b><br>'+
-     'COUNTERFACTUAL · '+Number(cf.tracked||0)+' tracked · '+Number(cf.open||0)+' open · '+Number(cf.positiveR||0)+' positive · '+Number(cf.negativeR||0)+' negative</div>';
- }
- let busy=false;
- async function sync(){
-   if(busy)return;busy=true;
-   try{paint(await getState())}finally{busy=false}
- }
- function boot(){
-   removeWrongMounts();
-   sync();
-   setInterval(sync,4000);
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
- window.addEventListener('pageshow',()=>setTimeout(sync,500));
+'use strict';
+const API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
+const MIRROR='https://raw.githubusercontent.com/Achi1984/meridian/telemetry/research-snapshot.json';
+
+function n(v,d=0){v=Number(v);return Number.isFinite(v)?v:d}
+function money(v){v=n(v);return (v<0?'−':v>0?'+':'')+'$'+Math.abs(v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function pct(v){return n(v).toFixed(2).replace('.',',')+'%'}
+
+function dashboard(){
+  return document.getElementById('v708-ab-dashboard');
+}
+function mount(){
+  const dash=dashboard();
+  if(!dash)return null;
+  const cols=dash.querySelector('.v708-cols');
+  if(!cols)return null;
+  cols.classList.add('v728-three');
+  let el=document.getElementById('v728-challenger-v2');
+  if(!el){
+    el=document.createElement('div');
+    el.id='v728-challenger-v2';
+    el.className='v708-bot challenger';
+    cols.appendChild(el);
+  } else if(el.parentElement!==cols){
+    cols.appendChild(el);
+  }
+  const h=dash.querySelector('.v708-abhead b');
+  if(h)h.textContent='BASELINE ↔ SHADOW ↔ CHALLENGER';
+  return el;
+}
+async function state(){
+  try{
+    const c=window.MERIDIAN_CLOUD?.assistant?.challengerV2;
+    if(c)return c;
+  }catch(e){}
+  try{
+    const r=await fetch(API+'/api/challenger-v2',{cache:'no-store'});
+    if(r.ok){const j=await r.json(); if(j?.enabled!==undefined||j?.account)return j}
+  }catch(e){}
+  try{
+    const r=await fetch(MIRROR+'?t='+Date.now(),{cache:'no-store'});
+    if(r.ok){const j=await r.json(); if(j?.challengerV2)return j.challengerV2}
+  }catch(e){}
+  return null;
+}
+function render(c){
+  const el=mount(); if(!el)return;
+  if(!c){
+    el.innerHTML='<h4>CHALLENGER V2</h4><small>RESEARCH ONLY · TELEMETRY WIRD GELADEN</small>';
+    return;
+  }
+  const a=c.account||{}, d=c.lastDecision||c.lastEvaluation||{}, cf=c.counterfactual||{};
+  const start=n(a.startEquity||a.start||10000,10000), eq=n(a.equity,start);
+  const pnl=('realizedPnl' in a || 'unrealizedPnl' in a) ? n(a.realizedPnl)+n(a.unrealizedPnl) : eq-start;
+  const dec=String(d.decision||d.action||'WAIT').toUpperCase();
+  el.innerHTML=
+    '<h4>CHALLENGER V2</h4>'+
+    '<small>ADAPTIVE · EIGENER LEDGER · RESEARCH ONLY</small>'+
+    '<div class="v708-kpis">'+
+      '<div><span>TRADES</span><strong>'+n(c.closedCount)+'</strong></div>'+
+      '<div><span>EQUITY</span><strong>$'+eq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div>'+
+      '<div><span>P&L</span><strong class="'+(pnl>=0?'v708-green':'v708-red')+'">'+money(pnl)+'</strong></div>'+
+      '<div><span>WR / PF</span><strong>'+n(c.winRate).toFixed(0)+'% · '+n(c.profitFactor).toFixed(2)+'</strong></div>'+
+      '<div><span>MAX DD</span><strong>'+pct(a.drawdownPct||c.maxDrawdownPct)+'</strong></div>'+
+      '<div><span>JETZT</span><strong class="v708-blue">'+dec+'</strong></div>'+
+    '</div>'+
+    '<div class="v728-note"><b>CONF '+(d.confidence??'—')+' · '+String(d.regime||'—')+' · RISK '+(d.riskPct==null?'—':n(d.riskPct).toFixed(1)+'%')+'</b><br>'+
+    'COUNTERFACTUAL · '+n(cf.tracked)+' tracked · '+n(cf.open)+' open · '+n(cf.closed)+' closed</div>';
+}
+let busy=false;
+async function sync(){if(busy)return;busy=true;try{render(await state())}finally{busy=false}}
+function boot(){
+  sync();
+  const mo=new MutationObserver(()=>{ if(dashboard()&&!document.getElementById('v728-challenger-v2')) sync(); });
+  mo.observe(document.body,{childList:true,subtree:true});
+  setInterval(sync,5000);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('pageshow',()=>setTimeout(sync,300));
 })();
 </script>
 

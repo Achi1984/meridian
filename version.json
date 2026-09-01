@@ -1,1 +1,1 @@
-{"version":"7.27","ui":"7.27","buildId":"7.27-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.27 fixes Challenger V2 mobile placement: Paper A/B cockpit only; responsive 3-bot comparison; no backend/execution changes"}
+{"version":"7.28","ui":"7.28","buildId":"7.28-20260901-R1","engine":"6.2.0","ruleset":"6.2-SIGNAL-V1","evidence":"6.53-EVIDENCE","research":"v7.28 mounts Challenger V2 directly into the existing Paper A/B dashboard with API + telemetry fallback; no backend/execution changes"}
