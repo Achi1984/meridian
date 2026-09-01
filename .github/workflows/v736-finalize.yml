@@ -1,0 +1,64 @@
+name: MERIDIAN v7.36 Finalize Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-36-runtime-monitoring
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-36-runtime-monitoring
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch gateway release health
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path='server-gateway.js';
+          let s=fs.readFileSync(path,'utf8');
+          if(!s.includes('const RELEASE=JSON.parse(')){
+            const marker='const { Pool } = pg;\n';
+            if(!s.includes(marker))throw new Error('gateway Pool marker missing');
+            s=s.replace(marker,marker+'const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));\nconst DEPLOYMENT_SHA=String(process.env.NF_DEPLOYMENT_SHA||process.env.GITHUB_SHA||"").trim();\n');
+          }
+          const health=/return writeJson\(res,200,\{ok:true,version:"7\.33",internalPort:INTERNAL_PORT,privateData:!!\(await stateGet\(PRIVATE_STATE_KEY\)\),migration\},origin\|\|""\);/;
+          if(!health.test(s))throw new Error('gateway health v7.33 target missing');
+          s=s.replace(health,'return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),migration},origin||"");');
+          const log=/server\.listen\(EXTERNAL_PORT,"0\.0\.0\.0",\(\)=>console\.log\(`\[GATEWAY\] MERIDIAN v7\.33 on :\$\{EXTERNAL_PORT\} -> internal :\$\{INTERNAL_PORT\}`\)\);/;
+          if(!log.test(s))throw new Error('gateway startup log target missing');
+          s=s.replace(log,'server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));');
+          fs.writeFileSync(path,s);
+          NODE
+      - name: Synchronize release artifacts
+        run: |
+          node scripts/release-sync.mjs --write
+          npm install --package-lock-only --ignore-scripts
+      - name: Validate final release
+        run: |
+          node --check server-gateway.js
+          node --check app-runtime-monitor.js
+          node --check scripts/runtime-smoke.mjs
+          node scripts/release-sync.mjs --check
+          node scripts/release-check.mjs
+          node scripts/privacy-check.mjs
+          node scripts/secret-check.mjs
+          node --test test/*.test.js
+      - name: Commit finalized v7.36 and remove one-time workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/v736-finalize.yml
+          git add server-gateway.js index.html app-v6.06.js app-v7.33-hardening.js manifest.webmanifest package.json package-lock.json
+          git commit -m 'MERIDIAN v7.36: finalize runtime monitoring release'
+          git push origin HEAD:codex/meridian-v7-36-runtime-monitoring
