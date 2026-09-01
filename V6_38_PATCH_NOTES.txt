@@ -1,9 +1,0 @@
-ACHI MERIDIAN v6.38 — CENTER CLEANUP + VISION UI CONSISTENCY
-
-- CENTER: BTC-L100 (BE PROTECTED) aus operativer Risk-Anzeige entfernt.
-- CENTER: BTC-S30 bleibt einziger sichtbarer aktiver Risk Blocker.
-- CENTER: DUAL GATE -> EXECUTION GATE.
-- FCST: VISION 2.0 Labels konsistent auf VISION 2.1 aktualisiert.
-- FCST: BTC Peak Window Timing in eigene Zeile verschoben (Mobile Layout Fix).
-- Keine Änderung an Paper Engine 6.29.1 oder Ruleset 6.2-SIGNAL-V1.
-- BTC-L100 bleibt im SSOT / DEPOT / GRID erhalten; nur CENTER-Darstellung bereinigt.
