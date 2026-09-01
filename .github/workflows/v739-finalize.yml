@@ -1,0 +1,42 @@
+name: MERIDIAN v7.39 Finalize Once
+on:
+  push:
+    branches: [codex/meridian-v7-39-paper-overview]
+    paths:
+      - '.github/workflows/v739-finalize.yml'
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-39-paper-overview
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Extend release checks
+        run: node scripts/v739-finalize.mjs
+      - name: Sync release artifacts
+        run: |
+          node scripts/release-sync.mjs --write
+          npm install --package-lock-only --ignore-scripts
+      - name: Validate
+        run: |
+          node --check app-v7.39-paper-overview.js
+          node --test test/*.test.js
+          node scripts/release-sync.mjs --check
+          node scripts/release-check.mjs
+          node scripts/privacy-check.mjs
+          node scripts/secret-check.mjs
+          grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
+      - name: Commit final v7.39 tree
+        run: |
+          rm .github/workflows/v739-finalize.yml scripts/v739-finalize.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'MERIDIAN v7.39: finalize unified Paper overview'
+          git push origin HEAD:codex/meridian-v7-39-paper-overview
