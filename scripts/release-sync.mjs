@@ -37,6 +37,7 @@ apply('app-v6.06.js',src=>{
   let s=src;
   s=required(s,/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/g,`app-v7.32-legacy.js?v=${cacheTag}`,'compat legacy loader tag');
   s=required(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/g,`app-v7.33-hardening.js?v=${cacheTag}`,'compat hardening loader tag');
+  s=required(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/g,`app-runtime-monitor.js?v=${cacheTag}`,'runtime monitor loader tag');
   return s;
 });
 
@@ -60,7 +61,7 @@ apply('manifest.webmanifest',()=>JSON.stringify({
 apply('package.json',src=>{
   const p=JSON.parse(src);
   p.version=version+'.0';
-  p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs'};
+  p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs','runtime:smoke':'node scripts/runtime-smoke.mjs'};
   return JSON.stringify(p)+'\n';
 });
 
