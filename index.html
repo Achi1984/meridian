@@ -5,16 +5,16 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 <meta charset="utf-8">
-<meta name="meridian-build" content="7.30-20260901-R1">
+<meta name="meridian-build" content="7.31-20260901-R1">
 <script id="meridian-release-authority">
-window.MERIDIAN_RELEASE_VERSION='7.30';
-window.MERIDIAN_RELEASE_BUILD='7.30-20260901-R1';
+window.MERIDIAN_RELEASE_VERSION='7.31';
+window.MERIDIAN_RELEASE_BUILD='7.31-20260901-R1';
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080d">
-<link rel="manifest" href="manifest.webmanifest?v=7.30-R1">
+<link rel="manifest" href="manifest.webmanifest?v=7.31-R1">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles-v6.06.css?v=7.30-R1">
+<link rel="stylesheet" href="styles-v6.06.css?v=7.31-R1">
 <title>MERIDIAN</title>
 <script>window.MERIDIAN_PIONEX_SNAPSHOT={"version":"6.46","verifiedFrom":"Pionex screenshot 2026-08-28 15:10","activeCount":3,"activeBots":{"BTC-S30":{"symbol":"BTC","side":"SHORT","leverage":30,"investmentUSDT":52.0,"dynamicMarginUSDT":226.67,"currentPrice":79300.5,"liquidationPrice":86429.9,"pionexLiqBufferPct":8.99,"breakEven":72722.7,"creationPrice":69243.5,"range":[59589.2,79671.1],"totalProfitUSDT":-128.27,"gridProfit":14.51,"trendPnl":-142.78,"gridRounds24h":27,"gridRoundsTotal":1434,"stopLoss":null,"takeProfit":59589.2,"beProtected":false,"status":"ACTIVE","riskClass":"WATCH"},"HBAR-L3":{"symbol":"HBAR","side":"LONG","leverage":3,"investmentUSDT":573.35,"dynamicMarginUSDT":0,"currentPrice":0.07815,"liquidationPrice":0.05679,"pionexLiqBufferPct":27.33,"breakEven":0.07862,"creationPrice":0.07936,"range":[0.068,0.105],"totalProfitUSDT":-14.44,"gridProfit":123.65,"trendPnl":-198.38,"gridRounds24h":58,"gridRoundsTotal":406,"stopLoss":null,"takeProfit":0.105,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"},"XRP-L5":{"symbol":"XRP","side":"LONG","leverage":5,"investmentUSDT":565.92,"dynamicMarginUSDT":0,"currentPrice":1.4251,"liquidationPrice":0.8457,"pionexLiqBufferPct":40.65,"breakEven":1.4984,"creationPrice":1.586,"range":[0.7,1.9],"totalProfitUSDT":-71.39,"gridProfit":6.73,"trendPnl":-16.84,"gridRounds24h":34,"gridRoundsTotal":338,"stopLoss":null,"takeProfit":1.9,"beProtected":false,"status":"ACTIVE","riskClass":"SAFE"}},"priority":["BTC-S30","HBAR-L3","XRP-L5"],"sourcePolicy":"Pionex screenshot values are SSOT. Critical <8%; WATCH 8\u201312%. BTC-L100 closed."};</script>
 
@@ -3242,7 +3242,7 @@ main>section{
 
 <script id="v601-cache-migration">
 (function(){
-  const BUILD='7.25-20260901-R1';
+  const BUILD=window.MERIDIAN_RELEASE_BUILD||'7.31-20260901-R1';
   try{
     const last=localStorage.getItem('meridian-active-build');
     if(last!==BUILD){
@@ -4287,32 +4287,96 @@ body[data-view="paper"] .shadowv1-card{margin-top:12px}
 @media(max-width:390px){.v718-context{grid-template-columns:1fr}}
 </style>
 
-<style id="v730-paper-canonical-owner">
-/* v7.30: cloudPaperTradeView() is the canonical Paper research owner.
-   Research telemetry is fetched in the central MERIDIAN_CLOUD sync. */
-.v730-research-lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 12px}
-.v730-lane,.v730-current-lane{border:1px solid #173e55;border-radius:14px;padding:10px 11px;min-width:0;background:rgba(5,19,29,.58)}
-.v730-lane.base,.v730-current-lane.base{border-color:#71303d}
-.v730-lane.shadow,.v730-current-lane.shadow{border-color:#1d6c4a}
-.v730-lane.challenger,.v730-current-lane.challenger{border-color:#245f93}
-.v730-lane span,.v730-current-lane span{display:block;color:#8197a8;font-size:7px;letter-spacing:1.05px;margin-bottom:5px}
-.v730-lane b,.v730-current-lane b{display:block;font-size:11px;line-height:1.3;overflow-wrap:anywhere}
-.v730-lane small,.v730-current-lane small{display:block;color:#879cad;font-size:7.5px;line-height:1.45;margin-top:5px;overflow-wrap:anywhere}
-.v730-current-research{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-.v730-challenger-scan{margin-top:7px;padding-top:7px;border-top:1px solid rgba(36,95,147,.28);font-size:7px;line-height:1.45;color:#879cad}
-.v730-challenger-scan b{font-size:8px!important;margin-right:5px}.v730-challenger-scan span{display:block;margin-top:2px}
+
+
+
+<script id="v731-paper-tabs-controller">
+(function(){
+  'use strict';
+  const KEY='meridian_paper_bot_tab_v731';
+  const ALLOWED=new Set(['baseline','shadow','challenger','compare']);
+  function read(){
+    try{
+      const v=localStorage.getItem(KEY);
+      if(ALLOWED.has(v)) return v;
+    }catch(_e){}
+    return 'baseline';
+  }
+  window.meridianPaperBotTab=function(){
+    const v=window.MERIDIAN_PAPER_BOT_TAB||read();
+    return ALLOWED.has(v)?v:'baseline';
+  };
+  window.meridianPaperSetBotTab=function(v){
+    if(!ALLOWED.has(v))v='baseline';
+    window.MERIDIAN_PAPER_BOT_TAB=v;
+    try{localStorage.setItem(KEY,v)}catch(_e){}
+    try{renderOne('paper')}catch(_e){}
+    try{window.scrollTo({top:document.getElementById('v731-paper-tabs')?.getBoundingClientRect().top+window.scrollY-12||0,behavior:'auto'})}catch(_e){}
+  };
+  window.MERIDIAN_PAPER_BOT_TAB=read();
+})();
+</script>
+
+
+<style id="v731-paper-bot-tabs-style">
+#view-paper .v697-paper-intro{
+  margin:0 0 10px!important;padding:10px 13px!important;border-radius:15px!important;
+  display:grid!important;grid-template-columns:1fr auto!important;align-items:center!important;gap:8px!important;
+}
+#view-paper .v697-paper-intro .eyebrow{font-size:8px!important;letter-spacing:1.4px!important;margin:0!important}
+#view-paper .v697-paper-intro b{font-size:13px!important;margin-top:3px!important}
+#view-paper .v697-paper-intro small{grid-column:2;grid-row:1/3;max-width:120px;text-align:right;font-size:7px!important;line-height:1.3!important;margin:0!important}
+#v731-paper-tabs{
+  position:sticky;top:0;z-index:9;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;padding:7px;margin:0 0 11px;border:1px solid #173e55;border-radius:15px;
+  background:rgba(3,10,16,.96);backdrop-filter:blur(14px)
+}
+#v731-paper-tabs button{
+  min-width:0;border:1px solid #173e55;background:#07131d;color:#7891a5;border-radius:11px;
+  padding:9px 4px;font:900 8px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.55px
+}
+#v731-paper-tabs button.active{border-color:#1494d0;color:#38bdf8;background:#071d2b;box-shadow:inset 0 0 0 1px rgba(56,189,248,.08)}
+#v731-paper-tabs button.shadow.active{border-color:#1d7755;color:#2fe59a}
+#v731-paper-tabs button.challenger.active{border-color:#286ca2;color:#5bc6ff}
+#v731-paper-tabs button.compare.active{border-color:#8b6c27;color:#f0b84b}
+.v731-bot-hero{border:1px solid #1c4860;border-radius:17px;padding:13px;margin-bottom:11px;background:linear-gradient(145deg,#06131d,#071923)}
+.v731-bot-hero.base{border-color:#71343c}.v731-bot-hero.shadow{border-color:#1d6c4a}.v731-bot-hero.challenger{border-color:#286da3}
+.v731-hero-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.v731-hero-head span{font-size:8px;letter-spacing:1.2px;color:#8298a9}.v731-hero-head b{font-size:13px}
+.v731-hero-head i{font-style:normal;border:1px solid #1d4e69;border-radius:999px;padding:4px 7px;font-size:7px;color:#38bdf8;white-space:nowrap}
+.v731-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
+.v731-kpi{border:1px solid #173e55;border-radius:12px;padding:9px;min-width:0}
+.v731-kpi span{display:block;color:#71899a;font-size:6.5px;letter-spacing:.9px}.v731-kpi b{display:block;font-size:12px;margin-top:4px;overflow-wrap:anywhere}.v731-kpi small{display:block;color:#7790a2;font-size:7px;margin-top:3px}
+.v731-section{border:1px solid #173e55;border-radius:16px;padding:12px;margin-bottom:10px;background:rgba(4,17,26,.56)}
+.v731-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+.v731-title b{font-size:10px;letter-spacing:1px}.v731-title span{font-size:7px;color:#71899a}
+.v731-decision{border:1px solid #173e55;border-radius:13px;padding:10px}
+.v731-decision-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.v731-decision-head b{font-size:12px}.v731-decision-head strong{font-size:11px}
+.v731-decision small{display:block;color:#8399aa;font-size:8px;line-height:1.45;margin-top:5px}
+.v731-evals,.v731-trades,.v731-positions{display:flex;flex-direction:column;gap:7px}
+.v731-row{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:8px;border:1px solid #15384c;border-radius:12px;padding:9px}
+.v731-row>div{min-width:0}.v731-row span{display:block;color:#71899a;font-size:6.5px;letter-spacing:.7px}.v731-row b{display:block;font-size:10px;margin-top:3px;overflow-wrap:anywhere}.v731-row small{display:block;color:#8399aa;font-size:7px;margin-top:3px;line-height:1.35}
+.v731-rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.v731-rule{border:1px solid #173e55;border-radius:11px;padding:8px}.v731-rule span{display:block;color:#71899a;font-size:6px}.v731-rule b{display:block;font-size:9px;margin-top:3px}
+.v731-progress{margin-top:9px}.v731-progress-head{display:flex;justify-content:space-between;font-size:7px;color:#7891a3}.v731-progress i{display:block;height:5px;border:1px solid #1b4b65;border-radius:999px;overflow:hidden;margin-top:5px}.v731-progress i u{display:block;height:100%;background:#20a4ff;text-decoration:none}
+.v731-compare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.v731-compare-card{border:1px solid #173e55;border-radius:15px;padding:11px;min-width:0}
+.v731-compare-card.base{border-color:#71343c}.v731-compare-card.shadow{border-color:#1d6c4a}.v731-compare-card.challenger{border-color:#286da3}
+.v731-compare-card span{display:block;color:#71899a;font-size:6.5px;letter-spacing:.8px}.v731-compare-card h4{margin:4px 0 9px;font-size:11px}.v731-compare-card .line{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #15384c;padding:6px 0;font-size:8px}.v731-compare-card .line b{font-size:9px}
+.v731-deltas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:9px}
+.v731-deltas>div{border:1px solid #173e55;border-radius:11px;padding:8px}.v731-deltas span{display:block;color:#71899a;font-size:6px}.v731-deltas b{display:block;font-size:9px;margin-top:3px}
+.v731-verdict{margin-top:10px;border:1px solid #76591e;border-radius:12px;padding:10px;color:#e4b34a;font-size:8px;line-height:1.45}
+.v731-cf{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.v731-cf>div{border:1px solid #173e55;border-radius:10px;padding:7px}.v731-cf span{display:block;color:#71899a;font-size:6px}.v731-cf b{display:block;font-size:9px;margin-top:2px}
+.v731-audit-note{font-size:7px;color:#7891a3;line-height:1.5;margin-top:8px}
 @media(max-width:720px){
-  .v730-research-lanes,.v730-current-research{grid-template-columns:1fr}
+  #v731-paper-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v731-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v731-compare-grid{grid-template-columns:1fr}
+  .v731-deltas{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v731-cf{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-/* Legacy parallel Paper research dashboards are non-owners from v7.30 onward. */
-body[data-view="paper"] #v708-ab-dashboard,
-body[data-view="paper"] #v713-ab-dashboard,
-body[data-view="paper"] #v721-shadow-research,
-body[data-view="paper"] #shadow-v1-mount-v696,
-body[data-view="paper"] .v699-ab-strip,
-body[data-view="paper"] .v686-shadow-forward{
-  display:none!important;
-}
+@media(max-width:390px){.v731-row{grid-template-columns:1fr}.v731-rules{grid-template-columns:1fr}}
 </style>
 
 </head>
@@ -8364,268 +8428,190 @@ function cloudExecutionGateBlock(events,drawdownPct){
 }
 
 function cloudPaperTradeView(){
-  const C=MERIDIAN_CLOUD, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
+  const C=MERIDIAN_CLOUD||{}, st=C.status||{}, scan=C.signals||{}, p=C.paper||{}, a=p.account||{};
+  const shadow=C.shadow||{}, challenger=C.challenger||{};
+  const eng=st.engine||{}, db=st.db||{}, safety=st.safety||{}, limits=st.limits||{};
   const assets=Array.isArray(scan.assets)?scan.assets:[];
   const positions=Array.isArray(p.positions)?p.positions:[];
   const trades=Array.isArray(p.trades)?p.trades:[];
   const events=Array.isArray(C.events)?C.events:[];
-  const eng=st.engine||{}, db=st.db||{}, safety=st.safety||{};
-  const shadow=C.shadow||window.MERIDIAN_SHADOW_V1_STATE||{}, challenger=C.challenger||{};
-  const sha=shadow.account||{}, cha=challenger.account||{};
+  const active=typeof meridianPaperBotTab==='function'?meridianPaperBotTab():'baseline';
 
-  const equity=Number(a.equity||0), start=Number(a.startEquity||10000);
-  const realized=Number(a.realizedPnl||0), unreal=Number(a.unrealizedPnl||0);
-  const total=equity-start, totalPct=start?total/start*100:0;
-  const wins=trades.filter(t=>Number(t.realized)>0).length;
-  const winRate=trades.length?wins/trades.length*100:0;
-  const openRisk=positions.reduce((q,z)=>q+Number(z.riskPct||0),0);
-  const peak=Number(a.peakEquity||equity||start), drawdownPct=peak>0?Math.max(0,(peak-equity)/peak*100):0;
+  const n=x=>Number(x||0);
+  const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const money=x=>{x=n(x);return (x<0?'−':x>0?'+':'')+'$'+Math.abs(x).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})};
+  const pfLabel=x=>Number(x)>=99?'∞':fmt(n(x),2);
+  const tone=x=>n(x)>=0?'green':'red';
+  const sym=x=>String(x||'').replace('USDT','');
+  const start=n(a.startEquity||10000), equity=n(a.equity||start), basePnl=equity-start;
+  const basePeak=n(a.peakEquity||equity||start), baseDD=basePeak?Math.max(0,(basePeak-equity)/basePeak*100):0;
+  const baseWins=trades.filter(t=>n(t.realized)>0), baseLosses=trades.filter(t=>n(t.realized)<0);
+  const baseGP=baseWins.reduce((q,t)=>q+n(t.realized),0), baseGL=Math.abs(baseLosses.reduce((q,t)=>q+n(t.realized),0));
+  const basePF=baseGL?baseGP/baseGL:(baseGP>0?99:0), baseWR=trades.length?baseWins.length/trades.length*100:0;
+  const baseOpenRisk=positions.reduce((q,z)=>q+n(z.riskPct),0);
+
+  const sha=shadow.account||{}, shStart=n(sha.startEquity||10000), shEq=n(sha.equity||shStart), shPnl=shEq-shStart;
+  const shClosed=n(shadow.closedCount), shOpen=n(shadow.openCount), shWR=n(shadow.winRate), shPF=n(shadow.profitFactor), shDD=n(sha.drawdownPct);
+  const cha=challenger.account||{}, chStart=n(cha.startEquity||10000), chEq=n(cha.equity||chStart), chPnl=chEq-chStart;
+  const chClosed=n(challenger.closedCount), chOpen=n(challenger.openCount), chWR=n(challenger.winRate), chPF=n(challenger.profitFactor), chDD=n(cha.drawdownPct);
   const best=assets[0]||null;
-  const updated=C.updatedAt?cloudAge(C.updatedAt):'—';
 
-  const scannerRows=assets.map(q=>`
-    <div class="paper-scan-row observe" data-symbol="${String(q.symbol||'').replace('USDT','')}" data-side="${q.side||''}" data-tech="${q.technical??''}" data-cand="${q.candidate??''}" data-status="${q.status||''}" data-regime="${q.regime||''}" style="margin-bottom:10px">
-      <div>
-        <b>${String(q.symbol||'').replace('USDT','')} ${q.side||''}</b>
-        <small>TECH ${q.technical??'—'}/100 · CAND ${q.candidate??'—'}/100</small>
-        <em>${cloudPrice(q.price,q.symbol)} · ${q.distanceAtr!=null?fmt(q.distanceAtr,2)+' ATR':'—'}</em>
-      </div>
-      <div>
-        <span>BASE 6.2 · ${cloudStatusLabel(q.status)}</span>
-        <b class="${cloudStatusTone(q.status)}">${q.status==='READY'?'TRADE':'WATCH'}</b>
-        <em>${(q.reasons||[]).join(' · ')||'Baseline-Gates erfüllt'}</em><div class="v706-shadow-scan"></div><div class="v730-challenger-scan"></div>
-      </div>
-    </div>`).join('');
-
-  const openRows=positions.map(t=>`
-    <div class="paper-pos cloud-compact">
-      <div>
-        <b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b>
-        <small>${t.ruleset||'6.2'} · CLOUD PAPER</small>
-      </div>
-      <div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div>
-      <div><span>LIVE</span><b>${cloudPrice(t.livePrice,t.symbol)}</b></div>
-      <div><span>P&L</span><b class="${Number(t.unrealized||0)>=0?'green':'red'}">${Number(t.unrealized||0)>=0?'+':''}${cloudMoney(t.unrealized||0)}</b></div>
-      <div><span>SL</span><b>${cloudPrice(t.sl,t.symbol)}</b></div>
-      <div><span>TP1</span><b>${cloudPrice(t.tp1,t.symbol)}</b></div>
-      <div><span>TP2</span><b>${cloudPrice(t.tp2,t.symbol)}</b></div>
-    </div>`).join('');
-
-  const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`
-    <div class="trade-observe-card">
-      <div class="trade-observe-head">
-        <b>${String(t.symbol||'').replace('USDT','')} ${t.side}</b>
-        <strong class="${Number(t.realized||0)>=0?'green':'red'}">${t.exitReason||'CLOSED'} · ${Number(t.realized||0)>=0?'+':''}${cloudMoney(t.realized||0)}</strong>
-      </div>
-      <div class="trade-observe-grid">
-        <div><span>ENTRY</span><b>${cloudPrice(t.entry,t.symbol)}</b></div>
-        <div><span>EXIT</span><b>${cloudPrice(t.exit,t.symbol)}</b></div>
-        <div><span>OPEN</span><b>${cloudTime(t.openedAt)}</b></div>
-        <div><span>CLOSE</span><b>${cloudTime(t.closedAt)}</b></div>
-      </div>
-    </div>`).join('');
-
-  const eventRows=events.slice(0,20).map(e=>`
-    <div class="row"><span>${cloudTime(e.created_at)} · ${String(e.type||'EVENT').replaceAll('_',' ')}</span><b>${e.payload?.symbol||e.payload?.assets?.[0]?.symbol||''}</b></div>`).join('');
-
-  const why=best
-    ? (best.status==='READY'
-        ? 'ALLE GATES ERFÜLLT · PAPER ENTRY FREIGEGEBEN'
-        : best.status==='WAIT_ENTRY_ZONE'
-          ? 'SETUP STARK · AUF ENTRY-ZONE WARTEN'
-          : (best.reasons||[]).join(' · ') || 'KEIN SETUP')
-    : 'SCANNER LÄDT';
-
-  const shStart=Number(sha.startEquity||10000), shEq=Number(sha.equity||shStart),
-        shPnl=shEq-shStart, shClosed=Number(shadow.closedCount||0), shWr=Number(shadow.winRate||0),
-        shPf=Number(shadow.profitFactor||0), shDd=Number(sha.drawdownPct||shadow.drawdownPct||0);
-  const chStart=Number(cha.startEquity||10000), chEq=Number(cha.equity||chStart),
-        chPnl=('realizedPnl' in cha||'unrealizedPnl' in cha)?Number(cha.realizedPnl||0)+Number(cha.unrealizedPnl||0):chEq-chStart,
-        chClosed=Number(challenger.closedCount||0), chOpen=Number(challenger.openCount||0),
-        chWr=Number(challenger.winRate||0), chPf=Number(challenger.profitFactor||0), chDd=Number(cha.drawdownPct||0);
-
-  function paperResearchMatch(state,b){
-    if(!state||!b)return null;
-    const sym=String(b.symbol||'').toUpperCase(), side=String(b.side||'').toUpperCase();
-    const xs=[...(Array.isArray(state.lastEvaluations)?state.lastEvaluations:[]),state.lastDecision,state.lastSignal].filter(Boolean);
-    return xs.find(x=>String(x.symbol||'').toUpperCase()===sym&&String(x.side||'').toUpperCase()===side)||null;
+  function findEval(state,b){
+    if(!b)return null;
+    const xs=[...(Array.isArray(state?.lastEvaluations)?state.lastEvaluations:[]),state?.lastDecision,state?.lastSignal].filter(Boolean);
+    return xs.find(x=>String(x.symbol||'').toUpperCase()===String(b.symbol||'').toUpperCase()&&String(x.side||'').toUpperCase()===String(b.side||'').toUpperCase())||null;
   }
-  function paperShadowForBest(b){
-    if(!b)return {decision:'WAIT',tone:'amber',why:'KEIN CURRENT SIGNAL'};
-    const m=paperResearchMatch(shadow,b);
+  function shadowDecisionFor(b){
+    const m=findEval(shadow,b);
     if(m){
       const rs=Array.isArray(m.reasons)?m.reasons:[];
-      const raw=String(m.decision||((rs.length)?'REJECT':'ELIGIBLE')).toUpperCase();
-      const decision=(raw==='ENTER'||raw==='ELIGIBLE')?'ELIGIBLE':raw==='WAIT'?'WAIT':'REJECT';
-      return {decision,tone:decision==='ELIGIBLE'?'green':decision==='WAIT'?'amber':'red',why:rs.join(' · ')||'V1-GATES ERFÜLLT'};
+      let d=String(m.decision||'').toUpperCase();
+      if(d==='ENTER'||d==='ELIGIBLE')d='ELIGIBLE';
+      else if(d==='BLOCK')d='REJECT';
+      else if(!d)d=rs.length?'REJECT':'ELIGIBLE';
+      return {decision:d||'WAIT',reasons:rs,regime:m.regime||'—'};
     }
-    const tech=Number(b.technical||0), cand=Number(b.candidate||0), regime=String(b.regime||'').toUpperCase(), side=String(b.side||'').toUpperCase(), rs=[];
-    if(tech<75)rs.push('TECH < 75'); if(cand<70)rs.push('CAND < 70');
-    if(regime==='TRANSITION')rs.push('TRANSITION BLOCK');
-    else if(side==='LONG'&&regime!=='BULL')rs.push('LONG NUR BULL');
-    else if(side==='SHORT'&&!['BEAR','RANGE'].includes(regime))rs.push('SHORT NUR BEAR/RANGE');
-    if(b.status==='WAIT_ENTRY_ZONE')rs.push('WAIT ENTRY ZONE');
-    else if(b.status!=='READY'&&!rs.length)rs.push('BASE NOT READY');
-    const decision=rs.some(r=>/TECH|CAND|TRANSITION|NUR /.test(r))?'REJECT':b.status==='READY'?'ELIGIBLE':'WAIT';
-    return {decision,tone:decision==='ELIGIBLE'?'green':decision==='WAIT'?'amber':'red',why:rs.join(' · ')||'V1-GATES ERFÜLLT'};
+    return {decision:'NO MATCH',reasons:[],regime:b?.regime||'—'};
   }
-  function paperChallengerForBest(b){
-    if(!b)return {decision:'WAIT',tone:'amber',why:'KEIN CURRENT SIGNAL',confidence:'—',risk:'—'};
-    const m=paperResearchMatch(challenger,b);
-    if(!m)return {decision:'NO MATCH',tone:'muted',why:'Noch keine Challenger-Auswertung für genau dieses Signal.',confidence:'—',risk:'—'};
-    const d=String(m.decision||'SKIP').toUpperCase(), rs=Array.isArray(m.reasons)?m.reasons:[];
-    return {decision:d,tone:d==='TRADE'?'green':d==='CAUTION'?'amber':d==='SKIP'?'red':'muted',
-      why:rs.join(' · ')||String(m.status||'').replaceAll('_',' ')||'SOFT-SCORE AUSWERTUNG',
-      confidence:m.confidence??'—',risk:m.riskPct==null?'—':Number(m.riskPct).toFixed(1)+'%'};
+  function challengerDecisionFor(b){
+    const m=findEval(challenger,b);
+    if(!m)return {decision:'NO MATCH',reasons:[],confidence:'—',risk:'—',regime:b?.regime||'—'};
+    return {decision:String(m.decision||'SKIP').toUpperCase(),reasons:Array.isArray(m.reasons)?m.reasons:[],confidence:m.confidence??'—',risk:m.riskPct==null?'—':fmt(n(m.riskPct),1)+'%',regime:m.regime||'—'};
   }
-  const shBest=paperShadowForBest(best), chBest=paperChallengerForBest(best);
+  const shBest=shadowDecisionFor(best), chBest=challengerDecisionFor(best);
 
-  return (
-    card(`<div class="paper-head">
-      <div>
-        <div class="eyebrow">UI ${UI_VERSION} · ENGINE ${eng.version||'6.2.0'} · RULESET 6.2-SIGNAL-V1 · EVIDENCE ${status?.evidenceCapture?.version||'6.53-EVIDENCE'}</div>
-        <div class="forecast-main">CLOUD PAPER COCKPIT</div>
-        <div class="sub">Northflank · PostgreSQL · 24/7 Multi-Timeframe Scanner</div>
-      </div>
-      <span class="tag ${C.cached?'amber':(eng.state==='RUNNING'?'green':'red')} paper-tag">${C.cached?'STALE':(eng.state||'CONNECTING')}</span>
-    </div>
-    <div class="paper-isolation-banner">
-      <span>${safety.paperTrading&&!safety.liveTrading?'PAPER ONLY':'SAFETY CHECK'}</span>
-      <b>${db.persistent?'POSTGRES PERSISTENT':'DB NOT PERSISTENT'} · MARKET ${eng.marketFresh?'FRESH':'STALE'}</b>
-      <small>Cycle ${Math.round(Number(eng.intervalMs||0)/1000)}s · Scan ${Math.round(Number(eng.signalIntervalMs||0)/1000)}s · Sync ${updated}</small>
-      <div class="v629-limits">
-        <span>MAX POS<b>${Number(status?.limits?.maxOpenPositions||5)}</b></span>
-        <span>RISK CAP<b>${fmt(Number(status?.limits?.maxPortfolioRiskPct||4),0)}%</b></span>
-        <span>CORR GUARD<b>${Number(status?.limits?.maxCorrelatedSameDirection||3)}</b></span>
-        <span>TRADES/DAY<b>${Number(status?.limits?.maxTradesPerDay||20)}</b></span>
-      </div>
-    </div>
-    ${cloudExecutionGateBlock(events,drawdownPct)}
-    <div class="v730-research-lanes">
-      <div class="v730-lane base">
-        <span>BASELINE 6.2 · FROZEN REFERENCE</span>
-        <b>${cloudMoney(equity)} · ${total>=0?'+':''}${cloudMoney(total)}</b>
-        <small>${trades.length} closed · WR ${fmt(winRate,0)}% · DD ${fmt(drawdownPct,2)}% · MAX-DD Gate bleibt produktiv unverändert</small>
-      </div>
-      <div class="v730-lane shadow">
-        <span>SHADOW V1 · RESEARCH LEDGER</span>
-        <b class="${shPnl>=0?'green':'red'}">$${shEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} · ${shPnl>=0?'+':''}$${fmt(shPnl,2)}</b>
-        <small>${shClosed} closed · WR ${fmt(shWr,0)}% · PF ${fmt(shPf,2)} · DD ${fmt(shDd,2)}%</small>
-      </div>
-      <div class="v730-lane challenger">
-        <span>CHALLENGER V2 · ADAPTIVE · RESEARCH ONLY</span>
-        <b class="${chPnl>=0?'green':'red'}">$${chEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} · ${chPnl>=0?'+':''}$${fmt(chPnl,2)}</b>
-        <small>${chClosed} closed · ${chOpen} open · WR ${fmt(chWr,0)}% · PF ${fmt(chPf,2)} · DD ${fmt(chDd,2)}%</small>
-      </div>
-    </div>
-    <div class="paper-kpis harden v623-kpis">
-      <div class="kpi-card">
-        <span>EQUITY</span>
-        <b>${cloudMoney(equity)}</b>
-        <small>Start ${cloudMoney(start)}</small>
-      </div>
-      <div class="kpi-card">
-        <span>TOTAL P&L</span>
-        <b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b>
-        <small class="${totalPct>=0?'green':'red'}">${totalPct>=0?'+':''}${fmt(totalPct,2)}%</small>
-      </div>
-      <div class="kpi-card">
-        <span>REALIZED P&L</span>
-        <b class="${realized>=0?'green':'red'}">${realized>=0?'+':''}${cloudMoney(realized)}</b>
-        <small>inkl. Fees/Partials</small>
-      </div>
-      <div class="kpi-card">
-        <span>UNREALIZED</span>
-        <b class="${unreal>=0?'green':'red'}">${unreal>=0?'+':''}${cloudMoney(unreal)}</b>
-        <small>offene Positionen</small>
-      </div>
-      <div class="kpi-card">
-        <span>CLOSED TRADES</span>
-        <b>${trades.length}</b>
-        <small>Winrate ${fmt(winRate,0)}%</small>
-      </div>
-      <div class="kpi-card">
-        <span>OPEN RISK</span>
-        <b>${fmt(openRisk,2)}%</b>
-        <small>${positions.length}/${Number(status?.limits?.maxOpenPositions||5)} Positionen</small>
-      </div>
-    </div>`)
+  const tabs=`<div id="v731-paper-tabs">
+    <button class="${active==='baseline'?'active':''}" onclick="meridianPaperSetBotTab('baseline')">BASELINE 6.2</button>
+    <button class="shadow ${active==='shadow'?'active':''}" onclick="meridianPaperSetBotTab('shadow')">SHADOW V1</button>
+    <button class="challenger ${active==='challenger'?'active':''}" onclick="meridianPaperSetBotTab('challenger')">CHALLENGER V2</button>
+    <button class="compare ${active==='compare'?'active':''}" onclick="meridianPaperSetBotTab('compare')">VERGLEICH</button>
+  </div>`;
 
-    + card(`<div class="section-title">CURRENT SIGNAL <span class="tag ${best?cloudStatusTone(best.status):'muted'}">${best?cloudStatusLabel(best.status):'LOADING'}</span></div>
-      ${best?`
-        <div class="paper-signal">
-          <div><b>${String(best.symbol||'').replace('USDT','')} ${best.side}</b><strong class="${cloudStatusTone(best.status)}">${best.technical}/100 · ${best.candidate}/100</strong></div>
-          <small>Technical / Candidate · ${fmt(best.distanceAtr||0,2)} ATR zur Entry-Zone</small>
-        </div>
-        <div class="v730-current-research">
-          <div class="v730-current-lane base">
-            <span>BASELINE 6.2</span>
-            <b class="${best.status==='READY'?'green':'amber'}">${why}</b>
-            <small>ENTRY ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small>
-          </div>
-          <div class="v730-current-lane shadow">
-            <span>SHADOW V1</span>
-            <b class="${shBest.tone}">${shBest.decision}</b>
-            <small>${shBest.why}</small>
-          </div>
-          <div class="v730-current-lane challenger">
-            <span>CHALLENGER V2</span>
-            <b class="${chBest.tone}">${chBest.decision} · CONF ${chBest.confidence}</b>
-            <small>${chBest.why} · RISK ${chBest.risk}</small>
-          </div>
-        </div>`:'<div class="muted">Scanner lädt.</div>'}`)
+  function hero(cls,title,badge,eq,pnl,closed,open,wr,pf,dd){
+    return `<div class="v731-bot-hero ${cls}"><div class="v731-hero-head"><div><span>PAPER BOT</span><b>${title}</b></div><i>${badge}</i></div>
+      <div class="v731-kpis">
+        <div class="v731-kpi"><span>EQUITY</span><b>$${n(eq).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</b><small>Start $10.000</small></div>
+        <div class="v731-kpi"><span>P&L</span><b class="${tone(pnl)}">${money(pnl)}</b><small>${start?fmt(n(pnl)/10000*100,2):'0,00'}%</small></div>
+        <div class="v731-kpi"><span>CLOSED / OPEN</span><b>${closed} / ${open}</b><small>Research ledger</small></div>
+        <div class="v731-kpi"><span>WIN RATE</span><b>${fmt(wr,1)}%</b><small>closed trades</small></div>
+        <div class="v731-kpi"><span>PROFIT FACTOR</span><b>${pfLabel(pf)}</b><small>${n(pf)>=99?'keine Verlusttrades':'gross profit / loss'}</small></div>
+        <div class="v731-kpi"><span>MAX DD</span><b class="${dd>=8?'red':dd>=4?'amber':'green'}">${fmt(dd,2)}%</b><small>ledger peak</small></div>
+      </div></div>`;
+  }
 
-    + card(`<div class="section-title">LIVE SCANNER <span class="tag cyan">${assets.length} ASSETS</span></div>
-      <div class="v629-scanner-universe">BTC · ETH · SOL · XRP · SUI · DOGE · LINK · AVAX · ADA · NEAR</div>
-      <div class="paper-scanner">${scannerRows||'<div class="muted">Noch keine Cloud-Signale.</div>'}</div>`)
+  function signalHeader(){
+    if(!best)return `<div class="v731-section"><div class="v731-title"><b>CURRENT SIGNAL</b><span>SCANNER LÄDT</span></div></div>`;
+    return `<div class="paper-signal"><div><b>${sym(best.symbol)} ${best.side||''}</b><strong class="${cloudStatusTone(best.status)}">${best.technical??'—'}/100 · ${best.candidate??'—'}/100</strong></div>
+      <small>${best.regime||'—'} · ${best.distanceAtr!=null?fmt(best.distanceAtr,2)+' ATR':'—'} zur Entry-Zone</small></div>`;
+  }
 
-    + card(`<div class="section-title">OPEN POSITIONS <span class="muted" style="float:right">${positions.length}</span></div>
-      ${openRows||'<div class="muted">Keine offenen Cloud-Paper-Positionen.</div>'}`)
+  function baselineScanner(){
+    const universe=assets.map(x=>sym(x.symbol)).join(' · ')||'—';
+    const rows=assets.map(q=>`<div class="v731-row"><div><span>ASSET / SIDE</span><b>${sym(q.symbol)} ${q.side||''}</b><small>TECH ${q.technical??'—'} · CAND ${q.candidate??'—'} · ${q.regime||'—'}</small></div>
+      <div><span>BASELINE DECISION</span><b class="${cloudStatusTone(q.status)}">${cloudStatusLabel(q.status)}</b><small>${(q.reasons||[]).join(' · ')||'Baseline gates erfüllt'} · ${q.distanceAtr!=null?fmt(q.distanceAtr,2)+' ATR':'—'}</small></div></div>`).join('');
+    return `<div class="v731-section"><div class="v731-title"><b>LIVE SCANNER</b><span>${assets.length} LIVE ASSETS · ${universe}</span></div><div class="v731-evals">${rows||'<div class="muted">Keine Signale.</div>'}</div></div>`;
+  }
 
-    + card(`<div class="section-title">EQUITY & PERFORMANCE <span class="tag cyan">POSTGRES</span></div>
-      <div class="paper-performance-strip">
-        <div><span>LIVE EQUITY</span><b>${cloudMoney(equity)}</b></div>
-        <div><span>PEAK</span><b>${cloudMoney(peak)}</b></div>
-        <div><span>DD FROM PEAK</span><b class="${drawdownPct>3?'red':drawdownPct>1?'amber':'green'}">${fmt(drawdownPct,2)}%</b></div>
+  function researchEvalRows(state,kind){
+    const xs=Array.isArray(state?.lastEvaluations)?state.lastEvaluations:[];
+    return xs.map(x=>{
+      const d=String(x.decision||'WAIT').toUpperCase(), cls=d==='TRADE'||d==='ELIGIBLE'||d==='ENTER'?'green':d==='CAUTION'||d==='WAIT'?'amber':'red';
+      const extra=kind==='challenger'?`CONF ${x.confidence??'—'} · RISK ${x.riskPct==null?'—':fmt(n(x.riskPct),1)+'%'} · `:'';
+      return `<div class="v731-row"><div><span>ASSET / SIDE</span><b>${sym(x.symbol)} ${x.side||''}</b><small>TECH ${x.technical??'—'} · CAND ${x.candidate??'—'} · ${x.regime||'—'}</small></div>
+        <div><span>DECISION</span><b class="${cls}">${d}</b><small>${extra}${(x.reasons||[]).join(' · ')||x.status||'Gates erfüllt'}${x.distanceAtr!=null?' · '+fmt(x.distanceAtr,2)+' ATR':''}</small></div></div>`;
+    }).join('')||'<div class="muted">Noch keine Evaluations.</div>';
+  }
+
+  function researchPositions(state){
+    const xs=Array.isArray(state?.openPositions)?state.openPositions:[];
+    return xs.map(t=>`<div class="v731-row"><div><span>OPEN POSITION</span><b>${sym(t.symbol)} ${t.side||''}</b><small>ENTRY ${cloudPrice(t.entry,t.symbol)} · LIVE ${cloudPrice(t.livePrice,t.symbol)}</small></div>
+      <div><span>RISK / P&L</span><b class="${tone(t.unrealized)}">${money(t.unrealized)}</b><small>RISK ${fmt(n(t.riskPct),1)}% · SL ${cloudPrice(t.sl,t.symbol)} · TP1 ${cloudPrice(t.tp1,t.symbol)}</small></div></div>`).join('')||'<div class="muted">Keine offenen Positionen.</div>';
+  }
+
+  function researchClosed(state){
+    const xs=Array.isArray(state?.recentClosed)?state.recentClosed:[];
+    return xs.map(t=>`<div class="v731-row"><div><span>CLOSED</span><b>${sym(t.symbol)} ${t.side||''}</b><small>${t.exitReason||'CLOSED'} · ${cloudTime(t.closedAt)}</small></div>
+      <div><span>REALIZED</span><b class="${tone(t.realized)}">${money(t.realized)}</b><small>ENTRY ${cloudPrice(t.entry,t.symbol)} · EXIT ${cloudPrice(t.exit,t.symbol)}</small></div></div>`).join('')||'<div class="muted">Noch keine abgeschlossenen Trades.</div>';
+  }
+
+  function baselineView(){
+    const why=!best?'SCANNER LÄDT':best.status==='READY'?'ALLE GATES ERFÜLLT · PAPER ENTRY FREIGEGEBEN':best.status==='WAIT_ENTRY_ZONE'?'SETUP STARK · AUF ENTRY-ZONE WARTEN':(best.reasons||[]).join(' · ')||'KEIN SETUP';
+    const openRows=positions.map(t=>`<div class="v731-row"><div><span>OPEN POSITION</span><b>${sym(t.symbol)} ${t.side}</b><small>ENTRY ${cloudPrice(t.entry,t.symbol)} · LIVE ${cloudPrice(t.livePrice,t.symbol)}</small></div><div><span>P&L / RISK</span><b class="${tone(t.unrealized)}">${money(t.unrealized)}</b><small>${fmt(n(t.riskPct),1)}% · SL ${cloudPrice(t.sl,t.symbol)} · TP1 ${cloudPrice(t.tp1,t.symbol)}</small></div></div>`).join('')||'<div class="muted">Keine offenen Baseline-Positionen.</div>';
+    const tradeRows=trades.slice().reverse().slice(0,30).map(t=>`<div class="v731-row"><div><span>TRADE</span><b>${sym(t.symbol)} ${t.side}</b><small>${t.exitReason||'CLOSED'} · ${cloudTime(t.closedAt)}</small></div><div><span>REALIZED</span><b class="${tone(t.realized)}">${money(t.realized)}</b><small>ENTRY ${cloudPrice(t.entry,t.symbol)} · EXIT ${cloudPrice(t.exit,t.symbol)}</small></div></div>`).join('')||'<div class="muted">Noch keine Trades.</div>';
+    return hero('base','BASELINE 6.2','FROZEN REFERENCE',equity,basePnl,trades.length,positions.length,baseWR,basePF,baseDD)
+      + cloudExecutionGateBlock(events,baseDD)
+      + `<div class="v731-section"><div class="v731-title"><b>CURRENT SIGNAL</b><span>${best?cloudStatusLabel(best.status):'LOADING'}</span></div>${signalHeader()}${best?`<div class="v731-decision"><div class="v731-decision-head"><b>BASELINE 6.2</b><strong class="${best.status==='READY'?'green':'amber'}">${why}</strong></div><small>ENTRY ${cloudPrice(best.entry,best.symbol)} · SL ${cloudPrice(best.sl,best.symbol)} · TP1 ${cloudPrice(best.tp1,best.symbol)} · TP2 ${cloudPrice(best.tp2,best.symbol)}</small></div>`:''}</div>`
+      + baselineScanner()
+      + `<div class="v731-section"><div class="v731-title"><b>OPEN POSITIONS</b><span>${positions.length} / ${n(limits.maxOpenPositions||5)}</span></div><div class="v731-positions">${openRows}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>EQUITY & PERFORMANCE</b><span>POSTGRES</span></div>${cloudEquitySvg(p.equityCurve||[],events,positions,trades,start)}<div class="v731-kpis"><div class="v731-kpi"><span>REALIZED</span><b class="${tone(a.realizedPnl)}">${money(a.realizedPnl)}</b></div><div class="v731-kpi"><span>UNREALIZED</span><b class="${tone(a.unrealizedPnl)}">${money(a.unrealizedPnl)}</b></div><div class="v731-kpi"><span>OPEN RISK</span><b>${fmt(baseOpenRisk,2)}%</b></div></div></div>`
+      + card(cloudAnalyticsBlock(trades))
+      + card(backtestLabBlock())
+      + `<details class="card paper-details" data-detail-key="v731-base-history"><summary>TRADE HISTORY <strong>${trades.length}</strong></summary><div class="v731-trades">${tradeRows}</div></details>`
+      + `<details class="card paper-details" data-detail-key="v731-base-diag"><summary>ENGINE / DIAGNOSTIK <strong>${eng.state||'—'}</strong></summary><div><div class="row"><span>Database</span><b class="${db.persistent?'green':'red'}">${db.mode||'—'} · ${db.persistent?'persistent':'volatile'}</b></div><div class="row"><span>Safety</span><b class="${safety.paperTrading&&!safety.liveTrading?'green':'red'}">PAPER ${safety.paperTrading?'ON':'OFF'} · LIVE ${safety.liveTrading?'ON':'OFF'}</b></div><div class="row"><span>Cycles / Scans / Errors</span><b>${eng.cycles??'—'} / ${eng.signalScans??'—'} / ${eng.errors??'—'}</b></div><button class="paper-action green" onclick="meridianCloudSync(true)">CLOUD DATEN AKTUALISIEREN</button></div></details>`;
+  }
+
+  function shadowView(){
+    const d=shadow.lastDecision||{}, f=shadow.filters||{};
+    const target=20, prog=Math.min(100,shClosed/target*100);
+    return hero('shadow','SHADOW V1','RESEARCH ONLY · INDEPENDENT LEDGER',shEq,shPnl,shClosed,shOpen,shWR,shPF,shDD)
+      + `<div class="v731-section"><div class="v731-title"><b>V1 RULESET</b><span>${esc(shadow.ruleset||'6.98-SHADOW-V1')}</span></div><div class="v731-rules">
+        <div class="v731-rule"><span>TECH MIN</span><b>${f.minTechnical??75}</b></div><div class="v731-rule"><span>CAND MIN</span><b>${f.minCandidate??70}</b></div>
+        <div class="v731-rule"><span>LONG</span><b>${f.longRegime||'BULL'}</b></div><div class="v731-rule"><span>SHORT</span><b>${Array.isArray(f.shortRegimes)?f.shortRegimes.join(' / '):'BEAR / RANGE'}</b></div>
+        <div class="v731-rule"><span>BLOCK</span><b>${f.blockRegime||'TRANSITION'}</b></div><div class="v731-rule"><span>BASELINE MAX-DD</span><b class="green">${shadow.baselineRiskGateIgnored?'IGNORIERT':'GETRENNT'}</b></div>
+      </div><div class="v731-progress"><div class="v731-progress-head"><span>CHECKPOINT 1</span><b>${shClosed} / ${target} CLOSED</b></div><i><u style="width:${prog}%"></u></i></div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>LAST DECISION</b><span>${shadow.lastScanAt?cloudAge(shadow.lastScanAt):'—'}</span></div><div class="v731-decision"><div class="v731-decision-head"><b>${sym(d.symbol)} ${d.side||''}</b><strong class="${String(d.decision).toUpperCase()==='ELIGIBLE'?'green':String(d.decision).toUpperCase()==='WAIT'?'amber':'red'}">${d.decision||'—'}</strong></div><small>TECH ${d.technical??'—'} · CAND ${d.candidate??'—'} · ${d.regime||'—'} · ${(d.reasons||[]).join(' · ')||'V1 gates erfüllt'}</small></div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>SCANNER EVALUATIONS</b><span>${(shadow.lastEvaluations||[]).length}</span></div><div class="v731-evals">${researchEvalRows(shadow,'shadow')}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>OPEN POSITIONS</b><span>${shOpen}</span></div><div class="v731-positions">${researchPositions(shadow)}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>RECENT CLOSED</b><span>${shClosed} TOTAL</span></div><div class="v731-trades">${researchClosed(shadow)}</div></div>`;
+  }
+
+  function challengerView(){
+    const d=challenger.lastDecision||{}, m=challenger.model||{}, cf=challenger.counterfactual||{};
+    const target=20, prog=Math.min(100,chClosed/target*100);
+    return hero('challenger','CHALLENGER V2','ADAPTIVE · RESEARCH ONLY',chEq,chPnl,chClosed,chOpen,chWR,chPF,chDD)
+      + `<div class="v731-section"><div class="v731-title"><b>ADAPTIVE MODEL</b><span>${esc(challenger.ruleset||'6.99-CHALLENGER-V2')}</span></div><div class="v731-rules">
+        <div class="v731-rule"><span>TRADE SCORE</span><b>${m.tradeScore??72}</b></div><div class="v731-rule"><span>CAUTION SCORE</span><b>${m.cautionScore??62}</b></div>
+        <div class="v731-rule"><span>FULL RISK</span><b>${fmt(n(m.fullRiskPct||1),1)}%</b></div><div class="v731-rule"><span>CAUTION RISK</span><b>${fmt(n(m.cautionRiskPct||.5),1)}%</b></div>
+        <div class="v731-rule"><span>WEIGHTS</span><b>TECH ${fmt(n(m.weights?.technical||.42)*100,0)} · CAND ${fmt(n(m.weights?.candidate||.38)*100,0)} · DIST ${fmt(n(m.weights?.entryDistance||.20)*100,0)}</b></div>
+        <div class="v731-rule"><span>REGIME</span><b class="green">${m.regimeAdaptive?'ADAPTIVE':'STATIC'}</b></div>
+      </div><div class="v731-progress"><div class="v731-progress-head"><span>CHECKPOINT 1</span><b>${chClosed} / ${target} CLOSED</b></div><i><u style="width:${prog}%"></u></i></div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>LAST DECISION</b><span>${challenger.lastScanAt?cloudAge(challenger.lastScanAt):'—'}</span></div><div class="v731-decision"><div class="v731-decision-head"><b>${sym(d.symbol)} ${d.side||''}</b><strong class="${d.decision==='TRADE'?'green':d.decision==='CAUTION'?'amber':'red'}">${d.decision||'—'} · CONF ${d.confidence??'—'}</strong></div><small>${d.regime||'—'} · ${(d.reasons||[]).join(' · ')||d.status||'Soft-score gates erfüllt'} · RISK ${d.riskPct==null?'—':fmt(n(d.riskPct),1)+'%'}</small></div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>SCANNER EVALUATIONS</b><span>${(challenger.lastEvaluations||[]).length}</span></div><div class="v731-evals">${researchEvalRows(challenger,'challenger')}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>COUNTERFACTUALS</b><span>SKIPPED OUTCOMES</span></div><div class="v731-cf"><div><span>TRACKED</span><b>${n(cf.tracked)}</b></div><div><span>OPEN</span><b>${n(cf.open)}</b></div><div><span>CLOSED</span><b>${n(cf.closed)}</b></div><div><span>POSITIVE R</span><b class="green">${n(cf.positiveR)}</b></div><div><span>NEGATIVE R</span><b class="red">${n(cf.negativeR)}</b></div></div><div class="v731-audit-note">Counterfactuals sind Research-Näherungen und keine ausgeführten Trades.</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>OPEN POSITIONS</b><span>${chOpen}</span></div><div class="v731-positions">${researchPositions(challenger)}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>RECENT CLOSED</b><span>${chClosed} TOTAL</span></div><div class="v731-trades">${researchClosed(challenger)}</div></div>`;
+  }
+
+  function compareView(){
+    const ready=shClosed>=20&&chClosed>=20;
+    const shDelta=shPnl-basePnl, chDelta=chPnl-basePnl;
+    const shDdDelta=shDD-baseDD, chDdDelta=chDD-baseDD;
+    const cf=challenger.counterfactual||{};
+    const statusBase=best?cloudStatusLabel(best.status):'—';
+    return `<div class="v731-section"><div class="v731-title"><b>A/B/C BOT VERGLEICH</b><span>${ready?'REVIEW READY':'NO VERDICT'}</span></div>
+      <div class="v731-compare-grid">
+        <div class="v731-compare-card base"><span>FROZEN REFERENCE</span><h4>BASELINE 6.2</h4><div class="line"><span>Equity</span><b>$${equity.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="line"><span>P&L</span><b class="${tone(basePnl)}">${money(basePnl)}</b></div><div class="line"><span>Trades</span><b>${trades.length}</b></div><div class="line"><span>WR / PF</span><b>${fmt(baseWR,1)}% / ${pfLabel(basePF)}</b></div><div class="line"><span>DD</span><b>${fmt(baseDD,2)}%</b></div></div>
+        <div class="v731-compare-card shadow"><span>STRICT FILTER</span><h4>SHADOW V1</h4><div class="line"><span>Equity</span><b>$${shEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="line"><span>P&L</span><b class="${tone(shPnl)}">${money(shPnl)}</b></div><div class="line"><span>Trades</span><b>${shClosed}</b></div><div class="line"><span>WR / PF</span><b>${fmt(shWR,1)}% / ${pfLabel(shPF)}</b></div><div class="line"><span>DD</span><b>${fmt(shDD,2)}%</b></div></div>
+        <div class="v731-compare-card challenger"><span>ADAPTIVE SOFT SCORE</span><h4>CHALLENGER V2</h4><div class="line"><span>Equity</span><b>$${chEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="line"><span>P&L</span><b class="${tone(chPnl)}">${money(chPnl)}</b></div><div class="line"><span>Trades</span><b>${chClosed}</b></div><div class="line"><span>WR / PF</span><b>${fmt(chWR,1)}% / ${pfLabel(chPF)}</b></div><div class="line"><span>DD</span><b>${fmt(chDD,2)}%</b></div></div>
       </div>
-      ${cloudEquitySvg(p.equityCurve||[],events,positions,trades,start)}
-      <div class="paper-stats">
-        <div><span>TOTAL P&L</span><b class="${total>=0?'green':'red'}">${total>=0?'+':''}${cloudMoney(total)}</b></div>
-        <div><span>DAY START</span><b>${cloudMoney(a.dayStartEquity||start)}</b></div>
-        <div><span>WINRATE</span><b>${fmt(winRate,0)}%</b></div>
-        <div><span>ERRORS</span><b class="${Number(eng.errors||0)===0?'green':'red'}">${eng.errors||0}</b></div>
-      </div>`)
+      <div class="v731-deltas">
+        <div><span>SHADOW Δ P&L vs BASE</span><b class="${tone(shDelta)}">${money(shDelta)}</b></div>
+        <div><span>CHALLENGER Δ P&L vs BASE</span><b class="${tone(chDelta)}">${money(chDelta)}</b></div>
+        <div><span>SHADOW Δ DD</span><b class="${shDdDelta<=0?'green':'red'}">${shDdDelta>=0?'+':''}${fmt(shDdDelta,2)} %-Pkt.</b></div>
+        <div><span>CHALLENGER Δ DD</span><b class="${chDdDelta<=0?'green':'red'}">${chDdDelta>=0?'+':''}${fmt(chDdDelta,2)} %-Pkt.</b></div>
+      </div>
+      <div class="v731-verdict">${ready?'CHECKPOINT ERREICHT · Die Stichprobe ist groß genug für eine dokumentierte Review. Keine automatische Promotion.':'NO VERDICT · Shadow '+shClosed+'/20 · Challenger '+chClosed+'/20. Baseline bleibt Referenz; erst ab mindestens 20 abgeschlossenen Trades je Research-Bot wird bewertet.'}</div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>CURRENT SIGNAL · SAME MARKET INPUT</b><span>${best?sym(best.symbol)+' '+best.side:'—'}</span></div>${signalHeader()}
+        <div class="v731-compare-grid">
+          <div class="v731-compare-card base"><span>BASELINE</span><h4 class="${best&&best.status==='READY'?'green':'amber'}">${statusBase}</h4><div class="line"><span>Reason</span><b>${best?((best.reasons||[]).join(' · ')||'BASE GATES'):'—'}</b></div></div>
+          <div class="v731-compare-card shadow"><span>SHADOW V1</span><h4 class="${shBest.decision==='ELIGIBLE'?'green':shBest.decision==='WAIT'?'amber':'red'}">${shBest.decision}</h4><div class="line"><span>Reason</span><b>${shBest.reasons.join(' · ')||'V1 GATES'}</b></div></div>
+          <div class="v731-compare-card challenger"><span>CHALLENGER V2</span><h4 class="${chBest.decision==='TRADE'?'green':chBest.decision==='CAUTION'?'amber':'red'}">${chBest.decision} · CONF ${chBest.confidence}</h4><div class="line"><span>Reason</span><b>${chBest.reasons.join(' · ')||'SOFT SCORE'} · ${chBest.risk}</b></div></div>
+        </div></div>`
+      + `<div class="v731-section"><div class="v731-title"><b>RESEARCH COVERAGE</b><span>OPPORTUNITY COST</span></div><div class="v731-cf"><div><span>CF TRACKED</span><b>${n(cf.tracked)}</b></div><div><span>CF CLOSED</span><b>${n(cf.closed)}</b></div><div><span>POSITIVE R</span><b class="green">${n(cf.positiveR)}</b></div><div><span>NEGATIVE R</span><b class="red">${n(cf.negativeR)}</b></div><div><span>OPEN</span><b>${n(cf.open)}</b></div></div><div class="v731-audit-note">Vergleich verwendet getrennte Ledger. Unterschiedliche Trade-Anzahl ist Teil des Experiments und wird nicht künstlich normalisiert.</div></div>`;
+  }
 
-    + card(cloudAnalyticsBlock(trades))
-
-    + card(backtestLabBlock())
-
-    + `<details class="card paper-details" data-detail-key="cloud-trades">
-        <summary>TRADE HISTORY <strong>${trades.length}</strong></summary>
-        <div>${tradeRows||'<div class="muted">Noch keine abgeschlossenen Cloud-Paper-Trades.</div>'}</div>
-      </details>`
-
-    + `<details class="card paper-details" data-detail-key="cloud-diagnostics">
-        <summary>ENGINE / DIAGNOSTIK <strong>${eng.state||'—'}</strong></summary>
-        <div>
-          <div class="paper-stats">
-            <div><span>STATE</span><b class="${eng.state==='RUNNING'?'green':'red'}">${eng.state||'—'}</b></div>
-            <div><span>MARKET</span><b class="${eng.marketFresh?'green':'red'}">${eng.marketFresh?'FRESH':'STALE'}</b></div>
-            <div><span>CYCLES</span><b>${eng.cycles??'—'}</b></div>
-            <div><span>SCANS</span><b>${eng.signalScans??'—'}</b></div>
-          </div>
-          <div class="row"><span>Database</span><b class="${db.persistent?'green':'red'}">${db.mode||'—'} · ${db.persistent?'persistent':'volatile'}</b></div>
-          <div class="row"><span>Safety</span><b class="${safety.paperTrading&&!safety.liveTrading?'green':'red'}">PAPER ${safety.paperTrading?'ON':'OFF'} · LIVE ${safety.liveTrading?'ON':'OFF'}</b></div>
-          <div class="row"><span>Backend</span><b>Northflank</b></div>
-          <button class="paper-action green" onclick="meridianCloudSync(true)">CLOUD DATEN AKTUALISIEREN</button>
-        </div>
-      </details>`
-
-    + `<details class="card paper-details" data-detail-key="cloud-events">
-        <summary>CLOUD EVENTS <strong>${events.length}</strong></summary>
-        <div>${eventRows||'<div class="muted">Noch keine Events.</div>'}</div>
-      </details>`
-  );
+  let body=active==='shadow'?shadowView():active==='challenger'?challengerView():active==='compare'?compareView():baselineView();
+  return tabs+body;
 }
 setInterval(()=>meridianCloudSync(true),10000);
 setInterval(()=>meridianEngineMirrorSync().then(()=>{try{renderOne('center')}catch(e){}}),60000);
@@ -12462,43 +12448,8 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
 
 
 <!-- v6.98: SHADOW V1 A/B PAPER TEST + WHY NO TRADE diagnostics -->
-<style id="shadow-v1-ui-v696">
-.shadowv1-card{margin:14px 0 18px;border:1px solid #23516b;border-radius:18px;padding:15px;background:linear-gradient(180deg,rgba(6,24,35,.72),rgba(2,12,18,.5))}.shadowv1-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.shadowv1-head span{color:#9aafbf;font-size:10px;letter-spacing:1.5px;font-weight:800}.shadowv1-head b{color:#38bdf8;font-size:11px}.shadowv1-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:13px}.shadowv1-grid>div{border:1px solid #183e55;border-radius:13px;padding:10px}.shadowv1-grid span{display:block;color:#7891a3;font-size:8px;letter-spacing:1.2px}.shadowv1-grid b{display:block;margin-top:5px;font-size:18px}.shadowv1-rule{margin-top:12px;color:#8aa0af;font-size:9px;line-height:1.5}.shadowv1-rule strong{color:#d5e3eb}.shadowv1-positive{color:#22d98a}.shadowv1-negative{color:#ff5964}.shadowv1-muted{color:#8aa0af}.shadowv1-decision{margin-top:12px;border-top:1px solid #17394d;padding-top:11px}.shadowv1-decision .label{color:#7891a3;font-size:8px;letter-spacing:1.2px}.shadowv1-decision .title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:5px}.shadowv1-decision .title b{font-size:12px}.shadowv1-decision .why{margin-top:7px;color:#91a6b6;font-size:9px;line-height:1.45}.shadowv1-ok{color:#22d98a}.shadowv1-wait{color:#f0b84b}.shadowv1-block{color:#ff5964}.shadowv1-badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.shadowv1-badges span{border:1px solid #21465c;border-radius:999px;padding:4px 7px;font-size:7px;color:#8da3b3}.shadowv1-badges .ok{border-color:#1e684b;color:#22d98a}
-</style>
-<script id="shadow-v1-ui-js-v696">
-(function(){
- 'use strict';
- const API='https://p01--achi-meridian--ttvk44grdlp7.code.run';
- let state=null, lastMarkup='', fetchBusy=false;
- function money(x){const n=Number(x||0);return (n>=0?'+':'−')+'$'+Math.abs(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
- function reasonText(r,d){const m={WAIT_ENTRY_ZONE:'Auf Entry-Zone warten',BASE_NOT_READY:'Scanner noch nicht READY',SHADOW_TECH_LT_75:'Technical unter 75',SHADOW_CAND_LT_70:'Candidate unter 70',SHADOW_BLOCK_TRANSITION:'TRANSITION blockiert',SHADOW_LONG_ONLY_BULL:'LONG nur im BULL-Regime',SHADOW_SHORT_ONLY_BEAR_RANGE:'SHORT nur in BEAR/RANGE',SAME_SYMBOL_POSITION_OPEN:'Position im Asset bereits offen',SYMBOL_COOLDOWN:'Asset im Cooldown',MAX_OPEN_POSITIONS:'Maximale Positionen erreicht',MAX_TRADES_PER_DAY:'Tageslimit Trades erreicht',MAX_PORTFOLIO_RISK:'Portfolio-Risikolimit erreicht',MAX_DAILY_LOSS:'Shadow Tagesverlust-Limit erreicht',MAX_DRAWDOWN:'Shadow Max-DD erreicht'};return m[r]||r||'Kein Blocker';}
- function decisionHtml(state){const d=state.lastDecision||state.lastSignal||null;if(!d)return '<div class="shadowv1-decision"><div class="label">LAST DECISION / WHY NO TRADE</div><div class="why">Noch keine Shadow-Auswertung seit dem Backend-Start.</div></div>';const dec=d.decision||((d.reasons&&d.reasons.length)?'BLOCK':'ELIGIBLE');const cls=dec==='ENTER'||dec==='ELIGIBLE'?'shadowv1-ok':(dec==='WAIT'?'shadowv1-wait':'shadowv1-block');const rs=(d.reasons||[]);let why=rs.length?rs.map(x=>reasonText(x,d)).join(' · '):'V1-Regeln erfüllt';if(rs.includes('WAIT_ENTRY_ZONE')&&Number(d.distanceAtr)>=0)why+=' · '+Number(d.distanceAtr).toFixed(2).replace('.',',')+' ATR > '+Number(d.maxEntryDistanceAtr||0.75).toFixed(2).replace('.',',');return '<div class="shadowv1-decision"><div class="label">LAST DECISION / WHY NO TRADE</div><div class="title"><b>'+String(d.symbol||'—').replace('USDT','')+' '+String(d.side||'')+'</b><b class="'+cls+'">'+dec+'</b></div><div class="why">Tech '+Number(d.technical||0).toFixed(0)+' · Cand '+Number(d.candidate||0).toFixed(0)+' · '+why+'</div><div class="shadowv1-badges"><span class="ok">SEPARATER LEDGER</span><span class="ok">BASELINE MAX-DD IGNORIERT</span><span>'+String(d.regime||'REGIME —')+'</span></div></div>'; }
- function markup(){
-   if(!state) return '<div class="shadowv1-card"><div class="shadowv1-head"><span>SHADOW V1 · A/B PAPER TEST</span><b class="shadowv1-muted">SYNC…</b></div><div class="shadowv1-rule">Separater Research-Ledger. Baseline 6.2 und Paper-Execution bleiben unverändert.</div></div>';
-   const a=state.account||{}, start=Number(a.startEquity||10000), eq=Number(a.equity||start), pnl=eq-start, cls=pnl>=0?'shadowv1-positive':'shadowv1-negative';
-   const pf=Number(state.profitFactor||0), wr=Number(state.winRate||0), dd=Number(a.drawdownPct||state.drawdownPct||0);
-   const closed=Number(state.closedCount||0), target=20, pct=Math.min(100,closed/target*100); return '<div class="shadowv1-card"><div class="shadowv1-head"><span>SHADOW V1 · FORWARD VALIDATION</span><b>'+(state.enabled===false?'OFF':'ACTIVE')+'</b></div><div class="shadowv1-grid"><div><span>EQUITY</span><b>$'+eq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</b></div><div><span>P&L</span><b class="'+cls+'">'+money(pnl)+'</b></div><div><span>TRADES / WR</span><b>'+closed+' · '+wr.toFixed(0)+'%</b></div><div><span>PF / DD</span><b>'+pf.toFixed(2)+' · '+dd.toFixed(2)+'%</b></div></div><div class="shadowv1-progress"><div><span>FORWARD SAMPLE</span><b>'+closed+' / '+target+' TRADES</b></div><i><u style="width:'+pct+'%"></u></i><small>Eigene V1-Stichprobe · Baseline-Trades werden nicht mitgezählt.</small></div>'+decisionHtml(state)+'<div class="shadowv1-rule"><strong>V1:</strong> Tech ≥75 · Cand ≥70 · LONG nur BULL · SHORT nur BEAR/RANGE · TRANSITION blockiert. Eigener Research-Ledger; Baseline-6.2-MAX-DD sperrt Shadow nicht.</div></div>';
- }
- function findAnchor(){return document.querySelector('.v677-gate-lock') || document.querySelector('[class*="gate-lock"]');}
- function mount(){
-   if(document.body && document.body.dataset && document.body.dataset.view && document.body.dataset.view!=='paper') return;
-   const anchor=findAnchor(); if(!anchor) return;
-   let host=document.getElementById('shadow-v1-mount-v696');
-   if(!host){host=document.createElement('div');host.id='shadow-v1-mount-v696';anchor.insertAdjacentElement('afterend',host);lastMarkup='';}
-   const html=markup(); if(html!==lastMarkup){host.innerHTML=html;lastMarkup=html;}
- }
- async function refresh(){
-   if(fetchBusy) return; fetchBusy=true;
-   try{const r=await window.fetch(API+'/api/shadow-v1',{cache:'no-store'}); if(r.ok){state=await r.json(); window.MERIDIAN_SHADOW_V1_STATE=state;}}
-   catch(_e){}
-   finally{fetchBusy=false; mount(); setTimeout(()=>window.MERIDIAN_PAPER_VALIDATE_UI?.(),0);}
- }
- function tick(){mount();}
- if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){mount();refresh();},{once:true}); else {mount();refresh();}
- setInterval(tick,2000);
- setInterval(refresh,15000);
-})();
-</script>
+
+
 
 
 <style id="v697-paper-tab-style">
@@ -12513,7 +12464,7 @@ apply675();document.addEventListener('DOMContentLoaded',apply675,{once:true});se
  const base=window.paperTradeView;
  if(typeof base==='function'){
    window.paperTradeView=function(){
-     const intro='<div class="v697-paper-intro"><div class="eyebrow">PAPER LAB · BOT DEVELOPMENT</div><b>BASELINE 6.2 ↔ SHADOW V1 ↔ CHALLENGER V2</b><small>A/B/C · FORWARD · RESEARCH ONLY · NO EXECUTION CHANGE</small></div>';
+     const intro='<div class="v697-paper-intro"><div class="eyebrow">PAPER LAB · RESEARCH ONLY</div><b>BASELINE · SHADOW · CHALLENGER</b><small>3 BOTS · 1 VERGLEICH · RESEARCH ONLY · NO EXECUTION CHANGE</small></div>';
      return intro+base();
    };
  }
@@ -12642,60 +12593,8 @@ const apply=()=>{window.MERIDIAN_UI_VERSION=window.MERIDIAN_RELEASE_VERSION;cons
 })();
 </script>
 
-<style id="v686-paper-cockpit-style">
-/* v6.88 — unified compact Paper cockpit; presentation only */
-body[data-view="daytrade"] .v686-paper-shell{border:1px solid rgba(39,112,151,.45);border-radius:18px;padding:12px;margin:12px 0;background:rgba(2,12,18,.38)}
-body[data-view="daytrade"] .v686-paper-quick{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid rgba(39,112,151,.32);border-radius:14px;overflow:hidden;margin:10px 0 14px;background:rgba(5,18,27,.72)}
-body[data-view="daytrade"] .v686-paper-quick>div{padding:10px;border-right:1px solid rgba(39,112,151,.22)}
-body[data-view="daytrade"] .v686-paper-quick>div:last-child{border-right:0}
-body[data-view="daytrade"] .v686-paper-quick span,body[data-view="daytrade"] .v686-paper-quick small{display:block;color:#7890a2;font-size:6px;letter-spacing:.08em}
-body[data-view="daytrade"] .v686-paper-quick b{display:block;font-size:11px;margin:3px 0}
-body[data-view="daytrade"] .v686-paper-section{border:1px solid rgba(39,112,151,.28)!important;border-radius:14px!important;margin:10px 0!important;padding:0!important;background:rgba(2,12,18,.32)!important;overflow:hidden}
-body[data-view="daytrade"] .v686-paper-section>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px!important;list-style:none;cursor:pointer;color:#a9bac7;font-weight:800;letter-spacing:.10em;font-size:8px}
-body[data-view="daytrade"] .v686-paper-section>summary::-webkit-details-marker{display:none}
-body[data-view="daytrade"] .v686-paper-section>summary:after{content:'+';color:#38bdf8;font-size:15px}
-body[data-view="daytrade"] .v686-paper-section[open]>summary:after{content:'−'}
-body[data-view="daytrade"] .v686-paper-section[open]>summary{border-bottom:1px solid rgba(39,112,151,.25)}
-body[data-view="daytrade"] .v686-paper-section>.v686-body{padding:12px}
-body[data-view="daytrade"] .v686-shadow-forward{border:1px solid rgba(39,112,151,.42);border-radius:14px;overflow:hidden;margin:10px 0;background:rgba(4,16,24,.72)}
-body[data-view="daytrade"] .v686-shadow-forward .head{display:flex;justify-content:space-between;gap:10px;padding:11px 12px;background:rgba(7,25,36,.8)}
-body[data-view="daytrade"] .v686-shadow-forward .head span{font-size:7px;color:#7e96a8;letter-spacing:.1em}.v686-shadow-forward .head b{font-size:10px}.v686-shadow-forward .head strong{font-size:10px}
-body[data-view="daytrade"] .v686-shadow-forward .grid{display:grid;grid-template-columns:repeat(4,1fr)}
-body[data-view="daytrade"] .v686-shadow-forward .grid>div{padding:10px;border-right:1px solid rgba(39,112,151,.2)}.v686-shadow-forward .grid>div:last-child{border-right:0}
-body[data-view="daytrade"] .v686-shadow-forward .grid span,.v686-shadow-forward .grid small{display:block;color:#758d9e;font-size:6px}.v686-shadow-forward .grid b{font-size:10px;display:block;margin:3px 0}
-body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-top:1px solid rgba(39,112,151,.2);font-size:7px;color:#7f95a5;line-height:1.5}
-@media(max-width:700px){body[data-view="daytrade"] .v686-paper-quick,body[data-view="daytrade"] .v686-shadow-forward .grid{grid-template-columns:repeat(2,1fr)}body[data-view="daytrade"] .v686-paper-quick>div:nth-child(2){border-right:0}body[data-view="daytrade"] .v686-paper-quick>div:nth-child(-n+2){border-bottom:1px solid rgba(39,112,151,.22)}}
-</style>
-<script id="v686-paper-cockpit">
-(function(){
- function money(v){v=Number(v||0);return (v>=0?'+':'−')+'$'+Math.abs(v).toLocaleString('de-DE',{maximumFractionDigits:0})}
- function shadowReady(){
-   try{
-     const r=window.BT_STATE?.result||BT_STATE?.result;if(!r)return {ready:false,label:'NO BACKTEST',trades:0,pf:0,exp:0};
-     const xs=r.tradeList||[]; const s=typeof btTradeStats==='function'?btTradeStats(xs):null;
-     const ready=!!(r.mode==='BATCH' && Number(r.days)>=90 && xs.length>=200 && Number(s?.pf||r.avgPF||0)>=1.1 && Number(s?.expectancy||r.expectancy||0)>0);
-     return {ready,label:ready?'BACKTEST CANDIDATE':'HOLD',trades:xs.length||r.trades||0,pf:Number(s?.pf||r.avgPF||0),exp:Number(s?.expectancy||r.expectancy||0)};
-   }catch(e){return {ready:false,label:'HOLD',trades:0,pf:0,exp:0}}
- }
- function makeShadow(){const x=shadowReady();const d=document.createElement('div');d.className='v686-shadow-forward';d.innerHTML=`<div class="head"><div><span>SHADOW 6.3A · PARALLEL OBSERVATION</span><b>SOFT-SCORE RESEARCH · 6.2 EXECUTION UNCHANGED</b></div><strong class="${x.ready?'green':'amber'}">${x.label}</strong></div><div class="grid"><div><span>BACKTEST SAMPLE</span><b>${x.trades}</b><small>latest saved run</small></div><div><span>BACKTEST PF</span><b class="${x.pf>=1?'green':'red'}">${x.pf.toFixed(2).replace('.',',')}</b><small>diagnostic only</small></div><div><span>EXPECTANCY</span><b class="${x.exp>=0?'green':'red'}">${money(x.exp)}</b><small>per baseline trade</small></div><div><span>FORWARD SHADOW</span><b class="amber">0 TR</b><small>starts with new observations</small></div></div><div class="note">6.3A does not unlock the frozen 6.2 MAX-DD gate and does not place Paper trades. It is the comparison lane for future candidate scoring, trade frequency and opportunity cost before any separate Paper ledger is considered.</div>`;return d}
- function wrapCard(card,label,open){if(!card||card.dataset.v686==='1')return;card.dataset.v686='1';const d=document.createElement('details');d.className='v686-paper-section';d.open=!!open;const s=document.createElement('summary');s.textContent=label;const b=document.createElement('div');b.className='v686-body';card.parentNode.insertBefore(d,card);d.append(s,b);b.appendChild(card);card.style.border='0';card.style.margin='0';card.style.padding='0';card.style.background='transparent'}
- function apply(){
-   if(document.body.dataset.view!=='paper')return;
-   const main=[...document.querySelectorAll('.forecast-main')].find(x=>/CLOUD PAPER COCKPIT/.test(x.textContent||''));if(!main)return;
-   const first=main.closest('.card');if(!first)return;
-   const host=first.parentElement;if(host.dataset.v686paper==='1')return;host.dataset.v686paper='1';
-   const cards=[...host.children].filter(x=>x.classList?.contains('card'));
-   const title=c=>((c.querySelector('.section-title')?.textContent||c.querySelector('summary')?.textContent||'').trim());
-   const kpi=first.querySelector('.paper-kpis'); if(kpi){host.querySelectorAll('.v686-paper-quick').forEach(x=>x.remove());kpi.style.display=''}
-   if(!first.querySelector('.v686-shadow-forward'))first.appendChild(makeShadow());
-   cards.slice(1).forEach(c=>{const t=title(c);if(/CURRENT SIGNAL/.test(t))wrapCard(c,'CURRENT SIGNAL',true);else if(/LIVE SCANNER/.test(t))wrapCard(c,'LIVE SCANNER',false);else if(/OPEN POSITIONS/.test(t))wrapCard(c,'OPEN POSITIONS',false);else if(/EQUITY & PERFORMANCE/.test(t))wrapCard(c,'EQUITY & PERFORMANCE',false);else if(/BACKTEST LAB/.test(c.textContent||''))wrapCard(c,'BACKTEST / RESEARCH LAB',false);else if(!c.matches('.paper-details'))wrapCard(c,t||'PAPER ANALYTICS',false)});
-   host.querySelectorAll('details.paper-details').forEach(d=>d.classList.add('v686-paper-section'));
-   const eye=first.querySelector('.eyebrow');if(eye)eye.textContent=(eye.textContent||'').replace(/UI\s+[0-9.]+/,'UI '+window.MERIDIAN_RELEASE_VERSION);
-   setTimeout(()=>window.MERIDIAN_PAPER_VALIDATE_UI?.(),0);
- }
- new MutationObserver(()=>setTimeout(apply,25)).observe(document.body,{childList:true,subtree:true});setTimeout(apply,250);setTimeout(apply,1200);
-})();
-</script>
+
+
 <script id="v686-version-lock">(function(){const a=()=>{const b=document.getElementById('versionBadge');if(b)b.textContent='v'+window.MERIDIAN_RELEASE_VERSION+' · LIVE'};a();setTimeout(a,500);setTimeout(a,1800);setTimeout(a,5000)})();</script>
 
 
@@ -12703,56 +12602,8 @@ body[data-view="daytrade"] .v686-shadow-forward .note{padding:9px 12px;border-to
 
 
 <!-- v7.00 PAPER COCKPIT + RESILIENT CLOUD · presentation only -->
-<style id="v700-paper-cleanup-style">
-body[data-view="paper"] #view-paper{padding-bottom:105px}
-body[data-view="paper"] .v699-research{border:1px solid rgba(39,112,151,.34);border-radius:16px;margin:14px 0;background:rgba(3,14,22,.54);overflow:hidden}
-body[data-view="paper"] .v699-research>summary{list-style:none;padding:14px 15px;display:flex;justify-content:space-between;align-items:center;gap:10px;color:#9fb2c0;font-size:9px;font-weight:900;letter-spacing:.12em;cursor:pointer}
-body[data-view="paper"] .v699-research>summary::-webkit-details-marker{display:none}
-body[data-view="paper"] .v699-research>summary:after{content:'+';font-size:16px;color:#38bdf8}
-body[data-view="paper"] .v699-research[open]>summary:after{content:'−'}
-body[data-view="paper"] .v699-research[open]>summary{border-bottom:1px solid rgba(39,112,151,.24)}
-body[data-view="paper"] .v699-research-body{padding:10px}
-body[data-view="paper"] .v699-research-body>*{margin-top:8px!important;margin-bottom:8px!important}
-body[data-view="paper"] .v699-ab-strip{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
-body[data-view="paper"] .v699-ab-box{border:1px solid #1d455d;border-radius:14px;padding:11px;background:rgba(4,18,27,.72)}
-body[data-view="paper"] .v699-ab-box span{display:block;color:#7891a3;font-size:7px;letter-spacing:.12em}
-body[data-view="paper"] .v699-ab-box b{display:block;margin-top:4px;font-size:12px}
-body[data-view="paper"] .v699-ab-box small{display:block;color:#8196a6;font-size:7px;line-height:1.35;margin-top:4px}
-body[data-view="paper"] .v699-ab-note{grid-column:1/-1;color:#7f96a7;font-size:7px;line-height:1.45;padding:0 2px}
-body[data-view="paper"] .v686-shadow-forward{display:none!important}
-@media(max-width:520px){body[data-view="paper"] .v699-ab-strip{grid-template-columns:1fr 1fr}}
-</style>
-<script id="v700-paper-cleanup-js">
-(function(){
- 'use strict';
- function txt(el){return String(el?.textContent||'').replace(/\s+/g,' ').trim()}
- function version(){window.MERIDIAN_UI_VERSION=window.MERIDIAN_RELEASE_VERSION;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+window.MERIDIAN_RELEASE_VERSION+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=window.MERIDIAN_RELEASE_VERSION);}
- function researchCandidate(el){const t=txt(el).toUpperCase();return /LIVE EVIDENCE MONITOR|RESEARCH LAB · COUNTERFACTUAL|DECISION LAB · 6\.64|DECISION JOURNAL · 6\.64|H7 · ADAPTIVE RISK SHADOW|SHADOW RULESET 6\.3|BACKTEST \/ RESEARCH LAB|BACKTEST LAB|LEARNING MONITOR/.test(t)}
- function addAB(first,shadow){if(!first||!shadow||first.querySelector('.v699-ab-strip'))return;const gate=[...document.querySelectorAll('*')].find(e=>e.children.length<12&&/EXECUTION RISK GATE/.test(txt(e))&&/MAX DRAWDOWN/.test(txt(e)));let dd='11,35%';if(gate){const m=txt(gate).match(/DRAWDOWN\s+([0-9,.]+%)/i);if(m)dd=m[1]}
-   const s=shadow.querySelector('.shadowv1-grid');let seq='—',spnl='—',str='—';if(s){const cells=[...s.children];seq=txt(cells[0]?.querySelector('b'))||'—';spnl=txt(cells[1]?.querySelector('b'))||'—';str=txt(cells[2]?.querySelector('b'))||'—'}
-   const d=document.createElement('div');d.className='v699-ab-strip';d.innerHTML='<div class="v699-ab-box"><span>BASELINE 6.2</span><b class="red">LOCKED · MAX DD '+dd+'</b><small>30 Closed Trades · Execution bleibt eingefroren</small></div><div class="v699-ab-box"><span>SHADOW V1</span><b class="green">'+seq+' · '+spnl+'</b><small>'+str+' · separater Forward-Ledger</small></div><div class="v699-ab-note">A/B STATUS · Baseline bleibt Referenz. Shadow darf unabhängig vom Baseline-Max-DD neue Research-Trades eröffnen, sobald V1-Regeln und Entry-Zone erfüllt sind.</div>';
-   shadow.insertAdjacentElement('afterend',d);
- }
- function cleanup(){version();if(document.body?.dataset?.view!=='paper')return;
-   const main=[...document.querySelectorAll('.forecast-main')].find(x=>/CLOUD PAPER COCKPIT/.test(txt(x)));if(!main)return;const first=main.closest('.card');if(!first)return;const host=first.parentElement;
-   const shadow=document.getElementById('shadow-v1-mount-v696');if(shadow){addAB(first,shadow)}
-   let research=host.querySelector(':scope > .v699-research');if(!research){research=document.createElement('details');research.className='v699-research';research.innerHTML='<summary>RESEARCH & DIAGNOSTICS</summary><div class="v699-research-body"></div>';host.appendChild(research)}
-   const rb=research.querySelector('.v699-research-body');
-   [...host.children].forEach(el=>{if(el===first||el===shadow||el===research||el.classList?.contains('v697-paper-intro')||el.classList?.contains('v699-ab-strip'))return;if(researchCandidate(el))rb.appendChild(el)});
-   // Also collect legacy research modules nested in generic PAPER ANALYTICS wrappers.
-   [...host.querySelectorAll(':scope > details.v686-paper-section')].forEach(el=>{if(researchCandidate(el)&&el.parentElement!==rb)rb.appendChild(el)});
-   // Core order: cockpit -> shadow -> A/B -> current signal -> scanner -> positions -> performance -> research.
-   const order=[];if(first)order.push(first);if(shadow)order.push(shadow);const ab=shadow?.nextElementSibling?.classList?.contains('v699-ab-strip')?shadow.nextElementSibling:null;if(ab)order.push(ab);
-   const core=[...host.children].filter(el=>el!==research&&!order.includes(el));
-   ['CURRENT SIGNAL','LIVE SCANNER','OPEN POSITIONS','EQUITY & PERFORMANCE'].forEach(label=>{const e=core.find(x=>txt(x).toUpperCase().startsWith(label)||txt(x).toUpperCase().includes(label));if(e&&!order.includes(e))order.push(e)});
-   order.forEach(el=>host.insertBefore(el,research));host.appendChild(research);
- }
- window.MERIDIAN_PAPER_CLEANUP=cleanup;
- window.MERIDIAN_PAPER_VERSION=version;
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(cleanup,120),{once:true});else setTimeout(cleanup,0);
- window.addEventListener('pageshow',()=>setTimeout(cleanup,120));
-})();
-</script>
+
+
 
 
 
@@ -12760,39 +12611,8 @@ body[data-view="paper"] .v686-shadow-forward{display:none!important}
 
 
 <!-- v7.18 FORWARD A/B COMPARISON DASHBOARD -->
-<style id="v714-ab-dashboard-style">
-body[data-view="paper"] .v708-abdash{margin:14px 0 18px;border:1px solid #236486;border-radius:19px;padding:14px;background:linear-gradient(180deg,rgba(5,26,38,.88),rgba(2,13,20,.72))}.v708-abhead{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:7px}.v708-abhead span{font-size:10px;font-weight:900;letter-spacing:.16em;color:#a8bac7}.v708-abhead b{font-size:8px;color:#38bdf8;border:1px solid #1787bd;border-radius:999px;padding:4px 8px;letter-spacing:.12em}.v714-start{font-size:7px;color:#718b9d;letter-spacing:.08em;margin-bottom:11px}.v708-cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}.v708-bot{border:1px solid #1c4359;border-radius:15px;padding:11px;min-width:0}.v708-bot.base{border-color:#71343c}.v708-bot.shadow{border-color:#17684a}.v708-bot h4{margin:0 0 3px;font-size:11px;letter-spacing:.08em}.v708-bot small{display:block;font-size:7px;letter-spacing:.09em;color:#7f95a5;min-height:18px}.v708-kpis{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-kpis div{border-top:1px solid #173748;padding-top:6px}.v708-kpis span,.v714-deltas span,.v714-counts span{display:block;font-size:6.5px;color:#718b9d;letter-spacing:.1em}.v708-kpis strong{display:block;margin-top:2px;font-size:11px}.v708-red{color:#ff5964}.v708-green{color:#22d98a}.v708-blue{color:#38bdf8}.v708-amber{color:#f0b84b}.v714-deltas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}.v714-deltas div,.v714-counts div{border:1px solid #173d52;border-radius:10px;padding:7px;min-width:0}.v714-deltas b,.v714-counts b{display:block;font-size:8px;margin-top:3px}.v714-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.v708-verdict{margin-top:10px;border-top:1px solid #1b4359;padding-top:10px}.v708-verdict-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.v708-verdict-top span{font-size:7px;color:#7f96a7;letter-spacing:.12em}.v708-verdict-top b{font-size:9px;color:#f0b84b}.v708-bar{height:5px;border:1px solid #1d455d;border-radius:999px;overflow:hidden;margin:7px 0;background:#07131e}.v708-bar i{display:block;height:100%;background:#20a4ff}.v708-note{font-size:7px;line-height:1.45;color:#8197a7}.v708-diverge{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.v708-diverge div{border:1px solid #173d52;border-radius:11px;padding:7px}.v708-diverge span{display:block;font-size:6px;color:#718b9d;letter-spacing:.08em}.v708-diverge b{font-size:8px;display:block;margin-top:3px;white-space:normal}@media(max-width:390px){.v708-kpis{grid-template-columns:1fr}.v708-bot{padding:9px}.v708-kpis strong{font-size:10px}.v714-deltas,.v714-counts{grid-template-columns:1fr 1fr}}
-</style>
-<script id="v714-ab-dashboard-js">
-(function(){'use strict';
- const K='meridian_v714_ab', money=n=>{n=Number(n||0);return (n<0?'−':n>0?'+':'')+'$'+Math.abs(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}, pct=n=>Number(n||0).toFixed(2).replace('.',',')+'%', cls=n=>Number(n)>=0?'v708-green':'v708-red';
- const pf=ts=>{let w=0,l=0;(ts||[]).forEach(t=>{const x=Number(t.realized||t.pnl||0);if(x>0)w+=x;else if(x<0)l+=Math.abs(x)});return l?w/l:(w>0?99:0)};
- const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'null')}catch(e){return null}}, save=x=>{try{localStorage.setItem(K,JSON.stringify(x))}catch(e){}};
- function render(){if(document.body?.dataset?.view!=='paper')return;const c=window.MERIDIAN_CLOUD||{},p=c.paper||{},a=p.account||{},ts=Array.isArray(p.trades)?p.trades:[],sh=window.MERIDIAN_SHADOW_V1_STATE||{},sa=sh.account||{};
-  const beq=Number(a.equity||a.startEquity||10000), bpeak=Number(a.peakEquity||beq), bdd=bpeak?Math.max(0,(bpeak-beq)/bpeak*100):0, bpf=pf(ts), bw=ts.filter(t=>Number(t.realized||t.pnl||0)>0).length, bwr=ts.length?bw/ts.length*100:0;
-  const seq=Number(sa.equity||sa.startEquity||10000), sc=Number(sh.closedCount||0), swr=Number(sh.winRate||0), spf=Number(sh.profitFactor||0), sdd=Number(sa.drawdownPct||sh.drawdownPct||0), spnl=seq-Number(sa.startEquity||10000);
-  const sd=sh.lastDecision||sh.lastSignal||{},scan=c.signals||{},best=(Array.isArray(scan.assets)?scan.assets:[])[0]||{},bdec=best.status==='READY'?'ENTRY READY':best.status==='WAIT_ENTRY_ZONE'?'WAIT':'NO SETUP',sdec=String(sd.decision||((sd.reasons||[]).length?'REJECT':'WAIT')).toUpperCase();
-  let st=load();if(!st){st={startedAt:new Date().toISOString(),baseEq:beq,baseTrades:ts.length,basePeak:beq,counts:{bothTrade:0,baseOnly:0,shadowOnly:0,bothNo:0},lastPair:''}};st.basePeak=Math.max(Number(st.basePeak||st.baseEq),beq);
-  const bForwardTrades=Math.max(0,ts.length-Number(st.baseTrades||0)),bpnl=beq-Number(st.baseEq||beq),bfdd=st.basePeak?Math.max(0,(st.basePeak-beq)/st.basePeak*100):0;
-  const bTrade=/ENTRY READY|OPEN|TRADE/.test(bdec),sTrade=/ENTRY|OPEN|TRADE|ELIGIBLE/.test(sdec),pair=(bTrade?'1':'0')+(sTrade?'1':'0');if(pair!==st.lastPair){if(pair==='11')st.counts.bothTrade++;else if(pair==='10')st.counts.baseOnly++;else if(pair==='01')st.counts.shadowOnly++;else st.counts.bothNo++;st.lastPair=pair;save(st)}
-  const dP=spnl-bpnl,dDD=sdd-bfdd,dPF=spf-bpf,dT=sc-bForwardTrades,target=20,progress=Math.min(100,sc/target*100),enough=sc>=target;
-  const regime=String(sd.regime||best.regime||sh.regime||'—').toUpperCase();
-  const reason=((sd.reasons||[])[0]||sd.reason||best.reason||'—').toString().replaceAll('_',' ');
-  let verdict='NO VERDICT · '+sc+'/'+target;
-  if(enough){let score=0;if(dP>0)score++;if(dDD<0)score++;if(dPF>0)score++;verdict=score===3?'PROMOTE CANDIDATE':score>=1?'MODIFY / EXTEND':'REJECT'}
-  let el=document.getElementById('v708-ab-dashboard');if(!el){el=document.createElement('div');el.id='v708-ab-dashboard';el.className='v708-abdash';const intro=document.querySelector('.v697-paper-intro');if(intro)intro.insertAdjacentElement('afterend',el);else return}
-  const dt=new Date(st.startedAt),startLabel=isNaN(dt)?'—':dt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  el.innerHTML='<div class="v708-abhead"><span>PAPERBOT A/B · LIVE</span><b>FORWARD BASELINE ↔ SHADOW</b></div><div class="v714-start">GEMEINSAMER A/B START · '+startLabel+' · nur Werte ab diesem Messpunkt</div><div class="v708-cols">'+
-  '<div class="v708-bot base"><h4>FORWARD BASELINE 6.2</h4><small>FROZEN RULESET · REFERENZ</small><div class="v708-kpis"><div><span>TRADES</span><strong>'+bForwardTrades+'</strong></div><div><span>EQUITY</span><strong>$'+beq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div><div><span>FORWARD P&L</span><strong class="'+cls(bpnl)+'">'+money(bpnl)+'</strong></div><div><span>WR / PF*</span><strong>'+bwr.toFixed(0)+'% · '+bpf.toFixed(2)+'</strong></div><div><span>FORWARD DD</span><strong>'+pct(bfdd)+'</strong></div><div><span>JETZT</span><strong class="v708-amber">'+bdec+'</strong></div></div></div>'+
-  '<div class="v708-bot shadow"><h4>SHADOW V1</h4><small>ACTIVE · EIGENER LEDGER · '+sc+'/'+target+'</small><div class="v708-kpis"><div><span>TRADES</span><strong>'+sc+'</strong></div><div><span>EQUITY</span><strong>$'+seq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</strong></div><div><span>P&L</span><strong class="'+cls(spnl)+'">'+money(spnl)+'</strong></div><div><span>WR / PF</span><strong>'+swr.toFixed(0)+'% · '+spf.toFixed(2)+'</strong></div><div><span>MAX DD</span><strong>'+pct(sdd)+'</strong></div><div><span>JETZT</span><strong class="v708-amber">'+sdec+'</strong></div></div></div></div>'+
-  '<div class="v714-deltas"><div><span>Δ P&L · SH−BASE</span><b class="'+cls(dP)+'">'+money(dP)+'</b></div><div><span>Δ DD</span><b class="'+(dDD<=0?'v708-green':'v708-red')+'">'+(dDD>0?'+':'')+pct(dDD)+'</b></div><div><span>Δ PF</span><b class="'+cls(dPF)+'">'+(dPF>0?'+':'')+dPF.toFixed(2)+'</b></div><div><span>Δ TRADES</span><b>'+(dT>0?'+':'')+dT+'</b></div></div>'+
-  '<div class="v714-counts"><div><span>BEIDE TRADE</span><b>'+st.counts.bothTrade+'</b></div><div><span>NUR BASE</span><b>'+st.counts.baseOnly+'</b></div><div><span>NUR SHADOW</span><b>'+st.counts.shadowOnly+'</b></div><div><span>BEIDE KEIN</span><b>'+st.counts.bothNo+'</b></div></div>'+
-  '<div class="v718-context"><div><span>REGIME</span><b>'+regime+'</b></div><div><span>SHADOW WHY</span><b>'+reason+'</b></div></div>'+
-  '<div class="v708-verdict"><div class="v708-verdict-top"><span>FORWARD VALIDATION</span><b>'+verdict+'</b></div><div class="v708-bar"><i style="width:'+progress+'%"></i></div><div class="v708-diverge"><div><span>CURRENT BASELINE</span><b>'+bdec+'</b></div><div><span>CURRENT SHADOW</span><b>'+sdec+'</b></div></div><div class="v708-note">Verdict ab 20 Shadow-Trades: PROMOTE nur wenn P&L, DD und PF gegenüber der Forward-Baseline gleichzeitig besser sind; gemischtes Bild = MODIFY / EXTEND, sonst REJECT. *Baseline WR/PF bleibt Backend-Gesamtstatistik, bis Forward-Trade-Events separat geliefert werden.</div></div>';
- }
- setInterval(render,2500);window.addEventListener('pageshow',()=>setTimeout(render,500));document.addEventListener('DOMContentLoaded',()=>setTimeout(render,900));window.MERIDIAN_AB_RENDER=render;
-})();
-</script>
+
+
 
 
 <!-- v7.07 CONSOLIDATED IOS NAV · single owner · no prewarm · no busy lock -->
@@ -12893,80 +12713,8 @@ main>section:not(.hidden){content-visibility:visible}
 </script>
 
 <!-- v7.07 PAPER VALIDATION CLARITY · baseline/shadow separation · duplicate KPI cleanup -->
-<style id="v706-paper-validation-style">
-body[data-view="paper"] .v686-paper-quick{display:none!important}
-.shadowv1-progress{margin-top:12px;padding-top:10px;border-top:1px solid #17394d}.shadowv1-progress>div{display:flex;justify-content:space-between;gap:12px;align-items:center}.shadowv1-progress span,.shadowv1-progress small{color:#7891a3;font-size:7px;letter-spacing:.1em}.shadowv1-progress b{font-size:9px;color:#38bdf8}.shadowv1-progress i{display:block;height:5px;margin:7px 0;border:1px solid #1d455d;border-radius:999px;overflow:hidden;background:#07131e}.shadowv1-progress u{display:block;height:100%;background:#20a4ff;text-decoration:none}
-.v706-shadow-scan{margin-top:7px;padding-top:7px;border-top:1px solid rgba(39,112,151,.22);font-size:7px;line-height:1.45;color:#879cad}.v706-shadow-scan b{font-size:8px!important;margin-right:5px}.v706-shadow-scan .green{color:#22d98a}.v706-shadow-scan .amber{color:#f0b84b}.v706-shadow-scan .red{color:#ff5964}
-.v706-current-shadow{margin-top:9px;padding-top:9px;border-top:1px solid rgba(240,184,75,.25);font-size:8px;line-height:1.45}.v706-current-shadow b{display:inline!important;font-size:9px!important;margin-right:6px}.v706-current-shadow small{display:block!important;margin-top:4px!important}
-</style>
-<script id="v706-paper-validation-js">
-(function(){
- 'use strict';
- const VER=window.MERIDIAN_RELEASE_VERSION;
- function stamp(){try{window.MERIDIAN_UI_VERSION=VER;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+VER+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER)}catch(_e){}}
- function n(v){const x=Number(v);return Number.isFinite(x)?x:0}
- function norm(v){return String(v||'').toUpperCase()}
- function assess(d){
-   const tech=n(d.tech), cand=n(d.cand), status=norm(d.status), side=norm(d.side), regime=norm(d.regime);
-   const reasons=[];
-   if(tech<75)reasons.push('TECH '+tech+' < 75');
-   if(cand<70)reasons.push('CAND '+cand+' < 70');
-   if(regime==='TRANSITION')reasons.push('TRANSITION BLOCK');
-   else if(side==='LONG'&&regime&&regime!=='BULL')reasons.push('LONG NUR BULL');
-   else if(side==='SHORT'&&regime&&!['BEAR','RANGE'].includes(regime))reasons.push('SHORT NUR BEAR/RANGE');
-   if(status!=='READY'){
-     if(status==='WAIT_ENTRY_ZONE')reasons.push('WAIT ENTRY ZONE');
-     else if(!reasons.length)reasons.push('BASE NOCH NICHT READY');
-   }
-   if(!regime)reasons.push('REGIME CHECK');
-   const hard=reasons.some(r=>/TECH|CAND|TRANSITION|NUR /.test(r));
-   if(hard)return {state:'REJECT',cls:'red',why:reasons.join(' · ')};
-   if(status!=='READY'||!regime)return {state:'WAIT',cls:'amber',why:reasons.join(' · ')};
-   return {state:'ELIGIBLE',cls:'green',why:'V1-GATES ERFÜLLT'};
- }
- function useShadowLast(d){
-   const st=window.MERIDIAN_SHADOW_V1_STATE||{}, x=st.lastDecision||st.lastSignal;
-   if(!x)return null;
-   const sym=String(x.symbol||'').replace('USDT','').toUpperCase();
-   if(sym!==norm(d.symbol)||norm(x.side)!==norm(d.side))return null;
-   const rs=Array.isArray(x.reasons)?x.reasons:[];
-   const map={WAIT_ENTRY_ZONE:'WAIT ENTRY ZONE',SHADOW_TECH_LT_75:'TECH < 75',SHADOW_CAND_LT_70:'CAND < 70',SHADOW_BLOCK_TRANSITION:'TRANSITION BLOCK',SHADOW_LONG_ONLY_BULL:'LONG NUR BULL',SHADOW_SHORT_ONLY_BEAR_RANGE:'SHORT NUR BEAR/RANGE'};
-   const dec=norm(x.decision||((rs.length)?'BLOCK':'ELIGIBLE'));
-   return {state:(dec==='ENTER'||dec==='ELIGIBLE')?'ELIGIBLE':(dec==='WAIT'?'WAIT':'REJECT'),cls:(dec==='ENTER'||dec==='ELIGIBLE')?'green':(dec==='WAIT'?'amber':'red'),why:rs.length?rs.map(r=>map[r]||r).join(' · '):'V1-GATES ERFÜLLT'};
- }
- function challengerEval(d){
-   const st=window.MERIDIAN_CLOUD?.challenger||{}, xs=[...(Array.isArray(st.lastEvaluations)?st.lastEvaluations:[]),st.lastDecision,st.lastSignal].filter(Boolean);
-   const sym=norm(d.symbol), side=norm(d.side);
-   const x=xs.find(z=>norm(String(z.symbol||'').replace('USDT',''))===sym&&norm(z.side)===side);
-   if(!x)return null;
-   const dec=norm(x.decision||'SKIP'), cls=dec==='TRADE'?'green':dec==='CAUTION'?'amber':'red';
-   const rs=Array.isArray(x.reasons)?x.reasons:[];
-   return {state:dec,cls,why:'CONF '+(x.confidence??'—')+' · '+(rs.join(' · ')||norm(x.status).replaceAll('_',' ')||'SOFT SCORE')+' · RISK '+(x.riskPct==null?'—':n(x.riskPct).toFixed(1)+'%')};
- }
- function decorate(){
-   stamp(); if(document.body?.dataset?.view!=='paper')return;
-   document.querySelectorAll('.v686-paper-quick').forEach(x=>x.remove());
-   document.querySelectorAll('.paper-kpis').forEach(x=>x.style.display='');
-   document.querySelectorAll('.paper-scan-row[data-symbol]').forEach(row=>{
-     const d={symbol:row.dataset.symbol,side:row.dataset.side,tech:row.dataset.tech,cand:row.dataset.cand,status:row.dataset.status,regime:row.dataset.regime};
-     const r=useShadowLast(d)||assess(d), host=row.querySelector('.v706-shadow-scan');
-     if(host)host.innerHTML='<b class="'+r.cls+'">SHADOW V1 · '+r.state+'</b><span>'+r.why+'</span>';
-     const cr=challengerEval(d), ch=row.querySelector('.v730-challenger-scan');
-     if(ch)ch.innerHTML=cr?'<b class="'+cr.cls+'">CHALLENGER V2 · '+cr.state+'</b><span>'+cr.why+'</span>':'<b class="muted">CHALLENGER V2 · NO MATCH</b><span>Noch keine Auswertung für dieses Signal.</span>';
-   });
-   document.querySelectorAll('.v706-current-decision').forEach(box=>{
-     const d={symbol:box.dataset.symbol,side:box.dataset.side,tech:box.dataset.tech,cand:box.dataset.cand,status:box.dataset.status,regime:box.dataset.regime};
-     const r=useShadowLast(d)||assess(d), host=box.querySelector('.v706-current-shadow'); if(!host)return;
-     host.innerHTML='<b class="'+r.cls+'">SHADOW V1 · '+r.state+'</b><small>'+r.why+'</small>';
-   });
-   document.querySelectorAll('.learning-monitor .section-title').forEach(t=>{if(!/BASELINE 6\.2/.test(t.textContent||''))t.insertAdjacentText('afterbegin','BASELINE 6.2 · ')});
- }
- window.MERIDIAN_PAPER_VALIDATE_UI=decorate;
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(decorate,160),{once:true});else setTimeout(decorate,0);
- window.addEventListener('pageshow',()=>setTimeout(decorate,100));
- setInterval(()=>{if(document.body?.dataset?.view==='paper')decorate()},2500);
-})();
-</script>
+
+
 
 
 <!-- v7.07: server-side calendar window reset validation -->
@@ -13015,107 +12763,24 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 
 
 <!-- v7.18 ROBUST PAPER A/B DASHBOARD MOUNT -->
-<style id="v713-ab-mount-style">
-#v713-ab-dashboard{margin:0 0 14px}
-</style>
-<script id="v713-ab-mount-js">
-(function(){
- 'use strict';
- const VER=window.MERIDIAN_RELEASE_VERSION;
- function stamp(){
-   try{window.MERIDIAN_UI_VERSION=VER;const b=document.getElementById('versionBadge');if(b)b.textContent='v'+VER+' · LIVE';document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER)}catch(_e){}
- }
- function ensureMount(){
-   if(document.body?.dataset?.view!=='paper')return;
-   const view=document.getElementById('view-paper');if(!view)return;
-   let m=document.getElementById('v713-ab-dashboard');
-   if(!m){
-     m=document.createElement('div');m.id='v713-ab-dashboard';
-     const intro=view.querySelector('.v697-paper-intro');
-     if(intro)intro.insertAdjacentElement('afterend',m);else view.prepend(m);
-   }
-   let old=document.getElementById('v708-ab-dashboard');
-   if(old&&old.parentElement!==m){m.appendChild(old)}
-   try{window.MERIDIAN_AB_RENDER?.()}catch(_e){}
-   old=document.getElementById('v708-ab-dashboard');
-   if(old&&old.parentElement!==m)m.appendChild(old);
- }
- function apply(){stamp();ensureMount()}
- const mo=new MutationObserver(()=>{if(document.body?.dataset?.view==='paper')requestAnimationFrame(apply)});
- document.addEventListener('DOMContentLoaded',()=>{stamp();mo.observe(document.getElementById('view-paper')||document.body,{childList:true,subtree:true});setTimeout(apply,150)},{once:true});
- window.addEventListener('pageshow',()=>setTimeout(apply,100));
- setInterval(apply,1000);
-})();
-</script>
+
+
 
 <!-- v7.18 PAPER LAB COMPACT HEADER / STATUS DENSITY — UI ONLY -->
-<style id="v715-paper-compact-style">
-/* Intro becomes a slim status ribbon; detailed explanation is already available below. */
-#view-paper .v697-paper-intro{margin:0 0 10px!important;padding:9px 13px!important;border-radius:14px!important;display:grid!important;grid-template-columns:1fr auto!important;align-items:center!important;column-gap:10px!important;min-height:0!important}
-#view-paper .v697-paper-intro .eyebrow{grid-column:1;margin:0!important;font-size:8px!important;line-height:1.15!important;letter-spacing:1.5px!important}
-#view-paper .v697-paper-intro b{grid-column:1;font-size:12px!important;line-height:1.2!important;margin-top:3px!important}
-#view-paper .v697-paper-intro small{grid-column:2;grid-row:1/3;margin:0!important;max-width:105px;text-align:right;font-size:7px!important;line-height:1.25!important;color:#6f8798!important}
-/* Secondary diagnostics should read as controls, not headline content. */
-#view-paper details.paper-details{margin-top:8px!important;margin-bottom:8px!important;border-radius:14px!important}
-#view-paper details.paper-details>summary{min-height:0!important;padding:11px 14px!important;font-size:12px!important;line-height:1.15!important}
-#view-paper details.paper-details>summary strong{font-size:12px!important}
-/* A/B remains the visual priority directly below the slim intro. */
-#v713-ab-dashboard,#v708-ab-dashboard{margin-top:0!important}
-@media(max-width:520px){#view-paper .v697-paper-intro small{max-width:92px;font-size:6.5px!important}}
-</style>
-<script id="v715-paper-compact-js">
-(function(){
- 'use strict';
- const VER=window.MERIDIAN_RELEASE_VERSION;
- function apply(){
-   window.MERIDIAN_UI_VERSION=VER;
-   const badge=document.getElementById('versionBadge'); if(badge) badge.textContent='v'+VER+' · LIVE';
-   document.querySelectorAll('[data-ui-version]').forEach(x=>x.textContent=VER);
-   const intro=document.querySelector('#view-paper .v697-paper-intro');
-   if(intro){
-     const e=intro.querySelector('.eyebrow'), b=intro.querySelector('b'), sm=intro.querySelector('small');
-     if(e)e.textContent='PAPER LAB · RESEARCH ONLY';
-     if(b)b.textContent='BASELINE 6.2 ↔ SHADOW V1 ↔ CHALLENGER V2';
-     if(sm)sm.textContent='A/B/C · FORWARD · NO EXECUTION CHANGE';
-   }
- }
- window.MERIDIAN_V715_APPLY=apply;
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(apply,80),{once:true});else setTimeout(apply,0);
- window.addEventListener('pageshow',()=>setTimeout(apply,80));
- setInterval(()=>{if(document.body?.dataset?.view==='paper')apply()},1800);
-})();
-</script>
+
+
 
 
 
 <!-- v7.18 A/B DECISION INTELLIGENCE — RESEARCH ONLY -->
-<style id="v716-ab-intel-style">
-#v716-ab-intel{margin:10px 0 0;border-top:1px solid #1b4359;padding-top:10px}.v716-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.v716-title span{font-size:7px;color:#8aa1b1;letter-spacing:.14em}.v716-title b{font-size:7px;color:#38bdf8;border:1px solid #1c5a79;border-radius:999px;padding:3px 7px}.v716-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.v716-grid>div{border:1px solid #173d52;border-radius:10px;padding:7px;min-width:0}.v716-grid span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v716-grid strong{display:block;font-size:8px;margin-top:3px;overflow-wrap:anywhere}.v716-why{margin-top:7px;border:1px solid #173d52;border-radius:10px;padding:8px}.v716-why span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v716-why b{display:block;font-size:8px;line-height:1.45;margin-top:3px}.v716-foot{font-size:6.5px;line-height:1.4;color:#7e95a6;margin-top:7px}.v716-good{color:#22d98a}.v716-warn{color:#f0b84b}.v716-bad{color:#ff5964}.v716-blue{color:#38bdf8}@media(max-width:390px){.v716-grid{grid-template-columns:1fr 1fr}}
-</style>
-<script id="v716-ab-intel-js">
-(function(){'use strict';
- const K='meridian_v716_intel';
- const norm=x=>String(x??'').toUpperCase(), n=x=>Number(x||0);
- const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'null')||{seen:'',reasons:{},div:{}}}catch(e){return {seen:'',reasons:{},div:{}}}}, save=x=>{try{localStorage.setItem(K,JSON.stringify(x))}catch(e){}};
- const reasonLabel=r=>({WAIT_ENTRY_ZONE:'ENTRY DIST',SHADOW_TECH_LT_75:'TECH <75',SHADOW_CAND_LT_70:'CAND <70',SHADOW_BLOCK_TRANSITION:'TRANSITION',SHADOW_LONG_ONLY_BULL:'LONG≠BULL',SHADOW_SHORT_ONLY_BEAR_RANGE:'SHORT REGIME',SAME_SYMBOL_POSITION_OPEN:'SYMBOL OPEN',SYMBOL_COOLDOWN:'COOLDOWN',MAX_OPEN_POSITIONS:'MAX POS',MAX_TRADES_PER_DAY:'DAY LIMIT',MAX_PORTFOLIO_RISK:'RISK CAP',MAX_DAILY_LOSS:'DAILY LOSS',MAX_DRAWDOWN:'MAX DD'}[r]||r||'NONE');
- function render(){if(document.body?.dataset?.view!=='paper')return;const dash=document.getElementById('v708-ab-dashboard');if(!dash)return;const sh=window.MERIDIAN_SHADOW_V1_STATE||{},d=sh.lastDecision||sh.lastSignal||{},c=window.MERIDIAN_CLOUD||{},assets=Array.isArray(c.signals?.assets)?c.signals.assets:[],best=assets[0]||{};
-  const rs=Array.isArray(d.reasons)?d.reasons:[], dec=norm(d.decision||((rs.length)?'REJECT':'ELIGIBLE')), regime=norm(d.regime||best.regime||'—'), sym=String(d.symbol||best.symbol||'—').replace('USDT',''), side=norm(d.side||best.side||'');
-  const bdec=best.status==='READY'?'ENTRY READY':best.status==='WAIT_ENTRY_ZONE'?'WAIT':'NO SETUP';const sdec=(dec==='ENTER'||dec==='ELIGIBLE')?'ENTRY READY':dec==='WAIT'?'WAIT':'REJECT';const divergence=bdec===sdec?'AGREE':(bdec==='ENTRY READY'&&sdec!=='ENTRY READY'?'SHADOW FILTER':'SHADOW ONLY / BASE WAIT');
-  const fp=[d.id||d.createdAt||d.ts||d.timestamp||'',sym,side,dec,rs.join(',')].join('|');let st=load();if(fp&&fp!==st.seen){rs.forEach(r=>st.reasons[r]=(st.reasons[r]||0)+1);st.div[divergence]=(st.div[divergence]||0)+1;st.seen=fp;save(st)}
-  const top=Object.entries(st.reasons).sort((a,b)=>b[1]-a[1]).slice(0,2);const topTxt=top.length?top.map(([r,v])=>reasonLabel(r)+' '+v).join(' · '):'NO BLOCKS YET';const why=rs.length?rs.map(reasonLabel).join(' · '):(sdec==='ENTRY READY'?'V1 GATES ERFÜLLT':'KEIN SHADOW EVENT');const dist=Number.isFinite(Number(d.distanceAtr))?n(d.distanceAtr).toFixed(2).replace('.',',')+' ATR':'—';const tech=n(d.technical||best.technical||best.tech),cand=n(d.candidate||best.candidate||best.cand);
-  let el=document.getElementById('v716-ab-intel');if(!el){el=document.createElement('div');el.id='v716-ab-intel';const counts=dash.querySelector('.v714-counts');(counts||dash.querySelector('.v714-deltas'))?.insertAdjacentElement('afterend',el)}if(!el)return;
-  const dc=divergence==='AGREE'?'v716-good':divergence==='SHADOW FILTER'?'v716-warn':'v716-blue';
-  el.innerHTML='<div class="v716-title"><span>DECISION INTELLIGENCE</span><b>RESEARCH ONLY</b></div><div class="v716-grid"><div><span>DIVERGENZ</span><strong class="'+dc+'">'+divergence+'</strong></div><div><span>REGIME</span><strong>'+regime+'</strong></div><div><span>TECH / CAND</span><strong>'+tech.toFixed(0)+' / '+cand.toFixed(0)+'</strong></div><div><span>ENTRY DIST</span><strong>'+dist+'</strong></div></div><div class="v716-why"><span>'+sym+' '+side+' · WHY NO TRADE / FILTER</span><b class="'+(rs.length?'v716-warn':'v716-good')+'">'+why+'</b></div><div class="v716-foot">TOP REJECTS · '+topTxt+' · Opportunity Cost wird erst nach abgeschlossenen, vergleichbaren Forward-Events bewertet — keine erfundene Gegenrechnung.</div>';
- }
- setInterval(render,2500);document.addEventListener('DOMContentLoaded',()=>setTimeout(render,1000));window.addEventListener('pageshow',()=>setTimeout(render,300));window.MERIDIAN_AB_INTEL_RENDER=render;
-})();
-</script>
+
+
 
 <script id="meridian-version-authority-v717">
 (function(){
   'use strict';
   const CODE_VERSION=window.MERIDIAN_RELEASE_VERSION;
-  const BUILD_ID='7.25-20260901-R1';
+  const BUILD_ID=window.MERIDIAN_RELEASE_BUILD||'7.31-20260901-R1';
   window.MERIDIAN_UI_VERSION=CODE_VERSION;
   window.__MERIDIAN_BUILD__=BUILD_ID;
   function paint(ok=true){
@@ -13147,24 +12812,8 @@ async function load(){if(busy)return;busy=true;try{const r=await fetch(API+'/api
 
 
 <!-- v7.20 FORWARD TELEMETRY / EVIDENCE — RESEARCH ONLY -->
-<style id="v719-telemetry-style">
-#v719-telemetry{margin:10px 0 0;border-top:1px solid #1b4359;padding-top:10px}.v719-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.v719-head span{font-size:7px;color:#8aa1b1;letter-spacing:.14em}.v719-head b{font-size:7px;color:#38bdf8}.v719-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.v719-grid>div{border:1px solid #173d52;border-radius:10px;padding:7px}.v719-grid span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v719-grid strong{display:block;font-size:8px;margin-top:3px}.v719-foot{font-size:6.5px;line-height:1.45;color:#7e95a6;margin-top:7px}@media(max-width:390px){.v719-grid{grid-template-columns:1fr 1fr}}
-</style>
-<script id="v719-telemetry-js">
-(function(){'use strict';
- const K='meridian_v719_forward_evidence',MAX=500,norm=x=>String(x??'').toUpperCase();
- const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'[]')}catch(e){return []}},save=a=>{try{localStorage.setItem(K,JSON.stringify(a.slice(-MAX)))}catch(e){}};
- function capture(){if(document.body?.dataset?.view!=='paper')return;const sh=window.MERIDIAN_SHADOW_V1_STATE||{},d=sh.lastDecision||sh.lastSignal||{},c=window.MERIDIAN_CLOUD||{},a=Array.isArray(c.signals?.assets)?c.signals.assets:[],best=a[0]||{};if(!Object.keys(d).length&&!Object.keys(best).length)return;
-  const reasons=Array.isArray(d.reasons)?d.reasons:[],sym=String(d.symbol||best.symbol||'—').replace('USDT',''),side=norm(d.side||best.side||''),regime=norm(d.regime||best.regime||'—'),shadow=norm(d.decision||((reasons.length)?'REJECT':'ELIGIBLE')),base=best.status==='READY'?'TRADE':best.status==='WAIT_ENTRY_ZONE'?'WAIT':'NO SETUP';
-  const ev={at:d.createdAt||d.ts||d.timestamp||new Date().toISOString(),symbol:sym,side,regime,technical:Number(d.technical??best.technical??best.tech??0),candidate:Number(d.candidate??best.candidate??best.cand??0),distanceAtr:Number.isFinite(Number(d.distanceAtr))?Number(d.distanceAtr):null,baseline:base,shadow,reasons};
-  const fp=[ev.at,sym,side,base,shadow,reasons.join(',')].join('|'),arr=load();if(arr.length&&arr[arr.length-1].fp===fp)return;ev.fp=fp;arr.push(ev);save(arr);window.MERIDIAN_FORWARD_EVIDENCE=arr;
- }
- function render(){capture();const dash=document.getElementById('v708-ab-dashboard');if(!dash)return;let el=document.getElementById('v719-telemetry');if(!el){el=document.createElement('div');el.id='v719-telemetry';const intel=document.getElementById('v716-ab-intel');(intel||dash.querySelector('.v714-counts'))?.insertAdjacentElement('afterend',el)}if(!el)return;const arr=load(),last=arr[arr.length-1]||{},rej=arr.filter(x=>x.shadow==='REJECT').length,wait=arr.filter(x=>x.shadow==='WAIT').length,div=arr.filter(x=>(x.baseline==='TRADE')!==(['ENTER','ELIGIBLE','TRADE'].includes(x.shadow))).length;
-  el.innerHTML='<div class="v719-head"><span>FORWARD EVIDENCE</span><b>'+arr.length+' EVENTS</b></div><div class="v719-grid"><div><span>REGIME</span><strong>'+String(last.regime||'—')+'</strong></div><div><span>ASSET / SIDE</span><strong>'+String(last.symbol||'—')+' '+String(last.side||'')+'</strong></div><div><span>REJECT / WAIT</span><strong>'+rej+' / '+wait+'</strong></div><div><span>DIVERGENZ</span><strong>'+div+'</strong></div></div><div class="v719-foot">Persistiert lokal bis 500 eindeutige Forward-Entscheidungen: Zeit · Asset · Richtung · Regime · Tech/Cand · Entry-Distanz · Baseline · Shadow · Reject/Wait-Grund. Research-only; keine Execution-Änderung.</div>';
- }
- setInterval(render,2500);document.addEventListener('DOMContentLoaded',()=>setTimeout(render,900));window.addEventListener('pageshow',()=>setTimeout(render,250));window.MERIDIAN_V719_EVIDENCE=()=>load();
-})();
-</script>
+
+
 
 <script id="meridian-version-authority-v719">
 (function(){'use strict';const V=window.MERIDIAN_RELEASE_VERSION,B=window.MERIDIAN_RELEASE_BUILD;window.MERIDIAN_UI_VERSION=V;window.__MERIDIAN_BUILD__=B;function paint(ok=true){const b=document.getElementById('versionBadge');if(b)b.textContent='v'+V+(ok?' · LIVE':' · FILE MISMATCH');document.querySelectorAll('[data-ui-version]').forEach(e=>e.textContent=V)}async function verify(){paint(true);try{const r=await fetch('version.json?build='+B+'&t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();paint(String(j.version||j.ui||'')===V&&String(j.buildId||'')===B)}catch(e){paint(true)}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',verify,{once:true});else verify();window.addEventListener('pageshow',verify);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verify()});setInterval(()=>paint(true),3500)})();
@@ -13218,125 +12867,9 @@ letter-spacing:.08em;line-height:1.4}
 
 
 <!-- v7.22 SHADOW RESEARCH COCKPIT — UI/RESEARCH ONLY; 6.2 EXECUTION UNCHANGED -->
-<style id="v721-shadow-research-style">
-#v721-shadow-research{margin:0 0 12px;border:1px solid #1d5875;border-radius:16px;padding:12px;background:linear-gradient(180deg,rgba(4,24,36,.92),rgba(3,15,23,.82));color:#d9e5ec}
-.v721-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.v721-head span{display:block;font-size:7px;letter-spacing:.15em;color:#7894a7}.v721-head b{display:block;font-size:11px;margin-top:3px}.v721-live{font-size:7px!important;color:#38bdf8!important;border:1px solid #17618a;border-radius:999px;padding:4px 7px;white-space:nowrap}
-.v721-progress{margin-top:10px}.v721-progress-top{display:flex;justify-content:space-between;gap:8px;font-size:7px;color:#829bab}.v721-progress-top strong{color:#38bdf8}.v721-bar{height:6px;margin-top:6px;border:1px solid #1d455d;border-radius:999px;overflow:hidden;background:#07131e}.v721-bar i{display:block;height:100%;background:#20a4ff}
-.v721-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}.v721-kpis>div,.v721-split>div,.v721-regimes>div{border:1px solid #173d52;border-radius:10px;padding:7px;min-width:0}.v721-kpis span,.v721-split span,.v721-regimes span{display:block;font-size:6px;color:#718b9d;letter-spacing:.09em}.v721-kpis strong,.v721-split strong,.v721-regimes strong{display:block;font-size:9px;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
-.v721-pos{color:#31d78a}.v721-neg{color:#ff6374}.v721-warn{color:#ffc35a}.v721-blue{color:#38bdf8}
-.v721-section{margin-top:11px;padding-top:10px;border-top:1px solid #17394d}.v721-title{font-size:7px;font-weight:900;letter-spacing:.14em;color:#9fb2c0;margin-bottom:7px}
-.v721-split{display:grid;grid-template-columns:1fr 1fr;gap:6px}.v721-regimes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
-.v721-ab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.v721-ab>div{border:1px solid #173d52;border-radius:11px;padding:8px}.v721-ab small{display:block;color:#718b9d;font-size:6px;letter-spacing:.1em}.v721-ab b{display:block;font-size:9px;margin-top:4px}.v721-ab p{margin:5px 0 0;font-size:6.5px;line-height:1.4;color:#8299a9}.v721-ab .base{border-color:#63313a}.v721-ab .shadow{border-color:#1d6248}.v721-ab .challenger{border-color:#245f93}
-.v721-oc{margin-top:7px;border-left:2px solid #705724;padding:7px 9px;background:rgba(112,87,36,.08);font-size:6.5px;line-height:1.45;color:#c7aa6b}
-.v721-tf{display:flex;gap:5px;overflow:auto;-webkit-overflow-scrolling:touch}.v721-tf button{border:1px solid #1d455d;background:#07131e;color:#8197a8;border-radius:999px;padding:6px 9px;font:900 7px monospace;white-space:nowrap}.v721-tf button.active{border-color:#1787bd;color:#38bdf8;background:#071d2b}.v721-frame{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px}.v721-frame>div{border-top:1px solid #17394d;padding-top:6px}.v721-frame span{display:block;font-size:6px;color:#718b9d}.v721-frame b{display:block;font-size:8px;margin-top:2px}.v721-nodata{margin-top:8px;color:#ffc35a;font-size:7px;line-height:1.45}
-.v721-last{margin-top:7px;font-size:6.5px;line-height:1.45;color:#849bab}.v721-last b{color:#b9cad4}
-.v721-foot{margin-top:9px;font-size:6px;line-height:1.45;color:#6f889a}
-@media(max-width:680px){.v721-ab{grid-template-columns:1fr}.v721-kpis{grid-template-columns:1fr 1fr}.v721-regimes{grid-template-columns:1fr 1fr}.v721-frame{grid-template-columns:1fr 1fr}}
-</style>
 
-<script id="v721-shadow-research-js">
-(function(){
-'use strict';
-const URL='https://raw.githubusercontent.com/Achi1984/meridian/telemetry/research-snapshot.json';
-const V=window.MERIDIAN_RELEASE_VERSION, BUILD=window.MERIDIAN_RELEASE_BUILD;
-let TF='15m', lastJson=null, lastFetch=0;
-window.MERIDIAN_UI_VERSION=V; window.__MERIDIAN_BUILD__=BUILD;
 
-const n=x=>Number(x||0), esc=s=>String(s??'—').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const money=x=>{x=n(x);return (x>=0?'+':'−')+'$'+Math.abs(x).toLocaleString('de-DE',{maximumFractionDigits:0})};
-const pct=x=>n(x).toFixed(1).replace('.',',')+'%';
-function shadow(j){return j?.shadowV1||j?.shadow||j?.research?.shadowV1||{}}
-function challenger(j){return j?.challengerV2||j?.research?.challengerV2||{}}
-function cfStats(c){return c?.counterfactual||{}}
 
-function closed(j){const s=shadow(j);return Array.isArray(s.recentClosed)?s.recentClosed:Array.isArray(s.closedPositions)?s.closedPositions:[]}
-function pnl(xs){return xs.reduce((a,t)=>a+n(t.realized),0)}
-function stats(xs){const wins=xs.filter(t=>n(t.realized)>0);return {trades:xs.length,wins:wins.length,wr:xs.length?wins.length/xs.length*100:0,pnl:pnl(xs)}}
-function latestFrames(j){
-  const ev=Array.isArray(j?.events)?j.events:[];
-  for(const e of ev){if(e?.payload?.frames)return e.payload.frames}
-  const s=shadow(j); return s?.lastDecision?.frames||s?.lastSignal?.frames||null;
-}
-function mount(){
-  let host=document.querySelector('.v699-research-body');
-  if(!host){
-    const paper=document.getElementById('view-paper'); if(!paper)return null;
-    host=paper;
-  }
-  let el=document.getElementById('v721-shadow-research');
-  if(!el){el=document.createElement('div');el.id='v721-shadow-research';host.insertBefore(el,host.firstChild)}
-  return el;
-}
-function regimeStats(xs){
-  const o={};
-  xs.forEach(t=>{const k=String(t.shadowRegime||t.regime||t.evidenceSnapshot?.regime||'UNKNOWN').toUpperCase();(o[k]||(o[k]=[])).push(t)});
-  return o;
-}
-function baselineRejects(j){
-  const ev=Array.isArray(j?.events)?j.events:[];
-  return ev.filter(e=>e?.type==='SIGNAL_REJECTED' && e?.payload?.gate?.ok===false).length;
-}
-function renderFrame(frames){
-  if(!frames||!frames[TF]){
-    return '<div class="v721-nodata">'+TF+' · KEINE ECHTEN FRAME-DATEN IM TELEMETRIE-SNAPSHOT — keine hochgerechneten Werte.</div>';
-  }
-  const f=frames[TF];
-  return '<div class="v721-frame"><div><span>SCORE</span><b>'+esc(f.score??'—')+'</b></div><div><span>RSI</span><b>'+esc(n(f.rsi).toFixed(1))+'</b></div><div><span>ADX</span><b>'+esc(n(f.adx).toFixed(1))+'</b></div><div><span>VOL RATIO</span><b>'+esc(n(f.volumeRatio).toFixed(2))+'</b></div><div><span>PRICE</span><b>'+esc(n(f.price).toLocaleString('de-DE',{maximumFractionDigits:2}))+'</b></div><div><span>EMA20</span><b>'+esc(n(f.ema20).toLocaleString('de-DE',{maximumFractionDigits:2}))+'</b></div><div><span>EMA50</span><b>'+esc(n(f.ema50).toLocaleString('de-DE',{maximumFractionDigits:2}))+'</b></div><div><span>MACD HIST</span><b>'+esc(n(f.macdHist).toFixed(2))+'</b></div></div>';
-}
-function render(j){
-  const el=mount(); if(!el||!j)return;
-  const s=shadow(j), c=challenger(j), ca=c.account||{}, cf=cfStats(c),
-      xs=closed(j), all=stats(xs), lng=stats(xs.filter(t=>String(t.side).toUpperCase()==='LONG')), sh=stats(xs.filter(t=>String(t.side).toUpperCase()==='SHORT'));
-  const cStart=n(ca.startEquity||10000), cEq=n(ca.equity||cStart), cPnl=n(ca.realizedPnl)+n(ca.unrealizedPnl),
-        cWr=n(c.winRate), cPf=n(c.profitFactor), cDd=n(ca.drawdownPct||0), cClosed=n(c.closedCount), cOpen=n(c.openCount),
-        cd=c.lastDecision||{}, cDecision=String(cd.decision||'WAIT').toUpperCase(), cRegime=String(cd.regime||'—').toUpperCase(),
-        cConf=(cd.confidence??'—'), cRisk=(cd.riskPct==null?'—':n(cd.riskPct).toFixed(1)+'%');
-  const regs=regimeStats(xs), rhtml=Object.entries(regs).slice(0,6).map(([k,v])=>{const z=stats(v);return '<div><span>'+esc(k)+'</span><strong class="'+(z.pnl>=0?'v721-pos':'v721-neg')+'">'+z.trades+' TR · '+money(z.pnl)+'</strong></div>'}).join('')||'<div><span>REGIME</span><strong>—</strong></div>';
-  const progress=Math.min(100,all.trades/20*100), remaining=Math.max(0,20-all.trades), pf=Number.isFinite(Number(s.profitFactor))?Number(s.profitFactor):null;
-  const last=xs[0]||xs[xs.length-1]||null, br=baselineRejects(j), frames=latestFrames(j);
-  const age=s.updatedAt||j?.engine?.lastCycleAt||'—';
-  el.innerHTML=
-    '<div class="v721-head"><div><span>SHADOW RESEARCH · FORWARD</span><b>CHECKPOINT 1 · 20 CLOSED TRADES</b></div><b class="v721-live">TELEMETRY</b></div>'+
-    '<div class="v721-progress"><div class="v721-progress-top"><span>FORTSCHRITT</span><strong>'+all.trades+' / 20 · '+remaining+' fehlen</strong></div><div class="v721-bar"><i style="width:'+progress+'%"></i></div></div>'+
-    '<div class="v721-kpis"><div><span>CLOSED</span><strong>'+all.trades+'</strong></div><div><span>WIN RATE</span><strong class="'+(all.wr>=50?'v721-pos':'v721-warn')+'">'+pct(all.wr)+'</strong></div><div><span>REALIZED P&L</span><strong class="'+(all.pnl>=0?'v721-pos':'v721-neg')+'">'+money(all.pnl)+'</strong></div><div><span>PROFIT FACTOR</span><strong class="'+(pf!==null&&pf>=1?'v721-pos':'v721-warn')+'">'+(pf===null?'—':pf.toFixed(2).replace('.',','))+'</strong></div></div>'+
-    '<div class="v721-section"><div class="v721-title">DIRECTION & REGIME</div><div class="v721-split"><div><span>LONG</span><strong class="'+(lng.pnl>=0?'v721-pos':'v721-neg')+'">'+lng.trades+' TR · '+pct(lng.wr)+' · '+money(lng.pnl)+'</strong></div><div><span>SHORT</span><strong class="'+(sh.pnl>=0?'v721-pos':'v721-neg')+'">'+sh.trades+' TR · '+pct(sh.wr)+' · '+money(sh.pnl)+'</strong></div></div><div class="v721-regimes">'+rhtml+'</div></div>'+
-    '<div class="v721-section"><div class="v721-title">BASELINE 6.2 · SHADOW V1 · CHALLENGER V2</div><div class="v721-ab">'+
-      '<div class="base"><small>BASELINE 6.2</small><b class="v721-neg">RISK LOCK ACTIVE</b><p>'+br+' sichtbare risk-gate Rejections · frozen execution reference.</p></div>'+
-      '<div class="shadow"><small>SHADOW V1</small><b class="v721-blue">'+all.trades+' CLOSED · '+money(all.pnl)+'</b><p>Separater Research-Ledger · keine Execution-Wirkung.</p></div>'+
-      '<div class="challenger"><small>CHALLENGER V2 · RESEARCH ONLY</small><b class="'+(cPnl>=0?'v721-pos':'v721-neg')+'">$'+cEq.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' · '+money(cPnl)+'</b><p>'+cClosed+' closed · '+cOpen+' open · WR '+pct(cWr)+' · PF '+cPf.toFixed(2)+' · DD '+pct(cDd)+'<br>'+esc(cDecision)+' · CONF '+esc(cConf)+' · '+esc(cRegime)+' · RISK '+esc(cRisk)+'</p></div>'+
-    '</div><div class="v721-oc">COUNTERFACTUAL · Challenger '+n(cf.tracked)+' tracked · '+n(cf.open)+' open · '+n(cf.closed)+' closed · '+n(cf.positiveR)+' positive R · '+n(cf.negativeR)+' negative R. Baseline 6.2 bleibt unverändert; Shadow V1 und Challenger V2 sind getrennte Research-Ledger ohne Execution-Wirkung.</div></div>'+
-    '<div class="v721-section"><div class="v721-title">TIMEFRAME EVIDENCE</div><div class="v721-tf">'+['15m','1h','4h','1d','1w'].map(x=>'<button type="button" data-v721-tf="'+x+'" class="'+(TF===x?'active':'')+'">'+x+'</button>').join('')+'</div><div id="v721-frame-box">'+renderFrame(frames)+'</div></div>'+
-    (last?'<div class="v721-last"><b>LETZTER CLOSED:</b> '+esc(last.symbol)+' '+esc(last.side)+' · '+esc(last.shadowRegime||last.evidenceSnapshot?.regime||'—')+' · '+esc(last.exitReason||'—')+' · '+money(last.realized)+'</div>':'')+
-    '<div class="v721-foot">Stand '+esc(age)+' · Quelle: read-only telemetry branch. 1d/1w werden nur angezeigt, wenn echte Frame-Daten vorhanden sind. Engine 6.2.0 / Ruleset 6.2-SIGNAL-V1 bleiben unverändert.</div>';
-  el.querySelectorAll('[data-v721-tf]').forEach(b=>b.onclick=()=>{TF=b.dataset.v721Tf;render(lastJson)});
-}
-async function fetchTelemetry(force=false){
-  const now=Date.now(); if(!force && now-lastFetch<60000)return;
-  lastFetch=now;
-  try{
-    const r=await fetch(URL+'?t='+now,{cache:'no-store'});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const j=await r.json(); lastJson=j; window.MERIDIAN_TELEMETRY_SNAPSHOT=j; render(j);
-  }catch(e){
-    const el=mount(); if(el&&!lastJson)el.innerHTML='<div class="v721-head"><div><span>SHADOW RESEARCH · FORWARD</span><b>TELEMETRIE NICHT ERREICHBAR</b></div><b class="v721-live">RETRY</b></div><div class="v721-foot">Dashboard/Trading bleiben davon unberührt. Nächster Leseversuch automatisch.</div>';
-  }
-}
-function sourceClarity(){
-  const snap=window.MERIDIAN_PIONEX_SNAPSHOT;if(!snap)return;
-  snap.sourcePolicy='STATIC SNAPSHOT · NOT LIVE · '+String(snap.verifiedFrom||'Pionex screenshot');
-  let n=document.getElementById('v721-static-pionex');
-  if(n)return;
-  const candidates=[...document.querySelectorAll('.card,details,section,div')].filter(el=>{const t=(el.textContent||'').toUpperCase();return el.children.length<40&&t.includes('PIONEX')&&(t.includes('BOT')||t.includes('GRID'))});
-  const host=candidates[0];if(!host)return;
-  n=document.createElement('div');n.id='v721-static-pionex';n.className='v720-static-source';n.textContent='PIONEX · STATIC · 28.08.2026 · NICHT LIVE';host.insertBefore(n,host.firstChild);
-}
-function boot(){sourceClarity();fetchTelemetry(true);setTimeout(()=>{sourceClarity();fetchTelemetry(true)},1500)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-window.addEventListener('pageshow',()=>{sourceClarity();fetchTelemetry(true)});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchTelemetry(true)});
-setInterval(()=>fetchTelemetry(false),60000);
-})();
-</script>
 
 
 <script id="meridian-release-audit-v725">
