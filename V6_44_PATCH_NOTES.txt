@@ -1,4 +1,0 @@
-MERIDIAN v6.44
-- Fix 15M / 1H / 4H / 1D / 1W timeframe controls on iOS/touch
-- Added robust delegated click handling and touch hit targets
-- Fixed malformed Equity SVG markup
