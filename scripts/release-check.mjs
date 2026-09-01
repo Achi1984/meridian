@@ -28,7 +28,8 @@ const loader=read('app-v6.06.js');
 must(loader.includes(`app-v7.32-legacy.js?v=${tag}`),'legacy loader cache tag mismatch');
 must(loader.includes(`app-v7.33-hardening.js?v=${tag}`),'hardening loader cache tag mismatch');
 must(loader.includes(`app-runtime-monitor.js?v=${tag}`),'runtime monitor cache tag mismatch');
-must(loader.includes(`app-v7.37-ui-polish.js?v=${tag}`),'mobile UI polish loader cache tag mismatch');
+must(loader.includes(`app-v7.37-ui-polish.js?v=${tag}`),'ui polish loader cache tag mismatch');
+must(loader.includes(`app-v7.38-regime-ui.js?v=${tag}`),'regime UI loader cache tag mismatch');
 
 const hardening=read('app-v7.33-hardening.js');
 must(hardening.includes(`const VERSION='${v}';`),'hardening VERSION mismatch');
@@ -40,7 +41,10 @@ must(runtime.includes('/gateway-health'),'runtime monitor must use gateway healt
 must(runtime.includes('MERIDIAN_RUNTIME_STATUS'),'runtime monitor status export missing');
 
 const uiPolish=read('app-v7.37-ui-polish.js');
-must(uiPolish.includes('meridian-release-status-row'),'mobile release status row missing');
+must(uiPolish.includes('meridian-release-status-row'),'mobile status row missing');
+const regimeUi=read('app-v7.38-regime-ui.js');
+must(regimeUi.includes('/api/regime-v1'),'regime UI endpoint missing');
+must(read('regime-v1.js').includes("REGIME_V1_RULESET='7.38-REGIME-V1'"),'regime model ruleset missing');
 must(uiPolish.includes("document.getElementById('versionBadge')"),'mobile UI polish must relocate version badge');
 must(uiPolish.includes("document.getElementById('meridian-runtime-badge')"),'mobile UI polish must relocate runtime badge');
 must(uiPolish.includes('@media(max-width:390px)'),'narrow iPhone header guard missing');
