@@ -4,6 +4,8 @@ import crypto from "node:crypto";
 import pg from "pg";
 
 const { Pool } = pg;
+const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
+const DEPLOYMENT_SHA=String(process.env.NF_DEPLOYMENT_SHA||process.env.GITHUB_SHA||"").trim();
 const EXTERNAL_PORT = Number(process.env.PORT || 10000);
 const INTERNAL_PORT = Number(process.env.MERIDIAN_INTERNAL_PORT || (EXTERNAL_PORT + 1));
 const READ_TOKEN_HASH = String(process.env.MERIDIAN_READ_TOKEN_SHA256 || "bd92c80bb4a43ea04788f2ee21591bad56052c5d609696402357597a43cbe4bc").trim().toLowerCase();
@@ -186,7 +188,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
-      return writeJson(res,200,{ok:true,version:"7.33",internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),migration},origin||"");
+      return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),migration},origin||"");
     }
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
@@ -207,4 +209,4 @@ const server=http.createServer(async(req,res)=>{
     return proxy(req,res,origin||"");
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
-server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN v7.33 on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
+server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
