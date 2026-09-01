@@ -1,0 +1,70 @@
+name: MERIDIAN Research Snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-research-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch public MERIDIAN snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            "https://p01--achi-meridian--ttvk44grdlp7.code.run/api/assistant" \
+            -o /tmp/research-snapshot.json
+
+          python - <<'PY'
+          import json
+          p="/tmp/research-snapshot.json"
+          with open(p, encoding="utf-8") as f:
+              data=json.load(f)
+          if not data.get("publicReadOnly"):
+              raise SystemExit("Snapshot rejected: publicReadOnly flag missing")
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+      - name: Publish to telemetry branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin telemetry >/dev/null 2>&1; then
+            git fetch origin telemetry
+            git checkout -B telemetry origin/telemetry
+          else
+            git checkout --orphan telemetry
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp /tmp/research-snapshot.json research-snapshot.json
+
+          git add research-snapshot.json
+
+          if git diff --cached --quiet; then
+            echo "No snapshot change"
+            exit 0
+          fi
+
+          git commit -m "Update MERIDIAN research snapshot"
+          git push origin telemetry
