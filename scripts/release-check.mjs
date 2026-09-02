@@ -61,11 +61,17 @@ must(read('research-analytics.js').includes('executionImpact:false'),'research t
 must(read('exit-lab-replay.js').includes('Number(c.closeTime)>opened'),'entry-candle lookahead guard missing');
 must(read('regime-v1.js').includes("REGIME_V1_RULESET='7.38-REGIME-V1'"),'regime ruleset missing');
 for(const f of ['MERIDIAN_CONTEXT.md','MERIDIAN_DECISIONS.md','MERIDIAN_HANDOFF.md'])must(fs.existsSync(f),`continuity file missing: ${f}`);
-for(const [file,hash] of [['center.html','#center'],['depot.html','#portfolio'],['market.html','#market'],['trade.html','#daytrade'],['forecast.html','#forecast']])must(read(file).includes(`index.html${hash}`),`${file} must redirect to canonical index`);
+for(const [file,view] of [['center.html','center'],['depot.html','portfolio'],['market.html','market'],['trade.html','daytrade'],['forecast.html','forecast']]){
+  const shim=read(file);
+  must(shim.includes(`route=${view}`)&&shim.includes(`#${view}`),`${file} must redirect to canonical index`);
+  must(shim.includes('background:#03070c'),`${file} white-screen guard missing`);
+  must(shim.includes('getRegistrations')&&shim.includes('caches.keys'),`${file} stale PWA cleanup missing`);
+}
 const smoke=read('scripts/runtime-smoke.mjs');
-must(smoke.includes('Canonical inline render engine missing'),'runtime smoke must validate inline render engine');
+must(smoke.includes('Canonical index missing inline depot renderer'),'runtime smoke must validate inline render engine');
 must(smoke.includes('approved logo asset'),'runtime smoke must validate approved logo');
 must(smoke.includes('six equal columns'),'runtime smoke must validate six-tab nav');
+must(smoke.includes('white boot screen'),'runtime smoke must validate white-screen guard');
 const sw=read('sw.js');
 must(sw.includes('MERIDIAN_SW_RETIRE'),'service worker retirement sentinel missing');
 must(!/caches\.open\s*\(/.test(sw),'service worker must not create application cache');
