@@ -1,0 +1,40 @@
+name: MERIDIAN v7.54 Challenger V3.1 Attribution Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-53-challenger-v31
+    paths:
+      - .github/workflows/v754-v31-attribution-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-53-challenger-v31
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify research branch
+        run: npm test && node --check cloud-backtest.js && node --check scripts/challenger-v31-attribution.mjs
+      - name: Use Binance public market-data endpoint in CI
+        run: sed -i "s#https://api.binance.com#https://data-api.binance.vision#g" cloud-backtest.js
+      - name: Run V3.1 attribution
+        run: node scripts/challenger-v31-attribution.mjs
+      - name: Restore canonical source and commit report
+        run: |
+          git checkout -- cloud-backtest.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v754-v31-attribution-once.yml
+          git add scripts/challenger-v31-attribution.mjs research/challenger-v31-attribution-v754.json research/challenger-v31-attribution-v754.md
+          git commit -m "MERIDIAN v7.54: Challenger V3.1 attribution evidence"
+          git push origin HEAD:codex/meridian-v7-53-challenger-v31
