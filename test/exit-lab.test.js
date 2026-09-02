@@ -14,7 +14,7 @@ test('model A closes full position at TP1',()=>{
 test('model B takes half at TP1 and protects remainder at BE plus costs',()=>{
   const r=simulateExitModel(trade,[
     {ts:1,open:100,high:115,low:99,close:114},
-    {ts:2,open:114,high:116,low:100.5,close:101}
+    {ts:2,open:114,high:116,low:99.5,close:101}
   ],'B_PROTECTED',{feeBps:0,slippageBps:0});
   assert.equal(r.tp1Hit,true);
   assert.equal(r.bePrice,100);
