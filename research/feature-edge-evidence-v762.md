@@ -1,6 +1,6 @@
 # MERIDIAN v7.62 — Raw Feature Edge Evidence
 
-Generated: 2026-09-02T14:44:12.010Z
+Generated: 2026-09-02T14:46:36.537Z
 
 Portfolio-independent signal cohorts; one candidate per symbol per 4h. A_CURRENT/full TP1 normalized-R, SL first on same candle, 14-day complete horizon. Portfolio gates excluded.
 
@@ -32,7 +32,7 @@ Samples: **6468** · Avg R: **-0.015** · PF: **0.974** · WR: **41%**
 - **adx1h = 18-25** — NEGATIVE; 30d: -0.064R (n=641, PF=0.895); 60d: -0.035R (n=1315, PF=0.942); 90d: -0.015R (n=1901, PF=0.974)
 - **adx1h = 25-35** — NEGATIVE; 30d: -0.113R (n=601, PF=0.82); 60d: -0.081R (n=1165, PF=0.868); 90d: -0.063R (n=1716, PF=0.897)
 - **adx4h = 18-25** — NEGATIVE; 30d: -0.106R (n=773, PF=0.831); 60d: -0.04R (n=1467, PF=0.934); 90d: -0.02R (n=2082, PF=0.966)
-- **adx4h = 25-35** — NEGATIVE; 30d: -0.186R (n=472, PF=0.718); 60d: -0.091R (n=1056, PF=0.854); 90d: -0.042R (n=1653, PF=0.931)
+- **adx4h = 25-35** — NEGATIVE; 30d: -0.186R (n=472, PF=0.718); 60d: -0.091R (n=1056, PF=0.854); 90d: -0.042R (n=1654, PF=0.93)
 - **rsi15 = 50-58** — NEGATIVE; 30d: -0.079R (n=524, PF=0.871); 60d: -0.031R (n=1164, PF=0.948); 90d: -0.003R (n=1647, PF=0.994)
 - **rsi15 = 58-70** — NEGATIVE; 30d: -0.153R (n=405, PF=0.764); 60d: -0.118R (n=808, PF=0.814); 90d: -0.099R (n=1175, PF=0.841)
 - **rsi15 = <30** — NEGATIVE; 30d: -0.155R (n=88, PF=0.761); 60d: -0.075R (n=166, PF=0.878); 90d: -0.071R (n=266, PF=0.885)
@@ -72,4 +72,4 @@ Samples: **6468** · Avg R: **-0.015** · PF: **0.974** · WR: **41%**
 
 ## Interpretation rule
 
-This report is attribution evidence, not a trading ruleset. Positive buckets are candidates for calibrated soft scoring only after sample-size, side/regime context and walk-forward checks. Do not convert isolated buckets into new hard gates.
+Attribution evidence only. Positive buckets are soft-score candidates, not hard gates.

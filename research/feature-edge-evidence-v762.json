@@ -1,6 +1,6 @@
 {
   "schemaVersion": "7.61-FEATURE-EDGE-REPORT-V1",
-  "generatedAt": "2026-09-02T14:44:12.010Z",
+  "generatedAt": "2026-09-02T14:46:36.537Z",
   "researchOnly": true,
   "executionImpact": false,
   "minSamples": 30,
@@ -2135,20 +2135,20 @@
             },
             {
               "bucket": "25-35",
-              "samples": 1653,
-              "totalR": -69,
+              "samples": 1654,
+              "totalR": -70,
               "avgR": -0.042,
               "winRate": 39.9,
-              "pf": 0.931,
+              "pf": 0.93,
               "adequate": true
             },
             {
               "bucket": ">=35",
-              "samples": 1068,
-              "totalR": 9.6,
-              "avgR": 0.009,
-              "winRate": 42,
-              "pf": 1.016,
+              "samples": 1067,
+              "totalR": 10.6,
+              "avgR": 0.01,
+              "winRate": 42.1,
+              "pf": 1.017,
               "adequate": true
             }
           ],
@@ -3451,8 +3451,8 @@
             {
               "window": "90d",
               "avgR": -0.042,
-              "samples": 1653,
-              "pf": 0.931
+              "samples": 1654,
+              "pf": 0.93
             }
           ]
         },
@@ -3502,9 +3502,9 @@
             },
             {
               "window": "90d",
-              "avgR": 0.009,
-              "samples": 1068,
-              "pf": 1.016
+              "avgR": 0.01,
+              "samples": 1067,
+              "pf": 1.017
             }
           ]
         }
