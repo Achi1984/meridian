@@ -10,7 +10,7 @@
     document.write('<script src="app-v7.39-paper-overview.js?v=7.60-R1"><\/script>');
     document.write('<script src="app-v7.60-dashboard-consistency.js?v=7.60-R1"><\/script>');
     document.write('<script src="app-v7.60-private-hydration-hotfix.js?v=7.60-R2"><\/script>');
-    document.write('<script src="app-v7.60-nav-hotfix.js?v=7.60-R3"><\/script>');
+    document.write('<script src="app-v7.60-nav-hotfix.js?v=7.60-R5"><\/script>');
     document.write('<script src="app-v7.60-unlock-hotfix.js?v=7.60-R4"><\/script>');
     return;
   }
@@ -23,7 +23,7 @@
     .then(()=>load('app-v7.39-paper-overview.js?v=7.60-R1'))
     .then(()=>load('app-v7.60-dashboard-consistency.js?v=7.60-R1'))
     .then(()=>load('app-v7.60-private-hydration-hotfix.js?v=7.60-R2'))
-    .then(()=>load('app-v7.60-nav-hotfix.js?v=7.60-R3'))
+    .then(()=>load('app-v7.60-nav-hotfix.js?v=7.60-R5'))
     .then(()=>load('app-v7.60-unlock-hotfix.js?v=7.60-R4'))
     .catch(e=>console.error('MERIDIAN loader',e));
 })();
