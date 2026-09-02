@@ -7,6 +7,7 @@
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
 - Main contains the stable research stack through v7.51 plus preserved evidence reports for rejected Challenger V3/V3.1 experiments and Signal Calibration.
+- v7.61 Feature Attribution infrastructure is now present on `main` as research-only code; it does not change Paper execution.
 - The rejected V3/V3.1 implementation branches must not be treated as production candidates or silently merged.
 
 ## Latest durable research findings
@@ -25,10 +26,16 @@ Portfolio-independent calibration sampled one candidate per symbol per 4h across
 
 Critical result: **all confidence buckets were negative over 30d, 60d and 90d. Higher confidence was not monotonic with better normalized outcome.** This means the current compressed confidence stack is not a validated predictor of edge. Positive portfolio windows can be caused by path-dependent portfolio selection and must not be used to declare the score calibrated.
 
+### v7.61 — Raw Feature Edge Map / Feature Attribution Lab
+Research-only infrastructure has been implemented in `feature-attribution.js`, with an offline report runner in `scripts/feature-edge-map.mjs` and unit tests in `test/feature-attribution.test.js`.
+
+The lab measures side-aware raw observations instead of reusing the failed compressed confidence stack: 15m/1h/4h alignment, MACD agreement, ADX, RSI, volume participation, EMA structure, price-to-EMA20 alignment/distance, side × regime and Baseline status as evidence only. It reports normalized-R bucket statistics, minimum-sample adequacy and cross-window directional stability. Local focused tests passed after correcting the expected numeric bucket label. No entry, sizing, risk, exit or Paper execution code was changed.
+
 Preserved evidence files:
 - `research/challenger-v3-evidence-v752.md`
 - `research/challenger-v31-evidence-v753.md`
 - `research/signal-calibration-v755.md`
+- `research/feature-attribution-v761.md`
 
 ## Known bot findings that must not be forgotten
 
@@ -40,24 +47,21 @@ Preserved evidence files:
 6. LONG/SHORT must always be interpreted in regime context.
 7. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory metrics.
 8. More evidence must not automatically become more hard gates.
+9. Feature Attribution is research-only and must consume portfolio-independent cohorts; do not feed it portfolio-gated winners and then call the result signal edge.
 
 ## Next recommended work — highest priority
 
-### Priority 1 — Raw Feature Edge Map / Feature Attribution Lab
-Before writing Challenger V3.2, measure raw feature/outcome relationships on portfolio-independent signal cohorts. Candidate features should include:
-- 15m / 1h / 4h directional alignment
-- ADX / trend-strength buckets
-- RSI state by side
-- MACD agreement across timeframes
-- volume participation
-- EMA20/EMA50 structure and price-to-EMA distance
-- side × regime
-- Baseline status as evidence only
+### Priority 1 — Generate raw Feature Attribution cohorts and run v7.61
+The analysis engine is ready; the next task is to export/generate portfolio-independent signal cohorts for 30d, 60d and 90d containing the original 15m/1h/4h frame metrics plus A_CURRENT normalized-R outcomes.
 
-Use normalized R outcomes, adequate samples and cross-window stability. Look for monotonic or repeatable relationships, not isolated best buckets.
+Run the cohorts through:
 
-### Priority 2 — Challenger V3.2 only after Feature Edge Map
-Build V3.2 from evidence-backed soft features. Preserve independent opportunity discovery, but do not copy V3/V3.1 weights. Retest signal calibration first, then portfolio 30/60/90d, walk-forward, frequency and opportunity cost.
+`node scripts/feature-edge-map.mjs --30 <30d.json> --60 <60d.json> --90 <90d.json> --out <report.json>`
+
+Evaluate adequate sample size and repeatability across windows. Look for monotonic or repeatable relationships, not isolated best buckets. Preserve side-aware interpretation so SHORT never reuses LONG semantics.
+
+### Priority 2 — Challenger V3.2 only after Feature Edge Map evidence
+Build V3.2 from evidence-backed soft features only if the raw-feature analysis demonstrates signal-level relationships. Preserve independent opportunity discovery, but do not copy V3/V3.1 weights. Retest signal calibration first, then portfolio 30/60/90d, walk-forward, frequency and opportunity cost.
 
 ### Priority 3 — Regime V2
 Recompute all directional evidence after final side selection. Test independently.
