@@ -1,7 +1,7 @@
 {
   "schemaVersion": "7.51-EXIT-LAB-EVIDENCE-V1",
-  "generatedAt": "2026-09-02T12:38:09.518Z",
-  "end": 1788352604777,
+  "generatedAt": "2026-09-02T12:41:23.516Z",
+  "end": 1788352808450,
   "assets": [
     "BTCUSDT",
     "ETHUSDT",
@@ -47,9 +47,10 @@
           "avgR": -0.19,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.077,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -60,9 +61,10 @@
           "avgR": -0.188,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.365,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 20,
+          "tp2TouchAfterTp1Rate": 28,
           "deltaVsCurrent": 0.036
         },
         {
@@ -73,9 +75,10 @@
           "avgR": -0.225,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.596,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 12,
+          "tp2TouchAfterTp1Rate": 12,
           "deltaVsCurrent": -0.887
         },
         {
@@ -86,9 +89,10 @@
           "avgR": -0.136,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.591,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 8,
+          "tp2TouchAfterTp1Rate": 16,
           "deltaVsCurrent": 1.349
         },
         {
@@ -99,9 +103,10 @@
           "avgR": -0.208,
           "medianR": -1.108,
           "winRateR": 40,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.43,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 8,
+          "tp2TouchAfterTp1Rate": 32,
           "deltaVsCurrent": -0.466
         },
         {
@@ -112,9 +117,10 @@
           "avgR": -0.178,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.355,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 20,
+          "tp2TouchAfterTp1Rate": 28,
           "deltaVsCurrent": 0.286
         },
         {
@@ -125,9 +131,10 @@
           "avgR": -0.189,
           "medianR": -1.108,
           "winRateR": 48,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.314,
+          "tp1Rate": 48,
+          "tp1ToBeStopRate": 24,
+          "tp2TouchAfterTp1Rate": 24,
           "deltaVsCurrent": 0.014
         },
         {
@@ -138,9 +145,10 @@
           "avgR": -0.624,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.381,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -151,9 +159,10 @@
           "avgR": -0.668,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.522,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 16.7,
+          "tp2TouchAfterTp1Rate": 11.1,
           "deltaVsCurrent": -0.793
         },
         {
@@ -164,9 +173,10 @@
           "avgR": -0.61,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.482,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 5.6,
           "deltaVsCurrent": 0.255
         },
         {
@@ -177,9 +187,10 @@
           "avgR": -0.586,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.511,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 11.1,
           "deltaVsCurrent": 0.681
         },
         {
@@ -190,9 +201,10 @@
           "avgR": -0.703,
           "medianR": -1.199,
           "winRateR": 22.2,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.557,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 11.1,
+          "tp2TouchAfterTp1Rate": 11.1,
           "deltaVsCurrent": -1.419
         },
         {
@@ -203,9 +215,10 @@
           "avgR": -0.66,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.514,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 16.7,
+          "tp2TouchAfterTp1Rate": 11.1,
           "deltaVsCurrent": -0.643
         },
         {
@@ -216,9 +229,10 @@
           "avgR": -0.647,
           "medianR": -1.199,
           "winRateR": 27.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.458,
+          "tp1Rate": 27.8,
+          "tp1ToBeStopRate": 16.7,
+          "tp2TouchAfterTp1Rate": 11.1,
           "deltaVsCurrent": -0.418
         },
         {
@@ -229,9 +243,10 @@
           "avgR": -0.233,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.104,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -242,9 +257,10 @@
           "avgR": -0.215,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.387,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 16.7,
+          "tp2TouchAfterTp1Rate": 29.2,
           "deltaVsCurrent": 0.422
         },
         {
@@ -255,9 +271,10 @@
           "avgR": -0.257,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.631,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 8.3,
+          "tp2TouchAfterTp1Rate": 12.5,
           "deltaVsCurrent": -0.576
         },
         {
@@ -268,9 +285,10 @@
           "avgR": -0.17,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.633,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 4.2,
+          "tp2TouchAfterTp1Rate": 16.7,
           "deltaVsCurrent": 1.502
         },
         {
@@ -281,9 +299,10 @@
           "avgR": -0.267,
           "medianR": -1.127,
           "winRateR": 37.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.456,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 8.3,
+          "tp2TouchAfterTp1Rate": 29.2,
           "deltaVsCurrent": -0.833
         },
         {
@@ -294,9 +313,10 @@
           "avgR": -0.207,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.379,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 16.7,
+          "tp2TouchAfterTp1Rate": 29.2,
           "deltaVsCurrent": 0.622
         },
         {
@@ -307,9 +327,10 @@
           "avgR": -0.221,
           "medianR": -1.127,
           "winRateR": 45.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.339,
+          "tp1Rate": 45.8,
+          "tp1ToBeStopRate": 20.8,
+          "tp2TouchAfterTp1Rate": 25,
           "deltaVsCurrent": 0.276
         },
         {
@@ -320,9 +341,10 @@
           "avgR": -0.485,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.279,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -333,9 +355,10 @@
           "avgR": -0.496,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.536,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 20.5,
+          "tp2TouchAfterTp1Rate": 20.5,
           "deltaVsCurrent": -0.446
         },
         {
@@ -346,9 +369,10 @@
           "avgR": -0.432,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.473,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 15.4,
+          "tp2TouchAfterTp1Rate": 15.4,
           "deltaVsCurrent": 2.062
         },
         {
@@ -359,9 +383,10 @@
           "avgR": -0.44,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.452,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 17.9,
+          "tp2TouchAfterTp1Rate": 15.4,
           "deltaVsCurrent": 1.739
         },
         {
@@ -372,9 +397,10 @@
           "avgR": -0.483,
           "medianR": -1.21,
           "winRateR": 35.9,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.586,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 7.7,
+          "tp2TouchAfterTp1Rate": 28.2,
           "deltaVsCurrent": 0.088
         },
         {
@@ -385,9 +411,10 @@
           "avgR": -0.486,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.525,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 20.5,
+          "tp2TouchAfterTp1Rate": 20.5,
           "deltaVsCurrent": -0.046
         },
         {
@@ -398,9 +425,10 @@
           "avgR": -0.471,
           "medianR": -1.21,
           "winRateR": 41,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.497,
+          "tp1Rate": 41,
+          "tp1ToBeStopRate": 20.5,
+          "tp2TouchAfterTp1Rate": 20.5,
           "deltaVsCurrent": 0.554
         }
       ],
@@ -20565,9 +20593,10 @@
           "avgR": -0.461,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.095,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -20578,9 +20607,10 @@
           "avgR": -0.584,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.295,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.838
         },
         {
@@ -20591,9 +20621,10 @@
           "avgR": -0.499,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.21,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -0.565
         },
         {
@@ -20604,9 +20635,10 @@
           "avgR": -0.558,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.269,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 13.3,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.447
         },
         {
@@ -20617,9 +20649,10 @@
           "avgR": -0.744,
           "medianR": -1.114,
           "winRateR": 13.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.456,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -4.25
         },
         {
@@ -20630,9 +20663,10 @@
           "avgR": -0.57,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.282,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.638
         },
         {
@@ -20643,9 +20677,10 @@
           "avgR": -0.55,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.262,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.338
         },
         {
@@ -20656,9 +20691,10 @@
           "avgR": -0.522,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.225,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -20669,9 +20705,10 @@
           "avgR": -0.624,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.416,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 23.1,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -1.326
         },
         {
@@ -20682,9 +20719,10 @@
           "avgR": -0.545,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.337,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -0.297
         },
         {
@@ -20695,9 +20733,10 @@
           "avgR": -0.595,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.387,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 7.7,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -0.941
         },
         {
@@ -20708,9 +20747,10 @@
           "avgR": -0.761,
           "medianR": -1.135,
           "winRateR": 15.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.553,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -3.108
         },
         {
@@ -20721,9 +20761,10 @@
           "avgR": -0.613,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.405,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 23.1,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -1.176
         },
         {
@@ -20734,9 +20775,10 @@
           "avgR": -0.596,
           "medianR": -1.135,
           "winRateR": 30.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.387,
+          "tp1Rate": 30.8,
+          "tp1ToBeStopRate": 23.1,
+          "tp2TouchAfterTp1Rate": 7.7,
           "deltaVsCurrent": -0.951
         },
         {
@@ -20747,9 +20789,10 @@
           "avgR": -0.461,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.095,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -20760,9 +20803,10 @@
           "avgR": -0.584,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.295,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.838
         },
         {
@@ -20773,9 +20817,10 @@
           "avgR": -0.499,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.21,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -0.565
         },
         {
@@ -20786,9 +20831,10 @@
           "avgR": -0.558,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.269,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 13.3,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.447
         },
         {
@@ -20799,9 +20845,10 @@
           "avgR": -0.744,
           "medianR": -1.114,
           "winRateR": 13.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.456,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -4.25
         },
         {
@@ -20812,9 +20859,10 @@
           "avgR": -0.57,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.282,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.638
         },
         {
@@ -20825,9 +20873,10 @@
           "avgR": -0.55,
           "medianR": -1.114,
           "winRateR": 33.3,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.262,
+          "tp1Rate": 33.3,
+          "tp1ToBeStopRate": 26.7,
+          "tp2TouchAfterTp1Rate": 6.7,
           "deltaVsCurrent": -1.338
         },
         {
@@ -20838,9 +20887,10 @@
           "avgR": -0.657,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.416,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -20851,9 +20901,10 @@
           "avgR": -0.794,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.659,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 25,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -2.734
         },
         {
@@ -20864,9 +20915,10 @@
           "avgR": -0.713,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.525,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 5,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -1.12
         },
         {
@@ -20877,9 +20929,10 @@
           "avgR": -0.763,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.575,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 10,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -2.119
         },
         {
@@ -20890,9 +20943,10 @@
           "avgR": -0.862,
           "medianR": -1.189,
           "winRateR": 15,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.727,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 15,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -4.091
         },
         {
@@ -20903,9 +20957,10 @@
           "avgR": -0.781,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.647,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 25,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -2.484
         },
         {
@@ -20916,9 +20971,10 @@
           "avgR": -0.763,
           "medianR": -1.189,
           "winRateR": 25,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.575,
+          "tp1Rate": 25,
+          "tp1ToBeStopRate": 25,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": -2.109
         }
       ],
@@ -36896,9 +36952,10 @@
           "avgR": 0.209,
           "medianR": 1.173,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 0.945,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -36909,9 +36966,10 @@
           "avgR": 0.304,
           "medianR": 0.599,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.249,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 12.8,
+          "tp2TouchAfterTp1Rate": 43.6,
           "deltaVsCurrent": 3.677
         },
         {
@@ -36922,9 +36980,10 @@
           "avgR": 0.317,
           "medianR": 0.91,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.283,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 28.2,
           "deltaVsCurrent": 4.189
         },
         {
@@ -36935,9 +36994,10 @@
           "avgR": 0.329,
           "medianR": 0.756,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.317,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 30.8,
           "deltaVsCurrent": 4.668
         },
         {
@@ -36948,9 +37008,10 @@
           "avgR": 0.274,
           "medianR": 0.589,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.279,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 7.7,
+          "tp2TouchAfterTp1Rate": 43.6,
           "deltaVsCurrent": 2.513
         },
         {
@@ -36961,9 +37022,10 @@
           "avgR": 0.285,
           "medianR": 0.649,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.255,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 15.4,
+          "tp2TouchAfterTp1Rate": 41,
           "deltaVsCurrent": 2.964
         },
         {
@@ -36974,9 +37036,10 @@
           "avgR": 0.275,
           "medianR": 0.724,
           "winRateR": 56.4,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.243,
+          "tp1Rate": 56.4,
+          "tp1ToBeStopRate": 17.9,
+          "tp2TouchAfterTp1Rate": 38.5,
           "deltaVsCurrent": 2.543
         },
         {
@@ -36987,9 +37050,10 @@
           "avgR": 0.065,
           "medianR": 0.05,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 0.859,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -37000,9 +37064,10 @@
           "avgR": 0.172,
           "medianR": -0.239,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.184,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 8.8,
+          "tp2TouchAfterTp1Rate": 41.2,
           "deltaVsCurrent": 3.634
         },
         {
@@ -37013,9 +37078,10 @@
           "avgR": 0.181,
           "medianR": -0.089,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.229,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 26.5,
           "deltaVsCurrent": 3.921
         },
         {
@@ -37026,9 +37092,10 @@
           "avgR": 0.187,
           "medianR": -0.225,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.259,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 29.4,
           "deltaVsCurrent": 4.15
         },
         {
@@ -37039,9 +37106,10 @@
           "avgR": 0.14,
           "medianR": -0.501,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.216,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 2.9,
+          "tp2TouchAfterTp1Rate": 41.2,
           "deltaVsCurrent": 2.544
         },
         {
@@ -37052,9 +37120,10 @@
           "avgR": 0.12,
           "medianR": -0.214,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.205,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 14.7,
+          "tp2TouchAfterTp1Rate": 35.3,
           "deltaVsCurrent": 1.855
         },
         {
@@ -37065,9 +37134,10 @@
           "avgR": 0.131,
           "medianR": -0.177,
           "winRateR": 50,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.194,
+          "tp1Rate": 50,
+          "tp1ToBeStopRate": 14.7,
+          "tp2TouchAfterTp1Rate": 35.3,
           "deltaVsCurrent": 2.23
         },
         {
@@ -37078,9 +37148,10 @@
           "avgR": 0.151,
           "medianR": 1.169,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.021,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -37091,9 +37162,10 @@
           "avgR": 0.259,
           "medianR": 0.589,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.299,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 10.3,
+          "tp2TouchAfterTp1Rate": 43.6,
           "deltaVsCurrent": 4.243
         },
         {
@@ -37104,9 +37176,10 @@
           "avgR": 0.27,
           "medianR": 0.91,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.34,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 28.2,
           "deltaVsCurrent": 4.642
         },
         {
@@ -37117,9 +37190,10 @@
           "avgR": 0.297,
           "medianR": 0.801,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.355,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 30.8,
           "deltaVsCurrent": 5.712
         },
         {
@@ -37130,9 +37204,10 @@
           "avgR": 0.245,
           "medianR": 0.585,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.313,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 7.7,
+          "tp2TouchAfterTp1Rate": 43.6,
           "deltaVsCurrent": 3.678
         },
         {
@@ -37143,9 +37218,10 @@
           "avgR": 0.24,
           "medianR": 0.639,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.306,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 12.8,
+          "tp2TouchAfterTp1Rate": 41,
           "deltaVsCurrent": 3.48
         },
         {
@@ -37156,9 +37232,10 @@
           "avgR": 0.227,
           "medianR": 0.714,
           "winRateR": 53.8,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.296,
+          "tp1Rate": 53.8,
+          "tp1ToBeStopRate": 15.4,
+          "tp2TouchAfterTp1Rate": 38.5,
           "deltaVsCurrent": 2.984
         },
         {
@@ -37169,9 +37246,10 @@
           "avgR": -0.1,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.029,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 0,
+          "tp2TouchAfterTp1Rate": 0,
           "deltaVsCurrent": 0
         },
         {
@@ -37182,9 +37260,10 @@
           "avgR": 0.006,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.254,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 10.6,
+          "tp2TouchAfterTp1Rate": 34.8,
           "deltaVsCurrent": 7.048
         },
         {
@@ -37195,9 +37274,10 @@
           "avgR": -0.082,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.278,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 1.5,
+          "tp2TouchAfterTp1Rate": 13.6,
           "deltaVsCurrent": 1.179
         },
         {
@@ -37208,9 +37288,10 @@
           "avgR": -0.062,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.343,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 1.5,
+          "tp2TouchAfterTp1Rate": 18.2,
           "deltaVsCurrent": 2.504
         },
         {
@@ -37221,9 +37302,10 @@
           "avgR": 0.022,
           "medianR": -1.103,
           "winRateR": 43.9,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.27,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 6.1,
+          "tp2TouchAfterTp1Rate": 37.9,
           "deltaVsCurrent": 8.075
         },
         {
@@ -37234,9 +37316,10 @@
           "avgR": 0.012,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.249,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 10.6,
+          "tp2TouchAfterTp1Rate": 34.8,
           "deltaVsCurrent": 7.398
         },
         {
@@ -37247,9 +37330,10 @@
           "avgR": -0.02,
           "medianR": -1.103,
           "winRateR": 45.5,
-          "givebackR": null,
-          "tp1ThenBeRate": null,
-          "tp2Rate": null,
+          "avgGivebackR": 1.255,
+          "tp1Rate": 45.5,
+          "tp1ToBeStopRate": 15.2,
+          "tp2TouchAfterTp1Rate": 30.3,
           "deltaVsCurrent": 5.299
         }
       ],
@@ -57842,9 +57926,15 @@
       "sumDelta": 5.7669999999999995,
       "sumAvgR": -0.4310000000000001,
       "sumTotalR": -0.8640000000000008,
+      "sumGiveback": 4.257,
+      "sumBeStop": 17.5,
+      "sumTp2": 54.2,
       "avgDeltaR": 1.922,
       "meanAvgR": -0.144,
-      "meanTotalR": -0.288
+      "meanTotalR": -0.288,
+      "meanGivebackR": 1.419,
+      "meanBeStopRate": 5.8,
+      "meanTp2Rate": 18.1
     },
     {
       "bot": "baseline",
@@ -57854,9 +57944,15 @@
       "sumDelta": 4.57,
       "sumAvgR": -0.36500000000000005,
       "sumTotalR": 1.0749999999999993,
+      "sumGiveback": 4.177,
+      "sumBeStop": 21.3,
+      "sumTp2": 53.5,
       "avgDeltaR": 1.523,
       "meanAvgR": -0.122,
-      "meanTotalR": 0.358
+      "meanTotalR": 0.358,
+      "meanGivebackR": 1.392,
+      "meanBeStopRate": 7.1,
+      "meanTp2Rate": 17.8
     },
     {
       "bot": "regime",
@@ -57866,9 +57962,15 @@
       "sumDelta": 4.071999999999999,
       "sumAvgR": -1.323,
       "sumTotalR": -34.60600000000001,
+      "sumGiveback": 4.583,
+      "sumBeStop": 28.799999999999997,
+      "sumTp2": 66.1,
       "avgDeltaR": 1.357,
       "meanAvgR": -0.441,
-      "meanTotalR": -11.535
+      "meanTotalR": -11.535,
+      "meanGivebackR": 1.528,
+      "meanBeStopRate": 9.6,
+      "meanTp2Rate": 22
     },
     {
       "bot": "shadow",
@@ -57878,9 +57980,15 @@
       "sumDelta": 3.8900000000000006,
       "sumAvgR": -0.994,
       "sumTotalR": -11.913,
+      "sumGiveback": 4.157,
+      "sumBeStop": 7.7,
+      "sumTp2": 48.2,
       "avgDeltaR": 1.297,
       "meanAvgR": -0.331,
-      "meanTotalR": -3.971
+      "meanTotalR": -3.971,
+      "meanGivebackR": 1.386,
+      "meanBeStopRate": 2.6,
+      "meanTp2Rate": 16.1
     },
     {
       "bot": "shadow",
@@ -57890,9 +57998,15 @@
       "sumDelta": 3.879,
       "sumAvgR": -0.974,
       "sumTotalR": -11.924,
+      "sumGiveback": 4.048,
+      "sumBeStop": 0,
+      "sumTp2": 39.8,
       "avgDeltaR": 1.293,
       "meanAvgR": -0.325,
-      "meanTotalR": -3.975
+      "meanTotalR": -3.975,
+      "meanGivebackR": 1.349,
+      "meanBeStopRate": 0,
+      "meanTp2Rate": 13.3
     },
     {
       "bot": "regime",
@@ -57902,9 +58016,15 @@
       "sumDelta": 3.7440000000000007,
       "sumAvgR": -1.254,
       "sumTotalR": -34.934,
+      "sumGiveback": 4.327,
+      "sumBeStop": 60.7,
+      "sumTp2": 50.8,
       "avgDeltaR": 1.248,
       "meanAvgR": -0.418,
-      "meanTotalR": -11.645
+      "meanTotalR": -11.645,
+      "meanGivebackR": 1.442,
+      "meanBeStopRate": 20.2,
+      "meanTp2Rate": 16.9
     },
     {
       "bot": "challenger",
@@ -57914,9 +58034,15 @@
       "sumDelta": 2.827,
       "sumAvgR": -0.5399999999999999,
       "sumTotalR": -3.804000000000002,
+      "sumGiveback": 3.981,
+      "sumBeStop": 53.7,
+      "sumTp2": 79.5,
       "avgDeltaR": 0.942,
       "meanAvgR": -0.18,
-      "meanTotalR": -1.268
+      "meanTotalR": -1.268,
+      "meanGivebackR": 1.327,
+      "meanBeStopRate": 17.9,
+      "meanTp2Rate": 26.5
     },
     {
       "bot": "challenger",
@@ -57926,9 +58052,15 @@
       "sumDelta": 2.464,
       "sumAvgR": -0.5369999999999999,
       "sumTotalR": -4.167,
+      "sumGiveback": 3.967,
+      "sumBeStop": 56.2,
+      "sumTp2": 76.9,
       "avgDeltaR": 0.821,
       "meanAvgR": -0.179,
-      "meanTotalR": -1.389
+      "meanTotalR": -1.389,
+      "meanGivebackR": 1.322,
+      "meanBeStopRate": 18.7,
+      "meanTp2Rate": 25.6
     },
     {
       "bot": "regime",
@@ -57938,9 +58070,15 @@
       "sumDelta": 2.1239999999999997,
       "sumAvgR": -1.2650000000000001,
       "sumTotalR": -36.554,
+      "sumGiveback": 4.37,
+      "sumBeStop": 29.4,
+      "sumTp2": 33.6,
       "avgDeltaR": 0.708,
       "meanAvgR": -0.422,
-      "meanTotalR": -12.185
+      "meanTotalR": -12.185,
+      "meanGivebackR": 1.457,
+      "meanBeStopRate": 9.8,
+      "meanTp2Rate": 11.2
     },
     {
       "bot": "regime",
@@ -57950,9 +58088,15 @@
       "sumDelta": 2.1209999999999996,
       "sumAvgR": -1.227,
       "sumTotalR": -36.557,
+      "sumGiveback": 4.276,
+      "sumBeStop": 21.9,
+      "sumTp2": 29,
       "avgDeltaR": 0.707,
       "meanAvgR": -0.409,
-      "meanTotalR": -12.186
+      "meanTotalR": -12.186,
+      "meanGivebackR": 1.425,
+      "meanBeStopRate": 7.3,
+      "meanTp2Rate": 9.7
     },
     {
       "bot": "challenger",
@@ -57962,9 +58106,15 @@
       "sumDelta": 1.922,
       "sumAvgR": -0.544,
       "sumTotalR": -4.709000000000001,
+      "sumGiveback": 3.8970000000000002,
+      "sumBeStop": 62.9,
+      "sumTp2": 70.2,
       "avgDeltaR": 0.641,
       "meanAvgR": -0.181,
-      "meanTotalR": -1.57
+      "meanTotalR": -1.57,
+      "meanGivebackR": 1.299,
+      "meanBeStopRate": 21,
+      "meanTp2Rate": 23.4
     },
     {
       "bot": "baseline",
@@ -57974,9 +58124,15 @@
       "sumDelta": 1.875,
       "sumAvgR": -0.468,
       "sumTotalR": -1.620000000000001,
+      "sumGiveback": 3.9090000000000003,
+      "sumBeStop": 59.5,
+      "sumTp2": 78.30000000000001,
       "avgDeltaR": 0.625,
       "meanAvgR": -0.156,
-      "meanTotalR": -0.54
+      "meanTotalR": -0.54,
+      "meanGivebackR": 1.303,
+      "meanBeStopRate": 19.8,
+      "meanTp2Rate": 26.1
     },
     {
       "bot": "baseline",
@@ -57986,9 +58142,15 @@
       "sumDelta": 1.612,
       "sumAvgR": -0.463,
       "sumTotalR": -1.8829999999999991,
+      "sumGiveback": 3.892,
+      "sumBeStop": 62.1,
+      "sumTp2": 75.7,
       "avgDeltaR": 0.537,
       "meanAvgR": -0.154,
-      "meanTotalR": -0.628
+      "meanTotalR": -0.628,
+      "meanGivebackR": 1.297,
+      "meanBeStopRate": 20.7,
+      "meanTp2Rate": 25.2
     },
     {
       "bot": "baseline",
@@ -57998,9 +58160,15 @@
       "sumDelta": 1.219,
       "sumAvgR": -0.4640000000000001,
       "sumTotalR": -2.2760000000000016,
+      "sumGiveback": 3.819,
+      "sumBeStop": 68.6,
+      "sumTp2": 69.2,
       "avgDeltaR": 0.406,
       "meanAvgR": -0.155,
-      "meanTotalR": -0.759
+      "meanTotalR": -0.759,
+      "meanGivebackR": 1.273,
+      "meanBeStopRate": 22.9,
+      "meanTp2Rate": 23.1
     },
     {
       "bot": "regime",
@@ -58010,9 +58178,15 @@
       "sumDelta": 4.868,
       "sumAvgR": -1.255,
       "sumTotalR": -33.81,
+      "sumGiveback": 4.420999999999999,
+      "sumBeStop": 56.1,
+      "sumTp2": 55.3,
       "avgDeltaR": 1.623,
       "meanAvgR": -0.418,
-      "meanTotalR": -11.27
+      "meanTotalR": -11.27,
+      "meanGivebackR": 1.474,
+      "meanBeStopRate": 18.7,
+      "meanTp2Rate": 18.4
     },
     {
       "bot": "regime",
@@ -58022,9 +58196,15 @@
       "sumDelta": 3.868,
       "sumAvgR": -1.284,
       "sumTotalR": -34.81,
+      "sumGiveback": 4.449,
+      "sumBeStop": 56.1,
+      "sumTp2": 55.3,
       "avgDeltaR": 1.289,
       "meanAvgR": -0.428,
-      "meanTotalR": -11.603
+      "meanTotalR": -11.603,
+      "meanGivebackR": 1.483,
+      "meanBeStopRate": 18.7,
+      "meanTp2Rate": 18.4
     },
     {
       "bot": "challenger",
@@ -58034,9 +58214,15 @@
       "sumDelta": 3.5010000000000003,
       "sumAvgR": -0.486,
       "sumTotalR": -3.129999999999999,
+      "sumGiveback": 4.181,
+      "sumBeStop": 8.3,
+      "sumTp2": 47.4,
       "avgDeltaR": 1.167,
       "meanAvgR": -0.162,
-      "meanTotalR": -1.043
+      "meanTotalR": -1.043,
+      "meanGivebackR": 1.394,
+      "meanBeStopRate": 2.8,
+      "meanTp2Rate": 15.8
     },
     {
       "bot": "baseline",
@@ -58046,9 +58232,15 @@
       "sumDelta": 2.737,
       "sumAvgR": -0.407,
       "sumTotalR": -0.7579999999999991,
+      "sumGiveback": 4.089,
+      "sumBeStop": 12,
+      "sumTp2": 46.9,
       "avgDeltaR": 0.912,
       "meanAvgR": -0.136,
-      "meanTotalR": -0.253
+      "meanTotalR": -0.253,
+      "meanGivebackR": 1.363,
+      "meanBeStopRate": 4,
+      "meanTp2Rate": 15.6
     },
     {
       "bot": "shadow",
@@ -58058,9 +58250,15 @@
       "sumDelta": 1.5149999999999997,
       "sumAvgR": -1.12,
       "sumTotalR": -14.288,
+      "sumGiveback": 4.122,
+      "sumBeStop": 48.599999999999994,
+      "sumTp2": 60,
       "avgDeltaR": 0.505,
       "meanAvgR": -0.373,
-      "meanTotalR": -4.763
+      "meanTotalR": -4.763,
+      "meanGivebackR": 1.374,
+      "meanBeStopRate": 16.2,
+      "meanTp2Rate": 20
     },
     {
       "bot": "shadow",
@@ -58070,9 +58268,15 @@
       "sumDelta": 0.861,
       "sumAvgR": -1.1119999999999999,
       "sumTotalR": -14.942,
+      "sumGiveback": 4.039,
+      "sumBeStop": 54.5,
+      "sumTp2": 54.099999999999994,
       "avgDeltaR": 0.287,
       "meanAvgR": -0.371,
-      "meanTotalR": -4.981
+      "meanTotalR": -4.981,
+      "meanGivebackR": 1.346,
+      "meanBeStopRate": 18.2,
+      "meanTp2Rate": 18
     },
     {
       "bot": "shadow",
@@ -58082,9 +58286,15 @@
       "sumDelta": 0.03600000000000003,
       "sumAvgR": -1.153,
       "sumTotalR": -15.767,
+      "sumGiveback": 4.1240000000000006,
+      "sumBeStop": 54.5,
+      "sumTp2": 54.099999999999994,
       "avgDeltaR": 0.012,
       "meanAvgR": -0.384,
-      "meanTotalR": -5.256
+      "meanTotalR": -5.256,
+      "meanGivebackR": 1.375,
+      "meanBeStopRate": 18.2,
+      "meanTp2Rate": 18
     },
     {
       "bot": "challenger",
@@ -58094,9 +58304,15 @@
       "sumDelta": -1.4050000000000002,
       "sumAvgR": -0.7660000000000001,
       "sumTotalR": -8.036,
+      "sumGiveback": 4.225,
+      "sumBeStop": 16,
+      "sumTp2": 79.5,
       "avgDeltaR": -0.468,
       "meanAvgR": -0.255,
-      "meanTotalR": -2.679
+      "meanTotalR": -2.679,
+      "meanGivebackR": 1.408,
+      "meanBeStopRate": 5.3,
+      "meanTp2Rate": 26.5
     },
     {
       "bot": "shadow",
@@ -58106,9 +58322,15 @@
       "sumDelta": -1.983,
       "sumAvgR": -1.3239999999999998,
       "sumTotalR": -17.785999999999998,
+      "sumGiveback": 4.326,
+      "sumBeStop": 14,
+      "sumTp2": 60,
       "avgDeltaR": -0.661,
       "meanAvgR": -0.441,
-      "meanTotalR": -5.929
+      "meanTotalR": -5.929,
+      "meanGivebackR": 1.442,
+      "meanBeStopRate": 4.7,
+      "meanTp2Rate": 20
     },
     {
       "bot": "baseline",
@@ -58118,9 +58340,15 @@
       "sumDelta": -2.2030000000000003,
       "sumAvgR": -0.6779999999999999,
       "sumTotalR": -5.697999999999999,
+      "sumGiveback": 4.165,
+      "sumBeStop": 15.7,
+      "sumTp2": 82.30000000000001,
       "avgDeltaR": -0.734,
       "meanAvgR": -0.226,
-      "meanTotalR": -1.899
+      "meanTotalR": -1.899,
+      "meanGivebackR": 1.388,
+      "meanBeStopRate": 5.2,
+      "meanTp2Rate": 27.4
     },
     {
       "bot": "baseline",
@@ -58130,9 +58358,15 @@
       "sumDelta": 0,
       "sumAvgR": -0.44200000000000006,
       "sumTotalR": -3.494999999999999,
+      "sumGiveback": 3.1169999999999995,
+      "sumBeStop": 0,
+      "sumTp2": 0,
       "avgDeltaR": 0,
       "meanAvgR": -0.147,
-      "meanTotalR": -1.165
+      "meanTotalR": -1.165,
+      "meanGivebackR": 1.039,
+      "meanBeStopRate": 0,
+      "meanTp2Rate": 0
     },
     {
       "bot": "shadow",
@@ -58142,9 +58376,15 @@
       "sumDelta": 0,
       "sumAvgR": -1.081,
       "sumTotalR": -15.803,
+      "sumGiveback": 3.465,
+      "sumBeStop": 0,
+      "sumTp2": 0,
       "avgDeltaR": 0,
       "meanAvgR": -0.36,
-      "meanTotalR": -5.268
+      "meanTotalR": -5.268,
+      "meanGivebackR": 1.155,
+      "meanBeStopRate": 0,
+      "meanTp2Rate": 0
     },
     {
       "bot": "challenger",
@@ -58154,9 +58394,15 @@
       "sumDelta": 0,
       "sumAvgR": -0.543,
       "sumTotalR": -6.630999999999999,
+      "sumGiveback": 3.2199999999999998,
+      "sumBeStop": 0,
+      "sumTp2": 0,
       "avgDeltaR": 0,
       "meanAvgR": -0.181,
-      "meanTotalR": -2.21
+      "meanTotalR": -2.21,
+      "meanGivebackR": 1.073,
+      "meanBeStopRate": 0,
+      "meanTp2Rate": 0
     },
     {
       "bot": "regime",
@@ -58166,9 +58412,15 @@
       "sumDelta": 0,
       "sumAvgR": -1.242,
       "sumTotalR": -38.678,
+      "sumGiveback": 3.7239999999999998,
+      "sumBeStop": 0,
+      "sumTp2": 0,
       "avgDeltaR": 0,
       "meanAvgR": -0.414,
-      "meanTotalR": -12.893
+      "meanTotalR": -12.893,
+      "meanGivebackR": 1.241,
+      "meanBeStopRate": 0,
+      "meanTp2Rate": 0
     }
   ]
 }
