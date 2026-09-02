@@ -24,7 +24,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Sync release generated files
-        run: node scripts/release-sync.mjs --write
+        run: |
+          node scripts/release-sync.mjs --write
+          npm install --package-lock-only --ignore-scripts
       - name: Verify syntax and regression safety
         run: |
           node --check app-v7.60-dashboard-consistency.js
