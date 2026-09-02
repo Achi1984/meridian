@@ -18,6 +18,8 @@ must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
 must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
 must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
+must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');
+must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
 
 const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
@@ -79,6 +81,25 @@ must(telemetry.includes('bySymbol'),'research telemetry symbol split missing');
 must(telemetry.includes('byRegime'),'research telemetry regime split missing');
 must(telemetry.includes('challengerBaselineReadyDependency:true'),'challenger architecture audit flag missing');
 must(telemetry.includes('regimeAdaptedSideUsesBaselineDirectionalScores:true'),'regime architecture audit flag missing');
+
+must(fs.existsSync('exit-lab.js'),'Exit Lab module missing');
+const exitLab=read('exit-lab.js');
+must(exitLab.includes("EXIT_LAB_VERSION='7.49-EXIT-LAB-REPLAY-V1'"),'Exit Lab schema mismatch');
+must(exitLab.includes('B_CONFIRM_CLOSE'),'TP1 close-confirmation probe missing');
+must(exitLab.includes('B_BE_PLUS_010'),'BE +0.10R probe missing');
+must(exitLab.includes('B_BE_PLUS_025'),'BE +0.25R probe missing');
+must(exitLab.includes('confirmTp1Close'),'confirmed TP1 close protection missing');
+must(exitLab.includes('beExtraR'),'R-profit lock support missing');
+must(fs.existsSync('exit-lab-replay.js'),'Exit Lab replay module missing');
+const exitReplay=read('exit-lab-replay.js');
+must(exitReplay.includes('FIXED_ENTRY_15M_EXIT_COHORT_REPLAY'),'fixed-entry cohort replay missing');
+must(exitReplay.includes('SAME_HISTORICAL_ENTRIES_PARALLEL_EXIT_POLICIES'),'parallel exit policy replay missing');
+must(exitReplay.includes('Number(c.closeTime)>opened'),'entry-candle lookahead guard missing');
+const cloud=read('cloud-backtest.js');
+must(cloud.includes("from './exit-lab-replay.js'"),'cloud backtest Exit Lab replay import missing');
+must(cloud.includes("stage:'exit-lab-replay'"),'cloud backtest Exit Lab progress stage missing');
+must(cloud.includes('exitLabReplay'),'cloud backtest Exit Lab result missing');
+must(cloud.includes("version:'7.49-EXIT-LAB-REPLAY-V1'"),'cloud backtest Exit Lab version missing');
 
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');

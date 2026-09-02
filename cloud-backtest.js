@@ -2,6 +2,7 @@
 // Research-only. Shared multi-asset timeline with independent Baseline/Shadow/Challenger ledgers.
 // Does NOT alter live/Paper execution in server.js.
 import { regimeDecision } from './regime-v1.js';
+import { replayExitLabForLedgers } from './exit-lab-replay.js';
 const BINANCE='https://api.binance.com';
 const MS={'15m':900000,'1h':3600000,'4h':14400000};
 const DAY=86400000;
@@ -83,6 +84,26 @@ function continuousSummary(events,start,end,cfg=CLOUD_BT_CONFIG,full=null){
 
 async function fetchKlines(symbol,interval,start,end){let out=[],cur=start,guard=0;while(cur<end&&guard++<800){const u=`${BINANCE}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${Math.floor(cur)}&endTime=${Math.floor(end)}&limit=1000`;let j,lastErr;for(let a=0;a<6;a++){try{const r=await fetch(u,{headers:{'user-agent':'ACHI-MERIDIAN-RESEARCH-V2/7.34'}});if(!r.ok)throw new Error(`HTTP ${r.status}`);j=await r.json();break}catch(e){lastErr=e;await sleep(Math.min(8000,500*2**a))}}if(!Array.isArray(j))throw lastErr||new Error('Binance load failed');if(!j.length)break;const rows=j.map(k=>({openTime:+k[0],open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5],closeTime:+k[6]}));out.push(...rows);const nx=rows.at(-1).openTime+MS[interval];if(nx<=cur)break;cur=nx;await sleep(75)}return [...new Map(out.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime)}
 
-export async function runCloudBacktest({assets,days=90,end=Date.now(),onProgress=()=>{}}){const cfg=CLOUD_BT_CONFIG,start=end-days*DAY,warmStart=start-60*MS['4h'],market={};for(let i=0;i<assets.length;i++){const symbol=assets[i];onProgress({stage:'loading',asset:symbol,index:i,total:assets.length,pct:Math.round(i/assets.length*45)});const [m15,h1,h4]=await Promise.all([fetchKlines(symbol,'15m',warmStart,end),fetchKlines(symbol,'1h',warmStart,end),fetchKlines(symbol,'4h',warmStart,end)]);market[symbol]={'15m':m15,'1h':h1,'4h':h4}}onProgress({stage:'prepare',pct:50});const events=prepareEvents(market,start,end,cfg,p=>onProgress({...p,pct:50+Math.round((p.pct||0)*.15)}));onProgress({stage:'portfolio-replay',pct:68});const ledgers=replayPrepared(events,start,end,cfg);onProgress({stage:'walk-forward',pct:82});const researchContinuous=continuousSummary(events,start,end,cfg,ledgers);const result={mode:'PORTFOLIO_V2',cloud:true,version:'7.38-REGIME-V1',method:'SHARED_MULTI_ASSET_TIMELINE_INDEPENDENT_LEDGERS',executionImpact:false,days,start,end,assets,config:cfg,summary:compactStats(ledgers.baseline),ledgers:{baseline:{...compactStats(ledgers.baseline),tradeList:ledgers.baseline.tradeList,equityCurve:ledgers.baseline.equityCurve,byAsset:assetBreakdown(ledgers.baseline.tradeList)},shadow:{...compactStats(ledgers.shadow),tradeList:ledgers.shadow.tradeList,equityCurve:ledgers.shadow.equityCurve,byAsset:assetBreakdown(ledgers.shadow.tradeList)},challenger:{...compactStats(ledgers.challenger),tradeList:ledgers.challenger.tradeList,equityCurve:ledgers.challenger.equityCurve,byAsset:assetBreakdown(ledgers.challenger.tradeList)},regime:{...compactStats(ledgers.regime),tradeList:ledgers.regime.tradeList,equityCurve:ledgers.regime.equityCurve,byAsset:assetBreakdown(ledgers.regime.tradeList)}},researchContinuous,generatedAt:new Date().toISOString()};onProgress({stage:'done',pct:100});return result}
+export async function runCloudBacktest({assets,days=90,end=Date.now(),onProgress=()=>{}}){
+  const cfg=CLOUD_BT_CONFIG,start=end-days*DAY,warmStart=start-60*MS['4h'],market={};
+  for(let i=0;i<assets.length;i++){
+    const symbol=assets[i];onProgress({stage:'loading',asset:symbol,index:i,total:assets.length,pct:Math.round(i/assets.length*45)});
+    const [m15,h1,h4]=await Promise.all([fetchKlines(symbol,'15m',warmStart,end),fetchKlines(symbol,'1h',warmStart,end),fetchKlines(symbol,'4h',warmStart,end)]);
+    market[symbol]={'15m':m15,'1h':h1,'4h':h4};
+  }
+  onProgress({stage:'prepare',pct:50});
+  const events=prepareEvents(market,start,end,cfg,p=>onProgress({...p,pct:50+Math.round((p.pct||0)*.15)}));
+  onProgress({stage:'portfolio-replay',pct:68});
+  const ledgers=replayPrepared(events,start,end,cfg);
+  onProgress({stage:'walk-forward',pct:82});
+  const researchContinuous=continuousSummary(events,start,end,cfg,ledgers);
+  onProgress({stage:'exit-lab-replay',pct:92});
+  const exitLabReplay=replayExitLabForLedgers({
+    ledgers:{baseline:ledgers.baseline.tradeList,shadow:ledgers.shadow.tradeList,challenger:ledgers.challenger.tradeList,regime:ledgers.regime.tradeList},
+    market,end,opts:{horizonDays:14,feeBps:cfg.feeBps,slippageBps:cfg.slippageBps}
+  });
+  const result={mode:'PORTFOLIO_V2',cloud:true,version:'7.49-EXIT-LAB-REPLAY-V1',researchEngine:'7.34-RESEARCH-V2',regimeModel:'7.38-REGIME-V1',method:'SHARED_MULTI_ASSET_TIMELINE_INDEPENDENT_LEDGERS',executionImpact:false,days,start,end,assets,config:cfg,summary:compactStats(ledgers.baseline),ledgers:{baseline:{...compactStats(ledgers.baseline),tradeList:ledgers.baseline.tradeList,equityCurve:ledgers.baseline.equityCurve,byAsset:assetBreakdown(ledgers.baseline.tradeList)},shadow:{...compactStats(ledgers.shadow),tradeList:ledgers.shadow.tradeList,equityCurve:ledgers.shadow.equityCurve,byAsset:assetBreakdown(ledgers.shadow.tradeList)},challenger:{...compactStats(ledgers.challenger),tradeList:ledgers.challenger.tradeList,equityCurve:ledgers.challenger.equityCurve,byAsset:assetBreakdown(ledgers.challenger.tradeList)},regime:{...compactStats(ledgers.regime),tradeList:ledgers.regime.tradeList,equityCurve:ledgers.regime.equityCurve,byAsset:assetBreakdown(ledgers.regime.tradeList)}},researchContinuous,exitLabReplay,generatedAt:new Date().toISOString()};
+  onProgress({stage:'done',pct:100});return result;
+}
 
 export const __test={makeLedger,markLedger,gate,openPosition,closePosition,processExits,stats,replayPrepared,shadowDecision,challengerDecision,candidate,slip};

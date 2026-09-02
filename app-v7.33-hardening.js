@@ -1,8 +1,8 @@
 (function(){
   'use strict';
 
-  const VERSION='7.48';
-  const BUILD='7.48-20260902-R1';
+  const VERSION='7.49';
+  const BUILD='7.49-20260902-R1';
   const API=window.MERIDIAN_CLOUD_API||'https://p01--achi-meridian--ttvk44grdlp7.code.run';
   const TOKEN_KEY='meridian_read_token_v1';
   const PROTECTED=[
@@ -49,7 +49,7 @@
       const meta=document.querySelector('meta[name="meridian-build"]');
       if(meta)meta.content=BUILD;
       const manifest=document.querySelector('link[rel="manifest"]');
-      if(manifest)manifest.href='manifest.webmanifest?v=7.48-R1';
+      if(manifest)manifest.href='manifest.webmanifest?v=7.49-R1';
       const badge=document.getElementById('versionBadge');
       if(badge)badge.textContent='v'+VERSION+' · LIVE';
     }catch(_e){}
