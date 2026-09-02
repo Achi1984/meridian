@@ -30,6 +30,9 @@ check(!loader.includes('app-v7.32-legacy.js'),'retired v7.32 diagnostic layer is
 check(loader.includes('app-v7.60-final-ui-authority.js'),'canonical loader includes final UI authority');
 check(loader.lastIndexOf('app-v7.60-final-ui-authority.js')>loader.lastIndexOf('app-v7.60-private-hydration-hotfix.js'),'final UI authority loads after private hydration');
 check(!/emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(loader),'obsolete hotfix layers are not loaded');
+check(!loader.includes('document.write'),'canonical loader never injects modules during parser execution');
+check(loader.includes("window.addEventListener('load'")&&loader.includes('async function start()'),'canonical modules are deferred until legacy inline runtime has finished');
+check(loader.includes("data-meridian-canonical-ready"),'canonical loader exposes ready state for runtime diagnosis');
 
 check(fs.existsSync('assets/achi-meridian-topbar.webp'),'approved topbar logo asset exists');
 check(uiPolish.includes('assets/achi-meridian-topbar.webp'),'topbar uses approved ACHI MERIDIAN logo asset');
