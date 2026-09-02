@@ -1,0 +1,1222 @@
+{
+  "schemaVersion": "7.54-V31-ATTRIBUTION-V1",
+  "generatedAt": "2026-09-02T13:11:25.653Z",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "SUIUSDT",
+    "HBARUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "DOTUSDT",
+    "FETUSDT",
+    "INJUSDT"
+  ],
+  "windows": [
+    30,
+    60,
+    90
+  ],
+  "runs": [
+    {
+      "days": 30,
+      "total": {
+        "key": "ALL",
+        "trades": 42,
+        "pnl": -876.96,
+        "expectancy": -20.88,
+        "winRate": 40.5,
+        "pf": 0.555,
+        "avgRiskPct": 0.627,
+        "riskWeightedEdge": -33.31
+      },
+      "byStatus": [
+        {
+          "key": "READY",
+          "trades": 37,
+          "pnl": -839.89,
+          "expectancy": -22.7,
+          "winRate": 43.2,
+          "pf": 0.563,
+          "avgRiskPct": 0.697,
+          "riskWeightedEdge": -32.55
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "trades": 5,
+          "pnl": -37.07,
+          "expectancy": -7.41,
+          "winRate": 20,
+          "pf": 0.25,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -70.62
+        }
+      ],
+      "bySide": [
+        {
+          "key": "LONG",
+          "trades": 23,
+          "pnl": -190.97,
+          "expectancy": -8.3,
+          "winRate": 52.2,
+          "pf": 0.784,
+          "avgRiskPct": 0.579,
+          "riskWeightedEdge": -14.34
+        },
+        {
+          "key": "SHORT",
+          "trades": 19,
+          "pnl": -685.99,
+          "expectancy": -36.1,
+          "winRate": 26.3,
+          "pf": 0.369,
+          "avgRiskPct": 0.685,
+          "riskWeightedEdge": -52.73
+        }
+      ],
+      "byRegime": [
+        {
+          "key": "RANGE",
+          "trades": 21,
+          "pnl": -331.22,
+          "expectancy": -15.77,
+          "winRate": 47.6,
+          "pf": 0.602,
+          "avgRiskPct": 0.557,
+          "riskWeightedEdge": -28.3
+        },
+        {
+          "key": "BULL",
+          "trades": 11,
+          "pnl": -281.57,
+          "expectancy": -25.6,
+          "winRate": 36.4,
+          "pf": 0.566,
+          "avgRiskPct": 0.756,
+          "riskWeightedEdge": -33.86
+        },
+        {
+          "key": "TRANSITION",
+          "trades": 5,
+          "pnl": 21.61,
+          "expectancy": 4.32,
+          "winRate": 40,
+          "pf": 1.211,
+          "avgRiskPct": 0.44,
+          "riskWeightedEdge": 9.82
+        },
+        {
+          "key": "BEAR",
+          "trades": 5,
+          "pnl": -285.79,
+          "expectancy": -57.16,
+          "winRate": 20,
+          "pf": 0.265,
+          "avgRiskPct": 0.821,
+          "riskWeightedEdge": -69.62
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "LONG|BULL",
+          "trades": 11,
+          "pnl": -281.57,
+          "expectancy": -25.6,
+          "winRate": 36.4,
+          "pf": 0.566,
+          "avgRiskPct": 0.756,
+          "riskWeightedEdge": -33.86
+        },
+        {
+          "key": "LONG|RANGE",
+          "trades": 11,
+          "pnl": 64.75,
+          "expectancy": 5.89,
+          "winRate": 63.6,
+          "pf": 1.274,
+          "avgRiskPct": 0.427,
+          "riskWeightedEdge": 13.78
+        },
+        {
+          "key": "SHORT|RANGE",
+          "trades": 10,
+          "pnl": -395.96,
+          "expectancy": -39.6,
+          "winRate": 30,
+          "pf": 0.336,
+          "avgRiskPct": 0.701,
+          "riskWeightedEdge": -56.53
+        },
+        {
+          "key": "SHORT|BEAR",
+          "trades": 5,
+          "pnl": -285.79,
+          "expectancy": -57.16,
+          "winRate": 20,
+          "pf": 0.265,
+          "avgRiskPct": 0.821,
+          "riskWeightedEdge": -69.62
+        },
+        {
+          "key": "SHORT|TRANSITION",
+          "trades": 4,
+          "pnl": -4.24,
+          "expectancy": -1.06,
+          "winRate": 25,
+          "pf": 0.959,
+          "avgRiskPct": 0.475,
+          "riskWeightedEdge": -2.23
+        },
+        {
+          "key": "LONG|TRANSITION",
+          "trades": 1,
+          "pnl": 25.85,
+          "expectancy": 25.85,
+          "winRate": 100,
+          "pf": 99,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": 86.17
+        }
+      ],
+      "byDistance": [
+        {
+          "key": "<=0.25",
+          "trades": 14,
+          "pnl": -236.71,
+          "expectancy": -16.91,
+          "winRate": 50,
+          "pf": 0.674,
+          "avgRiskPct": 0.75,
+          "riskWeightedEdge": -22.54
+        },
+        {
+          "key": "0.50-0.75",
+          "trades": 13,
+          "pnl": -474.56,
+          "expectancy": -36.5,
+          "winRate": 30.8,
+          "pf": 0.299,
+          "avgRiskPct": 0.569,
+          "riskWeightedEdge": -64.13
+        },
+        {
+          "key": "0.25-0.50",
+          "trades": 10,
+          "pnl": -128.61,
+          "expectancy": -12.86,
+          "winRate": 50,
+          "pf": 0.752,
+          "avgRiskPct": 0.79,
+          "riskWeightedEdge": -16.28
+        },
+        {
+          "key": ">1.50",
+          "trades": 2,
+          "pnl": -23.12,
+          "expectancy": -11.56,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -110.08
+        },
+        {
+          "key": "0.75-1.00",
+          "trades": 2,
+          "pnl": -0.98,
+          "expectancy": -0.49,
+          "winRate": 50,
+          "pf": 0.927,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -4.67
+        },
+        {
+          "key": "1.00-1.50",
+          "trades": 1,
+          "pnl": -12.98,
+          "expectancy": -12.98,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -123.59
+        }
+      ],
+      "byConfidence": [
+        {
+          "key": "70-74",
+          "trades": 12,
+          "pnl": -142.19,
+          "expectancy": -11.85,
+          "winRate": 33.3,
+          "pf": 0.42,
+          "avgRiskPct": 0.251,
+          "riskWeightedEdge": -47.16
+        },
+        {
+          "key": "80-84",
+          "trades": 11,
+          "pnl": -228.75,
+          "expectancy": -20.8,
+          "winRate": 45.5,
+          "pf": 0.702,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -20.8
+        },
+        {
+          "key": ">=85",
+          "trades": 9,
+          "pnl": -657.94,
+          "expectancy": -73.1,
+          "winRate": 22.2,
+          "pf": 0.237,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -73.1
+        },
+        {
+          "key": "75-79",
+          "trades": 7,
+          "pnl": 140.91,
+          "expectancy": 20.13,
+          "winRate": 71.4,
+          "pf": 2.923,
+          "avgRiskPct": 0.4,
+          "riskWeightedEdge": 50.33
+        },
+        {
+          "key": "<70",
+          "trades": 3,
+          "pnl": 11.01,
+          "expectancy": 3.67,
+          "winRate": 33.3,
+          "pf": 1.476,
+          "avgRiskPct": 0.17,
+          "riskWeightedEdge": 21.59
+        }
+      ],
+      "byStatusDistance": [
+        {
+          "key": "READY|<=0.25",
+          "trades": 14,
+          "pnl": -236.71,
+          "expectancy": -16.91,
+          "winRate": 50,
+          "pf": 0.674,
+          "avgRiskPct": 0.75,
+          "riskWeightedEdge": -22.54
+        },
+        {
+          "key": "READY|0.50-0.75",
+          "trades": 13,
+          "pnl": -474.56,
+          "expectancy": -36.5,
+          "winRate": 30.8,
+          "pf": 0.299,
+          "avgRiskPct": 0.569,
+          "riskWeightedEdge": -64.13
+        },
+        {
+          "key": "READY|0.25-0.50",
+          "trades": 10,
+          "pnl": -128.61,
+          "expectancy": -12.86,
+          "winRate": 50,
+          "pf": 0.752,
+          "avgRiskPct": 0.79,
+          "riskWeightedEdge": -16.28
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|>1.50",
+          "trades": 2,
+          "pnl": -23.12,
+          "expectancy": -11.56,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -110.08
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|0.75-1.00",
+          "trades": 2,
+          "pnl": -0.98,
+          "expectancy": -0.49,
+          "winRate": 50,
+          "pf": 0.927,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -4.67
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|1.00-1.50",
+          "trades": 1,
+          "pnl": -12.98,
+          "expectancy": -12.98,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -123.59
+        }
+      ],
+      "byAsset": [
+        {
+          "key": "SUIUSDT",
+          "trades": 5,
+          "pnl": -238.73,
+          "expectancy": -47.75,
+          "winRate": 20,
+          "pf": 0.264,
+          "avgRiskPct": 0.72,
+          "riskWeightedEdge": -66.31
+        },
+        {
+          "key": "ADAUSDT",
+          "trades": 4,
+          "pnl": -111.49,
+          "expectancy": -27.87,
+          "winRate": 25,
+          "pf": 0.516,
+          "avgRiskPct": 0.776,
+          "riskWeightedEdge": -35.91
+        },
+        {
+          "key": "XRPUSDT",
+          "trades": 4,
+          "pnl": -96.58,
+          "expectancy": -24.14,
+          "winRate": 25,
+          "pf": 0.481,
+          "avgRiskPct": 0.601,
+          "riskWeightedEdge": -40.16
+        },
+        {
+          "key": "HBARUSDT",
+          "trades": 4,
+          "pnl": -38.21,
+          "expectancy": -9.55,
+          "winRate": 50,
+          "pf": 0.768,
+          "avgRiskPct": 0.65,
+          "riskWeightedEdge": -14.7
+        },
+        {
+          "key": "DOTUSDT",
+          "trades": 4,
+          "pnl": -14.36,
+          "expectancy": -3.59,
+          "winRate": 50,
+          "pf": 0.885,
+          "avgRiskPct": 0.553,
+          "riskWeightedEdge": -6.5
+        },
+        {
+          "key": "FETUSDT",
+          "trades": 4,
+          "pnl": 70.81,
+          "expectancy": 17.7,
+          "winRate": 75,
+          "pf": 3.217,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": 59.01
+        },
+        {
+          "key": "BTCUSDT",
+          "trades": 4,
+          "pnl": -133.32,
+          "expectancy": -33.33,
+          "winRate": 50,
+          "pf": 0.546,
+          "avgRiskPct": 0.825,
+          "riskWeightedEdge": -40.4
+        },
+        {
+          "key": "AVAXUSDT",
+          "trades": 3,
+          "pnl": 15.83,
+          "expectancy": 5.28,
+          "winRate": 66.7,
+          "pf": 1.126,
+          "avgRiskPct": 0.767,
+          "riskWeightedEdge": 6.88
+        },
+        {
+          "key": "ETHUSDT",
+          "trades": 3,
+          "pnl": -135.32,
+          "expectancy": -45.11,
+          "winRate": 33.3,
+          "pf": 0.165,
+          "avgRiskPct": 0.533,
+          "riskWeightedEdge": -84.58
+        },
+        {
+          "key": "SOLUSDT",
+          "trades": 3,
+          "pnl": -108.11,
+          "expectancy": -36.04,
+          "winRate": 33.3,
+          "pf": 0.216,
+          "avgRiskPct": 0.468,
+          "riskWeightedEdge": -76.94
+        },
+        {
+          "key": "NEARUSDT",
+          "trades": 3,
+          "pnl": 32.72,
+          "expectancy": 10.91,
+          "winRate": 33.3,
+          "pf": 1.465,
+          "avgRiskPct": 0.533,
+          "riskWeightedEdge": 20.45
+        },
+        {
+          "key": "INJUSDT",
+          "trades": 1,
+          "pnl": -120.2,
+          "expectancy": -120.2,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -120.2
+        }
+      ]
+    },
+    {
+      "days": 60,
+      "total": {
+        "key": "ALL",
+        "trades": 20,
+        "pnl": -673.17,
+        "expectancy": -33.66,
+        "winRate": 20,
+        "pf": 0.362,
+        "avgRiskPct": 0.607,
+        "riskWeightedEdge": -55.45
+      },
+      "byStatus": [
+        {
+          "key": "READY",
+          "trades": 12,
+          "pnl": -600.61,
+          "expectancy": -50.05,
+          "winRate": 25,
+          "pf": 0.381,
+          "avgRiskPct": 0.942,
+          "riskWeightedEdge": -53.15
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "trades": 8,
+          "pnl": -72.55,
+          "expectancy": -9.07,
+          "winRate": 12.5,
+          "pf": 0.143,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -86.37
+        }
+      ],
+      "bySide": [
+        {
+          "key": "LONG",
+          "trades": 20,
+          "pnl": -673.17,
+          "expectancy": -33.66,
+          "winRate": 20,
+          "pf": 0.362,
+          "avgRiskPct": 0.607,
+          "riskWeightedEdge": -55.45
+        }
+      ],
+      "byRegime": [
+        {
+          "key": "BULL",
+          "trades": 19,
+          "pnl": -641.83,
+          "expectancy": -33.78,
+          "winRate": 21.1,
+          "pf": 0.373,
+          "avgRiskPct": 0.623,
+          "riskWeightedEdge": -54.21
+        },
+        {
+          "key": "RANGE",
+          "trades": 1,
+          "pnl": -31.34,
+          "expectancy": -31.34,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -104.47
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "LONG|BULL",
+          "trades": 19,
+          "pnl": -641.83,
+          "expectancy": -33.78,
+          "winRate": 21.1,
+          "pf": 0.373,
+          "avgRiskPct": 0.623,
+          "riskWeightedEdge": -54.21
+        },
+        {
+          "key": "LONG|RANGE",
+          "trades": 1,
+          "pnl": -31.34,
+          "expectancy": -31.34,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -104.47
+        }
+      ],
+      "byDistance": [
+        {
+          "key": "0.50-0.75",
+          "trades": 5,
+          "pnl": -296.05,
+          "expectancy": -59.21,
+          "winRate": 20,
+          "pf": 0.212,
+          "avgRiskPct": 0.86,
+          "riskWeightedEdge": -68.85
+        },
+        {
+          "key": "0.25-0.50",
+          "trades": 5,
+          "pnl": -296.74,
+          "expectancy": -59.35,
+          "winRate": 20,
+          "pf": 0.382,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -59.35
+        },
+        {
+          "key": ">1.50",
+          "trades": 3,
+          "pnl": -12.26,
+          "expectancy": -4.09,
+          "winRate": 33.3,
+          "pf": 0.497,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -38.92
+        },
+        {
+          "key": "1.00-1.50",
+          "trades": 3,
+          "pnl": -36.8,
+          "expectancy": -12.27,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -116.83
+        },
+        {
+          "key": "0.75-1.00",
+          "trades": 2,
+          "pnl": -23.49,
+          "expectancy": -11.75,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -111.86
+        },
+        {
+          "key": "<=0.25",
+          "trades": 2,
+          "pnl": -7.83,
+          "expectancy": -3.91,
+          "winRate": 50,
+          "pf": 0.932,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -3.91
+        }
+      ],
+      "byConfidence": [
+        {
+          "key": ">=85",
+          "trades": 10,
+          "pnl": -449.07,
+          "expectancy": -44.91,
+          "winRate": 30,
+          "pf": 0.452,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -44.91
+        },
+        {
+          "key": "<70",
+          "trades": 5,
+          "pnl": -56.27,
+          "expectancy": -11.25,
+          "winRate": 20,
+          "pf": 0.177,
+          "avgRiskPct": 0.144,
+          "riskWeightedEdge": -78.15
+        },
+        {
+          "key": "75-79",
+          "trades": 3,
+          "pnl": -143.69,
+          "expectancy": -47.9,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.403,
+          "riskWeightedEdge": -118.75
+        },
+        {
+          "key": "70-74",
+          "trades": 2,
+          "pnl": -24.14,
+          "expectancy": -12.07,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -114.94
+        }
+      ],
+      "byStatusDistance": [
+        {
+          "key": "READY|0.50-0.75",
+          "trades": 5,
+          "pnl": -296.05,
+          "expectancy": -59.21,
+          "winRate": 20,
+          "pf": 0.212,
+          "avgRiskPct": 0.86,
+          "riskWeightedEdge": -68.85
+        },
+        {
+          "key": "READY|0.25-0.50",
+          "trades": 5,
+          "pnl": -296.74,
+          "expectancy": -59.35,
+          "winRate": 20,
+          "pf": 0.382,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -59.35
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|>1.50",
+          "trades": 3,
+          "pnl": -12.26,
+          "expectancy": -4.09,
+          "winRate": 33.3,
+          "pf": 0.497,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -38.92
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|1.00-1.50",
+          "trades": 3,
+          "pnl": -36.8,
+          "expectancy": -12.27,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -116.83
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|0.75-1.00",
+          "trades": 2,
+          "pnl": -23.49,
+          "expectancy": -11.75,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -111.86
+        },
+        {
+          "key": "READY|<=0.25",
+          "trades": 2,
+          "pnl": -7.83,
+          "expectancy": -3.91,
+          "winRate": 50,
+          "pf": 0.932,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -3.91
+        }
+      ],
+      "byAsset": [
+        {
+          "key": "BTCUSDT",
+          "trades": 4,
+          "pnl": -190.34,
+          "expectancy": -47.58,
+          "winRate": 25,
+          "pf": 0.295,
+          "avgRiskPct": 0.776,
+          "riskWeightedEdge": -61.3
+        },
+        {
+          "key": "ETHUSDT",
+          "trades": 3,
+          "pnl": -45.89,
+          "expectancy": -15.3,
+          "winRate": 33.3,
+          "pf": 0.8,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -15.3
+        },
+        {
+          "key": "HBARUSDT",
+          "trades": 3,
+          "pnl": -112,
+          "expectancy": -37.33,
+          "winRate": 33.3,
+          "pf": 0.098,
+          "avgRiskPct": 0.403,
+          "riskWeightedEdge": -92.56
+        },
+        {
+          "key": "SUIUSDT",
+          "trades": 2,
+          "pnl": -24.38,
+          "expectancy": -12.19,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -116.12
+        },
+        {
+          "key": "SOLUSDT",
+          "trades": 2,
+          "pnl": -16.14,
+          "expectancy": -8.07,
+          "winRate": 50,
+          "pf": 0.869,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -8.07
+        },
+        {
+          "key": "XRPUSDT",
+          "trades": 2,
+          "pnl": -24.12,
+          "expectancy": -12.06,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -114.87
+        },
+        {
+          "key": "ADAUSDT",
+          "trades": 2,
+          "pnl": -216.94,
+          "expectancy": -108.47,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -108.47
+        },
+        {
+          "key": "NEARUSDT",
+          "trades": 1,
+          "pnl": -12,
+          "expectancy": -12,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -114.3
+        },
+        {
+          "key": "INJUSDT",
+          "trades": 1,
+          "pnl": -31.34,
+          "expectancy": -31.34,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -104.47
+        }
+      ]
+    },
+    {
+      "days": 90,
+      "total": {
+        "key": "ALL",
+        "trades": 37,
+        "pnl": 491.19,
+        "expectancy": 13.28,
+        "winRate": 51.4,
+        "pf": 1.353,
+        "avgRiskPct": 0.664,
+        "riskWeightedEdge": 20.01
+      },
+      "byStatus": [
+        {
+          "key": "READY",
+          "trades": 27,
+          "pnl": 456.57,
+          "expectancy": 16.91,
+          "winRate": 48.1,
+          "pf": 1.34,
+          "avgRiskPct": 0.87,
+          "riskWeightedEdge": 19.43
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "trades": 10,
+          "pnl": 34.62,
+          "expectancy": 3.46,
+          "winRate": 60,
+          "pf": 1.682,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 32.97
+        }
+      ],
+      "bySide": [
+        {
+          "key": "SHORT",
+          "trades": 29,
+          "pnl": 955.45,
+          "expectancy": 32.95,
+          "winRate": 62.1,
+          "pf": 2.078,
+          "avgRiskPct": 0.691,
+          "riskWeightedEdge": 47.65
+        },
+        {
+          "key": "LONG",
+          "trades": 8,
+          "pnl": -464.26,
+          "expectancy": -58.03,
+          "winRate": 12.5,
+          "pf": 0.081,
+          "avgRiskPct": 0.563,
+          "riskWeightedEdge": -103.17
+        }
+      ],
+      "byRegime": [
+        {
+          "key": "BEAR",
+          "trades": 30,
+          "pnl": 918.36,
+          "expectancy": 30.61,
+          "winRate": 60,
+          "pf": 1.994,
+          "avgRiskPct": 0.678,
+          "riskWeightedEdge": 45.13
+        },
+        {
+          "key": "TRANSITION",
+          "trades": 7,
+          "pnl": -427.17,
+          "expectancy": -61.02,
+          "winRate": 14.3,
+          "pf": 0.088,
+          "avgRiskPct": 0.6,
+          "riskWeightedEdge": -101.71
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "SHORT|BEAR",
+          "trades": 29,
+          "pnl": 955.45,
+          "expectancy": 32.95,
+          "winRate": 62.1,
+          "pf": 2.078,
+          "avgRiskPct": 0.691,
+          "riskWeightedEdge": 47.65
+        },
+        {
+          "key": "LONG|TRANSITION",
+          "trades": 7,
+          "pnl": -427.17,
+          "expectancy": -61.02,
+          "winRate": 14.3,
+          "pf": 0.088,
+          "avgRiskPct": 0.6,
+          "riskWeightedEdge": -101.71
+        },
+        {
+          "key": "LONG|BEAR",
+          "trades": 1,
+          "pnl": -37.09,
+          "expectancy": -37.09,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -123.63
+        }
+      ],
+      "byDistance": [
+        {
+          "key": "0.25-0.50",
+          "trades": 13,
+          "pnl": -309.29,
+          "expectancy": -23.79,
+          "winRate": 38.5,
+          "pf": 0.651,
+          "avgRiskPct": 0.892,
+          "riskWeightedEdge": -26.66
+        },
+        {
+          "key": "0.50-0.75",
+          "trades": 10,
+          "pnl": 656.67,
+          "expectancy": 65.67,
+          "winRate": 60,
+          "pf": 3.925,
+          "avgRiskPct": 0.79,
+          "riskWeightedEdge": 83.12
+        },
+        {
+          "key": ">1.50",
+          "trades": 5,
+          "pnl": 43.53,
+          "expectancy": 8.71,
+          "winRate": 80,
+          "pf": 4.309,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 82.91
+        },
+        {
+          "key": "<=0.25",
+          "trades": 4,
+          "pnl": 109.2,
+          "expectancy": 27.3,
+          "winRate": 50,
+          "pf": 1.471,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": 27.3
+        },
+        {
+          "key": "1.00-1.50",
+          "trades": 4,
+          "pnl": 3.56,
+          "expectancy": 0.89,
+          "winRate": 50,
+          "pf": 1.142,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 8.46
+        },
+        {
+          "key": "0.75-1.00",
+          "trades": 1,
+          "pnl": -12.47,
+          "expectancy": -12.47,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -118.74
+        }
+      ],
+      "byConfidence": [
+        {
+          "key": ">=85",
+          "trades": 16,
+          "pnl": 685.08,
+          "expectancy": 42.82,
+          "winRate": 62.5,
+          "pf": 1.955,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": 42.82
+        },
+        {
+          "key": "<70",
+          "trades": 12,
+          "pnl": -37.41,
+          "expectancy": -3.12,
+          "winRate": 50,
+          "pf": 0.695,
+          "avgRiskPct": 0.137,
+          "riskWeightedEdge": -22.67
+        },
+        {
+          "key": "80-84",
+          "trades": 4,
+          "pnl": 114.62,
+          "expectancy": 28.65,
+          "winRate": 50,
+          "pf": 1.478,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": 28.65
+        },
+        {
+          "key": "70-74",
+          "trades": 3,
+          "pnl": -30.02,
+          "expectancy": -10.01,
+          "winRate": 33.3,
+          "pf": 0.578,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -33.36
+        },
+        {
+          "key": "75-79",
+          "trades": 2,
+          "pnl": -241.07,
+          "expectancy": -120.54,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -120.54
+        }
+      ],
+      "byStatusDistance": [
+        {
+          "key": "READY|0.25-0.50",
+          "trades": 13,
+          "pnl": -309.29,
+          "expectancy": -23.79,
+          "winRate": 38.5,
+          "pf": 0.651,
+          "avgRiskPct": 0.892,
+          "riskWeightedEdge": -26.66
+        },
+        {
+          "key": "READY|0.50-0.75",
+          "trades": 10,
+          "pnl": 656.67,
+          "expectancy": 65.67,
+          "winRate": 60,
+          "pf": 3.925,
+          "avgRiskPct": 0.79,
+          "riskWeightedEdge": 83.12
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|>1.50",
+          "trades": 5,
+          "pnl": 43.53,
+          "expectancy": 8.71,
+          "winRate": 80,
+          "pf": 4.309,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 82.91
+        },
+        {
+          "key": "READY|<=0.25",
+          "trades": 4,
+          "pnl": 109.2,
+          "expectancy": 27.3,
+          "winRate": 50,
+          "pf": 1.471,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": 27.3
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|1.00-1.50",
+          "trades": 4,
+          "pnl": 3.56,
+          "expectancy": 0.89,
+          "winRate": 50,
+          "pf": 1.142,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 8.46
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE|0.75-1.00",
+          "trades": 1,
+          "pnl": -12.47,
+          "expectancy": -12.47,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -118.74
+        }
+      ],
+      "byAsset": [
+        {
+          "key": "SUIUSDT",
+          "trades": 7,
+          "pnl": 4.87,
+          "expectancy": 0.7,
+          "winRate": 57.1,
+          "pf": 1.025,
+          "avgRiskPct": 0.444,
+          "riskWeightedEdge": 1.56
+        },
+        {
+          "key": "BTCUSDT",
+          "trades": 6,
+          "pnl": 216.24,
+          "expectancy": 36.04,
+          "winRate": 50,
+          "pf": 1.831,
+          "avgRiskPct": 0.851,
+          "riskWeightedEdge": 42.36
+        },
+        {
+          "key": "XRPUSDT",
+          "trades": 5,
+          "pnl": -239.05,
+          "expectancy": -47.81,
+          "winRate": 40,
+          "pf": 0.102,
+          "avgRiskPct": 0.502,
+          "riskWeightedEdge": -95.24
+        },
+        {
+          "key": "SOLUSDT",
+          "trades": 4,
+          "pnl": 416.55,
+          "expectancy": 104.14,
+          "winRate": 100,
+          "pf": 99,
+          "avgRiskPct": 0.776,
+          "riskWeightedEdge": 134.16
+        },
+        {
+          "key": "ETHUSDT",
+          "trades": 4,
+          "pnl": 354.37,
+          "expectancy": 88.59,
+          "winRate": 75,
+          "pf": 3.893,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": 88.59
+        },
+        {
+          "key": "NEARUSDT",
+          "trades": 4,
+          "pnl": -213.69,
+          "expectancy": -53.42,
+          "winRate": 25,
+          "pf": 0.405,
+          "avgRiskPct": 1,
+          "riskWeightedEdge": -53.42
+        },
+        {
+          "key": "ADAUSDT",
+          "trades": 3,
+          "pnl": -1.66,
+          "expectancy": -0.55,
+          "winRate": 33.3,
+          "pf": 0.987,
+          "avgRiskPct": 0.702,
+          "riskWeightedEdge": -0.79
+        },
+        {
+          "key": "HBARUSDT",
+          "trades": 2,
+          "pnl": 0.5,
+          "expectancy": 0.25,
+          "winRate": 50,
+          "pf": 1.038,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": 2.36
+        },
+        {
+          "key": "FETUSDT",
+          "trades": 1,
+          "pnl": -34.47,
+          "expectancy": -34.47,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.3,
+          "riskWeightedEdge": -114.91
+        },
+        {
+          "key": "DOTUSDT",
+          "trades": 1,
+          "pnl": -12.47,
+          "expectancy": -12.47,
+          "winRate": 0,
+          "pf": 0,
+          "avgRiskPct": 0.105,
+          "riskWeightedEdge": -118.74
+        }
+      ]
+    }
+  ]
+}
