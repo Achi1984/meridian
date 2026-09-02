@@ -43,7 +43,7 @@ apply('app-v6.06.js',src=>{
 apply('app-v7.33-hardening.js',src=>{
   let s=src;s=required(s,/const VERSION='[^']+';/,`const VERSION='${version}';`,'hardening version');s=required(s,/const BUILD='[^']+';/,`const BUILD='${build}';`,'hardening build');s=s.replace(/manifest\.webmanifest\?v=[^'"\s]+/g,`manifest.webmanifest?v=${cacheTag}`);return s;
 });
-apply('manifest.webmanifest',()=>JSON.stringify({name:`ACHI MERIDIAN v${version}`,short_name:`MERIDIAN ${version}`,start_url:`./?build=${build}`,display:'standalone',background_color:'#03070c',theme_color:'#05080d'},null,2)+'\n');
+apply('manifest.webmanifest',()=>JSON.stringify({name:`ACHI MERIDIAN v${version}`,short_name:`MERIDIAN ${version}`,start_url:`./center.html?boot=${version}-R14`,display:'standalone',background_color:'#03070c',theme_color:'#05080d'},null,2)+'\n');
 apply('package.json',src=>{const p=JSON.parse(src);p.version=version+'.0';p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs','runtime:smoke':'node scripts/runtime-smoke.mjs'};return JSON.stringify(p)+'\n'});
 if(!write&&pending.length)throw new Error('release-generated files out of sync: '+pending.join(', '));
 console.log(write?'release sync complete':'release sync clean',version,build);
