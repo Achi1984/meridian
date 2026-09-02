@@ -1,0 +1,42 @@
+name: MERIDIAN v7.52 Challenger V3 Evidence Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-52-challenger-v3
+    paths:
+      - .github/workflows/v752-v3-evidence-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-52-challenger-v3
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Use Binance public market-data endpoint in CI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('cloud-backtest.js');s=p.read_text();s=s.replace("const BINANCE='https://api.binance.com';","const BINANCE='https://data-api.binance.vision';");p.write_text(s)
+          PY
+      - run: node scripts/challenger-v3-evidence.mjs
+      - name: Commit evidence and self-remove
+        run: |
+          git checkout -- cloud-backtest.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v752-v3-evidence-once.yml
+          git add scripts/challenger-v3-evidence.mjs research/challenger-v3-evidence-v752.json research/challenger-v3-evidence-v752.md
+          git commit -m "MERIDIAN v7.52: Challenger V3 historical evidence"
+          git push origin HEAD:codex/meridian-v7-52-challenger-v3
