@@ -1,6 +1,6 @@
 # MERIDIAN v7.62 — Raw Feature Edge Evidence
 
-Generated: 2026-09-02T14:48:57.087Z
+Generated: 2026-09-02T14:58:04.144Z
 
 Portfolio-independent signal cohorts; one candidate per symbol per 4h. A_CURRENT/full TP1 normalized-R, SL first on same candle, 14-day complete horizon. Portfolio gates excluded.
 

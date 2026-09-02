@@ -1,0 +1,482 @@
+{
+  "schemaVersion": "7.65-DISJOINT-HISTORY-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "minSamples": 30,
+  "periods": [
+    "P0",
+    "P1",
+    "P2",
+    "P3"
+  ],
+  "candidates": [
+    {
+      "id": "VOL_GE15_ADX_LT18",
+      "match": {
+        "volume15": ">=1.5",
+        "adx15": "<18"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 273,
+          "totalR": 39,
+          "avgR": 0.143,
+          "winRate": 47.6,
+          "pf": 1.273,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 232,
+          "totalR": 27.2,
+          "avgR": 0.117,
+          "winRate": 46.6,
+          "pf": 1.219,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 213,
+          "totalR": 39,
+          "avgR": 0.183,
+          "winRate": 49.3,
+          "pf": 1.361,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 258,
+          "totalR": 22.8,
+          "avgR": 0.088,
+          "winRate": 45.3,
+          "pf": 1.162,
+          "adequate": true,
+          "positive": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 4,
+      "positivePeriodPct": 100,
+      "weightedAvgR": 0.131,
+      "totalSamples": 976,
+      "robust": true
+    },
+    {
+      "id": "SHORT_TRANSITION_VOL_065_1",
+      "match": {
+        "volume15": "0.65-1",
+        "side": "SHORT",
+        "regime": "TRANSITION"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 163,
+          "totalR": 31.4,
+          "avgR": 0.193,
+          "winRate": 49.7,
+          "pf": 1.383,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 191,
+          "totalR": 10.6,
+          "avgR": 0.055,
+          "winRate": 44,
+          "pf": 1.099,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 153,
+          "totalR": 27,
+          "avgR": 0.176,
+          "winRate": 49,
+          "pf": 1.346,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 160,
+          "totalR": 0.8,
+          "avgR": 0.005,
+          "winRate": 41.9,
+          "pf": 1.009,
+          "adequate": true,
+          "positive": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 4,
+      "positivePeriodPct": 100,
+      "weightedAvgR": 0.104,
+      "totalSamples": 667,
+      "robust": true
+    },
+    {
+      "id": "VOL_GE15_ADX_18_25",
+      "match": {
+        "volume15": ">=1.5",
+        "adx15": "18-25"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 300,
+          "totalR": 26.4,
+          "avgR": 0.088,
+          "winRate": 45.3,
+          "pf": 1.161,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 271,
+          "totalR": 9.8,
+          "avgR": 0.036,
+          "winRate": 43.2,
+          "pf": 1.064,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 288,
+          "totalR": 24,
+          "avgR": 0.083,
+          "winRate": 45.1,
+          "pf": 1.152,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 289,
+          "totalR": 30.2,
+          "avgR": 0.104,
+          "winRate": 46,
+          "pf": 1.194,
+          "adequate": true,
+          "positive": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 4,
+      "positivePeriodPct": 100,
+      "weightedAvgR": 0.078,
+      "totalSamples": 1148,
+      "robust": true
+    },
+    {
+      "id": "VOL_1_115_RSI_50_58",
+      "match": {
+        "volume15": "1-1.15",
+        "rsi15": "50-58"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 106,
+          "totalR": 40.4,
+          "avgR": 0.381,
+          "winRate": 57.5,
+          "pf": 1.898,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 85,
+          "totalR": 11,
+          "avgR": 0.129,
+          "winRate": 47.1,
+          "pf": 1.244,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 101,
+          "totalR": -14.6,
+          "avgR": -0.145,
+          "winRate": 35.6,
+          "pf": 0.775,
+          "adequate": true,
+          "positive": false
+        },
+        {
+          "period": "P3",
+          "samples": 85,
+          "totalR": 11,
+          "avgR": 0.129,
+          "winRate": 47.1,
+          "pf": 1.244,
+          "adequate": true,
+          "positive": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "positivePeriodPct": 75,
+      "weightedAvgR": 0.126,
+      "totalSamples": 377,
+      "robust": true
+    },
+    {
+      "id": "VOL_1_115_READY",
+      "match": {
+        "volume15": "1-1.15",
+        "baselineStatus": "READY"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 102,
+          "totalR": 22.8,
+          "avgR": 0.224,
+          "winRate": 51,
+          "pf": 1.456,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 96,
+          "totalR": 12,
+          "avgR": 0.125,
+          "winRate": 46.9,
+          "pf": 1.235,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 106,
+          "totalR": -10,
+          "avgR": -0.094,
+          "winRate": 37.7,
+          "pf": 0.848,
+          "adequate": true,
+          "positive": false
+        },
+        {
+          "period": "P3",
+          "samples": 70,
+          "totalR": 11.6,
+          "avgR": 0.166,
+          "winRate": 48.6,
+          "pf": 1.322,
+          "adequate": true,
+          "positive": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "positivePeriodPct": 75,
+      "weightedAvgR": 0.098,
+      "totalSamples": 374,
+      "robust": true
+    },
+    {
+      "id": "VOL_GE15_RSI_50_58",
+      "match": {
+        "volume15": ">=1.5",
+        "rsi15": "50-58"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 163,
+          "totalR": 12.2,
+          "avgR": 0.075,
+          "winRate": 44.8,
+          "pf": 1.136,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 145,
+          "totalR": 20.6,
+          "avgR": 0.142,
+          "winRate": 47.6,
+          "pf": 1.271,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 161,
+          "totalR": 2.2,
+          "avgR": 0.014,
+          "winRate": 42.2,
+          "pf": 1.024,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 138,
+          "totalR": -3.6,
+          "avgR": -0.026,
+          "winRate": 40.6,
+          "pf": 0.956,
+          "adequate": true,
+          "positive": false
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "positivePeriodPct": 75,
+      "weightedAvgR": 0.052,
+      "totalSamples": 607,
+      "robust": true
+    },
+    {
+      "id": "VOL_GE15_NO_SETUP",
+      "match": {
+        "volume15": ">=1.5",
+        "baselineStatus": "NO_SETUP"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 248,
+          "totalR": 23.2,
+          "avgR": 0.094,
+          "winRate": 45.6,
+          "pf": 1.172,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 254,
+          "totalR": 17.2,
+          "avgR": 0.068,
+          "winRate": 44.5,
+          "pf": 1.122,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P2",
+          "samples": 235,
+          "totalR": 19.4,
+          "avgR": 0.083,
+          "winRate": 45.1,
+          "pf": 1.15,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 245,
+          "totalR": -12.2,
+          "avgR": -0.05,
+          "winRate": 39.6,
+          "pf": 0.918,
+          "adequate": true,
+          "positive": false
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "positivePeriodPct": 75,
+      "weightedAvgR": 0.049,
+      "totalSamples": 982,
+      "robust": true
+    },
+    {
+      "id": "VOL_GE15_RSI_42_50",
+      "match": {
+        "volume15": ">=1.5",
+        "rsi15": "42-50"
+      },
+      "periods": [
+        {
+          "period": "P0",
+          "samples": 146,
+          "totalR": 17.2,
+          "avgR": 0.118,
+          "winRate": 46.6,
+          "pf": 1.221,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P1",
+          "samples": 140,
+          "totalR": -8,
+          "avgR": -0.057,
+          "winRate": 39.3,
+          "pf": 0.906,
+          "adequate": true,
+          "positive": false
+        },
+        {
+          "period": "P2",
+          "samples": 147,
+          "totalR": 37.8,
+          "avgR": 0.257,
+          "winRate": 52.4,
+          "pf": 1.54,
+          "adequate": true,
+          "positive": true
+        },
+        {
+          "period": "P3",
+          "samples": 136,
+          "totalR": -20.8,
+          "avgR": -0.153,
+          "winRate": 35.3,
+          "pf": 0.764,
+          "adequate": true,
+          "positive": false
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 2,
+      "positivePeriodPct": 50,
+      "weightedAvgR": 0.046,
+      "totalSamples": 569,
+      "robust": false
+    }
+  ],
+  "generatedAt": "2026-09-02T14:58:05.112Z",
+  "periodMeta": {
+    "P0": {
+      "file": "/tmp/v765/p0/signal-cohort-90d.json",
+      "sampleStart": "2026-05-21T14:55:35.621Z",
+      "sampleEnd": "2026-08-19T14:55:35.621Z",
+      "samples": 6468
+    },
+    "P1": {
+      "file": "/tmp/v765/p1/signal-cohort-90d.json",
+      "sampleStart": "2026-02-20T14:56:12.000Z",
+      "sampleEnd": "2026-05-21T14:56:12.000Z",
+      "samples": 6468
+    },
+    "P2": {
+      "file": "/tmp/v765/p2/signal-cohort-90d.json",
+      "sampleStart": "2025-11-22T14:56:49.000Z",
+      "sampleEnd": "2026-02-20T14:56:49.000Z",
+      "samples": 6468
+    },
+    "P3": {
+      "file": "/tmp/v765/p3/signal-cohort-90d.json",
+      "sampleStart": "2025-08-24T14:57:26.000Z",
+      "sampleEnd": "2025-11-22T14:57:26.000Z",
+      "samples": 6468
+    }
+  }
+}
