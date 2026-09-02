@@ -118,30 +118,34 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 ## D-018 — Exit Lab v7.51 does not justify promotion yet
 
-**Evidence:** A 12-asset fixed-entry replay over 30/60/90-day windows showed that runner exits can materially outperform full TP1 in some windows, especially the 90-day window, but can underperform sharply in the 60-day window. The adaptive runner was strongest for Challenger in 30d and 90d, while the current full-TP1 exit was stronger in 60d. Protected BE variants also showed meaningful TP1→BE stop rates and were not uniformly superior.
+**Evidence:** A 12-asset fixed-entry replay over 30d/60d/90d windows showed that runner exits can materially outperform full TP1 in some windows, especially 90d, but can underperform sharply in 60d.
 
-**Decision:** Do not promote any runner/BE model into existing Paper execution yet. Challenger V3 must initially keep the current full-TP1 exit so its independent entry/scoring architecture can be evaluated without exit-policy contamination.
-
-**Why:** Changing entry universe and exit logic simultaneously would make attribution impossible. Exit Lab remains a separate research axis and can be layered onto Challenger V3 after V3 entry behavior is measured.
+**Decision:** Do not promote any runner/BE model into existing Paper execution yet. Challenger entry/scoring experiments keep the current full-TP1 exit so attribution remains clean.
 
 ## D-019 — Challenger V3 independence was valid architecturally but failed empirically
 
-**Evidence:** Challenger V3 removed the Baseline `READY` hard dependency and found mostly new opportunities, but its 30d/60d evidence was materially worse than V2/Baseline. Roughly 78–89% of its trades in the tested windows were outside `READY`, with very poor PF/expectancy in 30d and 60d.
+**Evidence:** Challenger V3 removed the Baseline `READY` hard dependency and found mostly new opportunities, but its 30d/60d evidence was materially worse than V2/Baseline.
 
-**Decision:** Do not merge or promote Challenger V3 as implemented. Preserve it only as a research checkpoint proving that simply widening the opportunity universe does not create edge.
+**Decision:** Do not merge or promote Challenger V3 as implemented. Preserve it as evidence that simply widening the opportunity universe does not create edge.
 
 ## D-020 — Challenger V3.1 improved risk/selection but still did not justify promotion
 
-**Evidence:** V3.1 strengthened distance/status penalties and reduced non-READY risk. It improved materially over V3 and reduced 90d drawdown, but remained weaker than Challenger V2/Baseline on the main comparison and was still unstable across windows.
+**Evidence:** V3.1 strengthened distance/status penalties and reduced non-READY risk. It improved materially over V3 but remained unstable and weaker than V2/Baseline on the main comparison.
 
 **Decision:** Do not promote V3.1. Do not continue threshold tuning blindly.
 
 ## D-021 — Confidence must be calibrated at signal level before Challenger V3.2
 
-**Evidence:** Signal Calibration Lab sampled one candidate per symbol per 4h across the same 12 assets and evaluated normalized A_CURRENT R without portfolio gates. Every tested confidence bucket was negative over 30d, 60d and 90d; higher confidence was not monotonic with better outcomes.
+**Evidence:** Signal Calibration Lab sampled one candidate per symbol per 4h across 12 assets and evaluated normalized A_CURRENT R without portfolio gates. Every tested confidence bucket was negative over 30d, 60d and 90d; higher confidence was not monotonic with better outcomes.
 
-**Decision:** Challenger V3.2 must not be another threshold-only or weight-only revision of the same compressed feature stack. First build a raw-feature edge map / attribution layer to identify which observations actually predict outcomes.
+**Decision:** Challenger V3.2 must not be another threshold-only revision of the same compressed feature stack. First identify predictive raw observations and interactions.
 
-**Method rule:** Separate signal-quality calibration from portfolio-path effects such as max-open-position, daily-loss and max-drawdown gates. A profitable portfolio window is not proof that the confidence score itself is calibrated.
+**Method rule:** Separate signal-quality calibration from portfolio-path effects. Preserve the soft-scoring philosophy; weak evidence does not automatically become another hard gate.
 
-**Architecture rule:** Preserve the soft-scoring philosophy. Evidence that a bucket is weak does not automatically become another hard gate.
+## D-022 — Challenger V3.2 uses evidence-backed soft ranking and must pass portfolio-path replay
+
+**Evidence:** v7.62-v7.65 identified raw feature interactions that survived cross-window, chronological walk-forward and four disjoint 90-day checks. The strongest durable evidence centered on 15m volume participation combined with ADX, and on SHORT signals in TRANSITION regimes. v7.66 then built an independent additive soft score from those robust interactions and compared it with Baseline `READY` at exactly equal signal count across four disjoint 90-day cohorts. V3.2 produced higher Avg R in all 4/4 periods while preserving equal coverage.
+
+**Decision:** Keep V3.2 research-only, independent of Baseline `READY`, and based on small additive evidence weights rather than new hard gates. Baseline status may contribute only as a weak feature.
+
+**Guardrail:** v7.66 is a composite signal-level sanity test on periods already used during feature research, not a fresh untouched holdout and not a Paper promotion. Before any Shadow activation, run a portfolio-path replay under common execution rules and compare expectancy/PF, max drawdown, concurrency, trade frequency, avoided losers, missed winners and opportunity cost. After that, freeze the score and observe a prospective/future holdout before promotion.
