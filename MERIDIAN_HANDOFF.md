@@ -6,73 +6,71 @@
 
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
-- Current research stack includes Research Engine V2, Regime V1, Research Telemetry V1, Exit Lab Historical Replay and the v7.51 Exit Lab evidence report.
-- v7.50 added the project continuity layer only; trading behavior remained unchanged.
+- Main contains the stable research stack through v7.51 plus preserved evidence reports for rejected Challenger V3/V3.1 experiments and Signal Calibration.
+- The rejected V3/V3.1 implementation branches must not be treated as production candidates or silently merged.
 
-## Latest completed development
+## Latest durable research findings
 
-### v7.47 — Research Telemetry
-Comparable ledger analytics including expectancy, payoff ratio, historical max drawdown, frequency, holding duration, side/symbol/regime/exit splits and Challenger opportunity-cost counterfactuals.
+### v7.51 — Exit Lab Evidence
+Runner/BE exits can materially outperform full TP1 in some windows but are not robust across 30d/60d/90d. No exit promotion yet. Keep A_CURRENT/full TP1 when testing entry/scoring architecture so attribution remains clean.
 
-### v7.48 — Exit Lab V1
-Research-only exit models: full TP1, protected BE runner, ATR runner and adaptive runner.
+### Challenger V3 — rejected experiment
+V3 removed the Baseline `READY` hard dependency as intended, but simply widening the opportunity universe performed badly. In the tested 30d and 60d windows PF/expectancy deteriorated sharply and most V3 trades were outside READY. 90d remained positive but weaker than Baseline/V2 and with higher drawdown. Preserve the evidence; do not promote the implementation.
 
-### v7.49 — Historical fixed-entry replay
-Same historical entries replayed through all exit policies on subsequent 15m candles. Added TP1-close confirmation, BE+0.10R and BE+0.25R probes.
+### Challenger V3.1 — improved but still rejected
+V3.1 strengthened soft penalties for entry distance/status and reduced risk outside READY. It improved materially over V3, including lower 90d DD, but still failed robustness and remained weaker than Challenger V2/Baseline on the key comparison. Do not continue tuning thresholds by intuition.
 
-### v7.51 — Exit Lab Evidence Report
-Ran a reproducible 12-asset fixed-entry comparison over 30d, 60d and 90d windows using BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ.
+### v7.55 — Signal Calibration Lab
+Portfolio-independent calibration sampled one candidate per symbol per 4h across 12 assets and evaluated A_CURRENT normalized R with a 14-day horizon, excluding portfolio max-position/daily-loss/max-DD gates.
 
-Key evidence:
-- Runner exits were materially better in the 90d window for Baseline, Shadow and Challenger.
-- Challenger D_ADAPTIVE improved vs full TP1 by +1.502R in 30d and +5.712R in 90d, but lost -1.447R vs full TP1 in 60d.
-- Challenger B_PROTECTED improved +0.422R in 30d and +4.243R in 90d, but lost -1.838R in 60d.
-- Immediate BE protection generated meaningful TP1→BE stop rates; it is not a free improvement.
-- No exit model is robust enough yet to replace current execution.
-- The first report formatting used wrong aggregate field names for giveback/BE/TP2; this was caught and corrected before interpretation.
+Critical result: **all confidence buckets were negative over 30d, 60d and 90d. Higher confidence was not monotonic with better normalized outcome.** This means the current compressed confidence stack is not a validated predictor of edge. Positive portfolio windows can be caused by path-dependent portfolio selection and must not be used to declare the score calibrated.
+
+Preserved evidence files:
+- `research/challenger-v3-evidence-v752.md`
+- `research/challenger-v31-evidence-v753.md`
+- `research/signal-calibration-v755.md`
 
 ## Known bot findings that must not be forgotten
 
-1. **Baseline 6.2** is the frozen benchmark and should not be optimized in place.
-2. **Shadow V1** is the over-filtering/hard-gate control; low DD alone is not sufficient evidence of superiority.
-3. **Challenger V2** still depends on Baseline `READY` for executable opportunities despite using soft confidence. This is the next architectural limitation to remove.
-4. **Regime V1** can adapt side while technical/candidate inputs may still reflect the original Baseline side. Regime V2 must recompute evidence for the final direction.
-5. Do not compare LONG/SHORT without regime context.
-6. Always include trade frequency and opportunity cost.
-7. Do not add hard gates merely because more evidence exists.
+1. **Baseline 6.2** remains frozen.
+2. **Shadow V1** remains the over-filtering/hard-gate control.
+3. **Challenger V2** has a Baseline-READY dependency but currently remains the stronger Challenger control versus rejected V3/V3.1.
+4. Removing READY as a hard gate remains architecturally desirable, but the replacement scoring model must first demonstrate real signal-level edge.
+5. **Regime V1** can adapt side while technical/candidate inputs can still reflect the source side; Regime V2 must recompute evidence for the final side.
+6. LONG/SHORT must always be interpreted in regime context.
+7. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory metrics.
+8. More evidence must not automatically become more hard gates.
 
-## Exit-management conclusion at this checkpoint
+## Next recommended work — highest priority
 
-Do **not** promote a runner/BE policy yet. Exit Lab remains research-only.
+### Priority 1 — Raw Feature Edge Map / Feature Attribution Lab
+Before writing Challenger V3.2, measure raw feature/outcome relationships on portfolio-independent signal cohorts. Candidate features should include:
+- 15m / 1h / 4h directional alignment
+- ADX / trend-strength buckets
+- RSI state by side
+- MACD agreement across timeframes
+- volume participation
+- EMA20/EMA50 structure and price-to-EMA distance
+- side × regime
+- Baseline status as evidence only
 
-For the first Challenger V3 evaluation, keep **A_CURRENT / full TP1** unchanged. This isolates the effect of the new independent entry/scoring architecture. After Challenger V3 has independent evidence, replay the same V3 entries through the Exit Lab policies.
+Use normalized R outcomes, adequate samples and cross-window stability. Look for monotonic or repeatable relationships, not isolated best buckets.
 
-## Next recommended work
-
-### Priority 1 — Challenger V3
-Build a new research-only bot with:
-- independent opportunity universe from all valid scanner candidates
-- Baseline status as soft evidence only, never a hidden hard dependency
-- side-specific technical/candidate scoring
-- soft TRADE / CAUTION / SKIP confidence
-- separate ledger and telemetry
-- current full-TP1 exit for the initial comparison
-- frequency/opportunity-cost comparison against Baseline and Challenger V2
-
-Do not modify Challenger V2 in place; preserve it as a control.
-
-### Priority 2 — Challenger V3 Exit Replay
-Once V3 entries exist, replay those identical entries through A/B/C/D plus the BE probes. Only then decide whether a runner should be coupled to V3.
+### Priority 2 — Challenger V3.2 only after Feature Edge Map
+Build V3.2 from evidence-backed soft features. Preserve independent opportunity discovery, but do not copy V3/V3.1 weights. Retest signal calibration first, then portfolio 30/60/90d, walk-forward, frequency and opportunity cost.
 
 ### Priority 3 — Regime V2
-Recompute all directional evidence after final side selection. Test independently before combining with Challenger V3.
+Recompute all directional evidence after final side selection. Test independently.
 
 ### Priority 4 — Hybrid / Allocator
-Only after Challenger V3 and Regime V2 have independent evidence, test soft allocation of setup quality + regime into risk/strategy/exit behavior.
+Only combine validated Challenger and Regime components. Use regime primarily as a soft strategy/risk allocator rather than adding many hard gates.
+
+### Priority 5 — Exit Lab integration
+Only after entry/scoring edge is demonstrated, replay the validated entry cohort through A/B/C/D and BE probes. Do not mix entry and exit changes prematurely.
 
 ## Promotion gate
 
-Do not declare a winner on a tiny sample. Promotion requires common-window evaluation, adequate closed-trade count, positive PF/expectancy, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost and stability across regimes/windows. No automatic promotion.
+No winner on a tiny or path-dependent sample. Promotion requires common-window evaluation, adequate closed-trade count, positive PF/expectancy, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost, signal-level calibration and stability across regimes/windows. No automatic promotion.
 
 ## New-chat startup instruction
 
