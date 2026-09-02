@@ -115,3 +115,11 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Rule:** When a release changes architecture, a durable principle, a known limitation, a major finding or the next planned step, update the applicable continuity files in the same branch/PR.
 
 **Reason:** Chat history and model memory are helpful but are not a reliable single source of truth for a long-running software/research project.
+
+## D-018 — Exit Lab v7.51 does not justify promotion yet
+
+**Evidence:** A 12-asset fixed-entry replay over 30/60/90-day windows showed that runner exits can materially outperform full TP1 in some windows, especially the 90-day window, but can underperform sharply in the 60-day window. The adaptive runner was strongest for Challenger in 30d and 90d, while the current full-TP1 exit was stronger in 60d. Protected BE variants also showed meaningful TP1→BE stop rates and were not uniformly superior.
+
+**Decision:** Do not promote any runner/BE model into existing Paper execution yet. Challenger V3 must initially keep the current full-TP1 exit so its independent entry/scoring architecture can be evaluated without exit-policy contamination.
+
+**Why:** Changing entry universe and exit logic simultaneously would make attribution impossible. Exit Lab remains a separate research axis and can be layered onto Challenger V3 after V3 entry behavior is measured.
