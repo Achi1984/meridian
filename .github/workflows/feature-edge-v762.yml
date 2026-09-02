@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+
       - name: Generate 30d 60d 90d signal cohorts
         run: node scripts/signal-cohort-v762.mjs --out-dir /tmp/v762
 
@@ -77,6 +80,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
           git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md
           if git diff --cached --quiet; then
             echo "No evidence change"
