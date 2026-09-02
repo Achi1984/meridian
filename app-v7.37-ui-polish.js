@@ -1,4 +1,4 @@
-/* MERIDIAN v7.43 — horizontal brand header; redundant live/refresh controls removed. */
+/* MERIDIAN v7.44 — selected horizontal image brand; redundant live/refresh controls removed. */
 (function(){
   'use strict';
 
@@ -13,16 +13,16 @@
     s.textContent=`
       .brand{min-width:0;width:100%}
       .brandline{min-width:0!important}
-      #${BRAND_IMG_ID}{display:block;width:min(100%,540px);height:auto;max-height:66px;object-fit:contain;object-position:left center}
-      #${ROW_ID}{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-top:3px;min-height:18px;white-space:nowrap}
+      #${BRAND_IMG_ID}{display:block;width:min(100%,560px);height:auto;max-height:64px;object-fit:contain;object-position:left center}
+      #${ROW_ID}{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-top:2px;min-height:18px;white-space:nowrap}
       #${ROW_ID} .version,#${ROW_ID} #meridian-runtime-badge,#${ROW_ID} .live{margin:0!important;flex:0 0 auto}
       #${ROW_ID} .live{display:flex!important;align-items:center!important}
       .top-actions{display:none!important}
       .logo-btn{display:none!important}
       @media(max-width:650px){
-        .topbar{display:block!important;margin-bottom:5px!important}
-        #${BRAND_IMG_ID}{width:min(100%,440px);max-height:58px}
-        #${ROW_ID}{gap:5px;margin-top:2px;min-height:17px;max-width:100%;overflow:visible}
+        .topbar{display:block!important;margin-bottom:4px!important}
+        #${BRAND_IMG_ID}{width:100%;max-height:54px}
+        #${ROW_ID}{gap:5px;margin-top:1px;min-height:17px;max-width:100%;overflow:visible}
         #${ROW_ID} .version{font-size:7.2px!important;line-height:1!important;padding:3px 6px!important}
         #${ROW_ID} #meridian-runtime-badge{font-size:7.2px!important;line-height:1!important;padding:3px 6px!important;gap:4px!important}
         #${ROW_ID} #meridian-runtime-badge::before{width:5px!important;height:5px!important}
@@ -30,13 +30,13 @@
         #${ROW_ID} .live .dot,.dot{width:5px!important;height:5px!important;margin-right:4px!important}
       }
       @media(max-width:390px){
-        #${BRAND_IMG_ID}{max-height:53px}
-        #${ROW_ID}{gap:4px;margin-top:1px}
+        #${BRAND_IMG_ID}{max-height:49px}
+        #${ROW_ID}{gap:4px;margin-top:0}
         #${ROW_ID} .version,#${ROW_ID} #meridian-runtime-badge{font-size:6.8px!important;padding:3px 5px!important}
         #${ROW_ID} .live{font-size:6.8px!important;letter-spacing:.8px!important}
       }
       @media(min-width:651px){
-        #${ROW_ID}{margin-top:4px}
+        #${ROW_ID}{margin-top:3px}
       }
     `;
     document.head.appendChild(s);
@@ -47,7 +47,7 @@
     if(!img){
       img=document.createElement('img');
       img.id=BRAND_IMG_ID;
-      img.src='assets/meridian-header-v743.svg?v=7.43-R1';
+      img.src='assets/meridian-header-logo-v744.png?v=7.44-R1';
       img.alt='ACHI MERIDIAN';
       img.decoding='async';
       brandline.replaceChildren(img);
@@ -80,7 +80,7 @@
     const actions=document.querySelector('.topbar .top-actions');
     if(actions)actions.setAttribute('aria-hidden','true');
 
-    document.body?.setAttribute('data-v743-header-ready','true');
+    document.body?.setAttribute('data-v744-header-ready','true');
     return true;
   }
 
