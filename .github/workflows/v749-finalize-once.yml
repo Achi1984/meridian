@@ -1,0 +1,117 @@
+name: MERIDIAN v7.49 Finalize Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-49-exit-lab-replay
+    paths:
+      - .github/workflows/v749-finalize-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-49-exit-lab-replay
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Deterministic install
+        run: npm ci
+      - name: Wire historical Exit Lab replay into cloud backtest
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path='cloud-backtest.js';
+          let s=fs.readFileSync(path,'utf8');
+          const imp="import { replayExitLabForLedgers } from './exit-lab-replay.js';";
+          if(!s.includes(imp)) s=s.replace("import { regimeDecision } from './regime-v1.js';",`import { regimeDecision } from './regime-v1.js';\n${imp}`);
+          const start=s.indexOf('export async function runCloudBacktest(');
+          const stop=s.indexOf('\n\nexport const __test',start);
+          if(start<0||stop<0)throw new Error('runCloudBacktest replacement target missing');
+          const replacement=`export async function runCloudBacktest({assets,days=90,end=Date.now(),onProgress=()=>{}}){
+            const cfg=CLOUD_BT_CONFIG,start=end-days*DAY,warmStart=start-60*MS['4h'],market={};
+            for(let i=0;i<assets.length;i++){
+              const symbol=assets[i];onProgress({stage:'loading',asset:symbol,index:i,total:assets.length,pct:Math.round(i/assets.length*45)});
+              const [m15,h1,h4]=await Promise.all([fetchKlines(symbol,'15m',warmStart,end),fetchKlines(symbol,'1h',warmStart,end),fetchKlines(symbol,'4h',warmStart,end)]);
+              market[symbol]={'15m':m15,'1h':h1,'4h':h4};
+            }
+            onProgress({stage:'prepare',pct:50});
+            const events=prepareEvents(market,start,end,cfg,p=>onProgress({...p,pct:50+Math.round((p.pct||0)*.15)}));
+            onProgress({stage:'portfolio-replay',pct:68});
+            const ledgers=replayPrepared(events,start,end,cfg);
+            onProgress({stage:'walk-forward',pct:82});
+            const researchContinuous=continuousSummary(events,start,end,cfg,ledgers);
+            onProgress({stage:'exit-lab-replay',pct:92});
+            const exitLabReplay=replayExitLabForLedgers({
+              ledgers:{baseline:ledgers.baseline.tradeList,shadow:ledgers.shadow.tradeList,challenger:ledgers.challenger.tradeList,regime:ledgers.regime.tradeList},
+              market,end,opts:{horizonDays:14,feeBps:cfg.feeBps,slippageBps:cfg.slippageBps}
+            });
+            const result={mode:'PORTFOLIO_V2',cloud:true,version:'7.49-EXIT-LAB-REPLAY-V1',researchEngine:'7.34-RESEARCH-V2',regimeModel:'7.38-REGIME-V1',method:'SHARED_MULTI_ASSET_TIMELINE_INDEPENDENT_LEDGERS',executionImpact:false,days,start,end,assets,config:cfg,summary:compactStats(ledgers.baseline),ledgers:{baseline:{...compactStats(ledgers.baseline),tradeList:ledgers.baseline.tradeList,equityCurve:ledgers.baseline.equityCurve,byAsset:assetBreakdown(ledgers.baseline.tradeList)},shadow:{...compactStats(ledgers.shadow),tradeList:ledgers.shadow.tradeList,equityCurve:ledgers.shadow.equityCurve,byAsset:assetBreakdown(ledgers.shadow.tradeList)},challenger:{...compactStats(ledgers.challenger),tradeList:ledgers.challenger.tradeList,equityCurve:ledgers.challenger.equityCurve,byAsset:assetBreakdown(ledgers.challenger.tradeList)},regime:{...compactStats(ledgers.regime),tradeList:ledgers.regime.tradeList,equityCurve:ledgers.regime.equityCurve,byAsset:assetBreakdown(ledgers.regime.tradeList)}},researchContinuous,exitLabReplay,generatedAt:new Date().toISOString()};
+            onProgress({stage:'done',pct:100});return result;
+          }`;
+          s=s.slice(0,start)+replacement+s.slice(stop);
+          fs.writeFileSync(path,s);
+          NODE
+      - name: Extend release safety checks
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path='scripts/release-check.mjs';
+          let s=fs.readFileSync(path,'utf8');
+          const anchor="must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');";
+          const meta="\nmust(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');\nmust(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');";
+          if(!s.includes("release.exitLab==='7.49-EXIT-LAB-REPLAY-V1'")){
+            if(!s.includes(anchor))throw new Error('release metadata check anchor missing');
+            s=s.replace(anchor,anchor+meta);
+          }
+          const manifestAnchor="const manifest=json('manifest.webmanifest');";
+          const checks=`must(fs.existsSync('exit-lab.js'),'Exit Lab module missing');
+          const exitLab=read('exit-lab.js');
+          must(exitLab.includes("EXIT_LAB_VERSION='7.49-EXIT-LAB-REPLAY-V1'"),'Exit Lab schema mismatch');
+          must(exitLab.includes('B_CONFIRM_CLOSE'),'TP1 close-confirmation probe missing');
+          must(exitLab.includes('B_BE_PLUS_010'),'BE +0.10R probe missing');
+          must(exitLab.includes('B_BE_PLUS_025'),'BE +0.25R probe missing');
+          must(exitLab.includes('confirmTp1Close'),'confirmed TP1 close protection missing');
+          must(exitLab.includes('beExtraR'),'R-profit lock support missing');
+          must(fs.existsSync('exit-lab-replay.js'),'Exit Lab replay module missing');
+          const exitReplay=read('exit-lab-replay.js');
+          must(exitReplay.includes('FIXED_ENTRY_15M_EXIT_COHORT_REPLAY'),'fixed-entry cohort replay missing');
+          must(exitReplay.includes('SAME_HISTORICAL_ENTRIES_PARALLEL_EXIT_POLICIES'),'parallel exit policy replay missing');
+          must(exitReplay.includes('Number(c.closeTime)>opened'),'entry-candle lookahead guard missing');
+          const cloud=read('cloud-backtest.js');
+          must(cloud.includes("from './exit-lab-replay.js'"),'cloud backtest Exit Lab replay import missing');
+          must(cloud.includes("stage:'exit-lab-replay'"),'cloud backtest Exit Lab progress stage missing');
+          must(cloud.includes('exitLabReplay'),'cloud backtest Exit Lab result missing');
+          must(cloud.includes("version:'7.49-EXIT-LAB-REPLAY-V1'"),'cloud backtest Exit Lab version missing');
+
+          `;
+          if(!s.includes("fixed-entry cohort replay missing")){
+            if(!s.includes(manifestAnchor))throw new Error('release check insertion anchor missing');
+            s=s.replace(manifestAnchor,checks+manifestAnchor);
+          }
+          fs.writeFileSync(path,s);
+          NODE
+      - name: Sync release files
+        run: node scripts/release-sync.mjs --write
+      - name: Refresh lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify release and tests
+        run: |
+          npm test
+          node scripts/release-sync.mjs --check
+          node scripts/release-check.mjs
+      - name: Remove one-time workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v749-finalize-once.yml
+          git add cloud-backtest.js scripts/release-check.mjs index.html app-v6.06.js app-v7.33-hardening.js manifest.webmanifest package.json package-lock.json
+          git commit -m "Finalize MERIDIAN v7.49 [v7.49-finalized]"
+          git push origin HEAD:codex/meridian-v7-49-exit-lab-replay
