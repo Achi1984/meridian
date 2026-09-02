@@ -1,0 +1,166 @@
+{
+  "schemaVersion": "7.66-CHALLENGER-V32-EVIDENCE-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "generatedAt": "2026-09-02T15:13:25.185Z",
+  "periods": {
+    "P0": {
+      "schemaVersion": "7.66-CHALLENGER-V32-COMPARE-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "top evidence score at Baseline READY-equivalent coverage",
+      "universe": 6468,
+      "baseline": {
+        "samples": 1657,
+        "totalR": -5.8,
+        "avgR": -0.004,
+        "winRate": 41.5,
+        "pf": 0.994
+      },
+      "challengerV32": {
+        "samples": 1657,
+        "totalR": 63.8,
+        "avgR": 0.039,
+        "winRate": 43.3,
+        "pf": 1.068
+      },
+      "opportunity": {
+        "coverageMatched": true,
+        "baselineCount": 1657,
+        "challengerCount": 1657,
+        "overlap": 360,
+        "discovered": 1297,
+        "displaced": 1297,
+        "avoidedLosers": 765,
+        "missedWinners": 532,
+        "discoveredWinners": 561,
+        "discoveredLosers": 736
+      },
+      "scoreDistribution": {
+        "positiveScore": 973,
+        "zeroScore": 5495,
+        "maxScore": 4.5
+      }
+    },
+    "P1": {
+      "schemaVersion": "7.66-CHALLENGER-V32-COMPARE-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "top evidence score at Baseline READY-equivalent coverage",
+      "universe": 6468,
+      "baseline": {
+        "samples": 1675,
+        "totalR": 12.2,
+        "avgR": 0.007,
+        "winRate": 42,
+        "pf": 1.013
+      },
+      "challengerV32": {
+        "samples": 1675,
+        "totalR": 84.2,
+        "avgR": 0.05,
+        "winRate": 43.8,
+        "pf": 1.089
+      },
+      "opportunity": {
+        "coverageMatched": true,
+        "baselineCount": 1675,
+        "challengerCount": 1675,
+        "overlap": 391,
+        "discovered": 1284,
+        "displaced": 1284,
+        "avoidedLosers": 755,
+        "missedWinners": 529,
+        "discoveredWinners": 559,
+        "discoveredLosers": 725
+      },
+      "scoreDistribution": {
+        "positiveScore": 907,
+        "zeroScore": 5561,
+        "maxScore": 4.5
+      }
+    },
+    "P2": {
+      "schemaVersion": "7.66-CHALLENGER-V32-COMPARE-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "top evidence score at Baseline READY-equivalent coverage",
+      "universe": 6468,
+      "baseline": {
+        "samples": 1672,
+        "totalR": -68.8,
+        "avgR": -0.041,
+        "winRate": 40,
+        "pf": 0.931
+      },
+      "challengerV32": {
+        "samples": 1672,
+        "totalR": 20,
+        "avgR": 0.012,
+        "winRate": 42.2,
+        "pf": 1.021
+      },
+      "opportunity": {
+        "coverageMatched": true,
+        "baselineCount": 1672,
+        "challengerCount": 1672,
+        "overlap": 397,
+        "discovered": 1275,
+        "displaced": 1275,
+        "avoidedLosers": 756,
+        "missedWinners": 519,
+        "discoveredWinners": 556,
+        "discoveredLosers": 719
+      },
+      "scoreDistribution": {
+        "positiveScore": 905,
+        "zeroScore": 5563,
+        "maxScore": 4.5
+      }
+    },
+    "P3": {
+      "schemaVersion": "7.66-CHALLENGER-V32-COMPARE-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "top evidence score at Baseline READY-equivalent coverage",
+      "universe": 6468,
+      "baseline": {
+        "samples": 1550,
+        "totalR": 5.2,
+        "avgR": 0.003,
+        "winRate": 41.8,
+        "pf": 1.006
+      },
+      "challengerV32": {
+        "samples": 1550,
+        "totalR": 142,
+        "avgR": 0.092,
+        "winRate": 45.5,
+        "pf": 1.168
+      },
+      "opportunity": {
+        "coverageMatched": true,
+        "baselineCount": 1550,
+        "challengerCount": 1550,
+        "overlap": 263,
+        "discovered": 1287,
+        "displaced": 1287,
+        "avoidedLosers": 754,
+        "missedWinners": 533,
+        "discoveredWinners": 590,
+        "discoveredLosers": 697
+      },
+      "scoreDistribution": {
+        "positiveScore": 894,
+        "zeroScore": 5574,
+        "maxScore": 4.5
+      }
+    }
+  },
+  "summary": {
+    "adequatePeriods": 4,
+    "v32AvgRBetterPeriods": 4,
+    "v32AvgRBetterPct": 100,
+    "allCoverageMatched": true
+  }
+}
