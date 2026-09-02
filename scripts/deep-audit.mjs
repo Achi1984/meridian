@@ -53,7 +53,10 @@ check(startGateway.includes("auth.mode==='LEGACY_FALLBACK'"),'gateway startup fa
 warn(!gateway.includes('MERIDIAN_READ_TOKEN_SHA256 ||'),'server-gateway still contains an unreachable legacy hash fallback; startup now fails closed before it can be used');
 
 for(const [file,view] of [['center.html','center'],['depot.html','portfolio'],['market.html','market'],['trade.html','daytrade'],['forecast.html','forecast']]){
-  const html=read(file);check(html.length<2000&&html.includes(`index.html#${view}`),`${file} is a thin redirect to canonical index`);
+  const html=read(file);
+  check(html.length<2400&&html.includes(`route=${view}`)&&html.includes(`#${view}`),`${file} is a hardened redirect to canonical index`);
+  check(html.includes('background:#03070c'),`${file} cannot present a white boot screen`);
+  check(html.includes('getRegistrations')&&html.includes('caches.keys'),`${file} clears stale PWA/service-worker state`);
 }
 
 const report={ok:failures.length===0,version,build,passed:pass.length,failed:failures,warnings,checkedAt:new Date().toISOString()};
