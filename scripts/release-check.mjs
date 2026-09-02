@@ -20,30 +20,31 @@ const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
 must(index.includes(`window.MERIDIAN_RELEASE_VERSION='${v}';`),'index release version mismatch');
 must(index.includes(`window.MERIDIAN_RELEASE_BUILD='${build}';`),'index release build mismatch');
+must(index.includes('function depot(){'),'canonical inline depot renderer missing');
+must(index.includes('function portfolioIntelligencePanel(){'),'canonical inline render engine missing');
 
 const loader=read('app-v6.06.js');
-must(hasTagged(loader,'app-v7.32-legacy.js'),'canonical base renderer missing or untagged');
-must(loader.indexOf('app-v7.32-legacy.js')<loader.indexOf('app-v7.33-hardening.js'),'base renderer must load before hardening');
+must(!loader.includes('app-v7.32-legacy.js'),'retired v7.32 diagnostic layer must not be loaded');
 must(!/emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(loader),'retired input hotfix layer loaded');
 for(const f of ['app-v7.33-hardening.js','app-runtime-monitor.js','app-v7.37-ui-polish.js','app-v7.38-regime-ui.js','app-v7.39-paper-overview.js','app-v7.60-dashboard-consistency.js','app-v7.60-private-hydration-hotfix.js','app-v7.60-final-ui-authority.js'])must(hasTagged(loader,f),`${f} missing or cache tag mismatch`);
 must(loader.lastIndexOf('app-v7.60-final-ui-authority.js')>loader.lastIndexOf('app-v7.60-private-hydration-hotfix.js'),'final UI authority must load after private hydration');
 
-const renderer=read('app-v7.32-legacy.js');
-must(renderer.includes('function renderAll')||renderer.includes('renderAll='),'base renderer renderAll missing');
 const hardening=read('app-v7.33-hardening.js');
 must(hardening.includes(`const VERSION='${v}';`),'hardening VERSION mismatch');
 must(hardening.includes(`const BUILD='${build}';`),'hardening BUILD mismatch');
-
 const polish=read('app-v7.37-ui-polish.js');
 must(fs.existsSync('assets/achi-meridian-topbar.webp'),'approved ACHI MERIDIAN banner asset missing');
 must(polish.includes('assets/achi-meridian-topbar.webp'),'topbar does not use approved banner asset');
 must(polish.includes('justify-content:center'),'topbar brand is not centered');
+must(polish.includes('.bottom .inner.five-tabs'),'legacy five-tab selector is not explicitly overridden');
 must(polish.includes('repeat(6,minmax(0,1fr))'),'mobile navigation must be six equal columns');
 must(polish.includes('#meridian-release-status-row')&&polish.includes('.topbar .live'),'topbar live/status controls must be hidden');
 
 const finalUi=read('app-v7.60-final-ui-authority.js');
 must(finalUi.includes(`const VERSION='${v}';`),'final UI VERSION mismatch');
 must(finalUi.includes(`const BUILD='${build}';`),'final UI BUILD mismatch');
+must(finalUi.includes('function ensureRendered()'),'empty-view recovery missing');
+must(finalUi.includes("typeof renderOne==='function'"),'empty-view recovery cannot invoke renderer');
 must(finalUi.includes('CHALLENGER V3.2'),'V3.2 research candidate missing from Paper overview');
 must(finalUi.includes('PAPER-/LIVE-EXECUTION'),'V3.2 research-only execution boundary missing');
 must(finalUi.includes('meridianRefreshPrivateDashboard'),'private hydration retry missing');
@@ -56,15 +57,13 @@ must(server.includes('if(!config.paperTrading||config.liveTrading) throw new Err
 const gateway=read('server-gateway.js');
 must(gateway.includes('privateData'),'gateway privateData health flag missing');
 must(gateway.includes('/api/research-analytics'),'research analytics endpoint missing');
-
 must(read('research-analytics.js').includes('executionImpact:false'),'research telemetry must remain non-executing');
 must(read('exit-lab-replay.js').includes('Number(c.closeTime)>opened'),'entry-candle lookahead guard missing');
 must(read('regime-v1.js').includes("REGIME_V1_RULESET='7.38-REGIME-V1'"),'regime ruleset missing');
 for(const f of ['MERIDIAN_CONTEXT.md','MERIDIAN_DECISIONS.md','MERIDIAN_HANDOFF.md'])must(fs.existsSync(f),`continuity file missing: ${f}`);
 for(const [file,hash] of [['center.html','#center'],['depot.html','#portfolio'],['market.html','#market'],['trade.html','#daytrade'],['forecast.html','#forecast']])must(read(file).includes(`index.html${hash}`),`${file} must redirect to canonical index`);
-
 const smoke=read('scripts/runtime-smoke.mjs');
-must(smoke.includes('Canonical loader missing base renderer'),'runtime smoke must validate base renderer');
+must(smoke.includes('Canonical inline render engine missing'),'runtime smoke must validate inline render engine');
 must(smoke.includes('approved logo asset'),'runtime smoke must validate approved logo');
 must(smoke.includes('six equal columns'),'runtime smoke must validate six-tab nav');
 const sw=read('sw.js');
