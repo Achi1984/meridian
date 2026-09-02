@@ -20,6 +20,10 @@ function required(text,re,replacement,label){
   if(!re.test(text))throw new Error(`release sync target missing: ${label}`);
   return text.replace(re,replacement);
 }
+function present(text,re,label){
+  if(!re.test(text))throw new Error(`release sync target missing: ${label}`);
+  return text;
+}
 
 apply('index.html',src=>{
   let s=src;
@@ -35,12 +39,17 @@ apply('index.html',src=>{
 
 apply('app-v6.06.js',src=>{
   let s=src;
-  s=required(s,/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/g,`app-v7.32-legacy.js?v=${cacheTag}`,'compat legacy loader tag');
-  s=required(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/g,`app-v7.33-hardening.js?v=${cacheTag}`,'compat hardening loader tag');
-  s=required(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/g,`app-runtime-monitor.js?v=${cacheTag}`,'runtime monitor loader tag');
-  s=required(s,/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/g,`app-v7.37-ui-polish.js?v=${cacheTag}`,'ui polish loader tag');
-  s=required(s,/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');
-  s=required(s,/app-v7\.39-paper-overview\.js\?v=[^"'<>\s]+/g,`app-v7.39-paper-overview.js?v=${cacheTag}`,'paper overview loader tag');
+  // The canonical loader may use a hotfix cache tag newer than the formal release tag.
+  // Release sync therefore validates module presence/order ownership without rewriting those tags.
+  s=present(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/,'compat hardening loader tag');
+  s=present(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/,'runtime monitor loader tag');
+  s=present(s,/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/,'ui polish loader tag');
+  s=present(s,/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/,'regime ui loader tag');
+  s=present(s,/app-v7\.39-paper-overview\.js\?v=[^"'<>\s]+/,'paper overview loader tag');
+  s=present(s,/app-v7\.60-dashboard-consistency\.js\?v=[^"'<>\s]+/,'dashboard consistency loader tag');
+  s=present(s,/app-v7\.60-private-hydration-hotfix\.js\?v=[^"'<>\s]+/,'private hydration loader tag');
+  s=present(s,/app-v7\.60-final-ui-authority\.js\?v=[^"'<>\s]+/,'final ui authority loader tag');
+  if(/app-v7\.32-legacy\.js|emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(s))throw new Error('obsolete frontend runtime layer present in canonical loader');
   return s;
 });
 
