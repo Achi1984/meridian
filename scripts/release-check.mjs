@@ -14,7 +14,7 @@ must(release.ruleset==='6.2-SIGNAL-V1','Ruleset must remain 6.2-SIGNAL-V1');
 must(release.research==='7.34-RESEARCH-V2','Research engine version mismatch');
 must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
-must(release.uiPolish==='7.41-HEADER','Header UI polish version mismatch');
+must(release.uiPolish==='7.42-COMPACT-HEADER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research version mismatch');
 must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
 
@@ -48,6 +48,7 @@ must(uiPolish.includes('meridian-release-status-row'),'mobile status row missing
 must(uiPolish.includes('object-fit:contain'),'header logo must use contain fit');
 must(uiPolish.includes("document.getElementById('versionBadge')"),'mobile UI polish must relocate version badge');
 must(uiPolish.includes("document.getElementById('meridian-runtime-badge')"),'mobile UI polish must relocate runtime badge');
+must(uiPolish.includes("document.querySelector('.topbar .live')"),'compact header must merge LIVE DASHBOARD into status row');
 must(uiPolish.includes('@media(max-width:390px)'),'narrow iPhone header guard missing');
 
 const regimeUi=read('app-v7.38-regime-ui.js');
