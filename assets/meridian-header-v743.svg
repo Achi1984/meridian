@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 170" role="img" aria-labelledby="title desc">
+  <title id="title">ACHI MERIDIAN</title>
+  <desc id="desc">MERIDIAN horizontal brand mark</desc>
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#55dcff"/>
+      <stop offset="0.55" stop-color="#1798ff"/>
+      <stop offset="1" stop-color="#2455ff"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#e9eef5"/>
+      <stop offset="1" stop-color="#9cabbc"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="translate(18 8)">
+    <circle cx="76" cy="76" r="58" fill="none" stroke="url(#ring)" stroke-width="8" opacity=".95"/>
+    <path d="M76 4 L126 132 L76 99 L26 132 Z" fill="url(#silver)"/>
+    <path d="M76 49 L100 112 L76 96 L52 112 Z" fill="#06111f"/>
+    <path d="M76 82 L82 98 L99 104 L82 110 L76 128 L70 110 L53 104 L70 98 Z" fill="#3fd8ff" filter="url(#glow)"/>
+  </g>
+  <text x="176" y="106" fill="url(#silver)" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700" letter-spacing="18">ACHI</text>
+  <text x="520" y="104" fill="#19a9ff" font-family="Arial, Helvetica, sans-serif" font-size="47" font-weight="600" letter-spacing="17">MERIDIAN</text>
+</svg>
