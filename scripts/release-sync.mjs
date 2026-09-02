@@ -24,19 +24,22 @@ apply('index.html',src=>{
   return s;
 });
 
+// v7.60 stable frontend authority. The restored loader intentionally includes
+// app-v7.32-legacy.js because that compatibility layer is the known-good base
+// used by the working v7.60 UI. Private dashboard hydration remains provided
+// by app-v7.33-hardening.js; do not require later emergency/hotfix layers.
 apply('app-v6.06.js',src=>{
   let s=src;
   for(const [re,label] of [
+    [/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/,'legacy compatibility loader tag'],
     [/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/,'hardening loader tag'],
     [/app-runtime-monitor\.js\?v=[^"'<>\s]+/,'runtime monitor loader tag'],
     [/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/,'ui polish loader tag'],
     [/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/,'regime ui loader tag'],
     [/app-v7\.39-paper-overview\.js\?v=[^"'<>\s]+/,'paper overview loader tag'],
-    [/app-v7\.60-dashboard-consistency\.js\?v=[^"'<>\s]+/,'dashboard consistency loader tag'],
-    [/app-v7\.60-private-hydration-hotfix\.js\?v=[^"'<>\s]+/,'private hydration loader tag'],
-    [/app-v7\.60-final-ui-authority\.js\?v=[^"'<>\s]+/,'final ui authority loader tag']
+    [/app-v7\.60-dashboard-consistency\.js\?v=[^"'<>\s]+/,'dashboard consistency loader tag']
   ])s=present(s,re,label);
-  if(/app-v7\.32-legacy\.js|emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(s))throw new Error('retired frontend layer present in canonical loader');
+  if(/emergency-input-hotfix|nav-hotfix|unlock-hotfix|private-hydration-hotfix|final-ui-authority/.test(s))throw new Error('post-rollback hotfix layer present in stable v7.60 loader');
   return s;
 });
 
