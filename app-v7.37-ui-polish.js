@@ -1,4 +1,4 @@
-/* MERIDIAN v7.41 — collision-safe mobile header and logo presentation. */
+/* MERIDIAN v7.41 — final collision-safe mobile header and logo presentation. */
 (function(){
   'use strict';
 
