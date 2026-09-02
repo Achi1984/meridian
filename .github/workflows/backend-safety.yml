@@ -30,6 +30,7 @@ jobs:
           node --check scripts/start-gateway.mjs
           node --check scripts/runtime-smoke.mjs
           node --check scripts/deep-audit.mjs
+          node --check scripts/index-inline-syntax.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
@@ -41,6 +42,8 @@ jobs:
           node --check app-v7.60-dashboard-consistency.js
           node --check app-v7.60-private-hydration-hotfix.js
           node --check app-v7.60-final-ui-authority.js
+      - name: Inline index syntax
+        run: node scripts/index-inline-syntax.mjs
       - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Deep cross-layer audit
