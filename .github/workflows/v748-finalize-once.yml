@@ -41,3 +41,4 @@ jobs:
           git add index.html app-v6.06.js app-v7.33-hardening.js manifest.webmanifest package.json package-lock.json
           git commit -m "Finalize MERIDIAN v7.48 [v7.48-finalized]"
           git push origin HEAD:codex/meridian-v7-48-exit-lab-v1
+# retry after regression fixture correction
