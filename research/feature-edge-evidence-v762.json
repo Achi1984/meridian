@@ -1,0 +1,4944 @@
+{
+  "schemaVersion": "7.61-FEATURE-EDGE-REPORT-V1",
+  "generatedAt": "2026-09-02T14:44:12.010Z",
+  "researchOnly": true,
+  "executionImpact": false,
+  "minSamples": 30,
+  "windows": {
+    "30d": {
+      "schemaVersion": "7.61-FEATURE-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "samples": 2160,
+      "minSamples": 30,
+      "overall": {
+        "samples": 2160,
+        "totalR": -216,
+        "avgR": -0.1,
+        "winRate": 37.5,
+        "pf": 0.84
+      },
+      "features": {
+        "side": {
+          "buckets": [
+            {
+              "bucket": "SHORT",
+              "samples": 1209,
+              "totalR": -112.2,
+              "avgR": -0.093,
+              "winRate": 37.8,
+              "pf": 0.851,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG",
+              "samples": 951,
+              "totalR": -103.8,
+              "avgR": -0.109,
+              "winRate": 37.1,
+              "pf": 0.826,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "regime": {
+          "buckets": [
+            {
+              "bucket": "BEAR",
+              "samples": 713,
+              "totalR": -98.6,
+              "avgR": -0.138,
+              "winRate": 35.9,
+              "pf": 0.784,
+              "adequate": true
+            },
+            {
+              "bucket": "RANGE",
+              "samples": 705,
+              "totalR": -11.4,
+              "avgR": -0.016,
+              "winRate": 41,
+              "pf": 0.973,
+              "adequate": true
+            },
+            {
+              "bucket": "TRANSITION",
+              "samples": 420,
+              "totalR": -16.8,
+              "avgR": -0.04,
+              "winRate": 40,
+              "pf": 0.933,
+              "adequate": true
+            },
+            {
+              "bucket": "BULL",
+              "samples": 322,
+              "totalR": -89.2,
+              "avgR": -0.277,
+              "winRate": 30.1,
+              "pf": 0.604,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "baselineStatus": {
+          "buckets": [
+            {
+              "bucket": "WAIT_ENTRY_ZONE",
+              "samples": 863,
+              "totalR": -83,
+              "avgR": -0.096,
+              "winRate": 37.7,
+              "pf": 0.846,
+              "adequate": true
+            },
+            {
+              "bucket": "NO_SETUP",
+              "samples": 773,
+              "totalR": -105.8,
+              "avgR": -0.137,
+              "winRate": 36,
+              "pf": 0.786,
+              "adequate": true
+            },
+            {
+              "bucket": "READY",
+              "samples": 524,
+              "totalR": -27.2,
+              "avgR": -0.052,
+              "winRate": 39.5,
+              "pf": 0.914,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 3,
+          "positiveBuckets": 0,
+          "negativeBuckets": 3
+        },
+        "mtfAlignment": {
+          "buckets": [
+            {
+              "bucket": "1/3",
+              "samples": 980,
+              "totalR": -130.4,
+              "avgR": -0.133,
+              "winRate": 36.1,
+              "pf": 0.792,
+              "adequate": true
+            },
+            {
+              "bucket": "2/3",
+              "samples": 583,
+              "totalR": -59.8,
+              "avgR": -0.103,
+              "winRate": 37.4,
+              "pf": 0.836,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 388,
+              "totalR": -40,
+              "avgR": -0.103,
+              "winRate": 37.4,
+              "pf": 0.835,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 209,
+              "totalR": 14.2,
+              "avgR": 0.068,
+              "winRate": 44.5,
+              "pf": 1.122,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 1,
+          "negativeBuckets": 3
+        },
+        "macdAgreement": {
+          "buckets": [
+            {
+              "bucket": "2/3",
+              "samples": 1152,
+              "totalR": -100.8,
+              "avgR": -0.087,
+              "winRate": 38,
+              "pf": 0.859,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 530,
+              "totalR": -23.6,
+              "avgR": -0.045,
+              "winRate": 39.8,
+              "pf": 0.926,
+              "adequate": true
+            },
+            {
+              "bucket": "1/3",
+              "samples": 461,
+              "totalR": -84.2,
+              "avgR": -0.183,
+              "winRate": 34.1,
+              "pf": 0.723,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 17,
+              "totalR": -7.4,
+              "avgR": -0.435,
+              "winRate": 23.5,
+              "pf": 0.431,
+              "adequate": false
+            }
+          ],
+          "adequateBuckets": 3,
+          "positiveBuckets": 0,
+          "negativeBuckets": 3
+        },
+        "adx15": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 606,
+              "totalR": -51.6,
+              "avgR": -0.085,
+              "winRate": 38.1,
+              "pf": 0.862,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 591,
+              "totalR": -75,
+              "avgR": -0.127,
+              "winRate": 36.4,
+              "pf": 0.801,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 567,
+              "totalR": -12.6,
+              "avgR": -0.022,
+              "winRate": 40.7,
+              "pf": 0.962,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 396,
+              "totalR": -76.8,
+              "avgR": -0.194,
+              "winRate": 33.6,
+              "pf": 0.708,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "adx1h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 641,
+              "totalR": -41,
+              "avgR": -0.064,
+              "winRate": 39,
+              "pf": 0.895,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 601,
+              "totalR": -68.2,
+              "avgR": -0.113,
+              "winRate": 36.9,
+              "pf": 0.82,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 561,
+              "totalR": -61.8,
+              "avgR": -0.11,
+              "winRate": 37.1,
+              "pf": 0.825,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 357,
+              "totalR": -45,
+              "avgR": -0.126,
+              "winRate": 36.4,
+              "pf": 0.802,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "adx4h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 773,
+              "totalR": -81.8,
+              "avgR": -0.106,
+              "winRate": 37.3,
+              "pf": 0.831,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 705,
+              "totalR": -11.4,
+              "avgR": -0.016,
+              "winRate": 41,
+              "pf": 0.973,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 472,
+              "totalR": -88,
+              "avgR": -0.186,
+              "winRate": 33.9,
+              "pf": 0.718,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 210,
+              "totalR": -34.8,
+              "avgR": -0.166,
+              "winRate": 34.8,
+              "pf": 0.746,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "rsi15": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 583,
+              "totalR": -62.2,
+              "avgR": -0.107,
+              "winRate": 37.2,
+              "pf": 0.83,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 524,
+              "totalR": -41.6,
+              "avgR": -0.079,
+              "winRate": 38.4,
+              "pf": 0.871,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 474,
+              "totalR": -34.8,
+              "avgR": -0.073,
+              "winRate": 38.6,
+              "pf": 0.88,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 405,
+              "totalR": -61.8,
+              "avgR": -0.153,
+              "winRate": 35.3,
+              "pf": 0.764,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 88,
+              "totalR": -13.6,
+              "avgR": -0.155,
+              "winRate": 35.2,
+              "pf": 0.761,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 86,
+              "totalR": -2,
+              "avgR": -0.023,
+              "winRate": 40.7,
+              "pf": 0.961,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "rsi1h": {
+          "buckets": [
+            {
+              "bucket": "50-58",
+              "samples": 576,
+              "totalR": -88.8,
+              "avgR": -0.154,
+              "winRate": 35.2,
+              "pf": 0.762,
+              "adequate": true
+            },
+            {
+              "bucket": "42-50",
+              "samples": 523,
+              "totalR": -67,
+              "avgR": -0.128,
+              "winRate": 36.3,
+              "pf": 0.799,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 516,
+              "totalR": -12,
+              "avgR": -0.023,
+              "winRate": 40.7,
+              "pf": 0.961,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 357,
+              "totalR": -23.4,
+              "avgR": -0.066,
+              "winRate": 38.9,
+              "pf": 0.893,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 115,
+              "totalR": -9.4,
+              "avgR": -0.082,
+              "winRate": 38.3,
+              "pf": 0.868,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 73,
+              "totalR": -15.4,
+              "avgR": -0.211,
+              "winRate": 32.9,
+              "pf": 0.686,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "rsi4h": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 655,
+              "totalR": -33.4,
+              "avgR": -0.051,
+              "winRate": 39.5,
+              "pf": 0.916,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 600,
+              "totalR": -62.4,
+              "avgR": -0.104,
+              "winRate": 37.3,
+              "pf": 0.834,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 455,
+              "totalR": -68.6,
+              "avgR": -0.151,
+              "winRate": 35.4,
+              "pf": 0.767,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 301,
+              "totalR": -29.8,
+              "avgR": -0.099,
+              "winRate": 37.5,
+              "pf": 0.841,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 96,
+              "totalR": -12,
+              "avgR": -0.125,
+              "winRate": 36.5,
+              "pf": 0.803,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 53,
+              "totalR": -9.8,
+              "avgR": -0.185,
+              "winRate": 34,
+              "pf": 0.72,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "volume15": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 946,
+              "totalR": -146.8,
+              "avgR": -0.155,
+              "winRate": 35.2,
+              "pf": 0.761,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 517,
+              "totalR": -34.6,
+              "avgR": -0.067,
+              "winRate": 38.9,
+              "pf": 0.891,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 328,
+              "totalR": 5.6,
+              "avgR": 0.017,
+              "winRate": 42.4,
+              "pf": 1.03,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 226,
+              "totalR": -36.4,
+              "avgR": -0.161,
+              "winRate": 35,
+              "pf": 0.752,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 143,
+              "totalR": -3.8,
+              "avgR": -0.027,
+              "winRate": 40.6,
+              "pf": 0.955,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 1,
+          "negativeBuckets": 4
+        },
+        "volume1h": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 824,
+              "totalR": -108.8,
+              "avgR": -0.132,
+              "winRate": 36.2,
+              "pf": 0.793,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 578,
+              "totalR": -45.2,
+              "avgR": -0.078,
+              "winRate": 38.4,
+              "pf": 0.873,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 349,
+              "totalR": -17.8,
+              "avgR": -0.051,
+              "winRate": 39.5,
+              "pf": 0.916,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 236,
+              "totalR": -44,
+              "avgR": -0.186,
+              "winRate": 33.9,
+              "pf": 0.718,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 173,
+              "totalR": -0.2,
+              "avgR": -0.001,
+              "winRate": 41.6,
+              "pf": 0.998,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 0,
+          "negativeBuckets": 5
+        },
+        "emaStructure15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 1895,
+              "totalR": -155,
+              "avgR": -0.082,
+              "winRate": 38.3,
+              "pf": 0.868,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 265,
+              "totalR": -61,
+              "avgR": -0.23,
+              "winRate": 32.1,
+              "pf": 0.661,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 1600,
+              "totalR": -157.6,
+              "avgR": -0.098,
+              "winRate": 37.6,
+              "pf": 0.842,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 560,
+              "totalR": -58.4,
+              "avgR": -0.104,
+              "winRate": 37.3,
+              "pf": 0.834,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 1254,
+              "totalR": -171.6,
+              "avgR": -0.137,
+              "winRate": 36,
+              "pf": 0.786,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 906,
+              "totalR": -44.4,
+              "avgR": -0.049,
+              "winRate": 39.6,
+              "pf": 0.919,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 1720,
+              "totalR": -179.2,
+              "avgR": -0.104,
+              "winRate": 37.3,
+              "pf": 0.834,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 440,
+              "totalR": -36.8,
+              "avgR": -0.084,
+              "winRate": 38.2,
+              "pf": 0.865,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 2011,
+              "totalR": -170.2,
+              "avgR": -0.085,
+              "winRate": 38.1,
+              "pf": 0.863,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 149,
+              "totalR": -45.8,
+              "avgR": -0.307,
+              "winRate": 28.9,
+              "pf": 0.568,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 1818,
+              "totalR": -181.2,
+              "avgR": -0.1,
+              "winRate": 37.5,
+              "pf": 0.84,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 342,
+              "totalR": -34.8,
+              "avgR": -0.102,
+              "winRate": 37.4,
+              "pf": 0.837,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaDistanceAtr15": {
+          "buckets": [
+            {
+              "bucket": ">=1.5",
+              "samples": 516,
+              "totalR": -57.6,
+              "avgR": -0.112,
+              "winRate": 37,
+              "pf": 0.823,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.5",
+              "samples": 400,
+              "totalR": -47.2,
+              "avgR": -0.118,
+              "winRate": 36.8,
+              "pf": 0.813,
+              "adequate": true
+            },
+            {
+              "bucket": "0.25-0.5",
+              "samples": 334,
+              "totalR": -36.4,
+              "avgR": -0.109,
+              "winRate": 37.1,
+              "pf": 0.827,
+              "adequate": true
+            },
+            {
+              "bucket": "<0.25",
+              "samples": 327,
+              "totalR": -31.8,
+              "avgR": -0.097,
+              "winRate": 37.6,
+              "pf": 0.844,
+              "adequate": true
+            },
+            {
+              "bucket": "0.5-0.75",
+              "samples": 325,
+              "totalR": -20.2,
+              "avgR": -0.062,
+              "winRate": 39.1,
+              "pf": 0.898,
+              "adequate": true
+            },
+            {
+              "bucket": "0.75-1",
+              "samples": 258,
+              "totalR": -22.8,
+              "avgR": -0.088,
+              "winRate": 38,
+              "pf": 0.858,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "sideRegime": {
+          "buckets": [
+            {
+              "bucket": "SHORT×BEAR",
+              "samples": 516,
+              "totalR": -86.4,
+              "avgR": -0.167,
+              "winRate": 34.7,
+              "pf": 0.744,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×RANGE",
+              "samples": 393,
+              "totalR": -1.8,
+              "avgR": -0.005,
+              "winRate": 41.5,
+              "pf": 0.992,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×RANGE",
+              "samples": 312,
+              "totalR": -9.6,
+              "avgR": -0.031,
+              "winRate": 40.4,
+              "pf": 0.948,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BULL",
+              "samples": 222,
+              "totalR": -68.4,
+              "avgR": -0.308,
+              "winRate": 28.8,
+              "pf": 0.567,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×TRANSITION",
+              "samples": 220,
+              "totalR": -13.6,
+              "avgR": -0.062,
+              "winRate": 39.1,
+              "pf": 0.899,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×TRANSITION",
+              "samples": 200,
+              "totalR": -3.2,
+              "avgR": -0.016,
+              "winRate": 41,
+              "pf": 0.973,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BEAR",
+              "samples": 197,
+              "totalR": -12.2,
+              "avgR": -0.062,
+              "winRate": 39.1,
+              "pf": 0.898,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×BULL",
+              "samples": 100,
+              "totalR": -20.8,
+              "avgR": -0.208,
+              "winRate": 33,
+              "pf": 0.69,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 8,
+          "positiveBuckets": 0,
+          "negativeBuckets": 8
+        }
+      }
+    },
+    "60d": {
+      "schemaVersion": "7.61-FEATURE-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "samples": 4320,
+      "minSamples": 30,
+      "overall": {
+        "samples": 4320,
+        "totalR": -194.4,
+        "avgR": -0.045,
+        "winRate": 39.8,
+        "pf": 0.925
+      },
+      "features": {
+        "side": {
+          "buckets": [
+            {
+              "bucket": "SHORT",
+              "samples": 2330,
+              "totalR": -69.2,
+              "avgR": -0.03,
+              "winRate": 40.4,
+              "pf": 0.95,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG",
+              "samples": 1990,
+              "totalR": -125.2,
+              "avgR": -0.063,
+              "winRate": 39,
+              "pf": 0.897,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "regime": {
+          "buckets": [
+            {
+              "bucket": "BEAR",
+              "samples": 1444,
+              "totalR": -145.6,
+              "avgR": -0.101,
+              "winRate": 37.5,
+              "pf": 0.839,
+              "adequate": true
+            },
+            {
+              "bucket": "RANGE",
+              "samples": 1229,
+              "totalR": -24.2,
+              "avgR": -0.02,
+              "winRate": 40.8,
+              "pf": 0.967,
+              "adequate": true
+            },
+            {
+              "bucket": "TRANSITION",
+              "samples": 876,
+              "totalR": 31.2,
+              "avgR": 0.036,
+              "winRate": 43.2,
+              "pf": 1.063,
+              "adequate": true
+            },
+            {
+              "bucket": "BULL",
+              "samples": 771,
+              "totalR": -55.8,
+              "avgR": -0.072,
+              "winRate": 38.7,
+              "pf": 0.882,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 1,
+          "negativeBuckets": 3
+        },
+        "baselineStatus": {
+          "buckets": [
+            {
+              "bucket": "WAIT_ENTRY_ZONE",
+              "samples": 1622,
+              "totalR": -117.2,
+              "avgR": -0.072,
+              "winRate": 38.7,
+              "pf": 0.882,
+              "adequate": true
+            },
+            {
+              "bucket": "NO_SETUP",
+              "samples": 1577,
+              "totalR": -79.4,
+              "avgR": -0.05,
+              "winRate": 39.6,
+              "pf": 0.917,
+              "adequate": true
+            },
+            {
+              "bucket": "READY",
+              "samples": 1121,
+              "totalR": 2.2,
+              "avgR": 0.002,
+              "winRate": 41.7,
+              "pf": 1.003,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 3,
+          "positiveBuckets": 1,
+          "negativeBuckets": 2
+        },
+        "mtfAlignment": {
+          "buckets": [
+            {
+              "bucket": "1/3",
+              "samples": 2000,
+              "totalR": -84.8,
+              "avgR": -0.042,
+              "winRate": 39.9,
+              "pf": 0.929,
+              "adequate": true
+            },
+            {
+              "bucket": "2/3",
+              "samples": 1162,
+              "totalR": -65.2,
+              "avgR": -0.056,
+              "winRate": 39.3,
+              "pf": 0.908,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 756,
+              "totalR": -36,
+              "avgR": -0.048,
+              "winRate": 39.7,
+              "pf": 0.921,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 402,
+              "totalR": -8.4,
+              "avgR": -0.021,
+              "winRate": 40.8,
+              "pf": 0.965,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "macdAgreement": {
+          "buckets": [
+            {
+              "bucket": "2/3",
+              "samples": 2286,
+              "totalR": -126,
+              "avgR": -0.055,
+              "winRate": 39.4,
+              "pf": 0.909,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 1043,
+              "totalR": -54.2,
+              "avgR": -0.052,
+              "winRate": 39.5,
+              "pf": 0.914,
+              "adequate": true
+            },
+            {
+              "bucket": "1/3",
+              "samples": 961,
+              "totalR": -3.4,
+              "avgR": -0.004,
+              "winRate": 41.5,
+              "pf": 0.994,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 30,
+              "totalR": -10.8,
+              "avgR": -0.36,
+              "winRate": 26.7,
+              "pf": 0.509,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "adx15": {
+          "buckets": [
+            {
+              "bucket": "<18",
+              "samples": 1264,
+              "totalR": -109.6,
+              "avgR": -0.087,
+              "winRate": 38.1,
+              "pf": 0.86,
+              "adequate": true
+            },
+            {
+              "bucket": "18-25",
+              "samples": 1227,
+              "totalR": -19.8,
+              "avgR": -0.016,
+              "winRate": 41,
+              "pf": 0.973,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1114,
+              "totalR": -10,
+              "avgR": -0.009,
+              "winRate": 41.3,
+              "pf": 0.985,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 715,
+              "totalR": -55,
+              "avgR": -0.077,
+              "winRate": 38.5,
+              "pf": 0.875,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "adx1h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 1315,
+              "totalR": -45.4,
+              "avgR": -0.035,
+              "winRate": 40.2,
+              "pf": 0.942,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 1236,
+              "totalR": -4.8,
+              "avgR": -0.004,
+              "winRate": 41.5,
+              "pf": 0.993,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1165,
+              "totalR": -94.6,
+              "avgR": -0.081,
+              "winRate": 38.3,
+              "pf": 0.868,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 604,
+              "totalR": -49.6,
+              "avgR": -0.082,
+              "winRate": 38.2,
+              "pf": 0.867,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "adx4h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 1467,
+              "totalR": -58.2,
+              "avgR": -0.04,
+              "winRate": 40,
+              "pf": 0.934,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 1229,
+              "totalR": -24.2,
+              "avgR": -0.02,
+              "winRate": 40.8,
+              "pf": 0.967,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1056,
+              "totalR": -96,
+              "avgR": -0.091,
+              "winRate": 37.9,
+              "pf": 0.854,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 568,
+              "totalR": -16,
+              "avgR": -0.028,
+              "winRate": 40.5,
+              "pf": 0.953,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 0,
+          "negativeBuckets": 4
+        },
+        "rsi15": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 1170,
+              "totalR": -15.6,
+              "avgR": -0.013,
+              "winRate": 41.1,
+              "pf": 0.977,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 1164,
+              "totalR": -36,
+              "avgR": -0.031,
+              "winRate": 40.4,
+              "pf": 0.948,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 851,
+              "totalR": -27.8,
+              "avgR": -0.033,
+              "winRate": 40.3,
+              "pf": 0.945,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 808,
+              "totalR": -95.2,
+              "avgR": -0.118,
+              "winRate": 36.8,
+              "pf": 0.814,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 166,
+              "totalR": -12.4,
+              "avgR": -0.075,
+              "winRate": 38.6,
+              "pf": 0.878,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 161,
+              "totalR": -7.4,
+              "avgR": -0.046,
+              "winRate": 39.8,
+              "pf": 0.924,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "rsi1h": {
+          "buckets": [
+            {
+              "bucket": "50-58",
+              "samples": 1153,
+              "totalR": -97,
+              "avgR": -0.084,
+              "winRate": 38.2,
+              "pf": 0.864,
+              "adequate": true
+            },
+            {
+              "bucket": "42-50",
+              "samples": 1104,
+              "totalR": -100.8,
+              "avgR": -0.091,
+              "winRate": 37.9,
+              "pf": 0.853,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 958,
+              "totalR": 54.8,
+              "avgR": 0.057,
+              "winRate": 44.1,
+              "pf": 1.102,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 785,
+              "totalR": -7.4,
+              "avgR": -0.009,
+              "winRate": 41.3,
+              "pf": 0.984,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 184,
+              "totalR": -18.4,
+              "avgR": -0.1,
+              "winRate": 37.5,
+              "pf": 0.84,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 136,
+              "totalR": -25.6,
+              "avgR": -0.188,
+              "winRate": 33.8,
+              "pf": 0.716,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 1,
+          "negativeBuckets": 5
+        },
+        "rsi4h": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 1276,
+              "totalR": 3.2,
+              "avgR": 0.003,
+              "winRate": 41.8,
+              "pf": 1.004,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 1142,
+              "totalR": -95.6,
+              "avgR": -0.084,
+              "winRate": 38.2,
+              "pf": 0.865,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 986,
+              "totalR": -66.8,
+              "avgR": -0.068,
+              "winRate": 38.8,
+              "pf": 0.889,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 655,
+              "totalR": -7,
+              "avgR": -0.011,
+              "winRate": 41.2,
+              "pf": 0.982,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 156,
+              "totalR": -24,
+              "avgR": -0.154,
+              "winRate": 35.3,
+              "pf": 0.762,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 105,
+              "totalR": -4.2,
+              "avgR": -0.04,
+              "winRate": 40,
+              "pf": 0.933,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 1,
+          "negativeBuckets": 5
+        },
+        "volume15": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 1854,
+              "totalR": -152.4,
+              "avgR": -0.082,
+              "winRate": 38.2,
+              "pf": 0.867,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 1077,
+              "totalR": -54.6,
+              "avgR": -0.051,
+              "winRate": 39.6,
+              "pf": 0.916,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 675,
+              "totalR": 16.2,
+              "avgR": 0.024,
+              "winRate": 42.7,
+              "pf": 1.042,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 430,
+              "totalR": -36.4,
+              "avgR": -0.085,
+              "winRate": 38.1,
+              "pf": 0.863,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 284,
+              "totalR": 32.8,
+              "avgR": 0.115,
+              "winRate": 46.5,
+              "pf": 1.216,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 2,
+          "negativeBuckets": 3
+        },
+        "volume1h": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 1667,
+              "totalR": -87.8,
+              "avgR": -0.053,
+              "winRate": 39.5,
+              "pf": 0.913,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 1168,
+              "totalR": -6.4,
+              "avgR": -0.005,
+              "winRate": 41.4,
+              "pf": 0.991,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 687,
+              "totalR": -22.2,
+              "avgR": -0.032,
+              "winRate": 40.3,
+              "pf": 0.946,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 478,
+              "totalR": -41.2,
+              "avgR": -0.086,
+              "winRate": 38.1,
+              "pf": 0.861,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 320,
+              "totalR": -36.8,
+              "avgR": -0.115,
+              "winRate": 36.9,
+              "pf": 0.818,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 0,
+          "negativeBuckets": 5
+        },
+        "emaStructure15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 3801,
+              "totalR": -100.2,
+              "avgR": -0.026,
+              "winRate": 40.6,
+              "pf": 0.956,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 519,
+              "totalR": -94.2,
+              "avgR": -0.182,
+              "winRate": 34.1,
+              "pf": 0.725,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 3220,
+              "totalR": -133.6,
+              "avgR": -0.041,
+              "winRate": 39.9,
+              "pf": 0.931,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 1100,
+              "totalR": -60.8,
+              "avgR": -0.055,
+              "winRate": 39.4,
+              "pf": 0.909,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 2538,
+              "totalR": -154.8,
+              "avgR": -0.061,
+              "winRate": 39.1,
+              "pf": 0.9,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 1782,
+              "totalR": -39.6,
+              "avgR": -0.022,
+              "winRate": 40.7,
+              "pf": 0.962,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 3343,
+              "totalR": -227.8,
+              "avgR": -0.068,
+              "winRate": 38.8,
+              "pf": 0.889,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 977,
+              "totalR": 33.4,
+              "avgR": 0.034,
+              "winRate": 43.1,
+              "pf": 1.06,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 1,
+          "negativeBuckets": 1
+        },
+        "priceVsEma20_1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 4022,
+              "totalR": -158,
+              "avgR": -0.039,
+              "winRate": 40,
+              "pf": 0.934,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 298,
+              "totalR": -36.4,
+              "avgR": -0.122,
+              "winRate": 36.6,
+              "pf": 0.807,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 3639,
+              "totalR": -135,
+              "avgR": -0.037,
+              "winRate": 40.1,
+              "pf": 0.938,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 681,
+              "totalR": -59.4,
+              "avgR": -0.087,
+              "winRate": 38,
+              "pf": 0.859,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaDistanceAtr15": {
+          "buckets": [
+            {
+              "bucket": ">=1.5",
+              "samples": 926,
+              "totalR": -66.8,
+              "avgR": -0.072,
+              "winRate": 38.7,
+              "pf": 0.882,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.5",
+              "samples": 793,
+              "totalR": -53.8,
+              "avgR": -0.068,
+              "winRate": 38.8,
+              "pf": 0.889,
+              "adequate": true
+            },
+            {
+              "bucket": "0.25-0.5",
+              "samples": 712,
+              "totalR": -16,
+              "avgR": -0.022,
+              "winRate": 40.7,
+              "pf": 0.962,
+              "adequate": true
+            },
+            {
+              "bucket": "<0.25",
+              "samples": 703,
+              "totalR": -11.8,
+              "avgR": -0.017,
+              "winRate": 41,
+              "pf": 0.972,
+              "adequate": true
+            },
+            {
+              "bucket": "0.5-0.75",
+              "samples": 672,
+              "totalR": -4.8,
+              "avgR": -0.007,
+              "winRate": 41.4,
+              "pf": 0.988,
+              "adequate": true
+            },
+            {
+              "bucket": "0.75-1",
+              "samples": 514,
+              "totalR": -41.2,
+              "avgR": -0.08,
+              "winRate": 38.3,
+              "pf": 0.87,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 0,
+          "negativeBuckets": 6
+        },
+        "sideRegime": {
+          "buckets": [
+            {
+              "bucket": "SHORT×BEAR",
+              "samples": 1059,
+              "totalR": -91.8,
+              "avgR": -0.087,
+              "winRate": 38.1,
+              "pf": 0.86,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×RANGE",
+              "samples": 646,
+              "totalR": 6.8,
+              "avgR": 0.011,
+              "winRate": 42.1,
+              "pf": 1.018,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×RANGE",
+              "samples": 583,
+              "totalR": -31,
+              "avgR": -0.053,
+              "winRate": 39.5,
+              "pf": 0.912,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BULL",
+              "samples": 557,
+              "totalR": -62.6,
+              "avgR": -0.112,
+              "winRate": 37,
+              "pf": 0.822,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×TRANSITION",
+              "samples": 465,
+              "totalR": 22.2,
+              "avgR": 0.048,
+              "winRate": 43.7,
+              "pf": 1.085,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×TRANSITION",
+              "samples": 411,
+              "totalR": 9,
+              "avgR": 0.022,
+              "winRate": 42.6,
+              "pf": 1.038,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BEAR",
+              "samples": 385,
+              "totalR": -53.8,
+              "avgR": -0.14,
+              "winRate": 35.8,
+              "pf": 0.782,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×BULL",
+              "samples": 214,
+              "totalR": 6.8,
+              "avgR": 0.032,
+              "winRate": 43,
+              "pf": 1.056,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 8,
+          "positiveBuckets": 4,
+          "negativeBuckets": 4
+        }
+      }
+    },
+    "90d": {
+      "schemaVersion": "7.61-FEATURE-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "samples": 6468,
+      "minSamples": 30,
+      "overall": {
+        "samples": 6468,
+        "totalR": -98.4,
+        "avgR": -0.015,
+        "winRate": 41,
+        "pf": 0.974
+      },
+      "features": {
+        "side": {
+          "buckets": [
+            {
+              "bucket": "SHORT",
+              "samples": 3619,
+              "totalR": 115.4,
+              "avgR": 0.032,
+              "winRate": 43,
+              "pf": 1.056,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG",
+              "samples": 2849,
+              "totalR": -213.8,
+              "avgR": -0.075,
+              "winRate": 38.5,
+              "pf": 0.878,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 1,
+          "negativeBuckets": 1
+        },
+        "regime": {
+          "buckets": [
+            {
+              "bucket": "BEAR",
+              "samples": 2295,
+              "totalR": -65.4,
+              "avgR": -0.028,
+              "winRate": 40.5,
+              "pf": 0.952,
+              "adequate": true
+            },
+            {
+              "bucket": "RANGE",
+              "samples": 1665,
+              "totalR": 3,
+              "avgR": 0.002,
+              "winRate": 41.7,
+              "pf": 1.003,
+              "adequate": true
+            },
+            {
+              "bucket": "TRANSITION",
+              "samples": 1435,
+              "totalR": 5,
+              "avgR": 0.003,
+              "winRate": 41.8,
+              "pf": 1.006,
+              "adequate": true
+            },
+            {
+              "bucket": "BULL",
+              "samples": 1073,
+              "totalR": -41,
+              "avgR": -0.038,
+              "winRate": 40.1,
+              "pf": 0.936,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 2,
+          "negativeBuckets": 2
+        },
+        "baselineStatus": {
+          "buckets": [
+            {
+              "bucket": "WAIT_ENTRY_ZONE",
+              "samples": 2559,
+              "totalR": -46.2,
+              "avgR": -0.018,
+              "winRate": 40.9,
+              "pf": 0.969,
+              "adequate": true
+            },
+            {
+              "bucket": "NO_SETUP",
+              "samples": 2252,
+              "totalR": -46.4,
+              "avgR": -0.021,
+              "winRate": 40.8,
+              "pf": 0.965,
+              "adequate": true
+            },
+            {
+              "bucket": "READY",
+              "samples": 1657,
+              "totalR": -5.8,
+              "avgR": -0.004,
+              "winRate": 41.5,
+              "pf": 0.994,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 3,
+          "positiveBuckets": 0,
+          "negativeBuckets": 3
+        },
+        "mtfAlignment": {
+          "buckets": [
+            {
+              "bucket": "1/3",
+              "samples": 2928,
+              "totalR": -19.2,
+              "avgR": -0.007,
+              "winRate": 41.4,
+              "pf": 0.989,
+              "adequate": true
+            },
+            {
+              "bucket": "2/3",
+              "samples": 1788,
+              "totalR": -33.6,
+              "avgR": -0.019,
+              "winRate": 40.9,
+              "pf": 0.968,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 1103,
+              "totalR": -54.2,
+              "avgR": -0.049,
+              "winRate": 39.6,
+              "pf": 0.919,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 649,
+              "totalR": 8.6,
+              "avgR": 0.013,
+              "winRate": 42.2,
+              "pf": 1.023,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 1,
+          "negativeBuckets": 3
+        },
+        "macdAgreement": {
+          "buckets": [
+            {
+              "bucket": "2/3",
+              "samples": 3435,
+              "totalR": -70.2,
+              "avgR": -0.02,
+              "winRate": 40.8,
+              "pf": 0.965,
+              "adequate": true
+            },
+            {
+              "bucket": "3/3",
+              "samples": 1633,
+              "totalR": -46.6,
+              "avgR": -0.029,
+              "winRate": 40.5,
+              "pf": 0.952,
+              "adequate": true
+            },
+            {
+              "bucket": "1/3",
+              "samples": 1361,
+              "totalR": 26.2,
+              "avgR": 0.019,
+              "winRate": 42.5,
+              "pf": 1.033,
+              "adequate": true
+            },
+            {
+              "bucket": "0/3",
+              "samples": 39,
+              "totalR": -7.8,
+              "avgR": -0.2,
+              "winRate": 33.3,
+              "pf": 0.7,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 1,
+          "negativeBuckets": 3
+        },
+        "adx15": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 1836,
+              "totalR": -16.8,
+              "avgR": -0.009,
+              "winRate": 41.3,
+              "pf": 0.984,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 1831,
+              "totalR": -62.2,
+              "avgR": -0.034,
+              "winRate": 40.3,
+              "pf": 0.943,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1691,
+              "totalR": 13,
+              "avgR": 0.008,
+              "winRate": 42,
+              "pf": 1.013,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 1110,
+              "totalR": -32.4,
+              "avgR": -0.029,
+              "winRate": 40.5,
+              "pf": 0.951,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 1,
+          "negativeBuckets": 3
+        },
+        "adx1h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 1901,
+              "totalR": -29,
+              "avgR": -0.015,
+              "winRate": 41,
+              "pf": 0.974,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 1729,
+              "totalR": 8.6,
+              "avgR": 0.005,
+              "winRate": 41.9,
+              "pf": 1.009,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1716,
+              "totalR": -108,
+              "avgR": -0.063,
+              "winRate": 39,
+              "pf": 0.897,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 1122,
+              "totalR": 30,
+              "avgR": 0.027,
+              "winRate": 42.8,
+              "pf": 1.047,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 2,
+          "negativeBuckets": 2
+        },
+        "adx4h": {
+          "buckets": [
+            {
+              "bucket": "18-25",
+              "samples": 2082,
+              "totalR": -42,
+              "avgR": -0.02,
+              "winRate": 40.8,
+              "pf": 0.966,
+              "adequate": true
+            },
+            {
+              "bucket": "<18",
+              "samples": 1665,
+              "totalR": 3,
+              "avgR": 0.002,
+              "winRate": 41.7,
+              "pf": 1.003,
+              "adequate": true
+            },
+            {
+              "bucket": "25-35",
+              "samples": 1653,
+              "totalR": -69,
+              "avgR": -0.042,
+              "winRate": 39.9,
+              "pf": 0.931,
+              "adequate": true
+            },
+            {
+              "bucket": ">=35",
+              "samples": 1068,
+              "totalR": 9.6,
+              "avgR": 0.009,
+              "winRate": 42,
+              "pf": 1.016,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 4,
+          "positiveBuckets": 2,
+          "negativeBuckets": 2
+        },
+        "rsi15": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 1772,
+              "totalR": 30.4,
+              "avgR": 0.017,
+              "winRate": 42.4,
+              "pf": 1.03,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 1647,
+              "totalR": -5.4,
+              "avgR": -0.003,
+              "winRate": 41.5,
+              "pf": 0.994,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 1377,
+              "totalR": 7.8,
+              "avgR": 0.006,
+              "winRate": 41.9,
+              "pf": 1.01,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 1175,
+              "totalR": -116.6,
+              "avgR": -0.099,
+              "winRate": 37.5,
+              "pf": 0.841,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 266,
+              "totalR": -18.8,
+              "avgR": -0.071,
+              "winRate": 38.7,
+              "pf": 0.885,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 231,
+              "totalR": 4.2,
+              "avgR": 0.018,
+              "winRate": 42.4,
+              "pf": 1.032,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 3,
+          "negativeBuckets": 3
+        },
+        "rsi1h": {
+          "buckets": [
+            {
+              "bucket": "50-58",
+              "samples": 1660,
+              "totalR": -138.4,
+              "avgR": -0.083,
+              "winRate": 38.2,
+              "pf": 0.865,
+              "adequate": true
+            },
+            {
+              "bucket": "42-50",
+              "samples": 1660,
+              "totalR": -16,
+              "avgR": -0.01,
+              "winRate": 41.3,
+              "pf": 0.984,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 1511,
+              "totalR": 159.4,
+              "avgR": 0.105,
+              "winRate": 46.1,
+              "pf": 1.196,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 1108,
+              "totalR": -47.2,
+              "avgR": -0.043,
+              "winRate": 39.9,
+              "pf": 0.929,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 320,
+              "totalR": -36.8,
+              "avgR": -0.115,
+              "winRate": 36.9,
+              "pf": 0.818,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 209,
+              "totalR": -19.4,
+              "avgR": -0.093,
+              "winRate": 37.8,
+              "pf": 0.851,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 1,
+          "negativeBuckets": 5
+        },
+        "rsi4h": {
+          "buckets": [
+            {
+              "bucket": "42-50",
+              "samples": 1913,
+              "totalR": -2.6,
+              "avgR": -0.001,
+              "winRate": 41.6,
+              "pf": 0.998,
+              "adequate": true
+            },
+            {
+              "bucket": "30-42",
+              "samples": 1685,
+              "totalR": -2.6,
+              "avgR": -0.002,
+              "winRate": 41.6,
+              "pf": 0.997,
+              "adequate": true
+            },
+            {
+              "bucket": "50-58",
+              "samples": 1431,
+              "totalR": -99,
+              "avgR": -0.069,
+              "winRate": 38.8,
+              "pf": 0.887,
+              "adequate": true
+            },
+            {
+              "bucket": "58-70",
+              "samples": 888,
+              "totalR": 12,
+              "avgR": 0.014,
+              "winRate": 42.2,
+              "pf": 1.023,
+              "adequate": true
+            },
+            {
+              "bucket": "<30",
+              "samples": 388,
+              "totalR": 3.2,
+              "avgR": 0.008,
+              "winRate": 42,
+              "pf": 1.014,
+              "adequate": true
+            },
+            {
+              "bucket": ">=70",
+              "samples": 163,
+              "totalR": -9.4,
+              "avgR": -0.058,
+              "winRate": 39.3,
+              "pf": 0.905,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 2,
+          "negativeBuckets": 4
+        },
+        "volume15": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 2737,
+              "totalR": -125.8,
+              "avgR": -0.046,
+              "winRate": 39.8,
+              "pf": 0.924,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 1638,
+              "totalR": -68.4,
+              "avgR": -0.042,
+              "winRate": 39.9,
+              "pf": 0.93,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 1017,
+              "totalR": 27,
+              "avgR": 0.027,
+              "winRate": 42.8,
+              "pf": 1.046,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 636,
+              "totalR": 2.4,
+              "avgR": 0.004,
+              "winRate": 41.8,
+              "pf": 1.006,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 440,
+              "totalR": 66.4,
+              "avgR": 0.151,
+              "winRate": 48,
+              "pf": 1.29,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 3,
+          "negativeBuckets": 2
+        },
+        "volume1h": {
+          "buckets": [
+            {
+              "bucket": "<0.65",
+              "samples": 2443,
+              "totalR": -23.8,
+              "avgR": -0.01,
+              "winRate": 41.3,
+              "pf": 0.983,
+              "adequate": true
+            },
+            {
+              "bucket": "0.65-1",
+              "samples": 1751,
+              "totalR": 51.4,
+              "avgR": 0.029,
+              "winRate": 42.9,
+              "pf": 1.051,
+              "adequate": true
+            },
+            {
+              "bucket": ">=1.5",
+              "samples": 1081,
+              "totalR": -15.4,
+              "avgR": -0.014,
+              "winRate": 41.1,
+              "pf": 0.976,
+              "adequate": true
+            },
+            {
+              "bucket": "1.15-1.5",
+              "samples": 716,
+              "totalR": -75.2,
+              "avgR": -0.105,
+              "winRate": 37.3,
+              "pf": 0.833,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.15",
+              "samples": 477,
+              "totalR": -35.4,
+              "avgR": -0.074,
+              "winRate": 38.6,
+              "pf": 0.879,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 5,
+          "positiveBuckets": 1,
+          "negativeBuckets": 4
+        },
+        "emaStructure15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 5700,
+              "totalR": -26.4,
+              "avgR": -0.005,
+              "winRate": 41.5,
+              "pf": 0.992,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 768,
+              "totalR": -72,
+              "avgR": -0.094,
+              "winRate": 37.8,
+              "pf": 0.849,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 4835,
+              "totalR": -30.2,
+              "avgR": -0.006,
+              "winRate": 41.4,
+              "pf": 0.989,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 1633,
+              "totalR": -68.2,
+              "avgR": -0.042,
+              "winRate": 39.9,
+              "pf": 0.93,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaStructure4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 3835,
+              "totalR": -14.2,
+              "avgR": -0.004,
+              "winRate": 41.5,
+              "pf": 0.994,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 2633,
+              "totalR": -84.2,
+              "avgR": -0.032,
+              "winRate": 40.3,
+              "pf": 0.946,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_15": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 5079,
+              "totalR": -226.2,
+              "avgR": -0.045,
+              "winRate": 39.8,
+              "pf": 0.926,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 1389,
+              "totalR": 127.8,
+              "avgR": 0.092,
+              "winRate": 45.5,
+              "pf": 1.169,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 1,
+          "negativeBuckets": 1
+        },
+        "priceVsEma20_1h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 6029,
+              "totalR": -81.8,
+              "avgR": -0.014,
+              "winRate": 41.1,
+              "pf": 0.977,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 439,
+              "totalR": -16.6,
+              "avgR": -0.038,
+              "winRate": 40.1,
+              "pf": 0.937,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "priceVsEma20_4h": {
+          "buckets": [
+            {
+              "bucket": "ALIGNED",
+              "samples": 5480,
+              "totalR": -34.4,
+              "avgR": -0.006,
+              "winRate": 41.4,
+              "pf": 0.989,
+              "adequate": true
+            },
+            {
+              "bucket": "OPPOSED",
+              "samples": 988,
+              "totalR": -64,
+              "avgR": -0.065,
+              "winRate": 39,
+              "pf": 0.894,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 2,
+          "positiveBuckets": 0,
+          "negativeBuckets": 2
+        },
+        "emaDistanceAtr15": {
+          "buckets": [
+            {
+              "bucket": ">=1.5",
+              "samples": 1401,
+              "totalR": -57,
+              "avgR": -0.041,
+              "winRate": 40,
+              "pf": 0.932,
+              "adequate": true
+            },
+            {
+              "bucket": "1-1.5",
+              "samples": 1194,
+              "totalR": -58.8,
+              "avgR": -0.049,
+              "winRate": 39.6,
+              "pf": 0.918,
+              "adequate": true
+            },
+            {
+              "bucket": "<0.25",
+              "samples": 1070,
+              "totalR": 43.6,
+              "avgR": 0.041,
+              "winRate": 43.4,
+              "pf": 1.072,
+              "adequate": true
+            },
+            {
+              "bucket": "0.25-0.5",
+              "samples": 1042,
+              "totalR": -36.4,
+              "avgR": -0.035,
+              "winRate": 40.2,
+              "pf": 0.942,
+              "adequate": true
+            },
+            {
+              "bucket": "0.5-0.75",
+              "samples": 951,
+              "totalR": -19.8,
+              "avgR": -0.021,
+              "winRate": 40.8,
+              "pf": 0.965,
+              "adequate": true
+            },
+            {
+              "bucket": "0.75-1",
+              "samples": 810,
+              "totalR": 30,
+              "avgR": 0.037,
+              "winRate": 43.2,
+              "pf": 1.065,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 6,
+          "positiveBuckets": 2,
+          "negativeBuckets": 4
+        },
+        "sideRegime": {
+          "buckets": [
+            {
+              "bucket": "SHORT×BEAR",
+              "samples": 1729,
+              "totalR": 1.4,
+              "avgR": 0.001,
+              "winRate": 41.7,
+              "pf": 1.001,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×RANGE",
+              "samples": 932,
+              "totalR": 42.4,
+              "avgR": 0.045,
+              "winRate": 43.6,
+              "pf": 1.081,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×TRANSITION",
+              "samples": 777,
+              "totalR": -54.6,
+              "avgR": -0.07,
+              "winRate": 38.7,
+              "pf": 0.885,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BULL",
+              "samples": 773,
+              "totalR": -53,
+              "avgR": -0.069,
+              "winRate": 38.8,
+              "pf": 0.888,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×RANGE",
+              "samples": 733,
+              "totalR": -39.4,
+              "avgR": -0.054,
+              "winRate": 39.4,
+              "pf": 0.911,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×TRANSITION",
+              "samples": 658,
+              "totalR": 59.6,
+              "avgR": 0.091,
+              "winRate": 45.4,
+              "pf": 1.166,
+              "adequate": true
+            },
+            {
+              "bucket": "LONG×BEAR",
+              "samples": 566,
+              "totalR": -66.8,
+              "avgR": -0.118,
+              "winRate": 36.7,
+              "pf": 0.813,
+              "adequate": true
+            },
+            {
+              "bucket": "SHORT×BULL",
+              "samples": 300,
+              "totalR": 12,
+              "avgR": 0.04,
+              "winRate": 43.3,
+              "pf": 1.071,
+              "adequate": true
+            }
+          ],
+          "adequateBuckets": 8,
+          "positiveBuckets": 4,
+          "negativeBuckets": 4
+        }
+      }
+    }
+  },
+  "stability": {
+    "schemaVersion": "7.61-FEATURE-STABILITY-V1",
+    "researchOnly": true,
+    "windows": [
+      "30d",
+      "60d",
+      "90d"
+    ],
+    "features": {
+      "side": [
+        {
+          "bucket": "LONG",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.109,
+              "samples": 951,
+              "pf": 0.826
+            },
+            {
+              "window": "60d",
+              "avgR": -0.063,
+              "samples": 1990,
+              "pf": 0.897
+            },
+            {
+              "window": "90d",
+              "avgR": -0.075,
+              "samples": 2849,
+              "pf": 0.878
+            }
+          ]
+        },
+        {
+          "bucket": "SHORT",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.093,
+              "samples": 1209,
+              "pf": 0.851
+            },
+            {
+              "window": "60d",
+              "avgR": -0.03,
+              "samples": 2330,
+              "pf": 0.95
+            },
+            {
+              "window": "90d",
+              "avgR": 0.032,
+              "samples": 3619,
+              "pf": 1.056
+            }
+          ]
+        }
+      ],
+      "regime": [
+        {
+          "bucket": "BEAR",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.138,
+              "samples": 713,
+              "pf": 0.784
+            },
+            {
+              "window": "60d",
+              "avgR": -0.101,
+              "samples": 1444,
+              "pf": 0.839
+            },
+            {
+              "window": "90d",
+              "avgR": -0.028,
+              "samples": 2295,
+              "pf": 0.952
+            }
+          ]
+        },
+        {
+          "bucket": "BULL",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.277,
+              "samples": 322,
+              "pf": 0.604
+            },
+            {
+              "window": "60d",
+              "avgR": -0.072,
+              "samples": 771,
+              "pf": 0.882
+            },
+            {
+              "window": "90d",
+              "avgR": -0.038,
+              "samples": 1073,
+              "pf": 0.936
+            }
+          ]
+        },
+        {
+          "bucket": "RANGE",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.016,
+              "samples": 705,
+              "pf": 0.973
+            },
+            {
+              "window": "60d",
+              "avgR": -0.02,
+              "samples": 1229,
+              "pf": 0.967
+            },
+            {
+              "window": "90d",
+              "avgR": 0.002,
+              "samples": 1665,
+              "pf": 1.003
+            }
+          ]
+        },
+        {
+          "bucket": "TRANSITION",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.04,
+              "samples": 420,
+              "pf": 0.933
+            },
+            {
+              "window": "60d",
+              "avgR": 0.036,
+              "samples": 876,
+              "pf": 1.063
+            },
+            {
+              "window": "90d",
+              "avgR": 0.003,
+              "samples": 1435,
+              "pf": 1.006
+            }
+          ]
+        }
+      ],
+      "baselineStatus": [
+        {
+          "bucket": "WAIT_ENTRY_ZONE",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.096,
+              "samples": 863,
+              "pf": 0.846
+            },
+            {
+              "window": "60d",
+              "avgR": -0.072,
+              "samples": 1622,
+              "pf": 0.882
+            },
+            {
+              "window": "90d",
+              "avgR": -0.018,
+              "samples": 2559,
+              "pf": 0.969
+            }
+          ]
+        },
+        {
+          "bucket": "NO_SETUP",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.137,
+              "samples": 773,
+              "pf": 0.786
+            },
+            {
+              "window": "60d",
+              "avgR": -0.05,
+              "samples": 1577,
+              "pf": 0.917
+            },
+            {
+              "window": "90d",
+              "avgR": -0.021,
+              "samples": 2252,
+              "pf": 0.965
+            }
+          ]
+        },
+        {
+          "bucket": "READY",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.052,
+              "samples": 524,
+              "pf": 0.914
+            },
+            {
+              "window": "60d",
+              "avgR": 0.002,
+              "samples": 1121,
+              "pf": 1.003
+            },
+            {
+              "window": "90d",
+              "avgR": -0.004,
+              "samples": 1657,
+              "pf": 0.994
+            }
+          ]
+        }
+      ],
+      "mtfAlignment": [
+        {
+          "bucket": "1/3",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.133,
+              "samples": 980,
+              "pf": 0.792
+            },
+            {
+              "window": "60d",
+              "avgR": -0.042,
+              "samples": 2000,
+              "pf": 0.929
+            },
+            {
+              "window": "90d",
+              "avgR": -0.007,
+              "samples": 2928,
+              "pf": 0.989
+            }
+          ]
+        },
+        {
+          "bucket": "2/3",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.103,
+              "samples": 583,
+              "pf": 0.836
+            },
+            {
+              "window": "60d",
+              "avgR": -0.056,
+              "samples": 1162,
+              "pf": 0.908
+            },
+            {
+              "window": "90d",
+              "avgR": -0.019,
+              "samples": 1788,
+              "pf": 0.968
+            }
+          ]
+        },
+        {
+          "bucket": "0/3",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.103,
+              "samples": 388,
+              "pf": 0.835
+            },
+            {
+              "window": "60d",
+              "avgR": -0.048,
+              "samples": 756,
+              "pf": 0.921
+            },
+            {
+              "window": "90d",
+              "avgR": -0.049,
+              "samples": 1103,
+              "pf": 0.919
+            }
+          ]
+        },
+        {
+          "bucket": "3/3",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": 0.068,
+              "samples": 209,
+              "pf": 1.122
+            },
+            {
+              "window": "60d",
+              "avgR": -0.021,
+              "samples": 402,
+              "pf": 0.965
+            },
+            {
+              "window": "90d",
+              "avgR": 0.013,
+              "samples": 649,
+              "pf": 1.023
+            }
+          ]
+        }
+      ],
+      "macdAgreement": [
+        {
+          "bucket": "2/3",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.087,
+              "samples": 1152,
+              "pf": 0.859
+            },
+            {
+              "window": "60d",
+              "avgR": -0.055,
+              "samples": 2286,
+              "pf": 0.909
+            },
+            {
+              "window": "90d",
+              "avgR": -0.02,
+              "samples": 3435,
+              "pf": 0.965
+            }
+          ]
+        },
+        {
+          "bucket": "3/3",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.045,
+              "samples": 530,
+              "pf": 0.926
+            },
+            {
+              "window": "60d",
+              "avgR": -0.052,
+              "samples": 1043,
+              "pf": 0.914
+            },
+            {
+              "window": "90d",
+              "avgR": -0.029,
+              "samples": 1633,
+              "pf": 0.952
+            }
+          ]
+        },
+        {
+          "bucket": "1/3",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.183,
+              "samples": 461,
+              "pf": 0.723
+            },
+            {
+              "window": "60d",
+              "avgR": -0.004,
+              "samples": 961,
+              "pf": 0.994
+            },
+            {
+              "window": "90d",
+              "avgR": 0.019,
+              "samples": 1361,
+              "pf": 1.033
+            }
+          ]
+        },
+        {
+          "bucket": "0/3",
+          "windows": 2,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "60d",
+              "avgR": -0.36,
+              "samples": 30,
+              "pf": 0.509
+            },
+            {
+              "window": "90d",
+              "avgR": -0.2,
+              "samples": 39,
+              "pf": 0.7
+            }
+          ]
+        }
+      ],
+      "adx15": [
+        {
+          "bucket": "18-25",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.085,
+              "samples": 606,
+              "pf": 0.862
+            },
+            {
+              "window": "60d",
+              "avgR": -0.016,
+              "samples": 1227,
+              "pf": 0.973
+            },
+            {
+              "window": "90d",
+              "avgR": -0.009,
+              "samples": 1836,
+              "pf": 0.984
+            }
+          ]
+        },
+        {
+          "bucket": "<18",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.127,
+              "samples": 591,
+              "pf": 0.801
+            },
+            {
+              "window": "60d",
+              "avgR": -0.087,
+              "samples": 1264,
+              "pf": 0.86
+            },
+            {
+              "window": "90d",
+              "avgR": -0.034,
+              "samples": 1831,
+              "pf": 0.943
+            }
+          ]
+        },
+        {
+          "bucket": ">=35",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.194,
+              "samples": 396,
+              "pf": 0.708
+            },
+            {
+              "window": "60d",
+              "avgR": -0.077,
+              "samples": 715,
+              "pf": 0.875
+            },
+            {
+              "window": "90d",
+              "avgR": -0.029,
+              "samples": 1110,
+              "pf": 0.951
+            }
+          ]
+        },
+        {
+          "bucket": "25-35",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.022,
+              "samples": 567,
+              "pf": 0.962
+            },
+            {
+              "window": "60d",
+              "avgR": -0.009,
+              "samples": 1114,
+              "pf": 0.985
+            },
+            {
+              "window": "90d",
+              "avgR": 0.008,
+              "samples": 1691,
+              "pf": 1.013
+            }
+          ]
+        }
+      ],
+      "adx1h": [
+        {
+          "bucket": "18-25",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.064,
+              "samples": 641,
+              "pf": 0.895
+            },
+            {
+              "window": "60d",
+              "avgR": -0.035,
+              "samples": 1315,
+              "pf": 0.942
+            },
+            {
+              "window": "90d",
+              "avgR": -0.015,
+              "samples": 1901,
+              "pf": 0.974
+            }
+          ]
+        },
+        {
+          "bucket": "25-35",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.113,
+              "samples": 601,
+              "pf": 0.82
+            },
+            {
+              "window": "60d",
+              "avgR": -0.081,
+              "samples": 1165,
+              "pf": 0.868
+            },
+            {
+              "window": "90d",
+              "avgR": -0.063,
+              "samples": 1716,
+              "pf": 0.897
+            }
+          ]
+        },
+        {
+          "bucket": "<18",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.11,
+              "samples": 561,
+              "pf": 0.825
+            },
+            {
+              "window": "60d",
+              "avgR": -0.004,
+              "samples": 1236,
+              "pf": 0.993
+            },
+            {
+              "window": "90d",
+              "avgR": 0.005,
+              "samples": 1729,
+              "pf": 1.009
+            }
+          ]
+        },
+        {
+          "bucket": ">=35",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.126,
+              "samples": 357,
+              "pf": 0.802
+            },
+            {
+              "window": "60d",
+              "avgR": -0.082,
+              "samples": 604,
+              "pf": 0.867
+            },
+            {
+              "window": "90d",
+              "avgR": 0.027,
+              "samples": 1122,
+              "pf": 1.047
+            }
+          ]
+        }
+      ],
+      "adx4h": [
+        {
+          "bucket": "18-25",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.106,
+              "samples": 773,
+              "pf": 0.831
+            },
+            {
+              "window": "60d",
+              "avgR": -0.04,
+              "samples": 1467,
+              "pf": 0.934
+            },
+            {
+              "window": "90d",
+              "avgR": -0.02,
+              "samples": 2082,
+              "pf": 0.966
+            }
+          ]
+        },
+        {
+          "bucket": "25-35",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.186,
+              "samples": 472,
+              "pf": 0.718
+            },
+            {
+              "window": "60d",
+              "avgR": -0.091,
+              "samples": 1056,
+              "pf": 0.854
+            },
+            {
+              "window": "90d",
+              "avgR": -0.042,
+              "samples": 1653,
+              "pf": 0.931
+            }
+          ]
+        },
+        {
+          "bucket": "<18",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.016,
+              "samples": 705,
+              "pf": 0.973
+            },
+            {
+              "window": "60d",
+              "avgR": -0.02,
+              "samples": 1229,
+              "pf": 0.967
+            },
+            {
+              "window": "90d",
+              "avgR": 0.002,
+              "samples": 1665,
+              "pf": 1.003
+            }
+          ]
+        },
+        {
+          "bucket": ">=35",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.166,
+              "samples": 210,
+              "pf": 0.746
+            },
+            {
+              "window": "60d",
+              "avgR": -0.028,
+              "samples": 568,
+              "pf": 0.953
+            },
+            {
+              "window": "90d",
+              "avgR": 0.009,
+              "samples": 1068,
+              "pf": 1.016
+            }
+          ]
+        }
+      ],
+      "rsi15": [
+        {
+          "bucket": "50-58",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.079,
+              "samples": 524,
+              "pf": 0.871
+            },
+            {
+              "window": "60d",
+              "avgR": -0.031,
+              "samples": 1164,
+              "pf": 0.948
+            },
+            {
+              "window": "90d",
+              "avgR": -0.003,
+              "samples": 1647,
+              "pf": 0.994
+            }
+          ]
+        },
+        {
+          "bucket": "58-70",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.153,
+              "samples": 405,
+              "pf": 0.764
+            },
+            {
+              "window": "60d",
+              "avgR": -0.118,
+              "samples": 808,
+              "pf": 0.814
+            },
+            {
+              "window": "90d",
+              "avgR": -0.099,
+              "samples": 1175,
+              "pf": 0.841
+            }
+          ]
+        },
+        {
+          "bucket": "<30",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.155,
+              "samples": 88,
+              "pf": 0.761
+            },
+            {
+              "window": "60d",
+              "avgR": -0.075,
+              "samples": 166,
+              "pf": 0.878
+            },
+            {
+              "window": "90d",
+              "avgR": -0.071,
+              "samples": 266,
+              "pf": 0.885
+            }
+          ]
+        },
+        {
+          "bucket": "42-50",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.107,
+              "samples": 583,
+              "pf": 0.83
+            },
+            {
+              "window": "60d",
+              "avgR": -0.013,
+              "samples": 1170,
+              "pf": 0.977
+            },
+            {
+              "window": "90d",
+              "avgR": 0.017,
+              "samples": 1772,
+              "pf": 1.03
+            }
+          ]
+        },
+        {
+          "bucket": "30-42",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.073,
+              "samples": 474,
+              "pf": 0.88
+            },
+            {
+              "window": "60d",
+              "avgR": -0.033,
+              "samples": 851,
+              "pf": 0.945
+            },
+            {
+              "window": "90d",
+              "avgR": 0.006,
+              "samples": 1377,
+              "pf": 1.01
+            }
+          ]
+        },
+        {
+          "bucket": ">=70",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.023,
+              "samples": 86,
+              "pf": 0.961
+            },
+            {
+              "window": "60d",
+              "avgR": -0.046,
+              "samples": 161,
+              "pf": 0.924
+            },
+            {
+              "window": "90d",
+              "avgR": 0.018,
+              "samples": 231,
+              "pf": 1.032
+            }
+          ]
+        }
+      ],
+      "rsi1h": [
+        {
+          "bucket": "50-58",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.154,
+              "samples": 576,
+              "pf": 0.762
+            },
+            {
+              "window": "60d",
+              "avgR": -0.084,
+              "samples": 1153,
+              "pf": 0.864
+            },
+            {
+              "window": "90d",
+              "avgR": -0.083,
+              "samples": 1660,
+              "pf": 0.865
+            }
+          ]
+        },
+        {
+          "bucket": "42-50",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.128,
+              "samples": 523,
+              "pf": 0.799
+            },
+            {
+              "window": "60d",
+              "avgR": -0.091,
+              "samples": 1104,
+              "pf": 0.853
+            },
+            {
+              "window": "90d",
+              "avgR": -0.01,
+              "samples": 1660,
+              "pf": 0.984
+            }
+          ]
+        },
+        {
+          "bucket": "58-70",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.066,
+              "samples": 357,
+              "pf": 0.893
+            },
+            {
+              "window": "60d",
+              "avgR": -0.009,
+              "samples": 785,
+              "pf": 0.984
+            },
+            {
+              "window": "90d",
+              "avgR": -0.043,
+              "samples": 1108,
+              "pf": 0.929
+            }
+          ]
+        },
+        {
+          "bucket": "<30",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.082,
+              "samples": 115,
+              "pf": 0.868
+            },
+            {
+              "window": "60d",
+              "avgR": -0.1,
+              "samples": 184,
+              "pf": 0.84
+            },
+            {
+              "window": "90d",
+              "avgR": -0.115,
+              "samples": 320,
+              "pf": 0.818
+            }
+          ]
+        },
+        {
+          "bucket": ">=70",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.211,
+              "samples": 73,
+              "pf": 0.686
+            },
+            {
+              "window": "60d",
+              "avgR": -0.188,
+              "samples": 136,
+              "pf": 0.716
+            },
+            {
+              "window": "90d",
+              "avgR": -0.093,
+              "samples": 209,
+              "pf": 0.851
+            }
+          ]
+        },
+        {
+          "bucket": "30-42",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.023,
+              "samples": 516,
+              "pf": 0.961
+            },
+            {
+              "window": "60d",
+              "avgR": 0.057,
+              "samples": 958,
+              "pf": 1.102
+            },
+            {
+              "window": "90d",
+              "avgR": 0.105,
+              "samples": 1511,
+              "pf": 1.196
+            }
+          ]
+        }
+      ],
+      "rsi4h": [
+        {
+          "bucket": "30-42",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.104,
+              "samples": 600,
+              "pf": 0.834
+            },
+            {
+              "window": "60d",
+              "avgR": -0.084,
+              "samples": 1142,
+              "pf": 0.865
+            },
+            {
+              "window": "90d",
+              "avgR": -0.002,
+              "samples": 1685,
+              "pf": 0.997
+            }
+          ]
+        },
+        {
+          "bucket": "50-58",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.151,
+              "samples": 455,
+              "pf": 0.767
+            },
+            {
+              "window": "60d",
+              "avgR": -0.068,
+              "samples": 986,
+              "pf": 0.889
+            },
+            {
+              "window": "90d",
+              "avgR": -0.069,
+              "samples": 1431,
+              "pf": 0.887
+            }
+          ]
+        },
+        {
+          "bucket": ">=70",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.185,
+              "samples": 53,
+              "pf": 0.72
+            },
+            {
+              "window": "60d",
+              "avgR": -0.04,
+              "samples": 105,
+              "pf": 0.933
+            },
+            {
+              "window": "90d",
+              "avgR": -0.058,
+              "samples": 163,
+              "pf": 0.905
+            }
+          ]
+        },
+        {
+          "bucket": "42-50",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.051,
+              "samples": 655,
+              "pf": 0.916
+            },
+            {
+              "window": "60d",
+              "avgR": 0.003,
+              "samples": 1276,
+              "pf": 1.004
+            },
+            {
+              "window": "90d",
+              "avgR": -0.001,
+              "samples": 1913,
+              "pf": 0.998
+            }
+          ]
+        },
+        {
+          "bucket": "58-70",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.099,
+              "samples": 301,
+              "pf": 0.841
+            },
+            {
+              "window": "60d",
+              "avgR": -0.011,
+              "samples": 655,
+              "pf": 0.982
+            },
+            {
+              "window": "90d",
+              "avgR": 0.014,
+              "samples": 888,
+              "pf": 1.023
+            }
+          ]
+        },
+        {
+          "bucket": "<30",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.125,
+              "samples": 96,
+              "pf": 0.803
+            },
+            {
+              "window": "60d",
+              "avgR": -0.154,
+              "samples": 156,
+              "pf": 0.762
+            },
+            {
+              "window": "90d",
+              "avgR": 0.008,
+              "samples": 388,
+              "pf": 1.014
+            }
+          ]
+        }
+      ],
+      "volume15": [
+        {
+          "bucket": "<0.65",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.155,
+              "samples": 946,
+              "pf": 0.761
+            },
+            {
+              "window": "60d",
+              "avgR": -0.082,
+              "samples": 1854,
+              "pf": 0.867
+            },
+            {
+              "window": "90d",
+              "avgR": -0.046,
+              "samples": 2737,
+              "pf": 0.924
+            }
+          ]
+        },
+        {
+          "bucket": "0.65-1",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.067,
+              "samples": 517,
+              "pf": 0.891
+            },
+            {
+              "window": "60d",
+              "avgR": -0.051,
+              "samples": 1077,
+              "pf": 0.916
+            },
+            {
+              "window": "90d",
+              "avgR": -0.042,
+              "samples": 1638,
+              "pf": 0.93
+            }
+          ]
+        },
+        {
+          "bucket": ">=1.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "POSITIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": 0.017,
+              "samples": 328,
+              "pf": 1.03
+            },
+            {
+              "window": "60d",
+              "avgR": 0.024,
+              "samples": 675,
+              "pf": 1.042
+            },
+            {
+              "window": "90d",
+              "avgR": 0.027,
+              "samples": 1017,
+              "pf": 1.046
+            }
+          ]
+        },
+        {
+          "bucket": "1.15-1.5",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.161,
+              "samples": 226,
+              "pf": 0.752
+            },
+            {
+              "window": "60d",
+              "avgR": -0.085,
+              "samples": 430,
+              "pf": 0.863
+            },
+            {
+              "window": "90d",
+              "avgR": 0.004,
+              "samples": 636,
+              "pf": 1.006
+            }
+          ]
+        },
+        {
+          "bucket": "1-1.15",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.027,
+              "samples": 143,
+              "pf": 0.955
+            },
+            {
+              "window": "60d",
+              "avgR": 0.115,
+              "samples": 284,
+              "pf": 1.216
+            },
+            {
+              "window": "90d",
+              "avgR": 0.151,
+              "samples": 440,
+              "pf": 1.29
+            }
+          ]
+        }
+      ],
+      "volume1h": [
+        {
+          "bucket": "<0.65",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.132,
+              "samples": 824,
+              "pf": 0.793
+            },
+            {
+              "window": "60d",
+              "avgR": -0.053,
+              "samples": 1667,
+              "pf": 0.913
+            },
+            {
+              "window": "90d",
+              "avgR": -0.01,
+              "samples": 2443,
+              "pf": 0.983
+            }
+          ]
+        },
+        {
+          "bucket": ">=1.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.051,
+              "samples": 349,
+              "pf": 0.916
+            },
+            {
+              "window": "60d",
+              "avgR": -0.032,
+              "samples": 687,
+              "pf": 0.946
+            },
+            {
+              "window": "90d",
+              "avgR": -0.014,
+              "samples": 1081,
+              "pf": 0.976
+            }
+          ]
+        },
+        {
+          "bucket": "1.15-1.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.186,
+              "samples": 236,
+              "pf": 0.718
+            },
+            {
+              "window": "60d",
+              "avgR": -0.086,
+              "samples": 478,
+              "pf": 0.861
+            },
+            {
+              "window": "90d",
+              "avgR": -0.105,
+              "samples": 716,
+              "pf": 0.833
+            }
+          ]
+        },
+        {
+          "bucket": "1-1.15",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.001,
+              "samples": 173,
+              "pf": 0.998
+            },
+            {
+              "window": "60d",
+              "avgR": -0.115,
+              "samples": 320,
+              "pf": 0.818
+            },
+            {
+              "window": "90d",
+              "avgR": -0.074,
+              "samples": 477,
+              "pf": 0.879
+            }
+          ]
+        },
+        {
+          "bucket": "0.65-1",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.078,
+              "samples": 578,
+              "pf": 0.873
+            },
+            {
+              "window": "60d",
+              "avgR": -0.005,
+              "samples": 1168,
+              "pf": 0.991
+            },
+            {
+              "window": "90d",
+              "avgR": 0.029,
+              "samples": 1751,
+              "pf": 1.051
+            }
+          ]
+        }
+      ],
+      "emaStructure15": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.082,
+              "samples": 1895,
+              "pf": 0.868
+            },
+            {
+              "window": "60d",
+              "avgR": -0.026,
+              "samples": 3801,
+              "pf": 0.956
+            },
+            {
+              "window": "90d",
+              "avgR": -0.005,
+              "samples": 5700,
+              "pf": 0.992
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.23,
+              "samples": 265,
+              "pf": 0.661
+            },
+            {
+              "window": "60d",
+              "avgR": -0.182,
+              "samples": 519,
+              "pf": 0.725
+            },
+            {
+              "window": "90d",
+              "avgR": -0.094,
+              "samples": 768,
+              "pf": 0.849
+            }
+          ]
+        }
+      ],
+      "emaStructure1h": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.098,
+              "samples": 1600,
+              "pf": 0.842
+            },
+            {
+              "window": "60d",
+              "avgR": -0.041,
+              "samples": 3220,
+              "pf": 0.931
+            },
+            {
+              "window": "90d",
+              "avgR": -0.006,
+              "samples": 4835,
+              "pf": 0.989
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.104,
+              "samples": 560,
+              "pf": 0.834
+            },
+            {
+              "window": "60d",
+              "avgR": -0.055,
+              "samples": 1100,
+              "pf": 0.909
+            },
+            {
+              "window": "90d",
+              "avgR": -0.042,
+              "samples": 1633,
+              "pf": 0.93
+            }
+          ]
+        }
+      ],
+      "emaStructure4h": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.137,
+              "samples": 1254,
+              "pf": 0.786
+            },
+            {
+              "window": "60d",
+              "avgR": -0.061,
+              "samples": 2538,
+              "pf": 0.9
+            },
+            {
+              "window": "90d",
+              "avgR": -0.004,
+              "samples": 3835,
+              "pf": 0.994
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.049,
+              "samples": 906,
+              "pf": 0.919
+            },
+            {
+              "window": "60d",
+              "avgR": -0.022,
+              "samples": 1782,
+              "pf": 0.962
+            },
+            {
+              "window": "90d",
+              "avgR": -0.032,
+              "samples": 2633,
+              "pf": 0.946
+            }
+          ]
+        }
+      ],
+      "priceVsEma20_15": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.104,
+              "samples": 1720,
+              "pf": 0.834
+            },
+            {
+              "window": "60d",
+              "avgR": -0.068,
+              "samples": 3343,
+              "pf": 0.889
+            },
+            {
+              "window": "90d",
+              "avgR": -0.045,
+              "samples": 5079,
+              "pf": 0.926
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.084,
+              "samples": 440,
+              "pf": 0.865
+            },
+            {
+              "window": "60d",
+              "avgR": 0.034,
+              "samples": 977,
+              "pf": 1.06
+            },
+            {
+              "window": "90d",
+              "avgR": 0.092,
+              "samples": 1389,
+              "pf": 1.169
+            }
+          ]
+        }
+      ],
+      "priceVsEma20_1h": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.085,
+              "samples": 2011,
+              "pf": 0.863
+            },
+            {
+              "window": "60d",
+              "avgR": -0.039,
+              "samples": 4022,
+              "pf": 0.934
+            },
+            {
+              "window": "90d",
+              "avgR": -0.014,
+              "samples": 6029,
+              "pf": 0.977
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.307,
+              "samples": 149,
+              "pf": 0.568
+            },
+            {
+              "window": "60d",
+              "avgR": -0.122,
+              "samples": 298,
+              "pf": 0.807
+            },
+            {
+              "window": "90d",
+              "avgR": -0.038,
+              "samples": 439,
+              "pf": 0.937
+            }
+          ]
+        }
+      ],
+      "priceVsEma20_4h": [
+        {
+          "bucket": "ALIGNED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.1,
+              "samples": 1818,
+              "pf": 0.84
+            },
+            {
+              "window": "60d",
+              "avgR": -0.037,
+              "samples": 3639,
+              "pf": 0.938
+            },
+            {
+              "window": "90d",
+              "avgR": -0.006,
+              "samples": 5480,
+              "pf": 0.989
+            }
+          ]
+        },
+        {
+          "bucket": "OPPOSED",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.102,
+              "samples": 342,
+              "pf": 0.837
+            },
+            {
+              "window": "60d",
+              "avgR": -0.087,
+              "samples": 681,
+              "pf": 0.859
+            },
+            {
+              "window": "90d",
+              "avgR": -0.065,
+              "samples": 988,
+              "pf": 0.894
+            }
+          ]
+        }
+      ],
+      "emaDistanceAtr15": [
+        {
+          "bucket": ">=1.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.112,
+              "samples": 516,
+              "pf": 0.823
+            },
+            {
+              "window": "60d",
+              "avgR": -0.072,
+              "samples": 926,
+              "pf": 0.882
+            },
+            {
+              "window": "90d",
+              "avgR": -0.041,
+              "samples": 1401,
+              "pf": 0.932
+            }
+          ]
+        },
+        {
+          "bucket": "1-1.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.118,
+              "samples": 400,
+              "pf": 0.813
+            },
+            {
+              "window": "60d",
+              "avgR": -0.068,
+              "samples": 793,
+              "pf": 0.889
+            },
+            {
+              "window": "90d",
+              "avgR": -0.049,
+              "samples": 1194,
+              "pf": 0.918
+            }
+          ]
+        },
+        {
+          "bucket": "0.25-0.5",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.109,
+              "samples": 334,
+              "pf": 0.827
+            },
+            {
+              "window": "60d",
+              "avgR": -0.022,
+              "samples": 712,
+              "pf": 0.962
+            },
+            {
+              "window": "90d",
+              "avgR": -0.035,
+              "samples": 1042,
+              "pf": 0.942
+            }
+          ]
+        },
+        {
+          "bucket": "0.5-0.75",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.062,
+              "samples": 325,
+              "pf": 0.898
+            },
+            {
+              "window": "60d",
+              "avgR": -0.007,
+              "samples": 672,
+              "pf": 0.988
+            },
+            {
+              "window": "90d",
+              "avgR": -0.021,
+              "samples": 951,
+              "pf": 0.965
+            }
+          ]
+        },
+        {
+          "bucket": "<0.25",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.097,
+              "samples": 327,
+              "pf": 0.844
+            },
+            {
+              "window": "60d",
+              "avgR": -0.017,
+              "samples": 703,
+              "pf": 0.972
+            },
+            {
+              "window": "90d",
+              "avgR": 0.041,
+              "samples": 1070,
+              "pf": 1.072
+            }
+          ]
+        },
+        {
+          "bucket": "0.75-1",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.088,
+              "samples": 258,
+              "pf": 0.858
+            },
+            {
+              "window": "60d",
+              "avgR": -0.08,
+              "samples": 514,
+              "pf": 0.87
+            },
+            {
+              "window": "90d",
+              "avgR": 0.037,
+              "samples": 810,
+              "pf": 1.065
+            }
+          ]
+        }
+      ],
+      "sideRegime": [
+        {
+          "bucket": "LONG×RANGE",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.031,
+              "samples": 312,
+              "pf": 0.948
+            },
+            {
+              "window": "60d",
+              "avgR": -0.053,
+              "samples": 583,
+              "pf": 0.912
+            },
+            {
+              "window": "90d",
+              "avgR": -0.054,
+              "samples": 733,
+              "pf": 0.911
+            }
+          ]
+        },
+        {
+          "bucket": "LONG×BULL",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.308,
+              "samples": 222,
+              "pf": 0.567
+            },
+            {
+              "window": "60d",
+              "avgR": -0.112,
+              "samples": 557,
+              "pf": 0.822
+            },
+            {
+              "window": "90d",
+              "avgR": -0.069,
+              "samples": 773,
+              "pf": 0.888
+            }
+          ]
+        },
+        {
+          "bucket": "LONG×BEAR",
+          "windows": 3,
+          "consistentDirection": true,
+          "direction": "NEGATIVE",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.062,
+              "samples": 197,
+              "pf": 0.898
+            },
+            {
+              "window": "60d",
+              "avgR": -0.14,
+              "samples": 385,
+              "pf": 0.782
+            },
+            {
+              "window": "90d",
+              "avgR": -0.118,
+              "samples": 566,
+              "pf": 0.813
+            }
+          ]
+        },
+        {
+          "bucket": "SHORT×BEAR",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.167,
+              "samples": 516,
+              "pf": 0.744
+            },
+            {
+              "window": "60d",
+              "avgR": -0.087,
+              "samples": 1059,
+              "pf": 0.86
+            },
+            {
+              "window": "90d",
+              "avgR": 0.001,
+              "samples": 1729,
+              "pf": 1.001
+            }
+          ]
+        },
+        {
+          "bucket": "SHORT×RANGE",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.005,
+              "samples": 393,
+              "pf": 0.992
+            },
+            {
+              "window": "60d",
+              "avgR": 0.011,
+              "samples": 646,
+              "pf": 1.018
+            },
+            {
+              "window": "90d",
+              "avgR": 0.045,
+              "samples": 932,
+              "pf": 1.081
+            }
+          ]
+        },
+        {
+          "bucket": "LONG×TRANSITION",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.062,
+              "samples": 220,
+              "pf": 0.899
+            },
+            {
+              "window": "60d",
+              "avgR": 0.048,
+              "samples": 465,
+              "pf": 1.085
+            },
+            {
+              "window": "90d",
+              "avgR": -0.07,
+              "samples": 777,
+              "pf": 0.885
+            }
+          ]
+        },
+        {
+          "bucket": "SHORT×TRANSITION",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.016,
+              "samples": 200,
+              "pf": 0.973
+            },
+            {
+              "window": "60d",
+              "avgR": 0.022,
+              "samples": 411,
+              "pf": 1.038
+            },
+            {
+              "window": "90d",
+              "avgR": 0.091,
+              "samples": 658,
+              "pf": 1.166
+            }
+          ]
+        },
+        {
+          "bucket": "SHORT×BULL",
+          "windows": 3,
+          "consistentDirection": false,
+          "direction": "MIXED",
+          "observations": [
+            {
+              "window": "30d",
+              "avgR": -0.208,
+              "samples": 100,
+              "pf": 0.69
+            },
+            {
+              "window": "60d",
+              "avgR": 0.032,
+              "samples": 214,
+              "pf": 1.056
+            },
+            {
+              "window": "90d",
+              "avgR": 0.04,
+              "samples": 300,
+              "pf": 1.071
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
