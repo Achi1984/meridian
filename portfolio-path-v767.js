@@ -30,8 +30,10 @@ function makeState(cfg){return{equity:cfg.startEquity,peak:cfg.startEquity,maxDD
 function refreshDay(S,t){const d=dayKey(t);if(!S.dayStartEquity.has(d))S.dayStartEquity.set(d,S.equity);return d;}
 function markDD(S){S.peak=Math.max(S.peak,S.equity);const dd=S.peak>0?Math.max(0,(S.peak-S.equity)/S.peak*100):0;S.maxDD=Math.max(S.maxDD,dd);}
 function closeDue(S,t){
-  const keep=[];
-  for(const p of S.positions){if(p.exitAt<=t){const pnl=p.equityAtRiskAtOpen*(p.riskPct/100)*p.outcomeR;S.equity+=pnl;S.trades.push({...p,pnl:round(pnl,4),equityAfter:round(S.equity,4)});S.lastCloseBySymbol.set(p.symbol,p.exitAt);markDD(S);}else keep.push(p)}
+  const due=[],keep=[];
+  for(const p of S.positions)(p.exitAt<=t?due:keep).push(p);
+  due.sort((a,b)=>a.exitAt-b.exitAt||String(a.symbol||'').localeCompare(String(b.symbol||'')));
+  for(const p of due){refreshDay(S,p.exitAt);const pnl=p.equityAtRiskAtOpen*(p.riskPct/100)*p.outcomeR;S.equity+=pnl;S.trades.push({...p,pnl:round(pnl,4),equityAfter:round(S.equity,4)});S.lastCloseBySymbol.set(p.symbol,p.exitAt);markDD(S)}
   S.positions=keep;
 }
 function gate(S,r,t,cfg){
