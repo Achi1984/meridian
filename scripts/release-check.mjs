@@ -14,7 +14,7 @@ must(release.ruleset==='6.2-SIGNAL-V1','Ruleset must remain 6.2-SIGNAL-V1');
 must(release.research==='7.34-RESEARCH-V2','Research engine version mismatch');
 must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
-must(release.uiPolish==='7.44-HEADER-BRAND-IMAGE','Header UI polish version mismatch');
+must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
 must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
 
@@ -45,7 +45,9 @@ must(runtime.includes('MERIDIAN_RUNTIME_STATUS'),'runtime monitor status export 
 
 const uiPolish=read('app-v7.37-ui-polish.js');
 must(uiPolish.includes('<svg id="${BRAND_IMG_ID}"'),'inline horizontal SVG header brand missing');
-must(uiPolish.includes('viewBox="0 0 560 64"'),'inline header brand viewBox missing');
+must(uiPolish.includes('viewBox="0 0 980 112"'),'premium banner viewBox missing');
+must(uiPolish.includes('mbSilver'),'premium silver wordmark gradient missing');
+must(uiPolish.includes('MERIDIAN</text>'),'premium MERIDIAN wordmark missing');
 must(uiPolish.includes('meridian-release-status-row'),'mobile status row missing');
 must(uiPolish.includes("document.getElementById('versionBadge')"),'mobile UI polish must relocate version badge');
 must(uiPolish.includes("document.getElementById('meridian-runtime-badge')"),'mobile UI polish must relocate runtime badge');
