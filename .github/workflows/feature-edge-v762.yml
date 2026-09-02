@@ -1,0 +1,86 @@
+name: MERIDIAN Feature Edge v7.62
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/signal-cohort-v762.mjs"
+      - "scripts/feature-edge-map.mjs"
+      - "feature-attribution.js"
+      - ".github/workflows/feature-edge-v762.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-feature-edge-v762
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate 30d 60d 90d signal cohorts
+        run: node scripts/signal-cohort-v762.mjs --out-dir /tmp/v762
+
+      - name: Build raw feature edge report
+        run: |
+          node scripts/feature-edge-map.mjs \
+            --30 /tmp/v762/signal-cohort-30d.json \
+            --60 /tmp/v762/signal-cohort-60d.json \
+            --90 /tmp/v762/signal-cohort-90d.json \
+            --min-samples 30 \
+            --out research/feature-edge-evidence-v762.json
+
+      - name: Build compact evidence summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='research/feature-edge-evidence-v762.json';
+          const r=JSON.parse(fs.readFileSync(p,'utf8'));
+          const lines=['# MERIDIAN v7.62 — Raw Feature Edge Evidence','',`Generated: ${r.generatedAt}`,'','Portfolio-independent signal cohorts; one candidate per symbol per 4h. A_CURRENT/full TP1 normalized-R, SL first on same candle, 14-day complete horizon. Portfolio gates excluded.',''];
+          for(const [w,m] of Object.entries(r.windows||{}))lines.push(`## ${w}`,`Samples: **${m.samples}** · Avg R: **${m.overall?.avgR}** · PF: **${m.overall?.pf}** · WR: **${m.overall?.winRate}%**`,'');
+          lines.push('## Repeatable adequate buckets','');
+          let found=0;
+          for(const [feature,items] of Object.entries(r.stability?.features||{}))for(const x of items||[]){if(x.consistentDirection&&x.windows>=2){found++;const obs=x.observations.map(o=>`${o.window}: ${o.avgR}R (n=${o.samples}, PF=${o.pf})`).join('; ');lines.push(`- **${feature} = ${x.bucket}** — ${x.direction}; ${obs}`)}}
+          if(!found)lines.push('- No bucket met the repeatable-direction requirement across at least two adequate windows.');
+          lines.push('','## Interpretation rule','','This report is attribution evidence, not a trading ruleset. Positive buckets are candidates for calibrated soft scoring only after sample-size, side/regime context and walk-forward checks. Do not convert isolated buckets into new hard gates.','');
+          fs.writeFileSync('research/feature-edge-evidence-v762.md',lines.join('\n'));
+          NODE
+
+      - name: Test research analytics
+        run: node --test test/feature-attribution.test.js test/research-v2.test.js test/research-analytics.test.js
+
+      - name: Upload raw cohorts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-v762-signal-cohorts
+          path: /tmp/v762/*.json
+          retention-days: 30
+
+      - name: Commit evidence to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md
+          if git diff --cached --quiet; then
+            echo "No evidence change"
+            exit 0
+          fi
+          git commit -m "MERIDIAN v7.62: raw feature edge evidence"
+          git push origin HEAD:main
