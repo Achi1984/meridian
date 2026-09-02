@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { interactionEdgeMap, crossWindowInteractionStability } from '../feature-interactions.js';
+const row=(outcomeR,extra={})=>({side:'LONG',regime:'BULL',baselineStatus:'READY',outcomeR,frames:{'15m':{price:101,ema20:100,ema50:99,rsi:55,macdHist:.5,adx:27,atr:2,volumeRatio:1.6},'1h':{price:102,ema20:100,ema50:98,rsi:58,macdHist:1,adx:30,atr:4,volumeRatio:1.1},'4h':{price:104,ema20:100,ema50:96,rsi:60,macdHist:2,adx:36,atr:8,volumeRatio:1}},...extra});
+test('interaction map groups conditional raw features',()=>{const x=interactionEdgeMap([row(1.4),row(-1),row(1.4,{regime:'BEAR'})],{minSamples:1,interactions:[['volume15','regime']]});assert.equal(x.researchOnly,true);const b=x.interactions['volume15 × regime'].buckets.find(v=>v.bucket==='>=1.5 × BULL');assert.equal(b.samples,2);assert.equal(b.avgR,.2)});
+test('interaction stability requires repeatable direction',()=>{const a=interactionEdgeMap([row(.5),row(.5)],{minSamples:2,interactions:[['volume15','side']]}),b=interactionEdgeMap([row(.2),row(.2)],{minSamples:2,interactions:[['volume15','side']]});const s=crossWindowInteractionStability({'30d':a,'60d':b});const x=s.interactions['volume15 × side'].find(v=>v.bucket==='>=1.5 × LONG');assert.equal(x.consistentDirection,true);assert.equal(x.direction,'POSITIVE')});
