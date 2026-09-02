@@ -1,0 +1,37 @@
+name: MERIDIAN v7.51 Exit Lab Evidence Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-51-exit-lab-evidence
+    paths:
+      - .github/workflows/v751-exit-lab-evidence-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-51-exit-lab-evidence
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Deterministic install
+        run: npm ci
+      - name: Run Exit Lab 30/60/90d evidence
+        run: node scripts/exit-lab-evidence-report.mjs
+      - name: Commit evidence and self-remove
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v751-exit-lab-evidence-once.yml
+          git add research/exit-lab-evidence-v751.json research/exit-lab-evidence-v751.md
+          git commit -m "MERIDIAN v7.51: Exit Lab historical evidence report"
+          git push origin HEAD:codex/meridian-v7-51-exit-lab-evidence
