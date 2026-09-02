@@ -19,7 +19,7 @@ test('SHORT transition volume interaction receives robust evidence weight',()=>{
 
 test('comparison matches Baseline READY coverage and tracks opportunity cost',()=>{
   const rows=[
-    row({baselineStatus:'READY',outcomeR:-1,symbol:'A'}),
+    row({baselineStatus:'READY',outcomeR:-1,volume:.5,adx:30,symbol:'A'}),
     row({baselineStatus:'READY',outcomeR:1.4,volume:.5,adx:30,symbol:'B'}),
     row({baselineStatus:'NO_SETUP',outcomeR:1.4,volume:1.7,adx:16,symbol:'C'}),
     row({baselineStatus:'NO_SETUP',outcomeR:1.4,side:'SHORT',regime:'TRANSITION',volume:.8,adx:30,symbol:'D'})
