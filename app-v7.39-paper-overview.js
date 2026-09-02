@@ -1,4 +1,4 @@
-// MERIDIAN v7.40 — A/B/C/D Paper overview consistency using card-derived metrics; presentation only.
+// MERIDIAN v7.41 — overview-first Paper UX with card-derived metrics; presentation only.
 (function(){
   'use strict';
   const n=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -7,6 +7,7 @@
   const tone=v=>n(v)>0?'green':n(v)<0?'red':'muted';
   const pf=v=>n(v)>=99?'∞':fmt(v,2);
   const numberFromText=(v,f=0)=>{const s=String(v||'').replace(/\s/g,'').replace(/\$/g,'').replace(/%/g,'').replace(/−/g,'-').replace(/\./g,'').replace(',','.');const m=s.match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):f;};
+  let lastView=null;
 
   function regime(){return window.MERIDIAN_CLOUD?.regimeV1||{};}
   function regimeCard(){
@@ -26,22 +27,28 @@
     const ready=sh>=20&&ch>=20&&rg>=20;
     return {ready,text:`${ready?'REVIEW READY':'NO VERDICT'} · Shadow ${sh}/20 · Challenger ${ch}/20 · Regime ${rg}/20. Baseline bleibt Referenz; erst ab mindestens 20 abgeschlossenen Trades je Research-Bot wird bewertet.`};
   }
-  function fixPaperLabHeader(root){
-    root.querySelectorAll('*').forEach(el=>{
-      if(el.children.length!==0)return;
-      let x=el.textContent;
-      if(x.includes('3 BOTS · 1 VERGLEICH'))x=x.replace('3 BOTS · 1 VERGLEICH','4 BOTS · ÜBERSICHT');
-      if(x.includes('3 BOTS · 1 ÜBERSICHT'))x=x.replace('3 BOTS · 1 ÜBERSICHT','4 BOTS · ÜBERSICHT');
+  function replaceTextNodes(root){
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    nodes.forEach(node=>{
+      let x=node.nodeValue||'';
+      x=x.replace(/3 BOTS/g,'4 BOTS').replace(/1 VERGLEICH/g,'1 ÜBERSICHT');
       if(x.includes('BASELINE · SHADOW · CHALLENGER')&&!x.includes('REGIME'))x=x.replace('BASELINE · SHADOW · CHALLENGER','BASELINE · SHADOW · CHALLENGER · REGIME');
-      el.textContent=x;
+      node.nodeValue=x;
     });
+  }
+  function reorderTabs(root){
+    const tabs=root.querySelector('#v731-paper-tabs');
+    if(!tabs)return null;
+    const compare=[...tabs.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("'compare'"));
+    if(compare){compare.textContent='ÜBERSICHT';if(tabs.firstElementChild!==compare)tabs.prepend(compare);}
+    return compare;
   }
   function transform(html){
     const active=typeof window.meridianPaperBotTab==='function'?window.meridianPaperBotTab():window.MERIDIAN_PAPER_BOT_TAB;
     const t=document.createElement('template');t.innerHTML=html;
-    const compareButton=[...t.content.querySelectorAll('#v731-paper-tabs button')].find(b=>(b.getAttribute('onclick')||'').includes("'compare'"));
-    if(compareButton)compareButton.textContent='ÜBERSICHT';
-    fixPaperLabHeader(t.content);
+    reorderTabs(t.content);
+    replaceTextNodes(t.content);
     if(active!=='compare')return t.innerHTML;
 
     t.content.querySelectorAll('*').forEach(el=>{if(el.children.length===0&&el.textContent.trim()==='A/B/C BOT VERGLEICH')el.textContent='A/B/C/D BOT ÜBERSICHT';});
@@ -59,12 +66,30 @@
     return t.innerHTML;
   }
   function install(){
-    const cur=window.cloudPaperTradeView;if(typeof cur!=='function'||cur.__v740Wrapped)return;
-    const raw=cur.__v739Raw||cur;const wrapped=function(){try{return transform(raw.apply(this,arguments))}catch(e){console.warn('MERIDIAN v7.40 overview',e);return raw.apply(this,arguments)}};
-    wrapped.__v740Wrapped=true;wrapped.__v739Raw=raw;window.cloudPaperTradeView=wrapped;try{cloudPaperTradeView=wrapped}catch(_e){}
+    const cur=window.cloudPaperTradeView;if(typeof cur!=='function'||cur.__v741Wrapped)return;
+    const raw=cur.__v739Raw||cur;const wrapped=function(){try{return transform(raw.apply(this,arguments))}catch(e){console.warn('MERIDIAN v7.41 overview',e);return raw.apply(this,arguments)}};
+    wrapped.__v741Wrapped=true;wrapped.__v739Raw=raw;window.cloudPaperTradeView=wrapped;try{cloudPaperTradeView=wrapped}catch(_e){}
+  }
+  function activateOverview(){
+    if(document.body?.dataset?.view!=='paper')return;
+    setTimeout(()=>{
+      const tabs=document.getElementById('v731-paper-tabs');
+      const compare=tabs&&[...tabs.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("'compare'"));
+      if(compare&&!compare.classList.contains('active'))compare.click();
+    },80);
+  }
+  function watchPaperEntry(){
+    const now=document.body?.dataset?.view||'';
+    if(now==='paper'&&lastView!=='paper')activateOverview();
+    lastView=now;
   }
   function style(){if(document.getElementById('v739-overview-style'))return;const s=document.createElement('style');s.id='v739-overview-style';s.textContent='.v731-compare-card.regime{border-color:#6f5bd3}.v731-compare-card.regime>span{color:#a996ff}#v731-paper-tabs button.compare.active{color:#e8b24a}@media(max-width:650px){.v731-compare-grid{grid-template-columns:1fr!important}}';document.head.appendChild(s)}
-  function start(){style();install();try{if(document.body?.dataset?.view==='paper')renderOne('paper')}catch(_e){}}
+  function start(){
+    style();install();watchPaperEntry();
+    if(typeof MutationObserver!=='undefined'&&document.body){new MutationObserver(()=>watchPaperEntry()).observe(document.body,{attributes:true,attributeFilter:['data-view']});}
+    try{if(document.body?.dataset?.view==='paper')renderOne('paper')}catch(_e){}
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  addEventListener('pageshow',()=>{install();watchPaperEntry()});
   setInterval(install,1000);
 })();
