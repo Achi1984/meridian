@@ -97,6 +97,11 @@
       if(typeof DATA!=='undefined'&&DATA&&typeof DATA==='object'){
         Object.keys(d).forEach(k=>{DATA[k]=d[k]});
         DATA.appVersion=VERSION;
+        // The private snapshot contains historical aggregate totals. Signal the
+        // v7.60 dashboard-consistency layer to recompute the current portfolio
+        // from holdings x current quotes after hydration instead of rendering
+        // those stale snapshot aggregates verbatim.
+        try{window.dispatchEvent(new CustomEvent('meridian:private-dashboard-hydrated',{detail:{version:VERSION}}))}catch(_e){}
         if(typeof renderAll==='function')renderAll();
       }
     }catch(e){console.warn('MERIDIAN v7.33 private merge',e)}
