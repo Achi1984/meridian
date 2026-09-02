@@ -26,8 +26,6 @@ apply('index.html',src=>{
 
 apply('app-v6.06.js',src=>{
   let s=src;
-  // v7.32-legacy.js is retained as the base renderer; later layers own hardening and presentation.
-  s=present(s,/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/,'canonical base renderer tag');
   for(const [re,label] of [
     [/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/,'hardening loader tag'],
     [/app-runtime-monitor\.js\?v=[^"'<>\s]+/,'runtime monitor loader tag'],
@@ -38,19 +36,13 @@ apply('app-v6.06.js',src=>{
     [/app-v7\.60-private-hydration-hotfix\.js\?v=[^"'<>\s]+/,'private hydration loader tag'],
     [/app-v7\.60-final-ui-authority\.js\?v=[^"'<>\s]+/,'final ui authority loader tag']
   ])s=present(s,re,label);
-  if(/emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(s))throw new Error('obsolete frontend hotfix layer present in canonical loader');
-  if(s.indexOf('app-v7.32-legacy.js')>s.indexOf('app-v7.33-hardening.js'))throw new Error('base renderer must load before hardening');
+  if(/app-v7\.32-legacy\.js|emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(s))throw new Error('retired frontend layer present in canonical loader');
   return s;
 });
 
 apply('app-v7.33-hardening.js',src=>{
-  let s=src;
-  s=required(s,/const VERSION='[^']+';/,`const VERSION='${version}';`,'hardening version');
-  s=required(s,/const BUILD='[^']+';/,`const BUILD='${build}';`,'hardening build');
-  s=s.replace(/manifest\.webmanifest\?v=[^'"\s]+/g,`manifest.webmanifest?v=${cacheTag}`);
-  return s;
+  let s=src;s=required(s,/const VERSION='[^']+';/,`const VERSION='${version}';`,'hardening version');s=required(s,/const BUILD='[^']+';/,`const BUILD='${build}';`,'hardening build');s=s.replace(/manifest\.webmanifest\?v=[^'"\s]+/g,`manifest.webmanifest?v=${cacheTag}`);return s;
 });
-
 apply('manifest.webmanifest',()=>JSON.stringify({name:`ACHI MERIDIAN v${version}`,short_name:`MERIDIAN ${version}`,start_url:`./?build=${build}`,display:'standalone',background_color:'#03070c',theme_color:'#05080d'},null,2)+'\n');
 apply('package.json',src=>{const p=JSON.parse(src);p.version=version+'.0';p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs','runtime:smoke':'node scripts/runtime-smoke.mjs'};return JSON.stringify(p)+'\n'});
 if(!write&&pending.length)throw new Error('release-generated files out of sync: '+pending.join(', '));
