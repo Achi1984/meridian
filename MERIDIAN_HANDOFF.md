@@ -7,8 +7,8 @@
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
 - Deployed app/UI version may remain behind research-only milestone numbering.
-- Research evidence now extends through **v7.66 Challenger V3.2 Soft Score Evidence**.
-- Baseline 6.2 remains frozen; no v7.61–v7.66 research work changed Paper execution or `server.js`.
+- Research evidence now extends through **v7.67 Challenger V3.2 Portfolio-Path Replay**.
+- Baseline 6.2 remains frozen; no v7.61–v7.67 research work changed Paper execution or `server.js`.
 - Rejected V3/V3.1 branches remain evidence only and must not be silently merged.
 
 ## Latest durable research findings
@@ -26,37 +26,52 @@ Interactions exposed conditional edge that single indicators hid. Important fami
 45d train / 15d holdout / 15d step. Only 42.4% of adequate selected holdouts remained positive. Particularly durable holdouts included SHORT × TRANSITION × volume 0.65–1 and high-volume RSI/ADX contexts.
 
 ### v7.65 — Four disjoint 90-day validation blocks
-Pre-specified candidates were retested without discovery inside the blocks. Strongest durable candidates:
+Strongest durable candidates:
 - `VOL_GE15_ADX_LT18`: 4/4 positive, weighted Avg R +0.131, n=976.
 - `SHORT_TRANSITION_VOL_065_1`: 4/4 positive, +0.104, n=667.
 - `VOL_GE15_ADX_18_25`: 4/4 positive, +0.078, n=1148.
 Four weaker interactions passed 3/4; `VOL_GE15_RSI_42_50` failed 2/4.
 
 ### v7.66 — Challenger V3.2 evidence-backed soft ranking
-Files:
-- `challenger-v32.js`
-- `scripts/challenger-v32-v766.mjs`
-- `test/challenger-v32.test.js`
-- `.github/workflows/challenger-v32-v766.yml`
-- `research/challenger-v32-evidence-v766.json`
-- `research/challenger-v32-evidence-v766.md`
+V3.2 is research-only, independent of Baseline `READY`, and uses small additive weights from the robust interaction evidence. No new hard entry gates were added. At exactly equal signal count to Baseline READY across four 90-day periods, V3.2 improved Avg R and PF in all 4/4 periods. This confirmed signal-level ranking improvement but was not an untouched holdout.
 
-Architecture:
-- Research-only, `executionImpact:false`.
-- Independent of Baseline `READY`; ranks the full portfolio-independent signal universe.
-- Small additive evidence weights only; no new hard entry gates.
-- Baseline status is at most a weak soft feature.
-- Equal-coverage comparison: V3.2 selects exactly the same candidate count as Baseline READY in each 90-day period.
+### v7.67 — Challenger V3.2 chronological portfolio-path replay
+Implementation/evidence files:
+- `portfolio-path-v767.js`
+- `scripts/portfolio-path-v767.mjs`
+- `test/portfolio-path-v767.test.js`
+- `.github/workflows/portfolio-path-v767.yml`
+- `research/portfolio-path-evidence-v767.json`
+- `research/portfolio-path-evidence-v767.md`
 
-Evidence:
-- P0: Baseline n=1657, AvgR -0.004, PF 0.994; V3.2 n=1657, AvgR +0.039, PF 1.068.
-- P1: Baseline n=1675, AvgR +0.007, PF 1.013; V3.2 n=1675, AvgR +0.050, PF 1.089.
-- P2: Baseline n=1672, AvgR -0.041, PF 0.931; V3.2 n=1672, AvgR +0.012, PF 1.021.
-- P3: Baseline n=1550, AvgR +0.003, PF 1.006; V3.2 n=1550, AvgR +0.092, PF 1.168.
-- V3.2 AvgR better in 4/4 periods with equal coverage.
-- V3.2 replaces a large part of the READY cohort, so opportunity-cost accounting is mandatory. Example P0: overlap 360, discovered/displaced 1297, avoided losers 765, missed winners 532.
+Method:
+- identical 10,000 start equity for Baseline and V3.2;
+- 1% risk/trade;
+- max 3 open positions;
+- max 3% portfolio risk;
+- max 8 entries/day;
+- 3% daily-loss gate;
+- 8% max-drawdown gate;
+- 30m symbol cooldown;
+- same A_CURRENT/full-TP1 cohort outcomes;
+- chronological entry/exit competition;
+- no future outcome information in ranking.
 
-Important limitation: v7.66 combines features selected using related historical evidence, so these four periods are **not a fresh untouched holdout**. Do not call v7.66 promotion proof and do not tune weights further just to optimize these blocks.
+Final corrected evidence:
+- 30d: Baseline 139 trades, AvgR +0.157, PF 1.303, end equity 12,271.61, realized DD 8.89%; V3.2 108 trades, AvgR +0.022, PF 1.039, end equity 10,164.62, DD 9.31%.
+- 60d: Baseline 203 trades, AvgR +0.159, PF 1.307, end equity 13,411.52, DD 9.55%; V3.2 only 9 trades, AvgR -1.000, PF 0, end equity 9,126.73, DD 8.73% because it hit the hard drawdown stop early.
+- 90d/P0: Baseline 33 trades, AvgR +0.018, PF 1.032; V3.2 32 trades, AvgR +0.050, PF 1.089.
+- P1: Baseline AvgR +0.034 / PF 1.059; V3.2 +0.094 / 1.173.
+- P2: Baseline -0.354 / 0.516; V3.2 -0.169 / 0.741.
+- P3: Baseline -1.000 / 0; V3.2 -0.136 / 0.787.
+- Across P0–P3, V3.2 had better AvgR in 4/4 and better PF in 4/4, but lower realized DD in 0/4.
+
+Interpretation:
+- The v7.66 ranking edge survives chronological portfolio slot competition.
+- Portfolio survival/risk robustness does **not** yet pass. The 60d vs later 30d contrast shows strong path dependence from the hard max-DD gate.
+- Do not activate V3.2 in Shadow/Paper yet.
+- Do not tune v7.66 feature weights on v7.67 evidence.
+- v7.67 DD is realized-equity DD only; compact cohorts do not contain intratrade mark-to-market paths.
 
 ## Known bot findings that must not be forgotten
 
@@ -64,45 +79,46 @@ Important limitation: v7.66 combines features selected using related historical 
 2. Shadow V1 remains the over-filtering/hard-gate control.
 3. Challenger V2 remains a useful control but is restricted by Baseline READY.
 4. V3/V3.1 are rejected implementations.
-5. V3.2 is the first evidence-backed independent Challenger candidate, but is still a lab model, not an active Paper/Shadow bot.
-6. LONG/SHORT must be judged in regime context.
-7. Regime V2 must recompute evidence for the final selected side.
-8. Frequency, drawdown, concurrency, opportunity cost, avoided losers and missed winners are mandatory.
-9. More evidence must not automatically become more hard gates.
-10. Exit logic remains A_CURRENT/full TP1 while entry/scoring is being validated.
+5. V3.2 is the first evidence-backed independent Challenger ranker; the score is now frozen for risk diagnostics.
+6. V3.2 is not ready for Shadow/Paper because portfolio drawdown robustness failed v7.67.
+7. LONG/SHORT must be judged in regime context.
+8. Regime V2 must recompute evidence for the final selected side.
+9. Frequency, drawdown, concurrency, opportunity cost, avoided losers and missed winners are mandatory.
+10. More evidence must not automatically become more hard gates.
+11. Exit logic remains A_CURRENT/full TP1 while entry/scoring and portfolio-risk behavior are being validated.
 
 ## Next recommended work — highest priority
 
-### Priority 1 — v7.67 Portfolio-Path Replay for Challenger V3.2
-Build a research-only chronological portfolio simulator that compares **Baseline READY vs V3.2** under identical execution assumptions rather than signal-level top-N alone.
+### Priority 1 — v7.68 Portfolio Risk Sensitivity on the frozen V3.2 score
+Do not change `V766_WEIGHTS`. Diagnose risk/path behavior instead.
 
-Requirements:
-- same starting capital/risk model for both;
-- same A_CURRENT/full TP1 outcome/exit policy;
-- chronological entries and exits;
-- max-open/concurrency constraints applied equally;
-- no future information in ranking or portfolio selection;
-- common evaluation periods;
-- record PF, expectancy/AvgR, total R/equity, historical max DD, frequency, concurrency/exposure, avoided losers, missed winners and opportunity cost;
-- include 30/60/90 and/or the four disjoint 90-day blocks where feasible;
-- do not alter v7.66 weights based on replay results during the same test.
+Build a research-only sensitivity runner that replays Baseline and the unchanged V3.2 ranker on the same cohorts using pre-specified risk settings, for example:
+- 0.25% risk/trade;
+- 0.50%;
+- 0.75%;
+- 1.00% current control.
 
-Decision after v7.67:
-- If V3.2 keeps its edge with acceptable DD and coverage, freeze the scorer and start a prospective/future holdout before Shadow activation.
-- If it fails portfolio-path replay, do not threshold-tune blindly; diagnose feature/interaction attribution and portfolio selection effects.
+Keep max-open and all other portfolio assumptions identical between Baseline and V3.2 at each setting. Scale portfolio-risk capacity consistently where appropriate and record PF, AvgR, equity, realized max DD, number/timing of drawdown-stop events, trade count, concurrency and opportunity cost.
 
-### Priority 2 — Prospective frozen-score holdout
-Only after v7.67 passes. No score changes during the observation window.
+Also include a clearly labeled **diagnostic no-max-DD path** (for example maxDrawdownPct=100) with the same score and selection logic. Its purpose is to reveal the natural portfolio path and determine whether the 8% hard stop is truncating later recovery; it is not a production recommendation.
 
-### Priority 3 — Regime V2
+Run 30d/60d/90d and P0–P3. Do not select a preferred risk value from one period alone. Look for monotonic improvement in survival and repeatability across periods.
+
+### Priority 2 — Full candle-level mark-to-market replay
+Before any activation, replace the realized-only DD approximation with candle-level MTM equity/DD using historical 15m paths for every selected trade. Keep the V3.2 score frozen during this validation.
+
+### Priority 3 — Prospective frozen-score holdout
+Only after risk sensitivity and full MTM replay pass. No score changes during the observation window.
+
+### Priority 4 — Regime V2
 Side-specific rescoring after final side selection. Validate separately before Hybrid/Allocator.
 
-### Priority 4 — Exit Lab integration
-Only after entry/scoring is validated. Keep entry and exit attribution separate.
+### Priority 5 — Exit Lab integration
+Only after entry/scoring and risk survival are validated. Keep entry, risk and exit attribution separate.
 
 ## Promotion gate
 
-No automatic promotion. Require common-window evidence, adequate trade count, positive expectancy/PF, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost, stable side/regime behavior, portfolio-path validation, prospective evidence and explicit human approval.
+No automatic promotion. Require common-window evidence, adequate trade count, positive expectancy/PF, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost, stable side/regime behavior, full portfolio-path + MTM validation, prospective evidence and explicit human approval.
 
 ## New-chat startup instruction
 
