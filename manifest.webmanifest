@@ -1,7 +1,7 @@
 {
-  "name": "ACHI MERIDIAN v7.41",
-  "short_name": "MERIDIAN 7.41",
-  "start_url": "./?build=7.41-20260902-R1",
+  "name": "ACHI MERIDIAN v7.42",
+  "short_name": "MERIDIAN 7.42",
+  "start_url": "./?build=7.42-20260902-R1",
   "display": "standalone",
   "background_color": "#03070c",
   "theme_color": "#05080d"
