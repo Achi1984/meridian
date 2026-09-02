@@ -161,3 +161,16 @@ const server=read('server.js');
 must(server.includes('if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");'),'paper-only invariant missing');
 
 console.log('MERIDIAN release check OK',v,build);
+
+// v7.52 Challenger V3 research-only continuity guards
+must(release.challengerResearch==='7.52-CHALLENGER-V3','Challenger V3 metadata mismatch');
+must(release.exitLabEvidence==='7.51-EXIT-LAB-EVIDENCE-V1','Exit Lab evidence metadata missing');
+must(fs.existsSync('challenger-v3.js'),'Challenger V3 module missing');
+const c3v752=read('challenger-v3.js');
+must(c3v752.includes("CHALLENGER_V3_RULESET='7.52-CHALLENGER-V3'"),'Challenger V3 ruleset mismatch');
+must(c3v752.includes('baselineReadyDependency:false'),'Challenger V3 READY-independence marker missing');
+const cloud752=read('cloud-backtest.js');
+must(cloud752.includes("makeLedger('CHALLENGER_V3'"),'Challenger V3 independent ledger missing');
+must(cloud752.includes("variantStability('CHALLENGER V3'"),'Challenger V3 walk-forward missing');
+must(cloud752.includes('baselineStatusAtEntry:sig.status'),'Challenger V3 baseline status telemetry missing');
+must(!cloud752.includes('challengerV3:ledgers.challengerV3.tradeList'),'Challenger V3 must not enter Exit Lab before initial entry evaluation');
