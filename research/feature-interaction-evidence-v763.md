@@ -1,6 +1,6 @@
 # MERIDIAN v7.63 — Feature Interaction Evidence
 
-Generated: 2026-09-02T14:46:36.816Z
+Generated: 2026-09-02T14:48:57.352Z
 
 Conditional raw-feature attribution on the same portfolio-independent cohorts as v7.62. Minimum adequate bucket size: 40.
 
@@ -40,4 +40,4 @@ Conditional raw-feature attribution on the same portfolio-independent cohorts as
 
 ## Guardrail
 
-Interactions remain research evidence only. Do not promote Challenger V3.2 from one attractive combination; require 30/60/90 consistency, sufficient samples and walk-forward validation.
+Interactions remain research evidence only. Do not promote Challenger V3.2 from one attractive combination; require walk-forward validation.
