@@ -22,7 +22,7 @@ test('model B keeps runner to TP2 when trend continues',()=>{
 test('confirmed-close probe delays BE until candle closes through TP1',()=>{
   const c=compareExitModels(trade,[
     {ts:1,open:100,high:115,low:99,close:112},
-    {ts:2,open:112,high:113,low:95,close:100}
+    {ts:2,open:112,high:113,low:89,close:100}
   ],{feeBps:0,slippageBps:0});
   assert.equal(c.models.B_PROTECTED.runnerReason,'BE_OR_TRAIL');
   assert.equal(c.models.B_CONFIRM_CLOSE.runnerReason,'SL');
