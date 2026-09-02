@@ -14,7 +14,9 @@ must(release.ruleset==='6.2-SIGNAL-V1','Ruleset must remain 6.2-SIGNAL-V1');
 must(release.research==='7.34-RESEARCH-V2','Research engine version mismatch');
 must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
-must(release.uiPolish==='7.37-MOBILE','Mobile UI polish version mismatch');
+must(release.uiPolish==='7.41-HEADER','Header UI polish version mismatch');
+must(release.regimeResearch==='7.38-REGIME-V1','Regime research version mismatch');
+must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
 
 const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
@@ -43,16 +45,22 @@ must(runtime.includes('MERIDIAN_RUNTIME_STATUS'),'runtime monitor status export 
 
 const uiPolish=read('app-v7.37-ui-polish.js');
 must(uiPolish.includes('meridian-release-status-row'),'mobile status row missing');
-const regimeUi=read('app-v7.38-regime-ui.js');
-must(regimeUi.includes('/api/regime-v1'),'regime UI endpoint missing');
-must(read('regime-v1.js').includes("REGIME_V1_RULESET='7.38-REGIME-V1'"),'regime model ruleset missing');
-const overview=read('app-v7.39-paper-overview.js');
-must(overview.includes('A/B/C/D BOT ÜBERSICHT'),'ABCD overview heading missing');
-must(overview.includes('REGIME Δ P&L vs BASE'),'Regime delta missing');
-must(overview.includes("compareButton.textContent='ÜBERSICHT'"),'overview tab rename missing');
+must(uiPolish.includes('object-fit:contain'),'header logo must use contain fit');
 must(uiPolish.includes("document.getElementById('versionBadge')"),'mobile UI polish must relocate version badge');
 must(uiPolish.includes("document.getElementById('meridian-runtime-badge')"),'mobile UI polish must relocate runtime badge');
 must(uiPolish.includes('@media(max-width:390px)'),'narrow iPhone header guard missing');
+
+const regimeUi=read('app-v7.38-regime-ui.js');
+must(regimeUi.includes('/api/regime-v1'),'regime UI endpoint missing');
+must(read('regime-v1.js').includes("REGIME_V1_RULESET='7.38-REGIME-V1'"),'regime model ruleset missing');
+
+const overview=read('app-v7.39-paper-overview.js');
+must(overview.includes('A/B/C/D BOT ÜBERSICHT'),'ABCD overview heading missing');
+must(overview.includes('REGIME Δ P&L vs BASE'),'Regime delta missing');
+must(overview.includes("compare.textContent='ÜBERSICHT'"),'overview tab rename missing');
+must(overview.includes('tabs.prepend(compare)'),'overview tab must be first');
+must(overview.includes('activateOverview'),'Paper overview default activation missing');
+must(overview.includes("replace(/3 BOTS/g,'4 BOTS')"),'Paper Lab bot count correction missing');
 
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
