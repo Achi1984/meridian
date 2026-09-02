@@ -2,47 +2,24 @@
   'use strict';
 
   function installStyles(){
-    if(document.getElementById('v760-nav-hotfix-style'))return;
-    const s=document.createElement('style');
-    s.id='v760-nav-hotfix-style';
+    let s=document.getElementById('v760-nav-hotfix-style');
+    if(!s){s=document.createElement('style');s.id='v760-nav-hotfix-style';document.head.appendChild(s)}
     s.textContent=`
       #v733-private-unlock{bottom:calc(96px + env(safe-area-inset-bottom))!important;pointer-events:none!important;z-index:60!important}
       #v733-private-unlock button{pointer-events:auto!important}
       .bottom{z-index:100!important;pointer-events:auto!important}
-      .bottom .inner,.bottom .nav{pointer-events:auto!important}
+      .bottom .inner,.bottom .nav{pointer-events:auto!important;touch-action:manipulation!important}
       @media(max-width:520px){#v733-private-unlock{bottom:calc(98px + env(safe-area-inset-bottom))!important}}
     `;
-    document.head.appendChild(s);
   }
 
-  function activate(view,btn){
-    try{
-      document.querySelectorAll('.bottom .nav[data-view]').forEach(x=>x.classList.toggle('active',x===btn));
-      if(document.body)document.body.dataset.view=view;
-      if(typeof window.renderOne==='function')window.renderOne(view);
-      else if(typeof renderOne==='function')renderOne(view);
-    }catch(e){console.warn('MERIDIAN nav hotfix',e)}
+  // Important: navigation events are owned by the canonical v7.05 delegated router
+  // embedded in index.html. This hotfix only protects the touch/z-index area.
+  // A previous R3 capture listener stopped propagation before v7.05 could paint/hide views.
+  function boot(){
+    installStyles();
+    try{delete document.documentElement.dataset.v760NavHotfix}catch(_e){}
   }
-
-  function bind(){
-    if(document.documentElement.dataset.v760NavHotfix==='1')return;
-    document.documentElement.dataset.v760NavHotfix='1';
-    document.addEventListener('click',ev=>{
-      const btn=ev.target&&ev.target.closest?ev.target.closest('.bottom .nav[data-view]'):null;
-      if(!btn)return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      activate(btn.dataset.view,btn);
-    },true);
-    document.addEventListener('touchend',ev=>{
-      const btn=ev.target&&ev.target.closest?ev.target.closest('.bottom .nav[data-view]'):null;
-      if(!btn)return;
-      ev.preventDefault();
-      activate(btn.dataset.view,btn);
-    },{capture:true,passive:false});
-  }
-
-  function boot(){installStyles();bind()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
   addEventListener('pageshow',boot);
