@@ -111,6 +111,12 @@
     try{decoratePaper();decorateDepot();document.body?.setAttribute('data-v760-consistency-ready','1')}catch(e){console.error('MERIDIAN v7.60 decorate',e)}
   }
 
+  // Private hydration is asynchronous and may replace the portfolio object
+  // after this module's initial pass. Recompute immediately from the hydrated
+  // holdings so historical snapshot totals (including separate bot capital)
+  // can never become the visible current portfolio value.
+  window.addEventListener('meridian:private-dashboard-hydrated',()=>setTimeout(apply,0));
+
   const observer=new MutationObserver(()=>{decoratePaper();decorateDepot()});
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
