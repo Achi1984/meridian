@@ -22,6 +22,7 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Fixed-entry replay mode: `7.49-FIXED-ENTRY-15M-REPLAY`
 - Project continuity: `7.50-CONTINUITY-V1`
 - Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
+- Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -58,57 +59,48 @@ Soft-confidence research bot. It currently scores technical quality, candidate q
 ### Regime V1
 Adaptive research bot. Can alter direction and strategy behavior by regime. Known methodological limitation: when it changes side, parts of `technical` and `candidate` scoring still originate from the original Baseline direction. This must be corrected in a future Regime V2 rather than silently changing V1.
 
+## Rejected / experimental Challenger research
+
+### Challenger V3
+V3 correctly removed the hidden Baseline `READY` dependency, but the wider opportunity universe performed poorly in 30d/60d and was weaker than V2/Baseline in the 90d comparison. Do not merge or promote V3 as implemented.
+
+### Challenger V3.1
+V3.1 increased entry-distance/status penalties and reduced non-READY risk. It improved substantially over V3 but still failed the robustness/promotion standard. Do not promote it and do not keep tuning thresholds blindly.
+
+### Signal Calibration Lab
+A portfolio-independent signal calibration sampled one candidate per symbol per 4h across BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Each candidate received an A_CURRENT normalized-R outcome with a 14-day horizon and portfolio gates excluded.
+
+Key result: **every confidence bucket was negative across 30d/60d/90d, and higher confidence was not monotonic with better outcomes.** This means the current compressed technical/candidate/distance/regime/status score stack is not sufficiently calibrated at signal level. Positive portfolio windows cannot be treated as proof of signal-score edge because portfolio gates/path dependence select subsets.
+
 ## Research philosophy
 
 More evidence must not automatically become more hard entry gates. Prefer a small number of hard safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft confidence/scoring inputs.
 
-Always evaluate:
-- performance AND trade frequency
-- drawdown AND opportunity cost
-- LONG and SHORT in their market-regime context
-- avoided losers AND missed winners
-- in-sample AND walk-forward/out-of-sample stability
+Always evaluate performance AND trade frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/out-of-sample stability.
 
 Do not assume fewer trades are automatically better. A research variant that improves PF merely by removing most opportunity is not necessarily superior.
 
-## Research telemetry
-
-`7.47-TELEMETRY-V1` reads persistent ledgers and produces comparable analytics without changing execution. Important metrics include expectancy, payoff ratio, historical max drawdown, trade frequency, open risk, holding duration, LONG/SHORT split, symbol split, regime split, exit-reason split and Challenger opportunity-cost counterfactuals.
-
 ## Exit Lab
 
-Exit Lab is research-only. It tests the same historical entry cohort under different exit policies, avoiding entry-selection contamination.
-
-Current policies/probes:
-- A Current: full position exits at TP1
-- B Protected Runner: 50% at TP1, remainder protected at break-even plus fees/slippage and runs toward TP2
-- C ATR Runner: 50% at TP1, then protected runner with ATR trailing
-- D Adaptive Runner: partial realization and trailing behavior adapt to market regime
-- B Confirm Close: arm BE only after a confirming 15m close through TP1
-- B +0.10R: protect remaining position at BE + 0.10R after TP1
-- B +0.25R: protect remaining position at BE + 0.25R after TP1
-
-Historical replay uses only candles closing after the original entry timestamp to avoid entry-candle look-ahead.
-
-### v7.51 evidence checkpoint
-
-A reproducible 12-asset 30/60/90-day report showed that no single exit model is robust enough for promotion yet. Runner models materially improved the 90-day window and often the 30-day window, but several underperformed the current full-TP1 exit in the 60-day window. Challenger D_ADAPTIVE was +1.502R vs A in 30d and +5.712R in 90d, but -1.447R in 60d. Challenger B_PROTECTED was +0.422R, -1.838R and +4.243R respectively. Therefore Challenger V3 must initially retain A_CURRENT so entry/scoring changes are isolated from exit changes.
+Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that runner models can materially improve some windows, especially 90d, but can underperform full TP1 in others, especially 60d. No runner/BE policy is promoted yet. Challenger experiments remain on A_CURRENT/full TP1 until entry/scoring edge is established.
 
 ## Current strategic direction
 
-1. Build Challenger V3 as an independent soft-score model evaluating the full valid scanner universe instead of only Baseline `READY`.
-2. Keep Challenger V3 initial exit behavior equal to A_CURRENT/full TP1 for clean attribution.
-3. Replay Challenger V3 entries through Exit Lab only after V3 entry behavior is measured.
-4. Build Regime V2 with side-specific scoring recomputed after final side selection.
-5. Combine Challenger/Regime ideas into Hybrid/Allocator only if independent evidence supports both.
+1. **Do not build Challenger V3.2 as another threshold-only revision.**
+2. Build a **Raw Feature Edge Map / Feature Attribution Lab** using signal-level normalized outcomes before portfolio gates.
+3. Evaluate raw observations such as multi-timeframe alignment, ADX/trend strength, RSI state, MACD agreement, volume participation, EMA position/distance, side and regime.
+4. Use any discovered evidence primarily as calibrated soft scoring, not a proliferation of hard gates.
+5. Only after a predictive signal-quality model exists, create Challenger V3.2 and retest 30/60/90d plus walk-forward and opportunity cost.
+6. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
+7. Exit Lab can be layered onto a validated entry model later.
 
 ## Promotion principle
 
-No research bot is automatically promoted because it has the best current P&L. Promotion requires a common evaluation window, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage and reasonable stability across windows/regimes. Human approval remains mandatory.
+No research bot is automatically promoted because it has the best current P&L. Promotion requires a common evaluation window, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage, reasonable stability across windows/regimes and human approval.
 
 ## Continuity rule
 
-For every substantial MERIDIAN release, update these three files when the project state or reasoning changes:
+For every substantial MERIDIAN release or research conclusion, update these three files when project state or reasoning changes:
 - `MERIDIAN_CONTEXT.md`
 - `MERIDIAN_DECISIONS.md`
 - `MERIDIAN_HANDOFF.md`
