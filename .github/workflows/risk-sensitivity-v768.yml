@@ -1,0 +1,70 @@
+name: MERIDIAN Risk Sensitivity v7.68
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "risk-sensitivity-v768.js"
+      - "scripts/risk-sensitivity-v768.mjs"
+      - "test/risk-sensitivity-v768.test.js"
+      - ".github/workflows/risk-sensitivity-v768.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-risk-sensitivity-v768
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v768/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v768/${name}" --end-at "${end_at}"
+          done
+      - name: Test risk sensitivity
+        run: node --test test/risk-sensitivity-v768.test.js test/portfolio-path-v767.test.js test/challenger-v32.test.js
+      - name: Run risk sensitivity
+        run: node scripts/risk-sensitivity-v768.mjs --p0 /tmp/v768/p0/signal-cohort-90d.json --p1 /tmp/v768/p1/signal-cohort-90d.json --p2 /tmp/v768/p2/signal-cohort-90d.json --p3 /tmp/v768/p3/signal-cohort-90d.json --out research/risk-sensitivity-evidence-v768.json
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/risk-sensitivity-evidence-v768.json','utf8'));
+          const lines=['# MERIDIAN v7.68 — Portfolio Risk Sensitivity','',`Generated: ${r.generatedAt}`,'','Research-only. Challenger V3.2 score and ranking are frozen. Only risk per trade changes: 0.25%, 0.50%, 0.75%, 1.00%. Portfolio gates remain identical to v7.67. A separate diagnostic run uses 1.00% risk but disables only the 8% max-drawdown shutdown. No Paper/runtime/UI changes.',''];
+          for(const [name,p] of Object.entries(r.periods||{})){lines.push(`## ${name}`,'');for(const k of ['risk_0.25','risk_0.50','risk_0.75','risk_1.00']){const x=p.variants?.[k];if(!x)continue;lines.push(`${k.replace('risk_','Risk ')}% — V3.2: trades **${x.challengerV32.trades}**, AvgR **${x.challengerV32.avgR}**, PF **${x.challengerV32.pf}**, end equity **${x.challengerV32.endEquity}**, realized DD **${x.challengerV32.maxDrawdownPct}%**. Baseline DD **${x.baseline.maxDrawdownPct}%**.`)}const d=p.diagnosticNoDrawdown;lines.push(`Diagnostic 1.00% / no max-DD stop: V3.2 trades **${d.challengerV32.trades}**, AvgR **${d.challengerV32.avgR}**, PF **${d.challengerV32.pf}**, end equity **${d.challengerV32.endEquity}**.`,'')}
+          lines.push('## Cross-period aggregate','');for(const [k,x] of Object.entries(r.aggregate||{}))lines.push(`${k}: V3.2 positive AvgR **${x.v32Positive}/${x.periods}**, PF>1 **${x.v32PfAbove1}/${x.periods}**, better AvgR than Baseline **${x.v32BetterAvgR}/${x.periods}**, lower realized DD **${x.v32LowerDd}/${x.periods}**, avg end equity **${x.avgEndEquity}**, avg realized DD **${x.avgMaxDdPct}%**.`);lines.push('',`No-DD diagnostic: positive AvgR **${r.diagnosticNoDrawdown.v32Positive}/${r.diagnosticNoDrawdown.periods}**, PF>1 **${r.diagnosticNoDrawdown.v32PfAbove1}/${r.diagnosticNoDrawdown.periods}**, avg end equity **${r.diagnosticNoDrawdown.avgEndEquity}**.`,'','## Guardrail','','Do not alter V3.2 weights from this test. This step diagnoses portfolio risk sensitivity only. Intratrade mark-to-market drawdown still requires the planned v7.69 candle-path replay before any Shadow promotion.','');
+          fs.writeFileSync('research/risk-sensitivity-evidence-v768.md',lines.join('\n'));
+          NODE
+      - name: Commit evidence to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/risk-sensitivity-evidence-v768.json research/risk-sensitivity-evidence-v768.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.68: risk sensitivity evidence"
+          git push origin HEAD:main
