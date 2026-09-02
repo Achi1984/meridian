@@ -22,9 +22,15 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Fixed-entry replay mode: `7.49-FIXED-ENTRY-15M-REPLAY`
 - Project continuity: `7.50-CONTINUITY-V1`
 - Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
-- Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
+- Preserved rejected research: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
+- Raw Feature Attribution: `7.61`
+- Portfolio-independent cohort evidence: `7.62`
+- Feature Interaction Lab: `7.63`
+- Chronological walk-forward validation: `7.64`
+- Disjoint historical validation: `7.65`
+- Challenger V3.2 evidence-backed soft-score lab: `7.66`
 
-The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
+`version.json` may remain on the deployed UI/app release while research-only milestones advance separately. The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
 ## Deployment and safety
 
@@ -48,55 +54,80 @@ The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizin
 ## Active bot set
 
 ### Baseline 6.2
-Reference bot. Frozen execution. Its purpose is to provide the unchanged benchmark against which all research variants are measured.
+Frozen reference benchmark.
 
 ### Shadow V1
-Hard-filter research control. It only acts on Baseline-ready candidates and adds strict technical/candidate/regime gates. Useful to measure the cost and benefit of aggressive filtering, but not intended as the preferred architecture.
+Hard-filter research control. Useful for measuring the cost of aggressive filtering, not the preferred architecture.
 
 ### Challenger V2
-Soft-confidence research bot. It currently scores technical quality, candidate quality, entry distance and regime adjustment. Important limitation: its real Paper trade universe still depends on Baseline `READY`, so it cannot discover opportunities outside the Baseline-ready pool.
+Soft-confidence control. Important limitation: its executable opportunity universe still depends on Baseline `READY`.
 
 ### Regime V1
-Adaptive research bot. Can alter direction and strategy behavior by regime. Known methodological limitation: when it changes side, parts of `technical` and `candidate` scoring still originate from the original Baseline direction. This must be corrected in a future Regime V2 rather than silently changing V1.
+Adaptive research bot. Known limitation: a changed side can still inherit technical/candidate evidence from the source side. Regime V2 must recompute evidence for the final side.
+
+### Challenger V3.2 Lab
+Research-only independent ranking model introduced in v7.66. It does not require Baseline `READY`. It uses small additive weights from raw feature interactions that survived v7.64 walk-forward and v7.65 disjoint-history checks. It is not yet a Paper/Shadow bot.
 
 ## Rejected / experimental Challenger research
 
 ### Challenger V3
-V3 correctly removed the hidden Baseline `READY` dependency, but the wider opportunity universe performed poorly in 30d/60d and was weaker than V2/Baseline in the 90d comparison. Do not merge or promote V3 as implemented.
+Removed hidden READY dependency correctly but the wider universe performed poorly. Do not promote.
 
 ### Challenger V3.1
-V3.1 increased entry-distance/status penalties and reduced non-READY risk. It improved substantially over V3 but still failed the robustness/promotion standard. Do not promote it and do not keep tuning thresholds blindly.
+Improved over V3 but remained unstable and weaker than V2/Baseline on the main comparison. Do not promote or resume blind threshold tuning.
 
 ### Signal Calibration Lab
-A portfolio-independent signal calibration sampled one candidate per symbol per 4h across BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Each candidate received an A_CURRENT normalized-R outcome with a 14-day horizon and portfolio gates excluded.
+Every compressed confidence bucket was negative across 30d/60d/90d and higher confidence was not monotonic with better outcomes. This invalidated the old idea that simply retuning the same confidence stack would create edge.
 
-Key result: **every confidence bucket was negative across 30d/60d/90d, and higher confidence was not monotonic with better outcomes.** This means the current compressed technical/candidate/distance/regime/status score stack is not sufficiently calibrated at signal level. Positive portfolio windows cannot be treated as proof of signal-score edge because portfolio gates/path dependence select subsets.
+## Evidence path v7.61–v7.66
+
+### v7.61–v7.62 — Raw Feature Attribution
+Portfolio-independent cohorts sample one candidate per symbol per 4h across BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Outcomes use A_CURRENT/full TP1 normalized R with a 14-day horizon and portfolio gates excluded. Overall raw cohorts were still weak, but 15m volume participation emerged as one of the few repeatable positive single features.
+
+### v7.63 — Feature Interactions
+Conditional combinations revealed stronger structure than single indicators. Relevant examples included high 15m volume with ADX/RSI context and SHORT signals in TRANSITION regimes.
+
+### v7.64 — Walk-forward
+Chronological 45d train / 15d holdout / 15d step validation showed that many attractive training buckets did not survive. Only 42.4% of adequate selected holdouts stayed positive. This reinforced the need for out-of-sample filtering rather than visual bucket picking.
+
+### v7.65 — Four disjoint 90-day cohorts
+Strongest robust candidates included:
+- `VOL_GE15_ADX_LT18`: 4/4 positive periods, weighted Avg R `+0.131`, n=976.
+- `SHORT_TRANSITION_VOL_065_1`: 4/4 positive, `+0.104`, n=667.
+- `VOL_GE15_ADX_18_25`: 4/4 positive, `+0.078`, n=1148.
+Several weaker interactions passed 3/4; `VOL_GE15_RSI_42_50` failed at 2/4.
+
+### v7.66 — Challenger V3.2 soft ranking
+V3.2 uses small additive weights, no new hard signal gates, and independently ranks the full signal universe. At equal signal count to Baseline READY, it improved Avg R in all four historical 90-day periods:
+- P0: Baseline `-0.004R` vs V3.2 `+0.039R`
+- P1: `+0.007R` vs `+0.050R`
+- P2: `-0.041R` vs `+0.012R`
+- P3: `+0.003R` vs `+0.092R`
+PF also improved in all four periods. Because the feature candidates were derived using related historical evidence, v7.66 is not an untouched holdout. Treat it as composite signal-level evidence, not promotion proof.
 
 ## Research philosophy
 
-More evidence must not automatically become more hard entry gates. Prefer a small number of hard safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft confidence/scoring inputs.
+More evidence must not automatically become more hard entry gates. Prefer a small number of true safety constraints and use regime, asset history, direction, volatility, participation and other observations as calibrated soft confidence inputs.
 
-Always evaluate performance AND trade frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/out-of-sample stability.
-
-Do not assume fewer trades are automatically better. A research variant that improves PF merely by removing most opportunity is not necessarily superior.
+Always evaluate performance AND trade frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/out-of-sample stability. Fewer trades are not automatically better.
 
 ## Exit Lab
 
-Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that runner models can materially improve some windows, especially 90d, but can underperform full TP1 in others, especially 60d. No runner/BE policy is promoted yet. Challenger experiments remain on A_CURRENT/full TP1 until entry/scoring edge is established.
+Exit Lab remains research-only. Runner models can materially improve some windows but underperform in others. No runner/BE policy is promoted. Challenger experiments stay on A_CURRENT/full TP1 until entry/scoring edge is established under portfolio-path replay.
 
 ## Current strategic direction
 
-1. **Do not build Challenger V3.2 as another threshold-only revision.**
-2. Build a **Raw Feature Edge Map / Feature Attribution Lab** using signal-level normalized outcomes before portfolio gates.
-3. Evaluate raw observations such as multi-timeframe alignment, ADX/trend strength, RSI state, MACD agreement, volume participation, EMA position/distance, side and regime.
-4. Use any discovered evidence primarily as calibrated soft scoring, not a proliferation of hard gates.
-5. Only after a predictive signal-quality model exists, create Challenger V3.2 and retest 30/60/90d plus walk-forward and opportunity cost.
-6. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
-7. Exit Lab can be layered onto a validated entry model later.
+1. Keep Baseline 6.2 frozen and V3.2 research-only.
+2. Build a **portfolio-path replay for Challenger V3.2 vs Baseline** under identical execution rules: same capital/risk framework, max-open constraints, chronological concurrency and A_CURRENT/full TP1 exit.
+3. Compare expectancy/PF, max drawdown, trade frequency, exposure/concurrency, avoided losers, missed winners and opportunity cost on common periods.
+4. Do not tune v7.66 weights against the replay merely to make it win. If the composite fails, return to feature attribution rather than threshold chasing.
+5. If portfolio replay is robust, freeze the V3.2 score and collect a prospective/future holdout before any promotion/Shadow activation.
+6. Regime V2 remains a separate next research axis and requires side-specific rescoring after final side selection.
+7. Exit Lab can be layered only after the entry/scoring model survives these gates.
 
 ## Promotion principle
 
-No research bot is automatically promoted because it has the best current P&L. Promotion requires a common evaluation window, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage, reasonable stability across windows/regimes and human approval.
+No research bot is automatically promoted because it has the best current P&L. Promotion requires common-window evaluation, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage, reasonable stability across windows/regimes, prospective evidence and human approval.
 
 ## Continuity rule
 
