@@ -2,15 +2,14 @@
 (function(){
   'use strict';
   const scripts=[
-    'app-v7.32-legacy.js?v=7.60-R9',
-    'app-v7.33-hardening.js?v=7.60-R9',
-    'app-runtime-monitor.js?v=7.60-R9',
-    'app-v7.37-ui-polish.js?v=7.60-R9',
-    'app-v7.38-regime-ui.js?v=7.60-R9',
-    'app-v7.39-paper-overview.js?v=7.60-R9',
-    'app-v7.60-dashboard-consistency.js?v=7.60-R9',
-    'app-v7.60-private-hydration-hotfix.js?v=7.60-R9',
-    'app-v7.60-final-ui-authority.js?v=7.60-R9'
+    'app-v7.33-hardening.js?v=7.60-R10',
+    'app-runtime-monitor.js?v=7.60-R10',
+    'app-v7.37-ui-polish.js?v=7.60-R10',
+    'app-v7.38-regime-ui.js?v=7.60-R10',
+    'app-v7.39-paper-overview.js?v=7.60-R10',
+    'app-v7.60-dashboard-consistency.js?v=7.60-R10',
+    'app-v7.60-private-hydration-hotfix.js?v=7.60-R10',
+    'app-v7.60-final-ui-authority.js?v=7.60-R10'
   ];
   if(document.readyState==='loading'){
     scripts.forEach(src=>document.write('<script src="'+src+'"></'+'script>'));
