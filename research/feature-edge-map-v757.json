@@ -1,0 +1,3130 @@
+{
+  "schemaVersion": "7.57-FEATURE-EDGE-MAP-V1",
+  "generatedAt": "2026-09-02T13:25:00.882Z",
+  "sampling": "one candidate per symbol per 4h",
+  "outcome": "A_CURRENT normalized R, 14d horizon, portfolio gates excluded",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "SUIUSDT",
+    "HBARUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "DOTUSDT",
+    "FETUSDT",
+    "INJUSDT"
+  ],
+  "windows": [
+    30,
+    60,
+    90
+  ],
+  "runs": [
+    {
+      "days": 30,
+      "total": {
+        "key": "ALL",
+        "samples": 2160,
+        "totalR": -733.141,
+        "avgR": -0.339,
+        "winRate": 40.4,
+        "pf": 0.569
+      },
+      "features": {
+        "sideRegime": [
+          {
+            "key": "LONG|BULL",
+            "samples": 471,
+            "totalR": -23.006,
+            "avgR": -0.049,
+            "winRate": 49,
+            "pf": 0.924
+          },
+          {
+            "key": "SHORT|RANGE",
+            "samples": 348,
+            "totalR": -118.689,
+            "avgR": -0.341,
+            "winRate": 41.1,
+            "pf": 0.561
+          },
+          {
+            "key": "SHORT|BEAR",
+            "samples": 330,
+            "totalR": -170.228,
+            "avgR": -0.516,
+            "winRate": 36.1,
+            "pf": 0.416
+          },
+          {
+            "key": "LONG|RANGE",
+            "samples": 279,
+            "totalR": -133.681,
+            "avgR": -0.479,
+            "winRate": 35.8,
+            "pf": 0.44
+          },
+          {
+            "key": "SHORT|TRANSITION",
+            "samples": 247,
+            "totalR": -69.555,
+            "avgR": -0.282,
+            "winRate": 40.9,
+            "pf": 0.622
+          },
+          {
+            "key": "SHORT|BULL",
+            "samples": 184,
+            "totalR": -57.832,
+            "avgR": -0.314,
+            "winRate": 39.1,
+            "pf": 0.59
+          },
+          {
+            "key": "LONG|TRANSITION",
+            "samples": 180,
+            "totalR": -60.118,
+            "avgR": -0.334,
+            "winRate": 42.2,
+            "pf": 0.58
+          },
+          {
+            "key": "LONG|BEAR",
+            "samples": 121,
+            "totalR": -100.033,
+            "avgR": -0.827,
+            "winRate": 24.8,
+            "pf": 0.232
+          }
+        ],
+        "status": [
+          {
+            "key": "WAIT_ENTRY_ZONE",
+            "samples": 820,
+            "totalR": -238.926,
+            "avgR": -0.291,
+            "winRate": 41.3,
+            "pf": 0.616
+          },
+          {
+            "key": "NO_SETUP",
+            "samples": 791,
+            "totalR": -337.581,
+            "avgR": -0.427,
+            "winRate": 38.3,
+            "pf": 0.492
+          },
+          {
+            "key": "READY",
+            "samples": 549,
+            "totalR": -156.634,
+            "avgR": -0.285,
+            "winRate": 41.9,
+            "pf": 0.622
+          }
+        ],
+        "emaStructure": [
+          {
+            "key": "3/3",
+            "samples": 934,
+            "totalR": -205.489,
+            "avgR": -0.22,
+            "winRate": 45.2,
+            "pf": 0.699
+          },
+          {
+            "key": "2/3",
+            "samples": 762,
+            "totalR": -318.927,
+            "avgR": -0.419,
+            "winRate": 37,
+            "pf": 0.491
+          },
+          {
+            "key": "1/3",
+            "samples": 441,
+            "totalR": -199.99,
+            "avgR": -0.453,
+            "winRate": 36.1,
+            "pf": 0.467
+          },
+          {
+            "key": "0/3",
+            "samples": 23,
+            "totalR": -8.735,
+            "avgR": -0.38,
+            "winRate": 39.1,
+            "pf": 0.54
+          }
+        ],
+        "priceEmaAlignment": [
+          {
+            "key": "3/3",
+            "samples": 1276,
+            "totalR": -406.383,
+            "avgR": -0.318,
+            "winRate": 40.8,
+            "pf": 0.588
+          },
+          {
+            "key": "2/3",
+            "samples": 785,
+            "totalR": -271.564,
+            "avgR": -0.346,
+            "winRate": 40.8,
+            "pf": 0.567
+          },
+          {
+            "key": "1/3",
+            "samples": 99,
+            "totalR": -55.195,
+            "avgR": -0.558,
+            "winRate": 32.3,
+            "pf": 0.379
+          }
+        ],
+        "macdAlignment": [
+          {
+            "key": "2/3",
+            "samples": 1081,
+            "totalR": -381.472,
+            "avgR": -0.353,
+            "winRate": 39.6,
+            "pf": 0.555
+          },
+          {
+            "key": "3/3",
+            "samples": 559,
+            "totalR": -182.635,
+            "avgR": -0.327,
+            "winRate": 40.1,
+            "pf": 0.581
+          },
+          {
+            "key": "1/3",
+            "samples": 502,
+            "totalR": -156.306,
+            "avgR": -0.311,
+            "winRate": 42.6,
+            "pf": 0.599
+          },
+          {
+            "key": "0/3",
+            "samples": 18,
+            "totalR": -12.728,
+            "avgR": -0.707,
+            "winRate": 33.3,
+            "pf": 0.334
+          }
+        ],
+        "rsi15": [
+          {
+            "key": "FAVORABLE",
+            "samples": 1494,
+            "totalR": -542.418,
+            "avgR": -0.363,
+            "winRate": 39.4,
+            "pf": 0.546
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 261,
+            "totalR": -92.905,
+            "avgR": -0.356,
+            "winRate": 41.8,
+            "pf": 0.553
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 241,
+            "totalR": -54.366,
+            "avgR": -0.226,
+            "winRate": 44.4,
+            "pf": 0.696
+          },
+          {
+            "key": "WEAK",
+            "samples": 61,
+            "totalR": -13.371,
+            "avgR": -0.219,
+            "winRate": 44.3,
+            "pf": 0.696
+          },
+          {
+            "key": "HOT",
+            "samples": 43,
+            "totalR": -0.15,
+            "avgR": -0.003,
+            "winRate": 51.2,
+            "pf": 0.994
+          },
+          {
+            "key": "EXTREME",
+            "samples": 31,
+            "totalR": -3.527,
+            "avgR": -0.114,
+            "winRate": 45.2,
+            "pf": 0.826
+          },
+          {
+            "key": "COLD",
+            "samples": 29,
+            "totalR": -26.405,
+            "avgR": -0.911,
+            "winRate": 13.8,
+            "pf": 0.142
+          }
+        ],
+        "rsi1h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 1673,
+            "totalR": -564.378,
+            "avgR": -0.337,
+            "winRate": 40.8,
+            "pf": 0.572
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 180,
+            "totalR": -83.783,
+            "avgR": -0.465,
+            "winRate": 37.2,
+            "pf": 0.453
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 155,
+            "totalR": -103.465,
+            "avgR": -0.668,
+            "winRate": 26.5,
+            "pf": 0.304
+          },
+          {
+            "key": "HOT",
+            "samples": 71,
+            "totalR": 27.244,
+            "avgR": 0.384,
+            "winRate": 64.8,
+            "pf": 1.927
+          },
+          {
+            "key": "EXTREME",
+            "samples": 43,
+            "totalR": 13.084,
+            "avgR": 0.304,
+            "winRate": 60.5,
+            "pf": 1.666
+          },
+          {
+            "key": "COLD",
+            "samples": 38,
+            "totalR": -21.843,
+            "avgR": -0.575,
+            "winRate": 26.3,
+            "pf": 0.35
+          }
+        ],
+        "rsi4h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 1351,
+            "totalR": -536.689,
+            "avgR": -0.397,
+            "winRate": 38.6,
+            "pf": 0.511
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 270,
+            "totalR": -144.968,
+            "avgR": -0.537,
+            "winRate": 34.8,
+            "pf": 0.404
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 219,
+            "totalR": -80.789,
+            "avgR": -0.369,
+            "winRate": 38.4,
+            "pf": 0.542
+          },
+          {
+            "key": "EXTREME",
+            "samples": 127,
+            "totalR": 85.225,
+            "avgR": 0.671,
+            "winRate": 75.6,
+            "pf": 3.403
+          },
+          {
+            "key": "WEAK",
+            "samples": 115,
+            "totalR": -57.404,
+            "avgR": -0.499,
+            "winRate": 33,
+            "pf": 0.437
+          },
+          {
+            "key": "HOT",
+            "samples": 59,
+            "totalR": 12.962,
+            "avgR": 0.22,
+            "winRate": 57.6,
+            "pf": 1.438
+          },
+          {
+            "key": "COLD",
+            "samples": 19,
+            "totalR": -11.478,
+            "avgR": -0.604,
+            "winRate": 26.3,
+            "pf": 0.337
+          }
+        ],
+        "adx15": [
+          {
+            "key": "18-24",
+            "samples": 628,
+            "totalR": -219.671,
+            "avgR": -0.35,
+            "winRate": 40.4,
+            "pf": 0.559
+          },
+          {
+            "key": "<18",
+            "samples": 601,
+            "totalR": -224.976,
+            "avgR": -0.374,
+            "winRate": 39.9,
+            "pf": 0.54
+          },
+          {
+            "key": "25-34",
+            "samples": 575,
+            "totalR": -179.248,
+            "avgR": -0.312,
+            "winRate": 41.2,
+            "pf": 0.596
+          },
+          {
+            "key": ">=35",
+            "samples": 356,
+            "totalR": -109.246,
+            "avgR": -0.307,
+            "winRate": 39.6,
+            "pf": 0.597
+          }
+        ],
+        "adx1h": [
+          {
+            "key": "<18",
+            "samples": 610,
+            "totalR": -285.84,
+            "avgR": -0.469,
+            "winRate": 37,
+            "pf": 0.459
+          },
+          {
+            "key": "18-24",
+            "samples": 608,
+            "totalR": -199.801,
+            "avgR": -0.329,
+            "winRate": 41.3,
+            "pf": 0.578
+          },
+          {
+            "key": "25-34",
+            "samples": 529,
+            "totalR": -248.744,
+            "avgR": -0.47,
+            "winRate": 34.8,
+            "pf": 0.445
+          },
+          {
+            "key": ">=35",
+            "samples": 413,
+            "totalR": 1.243,
+            "avgR": 0.003,
+            "winRate": 51.1,
+            "pf": 1.005
+          }
+        ],
+        "adx4h": [
+          {
+            "key": "<18",
+            "samples": 627,
+            "totalR": -252.37,
+            "avgR": -0.403,
+            "winRate": 38.8,
+            "pf": 0.504
+          },
+          {
+            "key": ">=35",
+            "samples": 596,
+            "totalR": -54.802,
+            "avgR": -0.092,
+            "winRate": 45.6,
+            "pf": 0.858
+          },
+          {
+            "key": "18-24",
+            "samples": 529,
+            "totalR": -257.552,
+            "avgR": -0.487,
+            "winRate": 37.1,
+            "pf": 0.447
+          },
+          {
+            "key": "25-34",
+            "samples": 408,
+            "totalR": -168.418,
+            "avgR": -0.413,
+            "winRate": 39.5,
+            "pf": 0.507
+          }
+        ],
+        "volume15": [
+          {
+            "key": "<0.65",
+            "samples": 959,
+            "totalR": -370.698,
+            "avgR": -0.387,
+            "winRate": 38.3,
+            "pf": 0.523
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 547,
+            "totalR": -142.805,
+            "avgR": -0.261,
+            "winRate": 43.3,
+            "pf": 0.649
+          },
+          {
+            "key": ">=1.50",
+            "samples": 305,
+            "totalR": -75.706,
+            "avgR": -0.248,
+            "winRate": 44.3,
+            "pf": 0.663
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 216,
+            "totalR": -90.636,
+            "avgR": -0.42,
+            "winRate": 38,
+            "pf": 0.507
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 133,
+            "totalR": -53.297,
+            "avgR": -0.401,
+            "winRate": 38.3,
+            "pf": 0.513
+          }
+        ],
+        "volume1h": [
+          {
+            "key": "<0.65",
+            "samples": 834,
+            "totalR": -283.055,
+            "avgR": -0.339,
+            "winRate": 41.2,
+            "pf": 0.573
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 585,
+            "totalR": -212.64,
+            "avgR": -0.363,
+            "winRate": 40,
+            "pf": 0.543
+          },
+          {
+            "key": ">=1.50",
+            "samples": 314,
+            "totalR": -93.568,
+            "avgR": -0.298,
+            "winRate": 39.8,
+            "pf": 0.603
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 246,
+            "totalR": -77.708,
+            "avgR": -0.316,
+            "winRate": 40.7,
+            "pf": 0.598
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 181,
+            "totalR": -66.17,
+            "avgR": -0.366,
+            "winRate": 38.1,
+            "pf": 0.543
+          }
+        ],
+        "macd15": [
+          {
+            "key": "ALIGNED",
+            "samples": 1258,
+            "totalR": -469.731,
+            "avgR": -0.373,
+            "winRate": 39,
+            "pf": 0.534
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 902,
+            "totalR": -263.41,
+            "avgR": -0.292,
+            "winRate": 42.4,
+            "pf": 0.621
+          }
+        ],
+        "macd1h": [
+          {
+            "key": "ALIGNED",
+            "samples": 1573,
+            "totalR": -484.197,
+            "avgR": -0.308,
+            "winRate": 41.3,
+            "pf": 0.601
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 587,
+            "totalR": -248.944,
+            "avgR": -0.424,
+            "winRate": 37.8,
+            "pf": 0.492
+          }
+        ],
+        "macd4h": [
+          {
+            "key": "ALIGNED",
+            "samples": 1510,
+            "totalR": -513.226,
+            "avgR": -0.34,
+            "winRate": 39.9,
+            "pf": 0.57
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 650,
+            "totalR": -219.915,
+            "avgR": -0.338,
+            "winRate": 41.5,
+            "pf": 0.568
+          }
+        ],
+        "distance": [
+          {
+            "key": ">1.50",
+            "samples": 463,
+            "totalR": -139.073,
+            "avgR": -0.3,
+            "winRate": 40.8,
+            "pf": 0.611
+          },
+          {
+            "key": "1.00-1.50",
+            "samples": 372,
+            "totalR": -138.521,
+            "avgR": -0.372,
+            "winRate": 39.2,
+            "pf": 0.529
+          },
+          {
+            "key": "0.25-0.50",
+            "samples": 352,
+            "totalR": -131.4,
+            "avgR": -0.373,
+            "winRate": 38.9,
+            "pf": 0.539
+          },
+          {
+            "key": "<=0.25",
+            "samples": 348,
+            "totalR": -112.721,
+            "avgR": -0.324,
+            "winRate": 41.1,
+            "pf": 0.587
+          },
+          {
+            "key": "0.50-0.75",
+            "samples": 334,
+            "totalR": -114.446,
+            "avgR": -0.343,
+            "winRate": 40.7,
+            "pf": 0.563
+          },
+          {
+            "key": "0.75-1.00",
+            "samples": 291,
+            "totalR": -96.979,
+            "avgR": -0.333,
+            "winRate": 41.6,
+            "pf": 0.581
+          }
+        ],
+        "asset": [
+          {
+            "key": "BTCUSDT",
+            "samples": 180,
+            "totalR": -116.36,
+            "avgR": -0.646,
+            "winRate": 39.4,
+            "pf": 0.368
+          },
+          {
+            "key": "ETHUSDT",
+            "samples": 180,
+            "totalR": -77.825,
+            "avgR": -0.432,
+            "winRate": 42.2,
+            "pf": 0.492
+          },
+          {
+            "key": "SOLUSDT",
+            "samples": 180,
+            "totalR": -74.513,
+            "avgR": -0.414,
+            "winRate": 38.9,
+            "pf": 0.5
+          },
+          {
+            "key": "XRPUSDT",
+            "samples": 180,
+            "totalR": -65.382,
+            "avgR": -0.363,
+            "winRate": 41.1,
+            "pf": 0.544
+          },
+          {
+            "key": "ADAUSDT",
+            "samples": 180,
+            "totalR": -47.716,
+            "avgR": -0.265,
+            "winRate": 39.4,
+            "pf": 0.637
+          },
+          {
+            "key": "SUIUSDT",
+            "samples": 180,
+            "totalR": -59.747,
+            "avgR": -0.332,
+            "winRate": 39.4,
+            "pf": 0.574
+          },
+          {
+            "key": "HBARUSDT",
+            "samples": 180,
+            "totalR": -75.521,
+            "avgR": -0.42,
+            "winRate": 39.4,
+            "pf": 0.495
+          },
+          {
+            "key": "AVAXUSDT",
+            "samples": 180,
+            "totalR": -58.962,
+            "avgR": -0.328,
+            "winRate": 40,
+            "pf": 0.576
+          },
+          {
+            "key": "NEARUSDT",
+            "samples": 180,
+            "totalR": -43.665,
+            "avgR": -0.243,
+            "winRate": 40,
+            "pf": 0.666
+          },
+          {
+            "key": "DOTUSDT",
+            "samples": 180,
+            "totalR": -42.172,
+            "avgR": -0.234,
+            "winRate": 42.2,
+            "pf": 0.673
+          },
+          {
+            "key": "FETUSDT",
+            "samples": 180,
+            "totalR": -50.488,
+            "avgR": -0.28,
+            "winRate": 37.2,
+            "pf": 0.62
+          },
+          {
+            "key": "INJUSDT",
+            "samples": 180,
+            "totalR": -20.791,
+            "avgR": -0.116,
+            "winRate": 45,
+            "pf": 0.826
+          }
+        ]
+      }
+    },
+    {
+      "days": 60,
+      "total": {
+        "key": "ALL",
+        "samples": 4320,
+        "totalR": -1399.708,
+        "avgR": -0.324,
+        "winRate": 40.9,
+        "pf": 0.582
+      },
+      "features": {
+        "sideRegime": [
+          {
+            "key": "LONG|BULL",
+            "samples": 815,
+            "totalR": -180.2,
+            "avgR": -0.221,
+            "winRate": 42.8,
+            "pf": 0.694
+          },
+          {
+            "key": "SHORT|BEAR",
+            "samples": 726,
+            "totalR": -353.467,
+            "avgR": -0.487,
+            "winRate": 35.3,
+            "pf": 0.438
+          },
+          {
+            "key": "SHORT|RANGE",
+            "samples": 662,
+            "totalR": -195.345,
+            "avgR": -0.295,
+            "winRate": 43.1,
+            "pf": 0.61
+          },
+          {
+            "key": "LONG|RANGE",
+            "samples": 549,
+            "totalR": -202.881,
+            "avgR": -0.37,
+            "winRate": 40.1,
+            "pf": 0.534
+          },
+          {
+            "key": "SHORT|TRANSITION",
+            "samples": 547,
+            "totalR": -147.627,
+            "avgR": -0.27,
+            "winRate": 41.9,
+            "pf": 0.635
+          },
+          {
+            "key": "LONG|TRANSITION",
+            "samples": 419,
+            "totalR": -108.955,
+            "avgR": -0.26,
+            "winRate": 43.9,
+            "pf": 0.649
+          },
+          {
+            "key": "SHORT|BULL",
+            "samples": 332,
+            "totalR": -86.339,
+            "avgR": -0.26,
+            "winRate": 42.2,
+            "pf": 0.648
+          },
+          {
+            "key": "LONG|BEAR",
+            "samples": 270,
+            "totalR": -124.894,
+            "avgR": -0.463,
+            "winRate": 37.8,
+            "pf": 0.462
+          }
+        ],
+        "status": [
+          {
+            "key": "NO_SETUP",
+            "samples": 1597,
+            "totalR": -604.06,
+            "avgR": -0.378,
+            "winRate": 39.8,
+            "pf": 0.531
+          },
+          {
+            "key": "WAIT_ENTRY_ZONE",
+            "samples": 1594,
+            "totalR": -486.193,
+            "avgR": -0.305,
+            "winRate": 40.8,
+            "pf": 0.6
+          },
+          {
+            "key": "READY",
+            "samples": 1129,
+            "totalR": -309.456,
+            "avgR": -0.274,
+            "winRate": 42.5,
+            "pf": 0.633
+          }
+        ],
+        "emaStructure": [
+          {
+            "key": "3/3",
+            "samples": 1771,
+            "totalR": -506.593,
+            "avgR": -0.286,
+            "winRate": 42.2,
+            "pf": 0.622
+          },
+          {
+            "key": "2/3",
+            "samples": 1630,
+            "totalR": -574.959,
+            "avgR": -0.353,
+            "winRate": 39.7,
+            "pf": 0.551
+          },
+          {
+            "key": "1/3",
+            "samples": 882,
+            "totalR": -306.178,
+            "avgR": -0.347,
+            "winRate": 40.2,
+            "pf": 0.559
+          },
+          {
+            "key": "0/3",
+            "samples": 37,
+            "totalR": -11.978,
+            "avgR": -0.324,
+            "winRate": 40.5,
+            "pf": 0.59
+          }
+        ],
+        "priceEmaAlignment": [
+          {
+            "key": "3/3",
+            "samples": 2556,
+            "totalR": -791.701,
+            "avgR": -0.31,
+            "winRate": 41,
+            "pf": 0.595
+          },
+          {
+            "key": "2/3",
+            "samples": 1579,
+            "totalR": -530.291,
+            "avgR": -0.336,
+            "winRate": 41,
+            "pf": 0.572
+          },
+          {
+            "key": "1/3",
+            "samples": 184,
+            "totalR": -76.485,
+            "avgR": -0.416,
+            "winRate": 37.5,
+            "pf": 0.492
+          },
+          {
+            "key": "0/3",
+            "samples": 1,
+            "totalR": -1.232,
+            "avgR": -1.232,
+            "winRate": 0,
+            "pf": 0
+          }
+        ],
+        "macdAlignment": [
+          {
+            "key": "2/3",
+            "samples": 2297,
+            "totalR": -746.283,
+            "avgR": -0.325,
+            "winRate": 40.7,
+            "pf": 0.58
+          },
+          {
+            "key": "3/3",
+            "samples": 1021,
+            "totalR": -290.454,
+            "avgR": -0.284,
+            "winRate": 41.5,
+            "pf": 0.622
+          },
+          {
+            "key": "1/3",
+            "samples": 977,
+            "totalR": -345.653,
+            "avgR": -0.354,
+            "winRate": 40.6,
+            "pf": 0.554
+          },
+          {
+            "key": "0/3",
+            "samples": 25,
+            "totalR": -17.319,
+            "avgR": -0.693,
+            "winRate": 32,
+            "pf": 0.325
+          }
+        ],
+        "rsi15": [
+          {
+            "key": "FAVORABLE",
+            "samples": 2944,
+            "totalR": -967.598,
+            "avgR": -0.329,
+            "winRate": 40.7,
+            "pf": 0.576
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 550,
+            "totalR": -194.231,
+            "avgR": -0.353,
+            "winRate": 41.1,
+            "pf": 0.556
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 496,
+            "totalR": -142.84,
+            "avgR": -0.288,
+            "winRate": 41.9,
+            "pf": 0.62
+          },
+          {
+            "key": "WEAK",
+            "samples": 119,
+            "totalR": -37.049,
+            "avgR": -0.311,
+            "winRate": 40.3,
+            "pf": 0.594
+          },
+          {
+            "key": "HOT",
+            "samples": 79,
+            "totalR": -5.604,
+            "avgR": -0.071,
+            "winRate": 49.4,
+            "pf": 0.89
+          },
+          {
+            "key": "COLD",
+            "samples": 75,
+            "totalR": -40.336,
+            "avgR": -0.538,
+            "winRate": 29.3,
+            "pf": 0.387
+          },
+          {
+            "key": "EXTREME",
+            "samples": 57,
+            "totalR": -12.051,
+            "avgR": -0.211,
+            "winRate": 42.1,
+            "pf": 0.701
+          }
+        ],
+        "rsi1h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 3381,
+            "totalR": -1039.053,
+            "avgR": -0.307,
+            "winRate": 41.7,
+            "pf": 0.599
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 352,
+            "totalR": -174.977,
+            "avgR": -0.497,
+            "winRate": 35.2,
+            "pf": 0.429
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 306,
+            "totalR": -141.568,
+            "avgR": -0.463,
+            "winRate": 35,
+            "pf": 0.448
+          },
+          {
+            "key": "HOT",
+            "samples": 115,
+            "totalR": 6.076,
+            "avgR": 0.053,
+            "winRate": 52.2,
+            "pf": 1.092
+          },
+          {
+            "key": "COLD",
+            "samples": 91,
+            "totalR": -52.43,
+            "avgR": -0.576,
+            "winRate": 27.5,
+            "pf": 0.359
+          },
+          {
+            "key": "EXTREME",
+            "samples": 74,
+            "totalR": 3.604,
+            "avgR": 0.049,
+            "winRate": 51.4,
+            "pf": 1.082
+          },
+          {
+            "key": "WEAK",
+            "samples": 1,
+            "totalR": -1.359,
+            "avgR": -1.359,
+            "winRate": 0,
+            "pf": 0
+          }
+        ],
+        "rsi4h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 2855,
+            "totalR": -1038.122,
+            "avgR": -0.364,
+            "winRate": 39.4,
+            "pf": 0.541
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 547,
+            "totalR": -211.677,
+            "avgR": -0.387,
+            "winRate": 40.6,
+            "pf": 0.521
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 444,
+            "totalR": -136.576,
+            "avgR": -0.308,
+            "winRate": 41,
+            "pf": 0.6
+          },
+          {
+            "key": "WEAK",
+            "samples": 194,
+            "totalR": -69.76,
+            "avgR": -0.36,
+            "winRate": 39.2,
+            "pf": 0.551
+          },
+          {
+            "key": "EXTREME",
+            "samples": 143,
+            "totalR": 76.534,
+            "avgR": 0.535,
+            "winRate": 69.9,
+            "pf": 2.555
+          },
+          {
+            "key": "HOT",
+            "samples": 81,
+            "totalR": 0.231,
+            "avgR": 0.003,
+            "winRate": 49.4,
+            "pf": 1.005
+          },
+          {
+            "key": "COLD",
+            "samples": 56,
+            "totalR": -20.338,
+            "avgR": -0.363,
+            "winRate": 35.7,
+            "pf": 0.544
+          }
+        ],
+        "adx15": [
+          {
+            "key": "18-24",
+            "samples": 1238,
+            "totalR": -394.978,
+            "avgR": -0.319,
+            "winRate": 41.2,
+            "pf": 0.587
+          },
+          {
+            "key": "<18",
+            "samples": 1203,
+            "totalR": -460.072,
+            "avgR": -0.382,
+            "winRate": 39.5,
+            "pf": 0.526
+          },
+          {
+            "key": "25-34",
+            "samples": 1130,
+            "totalR": -290.706,
+            "avgR": -0.257,
+            "winRate": 43.2,
+            "pf": 0.652
+          },
+          {
+            "key": ">=35",
+            "samples": 749,
+            "totalR": -253.952,
+            "avgR": -0.339,
+            "winRate": 39,
+            "pf": 0.565
+          }
+        ],
+        "adx1h": [
+          {
+            "key": "18-24",
+            "samples": 1273,
+            "totalR": -374.643,
+            "avgR": -0.294,
+            "winRate": 42.7,
+            "pf": 0.61
+          },
+          {
+            "key": "<18",
+            "samples": 1158,
+            "totalR": -438.519,
+            "avgR": -0.379,
+            "winRate": 39.7,
+            "pf": 0.532
+          },
+          {
+            "key": "25-34",
+            "samples": 1141,
+            "totalR": -441.94,
+            "avgR": -0.387,
+            "winRate": 38.1,
+            "pf": 0.517
+          },
+          {
+            "key": ">=35",
+            "samples": 748,
+            "totalR": -144.606,
+            "avgR": -0.193,
+            "winRate": 43.7,
+            "pf": 0.728
+          }
+        ],
+        "adx4h": [
+          {
+            "key": "18-24",
+            "samples": 1421,
+            "totalR": -543.008,
+            "avgR": -0.382,
+            "winRate": 39.7,
+            "pf": 0.527
+          },
+          {
+            "key": "<18",
+            "samples": 1211,
+            "totalR": -398.226,
+            "avgR": -0.329,
+            "winRate": 41.7,
+            "pf": 0.575
+          },
+          {
+            "key": "25-34",
+            "samples": 947,
+            "totalR": -373.701,
+            "avgR": -0.395,
+            "winRate": 38.2,
+            "pf": 0.516
+          },
+          {
+            "key": ">=35",
+            "samples": 741,
+            "totalR": -84.773,
+            "avgR": -0.114,
+            "winRate": 45.1,
+            "pf": 0.827
+          }
+        ],
+        "volume15": [
+          {
+            "key": "<0.65",
+            "samples": 1902,
+            "totalR": -674.282,
+            "avgR": -0.355,
+            "winRate": 39.3,
+            "pf": 0.552
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 1092,
+            "totalR": -338.927,
+            "avgR": -0.31,
+            "winRate": 41.4,
+            "pf": 0.594
+          },
+          {
+            "key": ">=1.50",
+            "samples": 639,
+            "totalR": -150.79,
+            "avgR": -0.236,
+            "winRate": 44.6,
+            "pf": 0.673
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 416,
+            "totalR": -164.746,
+            "avgR": -0.396,
+            "winRate": 38.5,
+            "pf": 0.519
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 271,
+            "totalR": -70.963,
+            "avgR": -0.262,
+            "winRate": 44.3,
+            "pf": 0.649
+          }
+        ],
+        "volume1h": [
+          {
+            "key": "<0.65",
+            "samples": 1692,
+            "totalR": -598.423,
+            "avgR": -0.354,
+            "winRate": 40.6,
+            "pf": 0.555
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 1168,
+            "totalR": -341.322,
+            "avgR": -0.292,
+            "winRate": 42.6,
+            "pf": 0.612
+          },
+          {
+            "key": ">=1.50",
+            "samples": 663,
+            "totalR": -199.819,
+            "avgR": -0.301,
+            "winRate": 39.5,
+            "pf": 0.6
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 455,
+            "totalR": -143.78,
+            "avgR": -0.316,
+            "winRate": 40.4,
+            "pf": 0.591
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 342,
+            "totalR": -116.365,
+            "avgR": -0.34,
+            "winRate": 39.5,
+            "pf": 0.568
+          }
+        ],
+        "macd15": [
+          {
+            "key": "ALIGNED",
+            "samples": 2484,
+            "totalR": -905.694,
+            "avgR": -0.365,
+            "winRate": 39.1,
+            "pf": 0.54
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 1836,
+            "totalR": -494.014,
+            "avgR": -0.269,
+            "winRate": 43.2,
+            "pf": 0.641
+          }
+        ],
+        "macd1h": [
+          {
+            "key": "ALIGNED",
+            "samples": 3084,
+            "totalR": -856.017,
+            "avgR": -0.278,
+            "winRate": 42.4,
+            "pf": 0.629
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 1236,
+            "totalR": -543.691,
+            "avgR": -0.44,
+            "winRate": 37,
+            "pf": 0.476
+          }
+        ],
+        "macd4h": [
+          {
+            "key": "ALIGNED",
+            "samples": 3066,
+            "totalR": -947.868,
+            "avgR": -0.309,
+            "winRate": 41.2,
+            "pf": 0.597
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 1254,
+            "totalR": -451.84,
+            "avgR": -0.36,
+            "winRate": 40.1,
+            "pf": 0.544
+          }
+        ],
+        "distance": [
+          {
+            "key": ">1.50",
+            "samples": 914,
+            "totalR": -251.422,
+            "avgR": -0.275,
+            "winRate": 41.7,
+            "pf": 0.633
+          },
+          {
+            "key": "1.00-1.50",
+            "samples": 756,
+            "totalR": -273.967,
+            "avgR": -0.362,
+            "winRate": 39.6,
+            "pf": 0.541
+          },
+          {
+            "key": "0.25-0.50",
+            "samples": 735,
+            "totalR": -236.637,
+            "avgR": -0.322,
+            "winRate": 41.1,
+            "pf": 0.583
+          },
+          {
+            "key": "<=0.25",
+            "samples": 708,
+            "totalR": -227.243,
+            "avgR": -0.321,
+            "winRate": 41.2,
+            "pf": 0.586
+          },
+          {
+            "key": "0.50-0.75",
+            "samples": 679,
+            "totalR": -222.286,
+            "avgR": -0.327,
+            "winRate": 41.2,
+            "pf": 0.578
+          },
+          {
+            "key": "0.75-1.00",
+            "samples": 528,
+            "totalR": -188.153,
+            "avgR": -0.356,
+            "winRate": 40,
+            "pf": 0.553
+          }
+        ],
+        "asset": [
+          {
+            "key": "BTCUSDT",
+            "samples": 360,
+            "totalR": -206.855,
+            "avgR": -0.575,
+            "winRate": 40.6,
+            "pf": 0.391
+          },
+          {
+            "key": "ETHUSDT",
+            "samples": 360,
+            "totalR": -124.761,
+            "avgR": -0.347,
+            "winRate": 44.2,
+            "pf": 0.562
+          },
+          {
+            "key": "SOLUSDT",
+            "samples": 360,
+            "totalR": -114.658,
+            "avgR": -0.318,
+            "winRate": 42.8,
+            "pf": 0.587
+          },
+          {
+            "key": "XRPUSDT",
+            "samples": 360,
+            "totalR": -140.809,
+            "avgR": -0.391,
+            "winRate": 40.8,
+            "pf": 0.517
+          },
+          {
+            "key": "ADAUSDT",
+            "samples": 360,
+            "totalR": -82.089,
+            "avgR": -0.228,
+            "winRate": 41.1,
+            "pf": 0.681
+          },
+          {
+            "key": "SUIUSDT",
+            "samples": 360,
+            "totalR": -130.595,
+            "avgR": -0.363,
+            "winRate": 38.3,
+            "pf": 0.543
+          },
+          {
+            "key": "HBARUSDT",
+            "samples": 360,
+            "totalR": -123.801,
+            "avgR": -0.344,
+            "winRate": 41.7,
+            "pf": 0.564
+          },
+          {
+            "key": "AVAXUSDT",
+            "samples": 360,
+            "totalR": -135.92,
+            "avgR": -0.378,
+            "winRate": 37.8,
+            "pf": 0.528
+          },
+          {
+            "key": "NEARUSDT",
+            "samples": 360,
+            "totalR": -102.447,
+            "avgR": -0.285,
+            "winRate": 38.3,
+            "pf": 0.619
+          },
+          {
+            "key": "DOTUSDT",
+            "samples": 360,
+            "totalR": -72.286,
+            "avgR": -0.201,
+            "winRate": 43.6,
+            "pf": 0.714
+          },
+          {
+            "key": "FETUSDT",
+            "samples": 360,
+            "totalR": -105.231,
+            "avgR": -0.292,
+            "winRate": 38.3,
+            "pf": 0.61
+          },
+          {
+            "key": "INJUSDT",
+            "samples": 360,
+            "totalR": -60.256,
+            "avgR": -0.167,
+            "winRate": 42.8,
+            "pf": 0.755
+          }
+        ]
+      }
+    },
+    {
+      "days": 90,
+      "total": {
+        "key": "ALL",
+        "samples": 6480,
+        "totalR": -1835.923,
+        "avgR": -0.283,
+        "winRate": 41.1,
+        "pf": 0.622
+      },
+      "features": {
+        "sideRegime": [
+          {
+            "key": "SHORT|BEAR",
+            "samples": 1469,
+            "totalR": -449.502,
+            "avgR": -0.306,
+            "winRate": 39.7,
+            "pf": 0.599
+          },
+          {
+            "key": "LONG|BULL",
+            "samples": 995,
+            "totalR": -172.019,
+            "avgR": -0.173,
+            "winRate": 44.6,
+            "pf": 0.751
+          },
+          {
+            "key": "SHORT|RANGE",
+            "samples": 886,
+            "totalR": -245.922,
+            "avgR": -0.278,
+            "winRate": 42.4,
+            "pf": 0.627
+          },
+          {
+            "key": "LONG|RANGE",
+            "samples": 762,
+            "totalR": -248.649,
+            "avgR": -0.326,
+            "winRate": 40.7,
+            "pf": 0.575
+          },
+          {
+            "key": "LONG|TRANSITION",
+            "samples": 750,
+            "totalR": -218.177,
+            "avgR": -0.291,
+            "winRate": 40.4,
+            "pf": 0.613
+          },
+          {
+            "key": "SHORT|TRANSITION",
+            "samples": 708,
+            "totalR": -164.416,
+            "avgR": -0.232,
+            "winRate": 42.8,
+            "pf": 0.677
+          },
+          {
+            "key": "LONG|BEAR",
+            "samples": 516,
+            "totalR": -237.048,
+            "avgR": -0.459,
+            "winRate": 34.7,
+            "pf": 0.457
+          },
+          {
+            "key": "SHORT|BULL",
+            "samples": 394,
+            "totalR": -100.191,
+            "avgR": -0.254,
+            "winRate": 41.9,
+            "pf": 0.654
+          }
+        ],
+        "status": [
+          {
+            "key": "WAIT_ENTRY_ZONE",
+            "samples": 2483,
+            "totalR": -702.636,
+            "avgR": -0.283,
+            "winRate": 40.3,
+            "pf": 0.621
+          },
+          {
+            "key": "NO_SETUP",
+            "samples": 2313,
+            "totalR": -738.334,
+            "avgR": -0.319,
+            "winRate": 40.7,
+            "pf": 0.586
+          },
+          {
+            "key": "READY",
+            "samples": 1684,
+            "totalR": -394.952,
+            "avgR": -0.235,
+            "winRate": 42.9,
+            "pf": 0.675
+          }
+        ],
+        "emaStructure": [
+          {
+            "key": "3/3",
+            "samples": 2710,
+            "totalR": -618.028,
+            "avgR": -0.228,
+            "winRate": 43,
+            "pf": 0.684
+          },
+          {
+            "key": "2/3",
+            "samples": 2423,
+            "totalR": -746.922,
+            "avgR": -0.308,
+            "winRate": 40.3,
+            "pf": 0.594
+          },
+          {
+            "key": "1/3",
+            "samples": 1291,
+            "totalR": -450.672,
+            "avgR": -0.349,
+            "winRate": 38.7,
+            "pf": 0.555
+          },
+          {
+            "key": "0/3",
+            "samples": 56,
+            "totalR": -20.3,
+            "avgR": -0.363,
+            "winRate": 37.5,
+            "pf": 0.544
+          }
+        ],
+        "priceEmaAlignment": [
+          {
+            "key": "3/3",
+            "samples": 3854,
+            "totalR": -1120.951,
+            "avgR": -0.291,
+            "winRate": 40.4,
+            "pf": 0.613
+          },
+          {
+            "key": "2/3",
+            "samples": 2355,
+            "totalR": -632.996,
+            "avgR": -0.269,
+            "winRate": 42.3,
+            "pf": 0.639
+          },
+          {
+            "key": "1/3",
+            "samples": 268,
+            "totalR": -80.664,
+            "avgR": -0.301,
+            "winRate": 40.7,
+            "pf": 0.603
+          },
+          {
+            "key": "0/3",
+            "samples": 3,
+            "totalR": -1.312,
+            "avgR": -0.437,
+            "winRate": 33.3,
+            "pf": 0.452
+          }
+        ],
+        "macdAlignment": [
+          {
+            "key": "2/3",
+            "samples": 3419,
+            "totalR": -1043.815,
+            "avgR": -0.305,
+            "winRate": 40.2,
+            "pf": 0.598
+          },
+          {
+            "key": "3/3",
+            "samples": 1596,
+            "totalR": -418.025,
+            "avgR": -0.262,
+            "winRate": 41,
+            "pf": 0.644
+          },
+          {
+            "key": "1/3",
+            "samples": 1429,
+            "totalR": -350.925,
+            "avgR": -0.246,
+            "winRate": 43.7,
+            "pf": 0.665
+          },
+          {
+            "key": "0/3",
+            "samples": 36,
+            "totalR": -23.158,
+            "avgR": -0.643,
+            "winRate": 30.6,
+            "pf": 0.338
+          }
+        ],
+        "rsi15": [
+          {
+            "key": "FAVORABLE",
+            "samples": 4426,
+            "totalR": -1367.619,
+            "avgR": -0.309,
+            "winRate": 40,
+            "pf": 0.594
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 843,
+            "totalR": -187.287,
+            "avgR": -0.222,
+            "winRate": 44.5,
+            "pf": 0.693
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 705,
+            "totalR": -155.469,
+            "avgR": -0.221,
+            "winRate": 43.8,
+            "pf": 0.694
+          },
+          {
+            "key": "WEAK",
+            "samples": 187,
+            "totalR": -39.167,
+            "avgR": -0.209,
+            "winRate": 43.3,
+            "pf": 0.705
+          },
+          {
+            "key": "HOT",
+            "samples": 112,
+            "totalR": -11.283,
+            "avgR": -0.101,
+            "winRate": 47.3,
+            "pf": 0.847
+          },
+          {
+            "key": "COLD",
+            "samples": 107,
+            "totalR": -49.107,
+            "avgR": -0.459,
+            "winRate": 31.8,
+            "pf": 0.448
+          },
+          {
+            "key": "EXTREME",
+            "samples": 100,
+            "totalR": -25.99,
+            "avgR": -0.26,
+            "winRate": 39,
+            "pf": 0.642
+          }
+        ],
+        "rsi1h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 5130,
+            "totalR": -1399.226,
+            "avgR": -0.273,
+            "winRate": 41.6,
+            "pf": 0.633
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 541,
+            "totalR": -197.731,
+            "avgR": -0.365,
+            "winRate": 39,
+            "pf": 0.541
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 428,
+            "totalR": -168.848,
+            "avgR": -0.395,
+            "winRate": 36.7,
+            "pf": 0.507
+          },
+          {
+            "key": "HOT",
+            "samples": 149,
+            "totalR": 2.621,
+            "avgR": 0.018,
+            "winRate": 50.3,
+            "pf": 1.03
+          },
+          {
+            "key": "COLD",
+            "samples": 132,
+            "totalR": -65.521,
+            "avgR": -0.496,
+            "winRate": 29.5,
+            "pf": 0.417
+          },
+          {
+            "key": "EXTREME",
+            "samples": 99,
+            "totalR": -5.858,
+            "avgR": -0.059,
+            "winRate": 46.5,
+            "pf": 0.907
+          },
+          {
+            "key": "WEAK",
+            "samples": 1,
+            "totalR": -1.359,
+            "avgR": -1.359,
+            "winRate": 0,
+            "pf": 0
+          }
+        ],
+        "rsi4h": [
+          {
+            "key": "FAVORABLE",
+            "samples": 4235,
+            "totalR": -1216.879,
+            "avgR": -0.287,
+            "winRate": 41.2,
+            "pf": 0.617
+          },
+          {
+            "key": "NEUTRAL_LOW",
+            "samples": 883,
+            "totalR": -388.095,
+            "avgR": -0.44,
+            "winRate": 35.9,
+            "pf": 0.47
+          },
+          {
+            "key": "NEUTRAL_HIGH",
+            "samples": 633,
+            "totalR": -174.135,
+            "avgR": -0.275,
+            "winRate": 41.5,
+            "pf": 0.632
+          },
+          {
+            "key": "WEAK",
+            "samples": 288,
+            "totalR": -83.108,
+            "avgR": -0.289,
+            "winRate": 40.6,
+            "pf": 0.619
+          },
+          {
+            "key": "EXTREME",
+            "samples": 206,
+            "totalR": 62.238,
+            "avgR": 0.302,
+            "winRate": 59.7,
+            "pf": 1.665
+          },
+          {
+            "key": "COLD",
+            "samples": 131,
+            "totalR": -44.473,
+            "avgR": -0.339,
+            "winRate": 34.4,
+            "pf": 0.559
+          },
+          {
+            "key": "HOT",
+            "samples": 104,
+            "totalR": 8.529,
+            "avgR": 0.082,
+            "winRate": 52.9,
+            "pf": 1.145
+          }
+        ],
+        "adx15": [
+          {
+            "key": "18-24",
+            "samples": 1878,
+            "totalR": -498.113,
+            "avgR": -0.265,
+            "winRate": 41.9,
+            "pf": 0.641
+          },
+          {
+            "key": "<18",
+            "samples": 1849,
+            "totalR": -590.192,
+            "avgR": -0.319,
+            "winRate": 40.5,
+            "pf": 0.585
+          },
+          {
+            "key": "25-34",
+            "samples": 1705,
+            "totalR": -440.158,
+            "avgR": -0.258,
+            "winRate": 41.7,
+            "pf": 0.648
+          },
+          {
+            "key": ">=35",
+            "samples": 1048,
+            "totalR": -307.459,
+            "avgR": -0.293,
+            "winRate": 39.9,
+            "pf": 0.611
+          }
+        ],
+        "adx1h": [
+          {
+            "key": "18-24",
+            "samples": 1901,
+            "totalR": -554.677,
+            "avgR": -0.292,
+            "winRate": 41.2,
+            "pf": 0.611
+          },
+          {
+            "key": "<18",
+            "samples": 1722,
+            "totalR": -537.886,
+            "avgR": -0.312,
+            "winRate": 40.9,
+            "pf": 0.594
+          },
+          {
+            "key": "25-34",
+            "samples": 1709,
+            "totalR": -568.505,
+            "avgR": -0.333,
+            "winRate": 39,
+            "pf": 0.569
+          },
+          {
+            "key": ">=35",
+            "samples": 1148,
+            "totalR": -174.855,
+            "avgR": -0.152,
+            "winRate": 44.3,
+            "pf": 0.777
+          }
+        ],
+        "adx4h": [
+          {
+            "key": "18-24",
+            "samples": 1985,
+            "totalR": -665.697,
+            "avgR": -0.335,
+            "winRate": 40.2,
+            "pf": 0.57
+          },
+          {
+            "key": "<18",
+            "samples": 1648,
+            "totalR": -494.571,
+            "avgR": -0.3,
+            "winRate": 41.6,
+            "pf": 0.603
+          },
+          {
+            "key": "25-34",
+            "samples": 1517,
+            "totalR": -488.736,
+            "avgR": -0.322,
+            "winRate": 39.4,
+            "pf": 0.583
+          },
+          {
+            "key": ">=35",
+            "samples": 1330,
+            "totalR": -186.92,
+            "avgR": -0.141,
+            "winRate": 43.7,
+            "pf": 0.79
+          }
+        ],
+        "volume15": [
+          {
+            "key": "<0.65",
+            "samples": 2751,
+            "totalR": -870.04,
+            "avgR": -0.316,
+            "winRate": 39.7,
+            "pf": 0.587
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 1655,
+            "totalR": -463.068,
+            "avgR": -0.28,
+            "winRate": 41.2,
+            "pf": 0.625
+          },
+          {
+            "key": ">=1.50",
+            "samples": 1009,
+            "totalR": -243.931,
+            "avgR": -0.242,
+            "winRate": 42.7,
+            "pf": 0.665
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 637,
+            "totalR": -182.338,
+            "avgR": -0.286,
+            "winRate": 41.3,
+            "pf": 0.624
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 428,
+            "totalR": -76.547,
+            "avgR": -0.179,
+            "winRate": 45.8,
+            "pf": 0.743
+          }
+        ],
+        "volume1h": [
+          {
+            "key": "<0.65",
+            "samples": 2500,
+            "totalR": -717.119,
+            "avgR": -0.287,
+            "winRate": 41.9,
+            "pf": 0.621
+          },
+          {
+            "key": "0.65-0.99",
+            "samples": 1757,
+            "totalR": -439.811,
+            "avgR": -0.25,
+            "winRate": 42.7,
+            "pf": 0.657
+          },
+          {
+            "key": ">=1.50",
+            "samples": 1017,
+            "totalR": -253.746,
+            "avgR": -0.25,
+            "winRate": 40.4,
+            "pf": 0.655
+          },
+          {
+            "key": "1.15-1.49",
+            "samples": 714,
+            "totalR": -235.506,
+            "avgR": -0.33,
+            "winRate": 38.4,
+            "pf": 0.574
+          },
+          {
+            "key": "1.00-1.14",
+            "samples": 492,
+            "totalR": -189.742,
+            "avgR": -0.386,
+            "winRate": 36.4,
+            "pf": 0.52
+          }
+        ],
+        "macd15": [
+          {
+            "key": "ALIGNED",
+            "samples": 3810,
+            "totalR": -1275.174,
+            "avgR": -0.335,
+            "winRate": 38.8,
+            "pf": 0.568
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 2670,
+            "totalR": -560.749,
+            "avgR": -0.21,
+            "winRate": 44.3,
+            "pf": 0.706
+          }
+        ],
+        "macd1h": [
+          {
+            "key": "ALIGNED",
+            "samples": 4587,
+            "totalR": -1171.464,
+            "avgR": -0.255,
+            "winRate": 42,
+            "pf": 0.652
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 1893,
+            "totalR": -664.459,
+            "avgR": -0.351,
+            "winRate": 38.9,
+            "pf": 0.555
+          }
+        ],
+        "macd4h": [
+          {
+            "key": "ALIGNED",
+            "samples": 4658,
+            "totalR": -1245.992,
+            "avgR": -0.267,
+            "winRate": 41.4,
+            "pf": 0.639
+          },
+          {
+            "key": "OPPOSED",
+            "samples": 1822,
+            "totalR": -589.931,
+            "avgR": -0.324,
+            "winRate": 40.3,
+            "pf": 0.578
+          }
+        ],
+        "distance": [
+          {
+            "key": ">1.50",
+            "samples": 1364,
+            "totalR": -381.802,
+            "avgR": -0.28,
+            "winRate": 40.2,
+            "pf": 0.625
+          },
+          {
+            "key": "1.00-1.50",
+            "samples": 1173,
+            "totalR": -409.719,
+            "avgR": -0.349,
+            "winRate": 38.4,
+            "pf": 0.552
+          },
+          {
+            "key": "0.25-0.50",
+            "samples": 1091,
+            "totalR": -310.309,
+            "avgR": -0.284,
+            "winRate": 41.3,
+            "pf": 0.621
+          },
+          {
+            "key": "<=0.25",
+            "samples": 1073,
+            "totalR": -255.35,
+            "avgR": -0.238,
+            "winRate": 43.2,
+            "pf": 0.673
+          },
+          {
+            "key": "0.50-0.75",
+            "samples": 965,
+            "totalR": -283.166,
+            "avgR": -0.293,
+            "winRate": 41.2,
+            "pf": 0.611
+          },
+          {
+            "key": "0.75-1.00",
+            "samples": 814,
+            "totalR": -195.578,
+            "avgR": -0.24,
+            "winRate": 43.1,
+            "pf": 0.672
+          }
+        ],
+        "asset": [
+          {
+            "key": "BTCUSDT",
+            "samples": 540,
+            "totalR": -265.013,
+            "avgR": -0.491,
+            "winRate": 41.3,
+            "pf": 0.446
+          },
+          {
+            "key": "ETHUSDT",
+            "samples": 540,
+            "totalR": -151.35,
+            "avgR": -0.28,
+            "winRate": 45,
+            "pf": 0.627
+          },
+          {
+            "key": "SOLUSDT",
+            "samples": 540,
+            "totalR": -142.689,
+            "avgR": -0.264,
+            "winRate": 43,
+            "pf": 0.643
+          },
+          {
+            "key": "XRPUSDT",
+            "samples": 540,
+            "totalR": -168.693,
+            "avgR": -0.312,
+            "winRate": 42.4,
+            "pf": 0.592
+          },
+          {
+            "key": "ADAUSDT",
+            "samples": 540,
+            "totalR": -102.761,
+            "avgR": -0.19,
+            "winRate": 42,
+            "pf": 0.726
+          },
+          {
+            "key": "SUIUSDT",
+            "samples": 540,
+            "totalR": -174.833,
+            "avgR": -0.324,
+            "winRate": 38.5,
+            "pf": 0.579
+          },
+          {
+            "key": "HBARUSDT",
+            "samples": 540,
+            "totalR": -177.271,
+            "avgR": -0.328,
+            "winRate": 40.9,
+            "pf": 0.577
+          },
+          {
+            "key": "AVAXUSDT",
+            "samples": 540,
+            "totalR": -164.704,
+            "avgR": -0.305,
+            "winRate": 39.4,
+            "pf": 0.598
+          },
+          {
+            "key": "NEARUSDT",
+            "samples": 540,
+            "totalR": -139.976,
+            "avgR": -0.259,
+            "winRate": 38.1,
+            "pf": 0.645
+          },
+          {
+            "key": "DOTUSDT",
+            "samples": 540,
+            "totalR": -120.692,
+            "avgR": -0.224,
+            "winRate": 41.9,
+            "pf": 0.686
+          },
+          {
+            "key": "FETUSDT",
+            "samples": 540,
+            "totalR": -131.429,
+            "avgR": -0.243,
+            "winRate": 39.3,
+            "pf": 0.663
+          },
+          {
+            "key": "INJUSDT",
+            "samples": 540,
+            "totalR": -96.512,
+            "avgR": -0.179,
+            "winRate": 41.3,
+            "pf": 0.74
+          }
+        ]
+      }
+    }
+  ],
+  "robustness": [
+    {
+      "feature": "rsi4h",
+      "bucket": "EXTREME",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 3,
+      "meanAvgR": 0.503,
+      "minSamples": 127
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "HOT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 3,
+      "meanAvgR": 0.152,
+      "minSamples": 71
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "HOT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 3,
+      "meanAvgR": 0.102,
+      "minSamples": 59
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "EXTREME",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 2,
+      "meanAvgR": 0.098,
+      "minSamples": 43
+    },
+    {
+      "feature": "adx1h",
+      "bucket": ">=35",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 1,
+      "meanAvgR": -0.114,
+      "minSamples": 413
+    },
+    {
+      "feature": "priceEmaAlignment",
+      "bucket": "0/3",
+      "windows": 2,
+      "adequateWindows": 0,
+      "positiveWindows": 0,
+      "meanAvgR": 0,
+      "minSamples": 0
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "WEAK",
+      "windows": 2,
+      "adequateWindows": 0,
+      "positiveWindows": 0,
+      "meanAvgR": 0,
+      "minSamples": 0
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "HOT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.058,
+      "minSamples": 43
+    },
+    {
+      "feature": "adx4h",
+      "bucket": ">=35",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.116,
+      "minSamples": 596
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "LONG|BULL",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.148,
+      "minSamples": 471
+    },
+    {
+      "feature": "asset",
+      "bucket": "INJUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.154,
+      "minSamples": 180
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "EXTREME",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.195,
+      "minSamples": 31
+    },
+    {
+      "feature": "asset",
+      "bucket": "DOTUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.22,
+      "minSamples": 180
+    },
+    {
+      "feature": "asset",
+      "bucket": "ADAUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.228,
+      "minSamples": 180
+    },
+    {
+      "feature": "volume15",
+      "bucket": ">=1.50",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.242,
+      "minSamples": 305
+    },
+    {
+      "feature": "emaStructure",
+      "bucket": "3/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.245,
+      "minSamples": 934
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "NEUTRAL_LOW",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.245,
+      "minSamples": 241
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "WEAK",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.246,
+      "minSamples": 61
+    },
+    {
+      "feature": "macd15",
+      "bucket": "OPPOSED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.257,
+      "minSamples": 902
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "SHORT|TRANSITION",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.261,
+      "minSamples": 247
+    },
+    {
+      "feature": "asset",
+      "bucket": "NEARUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.262,
+      "minSamples": 180
+    },
+    {
+      "feature": "status",
+      "bucket": "READY",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.265,
+      "minSamples": 549
+    },
+    {
+      "feature": "asset",
+      "bucket": "FETUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.272,
+      "minSamples": 180
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "SHORT|BULL",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.276,
+      "minSamples": 184
+    },
+    {
+      "feature": "adx15",
+      "bucket": "25-34",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.276,
+      "minSamples": 575
+    },
+    {
+      "feature": "macd1h",
+      "bucket": "ALIGNED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.28,
+      "minSamples": 1573
+    },
+    {
+      "feature": "volume15",
+      "bucket": "1.00-1.14",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.281,
+      "minSamples": 133
+    },
+    {
+      "feature": "volume1h",
+      "bucket": ">=1.50",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.283,
+      "minSamples": 314
+    },
+    {
+      "feature": "volume15",
+      "bucket": "0.65-0.99",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.284,
+      "minSamples": 547
+    },
+    {
+      "feature": "distance",
+      "bucket": ">1.50",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.285,
+      "minSamples": 463
+    },
+    {
+      "feature": "macdAlignment",
+      "bucket": "3/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.291,
+      "minSamples": 559
+    },
+    {
+      "feature": "status",
+      "bucket": "WAIT_ENTRY_ZONE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.293,
+      "minSamples": 820
+    },
+    {
+      "feature": "distance",
+      "bucket": "<=0.25",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.294,
+      "minSamples": 348
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "LONG|TRANSITION",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.295,
+      "minSamples": 180
+    },
+    {
+      "feature": "volume1h",
+      "bucket": "0.65-0.99",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.302,
+      "minSamples": 585
+    },
+    {
+      "feature": "macdAlignment",
+      "bucket": "1/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.304,
+      "minSamples": 502
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "SHORT|RANGE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.305,
+      "minSamples": 348
+    },
+    {
+      "feature": "adx1h",
+      "bucket": "18-24",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.305,
+      "minSamples": 608
+    },
+    {
+      "feature": "macd4h",
+      "bucket": "ALIGNED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.305,
+      "minSamples": 1510
+    },
+    {
+      "feature": "priceEmaAlignment",
+      "bucket": "3/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.306,
+      "minSamples": 1276
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "FAVORABLE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.306,
+      "minSamples": 1673
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "NEUTRAL_HIGH",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.31,
+      "minSamples": 261
+    },
+    {
+      "feature": "distance",
+      "bucket": "0.75-1.00",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.31,
+      "minSamples": 291
+    },
+    {
+      "feature": "adx15",
+      "bucket": "18-24",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.311,
+      "minSamples": 628
+    },
+    {
+      "feature": "adx15",
+      "bucket": ">=35",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.313,
+      "minSamples": 356
+    },
+    {
+      "feature": "priceEmaAlignment",
+      "bucket": "2/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.317,
+      "minSamples": 785
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "NEUTRAL_HIGH",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.317,
+      "minSamples": 219
+    },
+    {
+      "feature": "volume1h",
+      "bucket": "1.15-1.49",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.321,
+      "minSamples": 246
+    },
+    {
+      "feature": "distance",
+      "bucket": "0.50-0.75",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.321,
+      "minSamples": 334
+    },
+    {
+      "feature": "distance",
+      "bucket": "0.25-0.50",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.326,
+      "minSamples": 352
+    },
+    {
+      "feature": "volume1h",
+      "bucket": "<0.65",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.327,
+      "minSamples": 834
+    },
+    {
+      "feature": "macdAlignment",
+      "bucket": "2/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.328,
+      "minSamples": 1081
+    },
+    {
+      "feature": "asset",
+      "bucket": "SOLUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.332,
+      "minSamples": 180
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "FAVORABLE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.334,
+      "minSamples": 1494
+    },
+    {
+      "feature": "asset",
+      "bucket": "AVAXUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.337,
+      "minSamples": 180
+    },
+    {
+      "feature": "asset",
+      "bucket": "SUIUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.34,
+      "minSamples": 180
+    },
+    {
+      "feature": "macd4h",
+      "bucket": "OPPOSED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.341,
+      "minSamples": 650
+    },
+    {
+      "feature": "emaStructure",
+      "bucket": "0/3",
+      "windows": 3,
+      "adequateWindows": 2,
+      "positiveWindows": 0,
+      "meanAvgR": -0.343,
+      "minSamples": 37
+    },
+    {
+      "feature": "adx4h",
+      "bucket": "<18",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.344,
+      "minSamples": 627
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "FAVORABLE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.349,
+      "minSamples": 1351
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "COLD",
+      "windows": 3,
+      "adequateWindows": 2,
+      "positiveWindows": 0,
+      "meanAvgR": -0.351,
+      "minSamples": 56
+    },
+    {
+      "feature": "volume15",
+      "bucket": "<0.65",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.353,
+      "minSamples": 959
+    },
+    {
+      "feature": "asset",
+      "bucket": "ETHUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.353,
+      "minSamples": 180
+    },
+    {
+      "feature": "asset",
+      "bucket": "XRPUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.355,
+      "minSamples": 180
+    },
+    {
+      "feature": "adx15",
+      "bucket": "<18",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.358,
+      "minSamples": 601
+    },
+    {
+      "feature": "macd15",
+      "bucket": "ALIGNED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.358,
+      "minSamples": 1258
+    },
+    {
+      "feature": "emaStructure",
+      "bucket": "2/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.36,
+      "minSamples": 762
+    },
+    {
+      "feature": "distance",
+      "bucket": "1.00-1.50",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.361,
+      "minSamples": 372
+    },
+    {
+      "feature": "volume1h",
+      "bucket": "1.00-1.14",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.364,
+      "minSamples": 181
+    },
+    {
+      "feature": "asset",
+      "bucket": "HBARUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.364,
+      "minSamples": 180
+    },
+    {
+      "feature": "volume15",
+      "bucket": "1.15-1.49",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.367,
+      "minSamples": 216
+    },
+    {
+      "feature": "status",
+      "bucket": "NO_SETUP",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.375,
+      "minSamples": 791
+    },
+    {
+      "feature": "adx4h",
+      "bucket": "25-34",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.377,
+      "minSamples": 408
+    },
+    {
+      "feature": "emaStructure",
+      "bucket": "1/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.383,
+      "minSamples": 441
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "WEAK",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.383,
+      "minSamples": 115
+    },
+    {
+      "feature": "adx1h",
+      "bucket": "<18",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.387,
+      "minSamples": 610
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "LONG|RANGE",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.392,
+      "minSamples": 279
+    },
+    {
+      "feature": "adx1h",
+      "bucket": "25-34",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.397,
+      "minSamples": 529
+    },
+    {
+      "feature": "adx4h",
+      "bucket": "18-24",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.401,
+      "minSamples": 529
+    },
+    {
+      "feature": "macd1h",
+      "bucket": "OPPOSED",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.405,
+      "minSamples": 587
+    },
+    {
+      "feature": "priceEmaAlignment",
+      "bucket": "1/3",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.425,
+      "minSamples": 99
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "SHORT|BEAR",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.436,
+      "minSamples": 330
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "NEUTRAL_HIGH",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.442,
+      "minSamples": 180
+    },
+    {
+      "feature": "rsi4h",
+      "bucket": "NEUTRAL_LOW",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.455,
+      "minSamples": 270
+    },
+    {
+      "feature": "rsi15",
+      "bucket": "COLD",
+      "windows": 3,
+      "adequateWindows": 2,
+      "positiveWindows": 0,
+      "meanAvgR": -0.499,
+      "minSamples": 75
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "NEUTRAL_LOW",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.509,
+      "minSamples": 155
+    },
+    {
+      "feature": "rsi1h",
+      "bucket": "COLD",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.549,
+      "minSamples": 38
+    },
+    {
+      "feature": "asset",
+      "bucket": "BTCUSDT",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.571,
+      "minSamples": 180
+    },
+    {
+      "feature": "sideRegime",
+      "bucket": "LONG|BEAR",
+      "windows": 3,
+      "adequateWindows": 3,
+      "positiveWindows": 0,
+      "meanAvgR": -0.583,
+      "minSamples": 121
+    },
+    {
+      "feature": "macdAlignment",
+      "bucket": "0/3",
+      "windows": 3,
+      "adequateWindows": 1,
+      "positiveWindows": 0,
+      "meanAvgR": -0.643,
+      "minSamples": 36
+    }
+  ]
+}

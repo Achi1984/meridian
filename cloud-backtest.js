@@ -106,4 +106,4 @@ export async function runCloudBacktest({assets,days=90,end=Date.now(),onProgress
   onProgress({stage:'done',pct:100});return result;
 }
 
-export const __test={makeLedger,markLedger,gate,openPosition,closePosition,processExits,stats,replayPrepared,shadowDecision,challengerDecision,candidate,slip};
+export const __test={makeLedger,markLedger,gate,openPosition,closePosition,processExits,stats,replayPrepared,shadowDecision,challengerDecision,candidate,slip,prepareEvents,fetchKlines};
