@@ -1,0 +1,4457 @@
+{
+  "schemaVersion": "7.58-FEATURE-INTERACTION-V1",
+  "generatedAt": "2026-09-02T13:30:04.035Z",
+  "sampling": "one candidate per symbol per 4h",
+  "outcome": "A_CURRENT normalized R, portfolio gates excluded",
+  "runs": [
+    {
+      "days": 30,
+      "sideRegimeRsi4": [
+        {
+          "key": "SHORT|BEAR|4h:FAVORABLE",
+          "samples": 308,
+          "totalR": -155.236,
+          "avgR": -0.504,
+          "wr": 37,
+          "pf": 0.426
+        },
+        {
+          "key": "SHORT|RANGE|4h:FAVORABLE",
+          "samples": 297,
+          "totalR": -91.797,
+          "avgR": -0.309,
+          "wr": 42.1,
+          "pf": 0.592
+        },
+        {
+          "key": "LONG|BULL|4h:FAVORABLE",
+          "samples": 290,
+          "totalR": -124.912,
+          "avgR": -0.431,
+          "wr": 35.2,
+          "pf": 0.486
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:FAVORABLE",
+          "samples": 171,
+          "totalR": -55.966,
+          "avgR": -0.327,
+          "wr": 39.8,
+          "pf": 0.574
+        },
+        {
+          "key": "LONG|RANGE|4h:FAVORABLE",
+          "samples": 167,
+          "totalR": -76.126,
+          "avgR": -0.456,
+          "wr": 37.7,
+          "pf": 0.458
+        },
+        {
+          "key": "LONG|BULL|4h:EXTREME",
+          "samples": 120,
+          "totalR": 88.654,
+          "avgR": 0.739,
+          "wr": 78.3,
+          "pf": 3.991
+        },
+        {
+          "key": "LONG|RANGE|4h:NEUTRAL_LOW",
+          "samples": 110,
+          "totalR": -59.802,
+          "avgR": -0.544,
+          "wr": 31.8,
+          "pf": 0.391
+        },
+        {
+          "key": "LONG|TRANSITION|4h:FAVORABLE",
+          "samples": 100,
+          "totalR": -31.276,
+          "avgR": -0.313,
+          "wr": 40,
+          "pf": 0.592
+        },
+        {
+          "key": "SHORT|BULL|4h:NEUTRAL_HIGH",
+          "samples": 95,
+          "totalR": -39.083,
+          "avgR": -0.411,
+          "wr": 36.8,
+          "pf": 0.507
+        },
+        {
+          "key": "LONG|BEAR|4h:NEUTRAL_LOW",
+          "samples": 81,
+          "totalR": -57.859,
+          "avgR": -0.714,
+          "wr": 28.4,
+          "pf": 0.28
+        },
+        {
+          "key": "SHORT|BULL|4h:WEAK",
+          "samples": 77,
+          "totalR": -15.466,
+          "avgR": -0.201,
+          "wr": 41.6,
+          "pf": 0.709
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:NEUTRAL_HIGH",
+          "samples": 76,
+          "totalR": -13.588,
+          "avgR": -0.179,
+          "wr": 43.4,
+          "pf": 0.743
+        },
+        {
+          "key": "LONG|TRANSITION|4h:NEUTRAL_LOW",
+          "samples": 70,
+          "totalR": -33.542,
+          "avgR": -0.479,
+          "wr": 41.4,
+          "pf": 0.461
+        },
+        {
+          "key": "LONG|BULL|4h:HOT",
+          "samples": 52,
+          "totalR": 7.017,
+          "avgR": 0.135,
+          "wr": 53.8,
+          "pf": 1.251
+        },
+        {
+          "key": "SHORT|RANGE|4h:NEUTRAL_HIGH",
+          "samples": 48,
+          "totalR": -28.118,
+          "avgR": -0.586,
+          "wr": 33.3,
+          "pf": 0.365
+        },
+        {
+          "key": "LONG|BEAR|4h:WEAK",
+          "samples": 34,
+          "totalR": -44.082,
+          "avgR": -1.297,
+          "wr": 8.8,
+          "pf": 0.072
+        }
+      ],
+      "sideRegimeRsi1": [
+        {
+          "key": "LONG|BULL|1h:FAVORABLE",
+          "samples": 331,
+          "totalR": -25.182,
+          "avgR": -0.076,
+          "wr": 48.9,
+          "pf": 0.885
+        },
+        {
+          "key": "SHORT|RANGE|1h:FAVORABLE",
+          "samples": 278,
+          "totalR": -75.37,
+          "avgR": -0.271,
+          "wr": 43.9,
+          "pf": 0.632
+        },
+        {
+          "key": "SHORT|BEAR|1h:FAVORABLE",
+          "samples": 254,
+          "totalR": -123.64,
+          "avgR": -0.487,
+          "wr": 36.6,
+          "pf": 0.438
+        },
+        {
+          "key": "LONG|RANGE|1h:FAVORABLE",
+          "samples": 232,
+          "totalR": -104.76,
+          "avgR": -0.452,
+          "wr": 37.1,
+          "pf": 0.464
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:FAVORABLE",
+          "samples": 216,
+          "totalR": -49.82,
+          "avgR": -0.231,
+          "wr": 43.1,
+          "pf": 0.682
+        },
+        {
+          "key": "SHORT|BULL|1h:FAVORABLE",
+          "samples": 139,
+          "totalR": -57.264,
+          "avgR": -0.412,
+          "wr": 36,
+          "pf": 0.497
+        },
+        {
+          "key": "LONG|TRANSITION|1h:FAVORABLE",
+          "samples": 128,
+          "totalR": -53.128,
+          "avgR": -0.415,
+          "wr": 39.8,
+          "pf": 0.504
+        },
+        {
+          "key": "LONG|BEAR|1h:FAVORABLE",
+          "samples": 95,
+          "totalR": -75.214,
+          "avgR": -0.792,
+          "wr": 26.3,
+          "pf": 0.25
+        },
+        {
+          "key": "LONG|BULL|1h:NEUTRAL_LOW",
+          "samples": 61,
+          "totalR": -41.482,
+          "avgR": -0.68,
+          "wr": 21.3,
+          "pf": 0.278
+        },
+        {
+          "key": "SHORT|RANGE|1h:NEUTRAL_HIGH",
+          "samples": 59,
+          "totalR": -37.262,
+          "avgR": -0.632,
+          "wr": 30.5,
+          "pf": 0.335
+        },
+        {
+          "key": "SHORT|BEAR|1h:NEUTRAL_HIGH",
+          "samples": 57,
+          "totalR": -37.805,
+          "avgR": -0.663,
+          "wr": 35.1,
+          "pf": 0.321
+        },
+        {
+          "key": "LONG|BULL|1h:HOT",
+          "samples": 47,
+          "totalR": 27.451,
+          "avgR": 0.584,
+          "wr": 72.3,
+          "pf": 2.846
+        },
+        {
+          "key": "SHORT|BULL|1h:NEUTRAL_HIGH",
+          "samples": 43,
+          "totalR": 1.764,
+          "avgR": 0.041,
+          "wr": 51.2,
+          "pf": 1.072
+        },
+        {
+          "key": "LONG|RANGE|1h:NEUTRAL_LOW",
+          "samples": 39,
+          "totalR": -26.321,
+          "avgR": -0.675,
+          "wr": 28.2,
+          "pf": 0.296
+        },
+        {
+          "key": "LONG|BULL|1h:EXTREME",
+          "samples": 32,
+          "totalR": 16.207,
+          "avgR": 0.506,
+          "wr": 68.8,
+          "pf": 2.416
+        },
+        {
+          "key": "LONG|TRANSITION|1h:NEUTRAL_LOW",
+          "samples": 30,
+          "totalR": -9.559,
+          "avgR": -0.319,
+          "wr": 43.3,
+          "pf": 0.6
+        },
+        {
+          "key": "LONG|BEAR|1h:NEUTRAL_LOW",
+          "samples": 25,
+          "totalR": -26.103,
+          "avgR": -1.044,
+          "wr": 16,
+          "pf": 0.129
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:NEUTRAL_HIGH",
+          "samples": 21,
+          "totalR": -10.48,
+          "avgR": -0.499,
+          "wr": 33.3,
+          "pf": 0.378
+        }
+      ],
+      "rsiCombo": [
+        {
+          "key": "FAVORABLE|FAVORABLE",
+          "samples": 1107,
+          "totalR": -394.002,
+          "avgR": -0.356,
+          "wr": 40.4,
+          "pf": 0.551
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_LOW",
+          "samples": 212,
+          "totalR": -103.972,
+          "avgR": -0.49,
+          "wr": 36.8,
+          "pf": 0.439
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_HIGH",
+          "samples": 184,
+          "totalR": -67.866,
+          "avgR": -0.369,
+          "wr": 38,
+          "pf": 0.542
+        },
+        {
+          "key": "NEUTRAL_HIGH|FAVORABLE",
+          "samples": 107,
+          "totalR": -68.963,
+          "avgR": -0.645,
+          "wr": 32.7,
+          "pf": 0.322
+        },
+        {
+          "key": "NEUTRAL_LOW|FAVORABLE",
+          "samples": 77,
+          "totalR": -44.655,
+          "avgR": -0.58,
+          "wr": 27.3,
+          "pf": 0.348
+        },
+        {
+          "key": "FAVORABLE|EXTREME",
+          "samples": 63,
+          "totalR": 45.696,
+          "avgR": 0.725,
+          "wr": 77.8,
+          "pf": 3.828
+        },
+        {
+          "key": "NEUTRAL_LOW|NEUTRAL_LOW",
+          "samples": 58,
+          "totalR": -40.996,
+          "avgR": -0.707,
+          "wr": 27.6,
+          "pf": 0.289
+        },
+        {
+          "key": "FAVORABLE|WEAK",
+          "samples": 57,
+          "totalR": -37.693,
+          "avgR": -0.661,
+          "wr": 28.1,
+          "pf": 0.331
+        },
+        {
+          "key": "FAVORABLE|HOT",
+          "samples": 40,
+          "totalR": 1.17,
+          "avgR": 0.029,
+          "wr": 50,
+          "pf": 1.049
+        },
+        {
+          "key": "NEUTRAL_HIGH|WEAK",
+          "samples": 38,
+          "totalR": -1.897,
+          "avgR": -0.05,
+          "wr": 47.4,
+          "pf": 0.918
+        },
+        {
+          "key": "NEUTRAL_HIGH|NEUTRAL_HIGH",
+          "samples": 35,
+          "totalR": -12.923,
+          "avgR": -0.369,
+          "wr": 40,
+          "pf": 0.542
+        },
+        {
+          "key": "EXTREME|EXTREME",
+          "samples": 32,
+          "totalR": 16.361,
+          "avgR": 0.511,
+          "wr": 68.8,
+          "pf": 2.449
+        },
+        {
+          "key": "HOT|EXTREME",
+          "samples": 31,
+          "totalR": 21.954,
+          "avgR": 0.708,
+          "wr": 77.4,
+          "pf": 3.738
+        },
+        {
+          "key": "COLD|FAVORABLE",
+          "samples": 29,
+          "totalR": -20.456,
+          "avgR": -0.705,
+          "wr": 20.7,
+          "pf": 0.255
+        },
+        {
+          "key": "HOT|FAVORABLE",
+          "samples": 25,
+          "totalR": -4.061,
+          "avgR": -0.162,
+          "wr": 44,
+          "pf": 0.758
+        },
+        {
+          "key": "NEUTRAL_LOW|WEAK",
+          "samples": 20,
+          "totalR": -17.815,
+          "avgR": -0.891,
+          "wr": 20,
+          "pf": 0.207
+        }
+      ],
+      "rsi4Asset": [
+        {
+          "key": "4h:FAVORABLE|NEARUSDT",
+          "samples": 124,
+          "totalR": -29.708,
+          "avgR": -0.24,
+          "wr": 40.3,
+          "pf": 0.669
+        },
+        {
+          "key": "4h:FAVORABLE|HBARUSDT",
+          "samples": 119,
+          "totalR": -63.046,
+          "avgR": -0.53,
+          "wr": 36.1,
+          "pf": 0.402
+        },
+        {
+          "key": "4h:FAVORABLE|AVAXUSDT",
+          "samples": 119,
+          "totalR": -53.769,
+          "avgR": -0.452,
+          "wr": 35.3,
+          "pf": 0.459
+        },
+        {
+          "key": "4h:FAVORABLE|FETUSDT",
+          "samples": 116,
+          "totalR": -47.902,
+          "avgR": -0.413,
+          "wr": 31.9,
+          "pf": 0.485
+        },
+        {
+          "key": "4h:FAVORABLE|ADAUSDT",
+          "samples": 115,
+          "totalR": -23.074,
+          "avgR": -0.201,
+          "wr": 42.6,
+          "pf": 0.71
+        },
+        {
+          "key": "4h:FAVORABLE|BTCUSDT",
+          "samples": 114,
+          "totalR": -80.184,
+          "avgR": -0.703,
+          "wr": 36.8,
+          "pf": 0.32
+        },
+        {
+          "key": "4h:FAVORABLE|SUIUSDT",
+          "samples": 113,
+          "totalR": -33.255,
+          "avgR": -0.294,
+          "wr": 41.6,
+          "pf": 0.607
+        },
+        {
+          "key": "4h:FAVORABLE|DOTUSDT",
+          "samples": 110,
+          "totalR": -39.902,
+          "avgR": -0.363,
+          "wr": 37.3,
+          "pf": 0.533
+        },
+        {
+          "key": "4h:FAVORABLE|SOLUSDT",
+          "samples": 107,
+          "totalR": -56.865,
+          "avgR": -0.531,
+          "wr": 35.5,
+          "pf": 0.401
+        },
+        {
+          "key": "4h:FAVORABLE|ETHUSDT",
+          "samples": 107,
+          "totalR": -64.763,
+          "avgR": -0.605,
+          "wr": 36.4,
+          "pf": 0.355
+        },
+        {
+          "key": "4h:FAVORABLE|INJUSDT",
+          "samples": 105,
+          "totalR": -6.43,
+          "avgR": -0.061,
+          "wr": 47.6,
+          "pf": 0.904
+        },
+        {
+          "key": "4h:FAVORABLE|XRPUSDT",
+          "samples": 102,
+          "totalR": -37.791,
+          "avgR": -0.371,
+          "wr": 42.2,
+          "pf": 0.53
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 42,
+          "totalR": -39.457,
+          "avgR": -0.939,
+          "wr": 21.4,
+          "pf": 0.165
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|DOTUSDT",
+          "samples": 30,
+          "totalR": -9.54,
+          "avgR": -0.318,
+          "wr": 40,
+          "pf": 0.591
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SOLUSDT",
+          "samples": 29,
+          "totalR": -19.948,
+          "avgR": -0.688,
+          "wr": 27.6,
+          "pf": 0.296
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|SUIUSDT",
+          "samples": 27,
+          "totalR": -16.504,
+          "avgR": -0.611,
+          "wr": 29.6,
+          "pf": 0.361
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ETHUSDT",
+          "samples": 26,
+          "totalR": -11.63,
+          "avgR": -0.447,
+          "wr": 46.2,
+          "pf": 0.472
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|NEARUSDT",
+          "samples": 25,
+          "totalR": -9.415,
+          "avgR": -0.377,
+          "wr": 36,
+          "pf": 0.536
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 24,
+          "totalR": -13.385,
+          "avgR": -0.558,
+          "wr": 29.2,
+          "pf": 0.381
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|AVAXUSDT",
+          "samples": 24,
+          "totalR": -11.014,
+          "avgR": -0.459,
+          "wr": 37.5,
+          "pf": 0.455
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ADAUSDT",
+          "samples": 23,
+          "totalR": -10.847,
+          "avgR": -0.472,
+          "wr": 30.4,
+          "pf": 0.437
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|FETUSDT",
+          "samples": 22,
+          "totalR": -4.894,
+          "avgR": -0.222,
+          "wr": 40.9,
+          "pf": 0.685
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|HBARUSDT",
+          "samples": 22,
+          "totalR": -12.155,
+          "avgR": -0.552,
+          "wr": 36.4,
+          "pf": 0.397
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|NEARUSDT",
+          "samples": 21,
+          "totalR": -0.276,
+          "avgR": -0.013,
+          "wr": 47.6,
+          "pf": 0.978
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|AVAXUSDT",
+          "samples": 21,
+          "totalR": -2.474,
+          "avgR": -0.118,
+          "wr": 47.6,
+          "pf": 0.819
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|INJUSDT",
+          "samples": 20,
+          "totalR": -2.364,
+          "avgR": -0.118,
+          "wr": 45,
+          "pf": 0.814
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 18,
+          "totalR": -11.634,
+          "avgR": -0.646,
+          "wr": 33.3,
+          "pf": 0.346
+        },
+        {
+          "key": "4h:WEAK|BTCUSDT",
+          "samples": 18,
+          "totalR": -11.381,
+          "avgR": -0.632,
+          "wr": 44.4,
+          "pf": 0.419
+        },
+        {
+          "key": "4h:EXTREME|SOLUSDT",
+          "samples": 18,
+          "totalR": 12.736,
+          "avgR": 0.708,
+          "wr": 77.8,
+          "pf": 3.81
+        },
+        {
+          "key": "4h:WEAK|INJUSDT",
+          "samples": 17,
+          "totalR": -10.695,
+          "avgR": -0.629,
+          "wr": 23.5,
+          "pf": 0.324
+        },
+        {
+          "key": "4h:EXTREME|BTCUSDT",
+          "samples": 17,
+          "totalR": 10.4,
+          "avgR": 0.612,
+          "wr": 76.5,
+          "pf": 3.03
+        },
+        {
+          "key": "4h:EXTREME|XRPUSDT",
+          "samples": 17,
+          "totalR": 10.003,
+          "avgR": 0.588,
+          "wr": 70.6,
+          "pf": 2.836
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|INJUSDT",
+          "samples": 16,
+          "totalR": -4.945,
+          "avgR": -0.309,
+          "wr": 37.5,
+          "pf": 0.59
+        },
+        {
+          "key": "4h:EXTREME|ETHUSDT",
+          "samples": 16,
+          "totalR": 12.755,
+          "avgR": 0.797,
+          "wr": 81.3,
+          "pf": 4.695
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 15,
+          "totalR": -19.926,
+          "avgR": -1.328,
+          "wr": 20,
+          "pf": 0.104
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|DOTUSDT",
+          "samples": 15,
+          "totalR": -3.5,
+          "avgR": -0.233,
+          "wr": 40,
+          "pf": 0.669
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ADAUSDT",
+          "samples": 15,
+          "totalR": -6.104,
+          "avgR": -0.407,
+          "wr": 33.3,
+          "pf": 0.5
+        },
+        {
+          "key": "4h:HOT|INJUSDT",
+          "samples": 15,
+          "totalR": 9.77,
+          "avgR": 0.651,
+          "wr": 73.3,
+          "pf": 3.243
+        }
+      ],
+      "rsi1Asset": [
+        {
+          "key": "1h:FAVORABLE|NEARUSDT",
+          "samples": 156,
+          "totalR": -27.164,
+          "avgR": -0.174,
+          "wr": 42.9,
+          "pf": 0.749
+        },
+        {
+          "key": "1h:FAVORABLE|DOTUSDT",
+          "samples": 147,
+          "totalR": -25.74,
+          "avgR": -0.175,
+          "wr": 44.9,
+          "pf": 0.744
+        },
+        {
+          "key": "1h:FAVORABLE|ADAUSDT",
+          "samples": 146,
+          "totalR": -36.175,
+          "avgR": -0.248,
+          "wr": 40.4,
+          "pf": 0.656
+        },
+        {
+          "key": "1h:FAVORABLE|INJUSDT",
+          "samples": 144,
+          "totalR": -27.918,
+          "avgR": -0.194,
+          "wr": 41.7,
+          "pf": 0.724
+        },
+        {
+          "key": "1h:FAVORABLE|SUIUSDT",
+          "samples": 143,
+          "totalR": -54.3,
+          "avgR": -0.38,
+          "wr": 37.8,
+          "pf": 0.527
+        },
+        {
+          "key": "1h:FAVORABLE|AVAXUSDT",
+          "samples": 142,
+          "totalR": -40.224,
+          "avgR": -0.283,
+          "wr": 42.3,
+          "pf": 0.621
+        },
+        {
+          "key": "1h:FAVORABLE|HBARUSDT",
+          "samples": 140,
+          "totalR": -58.399,
+          "avgR": -0.417,
+          "wr": 40,
+          "pf": 0.496
+        },
+        {
+          "key": "1h:FAVORABLE|BTCUSDT",
+          "samples": 138,
+          "totalR": -99.128,
+          "avgR": -0.718,
+          "wr": 38.4,
+          "pf": 0.33
+        },
+        {
+          "key": "1h:FAVORABLE|SOLUSDT",
+          "samples": 137,
+          "totalR": -64.964,
+          "avgR": -0.474,
+          "wr": 38,
+          "pf": 0.453
+        },
+        {
+          "key": "1h:FAVORABLE|FETUSDT",
+          "samples": 127,
+          "totalR": -34.173,
+          "avgR": -0.269,
+          "wr": 37.8,
+          "pf": 0.631
+        },
+        {
+          "key": "1h:FAVORABLE|ETHUSDT",
+          "samples": 127,
+          "totalR": -62.252,
+          "avgR": -0.49,
+          "wr": 40.2,
+          "pf": 0.448
+        },
+        {
+          "key": "1h:FAVORABLE|XRPUSDT",
+          "samples": 126,
+          "totalR": -33.942,
+          "avgR": -0.269,
+          "wr": 44.4,
+          "pf": 0.638
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 25,
+          "totalR": -15.839,
+          "avgR": -0.634,
+          "wr": 36,
+          "pf": 0.353
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|XRPUSDT",
+          "samples": 25,
+          "totalR": -15.576,
+          "avgR": -0.623,
+          "wr": 36,
+          "pf": 0.325
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 18,
+          "totalR": -14.931,
+          "avgR": -0.83,
+          "wr": 22.2,
+          "pf": 0.218
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|HBARUSDT",
+          "samples": 18,
+          "totalR": -2.24,
+          "avgR": -0.124,
+          "wr": 50,
+          "pf": 0.812
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 17,
+          "totalR": 1.534,
+          "avgR": 0.09,
+          "wr": 58.8,
+          "pf": 1.161
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 17,
+          "totalR": -10.812,
+          "avgR": -0.636,
+          "wr": 35.3,
+          "pf": 0.33
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|SOLUSDT",
+          "samples": 15,
+          "totalR": -8.743,
+          "avgR": -0.583,
+          "wr": 26.7,
+          "pf": 0.345
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|FETUSDT",
+          "samples": 15,
+          "totalR": -11.155,
+          "avgR": -0.744,
+          "wr": 20,
+          "pf": 0.249
+        }
+      ]
+    },
+    {
+      "days": 60,
+      "sideRegimeRsi4": [
+        {
+          "key": "SHORT|BEAR|4h:FAVORABLE",
+          "samples": 662,
+          "totalR": -326.077,
+          "avgR": -0.493,
+          "wr": 35.5,
+          "pf": 0.434
+        },
+        {
+          "key": "LONG|BULL|4h:FAVORABLE",
+          "samples": 599,
+          "totalR": -262.606,
+          "avgR": -0.438,
+          "wr": 35.2,
+          "pf": 0.473
+        },
+        {
+          "key": "SHORT|RANGE|4h:FAVORABLE",
+          "samples": 561,
+          "totalR": -148.597,
+          "avgR": -0.265,
+          "wr": 44.2,
+          "pf": 0.641
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:FAVORABLE",
+          "samples": 404,
+          "totalR": -116.133,
+          "avgR": -0.287,
+          "wr": 41.6,
+          "pf": 0.616
+        },
+        {
+          "key": "LONG|RANGE|4h:FAVORABLE",
+          "samples": 330,
+          "totalR": -121.603,
+          "avgR": -0.368,
+          "wr": 40,
+          "pf": 0.537
+        },
+        {
+          "key": "LONG|TRANSITION|4h:FAVORABLE",
+          "samples": 257,
+          "totalR": -56.654,
+          "avgR": -0.22,
+          "wr": 43.6,
+          "pf": 0.689
+        },
+        {
+          "key": "LONG|RANGE|4h:NEUTRAL_LOW",
+          "samples": 216,
+          "totalR": -82.25,
+          "avgR": -0.381,
+          "wr": 39.8,
+          "pf": 0.52
+        },
+        {
+          "key": "SHORT|BULL|4h:NEUTRAL_HIGH",
+          "samples": 203,
+          "totalR": -56.984,
+          "avgR": -0.281,
+          "wr": 42.4,
+          "pf": 0.63
+        },
+        {
+          "key": "LONG|BEAR|4h:NEUTRAL_LOW",
+          "samples": 172,
+          "totalR": -77.279,
+          "avgR": -0.449,
+          "wr": 38.4,
+          "pf": 0.468
+        },
+        {
+          "key": "LONG|TRANSITION|4h:NEUTRAL_LOW",
+          "samples": 147,
+          "totalR": -55.615,
+          "avgR": -0.378,
+          "wr": 42.9,
+          "pf": 0.536
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:NEUTRAL_HIGH",
+          "samples": 142,
+          "totalR": -30.329,
+          "avgR": -0.214,
+          "wr": 43,
+          "pf": 0.7
+        },
+        {
+          "key": "LONG|BULL|4h:EXTREME",
+          "samples": 131,
+          "totalR": 83.377,
+          "avgR": 0.636,
+          "wr": 74,
+          "pf": 3.153
+        },
+        {
+          "key": "SHORT|BULL|4h:WEAK",
+          "samples": 106,
+          "totalR": -27.326,
+          "avgR": -0.258,
+          "wr": 40.6,
+          "pf": 0.646
+        },
+        {
+          "key": "SHORT|RANGE|4h:NEUTRAL_HIGH",
+          "samples": 98,
+          "totalR": -48.003,
+          "avgR": -0.49,
+          "wr": 35.7,
+          "pf": 0.437
+        },
+        {
+          "key": "LONG|BEAR|4h:WEAK",
+          "samples": 79,
+          "totalR": -43.192,
+          "avgR": -0.547,
+          "wr": 35.4,
+          "pf": 0.411
+        },
+        {
+          "key": "LONG|BULL|4h:HOT",
+          "samples": 73,
+          "totalR": -4.437,
+          "avgR": -0.061,
+          "wr": 46.6,
+          "pf": 0.905
+        },
+        {
+          "key": "SHORT|BEAR|4h:COLD",
+          "samples": 52,
+          "totalR": -20.428,
+          "avgR": -0.393,
+          "wr": 34.6,
+          "pf": 0.516
+        },
+        {
+          "key": "SHORT|BULL|4h:FAVORABLE",
+          "samples": 23,
+          "totalR": -2.028,
+          "avgR": -0.088,
+          "wr": 47.8,
+          "pf": 0.859
+        }
+      ],
+      "sideRegimeRsi1": [
+        {
+          "key": "LONG|BULL|1h:FAVORABLE",
+          "samples": 589,
+          "totalR": -132.758,
+          "avgR": -0.225,
+          "wr": 43.3,
+          "pf": 0.69
+        },
+        {
+          "key": "SHORT|BEAR|1h:FAVORABLE",
+          "samples": 560,
+          "totalR": -257.769,
+          "avgR": -0.46,
+          "wr": 36.1,
+          "pf": 0.458
+        },
+        {
+          "key": "SHORT|RANGE|1h:FAVORABLE",
+          "samples": 526,
+          "totalR": -121.785,
+          "avgR": -0.232,
+          "wr": 45.6,
+          "pf": 0.679
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:FAVORABLE",
+          "samples": 458,
+          "totalR": -99.638,
+          "avgR": -0.218,
+          "wr": 44.1,
+          "pf": 0.696
+        },
+        {
+          "key": "LONG|RANGE|1h:FAVORABLE",
+          "samples": 458,
+          "totalR": -157.327,
+          "avgR": -0.344,
+          "wr": 41.3,
+          "pf": 0.559
+        },
+        {
+          "key": "LONG|TRANSITION|1h:FAVORABLE",
+          "samples": 318,
+          "totalR": -95.472,
+          "avgR": -0.3,
+          "wr": 42.8,
+          "pf": 0.605
+        },
+        {
+          "key": "SHORT|BULL|1h:FAVORABLE",
+          "samples": 260,
+          "totalR": -71.568,
+          "avgR": -0.275,
+          "wr": 41.9,
+          "pf": 0.633
+        },
+        {
+          "key": "LONG|BEAR|1h:FAVORABLE",
+          "samples": 212,
+          "totalR": -102.736,
+          "avgR": -0.485,
+          "wr": 36.8,
+          "pf": 0.446
+        },
+        {
+          "key": "LONG|BULL|1h:NEUTRAL_LOW",
+          "samples": 116,
+          "totalR": -75.986,
+          "avgR": -0.655,
+          "wr": 24.1,
+          "pf": 0.295
+        },
+        {
+          "key": "SHORT|RANGE|1h:NEUTRAL_HIGH",
+          "samples": 114,
+          "totalR": -66.134,
+          "avgR": -0.58,
+          "wr": 32.5,
+          "pf": 0.37
+        },
+        {
+          "key": "SHORT|BEAR|1h:NEUTRAL_HIGH",
+          "samples": 107,
+          "totalR": -70.327,
+          "avgR": -0.657,
+          "wr": 31.8,
+          "pf": 0.325
+        },
+        {
+          "key": "LONG|RANGE|1h:NEUTRAL_LOW",
+          "samples": 75,
+          "totalR": -39.388,
+          "avgR": -0.525,
+          "wr": 33.3,
+          "pf": 0.397
+        },
+        {
+          "key": "LONG|BULL|1h:HOT",
+          "samples": 72,
+          "totalR": 17.883,
+          "avgR": 0.248,
+          "wr": 59.7,
+          "pf": 1.519
+        },
+        {
+          "key": "SHORT|BULL|1h:NEUTRAL_HIGH",
+          "samples": 70,
+          "totalR": -12.438,
+          "avgR": -0.178,
+          "wr": 44.3,
+          "pf": 0.741
+        },
+        {
+          "key": "LONG|TRANSITION|1h:NEUTRAL_LOW",
+          "samples": 61,
+          "totalR": -3.87,
+          "avgR": -0.063,
+          "wr": 52.5,
+          "pf": 0.901
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:NEUTRAL_HIGH",
+          "samples": 61,
+          "totalR": -26.079,
+          "avgR": -0.428,
+          "wr": 36.1,
+          "pf": 0.469
+        },
+        {
+          "key": "LONG|BEAR|1h:NEUTRAL_LOW",
+          "samples": 54,
+          "totalR": -22.324,
+          "avgR": -0.413,
+          "wr": 40.7,
+          "pf": 0.497
+        },
+        {
+          "key": "SHORT|BEAR|1h:COLD",
+          "samples": 43,
+          "totalR": -20.577,
+          "avgR": -0.479,
+          "wr": 32.6,
+          "pf": 0.444
+        },
+        {
+          "key": "LONG|BULL|1h:EXTREME",
+          "samples": 37,
+          "totalR": 12.02,
+          "avgR": 0.325,
+          "wr": 62.2,
+          "pf": 1.71
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:COLD",
+          "samples": 27,
+          "totalR": -20.746,
+          "avgR": -0.768,
+          "wr": 18.5,
+          "pf": 0.223
+        },
+        {
+          "key": "LONG|TRANSITION|1h:HOT",
+          "samples": 26,
+          "totalR": -7.257,
+          "avgR": -0.279,
+          "wr": 38.5,
+          "pf": 0.622
+        }
+      ],
+      "rsiCombo": [
+        {
+          "key": "FAVORABLE|FAVORABLE",
+          "samples": 2334,
+          "totalR": -765.638,
+          "avgR": -0.328,
+          "wr": 41,
+          "pf": 0.576
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_LOW",
+          "samples": 436,
+          "totalR": -160.306,
+          "avgR": -0.368,
+          "wr": 41.5,
+          "pf": 0.539
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_HIGH",
+          "samples": 358,
+          "totalR": -95.616,
+          "avgR": -0.267,
+          "wr": 42.5,
+          "pf": 0.643
+        },
+        {
+          "key": "NEUTRAL_HIGH|FAVORABLE",
+          "samples": 212,
+          "totalR": -125.123,
+          "avgR": -0.59,
+          "wr": 33,
+          "pf": 0.362
+        },
+        {
+          "key": "NEUTRAL_LOW|FAVORABLE",
+          "samples": 151,
+          "totalR": -76.736,
+          "avgR": -0.508,
+          "wr": 31.1,
+          "pf": 0.406
+        },
+        {
+          "key": "NEUTRAL_LOW|NEUTRAL_LOW",
+          "samples": 111,
+          "totalR": -51.371,
+          "avgR": -0.463,
+          "wr": 36.9,
+          "pf": 0.451
+        },
+        {
+          "key": "FAVORABLE|WEAK",
+          "samples": 96,
+          "totalR": -47.405,
+          "avgR": -0.494,
+          "wr": 34.4,
+          "pf": 0.441
+        },
+        {
+          "key": "NEUTRAL_HIGH|NEUTRAL_HIGH",
+          "samples": 86,
+          "totalR": -40.96,
+          "avgR": -0.476,
+          "wr": 34.9,
+          "pf": 0.442
+        },
+        {
+          "key": "FAVORABLE|EXTREME",
+          "samples": 72,
+          "totalR": 37.743,
+          "avgR": 0.524,
+          "wr": 69.4,
+          "pf": 2.489
+        },
+        {
+          "key": "COLD|FAVORABLE",
+          "samples": 72,
+          "totalR": -45.561,
+          "avgR": -0.633,
+          "wr": 25,
+          "pf": 0.315
+        },
+        {
+          "key": "HOT|FAVORABLE",
+          "samples": 58,
+          "totalR": -16.955,
+          "avgR": -0.292,
+          "wr": 39.7,
+          "pf": 0.604
+        },
+        {
+          "key": "FAVORABLE|HOT",
+          "samples": 54,
+          "totalR": -1.583,
+          "avgR": -0.029,
+          "wr": 48.1,
+          "pf": 0.953
+        },
+        {
+          "key": "NEUTRAL_HIGH|WEAK",
+          "samples": 54,
+          "totalR": -8.894,
+          "avgR": -0.165,
+          "wr": 44.4,
+          "pf": 0.757
+        },
+        {
+          "key": "NEUTRAL_LOW|WEAK",
+          "samples": 44,
+          "totalR": -13.461,
+          "avgR": -0.306,
+          "wr": 43.2,
+          "pf": 0.602
+        },
+        {
+          "key": "HOT|EXTREME",
+          "samples": 36,
+          "totalR": 21.058,
+          "avgR": 0.585,
+          "wr": 72.2,
+          "pf": 2.842
+        },
+        {
+          "key": "EXTREME|EXTREME",
+          "samples": 34,
+          "totalR": 16.519,
+          "avgR": 0.486,
+          "wr": 67.6,
+          "pf": 2.329
+        },
+        {
+          "key": "FAVORABLE|COLD",
+          "samples": 31,
+          "totalR": -6.248,
+          "avgR": -0.202,
+          "wr": 41.9,
+          "pf": 0.716
+        },
+        {
+          "key": "EXTREME|FAVORABLE",
+          "samples": 27,
+          "totalR": -6.75,
+          "avgR": -0.25,
+          "wr": 40.7,
+          "pf": 0.663
+        },
+        {
+          "key": "HOT|HOT",
+          "samples": 21,
+          "totalR": 1.972,
+          "avgR": 0.094,
+          "wr": 52.4,
+          "pf": 1.165
+        }
+      ],
+      "rsi4Asset": [
+        {
+          "key": "4h:FAVORABLE|AVAXUSDT",
+          "samples": 255,
+          "totalR": -118.605,
+          "avgR": -0.465,
+          "wr": 34.1,
+          "pf": 0.449
+        },
+        {
+          "key": "4h:FAVORABLE|HBARUSDT",
+          "samples": 246,
+          "totalR": -103.789,
+          "avgR": -0.422,
+          "wr": 39,
+          "pf": 0.49
+        },
+        {
+          "key": "4h:FAVORABLE|BTCUSDT",
+          "samples": 241,
+          "totalR": -147.016,
+          "avgR": -0.61,
+          "wr": 38.6,
+          "pf": 0.359
+        },
+        {
+          "key": "4h:FAVORABLE|INJUSDT",
+          "samples": 241,
+          "totalR": -31.233,
+          "avgR": -0.13,
+          "wr": 44.4,
+          "pf": 0.805
+        },
+        {
+          "key": "4h:FAVORABLE|NEARUSDT",
+          "samples": 240,
+          "totalR": -83.25,
+          "avgR": -0.347,
+          "wr": 35.8,
+          "pf": 0.553
+        },
+        {
+          "key": "4h:FAVORABLE|ADAUSDT",
+          "samples": 237,
+          "totalR": -42.906,
+          "avgR": -0.181,
+          "wr": 43.5,
+          "pf": 0.737
+        },
+        {
+          "key": "4h:FAVORABLE|SOLUSDT",
+          "samples": 236,
+          "totalR": -89.821,
+          "avgR": -0.381,
+          "wr": 40.7,
+          "pf": 0.527
+        },
+        {
+          "key": "4h:FAVORABLE|DOTUSDT",
+          "samples": 236,
+          "totalR": -67.275,
+          "avgR": -0.285,
+          "wr": 40.3,
+          "pf": 0.615
+        },
+        {
+          "key": "4h:FAVORABLE|SUIUSDT",
+          "samples": 235,
+          "totalR": -74.208,
+          "avgR": -0.316,
+          "wr": 40.4,
+          "pf": 0.587
+        },
+        {
+          "key": "4h:FAVORABLE|FETUSDT",
+          "samples": 230,
+          "totalR": -89.859,
+          "avgR": -0.391,
+          "wr": 34.3,
+          "pf": 0.51
+        },
+        {
+          "key": "4h:FAVORABLE|ETHUSDT",
+          "samples": 230,
+          "totalR": -86.144,
+          "avgR": -0.375,
+          "wr": 43.5,
+          "pf": 0.534
+        },
+        {
+          "key": "4h:FAVORABLE|XRPUSDT",
+          "samples": 228,
+          "totalR": -104.016,
+          "avgR": -0.456,
+          "wr": 38.6,
+          "pf": 0.46
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 70,
+          "totalR": -47.477,
+          "avgR": -0.678,
+          "wr": 32.9,
+          "pf": 0.3
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|FETUSDT",
+          "samples": 58,
+          "totalR": -19.527,
+          "avgR": -0.337,
+          "wr": 37.9,
+          "pf": 0.564
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|INJUSDT",
+          "samples": 54,
+          "totalR": -19.659,
+          "avgR": -0.364,
+          "wr": 35.2,
+          "pf": 0.531
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|NEARUSDT",
+          "samples": 54,
+          "totalR": -20.634,
+          "avgR": -0.382,
+          "wr": 35.2,
+          "pf": 0.524
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|DOTUSDT",
+          "samples": 51,
+          "totalR": -9.632,
+          "avgR": -0.189,
+          "wr": 45.1,
+          "pf": 0.733
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|SUIUSDT",
+          "samples": 50,
+          "totalR": -22.785,
+          "avgR": -0.456,
+          "wr": 36,
+          "pf": 0.466
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|HBARUSDT",
+          "samples": 50,
+          "totalR": -21.259,
+          "avgR": -0.425,
+          "wr": 40,
+          "pf": 0.486
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ETHUSDT",
+          "samples": 48,
+          "totalR": -15.452,
+          "avgR": -0.322,
+          "wr": 50,
+          "pf": 0.57
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SOLUSDT",
+          "samples": 47,
+          "totalR": -24.146,
+          "avgR": -0.514,
+          "wr": 34,
+          "pf": 0.415
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|AVAXUSDT",
+          "samples": 43,
+          "totalR": -9.014,
+          "avgR": -0.21,
+          "wr": 46.5,
+          "pf": 0.706
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 42,
+          "totalR": -19.177,
+          "avgR": -0.457,
+          "wr": 33.3,
+          "pf": 0.46
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ADAUSDT",
+          "samples": 41,
+          "totalR": -15.879,
+          "avgR": -0.387,
+          "wr": 34.1,
+          "pf": 0.514
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|AVAXUSDT",
+          "samples": 39,
+          "totalR": -12.148,
+          "avgR": -0.311,
+          "wr": 41,
+          "pf": 0.592
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 39,
+          "totalR": -19.958,
+          "avgR": -0.512,
+          "wr": 35.9,
+          "pf": 0.432
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|NEARUSDT",
+          "samples": 38,
+          "totalR": 3.185,
+          "avgR": 0.084,
+          "wr": 52.6,
+          "pf": 1.15
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 37,
+          "totalR": -26.034,
+          "avgR": -0.704,
+          "wr": 37.8,
+          "pf": 0.327
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|SOLUSDT",
+          "samples": 35,
+          "totalR": -12.062,
+          "avgR": -0.345,
+          "wr": 45.7,
+          "pf": 0.556
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|BTCUSDT",
+          "samples": 35,
+          "totalR": -26.821,
+          "avgR": -0.766,
+          "wr": 37.1,
+          "pf": 0.266
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|DOTUSDT",
+          "samples": 31,
+          "totalR": -4.356,
+          "avgR": -0.141,
+          "wr": 45.2,
+          "pf": 0.79
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|HBARUSDT",
+          "samples": 30,
+          "totalR": 2.095,
+          "avgR": 0.07,
+          "wr": 56.7,
+          "pf": 1.123
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ADAUSDT",
+          "samples": 29,
+          "totalR": -4.665,
+          "avgR": -0.161,
+          "wr": 44.8,
+          "pf": 0.764
+        },
+        {
+          "key": "4h:WEAK|BTCUSDT",
+          "samples": 26,
+          "totalR": -14.418,
+          "avgR": -0.555,
+          "wr": 46.2,
+          "pf": 0.438
+        },
+        {
+          "key": "4h:WEAK|ADAUSDT",
+          "samples": 26,
+          "totalR": -17.121,
+          "avgR": -0.659,
+          "wr": 23.1,
+          "pf": 0.296
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|XRPUSDT",
+          "samples": 24,
+          "totalR": 9.329,
+          "avgR": 0.389,
+          "wr": 70.8,
+          "pf": 2
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|INJUSDT",
+          "samples": 24,
+          "totalR": -2.35,
+          "avgR": -0.098,
+          "wr": 45.8,
+          "pf": 0.848
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|FETUSDT",
+          "samples": 22,
+          "totalR": -9.828,
+          "avgR": -0.447,
+          "wr": 31.8,
+          "pf": 0.46
+        },
+        {
+          "key": "4h:EXTREME|XRPUSDT",
+          "samples": 18,
+          "totalR": 8.838,
+          "avgR": 0.491,
+          "wr": 66.7,
+          "pf": 2.336
+        },
+        {
+          "key": "4h:WEAK|FETUSDT",
+          "samples": 18,
+          "totalR": 0.308,
+          "avgR": 0.017,
+          "wr": 50,
+          "pf": 1.029
+        },
+        {
+          "key": "4h:WEAK|INJUSDT",
+          "samples": 18,
+          "totalR": -9.468,
+          "avgR": -0.526,
+          "wr": 27.8,
+          "pf": 0.402
+        },
+        {
+          "key": "4h:EXTREME|SOLUSDT",
+          "samples": 18,
+          "totalR": 12.736,
+          "avgR": 0.708,
+          "wr": 77.8,
+          "pf": 3.81
+        },
+        {
+          "key": "4h:WEAK|SOLUSDT",
+          "samples": 17,
+          "totalR": -0.048,
+          "avgR": -0.003,
+          "wr": 52.9,
+          "pf": 0.995
+        },
+        {
+          "key": "4h:WEAK|ETHUSDT",
+          "samples": 17,
+          "totalR": -3.113,
+          "avgR": -0.183,
+          "wr": 47.1,
+          "pf": 0.747
+        },
+        {
+          "key": "4h:EXTREME|BTCUSDT",
+          "samples": 17,
+          "totalR": 10.4,
+          "avgR": 0.612,
+          "wr": 76.5,
+          "pf": 3.03
+        },
+        {
+          "key": "4h:EXTREME|ADAUSDT",
+          "samples": 16,
+          "totalR": 1.465,
+          "avgR": 0.092,
+          "wr": 50,
+          "pf": 1.163
+        },
+        {
+          "key": "4h:COLD|FETUSDT",
+          "samples": 16,
+          "totalR": 7.65,
+          "avgR": 0.478,
+          "wr": 68.8,
+          "pf": 2.313
+        },
+        {
+          "key": "4h:WEAK|SUIUSDT",
+          "samples": 16,
+          "totalR": -10.75,
+          "avgR": -0.672,
+          "wr": 25,
+          "pf": 0.29
+        },
+        {
+          "key": "4h:EXTREME|ETHUSDT",
+          "samples": 16,
+          "totalR": 12.755,
+          "avgR": 0.797,
+          "wr": 81.3,
+          "pf": 4.695
+        },
+        {
+          "key": "4h:HOT|INJUSDT",
+          "samples": 15,
+          "totalR": 9.77,
+          "avgR": 0.651,
+          "wr": 73.3,
+          "pf": 3.243
+        }
+      ],
+      "rsi1Asset": [
+        {
+          "key": "1h:FAVORABLE|DOTUSDT",
+          "samples": 297,
+          "totalR": -52.477,
+          "avgR": -0.177,
+          "wr": 44.8,
+          "pf": 0.743
+        },
+        {
+          "key": "1h:FAVORABLE|INJUSDT",
+          "samples": 295,
+          "totalR": -61.877,
+          "avgR": -0.21,
+          "wr": 41,
+          "pf": 0.703
+        },
+        {
+          "key": "1h:FAVORABLE|NEARUSDT",
+          "samples": 292,
+          "totalR": -73.806,
+          "avgR": -0.253,
+          "wr": 39.7,
+          "pf": 0.655
+        },
+        {
+          "key": "1h:FAVORABLE|HBARUSDT",
+          "samples": 287,
+          "totalR": -98.556,
+          "avgR": -0.343,
+          "wr": 41.8,
+          "pf": 0.563
+        },
+        {
+          "key": "1h:FAVORABLE|SUIUSDT",
+          "samples": 286,
+          "totalR": -96.735,
+          "avgR": -0.338,
+          "wr": 39.5,
+          "pf": 0.567
+        },
+        {
+          "key": "1h:FAVORABLE|ADAUSDT",
+          "samples": 286,
+          "totalR": -49.26,
+          "avgR": -0.172,
+          "wr": 43.7,
+          "pf": 0.749
+        },
+        {
+          "key": "1h:FAVORABLE|BTCUSDT",
+          "samples": 283,
+          "totalR": -165.29,
+          "avgR": -0.584,
+          "wr": 41,
+          "pf": 0.387
+        },
+        {
+          "key": "1h:FAVORABLE|SOLUSDT",
+          "samples": 279,
+          "totalR": -82.639,
+          "avgR": -0.296,
+          "wr": 44.4,
+          "pf": 0.611
+        },
+        {
+          "key": "1h:FAVORABLE|AVAXUSDT",
+          "samples": 279,
+          "totalR": -93.527,
+          "avgR": -0.335,
+          "wr": 39.8,
+          "pf": 0.569
+        },
+        {
+          "key": "1h:FAVORABLE|ETHUSDT",
+          "samples": 271,
+          "totalR": -98.585,
+          "avgR": -0.364,
+          "wr": 43.5,
+          "pf": 0.546
+        },
+        {
+          "key": "1h:FAVORABLE|FETUSDT",
+          "samples": 269,
+          "totalR": -85.411,
+          "avgR": -0.318,
+          "wr": 37.5,
+          "pf": 0.583
+        },
+        {
+          "key": "1h:FAVORABLE|XRPUSDT",
+          "samples": 257,
+          "totalR": -80.89,
+          "avgR": -0.315,
+          "wr": 44,
+          "pf": 0.591
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|XRPUSDT",
+          "samples": 43,
+          "totalR": -24.637,
+          "avgR": -0.573,
+          "wr": 37.2,
+          "pf": 0.364
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|HBARUSDT",
+          "samples": 38,
+          "totalR": -8.004,
+          "avgR": -0.211,
+          "wr": 47.4,
+          "pf": 0.707
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|FETUSDT",
+          "samples": 33,
+          "totalR": -11.969,
+          "avgR": -0.363,
+          "wr": 36.4,
+          "pf": 0.541
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 32,
+          "totalR": -19.674,
+          "avgR": -0.615,
+          "wr": 31.3,
+          "pf": 0.339
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|ADAUSDT",
+          "samples": 32,
+          "totalR": -10.189,
+          "avgR": -0.318,
+          "wr": 37.5,
+          "pf": 0.579
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|ETHUSDT",
+          "samples": 30,
+          "totalR": -2.631,
+          "avgR": -0.088,
+          "wr": 56.7,
+          "pf": 0.856
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 30,
+          "totalR": -20.621,
+          "avgR": -0.687,
+          "wr": 33.3,
+          "pf": 0.32
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|AVAXUSDT",
+          "samples": 30,
+          "totalR": -23.114,
+          "avgR": -0.77,
+          "wr": 23.3,
+          "pf": 0.246
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 29,
+          "totalR": -22.49,
+          "avgR": -0.776,
+          "wr": 31,
+          "pf": 0.256
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 29,
+          "totalR": -9.097,
+          "avgR": -0.314,
+          "wr": 41.4,
+          "pf": 0.593
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|SOLUSDT",
+          "samples": 29,
+          "totalR": -13.293,
+          "avgR": -0.458,
+          "wr": 34.5,
+          "pf": 0.44
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|NEARUSDT",
+          "samples": 28,
+          "totalR": -17.479,
+          "avgR": -0.624,
+          "wr": 25,
+          "pf": 0.318
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|INJUSDT",
+          "samples": 28,
+          "totalR": -2.514,
+          "avgR": -0.09,
+          "wr": 46.4,
+          "pf": 0.861
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|SUIUSDT",
+          "samples": 27,
+          "totalR": -19.585,
+          "avgR": -0.725,
+          "wr": 22.2,
+          "pf": 0.252
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|AVAXUSDT",
+          "samples": 26,
+          "totalR": -16.439,
+          "avgR": -0.632,
+          "wr": 26.9,
+          "pf": 0.326
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|SOLUSDT",
+          "samples": 25,
+          "totalR": -14.602,
+          "avgR": -0.584,
+          "wr": 32,
+          "pf": 0.364
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|DOTUSDT",
+          "samples": 25,
+          "totalR": -9.256,
+          "avgR": -0.37,
+          "wr": 36,
+          "pf": 0.528
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|NEARUSDT",
+          "samples": 23,
+          "totalR": -8.13,
+          "avgR": -0.353,
+          "wr": 34.8,
+          "pf": 0.547
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|BTCUSDT",
+          "samples": 23,
+          "totalR": -16.631,
+          "avgR": -0.723,
+          "wr": 34.8,
+          "pf": 0.281
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|FETUSDT",
+          "samples": 23,
+          "totalR": -3.433,
+          "avgR": -0.149,
+          "wr": 43.5,
+          "pf": 0.775
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|DOTUSDT",
+          "samples": 23,
+          "totalR": -12.399,
+          "avgR": -0.539,
+          "wr": 30.4,
+          "pf": 0.398
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|HBARUSDT",
+          "samples": 21,
+          "totalR": -14.259,
+          "avgR": -0.679,
+          "wr": 28.6,
+          "pf": 0.313
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|ADAUSDT",
+          "samples": 19,
+          "totalR": -15.723,
+          "avgR": -0.828,
+          "wr": 15.8,
+          "pf": 0.193
+        },
+        {
+          "key": "1h:COLD|FETUSDT",
+          "samples": 17,
+          "totalR": -5.468,
+          "avgR": -0.322,
+          "wr": 35.3,
+          "pf": 0.575
+        },
+        {
+          "key": "1h:HOT|ETHUSDT",
+          "samples": 15,
+          "totalR": -2.565,
+          "avgR": -0.171,
+          "wr": 46.7,
+          "pf": 0.745
+        }
+      ]
+    },
+    {
+      "days": 90,
+      "sideRegimeRsi4": [
+        {
+          "key": "SHORT|BEAR|4h:FAVORABLE",
+          "samples": 1267,
+          "totalR": -385.788,
+          "avgR": -0.304,
+          "wr": 40.5,
+          "pf": 0.602
+        },
+        {
+          "key": "LONG|BULL|4h:FAVORABLE",
+          "samples": 746,
+          "totalR": -253.514,
+          "avgR": -0.34,
+          "wr": 38.9,
+          "pf": 0.564
+        },
+        {
+          "key": "SHORT|RANGE|4h:FAVORABLE",
+          "samples": 708,
+          "totalR": -187.226,
+          "avgR": -0.264,
+          "wr": 42.9,
+          "pf": 0.641
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:FAVORABLE",
+          "samples": 505,
+          "totalR": -130.612,
+          "avgR": -0.259,
+          "wr": 42,
+          "pf": 0.647
+        },
+        {
+          "key": "LONG|RANGE|4h:FAVORABLE",
+          "samples": 477,
+          "totalR": -148.511,
+          "avgR": -0.311,
+          "wr": 41.3,
+          "pf": 0.591
+        },
+        {
+          "key": "LONG|TRANSITION|4h:FAVORABLE",
+          "samples": 476,
+          "totalR": -103.134,
+          "avgR": -0.217,
+          "wr": 42.4,
+          "pf": 0.695
+        },
+        {
+          "key": "LONG|BEAR|4h:NEUTRAL_LOW",
+          "samples": 326,
+          "totalR": -169.583,
+          "avgR": -0.52,
+          "wr": 32.5,
+          "pf": 0.405
+        },
+        {
+          "key": "LONG|RANGE|4h:NEUTRAL_LOW",
+          "samples": 282,
+          "totalR": -101.109,
+          "avgR": -0.359,
+          "wr": 39.4,
+          "pf": 0.541
+        },
+        {
+          "key": "LONG|TRANSITION|4h:NEUTRAL_LOW",
+          "samples": 261,
+          "totalR": -118.33,
+          "avgR": -0.453,
+          "wr": 35.6,
+          "pf": 0.46
+        },
+        {
+          "key": "SHORT|BULL|4h:NEUTRAL_HIGH",
+          "samples": 247,
+          "totalR": -75.722,
+          "avgR": -0.307,
+          "wr": 40.5,
+          "pf": 0.601
+        },
+        {
+          "key": "SHORT|TRANSITION|4h:NEUTRAL_HIGH",
+          "samples": 202,
+          "totalR": -32.639,
+          "avgR": -0.162,
+          "wr": 45,
+          "pf": 0.763
+        },
+        {
+          "key": "SHORT|RANGE|4h:NEUTRAL_HIGH",
+          "samples": 175,
+          "totalR": -59.95,
+          "avgR": -0.343,
+          "wr": 40,
+          "pf": 0.564
+        },
+        {
+          "key": "LONG|BEAR|4h:WEAK",
+          "samples": 161,
+          "totalR": -58.699,
+          "avgR": -0.365,
+          "wr": 38.5,
+          "pf": 0.548
+        },
+        {
+          "key": "LONG|BULL|4h:EXTREME",
+          "samples": 139,
+          "totalR": 76.707,
+          "avgR": 0.552,
+          "wr": 70.5,
+          "pf": 2.644
+        },
+        {
+          "key": "SHORT|BEAR|4h:COLD",
+          "samples": 127,
+          "totalR": -44.563,
+          "avgR": -0.351,
+          "wr": 33.9,
+          "pf": 0.547
+        },
+        {
+          "key": "SHORT|BULL|4h:WEAK",
+          "samples": 120,
+          "totalR": -25.139,
+          "avgR": -0.209,
+          "wr": 42.5,
+          "pf": 0.703
+        },
+        {
+          "key": "LONG|BULL|4h:HOT",
+          "samples": 96,
+          "totalR": 3.861,
+          "avgR": 0.04,
+          "wr": 51,
+          "pf": 1.069
+        },
+        {
+          "key": "SHORT|BEAR|4h:EXTREME",
+          "samples": 66,
+          "totalR": -13.329,
+          "avgR": -0.202,
+          "wr": 37.9,
+          "pf": 0.709
+        },
+        {
+          "key": "LONG|BEAR|4h:FAVORABLE",
+          "samples": 29,
+          "totalR": -8.766,
+          "avgR": -0.302,
+          "wr": 37.9,
+          "pf": 0.594
+        },
+        {
+          "key": "SHORT|BULL|4h:FAVORABLE",
+          "samples": 27,
+          "totalR": 0.671,
+          "avgR": 0.025,
+          "wr": 51.9,
+          "pf": 1.044
+        }
+      ],
+      "sideRegimeRsi1": [
+        {
+          "key": "SHORT|BEAR|1h:FAVORABLE",
+          "samples": 1174,
+          "totalR": -329.112,
+          "avgR": -0.28,
+          "wr": 40.5,
+          "pf": 0.625
+        },
+        {
+          "key": "LONG|BULL|1h:FAVORABLE",
+          "samples": 718,
+          "totalR": -128.248,
+          "avgR": -0.179,
+          "wr": 45,
+          "pf": 0.745
+        },
+        {
+          "key": "SHORT|RANGE|1h:FAVORABLE",
+          "samples": 702,
+          "totalR": -153.465,
+          "avgR": -0.219,
+          "wr": 44.7,
+          "pf": 0.693
+        },
+        {
+          "key": "LONG|RANGE|1h:FAVORABLE",
+          "samples": 625,
+          "totalR": -196.839,
+          "avgR": -0.315,
+          "wr": 41.4,
+          "pf": 0.587
+        },
+        {
+          "key": "LONG|TRANSITION|1h:FAVORABLE",
+          "samples": 619,
+          "totalR": -196.065,
+          "avgR": -0.317,
+          "wr": 39.4,
+          "pf": 0.585
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:FAVORABLE",
+          "samples": 570,
+          "totalR": -114.958,
+          "avgR": -0.202,
+          "wr": 44.2,
+          "pf": 0.713
+        },
+        {
+          "key": "LONG|BEAR|1h:FAVORABLE",
+          "samples": 409,
+          "totalR": -191.539,
+          "avgR": -0.468,
+          "wr": 34.2,
+          "pf": 0.451
+        },
+        {
+          "key": "SHORT|BULL|1h:FAVORABLE",
+          "samples": 313,
+          "totalR": -89,
+          "avgR": -0.284,
+          "wr": 40.9,
+          "pf": 0.622
+        },
+        {
+          "key": "SHORT|BEAR|1h:NEUTRAL_HIGH",
+          "samples": 201,
+          "totalR": -79.61,
+          "avgR": -0.396,
+          "wr": 38.8,
+          "pf": 0.518
+        },
+        {
+          "key": "SHORT|RANGE|1h:NEUTRAL_HIGH",
+          "samples": 157,
+          "totalR": -83.827,
+          "avgR": -0.534,
+          "wr": 33.1,
+          "pf": 0.399
+        },
+        {
+          "key": "LONG|BULL|1h:NEUTRAL_LOW",
+          "samples": 140,
+          "totalR": -67.12,
+          "avgR": -0.479,
+          "wr": 31.4,
+          "pf": 0.43
+        },
+        {
+          "key": "LONG|RANGE|1h:NEUTRAL_LOW",
+          "samples": 108,
+          "totalR": -45.081,
+          "avgR": -0.417,
+          "wr": 36.1,
+          "pf": 0.484
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:NEUTRAL_HIGH",
+          "samples": 104,
+          "totalR": -25.436,
+          "avgR": -0.245,
+          "wr": 42.3,
+          "pf": 0.659
+        },
+        {
+          "key": "LONG|BEAR|1h:NEUTRAL_LOW",
+          "samples": 103,
+          "totalR": -45.675,
+          "avgR": -0.443,
+          "wr": 35.9,
+          "pf": 0.464
+        },
+        {
+          "key": "LONG|BULL|1h:HOT",
+          "samples": 85,
+          "totalR": 16.791,
+          "avgR": 0.198,
+          "wr": 57.6,
+          "pf": 1.393
+        },
+        {
+          "key": "SHORT|BULL|1h:NEUTRAL_HIGH",
+          "samples": 79,
+          "totalR": -8.859,
+          "avgR": -0.112,
+          "wr": 46.8,
+          "pf": 0.829
+        },
+        {
+          "key": "LONG|TRANSITION|1h:NEUTRAL_LOW",
+          "samples": 77,
+          "totalR": -10.972,
+          "avgR": -0.142,
+          "wr": 48.1,
+          "pf": 0.79
+        },
+        {
+          "key": "SHORT|BEAR|1h:COLD",
+          "samples": 74,
+          "totalR": -31.464,
+          "avgR": -0.425,
+          "wr": 32.4,
+          "pf": 0.479
+        },
+        {
+          "key": "LONG|BULL|1h:EXTREME",
+          "samples": 51,
+          "totalR": 7.917,
+          "avgR": 0.155,
+          "wr": 54.9,
+          "pf": 1.29
+        },
+        {
+          "key": "LONG|TRANSITION|1h:HOT",
+          "samples": 38,
+          "totalR": -8.928,
+          "avgR": -0.235,
+          "wr": 39.5,
+          "pf": 0.671
+        },
+        {
+          "key": "SHORT|TRANSITION|1h:COLD",
+          "samples": 33,
+          "totalR": -22.857,
+          "avgR": -0.693,
+          "wr": 21.2,
+          "pf": 0.271
+        },
+        {
+          "key": "SHORT|RANGE|1h:COLD",
+          "samples": 23,
+          "totalR": -8.868,
+          "avgR": -0.386,
+          "wr": 34.8,
+          "pf": 0.513
+        },
+        {
+          "key": "LONG|RANGE|1h:HOT",
+          "samples": 22,
+          "totalR": -5.407,
+          "avgR": -0.246,
+          "wr": 40.9,
+          "pf": 0.657
+        },
+        {
+          "key": "SHORT|BEAR|1h:EXTREME",
+          "samples": 20,
+          "totalR": -9.316,
+          "avgR": -0.466,
+          "wr": 30,
+          "pf": 0.438
+        }
+      ],
+      "rsiCombo": [
+        {
+          "key": "FAVORABLE|FAVORABLE",
+          "samples": 3494,
+          "totalR": -935.824,
+          "avgR": -0.268,
+          "wr": 42,
+          "pf": 0.638
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_LOW",
+          "samples": 715,
+          "totalR": -315.612,
+          "avgR": -0.441,
+          "wr": 35.8,
+          "pf": 0.469
+        },
+        {
+          "key": "FAVORABLE|NEUTRAL_HIGH",
+          "samples": 485,
+          "totalR": -110.9,
+          "avgR": -0.229,
+          "wr": 43.3,
+          "pf": 0.684
+        },
+        {
+          "key": "NEUTRAL_HIGH|FAVORABLE",
+          "samples": 331,
+          "totalR": -127.972,
+          "avgR": -0.387,
+          "wr": 39,
+          "pf": 0.524
+        },
+        {
+          "key": "NEUTRAL_LOW|FAVORABLE",
+          "samples": 190,
+          "totalR": -73.13,
+          "avgR": -0.385,
+          "wr": 35.8,
+          "pf": 0.514
+        },
+        {
+          "key": "NEUTRAL_LOW|NEUTRAL_LOW",
+          "samples": 167,
+          "totalR": -71.367,
+          "avgR": -0.427,
+          "wr": 36.5,
+          "pf": 0.478
+        },
+        {
+          "key": "FAVORABLE|WEAK",
+          "samples": 155,
+          "totalR": -52.232,
+          "avgR": -0.337,
+          "wr": 38.7,
+          "pf": 0.574
+        },
+        {
+          "key": "NEUTRAL_HIGH|NEUTRAL_HIGH",
+          "samples": 148,
+          "totalR": -63.235,
+          "avgR": -0.427,
+          "wr": 35.8,
+          "pf": 0.481
+        },
+        {
+          "key": "FAVORABLE|EXTREME",
+          "samples": 122,
+          "totalR": 33.159,
+          "avgR": 0.272,
+          "wr": 58.2,
+          "pf": 1.578
+        },
+        {
+          "key": "COLD|FAVORABLE",
+          "samples": 99,
+          "totalR": -55.202,
+          "avgR": -0.558,
+          "wr": 27.3,
+          "pf": 0.366
+        },
+        {
+          "key": "FAVORABLE|COLD",
+          "samples": 94,
+          "totalR": -26.57,
+          "avgR": -0.283,
+          "wr": 36.2,
+          "pf": 0.616
+        },
+        {
+          "key": "HOT|FAVORABLE",
+          "samples": 84,
+          "totalR": -18.355,
+          "avgR": -0.219,
+          "wr": 41.7,
+          "pf": 0.688
+        },
+        {
+          "key": "NEUTRAL_LOW|WEAK",
+          "samples": 71,
+          "totalR": -24.352,
+          "avgR": -0.343,
+          "wr": 39.4,
+          "pf": 0.56
+        },
+        {
+          "key": "FAVORABLE|HOT",
+          "samples": 65,
+          "totalR": 8.754,
+          "avgR": 0.135,
+          "wr": 55.4,
+          "pf": 1.251
+        },
+        {
+          "key": "NEUTRAL_HIGH|WEAK",
+          "samples": 62,
+          "totalR": -6.525,
+          "avgR": -0.105,
+          "wr": 46.8,
+          "pf": 0.838
+        },
+        {
+          "key": "EXTREME|EXTREME",
+          "samples": 42,
+          "totalR": 9.907,
+          "avgR": 0.236,
+          "wr": 57.1,
+          "pf": 1.488
+        },
+        {
+          "key": "EXTREME|FAVORABLE",
+          "samples": 36,
+          "totalR": -5.036,
+          "avgR": -0.14,
+          "wr": 44.4,
+          "pf": 0.795
+        },
+        {
+          "key": "HOT|EXTREME",
+          "samples": 36,
+          "totalR": 21.058,
+          "avgR": 0.585,
+          "wr": 72.2,
+          "pf": 2.842
+        },
+        {
+          "key": "HOT|HOT",
+          "samples": 28,
+          "totalR": 1.034,
+          "avgR": 0.037,
+          "wr": 50,
+          "pf": 1.062
+        },
+        {
+          "key": "COLD|COLD",
+          "samples": 27,
+          "totalR": -8.433,
+          "avgR": -0.312,
+          "wr": 37,
+          "pf": 0.595
+        }
+      ],
+      "rsi4Asset": [
+        {
+          "key": "4h:FAVORABLE|AVAXUSDT",
+          "samples": 367,
+          "totalR": -126.848,
+          "avgR": -0.346,
+          "wr": 37.9,
+          "pf": 0.557
+        },
+        {
+          "key": "4h:FAVORABLE|HBARUSDT",
+          "samples": 366,
+          "totalR": -116.035,
+          "avgR": -0.317,
+          "wr": 41.8,
+          "pf": 0.589
+        },
+        {
+          "key": "4h:FAVORABLE|FETUSDT",
+          "samples": 363,
+          "totalR": -99.166,
+          "avgR": -0.273,
+          "wr": 38,
+          "pf": 0.629
+        },
+        {
+          "key": "4h:FAVORABLE|NEARUSDT",
+          "samples": 362,
+          "totalR": -104.028,
+          "avgR": -0.287,
+          "wr": 37,
+          "pf": 0.613
+        },
+        {
+          "key": "4h:FAVORABLE|BTCUSDT",
+          "samples": 359,
+          "totalR": -176.823,
+          "avgR": -0.493,
+          "wr": 41.2,
+          "pf": 0.44
+        },
+        {
+          "key": "4h:FAVORABLE|DOTUSDT",
+          "samples": 358,
+          "totalR": -81.003,
+          "avgR": -0.226,
+          "wr": 41.9,
+          "pf": 0.682
+        },
+        {
+          "key": "4h:FAVORABLE|INJUSDT",
+          "samples": 358,
+          "totalR": -54.919,
+          "avgR": -0.153,
+          "wr": 42.5,
+          "pf": 0.773
+        },
+        {
+          "key": "4h:FAVORABLE|SOLUSDT",
+          "samples": 346,
+          "totalR": -109.356,
+          "avgR": -0.316,
+          "wr": 41.3,
+          "pf": 0.588
+        },
+        {
+          "key": "4h:FAVORABLE|SUIUSDT",
+          "samples": 345,
+          "totalR": -91.712,
+          "avgR": -0.266,
+          "wr": 41.2,
+          "pf": 0.639
+        },
+        {
+          "key": "4h:FAVORABLE|ADAUSDT",
+          "samples": 345,
+          "totalR": -38.438,
+          "avgR": -0.111,
+          "wr": 45.8,
+          "pf": 0.83
+        },
+        {
+          "key": "4h:FAVORABLE|ETHUSDT",
+          "samples": 333,
+          "totalR": -99.426,
+          "avgR": -0.299,
+          "wr": 44.7,
+          "pf": 0.608
+        },
+        {
+          "key": "4h:FAVORABLE|XRPUSDT",
+          "samples": 333,
+          "totalR": -119.125,
+          "avgR": -0.358,
+          "wr": 41.1,
+          "pf": 0.547
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 98,
+          "totalR": -58.961,
+          "avgR": -0.602,
+          "wr": 33.7,
+          "pf": 0.349
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|SUIUSDT",
+          "samples": 86,
+          "totalR": -38.228,
+          "avgR": -0.445,
+          "wr": 33.7,
+          "pf": 0.467
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|NEARUSDT",
+          "samples": 85,
+          "totalR": -24.06,
+          "avgR": -0.283,
+          "wr": 37.6,
+          "pf": 0.62
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|FETUSDT",
+          "samples": 82,
+          "totalR": -29.662,
+          "avgR": -0.362,
+          "wr": 35.4,
+          "pf": 0.535
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|HBARUSDT",
+          "samples": 80,
+          "totalR": -49.572,
+          "avgR": -0.62,
+          "wr": 30,
+          "pf": 0.332
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ETHUSDT",
+          "samples": 79,
+          "totalR": -31.33,
+          "avgR": -0.397,
+          "wr": 43,
+          "pf": 0.504
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|DOTUSDT",
+          "samples": 77,
+          "totalR": -31.137,
+          "avgR": -0.404,
+          "wr": 35.1,
+          "pf": 0.501
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|INJUSDT",
+          "samples": 75,
+          "totalR": -24.196,
+          "avgR": -0.323,
+          "wr": 36,
+          "pf": 0.574
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SOLUSDT",
+          "samples": 68,
+          "totalR": -25.949,
+          "avgR": -0.382,
+          "wr": 38.2,
+          "pf": 0.527
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|BTCUSDT",
+          "samples": 65,
+          "totalR": -49.907,
+          "avgR": -0.768,
+          "wr": 30.8,
+          "pf": 0.253
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|AVAXUSDT",
+          "samples": 65,
+          "totalR": -18.896,
+          "avgR": -0.291,
+          "wr": 41.5,
+          "pf": 0.612
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 59,
+          "totalR": -22.827,
+          "avgR": -0.387,
+          "wr": 35.6,
+          "pf": 0.518
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|ADAUSDT",
+          "samples": 58,
+          "totalR": -31.393,
+          "avgR": -0.541,
+          "wr": 27.6,
+          "pf": 0.375
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|AVAXUSDT",
+          "samples": 57,
+          "totalR": -5.623,
+          "avgR": -0.099,
+          "wr": 49.1,
+          "pf": 0.848
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|SOLUSDT",
+          "samples": 56,
+          "totalR": -17.897,
+          "avgR": -0.32,
+          "wr": 42.9,
+          "pf": 0.578
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 55,
+          "totalR": -17.477,
+          "avgR": -0.318,
+          "wr": 43.6,
+          "pf": 0.597
+        },
+        {
+          "key": "4h:NEUTRAL_LOW|INJUSDT",
+          "samples": 52,
+          "totalR": -7.051,
+          "avgR": -0.136,
+          "wr": 42.3,
+          "pf": 0.794
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 51,
+          "totalR": -28.804,
+          "avgR": -0.565,
+          "wr": 41.2,
+          "pf": 0.407
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|NEARUSDT",
+          "samples": 51,
+          "totalR": -1.75,
+          "avgR": -0.034,
+          "wr": 47.1,
+          "pf": 0.944
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|ADAUSDT",
+          "samples": 50,
+          "totalR": -21.879,
+          "avgR": -0.438,
+          "wr": 32,
+          "pf": 0.466
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|HBARUSDT",
+          "samples": 49,
+          "totalR": -4.979,
+          "avgR": -0.102,
+          "wr": 49,
+          "pf": 0.845
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|DOTUSDT",
+          "samples": 44,
+          "totalR": -7.978,
+          "avgR": -0.181,
+          "wr": 43.2,
+          "pf": 0.738
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|XRPUSDT",
+          "samples": 39,
+          "totalR": 2.327,
+          "avgR": 0.06,
+          "wr": 56.4,
+          "pf": 1.107
+        },
+        {
+          "key": "4h:NEUTRAL_HIGH|FETUSDT",
+          "samples": 35,
+          "totalR": -15,
+          "avgR": -0.429,
+          "wr": 31.4,
+          "pf": 0.473
+        },
+        {
+          "key": "4h:WEAK|ADAUSDT",
+          "samples": 34,
+          "totalR": -14.357,
+          "avgR": -0.422,
+          "wr": 32.4,
+          "pf": 0.481
+        },
+        {
+          "key": "4h:EXTREME|ADAUSDT",
+          "samples": 32,
+          "totalR": 3.274,
+          "avgR": 0.102,
+          "wr": 50,
+          "pf": 1.185
+        },
+        {
+          "key": "4h:EXTREME|SOLUSDT",
+          "samples": 32,
+          "totalR": 9.158,
+          "avgR": 0.286,
+          "wr": 59.4,
+          "pf": 1.625
+        },
+        {
+          "key": "4h:WEAK|BTCUSDT",
+          "samples": 30,
+          "totalR": -14.701,
+          "avgR": -0.49,
+          "wr": 46.7,
+          "pf": 0.477
+        },
+        {
+          "key": "4h:WEAK|ETHUSDT",
+          "samples": 28,
+          "totalR": 0.136,
+          "avgR": 0.005,
+          "wr": 53.6,
+          "pf": 1.008
+        },
+        {
+          "key": "4h:EXTREME|ETHUSDT",
+          "samples": 27,
+          "totalR": 12.417,
+          "avgR": 0.46,
+          "wr": 66.7,
+          "pf": 2.213
+        },
+        {
+          "key": "4h:WEAK|SOLUSDT",
+          "samples": 26,
+          "totalR": -1.234,
+          "avgR": -0.047,
+          "wr": 50,
+          "pf": 0.922
+        },
+        {
+          "key": "4h:WEAK|FETUSDT",
+          "samples": 25,
+          "totalR": -0.455,
+          "avgR": -0.018,
+          "wr": 48,
+          "pf": 0.97
+        },
+        {
+          "key": "4h:EXTREME|XRPUSDT",
+          "samples": 24,
+          "totalR": 9.412,
+          "avgR": 0.392,
+          "wr": 62.5,
+          "pf": 1.948
+        },
+        {
+          "key": "4h:WEAK|SUIUSDT",
+          "samples": 23,
+          "totalR": -14.648,
+          "avgR": -0.637,
+          "wr": 26.1,
+          "pf": 0.317
+        },
+        {
+          "key": "4h:WEAK|XRPUSDT",
+          "samples": 23,
+          "totalR": 3.191,
+          "avgR": 0.139,
+          "wr": 56.5,
+          "pf": 1.272
+        },
+        {
+          "key": "4h:WEAK|INJUSDT",
+          "samples": 22,
+          "totalR": -6.667,
+          "avgR": -0.303,
+          "wr": 36.4,
+          "pf": 0.606
+        },
+        {
+          "key": "4h:WEAK|HBARUSDT",
+          "samples": 21,
+          "totalR": -16.927,
+          "avgR": -0.806,
+          "wr": 19,
+          "pf": 0.219
+        },
+        {
+          "key": "4h:EXTREME|AVAXUSDT",
+          "samples": 21,
+          "totalR": 3.19,
+          "avgR": 0.152,
+          "wr": 52.4,
+          "pf": 1.292
+        },
+        {
+          "key": "4h:WEAK|AVAXUSDT",
+          "samples": 21,
+          "totalR": -13.306,
+          "avgR": -0.634,
+          "wr": 23.8,
+          "pf": 0.312
+        },
+        {
+          "key": "4h:WEAK|DOTUSDT",
+          "samples": 21,
+          "totalR": -1.814,
+          "avgR": -0.086,
+          "wr": 47.6,
+          "pf": 0.863
+        },
+        {
+          "key": "4h:COLD|DOTUSDT",
+          "samples": 20,
+          "totalR": -8.948,
+          "avgR": -0.447,
+          "wr": 30,
+          "pf": 0.453
+        },
+        {
+          "key": "4h:EXTREME|BTCUSDT",
+          "samples": 19,
+          "totalR": 8.185,
+          "avgR": 0.431,
+          "wr": 68.4,
+          "pf": 2.116
+        },
+        {
+          "key": "4h:COLD|FETUSDT",
+          "samples": 19,
+          "totalR": 6.829,
+          "avgR": 0.359,
+          "wr": 63.2,
+          "pf": 1.855
+        },
+        {
+          "key": "4h:COLD|NEARUSDT",
+          "samples": 16,
+          "totalR": -4.001,
+          "avgR": -0.25,
+          "wr": 37.5,
+          "pf": 0.649
+        },
+        {
+          "key": "4h:COLD|SUIUSDT",
+          "samples": 15,
+          "totalR": -13.063,
+          "avgR": -0.871,
+          "wr": 13.3,
+          "pf": 0.169
+        },
+        {
+          "key": "4h:HOT|INJUSDT",
+          "samples": 15,
+          "totalR": 9.77,
+          "avgR": 0.651,
+          "wr": 73.3,
+          "pf": 3.243
+        }
+      ],
+      "rsi1Asset": [
+        {
+          "key": "1h:FAVORABLE|INJUSDT",
+          "samples": 444,
+          "totalR": -87.465,
+          "avgR": -0.197,
+          "wr": 40.5,
+          "pf": 0.717
+        },
+        {
+          "key": "1h:FAVORABLE|BTCUSDT",
+          "samples": 439,
+          "totalR": -210.875,
+          "avgR": -0.48,
+          "wr": 42.1,
+          "pf": 0.455
+        },
+        {
+          "key": "1h:FAVORABLE|HBARUSDT",
+          "samples": 437,
+          "totalR": -140.851,
+          "avgR": -0.322,
+          "wr": 41.2,
+          "pf": 0.583
+        },
+        {
+          "key": "1h:FAVORABLE|DOTUSDT",
+          "samples": 436,
+          "totalR": -97.346,
+          "avgR": -0.223,
+          "wr": 42,
+          "pf": 0.686
+        },
+        {
+          "key": "1h:FAVORABLE|SOLUSDT",
+          "samples": 431,
+          "totalR": -103.171,
+          "avgR": -0.239,
+          "wr": 44.3,
+          "pf": 0.671
+        },
+        {
+          "key": "1h:FAVORABLE|SUIUSDT",
+          "samples": 430,
+          "totalR": -138.562,
+          "avgR": -0.322,
+          "wr": 38.6,
+          "pf": 0.58
+        },
+        {
+          "key": "1h:FAVORABLE|NEARUSDT",
+          "samples": 430,
+          "totalR": -105.458,
+          "avgR": -0.245,
+          "wr": 38.8,
+          "pf": 0.661
+        },
+        {
+          "key": "1h:FAVORABLE|ADAUSDT",
+          "samples": 426,
+          "totalR": -68.264,
+          "avgR": -0.16,
+          "wr": 43.4,
+          "pf": 0.764
+        },
+        {
+          "key": "1h:FAVORABLE|AVAXUSDT",
+          "samples": 425,
+          "totalR": -122.364,
+          "avgR": -0.288,
+          "wr": 40.2,
+          "pf": 0.615
+        },
+        {
+          "key": "1h:FAVORABLE|FETUSDT",
+          "samples": 423,
+          "totalR": -108.674,
+          "avgR": -0.257,
+          "wr": 38.8,
+          "pf": 0.647
+        },
+        {
+          "key": "1h:FAVORABLE|ETHUSDT",
+          "samples": 411,
+          "totalR": -113.36,
+          "avgR": -0.276,
+          "wr": 45.3,
+          "pf": 0.633
+        },
+        {
+          "key": "1h:FAVORABLE|XRPUSDT",
+          "samples": 398,
+          "totalR": -102.838,
+          "avgR": -0.258,
+          "wr": 44.5,
+          "pf": 0.649
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|XRPUSDT",
+          "samples": 62,
+          "totalR": -30.326,
+          "avgR": -0.489,
+          "wr": 38.7,
+          "pf": 0.426
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|HBARUSDT",
+          "samples": 54,
+          "totalR": -13.955,
+          "avgR": -0.258,
+          "wr": 44.4,
+          "pf": 0.649
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|DOTUSDT",
+          "samples": 50,
+          "totalR": -16.237,
+          "avgR": -0.325,
+          "wr": 38,
+          "pf": 0.58
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|ADAUSDT",
+          "samples": 50,
+          "totalR": -12.883,
+          "avgR": -0.258,
+          "wr": 40,
+          "pf": 0.644
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|NEARUSDT",
+          "samples": 49,
+          "totalR": -14.55,
+          "avgR": -0.297,
+          "wr": 36.7,
+          "pf": 0.604
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|ETHUSDT",
+          "samples": 47,
+          "totalR": -25.572,
+          "avgR": -0.544,
+          "wr": 36.2,
+          "pf": 0.406
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|SUIUSDT",
+          "samples": 45,
+          "totalR": -6.772,
+          "avgR": -0.15,
+          "wr": 46.7,
+          "pf": 0.78
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|FETUSDT",
+          "samples": 44,
+          "totalR": -5.229,
+          "avgR": -0.119,
+          "wr": 45.5,
+          "pf": 0.823
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|SUIUSDT",
+          "samples": 43,
+          "totalR": -22.228,
+          "avgR": -0.517,
+          "wr": 30.2,
+          "pf": 0.401
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|XRPUSDT",
+          "samples": 43,
+          "totalR": -21.353,
+          "avgR": -0.497,
+          "wr": 34.9,
+          "pf": 0.425
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|BTCUSDT",
+          "samples": 42,
+          "totalR": -30.516,
+          "avgR": -0.727,
+          "wr": 31,
+          "pf": 0.283
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|AVAXUSDT",
+          "samples": 41,
+          "totalR": -12.885,
+          "avgR": -0.314,
+          "wr": 39,
+          "pf": 0.589
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|AVAXUSDT",
+          "samples": 41,
+          "totalR": -22.111,
+          "avgR": -0.539,
+          "wr": 31.7,
+          "pf": 0.396
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|ETHUSDT",
+          "samples": 41,
+          "totalR": -4.799,
+          "avgR": -0.117,
+          "wr": 53.7,
+          "pf": 0.817
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|SOLUSDT",
+          "samples": 39,
+          "totalR": -18.144,
+          "avgR": -0.465,
+          "wr": 33.3,
+          "pf": 0.435
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|INJUSDT",
+          "samples": 36,
+          "totalR": -4.328,
+          "avgR": -0.12,
+          "wr": 44.4,
+          "pf": 0.817
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|NEARUSDT",
+          "samples": 33,
+          "totalR": -17.055,
+          "avgR": -0.517,
+          "wr": 27.3,
+          "pf": 0.393
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|DOTUSDT",
+          "samples": 33,
+          "totalR": -9.148,
+          "avgR": -0.277,
+          "wr": 39.4,
+          "pf": 0.623
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|FETUSDT",
+          "samples": 33,
+          "totalR": -10.1,
+          "avgR": -0.306,
+          "wr": 36.4,
+          "pf": 0.586
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|SOLUSDT",
+          "samples": 33,
+          "totalR": -15.143,
+          "avgR": -0.459,
+          "wr": 36.4,
+          "pf": 0.459
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|HBARUSDT",
+          "samples": 31,
+          "totalR": -17.024,
+          "avgR": -0.549,
+          "wr": 32.3,
+          "pf": 0.392
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|BTCUSDT",
+          "samples": 28,
+          "totalR": -18.479,
+          "avgR": -0.66,
+          "wr": 35.7,
+          "pf": 0.319
+        },
+        {
+          "key": "1h:NEUTRAL_LOW|ADAUSDT",
+          "samples": 27,
+          "totalR": -13.305,
+          "avgR": -0.493,
+          "wr": 29.6,
+          "pf": 0.426
+        },
+        {
+          "key": "1h:NEUTRAL_HIGH|INJUSDT",
+          "samples": 24,
+          "totalR": -4.438,
+          "avgR": -0.185,
+          "wr": 41.7,
+          "pf": 0.728
+        },
+        {
+          "key": "1h:COLD|FETUSDT",
+          "samples": 20,
+          "totalR": -6.297,
+          "avgR": -0.315,
+          "wr": 35,
+          "pf": 0.581
+        },
+        {
+          "key": "1h:HOT|ETHUSDT",
+          "samples": 19,
+          "totalR": -4.964,
+          "avgR": -0.261,
+          "wr": 42.1,
+          "pf": 0.635
+        },
+        {
+          "key": "1h:HOT|ADAUSDT",
+          "samples": 18,
+          "totalR": -5.814,
+          "avgR": -0.323,
+          "wr": 33.3,
+          "pf": 0.569
+        },
+        {
+          "key": "1h:COLD|INJUSDT",
+          "samples": 15,
+          "totalR": -2.966,
+          "avgR": -0.198,
+          "wr": 40,
+          "pf": 0.714
+        }
+      ]
+    }
+  ],
+  "robustness": {
+    "sideRegimeRsi4": [
+      {
+        "key": "LONG|BULL|4h:EXTREME",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.642,
+        "minSamples": 120
+      },
+      {
+        "key": "LONG|BULL|4h:HOT",
+        "adequate": 3,
+        "positive": 2,
+        "meanAvgR": 0.038,
+        "minSamples": 52
+      },
+      {
+        "key": "SHORT|BULL|4h:FAVORABLE",
+        "adequate": 2,
+        "positive": 1,
+        "meanAvgR": -0.031,
+        "minSamples": 23
+      },
+      {
+        "key": "SHORT|TRANSITION|4h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.185,
+        "minSamples": 76
+      },
+      {
+        "key": "SHORT|BEAR|4h:EXTREME",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.202,
+        "minSamples": 66
+      },
+      {
+        "key": "SHORT|BULL|4h:WEAK",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.223,
+        "minSamples": 77
+      },
+      {
+        "key": "LONG|TRANSITION|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.25,
+        "minSamples": 100
+      },
+      {
+        "key": "SHORT|RANGE|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.279,
+        "minSamples": 297
+      },
+      {
+        "key": "SHORT|TRANSITION|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.291,
+        "minSamples": 171
+      },
+      {
+        "key": "LONG|BEAR|4h:FAVORABLE",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.302,
+        "minSamples": 29
+      },
+      {
+        "key": "SHORT|BULL|4h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.333,
+        "minSamples": 95
+      },
+      {
+        "key": "SHORT|BEAR|4h:COLD",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.372,
+        "minSamples": 52
+      },
+      {
+        "key": "LONG|RANGE|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.378,
+        "minSamples": 167
+      },
+      {
+        "key": "LONG|BULL|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.403,
+        "minSamples": 290
+      },
+      {
+        "key": "LONG|RANGE|4h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.428,
+        "minSamples": 110
+      },
+      {
+        "key": "SHORT|BEAR|4h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.434,
+        "minSamples": 308
+      },
+      {
+        "key": "LONG|TRANSITION|4h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.437,
+        "minSamples": 70
+      },
+      {
+        "key": "SHORT|RANGE|4h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.473,
+        "minSamples": 48
+      },
+      {
+        "key": "LONG|BEAR|4h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.561,
+        "minSamples": 81
+      },
+      {
+        "key": "LONG|BEAR|4h:WEAK",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.736,
+        "minSamples": 34
+      }
+    ],
+    "sideRegimeRsi1": [
+      {
+        "key": "LONG|BULL|1h:HOT",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.343,
+        "minSamples": 47
+      },
+      {
+        "key": "LONG|BULL|1h:EXTREME",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.329,
+        "minSamples": 32
+      },
+      {
+        "key": "SHORT|BULL|1h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 1,
+        "meanAvgR": -0.083,
+        "minSamples": 43
+      },
+      {
+        "key": "LONG|BULL|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.16,
+        "minSamples": 331
+      },
+      {
+        "key": "LONG|TRANSITION|1h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.175,
+        "minSamples": 30
+      },
+      {
+        "key": "SHORT|TRANSITION|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.217,
+        "minSamples": 216
+      },
+      {
+        "key": "SHORT|RANGE|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.241,
+        "minSamples": 278
+      },
+      {
+        "key": "LONG|RANGE|1h:HOT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.246,
+        "minSamples": 22
+      },
+      {
+        "key": "LONG|TRANSITION|1h:HOT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.257,
+        "minSamples": 26
+      },
+      {
+        "key": "SHORT|BULL|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.324,
+        "minSamples": 139
+      },
+      {
+        "key": "LONG|TRANSITION|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.344,
+        "minSamples": 128
+      },
+      {
+        "key": "LONG|RANGE|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.37,
+        "minSamples": 232
+      },
+      {
+        "key": "SHORT|RANGE|1h:COLD",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.386,
+        "minSamples": 23
+      },
+      {
+        "key": "SHORT|TRANSITION|1h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.391,
+        "minSamples": 21
+      },
+      {
+        "key": "SHORT|BEAR|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.409,
+        "minSamples": 254
+      },
+      {
+        "key": "SHORT|BEAR|1h:COLD",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.452,
+        "minSamples": 43
+      },
+      {
+        "key": "SHORT|BEAR|1h:EXTREME",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.466,
+        "minSamples": 20
+      },
+      {
+        "key": "LONG|RANGE|1h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.539,
+        "minSamples": 39
+      },
+      {
+        "key": "SHORT|BEAR|1h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.572,
+        "minSamples": 57
+      },
+      {
+        "key": "LONG|BEAR|1h:FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.582,
+        "minSamples": 95
+      },
+      {
+        "key": "SHORT|RANGE|1h:NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.582,
+        "minSamples": 59
+      },
+      {
+        "key": "LONG|BULL|1h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.605,
+        "minSamples": 61
+      },
+      {
+        "key": "LONG|BEAR|1h:NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.633,
+        "minSamples": 25
+      },
+      {
+        "key": "SHORT|TRANSITION|1h:COLD",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.73,
+        "minSamples": 27
+      }
+    ],
+    "rsiCombo": [
+      {
+        "key": "HOT|EXTREME",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.626,
+        "minSamples": 31
+      },
+      {
+        "key": "FAVORABLE|EXTREME",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.507,
+        "minSamples": 63
+      },
+      {
+        "key": "EXTREME|EXTREME",
+        "adequate": 3,
+        "positive": 3,
+        "meanAvgR": 0.411,
+        "minSamples": 32
+      },
+      {
+        "key": "HOT|HOT",
+        "adequate": 2,
+        "positive": 2,
+        "meanAvgR": 0.066,
+        "minSamples": 21
+      },
+      {
+        "key": "FAVORABLE|HOT",
+        "adequate": 3,
+        "positive": 2,
+        "meanAvgR": 0.045,
+        "minSamples": 40
+      },
+      {
+        "key": "NEUTRAL_HIGH|WEAK",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.107,
+        "minSamples": 38
+      },
+      {
+        "key": "EXTREME|FAVORABLE",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.195,
+        "minSamples": 27
+      },
+      {
+        "key": "HOT|FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.224,
+        "minSamples": 25
+      },
+      {
+        "key": "FAVORABLE|COLD",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.242,
+        "minSamples": 31
+      },
+      {
+        "key": "FAVORABLE|NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.288,
+        "minSamples": 184
+      },
+      {
+        "key": "COLD|COLD",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.312,
+        "minSamples": 27
+      },
+      {
+        "key": "FAVORABLE|FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.317,
+        "minSamples": 1107
+      },
+      {
+        "key": "NEUTRAL_HIGH|NEUTRAL_HIGH",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.424,
+        "minSamples": 35
+      },
+      {
+        "key": "FAVORABLE|NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.433,
+        "minSamples": 212
+      },
+      {
+        "key": "NEUTRAL_LOW|FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.491,
+        "minSamples": 77
+      },
+      {
+        "key": "FAVORABLE|WEAK",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.497,
+        "minSamples": 57
+      },
+      {
+        "key": "NEUTRAL_LOW|WEAK",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.513,
+        "minSamples": 20
+      },
+      {
+        "key": "NEUTRAL_LOW|NEUTRAL_LOW",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.532,
+        "minSamples": 58
+      },
+      {
+        "key": "NEUTRAL_HIGH|FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.541,
+        "minSamples": 107
+      },
+      {
+        "key": "COLD|FAVORABLE",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.632,
+        "minSamples": 29
+      }
+    ],
+    "rsi4Asset": [
+      {
+        "key": "4h:NEUTRAL_HIGH|XRPUSDT",
+        "adequate": 2,
+        "positive": 2,
+        "meanAvgR": 0.225,
+        "minSamples": 24
+      },
+      {
+        "key": "4h:EXTREME|ETHUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.46,
+        "minSamples": 27
+      },
+      {
+        "key": "4h:EXTREME|XRPUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.392,
+        "minSamples": 24
+      },
+      {
+        "key": "4h:EXTREME|SOLUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.286,
+        "minSamples": 32
+      },
+      {
+        "key": "4h:EXTREME|AVAXUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.152,
+        "minSamples": 21
+      },
+      {
+        "key": "4h:WEAK|XRPUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.139,
+        "minSamples": 23
+      },
+      {
+        "key": "4h:EXTREME|ADAUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.102,
+        "minSamples": 32
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|NEARUSDT",
+        "adequate": 3,
+        "positive": 1,
+        "meanAvgR": 0.012,
+        "minSamples": 21
+      },
+      {
+        "key": "4h:WEAK|ETHUSDT",
+        "adequate": 1,
+        "positive": 1,
+        "meanAvgR": 0.005,
+        "minSamples": 28
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|HBARUSDT",
+        "adequate": 2,
+        "positive": 1,
+        "meanAvgR": -0.016,
+        "minSamples": 30
+      },
+      {
+        "key": "4h:WEAK|FETUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.018,
+        "minSamples": 25
+      },
+      {
+        "key": "4h:WEAK|SOLUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.047,
+        "minSamples": 26
+      },
+      {
+        "key": "4h:WEAK|DOTUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.086,
+        "minSamples": 21
+      },
+      {
+        "key": "4h:FAVORABLE|INJUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.115,
+        "minSamples": 105
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|INJUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.117,
+        "minSamples": 24
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|DOTUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.161,
+        "minSamples": 31
+      },
+      {
+        "key": "4h:FAVORABLE|ADAUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.164,
+        "minSamples": 115
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|AVAXUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.176,
+        "minSamples": 21
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|INJUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.268,
+        "minSamples": 20
+      },
+      {
+        "key": "4h:FAVORABLE|NEARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.291,
+        "minSamples": 124
+      },
+      {
+        "key": "4h:FAVORABLE|DOTUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.291,
+        "minSamples": 110
+      },
+      {
+        "key": "4h:FAVORABLE|SUIUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.292,
+        "minSamples": 113
+      },
+      {
+        "key": "4h:WEAK|INJUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.303,
+        "minSamples": 22
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|DOTUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.304,
+        "minSamples": 30
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|FETUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.307,
+        "minSamples": 22
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|AVAXUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.32,
+        "minSamples": 24
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|SOLUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.332,
+        "minSamples": 35
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|NEARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.347,
+        "minSamples": 25
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|ADAUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.351,
+        "minSamples": 29
+      },
+      {
+        "key": "4h:FAVORABLE|FETUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.359,
+        "minSamples": 116
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|ETHUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.389,
+        "minSamples": 26
+      },
+      {
+        "key": "4h:FAVORABLE|XRPUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.395,
+        "minSamples": 102
+      },
+      {
+        "key": "4h:FAVORABLE|SOLUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.409,
+        "minSamples": 107
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|ETHUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.415,
+        "minSamples": 39
+      },
+      {
+        "key": "4h:FAVORABLE|AVAXUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.421,
+        "minSamples": 119
+      },
+      {
+        "key": "4h:FAVORABLE|HBARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.423,
+        "minSamples": 119
+      },
+      {
+        "key": "4h:FAVORABLE|ETHUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.426,
+        "minSamples": 107
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|ADAUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.432,
+        "minSamples": 23
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|FETUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.438,
+        "minSamples": 22
+      },
+      {
+        "key": "4h:COLD|DOTUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.447,
+        "minSamples": 20
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|SUIUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.467,
+        "minSamples": 24
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|SUIUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.504,
+        "minSamples": 27
+      },
+      {
+        "key": "4h:WEAK|BTCUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.522,
+        "minSamples": 26
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|SOLUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.528,
+        "minSamples": 29
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|HBARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.532,
+        "minSamples": 22
+      },
+      {
+        "key": "4h:WEAK|ADAUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.54,
+        "minSamples": 26
+      },
+      {
+        "key": "4h:FAVORABLE|BTCUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.602,
+        "minSamples": 114
+      },
+      {
+        "key": "4h:NEUTRAL_HIGH|BTCUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.634,
+        "minSamples": 37
+      },
+      {
+        "key": "4h:WEAK|AVAXUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.634,
+        "minSamples": 21
+      },
+      {
+        "key": "4h:WEAK|SUIUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.637,
+        "minSamples": 23
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|XRPUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.74,
+        "minSamples": 42
+      },
+      {
+        "key": "4h:NEUTRAL_LOW|BTCUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.767,
+        "minSamples": 35
+      },
+      {
+        "key": "4h:WEAK|HBARUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.806,
+        "minSamples": 21
+      }
+    ],
+    "rsi1Asset": [
+      {
+        "key": "1h:NEUTRAL_LOW|ETHUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.103,
+        "minSamples": 30
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|INJUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.105,
+        "minSamples": 28
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|INJUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.185,
+        "minSamples": 24
+      },
+      {
+        "key": "1h:FAVORABLE|DOTUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.192,
+        "minSamples": 147
+      },
+      {
+        "key": "1h:FAVORABLE|ADAUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.193,
+        "minSamples": 146
+      },
+      {
+        "key": "1h:FAVORABLE|INJUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.2,
+        "minSamples": 144
+      },
+      {
+        "key": "1h:FAVORABLE|NEARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.224,
+        "minSamples": 156
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|FETUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.227,
+        "minSamples": 23
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|SUIUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.232,
+        "minSamples": 29
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|HBARUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.234,
+        "minSamples": 38
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|FETUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.241,
+        "minSamples": 33
+      },
+      {
+        "key": "1h:FAVORABLE|FETUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.281,
+        "minSamples": 127
+      },
+      {
+        "key": "1h:FAVORABLE|XRPUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.281,
+        "minSamples": 126
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|ADAUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.288,
+        "minSamples": 32
+      },
+      {
+        "key": "1h:FAVORABLE|AVAXUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.302,
+        "minSamples": 142
+      },
+      {
+        "key": "1h:COLD|FETUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.315,
+        "minSamples": 20
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|DOTUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.323,
+        "minSamples": 25
+      },
+      {
+        "key": "1h:FAVORABLE|SOLUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.336,
+        "minSamples": 137
+      },
+      {
+        "key": "1h:FAVORABLE|SUIUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.347,
+        "minSamples": 143
+      },
+      {
+        "key": "1h:FAVORABLE|HBARUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.361,
+        "minSamples": 140
+      },
+      {
+        "key": "1h:FAVORABLE|ETHUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.377,
+        "minSamples": 127
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|DOTUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.432,
+        "minSamples": 23
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|NEARUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.435,
+        "minSamples": 23
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|NEARUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.46,
+        "minSamples": 28
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|SOLUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.461,
+        "minSamples": 29
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|AVAXUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.473,
+        "minSamples": 26
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|ADAUSDT",
+        "adequate": 1,
+        "positive": 0,
+        "meanAvgR": -0.493,
+        "minSamples": 27
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|SOLUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.521,
+        "minSamples": 25
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|XRPUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.556,
+        "minSamples": 32
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|XRPUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.562,
+        "minSamples": 25
+      },
+      {
+        "key": "1h:FAVORABLE|BTCUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.594,
+        "minSamples": 138
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|HBARUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.614,
+        "minSamples": 21
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|SUIUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.621,
+        "minSamples": 27
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|ETHUSDT",
+        "adequate": 3,
+        "positive": 0,
+        "meanAvgR": -0.622,
+        "minSamples": 25
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|AVAXUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.655,
+        "minSamples": 30
+      },
+      {
+        "key": "1h:NEUTRAL_LOW|BTCUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.691,
+        "minSamples": 23
+      },
+      {
+        "key": "1h:NEUTRAL_HIGH|BTCUSDT",
+        "adequate": 2,
+        "positive": 0,
+        "meanAvgR": -0.751,
+        "minSamples": 29
+      }
+    ]
+  }
+}
