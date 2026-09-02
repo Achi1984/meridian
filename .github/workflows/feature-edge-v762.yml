@@ -1,4 +1,4 @@
-name: MERIDIAN Feature Edge v7.63
+name: MERIDIAN Feature Edge v7.64
 
 on:
   workflow_dispatch:
@@ -8,16 +8,19 @@ on:
       - "scripts/signal-cohort-v762.mjs"
       - "scripts/feature-edge-map.mjs"
       - "scripts/feature-interaction-map.mjs"
+      - "scripts/walk-forward-v764.mjs"
       - "feature-attribution.js"
       - "feature-interactions.js"
+      - "walk-forward-interactions.js"
       - "test/feature-interactions.test.js"
+      - "test/walk-forward-interactions.test.js"
       - ".github/workflows/feature-edge-v762.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: meridian-feature-edge-v763
+  group: meridian-feature-edge-v764
   cancel-in-progress: false
 
 jobs:
@@ -38,11 +41,11 @@ jobs:
       - name: Generate 30d 60d 90d signal cohorts
         run: node scripts/signal-cohort-v762.mjs --out-dir /tmp/v762
       - name: Build raw feature edge report
-        run: |
-          node scripts/feature-edge-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 30 --out research/feature-edge-evidence-v762.json
+        run: node scripts/feature-edge-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 30 --out research/feature-edge-evidence-v762.json
       - name: Build conditional interaction report
-        run: |
-          node scripts/feature-interaction-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 40 --out research/feature-interaction-evidence-v763.json
+        run: node scripts/feature-interaction-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 40 --out research/feature-interaction-evidence-v763.json
+      - name: Run chronological walk-forward validation
+        run: node scripts/walk-forward-v764.mjs --input /tmp/v762/signal-cohort-90d.json --train-days 45 --test-days 15 --step-days 15 --min-train-samples 50 --min-test-samples 15 --min-train-avgr 0.03 --out research/walk-forward-evidence-v764.json
       - name: Build compact summaries
         shell: bash
         run: |
@@ -61,15 +64,21 @@ jobs:
           const out=['# MERIDIAN v7.63 — Feature Interaction Evidence','',`Generated: ${r.generatedAt}`,'','Conditional raw-feature attribution on the same portfolio-independent cohorts as v7.62. Minimum adequate bucket size: 40.','', '## Repeatable positive interactions',''];let pos=0;
           for(const [name,items] of Object.entries(r.stability?.interactions||{}))for(const x of items||[]){if(x.consistentDirection&&x.direction==='POSITIVE'&&x.windows>=2){pos++;out.push(`- **${name}: ${x.bucket}** — ${x.observations.map(o=>`${o.window}: ${o.avgR}R (n=${o.samples}, PF=${o.pf})`).join('; ')}`)}}
           if(!pos)out.push('- No positive interaction repeated across at least two adequate windows.');
-          out.push('','## Guardrail','','Interactions remain research evidence only. Do not promote Challenger V3.2 from one attractive combination; require 30/60/90 consistency, sufficient samples and walk-forward validation.','');
+          out.push('','## Guardrail','','Interactions remain research evidence only. Do not promote Challenger V3.2 from one attractive combination; require walk-forward validation.','');
           fs.writeFileSync('research/feature-interaction-evidence-v763.md',out.join('\n'));
+
+          const w=JSON.parse(fs.readFileSync('research/walk-forward-evidence-v764.json','utf8'));
+          const s=w.summary||{},wf=['# MERIDIAN v7.64 — Walk-Forward Interaction Validation','',`Generated from ${w.range?.samples||0} chronological 90d cohort samples.`,'',`Config: ${w.config?.trainDays}d train / ${w.config?.testDays}d holdout / ${w.config?.stepDays}d step. Train bucket minimum ${w.config?.minTrainSamples}; holdout minimum ${w.config?.minTestSamples}; train Avg R threshold ${w.config?.minTrainAvgR}.`,'',`Folds: **${s.folds||0}** · selected train buckets: **${s.selections||0}** · adequate holdouts: **${s.adequateHoldout||0}** · positive holdouts: **${s.positiveHoldout||0}** · retention: **${s.positiveRetentionPct ?? 'n/a'}%**`,'','## Repeated holdout behavior',''];
+          const rep=(s.repeated||[]).filter(x=>x.folds>=2).slice(0,20);if(rep.length)for(const x of rep)wf.push(`- **${x.interaction}: ${x.bucket}** — positive ${x.positiveFolds}/${x.folds} folds (${x.positiveFoldPct}%), weighted holdout Avg R ${x.weightedTestAvgR}, n=${x.testSamples}`);else wf.push('- No interaction bucket was selected and adequately retested in at least two folds.');
+          wf.push('','## Decision rule','','Only interactions that survive unseen chronological holdouts are candidates for a future calibrated soft score. This does not change Baseline 6.2 or Paper execution.','');
+          fs.writeFileSync('research/walk-forward-evidence-v764.md',wf.join('\n'));
           NODE
       - name: Test research analytics
-        run: node --test test/feature-attribution.test.js test/feature-interactions.test.js test/research-v2.test.js test/research-analytics.test.js
+        run: node --test test/feature-attribution.test.js test/feature-interactions.test.js test/walk-forward-interactions.test.js test/research-v2.test.js test/research-analytics.test.js
       - name: Upload raw cohorts
         uses: actions/upload-artifact@v4
         with:
-          name: meridian-v763-signal-cohorts
+          name: meridian-v764-signal-cohorts
           path: /tmp/v762/*.json
           retention-days: 30
       - name: Commit evidence to main
@@ -79,7 +88,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -- scripts/signal-cohort-v762.mjs
-          git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md research/feature-interaction-evidence-v763.json research/feature-interaction-evidence-v763.md
+          git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md research/feature-interaction-evidence-v763.json research/feature-interaction-evidence-v763.md research/walk-forward-evidence-v764.json research/walk-forward-evidence-v764.md
           if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
-          git commit -m "MERIDIAN v7.63: feature interaction evidence"
+          git commit -m "MERIDIAN v7.64: walk-forward feature evidence"
           git push origin HEAD:main
