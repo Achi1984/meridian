@@ -25,9 +25,12 @@ async function json(url){
   if(!r.ok)fail(`${url} HTTP ${r.status}`);
   return await r.json();
 }
-function sameRelease(x){
-  return String(x?.version||'')===EXPECTED_VERSION&&String(x?.buildId||'')===EXPECTED_BUILD;
+async function text(url){
+  const r=await request(url);
+  if(!r.ok)fail(`${url} HTTP ${r.status}`);
+  return await r.text();
 }
+function sameRelease(x){return String(x?.version||'')===EXPECTED_VERSION&&String(x?.buildId||'')===EXPECTED_BUILD;}
 function shaInfo(h){
   const deployed=String(h?.deploymentSha||'').trim().toLowerCase();
   if(!deployed||!EXPECTED_SHA)return {deploymentSha:deployed||null,shaMatch:null};
@@ -38,6 +41,24 @@ async function smoke(){
   const nonce=Date.now();
   const pages=await json(`${PAGES_BASE}/version.json?smoke=${nonce}`);
   if(!sameRelease(pages))fail(`GitHub Pages stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${pages?.version}/${pages?.buildId}`);
+
+  const index=await text(`${PAGES_BASE}/index.html?smoke=${nonce}`);
+  if(!index.includes(`MERIDIAN_RELEASE_VERSION='${EXPECTED_VERSION}'`))fail('Pages index release authority is stale');
+  if(!index.includes(`MERIDIAN_RELEASE_BUILD='${EXPECTED_BUILD}'`))fail('Pages index build authority is stale');
+
+  const loader=await text(`${PAGES_BASE}/app-v6.06.js?smoke=${nonce}`);
+  if(!loader.includes('app-v7.60-final-ui-authority.js'))fail('Canonical loader missing final UI authority');
+  if(loader.includes('app-v7.32-legacy.js'))fail('Canonical loader still activates obsolete v7.32 runtime layer');
+  if(loader.includes('emergency-input-hotfix'))fail('Canonical loader still activates emergency input layer');
+
+  const finalUi=await text(`${PAGES_BASE}/app-v7.60-final-ui-authority.js?smoke=${nonce}`);
+  if(!finalUi.includes('CHALLENGER V3.2'))fail('Deployed Paper UI missing V3.2 research candidate');
+  if(!finalUi.includes("const VERSION='7.60'"))fail('Deployed final UI authority has wrong version');
+
+  for(const [route,hash] of [['center.html','#center'],['depot.html','#portfolio'],['market.html','#market'],['trade.html','#daytrade'],['forecast.html','#forecast']]){
+    const shim=await text(`${PAGES_BASE}/${route}?smoke=${nonce}`);
+    if(!shim.includes(`index.html${hash}`))fail(`${route} is still a stale standalone snapshot`);
+  }
 
   const health=await json(`${GATEWAY}/gateway-health?smoke=${nonce}`);
   if(!health?.ok)fail('Gateway health not ok');
@@ -50,30 +71,13 @@ async function smoke(){
   const sha=shaInfo(health);
   if(REQUIRE_SHA&&sha.shaMatch!==true)fail(`Deployment SHA mismatch: expected ${EXPECTED_SHA||'unknown'}, got ${sha.deploymentSha||'missing'}`);
 
-  return {
-    ok:true,
-    version:EXPECTED_VERSION,
-    buildId:EXPECTED_BUILD,
-    pages:true,
-    gateway:true,
-    privateData:true,
-    anonymousProtectedStatus:protectedResponse.status,
-    ...sha,
-    checkedAt:new Date().toISOString()
-  };
+  return {ok:true,version:EXPECTED_VERSION,buildId:EXPECTED_BUILD,pages:true,canonicalLoader:true,legacyRoutes:true,gateway:true,privateData:true,anonymousProtectedStatus:protectedResponse.status,...sha,checkedAt:new Date().toISOString()};
 }
 
 let last;
 for(let attempt=1;attempt<=RETRIES;attempt++){
-  try{
-    const result=await smoke();
-    console.log(JSON.stringify({...result,attempt},null,2));
-    process.exit(0);
-  }catch(e){
-    last=e;
-    console.warn(`[runtime-smoke] attempt ${attempt}/${RETRIES}: ${String(e?.message||e)}`);
-    if(attempt<RETRIES)await sleep(DELAY_MS);
-  }
+  try{const result=await smoke();console.log(JSON.stringify({...result,attempt},null,2));process.exit(0)}
+  catch(e){last=e;console.warn(`[runtime-smoke] attempt ${attempt}/${RETRIES}: ${String(e?.message||e)}`);if(attempt<RETRIES)await sleep(DELAY_MS)}
 }
 console.error('[runtime-smoke] FAILED:',String(last?.stack||last));
 process.exit(1);
