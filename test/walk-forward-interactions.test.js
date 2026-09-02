@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { walkForwardInteractions } from '../walk-forward-interactions.js';
+const DAY=86400000,t0=Date.UTC(2026,0,1);
+function row(day,outcomeR,volume=1.6){return{sampledAt:new Date(t0+day*DAY).toISOString(),side:'LONG',regime:'RANGE',baselineStatus:'READY',outcomeR,frames:{'15m':{price:101,ema20:100,ema50:99,rsi:55,macdHist:.5,adx:22,atr:2,volumeRatio:volume},'1h':{price:102,ema20:100,ema50:98,rsi:58,macdHist:1,adx:30,atr:4,volumeRatio:1.1},'4h':{price:104,ema20:100,ema50:96,rsi:60,macdHist:2,adx:36,atr:8,volumeRatio:1}}}}
+test('walk-forward selects only past-positive buckets and evaluates unseen future rows',()=>{const rows=[];for(let d=0;d<90;d++)for(let i=0;i<4;i++)rows.push(row(d,d<60?.2:(d<75?.1:-.1)));const x=walkForwardInteractions(rows,{trainDays:45,testDays:15,stepDays:15,minTrainSamples:20,minTestSamples:10,minTrainAvgR:.03,interactions:[['volume15','regime']]});assert.ok(x.folds.length>=2);assert.ok(x.summary.selections>0);assert.ok(x.folds[0].testStart>x.folds[0].trainEnd);assert.equal(x.researchOnly,true);assert.equal(x.executionImpact,false)});
+test('holdout retention turns false when future edge reverses',()=>{const rows=[];for(let d=0;d<75;d++)for(let i=0;i<3;i++)rows.push(row(d,d<45?.2:-.2));const x=walkForwardInteractions(rows,{trainDays:45,testDays:15,stepDays:15,minTrainSamples:20,minTestSamples:10,minTrainAvgR:.03,interactions:[['volume15','regime']]});assert.ok(x.folds[0].selections.length>0);assert.equal(x.folds[0].selections[0].holdoutPositive,false)});
