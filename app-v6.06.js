@@ -11,6 +11,7 @@
     document.write('<script src="app-v7.60-dashboard-consistency.js?v=7.60-R1"><\/script>');
     document.write('<script src="app-v7.60-private-hydration-hotfix.js?v=7.60-R2"><\/script>');
     document.write('<script src="app-v7.60-nav-hotfix.js?v=7.60-R3"><\/script>');
+    document.write('<script src="app-v7.60-unlock-hotfix.js?v=7.60-R4"><\/script>');
     return;
   }
   const load=src=>new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)});
@@ -23,5 +24,6 @@
     .then(()=>load('app-v7.60-dashboard-consistency.js?v=7.60-R1'))
     .then(()=>load('app-v7.60-private-hydration-hotfix.js?v=7.60-R2'))
     .then(()=>load('app-v7.60-nav-hotfix.js?v=7.60-R3'))
+    .then(()=>load('app-v7.60-unlock-hotfix.js?v=7.60-R4'))
     .catch(e=>console.error('MERIDIAN loader',e));
 })();
