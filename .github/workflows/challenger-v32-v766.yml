@@ -1,0 +1,72 @@
+name: MERIDIAN Challenger V3.2 v7.66
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "challenger-v32.js"
+      - "scripts/challenger-v32-v766.mjs"
+      - "test/challenger-v32.test.js"
+      - ".github/workflows/challenger-v32-v766.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-challenger-v32-v766
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v766/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v766/${name}" --end-at "${end_at}"
+          done
+      - name: Test Challenger V3.2 analytics
+        run: node --test test/challenger-v32.test.js test/feature-attribution.test.js
+      - name: Compare V3.2 with Baseline at equal coverage
+        run: node scripts/challenger-v32-v766.mjs --p0 /tmp/v766/p0/signal-cohort-90d.json --p1 /tmp/v766/p1/signal-cohort-90d.json --p2 /tmp/v766/p2/signal-cohort-90d.json --p3 /tmp/v766/p3/signal-cohort-90d.json --out research/challenger-v32-evidence-v766.json
+      - name: Build compact evidence summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/challenger-v32-evidence-v766.json','utf8'));
+          const out=['# MERIDIAN v7.66 — Challenger V3.2 Soft Score Evidence','',`Generated: ${r.generatedAt}`,'','Research-only. V3.2 ranks the full portfolio-independent signal universe using small additive weights from interactions that survived v7.64 walk-forward and v7.65 disjoint validation. It does not require Baseline READY. For fair signal-level comparison, V3.2 selects exactly the same number of candidates as Baseline READY in each period.',''];
+          for(const [p,x] of Object.entries(r.periods||{})){
+            out.push(`## ${p}`,'',`Baseline: n=${x.baseline.samples}, Avg R=${x.baseline.avgR}, PF=${x.baseline.pf}, WR=${x.baseline.winRate}%` ,`V3.2: n=${x.challengerV32.samples}, Avg R=${x.challengerV32.avgR}, PF=${x.challengerV32.pf}, WR=${x.challengerV32.winRate}%` ,`Opportunity: overlap=${x.opportunity.overlap}, discovered=${x.opportunity.discovered}, displaced=${x.opportunity.displaced}, avoided losers=${x.opportunity.avoidedLosers}, missed winners=${x.opportunity.missedWinners}, discovered winners=${x.opportunity.discoveredWinners}, discovered losers=${x.opportunity.discoveredLosers}`,'');
+          }
+          out.push('## Summary','',`V3.2 Avg R better in **${r.summary.v32AvgRBetterPeriods}/${r.summary.adequatePeriods}** periods (${r.summary.v32AvgRBetterPct}%). Equal coverage in all periods: **${r.summary.allCoverageMatched?'YES':'NO'}**.`,'','## Guardrail','','This is signal-level ranking evidence, not a Paper promotion. Before Shadow activation, require portfolio-path replay with drawdown, concurrency, frequency/opportunity cost and common execution rules. Baseline 6.2 remains frozen.','');
+          fs.writeFileSync('research/challenger-v32-evidence-v766.md',out.join('\n'));
+          NODE
+      - name: Commit evidence to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/challenger-v32-evidence-v766.json research/challenger-v32-evidence-v766.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.66: Challenger V3.2 evidence"
+          git push origin HEAD:main
