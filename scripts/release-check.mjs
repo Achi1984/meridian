@@ -17,6 +17,7 @@ must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
 must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
 must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
+must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
 
 const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
@@ -67,6 +68,18 @@ must(overview.includes('tabs.prepend(compare)'),'overview tab must be first');
 must(overview.includes('activateOverview'),'Paper overview default activation missing');
 must(overview.includes("replace(/3 BOTS/g,'4 BOTS')"),'Paper Lab bot count correction missing');
 
+must(fs.existsSync('research-analytics.js'),'research telemetry module missing');
+const telemetry=read('research-analytics.js');
+must(telemetry.includes("schemaVersion:'7.47-TELEMETRY-V1'"),'research telemetry schema mismatch');
+must(telemetry.includes('executionImpact:false'),'research telemetry must remain non-executing');
+must(telemetry.includes('expectancy'),'research telemetry expectancy missing');
+must(telemetry.includes('payoffRatio'),'research telemetry payoff ratio missing');
+must(telemetry.includes('bySide'),'research telemetry side split missing');
+must(telemetry.includes('bySymbol'),'research telemetry symbol split missing');
+must(telemetry.includes('byRegime'),'research telemetry regime split missing');
+must(telemetry.includes('challengerBaselineReadyDependency:true'),'challenger architecture audit flag missing');
+must(telemetry.includes('regimeAdaptedSideUsesBaselineDirectionalScores:true'),'regime architecture audit flag missing');
+
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
 must(manifest.short_name===`MERIDIAN ${v}`,'manifest short_name mismatch');
@@ -91,6 +104,12 @@ const gateway=read('server-gateway.js');
 must(gateway.includes('RELEASE.buildId'),'gateway health must expose canonical build');
 must(gateway.includes('NF_DEPLOYMENT_SHA'),'gateway health must expose deployment SHA when available');
 must(gateway.includes('privateData'),'gateway health must retain private store readiness');
+must(gateway.includes('researchComparison'),'gateway must load research analytics');
+must(gateway.includes('/api/research-analytics'),'protected research analytics endpoint missing');
+must(gateway.includes('stateGet("paper")'),'research analytics baseline state source missing');
+must(gateway.includes('stateGet("shadow_v1")'),'research analytics shadow state source missing');
+must(gateway.includes('stateGet("challenger_v2")'),'research analytics challenger state source missing');
+must(gateway.includes('stateGet("regime_v1")'),'research analytics regime state source missing');
 
 must(fs.existsSync('.github/workflows/runtime-smoke.yml'),'runtime smoke workflow missing');
 const smoke=read('scripts/runtime-smoke.mjs');
