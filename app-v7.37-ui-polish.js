@@ -1,4 +1,4 @@
-/* MERIDIAN v7.44 — final horizontal image brand; redundant live/refresh controls removed. */
+/* MERIDIAN v7.44 — selected horizontal image brand; redundant live/refresh controls removed. */
 (function(){
   'use strict';
 
