@@ -4,15 +4,25 @@ const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**d:null;
 const isoMs=v=>{const t=Date.parse(v||'');return Number.isFinite(t)?t:null;};
 
-function group(rows,keyFn){
+function group(rows,keyFn,valueFn=r=>num(r.realized)){
   const out={};
   for(const r of rows){
     const key=String(keyFn(r)||'UNKNOWN');
     const x=out[key]||(out[key]={trades:0,pnl:0,wins:0,losses:0});
-    const p=num(r.realized);x.trades++;x.pnl+=p;if(p>0)x.wins++;else if(p<0)x.losses++;
+    const p=num(valueFn(r));x.trades++;x.pnl+=p;if(p>0)x.wins++;else if(p<0)x.losses++;
   }
-  for(const x of Object.values(out)){x.pnl=round(x.pnl,2);x.winRate=x.trades?round(x.wins/x.trades*100,1):0;}
+  for(const x of Object.values(out)){x.pnl=round(x.pnl,3);x.winRate=x.trades?round(x.wins/x.trades*100,1):0;}
   return out;
+}
+function maxDrawdownPct(state={},fallbackEq=0){
+  const curve=Array.isArray(state?.equityCurve)?state.equityCurve:[];
+  const values=curve.map(x=>num(x?.equity,NaN)).filter(v=>Number.isFinite(v)&&v>0);
+  const eq=num(state?.account?.equity,fallbackEq);
+  if(eq>0)values.push(eq);
+  if(!values.length)return 0;
+  let peak=values[0],maxDd=0;
+  for(const v of values){peak=Math.max(peak,v);if(peak>0)maxDd=Math.max(maxDd,(peak-v)/peak*100);}
+  return maxDd;
 }
 function regimeOf(t,bot){
   if(bot==='regime')return t.regimeType||t.regime||null;
@@ -43,16 +53,14 @@ export function ledgerAnalytics(state={},bot='baseline'){
   const last=trades.map(t=>isoMs(t.closedAt||t.openedAt)).filter(Number.isFinite).sort((a,b)=>b-a)[0]??null;
   const spanDays=first!=null&&last!=null&&last>first?(last-first)/86400000:null;
   const eq=num(state?.account?.equity,num(state?.account?.startEquity,10000));
-  const peak=num(state?.account?.peakEquity,eq);
   const start=num(state?.account?.startEquity,10000);
-  const dd=peak>0?Math.max(0,(peak-eq)/peak*100):0;
   const riskOpen=open.reduce((a,p)=>a+num(p.riskPct),0);
   const result={
     bot,closedTrades:trades.length,openTrades:open.length,startEquity:round(start,2),equity:round(eq,2),pnl:round(eq-start,2),realizedTradePnl:round(pnl,2),
     wins:wins.length,losses:losses.length,winRate:trades.length?round(wins.length/trades.length*100,1):0,
     profitFactor:gl>0?round(gp/gl,2):(gp>0?99:0),expectancy:trades.length?round(pnl/trades.length,2):0,
     avgWin:round(avgWin,2),avgLoss:round(avgLoss,2),payoffRatio:avgLoss>0?round(avgWin/avgLoss,2):(avgWin>0?99:0),
-    maxDrawdownPct:round(dd,2),openRiskPct:round(riskOpen,3),avgHoldMinutes:holds.length?round(holds.reduce((a,b)=>a+b,0)/holds.length,1):null,
+    maxDrawdownPct:round(maxDrawdownPct(state,eq),2),openRiskPct:round(riskOpen,3),avgHoldMinutes:holds.length?round(holds.reduce((a,b)=>a+b,0)/holds.length,1):null,
     tradesPerDay:spanDays&&spanDays>0?round(trades.length/spanDays,3):null,
     activeSpanDays:spanDays?round(spanDays,2):null,
     bySide:group(trades,t=>t.side),bySymbol:group(trades,t=>t.symbol),byExit:group(trades,t=>t.exitReason),byRegime:group(trades,t=>regimeOf(t,bot))
@@ -72,11 +80,14 @@ export function challengerCounterfactual(state={}){
   const all=Array.isArray(state?.counterfactuals)?state.counterfactuals:[];
   const closed=all.filter(x=>x?.status==='CLOSED'&&Number.isFinite(Number(x.outcomeR)));
   const positive=closed.filter(x=>num(x.outcomeR)>0),negative=closed.filter(x=>num(x.outcomeR)<0);
+  const byReason=group(closed,x=>x.reason,x=>num(x.outcomeR));
+  const byRegime=group(closed,x=>x.regime,x=>num(x.outcomeR));
+  for(const x of [...Object.values(byReason),...Object.values(byRegime)]){x.netR=x.pnl;delete x.pnl;}
   return {
     tracked:all.length,closed:closed.length,open:all.filter(x=>x?.status==='OPEN').length,
     missedWinners:positive.length,avoidedLosers:negative.length,
     netCounterfactualR:round(closed.reduce((a,x)=>a+num(x.outcomeR),0),3),avgCounterfactualR:closed.length?round(closed.reduce((a,x)=>a+num(x.outcomeR),0)/closed.length,3):null,
-    byReason:group(closed,x=>x.reason),byRegime:group(closed,x=>x.regime)
+    byReason,byRegime
   };
 }
 
