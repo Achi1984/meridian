@@ -1,0 +1,1413 @@
+{
+  "schemaVersion": "7.68-RISK-SENSITIVITY-EVIDENCE-V1",
+  "generatedAt": "2026-09-02T19:42:33.622Z",
+  "researchOnly": true,
+  "executionImpact": false,
+  "scorerFrozen": true,
+  "periods": {
+    "P0": {
+      "schemaVersion": "7.68-RISK-SENSITIVITY-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "scorerFrozen": true,
+      "scoreVersion": "7.66-CHALLENGER-V3.2",
+      "method": "same chronological cohort and portfolio gates as v7.67; only riskPerTradePct varies; diagnostic run disables max-drawdown shutdown without changing entry ranking",
+      "variants": {
+        "risk_0.25": {
+          "riskPerTradePct": 0.25,
+          "baseline": {
+            "trades": 709,
+            "totalR": 42.2,
+            "avgR": 0.06,
+            "winRate": 44.1,
+            "pf": 1.107,
+            "startEquity": 10000,
+            "endEquity": 11058.01,
+            "returnPct": 10.58,
+            "maxDrawdownPct": 7.43,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.68,
+            "entriesPerActiveDay": 7.79,
+            "skips": {
+              "maxOpen": 428,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 539,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 93,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 723,
+            "totalR": 42.6,
+            "avgR": 0.059,
+            "winRate": 44.1,
+            "pf": 1.105,
+            "startEquity": 10000,
+            "endEquity": 11075.71,
+            "returnPct": 10.76,
+            "maxDrawdownPct": 4.2,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.61,
+            "entriesPerActiveDay": 7.95,
+            "skips": {
+              "maxOpen": 2334,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3674,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 144,
+              "cooldown": 33
+            }
+          },
+          "opportunity": {
+            "overlap": 151,
+            "discovered": 572,
+            "displaced": 558,
+            "avoidedLosers": 312,
+            "missedWinners": 246,
+            "discoveredWinners": 252,
+            "discoveredLosers": 320
+          },
+          "comparison": {
+            "avgRDelta": -0.001,
+            "pfDelta": -0.002,
+            "endEquityDelta": 17.7,
+            "maxDrawdownDeltaPct": -3.23,
+            "v32BetterAvgR": false
+          }
+        },
+        "risk_0.50": {
+          "riskPerTradePct": 0.5,
+          "baseline": {
+            "trades": 78,
+            "totalR": -6,
+            "avgR": -0.077,
+            "winRate": 38.5,
+            "pf": 0.875,
+            "startEquity": 10000,
+            "endEquity": 9681.89,
+            "returnPct": -3.18,
+            "maxDrawdownPct": 8.55,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.19,
+            "entriesPerActiveDay": 7.09,
+            "skips": {
+              "maxOpen": 53,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 32,
+              "maxDailyLoss": 10,
+              "maxDrawdown": 1481,
+              "sameSymbol": 12,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 723,
+            "totalR": 42.6,
+            "avgR": 0.059,
+            "winRate": 44.1,
+            "pf": 1.105,
+            "startEquity": 10000,
+            "endEquity": 12161.81,
+            "returnPct": 21.62,
+            "maxDrawdownPct": 8.39,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.61,
+            "entriesPerActiveDay": 7.95,
+            "skips": {
+              "maxOpen": 2334,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3674,
+              "maxDailyLoss": 36,
+              "maxDrawdown": 0,
+              "sameSymbol": 144,
+              "cooldown": 33
+            }
+          },
+          "opportunity": {
+            "overlap": 22,
+            "discovered": 701,
+            "displaced": 56,
+            "avoidedLosers": 35,
+            "missedWinners": 21,
+            "discoveredWinners": 310,
+            "discoveredLosers": 391
+          },
+          "comparison": {
+            "avgRDelta": 0.136,
+            "pfDelta": 0.23,
+            "endEquityDelta": 2479.92,
+            "maxDrawdownDeltaPct": -0.16,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.75": {
+          "riskPerTradePct": 0.75,
+          "baseline": {
+            "trades": 41,
+            "totalR": -0.2,
+            "avgR": -0.005,
+            "winRate": 41.5,
+            "pf": 0.992,
+            "startEquity": 10000,
+            "endEquity": 9951.84,
+            "returnPct": -0.48,
+            "maxDrawdownPct": 8.58,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.09,
+            "entriesPerActiveDay": 6.83,
+            "skips": {
+              "maxOpen": 26,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 15,
+              "maxDailyLoss": 11,
+              "maxDrawdown": 1573,
+              "sameSymbol": 3,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 41,
+            "totalR": -0.2,
+            "avgR": -0.005,
+            "winRate": 41.5,
+            "pf": 0.992,
+            "startEquity": 10000,
+            "endEquity": 9958.92,
+            "returnPct": -0.41,
+            "maxDrawdownPct": 9.12,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.09,
+            "entriesPerActiveDay": 6.83,
+            "skips": {
+              "maxOpen": 150,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 171,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 6144,
+              "sameSymbol": 9,
+              "cooldown": 0
+            }
+          },
+          "opportunity": {
+            "overlap": 13,
+            "discovered": 28,
+            "displaced": 28,
+            "avoidedLosers": 18,
+            "missedWinners": 10,
+            "discoveredWinners": 10,
+            "discoveredLosers": 18
+          },
+          "comparison": {
+            "avgRDelta": 0,
+            "pfDelta": 0,
+            "endEquityDelta": 7.08,
+            "maxDrawdownDeltaPct": 0.54,
+            "v32BetterAvgR": false
+          }
+        },
+        "risk_1.00": {
+          "riskPerTradePct": 1,
+          "baseline": {
+            "trades": 38,
+            "totalR": 2.8,
+            "avgR": 0.074,
+            "winRate": 44.7,
+            "pf": 1.133,
+            "startEquity": 10000,
+            "endEquity": 10228.1,
+            "returnPct": 2.28,
+            "maxDrawdownPct": 8.58,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.08,
+            "entriesPerActiveDay": 6.33,
+            "skips": {
+              "maxOpen": 22,
+              "maxPortfolioRisk": 22,
+              "maxTradesDay": 15,
+              "maxDailyLoss": 24,
+              "maxDrawdown": 1580,
+              "sameSymbol": 3,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 30,
+            "totalR": 3.6,
+            "avgR": 0.12,
+            "winRate": 46.7,
+            "pf": 1.225,
+            "startEquity": 10000,
+            "endEquity": 10324.38,
+            "returnPct": 3.24,
+            "maxDrawdownPct": 8.55,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.06,
+            "entriesPerActiveDay": 6,
+            "skips": {
+              "maxOpen": 101,
+              "maxPortfolioRisk": 101,
+              "maxTradesDay": 136,
+              "maxDailyLoss": 60,
+              "maxDrawdown": 6228,
+              "sameSymbol": 3,
+              "cooldown": 0
+            }
+          },
+          "opportunity": {
+            "overlap": 11,
+            "discovered": 19,
+            "displaced": 27,
+            "avoidedLosers": 17,
+            "missedWinners": 10,
+            "discoveredWinners": 7,
+            "discoveredLosers": 12
+          },
+          "comparison": {
+            "avgRDelta": 0.046,
+            "pfDelta": 0.092,
+            "endEquityDelta": 96.28,
+            "maxDrawdownDeltaPct": -0.03,
+            "v32BetterAvgR": true
+          }
+        }
+      },
+      "diagnosticNoDrawdown": {
+        "riskPerTradePct": 1,
+        "baseline": {
+          "trades": 629,
+          "totalR": 43,
+          "avgR": 0.068,
+          "winRate": 44.5,
+          "pf": 1.123,
+          "startEquity": 10000,
+          "endEquity": 14313.97,
+          "returnPct": 43.14,
+          "maxDrawdownPct": 21.81,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.51,
+          "entriesPerActiveDay": 6.91,
+          "skips": {
+            "maxOpen": 399,
+            "maxPortfolioRisk": 399,
+            "maxTradesDay": 420,
+            "maxDailyLoss": 230,
+            "maxDrawdown": 0,
+            "sameSymbol": 88,
+            "cooldown": 1
+          }
+        },
+        "challengerV32": {
+          "trades": 638,
+          "totalR": 29.2,
+          "avgR": 0.046,
+          "winRate": 43.6,
+          "pf": 1.081,
+          "startEquity": 10000,
+          "endEquity": 12578.8,
+          "returnPct": 25.79,
+          "maxDrawdownPct": 20.28,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.41,
+          "entriesPerActiveDay": 7.01,
+          "skips": {
+            "maxOpen": 2093,
+            "maxPortfolioRisk": 2093,
+            "maxTradesDay": 2720,
+            "maxDailyLoss": 1344,
+            "maxDrawdown": 0,
+            "sameSymbol": 124,
+            "cooldown": 30
+          }
+        },
+        "opportunity": {
+          "overlap": 128,
+          "discovered": 510,
+          "displaced": 501,
+          "avoidedLosers": 278,
+          "missedWinners": 223,
+          "discoveredWinners": 221,
+          "discoveredLosers": 289
+        },
+        "comparison": {
+          "avgRDelta": -0.022,
+          "pfDelta": -0.042,
+          "endEquityDelta": -1735.17,
+          "maxDrawdownDeltaPct": -1.53,
+          "v32BetterAvgR": false
+        }
+      },
+      "summary": {
+        "bestByEndEquity": "risk_0.50",
+        "bestByDdAdjusted": "risk_0.50",
+        "bestDdAdjustedRatio": 2.577
+      }
+    },
+    "P1": {
+      "schemaVersion": "7.68-RISK-SENSITIVITY-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "scorerFrozen": true,
+      "scoreVersion": "7.66-CHALLENGER-V3.2",
+      "method": "same chronological cohort and portfolio gates as v7.67; only riskPerTradePct varies; diagnostic run disables max-drawdown shutdown without changing entry ranking",
+      "variants": {
+        "risk_0.25": {
+          "riskPerTradePct": 0.25,
+          "baseline": {
+            "trades": 508,
+            "totalR": 27.2,
+            "avgR": 0.054,
+            "winRate": 43.9,
+            "pf": 1.095,
+            "startEquity": 10000,
+            "endEquity": 10663.46,
+            "returnPct": 6.63,
+            "maxDrawdownPct": 8.32,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.19,
+            "entriesPerActiveDay": 7.7,
+            "skips": {
+              "maxOpen": 361,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 362,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 477,
+              "sameSymbol": 54,
+              "cooldown": 3
+            }
+          },
+          "challengerV32": {
+            "trades": 723,
+            "totalR": 40.2,
+            "avgR": 0.056,
+            "winRate": 44,
+            "pf": 1.099,
+            "startEquity": 10000,
+            "endEquity": 11002.99,
+            "returnPct": 10.03,
+            "maxDrawdownPct": 8.03,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.61,
+            "entriesPerActiveDay": 7.95,
+            "skips": {
+              "maxOpen": 2243,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3669,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 143,
+              "cooldown": 31
+            }
+          },
+          "opportunity": {
+            "overlap": 117,
+            "discovered": 606,
+            "displaced": 391,
+            "avoidedLosers": 224,
+            "missedWinners": 167,
+            "discoveredWinners": 262,
+            "discoveredLosers": 344
+          },
+          "comparison": {
+            "avgRDelta": 0.002,
+            "pfDelta": 0.004,
+            "endEquityDelta": 339.53,
+            "maxDrawdownDeltaPct": -0.29,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.50": {
+          "riskPerTradePct": 0.5,
+          "baseline": {
+            "trades": 85,
+            "totalR": -8.2,
+            "avgR": -0.096,
+            "winRate": 37.6,
+            "pf": 0.845,
+            "startEquity": 10000,
+            "endEquity": 9572.91,
+            "returnPct": -4.27,
+            "maxDrawdownPct": 8.68,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.21,
+            "entriesPerActiveDay": 7.08,
+            "skips": {
+              "maxOpen": 75,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 51,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1487,
+              "sameSymbol": 12,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 358,
+            "totalR": 50,
+            "avgR": 0.14,
+            "winRate": 47.5,
+            "pf": 1.266,
+            "startEquity": 10000,
+            "endEquity": 12706.17,
+            "returnPct": 27.06,
+            "maxDrawdownPct": 8.56,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.78,
+            "entriesPerActiveDay": 7.78,
+            "skips": {
+              "maxOpen": 1069,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 1835,
+              "maxDailyLoss": 72,
+              "maxDrawdown": 3276,
+              "sameSymbol": 60,
+              "cooldown": 16
+            }
+          },
+          "opportunity": {
+            "overlap": 23,
+            "discovered": 335,
+            "displaced": 62,
+            "avoidedLosers": 36,
+            "missedWinners": 26,
+            "discoveredWinners": 164,
+            "discoveredLosers": 171
+          },
+          "comparison": {
+            "avgRDelta": 0.236,
+            "pfDelta": 0.421,
+            "endEquityDelta": 3133.26,
+            "maxDrawdownDeltaPct": -0.12,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.75": {
+          "riskPerTradePct": 0.75,
+          "baseline": {
+            "trades": 69,
+            "totalR": -1.8,
+            "avgR": -0.026,
+            "winRate": 40.6,
+            "pf": 0.956,
+            "startEquity": 10000,
+            "endEquity": 9815.84,
+            "returnPct": -1.84,
+            "maxDrawdownPct": 8.42,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.17,
+            "entriesPerActiveDay": 6.9,
+            "skips": {
+              "maxOpen": 67,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 38,
+              "maxDailyLoss": 5,
+              "maxDrawdown": 1518,
+              "sameSymbol": 11,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 77,
+            "totalR": 4.6,
+            "avgR": 0.06,
+            "winRate": 44.2,
+            "pf": 1.107,
+            "startEquity": 10000,
+            "endEquity": 10295.32,
+            "returnPct": 2.95,
+            "maxDrawdownPct": 9.78,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.18,
+            "entriesPerActiveDay": 7,
+            "skips": {
+              "maxOpen": 278,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 250,
+              "maxDailyLoss": 96,
+              "maxDrawdown": 5784,
+              "sameSymbol": 22,
+              "cooldown": 2
+            }
+          },
+          "opportunity": {
+            "overlap": 19,
+            "discovered": 58,
+            "displaced": 50,
+            "avoidedLosers": 26,
+            "missedWinners": 24,
+            "discoveredWinners": 30,
+            "discoveredLosers": 28
+          },
+          "comparison": {
+            "avgRDelta": 0.086,
+            "pfDelta": 0.151,
+            "endEquityDelta": 479.48,
+            "maxDrawdownDeltaPct": 1.36,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_1.00": {
+          "riskPerTradePct": 1,
+          "baseline": {
+            "trades": 66,
+            "totalR": 1.2,
+            "avgR": 0.018,
+            "winRate": 42.4,
+            "pf": 1.032,
+            "startEquity": 10000,
+            "endEquity": 10034.36,
+            "returnPct": 0.34,
+            "maxDrawdownPct": 8.36,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.17,
+            "entriesPerActiveDay": 6.6,
+            "skips": {
+              "maxOpen": 62,
+              "maxPortfolioRisk": 62,
+              "maxTradesDay": 28,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1526,
+              "sameSymbol": 11,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 61,
+            "totalR": 1.4,
+            "avgR": 0.023,
+            "winRate": 42.6,
+            "pf": 1.04,
+            "startEquity": 10000,
+            "endEquity": 10070.08,
+            "returnPct": 0.7,
+            "maxDrawdownPct": 8.47,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.15,
+            "entriesPerActiveDay": 6.1,
+            "skips": {
+              "maxOpen": 242,
+              "maxPortfolioRisk": 242,
+              "maxTradesDay": 158,
+              "maxDailyLoss": 216,
+              "maxDrawdown": 5868,
+              "sameSymbol": 20,
+              "cooldown": 1
+            }
+          },
+          "opportunity": {
+            "overlap": 16,
+            "discovered": 45,
+            "displaced": 50,
+            "avoidedLosers": 25,
+            "missedWinners": 25,
+            "discoveredWinners": 23,
+            "discoveredLosers": 22
+          },
+          "comparison": {
+            "avgRDelta": 0.005,
+            "pfDelta": 0.008,
+            "endEquityDelta": 35.72,
+            "maxDrawdownDeltaPct": 0.11,
+            "v32BetterAvgR": true
+          }
+        }
+      },
+      "diagnosticNoDrawdown": {
+        "riskPerTradePct": 1,
+        "baseline": {
+          "trades": 626,
+          "totalR": 34,
+          "avgR": 0.054,
+          "winRate": 43.9,
+          "pf": 1.097,
+          "startEquity": 10000,
+          "endEquity": 13076.95,
+          "returnPct": 30.77,
+          "maxDrawdownPct": 38.34,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.46,
+          "entriesPerActiveDay": 6.88,
+          "skips": {
+            "maxOpen": 452,
+            "maxPortfolioRisk": 452,
+            "maxTradesDay": 419,
+            "maxDailyLoss": 238,
+            "maxDrawdown": 0,
+            "sameSymbol": 69,
+            "cooldown": 3
+          }
+        },
+        "challengerV32": {
+          "trades": 631,
+          "totalR": 38.6,
+          "avgR": 0.061,
+          "winRate": 44.2,
+          "pf": 1.11,
+          "startEquity": 10000,
+          "endEquity": 13759.77,
+          "returnPct": 37.6,
+          "maxDrawdownPct": 18.86,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.41,
+          "entriesPerActiveDay": 6.93,
+          "skips": {
+            "maxOpen": 2084,
+            "maxPortfolioRisk": 2084,
+            "maxTradesDay": 2566,
+            "maxDailyLoss": 1512,
+            "maxDrawdown": 0,
+            "sameSymbol": 131,
+            "cooldown": 29
+          }
+        },
+        "opportunity": {
+          "overlap": 132,
+          "discovered": 499,
+          "displaced": 494,
+          "avoidedLosers": 277,
+          "missedWinners": 217,
+          "discoveredWinners": 221,
+          "discoveredLosers": 278
+        },
+        "comparison": {
+          "avgRDelta": 0.007,
+          "pfDelta": 0.013,
+          "endEquityDelta": 682.82,
+          "maxDrawdownDeltaPct": -19.48,
+          "v32BetterAvgR": true
+        }
+      },
+      "summary": {
+        "bestByEndEquity": "risk_0.50",
+        "bestByDdAdjusted": "risk_0.50",
+        "bestDdAdjustedRatio": 3.161
+      }
+    },
+    "P2": {
+      "schemaVersion": "7.68-RISK-SENSITIVITY-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "scorerFrozen": true,
+      "scoreVersion": "7.66-CHALLENGER-V3.2",
+      "method": "same chronological cohort and portfolio gates as v7.67; only riskPerTradePct varies; diagnostic run disables max-drawdown shutdown without changing entry ranking",
+      "variants": {
+        "risk_0.25": {
+          "riskPerTradePct": 0.25,
+          "baseline": {
+            "trades": 267,
+            "totalR": -29.4,
+            "avgR": -0.11,
+            "winRate": 37.1,
+            "pf": 0.825,
+            "startEquity": 10000,
+            "endEquity": 9275.06,
+            "returnPct": -7.25,
+            "maxDrawdownPct": 8.21,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.75,
+            "entriesPerActiveDay": 7.22,
+            "skips": {
+              "maxOpen": 249,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 170,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1001,
+              "sameSymbol": 61,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 358,
+            "totalR": -26.8,
+            "avgR": -0.075,
+            "winRate": 38.5,
+            "pf": 0.878,
+            "startEquity": 10000,
+            "endEquity": 9328.86,
+            "returnPct": -6.71,
+            "maxDrawdownPct": 8.5,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.83,
+            "entriesPerActiveDay": 7.78,
+            "skips": {
+              "maxOpen": 1248,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 1732,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 3276,
+              "sameSymbol": 90,
+              "cooldown": 24
+            }
+          },
+          "opportunity": {
+            "overlap": 60,
+            "discovered": 298,
+            "displaced": 207,
+            "avoidedLosers": 133,
+            "missedWinners": 74,
+            "discoveredWinners": 113,
+            "discoveredLosers": 185
+          },
+          "comparison": {
+            "avgRDelta": 0.035,
+            "pfDelta": 0.053,
+            "endEquityDelta": 53.8,
+            "maxDrawdownDeltaPct": 0.29,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.50": {
+          "riskPerTradePct": 0.5,
+          "baseline": {
+            "trades": 43,
+            "totalR": -14.2,
+            "avgR": -0.33,
+            "winRate": 27.9,
+            "pf": 0.542,
+            "startEquity": 10000,
+            "endEquity": 9304.64,
+            "returnPct": -6.95,
+            "maxDrawdownPct": 8.69,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.1,
+            "entriesPerActiveDay": 6.14,
+            "skips": {
+              "maxOpen": 13,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 25,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1582,
+              "sameSymbol": 6,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 74,
+            "totalR": -9.2,
+            "avgR": -0.124,
+            "winRate": 36.5,
+            "pf": 0.804,
+            "startEquity": 10000,
+            "endEquity": 9534.06,
+            "returnPct": -4.66,
+            "maxDrawdownPct": 8.39,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.18,
+            "entriesPerActiveDay": 7.4,
+            "skips": {
+              "maxOpen": 288,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 317,
+              "maxDailyLoss": 36,
+              "maxDrawdown": 5808,
+              "sameSymbol": 21,
+              "cooldown": 6
+            }
+          },
+          "opportunity": {
+            "overlap": 10,
+            "discovered": 64,
+            "displaced": 33,
+            "avoidedLosers": 25,
+            "missedWinners": 8,
+            "discoveredWinners": 23,
+            "discoveredLosers": 41
+          },
+          "comparison": {
+            "avgRDelta": 0.206,
+            "pfDelta": 0.262,
+            "endEquityDelta": 229.42,
+            "maxDrawdownDeltaPct": -0.3,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.75": {
+          "riskPerTradePct": 0.75,
+          "baseline": {
+            "trades": 34,
+            "totalR": -7.6,
+            "avgR": -0.224,
+            "winRate": 32.4,
+            "pf": 0.67,
+            "startEquity": 10000,
+            "endEquity": 9431.5,
+            "returnPct": -5.68,
+            "maxDrawdownPct": 9.26,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.08,
+            "entriesPerActiveDay": 5.67,
+            "skips": {
+              "maxOpen": 11,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 25,
+              "maxDailyLoss": 8,
+              "maxDrawdown": 1598,
+              "sameSymbol": 5,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 55,
+            "totalR": -4.6,
+            "avgR": -0.084,
+            "winRate": 38.2,
+            "pf": 0.865,
+            "startEquity": 10000,
+            "endEquity": 9637.6,
+            "returnPct": -3.62,
+            "maxDrawdownPct": 8.97,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.12,
+            "entriesPerActiveDay": 6.88,
+            "skips": {
+              "maxOpen": 197,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 216,
+              "maxDailyLoss": 36,
+              "maxDrawdown": 6000,
+              "sameSymbol": 11,
+              "cooldown": 5
+            }
+          },
+          "opportunity": {
+            "overlap": 9,
+            "discovered": 46,
+            "displaced": 25,
+            "avoidedLosers": 18,
+            "missedWinners": 7,
+            "discoveredWinners": 17,
+            "discoveredLosers": 29
+          },
+          "comparison": {
+            "avgRDelta": 0.14,
+            "pfDelta": 0.195,
+            "endEquityDelta": 206.1,
+            "maxDrawdownDeltaPct": -0.29,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_1.00": {
+          "riskPerTradePct": 1,
+          "baseline": {
+            "trades": 30,
+            "totalR": -6,
+            "avgR": -0.2,
+            "winRate": 33.3,
+            "pf": 0.7,
+            "startEquity": 10000,
+            "endEquity": 9394.58,
+            "returnPct": -6.05,
+            "maxDrawdownPct": 9.48,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.06,
+            "entriesPerActiveDay": 6,
+            "skips": {
+              "maxOpen": 5,
+              "maxPortfolioRisk": 5,
+              "maxTradesDay": 22,
+              "maxDailyLoss": 8,
+              "maxDrawdown": 1608,
+              "sameSymbol": 0,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 47,
+            "totalR": -1.4,
+            "avgR": -0.03,
+            "winRate": 40.4,
+            "pf": 0.95,
+            "startEquity": 10000,
+            "endEquity": 9823.14,
+            "returnPct": -1.77,
+            "maxDrawdownPct": 9.08,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.11,
+            "entriesPerActiveDay": 5.88,
+            "skips": {
+              "maxOpen": 169,
+              "maxPortfolioRisk": 169,
+              "maxTradesDay": 170,
+              "maxDailyLoss": 108,
+              "maxDrawdown": 6000,
+              "sameSymbol": 10,
+              "cooldown": 4
+            }
+          },
+          "opportunity": {
+            "overlap": 6,
+            "discovered": 41,
+            "displaced": 24,
+            "avoidedLosers": 16,
+            "missedWinners": 8,
+            "discoveredWinners": 17,
+            "discoveredLosers": 24
+          },
+          "comparison": {
+            "avgRDelta": 0.17,
+            "pfDelta": 0.25,
+            "endEquityDelta": 428.56,
+            "maxDrawdownDeltaPct": -0.4,
+            "v32BetterAvgR": true
+          }
+        }
+      },
+      "diagnosticNoDrawdown": {
+        "riskPerTradePct": 1,
+        "baseline": {
+          "trades": 575,
+          "totalR": -35,
+          "avgR": -0.061,
+          "winRate": 39.1,
+          "pf": 0.9,
+          "startEquity": 10000,
+          "endEquity": 6603.95,
+          "returnPct": -33.96,
+          "maxDrawdownPct": 38.13,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.46,
+          "entriesPerActiveDay": 6.46,
+          "skips": {
+            "maxOpen": 526,
+            "maxPortfolioRisk": 526,
+            "maxTradesDay": 354,
+            "maxDailyLoss": 307,
+            "maxDrawdown": 0,
+            "sameSymbol": 87,
+            "cooldown": 1
+          }
+        },
+        "challengerV32": {
+          "trades": 627,
+          "totalR": 11.4,
+          "avgR": 0.018,
+          "winRate": 42.4,
+          "pf": 1.032,
+          "startEquity": 10000,
+          "endEquity": 10426.46,
+          "returnPct": 4.26,
+          "maxDrawdownPct": 38.41,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.46,
+          "entriesPerActiveDay": 6.97,
+          "skips": {
+            "maxOpen": 2261,
+            "maxPortfolioRisk": 2261,
+            "maxTradesDay": 2403,
+            "maxDailyLoss": 1584,
+            "maxDrawdown": 0,
+            "sameSymbol": 160,
+            "cooldown": 32
+          }
+        },
+        "opportunity": {
+          "overlap": 139,
+          "discovered": 488,
+          "displaced": 436,
+          "avoidedLosers": 263,
+          "missedWinners": 173,
+          "discoveredWinners": 214,
+          "discoveredLosers": 274
+        },
+        "comparison": {
+          "avgRDelta": 0.079,
+          "pfDelta": 0.132,
+          "endEquityDelta": 3822.51,
+          "maxDrawdownDeltaPct": 0.28,
+          "v32BetterAvgR": true
+        }
+      },
+      "summary": {
+        "bestByEndEquity": "risk_1.00",
+        "bestByDdAdjusted": "risk_1.00",
+        "bestDdAdjustedRatio": -0.195
+      }
+    },
+    "P3": {
+      "schemaVersion": "7.68-RISK-SENSITIVITY-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "scorerFrozen": true,
+      "scoreVersion": "7.66-CHALLENGER-V3.2",
+      "method": "same chronological cohort and portfolio gates as v7.67; only riskPerTradePct varies; diagnostic run disables max-drawdown shutdown without changing entry ranking",
+      "variants": {
+        "risk_0.25": {
+          "riskPerTradePct": 0.25,
+          "baseline": {
+            "trades": 661,
+            "totalR": -3.4,
+            "avgR": -0.005,
+            "winRate": 41.5,
+            "pf": 0.991,
+            "startEquity": 10000,
+            "endEquity": 9869.58,
+            "returnPct": -1.3,
+            "maxDrawdownPct": 7.78,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.61,
+            "entriesPerActiveDay": 7.26,
+            "skips": {
+              "maxOpen": 535,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 398,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 71,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 721,
+            "totalR": 59,
+            "avgR": 0.082,
+            "winRate": 45.1,
+            "pf": 1.149,
+            "startEquity": 10000,
+            "endEquity": 11532.37,
+            "returnPct": 15.32,
+            "maxDrawdownPct": 7.7,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.62,
+            "entriesPerActiveDay": 7.92,
+            "skips": {
+              "maxOpen": 2343,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3634,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 154,
+              "cooldown": 29
+            }
+          },
+          "opportunity": {
+            "overlap": 156,
+            "discovered": 565,
+            "displaced": 505,
+            "avoidedLosers": 291,
+            "missedWinners": 214,
+            "discoveredWinners": 265,
+            "discoveredLosers": 300
+          },
+          "comparison": {
+            "avgRDelta": 0.087,
+            "pfDelta": 0.158,
+            "endEquityDelta": 1662.79,
+            "maxDrawdownDeltaPct": -0.08,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.50": {
+          "riskPerTradePct": 0.5,
+          "baseline": {
+            "trades": 196,
+            "totalR": -4,
+            "avgR": -0.02,
+            "winRate": 40.8,
+            "pf": 0.966,
+            "startEquity": 10000,
+            "endEquity": 9747.19,
+            "returnPct": -2.53,
+            "maxDrawdownPct": 8.29,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.51,
+            "entriesPerActiveDay": 7,
+            "skips": {
+              "maxOpen": 142,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 95,
+              "maxDailyLoss": 12,
+              "maxDrawdown": 1124,
+              "sameSymbol": 25,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 593,
+            "totalR": 43,
+            "avgR": 0.073,
+            "winRate": 44.7,
+            "pf": 1.131,
+            "startEquity": 10000,
+            "endEquity": 12213.27,
+            "returnPct": 22.13,
+            "maxDrawdownPct": 8.11,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.31,
+            "entriesPerActiveDay": 7.91,
+            "skips": {
+              "maxOpen": 1873,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3018,
+              "maxDailyLoss": 132,
+              "maxDrawdown": 1152,
+              "sameSymbol": 114,
+              "cooldown": 20
+            }
+          },
+          "opportunity": {
+            "overlap": 42,
+            "discovered": 551,
+            "displaced": 154,
+            "avoidedLosers": 89,
+            "missedWinners": 65,
+            "discoveredWinners": 250,
+            "discoveredLosers": 301
+          },
+          "comparison": {
+            "avgRDelta": 0.093,
+            "pfDelta": 0.165,
+            "endEquityDelta": 2466.08,
+            "maxDrawdownDeltaPct": -0.18,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_0.75": {
+          "riskPerTradePct": 0.75,
+          "baseline": {
+            "trades": 31,
+            "totalR": -9.4,
+            "avgR": -0.303,
+            "winRate": 29,
+            "pf": 0.573,
+            "startEquity": 10000,
+            "endEquity": 9306.87,
+            "returnPct": -6.93,
+            "maxDrawdownPct": 8.45,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.07,
+            "entriesPerActiveDay": 6.2,
+            "skips": {
+              "maxOpen": 20,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 10,
+              "maxDailyLoss": 3,
+              "maxDrawdown": 1490,
+              "sameSymbol": 1,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 26,
+            "totalR": -6.8,
+            "avgR": -0.262,
+            "winRate": 30.8,
+            "pf": 0.622,
+            "startEquity": 10000,
+            "endEquity": 9487.02,
+            "returnPct": -5.13,
+            "maxDrawdownPct": 9.11,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.06,
+            "entriesPerActiveDay": 6.5,
+            "skips": {
+              "maxOpen": 95,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 67,
+              "maxDailyLoss": 72,
+              "maxDrawdown": 6276,
+              "sameSymbol": 7,
+              "cooldown": 1
+            }
+          },
+          "opportunity": {
+            "overlap": 13,
+            "discovered": 13,
+            "displaced": 18,
+            "avoidedLosers": 11,
+            "missedWinners": 7,
+            "discoveredWinners": 6,
+            "discoveredLosers": 7
+          },
+          "comparison": {
+            "avgRDelta": 0.041,
+            "pfDelta": 0.049,
+            "endEquityDelta": 180.15,
+            "maxDrawdownDeltaPct": 0.66,
+            "v32BetterAvgR": true
+          }
+        },
+        "risk_1.00": {
+          "riskPerTradePct": 1,
+          "baseline": {
+            "trades": 26,
+            "totalR": -6.8,
+            "avgR": -0.262,
+            "winRate": 30.8,
+            "pf": 0.622,
+            "startEquity": 10000,
+            "endEquity": 9323.48,
+            "returnPct": -6.77,
+            "maxDrawdownPct": 8.41,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.06,
+            "entriesPerActiveDay": 5.2,
+            "skips": {
+              "maxOpen": 16,
+              "maxPortfolioRisk": 16,
+              "maxTradesDay": 10,
+              "maxDailyLoss": 8,
+              "maxDrawdown": 1494,
+              "sameSymbol": 1,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 63,
+            "totalR": -3,
+            "avgR": -0.048,
+            "winRate": 39.7,
+            "pf": 0.921,
+            "startEquity": 10000,
+            "endEquity": 9643.58,
+            "returnPct": -3.56,
+            "maxDrawdownPct": 8.9,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.14,
+            "entriesPerActiveDay": 5.73,
+            "skips": {
+              "maxOpen": 217,
+              "maxPortfolioRisk": 217,
+              "maxTradesDay": 238,
+              "maxDailyLoss": 240,
+              "maxDrawdown": 5796,
+              "sameSymbol": 15,
+              "cooldown": 3
+            }
+          },
+          "opportunity": {
+            "overlap": 10,
+            "discovered": 53,
+            "displaced": 16,
+            "avoidedLosers": 10,
+            "missedWinners": 6,
+            "discoveredWinners": 23,
+            "discoveredLosers": 30
+          },
+          "comparison": {
+            "avgRDelta": 0.214,
+            "pfDelta": 0.299,
+            "endEquityDelta": 320.1,
+            "maxDrawdownDeltaPct": 0.49,
+            "v32BetterAvgR": true
+          }
+        }
+      },
+      "diagnosticNoDrawdown": {
+        "riskPerTradePct": 1,
+        "baseline": {
+          "trades": 575,
+          "totalR": 17.8,
+          "avgR": 0.031,
+          "winRate": 43,
+          "pf": 1.054,
+          "startEquity": 10000,
+          "endEquity": 11189.2,
+          "returnPct": 11.89,
+          "maxDrawdownPct": 26.54,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.4,
+          "entriesPerActiveDay": 6.39,
+          "skips": {
+            "maxOpen": 460,
+            "maxPortfolioRisk": 460,
+            "maxTradesDay": 329,
+            "maxDailyLoss": 230,
+            "maxDrawdown": 0,
+            "sameSymbol": 65,
+            "cooldown": 0
+          }
+        },
+        "challengerV32": {
+          "trades": 606,
+          "totalR": 42,
+          "avgR": 0.069,
+          "winRate": 44.6,
+          "pf": 1.125,
+          "startEquity": 10000,
+          "endEquity": 14232.5,
+          "returnPct": 42.32,
+          "maxDrawdownPct": 17.51,
+          "maxConcurrent": 3,
+          "avgConcurrent": 1.37,
+          "entriesPerActiveDay": 6.66,
+          "skips": {
+            "maxOpen": 2078,
+            "maxPortfolioRisk": 2078,
+            "maxTradesDay": 2372,
+            "maxDailyLoss": 1656,
+            "maxDrawdown": 0,
+            "sameSymbol": 134,
+            "cooldown": 26
+          }
+        },
+        "opportunity": {
+          "overlap": 131,
+          "discovered": 475,
+          "displaced": 444,
+          "avoidedLosers": 242,
+          "missedWinners": 202,
+          "discoveredWinners": 225,
+          "discoveredLosers": 250
+        },
+        "comparison": {
+          "avgRDelta": 0.038,
+          "pfDelta": 0.071,
+          "endEquityDelta": 3043.3,
+          "maxDrawdownDeltaPct": -9.03,
+          "v32BetterAvgR": true
+        }
+      },
+      "summary": {
+        "bestByEndEquity": "risk_0.50",
+        "bestByDdAdjusted": "risk_0.50",
+        "bestDdAdjustedRatio": 2.729
+      }
+    }
+  },
+  "aggregate": {
+    "risk_0.25": {
+      "periods": 4,
+      "v32Positive": 3,
+      "v32PfAbove1": 3,
+      "v32BetterAvgR": 3,
+      "v32LowerDd": 3,
+      "avgEndEquity": 10734.98,
+      "avgMaxDdPct": 7.11
+    },
+    "risk_0.50": {
+      "periods": 4,
+      "v32Positive": 3,
+      "v32PfAbove1": 3,
+      "v32BetterAvgR": 4,
+      "v32LowerDd": 4,
+      "avgEndEquity": 11653.83,
+      "avgMaxDdPct": 8.36
+    },
+    "risk_0.75": {
+      "periods": 4,
+      "v32Positive": 1,
+      "v32PfAbove1": 1,
+      "v32BetterAvgR": 3,
+      "v32LowerDd": 1,
+      "avgEndEquity": 9844.72,
+      "avgMaxDdPct": 9.24
+    },
+    "risk_1.00": {
+      "periods": 4,
+      "v32Positive": 2,
+      "v32PfAbove1": 2,
+      "v32BetterAvgR": 4,
+      "v32LowerDd": 2,
+      "avgEndEquity": 9965.3,
+      "avgMaxDdPct": 8.75
+    }
+  },
+  "diagnosticNoDrawdown": {
+    "periods": 4,
+    "v32Positive": 4,
+    "v32PfAbove1": 4,
+    "avgEndEquity": 12749.38
+  }
+}
