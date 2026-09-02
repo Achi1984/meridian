@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import pg from "pg";
+import { researchComparison } from "./research-analytics.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -18,7 +19,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const PUBLIC_PATHS = new Set(["/","/health","/api/public-status","/api/assistant"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
-  "/api/shadow-v1","/api/challenger-v2","/api/regime-v1","/api/backtests","/api/activity-summary",
+  "/api/shadow-v1","/api/challenger-v2","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
   "/api/private/"
 ];
 
@@ -154,6 +155,13 @@ async function activitySummary(){
       : null
   };
 }
+async function researchAnalytics(){
+  if(!pool())return {schemaVersion:"7.47-TELEMETRY-V1",researchOnly:true,executionImpact:false,source:"NO_DATABASE",generatedAt:new Date().toISOString(),ledgers:{}};
+  const [baseline,shadow,challenger,regime]=await Promise.all([
+    stateGet("paper"),stateGet("shadow_v1"),stateGet("challenger_v2"),stateGet("regime_v1")
+  ]);
+  return {...researchComparison({baseline,shadow,challenger,regime}),source:"POSTGRES_STATE"};
+}
 
 function proxy(req,res,origin){
   const headers={...req.headers,host:`127.0.0.1:${INTERNAL_PORT}`};
@@ -200,6 +208,9 @@ const server=http.createServer(async(req,res)=>{
     }
     if(req.method==="GET"&&u.pathname==="/api/activity-summary"){
       return writeJson(res,200,await activitySummary(),origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/research-analytics"){
+      return writeJson(res,200,await researchAnalytics(),origin||"");
     }
     if(req.method==="POST"&&u.pathname==="/api/backtests"){
       return proxy(req,res,origin||"");
