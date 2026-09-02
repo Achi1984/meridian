@@ -20,6 +20,7 @@ must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mi
 must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
 must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
+must(release.projectMemory==='7.50-CONTINUITY-V1','Project memory version mismatch');
 
 const index=read('index.html');
 must(index.includes(`<meta name="meridian-build" content="${build}">`),'index build meta mismatch');
@@ -100,6 +101,20 @@ must(cloud.includes("from './exit-lab-replay.js'"),'cloud backtest Exit Lab repl
 must(cloud.includes("stage:'exit-lab-replay'"),'cloud backtest Exit Lab progress stage missing');
 must(cloud.includes('exitLabReplay'),'cloud backtest Exit Lab result missing');
 must(cloud.includes("version:'7.49-EXIT-LAB-REPLAY-V1'"),'cloud backtest Exit Lab version missing');
+
+const continuityFiles=['MERIDIAN_CONTEXT.md','MERIDIAN_DECISIONS.md','MERIDIAN_HANDOFF.md'];
+for(const f of continuityFiles)must(fs.existsSync(f),`continuity file missing: ${f}`);
+const context=read('MERIDIAN_CONTEXT.md');
+const decisions=read('MERIDIAN_DECISIONS.md');
+const handoff=read('MERIDIAN_HANDOFF.md');
+must(context.includes('Single source of truth for project continuity'),'canonical context marker missing');
+must(context.includes('Baseline 6.2 execution is a frozen reference'),'baseline freeze context missing');
+must(decisions.includes('Avoid over-filtering'),'over-filtering principle missing');
+must(decisions.includes('Research must never auto-promote'),'research promotion principle missing');
+must(decisions.includes('TP1 should transition into a protected runner in research'),'protected runner decision missing');
+must(handoff.includes('Challenger V3'),'next bot handoff missing');
+must(handoff.includes('Regime V2'),'regime v2 handoff missing');
+must(handoff.includes('read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md` first'),'new-chat startup instruction missing');
 
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
