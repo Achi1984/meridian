@@ -32,10 +32,12 @@ test('confirmed-close probe delays BE until candle closes through TP1',()=>{
 test('BE +0.10R and +0.25R probes lock progressively more runner profit',()=>{
   const c=compareExitModels(trade,[
     {ts:1,open:100,high:115,low:101,close:114},
-    {ts:2,open:114,high:116,low:102,close:103}
+    {ts:2,open:114,high:116,low:100.5,close:103}
   ],{feeBps:0,slippageBps:0});
   assert.equal(c.models.B_BE_PLUS_010.beExtraR,.1);
   assert.equal(c.models.B_BE_PLUS_025.beExtraR,.25);
+  assert.equal(c.models.B_BE_PLUS_010.runnerReason,'BE_OR_TRAIL');
+  assert.equal(c.models.B_BE_PLUS_025.runnerReason,'BE_OR_TRAIL');
   assert.ok(c.models.B_BE_PLUS_025.realizedR>c.models.B_BE_PLUS_010.realizedR);
 });
 
