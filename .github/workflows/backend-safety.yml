@@ -29,15 +29,22 @@ jobs:
           node --check scripts/read-token-auth.mjs
           node --check scripts/start-gateway.mjs
           node --check scripts/runtime-smoke.mjs
+          node --check scripts/deep-audit.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
-          node --check app-v7.32-legacy.js
           node --check app-v7.33-hardening.js
           node --check app-runtime-monitor.js
           node --check app-v7.37-ui-polish.js
+          node --check app-v7.38-regime-ui.js
+          node --check app-v7.39-paper-overview.js
+          node --check app-v7.60-dashboard-consistency.js
+          node --check app-v7.60-private-hydration-hotfix.js
+          node --check app-v7.60-final-ui-authority.js
       - name: Research and auth regression tests
         run: node --test test/*.test.js
+      - name: Deep cross-layer audit
+        run: node scripts/deep-audit.mjs
       - name: Release authority consistency
         run: |
           node scripts/release-sync.mjs --check
