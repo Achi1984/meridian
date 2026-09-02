@@ -1,9 +1,11 @@
 /* MERIDIAN v7.33 — security/privacy hardening UI only. */
-#v733-private-unlock{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);z-index:9999;width:min(92vw,560px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid rgba(232,178,74,.72);border-radius:14px;background:rgba(5,14,22,.97);box-shadow:0 12px 34px rgba(0,0,0,.45);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+#v733-private-unlock{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:80;width:min(92vw,560px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid rgba(232,178,74,.72);border-radius:14px;background:rgba(5,14,22,.97);box-shadow:0 12px 34px rgba(0,0,0,.45);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:auto}
 #v733-private-unlock b{display:block;color:#f0b84b;font-size:9px;letter-spacing:.09em}
 #v733-private-unlock span{display:block;margin-top:3px;color:#8297a8;font-size:7px;line-height:1.35}
-#v733-private-unlock button{flex:0 0 auto;border:1px solid #159bd7;border-radius:999px;background:#08202d;color:#37c5ff;padding:9px 12px;font:900 8px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}
+#v733-private-unlock button{flex:0 0 auto;border:1px solid #159bd7;border-radius:999px;background:#08202d;color:#37c5ff;padding:9px 12px;font:900 8px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;pointer-events:auto;touch-action:manipulation}
 #v733-private-unlock[data-state="VERIFY"]{border-color:rgba(56,189,248,.55)}
+.bottom{z-index:120!important;pointer-events:auto!important}
+.bottom .inner,.bottom .nav{pointer-events:auto!important}
 .v733-activity+.v732-activity{display:none!important}
 .v733-activity{border-color:rgba(56,189,248,.42)!important}
-@media(max-width:520px){#v733-private-unlock{bottom:72px;width:calc(100vw - 18px);padding:9px 10px}#v733-private-unlock span{max-width:230px}}
+@media(max-width:520px){#v733-private-unlock{bottom:calc(108px + env(safe-area-inset-bottom));width:calc(100vw - 18px);padding:9px 10px}#v733-private-unlock span{max-width:230px}}
