@@ -97,11 +97,6 @@
       if(typeof DATA!=='undefined'&&DATA&&typeof DATA==='object'){
         Object.keys(d).forEach(k=>{DATA[k]=d[k]});
         DATA.appVersion=VERSION;
-        // The private snapshot contains historical aggregate totals. Signal the
-        // v7.60 dashboard-consistency layer to recompute the current portfolio
-        // from holdings x current quotes after hydration instead of rendering
-        // those stale snapshot aggregates verbatim.
-        try{window.dispatchEvent(new CustomEvent('meridian:private-dashboard-hydrated',{detail:{version:VERSION}}))}catch(_e){}
         if(typeof renderAll==='function')renderAll();
       }
     }catch(e){console.warn('MERIDIAN v7.33 private merge',e)}
@@ -156,27 +151,11 @@
       const ret=key==='baseline'?100:(baseClosed?closed/baseClosed*100:NaN);
       const [lab,cls]=key==='baseline'?['REFERENCE','cyan']:risk(ret,baseClosed,days,s.coverageComplete);
       const lost=key==='baseline'?0:(Number.isFinite(ret)?Math.max(0,100-ret):NaN);
-      return `<div class="v732-row ${key}">
-        <div class="v732-bot"><b>${name}</b><small>${key==='baseline'?'FROZEN 6.2':'RESEARCH LEDGER'}</small></div>
-        <div><span>CLOSED</span><b>${closed}</b><small>OPEN ≈ ${open}</small></div>
-        <div><span>TR / DAY</span><b>${nf(closed/days,2)}</b><small>${days>=7?(Number(x.closed7d)||0)+' / 7D':'7D —'}</small></div>
-        <div><span>ACTIVE DAYS</span><b>${Number(x.activeDays)||0}</b><small>${key==='baseline'?'REFERENCE':(closed-baseClosed>=0?'+':'')+(closed-baseClosed)+' TR'}</small></div>
-        <div><span>RETENTION</span><b class="${cls}">${Number.isFinite(ret)?nf(ret,0)+'%':'—'}</b><small>${key==='baseline'?'BASE':nf((closed-baseClosed)/days,2)+' TR/D'}</small></div>
-        <div><span>OVERFILTER</span><b class="${cls}">${lab}</b><small>${key==='baseline'?'—':Number.isFinite(lost)?nf(lost,0)+'% LOST':'—'}</small></div>
-      </div>`;
+      return `<div class="v732-row ${key}"><div class="v732-bot"><b>${name}</b><small>${key==='baseline'?'FROZEN 6.2':'RESEARCH LEDGER'}</small></div><div><span>CLOSED</span><b>${closed}</b><small>OPEN ≈ ${open}</small></div><div><span>TR / DAY</span><b>${nf(closed/days,2)}</b><small>${days>=7?(Number(x.closed7d)||0)+' / 7D':'7D —'}</small></div><div><span>ACTIVE DAYS</span><b>${Number(x.activeDays)||0}</b><small>${key==='baseline'?'REFERENCE':(closed-baseClosed>=0?'+':'')+(closed-baseClosed)+' TR'}</small></div><div><span>RETENTION</span><b class="${cls}">${Number.isFinite(ret)?nf(ret,0)+'%':'—'}</b><small>${key==='baseline'?'BASE':nf((closed-baseClosed)/days,2)+' TR/D'}</small></div><div><span>OVERFILTER</span><b class="${cls}">${lab}</b><small>${key==='baseline'?'—':Number.isFinite(lost)?nf(lost,0)+'% LOST':'—'}</small></div></div>`;
     };
     const start=new Date(w.start).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
     const end=new Date(w.end).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
-    return `<div class="v731-section v733-activity">
-      <div class="v731-title"><b>ACTIVITY / OPPORTUNITY COST</b><span>v7.33 · SERVER AGGREGATE</span></div>
-      <div class="v732-window"><div><span>COMMON WINDOW</span><b>${nf(days,1)} DAYS</b></div><small>${start} → ${end} · FULL EVENT HISTORY</small></div>
-      <div class="v732-head"><span>BOT</span><span>CLOSED</span><span>FREQUENCY</span><span>ACTIVITY</span><span>RETENTION</span><span>RISK</span></div>
-      ${row('BASELINE 6.2',b,'baseline')}
-      ${row('SHADOW V1',sh,'shadow')}
-      ${row('CHALLENGER V2',ch,'challenger')}
-      ${row('REGIME V1',rg,'regime')}
-      <div class="v732-note">v7.33 nutzt serverseitige Vollhistorie statt des alten 500-Event-Fensters. Overfilter bleibt rein diagnostisch und verändert keine Execution.</div>
-    </div>`;
+    return `<div class="v731-section v733-activity"><div class="v731-title"><b>ACTIVITY / OPPORTUNITY COST</b><span>v7.33 · SERVER AGGREGATE</span></div><div class="v732-window"><div><span>COMMON WINDOW</span><b>${nf(days,1)} DAYS</b></div><small>${start} → ${end} · FULL EVENT HISTORY</small></div><div class="v732-head"><span>BOT</span><span>CLOSED</span><span>FREQUENCY</span><span>ACTIVITY</span><span>RETENTION</span><span>RISK</span></div>${row('BASELINE 6.2',b,'baseline')}${row('SHADOW V1',sh,'shadow')}${row('CHALLENGER V2',ch,'challenger')}${row('REGIME V1',rg,'regime')}<div class="v732-note">v7.33 nutzt serverseitige Vollhistorie statt des alten 500-Event-Fensters. Overfilter bleibt rein diagnostisch und verändert keine Execution.</div></div>`;
   }
 
   function installCompare(){
@@ -204,11 +183,8 @@
   }
 
   stamp();
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>{stamp();renderUnlock();installCompare();refreshPrivate()},{once:true});
-  }else{
-    renderUnlock();installCompare();refreshPrivate();
-  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{stamp();renderUnlock();installCompare();refreshPrivate()},{once:true});
+  else{renderUnlock();installCompare();refreshPrivate();}
   addEventListener('pageshow',()=>{stamp();installCompare();refreshPrivate()});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){stamp();installCompare();refreshPrivate()}});
   setInterval(stamp,5000);
