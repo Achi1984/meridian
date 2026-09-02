@@ -1,4 +1,4 @@
-name: MERIDIAN Feature Edge v7.64
+name: MERIDIAN Feature Edge v7.65
 
 on:
   workflow_dispatch:
@@ -9,18 +9,21 @@ on:
       - "scripts/feature-edge-map.mjs"
       - "scripts/feature-interaction-map.mjs"
       - "scripts/walk-forward-v764.mjs"
+      - "scripts/disjoint-history-v765.mjs"
       - "feature-attribution.js"
       - "feature-interactions.js"
       - "walk-forward-interactions.js"
+      - "disjoint-period-validation.js"
       - "test/feature-interactions.test.js"
       - "test/walk-forward-interactions.test.js"
+      - "test/disjoint-period-validation.test.js"
       - ".github/workflows/feature-edge-v762.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: meridian-feature-edge-v764
+  group: meridian-feature-edge-v765
   cancel-in-progress: false
 
 jobs:
@@ -38,14 +41,27 @@ jobs:
           node-version: 22
       - name: Use Binance public market-data endpoint
         run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
-      - name: Generate 30d 60d 90d signal cohorts
-        run: node scripts/signal-cohort-v762.mjs --out-dir /tmp/v762
+      - name: Generate current 90d cohort
+        run: node scripts/signal-cohort-v762.mjs --out-dir /tmp/v765/p0
+      - name: Generate disjoint historical 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"
+            days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "Generate ${name} with outcome data through ${end_at}"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v765/${name}" --end-at "${end_at}"
+          done
       - name: Build raw feature edge report
-        run: node scripts/feature-edge-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 30 --out research/feature-edge-evidence-v762.json
+        run: node scripts/feature-edge-map.mjs --30 /tmp/v765/p0/signal-cohort-30d.json --60 /tmp/v765/p0/signal-cohort-60d.json --90 /tmp/v765/p0/signal-cohort-90d.json --min-samples 30 --out research/feature-edge-evidence-v762.json
       - name: Build conditional interaction report
-        run: node scripts/feature-interaction-map.mjs --30 /tmp/v762/signal-cohort-30d.json --60 /tmp/v762/signal-cohort-60d.json --90 /tmp/v762/signal-cohort-90d.json --min-samples 40 --out research/feature-interaction-evidence-v763.json
+        run: node scripts/feature-interaction-map.mjs --30 /tmp/v765/p0/signal-cohort-30d.json --60 /tmp/v765/p0/signal-cohort-60d.json --90 /tmp/v765/p0/signal-cohort-90d.json --min-samples 40 --out research/feature-interaction-evidence-v763.json
       - name: Run chronological walk-forward validation
-        run: node scripts/walk-forward-v764.mjs --input /tmp/v762/signal-cohort-90d.json --train-days 45 --test-days 15 --step-days 15 --min-train-samples 50 --min-test-samples 15 --min-train-avgr 0.03 --out research/walk-forward-evidence-v764.json
+        run: node scripts/walk-forward-v764.mjs --input /tmp/v765/p0/signal-cohort-90d.json --train-days 45 --test-days 15 --step-days 15 --min-train-samples 50 --min-test-samples 15 --min-train-avgr 0.03 --out research/walk-forward-evidence-v764.json
+      - name: Run disjoint historical validation
+        run: node scripts/disjoint-history-v765.mjs --p0 /tmp/v765/p0/signal-cohort-90d.json --p1 /tmp/v765/p1/signal-cohort-90d.json --p2 /tmp/v765/p2/signal-cohort-90d.json --p3 /tmp/v765/p3/signal-cohort-90d.json --min-samples 30 --out research/disjoint-history-evidence-v765.json
       - name: Build compact summaries
         shell: bash
         run: |
@@ -72,14 +88,20 @@ jobs:
           const rep=(s.repeated||[]).filter(x=>x.folds>=2).slice(0,20);if(rep.length)for(const x of rep)wf.push(`- **${x.interaction}: ${x.bucket}** — positive ${x.positiveFolds}/${x.folds} folds (${x.positiveFoldPct}%), weighted holdout Avg R ${x.weightedTestAvgR}, n=${x.testSamples}`);else wf.push('- No interaction bucket was selected and adequately retested in at least two folds.');
           wf.push('','## Decision rule','','Only interactions that survive unseen chronological holdouts are candidates for a future calibrated soft score. This does not change Baseline 6.2 or Paper execution.','');
           fs.writeFileSync('research/walk-forward-evidence-v764.md',wf.join('\n'));
+
+          const d=JSON.parse(fs.readFileSync('research/disjoint-history-evidence-v765.json','utf8'));
+          const dh=['# MERIDIAN v7.65 — Disjoint Historical Validation','',`Generated: ${d.generatedAt}`,'','Four non-overlapping 90-day cohorts are used to retest pre-specified v7.64 interaction candidates. No candidate discovery occurs inside these historical blocks.','',`Minimum samples per candidate/period: **${d.minSamples}**`,'','## Candidate robustness',''];
+          for(const x of d.candidates||[]){dh.push(`- **${x.id}** — positive ${x.positivePeriods}/${x.adequatePeriods} adequate periods (${x.positivePeriodPct ?? 'n/a'}%), weighted Avg R ${x.weightedAvgR ?? 'n/a'}, n=${x.totalSamples}, robust=${x.robust?'YES':'NO'}`);for(const p of x.periods||[])dh.push(`  - ${p.period}: ${p.adequate?(p.avgR+'R, n='+p.samples+', PF='+p.pf):('insufficient, n='+p.samples)}`)}
+          dh.push('','## Promotion guardrail','','A candidate is marked robust only when at least 3 periods are adequate, at least 75% of adequate periods are positive, and weighted Avg R remains above zero. This remains research evidence only; Baseline 6.2 and Paper execution are unchanged.','');
+          fs.writeFileSync('research/disjoint-history-evidence-v765.md',dh.join('\n'));
           NODE
       - name: Test research analytics
-        run: node --test test/feature-attribution.test.js test/feature-interactions.test.js test/walk-forward-interactions.test.js test/research-v2.test.js test/research-analytics.test.js
-      - name: Upload raw cohorts
+        run: node --test test/feature-attribution.test.js test/feature-interactions.test.js test/walk-forward-interactions.test.js test/disjoint-period-validation.test.js test/research-v2.test.js test/research-analytics.test.js
+      - name: Upload historical cohorts
         uses: actions/upload-artifact@v4
         with:
-          name: meridian-v764-signal-cohorts
-          path: /tmp/v762/*.json
+          name: meridian-v765-disjoint-cohorts
+          path: /tmp/v765/*/signal-cohort-90d.json
           retention-days: 30
       - name: Commit evidence to main
         shell: bash
@@ -88,7 +110,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -- scripts/signal-cohort-v762.mjs
-          git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md research/feature-interaction-evidence-v763.json research/feature-interaction-evidence-v763.md research/walk-forward-evidence-v764.json research/walk-forward-evidence-v764.md
+          git add research/feature-edge-evidence-v762.json research/feature-edge-evidence-v762.md research/feature-interaction-evidence-v763.json research/feature-interaction-evidence-v763.md research/walk-forward-evidence-v764.json research/walk-forward-evidence-v764.md research/disjoint-history-evidence-v765.json research/disjoint-history-evidence-v765.md
           if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
-          git commit -m "MERIDIAN v7.64: walk-forward feature evidence"
+          git commit -m "MERIDIAN v7.65: disjoint historical evidence"
           git push origin HEAD:main
