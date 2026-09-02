@@ -148,4 +148,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **Decision:** Keep V3.2 research-only, independent of Baseline `READY`, and based on small additive evidence weights rather than new hard gates. Baseline status may contribute only as a weak feature.
 
-**Guardrail:** v7.66 is a composite signal-level sanity test on periods already used during feature research, not a fresh untouched holdout and not a Paper promotion. Before any Shadow activation, run a portfolio-path replay under common execution rules and compare expectancy/PF, max drawdown, concurrency, trade frequency, avoided losers, missed winners and opportunity cost. After that, freeze the score and observe a prospective/future holdout before promotion.
+**Guardrail:** v7.66 is a composite signal-level sanity test on periods already used during feature research, not a fresh untouched holdout and not a Paper promotion. Before any Shadow activation, run a portfolio-path replay under common execution rules and compare expectancy/PF, max drawdown, concurrency, trade frequency, avoided losers, missed winners and opportunity cost.
+
+## D-023 — v7.67 confirms ranking edge but not portfolio-risk robustness
+
+**Evidence:** The chronological v7.67 portfolio-path replay used identical execution constraints for Baseline READY and V3.2: 10,000 start equity, 1% risk/trade, max 3 open positions, max 3% portfolio risk, max 8 entries/day, 3% daily-loss gate, 8% drawdown gate and 30m symbol cooldown. Across the four disjoint 90-day periods V3.2 produced better Avg R and PF in all 4/4 periods, but lower realized-equity drawdown in 0/4. The 60-day window is especially path-sensitive: V3.2 hit the drawdown stop after nine -1R trades and stopped, even though the later 30-day subwindow was positive. This demonstrates that signal ranking quality and portfolio survival are separate problems.
+
+**Decision:** Do not activate V3.2 in Shadow/Paper yet and do not retune its v7.66 feature weights against v7.67. Keep the score frozen while diagnosing portfolio/risk sensitivity.
+
+**Next method:** v7.68 should replay the unchanged scorer across pre-specified fixed-risk levels and a diagnostic no-max-DD path to separate ranking edge, concurrency/path dependence and drawdown-gate effects. Any future adaptive risk layer must be validated separately as a soft allocator; it must not be disguised score tuning.
+
+**Measurement caveat:** v7.67 compact cohorts provide realized exit events but not full intratrade mark-to-market paths. Realized-equity DD is useful for comparison but a full candle-level MTM replay is still required before any activation.
