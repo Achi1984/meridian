@@ -1,0 +1,40 @@
+name: MERIDIAN v7.59 Momentum Continuation Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-59-momentum-continuation
+    paths:
+      - .github/workflows/v759-momentum-continuation-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  momentum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-59-momentum-continuation
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify
+        run: npm test && node --check scripts/momentum-continuation-v759.mjs
+      - name: Use Binance public market-data endpoint in CI
+        run: sed -i "s#https://api.binance.com#https://data-api.binance.vision#g" cloud-backtest.js
+      - name: Run Momentum Continuation Lab
+        run: node scripts/momentum-continuation-v759.mjs
+      - name: Restore canonical endpoint and commit report
+        run: |
+          git checkout -- cloud-backtest.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v759-momentum-continuation-once.yml
+          git add scripts/momentum-continuation-v759.mjs research/momentum-continuation-v759.json research/momentum-continuation-v759.md
+          git commit -m "MERIDIAN v7.59: momentum continuation evidence"
+          git push origin HEAD:codex/meridian-v7-59-momentum-continuation
