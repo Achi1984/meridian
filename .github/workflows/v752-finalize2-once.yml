@@ -1,0 +1,38 @@
+name: MERIDIAN v7.52 Finalize2 Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-52-challenger-v3
+    paths:
+      - .github/workflows/v752-finalize2-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/meridian-v7-52-challenger-v3
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/v752-finalize.mjs
+      - run: node scripts/release-sync.mjs --write
+      - run: npm install --package-lock-only --ignore-scripts
+      - name: Verify
+        run: npm test && node --check cloud-backtest.js && node scripts/release-sync.mjs --check && node scripts/release-check.mjs
+      - name: Commit and self-remove
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v752-finalize2-once.yml scripts/v752-finalize.mjs
+          git add cloud-backtest.js challenger-v3.js test/challenger-v3.test.js version.json scripts/release-check.mjs index.html app-v6.06.js app-v7.33-hardening.js manifest.webmanifest package.json package-lock.json
+          git commit -m "Finalize MERIDIAN v7.52 Challenger V3 [v7.52-finalized]"
+          git push origin HEAD:codex/meridian-v7-52-challenger-v3
