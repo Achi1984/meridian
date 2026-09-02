@@ -1,0 +1,70 @@
+name: MERIDIAN Portfolio Path v7.67
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "portfolio-path-v767.js"
+      - "scripts/portfolio-path-v767.mjs"
+      - "test/portfolio-path-v767.test.js"
+      - ".github/workflows/portfolio-path-v767.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-portfolio-path-v767
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v767/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v767/${name}" --end-at "${end_at}"
+          done
+      - name: Test portfolio replay
+        run: node --test test/portfolio-path-v767.test.js test/challenger-v32.test.js test/feature-attribution.test.js
+      - name: Run portfolio-path replay
+        run: node scripts/portfolio-path-v767.mjs --p0 /tmp/v767/p0/signal-cohort-90d.json --p1 /tmp/v767/p1/signal-cohort-90d.json --p2 /tmp/v767/p2/signal-cohort-90d.json --p3 /tmp/v767/p3/signal-cohort-90d.json --out research/portfolio-path-evidence-v767.json
+      - name: Build compact evidence summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/portfolio-path-evidence-v767.json','utf8'));
+          const lines=['# MERIDIAN v7.67 — Challenger V3.2 Portfolio-Path Replay','',`Generated: ${r.generatedAt}`,'','Research-only. Baseline READY and Challenger V3.2 are replayed chronologically with the same 10,000 start equity, 1% risk/trade, max 3 open positions, max 3% portfolio risk, max 8 entries/day, 3% daily-loss gate, 8% drawdown gate and 30m symbol cooldown. V3.2 ranking uses only features present at each sample timestamp.','', '> Drawdown caveat: compact cohorts only contain entry/outcome/exit events, so DD is realized-equity drawdown rather than intratrade mark-to-market DD.',''];
+          for(const name of ['30d','60d','90d','P0','P1','P2','P3']){const p=r.periods?.[name];if(!p)continue;lines.push(`## ${name}`,'',`Baseline: trades **${p.baseline.trades}**, AvgR **${p.baseline.avgR}**, PF **${p.baseline.pf}**, end equity **${p.baseline.endEquity}**, realized DD **${p.baseline.maxDrawdownPct}%**.`);lines.push(`V3.2: trades **${p.challengerV32.trades}**, AvgR **${p.challengerV32.avgR}**, PF **${p.challengerV32.pf}**, end equity **${p.challengerV32.endEquity}**, realized DD **${p.challengerV32.maxDrawdownPct}%**.`);lines.push(`Opportunity: overlap ${p.opportunity.overlap}, discovered ${p.opportunity.discovered}, displaced ${p.opportunity.displaced}, avoided losers ${p.opportunity.avoidedLosers}, missed winners ${p.opportunity.missedWinners}.`,'')}
+          const s=r.summary||{};lines.push('## Summary','',`Across disjoint P0–P3, V3.2 had better AvgR in **${s.v32BetterAvgR}/${s.periods}** periods, better PF in **${s.v32BetterPf}/${s.periods}**, and lower realized DD in **${s.v32LowerRealizedDD}/${s.periods}**.`,'','## Guardrail','','This is a chronological portfolio-path test, not Paper activation. If evidence survives, freeze the scorer and require a prospective untouched holdout before Shadow activation. Do not retune v7.66 weights on these same periods.','');
+          fs.writeFileSync('research/portfolio-path-evidence-v767.md',lines.join('\n'));
+          NODE
+      - name: Commit evidence to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/portfolio-path-evidence-v767.json research/portfolio-path-evidence-v767.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.67: portfolio path evidence"
+          git push origin HEAD:main
