@@ -31,7 +31,7 @@ function refreshDay(S,t){const d=dayKey(t);if(!S.dayStartEquity.has(d))S.dayStar
 function markDD(S){S.peak=Math.max(S.peak,S.equity);const dd=S.peak>0?Math.max(0,(S.peak-S.equity)/S.peak*100):0;S.maxDD=Math.max(S.maxDD,dd);}
 function closeDue(S,t){
   const keep=[];
-  for(const p of S.positions){if(p.exitAt<=t){const pnl=S.equityAtRiskAtOpen*(p.riskPct/100)*p.outcomeR;S.equity+=pnl;S.trades.push({...p,pnl:round(pnl,4),equityAfter:round(S.equity,4)});S.lastCloseBySymbol.set(p.symbol,p.exitAt);markDD(S);}else keep.push(p)}
+  for(const p of S.positions){if(p.exitAt<=t){const pnl=p.equityAtRiskAtOpen*(p.riskPct/100)*p.outcomeR;S.equity+=pnl;S.trades.push({...p,pnl:round(pnl,4),equityAfter:round(S.equity,4)});S.lastCloseBySymbol.set(p.symbol,p.exitAt);markDD(S);}else keep.push(p)}
   S.positions=keep;
 }
 function gate(S,r,t,cfg){
@@ -51,8 +51,8 @@ function simulate(rows,selector,cfg,options={}){
   const clean=rows.filter(r=>Number.isFinite(ts(r))&&Number.isFinite(exitTs(r))&&outcome(r)!=null).sort((a,b)=>ts(a)-ts(b)||String(a.symbol||'').localeCompare(String(b.symbol||''))),S=makeState(cfg),selectedKeys=new Set(),candidateKeys=new Set();
   let i=0;
   while(i<clean.length){const t=ts(clean[i]);closeDue(S,t);const batch=[];while(i<clean.length&&ts(clean[i])===t)batch.push(clean[i++]);const ranked=selector(batch,options);for(const r of ranked){candidateKeys.add(key(r));const g=gate(S,r,t,cfg);if(!g.ok){for(const reason of new Set(g.reasons))S.skips[reason]=(S.skips[reason]||0)+1;continue}const riskPct=cfg.riskPerTradePct,d=g.d;S.entriesByDay.set(d,Number(S.entriesByDay.get(d)||0)+1);S.positions.push({symbol:r.symbol,side:r.side,sampledAt:r.sampledAt,exitAt:exitTs(r),exitAtIso:r.exitAt,outcomeR:outcome(r),riskPct,equityAtRiskAtOpen:S.equity,baselineStatus:r.baselineStatus,score:Number(r.__v32Score??NaN),hits:r.__v32Hits||[]});selectedKeys.add(key(r));S.maxConcurrent=Math.max(S.maxConcurrent,S.positions.length)}S.concurrencySum+=S.positions.length;S.concurrencySamples++}
-  closeDue(S,Infinity);
-  const stats=summarizeTrades(S.trades,cfg.startEquity,S.equity,S.maxDD);stats.maxConcurrent=S.maxConcurrent;stats.avgConcurrent=S.concurrencySamples?round(S.concurrencySum/S.concurrencySamples,2):0;stats.entriesPerDay=S.entriesByDay.size?round(S.trades.length/S.entriesByDay.size,2):0;
+  closeDue(S,Number.POSITIVE_INFINITY);
+  const stats=summarizeTrades(S.trades,cfg.startEquity,S.equity,S.maxDD);stats.maxConcurrent=S.maxConcurrent;stats.avgConcurrent=S.concurrencySamples?round(S.concurrencySum/S.concurrencySamples,2):0;stats.entriesPerActiveDay=S.entriesByDay.size?round(S.trades.length/S.entriesByDay.size,2):0;
   return{stats,trades:S.trades,selectedKeys,candidateKeys,skips:S.skips};
 }
 
