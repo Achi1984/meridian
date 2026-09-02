@@ -7,6 +7,7 @@ const release=json('version.json');
 const v=String(release.version||'');
 const build=String(release.buildId||'');
 const tag=v+'-R1';
+const hasTagged=(src,name)=>new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v='+v.replace('.','\\.')+'-[^"\'<>\\s]+').test(src);
 
 must(release.ui===v,'version.json ui mismatch');
 must(release.engine==='6.2.0','Engine must remain 6.2.0');
@@ -17,7 +18,7 @@ must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
 must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
 must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
-must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
+must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry schema mismatch');
 must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
 must(release.projectMemory==='7.50-CONTINUITY-V1','Project memory version mismatch');
@@ -31,17 +32,28 @@ must(index.includes(`styles-v6.06.css?v=${tag}`),'CSS cache tag mismatch');
 must(index.includes(`app-v6.06.js?v=${tag}`),'core app cache tag mismatch');
 
 const loader=read('app-v6.06.js');
-must(loader.includes(`app-v7.32-legacy.js?v=${tag}`),'legacy loader cache tag mismatch');
-must(loader.includes(`app-v7.33-hardening.js?v=${tag}`),'hardening loader cache tag mismatch');
-must(loader.includes(`app-runtime-monitor.js?v=${tag}`),'runtime monitor cache tag mismatch');
-must(loader.includes(`app-v7.37-ui-polish.js?v=${tag}`),'ui polish loader cache tag mismatch');
-must(loader.includes(`app-v7.38-regime-ui.js?v=${tag}`),'regime UI loader cache tag mismatch');
-must(loader.includes(`app-v7.39-paper-overview.js?v=${tag}`),'paper overview loader cache tag mismatch');
+must(!loader.includes('app-v7.32-legacy.js'),'retired v7.32 runtime layer must not be loaded');
+must(!/emergency-input-hotfix|nav-hotfix|unlock-hotfix/.test(loader),'retired hotfix input layers must not be loaded');
+must(hasTagged(loader,'app-v7.33-hardening.js'),'hardening loader cache tag mismatch');
+must(hasTagged(loader,'app-runtime-monitor.js'),'runtime monitor cache tag mismatch');
+must(hasTagged(loader,'app-v7.37-ui-polish.js'),'ui polish loader cache tag mismatch');
+must(hasTagged(loader,'app-v7.38-regime-ui.js'),'regime UI loader cache tag mismatch');
+must(hasTagged(loader,'app-v7.39-paper-overview.js'),'paper overview loader cache tag mismatch');
+must(hasTagged(loader,'app-v7.60-dashboard-consistency.js'),'dashboard consistency loader cache tag mismatch');
+must(hasTagged(loader,'app-v7.60-private-hydration-hotfix.js'),'private hydration loader cache tag mismatch');
+must(hasTagged(loader,'app-v7.60-final-ui-authority.js'),'final UI authority loader cache tag mismatch');
+must(loader.lastIndexOf('app-v7.60-final-ui-authority.js')>loader.lastIndexOf('app-v7.60-private-hydration-hotfix.js'),'final UI authority must load after private hydration');
 
 const hardening=read('app-v7.33-hardening.js');
 must(hardening.includes(`const VERSION='${v}';`),'hardening VERSION mismatch');
 must(hardening.includes(`const BUILD='${build}';`),'hardening BUILD mismatch');
 must(hardening.includes(`manifest.webmanifest?v=${tag}`),'hardening manifest tag mismatch');
+
+const finalUi=read('app-v7.60-final-ui-authority.js');
+must(finalUi.includes(`const VERSION='${v}';`),'final UI VERSION mismatch');
+must(finalUi.includes(`const BUILD='${build}';`),'final UI BUILD mismatch');
+must(finalUi.includes('CHALLENGER V3.2'),'V3.2 research candidate missing from Paper overview');
+must(finalUi.includes('PAPER-/LIVE-EXECUTION'),'V3.2 research-only execution boundary missing');
 
 const runtime=read('app-runtime-monitor.js');
 must(runtime.includes('/gateway-health'),'runtime monitor must use gateway health');
@@ -152,6 +164,8 @@ const smoke=read('scripts/runtime-smoke.mjs');
 must(smoke.includes('GitHub Pages stale'),'runtime smoke must validate Pages release');
 must(smoke.includes('Northflank stale'),'runtime smoke must validate Northflank release');
 must(smoke.includes('expected 401'),'runtime smoke must verify anonymous protection');
+must(smoke.includes('Canonical loader missing final UI authority'),'runtime smoke must validate canonical frontend loader');
+must(smoke.includes('stale standalone snapshot'),'runtime smoke must validate legacy route redirects');
 
 const sw=read('sw.js');
 must(sw.includes('MERIDIAN_SW_RETIRE'),'service worker retirement sentinel missing');
