@@ -1,0 +1,35 @@
+name: MERIDIAN v7.43 Finalize Once
+
+on:
+  push:
+    branches:
+      - codex/meridian-v7-43-header-brand
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: codex/meridian-v7-43-header-brand
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/release-sync.mjs --write
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: node --check app-v7.37-ui-polish.js
+      - run: npm test
+      - run: npm run release:check
+      - run: git rm .github/workflows/v7-43-finalize-once.yml
+      - name: Commit finalized release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "MERIDIAN v7.43: finalize horizontal brand header release"
+          git push origin HEAD:codex/meridian-v7-43-header-brand
