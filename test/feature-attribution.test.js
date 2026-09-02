@@ -18,7 +18,7 @@ test('extractRawFeatures is side-aware and exposes raw evidence buckets',()=>{
   assert.equal(x.emaStructure15,'ALIGNED');
   assert.equal(x.priceVsEma20_15,'ALIGNED');
   assert.equal(x.sideRegime,'LONG×BULL');
-  assert.equal(x.emaDistanceAtr15,'.5-.75');
+  assert.equal(x.emaDistanceAtr15,'0.5-0.75');
 });
 
 test('SHORT interpretation flips directional alignment rather than reusing LONG meaning',()=>{
