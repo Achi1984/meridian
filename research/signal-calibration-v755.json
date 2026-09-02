@@ -1,0 +1,1928 @@
+{
+  "schemaVersion": "7.55-SIGNAL-CALIBRATION-V1",
+  "generatedAt": "2026-09-02T13:15:40.788Z",
+  "sampling": "one candidate per symbol per 4h",
+  "outcome": "A_CURRENT normalized R, stop-first same candle, 14d horizon",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "SUIUSDT",
+    "HBARUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "DOTUSDT",
+    "FETUSDT",
+    "INJUSDT"
+  ],
+  "windows": [
+    30,
+    60,
+    90
+  ],
+  "runs": [
+    {
+      "days": 30,
+      "total": {
+        "key": "ALL",
+        "samples": 2160,
+        "totalR": -729.998,
+        "avgR": -0.338,
+        "winRate": 40.5,
+        "pf": 0.571
+      },
+      "byConfidence": [
+        {
+          "key": "<60",
+          "samples": 1290,
+          "totalR": -524.392,
+          "avgR": -0.407,
+          "winRate": 38.2,
+          "pf": 0.507
+        },
+        {
+          "key": "65-69",
+          "samples": 161,
+          "totalR": -34.195,
+          "avgR": -0.212,
+          "winRate": 43.5,
+          "pf": 0.703
+        },
+        {
+          "key": ">=90",
+          "samples": 151,
+          "totalR": -36.386,
+          "avgR": -0.241,
+          "winRate": 43,
+          "pf": 0.667
+        },
+        {
+          "key": "60-64",
+          "samples": 133,
+          "totalR": -18.728,
+          "avgR": -0.141,
+          "winRate": 48.1,
+          "pf": 0.793
+        },
+        {
+          "key": "70-74",
+          "samples": 121,
+          "totalR": -21.664,
+          "avgR": -0.179,
+          "winRate": 45.5,
+          "pf": 0.744
+        },
+        {
+          "key": "75-79",
+          "samples": 110,
+          "totalR": -26.361,
+          "avgR": -0.24,
+          "winRate": 44.5,
+          "pf": 0.677
+        },
+        {
+          "key": "85-89",
+          "samples": 101,
+          "totalR": -19.946,
+          "avgR": -0.197,
+          "winRate": 47.5,
+          "pf": 0.731
+        },
+        {
+          "key": "80-84",
+          "samples": 93,
+          "totalR": -48.326,
+          "avgR": -0.52,
+          "winRate": 33.3,
+          "pf": 0.414
+        }
+      ],
+      "byDecision": [
+        {
+          "key": "SKIP",
+          "samples": 1520,
+          "totalR": -566.902,
+          "avgR": -0.373,
+          "winRate": 39.3,
+          "pf": 0.537
+        },
+        {
+          "key": "TRADE",
+          "samples": 380,
+          "totalR": -109.88,
+          "avgR": -0.289,
+          "winRate": 42.1,
+          "pf": 0.62
+        },
+        {
+          "key": "CAUTION",
+          "samples": 260,
+          "totalR": -53.216,
+          "avgR": -0.205,
+          "winRate": 45.4,
+          "pf": 0.717
+        }
+      ],
+      "byStatus": [
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "samples": 820,
+          "totalR": -237.757,
+          "avgR": -0.29,
+          "winRate": 41.5,
+          "pf": 0.617
+        },
+        {
+          "key": "NO_SETUP",
+          "samples": 791,
+          "totalR": -337.48,
+          "avgR": -0.427,
+          "winRate": 38.3,
+          "pf": 0.493
+        },
+        {
+          "key": "READY",
+          "samples": 549,
+          "totalR": -154.762,
+          "avgR": -0.282,
+          "winRate": 42.3,
+          "pf": 0.627
+        }
+      ],
+      "byDistance": [
+        {
+          "key": ">1.50",
+          "samples": 462,
+          "totalR": -137.96,
+          "avgR": -0.299,
+          "winRate": 40.9,
+          "pf": 0.613
+        },
+        {
+          "key": "1.00-1.50",
+          "samples": 372,
+          "totalR": -139.799,
+          "avgR": -0.376,
+          "winRate": 39,
+          "pf": 0.527
+        },
+        {
+          "key": "0.25-0.50",
+          "samples": 352,
+          "totalR": -130.278,
+          "avgR": -0.37,
+          "winRate": 39.2,
+          "pf": 0.542
+        },
+        {
+          "key": "<=0.25",
+          "samples": 348,
+          "totalR": -112.665,
+          "avgR": -0.324,
+          "winRate": 41.1,
+          "pf": 0.587
+        },
+        {
+          "key": "0.50-0.75",
+          "samples": 334,
+          "totalR": -113.651,
+          "avgR": -0.34,
+          "winRate": 41,
+          "pf": 0.565
+        },
+        {
+          "key": "0.75-1.00",
+          "samples": 292,
+          "totalR": -95.645,
+          "avgR": -0.328,
+          "winRate": 42.1,
+          "pf": 0.586
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "LONG|BULL",
+          "samples": 471,
+          "totalR": -23.006,
+          "avgR": -0.049,
+          "winRate": 49,
+          "pf": 0.924
+        },
+        {
+          "key": "SHORT|RANGE",
+          "samples": 348,
+          "totalR": -117.521,
+          "avgR": -0.338,
+          "winRate": 41.4,
+          "pf": 0.565
+        },
+        {
+          "key": "SHORT|BEAR",
+          "samples": 330,
+          "totalR": -169.572,
+          "avgR": -0.514,
+          "winRate": 36.1,
+          "pf": 0.418
+        },
+        {
+          "key": "LONG|RANGE",
+          "samples": 279,
+          "totalR": -133.681,
+          "avgR": -0.479,
+          "winRate": 35.8,
+          "pf": 0.44
+        },
+        {
+          "key": "SHORT|TRANSITION",
+          "samples": 247,
+          "totalR": -68.581,
+          "avgR": -0.278,
+          "winRate": 41.7,
+          "pf": 0.627
+        },
+        {
+          "key": "SHORT|BULL",
+          "samples": 184,
+          "totalR": -57.487,
+          "avgR": -0.312,
+          "winRate": 39.1,
+          "pf": 0.592
+        },
+        {
+          "key": "LONG|TRANSITION",
+          "samples": 180,
+          "totalR": -60.118,
+          "avgR": -0.334,
+          "winRate": 42.2,
+          "pf": 0.58
+        },
+        {
+          "key": "LONG|BEAR",
+          "samples": 121,
+          "totalR": -100.033,
+          "avgR": -0.827,
+          "winRate": 24.8,
+          "pf": 0.232
+        }
+      ],
+      "byConfidenceSideRegime": [
+        {
+          "key": "<60|LONG|RANGE",
+          "samples": 213,
+          "totalR": -101.427,
+          "avgR": -0.476,
+          "winRate": 36.2,
+          "pf": 0.445
+        },
+        {
+          "key": "<60|SHORT|RANGE",
+          "samples": 212,
+          "totalR": -93.188,
+          "avgR": -0.44,
+          "winRate": 37.3,
+          "pf": 0.476
+        },
+        {
+          "key": "<60|SHORT|BULL",
+          "samples": 182,
+          "totalR": -57.572,
+          "avgR": -0.316,
+          "winRate": 39,
+          "pf": 0.588
+        },
+        {
+          "key": "<60|SHORT|TRANSITION",
+          "samples": 172,
+          "totalR": -56.282,
+          "avgR": -0.327,
+          "winRate": 39.5,
+          "pf": 0.575
+        },
+        {
+          "key": "<60|LONG|TRANSITION",
+          "samples": 145,
+          "totalR": -45.081,
+          "avgR": -0.311,
+          "winRate": 43.4,
+          "pf": 0.604
+        },
+        {
+          "key": "<60|LONG|BULL",
+          "samples": 142,
+          "totalR": -16.715,
+          "avgR": -0.118,
+          "winRate": 46.5,
+          "pf": 0.825
+        },
+        {
+          "key": "<60|LONG|BEAR",
+          "samples": 118,
+          "totalR": -96.165,
+          "avgR": -0.815,
+          "winRate": 25.4,
+          "pf": 0.239
+        },
+        {
+          "key": "<60|SHORT|BEAR",
+          "samples": 106,
+          "totalR": -57.961,
+          "avgR": -0.547,
+          "winRate": 36.8,
+          "pf": 0.393
+        },
+        {
+          "key": ">=90|LONG|BULL",
+          "samples": 82,
+          "totalR": -13.242,
+          "avgR": -0.161,
+          "winRate": 43.9,
+          "pf": 0.765
+        },
+        {
+          "key": "65-69|LONG|BULL",
+          "samples": 78,
+          "totalR": 6.731,
+          "avgR": 0.086,
+          "winRate": 53.8,
+          "pf": 1.153
+        },
+        {
+          "key": ">=90|SHORT|BEAR",
+          "samples": 64,
+          "totalR": -20.813,
+          "avgR": -0.325,
+          "winRate": 42.2,
+          "pf": 0.576
+        },
+        {
+          "key": "60-64|LONG|BULL",
+          "samples": 56,
+          "totalR": 6.993,
+          "avgR": 0.125,
+          "winRate": 55.4,
+          "pf": 1.226
+        },
+        {
+          "key": "85-89|LONG|BULL",
+          "samples": 50,
+          "totalR": 4.642,
+          "avgR": 0.093,
+          "winRate": 58,
+          "pf": 1.149
+        },
+        {
+          "key": "65-69|SHORT|BEAR",
+          "samples": 47,
+          "totalR": -22.856,
+          "avgR": -0.486,
+          "winRate": 34,
+          "pf": 0.42
+        },
+        {
+          "key": "85-89|SHORT|BEAR",
+          "samples": 35,
+          "totalR": -26.825,
+          "avgR": -0.766,
+          "winRate": 25.7,
+          "pf": 0.237
+        },
+        {
+          "key": "80-84|SHORT|RANGE",
+          "samples": 34,
+          "totalR": -18.099,
+          "avgR": -0.532,
+          "winRate": 32.4,
+          "pf": 0.401
+        },
+        {
+          "key": "70-74|SHORT|TRANSITION",
+          "samples": 34,
+          "totalR": -1.919,
+          "avgR": -0.056,
+          "winRate": 50,
+          "pf": 0.913
+        },
+        {
+          "key": "60-64|SHORT|RANGE",
+          "samples": 32,
+          "totalR": -1.987,
+          "avgR": -0.062,
+          "winRate": 53.1,
+          "pf": 0.898
+        },
+        {
+          "key": "75-79|SHORT|RANGE",
+          "samples": 30,
+          "totalR": -3.027,
+          "avgR": -0.101,
+          "winRate": 50,
+          "pf": 0.844
+        },
+        {
+          "key": "80-84|LONG|BULL",
+          "samples": 27,
+          "totalR": -4.442,
+          "avgR": -0.165,
+          "winRate": 44.4,
+          "pf": 0.768
+        },
+        {
+          "key": "60-64|SHORT|BEAR",
+          "samples": 27,
+          "totalR": -18.095,
+          "avgR": -0.67,
+          "winRate": 29.6,
+          "pf": 0.325
+        },
+        {
+          "key": "75-79|LONG|RANGE",
+          "samples": 25,
+          "totalR": -6.141,
+          "avgR": -0.246,
+          "winRate": 44,
+          "pf": 0.653
+        },
+        {
+          "key": "70-74|LONG|BULL",
+          "samples": 24,
+          "totalR": -2.66,
+          "avgR": -0.111,
+          "winRate": 45.8,
+          "pf": 0.838
+        },
+        {
+          "key": "70-74|SHORT|BEAR",
+          "samples": 20,
+          "totalR": -2.693,
+          "avgR": -0.135,
+          "winRate": 50,
+          "pf": 0.802
+        },
+        {
+          "key": "75-79|SHORT|TRANSITION",
+          "samples": 19,
+          "totalR": -4.803,
+          "avgR": -0.253,
+          "winRate": 42.1,
+          "pf": 0.664
+        },
+        {
+          "key": "75-79|SHORT|BEAR",
+          "samples": 18,
+          "totalR": -7.395,
+          "avgR": -0.411,
+          "winRate": 44.4,
+          "pf": 0.558
+        },
+        {
+          "key": "70-74|LONG|TRANSITION",
+          "samples": 16,
+          "totalR": -5.532,
+          "avgR": -0.346,
+          "winRate": 37.5,
+          "pf": 0.552
+        },
+        {
+          "key": "70-74|LONG|RANGE",
+          "samples": 16,
+          "totalR": -8.592,
+          "avgR": -0.537,
+          "winRate": 31.3,
+          "pf": 0.388
+        },
+        {
+          "key": "85-89|SHORT|RANGE",
+          "samples": 15,
+          "totalR": 1.18,
+          "avgR": 0.079,
+          "winRate": 60,
+          "pf": 1.149
+        },
+        {
+          "key": "80-84|SHORT|BEAR",
+          "samples": 13,
+          "totalR": -12.933,
+          "avgR": -0.995,
+          "winRate": 15.4,
+          "pf": 0.142
+        },
+        {
+          "key": "75-79|LONG|BULL",
+          "samples": 12,
+          "totalR": -4.316,
+          "avgR": -0.36,
+          "winRate": 33.3,
+          "pf": 0.539
+        },
+        {
+          "key": "65-69|SHORT|TRANSITION",
+          "samples": 12,
+          "totalR": -0.817,
+          "avgR": -0.068,
+          "winRate": 50,
+          "pf": 0.896
+        },
+        {
+          "key": "80-84|LONG|RANGE",
+          "samples": 11,
+          "totalR": -7.573,
+          "avgR": -0.688,
+          "winRate": 27.3,
+          "pf": 0.319
+        },
+        {
+          "key": "70-74|SHORT|RANGE",
+          "samples": 11,
+          "totalR": -0.268,
+          "avgR": -0.024,
+          "winRate": 54.5,
+          "pf": 0.957
+        },
+        {
+          "key": "65-69|LONG|RANGE",
+          "samples": 9,
+          "totalR": -9.18,
+          "avgR": -1.02,
+          "winRate": 11.1,
+          "pf": 0.114
+        },
+        {
+          "key": "65-69|SHORT|RANGE",
+          "samples": 9,
+          "totalR": 0.2,
+          "avgR": 0.022,
+          "winRate": 55.6,
+          "pf": 1.039
+        },
+        {
+          "key": "75-79|LONG|TRANSITION",
+          "samples": 6,
+          "totalR": -0.679,
+          "avgR": -0.113,
+          "winRate": 50,
+          "pf": 0.835
+        },
+        {
+          "key": "60-64|SHORT|TRANSITION",
+          "samples": 6,
+          "totalR": -2.765,
+          "avgR": -0.461,
+          "winRate": 33.3,
+          "pf": 0.459
+        },
+        {
+          "key": "65-69|LONG|TRANSITION",
+          "samples": 6,
+          "totalR": -8.273,
+          "avgR": -1.379,
+          "winRate": 0,
+          "pf": 0
+        },
+        {
+          "key": ">=90|SHORT|RANGE",
+          "samples": 5,
+          "totalR": -2.332,
+          "avgR": -0.466,
+          "winRate": 40,
+          "pf": 0.387
+        },
+        {
+          "key": "60-64|LONG|RANGE",
+          "samples": 4,
+          "totalR": -1.824,
+          "avgR": -0.456,
+          "winRate": 50,
+          "pf": 0.365
+        },
+        {
+          "key": "80-84|LONG|TRANSITION",
+          "samples": 4,
+          "totalR": -3.285,
+          "avgR": -0.821,
+          "winRate": 25,
+          "pf": 0.277
+        },
+        {
+          "key": "80-84|SHORT|TRANSITION",
+          "samples": 4,
+          "totalR": -1.994,
+          "avgR": -0.499,
+          "winRate": 50,
+          "pf": 0.121
+        },
+        {
+          "key": "60-64|LONG|TRANSITION",
+          "samples": 3,
+          "totalR": 2.732,
+          "avgR": 0.911,
+          "winRate": 100,
+          "pf": 99
+        },
+        {
+          "key": "60-64|LONG|BEAR",
+          "samples": 3,
+          "totalR": -3.868,
+          "avgR": -1.289,
+          "winRate": 0,
+          "pf": 0
+        },
+        {
+          "key": "60-64|SHORT|BULL",
+          "samples": 2,
+          "totalR": 0.086,
+          "avgR": 0.043,
+          "winRate": 50,
+          "pf": 1.073
+        },
+        {
+          "key": "85-89|LONG|RANGE",
+          "samples": 1,
+          "totalR": 1.057,
+          "avgR": 1.057,
+          "winRate": 100,
+          "pf": 99
+        }
+      ]
+    },
+    {
+      "days": 60,
+      "total": {
+        "key": "ALL",
+        "samples": 4320,
+        "totalR": -1396.565,
+        "avgR": -0.323,
+        "winRate": 40.9,
+        "pf": 0.583
+      },
+      "byConfidence": [
+        {
+          "key": "<60",
+          "samples": 2593,
+          "totalR": -912.36,
+          "avgR": -0.352,
+          "winRate": 40.2,
+          "pf": 0.555
+        },
+        {
+          "key": "65-69",
+          "samples": 330,
+          "totalR": -113.955,
+          "avgR": -0.345,
+          "winRate": 38.5,
+          "pf": 0.558
+        },
+        {
+          "key": ">=90",
+          "samples": 285,
+          "totalR": -79.476,
+          "avgR": -0.279,
+          "winRate": 41.4,
+          "pf": 0.625
+        },
+        {
+          "key": "70-74",
+          "samples": 246,
+          "totalR": -81.081,
+          "avgR": -0.33,
+          "winRate": 39.4,
+          "pf": 0.572
+        },
+        {
+          "key": "60-64",
+          "samples": 241,
+          "totalR": -59.681,
+          "avgR": -0.248,
+          "winRate": 43.6,
+          "pf": 0.663
+        },
+        {
+          "key": "85-89",
+          "samples": 210,
+          "totalR": -51.006,
+          "avgR": -0.243,
+          "winRate": 44.8,
+          "pf": 0.673
+        },
+        {
+          "key": "80-84",
+          "samples": 210,
+          "totalR": -72.765,
+          "avgR": -0.346,
+          "winRate": 40.5,
+          "pf": 0.561
+        },
+        {
+          "key": "75-79",
+          "samples": 205,
+          "totalR": -26.243,
+          "avgR": -0.128,
+          "winRate": 48.8,
+          "pf": 0.81
+        }
+      ],
+      "byDecision": [
+        {
+          "key": "SKIP",
+          "samples": 3043,
+          "totalR": -1059.955,
+          "avgR": -0.348,
+          "winRate": 40.1,
+          "pf": 0.558
+        },
+        {
+          "key": "TRADE",
+          "samples": 780,
+          "totalR": -222.605,
+          "avgR": -0.285,
+          "winRate": 42.2,
+          "pf": 0.622
+        },
+        {
+          "key": "CAUTION",
+          "samples": 497,
+          "totalR": -114.005,
+          "avgR": -0.229,
+          "winRate": 44.1,
+          "pf": 0.683
+        }
+      ],
+      "byStatus": [
+        {
+          "key": "NO_SETUP",
+          "samples": 1597,
+          "totalR": -603.958,
+          "avgR": -0.378,
+          "winRate": 39.8,
+          "pf": 0.531
+        },
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "samples": 1594,
+          "totalR": -485.023,
+          "avgR": -0.304,
+          "winRate": 40.8,
+          "pf": 0.601
+        },
+        {
+          "key": "READY",
+          "samples": 1129,
+          "totalR": -307.584,
+          "avgR": -0.272,
+          "winRate": 42.7,
+          "pf": 0.635
+        }
+      ],
+      "byDistance": [
+        {
+          "key": ">1.50",
+          "samples": 913,
+          "totalR": -250.309,
+          "avgR": -0.274,
+          "winRate": 41.7,
+          "pf": 0.635
+        },
+        {
+          "key": "1.00-1.50",
+          "samples": 754,
+          "totalR": -272.488,
+          "avgR": -0.361,
+          "winRate": 39.5,
+          "pf": 0.542
+        },
+        {
+          "key": "0.25-0.50",
+          "samples": 734,
+          "totalR": -236.651,
+          "avgR": -0.322,
+          "winRate": 41.1,
+          "pf": 0.583
+        },
+        {
+          "key": "<=0.25",
+          "samples": 709,
+          "totalR": -226.05,
+          "avgR": -0.319,
+          "winRate": 41.3,
+          "pf": 0.588
+        },
+        {
+          "key": "0.50-0.75",
+          "samples": 680,
+          "totalR": -222.614,
+          "avgR": -0.327,
+          "winRate": 41.3,
+          "pf": 0.578
+        },
+        {
+          "key": "0.75-1.00",
+          "samples": 530,
+          "totalR": -188.454,
+          "avgR": -0.356,
+          "winRate": 40.2,
+          "pf": 0.553
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "LONG|BULL",
+          "samples": 815,
+          "totalR": -180.2,
+          "avgR": -0.221,
+          "winRate": 42.8,
+          "pf": 0.694
+        },
+        {
+          "key": "SHORT|BEAR",
+          "samples": 726,
+          "totalR": -352.811,
+          "avgR": -0.486,
+          "winRate": 35.3,
+          "pf": 0.439
+        },
+        {
+          "key": "SHORT|RANGE",
+          "samples": 662,
+          "totalR": -194.177,
+          "avgR": -0.293,
+          "winRate": 43.2,
+          "pf": 0.612
+        },
+        {
+          "key": "LONG|RANGE",
+          "samples": 549,
+          "totalR": -202.881,
+          "avgR": -0.37,
+          "winRate": 40.1,
+          "pf": 0.534
+        },
+        {
+          "key": "SHORT|TRANSITION",
+          "samples": 547,
+          "totalR": -146.654,
+          "avgR": -0.268,
+          "winRate": 42.2,
+          "pf": 0.637
+        },
+        {
+          "key": "LONG|TRANSITION",
+          "samples": 419,
+          "totalR": -108.955,
+          "avgR": -0.26,
+          "winRate": 43.9,
+          "pf": 0.649
+        },
+        {
+          "key": "SHORT|BULL",
+          "samples": 332,
+          "totalR": -85.993,
+          "avgR": -0.259,
+          "winRate": 42.2,
+          "pf": 0.649
+        },
+        {
+          "key": "LONG|BEAR",
+          "samples": 270,
+          "totalR": -124.894,
+          "avgR": -0.463,
+          "winRate": 37.8,
+          "pf": 0.462
+        }
+      ],
+      "byConfidenceSideRegime": [
+        {
+          "key": "<60|LONG|RANGE",
+          "samples": 409,
+          "totalR": -155.318,
+          "avgR": -0.38,
+          "winRate": 39.6,
+          "pf": 0.525
+        },
+        {
+          "key": "<60|SHORT|RANGE",
+          "samples": 407,
+          "totalR": -149.34,
+          "avgR": -0.367,
+          "winRate": 40.5,
+          "pf": 0.541
+        },
+        {
+          "key": "<60|SHORT|TRANSITION",
+          "samples": 396,
+          "totalR": -121.416,
+          "avgR": -0.307,
+          "winRate": 40.7,
+          "pf": 0.597
+        },
+        {
+          "key": "<60|LONG|TRANSITION",
+          "samples": 327,
+          "totalR": -70.124,
+          "avgR": -0.214,
+          "winRate": 45.9,
+          "pf": 0.701
+        },
+        {
+          "key": "<60|SHORT|BULL",
+          "samples": 325,
+          "totalR": -87.108,
+          "avgR": -0.268,
+          "winRate": 41.8,
+          "pf": 0.64
+        },
+        {
+          "key": "<60|LONG|BEAR",
+          "samples": 267,
+          "totalR": -121.026,
+          "avgR": -0.453,
+          "winRate": 38.2,
+          "pf": 0.47
+        },
+        {
+          "key": "<60|LONG|BULL",
+          "samples": 241,
+          "totalR": -63.819,
+          "avgR": -0.265,
+          "winRate": 41.5,
+          "pf": 0.644
+        },
+        {
+          "key": "<60|SHORT|BEAR",
+          "samples": 221,
+          "totalR": -144.208,
+          "avgR": -0.653,
+          "winRate": 29.9,
+          "pf": 0.319
+        },
+        {
+          "key": ">=90|LONG|BULL",
+          "samples": 137,
+          "totalR": -46.086,
+          "avgR": -0.336,
+          "winRate": 37.2,
+          "pf": 0.566
+        },
+        {
+          "key": "65-69|LONG|BULL",
+          "samples": 136,
+          "totalR": -15.721,
+          "avgR": -0.116,
+          "winRate": 46.3,
+          "pf": 0.825
+        },
+        {
+          "key": ">=90|SHORT|BEAR",
+          "samples": 136,
+          "totalR": -31.679,
+          "avgR": -0.233,
+          "winRate": 44.9,
+          "pf": 0.677
+        },
+        {
+          "key": "65-69|SHORT|BEAR",
+          "samples": 111,
+          "totalR": -61.76,
+          "avgR": -0.556,
+          "winRate": 30.6,
+          "pf": 0.372
+        },
+        {
+          "key": "85-89|LONG|BULL",
+          "samples": 93,
+          "totalR": -10.206,
+          "avgR": -0.11,
+          "winRate": 49.5,
+          "pf": 0.842
+        },
+        {
+          "key": "60-64|LONG|BULL",
+          "samples": 85,
+          "totalR": -11.145,
+          "avgR": -0.131,
+          "winRate": 45.9,
+          "pf": 0.807
+        },
+        {
+          "key": "85-89|SHORT|BEAR",
+          "samples": 81,
+          "totalR": -36.342,
+          "avgR": -0.449,
+          "winRate": 37,
+          "pf": 0.467
+        },
+        {
+          "key": "80-84|SHORT|RANGE",
+          "samples": 64,
+          "totalR": -17.923,
+          "avgR": -0.28,
+          "winRate": 43.8,
+          "pf": 0.629
+        },
+        {
+          "key": "60-64|SHORT|BEAR",
+          "samples": 62,
+          "totalR": -25.197,
+          "avgR": -0.406,
+          "winRate": 38.7,
+          "pf": 0.514
+        },
+        {
+          "key": "60-64|SHORT|RANGE",
+          "samples": 61,
+          "totalR": -9.768,
+          "avgR": -0.16,
+          "winRate": 47.5,
+          "pf": 0.761
+        },
+        {
+          "key": "70-74|SHORT|TRANSITION",
+          "samples": 60,
+          "totalR": -16.219,
+          "avgR": -0.27,
+          "winRate": 41.7,
+          "pf": 0.635
+        },
+        {
+          "key": "75-79|SHORT|RANGE",
+          "samples": 50,
+          "totalR": -2.478,
+          "avgR": -0.05,
+          "winRate": 52,
+          "pf": 0.921
+        },
+        {
+          "key": "80-84|LONG|BULL",
+          "samples": 49,
+          "totalR": -14.052,
+          "avgR": -0.287,
+          "winRate": 40.8,
+          "pf": 0.622
+        },
+        {
+          "key": "75-79|LONG|RANGE",
+          "samples": 48,
+          "totalR": -8.11,
+          "avgR": -0.169,
+          "winRate": 47.9,
+          "pf": 0.746
+        },
+        {
+          "key": "80-84|SHORT|BEAR",
+          "samples": 48,
+          "totalR": -29.097,
+          "avgR": -0.606,
+          "winRate": 29.2,
+          "pf": 0.353
+        },
+        {
+          "key": "70-74|LONG|BULL",
+          "samples": 47,
+          "totalR": -5.491,
+          "avgR": -0.117,
+          "winRate": 46.8,
+          "pf": 0.823
+        },
+        {
+          "key": "70-74|LONG|TRANSITION",
+          "samples": 44,
+          "totalR": -19.531,
+          "avgR": -0.444,
+          "winRate": 34.1,
+          "pf": 0.459
+        },
+        {
+          "key": "70-74|SHORT|BEAR",
+          "samples": 40,
+          "totalR": -20.157,
+          "avgR": -0.504,
+          "winRate": 32.5,
+          "pf": 0.418
+        },
+        {
+          "key": "75-79|SHORT|TRANSITION",
+          "samples": 37,
+          "totalR": 1.355,
+          "avgR": 0.037,
+          "winRate": 54.1,
+          "pf": 1.062
+        },
+        {
+          "key": "70-74|LONG|RANGE",
+          "samples": 37,
+          "totalR": -17.15,
+          "avgR": -0.464,
+          "winRate": 35.1,
+          "pf": 0.448
+        },
+        {
+          "key": "85-89|SHORT|RANGE",
+          "samples": 34,
+          "totalR": -4.195,
+          "avgR": -0.123,
+          "winRate": 50,
+          "pf": 0.81
+        },
+        {
+          "key": "65-69|SHORT|TRANSITION",
+          "samples": 32,
+          "totalR": -5.048,
+          "avgR": -0.158,
+          "winRate": 46.9,
+          "pf": 0.768
+        },
+        {
+          "key": "80-84|LONG|RANGE",
+          "samples": 30,
+          "totalR": -6.893,
+          "avgR": -0.23,
+          "winRate": 46.7,
+          "pf": 0.688
+        },
+        {
+          "key": "75-79|LONG|BULL",
+          "samples": 27,
+          "totalR": -13.68,
+          "avgR": -0.507,
+          "winRate": 29.6,
+          "pf": 0.407
+        },
+        {
+          "key": "75-79|SHORT|BEAR",
+          "samples": 27,
+          "totalR": -4.371,
+          "avgR": -0.162,
+          "winRate": 51.9,
+          "pf": 0.789
+        },
+        {
+          "key": "65-69|LONG|TRANSITION",
+          "samples": 18,
+          "totalR": -14.601,
+          "avgR": -0.811,
+          "winRate": 22.2,
+          "pf": 0.221
+        },
+        {
+          "key": "65-69|SHORT|RANGE",
+          "samples": 18,
+          "totalR": -6.619,
+          "avgR": -0.368,
+          "winRate": 38.9,
+          "pf": 0.536
+        },
+        {
+          "key": "70-74|SHORT|RANGE",
+          "samples": 17,
+          "totalR": -3.597,
+          "avgR": -0.212,
+          "winRate": 47.1,
+          "pf": 0.697
+        },
+        {
+          "key": "75-79|LONG|TRANSITION",
+          "samples": 16,
+          "totalR": 1.041,
+          "avgR": 0.065,
+          "winRate": 56.3,
+          "pf": 1.116
+        },
+        {
+          "key": "65-69|LONG|RANGE",
+          "samples": 15,
+          "totalR": -10.205,
+          "avgR": -0.68,
+          "winRate": 26.7,
+          "pf": 0.293
+        },
+        {
+          "key": "80-84|SHORT|TRANSITION",
+          "samples": 11,
+          "totalR": -1.276,
+          "avgR": -0.116,
+          "winRate": 54.5,
+          "pf": 0.797
+        },
+        {
+          "key": "60-64|SHORT|TRANSITION",
+          "samples": 11,
+          "totalR": -4.049,
+          "avgR": -0.368,
+          "winRate": 36.4,
+          "pf": 0.53
+        },
+        {
+          "key": ">=90|SHORT|RANGE",
+          "samples": 11,
+          "totalR": -0.256,
+          "avgR": -0.023,
+          "winRate": 54.5,
+          "pf": 0.959
+        },
+        {
+          "key": "80-84|LONG|TRANSITION",
+          "samples": 8,
+          "totalR": -3.523,
+          "avgR": -0.44,
+          "winRate": 37.5,
+          "pf": 0.503
+        },
+        {
+          "key": "60-64|LONG|RANGE",
+          "samples": 7,
+          "totalR": -3.487,
+          "avgR": -0.498,
+          "winRate": 42.9,
+          "pf": 0.373
+        },
+        {
+          "key": "60-64|SHORT|BULL",
+          "samples": 6,
+          "totalR": 0.05,
+          "avgR": 0.008,
+          "winRate": 50,
+          "pf": 1.014
+        },
+        {
+          "key": "60-64|LONG|TRANSITION",
+          "samples": 6,
+          "totalR": -2.218,
+          "avgR": -0.37,
+          "winRate": 50,
+          "pf": 0.552
+        },
+        {
+          "key": "60-64|LONG|BEAR",
+          "samples": 3,
+          "totalR": -3.868,
+          "avgR": -1.289,
+          "winRate": 0,
+          "pf": 0
+        },
+        {
+          "key": "85-89|LONG|RANGE",
+          "samples": 2,
+          "totalR": -0.263,
+          "avgR": -0.131,
+          "winRate": 50,
+          "pf": 0.801
+        },
+        {
+          "key": ">=90|LONG|RANGE",
+          "samples": 1,
+          "totalR": -1.454,
+          "avgR": -1.454,
+          "winRate": 0,
+          "pf": 0
+        },
+        {
+          "key": "70-74|SHORT|BULL",
+          "samples": 1,
+          "totalR": 1.065,
+          "avgR": 1.065,
+          "winRate": 100,
+          "pf": 99
+        }
+      ]
+    },
+    {
+      "days": 90,
+      "total": {
+        "key": "ALL",
+        "samples": 6480,
+        "totalR": -1832.78,
+        "avgR": -0.283,
+        "winRate": 41.1,
+        "pf": 0.622
+      },
+      "byConfidence": [
+        {
+          "key": "<60",
+          "samples": 3839,
+          "totalR": -1199.397,
+          "avgR": -0.312,
+          "winRate": 40.3,
+          "pf": 0.592
+        },
+        {
+          "key": "65-69",
+          "samples": 524,
+          "totalR": -168.18,
+          "avgR": -0.321,
+          "winRate": 38.2,
+          "pf": 0.58
+        },
+        {
+          "key": ">=90",
+          "samples": 475,
+          "totalR": -104.469,
+          "avgR": -0.22,
+          "winRate": 42.3,
+          "pf": 0.691
+        },
+        {
+          "key": "70-74",
+          "samples": 384,
+          "totalR": -113.828,
+          "avgR": -0.296,
+          "winRate": 39.8,
+          "pf": 0.606
+        },
+        {
+          "key": "60-64",
+          "samples": 373,
+          "totalR": -82.787,
+          "avgR": -0.222,
+          "winRate": 43.2,
+          "pf": 0.69
+        },
+        {
+          "key": "85-89",
+          "samples": 304,
+          "totalR": -57.808,
+          "avgR": -0.19,
+          "winRate": 45.7,
+          "pf": 0.731
+        },
+        {
+          "key": "80-84",
+          "samples": 296,
+          "totalR": -84.076,
+          "avgR": -0.284,
+          "winRate": 41.6,
+          "pf": 0.623
+        },
+        {
+          "key": "75-79",
+          "samples": 285,
+          "totalR": -22.237,
+          "avgR": -0.078,
+          "winRate": 49.5,
+          "pf": 0.879
+        }
+      ],
+      "byDecision": [
+        {
+          "key": "SKIP",
+          "samples": 4537,
+          "totalR": -1398.518,
+          "avgR": -0.308,
+          "winRate": 40.3,
+          "pf": 0.596
+        },
+        {
+          "key": "TRADE",
+          "samples": 1174,
+          "totalR": -260.503,
+          "avgR": -0.222,
+          "winRate": 43.4,
+          "pf": 0.691
+        },
+        {
+          "key": "CAUTION",
+          "samples": 769,
+          "totalR": -173.759,
+          "avgR": -0.226,
+          "winRate": 42.9,
+          "pf": 0.686
+        }
+      ],
+      "byStatus": [
+        {
+          "key": "WAIT_ENTRY_ZONE",
+          "samples": 2483,
+          "totalR": -701.467,
+          "avgR": -0.283,
+          "winRate": 40.3,
+          "pf": 0.621
+        },
+        {
+          "key": "NO_SETUP",
+          "samples": 2313,
+          "totalR": -738.233,
+          "avgR": -0.319,
+          "winRate": 40.7,
+          "pf": 0.586
+        },
+        {
+          "key": "READY",
+          "samples": 1684,
+          "totalR": -393.081,
+          "avgR": -0.233,
+          "winRate": 43,
+          "pf": 0.677
+        }
+      ],
+      "byDistance": [
+        {
+          "key": ">1.50",
+          "samples": 1363,
+          "totalR": -380.689,
+          "avgR": -0.279,
+          "winRate": 40.3,
+          "pf": 0.625
+        },
+        {
+          "key": "1.00-1.50",
+          "samples": 1171,
+          "totalR": -408.239,
+          "avgR": -0.349,
+          "winRate": 38.3,
+          "pf": 0.553
+        },
+        {
+          "key": "0.25-0.50",
+          "samples": 1090,
+          "totalR": -308.342,
+          "avgR": -0.283,
+          "winRate": 41.5,
+          "pf": 0.622
+        },
+        {
+          "key": "<=0.25",
+          "samples": 1075,
+          "totalR": -255.222,
+          "avgR": -0.237,
+          "winRate": 43.3,
+          "pf": 0.674
+        },
+        {
+          "key": "0.50-0.75",
+          "samples": 968,
+          "totalR": -283.142,
+          "avgR": -0.293,
+          "winRate": 41.3,
+          "pf": 0.612
+        },
+        {
+          "key": "0.75-1.00",
+          "samples": 813,
+          "totalR": -197.146,
+          "avgR": -0.242,
+          "winRate": 43.2,
+          "pf": 0.669
+        }
+      ],
+      "bySideRegime": [
+        {
+          "key": "SHORT|BEAR",
+          "samples": 1469,
+          "totalR": -448.846,
+          "avgR": -0.306,
+          "winRate": 39.7,
+          "pf": 0.6
+        },
+        {
+          "key": "LONG|BULL",
+          "samples": 995,
+          "totalR": -172.019,
+          "avgR": -0.173,
+          "winRate": 44.6,
+          "pf": 0.751
+        },
+        {
+          "key": "SHORT|RANGE",
+          "samples": 886,
+          "totalR": -244.754,
+          "avgR": -0.276,
+          "winRate": 42.6,
+          "pf": 0.629
+        },
+        {
+          "key": "LONG|RANGE",
+          "samples": 762,
+          "totalR": -248.649,
+          "avgR": -0.326,
+          "winRate": 40.7,
+          "pf": 0.575
+        },
+        {
+          "key": "LONG|TRANSITION",
+          "samples": 750,
+          "totalR": -218.177,
+          "avgR": -0.291,
+          "winRate": 40.4,
+          "pf": 0.613
+        },
+        {
+          "key": "SHORT|TRANSITION",
+          "samples": 708,
+          "totalR": -163.442,
+          "avgR": -0.231,
+          "winRate": 43.1,
+          "pf": 0.678
+        },
+        {
+          "key": "LONG|BEAR",
+          "samples": 516,
+          "totalR": -237.048,
+          "avgR": -0.459,
+          "winRate": 34.7,
+          "pf": 0.457
+        },
+        {
+          "key": "SHORT|BULL",
+          "samples": 394,
+          "totalR": -99.845,
+          "avgR": -0.253,
+          "winRate": 41.9,
+          "pf": 0.655
+        }
+      ],
+      "byConfidenceSideRegime": [
+        {
+          "key": "<60|LONG|RANGE",
+          "samples": 573,
+          "totalR": -195.262,
+          "avgR": -0.341,
+          "winRate": 40,
+          "pf": 0.56
+        },
+        {
+          "key": "<60|LONG|TRANSITION",
+          "samples": 557,
+          "totalR": -149.405,
+          "avgR": -0.268,
+          "winRate": 41.5,
+          "pf": 0.637
+        },
+        {
+          "key": "<60|SHORT|RANGE",
+          "samples": 552,
+          "totalR": -165.583,
+          "avgR": -0.3,
+          "winRate": 41.8,
+          "pf": 0.606
+        },
+        {
+          "key": "<60|SHORT|TRANSITION",
+          "samples": 534,
+          "totalR": -134.822,
+          "avgR": -0.252,
+          "winRate": 42.1,
+          "pf": 0.654
+        },
+        {
+          "key": "<60|LONG|BEAR",
+          "samples": 509,
+          "totalR": -230.755,
+          "avgR": -0.453,
+          "winRate": 35,
+          "pf": 0.462
+        },
+        {
+          "key": "<60|SHORT|BEAR",
+          "samples": 431,
+          "totalR": -166.057,
+          "avgR": -0.385,
+          "winRate": 37.6,
+          "pf": 0.525
+        },
+        {
+          "key": "<60|SHORT|BULL",
+          "samples": 387,
+          "totalR": -100.96,
+          "avgR": -0.261,
+          "winRate": 41.6,
+          "pf": 0.647
+        },
+        {
+          "key": "<60|LONG|BULL",
+          "samples": 296,
+          "totalR": -56.552,
+          "avgR": -0.191,
+          "winRate": 44.3,
+          "pf": 0.728
+        },
+        {
+          "key": ">=90|SHORT|BEAR",
+          "samples": 286,
+          "totalR": -61.326,
+          "avgR": -0.214,
+          "winRate": 42.7,
+          "pf": 0.697
+        },
+        {
+          "key": "65-69|SHORT|BEAR",
+          "samples": 236,
+          "totalR": -85.38,
+          "avgR": -0.362,
+          "winRate": 36,
+          "pf": 0.538
+        },
+        {
+          "key": ">=90|LONG|BULL",
+          "samples": 172,
+          "totalR": -40.269,
+          "avgR": -0.234,
+          "winRate": 41.3,
+          "pf": 0.675
+        },
+        {
+          "key": "65-69|LONG|BULL",
+          "samples": 164,
+          "totalR": -20.368,
+          "avgR": -0.124,
+          "winRate": 45.7,
+          "pf": 0.813
+        },
+        {
+          "key": "85-89|SHORT|BEAR",
+          "samples": 148,
+          "totalR": -33.199,
+          "avgR": -0.224,
+          "winRate": 43.9,
+          "pf": 0.688
+        },
+        {
+          "key": "60-64|SHORT|BEAR",
+          "samples": 137,
+          "totalR": -31.133,
+          "avgR": -0.227,
+          "winRate": 43.1,
+          "pf": 0.686
+        },
+        {
+          "key": "85-89|LONG|BULL",
+          "samples": 110,
+          "totalR": -15.634,
+          "avgR": -0.142,
+          "winRate": 48.2,
+          "pf": 0.798
+        },
+        {
+          "key": "60-64|LONG|BULL",
+          "samples": 102,
+          "totalR": -9.888,
+          "avgR": -0.097,
+          "winRate": 47.1,
+          "pf": 0.853
+        },
+        {
+          "key": "80-84|SHORT|BEAR",
+          "samples": 91,
+          "totalR": -32.726,
+          "avgR": -0.36,
+          "winRate": 37.4,
+          "pf": 0.548
+        },
+        {
+          "key": "70-74|SHORT|BEAR",
+          "samples": 91,
+          "totalR": -33.92,
+          "avgR": -0.373,
+          "winRate": 35.2,
+          "pf": 0.527
+        },
+        {
+          "key": "80-84|SHORT|RANGE",
+          "samples": 86,
+          "totalR": -32.49,
+          "avgR": -0.378,
+          "winRate": 38.4,
+          "pf": 0.527
+        },
+        {
+          "key": "60-64|SHORT|RANGE",
+          "samples": 83,
+          "totalR": -14.162,
+          "avgR": -0.171,
+          "winRate": 45.8,
+          "pf": 0.748
+        },
+        {
+          "key": "70-74|LONG|TRANSITION",
+          "samples": 82,
+          "totalR": -31.999,
+          "avgR": -0.39,
+          "winRate": 35.4,
+          "pf": 0.512
+        },
+        {
+          "key": "70-74|SHORT|TRANSITION",
+          "samples": 70,
+          "totalR": -14.001,
+          "avgR": -0.2,
+          "winRate": 44.3,
+          "pf": 0.716
+        },
+        {
+          "key": "75-79|LONG|RANGE",
+          "samples": 64,
+          "totalR": -4.081,
+          "avgR": -0.064,
+          "winRate": 51.6,
+          "pf": 0.896
+        },
+        {
+          "key": "70-74|LONG|BULL",
+          "samples": 63,
+          "totalR": -5.951,
+          "avgR": -0.094,
+          "winRate": 47.6,
+          "pf": 0.855
+        },
+        {
+          "key": "80-84|LONG|BULL",
+          "samples": 61,
+          "totalR": -11.916,
+          "avgR": -0.195,
+          "winRate": 44.3,
+          "pf": 0.725
+        },
+        {
+          "key": "75-79|SHORT|RANGE",
+          "samples": 58,
+          "totalR": 0.108,
+          "avgR": 0.002,
+          "winRate": 53.4,
+          "pf": 1.003
+        },
+        {
+          "key": "70-74|LONG|RANGE",
+          "samples": 55,
+          "totalR": -21.492,
+          "avgR": -0.391,
+          "winRate": 38.2,
+          "pf": 0.519
+        },
+        {
+          "key": "75-79|SHORT|BEAR",
+          "samples": 49,
+          "totalR": -5.105,
+          "avgR": -0.104,
+          "winRate": 49,
+          "pf": 0.852
+        },
+        {
+          "key": "75-79|LONG|TRANSITION",
+          "samples": 45,
+          "totalR": -4.473,
+          "avgR": -0.099,
+          "winRate": 46.7,
+          "pf": 0.847
+        },
+        {
+          "key": "85-89|SHORT|RANGE",
+          "samples": 44,
+          "totalR": -8.712,
+          "avgR": -0.198,
+          "winRate": 45.5,
+          "pf": 0.711
+        },
+        {
+          "key": "75-79|SHORT|TRANSITION",
+          "samples": 42,
+          "totalR": 2.753,
+          "avgR": 0.066,
+          "winRate": 54.8,
+          "pf": 1.114
+        },
+        {
+          "key": "65-69|LONG|TRANSITION",
+          "samples": 38,
+          "totalR": -19.841,
+          "avgR": -0.522,
+          "winRate": 31.6,
+          "pf": 0.403
+        },
+        {
+          "key": "65-69|SHORT|TRANSITION",
+          "samples": 38,
+          "totalR": -14.519,
+          "avgR": -0.382,
+          "winRate": 36.8,
+          "pf": 0.514
+        },
+        {
+          "key": "80-84|LONG|RANGE",
+          "samples": 31,
+          "totalR": -2.362,
+          "avgR": -0.076,
+          "winRate": 51.6,
+          "pf": 0.885
+        },
+        {
+          "key": "75-79|LONG|BULL",
+          "samples": 27,
+          "totalR": -11.44,
+          "avgR": -0.424,
+          "winRate": 33.3,
+          "pf": 0.478
+        },
+        {
+          "key": "65-69|SHORT|RANGE",
+          "samples": 25,
+          "totalR": -14.967,
+          "avgR": -0.599,
+          "winRate": 28,
+          "pf": 0.338
+        },
+        {
+          "key": "65-69|LONG|RANGE",
+          "samples": 23,
+          "totalR": -13.104,
+          "avgR": -0.57,
+          "winRate": 30.4,
+          "pf": 0.372
+        },
+        {
+          "key": "70-74|SHORT|RANGE",
+          "samples": 22,
+          "totalR": -7.53,
+          "avgR": -0.342,
+          "winRate": 40.9,
+          "pf": 0.552
+        },
+        {
+          "key": ">=90|SHORT|RANGE",
+          "samples": 16,
+          "totalR": -1.419,
+          "avgR": -0.089,
+          "winRate": 50,
+          "pf": 0.858
+        },
+        {
+          "key": "80-84|LONG|TRANSITION",
+          "samples": 15,
+          "totalR": -4.535,
+          "avgR": -0.302,
+          "winRate": 40,
+          "pf": 0.615
+        },
+        {
+          "key": "60-64|LONG|TRANSITION",
+          "samples": 13,
+          "totalR": -7.923,
+          "avgR": -0.609,
+          "winRate": 30.8,
+          "pf": 0.328
+        },
+        {
+          "key": "60-64|LONG|RANGE",
+          "samples": 13,
+          "totalR": -10.632,
+          "avgR": -0.818,
+          "winRate": 23.1,
+          "pf": 0.163
+        },
+        {
+          "key": "60-64|SHORT|TRANSITION",
+          "samples": 12,
+          "totalR": -2.806,
+          "avgR": -0.234,
+          "winRate": 41.7,
+          "pf": 0.674
+        },
+        {
+          "key": "80-84|SHORT|TRANSITION",
+          "samples": 12,
+          "totalR": -0.047,
+          "avgR": -0.004,
+          "winRate": 58.3,
+          "pf": 0.993
+        },
+        {
+          "key": "60-64|LONG|BEAR",
+          "samples": 7,
+          "totalR": -6.293,
+          "avgR": -0.899,
+          "winRate": 14.3,
+          "pf": 0.167
+        },
+        {
+          "key": "60-64|SHORT|BULL",
+          "samples": 6,
+          "totalR": 0.05,
+          "avgR": 0.008,
+          "winRate": 50,
+          "pf": 1.014
+        },
+        {
+          "key": "85-89|LONG|RANGE",
+          "samples": 2,
+          "totalR": -0.263,
+          "avgR": -0.131,
+          "winRate": 50,
+          "pf": 0.801
+        },
+        {
+          "key": ">=90|LONG|RANGE",
+          "samples": 1,
+          "totalR": -1.454,
+          "avgR": -1.454,
+          "winRate": 0,
+          "pf": 0
+        },
+        {
+          "key": "70-74|SHORT|BULL",
+          "samples": 1,
+          "totalR": 1.065,
+          "avgR": 1.065,
+          "winRate": 100,
+          "pf": 99
+        }
+      ]
+    }
+  ]
+}
