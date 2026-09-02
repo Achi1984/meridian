@@ -1,4 +1,4 @@
-// MERIDIAN v7.40 — A/B/C/D Paper overview consistency; presentation only.
+// MERIDIAN v7.40 — A/B/C/D Paper overview consistency using card-derived metrics; presentation only.
 (function(){
   'use strict';
   const n=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
