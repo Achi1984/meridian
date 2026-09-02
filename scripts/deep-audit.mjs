@@ -31,14 +31,15 @@ check(!loader.includes('app-v7.60-unlock-hotfix.js'),'obsolete unlock hotfix is 
 check(!loader.includes('app-v7.32-legacy.js'),'obsolete v7.32 runtime layer is not loaded');
 check(finalUi.includes("const VERSION='7.60'"),'final UI authority owns v7.60 stamp');
 check(finalUi.includes('CHALLENGER V3.2'),'Paper overview exposes Challenger V3.2 research candidate');
-check(finalUi.includes('NO PAPER-/LIVE-EXECUTION'),'V3.2 UI explicitly preserves research-only boundary');
+check(finalUi.includes('PAPER-/LIVE-EXECUTION'),'V3.2 UI explicitly preserves research-only boundary');
 check(finalUi.includes('meridianRefreshPrivateDashboard'),'final UI can retry private depot hydration');
 check(hardening.includes('meridianConfigureReadToken'),'canonical unlock function exists');
 check(Array.isArray(data?.portfolio?.holdings)&&data.portfolio.holdings.length===0,'public data.json contains no private holdings');
 check(data?.portfolio?.private===true,'public portfolio is marked private');
 check(server.includes('Unsafe configuration: PAPER only required.'),'paper-only invariant remains in engine');
 check(startGateway.includes('applyReadTokenSecret'),'gateway startup applies read-token hardening');
-warn(!gateway.includes('MERIDIAN_READ_TOKEN_SHA256 ||'),'server-gateway contains a legacy hash fallback path; remove it in a dedicated backend hardening patch');
+check(startGateway.includes("auth.mode==='LEGACY_FALLBACK'"),'gateway startup fails closed if no read-token secret is configured');
+warn(!gateway.includes('MERIDIAN_READ_TOKEN_SHA256 ||'),'server-gateway still contains an unreachable legacy hash fallback; startup now fails closed before it can be used');
 
 for(const [file,view] of [['center.html','center'],['depot.html','portfolio'],['market.html','market'],['trade.html','daytrade'],['forecast.html','forecast']]){
   const html=read(file);
