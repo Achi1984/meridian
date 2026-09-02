@@ -20,6 +20,8 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Research telemetry: `7.47-TELEMETRY-V1`
 - Exit Lab historical replay: `7.49-EXIT-LAB-REPLAY-V1`
 - Fixed-entry replay mode: `7.49-FIXED-ENTRY-15M-REPLAY`
+- Project continuity: `7.50-CONTINUITY-V1`
+- Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -71,22 +73,11 @@ Do not assume fewer trades are automatically better. A research variant that imp
 
 ## Research telemetry
 
-`7.47-TELEMETRY-V1` reads persistent ledgers and produces comparable analytics without changing execution. Important metrics include:
-- expectancy
-- payoff ratio
-- historical max drawdown from the equity curve
-- trade frequency
-- open risk
-- holding duration
-- LONG/SHORT split
-- symbol split
-- regime split
-- exit-reason split
-- Challenger counterfactual: avoided losers vs missed winners / opportunity cost
+`7.47-TELEMETRY-V1` reads persistent ledgers and produces comparable analytics without changing execution. Important metrics include expectancy, payoff ratio, historical max drawdown, trade frequency, open risk, holding duration, LONG/SHORT split, symbol split, regime split, exit-reason split and Challenger opportunity-cost counterfactuals.
 
 ## Exit Lab
 
-Exit Lab is research-only. It exists to test the same historical entry cohort under different exit policies, avoiding entry-selection contamination.
+Exit Lab is research-only. It tests the same historical entry cohort under different exit policies, avoiding entry-selection contamination.
 
 Current policies/probes:
 - A Current: full position exits at TP1
@@ -97,16 +88,19 @@ Current policies/probes:
 - B +0.10R: protect remaining position at BE + 0.10R after TP1
 - B +0.25R: protect remaining position at BE + 0.25R after TP1
 
-Historical replay uses only candles closing after the original entry timestamp to avoid entry-candle look-ahead. Compare total R, average/median R, R win rate, giveback, TP1→BE stop rate, TP2 continuation, side, symbol and regime.
+Historical replay uses only candles closing after the original entry timestamp to avoid entry-candle look-ahead.
+
+### v7.51 evidence checkpoint
+
+A reproducible 12-asset 30/60/90-day report showed that no single exit model is robust enough for promotion yet. Runner models materially improved the 90-day window and often the 30-day window, but several underperformed the current full-TP1 exit in the 60-day window. Challenger D_ADAPTIVE was +1.502R vs A in 30d and +5.712R in 90d, but -1.447R in 60d. Challenger B_PROTECTED was +0.422R, -1.838R and +4.243R respectively. Therefore Challenger V3 must initially retain A_CURRENT so entry/scoring changes are isolated from exit changes.
 
 ## Current strategic direction
 
-The next major bot-development path is:
-1. use Exit Lab data to select a robust exit policy rather than guessing;
-2. build Challenger V3 as an independent soft-score model that can evaluate the full valid scanner universe instead of only Baseline `READY`;
-3. build Regime V2 with side-specific scoring recomputed after final side selection;
-4. combine the strongest Challenger and Regime ideas into a Hybrid/Allocator model if evidence supports it;
-5. keep every new model research-only until explicit promotion criteria are met.
+1. Build Challenger V3 as an independent soft-score model evaluating the full valid scanner universe instead of only Baseline `READY`.
+2. Keep Challenger V3 initial exit behavior equal to A_CURRENT/full TP1 for clean attribution.
+3. Replay Challenger V3 entries through Exit Lab only after V3 entry behavior is measured.
+4. Build Regime V2 with side-specific scoring recomputed after final side selection.
+5. Combine Challenger/Regime ideas into Hybrid/Allocator only if independent evidence supports both.
 
 ## Promotion principle
 
