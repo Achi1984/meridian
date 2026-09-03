@@ -1,0 +1,67 @@
+name: MERIDIAN Candle Path v7.69
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research-v768-preserved-20260903]
+    paths:
+      - "candle-path-v769.js"
+      - "portfolio-path-v767.js"
+      - "scripts/candle-path-v769.mjs"
+      - "test/candle-path-v769.test.js"
+      - ".github/workflows/candle-path-v769.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-candle-path-v769
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v769/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v769/${name}" --end-at "${end_at}"
+          done
+      - name: Test candle path
+        run: node --test test/candle-path-v769.test.js test/portfolio-path-v767.test.js test/challenger-v32.test.js
+      - name: Run 15m candle-path replay
+        run: node scripts/candle-path-v769.mjs --p0 /tmp/v769/p0/signal-cohort-90d.json --p1 /tmp/v769/p1/signal-cohort-90d.json --p2 /tmp/v769/p2/signal-cohort-90d.json --p3 /tmp/v769/p3/signal-cohort-90d.json --out research/candle-path-evidence-v769.json
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/candle-path-evidence-v769.json','utf8'));
+          const lines=['# MERIDIAN v7.69 — Intratrade Candle-Path Drawdown','',`Generated: ${r.generatedAt}`,'','Research-only. Challenger V3.2 ranking remains frozen. This replay measures 15m close-to-market drawdown and a conservative adverse intrabar drawdown for the v7.68 risk finalists 0.25% and 0.50%. No Paper/runtime/UI changes.',''];
+          for(const [p,levels] of Object.entries(r.periods||{})){lines.push(`## ${p}`,'');for(const [k,x] of Object.entries(levels)){const c=x.mtm.comparison,b=x.mtm.baseline,a=x.mtm.challengerV32;lines.push(`${k}: Baseline adverse DD **${b.adverse.maxDrawdownPct}%**, V3.2 adverse DD **${a.adverse.maxDrawdownPct}%**, delta **${c.adverseDdDeltaPct}pp**; close DD delta **${c.closeDdDeltaPct}pp**. Trades B/V3.2 **${x.tradeCounts.baseline}/${x.tradeCounts.challengerV32}**.`)}lines.push('')}
+          lines.push('## Cross-period aggregate','');for(const [k,x] of Object.entries(r.aggregate||{}))lines.push(`${k}: lower V3.2 close DD **${x.v32LowerCloseDd}/${x.periods}**, lower V3.2 adverse DD **${x.v32LowerAdverseDd}/${x.periods}**, avg V3.2 close DD **${x.avgV32CloseDd}%**, avg V3.2 adverse DD **${x.avgV32AdverseDd}%**, avg Baseline adverse DD **${x.avgBaselineAdverseDd}%**.`);lines.push('','## Guardrail','',r.guardrail,'');fs.writeFileSync('research/candle-path-evidence-v769.md',lines.join('\n'));
+          NODE
+      - name: Commit evidence to research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/candle-path-evidence-v769.json research/candle-path-evidence-v769.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.69: candle-path evidence"
+          git push origin HEAD:research-v768-preserved-20260903
