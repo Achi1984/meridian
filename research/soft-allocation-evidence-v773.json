@@ -1,0 +1,295 @@
+{
+  "schemaVersion": "7.73-SOFT-ALLOCATION-EVIDENCE-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "generatedAt": "2026-09-03T12:58:54.355Z",
+  "bonus": {
+    "cell": "LONG__RANGE",
+    "score": 0.5
+  },
+  "periods": {
+    "P0": {
+      "signal": {
+        "equalCoverage": true,
+        "v32": {
+          "samples": 1659,
+          "totalR": 69,
+          "avgR": 0.042,
+          "winRate": 43.4,
+          "pf": 1.073
+        },
+        "v773": {
+          "samples": 1659,
+          "totalR": 71.4,
+          "avgR": 0.043,
+          "winRate": 43.5,
+          "pf": 1.076
+        },
+        "opportunity": {
+          "overlap": 1074,
+          "discovered": 585,
+          "displaced": 585,
+          "avoidedLosers": 362,
+          "missedWinners": 223,
+          "discoveredWinners": 224,
+          "discoveredLosers": 361
+        },
+        "comparison": {
+          "avgRDelta": 0.001,
+          "pfDelta": 0.003
+        }
+      },
+      "portfolio": {
+        "v32": {
+          "samples": 722,
+          "totalR": 38.8,
+          "avgR": 0.054,
+          "winRate": 43.9,
+          "pf": 1.096,
+          "startEquity": 10000,
+          "endEquity": 10971.45,
+          "returnPct": 9.71,
+          "maxDrawdownPct": 4.15,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.93,
+          "trades": 722
+        },
+        "v773": {
+          "samples": 723,
+          "totalR": 57,
+          "avgR": 0.079,
+          "winRate": 45,
+          "pf": 1.143,
+          "startEquity": 10000,
+          "endEquity": 11480.26,
+          "returnPct": 14.8,
+          "maxDrawdownPct": 4.04,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.95,
+          "trades": 723
+        },
+        "comparison": {
+          "avgRDelta": 0.025,
+          "pfDelta": 0.047,
+          "returnDeltaPct": 5.09,
+          "maxDrawdownDeltaPct": -0.11,
+          "tradeDelta": 1
+        }
+      }
+    },
+    "P1": {
+      "signal": {
+        "equalCoverage": true,
+        "v32": {
+          "samples": 1671,
+          "totalR": 90.6,
+          "avgR": 0.054,
+          "winRate": 43.9,
+          "pf": 1.097
+        },
+        "v773": {
+          "samples": 1671,
+          "totalR": 23.4,
+          "avgR": 0.014,
+          "winRate": 42.3,
+          "pf": 1.024
+        },
+        "opportunity": {
+          "overlap": 1034,
+          "discovered": 637,
+          "displaced": 637,
+          "avoidedLosers": 376,
+          "missedWinners": 261,
+          "discoveredWinners": 233,
+          "discoveredLosers": 404
+        },
+        "comparison": {
+          "avgRDelta": -0.04,
+          "pfDelta": -0.073
+        }
+      },
+      "portfolio": {
+        "v32": {
+          "samples": 726,
+          "totalR": 39.6,
+          "avgR": 0.055,
+          "winRate": 43.9,
+          "pf": 1.097,
+          "startEquity": 10000,
+          "endEquity": 10985.83,
+          "returnPct": 9.86,
+          "maxDrawdownPct": 7.76,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.98,
+          "trades": 726
+        },
+        "v773": {
+          "samples": 638,
+          "totalR": 17.2,
+          "avgR": 0.027,
+          "winRate": 42.8,
+          "pf": 1.047,
+          "startEquity": 10000,
+          "endEquity": 10390.39,
+          "returnPct": 3.9,
+          "maxDrawdownPct": 8.17,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.98,
+          "trades": 638
+        },
+        "comparison": {
+          "avgRDelta": -0.028,
+          "pfDelta": -0.05,
+          "returnDeltaPct": -5.96,
+          "maxDrawdownDeltaPct": 0.41,
+          "tradeDelta": -88
+        }
+      }
+    },
+    "P2": {
+      "signal": {
+        "equalCoverage": true,
+        "v32": {
+          "samples": 1682,
+          "totalR": 24.4,
+          "avgR": 0.015,
+          "winRate": 42.3,
+          "pf": 1.025
+        },
+        "v773": {
+          "samples": 1682,
+          "totalR": 89.2,
+          "avgR": 0.053,
+          "winRate": 43.9,
+          "pf": 1.094
+        },
+        "opportunity": {
+          "overlap": 1088,
+          "discovered": 594,
+          "displaced": 594,
+          "avoidedLosers": 363,
+          "missedWinners": 231,
+          "discoveredWinners": 258,
+          "discoveredLosers": 336
+        },
+        "comparison": {
+          "avgRDelta": 0.038,
+          "pfDelta": 0.069
+        }
+      },
+      "portfolio": {
+        "v32": {
+          "samples": 315,
+          "totalR": -31.8,
+          "avgR": -0.101,
+          "winRate": 37.5,
+          "pf": 0.839,
+          "startEquity": 10000,
+          "endEquity": 9215.88,
+          "returnPct": -7.84,
+          "maxDrawdownPct": 8.16,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.88,
+          "trades": 315
+        },
+        "v773": {
+          "samples": 725,
+          "totalR": 31,
+          "avgR": 0.043,
+          "winRate": 43.4,
+          "pf": 1.076,
+          "startEquity": 10000,
+          "endEquity": 10753.74,
+          "returnPct": 7.54,
+          "maxDrawdownPct": 7.43,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.97,
+          "trades": 725
+        },
+        "comparison": {
+          "avgRDelta": 0.144,
+          "pfDelta": 0.237,
+          "returnDeltaPct": 15.38,
+          "maxDrawdownDeltaPct": -0.73,
+          "tradeDelta": 410
+        }
+      }
+    },
+    "P3": {
+      "signal": {
+        "equalCoverage": true,
+        "v32": {
+          "samples": 1539,
+          "totalR": 141,
+          "avgR": 0.092,
+          "winRate": 45.5,
+          "pf": 1.168
+        },
+        "v773": {
+          "samples": 1539,
+          "totalR": 69,
+          "avgR": 0.045,
+          "winRate": 43.5,
+          "pf": 1.079
+        },
+        "opportunity": {
+          "overlap": 1058,
+          "discovered": 481,
+          "displaced": 481,
+          "avoidedLosers": 246,
+          "missedWinners": 235,
+          "discoveredWinners": 205,
+          "discoveredLosers": 276
+        },
+        "comparison": {
+          "avgRDelta": -0.047,
+          "pfDelta": -0.089
+        }
+      },
+      "portfolio": {
+        "v32": {
+          "samples": 725,
+          "totalR": 57.4,
+          "avgR": 0.079,
+          "winRate": 45,
+          "pf": 1.144,
+          "startEquity": 10000,
+          "endEquity": 11486.14,
+          "returnPct": 14.86,
+          "maxDrawdownPct": 7.7,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.97,
+          "trades": 725
+        },
+        "v773": {
+          "samples": 725,
+          "totalR": 50.2,
+          "avgR": 0.069,
+          "winRate": 44.6,
+          "pf": 1.125,
+          "startEquity": 10000,
+          "endEquity": 11282.85,
+          "returnPct": 12.83,
+          "maxDrawdownPct": 7.7,
+          "maxConcurrent": 3,
+          "entriesPerActiveDay": 7.97,
+          "trades": 725
+        },
+        "comparison": {
+          "avgRDelta": -0.01,
+          "pfDelta": -0.019,
+          "returnDeltaPct": -2.03,
+          "maxDrawdownDeltaPct": 0,
+          "tradeDelta": 0
+        }
+      }
+    }
+  },
+  "summary": {
+    "periods": 4,
+    "signalAvgRBetterPeriods": 2,
+    "portfolioAvgRBetterPeriods": 2,
+    "lowerDrawdownPeriods": 2,
+    "promotionAllowed": false
+  }
+}
