@@ -1,3 +1,58 @@
 /* MERIDIAN compatibility stylesheet entry. */
 @import url("./styles-v7.32-legacy.css?v=7.33-R1");
 @import url("./styles-v7.33-hardening.css?v=7.33-R1");
+
+/* v7.61 R5 — compact secondary navigation on mobile.
+   Presentation only: MARKET/NADIR and SETUP/GRID behavior is unchanged. */
+.segment-nav.market-segment-nav,
+.segment-nav.execution-segment-nav{
+  min-height:0 !important;
+  height:auto !important;
+  padding:5px !important;
+  margin:0 0 14px !important;
+  gap:4px !important;
+  border:1px solid #173f5b !important;
+  border-radius:16px !important;
+  background:#06111a !important;
+  box-shadow:none !important;
+}
+
+.segment-nav.market-segment-nav button,
+.segment-nav.execution-segment-nav button{
+  min-height:44px !important;
+  height:44px !important;
+  padding:0 12px !important;
+  margin:0 !important;
+  border:1px solid transparent !important;
+  border-radius:12px !important;
+  background:transparent !important;
+  color:#8293a7 !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+  letter-spacing:.08em !important;
+  line-height:1 !important;
+  box-shadow:none !important;
+}
+
+.segment-nav.market-segment-nav button.active,
+.segment-nav.execution-segment-nav button.active{
+  color:#27adff !important;
+  border-color:#1685c7 !important;
+  background:rgba(32,164,255,.08) !important;
+}
+
+@media(max-width:650px){
+  .segment-nav.market-segment-nav,
+  .segment-nav.execution-segment-nav{
+    padding:4px !important;
+    margin-bottom:12px !important;
+    border-radius:15px !important;
+  }
+  .segment-nav.market-segment-nav button,
+  .segment-nav.execution-segment-nav button{
+    min-height:42px !important;
+    height:42px !important;
+    border-radius:11px !important;
+    font-size:11px !important;
+  }
+}
