@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-09-03T19:07:16.501Z",
+  "sourceSchema": "7.74-ADAPTIVE-EVIDENCE-REPORT-V1",
+  "schemaVersion": "7.75-CHRONOLOGICAL-POLICY-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "method": "PREVIOUS_PERIOD_SELECTS_NEXT_PERIOD_POLICY",
+  "chronology": [
+    "P3",
+    "P2",
+    "P1",
+    "P0"
+  ],
+  "steps": [
+    {
+      "trainPeriod": "P3",
+      "testPeriod": "P2",
+      "selectedPolicy": "LR_MTF3_VOLUME",
+      "trainSignal": {
+        "avgRDelta": 0,
+        "pfDelta": 0,
+        "displaced": 0
+      },
+      "test": {
+        "equalCoverage": true,
+        "avgRDelta": 0.003,
+        "pfDelta": 0.005,
+        "base": {
+          "samples": 1684,
+          "avgR": 0.015,
+          "pf": 1.026,
+          "winRate": 42.3
+        },
+        "adaptive": {
+          "samples": 1684,
+          "avgR": 0.018,
+          "pf": 1.031,
+          "winRate": 42.4
+        },
+        "opportunity": {
+          "displaced": 3,
+          "discovered": 3,
+          "avoidedLosers": 2,
+          "missedWinners": 1,
+          "discoveredWinners": 3,
+          "discoveredLosers": 0
+        }
+      }
+    },
+    {
+      "trainPeriod": "P2",
+      "testPeriod": "P1",
+      "selectedPolicy": "LR_MTF3",
+      "trainSignal": {
+        "avgRDelta": 0.008,
+        "pfDelta": 0.015,
+        "displaced": 18
+      },
+      "test": {
+        "equalCoverage": true,
+        "avgRDelta": 0,
+        "pfDelta": 0,
+        "base": {
+          "samples": 1671,
+          "avgR": 0.054,
+          "pf": 1.097,
+          "winRate": 43.9
+        },
+        "adaptive": {
+          "samples": 1671,
+          "avgR": 0.054,
+          "pf": 1.097,
+          "winRate": 43.9
+        },
+        "opportunity": {
+          "displaced": 44,
+          "discovered": 44,
+          "avoidedLosers": 29,
+          "missedWinners": 15,
+          "discoveredWinners": 15,
+          "discoveredLosers": 29
+        }
+      }
+    },
+    {
+      "trainPeriod": "P1",
+      "testPeriod": "P0",
+      "selectedPolicy": "LR_VOLUME",
+      "trainSignal": {
+        "avgRDelta": 0.012,
+        "pfDelta": 0.021,
+        "displaced": 100
+      },
+      "test": {
+        "equalCoverage": true,
+        "avgRDelta": -0.002,
+        "pfDelta": -0.002,
+        "base": {
+          "samples": 1662,
+          "avgR": 0.047,
+          "pf": 1.083,
+          "winRate": 43.6
+        },
+        "adaptive": {
+          "samples": 1662,
+          "avgR": 0.045,
+          "pf": 1.081,
+          "winRate": 43.6
+        },
+        "opportunity": {
+          "displaced": 83,
+          "discovered": 83,
+          "avoidedLosers": 50,
+          "missedWinners": 33,
+          "discoveredWinners": 32,
+          "discoveredLosers": 51
+        }
+      }
+    }
+  ],
+  "summary": {
+    "periods": 3,
+    "positivePeriods": 1,
+    "neutralPeriods": 1,
+    "negativePeriods": 1,
+    "avgAvgRDelta": 0,
+    "avgPfDelta": 0.001,
+    "persistent": false
+  },
+  "promotionAllowed": false,
+  "nextStep": "REJECT_PERIOD_SWITCHING_POLICY"
+}
