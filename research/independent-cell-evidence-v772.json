@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "7.72-INDEPENDENT-CELL-VALIDATION-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "sourceCandidates": [
+    "LONG__RANGE",
+    "LONG__TRANSITION",
+    "SHORT__BEAR",
+    "SHORT__RANGE"
+  ],
+  "validation": {
+    "LONG__RANGE": {
+      "observations": [
+        {
+          "period": "Q0",
+          "baselineSamples": 160,
+          "challengerSamples": 161,
+          "deltaAvgR": 0.099,
+          "coverageDelta": 1,
+          "adequate": true
+        },
+        {
+          "period": "Q1",
+          "baselineSamples": 163,
+          "challengerSamples": 126,
+          "deltaAvgR": 0.174,
+          "coverageDelta": -37,
+          "adequate": true
+        },
+        {
+          "period": "Q2",
+          "baselineSamples": 179,
+          "challengerSamples": 157,
+          "deltaAvgR": 0.057,
+          "coverageDelta": -22,
+          "adequate": true
+        },
+        {
+          "period": "Q3",
+          "baselineSamples": 113,
+          "challengerSamples": 114,
+          "deltaAvgR": -0.093,
+          "coverageDelta": 1,
+          "adequate": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "negativePeriods": 1,
+      "meanDeltaAvgR": 0.059,
+      "independentlyValidated": true
+    },
+    "LONG__TRANSITION": {
+      "observations": [
+        {
+          "period": "Q0",
+          "baselineSamples": 171,
+          "challengerSamples": 116,
+          "deltaAvgR": -0.26,
+          "coverageDelta": -55,
+          "adequate": true
+        },
+        {
+          "period": "Q1",
+          "baselineSamples": 159,
+          "challengerSamples": 117,
+          "deltaAvgR": 0.05,
+          "coverageDelta": -42,
+          "adequate": true
+        },
+        {
+          "period": "Q2",
+          "baselineSamples": 182,
+          "challengerSamples": 115,
+          "deltaAvgR": 0.111,
+          "coverageDelta": -67,
+          "adequate": true
+        },
+        {
+          "period": "Q3",
+          "baselineSamples": 182,
+          "challengerSamples": 138,
+          "deltaAvgR": 0.115,
+          "coverageDelta": -44,
+          "adequate": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 3,
+      "negativePeriods": 1,
+      "meanDeltaAvgR": 0.004,
+      "independentlyValidated": true
+    },
+    "SHORT__BEAR": {
+      "observations": [
+        {
+          "period": "Q0",
+          "baselineSamples": 500,
+          "challengerSamples": 419,
+          "deltaAvgR": 0.137,
+          "coverageDelta": -81,
+          "adequate": true
+        },
+        {
+          "period": "Q1",
+          "baselineSamples": 420,
+          "challengerSamples": 399,
+          "deltaAvgR": 0.117,
+          "coverageDelta": -21,
+          "adequate": true
+        },
+        {
+          "period": "Q2",
+          "baselineSamples": 529,
+          "challengerSamples": 455,
+          "deltaAvgR": -0.135,
+          "coverageDelta": -74,
+          "adequate": true
+        },
+        {
+          "period": "Q3",
+          "baselineSamples": 432,
+          "challengerSamples": 386,
+          "deltaAvgR": -0.018,
+          "coverageDelta": -46,
+          "adequate": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 2,
+      "negativePeriods": 2,
+      "meanDeltaAvgR": 0.025,
+      "independentlyValidated": false
+    },
+    "SHORT__RANGE": {
+      "observations": [
+        {
+          "period": "Q0",
+          "baselineSamples": 116,
+          "challengerSamples": 111,
+          "deltaAvgR": 0.038,
+          "coverageDelta": -5,
+          "adequate": true
+        },
+        {
+          "period": "Q1",
+          "baselineSamples": 151,
+          "challengerSamples": 114,
+          "deltaAvgR": -0.101,
+          "coverageDelta": -37,
+          "adequate": true
+        },
+        {
+          "period": "Q2",
+          "baselineSamples": 269,
+          "challengerSamples": 221,
+          "deltaAvgR": -0.148,
+          "coverageDelta": -48,
+          "adequate": true
+        },
+        {
+          "period": "Q3",
+          "baselineSamples": 125,
+          "challengerSamples": 72,
+          "deltaAvgR": -0.059,
+          "coverageDelta": -53,
+          "adequate": true
+        }
+      ],
+      "adequatePeriods": 4,
+      "positivePeriods": 1,
+      "negativePeriods": 3,
+      "meanDeltaAvgR": -0.067,
+      "independentlyValidated": false
+    }
+  },
+  "validatedCells": [
+    "LONG__RANGE",
+    "LONG__TRANSITION"
+  ],
+  "allCandidatesValidated": false,
+  "promotionAllowed": false,
+  "guardrail": "Validated cells may inform small soft-score/risk-allocation experiments only; never become hard entry gates from this evidence.",
+  "generatedAt": "2026-09-03T12:27:44.440Z",
+  "windowDesign": "four disjoint 90d cohorts ending 360/450/540/630 days before run date; independent of v7.71 P0-P3"
+}
