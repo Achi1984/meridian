@@ -1,0 +1,48 @@
+name: MERIDIAN Chronological Policy v7.75
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research-v768-preserved-20260903]
+    paths:
+      - "chronological-policy-v775.js"
+      - "scripts/chronological-policy-v775.mjs"
+      - "test/chronological-policy-v775.test.js"
+      - "research/adaptive-evidence-v774.json"
+      - ".github/workflows/chronological-policy-v775.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-chronological-policy-v775
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research-v768-preserved-20260903
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test v7.75 chronological policy
+        run: node --test test/chronological-policy-v775.test.js
+      - name: Build v7.75 evidence
+        run: node scripts/chronological-policy-v775.mjs
+      - name: Commit evidence to research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/chronological-policy-v775.json research/chronological-policy-v775.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.75: chronological policy results"
+          git push origin HEAD:research-v768-preserved-20260903
