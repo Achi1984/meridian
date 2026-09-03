@@ -3,7 +3,7 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R8';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R9';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -53,8 +53,6 @@
     });
   }
 
-  // DEPOT SSOT: manual venue/bot balances are informational trading capital and
-  // must not silently inflate the spot/holdings portfolio total.
   try{
     if(typeof recalcPortfolio==='function' && !recalcPortfolio.__v760Wrapped){
       const originalRecalc=recalcPortfolio;
@@ -77,9 +75,6 @@
     }
   }catch(e){console.error('MERIDIAN v7.60 recalc wrapper',e)}
 
-  // Keep stored source history spot-only, but render the portfolio chart as total
-  // budget from the first known Pionex snapshot onward. Earlier points stay
-  // untouched so MERIDIAN never invents historical Pionex equity.
   try{
     if(typeof resampleSeries==='function' && !resampleSeries.__v760Wrapped){
       const originalResample=resampleSeries;
@@ -105,9 +100,6 @@
     return document.getElementById('view-paper') || document.querySelector('#paperView,.paper-view,[data-view="paper"]');
   }
 
-  // IMPORTANT: this must be idempotent. The old implementation replaced the
-  // prefix "BASELINE · SHADOW · CHALLENGER" on every MutationObserver pass,
-  // creating endless "· REGIME" text and starving the UI thread.
   function decoratePaper(){
     const paper=paperRoot();
     if(!paper)return;
@@ -156,6 +148,16 @@
     }
   }
 
+  function normalizeDepotText(text){
+    let after=String(text||'');
+    if(/^\s*LIVE\s*$/i.test(after))after=after.replace(/LIVE/i,'HYBRID');
+    // Collapse any prior repeated prefixes before applying the canonical label.
+    after=after.replace(/\b(?:SPOT\s+)*1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+    after=after.replace(/\b(?:SPOT-)*VERWAHRSTELLEN\b/i,'SPOT-VERWAHRSTELLEN');
+    after=after.replace(/\bGRÖSSTE(?:\s+SPOT-)?POSITION\b/i,'GRÖSSTE SPOT-POSITION');
+    return after;
+  }
+
   function decorateDepot(){
     const depot=document.getElementById('view-depot')||document;
     const eyebrow=[...depot.querySelectorAll('.eyebrow')].find(el=>(el.textContent||'').trim()==='GESAMTPORTFOLIO');
@@ -190,19 +192,12 @@
     }
     if(chartNote)chartNote.textContent='CHART · GESAMTPORTFOLIO · PIONEX AB SNAPSHOT';
 
-    // The headline combines live-priced holdings with a static Pionex snapshot,
-    // therefore its status is HYBRID rather than fully LIVE. The chart uses
-    // total budget from the known Pionex snapshot onward; performance and
-    // largest-position percentage remain spot-only until Pionex is live.
     const walker=document.createTreeWalker(hero,NodeFilter.SHOW_TEXT);
-    while(walker.nextNode()){
-      const n=walker.currentNode;
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    for(const n of nodes){
+      if(scope?.contains(n)||chartNote?.contains(n))continue;
       const before=n.nodeValue||'';
-      let after=before;
-      if(/^\s*LIVE\s*$/i.test(after))after=after.replace(/LIVE/i,'HYBRID');
-      after=after.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
-      after=after.replace(/\bGRÖSSTE POSITION\b/i,'GRÖSSTE SPOT-POSITION');
-      after=after.replace(/\bVERWAHRSTELLEN\b/i,'SPOT-VERWAHRSTELLEN');
+      const after=normalizeDepotText(before);
       if(after!==before)n.nodeValue=after;
     }
   }
@@ -230,5 +225,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,labelNormalizationIdempotent:true};
 })();
