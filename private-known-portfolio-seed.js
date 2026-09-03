@@ -56,9 +56,11 @@ function desiredTradingSignature(equity){
 function setPionexEquity(state,equity){
   state.portfolio=state.portfolio&&typeof state.portfolio==='object'?state.portfolio:{};
   // SSOT policy: manualVenueBalances is reserved for external trading/bot capital.
-  // With the current no-exchange-API setup, Pionex is the only such venue.
+  // Store both value and valueUsd because the stable v7.60 frontend reads value,
+  // while private/backend state uses valueUsd in newer paths.
   state.portfolio.manualVenueBalances=equity==null?[]:[{
     venue:'Pionex',
+    value:equity,
     valueUsd:equity,
     kind:'TRADING_CAPITAL',
     updatedAt:new Date().toISOString()
