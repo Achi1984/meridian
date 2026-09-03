@@ -215,6 +215,19 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),migration},origin||"");
     }
+    if(req.method==="GET"&&u.pathname==="/api/private/write-check"){
+      if(!authorizedWrite(req))return writeJson(res,401,{error:"write_token_required"},origin||"");
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      return writeJson(res,200,{
+        ok:true,
+        writeAuthorized:true,
+        databaseConfigured:!!DATABASE_URL,
+        databaseReachable:!!pool(),
+        privateData:!!current,
+        currentRevision:Number.isInteger(current?.privateRevision)?current.privateRevision:0,
+        writeEndpoint:"/api/private/dashboard-update"
+      },origin||"");
+    }
     if(req.method==="POST"&&u.pathname==="/api/private/dashboard-update"){
       if(!authorizedWrite(req))return writeJson(res,401,{error:"write_token_required"},origin||"");
       const current=await stateGet(PRIVATE_STATE_KEY);
