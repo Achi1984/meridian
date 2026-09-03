@@ -1,0 +1,1178 @@
+{
+  "schemaVersion": "7.69-CANDLE-PATH-EVIDENCE-V1",
+  "generatedAt": "2026-09-03T03:54:34.511Z",
+  "researchOnly": true,
+  "executionImpact": false,
+  "scorerFrozen": true,
+  "scoreVersion": "7.66-CHALLENGER-V3.2",
+  "riskLevels": [
+    0.25,
+    0.5
+  ],
+  "method": "15m public Binance candle path over already-selected portfolio trades; reports close-MTM and conservative adverse intrabar MTM",
+  "periods": {
+    "P0": {
+      "risk_0.25": {
+        "riskPerTradePct": 0.25,
+        "realized": {
+          "baseline": {
+            "trades": 706,
+            "totalR": 42.8,
+            "avgR": 0.061,
+            "winRate": 44.2,
+            "pf": 1.109,
+            "startEquity": 10000,
+            "endEquity": 11074.68,
+            "returnPct": 10.75,
+            "maxDrawdownPct": 7.43,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.68,
+            "entriesPerActiveDay": 7.84,
+            "skips": {
+              "maxOpen": 426,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 543,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 93,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 720,
+            "totalR": 40.8,
+            "avgR": 0.057,
+            "winRate": 44,
+            "pf": 1.101,
+            "startEquity": 10000,
+            "endEquity": 11026.29,
+            "returnPct": 10.26,
+            "maxDrawdownPct": 4.2,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.6,
+            "entriesPerActiveDay": 8,
+            "skips": {
+              "maxOpen": 2316,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3686,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 144,
+              "cooldown": 33
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 706,
+              "startEquity": 10000,
+              "endEquity": 11074.68,
+              "maxDrawdownPct": 7.736,
+              "worst": {
+                "at": "2026-06-22T10:44:59.999Z",
+                "equity": 9476.76,
+                "peak": 10271.4,
+                "realized": -491.74,
+                "unrealized": -31.5
+              },
+              "points": 4623
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 706,
+              "startEquity": 10000,
+              "endEquity": 11074.68,
+              "maxDrawdownPct": 7.786,
+              "worst": {
+                "at": "2026-06-22T09:44:59.999Z",
+                "equity": 9471.71,
+                "peak": 10271.4,
+                "realized": -491.74,
+                "unrealized": -36.55
+              },
+              "points": 4623
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 11026.29,
+              "maxDrawdownPct": 4.636,
+              "worst": {
+                "at": "2026-08-18T13:29:59.999Z",
+                "equity": 10871.83,
+                "peak": 11400.36,
+                "realized": 905.65,
+                "unrealized": -33.82
+              },
+              "points": 3686
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 11026.29,
+              "maxDrawdownPct": 4.63,
+              "worst": {
+                "at": "2026-08-18T13:44:59.999Z",
+                "equity": 10856.85,
+                "peak": 11383.91,
+                "realized": 905.65,
+                "unrealized": -48.81
+              },
+              "points": 3686
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -3.1,
+            "adverseDdDeltaPct": -3.156,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 706,
+          "challengerV32": 720
+        }
+      },
+      "risk_0.50": {
+        "riskPerTradePct": 0.5,
+        "realized": {
+          "baseline": {
+            "trades": 74,
+            "totalR": -6.8,
+            "avgR": -0.092,
+            "winRate": 37.8,
+            "pf": 0.852,
+            "startEquity": 10000,
+            "endEquity": 9643.75,
+            "returnPct": -3.56,
+            "maxDrawdownPct": 8.55,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.18,
+            "entriesPerActiveDay": 7.4,
+            "skips": {
+              "maxOpen": 51,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 32,
+              "maxDailyLoss": 10,
+              "maxDrawdown": 1486,
+              "sameSymbol": 12,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 720,
+            "totalR": 40.8,
+            "avgR": 0.057,
+            "winRate": 44,
+            "pf": 1.101,
+            "startEquity": 10000,
+            "endEquity": 12054.19,
+            "returnPct": 20.54,
+            "maxDrawdownPct": 8.39,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.6,
+            "entriesPerActiveDay": 8,
+            "skips": {
+              "maxOpen": 2316,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3686,
+              "maxDailyLoss": 36,
+              "maxDrawdown": 0,
+              "sameSymbol": 144,
+              "cooldown": 33
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 74,
+              "startEquity": 10000,
+              "endEquity": 9643.75,
+              "maxDrawdownPct": 8.551,
+              "worst": {
+                "at": "2026-05-31T16:29:59.999Z",
+                "equity": 9643.75,
+                "peak": 10545.54,
+                "realized": -356.25,
+                "unrealized": 0
+              },
+              "points": 496
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 74,
+              "startEquity": 10000,
+              "endEquity": 9643.75,
+              "maxDrawdownPct": 8.551,
+              "worst": {
+                "at": "2026-05-31T16:29:59.999Z",
+                "equity": 9643.75,
+                "peak": 10545.54,
+                "realized": -356.25,
+                "unrealized": 0
+              },
+              "points": 496
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 12054.19,
+              "maxDrawdownPct": 9.202,
+              "worst": {
+                "at": "2026-08-18T13:29:59.999Z",
+                "equity": 11718.34,
+                "peak": 12905.93,
+                "realized": 1791.82,
+                "unrealized": -73.48
+              },
+              "points": 3686
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 12054.19,
+              "maxDrawdownPct": 9.167,
+              "worst": {
+                "at": "2026-08-18T13:44:59.999Z",
+                "equity": 11685.76,
+                "peak": 12865.06,
+                "realized": 1791.82,
+                "unrealized": -106.06
+              },
+              "points": 3686
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": 0.651,
+            "adverseDdDeltaPct": 0.616,
+            "v32LowerCloseDd": false,
+            "v32LowerAdverseDd": false
+          }
+        },
+        "tradeCounts": {
+          "baseline": 74,
+          "challengerV32": 720
+        }
+      }
+    },
+    "P1": {
+      "risk_0.25": {
+        "riskPerTradePct": 0.25,
+        "realized": {
+          "baseline": {
+            "trades": 505,
+            "totalR": 25.4,
+            "avgR": 0.05,
+            "winRate": 43.8,
+            "pf": 1.089,
+            "startEquity": 10000,
+            "endEquity": 10615.85,
+            "returnPct": 6.16,
+            "maxDrawdownPct": 8.32,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.18,
+            "entriesPerActiveDay": 7.77,
+            "skips": {
+              "maxOpen": 357,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 359,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 483,
+              "sameSymbol": 54,
+              "cooldown": 3
+            }
+          },
+          "challengerV32": {
+            "trades": 720,
+            "totalR": 38.4,
+            "avgR": 0.053,
+            "winRate": 43.9,
+            "pf": 1.095,
+            "startEquity": 10000,
+            "endEquity": 10953.64,
+            "returnPct": 9.54,
+            "maxDrawdownPct": 8.03,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.6,
+            "entriesPerActiveDay": 8,
+            "skips": {
+              "maxOpen": 2214,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3693,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 140,
+              "cooldown": 30
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 505,
+              "startEquity": 10000,
+              "endEquity": 10615.85,
+              "maxDrawdownPct": 8.645,
+              "worst": {
+                "at": "2026-04-26T17:14:59.999Z",
+                "equity": 10581.33,
+                "peak": 11582.7,
+                "realized": 578.55,
+                "unrealized": 2.78
+              },
+              "points": 3264
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 505,
+              "startEquity": 10000,
+              "endEquity": 10615.85,
+              "maxDrawdownPct": 8.567,
+              "worst": {
+                "at": "2026-04-26T17:14:59.999Z",
+                "equity": 10577.31,
+                "peak": 11568.36,
+                "realized": 578.55,
+                "unrealized": -1.24
+              },
+              "points": 3264
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 10953.64,
+              "maxDrawdownPct": 8.06,
+              "worst": {
+                "at": "2026-05-21T08:59:59.999Z",
+                "equity": 10827.03,
+                "peak": 11776.21,
+                "realized": 839.37,
+                "unrealized": -12.35
+              },
+              "points": 3652
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 720,
+              "startEquity": 10000,
+              "endEquity": 10953.64,
+              "maxDrawdownPct": 8.107,
+              "worst": {
+                "at": "2026-05-21T09:14:59.999Z",
+                "equity": 10818.79,
+                "peak": 11773.28,
+                "realized": 839.37,
+                "unrealized": -20.58
+              },
+              "points": 3652
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.585,
+            "adverseDdDeltaPct": -0.46,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 505,
+          "challengerV32": 720
+        }
+      },
+      "risk_0.50": {
+        "riskPerTradePct": 0.5,
+        "realized": {
+          "baseline": {
+            "trades": 82,
+            "totalR": -10,
+            "avgR": -0.122,
+            "winRate": 36.6,
+            "pf": 0.808,
+            "startEquity": 10000,
+            "endEquity": 9488.1,
+            "returnPct": -5.12,
+            "maxDrawdownPct": 8.68,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.19,
+            "entriesPerActiveDay": 7.45,
+            "skips": {
+              "maxOpen": 71,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 48,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1493,
+              "sameSymbol": 12,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 355,
+            "totalR": 48.2,
+            "avgR": 0.136,
+            "winRate": 47.3,
+            "pf": 1.258,
+            "startEquity": 10000,
+            "endEquity": 12592.58,
+            "returnPct": 25.93,
+            "maxDrawdownPct": 8.56,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.76,
+            "entriesPerActiveDay": 7.89,
+            "skips": {
+              "maxOpen": 1040,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 1835,
+              "maxDailyLoss": 72,
+              "maxDrawdown": 3300,
+              "sameSymbol": 57,
+              "cooldown": 15
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 82,
+              "startEquity": 10000,
+              "endEquity": 9488.1,
+              "maxDrawdownPct": 9.063,
+              "worst": {
+                "at": "2026-03-03T16:14:59.999Z",
+                "equity": 9488.1,
+                "peak": 10433.69,
+                "realized": -511.9,
+                "unrealized": 0
+              },
+              "points": 489
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 82,
+              "startEquity": 10000,
+              "endEquity": 9488.1,
+              "maxDrawdownPct": 8.944,
+              "worst": {
+                "at": "2026-03-03T16:14:59.999Z",
+                "equity": 9488.1,
+                "peak": 10420.12,
+                "realized": -511.9,
+                "unrealized": 0
+              },
+              "points": 489
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 355,
+              "startEquity": 10000,
+              "endEquity": 12592.58,
+              "maxDrawdownPct": 8.788,
+              "worst": {
+                "at": "2026-04-06T07:44:59.999Z",
+                "equity": 12592.58,
+                "peak": 13805.78,
+                "realized": 2592.58,
+                "unrealized": 0
+              },
+              "points": 1681
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 355,
+              "startEquity": 10000,
+              "endEquity": 12592.58,
+              "maxDrawdownPct": 8.743,
+              "worst": {
+                "at": "2026-04-06T07:44:59.999Z",
+                "equity": 12592.58,
+                "peak": 13798.97,
+                "realized": 2592.58,
+                "unrealized": 0
+              },
+              "points": 1681
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.275,
+            "adverseDdDeltaPct": -0.201,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 82,
+          "challengerV32": 355
+        }
+      }
+    },
+    "P2": {
+      "risk_0.25": {
+        "riskPerTradePct": 0.25,
+        "realized": {
+          "baseline": {
+            "trades": 266,
+            "totalR": -30.8,
+            "avgR": -0.116,
+            "winRate": 36.8,
+            "pf": 0.817,
+            "startEquity": 10000,
+            "endEquity": 9242.71,
+            "returnPct": -7.57,
+            "maxDrawdownPct": 8.21,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.75,
+            "entriesPerActiveDay": 7.39,
+            "skips": {
+              "maxOpen": 249,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 170,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1016,
+              "sameSymbol": 61,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 323,
+            "totalR": -32.6,
+            "avgR": -0.101,
+            "winRate": 37.5,
+            "pf": 0.839,
+            "startEquity": 10000,
+            "endEquity": 9196.92,
+            "returnPct": -8.03,
+            "maxDrawdownPct": 8.03,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.76,
+            "entriesPerActiveDay": 7.88,
+            "skips": {
+              "maxOpen": 1148,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 1539,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 3588,
+              "sameSymbol": 88,
+              "cooldown": 21
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 266,
+              "startEquity": 10000,
+              "endEquity": 9242.71,
+              "maxDrawdownPct": 8.508,
+              "worst": {
+                "at": "2025-12-28T13:59:59.999Z",
+                "equity": 9221.46,
+                "peak": 10078.94,
+                "realized": -766.61,
+                "unrealized": -11.93
+              },
+              "points": 2098
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 266,
+              "startEquity": 10000,
+              "endEquity": 9242.71,
+              "maxDrawdownPct": 8.438,
+              "worst": {
+                "at": "2025-12-14T00:14:59.999Z",
+                "equity": 9214.44,
+                "peak": 10063.61,
+                "realized": -737.37,
+                "unrealized": -48.19
+              },
+              "points": 2098
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 323,
+              "startEquity": 10000,
+              "endEquity": 9196.92,
+              "maxDrawdownPct": 8.118,
+              "worst": {
+                "at": "2026-01-02T05:29:59.999Z",
+                "equity": 9196.92,
+                "peak": 10009.53,
+                "realized": -803.08,
+                "unrealized": 0
+              },
+              "points": 1826
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 323,
+              "startEquity": 10000,
+              "endEquity": 9196.92,
+              "maxDrawdownPct": 8.031,
+              "worst": {
+                "at": "2026-01-02T05:29:59.999Z",
+                "equity": 9196.92,
+                "peak": 10000,
+                "realized": -803.08,
+                "unrealized": 0
+              },
+              "points": 1826
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.39,
+            "adverseDdDeltaPct": -0.407,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 266,
+          "challengerV32": 323
+        }
+      },
+      "risk_0.50": {
+        "riskPerTradePct": 0.5,
+        "realized": {
+          "baseline": {
+            "trades": 42,
+            "totalR": -15.6,
+            "avgR": -0.371,
+            "winRate": 26.2,
+            "pf": 0.497,
+            "startEquity": 10000,
+            "endEquity": 9239.96,
+            "returnPct": -7.6,
+            "maxDrawdownPct": 8.69,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.1,
+            "entriesPerActiveDay": 7,
+            "skips": {
+              "maxOpen": 13,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 25,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 1597,
+              "sameSymbol": 6,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 55,
+            "totalR": -16.6,
+            "avgR": -0.302,
+            "winRate": 29.1,
+            "pf": 0.574,
+            "startEquity": 10000,
+            "endEquity": 9193.28,
+            "returnPct": -8.07,
+            "maxDrawdownPct": 8.07,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.12,
+            "entriesPerActiveDay": 7.86,
+            "skips": {
+              "maxOpen": 187,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 250,
+              "maxDailyLoss": 36,
+              "maxDrawdown": 6012,
+              "sameSymbol": 10,
+              "cooldown": 5
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 42,
+              "startEquity": 10000,
+              "endEquity": 9239.96,
+              "maxDrawdownPct": 9.034,
+              "worst": {
+                "at": "2025-11-28T11:14:59.999Z",
+                "equity": 9239.96,
+                "peak": 10157.56,
+                "realized": -760.04,
+                "unrealized": 0
+              },
+              "points": 316
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 42,
+              "startEquity": 10000,
+              "endEquity": 9239.96,
+              "maxDrawdownPct": 8.757,
+              "worst": {
+                "at": "2025-11-28T11:14:59.999Z",
+                "equity": 9239.96,
+                "peak": 10126.72,
+                "realized": -760.04,
+                "unrealized": 0
+              },
+              "points": 316
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 55,
+              "startEquity": 10000,
+              "endEquity": 9193.28,
+              "maxDrawdownPct": 8.167,
+              "worst": {
+                "at": "2025-11-29T14:14:59.999Z",
+                "equity": 9193.28,
+                "peak": 10010.84,
+                "realized": -806.72,
+                "unrealized": 0
+              },
+              "points": 295
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 55,
+              "startEquity": 10000,
+              "endEquity": 9193.28,
+              "maxDrawdownPct": 8.067,
+              "worst": {
+                "at": "2025-11-29T14:14:59.999Z",
+                "equity": 9193.28,
+                "peak": 10000,
+                "realized": -806.72,
+                "unrealized": 0
+              },
+              "points": 295
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.867,
+            "adverseDdDeltaPct": -0.69,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 42,
+          "challengerV32": 55
+        }
+      }
+    },
+    "P3": {
+      "risk_0.25": {
+        "riskPerTradePct": 0.25,
+        "realized": {
+          "baseline": {
+            "trades": 658,
+            "totalR": -5.2,
+            "avgR": -0.008,
+            "winRate": 41.3,
+            "pf": 0.987,
+            "startEquity": 10000,
+            "endEquity": 9825.37,
+            "returnPct": -1.75,
+            "maxDrawdownPct": 7.78,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.61,
+            "entriesPerActiveDay": 7.31,
+            "skips": {
+              "maxOpen": 542,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 391,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 74,
+              "cooldown": 1
+            }
+          },
+          "challengerV32": {
+            "trades": 719,
+            "totalR": 61,
+            "avgR": 0.085,
+            "winRate": 45.2,
+            "pf": 1.155,
+            "startEquity": 10000,
+            "endEquity": 11589.49,
+            "returnPct": 15.89,
+            "maxDrawdownPct": 7.7,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.62,
+            "entriesPerActiveDay": 7.99,
+            "skips": {
+              "maxOpen": 2345,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3645,
+              "maxDailyLoss": 0,
+              "maxDrawdown": 0,
+              "sameSymbol": 156,
+              "cooldown": 29
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 658,
+              "startEquity": 10000,
+              "endEquity": 9825.37,
+              "maxDrawdownPct": 7.974,
+              "worst": {
+                "at": "2025-11-21T16:59:59.999Z",
+                "equity": 9742.7,
+                "peak": 10586.88,
+                "realized": -257.3,
+                "unrealized": 0
+              },
+              "points": 4371
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 658,
+              "startEquity": 10000,
+              "endEquity": 9825.37,
+              "maxDrawdownPct": 7.945,
+              "worst": {
+                "at": "2025-11-21T21:59:59.999Z",
+                "equity": 9731.13,
+                "peak": 10571.03,
+                "realized": -257.3,
+                "unrealized": -11.57
+              },
+              "points": 4371
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 719,
+              "startEquity": 10000,
+              "endEquity": 11589.49,
+              "maxDrawdownPct": 7.702,
+              "worst": {
+                "at": "2025-11-13T13:29:59.999Z",
+                "equity": 10728.54,
+                "peak": 11623.82,
+                "realized": 728.54,
+                "unrealized": 0
+              },
+              "points": 3684
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 719,
+              "startEquity": 10000,
+              "endEquity": 11589.49,
+              "maxDrawdownPct": 7.748,
+              "worst": {
+                "at": "2025-11-14T04:14:59.999Z",
+                "equity": 10723.23,
+                "peak": 11623.82,
+                "realized": 728.54,
+                "unrealized": -5.3
+              },
+              "points": 3684
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.272,
+            "adverseDdDeltaPct": -0.197,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": true
+          }
+        },
+        "tradeCounts": {
+          "baseline": 658,
+          "challengerV32": 719
+        }
+      },
+      "risk_0.50": {
+        "riskPerTradePct": 0.5,
+        "realized": {
+          "baseline": {
+            "trades": 34,
+            "totalR": -14.8,
+            "avgR": -0.435,
+            "winRate": 23.5,
+            "pf": 0.431,
+            "startEquity": 10000,
+            "endEquity": 9279.87,
+            "returnPct": -7.2,
+            "maxDrawdownPct": 8.21,
+            "maxConcurrent": 3,
+            "avgConcurrent": 0.08,
+            "entriesPerActiveDay": 6.8,
+            "skips": {
+              "maxOpen": 20,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 5,
+              "maxDailyLoss": 10,
+              "maxDrawdown": 1485,
+              "sameSymbol": 1,
+              "cooldown": 0
+            }
+          },
+          "challengerV32": {
+            "trades": 590,
+            "totalR": 46,
+            "avgR": 0.078,
+            "winRate": 44.9,
+            "pf": 1.142,
+            "startEquity": 10000,
+            "endEquity": 12395.71,
+            "returnPct": 23.96,
+            "maxDrawdownPct": 8.11,
+            "maxConcurrent": 3,
+            "avgConcurrent": 1.31,
+            "entriesPerActiveDay": 7.97,
+            "skips": {
+              "maxOpen": 1864,
+              "maxPortfolioRisk": 0,
+              "maxTradesDay": 3006,
+              "maxDailyLoss": 132,
+              "maxDrawdown": 1176,
+              "sameSymbol": 114,
+              "cooldown": 20
+            }
+          }
+        },
+        "mtm": {
+          "schemaVersion": "7.69-CANDLE-PATH-COMPARISON-V1",
+          "researchOnly": true,
+          "executionImpact": false,
+          "baseline": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 34,
+              "startEquity": 10000,
+              "endEquity": 9279.87,
+              "maxDrawdownPct": 8.535,
+              "worst": {
+                "at": "2025-08-29T12:44:59.999Z",
+                "equity": 9279.87,
+                "peak": 10145.81,
+                "realized": -720.13,
+                "unrealized": 0
+              },
+              "points": 183
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 34,
+              "startEquity": 10000,
+              "endEquity": 9279.87,
+              "maxDrawdownPct": 8.216,
+              "worst": {
+                "at": "2025-08-29T12:44:59.999Z",
+                "equity": 9279.87,
+                "peak": 10110.59,
+                "realized": -720.13,
+                "unrealized": 0
+              },
+              "points": 183
+            }
+          },
+          "challengerV32": {
+            "close": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "close",
+              "trades": 590,
+              "startEquity": 10000,
+              "endEquity": 12395.71,
+              "maxDrawdownPct": 8.071,
+              "worst": {
+                "at": "2025-11-06T18:44:59.999Z",
+                "equity": 12395.71,
+                "peak": 13484.04,
+                "realized": 2395.71,
+                "unrealized": 0
+              },
+              "points": 2921
+            },
+            "adverse": {
+              "schemaVersion": "7.69-CANDLE-PATH-V1",
+              "researchOnly": true,
+              "executionImpact": false,
+              "mode": "adverse",
+              "trades": 590,
+              "startEquity": 10000,
+              "endEquity": 12395.71,
+              "maxDrawdownPct": 8.68,
+              "worst": {
+                "at": "2025-09-03T07:59:59.999Z",
+                "equity": 9538.44,
+                "peak": 10445.12,
+                "realized": -354.17,
+                "unrealized": -107.39
+              },
+              "points": 2921
+            }
+          },
+          "comparison": {
+            "closeDdDeltaPct": -0.464,
+            "adverseDdDeltaPct": 0.464,
+            "v32LowerCloseDd": true,
+            "v32LowerAdverseDd": false
+          }
+        },
+        "tradeCounts": {
+          "baseline": 34,
+          "challengerV32": 590
+        }
+      }
+    }
+  },
+  "aggregate": {
+    "risk_0.25": {
+      "periods": 4,
+      "v32LowerCloseDd": 4,
+      "v32LowerAdverseDd": 4,
+      "avgV32CloseDd": 7.129,
+      "avgV32AdverseDd": 7.129,
+      "avgBaselineAdverseDd": 8.184
+    },
+    "risk_0.50": {
+      "periods": 4,
+      "v32LowerCloseDd": 3,
+      "v32LowerAdverseDd": 2,
+      "avgV32CloseDd": 8.557,
+      "avgV32AdverseDd": 8.664,
+      "avgBaselineAdverseDd": 8.617
+    }
+  },
+  "guardrail": "No promotion from realized-equity DD alone. Require candle-path robustness across disjoint periods before prospective shadow."
+}
