@@ -45,12 +45,24 @@ function pionexEquity(){
   const n=Number(PIONEX_EQUITY_RAW);
   return Number.isFinite(n)&&n>=0?n:null;
 }
+function manualTradingSignature(state){
+  const balances=Array.isArray(state?.portfolio?.manualVenueBalances)?state.portfolio.manualVenueBalances:[];
+  return balances.map(x=>`${clean(x?.venue).toLowerCase()}|${Number(x?.valueUsd??x?.value??0).toFixed(8)}|${clean(x?.kind).toUpperCase()}`).sort().join(';');
+}
+function desiredTradingSignature(equity){
+  if(equity==null)return '';
+  return `pionex|${Number(equity).toFixed(8)}|TRADING_CAPITAL`;
+}
 function setPionexEquity(state,equity){
   state.portfolio=state.portfolio&&typeof state.portfolio==='object'?state.portfolio:{};
-  const balances=Array.isArray(state.portfolio.manualVenueBalances)?state.portfolio.manualVenueBalances:[];
-  const kept=balances.filter(x=>clean(x?.venue).toLowerCase()!=='pionex');
-  if(equity!=null)kept.push({venue:'Pionex',valueUsd:equity,kind:'TRADING_CAPITAL',updatedAt:new Date().toISOString()});
-  state.portfolio.manualVenueBalances=kept;
+  // SSOT policy: manualVenueBalances is reserved for external trading/bot capital.
+  // With the current no-exchange-API setup, Pionex is the only such venue.
+  state.portfolio.manualVenueBalances=equity==null?[]:[{
+    venue:'Pionex',
+    valueUsd:equity,
+    kind:'TRADING_CAPITAL',
+    updatedAt:new Date().toISOString()
+  }];
   state.portfolio.pionexEquityUsd=equity;
 }
 
@@ -72,7 +84,9 @@ export async function seedKnownPortfolioOnce(){
   }
   const equity=pionexEquity();
   const currentEquity=Number(current?.portfolio?.pionexEquityUsd);
-  const equityChanged=equity!=null && (!Number.isFinite(currentEquity)||Math.abs(currentEquity-equity)>1e-9);
+  const equityValueChanged=equity!=null && (!Number.isFinite(currentEquity)||Math.abs(currentEquity-equity)>1e-9);
+  const tradingBalancesChanged=equity!=null && manualTradingSignature(current)!==desiredTradingSignature(equity);
+  const equityChanged=equityValueChanged||tradingBalancesChanged;
   if(equityChanged){
     if(!holdingsChanged){
       next=JSON.parse(JSON.stringify(current));
@@ -89,6 +103,6 @@ export async function seedKnownPortfolioOnce(){
   next.portfolio=next.portfolio&&typeof next.portfolio==='object'?next.portfolio:{};
   next.portfolio.knownHoldingsSeedAt=new Date().toISOString();
   await stateSet(next);
-  console.log(`[KNOWN_PORTFOLIO] updated · ${venues.length?venues.join(', '):'Pionex'} · revision ${next.privateRevision}`);
+  console.log(`[KNOWN_PORTFOLIO] updated · ${venues.length?venues.join(', '):'Pionex'} · trading capital normalized · revision ${next.privateRevision}`);
   return {enabled:true,changed:true,venues,revision:next.privateRevision};
 }
