@@ -3,9 +3,9 @@
 (function(){
   'use strict';
 
-  const VERSION='7.61-DASHBOARD-CONSISTENCY-R3';
+  const VERSION='7.61-DASHBOARD-CONSISTENCY-R4';
   const UI_VERSION='7.61';
-  const BUILD='7.61-20260903-R3';
+  const BUILD='7.61-20260903-R4';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -95,7 +95,7 @@
         p.tradingCapitalTotal=manualTotal;
         p.totalIncludingTrading=(Number(p.total)||0)+manualTotal;
         p.valuationScope='SPOT_HOLDINGS_ONLY';
-        p.valuationConsistency='7.61-DEPOT-SSOT-R3';
+        p.valuationConsistency='7.61-DEPOT-SSOT-R4';
         return p.total;
       };
       wrapped.__v761Wrapped=true;
@@ -292,13 +292,75 @@
     fixHybridCard(hero);
   }
 
+  function leafNodes(root){
+    if(!root)return[];
+    return [...root.querySelectorAll('*')].filter(el=>![...el.children].length);
+  }
+  function runtimeRisk(){
+    try{return typeof currentBtcRiskSnapshot==='function'?currentBtcRiskSnapshot():null}catch(_){return null}
+  }
+  function runtimeCloud(){
+    try{return typeof cloudBackendFresh==='function'?cloudBackendFresh():null}catch(_){return null}
+  }
+  function decorateExecutionConsistency(){
+    try{
+      const risk=runtimeRisk();
+      const cloud=runtimeCloud();
+      const riskKnown=!!risk&&typeof risk.open==='boolean';
+      const riskText=riskKnown?(risk.open?'RISK OPEN':'RISK BLOCKED'):'RISK UNKNOWN';
+      const riskTone=riskKnown?(risk.open?'green':'red'):'amber';
+
+      const trade=document.getElementById('view-trade')||document.querySelector('#tradeView,.trade-view,[data-view="trade"]');
+      if(trade&&riskKnown){
+        for(const el of leafNodes(trade)){
+          const text=(el.textContent||'').replace(/\s+/g,' ').trim();
+          if(/^RISK\s+(?:OPEN|BLOCKED|UNKNOWN)$/i.test(text)){
+            if(text!==riskText)el.textContent=riskText;
+            el.classList.remove('green','red','amber');
+            el.classList.add(riskTone);
+            el.dataset.v761RiskSsot='1';
+          }
+        }
+      }
+
+      const center=document.getElementById('view-center')||document.querySelector('#centerView,.center-view,[data-view="center"]');
+      if(center&&cloud){
+        const source=String(cloud.source||'ENGINE').toUpperCase();
+        const age=Number(cloud.age);
+        const fresh=!!cloud.ok;
+        const next=`${source} · ${fresh?'LIVE':'STALE'}${Number.isFinite(age)?` · ${Math.max(0,Math.round(age))}s`:''}`;
+        for(const el of leafNodes(center)){
+          const text=(el.textContent||'').replace(/\s+/g,' ').trim();
+          if(/^ENGINE\s+(?:DIRECT|MIRROR)\s*·\s*(?:RUNNING|LIVE|STALE)(?:\s*·\s*\d+s)?$/i.test(text)){
+            if(text!==next)el.textContent=next;
+            el.classList.remove('green','red','amber');
+            el.classList.add(fresh?'green':'amber');
+            el.dataset.v761EngineFreshness='1';
+          }
+        }
+      }
+
+      if(center&&risk?.short?.source==='PIONEX VERIFIED'){
+        const riskCard=[...center.querySelectorAll('.card,.v602-riskcard')].find(el=>/BTC\s+LIQUIDATION\s+RISK/i.test(el.textContent||''));
+        if(riskCard&&!riskCard.querySelector('[data-v761-risk-source-note]')){
+          const note=document.createElement('div');
+          note.dataset.v761RiskSourceNote='1';
+          note.textContent='PUFFER · PIONEX SNAPSHOT · BTC-KURS LIVE';
+          note.style.cssText='margin:5px 0 0;font:600 9px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:#e8b24a;opacity:.9';
+          const head=riskCard.querySelector('.v602-riskhead')||riskCard.firstElementChild;
+          if(head)head.insertAdjacentElement('afterend',note);else riskCard.prepend(note);
+        }
+      }
+    }catch(e){console.error('MERIDIAN v7.61 execution consistency',e)}
+  }
+
   let decorateQueued=false;
   function queueDecorate(){
     if(decorateQueued)return;
     decorateQueued=true;
     requestAnimationFrame(()=>{
       decorateQueued=false;
-      try{stampVersion();hideGlobalPionexNotice();decoratePaper();decorateDepot()}catch(e){console.error('MERIDIAN v7.61 decorate',e)}
+      try{stampVersion();hideGlobalPionexNotice();decoratePaper();decorateDepot();decorateExecutionConsistency()}catch(e){console.error('MERIDIAN v7.61 decorate',e)}
     });
   }
   function apply(){
@@ -307,6 +369,7 @@
       hideGlobalPionexNotice();
       if(typeof recalcPortfolio==='function')recalcPortfolio();
       if(typeof renderAll==='function')renderAll();
+      decorateExecutionConsistency();
     }catch(e){console.error('MERIDIAN v7.61 initial refresh',e)}
     queueDecorate();
     document.body?.setAttribute('data-v760-consistency-ready','1');
@@ -316,5 +379,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,spotVenueCountExplicit:true,pionexHeaderBannerHidden:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,spotVenueCountExplicit:true,pionexHeaderBannerHidden:true,riskSsotUi:true,engineFreshnessUi:true,riskSourceExplicit:true};
 })();
