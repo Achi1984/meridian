@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import pg from "pg";
 import { researchComparison } from "./research-analytics.js";
+import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -10,6 +11,7 @@ const DEPLOYMENT_SHA=String(process.env.NF_DEPLOYMENT_SHA||process.env.GITHUB_SH
 const EXTERNAL_PORT = Number(process.env.PORT || 10000);
 const INTERNAL_PORT = Number(process.env.MERIDIAN_INTERNAL_PORT || (EXTERNAL_PORT + 1));
 const READ_TOKEN_HASH = String(process.env.MERIDIAN_READ_TOKEN_SHA256 || "bd92c80bb4a43ea04788f2ee21591bad56052c5d609696402357597a43cbe4bc").trim().toLowerCase();
+const WRITE_TOKEN_HASH = String(process.env.MERIDIAN_WRITE_TOKEN_SHA256 || "").trim().toLowerCase();
 const ALLOWED_ORIGINS = new Set(
   String(process.env.MERIDIAN_ALLOWED_ORIGINS || "https://achi1984.github.io,http://localhost:3000,http://127.0.0.1:3000")
     .split(",").map(x=>x.trim()).filter(Boolean)
@@ -28,10 +30,13 @@ function bearer(req){
   const h=String(req.headers.authorization||"");
   return h.startsWith("Bearer ")?h.slice(7).trim():"";
 }
-function authorizedRead(req){
-  const t=bearer(req);
-  return !!t && !!READ_TOKEN_HASH && crypto.timingSafeEqual(Buffer.from(sha256(t)),Buffer.from(READ_TOKEN_HASH));
+function hashAuthorized(token,expectedHash){
+  if(!token||!/^[a-f0-9]{64}$/.test(expectedHash))return false;
+  return crypto.timingSafeEqual(Buffer.from(sha256(token),"hex"),Buffer.from(expectedHash,"hex"));
 }
+function authorizedRead(req){return hashAuthorized(bearer(req),READ_TOKEN_HASH);}
+function writeToken(req){return String(req.headers["x-meridian-write-token"]||"").trim();}
+function authorizedWrite(req){return hashAuthorized(writeToken(req),WRITE_TOKEN_HASH);}
 function isProtected(pathname){
   return PROTECTED_PREFIXES.some(p=>pathname===p || pathname.startsWith(p.endsWith("/")?p:p+"/"));
 }
@@ -56,11 +61,22 @@ function corsPreflight(req,res,origin){
   if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
   res.writeHead(204,{
     ...(origin?{"access-control-allow-origin":origin}:{}),
-    "access-control-allow-headers":"content-type, authorization",
+    "access-control-allow-headers":"content-type, authorization, x-meridian-write-token",
     "access-control-allow-methods":"GET,POST,OPTIONS",
     "access-control-max-age":"600",
     "vary":"Origin"
   });res.end();
+}
+async function readJsonBody(req,maxBytes=131072){
+  const chunks=[];let size=0;
+  for await(const chunk of req){
+    size+=chunk.length;
+    if(size>maxBytes){const e=new Error("request_body_too_large");e.code="BODY_TOO_LARGE";throw e;}
+    chunks.push(chunk);
+  }
+  if(!chunks.length)return {};
+  try{return JSON.parse(Buffer.concat(chunks).toString("utf8"));}
+  catch(_e){const e=new Error("invalid_json");e.code="INVALID_JSON";throw e;}
 }
 
 let privatePool=null;
@@ -197,7 +213,27 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
-      return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),migration},origin||"");
+      return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),migration},origin||"");
+    }
+    if(req.method==="POST"&&u.pathname==="/api/private/dashboard-update"){
+      if(!authorizedWrite(req))return writeJson(res,401,{error:"write_token_required"},origin||"");
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      let body;
+      try{body=await readJsonBody(req);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      const merged=mergePrivateDashboard(current,body);
+      if(!merged.ok){
+        const code=merged.error==="revision_conflict"?409:400;
+        return writeJson(res,code,{error:merged.error,currentRevision:merged.currentRevision,forbidden:merged.forbidden,section:merged.section},origin||"");
+      }
+      const receipt=privateDashboardPublicReceipt(merged,{dryRun:body.dryRun});
+      if(body.dryRun)return writeJson(res,200,receipt,origin||"");
+      await stateSet(PRIVATE_STATE_KEY,merged.data);
+      return writeJson(res,200,receipt,origin||"");
     }
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
