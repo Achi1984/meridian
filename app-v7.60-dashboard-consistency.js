@@ -3,11 +3,27 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R4';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R5';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
     try{return (DATA?.portfolio?.manualVenueBalances||[]).reduce((s,x)=>s+balanceValue(x),0)}catch(_){return 0}
+  }
+  function holdingValue(h){
+    const q=Number(h?.quantity),p=Number(h?.price);
+    if(Number.isFinite(q)&&Number.isFinite(p))return q*p;
+    const v=Number(h?.value??h?.valueUsd);
+    return Number.isFinite(v)?v:0;
+  }
+  function spotHoldingsTotal(){
+    try{
+      const hs=Array.isArray(DATA?.portfolio?.holdings)?DATA.portfolio.holdings:[];
+      const sum=hs.reduce((s,h)=>s+holdingValue(h),0);
+      if(sum>0)return sum;
+      const total=Number(DATA?.portfolio?.total)||0;
+      const trading=manualTradingTotal();
+      return trading>0&&total>trading?total-trading:total;
+    }catch(_){return 0}
   }
 
   // DEPOT SSOT: manual venue/bot balances are informational trading capital and
@@ -49,6 +65,7 @@
         return out;
       };
       wrapped.__v760Wrapped=true;
+      wrapped.__v760Original=originalResample;
       resampleSeries=wrapped;
     }
   }catch(e){console.error('MERIDIAN v7.60 resample wrapper',e)}
@@ -107,12 +124,23 @@
       const valueLine=hero.querySelector('.portfolio-value-line');
       if(valueLine)valueLine.insertAdjacentElement('afterend',scope);else eyebrow.insertAdjacentElement('afterend',scope);
     }
-    const spot=Number(DATA?.portfolio?.total)||0;
+    const spot=spotHoldingsTotal();
     const trading=manualTradingTotal();
     const next=trading>0
-      ?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)}`
+      ?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)} SNAPSHOT`
       :'GESAMT = SPOT-HOLDINGS';
     if(scope.textContent!==next)scope.textContent=next;
+
+    // The historical chart is built from holdings history, not the static
+    // Pionex snapshot. Make that scope explicit so its high/low values are not
+    // compared to the larger Gesamtportfolio headline.
+    const walker=document.createTreeWalker(hero,NodeFilter.SHOW_TEXT);
+    while(walker.nextNode()){
+      const n=walker.currentNode;
+      const before=n.nodeValue||'';
+      const after=before.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+      if(after!==before)n.nodeValue=after;
+    }
   }
 
   let decorateQueued=false;
@@ -138,5 +166,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,chartScopeExplicit:true,mutationLoopFixed:true};
 })();
