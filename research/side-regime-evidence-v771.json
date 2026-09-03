@@ -1,0 +1,888 @@
+{
+  "schemaVersion": "7.71-SIDE-REGIME-EVIDENCE-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "generatedAt": "2026-09-03T12:10:12.530Z",
+  "periods": {
+    "P0": {
+      "schemaVersion": "7.71-SIDE-REGIME-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "same V3.2 equal-coverage ranking as v7.66",
+      "baselineCount": 1659,
+      "challengerCount": 1659,
+      "equalCoverage": true,
+      "overlap": 360,
+      "sideOnly": {
+        "LONG": {
+          "baseline": {
+            "samples": 664,
+            "totalR": -42.4,
+            "avgR": -0.064,
+            "winRate": 39,
+            "pf": 0.895
+          },
+          "challengerV32": {
+            "samples": 646,
+            "totalR": 6.8,
+            "avgR": 0.011,
+            "winRate": 42.1,
+            "pf": 1.018
+          },
+          "deltaAvgR": 0.075,
+          "coverageDelta": -18
+        },
+        "SHORT": {
+          "baseline": {
+            "samples": 995,
+            "totalR": 41.8,
+            "avgR": 0.042,
+            "winRate": 43.4,
+            "pf": 1.074
+          },
+          "challengerV32": {
+            "samples": 1013,
+            "totalR": 62.2,
+            "avgR": 0.061,
+            "winRate": 44.2,
+            "pf": 1.11
+          },
+          "deltaAvgR": 0.019,
+          "coverageDelta": 18
+        }
+      },
+      "cells": {
+        "LONG__BEAR": {
+          "baseline": {
+            "samples": 20,
+            "totalR": -8,
+            "avgR": -0.4,
+            "winRate": 25,
+            "pf": 0.467
+          },
+          "challengerV32": {
+            "samples": 79,
+            "totalR": 5,
+            "avgR": 0.063,
+            "winRate": 44.3,
+            "pf": 1.114
+          },
+          "deltaAvgR": 0.463,
+          "deltaPf": 0.647,
+          "coverageDelta": 59
+        },
+        "LONG__BULL": {
+          "baseline": {
+            "samples": 283,
+            "totalR": -35.8,
+            "avgR": -0.127,
+            "winRate": 36.4,
+            "pf": 0.801
+          },
+          "challengerV32": {
+            "samples": 239,
+            "totalR": -8.6,
+            "avgR": -0.036,
+            "winRate": 40.2,
+            "pf": 0.94
+          },
+          "deltaAvgR": 0.091,
+          "deltaPf": 0.139,
+          "coverageDelta": -44
+        },
+        "LONG__RANGE": {
+          "baseline": {
+            "samples": 163,
+            "totalR": 12.2,
+            "avgR": 0.075,
+            "winRate": 44.8,
+            "pf": 1.136
+          },
+          "challengerV32": {
+            "samples": 153,
+            "totalR": 19.8,
+            "avgR": 0.129,
+            "winRate": 47.1,
+            "pf": 1.244
+          },
+          "deltaAvgR": 0.054,
+          "deltaPf": 0.108,
+          "coverageDelta": -10
+        },
+        "LONG__TRANSITION": {
+          "baseline": {
+            "samples": 198,
+            "totalR": -10.8,
+            "avgR": -0.055,
+            "winRate": 39.4,
+            "pf": 0.91
+          },
+          "challengerV32": {
+            "samples": 175,
+            "totalR": -9.4,
+            "avgR": -0.054,
+            "winRate": 39.4,
+            "pf": 0.911
+          },
+          "deltaAvgR": 0.001,
+          "deltaPf": 0.001,
+          "coverageDelta": -23
+        },
+        "SHORT__BEAR": {
+          "baseline": {
+            "samples": 607,
+            "totalR": 14.6,
+            "avgR": 0.024,
+            "winRate": 42.7,
+            "pf": 1.042
+          },
+          "challengerV32": {
+            "samples": 551,
+            "totalR": 1,
+            "avgR": 0.002,
+            "winRate": 41.7,
+            "pf": 1.003
+          },
+          "deltaAvgR": -0.022,
+          "deltaPf": -0.039,
+          "coverageDelta": -56
+        },
+        "SHORT__BULL": {
+          "baseline": {
+            "samples": 12,
+            "totalR": 4.8,
+            "avgR": 0.4,
+            "winRate": 58.3,
+            "pf": 1.96
+          },
+          "challengerV32": {
+            "samples": 29,
+            "totalR": 9.4,
+            "avgR": 0.324,
+            "winRate": 55.2,
+            "pf": 1.723
+          },
+          "deltaAvgR": -0.076,
+          "deltaPf": -0.237,
+          "coverageDelta": 17
+        },
+        "SHORT__RANGE": {
+          "baseline": {
+            "samples": 232,
+            "totalR": -1.6,
+            "avgR": -0.007,
+            "winRate": 41.4,
+            "pf": 0.988
+          },
+          "challengerV32": {
+            "samples": 171,
+            "totalR": 16.2,
+            "avgR": 0.095,
+            "winRate": 45.6,
+            "pf": 1.174
+          },
+          "deltaAvgR": 0.102,
+          "deltaPf": 0.186,
+          "coverageDelta": -61
+        },
+        "SHORT__TRANSITION": {
+          "baseline": {
+            "samples": 144,
+            "totalR": 24,
+            "avgR": 0.167,
+            "winRate": 48.6,
+            "pf": 1.324
+          },
+          "challengerV32": {
+            "samples": 262,
+            "totalR": 35.6,
+            "avgR": 0.136,
+            "winRate": 47.3,
+            "pf": 1.258
+          },
+          "deltaAvgR": -0.031,
+          "deltaPf": -0.066,
+          "coverageDelta": 118
+        }
+      }
+    },
+    "P1": {
+      "schemaVersion": "7.71-SIDE-REGIME-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "same V3.2 equal-coverage ranking as v7.66",
+      "baselineCount": 1671,
+      "challengerCount": 1671,
+      "equalCoverage": true,
+      "overlap": 390,
+      "sideOnly": {
+        "LONG": {
+          "baseline": {
+            "samples": 795,
+            "totalR": 1.8,
+            "avgR": 0.002,
+            "winRate": 41.8,
+            "pf": 1.004
+          },
+          "challengerV32": {
+            "samples": 792,
+            "totalR": 43.2,
+            "avgR": 0.055,
+            "winRate": 43.9,
+            "pf": 1.097
+          },
+          "deltaAvgR": 0.053,
+          "coverageDelta": -3
+        },
+        "SHORT": {
+          "baseline": {
+            "samples": 876,
+            "totalR": 12,
+            "avgR": 0.014,
+            "winRate": 42.2,
+            "pf": 1.024
+          },
+          "challengerV32": {
+            "samples": 879,
+            "totalR": 47.4,
+            "avgR": 0.054,
+            "winRate": 43.9,
+            "pf": 1.096
+          },
+          "deltaAvgR": 0.04,
+          "coverageDelta": 3
+        }
+      },
+      "cells": {
+        "LONG__BEAR": {
+          "baseline": {
+            "samples": 19,
+            "totalR": 5,
+            "avgR": 0.263,
+            "winRate": 52.6,
+            "pf": 1.556
+          },
+          "challengerV32": {
+            "samples": 39,
+            "totalR": -3,
+            "avgR": -0.077,
+            "winRate": 38.5,
+            "pf": 0.875
+          },
+          "deltaAvgR": -0.34,
+          "deltaPf": -0.681,
+          "coverageDelta": 20
+        },
+        "LONG__BULL": {
+          "baseline": {
+            "samples": 443,
+            "totalR": 49,
+            "avgR": 0.111,
+            "winRate": 46.3,
+            "pf": 1.206
+          },
+          "challengerV32": {
+            "samples": 447,
+            "totalR": 13.8,
+            "avgR": 0.031,
+            "winRate": 43,
+            "pf": 1.054
+          },
+          "deltaAvgR": -0.08,
+          "deltaPf": -0.152,
+          "coverageDelta": 4
+        },
+        "LONG__RANGE": {
+          "baseline": {
+            "samples": 179,
+            "totalR": -30.2,
+            "avgR": -0.169,
+            "winRate": 34.6,
+            "pf": 0.742
+          },
+          "challengerV32": {
+            "samples": 174,
+            "totalR": 30,
+            "avgR": 0.172,
+            "winRate": 48.9,
+            "pf": 1.337
+          },
+          "deltaAvgR": 0.341,
+          "deltaPf": 0.595,
+          "coverageDelta": -5
+        },
+        "LONG__TRANSITION": {
+          "baseline": {
+            "samples": 154,
+            "totalR": -22,
+            "avgR": -0.143,
+            "winRate": 35.7,
+            "pf": 0.778
+          },
+          "challengerV32": {
+            "samples": 132,
+            "totalR": 2.4,
+            "avgR": 0.018,
+            "winRate": 42.4,
+            "pf": 1.032
+          },
+          "deltaAvgR": 0.161,
+          "deltaPf": 0.254,
+          "coverageDelta": -22
+        },
+        "SHORT__BEAR": {
+          "baseline": {
+            "samples": 423,
+            "totalR": 6.6,
+            "avgR": 0.016,
+            "winRate": 42.3,
+            "pf": 1.027
+          },
+          "challengerV32": {
+            "samples": 360,
+            "totalR": 45.6,
+            "avgR": 0.127,
+            "winRate": 46.9,
+            "pf": 1.239
+          },
+          "deltaAvgR": 0.111,
+          "deltaPf": 0.212,
+          "coverageDelta": -63
+        },
+        "SHORT__BULL": {
+          "baseline": {
+            "samples": 18,
+            "totalR": 8.4,
+            "avgR": 0.467,
+            "winRate": 61.1,
+            "pf": 2.2
+          },
+          "challengerV32": {
+            "samples": 37,
+            "totalR": 3.8,
+            "avgR": 0.103,
+            "winRate": 45.9,
+            "pf": 1.19
+          },
+          "deltaAvgR": -0.364,
+          "deltaPf": -1.01,
+          "coverageDelta": 19
+        },
+        "SHORT__RANGE": {
+          "baseline": {
+            "samples": 223,
+            "totalR": -23.8,
+            "avgR": -0.107,
+            "winRate": 37.2,
+            "pf": 0.83
+          },
+          "challengerV32": {
+            "samples": 182,
+            "totalR": -6.8,
+            "avgR": -0.037,
+            "winRate": 40.1,
+            "pf": 0.938
+          },
+          "deltaAvgR": 0.07,
+          "deltaPf": 0.108,
+          "coverageDelta": -41
+        },
+        "SHORT__TRANSITION": {
+          "baseline": {
+            "samples": 212,
+            "totalR": 20.8,
+            "avgR": 0.098,
+            "winRate": 45.8,
+            "pf": 1.181
+          },
+          "challengerV32": {
+            "samples": 300,
+            "totalR": 4.8,
+            "avgR": 0.016,
+            "winRate": 42.3,
+            "pf": 1.028
+          },
+          "deltaAvgR": -0.082,
+          "deltaPf": -0.153,
+          "coverageDelta": 88
+        }
+      }
+    },
+    "P2": {
+      "schemaVersion": "7.71-SIDE-REGIME-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "same V3.2 equal-coverage ranking as v7.66",
+      "baselineCount": 1682,
+      "challengerCount": 1682,
+      "equalCoverage": true,
+      "overlap": 400,
+      "sideOnly": {
+        "LONG": {
+          "baseline": {
+            "samples": 619,
+            "totalR": -50.2,
+            "avgR": -0.081,
+            "winRate": 38.3,
+            "pf": 0.869
+          },
+          "challengerV32": {
+            "samples": 597,
+            "totalR": -37.8,
+            "avgR": -0.063,
+            "winRate": 39,
+            "pf": 0.896
+          },
+          "deltaAvgR": 0.018,
+          "coverageDelta": -22
+        },
+        "SHORT": {
+          "baseline": {
+            "samples": 1063,
+            "totalR": -7,
+            "avgR": -0.007,
+            "winRate": 41.4,
+            "pf": 0.989
+          },
+          "challengerV32": {
+            "samples": 1085,
+            "totalR": 62.2,
+            "avgR": 0.057,
+            "winRate": 44.1,
+            "pf": 1.102
+          },
+          "deltaAvgR": 0.064,
+          "coverageDelta": 22
+        }
+      },
+      "cells": {
+        "LONG__BEAR": {
+          "baseline": {
+            "samples": 20,
+            "totalR": 1.6,
+            "avgR": 0.08,
+            "winRate": 45,
+            "pf": 1.145
+          },
+          "challengerV32": {
+            "samples": 59,
+            "totalR": -11,
+            "avgR": -0.186,
+            "winRate": 33.9,
+            "pf": 0.718
+          },
+          "deltaAvgR": -0.266,
+          "deltaPf": -0.427,
+          "coverageDelta": 39
+        },
+        "LONG__BULL": {
+          "baseline": {
+            "samples": 245,
+            "totalR": -26.6,
+            "avgR": -0.109,
+            "winRate": 37.1,
+            "pf": 0.827
+          },
+          "challengerV32": {
+            "samples": 205,
+            "totalR": -10.6,
+            "avgR": -0.052,
+            "winRate": 39.5,
+            "pf": 0.915
+          },
+          "deltaAvgR": 0.057,
+          "deltaPf": 0.088,
+          "coverageDelta": -40
+        },
+        "LONG__RANGE": {
+          "baseline": {
+            "samples": 138,
+            "totalR": -20.4,
+            "avgR": -0.148,
+            "winRate": 35.5,
+            "pf": 0.771
+          },
+          "challengerV32": {
+            "samples": 177,
+            "totalR": 3,
+            "avgR": 0.017,
+            "winRate": 42.4,
+            "pf": 1.029
+          },
+          "deltaAvgR": 0.165,
+          "deltaPf": 0.258,
+          "coverageDelta": 39
+        },
+        "LONG__TRANSITION": {
+          "baseline": {
+            "samples": 216,
+            "totalR": -4.8,
+            "avgR": -0.022,
+            "winRate": 40.7,
+            "pf": 0.963
+          },
+          "challengerV32": {
+            "samples": 156,
+            "totalR": -19.2,
+            "avgR": -0.123,
+            "winRate": 36.5,
+            "pf": 0.806
+          },
+          "deltaAvgR": -0.101,
+          "deltaPf": -0.157,
+          "coverageDelta": -60
+        },
+        "SHORT__BEAR": {
+          "baseline": {
+            "samples": 612,
+            "totalR": 16.8,
+            "avgR": 0.027,
+            "winRate": 42.8,
+            "pf": 1.048
+          },
+          "challengerV32": {
+            "samples": 582,
+            "totalR": 25.2,
+            "avgR": 0.043,
+            "winRate": 43.5,
+            "pf": 1.077
+          },
+          "deltaAvgR": 0.016,
+          "deltaPf": 0.029,
+          "coverageDelta": -30
+        },
+        "SHORT__BULL": {
+          "baseline": {
+            "samples": 10,
+            "totalR": -0.4,
+            "avgR": -0.04,
+            "winRate": 40,
+            "pf": 0.933
+          },
+          "challengerV32": {
+            "samples": 17,
+            "totalR": 4.6,
+            "avgR": 0.271,
+            "winRate": 52.9,
+            "pf": 1.575
+          },
+          "deltaAvgR": 0.311,
+          "deltaPf": 0.642,
+          "coverageDelta": 7
+        },
+        "SHORT__RANGE": {
+          "baseline": {
+            "samples": 301,
+            "totalR": -39.4,
+            "avgR": -0.131,
+            "winRate": 36.2,
+            "pf": 0.795
+          },
+          "challengerV32": {
+            "samples": 235,
+            "totalR": -14.2,
+            "avgR": -0.06,
+            "winRate": 39.1,
+            "pf": 0.901
+          },
+          "deltaAvgR": 0.071,
+          "deltaPf": 0.106,
+          "coverageDelta": -66
+        },
+        "SHORT__TRANSITION": {
+          "baseline": {
+            "samples": 140,
+            "totalR": 16,
+            "avgR": 0.114,
+            "winRate": 46.4,
+            "pf": 1.213
+          },
+          "challengerV32": {
+            "samples": 251,
+            "totalR": 46.6,
+            "avgR": 0.186,
+            "winRate": 49.4,
+            "pf": 1.367
+          },
+          "deltaAvgR": 0.072,
+          "deltaPf": 0.154,
+          "coverageDelta": 111
+        }
+      }
+    },
+    "P3": {
+      "schemaVersion": "7.71-SIDE-REGIME-ATTRIBUTION-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "selectionMethod": "same V3.2 equal-coverage ranking as v7.66",
+      "baselineCount": 1539,
+      "challengerCount": 1539,
+      "equalCoverage": true,
+      "overlap": 257,
+      "sideOnly": {
+        "LONG": {
+          "baseline": {
+            "samples": 603,
+            "totalR": 18.6,
+            "avgR": 0.031,
+            "winRate": 43,
+            "pf": 1.054
+          },
+          "challengerV32": {
+            "samples": 589,
+            "totalR": -22.6,
+            "avgR": -0.038,
+            "winRate": 40.1,
+            "pf": 0.936
+          },
+          "deltaAvgR": -0.069,
+          "coverageDelta": -14
+        },
+        "SHORT": {
+          "baseline": {
+            "samples": 936,
+            "totalR": -19.2,
+            "avgR": -0.021,
+            "winRate": 40.8,
+            "pf": 0.965
+          },
+          "challengerV32": {
+            "samples": 950,
+            "totalR": 163.6,
+            "avgR": 0.172,
+            "winRate": 48.8,
+            "pf": 1.337
+          },
+          "deltaAvgR": 0.193,
+          "coverageDelta": 14
+        }
+      },
+      "cells": {
+        "LONG__BEAR": {
+          "baseline": {
+            "samples": 33,
+            "totalR": -16.2,
+            "avgR": -0.491,
+            "winRate": 21.2,
+            "pf": 0.377
+          },
+          "challengerV32": {
+            "samples": 94,
+            "totalR": -24.4,
+            "avgR": -0.26,
+            "winRate": 30.9,
+            "pf": 0.625
+          },
+          "deltaAvgR": 0.231,
+          "deltaPf": 0.248,
+          "coverageDelta": 61
+        },
+        "LONG__BULL": {
+          "baseline": {
+            "samples": 277,
+            "totalR": 42.2,
+            "avgR": 0.152,
+            "winRate": 48,
+            "pf": 1.293
+          },
+          "challengerV32": {
+            "samples": 267,
+            "totalR": 35.4,
+            "avgR": 0.133,
+            "winRate": 47.2,
+            "pf": 1.251
+          },
+          "deltaAvgR": -0.019,
+          "deltaPf": -0.042,
+          "coverageDelta": -10
+        },
+        "LONG__RANGE": {
+          "baseline": {
+            "samples": 106,
+            "totalR": 9.2,
+            "avgR": 0.087,
+            "winRate": 45.3,
+            "pf": 1.159
+          },
+          "challengerV32": {
+            "samples": 108,
+            "totalR": -24,
+            "avgR": -0.222,
+            "winRate": 32.4,
+            "pf": 0.671
+          },
+          "deltaAvgR": -0.309,
+          "deltaPf": -0.488,
+          "coverageDelta": 2
+        },
+        "LONG__TRANSITION": {
+          "baseline": {
+            "samples": 187,
+            "totalR": -16.6,
+            "avgR": -0.089,
+            "winRate": 38,
+            "pf": 0.857
+          },
+          "challengerV32": {
+            "samples": 120,
+            "totalR": -9.6,
+            "avgR": -0.08,
+            "winRate": 38.3,
+            "pf": 0.87
+          },
+          "deltaAvgR": 0.009,
+          "deltaPf": 0.013,
+          "coverageDelta": -67
+        },
+        "SHORT__BEAR": {
+          "baseline": {
+            "samples": 625,
+            "totalR": 44.6,
+            "avgR": 0.071,
+            "winRate": 44.6,
+            "pf": 1.129
+          },
+          "challengerV32": {
+            "samples": 503,
+            "totalR": 121,
+            "avgR": 0.241,
+            "winRate": 51.7,
+            "pf": 1.498
+          },
+          "deltaAvgR": 0.17,
+          "deltaPf": 0.369,
+          "coverageDelta": -122
+        },
+        "SHORT__BULL": {
+          "baseline": {
+            "samples": 9,
+            "totalR": -4.2,
+            "avgR": -0.467,
+            "winRate": 22.2,
+            "pf": 0.4
+          },
+          "challengerV32": {
+            "samples": 27,
+            "totalR": 1.8,
+            "avgR": 0.067,
+            "winRate": 44.4,
+            "pf": 1.12
+          },
+          "deltaAvgR": 0.534,
+          "deltaPf": 0.72,
+          "coverageDelta": 18
+        },
+        "SHORT__RANGE": {
+          "baseline": {
+            "samples": 166,
+            "totalR": -10,
+            "avgR": -0.06,
+            "winRate": 39.2,
+            "pf": 0.901
+          },
+          "challengerV32": {
+            "samples": 137,
+            "totalR": 45.4,
+            "avgR": 0.331,
+            "winRate": 55.5,
+            "pf": 1.744
+          },
+          "deltaAvgR": 0.391,
+          "deltaPf": 0.843,
+          "coverageDelta": -29
+        },
+        "SHORT__TRANSITION": {
+          "baseline": {
+            "samples": 136,
+            "totalR": -49.6,
+            "avgR": -0.365,
+            "winRate": 26.5,
+            "pf": 0.504
+          },
+          "challengerV32": {
+            "samples": 283,
+            "totalR": -4.6,
+            "avgR": -0.016,
+            "winRate": 41,
+            "pf": 0.972
+          },
+          "deltaAvgR": 0.349,
+          "deltaPf": 0.468,
+          "coverageDelta": 147
+        }
+      }
+    }
+  },
+  "summary": {
+    "sidePersistence": {
+      "LONG": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 3,
+        "betterPct": 75,
+        "robustPositive": true
+      },
+      "SHORT": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 4,
+        "betterPct": 100,
+        "robustPositive": true
+      }
+    },
+    "cellPersistence": {
+      "LONG__BEAR": {
+        "adequatePeriods": 3,
+        "betterAvgRPeriods": 2,
+        "betterPct": 66.7,
+        "robustPositive": false
+      },
+      "LONG__BULL": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 2,
+        "betterPct": 50,
+        "robustPositive": false
+      },
+      "LONG__RANGE": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 3,
+        "betterPct": 75,
+        "robustPositive": true
+      },
+      "LONG__TRANSITION": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 3,
+        "betterPct": 75,
+        "robustPositive": true
+      },
+      "SHORT__BEAR": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 3,
+        "betterPct": 75,
+        "robustPositive": true
+      },
+      "SHORT__BULL": {
+        "adequatePeriods": 0,
+        "betterAvgRPeriods": 0,
+        "betterPct": null,
+        "robustPositive": false
+      },
+      "SHORT__RANGE": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 4,
+        "betterPct": 100,
+        "robustPositive": true
+      },
+      "SHORT__TRANSITION": {
+        "adequatePeriods": 4,
+        "betterAvgRPeriods": 2,
+        "betterPct": 50,
+        "robustPositive": false
+      }
+    },
+    "robustCells": [
+      "LONG__RANGE",
+      "LONG__TRANSITION",
+      "SHORT__BEAR",
+      "SHORT__RANGE"
+    ]
+  }
+}
