@@ -3,7 +3,7 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R5';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R6';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -94,13 +94,16 @@
 
     const titles=[...paper.querySelectorAll('.section-title,.eyebrow,h1,h2,h3,b,strong')];
     const anchor=titles.find(el=>/PAPER LAB|BASELINE.*SHADOW.*CHALLENGER/i.test(el.textContent||''));
-    if(anchor && !paper.querySelector('[data-v760-research-next]')){
-      const note=document.createElement('div');
-      note.dataset.v760ResearchNext='1';
-      note.textContent='NEXT BOT · CHALLENGER V3.2 IN RESEARCH · NO PAPER EXECUTION';
-      note.style.cssText='margin-top:10px;font:600 11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:#28aefc;opacity:.88';
-      const host=anchor.closest('.card,.hero,.paper-head')||anchor.parentElement;
-      if(host)host.appendChild(note);
+    if(anchor){
+      let note=paper.querySelector('[data-v760-research-next]');
+      if(!note){
+        note=document.createElement('div');
+        note.dataset.v760ResearchNext='1';
+        note.style.cssText='margin-top:10px;font:600 11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:#28aefc;opacity:.88';
+        const host=anchor.closest('.card,.hero,.paper-head')||anchor.parentElement;
+        if(host)host.appendChild(note);
+      }
+      if(note)note.textContent='PAPER · CHALLENGER V2 · RESEARCH · V3.2 · NO EXECUTION CHANGE';
     }
   }
 
@@ -131,14 +134,17 @@
       :'GESAMT = SPOT-HOLDINGS';
     if(scope.textContent!==next)scope.textContent=next;
 
-    // The historical chart is built from holdings history, not the static
-    // Pionex snapshot. Make that scope explicit so its high/low values are not
-    // compared to the larger Gesamtportfolio headline.
+    // The headline combines live-priced holdings with a static Pionex snapshot,
+    // therefore its status is HYBRID rather than fully LIVE. The historical
+    // chart and largest-position percentage remain spot-only.
     const walker=document.createTreeWalker(hero,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()){
       const n=walker.currentNode;
       const before=n.nodeValue||'';
-      const after=before.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+      let after=before;
+      if(/^\s*LIVE\s*$/i.test(after))after=after.replace(/LIVE/i,'HYBRID');
+      after=after.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+      after=after.replace(/\bGRÖSSTE POSITION\b/i,'GRÖSSTE SPOT-POSITION');
       if(after!==before)n.nodeValue=after;
     }
   }
@@ -166,5 +172,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,chartScopeExplicit:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
 })();
