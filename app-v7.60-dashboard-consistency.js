@@ -3,10 +3,11 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R3';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R4';
 
+  function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
-    try{return (DATA?.portfolio?.manualVenueBalances||[]).reduce((s,x)=>s+(Number(x?.value)||0),0)}catch(_){return 0}
+    try{return (DATA?.portfolio?.manualVenueBalances||[]).reduce((s,x)=>s+balanceValue(x),0)}catch(_){return 0}
   }
 
   // DEPOT SSOT: manual venue/bot balances are informational trading capital and
@@ -18,7 +19,7 @@
         const p=DATA?.portfolio;
         if(!p)return originalRecalc.apply(this,arguments);
         const manual=Array.isArray(p.manualVenueBalances)?p.manualVenueBalances:[];
-        const manualTotal=manual.reduce((s,x)=>s+(Number(x?.value)||0),0);
+        const manualTotal=manual.reduce((s,x)=>s+balanceValue(x),0);
         p.manualVenueBalances=[];
         try{originalRecalc.apply(this,arguments)}finally{p.manualVenueBalances=manual}
         p.tradingCapitalTotal=manualTotal;
@@ -86,6 +87,12 @@
     }
   }
 
+  function compactUsd(v){
+    const n=Number(v)||0;
+    if(Math.abs(n)>=1000)return `$${new Intl.NumberFormat('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1}).format(n/1000)}K`;
+    return `$${new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(n)}`;
+  }
+
   function decorateDepot(){
     const depot=document.getElementById('view-depot')||document;
     const eyebrow=[...depot.querySelectorAll('.eyebrow')].find(el=>(el.textContent||'').trim()==='GESAMTPORTFOLIO');
@@ -100,9 +107,11 @@
       const valueLine=hero.querySelector('.portfolio-value-line');
       if(valueLine)valueLine.insertAdjacentElement('afterend',scope);else eyebrow.insertAdjacentElement('afterend',scope);
     }
-    const manual=manualTradingTotal();
-    const extra=manual>0?` · TRADING/BOT SEPARAT $${new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(manual)}`:'';
-    const next=`DEPOT SSOT · SPOT-HOLDINGS${extra}`;
+    const spot=Number(DATA?.portfolio?.total)||0;
+    const trading=manualTradingTotal();
+    const next=trading>0
+      ?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)}`
+      :'GESAMT = SPOT-HOLDINGS';
     if(scope.textContent!==next)scope.textContent=next;
   }
 
