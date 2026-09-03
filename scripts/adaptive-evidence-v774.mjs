@@ -9,7 +9,7 @@ if(files.some(x=>!x))throw new Error('required: --p0 --p1 --p2 --p3');
 const periods={};
 for(let i=0;i<files.length;i++){
   const cohort=JSON.parse(fs.readFileSync(files[i],'utf8'));
-  const rows=cohort.samples||cohort.rows||cohort.signals||[];
+  const rows=Array.isArray(cohort.rows)?cohort.rows:Array.isArray(cohort.signals)?cohort.signals:Array.isArray(cohort.samples)?cohort.samples:[];
   periods[`P${i}`]=evaluateAdaptivePolicies(rows);
 }
 const policies=['LR_MTF3','LR_VOLUME','LR_MTF3_VOLUME'];
