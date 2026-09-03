@@ -1,0 +1,404 @@
+{
+  "schemaVersion": "7.74-ADAPTIVE-EVIDENCE-REPORT-V1",
+  "generatedAt": "2026-09-03T18:37:45.473Z",
+  "researchOnly": true,
+  "executionImpact": false,
+  "periods": {
+    "P0": {
+      "schemaVersion": "7.74-ADAPTIVE-EVIDENCE-LAB-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "results": {
+        "LR_MTF3": {
+          "policy": "LR_MTF3",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1662,
+            "avgR": 0.047,
+            "pf": 1.083,
+            "winRate": 43.6
+          },
+          "adaptive": {
+            "samples": 1662,
+            "avgR": 0.058,
+            "pf": 1.105,
+            "winRate": 44.1
+          },
+          "comparison": {
+            "avgRDelta": 0.011,
+            "pfDelta": 0.022
+          },
+          "opportunity": {
+            "displaced": 19,
+            "discovered": 19,
+            "avoidedLosers": 14,
+            "missedWinners": 5,
+            "discoveredWinners": 13,
+            "discoveredLosers": 6
+          }
+        },
+        "LR_VOLUME": {
+          "policy": "LR_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1662,
+            "avgR": 0.047,
+            "pf": 1.083,
+            "winRate": 43.6
+          },
+          "adaptive": {
+            "samples": 1662,
+            "avgR": 0.045,
+            "pf": 1.081,
+            "winRate": 43.6
+          },
+          "comparison": {
+            "avgRDelta": -0.002,
+            "pfDelta": -0.002
+          },
+          "opportunity": {
+            "displaced": 83,
+            "discovered": 83,
+            "avoidedLosers": 50,
+            "missedWinners": 33,
+            "discoveredWinners": 32,
+            "discoveredLosers": 51
+          }
+        },
+        "LR_MTF3_VOLUME": {
+          "policy": "LR_MTF3_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1662,
+            "avgR": 0.047,
+            "pf": 1.083,
+            "winRate": 43.6
+          },
+          "adaptive": {
+            "samples": 1662,
+            "avgR": 0.047,
+            "pf": 1.083,
+            "winRate": 43.6
+          },
+          "comparison": {
+            "avgRDelta": 0,
+            "pfDelta": 0
+          },
+          "opportunity": {
+            "displaced": 2,
+            "discovered": 2,
+            "avoidedLosers": 0,
+            "missedWinners": 2,
+            "discoveredWinners": 2,
+            "discoveredLosers": 0
+          }
+        }
+      }
+    },
+    "P1": {
+      "schemaVersion": "7.74-ADAPTIVE-EVIDENCE-LAB-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "results": {
+        "LR_MTF3": {
+          "policy": "LR_MTF3",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1671,
+            "avgR": 0.054,
+            "pf": 1.097,
+            "winRate": 43.9
+          },
+          "adaptive": {
+            "samples": 1671,
+            "avgR": 0.054,
+            "pf": 1.097,
+            "winRate": 43.9
+          },
+          "comparison": {
+            "avgRDelta": 0,
+            "pfDelta": 0
+          },
+          "opportunity": {
+            "displaced": 44,
+            "discovered": 44,
+            "avoidedLosers": 29,
+            "missedWinners": 15,
+            "discoveredWinners": 15,
+            "discoveredLosers": 29
+          }
+        },
+        "LR_VOLUME": {
+          "policy": "LR_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1671,
+            "avgR": 0.054,
+            "pf": 1.097,
+            "winRate": 43.9
+          },
+          "adaptive": {
+            "samples": 1671,
+            "avgR": 0.066,
+            "pf": 1.118,
+            "winRate": 44.4
+          },
+          "comparison": {
+            "avgRDelta": 0.012,
+            "pfDelta": 0.021
+          },
+          "opportunity": {
+            "displaced": 100,
+            "discovered": 100,
+            "avoidedLosers": 65,
+            "missedWinners": 35,
+            "discoveredWinners": 43,
+            "discoveredLosers": 57
+          }
+        },
+        "LR_MTF3_VOLUME": {
+          "policy": "LR_MTF3_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1671,
+            "avgR": 0.054,
+            "pf": 1.097,
+            "winRate": 43.9
+          },
+          "adaptive": {
+            "samples": 1671,
+            "avgR": 0.056,
+            "pf": 1.099,
+            "winRate": 44
+          },
+          "comparison": {
+            "avgRDelta": 0.002,
+            "pfDelta": 0.002
+          },
+          "opportunity": {
+            "displaced": 6,
+            "discovered": 6,
+            "avoidedLosers": 4,
+            "missedWinners": 2,
+            "discoveredWinners": 3,
+            "discoveredLosers": 3
+          }
+        }
+      }
+    },
+    "P2": {
+      "schemaVersion": "7.74-ADAPTIVE-EVIDENCE-LAB-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "results": {
+        "LR_MTF3": {
+          "policy": "LR_MTF3",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1684,
+            "avgR": 0.015,
+            "pf": 1.026,
+            "winRate": 42.3
+          },
+          "adaptive": {
+            "samples": 1684,
+            "avgR": 0.023,
+            "pf": 1.041,
+            "winRate": 42.6
+          },
+          "comparison": {
+            "avgRDelta": 0.008,
+            "pfDelta": 0.015
+          },
+          "opportunity": {
+            "displaced": 18,
+            "discovered": 18,
+            "avoidedLosers": 12,
+            "missedWinners": 6,
+            "discoveredWinners": 12,
+            "discoveredLosers": 6
+          }
+        },
+        "LR_VOLUME": {
+          "policy": "LR_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1684,
+            "avgR": 0.015,
+            "pf": 1.026,
+            "winRate": 42.3
+          },
+          "adaptive": {
+            "samples": 1684,
+            "avgR": 0.023,
+            "pf": 1.041,
+            "winRate": 42.6
+          },
+          "comparison": {
+            "avgRDelta": 0.008,
+            "pfDelta": 0.015
+          },
+          "opportunity": {
+            "displaced": 105,
+            "discovered": 105,
+            "avoidedLosers": 65,
+            "missedWinners": 40,
+            "discoveredWinners": 46,
+            "discoveredLosers": 59
+          }
+        },
+        "LR_MTF3_VOLUME": {
+          "policy": "LR_MTF3_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1684,
+            "avgR": 0.015,
+            "pf": 1.026,
+            "winRate": 42.3
+          },
+          "adaptive": {
+            "samples": 1684,
+            "avgR": 0.018,
+            "pf": 1.031,
+            "winRate": 42.4
+          },
+          "comparison": {
+            "avgRDelta": 0.003,
+            "pfDelta": 0.005
+          },
+          "opportunity": {
+            "displaced": 3,
+            "discovered": 3,
+            "avoidedLosers": 2,
+            "missedWinners": 1,
+            "discoveredWinners": 3,
+            "discoveredLosers": 0
+          }
+        }
+      }
+    },
+    "P3": {
+      "schemaVersion": "7.74-ADAPTIVE-EVIDENCE-LAB-V1",
+      "researchOnly": true,
+      "executionImpact": false,
+      "results": {
+        "LR_MTF3": {
+          "policy": "LR_MTF3",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1541,
+            "avgR": 0.086,
+            "pf": 1.156,
+            "winRate": 45.2
+          },
+          "adaptive": {
+            "samples": 1541,
+            "avgR": 0.082,
+            "pf": 1.15,
+            "winRate": 45.1
+          },
+          "comparison": {
+            "avgRDelta": -0.004,
+            "pfDelta": -0.006
+          },
+          "opportunity": {
+            "displaced": 10,
+            "discovered": 10,
+            "avoidedLosers": 4,
+            "missedWinners": 6,
+            "discoveredWinners": 4,
+            "discoveredLosers": 6
+          }
+        },
+        "LR_VOLUME": {
+          "policy": "LR_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1541,
+            "avgR": 0.086,
+            "pf": 1.156,
+            "winRate": 45.2
+          },
+          "adaptive": {
+            "samples": 1541,
+            "avgR": 0.076,
+            "pf": 1.138,
+            "winRate": 44.8
+          },
+          "comparison": {
+            "avgRDelta": -0.01,
+            "pfDelta": -0.018
+          },
+          "opportunity": {
+            "displaced": 90,
+            "discovered": 90,
+            "avoidedLosers": 44,
+            "missedWinners": 46,
+            "discoveredWinners": 40,
+            "discoveredLosers": 50
+          }
+        },
+        "LR_MTF3_VOLUME": {
+          "policy": "LR_MTF3_VOLUME",
+          "equalCoverage": true,
+          "base": {
+            "samples": 1541,
+            "avgR": 0.086,
+            "pf": 1.156,
+            "winRate": 45.2
+          },
+          "adaptive": {
+            "samples": 1541,
+            "avgR": 0.086,
+            "pf": 1.156,
+            "winRate": 45.2
+          },
+          "comparison": {
+            "avgRDelta": 0,
+            "pfDelta": 0
+          },
+          "opportunity": {
+            "displaced": 0,
+            "discovered": 0,
+            "avoidedLosers": 0,
+            "missedWinners": 0,
+            "discoveredWinners": 0,
+            "discoveredLosers": 0
+          }
+        }
+      }
+    }
+  },
+  "summary": {
+    "LR_MTF3": {
+      "periods": 4,
+      "avgRBetterPeriods": 2,
+      "pfBetterPeriods": 2,
+      "equalCoveragePeriods": 4,
+      "avgAvgRDelta": 0.004,
+      "totalMissedWinners": 32,
+      "totalAvoidedLosers": 59
+    },
+    "LR_VOLUME": {
+      "periods": 4,
+      "avgRBetterPeriods": 2,
+      "pfBetterPeriods": 2,
+      "equalCoveragePeriods": 4,
+      "avgAvgRDelta": 0.002,
+      "totalMissedWinners": 154,
+      "totalAvoidedLosers": 224
+    },
+    "LR_MTF3_VOLUME": {
+      "periods": 4,
+      "avgRBetterPeriods": 2,
+      "pfBetterPeriods": 2,
+      "equalCoveragePeriods": 4,
+      "avgAvgRDelta": 0.001,
+      "totalMissedWinners": 5,
+      "totalAvoidedLosers": 6
+    }
+  },
+  "winner": null,
+  "promotionAllowed": false,
+  "nextStep": "REJECT_FIXED_ADAPTIVE_BONUS"
+}
