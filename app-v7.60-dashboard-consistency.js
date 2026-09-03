@@ -38,8 +38,6 @@
   }catch(e){console.error('MERIDIAN v7.60 recalc wrapper',e)}
 
   // Preserve the most recent observation when chart points are downsampled.
-  // This guarantees that the visible chart endpoint and the displayed current
-  // portfolio value refer to the same latest portfolio observation.
   try{
     if(typeof resampleSeries==='function' && !resampleSeries.__v760Wrapped){
       const originalResample=resampleSeries;
@@ -58,6 +56,24 @@
       resampleSeries=wrapped;
     }
   }catch(e){console.error('MERIDIAN v7.60 resample wrapper',e)}
+
+  // Primary tabs are a SPA control. Some legacy route pages (for example
+  // depot.html) are historical standalone copies and must never win over the
+  // live in-page renderer. Capture the tap before a legacy href can navigate.
+  function installPrimaryTabGuard(){
+    if(window.__MERIDIAN_V760_TAB_GUARD)return;
+    window.__MERIDIAN_V760_TAB_GUARD=true;
+    document.addEventListener('click',e=>{
+      const nav=e.target?.closest?.('.nav[data-view]');
+      if(!nav)return;
+      const view=String(nav.dataset.view||'').trim();
+      const target=document.getElementById('view-'+view);
+      if(!view||!target||typeof openView!=='function')return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      try{openView(view,nav)}catch(err){console.error('MERIDIAN v7.60 tab guard',view,err)}
+    },true);
+  }
 
   function textReplace(root,from,to){
     if(!root)return;
@@ -104,6 +120,7 @@
   }
 
   function apply(){
+    installPrimaryTabGuard();
     try{
       if(typeof recalcPortfolio==='function')recalcPortfolio();
       if(typeof renderAll==='function')renderAll();
@@ -115,5 +132,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,spaTabGuard:true};
 })();
