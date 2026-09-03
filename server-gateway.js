@@ -37,6 +37,7 @@ function hashAuthorized(token,expectedHash){
 function authorizedRead(req){return hashAuthorized(bearer(req),READ_TOKEN_HASH);}
 function writeToken(req){return String(req.headers["x-meridian-write-token"]||"").trim();}
 function authorizedWrite(req){return hashAuthorized(writeToken(req),WRITE_TOKEN_HASH);}
+function authorizedWriteToken(token){return hashAuthorized(String(token||"").trim(),WRITE_TOKEN_HASH);}
 function isProtected(pathname){
   return PROTECTED_PREFIXES.some(p=>pathname===p || pathname.startsWith(p.endsWith("/")?p:p+"/"));
 }
@@ -228,16 +229,40 @@ const server=http.createServer(async(req,res)=>{
         writeEndpoint:"/api/private/dashboard-update"
       },origin||"");
     }
-    if(req.method==="POST"&&u.pathname==="/api/private/dashboard-update"){
-      if(!authorizedWrite(req))return writeJson(res,401,{error:"write_token_required"},origin||"");
+    if(req.method==="POST"&&u.pathname==="/api/private/write-check"){
+      let body;
+      try{body=await readJsonBody(req,8192);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      if(!authorizedWriteToken(body?.writeToken))return writeJson(res,401,{error:"write_token_required"},origin||"");
       const current=await stateGet(PRIVATE_STATE_KEY);
-      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      return writeJson(res,200,{
+        ok:true,
+        writeAuthorized:true,
+        authTransport:"json_body",
+        databaseConfigured:!!DATABASE_URL,
+        databaseReachable:!!pool(),
+        privateData:!!current,
+        currentRevision:Number.isInteger(current?.privateRevision)?current.privateRevision:0,
+        writeEndpoint:"/api/private/dashboard-update"
+      },origin||"");
+    }
+    if(req.method==="POST"&&u.pathname==="/api/private/dashboard-update"){
       let body;
       try{body=await readJsonBody(req);}catch(e){
         if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
         if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
         throw e;
       }
+      const tokenFromHeader=writeToken(req);
+      const tokenFromBody=String(body?.writeToken||"").trim();
+      if(!(authorizedWriteToken(tokenFromHeader)||authorizedWriteToken(tokenFromBody))){
+        return writeJson(res,401,{error:"write_token_required"},origin||"");
+      }
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
       const merged=mergePrivateDashboard(current,body);
       if(!merged.ok){
         const code=merged.error==="revision_conflict"?409:400;
