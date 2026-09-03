@@ -3,7 +3,7 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R6';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R7';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -24,6 +24,9 @@
       const trading=manualTradingTotal();
       return trading>0&&total>trading?total-trading:total;
     }catch(_){return 0}
+  }
+  function formatUsd(v){
+    return `$${new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:0}).format(Number(v)||0)}`;
   }
 
   // DEPOT SSOT: manual venue/bot balances are informational trading capital and
@@ -113,12 +116,34 @@
     return `$${new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(n)}`;
   }
 
+  function setDepotHeadlineTotal(hero,total){
+    if(!(total>0))return;
+    // Only replace a standalone USD amount in the hero. This deliberately does
+    // not touch chart HIGH/LOW labels, EUR conversion, or the scope line.
+    const scope=hero.querySelector('[data-v760-depot-scope]');
+    const els=[...hero.querySelectorAll('*')].filter(el=>el!==scope && !scope?.contains(el));
+    const valueEl=els.find(el=>/^\s*\$\s*[\d.]+(?:,\d+)?\s*$/.test(el.textContent||'') && ![...el.children].length);
+    if(valueEl){
+      const next=formatUsd(total);
+      if((valueEl.textContent||'').trim()!==next)valueEl.textContent=next;
+      valueEl.dataset.v760HybridTotal='1';
+    }
+  }
+
   function decorateDepot(){
     const depot=document.getElementById('view-depot')||document;
     const eyebrow=[...depot.querySelectorAll('.eyebrow')].find(el=>(el.textContent||'').trim()==='GESAMTPORTFOLIO');
     if(!eyebrow)return;
     const hero=eyebrow.closest('.hero')||eyebrow.parentElement;
     if(!hero)return;
+    const spot=spotHoldingsTotal();
+    const trading=manualTradingTotal();
+    const hybridTotal=spot+trading;
+
+    // The GESAMTPORTFOLIO headline must use the same SSOT as CENTER:
+    // live-priced spot holdings + static Pionex trading/bot snapshot.
+    if(trading>0)setDepotHeadlineTotal(hero,hybridTotal);
+
     let scope=hero.querySelector('[data-v760-depot-scope]');
     if(!scope){
       scope=document.createElement('div');
@@ -127,8 +152,6 @@
       const valueLine=hero.querySelector('.portfolio-value-line');
       if(valueLine)valueLine.insertAdjacentElement('afterend',scope);else eyebrow.insertAdjacentElement('afterend',scope);
     }
-    const spot=spotHoldingsTotal();
-    const trading=manualTradingTotal();
     const next=trading>0
       ?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)} SNAPSHOT`
       :'GESAMT = SPOT-HOLDINGS';
@@ -145,6 +168,7 @@
       if(/^\s*LIVE\s*$/i.test(after))after=after.replace(/LIVE/i,'HYBRID');
       after=after.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
       after=after.replace(/\bGRÖSSTE POSITION\b/i,'GRÖSSTE SPOT-POSITION');
+      after=after.replace(/\bVERWAHRSTELLEN\b/i,'SPOT-VERWAHRSTELLEN');
       if(after!==before)n.nodeValue=after;
     }
   }
@@ -172,5 +196,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
 })();
