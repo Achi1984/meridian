@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import pg from "pg";
 import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
+import { mergeVenueHoldings } from "./private-holdings-sync.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -226,7 +227,8 @@ const server=http.createServer(async(req,res)=>{
         databaseReachable:!!pool(),
         privateData:!!current,
         currentRevision:Number.isInteger(current?.privateRevision)?current.privateRevision:0,
-        writeEndpoint:"/api/private/dashboard-update"
+        writeEndpoint:"/api/private/dashboard-update",
+        holdingsSyncEndpoint:"/api/private/holdings-sync"
       },origin||"");
     }
     if(req.method==="POST"&&u.pathname==="/api/private/write-check"){
@@ -246,8 +248,38 @@ const server=http.createServer(async(req,res)=>{
         databaseReachable:!!pool(),
         privateData:!!current,
         currentRevision:Number.isInteger(current?.privateRevision)?current.privateRevision:0,
-        writeEndpoint:"/api/private/dashboard-update"
+        writeEndpoint:"/api/private/dashboard-update",
+        holdingsSyncEndpoint:"/api/private/holdings-sync"
       },origin||"");
+    }
+    if(req.method==="POST"&&u.pathname==="/api/private/holdings-sync"){
+      let body;
+      try{body=await readJsonBody(req,32768);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      const tokenFromHeader=writeToken(req);
+      const tokenFromBody=String(body?.writeToken||"").trim();
+      if(!(authorizedWriteToken(tokenFromHeader)||authorizedWriteToken(tokenFromBody))){
+        return writeJson(res,401,{error:"write_token_required"},origin||"");
+      }
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      const merged=mergeVenueHoldings(current,body?.holdingsText);
+      if(!merged.ok)return writeJson(res,400,{error:merged.error,row:merged.row,item:merged.item,venue:merged.venue},origin||"");
+      const receipt={
+        ok:true,
+        dryRun:!!body?.dryRun,
+        revision:merged.nextRevision,
+        previousRevision:merged.currentRevision,
+        venues:merged.venues,
+        holdingCount:merged.holdingCount,
+        updatedAt:merged.data.privateUpdatedAt
+      };
+      if(body?.dryRun)return writeJson(res,200,receipt,origin||"");
+      await stateSet(PRIVATE_STATE_KEY,merged.data);
+      return writeJson(res,200,receipt,origin||"");
     }
     if(req.method==="POST"&&u.pathname==="/api/private/dashboard-update"){
       let body;
