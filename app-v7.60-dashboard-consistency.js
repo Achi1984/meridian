@@ -3,7 +3,7 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY-R7';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R8';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -27,6 +27,30 @@
   }
   function formatUsd(v){
     return `$${new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:0}).format(Number(v)||0)}`;
+  }
+  function tradingSnapshotStart(){
+    try{
+      const xs=(DATA?.portfolio?.manualVenueBalances||[])
+        .filter(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex')
+        .map(x=>Date.parse(x?.updatedAt||x?.updated_at||''))
+        .filter(Number.isFinite);
+      const seed=Date.parse(DATA?.portfolio?.knownHoldingsSeedAt||'');
+      if(Number.isFinite(seed))xs.push(seed);
+      return xs.length?Math.min(...xs):NaN;
+    }catch(_){return NaN}
+  }
+  function totalPortfolioSeries(series){
+    const trading=manualTradingTotal();
+    const start=tradingSnapshotStart();
+    if(!(trading>0)||!Number.isFinite(start)||!Array.isArray(series))return series;
+    return series.map(pt=>{
+      if(!Array.isArray(pt)||pt.length<2)return pt;
+      const raw=pt[0];
+      const t=Number.isFinite(Number(raw))?Number(raw):Date.parse(raw);
+      const v=Number(pt[1]);
+      if(!Number.isFinite(t)||!Number.isFinite(v)||t<start)return pt;
+      return [pt[0],v+trading,...pt.slice(2)];
+    });
   }
 
   // DEPOT SSOT: manual venue/bot balances are informational trading capital and
@@ -53,14 +77,18 @@
     }
   }catch(e){console.error('MERIDIAN v7.60 recalc wrapper',e)}
 
-  // Preserve the most recent observation when chart points are downsampled.
+  // Keep stored source history spot-only, but render the portfolio chart as total
+  // budget from the first known Pionex snapshot onward. Earlier points stay
+  // untouched so MERIDIAN never invents historical Pionex equity.
   try{
     if(typeof resampleSeries==='function' && !resampleSeries.__v760Wrapped){
       const originalResample=resampleSeries;
       const wrapped=function(series,maxPts=180){
-        const out=originalResample(series,maxPts);
-        if(!Array.isArray(series)||!series.length||!Array.isArray(out)||!out.length)return out;
-        const latest=series[series.length-1];
+        const isPortfolio=typeof PORTFOLIO_SERIES!=='undefined' && series===PORTFOLIO_SERIES;
+        const input=isPortfolio?totalPortfolioSeries(series):series;
+        const out=originalResample(input,maxPts);
+        if(!Array.isArray(input)||!input.length||!Array.isArray(out)||!out.length)return out;
+        const latest=input[input.length-1];
         const last=out[out.length-1];
         if(!last || Number(last[0])!==Number(latest[0])){
           if(out.length>=maxPts)out[out.length-1]=latest;else out.push(latest);
@@ -118,8 +146,6 @@
 
   function setDepotHeadlineTotal(hero,total){
     if(!(total>0))return;
-    // Only replace a standalone USD amount in the hero. This deliberately does
-    // not touch chart HIGH/LOW labels, EUR conversion, or the scope line.
     const scope=hero.querySelector('[data-v760-depot-scope]');
     const els=[...hero.querySelectorAll('*')].filter(el=>el!==scope && !scope?.contains(el));
     const valueEl=els.find(el=>/^\s*\$\s*[\d.]+(?:,\d+)?\s*$/.test(el.textContent||'') && ![...el.children].length);
@@ -140,8 +166,6 @@
     const trading=manualTradingTotal();
     const hybridTotal=spot+trading;
 
-    // The GESAMTPORTFOLIO headline must use the same SSOT as CENTER:
-    // live-priced spot holdings + static Pionex trading/bot snapshot.
     if(trading>0)setDepotHeadlineTotal(hero,hybridTotal);
 
     let scope=hero.querySelector('[data-v760-depot-scope]');
@@ -157,9 +181,19 @@
       :'GESAMT = SPOT-HOLDINGS';
     if(scope.textContent!==next)scope.textContent=next;
 
+    let chartNote=hero.querySelector('[data-v760-total-chart-note]');
+    if(!chartNote && trading>0){
+      chartNote=document.createElement('div');
+      chartNote.dataset.v760TotalChartNote='1';
+      chartNote.style.cssText='margin:4px 0 8px;font:600 9px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:#28aefc;opacity:.82';
+      scope.insertAdjacentElement('afterend',chartNote);
+    }
+    if(chartNote)chartNote.textContent='CHART · GESAMTPORTFOLIO · PIONEX AB SNAPSHOT';
+
     // The headline combines live-priced holdings with a static Pionex snapshot,
-    // therefore its status is HYBRID rather than fully LIVE. The historical
-    // chart and largest-position percentage remain spot-only.
+    // therefore its status is HYBRID rather than fully LIVE. The chart uses
+    // total budget from the known Pionex snapshot onward; performance and
+    // largest-position percentage remain spot-only until Pionex is live.
     const walker=document.createTreeWalker(hero,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()){
       const n=walker.currentNode;
@@ -196,5 +230,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
 })();
