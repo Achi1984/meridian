@@ -1,0 +1,73 @@
+name: MERIDIAN Soft Allocation v7.73
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research-v768-preserved-20260903]
+    paths:
+      - "soft-allocation-v773.js"
+      - "scripts/soft-allocation-v773.mjs"
+      - "test/soft-allocation-v773.test.js"
+      - ".github/workflows/soft-allocation-v773.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-soft-allocation-v773
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research-v768-preserved-20260903
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v773/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v773/${name}" --end-at "${end_at}"
+          done
+      - name: Test v7.73 soft allocation
+        run: node --test test/soft-allocation-v773.test.js test/challenger-v32.test.js
+      - name: Build v7.73 evidence
+        run: node scripts/soft-allocation-v773.mjs --p0 /tmp/v773/p0/signal-cohort-90d.json --p1 /tmp/v773/p1/signal-cohort-90d.json --p2 /tmp/v773/p2/signal-cohort-90d.json --p3 /tmp/v773/p3/signal-cohort-90d.json --out research/soft-allocation-evidence-v773.json
+      - name: Build compact summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/soft-allocation-evidence-v773.json','utf8'));
+          const out=['# MERIDIAN v7.73 — LONG RANGE Soft Allocation Lab','',`Generated: ${r.generatedAt}`,'','Research-only. Adds only +0.5 score to LONG__RANGE on top of frozen Challenger V3.2. Equal coverage remains required. Portfolio path uses 0.25% risk per trade. Baseline/Paper/UI unchanged.',''];
+          for(const [p,x] of Object.entries(r.periods||{})){
+            out.push(`## ${p}`,'',`Signal: V3.2 AvgR=${x.signal.v32.avgR}, V7.73 AvgR=${x.signal.v773.avgR}, Δ=${x.signal.comparison.avgRDelta}; PF Δ=${x.signal.comparison.pfDelta}; missed winners=${x.signal.opportunity.missedWinners}; avoided losers=${x.signal.opportunity.avoidedLosers}.`,`Portfolio: V3.2 trades=${x.portfolio.v32.trades}, V7.73 trades=${x.portfolio.v773.trades}, ΔAvgR=${x.portfolio.comparison.avgRDelta}, ΔPF=${x.portfolio.comparison.pfDelta}, ΔReturn=${x.portfolio.comparison.returnDeltaPct}pp, ΔDD=${x.portfolio.comparison.maxDrawdownDeltaPct}pp, trade Δ=${x.portfolio.comparison.tradeDelta}.`,'');
+          }
+          out.push('## Summary','',`Signal AvgR better: **${r.summary.signalAvgRBetterPeriods}/${r.summary.periods}**. Portfolio AvgR better: **${r.summary.portfolioAvgRBetterPeriods}/${r.summary.periods}**. Lower portfolio DD: **${r.summary.lowerDrawdownPeriods}/${r.summary.periods}**.`,'','## Guardrail','','No promotion from this experiment. A +0.5 LONG__RANGE bonus is accepted only if it improves edge without material opportunity-cost or drawdown deterioration across disjoint periods.','');
+          fs.writeFileSync('research/soft-allocation-evidence-v773.md',out.join('\n'));
+          NODE
+      - name: Commit evidence to research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/soft-allocation-evidence-v773.json research/soft-allocation-evidence-v773.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.73: soft allocation evidence"
+          git push origin HEAD:research-v768-preserved-20260903
