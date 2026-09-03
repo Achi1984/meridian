@@ -3,9 +3,9 @@
 (function(){
   'use strict';
 
-  const VERSION='7.61-DASHBOARD-CONSISTENCY-R2';
+  const VERSION='7.61-DASHBOARD-CONSISTENCY-R3';
   const UI_VERSION='7.61';
-  const BUILD='7.61-20260903-R2';
+  const BUILD='7.61-20260903-R3';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -95,7 +95,7 @@
         p.tradingCapitalTotal=manualTotal;
         p.totalIncludingTrading=(Number(p.total)||0)+manualTotal;
         p.valuationScope='SPOT_HOLDINGS_ONLY';
-        p.valuationConsistency='7.61-DEPOT-SSOT-R2';
+        p.valuationConsistency='7.61-DEPOT-SSOT-R3';
         return p.total;
       };
       wrapped.__v761Wrapped=true;
@@ -104,9 +104,6 @@
     }
   }catch(e){console.error('MERIDIAN v7.61 recalc wrapper',e)}
 
-  // Render the Depot portfolio series as total budget (spot + known Pionex snapshot).
-  // Detection is intentionally narrow: only while Depot is active and only when the
-  // series endpoint is close to the current spot-holdings total.
   try{
     if(typeof resampleSeries==='function' && !resampleSeries.__v761Wrapped){
       const originalResample=resampleSeries;
@@ -139,6 +136,36 @@
       document.querySelectorAll('[data-ui-version]').forEach(el=>{if(el.textContent!==UI_VERSION)el.textContent=UI_VERSION});
       const meta=document.querySelector('meta[name="meridian-build"]');
       if(meta)meta.setAttribute('content',BUILD);
+    }catch(_e){}
+  }
+
+  function hideGlobalPionexNotice(){
+    try{
+      const root=document.body||document.documentElement;
+      if(!root)return;
+      const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+      const matches=[];
+      while(walker.nextNode()){
+        const text=String(walker.currentNode.nodeValue||'').replace(/\s+/g,' ').trim();
+        if(/PIONEX/i.test(text)&&/STATISCHER\s+SNAPSHOT/i.test(text)&&/QUELLE\s+NICHT\s+LIVE/i.test(text))matches.push(walker.currentNode);
+      }
+      for(const node of matches){
+        let el=node.parentElement;
+        if(!el)continue;
+        let candidate=el;
+        for(let i=0;i<4&&candidate?.parentElement;i++){
+          const text=String(candidate.textContent||'').replace(/\s+/g,' ').trim();
+          if(/PIONEX/i.test(text)&&/STATISCHER\s+SNAPSHOT/i.test(text)&&/QUELLE\s+NICHT\s+LIVE/i.test(text)&&text.length<180){
+            candidate=candidate.parentElement;
+            continue;
+          }
+          break;
+        }
+        const target=(candidate&&String(candidate.textContent||'').length<220)?candidate:el;
+        target.style.display='none';
+        target.setAttribute('aria-hidden','true');
+        target.dataset.v761PionexHeaderHidden='1';
+      }
     }catch(_e){}
   }
 
@@ -190,7 +217,6 @@
   }
   function normalizeDepotLabel(text){
     let after=String(text||'');
-    // Collapse any old duplicated prefixes first, then assign one canonical label.
     after=after.replace(/^(?:\s*SPOT\s+)+1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\s*$/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
     after=after.replace(/^(?:\s*SPOT[-–])+VERWAHRSTELLEN\s*$/i,'SPOT-VERWAHRSTELLEN');
     after=after.replace(/^(?:\s*SPOT[-–])+GRÖSSTE\s+(?:SPOT[-–])?POSITION\s*$/i,'GRÖSSTE SPOT-POSITION');
@@ -272,12 +298,13 @@
     decorateQueued=true;
     requestAnimationFrame(()=>{
       decorateQueued=false;
-      try{stampVersion();decoratePaper();decorateDepot()}catch(e){console.error('MERIDIAN v7.61 decorate',e)}
+      try{stampVersion();hideGlobalPionexNotice();decoratePaper();decorateDepot()}catch(e){console.error('MERIDIAN v7.61 decorate',e)}
     });
   }
   function apply(){
     try{
       stampVersion();
+      hideGlobalPionexNotice();
       if(typeof recalcPortfolio==='function')recalcPortfolio();
       if(typeof renderAll==='function')renderAll();
     }catch(e){console.error('MERIDIAN v7.61 initial refresh',e)}
@@ -289,5 +316,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,spotVenueCountExplicit:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,spotVenueCountExplicit:true,pionexHeaderBannerHidden:true};
 })();
