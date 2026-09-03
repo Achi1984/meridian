@@ -1,0 +1,77 @@
+name: MERIDIAN Side-Regime Attribution v7.71
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research-v768-preserved-20260903]
+    paths:
+      - "side-regime-v771.js"
+      - "scripts/side-regime-v771.mjs"
+      - "test/side-regime-v771.test.js"
+      - ".github/workflows/side-regime-v771.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meridian-side-regime-v771
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research-v768-preserved-20260903
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Use Binance public market-data endpoint
+        run: sed -i 's#https://api.binance.com#https://data-api.binance.vision#g' scripts/signal-cohort-v762.mjs
+      - name: Generate four disjoint 90d cohorts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/signal-cohort-v762.mjs --out-dir /tmp/v771/p0
+          for pair in "p1:90" "p2:180" "p3:270"; do
+            name="${pair%%:*}"; days="${pair##*:}"
+            end_at="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+            node scripts/signal-cohort-v762.mjs --out-dir "/tmp/v771/${name}" --end-at "${end_at}"
+          done
+      - name: Test v7.71 attribution
+        run: node --test test/side-regime-v771.test.js test/challenger-v32.test.js test/feature-attribution.test.js
+      - name: Build side-regime evidence
+        run: node scripts/side-regime-v771.mjs --p0 /tmp/v771/p0/signal-cohort-90d.json --p1 /tmp/v771/p1/signal-cohort-90d.json --p2 /tmp/v771/p2/signal-cohort-90d.json --p3 /tmp/v771/p3/signal-cohort-90d.json --out research/side-regime-evidence-v771.json
+      - name: Build compact summary
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r=JSON.parse(fs.readFileSync('research/side-regime-evidence-v771.json','utf8'));
+          const out=['# MERIDIAN v7.71 — Side × Regime Attribution','',`Generated: ${r.generatedAt}`,'','Research-only. Baseline 6.2 remains frozen. V3.2 uses the same equal-coverage ranking as v7.66. This report asks whether the edge survives when split by LONG/SHORT and market regime.',''];
+          for(const [p,x] of Object.entries(r.periods||{})){
+            out.push(`## ${p}`,'');
+            for(const side of ['LONG','SHORT']){const s=x.sideOnly?.[side];if(s)out.push(`${side}: B n=${s.baseline.samples}, AvgR=${s.baseline.avgR}; V3.2 n=${s.challengerV32.samples}, AvgR=${s.challengerV32.avgR}; ΔAvgR=${s.deltaAvgR}; Δcoverage=${s.coverageDelta}`);}
+            out.push('');
+          }
+          out.push('## Persistence','');
+          for(const [side,s] of Object.entries(r.summary?.sidePersistence||{}))out.push(`${side}: better AvgR ${s.betterAvgRPeriods}/${s.adequatePeriods}; robust=${s.robustPositive?'YES':'NO'}`);
+          out.push('',`Robust side×regime cells: ${(r.summary?.robustCells||[]).join(', ')||'none'}`,'','## Guardrail','','No side or regime becomes a hard entry gate from this report. Robust cells may only become soft-score or risk-allocation candidates after independent validation. Paper/runtime/UI unchanged.','');
+          fs.writeFileSync('research/side-regime-evidence-v771.md',out.join('\n'));
+          NODE
+      - name: Commit evidence to research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- scripts/signal-cohort-v762.mjs
+          git add research/side-regime-evidence-v771.json research/side-regime-evidence-v771.md
+          if git diff --cached --quiet; then echo "No evidence change"; exit 0; fi
+          git commit -m "MERIDIAN v7.71: side-regime evidence"
+          git push origin HEAD:research-v768-preserved-20260903
