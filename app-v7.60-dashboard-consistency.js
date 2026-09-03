@@ -3,7 +3,7 @@
 (function(){
   'use strict';
 
-  const VERSION='7.60-DASHBOARD-CONSISTENCY';
+  const VERSION='7.60-DASHBOARD-CONSISTENCY-R3';
 
   function manualTradingTotal(){
     try{return (DATA?.portfolio?.manualVenueBalances||[]).reduce((s,x)=>s+(Number(x?.value)||0),0)}catch(_){return 0}
@@ -20,11 +20,7 @@
         const manual=Array.isArray(p.manualVenueBalances)?p.manualVenueBalances:[];
         const manualTotal=manual.reduce((s,x)=>s+(Number(x?.value)||0),0);
         p.manualVenueBalances=[];
-        try{
-          originalRecalc.apply(this,arguments);
-        } finally {
-          p.manualVenueBalances=manual;
-        }
+        try{originalRecalc.apply(this,arguments)}finally{p.manualVenueBalances=manual}
         p.tradingCapitalTotal=manualTotal;
         p.totalIncludingTrading=(Number(p.total)||0)+manualTotal;
         p.valuationScope='SPOT_HOLDINGS_ONLY';
@@ -47,8 +43,7 @@
         const latest=series[series.length-1];
         const last=out[out.length-1];
         if(!last || Number(last[0])!==Number(latest[0])){
-          if(out.length>=maxPts)out[out.length-1]=latest;
-          else out.push(latest);
+          if(out.length>=maxPts)out[out.length-1]=latest;else out.push(latest);
         }
         return out;
       };
@@ -57,41 +52,31 @@
     }
   }catch(e){console.error('MERIDIAN v7.60 resample wrapper',e)}
 
-  // Primary tabs are a SPA control. Some legacy route pages (for example
-  // depot.html) are historical standalone copies and must never win over the
-  // live in-page renderer. Capture the tap before a legacy href can navigate.
-  function installPrimaryTabGuard(){
-    if(window.__MERIDIAN_V760_TAB_GUARD)return;
-    window.__MERIDIAN_V760_TAB_GUARD=true;
-    document.addEventListener('click',e=>{
-      const nav=e.target?.closest?.('.nav[data-view]');
-      if(!nav)return;
-      const view=String(nav.dataset.view||'').trim();
-      const target=document.getElementById('view-'+view);
-      if(!view||!target||typeof openView!=='function')return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      try{openView(view,nav)}catch(err){console.error('MERIDIAN v7.60 tab guard',view,err)}
-    },true);
+  function paperRoot(){
+    return document.getElementById('view-paper') || document.querySelector('#paperView,.paper-view,[data-view="paper"]');
   }
 
-  function textReplace(root,from,to){
-    if(!root)return;
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
-    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
-    for(const n of nodes)if(n.nodeValue&&n.nodeValue.includes(from))n.nodeValue=n.nodeValue.split(from).join(to);
-  }
-
+  // IMPORTANT: this must be idempotent. The old implementation replaced the
+  // prefix "BASELINE · SHADOW · CHALLENGER" on every MutationObserver pass,
+  // creating endless "· REGIME" text and starving the UI thread.
   function decoratePaper(){
-    const paper=document.querySelector('[data-view="paper"], #paperView, .paper-view, main');
+    const paper=paperRoot();
     if(!paper)return;
-    textReplace(paper,'3 BOTS','4 BOTS');
-    textReplace(paper,'1 VERGLEICH','1 ÜBERSICHT');
-    textReplace(paper,'BASELINE · SHADOW · CHALLENGER','BASELINE · SHADOW · CHALLENGER · REGIME');
+    const walker=document.createTreeWalker(paper,NodeFilter.SHOW_TEXT);
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    for(const n of nodes){
+      const before=n.nodeValue||'';
+      let after=before;
+      after=after.replace(/\b3 BOTS\b/g,'4 BOTS').replace(/\b1 VERGLEICH\b/g,'1 ÜBERSICHT');
+      if(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER/i.test(after)){
+        after=after.replace(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER(?:\s*·\s*REGIME)*/gi,'BASELINE · SHADOW · CHALLENGER · REGIME');
+      }
+      if(after!==before)n.nodeValue=after;
+    }
 
     const titles=[...paper.querySelectorAll('.section-title,.eyebrow,h1,h2,h3,b,strong')];
     const anchor=titles.find(el=>/PAPER LAB|BASELINE.*SHADOW.*CHALLENGER/i.test(el.textContent||''));
-    if(anchor && !document.querySelector('[data-v760-research-next]')){
+    if(anchor && !paper.querySelector('[data-v760-research-next]')){
       const note=document.createElement('div');
       note.dataset.v760ResearchNext='1';
       note.textContent='NEXT BOT · CHALLENGER V3.2 IN RESEARCH · NO PAPER EXECUTION';
@@ -102,7 +87,8 @@
   }
 
   function decorateDepot(){
-    const eyebrow=[...document.querySelectorAll('.eyebrow')].find(el=>(el.textContent||'').trim()==='GESAMTPORTFOLIO');
+    const depot=document.getElementById('view-depot')||document;
+    const eyebrow=[...depot.querySelectorAll('.eyebrow')].find(el=>(el.textContent||'').trim()==='GESAMTPORTFOLIO');
     if(!eyebrow)return;
     const hero=eyebrow.closest('.hero')||eyebrow.parentElement;
     if(!hero)return;
@@ -116,21 +102,32 @@
     }
     const manual=manualTradingTotal();
     const extra=manual>0?` · TRADING/BOT SEPARAT $${new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(manual)}`:'';
-    scope.textContent=`DEPOT SSOT · SPOT-HOLDINGS${extra}`;
+    const next=`DEPOT SSOT · SPOT-HOLDINGS${extra}`;
+    if(scope.textContent!==next)scope.textContent=next;
+  }
+
+  let decorateQueued=false;
+  function queueDecorate(){
+    if(decorateQueued)return;
+    decorateQueued=true;
+    requestAnimationFrame(()=>{
+      decorateQueued=false;
+      try{decoratePaper();decorateDepot()}catch(e){console.error('MERIDIAN v7.60 decorate',e)}
+    });
   }
 
   function apply(){
-    installPrimaryTabGuard();
     try{
       if(typeof recalcPortfolio==='function')recalcPortfolio();
       if(typeof renderAll==='function')renderAll();
     }catch(e){console.error('MERIDIAN v7.60 initial refresh',e)}
-    try{decoratePaper();decorateDepot();document.body?.setAttribute('data-v760-consistency-ready','1')}catch(e){console.error('MERIDIAN v7.60 decorate',e)}
+    queueDecorate();
+    document.body?.setAttribute('data-v760-consistency-ready','1');
   }
 
-  const observer=new MutationObserver(()=>{decoratePaper();decorateDepot()});
+  const observer=new MutationObserver(queueDecorate);
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,spaTabGuard:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,spotOnlyDepot:true,manualTradingSeparated:true,mutationLoopFixed:true};
 })();
