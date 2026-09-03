@@ -3,9 +3,9 @@
 (function(){
   'use strict';
 
-  const VERSION='7.61-DASHBOARD-CONSISTENCY-R1';
+  const VERSION='7.61-DASHBOARD-CONSISTENCY-R2';
   const UI_VERSION='7.61';
-  const BUILD='7.61-20260903-R1';
+  const BUILD='7.61-20260903-R2';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -27,6 +27,13 @@
       return trading>0&&total>trading?total-trading:total;
     }catch(_){return 0}
   }
+  function spotVenueCount(){
+    try{
+      const hs=Array.isArray(DATA?.portfolio?.holdings)?DATA.portfolio.holdings:[];
+      const venues=new Set(hs.map(h=>String(h?.venue||'').trim()).filter(Boolean).filter(v=>v.toLowerCase()!=='pionex'));
+      return venues.size;
+    }catch(_){return 0}
+  }
   function formatUsd(v){
     return `$${new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:0}).format(Number(v)||0)}`;
   }
@@ -44,19 +51,39 @@
   function totalPortfolioSeries(series){
     const trading=manualTradingTotal();
     const start=tradingSnapshotStart();
-    if(!(trading>0)||!Number.isFinite(start)||!Array.isArray(series))return series;
+    if(!(trading>0)||!Array.isArray(series))return series;
     return series.map(pt=>{
       if(!Array.isArray(pt)||pt.length<2)return pt;
       const raw=pt[0];
       const t=Number.isFinite(Number(raw))?Number(raw):Date.parse(raw);
       const v=Number(pt[1]);
-      if(!Number.isFinite(t)||!Number.isFinite(v)||t<start)return pt;
+      if(!Number.isFinite(v))return pt;
+      if(Number.isFinite(start)&&Number.isFinite(t)&&t<start)return pt;
       return [pt[0],v+trading,...pt.slice(2)];
     });
   }
+  function looksLikeSpotPortfolioSeries(series){
+    try{
+      if(!Array.isArray(series)||series.length<2)return false;
+      const vals=series.map(x=>Array.isArray(x)?Number(x[1]):NaN).filter(Number.isFinite);
+      if(vals.length<2)return false;
+      const latest=vals[vals.length-1],spot=spotHoldingsTotal();
+      if(!(spot>0))return false;
+      return Math.abs(latest-spot)/spot<0.18;
+    }catch(_){return false}
+  }
+  function depotActive(){
+    try{
+      if(document.body?.dataset?.view==='depot')return true;
+      const el=document.getElementById('view-depot');
+      if(!el)return false;
+      const st=getComputedStyle(el);
+      return st.display!=='none'&&st.visibility!=='hidden';
+    }catch(_){return false}
+  }
 
   try{
-    if(typeof recalcPortfolio==='function' && !recalcPortfolio.__v760Wrapped){
+    if(typeof recalcPortfolio==='function' && !recalcPortfolio.__v761Wrapped){
       const originalRecalc=recalcPortfolio;
       const wrapped=function(){
         const p=DATA?.portfolio;
@@ -68,21 +95,24 @@
         p.tradingCapitalTotal=manualTotal;
         p.totalIncludingTrading=(Number(p.total)||0)+manualTotal;
         p.valuationScope='SPOT_HOLDINGS_ONLY';
-        p.valuationConsistency='7.61-DEPOT-SSOT';
+        p.valuationConsistency='7.61-DEPOT-SSOT-R2';
         return p.total;
       };
-      wrapped.__v760Wrapped=true;
-      wrapped.__v760Original=originalRecalc;
+      wrapped.__v761Wrapped=true;
+      wrapped.__v761Original=originalRecalc;
       recalcPortfolio=wrapped;
     }
   }catch(e){console.error('MERIDIAN v7.61 recalc wrapper',e)}
 
+  // Render the Depot portfolio series as total budget (spot + known Pionex snapshot).
+  // Detection is intentionally narrow: only while Depot is active and only when the
+  // series endpoint is close to the current spot-holdings total.
   try{
-    if(typeof resampleSeries==='function' && !resampleSeries.__v760Wrapped){
+    if(typeof resampleSeries==='function' && !resampleSeries.__v761Wrapped){
       const originalResample=resampleSeries;
       const wrapped=function(series,maxPts=180){
-        const isPortfolio=typeof PORTFOLIO_SERIES!=='undefined' && series===PORTFOLIO_SERIES;
-        const input=isPortfolio?totalPortfolioSeries(series):series;
+        const shouldHybrid=depotActive()&&manualTradingTotal()>0&&looksLikeSpotPortfolioSeries(series);
+        const input=shouldHybrid?totalPortfolioSeries(series):series;
         const out=originalResample(input,maxPts);
         if(!Array.isArray(input)||!input.length||!Array.isArray(out)||!out.length)return out;
         const latest=input[input.length-1];
@@ -92,8 +122,8 @@
         }
         return out;
       };
-      wrapped.__v760Wrapped=true;
-      wrapped.__v760Original=originalResample;
+      wrapped.__v761Wrapped=true;
+      wrapped.__v761Original=originalResample;
       resampleSeries=wrapped;
     }
   }catch(e){console.error('MERIDIAN v7.61 resample wrapper',e)}
@@ -124,9 +154,7 @@
       const before=n.nodeValue||'';
       let after=before;
       after=after.replace(/\b3 BOTS\b/g,'4 BOTS').replace(/\b1 VERGLEICH\b/g,'1 ÜBERSICHT');
-      if(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER/i.test(after)){
-        after=after.replace(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER(?:\s*·\s*REGIME)*/gi,'BASELINE · SHADOW · CHALLENGER · REGIME');
-      }
+      if(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER/i.test(after))after=after.replace(/BASELINE\s*·\s*SHADOW\s*·\s*CHALLENGER(?:\s*·\s*REGIME)*/gi,'BASELINE · SHADOW · CHALLENGER · REGIME');
       if(after!==before)n.nodeValue=after;
     }
     const titles=[...paper.querySelectorAll('.section-title,.eyebrow,h1,h2,h3,b,strong')];
@@ -162,13 +190,37 @@
   }
   function normalizeDepotLabel(text){
     let after=String(text||'');
-    after=after.replace(/(?:\bSPOT\s+){2,}(1D PERFORMANCE)/gi,'SPOT $1');
-    after=after.replace(/(?:\bSPOT[-–]){2,}(VERWAHRSTELLEN)/gi,'SPOT-$1');
-    after=after.replace(/(?:\bSPOT[-–]){2,}(GRÖSSTE POSITION)/gi,'SPOT-$1');
-    after=after.replace(/\b1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\b/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
-    after=after.replace(/^(?:SPOT[-–])?VERWAHRSTELLEN$/i,'SPOT-VERWAHRSTELLEN');
-    after=after.replace(/^(?:SPOT[-–])?GRÖSSTE POSITION$/i,'GRÖSSTE SPOT-POSITION');
+    // Collapse any old duplicated prefixes first, then assign one canonical label.
+    after=after.replace(/^(?:\s*SPOT\s+)+1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\s*$/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+    after=after.replace(/^(?:\s*SPOT[-–])+VERWAHRSTELLEN\s*$/i,'SPOT-VERWAHRSTELLEN');
+    after=after.replace(/^(?:\s*SPOT[-–])+GRÖSSTE\s+(?:SPOT[-–])?POSITION\s*$/i,'GRÖSSTE SPOT-POSITION');
+    after=after.replace(/^\s*1D PERFORMANCE\s*·\s*CASHFLOW[-–]BEREINIGT\s*$/i,'SPOT 1D PERFORMANCE · CASHFLOW-BEREINIGT');
+    after=after.replace(/^\s*(?:SPOT[-–])?VERWAHRSTELLEN\s*$/i,'SPOT-VERWAHRSTELLEN');
+    after=after.replace(/^\s*(?:GRÖSSTE\s+)?(?:SPOT[-–])?POSITION\s*$/i,m=>/GRÖSSTE/i.test(m)?'GRÖSSTE SPOT-POSITION':m);
     return after;
+  }
+  function fixSpotVenueCard(hero){
+    const venueLabel=[...hero.querySelectorAll('*')].find(el=>![...el.children].length && /^(?:SPOT[-–])?VERWAHRSTELLEN$/i.test((el.textContent||'').trim()));
+    if(!venueLabel)return;
+    venueLabel.textContent='SPOT-VERWAHRSTELLEN';
+    const card=venueLabel.closest('.card,.metric,.stat,.portfolio-stat')||venueLabel.parentElement;
+    if(!card)return;
+    const count=spotVenueCount();
+    if(!(count>0))return;
+    const leaf=[...card.querySelectorAll('*')].find(el=>![...el.children].length && /^\s*\d+\s*$/.test(el.textContent||''));
+    if(leaf)leaf.textContent=String(count);
+  }
+  function fixHybridCard(hero){
+    const mode=[...hero.querySelectorAll('*')].find(el=>![...el.children].length && /^\s*DATENMODUS\s*$/i.test(el.textContent||''));
+    if(!mode)return;
+    const card=mode.closest('.card,.metric,.stat,.portfolio-stat')||mode.parentElement;
+    if(!card)return;
+    const leaves=[...card.querySelectorAll('*')].filter(el=>![...el.children].length);
+    for(const el of leaves){
+      const t=(el.textContent||'').trim();
+      if(/^HYBRID\s*[•·]?\s*HYBRID$/i.test(t))el.textContent='Hybrid';
+      else if(/^LIVE$/i.test(t))el.textContent='HYBRID';
+    }
   }
   function decorateDepot(){
     const depot=document.getElementById('view-depot')||document;
@@ -189,9 +241,7 @@
       const valueLine=hero.querySelector('.portfolio-value-line');
       if(valueLine)valueLine.insertAdjacentElement('afterend',scope);else eyebrow.insertAdjacentElement('afterend',scope);
     }
-    const next=trading>0
-      ?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)} SNAPSHOT`
-      :'GESAMT = SPOT-HOLDINGS';
+    const next=trading>0?`GESAMT = SPOT + TRADING/BOTS · SPOT ${compactUsd(spot)} · BOTS ${compactUsd(trading)} SNAPSHOT`:'GESAMT = SPOT-HOLDINGS';
     if(scope.textContent!==next)scope.textContent=next;
 
     let chartNote=hero.querySelector('[data-v760-total-chart-note]');
@@ -209,10 +259,11 @@
       if(scope===n.parentElement||scope?.contains(n)||chartNote===n.parentElement||chartNote?.contains(n))continue;
       const before=n.nodeValue||'';
       let after=before;
-      if(/^\s*LIVE\s*$/i.test(after))after=after.replace(/LIVE/i,'HYBRID');
       after=normalizeDepotLabel(after);
       if(after!==before)n.nodeValue=after;
     }
+    fixSpotVenueCard(hero);
+    fixHybridCard(hero);
   }
 
   let decorateQueued=false;
@@ -238,5 +289,5 @@
   if(document.documentElement)observer.observe(document.documentElement,{childList:true,subtree:true});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else setTimeout(apply,0);
 
-  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true};
+  window.MERIDIAN_DASHBOARD_CONSISTENCY={version:VERSION,uiVersion:UI_VERSION,build:BUILD,spotOnlyDepot:true,hybridTotalHeadline:true,manualTradingSeparated:true,chartScopeExplicit:true,hybridPortfolioChart:true,pionexHistoryMode:'SNAPSHOT_FROM_KNOWN_AT',hybridHeadlineExplicit:true,paperResearchLabelExplicit:true,mutationLoopFixed:true,spotVenueCountExplicit:true};
 })();
