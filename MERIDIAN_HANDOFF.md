@@ -7,8 +7,8 @@
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
 - Main contains the stable research stack through v7.51 plus preserved evidence reports for rejected Challenger V3/V3.1 experiments and Signal Calibration.
-- The active research continuation is branch `research/adaptive-evidence-v774`.
-- `adaptive-evidence.js` is research-only and is not connected to Paper execution.
+- The active research continuation is branch `research/adaptive-evidence-v774` and draft PR #30.
+- Adaptive Evidence remains research-only and is not connected to Paper execution.
 - The rejected V3/V3.1 implementation branches must not be treated as production candidates or silently merged.
 
 ## Latest durable research findings
@@ -27,29 +27,25 @@ Portfolio-independent calibration sampled one candidate per symbol per 4h across
 
 Critical result: **all confidence buckets were negative over 30d, 60d and 90d. Higher confidence was not monotonic with better normalized outcome.** This means the current compressed confidence stack is not a validated predictor of edge. Positive portfolio windows can be caused by path-dependent portfolio selection and must not be used to declare the score calibrated.
 
-### v7.74 — Adaptive Evidence Lab checkpoint
-A new research-only core now converts raw context observations into reliability-weighted soft evidence. There is no built-in LONG + RANGE or other context bonus. Small samples are shrunk toward zero; cross-window agreement affects reliability; missing evidence is neutral.
+### v7.74 — Adaptive Evidence Lab current checkpoint
+The research branch now contains the complete first calibration pipeline from prepared research events to out-of-sample evidence reporting.
 
-The first implementation covers:
-- side,
-- regime,
-- 15m / 1h / 4h alignment,
-- momentum,
-- volume participation,
-- volatility,
-- asset × side,
-- Baseline status as evidence only,
-- Market Capture / Opportunity Cost metrics.
+Implemented:
+- `adaptive-evidence.js` — side-aware raw observations plus reliability-weighted soft evidence; no fixed LONG + RANGE or other context bonus.
+- `adaptive-evidence-cohorts.js` — portfolio-independent A_CURRENT normalized-R cohorts, default one sample per symbol per 4h.
+- full-horizon guard — recent signals without the complete 14-day outcome horizon are excluded by default to prevent right-censoring bias.
+- `adaptive-evidence-walkforward.js` — expanding out-of-sample validation with an explicit train/test overlap guard.
+- `adaptive-evidence-report.js` — 30d/60d/90d multi-window evidence report, reliable positive/negative feature summaries and Market Capture / Opportunity Cost.
+- `scripts/adaptive-evidence-report.mjs` — reproducible JSON/Markdown report CLI for prepared MERIDIAN research events.
+- tests for observations, shrinkage, cohort construction, no look-ahead, horizon censoring, leakage prevention, walk-forward, report output and market capture.
 
-Files:
-- `adaptive-evidence.js`
-- `test/adaptive-evidence.test.js`
-- `research/adaptive-evidence-v774.md`
+GitHub Release Safety passed on the cohort-builder checkpoint commit `458b52e4ade75ba83916b45f6954449bc3a0d1ea`. Later commits must still be verified by CI before merge.
 
 Preserved evidence files:
 - `research/challenger-v3-evidence-v752.md`
 - `research/challenger-v31-evidence-v753.md`
 - `research/signal-calibration-v755.md`
+- `research/adaptive-evidence-v774.md`
 
 ## Known bot findings that must not be forgotten
 
@@ -62,41 +58,36 @@ Preserved evidence files:
 7. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory metrics.
 8. More evidence must not automatically become more hard gates.
 9. Fixed context bonuses are not considered durable evidence; future V3.2 scoring should be fed by measured cohorts.
+10. Training evidence must strictly predate each evaluated walk-forward slice; no same-window calibration.
+11. Signals without a complete configured outcome horizon must not enter calibration by default.
 
 ## Next recommended work — highest priority
 
-### Priority 1 — Historical cohort generator for Adaptive Evidence
-Build a portfolio-independent research script that samples valid signal candidates and writes normalized-R cohorts for the exact dimensions consumed by `adaptive-evidence.js`.
+### Priority 1 — Connect the report pipeline to canonical Research Engine events
+The v7.74 report CLI currently consumes prepared MERIDIAN research events. Add the thinnest possible research-only adapter/export from `cloud-backtest.js` so the same canonical `candidate()` / `prepareEvents()` path can feed the report without duplicating signal logic.
 
-Required windows:
-- 30d
-- 60d
-- 90d
-- walk-forward / out-of-sample slices
+Guardrails:
+- do not change candidate calculations,
+- do not change Baseline/Shadow/Challenger/Regime execution,
+- do not touch `server.js`,
+- export/reuse existing research functions rather than cloning them into a second implementation.
 
-Required output per cohort:
-- sample count `n`
-- average / median R
-- win rate
-- positive / negative R totals
-- window-level avgR for stability
-- feature key / side / regime context
+### Priority 2 — Generate actual 12-asset evidence reports
+Use BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Produce 30d / 60d / 90d JSON + Markdown reports with 14-day full-horizon outcomes and expanding walk-forward slices.
 
-The generator must avoid portfolio gates so signal quality is measured separately from path dependence.
+Interpretation must include:
+- sample adequacy and feature reliability,
+- avg/median R and PF,
+- LONG/SHORT × regime,
+- market coverage,
+- missed-winner R,
+- avoided-loser R,
+- net opportunity cost,
+- Market Capture,
+- cross-window and out-of-sample stability.
 
-### Priority 2 — Feed measured evidence into Adaptive Evidence replay
-After cohorts exist, replay Adaptive Evidence labels against the same historical opportunity stream and compare:
-- expectancy / PF
-- max DD
-- trade frequency / coverage
-- missed-winner R
-- avoided-loser R
-- net opportunity cost
-- market-capture percentage
-- LONG/SHORT × regime behavior
-
-### Priority 3 — Challenger V3.2 only after calibration
-Only when the Adaptive Evidence score is demonstrably predictive at signal level should a Challenger V3.2 portfolio replay be built. Do not reuse V3/V3.1 threshold tuning.
+### Priority 3 — Challenger V3.2 portfolio replay only after calibration
+Only if Adaptive Evidence shows repeatable out-of-sample predictive value should a Challenger V3.2 portfolio replay be implemented. Do not reuse V3/V3.1 threshold tuning and do not auto-promote it.
 
 ### Priority 4 — Regime V2
 Recompute all directional evidence after final side selection. Test independently.
