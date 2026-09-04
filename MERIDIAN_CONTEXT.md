@@ -10,8 +10,8 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 
 - Production/Paper engine: `6.2.0`
 - Frozen baseline ruleset: `6.2-SIGNAL-V1`
-- Main live UI before this fix: `7.62 R4`
-- Portfolio Data Contract candidate: `7.63-PORTFOLIO-DATA-CONTRACT-V1` on `fix/portfolio-data-contract-v763`, draft PR #37
+- Main/live UI: `7.63 R1` after merged PR #37
+- Active portfolio-history candidate: `7.64-CANONICAL-PORTFOLIO-HISTORY-V1` on `fix/canonical-portfolio-history-v764`, draft PR #38
 - Evidence layer: `6.53-EVIDENCE`
 - Research Engine V2: `7.34-RESEARCH-V2`
 - Privacy/security layer: `7.33-HARDENED`
@@ -28,25 +28,32 @@ The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizin
 ## Deployment and safety
 
 - Paper only. Live trading remains disabled by invariant.
-- `server.js` contains the paper-only safety assertion and remains untouched by the v7.63 portfolio fix.
+- `server.js` contains the paper-only safety assertion and remains untouched by v7.63/v7.64 portfolio work.
 - Private portfolio/trading state is stored in PostgreSQL.
 - Read APIs are protected by bearer auth through `server-gateway.js`.
-- `MERIDIAN_READ_TOKEN` is hashed at startup and plaintext is removed from the runtime environment.
+- `MERIDIAN_READ_TOKEN` is hashed at startup and plaintext is removed from runtime environment.
 - Release Safety checks syntax, regression tests, release consistency, privacy, secret scanning and the paper-only invariant.
 
-## Portfolio valuation contract
+## Portfolio valuation and history contract
 
-The recurring Depot mismatch came from separate valuation paths for the current headline, historical chart and Pionex overlay. v7.63 establishes one canonical current snapshot:
+v7.63 established one canonical current value:
 
 `totalUsd = spotUsd + tradingUsd`
 
 - `spotUsd` = non-Pionex holdings valued with live prices where available.
-- `tradingUsd` = Pionex equity snapshot, preferring `portfolio.pionexEquityUsd` with manual Pionex balance fallback.
-- Pionex holdings are excluded from spot to prevent double counting.
-- the Depot headline and final chart point must use the same canonical current total.
-- mismatch must be observable rather than silently tolerated; the contract helper exposes `PORTFOLIO_DATA_MISMATCH` and the browser exposes canonical/consistency telemetry.
+- `tradingUsd` = Pionex equity snapshot.
+- Pionex is excluded from spot to prevent double counting.
+- Depot headline and final chart point must use the same canonical current total.
+- mismatch is observable through `MERIDIAN_PORTFOLIO_CONSISTENCY` rather than silently tolerated.
 
-Known limitation: historical Pionex equity is not reconstructed retrospectively from the current snapshot. v7.63 guarantees current endpoint identity. A later history migration should persist canonical `{spotUsd,tradingUsd,totalUsd}` values at capture time so every historical point follows the same contract.
+v7.64 extends the same contract into time series instead of rebuilding history from mixed sources:
+
+- PostgreSQL table `meridian_portfolio_history` persists `spotUsd`, `tradingUsd`, `totalUsd`, optional cashflow-adjusted total, cumulative cashflow, revision and source status.
+- runtime captures every five minutes using public Binance prices for spot valuation and preserves BETH→ETH / OKSOL→SOL aliases.
+- protected read API: `/api/private/portfolio-history?range=1d|1w|1m|6m|1y`.
+- Depot R2 consumes canonical history only after a warm-up gate; until then v7.63 current-value alignment remains fallback.
+- once 1D history is mature, Chart, High, Low and 1D Performance derive from the same stored series.
+- longer time ranges stay on fallback until enough canonical coverage exists rather than stretching a short history across a long window.
 
 ## UI principles
 
@@ -81,9 +88,9 @@ Full-window attribution is not OOS proof. Negative results are preserved rather 
 ## Current strategic direction
 
 1. Keep Baseline 6.2 frozen.
-2. Finish/review the v7.63 Portfolio Data Contract fix before treating the Depot chart as trustworthy.
-3. After current endpoint identity is stable, persist canonical portfolio snapshots at capture time so history/1D/high-low can share one time series.
-4. Keep bot research isolated from this display/data fix. Active Meta Allocator research remains on its own research branch and v7.79 prospective holdout remains locked.
+2. Finish/review v7.64 canonical portfolio history and its Depot warm-up/fallback behavior.
+3. After deployment, verify real PostgreSQL point accumulation and that the 1D chart transitions only after sufficient coverage.
+4. Keep bot research isolated. Active Meta Allocator research remains on its research branch and v7.79 prospective holdout remains locked.
 5. No research bot is automatically promoted.
 
 ## Promotion principle
