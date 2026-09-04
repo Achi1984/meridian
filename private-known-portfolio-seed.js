@@ -40,32 +40,33 @@ function parseRowsFromMerged(merged,venues){
   const wanted=new Set(venues.map(v=>clean(v).toLowerCase()));
   return (merged?.data?.portfolio?.holdings||[]).filter(h=>wanted.has(clean(h?.venue).toLowerCase()));
 }
-function pionexEquity(){
+function seedPionexEquity(){
   if(!PIONEX_EQUITY_RAW)return null;
   const n=Number(PIONEX_EQUITY_RAW);
   return Number.isFinite(n)&&n>=0?n:null;
 }
-function manualTradingSignature(state){
+function existingPionexEquity(state){
+  const direct=Number(state?.portfolio?.pionexEquityUsd);
+  if(Number.isFinite(direct)&&direct>=0)return direct;
   const balances=Array.isArray(state?.portfolio?.manualVenueBalances)?state.portfolio.manualVenueBalances:[];
-  return balances.map(x=>`${clean(x?.venue).toLowerCase()}|${Number(x?.valueUsd??x?.value??0).toFixed(8)}|${clean(x?.kind).toUpperCase()}`).sort().join(';');
-}
-function desiredTradingSignature(equity){
-  if(equity==null)return '';
-  return `pionex|${Number(equity).toFixed(8)}|TRADING_CAPITAL`;
+  const p=balances.find(x=>clean(x?.venue||x?.name).toLowerCase()==='pionex');
+  const n=Number(p?.valueUsd??p?.value);
+  return Number.isFinite(n)&&n>=0?n:null;
 }
 function setPionexEquity(state,equity){
   state.portfolio=state.portfolio&&typeof state.portfolio==='object'?state.portfolio:{};
-  // SSOT policy: manualVenueBalances is reserved for external trading/bot capital.
-  // Store both value and valueUsd because the stable v7.60 frontend reads value,
-  // while private/backend state uses valueUsd in newer paths.
-  state.portfolio.manualVenueBalances=equity==null?[]:[{
+  const now=new Date().toISOString();
+  state.portfolio.manualVenueBalances=[{
     venue:'Pionex',
     value:equity,
     valueUsd:equity,
     kind:'TRADING_CAPITAL',
-    updatedAt:new Date().toISOString()
+    updatedAt:now,
+    source:'KNOWN_SEED'
   }];
   state.portfolio.pionexEquityUsd=equity;
+  state.portfolio.pionexEquitySource='KNOWN_SEED';
+  state.portfolio.pionexEquityUpdatedAt=now;
 }
 
 export async function seedKnownPortfolioOnce(){
@@ -73,6 +74,7 @@ export async function seedKnownPortfolioOnce(){
   if(!HOLDINGS_TEXT&&!PIONEX_EQUITY_RAW){console.log('[KNOWN_PORTFOLIO] disabled · no private seed env');return {enabled:false,reason:'no_seed_env'}}
   const current=await stateGet();
   if(!current){console.error('[KNOWN_PORTFOLIO] private dashboard unavailable');return {enabled:false,reason:'private_dashboard_unavailable'}}
+
   let next=JSON.parse(JSON.stringify(current));
   let holdingsChanged=false;
   let venues=[];
@@ -84,27 +86,31 @@ export async function seedKnownPortfolioOnce(){
     holdingsChanged=currentVenueSignature(current,venues)!==incomingSignature(incoming);
     if(holdingsChanged)next=merged.data;
   }
-  const equity=pionexEquity();
-  const currentEquity=Number(current?.portfolio?.pionexEquityUsd);
-  const equityValueChanged=equity!=null && (!Number.isFinite(currentEquity)||Math.abs(currentEquity-equity)>1e-9);
-  const tradingBalancesChanged=equity!=null && manualTradingSignature(current)!==desiredTradingSignature(equity);
-  const equityChanged=equityValueChanged||tradingBalancesChanged;
+
+  // v7.62 policy: the env value is bootstrap-only. Never overwrite an existing
+  // private Pionex equity value at startup. This prevents deploys from rolling
+  // a newer/manual/private snapshot back to an older static seed.
+  const existingEquity=existingPionexEquity(current);
+  const seedEquity=seedPionexEquity();
+  const equityChanged=existingEquity==null && seedEquity!=null;
   if(equityChanged){
     if(!holdingsChanged){
       next=JSON.parse(JSON.stringify(current));
       next.privateRevision=(Number.isInteger(next.privateRevision)?next.privateRevision:0)+1;
       next.privateUpdatedAt=new Date().toISOString();
     }
-    setPionexEquity(next,equity);
+    setPionexEquity(next,seedEquity);
   }
+
   if(!(holdingsChanged||equityChanged)){
-    console.log(`[KNOWN_PORTFOLIO] no change${venues.length?` · ${venues.join(', ')}`:''}`);
-    return {enabled:true,changed:false,venues};
+    console.log(`[KNOWN_PORTFOLIO] no change${venues.length?` · ${venues.join(', ')}`:''} · Pionex equity preserved`);
+    return {enabled:true,changed:false,venues,pionexEquityPreserved:existingEquity!=null};
   }
-  next.privateUpdateSource='known_holdings_startup_seed';
+
+  next.privateUpdateSource=holdingsChanged?'known_holdings_startup_seed':'known_pionex_bootstrap_seed';
   next.portfolio=next.portfolio&&typeof next.portfolio==='object'?next.portfolio:{};
   next.portfolio.knownHoldingsSeedAt=new Date().toISOString();
   await stateSet(next);
-  console.log(`[KNOWN_PORTFOLIO] updated · ${venues.length?venues.join(', '):'Pionex'} · trading capital normalized · revision ${next.privateRevision}`);
+  console.log(`[KNOWN_PORTFOLIO] updated · ${venues.length?venues.join(', '):'Pionex bootstrap'} · existing Pionex equity protected · revision ${next.privateRevision}`);
   return {enabled:true,changed:true,venues,revision:next.privateRevision};
 }
