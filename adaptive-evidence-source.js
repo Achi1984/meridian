@@ -4,7 +4,7 @@
 import { CLOUD_BT_CONFIG, __test as cloudResearch } from './cloud-backtest.js';
 
 export const ADAPTIVE_SOURCE_VERSION='7.74-ADAPTIVE-SOURCE-V1';
-const BINANCE='https://api.binance.com';
+const BINANCE_ENDPOINTS=['https://api.binance.com','https://data-api.binance.vision'];
 const MS={'15m':900000,'1h':3600000,'4h':14400000};
 const DAY=86400000;
 const last=a=>a[a.length-1];
@@ -45,32 +45,50 @@ export function prepareAdaptiveEventsFromMarket(market,start,end,cfg=CLOUD_BT_CO
   return events;
 }
 
-async function fetchKlines(symbol,interval,start,end,{fetchImpl=globalThis.fetch,onRetry=()=>{}}={}){
-  if(typeof fetchImpl!=='function')throw new Error('Adaptive Evidence source requires fetch');
-  let out=[],cur=start,guard=0;
-  while(cur<end&&guard++<800){
-    const url=`${BINANCE}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${Math.floor(cur)}&endTime=${Math.floor(end)}&limit=1000`;
-    let json,lastErr;
+async function fetchPage(symbol,interval,start,end,{fetchImpl,onRetry}){
+  let lastErr;
+  for(const endpoint of BINANCE_ENDPOINTS){
     for(let attempt=0;attempt<6;attempt++){
+      const url=`${endpoint}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${Math.floor(start)}&endTime=${Math.floor(end)}&limit=1000`;
       try{
         const response=await fetchImpl(url,{headers:{'user-agent':'ACHI-MERIDIAN-ADAPTIVE-EVIDENCE/7.74'}});
-        if(!response.ok)throw new Error(`HTTP ${response.status}`);
-        json=await response.json();break;
-      }catch(error){lastErr=error;onRetry({symbol,interval,attempt:error?attempt+1:attempt,error:String(error?.message||error)});if(attempt<5)await sleep(Math.min(8000,500*2**attempt))}
+        if(!response.ok){
+          const e=new Error(`HTTP ${response.status}`);e.status=response.status;throw e;
+        }
+        const json=await response.json();
+        if(!Array.isArray(json))throw new Error('Invalid Binance kline response');
+        return{json,endpoint};
+      }catch(error){
+        lastErr=error;
+        onRetry({symbol,interval,endpoint,attempt:attempt+1,error:String(error?.message||error)});
+        const blocked=[403,451].includes(Number(error?.status));
+        if(blocked)break;
+        if(attempt<5)await sleep(Math.min(8000,500*2**attempt));
+      }
     }
-    if(!Array.isArray(json))throw lastErr||new Error('Binance load failed');
-    if(!json.length)break;
-    const rows=json.map(k=>({openTime:+k[0],open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5],closeTime:+k[6]}));
+  }
+  throw lastErr||new Error('Binance load failed');
+}
+
+async function fetchKlines(symbol,interval,start,end,{fetchImpl=globalThis.fetch,onRetry=()=>{}}={}){
+  if(typeof fetchImpl!=='function')throw new Error('Adaptive Evidence source requires fetch');
+  let out=[],cur=start,guard=0,lastEndpoint=null;
+  while(cur<end&&guard++<800){
+    const page=await fetchPage(symbol,interval,cur,end,{fetchImpl,onRetry});
+    lastEndpoint=page.endpoint;
+    if(!page.json.length)break;
+    const rows=page.json.map(k=>({openTime:+k[0],open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5],closeTime:+k[6]}));
     out.push(...rows);
     const next=rows.at(-1).openTime+MS[interval];if(next<=cur)break;cur=next;
     await sleep(75);
   }
-  return [...new Map(out.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime);
+  const rows=[...new Map(out.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime);
+  return{rows,endpoint:lastEndpoint};
 }
 
 export async function loadAdaptiveMarket({assets,start,end,fetchImpl=globalThis.fetch,onProgress=()=>{}}={}){
   if(!Array.isArray(assets)||!assets.length)throw new Error('Adaptive Evidence source requires assets');
-  const market={};
+  const market={},endpoints={};
   for(let i=0;i<assets.length;i++){
     const symbol=String(assets[i]).toUpperCase();
     onProgress({stage:'loading',asset:symbol,index:i,total:assets.length,pct:Math.round(i/assets.length*100)});
@@ -80,28 +98,29 @@ export async function loadAdaptiveMarket({assets,start,end,fetchImpl=globalThis.
       fetchKlines(symbol,'1h',start,end,options),
       fetchKlines(symbol,'4h',start,end,options)
     ]);
-    market[symbol]={'15m':m15,'1h':h1,'4h':h4};
+    market[symbol]={'15m':m15.rows,'1h':h1.rows,'4h':h4.rows};
+    endpoints[symbol]={'15m':m15.endpoint,'1h':h1.endpoint,'4h':h4.endpoint};
   }
   onProgress({stage:'loaded',pct:100});
-  return market;
+  return{market,endpoints};
 }
 
 export async function loadPreparedAdaptiveEvents({assets,windowsDays=[30,60,90],horizonDays=14,dataEnd=Date.now(),cfg=CLOUD_BT_CONFIG,fetchImpl=globalThis.fetch,onProgress=()=>{}}={}){
   const maxWindow=Math.max(...windowsDays.map(Number).filter(Number.isFinite));
   if(!(maxWindow>0))throw new Error('Adaptive Evidence source requires at least one positive window');
-  const signalEnd=dataEnd+horizonDays*0-DAY*horizonDays;
+  const signalEnd=dataEnd-horizonDays*DAY;
   const signalStart=signalEnd-maxWindow*DAY;
   const warmStart=signalStart-60*MS['4h'];
-  const market=await loadAdaptiveMarket({assets,start:warmStart,end:dataEnd,fetchImpl,onProgress});
-  const events=prepareAdaptiveEventsFromMarket(market,signalStart,dataEnd,cfg,p=>onProgress({...p,stage:'prepare'}));
+  const loaded=await loadAdaptiveMarket({assets,start:warmStart,end:dataEnd,fetchImpl,onProgress});
+  const events=prepareAdaptiveEventsFromMarket(loaded.market,signalStart,dataEnd,cfg,p=>onProgress({...p,stage:'prepare'}));
   return{
     version:ADAPTIVE_SOURCE_VERSION,
     researchOnly:true,
     executionImpact:false,
     method:'CANONICAL_CLOUD_CANDIDATE_PLUS_MATCHED_INDICATOR_WINDOWS',
     assets:[...assets],windowsDays:[...windowsDays],horizonDays,dataEnd,signalStart,signalEnd,warmStart,
-    market,events
+    endpoints:loaded.endpoints,market:loaded.market,events
   };
 }
 
-export const __test={metrics,windowMetrics,fetchKlines,lastIndexAt};
+export const __test={metrics,windowMetrics,fetchKlines,fetchPage,lastIndexAt};
