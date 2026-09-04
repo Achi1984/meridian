@@ -15,7 +15,8 @@ function candles(count,step,start=Date.UTC(2026,0,1),base=100,drift=.08){
 }
 
 function market(){
-  return {AAAUSDT:{'15m':candles(220,M15),'1h':candles(220,H1),'4h':candles(220,H4)}};
+  // Enough wall-clock coverage for all three frames at the same evaluation time.
+  return {AAAUSDT:{'15m':candles(1200,M15),'1h':candles(300,H1),'4h':candles(80,H4)}};
 }
 
 test('source metrics preserve cloud-backtest frame shape',()=>{
@@ -31,7 +32,7 @@ test('source metrics preserve cloud-backtest frame shape',()=>{
 });
 
 test('adaptive source delegates final candidate construction to canonical cloud candidate',()=>{
-  const data=market().AAAUSDT,t=data['15m'].at(-1).closeTime;
+  const data=market().AAAUSDT,t=data['4h'].at(-1).closeTime;
   const sig=adaptiveSignalAt('AAAUSDT',data,t,CLOUD_BT_CONFIG);
   assert.ok(sig);
   const frames={
@@ -43,9 +44,11 @@ test('adaptive source delegates final candidate construction to canonical cloud 
   assert.deepEqual(sig,canonical);
 });
 
-test('prepared events contain canonical signal and matching 15m candle only after warmup',()=>{
+test('prepared events contain canonical signal and matching 15m candle after multi-timeframe warmup',()=>{
   const m=market(),rows=m.AAAUSDT['15m'];
-  const start=rows[100].closeTime,end=rows.at(-1).closeTime;
+  const warmupTime=m.AAAUSDT['4h'][60].closeTime;
+  const first=rows.findIndex(x=>x.closeTime>=warmupTime);
+  const start=rows[first].closeTime,end=rows[Math.min(rows.length-1,first+120)].closeTime;
   const events=prepareAdaptiveEventsFromMarket(m,start,end,CLOUD_BT_CONFIG);
   assert.ok(events.length>0);
   assert.equal(events[0].t,start);
