@@ -106,8 +106,17 @@ const dimensionKeys=obs=>({
   baselineStatus:`${obs.side}|${obs.baselineStatus}`
 });
 
-export function evaluateAdaptiveEvidence(signal,evidenceMap={},options=ADAPTIVE_EVIDENCE_OPTIONS){
-  const obs=observationsFromSignal(signal);
+export function evaluateAdaptiveObservations(observations={},evidenceMap={},options=ADAPTIVE_EVIDENCE_OPTIONS){
+  const obs={
+    side:upper(observations.side)==='SHORT'?'SHORT':'LONG',
+    regime:upper(observations.regime),
+    mtfAlignment:String(observations.mtfAlignment??'UNKNOWN'),
+    momentum:upper(observations.momentum),
+    volume:upper(observations.volume),
+    volatility:upper(observations.volatility),
+    asset:upper(observations.asset),
+    baselineStatus:upper(observations.baselineStatus)
+  };
   const keys=dimensionKeys(obs);
   const components=[];
   for(const [dimension,key] of Object.entries(keys)){
@@ -138,6 +147,10 @@ export function evaluateAdaptiveEvidence(signal,evidenceMap={},options=ADAPTIVE_
     decision,
     components
   };
+}
+
+export function evaluateAdaptiveEvidence(signal,evidenceMap={},options=ADAPTIVE_EVIDENCE_OPTIONS){
+  return evaluateAdaptiveObservations(observationsFromSignal(signal),evidenceMap,options);
 }
 
 export function summarizeMarketCapture(rows=[]){
