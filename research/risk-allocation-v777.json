@@ -1,0 +1,687 @@
+{
+  "generatedAt": "2026-09-04T19:12:55.863Z",
+  "schemaVersion": "7.77-CHRONOLOGICAL-V33-RISK-SHADOW-V1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "method": "strict chronological expanding training: P3→P2, P3+P2→P1, P3+P2+P1→P0; test period never informs its policy; V3.2 trade set/exits frozen; only risk allocation changes",
+  "steps": [
+    {
+      "training": [
+        "P3"
+      ],
+      "test": "P2",
+      "policy": {
+        "schemaVersion": "7.77-V33-RISK-POLICY-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "trainingPeriods": [
+          "P3"
+        ],
+        "cells": [
+          {
+            "key": "LONG×RANGE|VOLATILITY_LOW",
+            "windows": 1,
+            "avgR": 0.076,
+            "pf": 1.138,
+            "captureEfficiency": 11.6,
+            "samples": 397
+          },
+          {
+            "key": "SHORT×BULL|VOLUME_HIGH",
+            "windows": 1,
+            "avgR": 0.168,
+            "pf": 1.326,
+            "captureEfficiency": 11.2,
+            "samples": 74
+          },
+          {
+            "key": "LONG×BULL|VOLATILITY_LOW",
+            "windows": 1,
+            "avgR": 0.195,
+            "pf": 1.388,
+            "captureEfficiency": 9.1,
+            "samples": 466
+          },
+          {
+            "key": "LONG×RANGE|VOLUME_NORMAL",
+            "windows": 1,
+            "avgR": 0.119,
+            "pf": 1.223,
+            "captureEfficiency": 8.1,
+            "samples": 193
+          },
+          {
+            "key": "SHORT×RANGE|MOMENTUM_STRETCHED",
+            "windows": 1,
+            "avgR": 0.452,
+            "pf": 2.144,
+            "captureEfficiency": 7.4,
+            "samples": 81
+          },
+          {
+            "key": "SHORT×TRANSITION|MTF_0/3",
+            "windows": 1,
+            "avgR": 0.194,
+            "pf": 1.385,
+            "captureEfficiency": 7.4,
+            "samples": 185
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLATILITY_LOW",
+            "windows": 1,
+            "avgR": 0.124,
+            "pf": 1.234,
+            "captureEfficiency": 6.5,
+            "samples": 301
+          },
+          {
+            "key": "SHORT×BEAR|VOLUME_HIGH",
+            "windows": 1,
+            "avgR": 0.298,
+            "pf": 1.649,
+            "captureEfficiency": 6.4,
+            "samples": 453
+          },
+          {
+            "key": "SHORT×RANGE|VOLUME_HIGH",
+            "windows": 1,
+            "avgR": 0.18,
+            "pf": 1.355,
+            "captureEfficiency": 5.8,
+            "samples": 183
+          },
+          {
+            "key": "LONG×RANGE|EVIDENCE_ZERO",
+            "windows": 1,
+            "avgR": 0.015,
+            "pf": 1.026,
+            "captureEfficiency": 5.6,
+            "samples": 506
+          },
+          {
+            "key": "SHORT×RANGE|MTF_3/3",
+            "windows": 1,
+            "avgR": 0.285,
+            "pf": 1.613,
+            "captureEfficiency": 5.4,
+            "samples": 99
+          },
+          {
+            "key": "LONG×BEAR|VOLATILITY_HIGH",
+            "windows": 1,
+            "avgR": 0.2,
+            "pf": 1.4,
+            "captureEfficiency": 5.4,
+            "samples": 52
+          },
+          {
+            "key": "LONG×TRANSITION|VOLATILITY_HIGH",
+            "windows": 1,
+            "avgR": 0.164,
+            "pf": 1.318,
+            "captureEfficiency": 5.4,
+            "samples": 66
+          },
+          {
+            "key": "LONG×RANGE|MTF_2/3",
+            "windows": 1,
+            "avgR": 0.084,
+            "pf": 1.154,
+            "captureEfficiency": 4.2,
+            "samples": 135
+          },
+          {
+            "key": "LONG×RANGE|MTF_0/3",
+            "windows": 1,
+            "avgR": 0.101,
+            "pf": 1.186,
+            "captureEfficiency": 4,
+            "samples": 109
+          },
+          {
+            "key": "SHORT×TRANSITION|MOMENTUM_STRETCHED",
+            "windows": 1,
+            "avgR": 0.187,
+            "pf": 1.369,
+            "captureEfficiency": 3.4,
+            "samples": 89
+          },
+          {
+            "key": "SHORT×RANGE|VOLATILITY_MID",
+            "windows": 1,
+            "avgR": 0.079,
+            "pf": 1.143,
+            "captureEfficiency": 3.2,
+            "samples": 347
+          },
+          {
+            "key": "SHORT×BEAR|MOMENTUM_NEUTRAL",
+            "windows": 1,
+            "avgR": 0.191,
+            "pf": 1.378,
+            "captureEfficiency": 3,
+            "samples": 639
+          },
+          {
+            "key": "SHORT×BULL|EVIDENCE_MEDIUM",
+            "windows": 1,
+            "avgR": 0.108,
+            "pf": 1.2,
+            "captureEfficiency": 3,
+            "samples": 26
+          },
+          {
+            "key": "LONG×BULL|MTF_0/3",
+            "windows": 1,
+            "avgR": 0.303,
+            "pf": 1.662,
+            "captureEfficiency": 2.8,
+            "samples": 70
+          },
+          {
+            "key": "SHORT×TRANSITION|MOMENTUM_NEUTRAL",
+            "windows": 1,
+            "avgR": 0.136,
+            "pf": 1.258,
+            "captureEfficiency": 2.8,
+            "samples": 112
+          },
+          {
+            "key": "LONG×BULL|EVIDENCE_LOW",
+            "windows": 1,
+            "avgR": 0.527,
+            "pf": 2.45,
+            "captureEfficiency": 2.7,
+            "samples": 33
+          },
+          {
+            "key": "SHORT×RANGE|EVIDENCE_MEDIUM",
+            "windows": 1,
+            "avgR": 0.268,
+            "pf": 1.568,
+            "captureEfficiency": 2.7,
+            "samples": 53
+          },
+          {
+            "key": "SHORT×BEAR|MTF_1/3",
+            "windows": 1,
+            "avgR": 0.178,
+            "pf": 1.351,
+            "captureEfficiency": 2.7,
+            "samples": 725
+          },
+          {
+            "key": "SHORT×RANGE|VOLUME_NORMAL",
+            "windows": 1,
+            "avgR": 0.087,
+            "pf": 1.16,
+            "captureEfficiency": 2.7,
+            "samples": 245
+          },
+          {
+            "key": "SHORT×RANGE|MOMENTUM_NEUTRAL",
+            "windows": 1,
+            "avgR": 0.093,
+            "pf": 1.171,
+            "captureEfficiency": 2.4,
+            "samples": 191
+          },
+          {
+            "key": "SHORT×BEAR|VOLATILITY_MID",
+            "windows": 1,
+            "avgR": 0.164,
+            "pf": 1.318,
+            "captureEfficiency": 2.3,
+            "samples": 1000
+          },
+          {
+            "key": "SHORT×BEAR|EVIDENCE_MEDIUM",
+            "windows": 1,
+            "avgR": 0.291,
+            "pf": 1.63,
+            "captureEfficiency": 1.8,
+            "samples": 132
+          },
+          {
+            "key": "SHORT×BEAR|MOMENTUM_STRETCHED",
+            "windows": 1,
+            "avgR": 0.256,
+            "pf": 1.538,
+            "captureEfficiency": 1.8,
+            "samples": 170
+          },
+          {
+            "key": "LONG×BULL|VOLUME_NORMAL",
+            "windows": 1,
+            "avgR": 0.124,
+            "pf": 1.234,
+            "captureEfficiency": 1.8,
+            "samples": 301
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLUME_HIGH",
+            "windows": 1,
+            "avgR": 0.08,
+            "pf": 1.145,
+            "captureEfficiency": 1.8,
+            "samples": 180
+          },
+          {
+            "key": "LONG×BULL|MOMENTUM_STRETCHED",
+            "windows": 1,
+            "avgR": 0.246,
+            "pf": 1.512,
+            "captureEfficiency": 1.6,
+            "samples": 52
+          },
+          {
+            "key": "SHORT×RANGE|VOLATILITY_HIGH",
+            "windows": 1,
+            "avgR": 0.15,
+            "pf": 1.288,
+            "captureEfficiency": 1.2,
+            "samples": 48
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLUME_NORMAL",
+            "windows": 1,
+            "avgR": 0.062,
+            "pf": 1.11,
+            "captureEfficiency": 1.1,
+            "samples": 208
+          },
+          {
+            "key": "SHORT×BEAR|MTF_3/3",
+            "windows": 1,
+            "avgR": 0.175,
+            "pf": 1.343,
+            "captureEfficiency": 1,
+            "samples": 288
+          },
+          {
+            "key": "LONG×BULL|EVIDENCE_MEDIUM",
+            "windows": 1,
+            "avgR": 0.163,
+            "pf": 1.315,
+            "captureEfficiency": 0.9,
+            "samples": 64
+          }
+        ],
+        "config": {
+          "baseRiskPct": 0.25,
+          "stepRiskPct": 0.025,
+          "maxRiskPct": 0.35,
+          "minSamples": 20,
+          "minAvgR": 0,
+          "minPf": 1,
+          "minCaptureEfficiency": 0.5
+        }
+      },
+      "replay": {
+        "schemaVersion": "7.77-V33-RISK-SHADOW-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "entriesFrozen": true,
+        "exitsFrozen": true,
+        "coverageEqual": true,
+        "selectedTrades": 310,
+        "policyCells": 36,
+        "constant": {
+          "trades": 310,
+          "startEquity": 10000,
+          "endEquity": 9331.99,
+          "returnPct": -6.68,
+          "maxDrawdownPct": 8.292,
+          "pf": 0.859,
+          "avgRiskPct": 0.25,
+          "avgWinnerRiskPct": 0.25,
+          "avgLoserRiskPct": 0.25,
+          "winnerMinusLoserRiskPct": 0
+        },
+        "adaptive": {
+          "trades": 310,
+          "startEquity": 10000,
+          "endEquity": 9249.08,
+          "returnPct": -7.509,
+          "maxDrawdownPct": 9.61,
+          "pf": 0.862,
+          "avgRiskPct": 0.2902,
+          "avgWinnerRiskPct": 0.2911,
+          "avgLoserRiskPct": 0.2896,
+          "winnerMinusLoserRiskPct": 0.0015
+        },
+        "delta": {
+          "returnPct": -0.829,
+          "maxDrawdownPct": 1.318,
+          "pf": 0.003,
+          "winnerMinusLoserRiskPct": 0.0015
+        },
+        "allocation": {
+          "boostedTrades": 237,
+          "maxRiskPct": 0.35
+        }
+      }
+    },
+    {
+      "training": [
+        "P3",
+        "P2"
+      ],
+      "test": "P1",
+      "policy": {
+        "schemaVersion": "7.77-V33-RISK-POLICY-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "trainingPeriods": [
+          "P3",
+          "P2"
+        ],
+        "cells": [
+          {
+            "key": "LONG×RANGE|VOLATILITY_LOW",
+            "windows": 2,
+            "avgR": 0.059,
+            "pf": 1.105,
+            "captureEfficiency": 6.9,
+            "samples": 895
+          },
+          {
+            "key": "SHORT×RANGE|VOLUME_NORMAL",
+            "windows": 2,
+            "avgR": 0.122,
+            "pf": 1.232,
+            "captureEfficiency": 5.2,
+            "samples": 581
+          },
+          {
+            "key": "SHORT×RANGE|MOMENTUM_STRETCHED",
+            "windows": 2,
+            "avgR": 0.281,
+            "pf": 1.674,
+            "captureEfficiency": 4.5,
+            "samples": 174
+          },
+          {
+            "key": "SHORT×TRANSITION|MTF_0/3",
+            "windows": 2,
+            "avgR": 0.161,
+            "pf": 1.314,
+            "captureEfficiency": 4.5,
+            "samples": 385
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLATILITY_LOW",
+            "windows": 2,
+            "avgR": 0.128,
+            "pf": 1.243,
+            "captureEfficiency": 4.5,
+            "samples": 585
+          },
+          {
+            "key": "LONG×RANGE|MTF_0/3",
+            "windows": 2,
+            "avgR": 0.123,
+            "pf": 1.23,
+            "captureEfficiency": 4.3,
+            "samples": 279
+          },
+          {
+            "key": "SHORT×BEAR|VOLUME_HIGH",
+            "windows": 2,
+            "avgR": 0.216,
+            "pf": 1.451,
+            "captureEfficiency": 3.8,
+            "samples": 868
+          },
+          {
+            "key": "LONG×RANGE|EVIDENCE_ZERO",
+            "windows": 2,
+            "avgR": 0.025,
+            "pf": 1.043,
+            "captureEfficiency": 3.8,
+            "samples": 1170
+          },
+          {
+            "key": "SHORT×RANGE|VOLUME_HIGH",
+            "windows": 2,
+            "avgR": 0.11,
+            "pf": 1.212,
+            "captureEfficiency": 3.6,
+            "samples": 444
+          },
+          {
+            "key": "SHORT×BEAR|EVIDENCE_MEDIUM",
+            "windows": 2,
+            "avgR": 0.387,
+            "pf": 1.947,
+            "captureEfficiency": 3.1,
+            "samples": 255
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLUME_HIGH",
+            "windows": 2,
+            "avgR": 0.155,
+            "pf": 1.309,
+            "captureEfficiency": 3.1,
+            "samples": 299
+          },
+          {
+            "key": "SHORT×RANGE|EVIDENCE_MEDIUM",
+            "windows": 2,
+            "avgR": 0.164,
+            "pf": 1.338,
+            "captureEfficiency": 1.7,
+            "samples": 130
+          },
+          {
+            "key": "LONG×BULL|MOMENTUM_STRETCHED",
+            "windows": 2,
+            "avgR": 0.15,
+            "pf": 1.304,
+            "captureEfficiency": 1.5,
+            "samples": 93
+          },
+          {
+            "key": "LONG×BULL|EVIDENCE_MEDIUM",
+            "windows": 2,
+            "avgR": 0.087,
+            "pf": 1.167,
+            "captureEfficiency": 0.9,
+            "samples": 102
+          }
+        ],
+        "config": {
+          "baseRiskPct": 0.25,
+          "stepRiskPct": 0.025,
+          "maxRiskPct": 0.35,
+          "minSamples": 20,
+          "minAvgR": 0,
+          "minPf": 1,
+          "minCaptureEfficiency": 0.5
+        }
+      },
+      "replay": {
+        "schemaVersion": "7.77-V33-RISK-SHADOW-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "entriesFrozen": true,
+        "exitsFrozen": true,
+        "coverageEqual": true,
+        "selectedTrades": 723,
+        "policyCells": 14,
+        "constant": {
+          "trades": 723,
+          "startEquity": 10000,
+          "endEquity": 10741.54,
+          "returnPct": 7.415,
+          "maxDrawdownPct": 8.027,
+          "pf": 1.067,
+          "avgRiskPct": 0.25,
+          "avgWinnerRiskPct": 0.25,
+          "avgLoserRiskPct": 0.25,
+          "winnerMinusLoserRiskPct": 0
+        },
+        "adaptive": {
+          "trades": 723,
+          "startEquity": 10000,
+          "endEquity": 10768.35,
+          "returnPct": 7.683,
+          "maxDrawdownPct": 8.401,
+          "pf": 1.065,
+          "avgRiskPct": 0.2648,
+          "avgWinnerRiskPct": 0.2646,
+          "avgLoserRiskPct": 0.265,
+          "winnerMinusLoserRiskPct": -0.0003
+        },
+        "delta": {
+          "returnPct": 0.268,
+          "maxDrawdownPct": 0.374,
+          "pf": -0.002,
+          "winnerMinusLoserRiskPct": -0.0003
+        },
+        "allocation": {
+          "boostedTrades": 313,
+          "maxRiskPct": 0.325
+        }
+      }
+    },
+    {
+      "training": [
+        "P3",
+        "P2",
+        "P1"
+      ],
+      "test": "P0",
+      "policy": {
+        "schemaVersion": "7.77-V33-RISK-POLICY-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "trainingPeriods": [
+          "P3",
+          "P2",
+          "P1"
+        ],
+        "cells": [
+          {
+            "key": "LONG×RANGE|MTF_0/3",
+            "windows": 3,
+            "avgR": 0.148,
+            "pf": 1.287,
+            "captureEfficiency": 5,
+            "samples": 401
+          },
+          {
+            "key": "SHORT×BEAR|VOLUME_HIGH",
+            "windows": 3,
+            "avgR": 0.212,
+            "pf": 1.438,
+            "captureEfficiency": 4.7,
+            "samples": 1119
+          },
+          {
+            "key": "SHORT×TRANSITION|VOLATILITY_LOW",
+            "windows": 3,
+            "avgR": 0.107,
+            "pf": 1.201,
+            "captureEfficiency": 4.5,
+            "samples": 1076
+          },
+          {
+            "key": "SHORT×RANGE|MOMENTUM_STRETCHED",
+            "windows": 3,
+            "avgR": 0.188,
+            "pf": 1.451,
+            "captureEfficiency": 3.5,
+            "samples": 241
+          },
+          {
+            "key": "SHORT×BEAR|EVIDENCE_MEDIUM",
+            "windows": 3,
+            "avgR": 0.306,
+            "pf": 1.723,
+            "captureEfficiency": 2.4,
+            "samples": 320
+          },
+          {
+            "key": "SHORT×RANGE|EVIDENCE_MEDIUM",
+            "windows": 3,
+            "avgR": 0.117,
+            "pf": 1.239,
+            "captureEfficiency": 1.8,
+            "samples": 205
+          },
+          {
+            "key": "LONG×BULL|EVIDENCE_MEDIUM",
+            "windows": 3,
+            "avgR": 0.088,
+            "pf": 1.165,
+            "captureEfficiency": 1,
+            "samples": 199
+          }
+        ],
+        "config": {
+          "baseRiskPct": 0.25,
+          "stepRiskPct": 0.025,
+          "maxRiskPct": 0.35,
+          "minSamples": 20,
+          "minAvgR": 0,
+          "minPf": 1,
+          "minCaptureEfficiency": 0.5
+        }
+      },
+      "replay": {
+        "schemaVersion": "7.77-V33-RISK-SHADOW-V1",
+        "researchOnly": true,
+        "executionImpact": false,
+        "entriesFrozen": true,
+        "exitsFrozen": true,
+        "coverageEqual": true,
+        "selectedTrades": 723,
+        "policyCells": 7,
+        "constant": {
+          "trades": 723,
+          "startEquity": 10000,
+          "endEquity": 11075.82,
+          "returnPct": 10.758,
+          "maxDrawdownPct": 4.199,
+          "pf": 1.102,
+          "avgRiskPct": 0.25,
+          "avgWinnerRiskPct": 0.25,
+          "avgLoserRiskPct": 0.25,
+          "winnerMinusLoserRiskPct": 0
+        },
+        "adaptive": {
+          "trades": 723,
+          "startEquity": 10000,
+          "endEquity": 11151.5,
+          "returnPct": 11.515,
+          "maxDrawdownPct": 4.342,
+          "pf": 1.105,
+          "avgRiskPct": 0.2589,
+          "avgWinnerRiskPct": 0.2593,
+          "avgLoserRiskPct": 0.2585,
+          "winnerMinusLoserRiskPct": 0.0008
+        },
+        "delta": {
+          "returnPct": 0.757,
+          "maxDrawdownPct": 0.143,
+          "pf": 0.003,
+          "winnerMinusLoserRiskPct": 0.0008
+        },
+        "allocation": {
+          "boostedTrades": 225,
+          "maxRiskPct": 0.3
+        }
+      }
+    }
+  ],
+  "summary": {
+    "positiveReturnSteps": 2,
+    "ddSafeSteps": 1,
+    "allocationEfficientSteps": 2,
+    "equalCoverage": true,
+    "persistent": false
+  },
+  "promotionAllowed": false,
+  "nextStep": "KEEP_V32_025_NO_CONTEXT_RISK"
+}
