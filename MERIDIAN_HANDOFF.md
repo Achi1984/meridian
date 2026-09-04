@@ -7,6 +7,8 @@
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
 - Main contains the stable research stack through v7.51 plus preserved evidence reports for rejected Challenger V3/V3.1 experiments and Signal Calibration.
+- The active research continuation is branch `research/adaptive-evidence-v774`.
+- `adaptive-evidence.js` is research-only and is not connected to Paper execution.
 - The rejected V3/V3.1 implementation branches must not be treated as production candidates or silently merged.
 
 ## Latest durable research findings
@@ -25,6 +27,25 @@ Portfolio-independent calibration sampled one candidate per symbol per 4h across
 
 Critical result: **all confidence buckets were negative over 30d, 60d and 90d. Higher confidence was not monotonic with better normalized outcome.** This means the current compressed confidence stack is not a validated predictor of edge. Positive portfolio windows can be caused by path-dependent portfolio selection and must not be used to declare the score calibrated.
 
+### v7.74 — Adaptive Evidence Lab checkpoint
+A new research-only core now converts raw context observations into reliability-weighted soft evidence. There is no built-in LONG + RANGE or other context bonus. Small samples are shrunk toward zero; cross-window agreement affects reliability; missing evidence is neutral.
+
+The first implementation covers:
+- side,
+- regime,
+- 15m / 1h / 4h alignment,
+- momentum,
+- volume participation,
+- volatility,
+- asset × side,
+- Baseline status as evidence only,
+- Market Capture / Opportunity Cost metrics.
+
+Files:
+- `adaptive-evidence.js`
+- `test/adaptive-evidence.test.js`
+- `research/adaptive-evidence-v774.md`
+
 Preserved evidence files:
 - `research/challenger-v3-evidence-v752.md`
 - `research/challenger-v31-evidence-v753.md`
@@ -40,37 +61,56 @@ Preserved evidence files:
 6. LONG/SHORT must always be interpreted in regime context.
 7. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory metrics.
 8. More evidence must not automatically become more hard gates.
+9. Fixed context bonuses are not considered durable evidence; future V3.2 scoring should be fed by measured cohorts.
 
 ## Next recommended work — highest priority
 
-### Priority 1 — Raw Feature Edge Map / Feature Attribution Lab
-Before writing Challenger V3.2, measure raw feature/outcome relationships on portfolio-independent signal cohorts. Candidate features should include:
-- 15m / 1h / 4h directional alignment
-- ADX / trend-strength buckets
-- RSI state by side
-- MACD agreement across timeframes
-- volume participation
-- EMA20/EMA50 structure and price-to-EMA distance
-- side × regime
-- Baseline status as evidence only
+### Priority 1 — Historical cohort generator for Adaptive Evidence
+Build a portfolio-independent research script that samples valid signal candidates and writes normalized-R cohorts for the exact dimensions consumed by `adaptive-evidence.js`.
 
-Use normalized R outcomes, adequate samples and cross-window stability. Look for monotonic or repeatable relationships, not isolated best buckets.
+Required windows:
+- 30d
+- 60d
+- 90d
+- walk-forward / out-of-sample slices
 
-### Priority 2 — Challenger V3.2 only after Feature Edge Map
-Build V3.2 from evidence-backed soft features. Preserve independent opportunity discovery, but do not copy V3/V3.1 weights. Retest signal calibration first, then portfolio 30/60/90d, walk-forward, frequency and opportunity cost.
+Required output per cohort:
+- sample count `n`
+- average / median R
+- win rate
+- positive / negative R totals
+- window-level avgR for stability
+- feature key / side / regime context
 
-### Priority 3 — Regime V2
+The generator must avoid portfolio gates so signal quality is measured separately from path dependence.
+
+### Priority 2 — Feed measured evidence into Adaptive Evidence replay
+After cohorts exist, replay Adaptive Evidence labels against the same historical opportunity stream and compare:
+- expectancy / PF
+- max DD
+- trade frequency / coverage
+- missed-winner R
+- avoided-loser R
+- net opportunity cost
+- market-capture percentage
+- LONG/SHORT × regime behavior
+
+### Priority 3 — Challenger V3.2 only after calibration
+Only when the Adaptive Evidence score is demonstrably predictive at signal level should a Challenger V3.2 portfolio replay be built. Do not reuse V3/V3.1 threshold tuning.
+
+### Priority 4 — Regime V2
 Recompute all directional evidence after final side selection. Test independently.
 
-### Priority 4 — Hybrid / Allocator
-Only combine validated Challenger and Regime components. Use regime primarily as a soft strategy/risk allocator rather than adding many hard gates.
-
-### Priority 5 — Exit Lab integration
-Only after entry/scoring edge is demonstrated, replay the validated entry cohort through A/B/C/D and BE probes. Do not mix entry and exit changes prematurely.
+### Priority 5 — Hybrid / Allocator and Exit Lab integration
+Only combine validated components. Exit changes remain separate until entry/scoring edge is established.
 
 ## Promotion gate
 
 No winner on a tiny or path-dependent sample. Promotion requires common-window evaluation, adequate closed-trade count, positive PF/expectancy, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost, signal-level calibration and stability across regimes/windows. No automatic promotion.
+
+## Save-progress rule
+
+Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with a descriptive commit. Keep experimental work on a named research branch until it is reviewed, then merge deliberately.
 
 ## New-chat startup instruction
 
@@ -78,4 +118,4 @@ A fresh chat should begin with:
 
 **“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md` first. Treat them as the canonical MERIDIAN project memory and continue from the handoff without changing Baseline 6.2.”**
 
-After reading, verify `version.json` and current `main` HEAD before making changes because deployment state may have advanced.
+After reading, verify `version.json`, current `main` HEAD and active research branches before making changes because deployment state may have advanced.
