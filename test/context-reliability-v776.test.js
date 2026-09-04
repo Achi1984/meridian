@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { contextDescriptor, buildContextReliabilityMap, crossWindowContextReliability } from '../context-reliability-v776.js';
 
 function row({side='LONG',regime='RANGE',r=1.4,rsi=60,vol=1.3,atr=.8,price=100,aligned=true}={}){
-  const ema20=aligned?(side==='LONG'?101:99):(side==='LONG'?99:101);
-  const ema50=side==='LONG'?100:100;
+  const ema20=aligned?(side==='LONG'?99:101):(side==='LONG'?101:99);
+  const ema50=aligned?(side==='LONG'?98:102):(side==='LONG'?100:100);
   const macd=aligned?(side==='LONG'?1:-1):(side==='LONG'?-1:1);
   const f={price,ema20,ema50,rsi,macdHist:macd,atr,adx:22,volumeRatio:vol};
   return {side,regime,baselineStatus:'READY',candidate:75,technical:74,outcomeR:r,frames:{'15m':f,'1h':f,'4h':f}};
