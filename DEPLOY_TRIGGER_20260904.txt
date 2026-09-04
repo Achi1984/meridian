@@ -1,0 +1,3 @@
+MERIDIAN deployment trigger
+Requested after v7.61 R5 selector fix.
+No runtime or UI logic change.
