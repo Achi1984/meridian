@@ -6,15 +6,15 @@ Research-only implementation checkpoint. No Baseline 6.2, Shadow V1, Challenger 
 
 ## Purpose
 
-Replace fixed context bonuses and repeated threshold tuning with a reusable evidence layer that scores raw observations from measured normalized-R cohorts.
+Replace fixed context bonuses and repeated threshold tuning with a reusable evidence layer that scores raw observations from measured normalized-R cohorts and validates them out of sample.
 
-The implementation lives in `adaptive-evidence.js` and is intentionally disconnected from Paper execution.
+The implementation is intentionally disconnected from Paper execution.
 
 ## Core design
 
 ### 1. Context observations
 
-The lab derives side-aware observations from signal frames:
+`adaptive-evidence.js` derives side-aware observations from signal frames:
 
 - Side: LONG / SHORT
 - Regime
@@ -39,13 +39,36 @@ Each cohort supplies at minimum `n` and `avgR`, optionally window-level results.
 
 Missing evidence is neutral rather than a reason to add another hard gate.
 
-### 3. Research classification
+`evaluateAdaptiveObservations()` lets historical cohort rows be scored directly without reconstructing a signal and is used by walk-forward validation.
 
-The output is `TRADE`, `CAUTION`, `NEUTRAL`, `SKIP`, or `OBSERVE`, plus estimated edge-R, reliability, confidence and component attribution.
+### 3. Portfolio-independent normalized-R cohorts
 
-These labels are research annotations only. They do not open positions.
+`adaptive-evidence-cohorts.js` builds signal cohorts from prepared research events using the existing `A_CURRENT` Exit Lab outcome model.
 
-### 4. Market Capture / Opportunity Cost
+Method guards:
+
+- default sampling cadence is one signal per symbol per 4h,
+- only candles strictly after the signal timestamp are replayed,
+- default outcome horizon is 14 days,
+- no max-position, daily-loss, drawdown or other portfolio-path gate is applied,
+- exact evidence dimensions match the Adaptive Evidence evaluator,
+- cohort tables include n, avg/median R, win rate, positive/negative R totals and per-window avgR.
+
+This keeps signal-quality calibration separate from portfolio-path selection.
+
+### 4. Leakage-safe walk-forward validation
+
+`adaptive-evidence-walkforward.js` adds expanding-window validation. For every out-of-sample slice:
+
+- training observations must end strictly before the test slice begins,
+- an overlap guard throws on training/test leakage,
+- evidence maps are built only from prior observations,
+- test signals are classified as TRADE / CAUTION / NEUTRAL / SKIP / OBSERVE,
+- selected and all-opportunity R statistics are retained separately.
+
+This is the required bridge between feature attribution and a future Challenger V3.2 portfolio replay.
+
+### 5. Market Capture / Opportunity Cost
 
 `summarizeMarketCapture()` measures:
 
@@ -62,17 +85,24 @@ This prevents a low-drawdown / low-frequency model from looking superior merely 
 
 ## Tests added
 
-`test/adaptive-evidence.test.js` verifies:
+The v7.74 research tests verify:
 
-1. side-aware raw observations,
-2. small-sample shrinkage,
-3. no built-in LONG + RANGE bonus,
-4. positive learned context can support a research TRADE label,
-5. negative learned context can support a research SKIP label,
-6. market capture exposes missed winners and avoided losers.
+- side-aware raw observations,
+- small-sample shrinkage,
+- no built-in LONG + RANGE bonus,
+- learned positive/negative context behavior,
+- market-capture accounting,
+- strict post-entry candle replay,
+- 4h signal sampling cadence,
+- exact evidence-map dimensions,
+- LONG/SHORT cohort separation,
+- explicit train/test leakage rejection,
+- expanding walk-forward train-before-test ordering.
+
+GitHub Release Safety passed on the cohort-builder checkpoint commit `458b52e4ade75ba83916b45f6954449bc3a0d1ea`.
 
 ## Next implementation step
 
-Build the historical cohort generator that feeds this module with normalized-R feature tables across 30d / 60d / 90d plus walk-forward windows. The generator must be portfolio-independent first, then portfolio replay can evaluate path effects separately.
+Add a reproducible report/orchestration layer that consumes prepared MERIDIAN research events and produces 30d / 60d / 90d cohort maps plus expanding walk-forward results in JSON/Markdown. The report must surface feature stability, sample adequacy, Market Capture and opportunity cost before any V3.2 portfolio behavior is written.
 
-Do not promote Challenger V3.2 until the evidence table demonstrates stable predictive relationships and acceptable opportunity coverage.
+Do not promote Challenger V3.2 until the evidence table demonstrates stable predictive relationships, adequate samples, acceptable opportunity coverage and out-of-sample behavior.
