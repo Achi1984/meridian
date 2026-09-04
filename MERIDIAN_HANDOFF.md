@@ -56,7 +56,10 @@ Master 90d cohort:
 
 **Conclusion:** Adaptive Evidence V1 fails the signal-edge promotion gate. It is valuable infrastructure and negative evidence, but it is not Challenger V3.2.
 
-Preserved summary: `research/adaptive-evidence-live-v774.md`.
+Preserved evidence:
+- `research/adaptive-evidence-live-v774.md` — interpretation and durable findings
+- `research/adaptive-evidence-live-v774-summary.json` — compact machine-readable summary
+- full raw JSON/Markdown — GitHub Actions artifact listed above
 
 ## Interpretation rules from this checkpoint
 
