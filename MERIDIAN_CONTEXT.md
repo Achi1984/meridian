@@ -12,6 +12,7 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Frozen baseline ruleset: `6.2-SIGNAL-V1`
 - Main/live UI: `7.63 R1` after merged PR #37
 - Active portfolio-history candidate: `7.64-CANONICAL-PORTFOLIO-HISTORY-V1` on `fix/canonical-portfolio-history-v764`, draft PR #38
+- v7.64 build metadata: `7.64-20260904-R2`
 - Evidence layer: `6.53-EVIDENCE`
 - Research Engine V2: `7.34-RESEARCH-V2`
 - Privacy/security layer: `7.33-HARDENED`
@@ -54,6 +55,10 @@ v7.64 extends the same contract into time series instead of rebuilding history f
 - Depot R2 consumes canonical history only after a warm-up gate; until then v7.63 current-value alignment remains fallback.
 - once 1D history is mature, Chart, High, Low and 1D Performance derive from the same stored series.
 - longer time ranges stay on fallback until enough canonical coverage exists rather than stretching a short history across a long window.
+
+## Verification state
+
+The full v7.64 R2 validation run on implementation head `de73c10c6f5d3114b9b571e8e0c0a69ae23e8fdf` completed successfully: deterministic install, history tests, gateway/Depot syntax checks and Release Safety all passed. Later commits only update continuity documentation; always recheck the latest PR head before merge.
 
 ## UI principles
 
