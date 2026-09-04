@@ -1,6 +1,6 @@
 # MERIDIAN v7.85 — Breakout / Expansion Bot V1
 
-Status: **research-only design + first pure signal engine**. No Paper/live execution impact.
+Status: **research-only design + historical R2 evidence track**. No Paper/live execution impact.
 
 ## Why this bot exists
 
@@ -19,7 +19,7 @@ The hypothesis is not that another confidence score will rescue the same opportu
 
 ## V1 signal anatomy
 
-Primary timeframe: **15m**. Higher timeframe trend context may use **1h** as soft evidence.
+Primary timeframe: **15m**. Higher timeframe trend context uses **1h** as soft evidence.
 
 A valid structural trigger requires a confirmed close outside the previous 20-bar high/low plus a small ATR buffer. This is the only intentional directional hard trigger in V1. The remaining evidence stays soft:
 
@@ -29,43 +29,36 @@ A valid structural trigger requires a confirmed close outside the previous 20-ba
 - candle decisiveness: body fraction + close location
 - trend alignment: EMA20/EMA50 and price/EMA20 context
 
-The score is deliberately transparent rather than an opaque model:
-
-- structure 35%
-- compression 15%
-- expansion 18%
-- volume 12%
-- candle quality 10%
-- trend 10%
+The score remains transparent: structure 35%, compression 15%, expansion 18%, volume 12%, candle quality 10%, trend 10%.
 
 V1 decisions are `TRADE | OBSERVE | SKIP | WAIT`. Risk suggestions are bounded to 1.00%, 0.50% or 0.25% and are research metadata only.
 
-## Initial exit geometry
-
-V1 fixes the exit geometry for attribution instead of optimizing entries and exits simultaneously:
+## Fixed exit geometry
 
 - initial SL: 1.20 ATR from entry
 - TP1: 1.50R
 - TP2: 2.50R
 
-This is not a promotion recommendation. Exit tuning belongs in a later isolated experiment if the entry family first shows positive OOS expectancy.
+R2 keeps this geometry fixed for entry attribution instead of tuning entries and exits simultaneously.
 
-## What we must measure
+## R2 historical evidence protocol — locked before results
 
-The first evidence run must compare Breakout V1 against the same 12-asset historical universe and chronologically separated windows. Required outputs:
+- Universe: BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET, INJ versus USDT.
+- Windows: 30d / 60d / 90d.
+- Signal cadence: every closed 15m candle.
+- Context: 15m structure/expansion plus 1h trend context.
+- Outcome horizon: 48 hours after each signal.
+- Exit attribution: full TP1 vs SL; timeout at the last available 15m close.
+- Same-candle SL + TP1 is conservatively resolved as SL.
+- Costs: 5 bps fee per side plus 3 bps slippage per side in normalized-R attribution.
+- Chronological stability: five sequential folds for TRADE decisions.
+- Required splits: LONG/SHORT and asset.
+- No threshold/weight tuning from the R2 run.
+- No automatic promotion, even if one window is positive.
 
-- trade count / frequency
-- total and average normalized R
-- PF and win rate
-- max drawdown on an isolated research ledger
-- LONG/SHORT split
-- regime split
-- asset concentration
-- compression/expansion/volume cohort attribution
-- Market Capture and missed-winner / avoided-loser R where a comparable opportunity pool exists
-- walk-forward OOS stability
+## Interpretation rules
 
-A lower drawdown caused only by very low trade count is not sufficient.
+A useful candidate needs more than one attractive full-window number. Cross-window expectancy/PF, chronological folds, side balance, asset concentration and trade frequency all matter. A tiny positive subset is a hypothesis, not a bot promotion.
 
 ## Promotion gate
 
@@ -80,8 +73,8 @@ No Paper bot until all of the following are true:
 
 ## Planned sequence
 
-- **v7.85 R1** — pure Breakout/Expansion decision engine + deterministic tests (current checkpoint)
-- **v7.85 R2** — historical 12-asset signal-level evidence, fixed exits
+- **v7.85 R1** — pure Breakout/Expansion decision engine + deterministic tests — complete/green
+- **v7.85 R2** — 12-asset 30/60/90d signal-level evidence with fixed exits — running
 - **v7.86** — isolated shadow ledger / portfolio-path replay only if R2 is promising
 - **v7.87** — optional retest-entry variant, compared against close-break V1 on identical triggers
 - dashboard exposure only after the engine has real telemetry worth displaying
