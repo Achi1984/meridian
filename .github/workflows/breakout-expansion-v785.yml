@@ -1,0 +1,28 @@
+name: MERIDIAN Breakout Expansion v7.85
+
+on:
+  push:
+    branches:
+      - research/breakout-expansion-v785
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  breakout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Breakout Expansion tests
+        run: node --test test/breakout-expansion-v1.test.js
+      - name: Syntax checks
+        run: node --check breakout-expansion-v1.js
+      - name: Release safety
+        run: npm run release:check
