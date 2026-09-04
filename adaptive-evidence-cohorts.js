@@ -34,15 +34,19 @@ export function buildSignalCohort(events=[],opts={}){
   const horizonMs=Math.max(HOUR,num(opts.horizonDays,14)*DAY);
   const feeBps=num(opts.feeBps,5),slippageBps=num(opts.slippageBps,3);
   const start=num(opts.start,-Infinity),end=num(opts.end,Infinity);
+  const requireFullHorizon=opts.requireFullHorizon!==false;
   const candles=candleIndex(events),lastSample=new Map(),rows=[];
+  const availableEnd=Object.fromEntries(Object.entries(candles).map(([symbol,x])=>[symbol,x.at(-1)?.ts??-Infinity]));
   for(const ev of [...events].sort((a,b)=>a.t-b.t)){
     if(ev.t<start||ev.t>end)continue;
     for(const [symbol,signal] of Object.entries(ev?.signals||{})){
       if(!signal||!(num(signal.entry)>0)||!(num(signal.sl)>0)||!(num(signal.tp1)>0))continue;
+      const outcomeEnd=ev.t+horizonMs;
+      if(requireFullHorizon&&availableEnd[symbol]<outcomeEnd)continue;
       const prev=lastSample.get(symbol)??-Infinity;
       if(ev.t-prev<sampleEveryMs)continue;
       lastSample.set(symbol,ev.t);
-      const future=futureCandles(candles[symbol]||[],ev.t,Math.min(end,ev.t+horizonMs));
+      const future=futureCandles(candles[symbol]||[],ev.t,Math.min(end,outcomeEnd));
       if(!future.length)continue;
       let outcome;
       try{outcome=simulateExitModel(signal,future,'A_CURRENT',{feeBps,slippageBps})}catch{continue}
@@ -59,7 +63,8 @@ export function buildSignalCohort(events=[],opts={}){
         maxOpenR:num(outcome.maxOpenR),
         exitReason:outcome.runnerReason,
         tp1Hit:Boolean(outcome.tp1Hit),
-        horizonEnd:Math.min(end,ev.t+horizonMs),
+        horizonEnd:outcomeEnd,
+        fullHorizon:availableEnd[symbol]>=outcomeEnd,
         researchOnly:true
       });
     }
