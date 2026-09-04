@@ -29,12 +29,23 @@ export function buildAdaptiveEvidenceReport(events=[],opts={}){
   const horizonDays=Math.max(1,Number(opts.horizonDays??14));
   const windowsDays=(opts.windowsDays||[30,60,90]).map(Number).filter(x=>x>0).sort((a,b)=>a-b);
   if(!(dataEnd>0))throw new Error('Adaptive Evidence report requires a valid dataEnd');
+  if(!windowsDays.length)throw new Error('Adaptive Evidence report requires at least one positive window');
   const signalEnd=dataEnd-horizonDays*DAY;
+  const anchorStart=signalEnd-Math.max(...windowsDays)*DAY;
+
+  // Build exactly one portfolio-independent cohort, then slice it for every comparison window.
+  // This keeps 4h sampling phase identical across 30d/60d/90d instead of re-anchoring at each window boundary.
+  const masterRows=buildSignalCohort(events,{
+    start:anchorStart,end:dataEnd,horizonDays,
+    sampleEveryMs:opts.sampleEveryMs,
+    feeBps:opts.feeBps,slippageBps:opts.slippageBps,
+    requireFullHorizon:true
+  }).filter(r=>r.ts>=anchorStart&&r.ts<=signalEnd);
+
   const windows={};
   for(const days of windowsDays){
     const start=signalEnd-days*DAY;
-    const rows=buildSignalCohort(events,{start,end:dataEnd,horizonDays,sampleEveryMs:opts.sampleEveryMs,feeBps:opts.feeBps,slippageBps:opts.slippageBps,requireFullHorizon:true});
-    const evalRows=rows.filter(r=>r.ts>=start&&r.ts<=signalEnd);
+    const evalRows=masterRows.filter(r=>r.ts>=start&&r.ts<=signalEnd);
     const stabilityWindows=evalRows.length?rollingWindows({start,end:signalEnd,count:opts.stabilityWindows||5}):[];
     const evidenceMap=buildEvidenceMap(evalRows,stabilityWindows);
     const featureRows=flattenEvidence(evidenceMap);
@@ -52,8 +63,10 @@ export function buildAdaptiveEvidenceReport(events=[],opts={}){
     version:ADAPTIVE_REPORT_VERSION,
     researchOnly:true,
     executionImpact:false,
-    method:'PORTFOLIO_INDEPENDENT_FULL_HORIZON_COHORTS_PLUS_EXPANDING_OOS',
-    dataEnd,signalEnd,horizonDays,windows,
+    method:'PORTFOLIO_INDEPENDENT_MASTER_COHORT_FULL_HORIZON_PLUS_EXPANDING_OOS',
+    dataEnd,signalEnd,anchorStart,horizonDays,
+    masterCohort:cohortSummary(masterRows),
+    windows,
     promotion:{allowed:false,reason:'RESEARCH_ONLY_REQUIRES_HUMAN_APPROVAL_AND_PORTFOLIO_REPLAY'},
     generatedAt:new Date().toISOString()
   };
@@ -70,6 +83,7 @@ export function renderAdaptiveEvidenceMarkdown(report){
     '',
     `Method: ${report.method}`,
     `Outcome horizon: ${report.horizonDays} days; recent signals without a full horizon are excluded.`,
+    `Sampling anchor: one master cohort from ${new Date(report.anchorStart).toISOString()} to ${new Date(report.signalEnd).toISOString()} so 30d/60d/90d use identical 4h sampling phase.`,
     ''
   ];
   for(const [label,w] of Object.entries(report.windows||{})){
