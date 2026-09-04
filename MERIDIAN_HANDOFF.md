@@ -4,101 +4,120 @@
 
 ## Current release track
 
-- Baseline engine: `6.2.0`
-- Baseline ruleset: `6.2-SIGNAL-V1`
-- Main remains the live source and Baseline/Paper execution is unchanged.
-- v7.74 branch: `research/adaptive-evidence-v774`, draft PR #30.
-- Active successor research branch: `research/context-interaction-v775`, draft PR #31 based on v7.74.
-- All v7.74/v7.75 work is research-only and disconnected from Paper execution.
+- Live/Main remains `v7.62 R4` UI/release with frozen Paper engine `6.2.0 / 6.2-SIGNAL-V1`.
+- Baseline/Paper execution remains unchanged.
+- Active prospective hypothesis branch: `research/prospective-holdout-v779`, draft PR #35.
+- Active Meta Allocator branch: `research/meta-allocator-v780-design`, draft PR #36, based on v7.79.
+- All v7.74–v7.80 work is research-only and disconnected from Paper execution unless explicitly stated otherwise.
 
-## v7.74 Adaptive Evidence result
+## Preserved research sequence
 
-The real 12-asset v7.74 calibration failed the signal-edge gate:
+- v7.74 Adaptive Evidence: failed signal-edge gate.
+- v7.75 Context Interaction: improved coverage but remained negative OOS.
+- v7.76 Interaction Family Ablation: `SIDE_REGIME_VOLATILITY` was the only family with a positive 90d OOS slice, but coverage was very small.
+- v7.77 Volatility Context Drilldown: localized the apparent family effect.
+- v7.78 Robustness: `LONG|TRANSITION|NORMAL` failed full-history robustness (107 signals, avg -0.043R, PF 0.93).
+- v7.79 Prospective Holdout: hypothesis frozen after `2026-09-04T20:02:00Z`; wait for 30 fully matured 14-day outcomes before review.
 
-- 30d: 2,160 signals, avg -0.403R; OOS selected 0
-- 60d: 4,320 signals, avg -0.314R; OOS selected 3 at -1.133R / PF 0
-- 90d: 6,480 signals, avg -0.270R; OOS selected 397 at -0.203R / PF 0.711
+## v7.80 Meta Allocator — implemented
 
-Preserved in `research/adaptive-evidence-live-v774.md`.
+Core concept: do not create another raw indicator bot. Synchronize existing model opinions on the same opportunity and test whether agreement/disagreement contains allocation or risk information.
 
-## v7.75 Context Interaction / Hierarchical Evidence
+### Decision Matrix core
 
-Implemented:
+`meta-decision-matrix.js` normalizes:
+- Baseline
+- Shadow V1
+- Challenger V2
+- Regime V1
 
-- predefined bounded interaction set,
-- hierarchical residual edge versus broader parent cohort,
-- child + parent sample guards,
-- shrinkage toward zero,
-- cross-window residual-sign reliability,
-- expanding train-before-test interaction walk-forward,
-- direct same-cohort OOS comparison versus v7.74,
-- reproducible 12-asset GitHub Actions workflow.
+Captured telemetry:
+- TRADE / CAUTION / WAIT / SKIP
+- direction votes and agreement
+- Baseline-vs-Regime side conflict
+- hard disagreement
+- dispersion
+- stable pattern key
+- normalized-R outcome attachment
 
-Predefined families:
+No trade routing or sizing exists.
 
-- side × regime × MTF
-- side × regime × momentum
-- side × regime × volatility
-- asset × side × regime
-- side × MTF × momentum
-- side × volume × volatility
+### v7.80 R2 canonical adapter
 
-### Definitive v7.75 live evidence
+Added:
+- `meta-decision-matrix-source.js`
+- `meta-decision-matrix-evidence.js`
+- `scripts/meta-decision-matrix-live.mjs`
+- regression tests
+- `.github/workflows/meta-decision-matrix-evidence-v780.yml`
 
-Workflow run `33912789463`, source commit `ce1c7c54553c7b721ab0f70f2991de320a7209cc`, artifact `9952013237`, SHA-256 `de7ee85ae8e2d9461562d756eda6ba0b9194762702a3e6b3c6c1866b1d260d58`.
+The adapter reuses canonical cloud candidate opportunities. Shadow and Challenger opinions mirror current research rules; Regime uses `regimeDecision`.
 
-| Window | Selector | Selected | Avg R | PF | Coverage | Capture |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 30d | v7.74 Marginal | 0 | — | 0 | 0.0% | 0.0% |
-| 30d | v7.75 Interaction | 113 | -0.657R | 0.324 | 6.5% | 5.0% |
-| 60d | v7.74 Marginal | 3 | -1.133R | 0 | 0.1% | 0.0% |
-| 60d | v7.75 Interaction | 977 | -0.377R | 0.531 | 28.3% | 27.6% |
-| 90d | v7.74 Marginal | 397 | -0.203R | 0.711 | 7.7% | 8.4% |
-| 90d | v7.75 Interaction | 978 | -0.300R | 0.604 | 18.9% | 19.1% |
+**Important outcome definition:** R2 attaches the A_CURRENT / Baseline-side normalized-R outcome. A Regime side conflict is therefore tested as a quality/risk signal for the source opportunity, not as alternate-side P&L.
 
-**Conclusion:** Hierarchical residuals increase coverage substantially but the combined interaction selector remains negative OOS in every window. v7.75 is not Challenger V3.2 and must not be promoted.
+## Definitive v7.80 R2 evidence
 
-A repeated attribution pattern worth investigating is `LONG|BULL|NORMAL volatility` versus `LONG|BULL`: residual +0.159R (30d), +0.146R (60d), +0.121R (90d). This remains hypothesis evidence only, not a fixed bonus.
+Workflow run `33915359505`, source commit `5e7c01ecf7c45cc7d68419f3419e722b79fff38e`, artifact `9952953366`, digest `sha256:de8ef10df1e70d05362f8a24a73fc1a0ba7264a6bc9cf8471c3467ba56d9fd09`.
 
-Durable report: `research/context-interaction-live-v775.md`.
+Overall sampled universe:
+- 30d: 2,160 signals, avg -0.394R, PF 0.521
+- 60d: 4,320 signals, avg -0.313R, PF 0.593
+- 90d: 6,480 signals, avg -0.269R, PF 0.638
 
-## Next recommended work — highest priority
+Support-count result:
+- all support-count cohorts remain negative in all windows
+- support strength is non-monotonic
+- 90d `SUPPORT_3`: 704 signals, avg -0.191R, PF 0.730
+- 90d `SUPPORT_4`: 758 signals, avg -0.247R, PF 0.662
+- 90d `SUPPORT_2`: 222 signals, avg -0.392R, PF 0.511
 
-### Priority 1 — Interaction Family Attribution / Ablation Lab
+Conflict result:
+- universal Baseline-vs-Regime side conflict is not a stable risk-off indicator
+- hard disagreement is only marginally different and does not justify a rule
 
-Do not tune the combined v7.75 thresholds. Instead evaluate each predefined interaction family **independently out of sample** on the identical master cohort and folds.
+Durable report: `research/meta-decision-matrix-live-v780-r2.md`.
 
-Questions to answer:
+## Current decision
 
-- Which interaction family, if any, has positive OOS avgR and PF?
-- Does that family remain positive in more than one time window?
-- How much coverage and Market Capture does it retain?
-- Are gains concentrated in one asset/regime or broadly repeatable?
-- Does side × regime × volatility, especially the repeated LONG/BULL/NORMAL pattern, survive true family-level OOS testing?
+Do **not** implement a majority-vote allocator.
+Do **not** turn side conflict into a hard gate.
+Do **not** map matrix classes to FULL / REDUCED / EXPLORATORY / SKIP yet.
+Do **not** alter existing bot thresholds to improve these results.
 
-### Priority 2 — Small predeclared combinations only after family evidence
+## Highest-priority next work — v7.80 R3
 
-If individual families show edge, test only a few predeclared combinations. Do not search arbitrary combinations after seeing results.
+Evaluate the same matrix inside predeclared **executable opportunity universes** rather than across every sampled 4h candidate:
 
-### Priority 3 — Challenger V3.2 portfolio replay only after positive signal-level OOS evidence
+1. `BASELINE_READY` — source signal is READY.
+2. `ANY_SUPPORT` — at least one model says TRADE/CAUTION.
+3. `REGIME_ONLY` — Baseline not READY while Regime is supportive.
 
-No portfolio replay or Paper integration until the revised model passes signal-level calibration with useful coverage.
+Within each universe, compare without tuning:
+- Shadow supportive vs blocking
+- Challenger TRADE vs CAUTION/SKIP
+- Regime direction agreement vs side conflict
+- 3-support vs 4-support
 
-### Priority 4 — Regime V2, then later Exit/Hybrid
+Use chronological folds and require stability across folds/windows. If no repeatable positive or materially risk-improving conditional edge exists, stop the voting/decision-matrix route rather than rescue it with thresholds.
 
-Keep separate research axes until independently validated.
+## Later architecture if R3 validates
+
+Only after repeatable evidence:
+- Shadow Meta Allocator ledger with FULL / REDUCED / EXPLORATORY / SKIP
+- Regime V2 side-specific rescoring before final allocator integration
+- later cluster/correlation risk overlay for portfolio concentration
 
 ## Method rules that remain mandatory
 
 1. Baseline 6.2 stays frozen.
-2. No Paper/live execution changes.
-3. Training strictly predates test data.
+2. No Paper/live execution changes during research.
+3. Training strictly predates test data where learning/calibration occurs.
 4. Full configured outcome horizon required.
-5. Portfolio gates excluded from signal calibration.
-6. Trade frequency, Market Capture, missed winners, avoided losers and opportunity cost remain mandatory.
+5. Portfolio gates excluded from signal-quality attribution unless explicitly testing portfolio path.
+6. Frequency, Market Capture, missed winners, avoided losers and opportunity cost remain mandatory for candidate strategies.
 7. More evidence does not automatically become more hard gates.
 8. Full-window attribution is not OOS proof.
-9. Do not lower thresholds merely to rescue a negative model.
+9. Preserve negative results; do not lower thresholds to rescue a model.
 
 ## Save-progress rule
 
@@ -106,4 +125,4 @@ Do not leave meaningful MERIDIAN work only in chat. Save every substantial imple
 
 ## New-chat startup instruction
 
-**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md`. Check active research branches/PRs and latest evidence. Keep Baseline 6.2 frozen and continue from the highest-priority handoff.”**
+**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md`. Check active research branches/PRs and latest evidence. Keep Baseline 6.2 frozen, keep v7.79 locked, and continue Meta Allocator work from v7.80 R3 executable-universe attribution.”**

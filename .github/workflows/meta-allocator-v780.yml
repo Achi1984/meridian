@@ -1,0 +1,26 @@
+name: MERIDIAN Meta Allocator v7.80
+
+on:
+  push:
+    branches:
+      - research/meta-allocator-v780-design
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Decision matrix regression tests
+        run: node --test test/meta-decision-matrix.test.js
+      - name: Syntax check
+        run: node --check meta-decision-matrix.js

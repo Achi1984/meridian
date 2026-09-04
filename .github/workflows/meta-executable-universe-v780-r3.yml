@@ -1,0 +1,34 @@
+name: MERIDIAN Meta Executable Universe v7.80 R3
+
+on:
+  push:
+    branches:
+      - research/meta-allocator-v780-design
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: R3 regression tests
+        run: node --test test/meta-executable-universe-evidence.test.js test/meta-decision-matrix.test.js test/meta-decision-matrix-source.test.js
+      - name: Run 12-asset executable universe evidence
+        run: node scripts/meta-executable-universe-live.mjs
+      - name: Upload R3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-meta-executable-universe-v780-r3
+          path: |
+            research/generated/meta-executable-universe-v780-r3.json
+            research/generated/meta-executable-universe-v780-r3.md
+          retention-days: 30

@@ -181,3 +181,13 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Next research:** Run interaction-family attribution/ablation out of sample. Evaluate each predefined family independently on identical folds before testing any small predeclared combination. Give special attention to side × regime × volatility because `LONG|BULL|NORMAL volatility` showed positive residual attribution in 30d, 60d and 90d, but require family-level OOS proof before treating it as edge.
 
 **Guard:** Full-window positive attribution is not OOS proof. Do not turn recurring residuals into fixed bonuses or hard gates without independent validation.
+
+## D-025 — Meta Allocator starts as attribution, not voting
+
+**Evidence:** v7.80 R2 synchronized Baseline, Shadow, Challenger and Regime opinions on the same canonical 12-asset research opportunities. Across 30d/60d/90d every support-count class remained negative. Consensus was non-monotonic: in 90d `SUPPORT_3` averaged -0.191R / PF 0.730 while `SUPPORT_4` averaged -0.247R / PF 0.662. Side conflict and hard disagreement were only weakly differentiated and did not provide a stable universal risk-off signal.
+
+**Decision:** Do not build the Meta Allocator as majority vote, do not add a universal side-conflict block, and do not map current matrix classes to FULL/REDUCED/EXPLORATORY/SKIP yet.
+
+**Next research:** Condition attribution on predeclared executable opportunity universes (`BASELINE_READY`, `ANY_SUPPORT`, `REGIME_ONLY`) and test chronological fold stability without changing underlying bot thresholds. The allocator may become a risk-information layer only after repeatable OOS differences emerge.
+
+**Method guard:** The R2 source outcome is A_CURRENT/Baseline-side geometry. Regime side conflict is therefore an opportunity-quality signal in this test, not evidence that the alternate Regime side would have been profitable.
