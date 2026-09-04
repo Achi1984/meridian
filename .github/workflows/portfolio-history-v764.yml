@@ -1,0 +1,33 @@
+name: MERIDIAN Portfolio History v7.64
+
+on:
+  push:
+    branches:
+      - fix/canonical-portfolio-history-v764
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Canonical history tests
+        run: node --test test/portfolio-history-store.test.js test/portfolio-history-runtime.test.js
+      - name: Syntax checks
+        run: |
+          node --check portfolio-history-store.js
+          node --check portfolio-history-runtime.js
+          node --check scripts/start-gateway.mjs
+          node --check server-gateway.js
+          node --check app-v7.61-depot-audit.js
+      - name: Release safety
+        run: npm run release:check

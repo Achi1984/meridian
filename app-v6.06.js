@@ -1,7 +1,7 @@
 /* MERIDIAN compatibility loader. The legacy filename remains referenced by index.html. */
 (function(){
   'use strict';
-  const TAG='7.63-R1';
+  const TAG='7.64-R2';
   const src=x=>x+'?v='+TAG;
   if(document.readyState==='loading'){
     document.write('<script src="'+src('app-v7.32-legacy.js')+'"><\/script>');
