@@ -21,8 +21,20 @@ jobs:
       - name: Deterministic install
         run: npm ci --ignore-scripts
       - name: Breakout Expansion tests
-        run: node --test test/breakout-expansion-v1.test.js
+        run: node --test test/breakout-expansion-v1.test.js test/breakout-expansion-evidence-v785.test.js
       - name: Syntax checks
-        run: node --check breakout-expansion-v1.js
+        run: |
+          node --check breakout-expansion-v1.js
+          node --check breakout-expansion-evidence-v785.js
+          node --check breakout-expansion-source-v785.js
+          node --check scripts/breakout-expansion-evidence-live-v785.mjs
       - name: Release safety
         run: npm run release:check
+      - name: 12-asset 30/60/90d evidence
+        run: node scripts/breakout-expansion-evidence-live-v785.mjs
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: breakout-expansion-v785-r2
+          path: artifacts/breakout-expansion-v785-r2.*
+          if-no-files-found: error
