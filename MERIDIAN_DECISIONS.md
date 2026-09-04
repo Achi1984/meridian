@@ -74,7 +74,7 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **Decision:** Do not choose an exit model by P&L alone.
 
-**Required evidence:** total R, average/median R, R win rate, giveback, TP1→BE stop rate, TP2 continuation, side/symbol/regime splits and robustness across time windows.
+**Required evidence:** total R, average/median R, R win rate, giveback, TP1→BE stop rate, TP2 continuation, side/symbol/regime/exit splits and robustness across time windows.
 
 ## D-011 — Regime is primarily a soft allocator/risk layer candidate
 
@@ -145,3 +145,13 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Method rule:** Separate signal-quality calibration from portfolio-path effects such as max-open-position, daily-loss and max-drawdown gates. A profitable portfolio window is not proof that the confidence score itself is calibrated.
 
 **Architecture rule:** Preserve the soft-scoring philosophy. Evidence that a bucket is weak does not automatically become another hard gate.
+
+## Portfolio Data Contract — current valuation has one source of truth
+
+**Decision:** The current Depot portfolio value is defined once as `spotUsd + Pionex equity` and must be reused by the headline and the final chart point. Individual UI components must not independently reconstruct their own current totals.
+
+**Why:** Repeated Depot fixes showed that independent display paths can produce contradictory values even when each local calculation appears plausible. A chart ending near $28,165 while the same screen reports a current total near $27,783 is a data-contract failure, not merely a chart-style issue.
+
+**Rules:** Pionex must not be double-counted as spot; current endpoint drift must be surfaced explicitly; `server.js` and trading execution remain outside this display/data-consistency change.
+
+**Known limitation:** The current-value contract does not fabricate historical Pionex equity. Full historical consistency requires canonical snapshots to be persisted at capture time with at least `spotUsd`, `tradingUsd`, and `totalUsd`.
