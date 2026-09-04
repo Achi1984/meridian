@@ -23,6 +23,7 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Project continuity: `7.50-CONTINUITY-V1`
 - Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
 - Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
+- Adaptive Evidence research core: `7.74-ADAPTIVE-EVIDENCE-V1` on branch `research/adaptive-evidence-v774` until reviewed/merged
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -72,6 +73,14 @@ A portfolio-independent signal calibration sampled one candidate per symbol per 
 
 Key result: **every confidence bucket was negative across 30d/60d/90d, and higher confidence was not monotonic with better outcomes.** This means the current compressed technical/candidate/distance/regime/status score stack is not sufficiently calibrated at signal level. Positive portfolio windows cannot be treated as proof of signal-score edge because portfolio gates/path dependence select subsets.
 
+## Adaptive Evidence Lab
+
+`adaptive-evidence.js` is the research-only foundation for Challenger V3.2. It derives side-aware raw context observations and consumes measured cohort statistics rather than fixed context bonuses. Small samples are shrunk toward neutral, cross-window agreement affects reliability, and missing evidence remains neutral.
+
+The current dimensions are side, regime, MTF alignment, momentum, volume, volatility, asset history and Baseline status as evidence only. The module also reports Market Capture / Opportunity Cost through coverage, missed-winner R, avoided-loser R and net skipped-signal opportunity cost.
+
+No Paper execution path imports this module at this checkpoint.
+
 ## Research philosophy
 
 More evidence must not automatically become more hard entry gates. Prefer a small number of hard safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft confidence/scoring inputs.
@@ -86,11 +95,11 @@ Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that r
 
 ## Current strategic direction
 
-1. **Do not build Challenger V3.2 as another threshold-only revision.**
-2. Build a **Raw Feature Edge Map / Feature Attribution Lab** using signal-level normalized outcomes before portfolio gates.
-3. Evaluate raw observations such as multi-timeframe alignment, ADX/trend strength, RSI state, MACD agreement, volume participation, EMA position/distance, side and regime.
-4. Use any discovered evidence primarily as calibrated soft scoring, not a proliferation of hard gates.
-5. Only after a predictive signal-quality model exists, create Challenger V3.2 and retest 30/60/90d plus walk-forward and opportunity cost.
+1. Keep Baseline 6.2 frozen and existing bots as controls.
+2. Complete the **Adaptive Evidence / Feature Attribution data pipeline** by generating portfolio-independent normalized-R cohorts for the raw observations used by `adaptive-evidence.js`.
+3. Validate feature effects across 30d / 60d / 90d and walk-forward windows; require adequate sample size and repeatability rather than isolated best buckets.
+4. Measure Market Capture / Opportunity Cost alongside PF, expectancy and DD so low-frequency variants are not rewarded merely for avoiding trades.
+5. Only after the evidence table demonstrates predictive signal quality should Challenger V3.2 consume it in portfolio replay.
 6. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
 7. Exit Lab can be layered onto a validated entry model later.
 
