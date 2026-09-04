@@ -6,7 +6,8 @@ const version=String(release.version||release.ui||'').trim();
 const build=String(release.buildId||'').trim();
 if(!/^\d+\.\d+$/.test(version)) throw new Error(`invalid release version: ${version}`);
 if(!build.startsWith(version+'-')) throw new Error(`buildId ${build} does not match version ${version}`);
-const cacheTag=version+'-R1';
+const revision=build.split('-').slice(-1)[0]||'R1';
+const cacheTag=`${version}-${revision}`;
 const pending=[];
 
 function apply(path,transform){
@@ -21,36 +22,9 @@ function required(text,re,replacement,label){
   return text.replace(re,replacement);
 }
 
-apply('index.html',src=>{
-  let s=src;
-  s=required(s,/<meta name="meridian-build" content="[^"]+">/,`<meta name="meridian-build" content="${build}">`,'index build meta');
-  s=required(s,/window\.MERIDIAN_RELEASE_VERSION='[^']+';/,`window.MERIDIAN_RELEASE_VERSION='${version}';`,'index release version');
-  s=required(s,/window\.MERIDIAN_RELEASE_BUILD='[^']+';/,`window.MERIDIAN_RELEASE_BUILD='${build}';`,'index release build');
-  s=s.replace(/manifest\.webmanifest\?v=[^"'<>\s]+/g,`manifest.webmanifest?v=${cacheTag}`);
-  s=s.replace(/styles-v6\.06\.css\?v=[^"'<>\s]+/g,`styles-v6.06.css?v=${cacheTag}`);
-  s=s.replace(/app-v6\.06\.js(?:\?v=[^"'<>\s]+)?/g,`app-v6.06.js?v=${cacheTag}`);
-  s=s.replace(/window\.MERIDIAN_RELEASE_BUILD\|\|'[^']+'/g,`window.MERIDIAN_RELEASE_BUILD||'${build}'`);
-  return s;
-});
-
-apply('app-v6.06.js',src=>{
-  let s=src;
-  s=required(s,/app-v7\.32-legacy\.js\?v=[^"'<>\s]+/g,`app-v7.32-legacy.js?v=${cacheTag}`,'compat legacy loader tag');
-  s=required(s,/app-v7\.33-hardening\.js\?v=[^"'<>\s]+/g,`app-v7.33-hardening.js?v=${cacheTag}`,'compat hardening loader tag');
-  s=required(s,/app-runtime-monitor\.js\?v=[^"'<>\s]+/g,`app-runtime-monitor.js?v=${cacheTag}`,'runtime monitor loader tag');
-  s=required(s,/app-v7\.37-ui-polish\.js\?v=[^"'<>\s]+/g,`app-v7.37-ui-polish.js?v=${cacheTag}`,'ui polish loader tag');
-  s=required(s,/app-v7\.38-regime-ui\.js\?v=[^"'<>\s]+/g,`app-v7.38-regime-ui.js?v=${cacheTag}`,'regime ui loader tag');
-  s=required(s,/app-v7\.39-paper-overview\.js\?v=[^"'<>\s]+/g,`app-v7.39-paper-overview.js?v=${cacheTag}`,'paper overview loader tag');
-  return s;
-});
-
-apply('app-v7.33-hardening.js',src=>{
-  let s=src;
-  s=required(s,/const VERSION='[^']+';/,`const VERSION='${version}';`,'hardening version');
-  s=required(s,/const BUILD='[^']+';/,`const BUILD='${build}';`,'hardening build');
-  s=s.replace(/manifest\.webmanifest\?v=[^'"\s]+/g,`manifest.webmanifest?v=${cacheTag}`);
-  return s;
-});
+// Runtime release authority is version.json. index.html remains a compatibility bootstrap;
+// app-release-authority.js corrects stale bootstrap painters immediately and observes later writes.
+apply('app-v6.06.js',src=>required(src,/const TAG='[^']+';/,`const TAG='${cacheTag}';`,'compat loader cache tag'));
 
 apply('manifest.webmanifest',()=>JSON.stringify({
   name:`ACHI MERIDIAN v${version}`,
@@ -68,7 +42,22 @@ apply('package.json',src=>{
   return JSON.stringify(p)+'\n';
 });
 
+apply('package-lock.json',src=>{
+  const p=JSON.parse(src);
+  p.version=version+'.0';
+  if(p.packages?.[''])p.packages[''].version=version+'.0';
+  return JSON.stringify(p,null,2)+'\n';
+});
+
+if(!fs.existsSync('app-release-authority.js'))throw new Error('app-release-authority.js missing');
+const authority=fs.readFileSync('app-release-authority.js','utf8');
+for(const marker of ["fetch('version.json?authority='+Date.now(),{cache:'no-store'})",'MERIDIAN_RELEASE_AUTHORITY','MutationObserver']){
+  if(!authority.includes(marker))throw new Error(`release authority marker missing: ${marker}`);
+}
+const loader=fs.readFileSync('app-v6.06.js','utf8');
+if(!loader.includes("app-release-authority.js"))throw new Error('compat loader must load app-release-authority.js');
+
 if(!write&&pending.length){
   throw new Error('release-generated files out of sync: '+pending.join(', '));
 }
-console.log(write?'release sync complete':'release sync clean',version,build);
+console.log(write?'release sync complete':'release sync clean',version,build,cacheTag);
