@@ -24,6 +24,9 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
 - Adaptive Evidence V1 (`7.74`) — completed negative signal-edge checkpoint on `research/adaptive-evidence-v774`
 - Context Interaction / Hierarchical Evidence V1 (`7.75`) — completed negative combined-selector checkpoint on `research/context-interaction-v775`
+- Interaction Family Ablation (`7.76`) and Volatility Context Drilldown/Robustness (`7.77`/`7.78`) — preserved research checkpoints; no promoted rule
+- Prospective locked holdout (`7.79`) — active, independent, and frozen pending matured future outcomes
+- Meta Allocator Decision Matrix (`7.80`) — active research line on `research/meta-allocator-v780-design`
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -64,7 +67,7 @@ Adaptive research control with a known side-rescoring methodological weakness. R
 Independent opportunity discovery was architecturally useful but empirical performance was not robust. Do not promote or resume blind threshold tuning.
 
 ### Signal Calibration v7.55
-Every tested confidence bucket was negative over 30d/60d/90d and higher confidence was not monotonic with better normalized outcome.
+Every tested confidence bucket was negative over 30d/60d/90d and higher confidence was not monotonic with better outcomes.
 
 ### Adaptive Evidence v7.74
 The full portfolio-independent 12-asset pipeline used one signal/symbol/4h, a 14-day A_CURRENT/full-TP1 outcome horizon, strict full-horizon censoring and expanding train-before-test validation.
@@ -86,9 +89,19 @@ The method increased coverage but selected OOS expectancy remained negative in e
 
 A notable repeated attribution is `LONG|BULL|NORMAL volatility` versus `LONG|BULL`, with positive residuals in 30d, 60d and 90d. This is a hypothesis for family-level OOS testing, not a fixed bonus.
 
+### Volatility-context sequence v7.76–v7.79
+Family ablation identified `SIDE_REGIME_VOLATILITY` as the only positive family in the 90d OOS slice, but follow-up context robustness failed. The predeclared `LONG|TRANSITION|NORMAL` context was negative over the full historical same-sample robustness check (107 signals, avg -0.043R, PF 0.93). v7.79 therefore freezes that hypothesis prospectively instead of tuning history further.
+
+### Meta Decision Matrix v7.80 R2
+v7.80 introduces a research-only matrix that synchronizes Baseline, Shadow, Challenger and Regime opinions for the same canonical research opportunity. R2 connected the matrix to the existing cloud-candidate pipeline and ran a 12-asset 30d/60d/90d evidence pass.
+
+Result: naive vote count, side conflict and hard disagreement do **not** establish edge in the broad sampled universe. Every support-count cohort remained negative in every window. `SUPPORT_3` was least negative in 60d/90d (-0.212R / PF 0.705 and -0.191R / PF 0.730), but still not promotable. Four-bot agreement was not consistently better than three-bot agreement, so consensus strength is non-monotonic.
+
 Durable evidence:
 - `research/adaptive-evidence-live-v774.md`
 - `research/context-interaction-live-v775.md`
+- `research/volatility-context-robustness-live-v778.md`
+- `research/meta-decision-matrix-live-v780-r2.md`
 
 ## Research philosophy
 
@@ -105,14 +118,14 @@ Exit Lab remains research-only. Runner/BE models were not robust enough across 3
 ## Current strategic direction
 
 1. Keep Baseline 6.2 frozen and all current bots as controls.
-2. Do not tune v7.74/v7.75 thresholds to rescue negative selectors.
-3. Build an **Interaction Family Attribution / Ablation Lab** that evaluates each predefined interaction family independently OOS on the same folds.
-4. Determine whether any family has repeatable positive avgR/PF with useful coverage across multiple windows.
-5. Specifically test whether side × regime × volatility survives OOS family attribution; do not assume the recurring `LONG|BULL|NORMAL` full-window residual is true edge.
-6. Only after individual family evidence exists, test a small predeclared combination; no unrestricted post-hoc combination search.
-7. Preserve full-horizon outcomes, strict prior-train/later-test separation, shrinkage, sample controls, Market Capture and Opportunity Cost.
-8. Only after positive signal-level OOS evidence should Challenger V3.2 portfolio replay exist.
-9. Regime V2 and Exit Lab remain separate future research axes.
+2. Keep v7.79 locked and prospectively monitored; do not rewrite its hypothesis.
+3. Continue Meta Allocator research as an **allocation/risk-information** layer rather than another raw-indicator bot.
+4. Do not use naive bot vote count, universal side-conflict blocks or hard disagreement as allocator rules based on v7.80 R2.
+5. Next run a predeclared **v7.80 R3 executable-universe attribution**: `BASELINE_READY`, `ANY_SUPPORT`, and `REGIME_ONLY`, with chronological fold stability.
+6. Inside those universes, compare Shadow support, Challenger TRADE vs CAUTION/SKIP, Regime agreement/conflict and 3-vs-4 support without changing existing thresholds.
+7. Only after repeatable OOS differences exist should a Shadow Meta Allocator map evidence to FULL / REDUCED / EXPLORATORY / SKIP.
+8. Regime V2 remains important before final allocator integration because V1 can retain original-side technical scoring after changing side.
+9. Portfolio cluster/correlation risk is a later overlay after decision-quality evidence exists.
 
 ## Promotion principle
 
