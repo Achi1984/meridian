@@ -5,6 +5,7 @@ import pg from "pg";
 import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
+import { readPortfolioHistory } from "./portfolio-history-store.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -180,6 +181,10 @@ async function researchAnalytics(){
   ]);
   return {...researchComparison({baseline,shadow,challenger,regime}),source:"POSTGRES_STATE"};
 }
+function portfolioHistoryRangeMs(raw){
+  const key=String(raw||'1d').toLowerCase();
+  return ({'1d':86400000,'1w':7*86400000,'1m':30*86400000,'6m':183*86400000,'1y':366*86400000})[key]||86400000;
+}
 
 function proxy(req,res,origin){
   const headers={...req.headers,host:`127.0.0.1:${INTERNAL_PORT}`};
@@ -311,6 +316,9 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="GET"&&u.pathname==="/api/private/dashboard"){
       const data=await stateGet(PRIVATE_STATE_KEY);
       return data?writeJson(res,200,{private:true,data},origin||""):writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/portfolio-history"){
+      return writeJson(res,200,await readPortfolioHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get('range')),limit:1800}),origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/activity-summary"){
       return writeJson(res,200,await activitySummary(),origin||"");
