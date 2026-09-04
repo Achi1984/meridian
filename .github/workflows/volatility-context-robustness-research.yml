@@ -1,0 +1,34 @@
+name: MERIDIAN Volatility Context Robustness
+
+on:
+  push:
+    branches:
+      - research/volatility-context-robustness-v778
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Robustness regression tests
+        run: node --test test/volatility-context-robustness.test.js
+      - name: Run 12-asset fixed-context robustness report
+        run: node scripts/volatility-context-robustness-live.mjs
+      - name: Upload robustness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-volatility-context-robustness-v778
+          path: |
+            research/generated/volatility-context-robustness-v778.json
+            research/generated/volatility-context-robustness-v778.md
+          retention-days: 30
