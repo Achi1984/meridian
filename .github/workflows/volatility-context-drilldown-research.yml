@@ -1,0 +1,34 @@
+name: MERIDIAN Volatility Context Drilldown
+
+on:
+  push:
+    branches:
+      - research/volatility-context-drilldown-v777
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Drilldown regression tests
+        run: node --test test/volatility-context-drilldown.test.js
+      - name: Run 12-asset volatility context drilldown
+        run: node scripts/volatility-context-drilldown-live.mjs
+      - name: Upload drilldown evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-volatility-context-v777
+          path: |
+            research/generated/volatility-context-drilldown-v777.json
+            research/generated/volatility-context-drilldown-v777.md
+          retention-days: 30
