@@ -19,12 +19,11 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Header/premium brand: `7.46-PREMIUM-BANNER`
 - Research telemetry: `7.47-TELEMETRY-V1`
 - Exit Lab historical replay: `7.49-EXIT-LAB-REPLAY-V1`
-- Fixed-entry replay mode: `7.49-FIXED-ENTRY-15M-REPLAY`
 - Project continuity: `7.50-CONTINUITY-V1`
 - Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
 - Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
-- Adaptive Evidence research core: `7.74-ADAPTIVE-EVIDENCE-V1` on branch `research/adaptive-evidence-v774` until reviewed/merged
-- Adaptive Evidence live 12-asset evidence: completed, negative signal-edge checkpoint; no promotion
+- Adaptive Evidence V1 (`7.74`) — completed negative signal-edge checkpoint on `research/adaptive-evidence-v774`
+- Context Interaction / Hierarchical Evidence V1 (`7.75`) — completed negative combined-selector checkpoint on `research/context-interaction-v775`
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -35,9 +34,7 @@ The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizin
 - Private portfolio/trading state is stored in PostgreSQL.
 - Read APIs are protected by bearer auth through `server-gateway.js`.
 - `MERIDIAN_READ_TOKEN` is hashed at startup and plaintext is removed from the runtime environment.
-- GitHub Pages and Northflank rollout are checked by Runtime Smoke.
 - Release Safety checks syntax, regression tests, release consistency, privacy, secret scanning and the paper-only invariant.
-- Historical Git history may still contain old sensitive snapshots. No destructive history rewrite has been performed.
 
 ## UI principles
 
@@ -47,84 +44,83 @@ The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizin
 - PAPER opens on `ÜBERSICHT`; bot tabs are ordered overview first.
 - UI work must not disturb bot or research execution.
 
-## Active bot set
+## Active bot controls
 
 ### Baseline 6.2
-Reference bot. Frozen execution. Its purpose is to provide the unchanged benchmark against which all research variants are measured.
+Frozen reference benchmark.
 
 ### Shadow V1
-Hard-filter research control. It only acts on Baseline-ready candidates and adds strict technical/candidate/regime gates. Useful to measure the cost and benefit of aggressive filtering, but not intended as the preferred architecture.
+Hard-filter/low-DD research control. Fewer trades are not automatically better.
 
 ### Challenger V2
-Soft-confidence research bot. It currently scores technical quality, candidate quality, entry distance and regime adjustment. Important limitation: its real Paper trade universe still depends on Baseline `READY`, so it cannot discover opportunities outside the Baseline-ready pool.
+Current strongest existing Challenger control. Uses soft confidence but still depends on Baseline `READY` for its executable universe.
 
 ### Regime V1
-Adaptive research bot. Can alter direction and strategy behavior by regime. Known methodological limitation: when it changes side, parts of `technical` and `candidate` scoring still originate from the original Baseline direction. This must be corrected in a future Regime V2 rather than silently changing V1.
+Adaptive research control with a known side-rescoring methodological weakness. Regime V2 must recompute directional evidence after final side selection.
 
-## Rejected / experimental Challenger research
+## Rejected / non-promotable research checkpoints
 
-### Challenger V3
-V3 correctly removed the hidden Baseline `READY` dependency, but the wider opportunity universe performed poorly in 30d/60d and was weaker than V2/Baseline in the 90d comparison. Do not merge or promote V3 as implemented.
+### Challenger V3 / V3.1
+Independent opportunity discovery was architecturally useful but empirical performance was not robust. Do not promote or resume blind threshold tuning.
 
-### Challenger V3.1
-V3.1 increased entry-distance/status penalties and reduced non-READY risk. It improved substantially over V3 but still failed the robustness/promotion standard. Do not promote it and do not keep tuning thresholds blindly.
+### Signal Calibration v7.55
+Every tested confidence bucket was negative over 30d/60d/90d and higher confidence was not monotonic with better normalized outcome.
 
-### Signal Calibration Lab
-A portfolio-independent signal calibration sampled one candidate per symbol per 4h across BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Each candidate received an A_CURRENT normalized-R outcome with a 14-day horizon and portfolio gates excluded.
-
-Key result: **every confidence bucket was negative across 30d/60d/90d, and higher confidence was not monotonic with better outcomes.** This means the current compressed technical/candidate/distance/regime/status score stack is not sufficiently calibrated at signal level. Positive portfolio windows cannot be treated as proof of signal-score edge because portfolio gates/path dependence select subsets.
-
-## Adaptive Evidence Lab
-
-`adaptive-evidence.js` is the research-only foundation intended to test a future Challenger V3.2 architecture. It derives side-aware raw context observations and consumes measured cohort statistics rather than fixed context bonuses. Small samples are shrunk toward neutral, cross-window agreement affects reliability, and missing evidence remains neutral.
-
-The v7.74 pipeline now includes portfolio-independent cohort construction, full-horizon censoring guards, expanding train-before-test validation, a canonical public-market source adapter, reproducible reporting, Market Capture / Opportunity Cost and a dedicated GitHub Actions evidence workflow.
-
-### First real 12-asset result
-
-The definitive v7.74 run sampled BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ on a consistent one-signal-per-symbol-per-4h master cohort with A_CURRENT/full TP1 and a complete 14-day horizon.
+### Adaptive Evidence v7.74
+The full portfolio-independent 12-asset pipeline used one signal/symbol/4h, a 14-day A_CURRENT/full-TP1 outcome horizon, strict full-horizon censoring and expanding train-before-test validation.
 
 - 30d: 2,160 signals, avg -0.403R; OOS selected 0
-- 60d: 4,320 signals, avg -0.314R; OOS selected 3 at avg -1.133R / PF 0
-- 90d: 6,480 signals, avg -0.270R; OOS selected 397 at avg -0.203R / PF 0.711
-- 90d coverage: 7.7%; Market Capture: 8.4%
-- Master 90d cohort: avg -0.2697R; LONG -0.3006R; SHORT -0.2440R
+- 60d: 4,320 signals, avg -0.314R; OOS selected 3 at -1.133R / PF 0
+- 90d: 6,480 signals, avg -0.270R; OOS selected 397 at -0.203R / PF 0.711
 
-Conclusion: **Adaptive Evidence V1 does not establish positive predictive signal-level edge and is not a promotion candidate.** Do not lower thresholds to manufacture trade frequency and do not convert weak marginal findings into more hard filters.
+Conclusion: marginal Adaptive Evidence V1 does not establish predictive signal-level edge.
 
-The detailed concise evidence is preserved in `research/adaptive-evidence-live-v774.md`. The large raw report remains in its reproducible GitHub Actions artifact.
+### Context Interaction v7.75
+v7.75 residualized predefined child interactions against broader parent cohorts and compared the combined interaction selector to v7.74 on the identical master cohort.
+
+- 30d interaction: 113 selected, avg -0.657R, PF 0.324, 6.5% coverage
+- 60d interaction: 977 selected, avg -0.377R, PF 0.531, 28.3% coverage
+- 90d interaction: 978 selected, avg -0.300R, PF 0.604, 18.9% coverage
+
+The method increased coverage but selected OOS expectancy remained negative in every window. It is not a promotion candidate.
+
+A notable repeated attribution is `LONG|BULL|NORMAL volatility` versus `LONG|BULL`, with positive residuals in 30d, 60d and 90d. This is a hypothesis for family-level OOS testing, not a fixed bonus.
+
+Durable evidence:
+- `research/adaptive-evidence-live-v774.md`
+- `research/context-interaction-live-v775.md`
 
 ## Research philosophy
 
-More evidence must not automatically become more hard entry gates. Prefer a small number of hard safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft confidence/scoring inputs.
+More evidence must not automatically become more hard entry gates. Prefer few true safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft evidence.
 
-Always evaluate performance AND trade frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/out-of-sample stability.
+Always evaluate performance AND frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/OOS stability.
 
-Do not assume fewer trades are automatically better. A research variant that improves PF merely by removing most opportunity is not necessarily superior.
+Full-window attribution is not OOS proof. Negative results are preserved rather than tuned away.
 
 ## Exit Lab
 
-Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that runner models can materially improve some windows, especially 90d, but can underperform full TP1 in others, especially 60d. No runner/BE policy is promoted yet. Challenger experiments remain on A_CURRENT/full TP1 until entry/scoring edge is established.
+Exit Lab remains research-only. Runner/BE models were not robust enough across 30d/60d/90d for promotion. Keep exit research separate until entry/scoring edge is established.
 
 ## Current strategic direction
 
-1. Keep Baseline 6.2 frozen and existing bots as controls.
-2. Treat Adaptive Evidence V1 as research infrastructure plus a negative calibration checkpoint, not as Challenger V3.2.
-3. Build the next **Context Interaction / Hierarchical Evidence Lab** using predefined, interpretable conditional interactions rather than unrestricted bucket search.
-4. Test side × regime × MTF, side × regime × momentum, side × regime × volatility, asset × side × regime and side × MTF × momentum where sample size is adequate.
-5. Center conditional evidence against broader base rates / parent cohorts so correlated marginal evidence is not counted repeatedly. Use residual or hierarchical shrinkage rather than simply summing raw avgR buckets.
-6. Preserve strict prior-train / later-test validation, full-horizon outcomes, sample-size controls, cross-window stability and Market Capture / Opportunity Cost.
-7. Only after a revised signal-quality model demonstrates repeatable positive OOS edge should Challenger V3.2 portfolio replay be built.
-8. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
-9. Exit Lab can be layered onto a validated entry model later.
+1. Keep Baseline 6.2 frozen and all current bots as controls.
+2. Do not tune v7.74/v7.75 thresholds to rescue negative selectors.
+3. Build an **Interaction Family Attribution / Ablation Lab** that evaluates each predefined interaction family independently OOS on the same folds.
+4. Determine whether any family has repeatable positive avgR/PF with useful coverage across multiple windows.
+5. Specifically test whether side × regime × volatility survives OOS family attribution; do not assume the recurring `LONG|BULL|NORMAL` full-window residual is true edge.
+6. Only after individual family evidence exists, test a small predeclared combination; no unrestricted post-hoc combination search.
+7. Preserve full-horizon outcomes, strict prior-train/later-test separation, shrinkage, sample controls, Market Capture and Opportunity Cost.
+8. Only after positive signal-level OOS evidence should Challenger V3.2 portfolio replay exist.
+9. Regime V2 and Exit Lab remain separate future research axes.
 
 ## Promotion principle
 
-No research bot is automatically promoted because it has the best current P&L. Promotion requires a common evaluation window, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage, reasonable stability across windows/regimes and human approval.
+No research bot is automatically promoted. Promotion requires common-window evaluation, adequate samples, positive OOS expectancy/PF, acceptable later portfolio drawdown, sufficient opportunity coverage, stability across windows/regimes and explicit human approval.
 
 ## Continuity rule
 
-For every substantial MERIDIAN release or research conclusion, update these three files when project state or reasoning changes:
+For every substantial MERIDIAN release or research conclusion, update:
 - `MERIDIAN_CONTEXT.md`
 - `MERIDIAN_DECISIONS.md`
 - `MERIDIAN_HANDOFF.md`
