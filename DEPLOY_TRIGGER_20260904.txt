@@ -1,3 +1,4 @@
 MERIDIAN deployment trigger
-Requested after v7.61 R5 selector fix.
+Requested after v7.61 R7 compatibility-aware sync fix.
+Trigger timestamp: 2026-09-04T13:07:00+02:00
 No runtime or UI logic change.
