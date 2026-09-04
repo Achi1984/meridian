@@ -1,0 +1,21 @@
+{
+  "version": "7.74-ADAPTIVE-EVIDENCE-LIVE-SUMMARY",
+  "researchOnly": true,
+  "promotion": false,
+  "workflowRunId": 33911834647,
+  "sourceCommit": "37e569f5d03ea579126017f10fabe5f2d69eeb6b",
+  "artifactId": 9951674418,
+  "artifactSha256": "9c2066fa4d5ef2da6bbd342d553f08b306c3f6e64323cf9d47ddc0b1db2010c4",
+  "assets": ["BTC","ETH","SOL","XRP","ADA","SUI","HBAR","AVAX","NEAR","DOT","FET","INJ"],
+  "method": "PORTFOLIO_INDEPENDENT_MASTER_COHORT_FULL_HORIZON_PLUS_EXPANDING_OOS",
+  "horizonDays": 14,
+  "sampling": "one signal per symbol per 4h",
+  "windows": {
+    "30d": {"signals":2160,"avgR":-0.403,"winRatePct":39.7,"selected":0,"selectedAvgR":null,"selectedPF":0,"coveragePct":0,"marketCapturePct":0},
+    "60d": {"signals":4320,"avgR":-0.314,"winRatePct":41.3,"selected":3,"selectedAvgR":-1.133,"selectedPF":0,"coveragePct":0.1,"marketCapturePct":0},
+    "90d": {"signals":6480,"avgR":-0.270,"winRatePct":41.7,"selected":397,"selectedAvgR":-0.203,"selectedPF":0.711,"coveragePct":7.7,"marketCapturePct":8.4}
+  },
+  "master90d": {"signals":6480,"avgR":-0.2697,"medianR":-1.1296,"totalR":-1747.3782,"longAvgR":-0.3006,"shortAvgR":-0.2440},
+  "conclusion": "Adaptive Evidence V1 does not establish positive predictive signal-level edge. Do not promote or lower thresholds to manufacture trade frequency.",
+  "next": "Context Interaction / Hierarchical Evidence Lab with predefined interactions, parent/base-rate residual evidence, shrinkage and strict train-before-test validation."
+}
