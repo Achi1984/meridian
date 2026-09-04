@@ -1,0 +1,28 @@
+name: MERIDIAN Retest Hold Breakout v7.86
+
+on:
+  push:
+    branches:
+      - research/retest-hold-breakout-v786
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Retest Hold tests
+        run: node --test test/retest-hold-breakout-v2.test.js
+      - name: Syntax check
+        run: node --check retest-hold-breakout-v2.js
+      - name: Release safety
+        run: npm run release:check
