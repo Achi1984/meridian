@@ -1,8 +1,8 @@
-/* MERIDIAN v7.62 R1 — Pionex equity SSOT resolver. Display/state consistency only; execution unchanged. */
+/* MERIDIAN v7.62 R3 — Pionex equity SSOT resolver. Display/state consistency only; execution unchanged. */
 (function(){
   'use strict';
   const VERSION='7.62';
-  const BUILD='7.62-20260904-R1';
+  const BUILD='7.62-20260904-R3';
 
   function data(){try{return typeof DATA!=='undefined'?DATA:window.DATA}catch(_e){return window.DATA||null}}
   function leafs(root){return root?[...root.querySelectorAll('*')].filter(el=>el.children.length===0):[]}
@@ -37,19 +37,26 @@
     if(mb)push(candidate(mb.value??mb.valueUsd,'MANUAL_VENUE',mb.updatedAt||p.snapshotAt||d?.privateUpdatedAt,70));
 
     const seedLike=String(d?.privateUpdateSource||'').toLowerCase().includes('known_holdings_startup_seed') || String(p?.pionexEquitySource||'').toUpperCase()==='KNOWN_SEED';
-    push(candidate(p.pionexEquityUsd,seedLike?'KNOWN_SEED':'PORTFOLIO_EQUITY',p.pionexEquityUpdatedAt||d?.privateUpdatedAt,seedLike?40:80));
+    push(candidate(p.pionexEquityUsd,seedLike?'KNOWN_SEED':'PORTFOLIO_EQUITY',p.pionexEquityUpdatedAt||d?.privateUpdatedAt,seedLike?10:80));
     return out;
   }
 
   function resolvePionex(d){
     const cs=collectCandidates(d);
-    if(!cs.length)return {value:0,source:'UNAVAILABLE',updatedAt:0};
-    cs.sort((a,b)=>{
-      const freshDelta=(b.updatedAt||0)-(a.updatedAt||0);
-      if(Math.abs(freshDelta)>60000)return freshDelta;
-      return b.priority-a.priority;
-    });
+    if(!cs.length)return {value:0,source:'UNAVAILABLE',updatedAt:0,priority:0};
+    /* Source quality is authoritative. Freshness only breaks ties within an equally trusted source tier. */
+    cs.sort((a,b)=>(b.priority-a.priority)||((b.updatedAt||0)-(a.updatedAt||0)));
     return cs[0];
+  }
+
+  function normalizeVenueRows(p,res){
+    if(!p||!res||res.value<=0)return;
+    const rows=Array.isArray(p.byVenue)?p.byVenue:[];
+    const idx=rows.findIndex(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex');
+    if(idx>=0){
+      rows[idx]={...rows[idx],value:res.value,valueUsd:res.value,totalUsd:res.value,updatedAt:res.updatedAt?new Date(res.updatedAt).toISOString():rows[idx]?.updatedAt,source:res.source};
+      p.byVenue=rows;
+    }
   }
 
   function normalizeData(d,res){
@@ -63,6 +70,7 @@
     const row={venue:'Pionex',value:res.value,valueUsd:res.value,kind:'TRADING_CAPITAL',updatedAt:p.pionexEquityUpdatedAt||new Date().toISOString(),source:res.source};
     if(idx>=0)rows[idx]={...rows[idx],...row}; else rows.push(row);
     p.manualVenueBalances=rows;
+    normalizeVenueRows(p,res);
   }
 
   function spotValue(d){
@@ -78,11 +86,34 @@
     return sum;
   }
 
+  function decorateWallet(root,res){
+    const heading=findLeaf(root,/^BÖRSE\s*\/\s*WALLET$/i);if(!heading)return;
+    let section=heading.parentElement;
+    for(let i=0;i<5&&section?.parentElement;i++){
+      if(/Bitpanda/i.test(section.textContent||'')&&/Pionex/i.test(section.textContent||''))break;
+      section=section.parentElement;
+    }
+    if(!section)return;
+    const pionex=findLeaf(section,/^Pionex$/i);if(!pionex)return;
+    let row=pionex.parentElement;
+    for(let i=0;i<4&&row?.parentElement;i++){
+      if(/Pionex/i.test(row.textContent||'')&&/\$/.test(row.textContent||''))break;
+      row=row.parentElement;
+    }
+    if(!row)return;
+    const money=leafs(row).find(el=>/^\s*\$\s*[\d.]+(?:,\d+)?\s*$/.test(String(el.textContent||'')));
+    if(money)money.textContent=fmtUsd(res.value);
+    const badge=leafs(row).find(el=>/^(SNAPSHOT|EQUITY SNAPSHOT|STATIC SEED)$/i.test(String(el.textContent||'').trim()));
+    if(badge)badge.textContent=res.source==='KNOWN_SEED'?'STATIC SEED':'EQUITY SNAPSHOT';
+  }
+
   function decorate(d,res){
     const root=document.getElementById('view-depot');if(!root)return;
     const spot=spotValue(d);
     const line=leafs(root).find(el=>/^GESAMT\s*=\s*SPOT\s*\+/i.test(String(el.textContent||'').trim()));
     if(line)line.textContent=`GESAMT = SPOT + PIONEX EQUITY · SPOT ${fmtK(spot)} · PIONEX ${fmtUsd(res.value)} ${res.source==='KNOWN_SEED'?'STATIC SEED':'PRIVATE SNAPSHOT'}`;
+
+    decorateWallet(root,res);
 
     const exposure=findLeaf(root,/^FUTURES\s*&\s*EXPOSURE$/i);
     if(exposure){
@@ -102,7 +133,7 @@
         const anchor=findLeaf(section,/^BOT-KAPITAL$/i)?.parentElement?.parentElement||exposure.parentElement;
         anchor?.insertAdjacentElement('afterend',note);
       }
-      if(note)note.textContent=res.source==='KNOWN_SEED'?'PIONEX EQUITY · STATIC SEED · NICHT LIVE':'PIONEX EQUITY · PRIVATE SNAPSHOT SSOT';
+      if(note)note.textContent=res.source==='KNOWN_SEED'?'PIONEX EQUITY · STATIC SEED · NICHT LIVE':`PIONEX EQUITY · ${res.source.replaceAll('_',' ')} · SSOT`;
     }
   }
 
