@@ -1,7 +1,7 @@
 /* MERIDIAN compatibility loader. The legacy filename remains referenced by index.html. */
 (function(){
   'use strict';
-  const TAG='7.62-R3';
+  const TAG='7.62-R4';
   const src=x=>x+'?v='+TAG;
   if(document.readyState==='loading'){
     document.write('<script src="'+src('app-v7.32-legacy.js')+'"><\/script>');
@@ -15,6 +15,7 @@
     document.write('<script src="'+src('app-v7.61-market-audit.js')+'"><\/script>');
     document.write('<script src="'+src('app-v7.61-depot-audit.js')+'"><\/script>');
     document.write('<script src="'+src('app-v7.62-pionex-ssot.js')+'"><\/script>');
+    document.write('<script src="'+src('app-v7.62-market-consistency.js')+'"><\/script>');
     document.write('<script src="'+src('app-release-authority.js')+'"><\/script>');
     return;
   }
@@ -30,6 +31,7 @@
     .then(()=>load('app-v7.61-market-audit.js'))
     .then(()=>load('app-v7.61-depot-audit.js'))
     .then(()=>load('app-v7.62-pionex-ssot.js'))
+    .then(()=>load('app-v7.62-market-consistency.js'))
     .then(()=>load('app-release-authority.js'))
     .catch(e=>console.error('MERIDIAN loader',e));
 })();
