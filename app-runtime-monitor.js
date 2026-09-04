@@ -9,7 +9,9 @@
   function fallbackExpected(){
     return {
       version:String(window.MERIDIAN_RELEASE_VERSION||window.MERIDIAN_UI_VERSION||''),
-      buildId:String(window.MERIDIAN_RELEASE_BUILD||window.__MERIDIAN_BUILD__||'')
+      buildId:String(window.MERIDIAN_RELEASE_BUILD||window.__MERIDIAN_BUILD__||''),
+      engine:String(window.MERIDIAN_ENGINE_VERSION||''),
+      ruleset:String(window.MERIDIAN_RULESET||'')
     };
   }
   function style(){
@@ -58,10 +60,26 @@
   async function expected(){
     try{
       const j=await getJson('version.json?runtime='+Date.now(),5000);
-      const next={version:String(j?.version||j?.ui||''),buildId:String(j?.buildId||'')};
+      const next={
+        version:String(j?.version||j?.ui||''),
+        buildId:String(j?.buildId||''),
+        engine:String(j?.engine||''),
+        ruleset:String(j?.ruleset||'')
+      };
       if(next.version&&next.buildId)localRelease=next;
     }catch(_e){}
     return localRelease||fallbackExpected();
+  }
+  function sameField(a,b){
+    const x=String(a||''),y=String(b||'');
+    return !x||!y||x===y;
+  }
+  function compatibility(exp,h){
+    const exact=!!h?.ok && String(h.version||'')===exp.version && String(h.buildId||'')===exp.buildId;
+    const versionOk=!!h?.ok && String(h.version||'')===exp.version;
+    const engineOk=sameField(exp.engine,h?.engine);
+    const rulesetOk=sameField(exp.ruleset,h?.ruleset);
+    return {exact,compatible:versionOk&&engineOk&&rulesetOk,versionOk,engineOk,rulesetOk};
   }
   async function check(){
     if(busy)return;
@@ -69,16 +87,18 @@
     try{
       const exp=await expected();
       const h=await getJson(API+'/gateway-health?ts='+Date.now());
-      const same=!!h?.ok&&String(h.version||'')===exp.version&&String(h.buildId||'')===exp.buildId;
+      const c=compatibility(exp,h);
       const privateOk=h?.privateData!==false;
       const shortSha=String(h?.deploymentSha||'').slice(0,7);
-      const detail=`UI ${exp.version} / ${exp.buildId} · Gateway ${h?.version||'—'} / ${h?.buildId||'—'}${shortSha?' · '+shortSha:''}`;
-      if(!same){
-        setState('wait','SYNC WAIT',detail,{gateway:h,expected:exp});
+      const detail=`UI ${exp.version} / ${exp.buildId} · Gateway ${h?.version||'—'} / ${h?.buildId||'—'}${shortSha?' · '+shortSha:''}${c.exact?' · exact build':' · compatible build'}`;
+      if(!h?.ok){
+        setState('error','GATEWAY',detail,{gateway:h,expected:exp,compatibility:c});
+      }else if(!c.compatible){
+        setState('wait','SYNC WAIT',detail,{gateway:h,expected:exp,compatibility:c});
       }else if(!privateOk){
-        setState('error','STORE',detail+' · private store unavailable',{gateway:h,expected:exp});
+        setState('error','STORE',detail+' · private store unavailable',{gateway:h,expected:exp,compatibility:c});
       }else{
-        setState('sync','SYNC',detail,{gateway:h,expected:exp});
+        setState('sync','SYNC',detail,{gateway:h,expected:exp,compatibility:c,exactBuild:c.exact});
       }
     }catch(e){
       setState('error','GATEWAY',String(e?.message||e),{error:String(e?.message||e),expected:localRelease||fallbackExpected()});
@@ -86,6 +106,7 @@
   }
 
   window.MERIDIAN_RUNTIME_CHECK=check;
+  window.MERIDIAN_RUNTIME_COMPATIBILITY=compatibility;
   function start(){badge();check()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
