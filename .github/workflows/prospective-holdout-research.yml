@@ -1,0 +1,36 @@
+name: MERIDIAN Prospective Holdout
+
+on:
+  push:
+    branches:
+      - research/prospective-holdout-v779
+  workflow_dispatch:
+  schedule:
+    - cron: '25 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Holdout regression tests
+        run: node --test test/prospective-holdout.test.js
+      - name: Run locked 12-asset prospective holdout
+        run: node scripts/prospective-holdout-live.mjs
+      - name: Upload holdout evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-prospective-holdout-v779
+          path: |
+            research/generated/prospective-holdout-v779.json
+            research/generated/prospective-holdout-v779.md
+          retention-days: 30
