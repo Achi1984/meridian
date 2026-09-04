@@ -43,13 +43,9 @@ Depot R2:
 
 ## Verification
 
-The dedicated v7.64 workflow checks:
-- deterministic npm install
-- canonical history store/runtime regression tests
-- syntax for history store/runtime, gateway bootstrap, `server-gateway.js` and Depot adapter
-- Release Safety
+The dedicated v7.64 workflow checks deterministic npm install, canonical history store/runtime regression tests, syntax for history store/runtime, gateway bootstrap, `server-gateway.js` and Depot adapter, plus Release Safety.
 
-A temporary npm-integrity failure occurred while release files were being manually synchronized; the branch was corrected by restoring the exact dependency checksums from `main` and changing only release version fields. Recheck the latest branch run before merge; do not merge a failed head.
+A temporary npm-integrity failure occurred while release files were being manually synchronized. It was corrected by restoring the exact dependency checksums from `main` and changing only the release version fields. The corrected validation head is `de73c10c6f5d3114b9b571e8e0c0a69ae23e8fdf`; recheck its workflow before merge.
 
 ## Deployment verification after merge
 
