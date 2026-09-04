@@ -132,7 +132,7 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 ## D-020 — Challenger V3.1 improved risk/selection but still did not justify promotion
 
-**Evidence:** V3.1 strengthened distance/status penalties and reduced non-READY risk. It improved materially over V3 and reduced 90d drawdown, but remained weaker than Challenger V2/Baseline on the main comparison and was still unstable across windows.
+**Evidence:** V3.1 strengthened soft penalties for entry distance/status and reduced risk outside READY. It improved materially over V3 and reduced 90d drawdown, but remained weaker than Challenger V2/Baseline on the main comparison and was still unstable across windows.
 
 **Decision:** Do not promote V3.1. Do not continue threshold tuning blindly.
 
@@ -146,12 +146,20 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **Architecture rule:** Preserve the soft-scoring philosophy. Evidence that a bucket is weak does not automatically become another hard gate.
 
-## Portfolio Data Contract — current valuation has one source of truth
+## D-022 — Portfolio current valuation has one source of truth
 
-**Decision:** The current Depot portfolio value is defined once as `spotUsd + Pionex equity` and must be reused by the headline and the final chart point. Individual UI components must not independently reconstruct their own current totals.
+**Decision:** The current Depot portfolio value is defined once as `spotUsd + Pionex equity` and must be reused by the headline and final chart point. Individual UI components must not independently reconstruct current totals.
 
-**Why:** Repeated Depot fixes showed that independent display paths can produce contradictory values even when each local calculation appears plausible. A chart ending near $28,165 while the same screen reports a current total near $27,783 is a data-contract failure, not merely a chart-style issue.
+**Why:** Repeated Depot fixes showed that independent display paths can produce contradictory values even when each local calculation appears plausible.
 
 **Rules:** Pionex must not be double-counted as spot; current endpoint drift must be surfaced explicitly; `server.js` and trading execution remain outside this display/data-consistency change.
 
-**Known limitation:** The current-value contract does not fabricate historical Pionex equity. Full historical consistency requires canonical snapshots to be persisted at capture time with at least `spotUsd`, `tradingUsd`, and `totalUsd`.
+## D-023 — Historical portfolio metrics must come from persisted canonical snapshots
+
+**Decision:** Portfolio history is persisted at capture time in PostgreSQL with Spot, Pionex/trading, total and cashflow metadata. Chart, High/Low and 1D Performance should consume the same stored series rather than reconstructing history from today's component values.
+
+**Why:** A current-value SSOT alone cannot make old chart points trustworthy when Pionex equity changes over time.
+
+**Warm-up rule:** A newly deployed canonical history must not immediately replace a longer legacy chart with a tiny sample. v7.64 only switches a time range after minimum point count and coverage are met; otherwise v7.63 current-value alignment remains the fallback.
+
+**Privacy/safety:** The history endpoint remains bearer-protected and PostgreSQL-backed. This change does not alter Baseline 6.2, `server.js`, Paper execution or research logic.
