@@ -57,3 +57,17 @@ test('prepared events contain canonical signal and matching 15m candle after mul
     assert.equal(ev.candles.AAAUSDT.closeTime,ev.t);
   }
 });
+
+test('market source falls back to Binance public data endpoint when primary is geo-blocked',async()=>{
+  const calls=[];
+  const fetchImpl=async url=>{
+    calls.push(url);
+    if(url.startsWith('https://api.binance.com'))return{ok:false,status:451,json:async()=>({})};
+    return{ok:true,status:200,json:async()=>[[0,'100','101','99','100.5','10',M15-1]]};
+  };
+  const page=await sourceTest.fetchPage('BTCUSDT','15m',0,M15,{fetchImpl,onRetry:()=>{}});
+  assert.equal(page.endpoint,'https://data-api.binance.vision');
+  assert.equal(page.json.length,1);
+  assert.ok(calls.some(x=>x.startsWith('https://api.binance.com')));
+  assert.ok(calls.some(x=>x.startsWith('https://data-api.binance.vision')));
+});
