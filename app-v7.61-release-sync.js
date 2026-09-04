@@ -1,9 +1,9 @@
-/* MERIDIAN v7.61 R7 — release/cache authority bridge. UI only; execution unchanged. */
+/* MERIDIAN v7.61 R8 — release/cache authority bridge. UI only; execution unchanged. */
 (function(){
   'use strict';
   const VERSION='7.61';
-  const BUILD='7.61-20260904-R7';
-  const STYLE_ID='meridian-v761-r7-tabs';
+  const BUILD='7.61-20260904-R8';
+  const STYLE_ID='meridian-v761-r8-tabs';
 
   function stamp(){
     window.MERIDIAN_RELEASE_VERSION=VERSION;
@@ -21,7 +21,7 @@
       const raw=link.getAttribute('href')||'';
       if(!/styles-v6\.06\.css/i.test(raw))return;
       const u=new URL(raw,location.href);
-      const tag=`${VERSION}-R7`;
+      const tag=`${VERSION}-R8`;
       if(u.searchParams.get('v')===tag)return;
       u.searchParams.set('v',tag);
       link.href=u.pathname+u.search;
@@ -39,17 +39,17 @@
       #view-trade .segment-nav{
         position:relative!important;top:auto!important;z-index:auto!important;
         display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
-        min-height:0!important;height:auto!important;padding:4px!important;
-        margin:0 0 12px!important;gap:4px!important;border:1px solid #173f5b!important;
-        border-radius:15px!important;background:#06111a!important;box-shadow:none!important
+        min-height:0!important;height:auto!important;padding:3px!important;
+        margin:0 0 10px!important;gap:3px!important;border:1px solid #173f5b!important;
+        border-radius:13px!important;background:#06111a!important;box-shadow:none!important
       }
       #view-market .segment-nav button,
       #view-daytrade .segment-nav button,
       #view-trade .segment-nav button{
-        min-width:0!important;width:100%!important;min-height:42px!important;height:42px!important;
-        padding:0 12px!important;margin:0!important;border:1px solid transparent!important;
-        border-radius:11px!important;background:transparent!important;color:#8293a7!important;
-        font-size:11px!important;font-weight:900!important;letter-spacing:.08em!important;
+        min-width:0!important;width:100%!important;min-height:38px!important;height:38px!important;
+        padding:0 10px!important;margin:0!important;border:1px solid transparent!important;
+        border-radius:9px!important;background:transparent!important;color:#8293a7!important;
+        font-size:10px!important;font-weight:900!important;letter-spacing:.08em!important;
         line-height:1!important;box-shadow:none!important
       }
       #view-market .segment-nav button.active,
