@@ -24,6 +24,7 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
 - Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
 - Adaptive Evidence research core: `7.74-ADAPTIVE-EVIDENCE-V1` on branch `research/adaptive-evidence-v774` until reviewed/merged
+- Adaptive Evidence live 12-asset evidence: completed, negative signal-edge checkpoint; no promotion
 
 The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
 
@@ -75,11 +76,23 @@ Key result: **every confidence bucket was negative across 30d/60d/90d, and highe
 
 ## Adaptive Evidence Lab
 
-`adaptive-evidence.js` is the research-only foundation for Challenger V3.2. It derives side-aware raw context observations and consumes measured cohort statistics rather than fixed context bonuses. Small samples are shrunk toward neutral, cross-window agreement affects reliability, and missing evidence remains neutral.
+`adaptive-evidence.js` is the research-only foundation intended to test a future Challenger V3.2 architecture. It derives side-aware raw context observations and consumes measured cohort statistics rather than fixed context bonuses. Small samples are shrunk toward neutral, cross-window agreement affects reliability, and missing evidence remains neutral.
 
-The current dimensions are side, regime, MTF alignment, momentum, volume, volatility, asset history and Baseline status as evidence only. The module also reports Market Capture / Opportunity Cost through coverage, missed-winner R, avoided-loser R and net skipped-signal opportunity cost.
+The v7.74 pipeline now includes portfolio-independent cohort construction, full-horizon censoring guards, expanding train-before-test validation, a canonical public-market source adapter, reproducible reporting, Market Capture / Opportunity Cost and a dedicated GitHub Actions evidence workflow.
 
-No Paper execution path imports this module at this checkpoint.
+### First real 12-asset result
+
+The definitive v7.74 run sampled BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ on a consistent one-signal-per-symbol-per-4h master cohort with A_CURRENT/full TP1 and a complete 14-day horizon.
+
+- 30d: 2,160 signals, avg -0.403R; OOS selected 0
+- 60d: 4,320 signals, avg -0.314R; OOS selected 3 at avg -1.133R / PF 0
+- 90d: 6,480 signals, avg -0.270R; OOS selected 397 at avg -0.203R / PF 0.711
+- 90d coverage: 7.7%; Market Capture: 8.4%
+- Master 90d cohort: avg -0.2697R; LONG -0.3006R; SHORT -0.2440R
+
+Conclusion: **Adaptive Evidence V1 does not establish positive predictive signal-level edge and is not a promotion candidate.** Do not lower thresholds to manufacture trade frequency and do not convert weak marginal findings into more hard filters.
+
+The detailed concise evidence is preserved in `research/adaptive-evidence-live-v774.md`. The large raw report remains in its reproducible GitHub Actions artifact.
 
 ## Research philosophy
 
@@ -96,12 +109,14 @@ Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that r
 ## Current strategic direction
 
 1. Keep Baseline 6.2 frozen and existing bots as controls.
-2. Complete the **Adaptive Evidence / Feature Attribution data pipeline** by generating portfolio-independent normalized-R cohorts for the raw observations used by `adaptive-evidence.js`.
-3. Validate feature effects across 30d / 60d / 90d and walk-forward windows; require adequate sample size and repeatability rather than isolated best buckets.
-4. Measure Market Capture / Opportunity Cost alongside PF, expectancy and DD so low-frequency variants are not rewarded merely for avoiding trades.
-5. Only after the evidence table demonstrates predictive signal quality should Challenger V3.2 consume it in portfolio replay.
-6. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
-7. Exit Lab can be layered onto a validated entry model later.
+2. Treat Adaptive Evidence V1 as research infrastructure plus a negative calibration checkpoint, not as Challenger V3.2.
+3. Build the next **Context Interaction / Hierarchical Evidence Lab** using predefined, interpretable conditional interactions rather than unrestricted bucket search.
+4. Test side × regime × MTF, side × regime × momentum, side × regime × volatility, asset × side × regime and side × MTF × momentum where sample size is adequate.
+5. Center conditional evidence against broader base rates / parent cohorts so correlated marginal evidence is not counted repeatedly. Use residual or hierarchical shrinkage rather than simply summing raw avgR buckets.
+6. Preserve strict prior-train / later-test validation, full-horizon outcomes, sample-size controls, cross-window stability and Market Capture / Opportunity Cost.
+7. Only after a revised signal-quality model demonstrates repeatable positive OOS edge should Challenger V3.2 portfolio replay be built.
+8. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
+9. Exit Lab can be layered onto a validated entry model later.
 
 ## Promotion principle
 
