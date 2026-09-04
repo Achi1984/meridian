@@ -6,107 +6,142 @@
 
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
-- Main contains the stable research stack through v7.51 plus preserved evidence reports for rejected Challenger V3/V3.1 experiments and Signal Calibration.
-- The active research continuation is branch `research/adaptive-evidence-v774` and draft PR #30.
+- Main remains the live source and Baseline/Paper execution is unchanged.
+- Active research branch: `research/adaptive-evidence-v774`
+- Draft PR: #30
 - Adaptive Evidence remains research-only and is not connected to Paper execution.
-- The rejected V3/V3.1 implementation branches must not be treated as production candidates or silently merged.
 
-## Latest durable research findings
+## Latest completed research — v7.74 Adaptive Evidence
 
-### v7.51 — Exit Lab Evidence
-Runner/BE exits can materially outperform full TP1 in some windows but are not robust across 30d/60d/90d. No exit promotion yet. Keep A_CURRENT/full TP1 when testing entry/scoring architecture so attribution remains clean.
+The first full Adaptive Evidence calibration pipeline is complete:
 
-### Challenger V3 — rejected experiment
-V3 removed the Baseline `READY` hard dependency as intended, but simply widening the opportunity universe performed badly. In the tested 30d and 60d windows PF/expectancy deteriorated sharply and most V3 trades were outside READY. 90d remained positive but weaker than Baseline/V2 and with higher drawdown. Preserve the evidence; do not promote the implementation.
+- reliability-weighted soft evidence with no fixed context bonus,
+- portfolio-independent A_CURRENT normalized-R cohorts,
+- one signal per symbol per 4h,
+- full 14-day horizon / right-censoring guard,
+- strict post-signal candle replay,
+- expanding train-before-test walk-forward,
+- Market Capture / Opportunity Cost,
+- canonical market-source adapter tied to the `cloud-backtest.js` candidate constructor,
+- Binance public-data fallback for geo-blocked runners,
+- one master cohort so 30d / 60d / 90d share the same sampling phase,
+- dedicated GitHub Actions evidence workflow and reproducible artifact.
 
-### Challenger V3.1 — improved but still rejected
-V3.1 strengthened soft penalties for entry distance/status and reduced risk outside READY. It improved materially over V3, including lower 90d DD, but still failed robustness and remained weaker than Challenger V2/Baseline on the key comparison. Do not continue tuning thresholds by intuition.
+Release Safety passed after the source-adapter test correction. The dedicated 12-asset research workflow also completed successfully.
 
-### v7.55 — Signal Calibration Lab
-Portfolio-independent calibration sampled one candidate per symbol per 4h across 12 assets and evaluated A_CURRENT normalized R with a 14-day horizon, excluding portfolio max-position/daily-loss/max-DD gates.
+## Definitive live evidence
 
-Critical result: **all confidence buckets were negative over 30d, 60d and 90d. Higher confidence was not monotonic with better normalized outcome.** This means the current compressed confidence stack is not a validated predictor of edge. Positive portfolio windows can be caused by path-dependent portfolio selection and must not be used to declare the score calibrated.
+GitHub Actions run:
 
-### v7.74 — Adaptive Evidence Lab current checkpoint
-The research branch now contains the complete first calibration pipeline from prepared research events to out-of-sample evidence reporting.
+- run id: `33911834647`
+- source commit: `37e569f5d03ea579126017f10fabe5f2d69eeb6b`
+- artifact id: `9951674418`
+- artifact SHA-256: `9c2066fa4d5ef2da6bbd342d553f08b306c3f6e64323cf9d47ddc0b1db2010c4`
 
-Implemented:
-- `adaptive-evidence.js` — side-aware raw observations plus reliability-weighted soft evidence; no fixed LONG + RANGE or other context bonus.
-- `adaptive-evidence-cohorts.js` — portfolio-independent A_CURRENT normalized-R cohorts, default one sample per symbol per 4h.
-- full-horizon guard — recent signals without the complete 14-day outcome horizon are excluded by default to prevent right-censoring bias.
-- `adaptive-evidence-walkforward.js` — expanding out-of-sample validation with an explicit train/test overlap guard.
-- `adaptive-evidence-report.js` — 30d/60d/90d multi-window evidence report, reliable positive/negative feature summaries and Market Capture / Opportunity Cost.
-- `scripts/adaptive-evidence-report.mjs` — reproducible JSON/Markdown report CLI for prepared MERIDIAN research events.
-- tests for observations, shrinkage, cohort construction, no look-ahead, horizon censoring, leakage prevention, walk-forward, report output and market capture.
+Assets: BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET, INJ.
 
-GitHub Release Safety passed on the cohort-builder checkpoint commit `458b52e4ade75ba83916b45f6954449bc3a0d1ea`. Later commits must still be verified by CI before merge.
+| Window | Cohort | Avg R | OOS selected | Selected Avg R | PF | Coverage | Capture |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 30d | 2,160 | -0.403R | 0 | — | 0 | 0.0% | 0.0% |
+| 60d | 4,320 | -0.314R | 3 | -1.133R | 0 | 0.1% | 0.0% |
+| 90d | 6,480 | -0.270R | 397 | -0.203R | 0.711 | 7.7% | 8.4% |
 
-Preserved evidence files:
-- `research/challenger-v3-evidence-v752.md`
-- `research/challenger-v31-evidence-v753.md`
-- `research/signal-calibration-v755.md`
-- `research/adaptive-evidence-v774.md`
+Master 90d cohort:
 
-## Known bot findings that must not be forgotten
+- avg -0.2697R
+- median -1.1296R
+- total -1747.3782R
+- LONG avg -0.3006R
+- SHORT avg -0.2440R
 
-1. **Baseline 6.2** remains frozen.
-2. **Shadow V1** remains the over-filtering/hard-gate control.
-3. **Challenger V2** has a Baseline-READY dependency but currently remains the stronger Challenger control versus rejected V3/V3.1.
-4. Removing READY as a hard gate remains architecturally desirable, but the replacement scoring model must first demonstrate real signal-level edge.
-5. **Regime V1** can adapt side while technical/candidate inputs can still reflect the source side; Regime V2 must recompute evidence for the final side.
-6. LONG/SHORT must always be interpreted in regime context.
-7. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory metrics.
-8. More evidence must not automatically become more hard gates.
-9. Fixed context bonuses are not considered durable evidence; future V3.2 scoring should be fed by measured cohorts.
-10. Training evidence must strictly predate each evaluated walk-forward slice; no same-window calibration.
-11. Signals without a complete configured outcome horizon must not enter calibration by default.
+**Conclusion:** Adaptive Evidence V1 fails the signal-edge promotion gate. It is valuable infrastructure and negative evidence, but it is not Challenger V3.2.
+
+Preserved summary: `research/adaptive-evidence-live-v774.md`.
+
+## Interpretation rules from this checkpoint
+
+1. Do not lower TRADE/CAUTION thresholds simply to increase trade count.
+2. Do not promote Adaptive Evidence V1.
+3. Do not convert large negative marginal buckets directly into hard filters.
+4. The broad 4h-sampled universe is itself negative under A_CURRENT.
+5. A negative skipped-opportunity metric means avoided losses exceeded missed winners; it does not prove profitable selection.
+6. The current marginal aggregator can double-count correlated base-rate effects because side, regime, momentum, MTF etc. overlap.
+7. The recurring `LONG | NORMAL volatility` positive marginal in 30d/60d did not generalize strongly to 90d and must not become a fixed bonus.
 
 ## Next recommended work — highest priority
 
-### Priority 1 — Connect the report pipeline to canonical Research Engine events
-The v7.74 report CLI currently consumes prepared MERIDIAN research events. Add the thinnest possible research-only adapter/export from `cloud-backtest.js` so the same canonical `candidate()` / `prepareEvents()` path can feed the report without duplicating signal logic.
+### Priority 1 — Context Interaction / Hierarchical Evidence Lab
 
-Guardrails:
-- do not change candidate calculations,
-- do not change Baseline/Shadow/Challenger/Regime execution,
-- do not touch `server.js`,
-- export/reuse existing research functions rather than cloning them into a second implementation.
+Build a new research-only checkpoint, preferably on a new named branch after v7.74 is clean, that tests a **small predefined interaction set** rather than unrestricted combinations:
 
-### Priority 2 — Generate actual 12-asset evidence reports
-Use BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Produce 30d / 60d / 90d JSON + Markdown reports with 14-day full-horizon outcomes and expanding walk-forward slices.
+- side × regime × MTF alignment
+- side × regime × momentum
+- side × regime × volatility
+- asset × side × regime
+- side × MTF alignment × momentum
+- volume × volatility only when sample sizes permit
 
-Interpretation must include:
-- sample adequacy and feature reliability,
-- avg/median R and PF,
-- LONG/SHORT × regime,
-- market coverage,
-- missed-winner R,
-- avoided-loser R,
-- net opportunity cost,
-- Market Capture,
-- cross-window and out-of-sample stability.
+Core methodological improvement: estimate conditional/residual edge relative to broader parent/base-rate cohorts so correlated marginal evidence is not counted repeatedly.
 
-### Priority 3 — Challenger V3.2 portfolio replay only after calibration
-Only if Adaptive Evidence shows repeatable out-of-sample predictive value should a Challenger V3.2 portfolio replay be implemented. Do not reuse V3/V3.1 threshold tuning and do not auto-promote it.
+Required guards:
+
+- strong minimum sample requirements,
+- shrinkage toward parent/base rate,
+- cross-window stability,
+- strict training data before test data,
+- no right-censored outcomes,
+- no portfolio gates during signal calibration,
+- bounded/predefined interaction search to reduce overfitting.
+
+### Priority 2 — OOS comparison against v7.74 marginals
+
+The new interaction model must beat the current v7.74 selector out of sample on more than one metric:
+
+- avgR / expectancy
+- PF
+- trade count / coverage
+- Market Capture
+- missed-winner R
+- avoided-loser R
+- opportunity cost
+- side × regime stability
+
+Do not claim success from one isolated window.
+
+### Priority 3 — Challenger V3.2 portfolio replay only after signal edge
+
+Only when a revised model demonstrates repeatable positive OOS signal-level edge should Challenger V3.2 portfolio replay be implemented. Preserve Challenger V2 and Baseline as controls.
 
 ### Priority 4 — Regime V2
-Recompute all directional evidence after final side selection. Test independently.
 
-### Priority 5 — Hybrid / Allocator and Exit Lab integration
-Only combine validated components. Exit changes remain separate until entry/scoring edge is established.
+Recompute directional evidence after final side selection. Test independently.
+
+### Priority 5 — Exit integration / Hybrid
+
+Only after entry/scoring edge is validated. Do not mix entry and exit changes prematurely.
+
+## Known bot findings that must not be forgotten
+
+1. Baseline 6.2 remains frozen.
+2. Shadow V1 is the hard-filter / low-DD control, not an assumed winner.
+3. Challenger V2 remains the strongest existing Challenger control but still depends on Baseline READY.
+4. Challenger V3/V3.1 were rejected.
+5. Adaptive Evidence V1 is now also a non-promotable signal-model checkpoint.
+6. Regime V1 retains the side-rescoring methodological weakness.
+7. More evidence must not automatically mean more hard gates.
+8. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory.
+9. Fixed context bonuses are not durable evidence.
+10. Training evidence must strictly predate evaluation.
+11. Full configured outcome horizon is required for calibration.
 
 ## Promotion gate
 
-No winner on a tiny or path-dependent sample. Promotion requires common-window evaluation, adequate closed-trade count, positive PF/expectancy, acceptable drawdown, sufficient frequency/coverage, manageable opportunity cost, signal-level calibration and stability across regimes/windows. No automatic promotion.
+No automatic promotion. Require adequate samples, positive OOS expectancy/PF, acceptable drawdown after later portfolio replay, sufficient coverage, manageable opportunity cost, cross-window/regime stability and explicit human approval.
 
 ## Save-progress rule
 
-Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with a descriptive commit. Keep experimental work on a named research branch until it is reviewed, then merge deliberately.
+Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with descriptive commits. Keep experimental work on named research branches until deliberately reviewed/merged.
 
 ## New-chat startup instruction
 
-A fresh chat should begin with:
-
-**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md` first. Treat them as the canonical MERIDIAN project memory and continue from the handoff without changing Baseline 6.2.”**
-
-After reading, verify `version.json`, current `main` HEAD and active research branches before making changes because deployment state may have advanced.
+**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md` first. Treat them as canonical MERIDIAN project memory. Verify `main`, active research branches and the latest evidence before changing anything. Do not change Baseline 6.2.”**
