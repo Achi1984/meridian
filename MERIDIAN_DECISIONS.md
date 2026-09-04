@@ -155,3 +155,17 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Opportunity-cost rule:** Any future comparison must report market coverage, missed-winner R, avoided-loser R and net opportunity cost in addition to P&L/PF/DD.
 
 **Safety rule:** The adaptive evidence layer must remain disconnected from Paper execution until signal-level calibration, portfolio replay and human approval are complete.
+
+## D-023 — Adaptive Evidence V1 fails the signal-edge gate; move to conditional residual research
+
+**Evidence:** The first real 12-asset v7.74 run used one master 4h-sampled cohort, a 14-day A_CURRENT outcome horizon and expanding train-before-test validation. The 30d / 60d / 90d cohorts were all negative: avgR -0.403R, -0.314R and -0.270R. Out-of-sample selection produced 0 trades in 30d, 3 trades at -1.133R average / PF 0 in 60d, and 397 trades at -0.203R average / PF 0.711 in 90d. Coverage was 0.0%, 0.1% and 7.7% respectively. The broad 90d master cohort itself averaged -0.2697R across 6,480 signals.
+
+**Decision:** Adaptive Evidence V1 is **not** a Challenger V3.2 promotion candidate. Do not lower decision thresholds or add hard filters merely to improve headline metrics or recover frequency.
+
+**Research direction:** The next signal-model experiment should test predefined contextual interactions and hierarchical/base-rate-centered residual evidence rather than simply combining correlated marginal avgR buckets. Candidate interactions include side × regime × MTF, side × regime × momentum, side × regime × volatility, asset × side × regime, and side × MTF × momentum.
+
+**Method guard:** Interaction buckets require stronger sample-size controls, shrinkage, cross-window stability and strict prior-train / later-test validation. Avoid unrestricted combinatorial search.
+
+**Interpretation guard:** A negative skipped-opportunity metric can mean avoided losers exceed missed winners; it is not proof of positive strategy edge. Selected OOS expectancy/PF and opportunity coverage must still pass independently.
+
+**Safety:** Keep Baseline 6.2, existing Paper execution, risk, sizing, exits and `server.js` unchanged while this research continues.
