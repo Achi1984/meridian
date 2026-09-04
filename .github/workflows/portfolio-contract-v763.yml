@@ -1,0 +1,35 @@
+name: MERIDIAN Portfolio Contract v7.63
+
+on:
+  push:
+    branches:
+      - fix/portfolio-data-contract-v763
+  pull_request:
+    paths:
+      - 'portfolio-data-contract.js'
+      - 'app-v7.61-depot-audit.js'
+      - 'test/portfolio-data-contract.test.js'
+      - 'version.json'
+      - '.github/workflows/portfolio-contract-v763.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Portfolio contract regression tests
+        run: node --test test/portfolio-data-contract.test.js
+      - name: Syntax check Depot adapter
+        run: node --check app-v7.61-depot-audit.js
+      - name: Release safety
+        run: npm run release:check
