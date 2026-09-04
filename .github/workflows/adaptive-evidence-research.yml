@@ -1,0 +1,60 @@
+name: MERIDIAN Adaptive Evidence Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: 'Calendar windows in days'
+        required: false
+        default: '30,60,90'
+      horizon:
+        description: 'Outcome horizon in days'
+        required: false
+        default: '14'
+  push:
+    branches:
+      - research/adaptive-evidence-v774
+    paths:
+      - adaptive-evidence-source.js
+      - adaptive-evidence.js
+      - adaptive-evidence-cohorts.js
+      - adaptive-evidence-walkforward.js
+      - adaptive-evidence-report.js
+      - scripts/adaptive-evidence-live-report.mjs
+      - .github/workflows/adaptive-evidence-research.yml
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Regression tests
+        run: node --test test/adaptive-evidence*.test.js
+      - name: Run 12-asset Adaptive Evidence report
+        env:
+          WINDOWS: ${{ github.event.inputs.windows || '30,60,90' }}
+          HORIZON: ${{ github.event.inputs.horizon || '14' }}
+        run: |
+          npm run research:adaptive-evidence -- \
+            --windows "$WINDOWS" \
+            --horizon "$HORIZON" \
+            --out research/generated/adaptive-evidence-v774
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-adaptive-evidence-v774
+          path: |
+            research/generated/adaptive-evidence-v774.json
+            research/generated/adaptive-evidence-v774.md
+          if-no-files-found: error
+          retention-days: 30
