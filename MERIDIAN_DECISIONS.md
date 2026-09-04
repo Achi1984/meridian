@@ -145,3 +145,13 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Method rule:** Separate signal-quality calibration from portfolio-path effects such as max-open-position, daily-loss and max-drawdown gates. A profitable portfolio window is not proof that the confidence score itself is calibrated.
 
 **Architecture rule:** Preserve the soft-scoring philosophy. Evidence that a bucket is weak does not automatically become another hard gate.
+
+## D-022 — Adaptive evidence replaces fixed context bonuses in future Challenger research
+
+**Decision:** Future Challenger V3.2 research must consume measured cohort evidence instead of hard-coded bonuses such as a fixed LONG + RANGE adjustment.
+
+**Implementation checkpoint:** `adaptive-evidence.js` (`7.74-ADAPTIVE-EVIDENCE-V1`) is research-only and converts side, regime, MTF alignment, momentum, volume, volatility, asset history and Baseline status into reliability-weighted soft evidence. Small samples are shrunk toward neutral and cross-window stability affects reliability.
+
+**Opportunity-cost rule:** Any future comparison must report market coverage, missed-winner R, avoided-loser R and net opportunity cost in addition to P&L/PF/DD.
+
+**Safety rule:** The adaptive evidence layer must remain disconnected from Paper execution until signal-level calibration, portfolio replay and human approval are complete.
