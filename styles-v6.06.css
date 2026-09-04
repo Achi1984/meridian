@@ -4,12 +4,12 @@
 
 /* v7.61 R6 — compact secondary navigation on mobile.
    Presentation only: MARKET/NADIR and SETUP/GRID behavior is unchanged.
-   Scope by actual view containers so the rules apply even when the generic
-   segment nav does not carry the optional market/execution modifier class. */
+   Scope by actual view containers, including the canonical TRADE view #view-daytrade. */
 .segment-nav.market-segment-nav,
 .segment-nav.execution-segment-nav,
 #view-market .segment-nav,
-#view-trade .segment-nav{
+#view-trade .segment-nav,
+#view-daytrade .segment-nav{
   min-height:0 !important;
   height:auto !important;
   padding:5px !important;
@@ -24,7 +24,8 @@
 .segment-nav.market-segment-nav button,
 .segment-nav.execution-segment-nav button,
 #view-market .segment-nav button,
-#view-trade .segment-nav button{
+#view-trade .segment-nav button,
+#view-daytrade .segment-nav button{
   min-height:44px !important;
   height:44px !important;
   padding:0 12px !important;
@@ -43,7 +44,8 @@
 .segment-nav.market-segment-nav button.active,
 .segment-nav.execution-segment-nav button.active,
 #view-market .segment-nav button.active,
-#view-trade .segment-nav button.active{
+#view-trade .segment-nav button.active,
+#view-daytrade .segment-nav button.active{
   color:#27adff !important;
   border-color:#1685c7 !important;
   background:rgba(32,164,255,.08) !important;
@@ -53,7 +55,8 @@
   .segment-nav.market-segment-nav,
   .segment-nav.execution-segment-nav,
   #view-market .segment-nav,
-  #view-trade .segment-nav{
+  #view-trade .segment-nav,
+  #view-daytrade .segment-nav{
     padding:4px !important;
     margin-bottom:12px !important;
     border-radius:15px !important;
@@ -61,7 +64,8 @@
   .segment-nav.market-segment-nav button,
   .segment-nav.execution-segment-nav button,
   #view-market .segment-nav button,
-  #view-trade .segment-nav button{
+  #view-trade .segment-nav button,
+  #view-daytrade .segment-nav button{
     min-height:42px !important;
     height:42px !important;
     border-radius:11px !important;
