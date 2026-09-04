@@ -1,0 +1,34 @@
+name: MERIDIAN Meta Decision Matrix Evidence v7.80 R2
+
+on:
+  push:
+    branches:
+      - research/meta-allocator-v780-design
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Matrix regression tests
+        run: node --test test/meta-decision-matrix.test.js test/meta-decision-matrix-source.test.js
+      - name: Run 12-asset decision matrix evidence
+        run: node scripts/meta-decision-matrix-live.mjs
+      - name: Upload matrix evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-meta-decision-matrix-v780-r2
+          path: |
+            research/generated/meta-decision-matrix-v780-r2.json
+            research/generated/meta-decision-matrix-v780-r2.md
+          retention-days: 30
