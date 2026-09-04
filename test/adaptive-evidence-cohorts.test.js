@@ -22,17 +22,26 @@ test('cohort replay uses candles strictly after the signal timestamp',()=>{
     event(t0,{signal:sig(),low:89,high:111,close:100}),
     event(t0+15*60000,{low:100,high:111,close:110})
   ];
-  const rows=buildSignalCohort(events,{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0});
+  const rows=buildSignalCohort(events,{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0,requireFullHorizon:false});
   assert.equal(rows.length,1);
   assert.equal(rows[0].realizedR,1);
   assert.equal(rows[0].exitReason,'TP1_FULL');
+});
+
+test('full-horizon guard rejects right-censored signals by default',()=>{
+  const t0=Date.UTC(2026,0,1),events=[
+    event(t0,{signal:sig()}),
+    event(t0+15*60000,{low:100,high:101,close:100})
+  ];
+  const rows=buildSignalCohort(events,{horizonDays:1,feeBps:0,slippageBps:0});
+  assert.equal(rows.length,0);
 });
 
 test('sampling cadence prevents repeated near-identical candidates',()=>{
   const t0=Date.UTC(2026,0,1),events=[];
   for(let i=0;i<20;i++)events.push(event(t0+i*15*60000,{signal:sig(),low:100,high:101,close:100}));
   events.push(event(t0+6*H,{low:100,high:111,close:110}));
-  const rows=buildSignalCohort(events,{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0});
+  const rows=buildSignalCohort(events,{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0,requireFullHorizon:false});
   assert.equal(rows.length,2);
   assert.ok(rows[1].ts-rows[0].ts>=4*H);
 });
@@ -42,7 +51,7 @@ test('evidence map exposes the exact adaptive-evidence dimensions',()=>{
   const rows=buildSignalCohort([
     event(t0,{signal:sig()}),
     event(t1,{low:100,high:111,close:110})
-  ],{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0});
+  ],{sampleEveryMs:4*H,horizonDays:1,feeBps:0,slippageBps:0,requireFullHorizon:false});
   const map=buildEvidenceMap(rows,[{id:'ALL',start:t0,end:t1}]);
   assert.equal(map.side.LONG.n,1);
   assert.equal(map.regime['LONG|BULL'].avgR,1);
