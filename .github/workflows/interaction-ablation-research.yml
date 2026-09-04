@@ -1,0 +1,58 @@
+name: MERIDIAN Interaction Family Ablation
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: 'Calendar windows in days'
+        required: false
+        default: '30,60,90'
+      horizon:
+        description: 'Outcome horizon in days'
+        required: false
+        default: '14'
+  push:
+    branches:
+      - research/interaction-ablation-v776
+    paths:
+      - interaction-family-ablation.js
+      - interaction-ablation-report.js
+      - scripts/interaction-ablation-live-report.mjs
+      - test/interaction-family-ablation.test.js
+      - .github/workflows/interaction-ablation-research.yml
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Ablation regression tests
+        run: node --test test/interaction-family-ablation.test.js
+      - name: Run 12-asset family ablation
+        env:
+          WINDOWS: ${{ github.event.inputs.windows || '30,60,90' }}
+          HORIZON: ${{ github.event.inputs.horizon || '14' }}
+        run: |
+          npm run research:interaction-ablation -- \
+            --windows "$WINDOWS" \
+            --horizon "$HORIZON" \
+            --out research/generated/interaction-ablation-v776
+      - name: Upload family-ablation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-interaction-ablation-v776
+          path: |
+            research/generated/interaction-ablation-v776.json
+            research/generated/interaction-ablation-v776.md
+          if-no-files-found: error
+          retention-days: 30
