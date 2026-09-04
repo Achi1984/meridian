@@ -7,144 +7,103 @@
 - Baseline engine: `6.2.0`
 - Baseline ruleset: `6.2-SIGNAL-V1`
 - Main remains the live source and Baseline/Paper execution is unchanged.
-- Active research branch: `research/adaptive-evidence-v774`
-- Draft PR: #30
-- Adaptive Evidence remains research-only and is not connected to Paper execution.
+- v7.74 branch: `research/adaptive-evidence-v774`, draft PR #30.
+- Active successor research branch: `research/context-interaction-v775`, draft PR #31 based on v7.74.
+- All v7.74/v7.75 work is research-only and disconnected from Paper execution.
 
-## Latest completed research — v7.74 Adaptive Evidence
+## v7.74 Adaptive Evidence result
 
-The first full Adaptive Evidence calibration pipeline is complete:
+The real 12-asset v7.74 calibration failed the signal-edge gate:
 
-- reliability-weighted soft evidence with no fixed context bonus,
-- portfolio-independent A_CURRENT normalized-R cohorts,
-- one signal per symbol per 4h,
-- full 14-day horizon / right-censoring guard,
-- strict post-signal candle replay,
-- expanding train-before-test walk-forward,
-- Market Capture / Opportunity Cost,
-- canonical market-source adapter tied to the `cloud-backtest.js` candidate constructor,
-- Binance public-data fallback for geo-blocked runners,
-- one master cohort so 30d / 60d / 90d share the same sampling phase,
-- dedicated GitHub Actions evidence workflow and reproducible artifact.
+- 30d: 2,160 signals, avg -0.403R; OOS selected 0
+- 60d: 4,320 signals, avg -0.314R; OOS selected 3 at -1.133R / PF 0
+- 90d: 6,480 signals, avg -0.270R; OOS selected 397 at -0.203R / PF 0.711
 
-Release Safety passed after the source-adapter test correction. The dedicated 12-asset research workflow also completed successfully.
+Preserved in `research/adaptive-evidence-live-v774.md`.
 
-## Definitive live evidence
+## v7.75 Context Interaction / Hierarchical Evidence
 
-GitHub Actions run:
+Implemented:
 
-- run id: `33911834647`
-- source commit: `37e569f5d03ea579126017f10fabe5f2d69eeb6b`
-- artifact id: `9951674418`
-- artifact SHA-256: `9c2066fa4d5ef2da6bbd342d553f08b306c3f6e64323cf9d47ddc0b1db2010c4`
+- predefined bounded interaction set,
+- hierarchical residual edge versus broader parent cohort,
+- child + parent sample guards,
+- shrinkage toward zero,
+- cross-window residual-sign reliability,
+- expanding train-before-test interaction walk-forward,
+- direct same-cohort OOS comparison versus v7.74,
+- reproducible 12-asset GitHub Actions workflow.
 
-Assets: BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET, INJ.
+Predefined families:
 
-| Window | Cohort | Avg R | OOS selected | Selected Avg R | PF | Coverage | Capture |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 30d | 2,160 | -0.403R | 0 | — | 0 | 0.0% | 0.0% |
-| 60d | 4,320 | -0.314R | 3 | -1.133R | 0 | 0.1% | 0.0% |
-| 90d | 6,480 | -0.270R | 397 | -0.203R | 0.711 | 7.7% | 8.4% |
-
-Master 90d cohort:
-
-- avg -0.2697R
-- median -1.1296R
-- total -1747.3782R
-- LONG avg -0.3006R
-- SHORT avg -0.2440R
-
-**Conclusion:** Adaptive Evidence V1 fails the signal-edge promotion gate. It is valuable infrastructure and negative evidence, but it is not Challenger V3.2.
-
-Preserved evidence:
-- `research/adaptive-evidence-live-v774.md` — interpretation and durable findings
-- `research/adaptive-evidence-live-v774-summary.json` — compact machine-readable summary
-- full raw JSON/Markdown — GitHub Actions artifact listed above
-
-## Interpretation rules from this checkpoint
-
-1. Do not lower TRADE/CAUTION thresholds simply to increase trade count.
-2. Do not promote Adaptive Evidence V1.
-3. Do not convert large negative marginal buckets directly into hard filters.
-4. The broad 4h-sampled universe is itself negative under A_CURRENT.
-5. A negative skipped-opportunity metric means avoided losses exceeded missed winners; it does not prove profitable selection.
-6. The current marginal aggregator can double-count correlated base-rate effects because side, regime, momentum, MTF etc. overlap.
-7. The recurring `LONG | NORMAL volatility` positive marginal in 30d/60d did not generalize strongly to 90d and must not become a fixed bonus.
-
-## Next recommended work — highest priority
-
-### Priority 1 — Context Interaction / Hierarchical Evidence Lab
-
-Build a new research-only checkpoint, preferably on a new named branch after v7.74 is clean, that tests a **small predefined interaction set** rather than unrestricted combinations:
-
-- side × regime × MTF alignment
+- side × regime × MTF
 - side × regime × momentum
 - side × regime × volatility
 - asset × side × regime
-- side × MTF alignment × momentum
-- volume × volatility only when sample sizes permit
+- side × MTF × momentum
+- side × volume × volatility
 
-Core methodological improvement: estimate conditional/residual edge relative to broader parent/base-rate cohorts so correlated marginal evidence is not counted repeatedly.
+### Definitive v7.75 live evidence
 
-Required guards:
+Workflow run `33912789463`, source commit `ce1c7c54553c7b721ab0f70f2991de320a7209cc`, artifact `9952013237`, SHA-256 `de7ee85ae8e2d9461562d756eda6ba0b9194762702a3e6b3c6c1866b1d260d58`.
 
-- strong minimum sample requirements,
-- shrinkage toward parent/base rate,
-- cross-window stability,
-- strict training data before test data,
-- no right-censored outcomes,
-- no portfolio gates during signal calibration,
-- bounded/predefined interaction search to reduce overfitting.
+| Window | Selector | Selected | Avg R | PF | Coverage | Capture |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 30d | v7.74 Marginal | 0 | — | 0 | 0.0% | 0.0% |
+| 30d | v7.75 Interaction | 113 | -0.657R | 0.324 | 6.5% | 5.0% |
+| 60d | v7.74 Marginal | 3 | -1.133R | 0 | 0.1% | 0.0% |
+| 60d | v7.75 Interaction | 977 | -0.377R | 0.531 | 28.3% | 27.6% |
+| 90d | v7.74 Marginal | 397 | -0.203R | 0.711 | 7.7% | 8.4% |
+| 90d | v7.75 Interaction | 978 | -0.300R | 0.604 | 18.9% | 19.1% |
 
-### Priority 2 — OOS comparison against v7.74 marginals
+**Conclusion:** Hierarchical residuals increase coverage substantially but the combined interaction selector remains negative OOS in every window. v7.75 is not Challenger V3.2 and must not be promoted.
 
-The new interaction model must beat the current v7.74 selector out of sample on more than one metric:
+A repeated attribution pattern worth investigating is `LONG|BULL|NORMAL volatility` versus `LONG|BULL`: residual +0.159R (30d), +0.146R (60d), +0.121R (90d). This remains hypothesis evidence only, not a fixed bonus.
 
-- avgR / expectancy
-- PF
-- trade count / coverage
-- Market Capture
-- missed-winner R
-- avoided-loser R
-- opportunity cost
-- side × regime stability
+Durable report: `research/context-interaction-live-v775.md`.
 
-Do not claim success from one isolated window.
+## Next recommended work — highest priority
 
-### Priority 3 — Challenger V3.2 portfolio replay only after signal edge
+### Priority 1 — Interaction Family Attribution / Ablation Lab
 
-Only when a revised model demonstrates repeatable positive OOS signal-level edge should Challenger V3.2 portfolio replay be implemented. Preserve Challenger V2 and Baseline as controls.
+Do not tune the combined v7.75 thresholds. Instead evaluate each predefined interaction family **independently out of sample** on the identical master cohort and folds.
 
-### Priority 4 — Regime V2
+Questions to answer:
 
-Recompute directional evidence after final side selection. Test independently.
+- Which interaction family, if any, has positive OOS avgR and PF?
+- Does that family remain positive in more than one time window?
+- How much coverage and Market Capture does it retain?
+- Are gains concentrated in one asset/regime or broadly repeatable?
+- Does side × regime × volatility, especially the repeated LONG/BULL/NORMAL pattern, survive true family-level OOS testing?
 
-### Priority 5 — Exit integration / Hybrid
+### Priority 2 — Small predeclared combinations only after family evidence
 
-Only after entry/scoring edge is validated. Do not mix entry and exit changes prematurely.
+If individual families show edge, test only a few predeclared combinations. Do not search arbitrary combinations after seeing results.
 
-## Known bot findings that must not be forgotten
+### Priority 3 — Challenger V3.2 portfolio replay only after positive signal-level OOS evidence
 
-1. Baseline 6.2 remains frozen.
-2. Shadow V1 is the hard-filter / low-DD control, not an assumed winner.
-3. Challenger V2 remains the strongest existing Challenger control but still depends on Baseline READY.
-4. Challenger V3/V3.1 were rejected.
-5. Adaptive Evidence V1 is now also a non-promotable signal-model checkpoint.
-6. Regime V1 retains the side-rescoring methodological weakness.
-7. More evidence must not automatically mean more hard gates.
-8. Trade frequency, opportunity cost, avoided losers and missed winners remain mandatory.
-9. Fixed context bonuses are not durable evidence.
-10. Training evidence must strictly predate evaluation.
-11. Full configured outcome horizon is required for calibration.
+No portfolio replay or Paper integration until the revised model passes signal-level calibration with useful coverage.
 
-## Promotion gate
+### Priority 4 — Regime V2, then later Exit/Hybrid
 
-No automatic promotion. Require adequate samples, positive OOS expectancy/PF, acceptable drawdown after later portfolio replay, sufficient coverage, manageable opportunity cost, cross-window/regime stability and explicit human approval.
+Keep separate research axes until independently validated.
+
+## Method rules that remain mandatory
+
+1. Baseline 6.2 stays frozen.
+2. No Paper/live execution changes.
+3. Training strictly predates test data.
+4. Full configured outcome horizon required.
+5. Portfolio gates excluded from signal calibration.
+6. Trade frequency, Market Capture, missed winners, avoided losers and opportunity cost remain mandatory.
+7. More evidence does not automatically become more hard gates.
+8. Full-window attribution is not OOS proof.
+9. Do not lower thresholds merely to rescue a negative model.
 
 ## Save-progress rule
 
-Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with descriptive commits. Keep experimental work on named research branches until deliberately reviewed/merged.
+Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with descriptive commits and preserve negative results as first-class evidence.
 
 ## New-chat startup instruction
 
-**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md` first. Treat them as canonical MERIDIAN project memory. Verify `main`, active research branches and the latest evidence before changing anything. Do not change Baseline 6.2.”**
+**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md`. Check active research branches/PRs and latest evidence. Keep Baseline 6.2 frozen and continue from the highest-priority handoff.”**

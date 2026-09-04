@@ -1,0 +1,59 @@
+name: MERIDIAN Context Interaction Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: 'Calendar windows in days'
+        required: false
+        default: '30,60,90'
+      horizon:
+        description: 'Outcome horizon in days'
+        required: false
+        default: '14'
+  push:
+    branches:
+      - research/context-interaction-v775
+    paths:
+      - context-interaction-evidence.js
+      - context-interaction-walkforward.js
+      - context-interaction-report.js
+      - scripts/context-interaction-live-report.mjs
+      - test/context-interaction*.test.js
+      - .github/workflows/context-interaction-research.yml
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Interaction regression tests
+        run: node --test test/context-interaction*.test.js
+      - name: Run 12-asset interaction comparison
+        env:
+          WINDOWS: ${{ github.event.inputs.windows || '30,60,90' }}
+          HORIZON: ${{ github.event.inputs.horizon || '14' }}
+        run: |
+          npm run research:context-interaction -- \
+            --windows "$WINDOWS" \
+            --horizon "$HORIZON" \
+            --out research/generated/context-interaction-v775
+      - name: Upload interaction evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-context-interaction-v775
+          path: |
+            research/generated/context-interaction-v775.json
+            research/generated/context-interaction-v775.md
+          if-no-files-found: error
+          retention-days: 30

@@ -169,3 +169,15 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Interpretation guard:** A negative skipped-opportunity metric can mean avoided losers exceed missed winners; it is not proof of positive strategy edge. Selected OOS expectancy/PF and opportunity coverage must still pass independently.
 
 **Safety:** Keep Baseline 6.2, existing Paper execution, risk, sizing, exits and `server.js` unchanged while this research continues.
+
+## D-024 — Combined hierarchical interactions improve coverage but still fail OOS edge
+
+**Evidence:** v7.75 compared hierarchical residual interactions against v7.74 marginals on the same master cohort. The interaction selector recovered 6.5%, 28.3% and 18.9% coverage over 30d/60d/90d, but selected average R remained negative at -0.657R, -0.377R and -0.300R with PF 0.324, 0.531 and 0.604. In 90d it captured more opportunity than v7.74 but degraded selected avgR and PF.
+
+**Decision:** Do not promote the combined v7.75 interaction selector and do not rescue it by threshold tuning.
+
+**Finding:** Hierarchical residualization is methodologically useful because it avoids rewarding a child bucket merely for inheriting its parent base rate, but several interaction families can still overlap on the same signal and duplicate conditional evidence.
+
+**Next research:** Run interaction-family attribution/ablation out of sample. Evaluate each predefined family independently on identical folds before testing any small predeclared combination. Give special attention to side × regime × volatility because `LONG|BULL|NORMAL volatility` showed positive residual attribution in 30d, 60d and 90d, but require family-level OOS proof before treating it as edge.
+
+**Guard:** Full-window positive attribution is not OOS proof. Do not turn recurring residuals into fixed bonuses or hard gates without independent validation.
