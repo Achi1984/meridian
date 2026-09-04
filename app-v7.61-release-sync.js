@@ -1,9 +1,9 @@
-/* MERIDIAN v7.61 R9 — release/cache authority + TRADE data freshness bridge. UI/data-source correction only; execution unchanged. */
+/* MERIDIAN v7.61 R10 — release/cache authority + TRADE data freshness bridge. UI/data-source correction only; execution unchanged. */
 (function(){
   'use strict';
   const VERSION='7.61';
-  const BUILD='7.61-20260904-R9';
-  const STYLE_ID='meridian-v761-r9-tabs';
+  const BUILD='7.61-20260904-R10';
+  const STYLE_ID='meridian-v761-r10-tabs';
   const MARKET_LIVE_MS=45000;
   const TECH_LIVE_MS=120000;
 
@@ -26,7 +26,7 @@
       const raw=link.getAttribute('href')||'';
       if(!/styles-v6\.06\.css/i.test(raw))return;
       const u=new URL(raw,location.href);
-      const tag=`${VERSION}-R9`;
+      const tag=`${VERSION}-R10`;
       if(u.searchParams.get('v')===tag)return;
       u.searchParams.set('v',tag);
       link.href=u.pathname+u.search;
@@ -76,7 +76,8 @@
     const qTs=Number(q?.updatedAt)||0;
     const qAge=qTs?Date.now()-qTs:Infinity;
     const qPrice=Number(q?.price);
-    const qLive=Number.isFinite(qPrice)&&qPrice>0&&String(q?.status||'').toUpperCase()==='LIVE'&&qAge<=MARKET_LIVE_MS;
+    const qState=String(q?.status||'').toUpperCase();
+    const qLive=Number.isFinite(qPrice)&&qPrice>0&&qState==='LIVE'&&qAge<=MARKET_LIVE_MS;
     const qFresh=Number.isFinite(qPrice)&&qPrice>0&&qAge<=MARKET_LIVE_MS*2;
 
     const techTs=Date.parse(d.technicalUpdatedAt||'');
@@ -84,7 +85,7 @@
 
     if(qLive){
       d.btcPrice=qPrice;
-      d.status.btcPrice=`LIVE · MARKET SSOT · ${q?.source||'Binance'}`;
+      d.status.btcPrice=`BROWSER LIVE · MARKET SSOT · ${q?.source||'Binance'}`;
       d.btcPriceSource='MARKET_SSOT';
       d.btcPriceUpdatedAt=new Date(qTs).toISOString();
     }else if(qFresh){
@@ -93,7 +94,7 @@
       d.btcPriceSource='MARKET_SSOT_FALLBACK';
       d.btcPriceUpdatedAt=new Date(qTs).toISOString();
     }else if(!techFresh){
-      d.status.btcPrice='SNAPSHOT · LIVE PRICE UNAVAILABLE';
+      d.status.btcPrice='SNAPSHOT · MARKET PRICE UNAVAILABLE';
       d.btcPriceSource='SNAPSHOT';
     }
 
@@ -106,11 +107,27 @@
     }
   }
 
+  function installRenderBridge(){
+    try{
+      if(typeof renderAll!=='function'||renderAll.__v761R10Wrapped)return;
+      const original=renderAll;
+      const wrapped=function(){
+        syncTradeDataFreshness();
+        return original.apply(this,arguments);
+      };
+      wrapped.__v761R10Wrapped=true;
+      wrapped.__v761R10Original=original;
+      renderAll=wrapped;
+    }catch(_e){}
+  }
+
   function apply(){
     stamp();
     tabStyle();
     bustStyles();
+    installRenderBridge();
     syncTradeDataFreshness();
+    try{if(typeof renderAll==='function')renderAll()}catch(_e){}
     setTimeout(()=>window.MERIDIAN_RUNTIME_CHECK?.(),80);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
