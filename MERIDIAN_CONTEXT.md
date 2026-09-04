@@ -10,6 +10,8 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 
 - Production/Paper engine: `6.2.0`
 - Frozen baseline ruleset: `6.2-SIGNAL-V1`
+- Main live UI before this fix: `7.62 R4`
+- Portfolio Data Contract candidate: `7.63-PORTFOLIO-DATA-CONTRACT-V1` on `fix/portfolio-data-contract-v763`, draft PR #37
 - Evidence layer: `6.53-EVIDENCE`
 - Research Engine V2: `7.34-RESEARCH-V2`
 - Privacy/security layer: `7.33-HARDENED`
@@ -19,23 +21,32 @@ MERIDIAN is a personal crypto dashboard, paper-trading engine and research platf
 - Header/premium brand: `7.46-PREMIUM-BANNER`
 - Research telemetry: `7.47-TELEMETRY-V1`
 - Exit Lab historical replay: `7.49-EXIT-LAB-REPLAY-V1`
-- Fixed-entry replay mode: `7.49-FIXED-ENTRY-15M-REPLAY`
 - Project continuity: `7.50-CONTINUITY-V1`
-- Exit Lab evidence report: `7.51-EXIT-LAB-EVIDENCE-V1`
-- Preserved rejected-research evidence: Challenger V3 (`7.52`), V3.1 (`7.53`), Signal Calibration (`7.55`)
 
-The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research must never silently change Paper execution.
+The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizing, risk, exit or ledger behavior unless explicitly approved. Research and display/data consistency work must never silently change Paper execution.
 
 ## Deployment and safety
 
 - Paper only. Live trading remains disabled by invariant.
-- `server.js` contains the paper-only safety assertion and should remain untouched by research-only work unless absolutely required and explicitly justified.
+- `server.js` contains the paper-only safety assertion and remains untouched by the v7.63 portfolio fix.
 - Private portfolio/trading state is stored in PostgreSQL.
 - Read APIs are protected by bearer auth through `server-gateway.js`.
 - `MERIDIAN_READ_TOKEN` is hashed at startup and plaintext is removed from the runtime environment.
-- GitHub Pages and Northflank rollout are checked by Runtime Smoke.
 - Release Safety checks syntax, regression tests, release consistency, privacy, secret scanning and the paper-only invariant.
-- Historical Git history may still contain old sensitive snapshots. No destructive history rewrite has been performed.
+
+## Portfolio valuation contract
+
+The recurring Depot mismatch came from separate valuation paths for the current headline, historical chart and Pionex overlay. v7.63 establishes one canonical current snapshot:
+
+`totalUsd = spotUsd + tradingUsd`
+
+- `spotUsd` = non-Pionex holdings valued with live prices where available.
+- `tradingUsd` = Pionex equity snapshot, preferring `portfolio.pionexEquityUsd` with manual Pionex balance fallback.
+- Pionex holdings are excluded from spot to prevent double counting.
+- the Depot headline and final chart point must use the same canonical current total.
+- mismatch must be observable rather than silently tolerated; the contract helper exposes `PORTFOLIO_DATA_MISMATCH` and the browser exposes canonical/consistency telemetry.
+
+Known limitation: historical Pionex equity is not reconstructed retrospectively from the current snapshot. v7.63 guarantees current endpoint identity. A later history migration should persist canonical `{spotUsd,tradingUsd,totalUsd}` values at capture time so every historical point follows the same contract.
 
 ## UI principles
 
@@ -45,62 +56,43 @@ The Baseline 6.2 execution is a frozen reference. Do not change its entry, sizin
 - PAPER opens on `ÜBERSICHT`; bot tabs are ordered overview first.
 - UI work must not disturb bot or research execution.
 
-## Active bot set
+## Active bot controls
 
 ### Baseline 6.2
-Reference bot. Frozen execution. Its purpose is to provide the unchanged benchmark against which all research variants are measured.
+Frozen reference benchmark.
 
 ### Shadow V1
-Hard-filter research control. It only acts on Baseline-ready candidates and adds strict technical/candidate/regime gates. Useful to measure the cost and benefit of aggressive filtering, but not intended as the preferred architecture.
+Hard-filter/low-DD research control. Fewer trades are not automatically better.
 
 ### Challenger V2
-Soft-confidence research bot. It currently scores technical quality, candidate quality, entry distance and regime adjustment. Important limitation: its real Paper trade universe still depends on Baseline `READY`, so it cannot discover opportunities outside the Baseline-ready pool.
+Soft-confidence research control. Its executable universe still depends on Baseline `READY`.
 
 ### Regime V1
-Adaptive research bot. Can alter direction and strategy behavior by regime. Known methodological limitation: when it changes side, parts of `technical` and `candidate` scoring still originate from the original Baseline direction. This must be corrected in a future Regime V2 rather than silently changing V1.
-
-## Rejected / experimental Challenger research
-
-### Challenger V3
-V3 correctly removed the hidden Baseline `READY` dependency, but the wider opportunity universe performed poorly in 30d/60d and was weaker than V2/Baseline in the 90d comparison. Do not merge or promote V3 as implemented.
-
-### Challenger V3.1
-V3.1 increased entry-distance/status penalties and reduced non-READY risk. It improved substantially over V3 but still failed the robustness/promotion standard. Do not promote it and do not keep tuning thresholds blindly.
-
-### Signal Calibration Lab
-A portfolio-independent signal calibration sampled one candidate per symbol per 4h across BTC, ETH, SOL, XRP, ADA, SUI, HBAR, AVAX, NEAR, DOT, FET and INJ. Each candidate received an A_CURRENT normalized-R outcome with a 14-day horizon and portfolio gates excluded.
-
-Key result: **every confidence bucket was negative across 30d/60d/90d, and higher confidence was not monotonic with better outcomes.** This means the current compressed technical/candidate/distance/regime/status score stack is not sufficiently calibrated at signal level. Positive portfolio windows cannot be treated as proof of signal-score edge because portfolio gates/path dependence select subsets.
+Adaptive research control with the known side-rescoring weakness. Regime V2 must recompute directional evidence after final side selection.
 
 ## Research philosophy
 
-More evidence must not automatically become more hard entry gates. Prefer a small number of hard safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft confidence/scoring inputs.
+More evidence must not automatically become more hard entry gates. Prefer few true safety constraints and use regime, asset history, directional evidence, volatility and other observations as soft evidence.
 
-Always evaluate performance AND trade frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/out-of-sample stability.
+Always evaluate performance AND frequency, drawdown AND opportunity cost, LONG/SHORT in regime context, avoided losers AND missed winners, and in-sample AND walk-forward/OOS stability.
 
-Do not assume fewer trades are automatically better. A research variant that improves PF merely by removing most opportunity is not necessarily superior.
-
-## Exit Lab
-
-Exit Lab remains research-only. The 12-asset 30/60/90-day evidence showed that runner models can materially improve some windows, especially 90d, but can underperform full TP1 in others, especially 60d. No runner/BE policy is promoted yet. Challenger experiments remain on A_CURRENT/full TP1 until entry/scoring edge is established.
+Full-window attribution is not OOS proof. Negative results are preserved rather than tuned away.
 
 ## Current strategic direction
 
-1. **Do not build Challenger V3.2 as another threshold-only revision.**
-2. Build a **Raw Feature Edge Map / Feature Attribution Lab** using signal-level normalized outcomes before portfolio gates.
-3. Evaluate raw observations such as multi-timeframe alignment, ADX/trend strength, RSI state, MACD agreement, volume participation, EMA position/distance, side and regime.
-4. Use any discovered evidence primarily as calibrated soft scoring, not a proliferation of hard gates.
-5. Only after a predictive signal-quality model exists, create Challenger V3.2 and retest 30/60/90d plus walk-forward and opportunity cost.
-6. Regime V2 still requires side-specific rescoring after final side selection; test independently before Hybrid/Allocator.
-7. Exit Lab can be layered onto a validated entry model later.
+1. Keep Baseline 6.2 frozen.
+2. Finish/review the v7.63 Portfolio Data Contract fix before treating the Depot chart as trustworthy.
+3. After current endpoint identity is stable, persist canonical portfolio snapshots at capture time so history/1D/high-low can share one time series.
+4. Keep bot research isolated from this display/data fix. Active Meta Allocator research remains on its own research branch and v7.79 prospective holdout remains locked.
+5. No research bot is automatically promoted.
 
 ## Promotion principle
 
-No research bot is automatically promoted because it has the best current P&L. Promotion requires a common evaluation window, adequate sample size, positive expectancy/PF, acceptable drawdown, sufficient opportunity coverage, reasonable stability across windows/regimes and human approval.
+No research bot is automatically promoted. Promotion requires common-window evaluation, adequate samples, positive OOS expectancy/PF, acceptable later portfolio drawdown, sufficient opportunity coverage, stability across windows/regimes and explicit human approval.
 
 ## Continuity rule
 
-For every substantial MERIDIAN release or research conclusion, update these three files when project state or reasoning changes:
+For every substantial MERIDIAN release or research conclusion, update:
 - `MERIDIAN_CONTEXT.md`
 - `MERIDIAN_DECISIONS.md`
 - `MERIDIAN_HANDOFF.md`
