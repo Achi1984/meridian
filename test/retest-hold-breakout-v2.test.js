@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {retestHoldDecision,findRetestHoldSetup} from '../retest-hold-breakout-v2.js';
 
-function makeSeries({side='LONG',breakoutAt=70,retestAt=72,currentAt=74}={}){
+function makeSeries({side='LONG',breakoutAt=80,retestAt=82,currentAt=84}={}){
   const rows=[];let p=100;
-  for(let i=0;i<75;i++){
+  for(let i=0;i<85;i++){
     let open=p,close=p+(i%2?0.08:-0.04),high=Math.max(open,close)+.25,low=Math.min(open,close)-.25,volume=100;
     if(i===breakoutAt){
       if(side==='LONG'){open=100.8;close=102.4;high=102.7;low=100.6}else{open=99.2;close=97.6;high=99.4;low=97.3}
