@@ -3,9 +3,9 @@
 (function(){
   'use strict';
 
-  const VERSION='7.61-DASHBOARD-CONSISTENCY-R4';
+  const VERSION='7.61-DASHBOARD-CONSISTENCY-R5';
   const UI_VERSION='7.61';
-  const BUILD='7.61-20260903-R4';
+  const BUILD='7.61-20260903-R5';
 
   function balanceValue(x){return Number(x?.value??x?.valueUsd??0)||0}
   function manualTradingTotal(){
@@ -95,7 +95,7 @@
         p.tradingCapitalTotal=manualTotal;
         p.totalIncludingTrading=(Number(p.total)||0)+manualTotal;
         p.valuationScope='SPOT_HOLDINGS_ONLY';
-        p.valuationConsistency='7.61-DEPOT-SSOT-R4';
+        p.valuationConsistency='7.61-DEPOT-SSOT-R5';
         return p.total;
       };
       wrapped.__v761Wrapped=true;
