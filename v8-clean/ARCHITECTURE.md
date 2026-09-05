@@ -11,13 +11,13 @@ v8 is rebuilt as an isolated frontend instead of layering more customer UI wrapp
 - Legacy v7.65 remains frozen and recoverable.
 
 ## Frontend architecture
-`v8-clean/` is a standalone app entry and does **not** load `index.html`, `app-v6.06.js`, legacy UI wrappers, hidden legacy navigation buttons or legacy renderer functions.
+`v8-clean/` is a standalone app entry and does **not** load the legacy production `index.html`, `app-v6.06.js`, old UI wrappers, hidden legacy navigation buttons or legacy renderer functions.
 
 Layers:
 1. **Data adapters** — same-origin API contracts only. One canonical source per metric.
 2. **State** — one explicit application state with one active route.
 3. **Views** — exactly five real root containers: CENTER, DEPOT, TRADE, PAPER, MORE.
-4. **Details modules** — explicit child modules opened from the owning view; never overlays that impersonate a top-level route.
+4. **Details modules** — explicit child modules owned by their view; never overlays that impersonate a top-level route.
 5. **Navigation** — one five-item navigation controlling only v8-clean state.
 
 ## R1 — Shell + CENTER
@@ -54,8 +54,15 @@ Layers:
 - Existing audit flags are surfaced explicitly, including the Challenger Baseline-READY dependency and Regime V1 directional-score caveat.
 - PAPER remains research-only and read-only. It does not alter entries, exits, sizing, risk, ledger state or execution.
 
-## Remaining clean view
-- MORE — explicit Market, Forecast, Scanner, Research, Diagnostics and settings modules.
+## R5 — MORE
+- MORE is now the fifth real owned view, not an overlay over CENTER or any legacy screen.
+- It is composed of six explicit child modules: MARKET, FORECAST, SCANNER, RESEARCH, DIAGNOSTICS and SETTINGS.
+- MARKET, FORECAST and SCANNER derive only from the protected private dashboard contract. No legacy DOM or hidden route is read.
+- RESEARCH reads the protected `/api/research-analytics` contract and keeps execution impact visible.
+- DIAGNOSTICS reads `/gateway-health` plus private revision/schema metadata so runtime/build/data state can be inspected without switching UI ownership.
+- SETTINGS currently owns the session-only read-token connection. No write token or secret is committed.
+- `more-runtime.js` owns hydration of `#view-more`; the module never opens a top-level overlay and never delegates to a hidden legacy button.
+- During R5 the malformed `data-route` attributes in the clean prototype HTML were corrected so all five nav targets are valid HTML before iPhone validation.
 
 ## Why this avoids the current failures
 - No renderer from another view can repaint the active view.
@@ -66,6 +73,7 @@ Layers:
 - DEPOT cannot disagree with a legacy DOM card because the clean app never reads legacy DOM values.
 - TRADE cannot bind to a wrong legacy view id because its root and data adapter are owned entirely by v8-clean.
 - PAPER cannot inherit legacy card state or imply promotion because its research-only contract and presentation semantics are explicit.
+- MORE cannot expose the old CENTER underneath it because `#view-more` is a real root and its child modules stay inside that root.
 
 ## Promotion plan
-The clean rebuild stays isolated on `v8-clean/rebuild` until all five views are complete, regression-tested and visually verified on iPhone. Only then should the production entry switch from the current compatibility stack to the clean shell.
+All five clean views are now implemented. The clean rebuild remains isolated on `v8-clean/rebuild` until regression checks are green and the complete five-view flow is visually verified on iPhone. Only after explicit human approval should the production entry switch from the compatibility stack to the clean shell.
