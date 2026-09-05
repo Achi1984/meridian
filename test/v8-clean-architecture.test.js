@@ -29,9 +29,18 @@ test('clean v8 does not load legacy compatibility renderer stack',()=>{
 test('clean GitHub Pages shell targets the real Northflank read API instead of same-origin Pages',()=>{
   assert.match(html,/window\.MERIDIAN_V8_CONFIG/);
   assert.match(html,/apiBase:'https:\/\/p01--achi-meridian--ttvk44grdlp7\.code\.run'/);
-  assert.match(html,/app\.js\?v=8\.0-clean-r6/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r6/);
+  assert.match(html,/app\.js\?v=8\.0-clean-r7/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r7/);
   assert.doesNotMatch(html,/MERIDIAN_READ_TOKEN|MERIDIAN_WRITE_TOKEN|authorization\s*:/i);
+});
+
+test('clean R7 persists read auth on-device and applies token changes immediately',()=>{
+  assert.match(data,/localStorage\.getItem\(TOKEN_KEY\)/);
+  assert.match(data,/localStorage\.setItem\(TOKEN_KEY,v\)/);
+  assert.match(data,/sessionStorage\.getItem\(TOKEN_KEY\)/);
+  assert.match(data,/meridian:v8-tokenchange/);
+  assert.match(moreRuntime,/setReadToken\(value\);\s*location\.reload\(\)/);
+  assert.doesNotMatch(html,/MERIDIAN_READ_TOKEN|MERIDIAN_WRITE_TOKEN/i);
 });
 
 test('clean CENTER consumes protected dashboard through a dedicated adapter',()=>{
@@ -44,6 +53,9 @@ test('clean CENTER consumes protected dashboard through a dedicated adapter',()=
 test('clean DEPOT uses canonical spot plus Pionex equity and private history only',()=>{
   assert.match(data,/function spotHoldings/);
   assert.match(data,/toLowerCase\(\)!=='pionex'/);
+  assert.match(data,/function spotValue/);
+  assert.match(data,/snapshotSpotValueUsd/);
+  assert.match(data,/PRIVATE_SPOT_SNAPSHOT/);
   assert.match(data,/function tradingValue/);
   assert.match(data,/portfolio\?\.pionexEquityUsd/);
   assert.match(data,/\/api\/private\/portfolio-history\?range=1d/);
@@ -53,6 +65,7 @@ test('clean DEPOT uses canonical spot plus Pionex equity and private history onl
   assert.match(app,/TOP POSITIONEN/);
   assert.match(app,/TRADING \/ BOTS/);
   assert.match(app,/KANONISCHE HISTORIE WIRD AUFGEBAUT/);
+  assert.doesNotMatch(data,/snapshotTotalIncludingPionexUsd/);
   assert.doesNotMatch(app,/snapshotTotalIncludingPionexUsd|querySelector\([^\n]*(portfolio|depot)/i);
 });
 
@@ -92,7 +105,7 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
 
 test('clean MORE is a real owned view with explicit read-only modules',()=>{
   assert.match(html,/id="view-more"/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r6/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r7/);
   assert.match(more,/export async function loadMore/);
   assert.match(more,/\/gateway-health/);
   assert.match(more,/\/api\/private\/dashboard/);
