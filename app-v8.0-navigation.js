@@ -27,13 +27,14 @@
   }
   function inferActive(){
     const bodyView=String(document.body?.dataset?.view||'').toLowerCase();
+    if(/market|forecast|fcst/.test(bodyView))return 'more';
     if(/paper/.test(bodyView))return 'paper';
     if(/trade|grid/.test(bodyView))return 'trade';
     if(/depot/.test(bodyView))return 'depot';
     if(/live|center|dashboard/.test(bodyView))return 'center';
     const visibleViews=[...document.querySelectorAll('[id^="view-"]')].filter(el=>{try{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'}catch(_e){return false}});
     const ids=visibleViews.map(x=>x.id.toLowerCase()).join(' ');
-    if(/paper/.test(ids))return 'paper';if(/trade|grid/.test(ids))return 'trade';if(/depot/.test(ids))return 'depot';if(/live|center|dashboard/.test(ids))return 'center';
+    if(/market|forecast|fcst/.test(ids))return 'more';if(/paper/.test(ids))return 'paper';if(/trade|grid/.test(ids))return 'trade';if(/depot/.test(ids))return 'depot';if(/live|center|dashboard/.test(ids))return 'center';
     return 'center';
   }
   function markActive(key){

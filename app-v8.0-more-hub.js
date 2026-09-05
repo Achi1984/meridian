@@ -10,12 +10,12 @@
     try{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'}catch(_e){return true}
   }
   function navCandidates(){
-    return [...document.querySelectorAll('button,[role="button"],a,.nav,.tab')].filter(visible);
+    return [...document.querySelectorAll('button,[role="button"],a,.nav,.tab')].filter(el=>!el.closest?.('#v8-more-overlay')&&el.id!=='v8-more-open');
   }
   function clickByLabel(patterns){
     const xs=navCandidates();
     for(const re of patterns){
-      const hit=xs.find(el=>re.test(text(el)) && el.id!=='v8-more-open');
+      const hit=xs.find(el=>re.test(text(el)));
       if(hit){hit.click();return true}
     }
     return false;

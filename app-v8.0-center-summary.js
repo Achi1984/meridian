@@ -33,7 +33,7 @@
     const pools=[cloud?.signals?.items,cloud?.signals?.opportunities,cloud?.scanner?.items,cloud?.opportunities,window.DATA?.scanner?.items,window.DATA?.opportunities].filter(Array.isArray);
     const xs=pools.flat().map(x=>({symbol:String(first(x?.symbol,x?.asset,x?.pair,'')).replace('USDT',''),side:String(first(x?.side,x?.direction,'')).toUpperCase(),status:String(first(x?.status,x?.decision,'')).toUpperCase(),confidence:Number(first(x?.confidence,x?.confidencePct,x?.score,x?.technicalScore))})).filter(x=>x.symbol);
     const ready=xs.filter(x=>/READY|TRADE|ENTRY/.test(x.status));
-    return (ready.length?ready:xs).sort((a,b)=>(Number.isFinite(b.confidence)?b.confidence:-1)-(Number.isFinite(a.confidence)?a.confidence:-1))[0]||null;
+    return ready.sort((a,b)=>(Number.isFinite(b.confidence)?b.confidence:-1)-(Number.isFinite(a.confidence)?a.confidence:-1))[0]||null;
   }
   function toneForRegime(r){return /BULL|EXPANSION|TREND/.test(r)?'cyan':/BEAR/.test(r)?'red':/TRANSITION|RANGE|CHOP/.test(r)?'amber':'muted'}
   function ensure(){
