@@ -14,8 +14,9 @@ Final top-level structure:
 
 ## v8 checkpoints
 PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
-Active hotfix branch: `fix/v8-mobile-live-hotfix-r8`.
-Current hotfix build: `8.0-20260905-R8`.
+PR #44 / R8 merged to `main` as `34d52c3cc98f0bc53015001d8dca71a203a0d7be`.
+Active hotfix branch: `fix/v8-bootstrap-selfheal-r9`.
+Current hotfix build: `8.0-20260905-R9`.
 
 ### R1 PAPER
 `app-v8.0-paper-summary.js` provides one answer header plus four compact bot rows. Relative leadership is not promotion; promotion still requires adequate sample, positive OOS/walk-forward evidence, acceptable drawdown/stability and explicit human approval.
@@ -46,7 +47,16 @@ Post-merge iPhone screenshots exposed three concrete presentation/data-binding r
 - The legacy `#primaryBottomNav` was restored by older high-specificity `!important` CSS, so it could remain visible above/below the new five-item navigation. R8 explicitly hard-hides `#primaryBottomNav` once v8 navigation is ready.
 - CENTER/TRADE were reading the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT` before the canonical browser risk model. R8 prefers the existing `canonicalBotStates()` SSOT and uses bootstrap/DOM only as fallback. CENTER also adds `DATA.btcRegime` as a market-regime fallback.
 
-Regression coverage in `test/v8-navigation.test.js` now asserts real-view binding, canonical bot-state preference and `#primaryBottomNav` suppression.
+### R9 BOOTSTRAP / CACHE SELF-HEAL
+Repeated iPhone screenshots after R8 showed the old module set still running even though R8 was merged and push CI/runtime smoke were green. The root issue is the compatibility/bootstrap layer: `index.html` still references the legacy compatibility filename with an old static query, so a browser/PWA can keep an older loader/module graph alive long enough to reproduce already-fixed UI bugs.
+
+R9 makes the compatibility layer authority-driven:
+- `app-v6.06.js` fetches `version.json` with `cache: no-store` before loading modules and derives the expected module cache tag from the authoritative build.
+- If the running loader tag is stale, it injects a fresh compatibility loader with a build-specific query and removes stale v8 summary/navigation CSS + DOM shells before rehydration.
+- `app-release-authority.js` independently compares the active loader tag with fresh `version.json` and can request the same hot bootstrap refresh when they diverge.
+- `test/v8-bootstrap-selfheal.test.js` protects the authority fetch, stale-loader refresh path, metadata sync and presentation-only boundary.
+
+This architecture is intended to prevent future releases from requiring manual cache clearing when the compatibility filename stays stable.
 
 Legacy detail remains accessible on demand; no v7 capability is deleted by the v8 presentation layer.
 
@@ -82,10 +92,10 @@ v7.64 canonical portfolio history remains the data contract. Current value formu
 - Meta Allocator work remains research-only until explicit promotion criteria are satisfied.
 
 ## Release authority
-v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: compatibility loader cache tag, manifest, package.json/package-lock version contract and `version.json` must agree before Release Safety passes.
+v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: compatibility loader cache tag, manifest, package.json/package-lock version contract and `version.json` must agree before Release Safety passes. R9 additionally treats fresh `version.json` as the runtime bootstrap authority and can hot-refresh stale v8 modules.
 
 ## Save-progress rule
 Every meaningful implementation or research checkpoint must be committed to GitHub. Do not leave substantive MERIDIAN work only in chat.
 
 ## Next step
-Run Release Safety + Portfolio Contract on the exact R8 head. If both are green, keep the hotfix ready for explicit merge approval, then verify CENTER / DEPOT / TRADE / PAPER / MORE again on the iPhone after deployment.
+Run Release Safety + Portfolio Contract on the exact R9 head. If both are green, merge under the user's already-established approval flow, then re-open MERIDIAN on iPhone and verify that only CENTER / DEPOT / TRADE / PAPER / MORE remains and that the TRADE summary is no longer embedded in CENTER.
