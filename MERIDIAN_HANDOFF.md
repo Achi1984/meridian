@@ -1,69 +1,36 @@
-# MERIDIAN — Next Session Handoff
+# MERIDIAN HANDOFF
 
-> Read `MERIDIAN_CONTEXT.md` and `MERIDIAN_DECISIONS.md` before acting on this handoff.
+## Frozen legacy dashboard
+- Frozen branch: `archive/v7.65-dashboard-frozen-20260905`
+- Frozen source commit: `8ddca55f194fb517a244cd45ae142cf28e2a8fd4`
+- Legacy dashboard remains recoverable and must not be mutated by v8 migration work.
 
-## Current release track
+## v8 customer dashboard
+- Active branch: `v8/customer-dashboard`
+- Draft PR: #43
+- Current phase: v8.0 R1 — PAPER customer summary
+- Goal: answer-first UX with details/research on demand.
+- Target top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
 
-- Baseline engine: `6.2.0`
-- Baseline ruleset: `6.2-SIGNAL-V1`
-- Main/live is now `7.63 R1` after PR #37 was merged.
-- Active portfolio-history branch: `fix/canonical-portfolio-history-v764`
-- Draft PR #38: `MERIDIAN v7.64: Canonical Portfolio History`
-- v7.64 R2 build metadata: `7.64-20260904-R2`
-- Trading/Paper execution and `server.js` remain unchanged.
+## v8 R1 PAPER
+- New module: `app-v8.0-paper-summary.js`
+- PAPER overview is reduced to one customer answer card plus four compact bot rows.
+- Rows show only: Trades, P&L, PF, DD and a compact status.
+- A relative current leader is shown, but relative leadership does not equal promotion.
+- Headline remains `NO MODEL QUALIFIES` unless the lightweight forward-quality check is met; even a `WATCH+` result is not a promotion.
+- Promotion still requires OOS/walk-forward, adequate sample and explicit human approval.
+- Full legacy PAPER remains available under `RESEARCH DETAILS` during migration.
+- Baseline 6.2 execution, sizing, risk and exits are unchanged.
+- `server.js` untouched.
 
-## Why v7.64 exists
+## Next v8 implementation order
+1. TRADE customer priority screen
+2. CENTER command view
+3. DEPOT simplification
+4. MORE consolidation
+5. navigation reduction and final mobile polish
 
-v7.63 solved current endpoint identity: the Depot headline and final chart point use one canonical `spotUsd + Pionex equity` value. It could not make historical points trustworthy because past Pionex equity was never stored.
-
-v7.64 therefore persists the full canonical valuation at capture time and exposes it through one protected history API.
-
-## v7.64 implemented
-
-Server/data layer:
-- `portfolio-history-store.js`
-- `portfolio-history-runtime.js`
-- PostgreSQL table `meridian_portfolio_history`
-- captures every 5 minutes
-- stores Spot USD, Pionex/trading USD, total USD, optional cashflow-adjusted total, cumulative cashflow, source revision and source status
-- public Binance pricing refresh for Spot valuation
-- aliases preserved: `BETH→ETH`, `OKSOL→SOL`
-- Pionex remains an equity component rather than being double counted as Spot
-- protected endpoint: `/api/private/portfolio-history?range=1d|1w|1m|6m|1y`
-
-Depot R2:
-- `app-v7.61-depot-audit.js` upgraded to v7.64 behavior
-- selected time range requests the same protected canonical history
-- canonical history replaces the legacy chart only after a warm-up gate
-- 1D requires enough points and approximately half-window coverage before switching
-- longer ranges remain on fallback until sufficient canonical coverage exists
-- after 1D is ready, High, Low and 1D Performance derive from the same stored series
-- final point is still aligned to the live canonical current total
-- browser telemetry identifies source as `V7.64_POSTGRES_CANONICAL_HISTORY` vs `V7.63_CURRENT_FALLBACK`
-
-## Verification
-
-The dedicated v7.64 workflow checks deterministic npm install, canonical history store/runtime regression tests, syntax for history store/runtime, gateway bootstrap, `server-gateway.js` and Depot adapter, plus Release Safety.
-
-A temporary npm-integrity failure occurred while release files were being manually synchronized. It was corrected by restoring the exact dependency checksums from `main` and changing only the release version fields. The corrected validation head is `de73c10c6f5d3114b9b571e8e0c0a69ae23e8fdf`; recheck its workflow before merge.
-
-## Deployment verification after merge
-
-1. confirm Northflank reports v7.64 R2;
-2. verify `meridian_portfolio_history` starts accumulating points roughly every five minutes;
-3. verify protected history endpoint returns `POSTGRES_CANONICAL_HISTORY`;
-4. during warm-up, Depot must explicitly remain on v7.63 fallback rather than stretching a tiny sample;
-5. once 1D coverage passes the gate, verify chart endpoint = current total and High/Low/1D all agree with the same history rows;
-6. only then consider long-range migration complete as those windows naturally accumulate coverage.
-
-## Separate research track
-
-Do not mix this fix with bot research. Meta Allocator work remains on `research/meta-allocator-v780-design`; v7.79 prospective holdout remains locked. Baseline 6.2 stays frozen.
-
-## Save-progress rule
-
-Do not leave meaningful MERIDIAN work only in chat. Save every substantial implementation/research checkpoint to GitHub with descriptive commits.
-
-## New-chat startup instruction
-
-**“Open `Achi1984/meridian` and read `MERIDIAN_CONTEXT.md`, `MERIDIAN_DECISIONS.md`, and `MERIDIAN_HANDOFF.md`. Check `main`, draft PR #38 and the latest v7.64 workflow. Keep Baseline 6.2 frozen and continue from the highest-priority handoff.”**
+## Research isolation
+- v7.86 Retest/Hold Breakout V2 remains research-only and separate.
+- v7.79 prospective holdout remains locked/prospective.
+- No research result auto-promotes into Paper/live execution.
