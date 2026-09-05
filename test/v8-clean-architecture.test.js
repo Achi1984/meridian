@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
 const app=fs.readFileSync(new URL('../v8-clean/app.js',import.meta.url),'utf8');
 const data=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8');
+const more=fs.readFileSync(new URL('../v8-clean/more.js',import.meta.url),'utf8');
+const moreRuntime=fs.readFileSync(new URL('../v8-clean/more-runtime.js',import.meta.url),'utf8');
 const arch=fs.readFileSync(new URL('../v8-clean/ARCHITECTURE.md',import.meta.url),'utf8');
 
 test('clean v8 has exactly five real view roots and one five-item nav',()=>{
@@ -80,8 +82,22 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
   assert.doesNotMatch(app,/PROMOTE|AUTO[- ]?PROMOTION|best model|winner model/i);
 });
 
+test('clean MORE is a real owned view with explicit read-only modules',()=>{
+  assert.match(html,/id="view-more"/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r5/);
+  assert.match(more,/export async function loadMore/);
+  assert.match(more,/\/gateway-health/);
+  assert.match(more,/\/api\/private\/dashboard/);
+  assert.match(more,/\/api\/research-analytics/);
+  for(const module of ['MARKET','FORECAST','SCANNER','RESEARCH','DIAGNOSTICS','SETTINGS'])assert.match(more,new RegExp(module));
+  assert.match(more,/kein Legacy-Overlay/);
+  assert.match(moreRuntime,/location\.hash==='#more'/);
+  assert.match(moreRuntime,/document\.getElementById\('view-more'\)/);
+  assert.doesNotMatch(more+moreRuntime,/primaryBottomNav|legacy\.click|data-view="market"|overlay/i);
+});
+
 test('clean v8 remains presentation/read-only',()=>{
-  const all=html+app+data+arch;
+  const all=html+app+data+more+moreRuntime+arch;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|liveTrading\s*=\s*true/i);
   assert.match(arch,/Baseline `6\.2\.0 \/ 6\.2-SIGNAL-V1` remains frozen/);
   assert.match(arch,/server\.js` remains untouched/);
