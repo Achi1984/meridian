@@ -15,39 +15,44 @@
 
 ## Active v8 direction — CLEAN REBUILD
 - Active branch: `v8-clean/rebuild`.
-- Goal: rebuild the v8 frontend from a clean shell instead of layering more wrappers over legacy v7 renderers.
+- Draft PR #49: `MERIDIAN v8 Clean Rebuild`.
 - Entry: `v8-clean/index.html`.
 - Architecture: `v8-clean/ARCHITECTURE.md`.
-- The clean app does not load `app-v6.06.js`, old v7 UI wrappers, hidden legacy nav buttons or legacy renderer functions.
+- Promotion rule: do not switch production entry until all five clean views are complete, regression-tested and visually verified on iPhone.
 
-## Clean architecture
-Five real root views only:
-1. CENTER
-2. DEPOT
-3. TRADE
-4. PAPER
-5. MORE
+## Clean architecture invariants
+- Exactly five real root views: CENTER / DEPOT / TRADE / PAPER / MORE.
+- One deterministic navigation; no hidden legacy buttons.
+- No legacy renderer/view ownership inside `v8-clean/`.
+- One explicit data adapter layer using backend/API contracts; never scrape legacy DOM for values.
+- No research auto-promotion.
 
-One deterministic navigation owns those five roots. Data arrives only through explicit adapters. Details are child modules of the owning view, never fake top-level overlays. No legacy DOM is used as a data source.
+## Clean R1 — Shell + CENTER
+Implemented and saved:
+- standalone mobile-first shell and status/header;
+- one five-item bottom navigation and one explicit route state;
+- dedicated `v8-clean/data.js` protected-data adapter;
+- CENTER reads `/api/private/dashboard` and derives canonical total, market, risk, one next action and only READY/TRADE/ENTRY-quality opportunity;
+- private read token uses session storage only; no token or secret committed.
 
-## Clean R1 implemented
-- Standalone mobile-first shell and status/header.
-- Exactly one five-item bottom navigation.
-- One explicit app-state route; no hidden-button delegation.
-- Dedicated `v8-clean/data.js` adapter.
-- CENTER R1 reads the protected `/api/private/dashboard` contract and derives portfolio/risk/next-action/opportunity without touching legacy renderers.
-- Private read token prototype uses session storage key `meridian.v8.readToken`; no token or secret is committed.
-- DEPOT / TRADE / PAPER / MORE are explicit placeholders for the next implementation stages.
-- Regression test: `test/v8-clean-architecture.test.js`.
+## Clean R2 — DEPOT
+Implemented and saved:
+- native clean DEPOT view; no old Depot DOM or renderer involved;
+- total is only `spotUsd + tradingUsd`;
+- Spot is valued from private holdings and excludes Pionex holdings, matching canonical v7.63 behavior;
+- Trading/Bots uses canonical Pionex equity with compatible private fallback fields;
+- 1D chart reads only `/api/private/portfolio-history?range=1d`;
+- 1D performance is withheld until at least 16.8h canonical history coverage; no fabricated history;
+- cashflow-adjusted performance is used only when both endpoints can be represented on that basis, otherwise raw canonical total;
+- Spot vs Trading/Bots split and Top 4 exposures use the same valuation basis;
+- BETH is displayed as ETH exposure and OKSOL as SOL exposure for aggregation/display only.
 
-## Build order
-1. Lock clean shell + CENTER contract.
-2. DEPOT from canonical portfolio + canonical history.
-3. TRADE from one bot-risk adapter.
-4. PAPER from protected ledgers/research endpoints, still research-only.
-5. MORE as explicit modules for Market / Forecast / Scanner / Research / Diagnostics / Settings.
-6. Full iPhone verification of all five views.
-7. Only after clean verification, deliberately switch the production entry to `v8-clean`.
+## Next implementation order
+1. TRADE — direct private risk/bot adapter, critical bot, buffer and one action.
+2. PAPER — direct protected paper/research analytics, no execution effect.
+3. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
+4. Full iPhone verification of all five clean views.
+5. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
