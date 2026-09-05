@@ -7,7 +7,7 @@ export function setReadToken(token){
 }
 export function hasReadToken(){return !!sessionStorage.getItem(TOKEN_KEY)}
 function authHeaders(){const t=sessionStorage.getItem(TOKEN_KEY);return t?{authorization:`Bearer ${t}`}:{}}
-async function getJson(path){
+export async function getJson(path){
   const r=await fetch(`${API_BASE}${path}`,{cache:'no-store',headers:{accept:'application/json',...authHeaders()}});
   if(!r.ok){const e=new Error(`HTTP ${r.status}`);e.status=r.status;throw e}
   return r.json();
