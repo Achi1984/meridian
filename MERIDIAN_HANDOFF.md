@@ -7,65 +7,47 @@
 
 ## v8 customer dashboard
 - Active branch: `v8/customer-dashboard`
-- Draft PR: #43
-- Current phase: v8.0 R6 — final five-item navigation + mobile polish
+- PR: #43 — ready for review; user explicitly approved merge after final clean review
+- Current phase: v8.0 R7 — pre-merge hardening
 - Goal: answer-first UX with details/research on demand.
 - Final top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
 
-## v8 R1 PAPER
-- New module: `app-v8.0-paper-summary.js`
-- PAPER overview is reduced to one customer answer card plus four compact bot rows.
-- Rows show only: Trades, P&L, PF, DD and a compact status.
-- Relative leadership does not equal promotion.
-- Full legacy PAPER remains under `RESEARCH DETAILS`.
+## Implemented customer screens
+- PAPER: one answer card plus compact Baseline / Shadow / Challenger / Regime rows; research details remain on demand; relative leader is not promotion.
+- TRADE: risk state, critical bot, liquidation buffer, exactly one next action and compact active-bot rows; legacy detail remains on demand.
+- CENTER: canonical portfolio value, market regime, risk state, one next action and only actionable READY/TRADE/ENTRY-quality scanner opportunity; otherwise `NO READY SIGNAL`.
+- DEPOT: canonical total, 1D performance, canonical-history sparkline when mature, Spot vs Trading/Bots and top positions; no fabricated history.
+- MORE: Market, Forecast, Scanner, Research and Diagnostics grouped behind one secondary hub.
 
-## v8 R2 TRADE
-- New module: `app-v8.0-trade-summary.js`.
-- Default TRADE answers first whether liquidation risk requires action.
-- Shows overall risk state, critical bot, liquidation buffer, one `NEXT ACTION`, and compact bot rows.
-- Reuses the v7.65 recovery ladder.
-- Legacy Trade detail remains under `DETAILS ANZEIGEN`.
+## Navigation / mobile
+- `app-v8.0-navigation.js` provides exactly CENTER / DEPOT / TRADE / PAPER / MORE.
+- First four items delegate to existing view handlers; MORE opens the hub.
+- Legacy bottom navigation is preserved but hidden only after v8 navigation is ready.
+- Market and Forecast remain reachable through preserved legacy handlers even while their old nav buttons are hidden; these secondary views map to MORE in the active five-item nav.
+- iPhone safe-area, card widths, banner spacing and small-screen nav density are normalized.
 
-## v8 R3 CENTER
-- New module: `app-v8.0-center-summary.js`.
-- CENTER is the customer start page and shows canonical portfolio value, market regime, portfolio/bot risk, one next action, and best available scanner opportunity.
-- Missing/uncertain scanner evidence is shown as `NO READY SIGNAL`.
+## R7 pre-merge review fixes
+- Fixed CENTER fallback that could previously surface a non-ready scanner item as `BEST OPPORTUNITY`.
+- Fixed MORE Market/Forecast routing after R6 hid legacy bottom navigation.
+- Extended `test/v8-navigation.test.js` with regression assertions for both behaviors.
+- Restored canonical project/security/research invariants in `MERIDIAN_CONTEXT.md` so continuity is not weakened by the v8 rewrite.
 
-## v8 R4 DEPOT
-- New module: `app-v8.0-depot-summary.js`.
-- Default DEPOT shows canonical total wealth, 1D performance, canonical-history sparkline, Spot vs Trading/Bots split, and four largest spot positions.
-- It reuses the v7.63/v7.64 canonical portfolio contract and does not introduce a second total.
-- Inadequate history is labeled as still building rather than fabricated.
-
-## v8 R5 MORE
-- New module: `app-v8.0-more-hub.js`.
-- One secondary MORE entry point groups Market, Forecast, Scanner, Research and Diagnostics.
-- MORE routes into existing detailed/legacy views instead of duplicating decision logic or financial data.
-- Runtime status can be surfaced as context, but MORE does not produce a new trading verdict.
-
-## v8 R6 NAVIGATION / MOBILE
-- New module: `app-v8.0-navigation.js`.
-- Final bottom navigation contains exactly five items: CENTER / DEPOT / TRADE / PAPER / MORE.
-- CENTER, DEPOT, TRADE and PAPER delegate to the existing view handlers so navigation does not fork application state.
-- MORE opens the R5 hub.
-- Legacy bottom navigation remains in the frozen implementation but is hidden at presentation level after the v8 nav is ready.
-- iPhone bottom safe area, customer banner spacing, card width and small-screen nav density are normalized.
-- Added `test/v8-navigation.test.js` to assert the five-item contract and presentation-only boundary.
-
-## Release safety note
-- v8 preview metadata must stay synchronized through `scripts/release-sync.mjs` outputs: loader cache tag, manifest, package.json and package-lock.json.
-
-## Safety
-- Baseline 6.2 execution, sizing, risk and exits are unchanged.
+## Release safety
+- Exact R7 release build: `8.0-20260905-R7`.
+- Compatibility loader tag and PWA manifest are synchronized to R7.
+- Baseline 6.2 execution, sizing, risk, exits and ledger behavior are unchanged.
 - Paper/live execution unchanged; live trading remains disabled.
 - `server.js` untouched.
+- v7.63/v7.64 canonical portfolio data/history contract remains authoritative.
 
-## Next v8 implementation order
-1. Review R6 on real iPhone screenshots across CENTER / DEPOT / TRADE / PAPER / MORE.
-2. Correct any display/navigation regression without changing execution.
-3. Human review before any merge to `main`.
+## Merge rule for PR #43
+Do not merge on an older successful run. Require both `MERIDIAN Release Safety` and `MERIDIAN Portfolio Contract v7.63` to succeed on the exact current R7 head. If both are green and PR remains mergeable, merge to `main` using the user's explicit approval from this conversation.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
 - v7.79 prospective holdout remains locked/prospective.
+- Meta Allocator remains research-only.
 - No research result auto-promotes into Paper/live execution.
+
+## After merge
+Verify `main` points at the v8 merge commit and then verify Northflank deployment separately; do not infer successful deployment solely from the GitHub merge.
