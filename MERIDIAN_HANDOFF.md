@@ -8,7 +8,7 @@
 - `server.js` remains untouched by v8 frontend work.
 - v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
-## Production status — v8 Clean LIVE
+## Production status — v8 LIVE
 - Production cutover PR #54 merged to `main` at `b075cff295311932fb777a61b329638d6ef5f2f1` after exact-head Release Safety run #688 succeeded.
 - Production root redirects deterministically to `./v8-clean/`, preserving query string and hash.
 - The previous R11 production root remains preserved on `archive/v8-r11-production-pre-cutover` for rollback.
@@ -81,11 +81,20 @@
 - DEPOT / TRADE / PAPER / MORE remain fully scrollable and preserve fixed bottom navigation.
 - iPhone production validation after cutover showed no visual blocker.
 
+## Clean R9 — Production identity
+- Branch: `fix/v8-production-identity-r9`.
+- User-facing prototype wording is removed now that the clean shell is canonical production.
+- Page title becomes `ACHI MERIDIAN v8`.
+- Status row becomes `v8.0 · PROD · SYNC · LIVE DASHBOARD`.
+- Mode banner becomes `MERIDIAN v8 · CUSTOMER VIEW` with concise product copy.
+- Cache tags move to `8.0-r9`; no data, auth, routing, research or execution behavior changes.
+- Regression coverage locks the production identity while preserving the same five-view/read-only architecture.
+
 ## Current next steps
-1. Treat v8 Clean as the canonical production UI.
-2. Keep the R11 rollback branch untouched unless a production regression requires rollback.
-3. Next product work should be incremental on v8 Clean only; do not reintroduce legacy renderer ownership.
-4. Prioritize data/model improvements separately from UI shell changes.
+1. Run Release Safety on the exact R9 head and merge only if green.
+2. Verify production root shows the R9 identity without changing any live data behavior.
+3. Keep the R11 rollback branch untouched unless a production regression requires rollback.
+4. Next product work should be incremental on v8 only; do not reintroduce legacy renderer ownership.
 5. Research remains isolated until evidence and explicit human approval justify any promotion.
 
 ## Research isolation
