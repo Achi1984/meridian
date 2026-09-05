@@ -29,6 +29,7 @@ Current build: `8.0-20260905-R3`
 Legacy detail remains accessible on demand during the migration; no v7 dashboard capability is deleted yet.
 
 ## Safety invariants
+Baseline 6.2 execution is a frozen reference.
 - Baseline execution remains frozen at `6.2.0 / 6.2-SIGNAL-V1` unless explicitly approved.
 - Paper only; live trading remains disabled.
 - Research never silently changes execution.
@@ -40,7 +41,7 @@ Legacy detail remains accessible on demand during the migration; no v7 dashboard
 v7.64 canonical portfolio history remains the data contract. Current value formula remains `totalUsd = spotUsd + tradingUsd`. Historical ranges only switch to canonical persisted history when their maturity/coverage rules are met; no fabricated Pionex backfill.
 
 ## Release authority
-v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: compatibility loader cache tag, manifest, package.json and package-lock.json must match `version.json` before Release Safety can pass.
+v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: compatibility loader cache tag, manifest, package.json and package-lock.json must match `version.json` before Release Safety can pass. Existing research/privacy/runtime metadata required by the release contract remains present in `version.json` throughout the v8 UI migration.
 
 ## Research isolation
 - v7.79 prospective holdout remains locked and prospective.
