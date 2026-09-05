@@ -100,6 +100,39 @@ function historyModel(raw,currentTotal,data){
   const pct=delta!=null&&from?delta/from*100:null;
   return {source:String(raw?.source||'UNKNOWN'),points,coverageMs,mature,basis,performance:mature&&delta!=null?{deltaUsd:delta,pct}:null};
 }
+function normalizeLedger(key,x={}){
+  return {
+    key,name:key==='baseline'?'BASELINE':key==='shadow'?'SHADOW V1':key==='challenger'?'CHALLENGER V2':'REGIME V1',
+    closedTrades:n(x?.closedTrades)??0,openTrades:n(x?.openTrades)??0,pnl:n(x?.pnl),expectancy:n(x?.expectancy),profitFactor:n(x?.profitFactor),
+    winRate:n(x?.winRate),maxDrawdownPct:n(x?.maxDrawdownPct),tradesPerDay:n(x?.tradesPerDay),activeSpanDays:n(x?.activeSpanDays),
+    retentionPct:n(x?.vsBaseline?.retentionPct),expectancyDelta:n(x?.vsBaseline?.expectancyDelta),pnlDelta:n(x?.vsBaseline?.pnlDelta)
+  };
+}
+function paperModel(analytics={},activity={}){
+  const ledgers=analytics?.ledgers||{};
+  const keys=['baseline','shadow','challenger','regime'];
+  const rows=keys.map(k=>normalizeLedger(k,ledgers[k]||{}));
+  const common=activity?.commonWindow||null;
+  const commonRows=common?.ledgers||{};
+  for(const row of rows){
+    const c=commonRows[row.key]||null;
+    row.commonClosed=c?Number(c.closed||0):null;
+    row.commonActiveDays=c?Number(c.activeDays||0):null;
+  }
+  const challenger=analytics?.opportunityCost?.challenger||{};
+  const flags=analytics?.auditFlags||{};
+  const warnings=[];
+  if(flags.challengerBaselineReadyDependency)warnings.push('Challenger V2 hängt historisch an Baseline READY.');
+  if(flags.regimeAdaptedSideUsesBaselineDirectionalScores)warnings.push('Regime V1 kann Side wechseln, nutzt aber teils Baseline-Richtungsscores.');
+  if(flags.liveBacktestExitSequencingMismatch)warnings.push('Live/Backtest Exit-Sequencing ist als Audit-Risiko markiert.');
+  return {
+    ok:true,locked:false,source:'RESEARCH_ANALYTICS',researchOnly:analytics?.researchOnly!==false,executionImpact:analytics?.executionImpact===true,
+    schemaVersion:String(analytics?.schemaVersion||'—'),rows,
+    commonWindow:common?{days:n(common.days),start:common.start||null,end:common.end||null}:null,
+    opportunityCost:{closed:n(challenger.closed)??0,missedWinners:n(challenger.missedWinners)??0,avoidedLosers:n(challenger.avoidedLosers)??0,netR:n(challenger.netCounterfactualR)},
+    warnings
+  };
+}
 
 export async function loadCenter(){
   try{
@@ -156,5 +189,15 @@ export async function loadTrade(){
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'PRIVATE_DASHBOARD',error:'READ_TOKEN_REQUIRED'};
     return {ok:false,locked:false,source:'PRIVATE_DASHBOARD',error:String(e?.message||e)};
+  }
+}
+
+export async function loadPaper(){
+  try{
+    const [analytics,activity]=await Promise.all([getJson('/api/research-analytics'),getJson('/api/activity-summary')]);
+    return paperModel(analytics,activity);
+  }catch(e){
+    if(e?.status===401)return {ok:false,locked:true,source:'RESEARCH_ANALYTICS',error:'READ_TOKEN_REQUIRED'};
+    return {ok:false,locked:false,source:'RESEARCH_ANALYTICS',error:String(e?.message||e)};
   }
 }
