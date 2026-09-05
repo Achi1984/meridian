@@ -58,11 +58,22 @@ Implemented and saved:
 - Trading Equity uses the same Pionex-equity adapter as DEPOT;
 - read-only presentation only; no margin move, order, sizing, stop or execution change.
 
+## Clean R4 — PAPER
+Implemented and saved:
+- native clean PAPER research board; no legacy PAPER cards or renderer involved;
+- reads only protected `/api/research-analytics` and `/api/activity-summary` endpoints;
+- Baseline, Shadow V1, Challenger V2 and Regime V1 normalized into one research comparison model;
+- displays closed trades, PnL, expectancy, profit factor, win rate and max drawdown;
+- Baseline remains explicit reference; no winner label and no automatic promotion;
+- common-window activity is shown separately so sample comparability is visible;
+- Challenger opportunity-cost telemetry shows missed winners, avoided losers and net counterfactual R when available;
+- audit flags remain visible, including Challenger Baseline-READY dependency and Regime V1 directional-score caveat;
+- research-only/read-only: no entry, exit, sizing, risk, ledger or execution effect.
+
 ## Next implementation order
-1. PAPER — direct protected paper/research analytics, no execution effect.
-2. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
-3. Full iPhone verification of all five clean views.
-4. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
+1. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
+2. Full iPhone verification of all five clean views.
+3. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
