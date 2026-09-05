@@ -7,6 +7,7 @@ const app=fs.readFileSync(new URL('../v8-clean/app.js',import.meta.url),'utf8');
 const data=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8');
 const more=fs.readFileSync(new URL('../v8-clean/more.js',import.meta.url),'utf8');
 const moreRuntime=fs.readFileSync(new URL('../v8-clean/more-runtime.js',import.meta.url),'utf8');
+const polish=fs.readFileSync(new URL('../v8-clean/r8-polish.css',import.meta.url),'utf8');
 const arch=fs.readFileSync(new URL('../v8-clean/ARCHITECTURE.md',import.meta.url),'utf8');
 
 test('clean v8 has exactly five real view roots and one five-item nav',()=>{
@@ -29,9 +30,19 @@ test('clean v8 does not load legacy compatibility renderer stack',()=>{
 test('clean GitHub Pages shell targets the real Northflank read API instead of same-origin Pages',()=>{
   assert.match(html,/window\.MERIDIAN_V8_CONFIG/);
   assert.match(html,/apiBase:'https:\/\/p01--achi-meridian--ttvk44grdlp7\.code\.run'/);
-  assert.match(html,/app\.js\?v=8\.0-clean-r7/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r7/);
+  assert.match(html,/app\.js\?v=8\.0-clean-r8/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r8/);
+  assert.match(html,/r8-polish\.css\?v=8\.0-clean-r8/);
   assert.doesNotMatch(html,/MERIDIAN_READ_TOKEN|MERIDIAN_WRITE_TOKEN|authorization\s*:/i);
+});
+
+test('clean R8 mobile polish is presentation-only and preserves five-view ownership',()=>{
+  assert.match(polish,/MERIDIAN v8 Clean R8/);
+  assert.match(polish,/@media \(max-width:520px\)/);
+  assert.match(polish,/#view-center \.hero-value/);
+  assert.match(polish,/\.main-nav button/);
+  assert.match(polish,/max-height:860px/);
+  assert.doesNotMatch(polish,/display\s*:\s*none[^}]*#view-|position\s*:\s*fixed[^}]*view-|pointer-events\s*:\s*none/i);
 });
 
 test('clean R7 persists read auth on-device and applies token changes immediately',()=>{
@@ -105,7 +116,7 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
 
 test('clean MORE is a real owned view with explicit read-only modules',()=>{
   assert.match(html,/id="view-more"/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r7/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r8/);
   assert.match(more,/export async function loadMore/);
   assert.match(more,/\/gateway-health/);
   assert.match(more,/\/api\/private\/dashboard/);
@@ -118,7 +129,7 @@ test('clean MORE is a real owned view with explicit read-only modules',()=>{
 });
 
 test('clean v8 remains presentation/read-only',()=>{
-  const all=html+app+data+more+moreRuntime+arch;
+  const all=html+app+data+more+moreRuntime+polish+arch;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|liveTrading\s*=\s*true/i);
   assert.match(arch,/Baseline `6\.2\.0 \/ 6\.2-SIGNAL-V1` remains frozen/);
   assert.match(arch,/server\.js` remains untouched/);

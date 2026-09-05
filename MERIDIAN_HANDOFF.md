@@ -11,6 +11,7 @@
 - Compatibility v8 R11 remains the production UI entry.
 - Clean rebuild R1-R5 was merged to `main` in PR #49 at merge commit `5540ff463546c96997814487329b4886ec2e3f78`, but only under `v8-clean/`; production `index.html` was not switched.
 - R6 GitHub Pages -> Northflank API binding was merged in PR #51 at `c71da83831e36e875190fab34fe6ba32fd6b4ce4`.
+- R7 token persistence + canonical spot repair was merged in PR #52 at `d1f10b4b359e1b7743aa228986de45a53ef031ff`.
 - PR #48 / R12 was closed unmerged and superseded after iPhone evidence showed legacy renderer/view collisions.
 
 ## Clean architecture invariants
@@ -60,22 +61,29 @@
 - Gateway CORS already allows origin `https://achi1984.github.io`; no `server.js` or CORS widening was needed.
 
 ## Clean R7 — Token persistence + canonical spot repair
-- iPhone validation showed a new browser/WebView session lost the read token because R6 used `sessionStorage` only; all protected views returned LOCKED again.
-- R7 branch: `fix/v8-clean-token-portfolio-r7`.
-- Read token is now stored on-device in `localStorage` under the existing `meridian.v8.readToken` key, with one-time migration from an existing session token. No token value is committed to the repository or sent anywhere except the authenticated gateway request header.
-- Connecting/replacing the token in MORE triggers an immediate page reload so CENTER / DEPOT / TRADE / PAPER all rehydrate from one authenticated state without waiting for the 30s refresh interval.
-- DEPOT/CENTER still prefer holdings valued with live/stored prices. If holdings exist but cannot currently be valued, R7 falls back only to the private `portfolio.snapshotSpotValueUsd` / canonical private spot snapshot. It does not use `snapshotTotalIncludingPionexUsd`, so Pionex cannot be double-counted.
-- Trading/Bots remains the preferred Pionex equity source. Total remains exactly `spot + trading`.
-- Top positions prefer computed holdings; if unavailable, private `portfolio.topPositions` snapshot rows may be shown. No legacy DOM fallback is reintroduced.
-- Clean cache tags bumped to `8.0-clean-r7` and regression coverage locks token persistence, remote API binding and spot fallback semantics.
+- Read token is now stored on-device in `localStorage` under the existing `meridian.v8.readToken` key, with one-time migration from an existing session token. No token value is committed.
+- Connecting/replacing the token in MORE triggers an immediate page reload so all protected views hydrate from one authenticated state.
+- DEPOT/CENTER prefer holdings valued with live/stored prices. If holdings cannot currently be valued, only the private spot snapshot is used as fallback.
+- `snapshotTotalIncludingPionexUsd` is intentionally not used, preventing Pionex double counting.
+- Trading/Bots remains separate. Total remains exactly `spot + trading`.
+- iPhone validation after R7 showed CENTER and DEPOT both at `$27.313`, with Spot `$26.417`, Trading/Bots `$896`, and consistent top positions/history.
+
+## Clean R8 — Visual & UX polish
+- Branch: `fix/v8-clean-visual-polish-r8`.
+- Presentation-only change; no data, auth, navigation ownership, research or execution behavior changes.
+- Adds `v8-clean/r8-polish.css` as a small override layer instead of modifying the stable clean base stylesheet.
+- Mobile spacing is tightened: topbar, status row, mode banner, cards, action cards and bottom navigation use less vertical space.
+- CENTER is prioritized so portfolio, market/risk, next action and best opportunity are more likely to fit within the first iPhone viewport.
+- Very short mobile viewports hide only the explanatory subline in the mode banner; all five real views and all data cards remain available.
+- Clean cache tags are bumped to `8.0-clean-r8`.
+- Regression coverage verifies R8 remains presentation-only and preserves five-view ownership.
 
 ## Current next steps
-1. Release Safety must pass on the exact R7 head before merge.
-2. Re-open the GitHub Pages clean URL and verify the already connected token survives a fresh browser/WebView open.
-3. Verify CENTER / DEPOT / TRADE / PAPER load immediately without revisiting SETTINGS.
-4. Check DEPOT total: Spot must no longer collapse to $0 when the private spot snapshot is present; Trading/Bots must remain separate.
-5. Validate top positions/history source labels and mobile layout.
-6. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
+1. Release Safety must pass on the exact R8 head before merge.
+2. Re-open the GitHub Pages clean URL and visually validate CENTER / DEPOT on iPhone with the compact layout.
+3. Confirm no clipping behind the fixed bottom navigation and that BEST OPPORTUNITY is reachable without awkward extra scroll.
+4. If clean, treat v8-clean R8 as the visual candidate for production cutover.
+5. Production entry migration remains a separate deliberate change and requires explicit approval.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
