@@ -21,25 +21,27 @@ test('v8 navigation is presentation-only and delegates existing routes',()=>{
   assert.doesNotMatch(nav,/placeOrder|createOrder|submitOrder|liveTrading\s*=\s*true|fetch\([^\n]*(order|trade)/i);
 });
 
-test('R11 routes primary tabs to real runtime containers',()=>{
+test('R12 routes all five primary tabs to real runtime containers',()=>{
   assert.match(nav,/ids:\['view-center','view-live','view-dashboard'\]/);
   assert.match(nav,/ids:\['view-depot'\]/);
   assert.match(nav,/ids:\['view-daytrade','view-trade'\],runtime:'daytrade'/);
   assert.match(nav,/ids:\['view-paper'\]/);
+  assert.match(nav,/ids:\['view-more'\],runtime:'more'/);
   assert.match(nav,/v\.classList\.toggle\('hidden',!on\)/);
-  assert.match(nav,/removeAttribute\('hidden'\)/);
 });
 
 test('R11 Trade summary binds to the real daytrade container first',()=>{
   assert.match(trade,/document\.getElementById\('view-daytrade'\)\|\|document\.getElementById\('view-trade'\)/);
-  assert.match(trade,/\['view-daytrade','view-trade'\]\.includes\(r\.id\)/);
   assert.match(trade,/meridian:v8-viewchange/);
 });
 
-test('R11 MORE overlay owns active nav state while open',()=>{
-  assert.match(nav,/document\.getElementById\('v8-more-overlay'\)\)return 'more'/);
-  assert.match(nav,/document\.body\.dataset\.view='more'/);
-  assert.match(nav,/markActive\('more'\)/);
+test('R12 MORE is a real view and old overlay is removed',()=>{
+  assert.match(more,/document\.getElementById\('view-more'\)/);
+  assert.match(more,/root\.id='view-more'/);
+  assert.match(nav,/ids:\['view-more'\]/);
+  assert.match(more,/document\.getElementById\('v8-more-overlay'\)\?\.remove\(\)/);
+  assert.doesNotMatch(more,/#v8-more-overlay\.open\{display:flex\}/);
+  assert.doesNotMatch(nav,/document\.getElementById\('v8-more-overlay'\)\)return 'more'/);
 });
 
 test('legacy primary bottom navigation is forcibly removed after v8 nav is ready',()=>{
@@ -57,11 +59,11 @@ test('Depot details toggle explicitly restores legacy detail children and persis
   assert.match(depot,/aria-expanded/);
 });
 
-test('MORE can route through hidden legacy navigation without clicking its own overlay buttons',()=>{
-  assert.match(more,/!el\.closest\?\.\('#v8-more-overlay'\)/);
+test('MORE routes only after an explicit user choice',()=>{
   assert.match(more,/kind==='market'/);
   assert.match(more,/kind==='forecast'/);
-  assert.doesNotMatch(more,/navCandidates\(\)[^\n]*filter\(visible\)/);
+  assert.match(more,/root\.querySelectorAll\('\[data-route\]'\)/);
+  assert.doesNotMatch(more,/function open\(\).*overlay/);
 });
 
 test('market and forecast detail screens keep MORE active in the five-item nav',()=>{
