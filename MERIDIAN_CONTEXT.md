@@ -5,7 +5,7 @@ MERIDIAN v8 is a customer-centered presentation redesign. The existing v7.65 das
 
 The v8 migration reduces cognitive load. Every top-level screen answers one customer question first; technical detail is secondary and research/diagnostics are tertiary.
 
-Target top-level structure:
+Final top-level structure:
 - CENTER — What do I need to know now?
 - DEPOT — How is my portfolio developing?
 - TRADE — Do I need to act or reduce risk?
@@ -15,7 +15,7 @@ Target top-level structure:
 ## v8 checkpoints
 Branch: `v8/customer-dashboard`
 Draft PR: #43
-Current build: `8.0-20260905-R5`
+Current build: `8.0-20260905-R6`
 
 ### R1 PAPER
 `app-v8.0-paper-summary.js` provides one answer header plus four compact bot rows. Relative leadership is not promotion; promotion still requires adequate sample, positive OOS/walk-forward evidence, acceptable drawdown/stability and explicit human approval.
@@ -31,6 +31,9 @@ Current build: `8.0-20260905-R5`
 
 ### R5 MORE
 `app-v8.0-more-hub.js` consolidates secondary depth behind one entry point. MORE contains Market, Forecast, Scanner, Research and Diagnostics routes. It does not create new trading decisions or duplicate data; it only routes the customer into existing detailed views. The primary screens remain answer-first.
+
+### R6 NAVIGATION / MOBILE
+`app-v8.0-navigation.js` installs the final five-item bottom navigation: CENTER / DEPOT / TRADE / PAPER / MORE. It delegates the first four routes to the existing view/navigation handlers and opens the MORE hub for secondary tools. The legacy bottom navigation is hidden only at presentation level after the v8 navigation is ready. iPhone safe-area spacing, compact customer-banner spacing and card widths are normalized in the same presentation layer.
 
 Legacy detail remains accessible on demand during the migration; no v7 dashboard capability is deleted yet.
 
@@ -55,4 +58,4 @@ v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: c
 - Meta Allocator work remains research-only until explicit promotion criteria are satisfied.
 
 ## Next v8 sequence
-Final five-item navigation and mobile polish.
+Mobile consistency review on real-device screenshots -> correct any presentation regressions -> human review before any merge to `main`.
