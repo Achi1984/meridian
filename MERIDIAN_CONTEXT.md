@@ -13,9 +13,9 @@ Final top-level structure:
 - MORE — Deep detail, market, forecast, diagnostics and research.
 
 ## v8 checkpoints
-Branch: `v8/customer-dashboard`
-PR: #43 — ready for review / pre-merge approved by user
-Current build: `8.0-20260905-R7`
+PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
+Active hotfix branch: `fix/v8-mobile-live-hotfix-r8`.
+Current hotfix build: `8.0-20260905-R8`.
 
 ### R1 PAPER
 `app-v8.0-paper-summary.js` provides one answer header plus four compact bot rows. Relative leadership is not promotion; promotion still requires adequate sample, positive OOS/walk-forward evidence, acceptable drawdown/stability and explicit human approval.
@@ -33,13 +33,20 @@ Current build: `8.0-20260905-R7`
 `app-v8.0-more-hub.js` consolidates secondary depth behind one entry point. MORE contains Market, Forecast, Scanner, Research and Diagnostics routes. It does not create new trading decisions or duplicate data; it routes into existing detailed views.
 
 ### R6 NAVIGATION / MOBILE
-`app-v8.0-navigation.js` installs the final five-item bottom navigation: CENTER / DEPOT / TRADE / PAPER / MORE. It delegates the first four routes to existing handlers and opens MORE for secondary tools. The legacy bottom navigation is hidden only at presentation level after the v8 navigation is ready. iPhone safe-area spacing, compact customer-banner spacing and card widths are normalized.
+`app-v8.0-navigation.js` installs the final five-item bottom navigation: CENTER / DEPOT / TRADE / PAPER / MORE. It delegates the first four routes to existing handlers and opens MORE for secondary tools.
 
 ### R7 PRE-MERGE HARDENING
-A final code review found and fixed two UI-contract regressions before merge:
+A final code review fixed two UI-contract regressions before the first v8 merge:
 - CENTER no longer falls back to a non-ready scanner candidate when no actionable signal exists.
-- MORE can still invoke preserved Market/Forecast legacy handlers after R6 hides the legacy bottom navigation; Market/Forecast are represented as MORE in the five-item active state.
-Regression coverage was added to `test/v8-navigation.test.js`.
+- MORE can still invoke preserved Market/Forecast legacy handlers after v8 hides the legacy bottom navigation; Market/Forecast are represented as MORE in the five-item active state.
+
+### R8 LIVE IPHONE HOTFIX
+Post-merge iPhone screenshots exposed three concrete presentation/data-binding regressions:
+- `app-v8.0-trade-summary.js` and `app-v8.0-depot-summary.js` had generic `[data-view=...]` fallbacks. The new v8 navigation itself uses `data-view`, so a missing/late real view could cause a customer summary to mount inside a navigation button. R8 binds summaries only to real `#view-*` containers.
+- The legacy `#primaryBottomNav` was restored by older high-specificity `!important` CSS, so it could remain visible above/below the new five-item navigation. R8 explicitly hard-hides `#primaryBottomNav` once v8 navigation is ready.
+- CENTER/TRADE were reading the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT` before the canonical browser risk model. R8 prefers the existing `canonicalBotStates()` SSOT and uses bootstrap/DOM only as fallback. CENTER also adds `DATA.btcRegime` as a market-regime fallback.
+
+Regression coverage in `test/v8-navigation.test.js` now asserts real-view binding, canonical bot-state preference and `#primaryBottomNav` suppression.
 
 Legacy detail remains accessible on demand; no v7 capability is deleted by the v8 presentation layer.
 
@@ -81,4 +88,4 @@ v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: c
 Every meaningful implementation or research checkpoint must be committed to GitHub. Do not leave substantive MERIDIAN work only in chat.
 
 ## Next step
-Require green Release Safety and Portfolio Contract on the exact R7 head, then merge PR #43 to `main` only under the user's explicit approval already given in this conversation.
+Run Release Safety + Portfolio Contract on the exact R8 head. If both are green, keep the hotfix ready for explicit merge approval, then verify CENTER / DEPOT / TRADE / PAPER / MORE again on the iPhone after deployment.
