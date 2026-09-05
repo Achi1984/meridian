@@ -45,8 +45,16 @@ Layers:
 - Active bots are sorted by buffer and show only concise operational fields such as side, leverage, liquidation price and buffer.
 - This is read-only presentation. It does not place orders, change margin, resize bots, move stops or alter risk/execution logic.
 
-## Remaining clean views
-- PAPER — direct research ledger/analytics adapter, research-only.
+## R4 — PAPER
+- PAPER is a native clean research board. It reads only protected `/api/research-analytics` and `/api/activity-summary` contracts.
+- Baseline, Shadow V1, Challenger V2 and Regime V1 are normalized into one display model with closed trades, PnL, expectancy, profit factor, win rate and max drawdown.
+- Baseline remains the reference. No model is labeled a winner and no relative result can trigger promotion.
+- Common-window activity is shown separately from full-ledger analytics so sample coverage is visible rather than implied.
+- Challenger opportunity-cost telemetry exposes missed winners, avoided losers and net counterfactual R where available.
+- Existing audit flags are surfaced explicitly, including the Challenger Baseline-READY dependency and Regime V1 directional-score caveat.
+- PAPER remains research-only and read-only. It does not alter entries, exits, sizing, risk, ledger state or execution.
+
+## Remaining clean view
 - MORE — explicit Market, Forecast, Scanner, Research, Diagnostics and settings modules.
 
 ## Why this avoids the current failures
@@ -57,6 +65,7 @@ Layers:
 - Cache/versioning can be handled by one clean entry rather than a compatibility-loader chain.
 - DEPOT cannot disagree with a legacy DOM card because the clean app never reads legacy DOM values.
 - TRADE cannot bind to a wrong legacy view id because its root and data adapter are owned entirely by v8-clean.
+- PAPER cannot inherit legacy card state or imply promotion because its research-only contract and presentation semantics are explicit.
 
 ## Promotion plan
 The clean rebuild stays isolated on `v8-clean/rebuild` until all five views are complete, regression-tested and visually verified on iPhone. Only then should the production entry switch from the current compatibility stack to the clean shell.
