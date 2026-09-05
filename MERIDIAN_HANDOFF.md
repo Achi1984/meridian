@@ -8,15 +8,9 @@
 - v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
 ## Current production main
-- Compatibility v8 R11 remains the production UI on `main` at `3c2c88280a8fd75e6b8bb4d38648b792a45e0965`.
+- Compatibility v8 R11 remains the production UI entry.
+- Clean rebuild R1-R5 was merged to `main` in PR #49 at merge commit `5540ff463546c96997814487329b4886ec2e3f78`, but only under `v8-clean/`; production `index.html` was not switched.
 - PR #48 / R12 was closed unmerged and superseded after iPhone evidence showed legacy renderer/view collisions.
-
-## Active v8 direction — CLEAN REBUILD
-- Active branch: `v8-clean/rebuild`.
-- Draft PR #49: `MERIDIAN v8 Clean Rebuild`.
-- Entry: `v8-clean/index.html`.
-- Architecture: `v8-clean/ARCHITECTURE.md`.
-- Promotion rule: no production-entry switch until all five clean views pass regression checks and are visually verified on iPhone.
 
 ## Clean architecture invariants
 - Exactly five real root views: CENTER / DEPOT / TRADE / PAPER / MORE.
@@ -51,21 +45,28 @@
 - Baseline is reference; no winner label or auto-promotion.
 
 ## Clean R5 — MORE
-Implemented and saved:
-- MORE is the fifth real top-level root, not an overlay;
-- explicit child modules: MARKET / FORECAST / SCANNER / RESEARCH / DIAGNOSTICS / SETTINGS;
-- MARKET, FORECAST and SCANNER derive only from the private dashboard contract;
-- RESEARCH uses protected research analytics;
-- DIAGNOSTICS uses `/gateway-health` plus private revision/schema metadata;
-- SETTINGS owns the session-only read token;
-- `more-runtime.js` hydrates only `#view-more` and never delegates to legacy navigation;
-- malformed prototype `data-route` attributes were corrected before iPhone validation.
+- MORE is the fifth real top-level root, not an overlay.
+- Explicit child modules: MARKET / FORECAST / SCANNER / RESEARCH / DIAGNOSTICS / SETTINGS.
+- MARKET, FORECAST and SCANNER derive only from the private dashboard contract.
+- RESEARCH uses protected research analytics.
+- DIAGNOSTICS uses `/gateway-health` plus private revision/schema metadata.
+- SETTINGS owns the session-only read token.
+- `more-runtime.js` hydrates only `#view-more` and never delegates to legacy navigation.
+
+## Clean R6 — GitHub Pages API binding
+- iPhone validation on `https://achi1984.github.io/meridian/v8-clean/` proved the clean five-view routing is stable, but all protected views returned HTTP 404 because the standalone shell used same-origin GitHub Pages as its API base.
+- Fix branch: `fix/v8-clean-api-base-r6`.
+- The test shell now sets `window.MERIDIAN_V8_CONFIG.apiBase` to the real Northflank gateway host `https://p01--achi-meridian--ttvk44grdlp7.code.run` before any clean modules load.
+- The gateway already allows origin `https://achi1984.github.io`; no CORS widening is required.
+- No read/write token is committed. The read token remains session-only and must be entered through MORE / SETTINGS.
+- Cache tags bumped to `8.0-clean-r6` and a regression test locks the remote API-base contract.
 
 ## Current next steps
-1. Wait for Release Safety on the exact R5 head and fix any regression failure before visual testing.
-2. Expose the clean entry for controlled iPhone validation without replacing production R11 yet.
-3. Verify all five tabs: route/content ownership, no legacy bleed-through, data consistency, safe-area/mobile layout, token reconnect and refresh behavior.
-4. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
+1. Run Release Safety on the exact R6 head and merge only if green.
+2. Re-open the same GitHub Pages clean URL on iPhone; without a token the protected views should show LOCKED/401 semantics rather than HTTP 404, while `/gateway-health` should resolve through Northflank.
+3. Enter the read token in MORE / SETTINGS and verify CENTER / DEPOT / TRADE / PAPER / MORE with real data.
+4. Validate data consistency and mobile layout across all five views.
+5. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
