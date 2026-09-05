@@ -2,17 +2,18 @@
 
 ## Frozen / protected references
 - Frozen legacy dashboard: `archive/v7.65-dashboard-frozen-20260905` at `8ddca55f194fb517a244cd45ae142cf28e2a8fd4`.
+- Pre-cutover production rollback branch: `archive/v8-r11-production-pre-cutover` at `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749`.
 - Baseline `6.2.0 / 6.2-SIGNAL-V1` remains frozen.
 - Paper/live execution, sizing, risk, exits and ledgers remain unchanged; live trading remains disabled.
 - `server.js` must remain untouched by v8 frontend work.
 - v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
-## Current production main
-- Compatibility v8 R11 remains the production UI entry.
-- Clean rebuild R1-R5 was merged to `main` in PR #49 at merge commit `5540ff463546c96997814487329b4886ec2e3f78`, but only under `v8-clean/`; production `index.html` was not switched.
-- R6 GitHub Pages -> Northflank API binding was merged in PR #51 at `c71da83831e36e875190fab34fe6ba32fd6b4ce4`.
-- R7 token persistence + canonical spot repair was merged in PR #52 at `d1f10b4b359e1b7743aa228986de45a53ef031ff`.
-- PR #48 / R12 was closed unmerged and superseded after iPhone evidence showed legacy renderer/view collisions.
+## Production cutover candidate
+- Branch: `release/v8-clean-production-cutover`.
+- Production root `index.html` now redirects deterministically to `./v8-clean/`, preserving query string and hash.
+- The previous R11 production root is preserved on `archive/v8-r11-production-pre-cutover` for immediate rollback.
+- No clean data/auth/research/execution code is changed by the cutover itself.
+- Root entry is intentionally thin to prevent any legacy renderer from initializing before the clean shell.
 
 ## Clean architecture invariants
 - Exactly five real root views: CENTER / DEPOT / TRADE / PAPER / MORE.
@@ -56,34 +57,29 @@
 - `more-runtime.js` hydrates only `#view-more` and never delegates to legacy navigation.
 
 ## Clean R6 — GitHub Pages API binding
-- iPhone validation on `https://achi1984.github.io/meridian/v8-clean/` proved clean five-view routing is stable, but protected views initially returned HTTP 404 because the standalone shell used same-origin GitHub Pages for API calls.
-- `window.MERIDIAN_V8_CONFIG.apiBase` now points to `https://p01--achi-meridian--ttvk44grdlp7.code.run` before clean modules load.
+- `window.MERIDIAN_V8_CONFIG.apiBase` points to `https://p01--achi-meridian--ttvk44grdlp7.code.run` before clean modules load.
 - Gateway CORS already allows origin `https://achi1984.github.io`; no `server.js` or CORS widening was needed.
 
 ## Clean R7 — Token persistence + canonical spot repair
-- Read token is now stored on-device in `localStorage` under the existing `meridian.v8.readToken` key, with one-time migration from an existing session token. No token value is committed.
-- Connecting/replacing the token in MORE triggers an immediate page reload so all protected views hydrate from one authenticated state.
-- DEPOT/CENTER prefer holdings valued with live/stored prices. If holdings cannot currently be valued, only the private spot snapshot is used as fallback.
+- Read token is stored on-device in `localStorage` under `meridian.v8.readToken`, with one-time migration from session storage. No token value is committed.
+- Connecting/replacing the token in MORE triggers immediate reload so all protected views hydrate from one authenticated state.
+- DEPOT/CENTER prefer holdings valued with live/stored prices and use only private canonical spot snapshot as fallback.
 - `snapshotTotalIncludingPionexUsd` is intentionally not used, preventing Pionex double counting.
-- Trading/Bots remains separate. Total remains exactly `spot + trading`.
-- iPhone validation after R7 showed CENTER and DEPOT both at `$27.313`, with Spot `$26.417`, Trading/Bots `$896`, and consistent top positions/history.
+- Trading/Bots remains separate; total remains exactly `spot + trading`.
+- iPhone validation showed CENTER and DEPOT at `$27.313`, with Spot `$26.417`, Trading/Bots `$896` and consistent history/top positions.
 
 ## Clean R8 — Visual & UX polish
-- Branch: `fix/v8-clean-visual-polish-r8`.
-- Presentation-only change; no data, auth, navigation ownership, research or execution behavior changes.
-- Adds `v8-clean/r8-polish.css` as a small override layer instead of modifying the stable clean base stylesheet.
-- Mobile spacing is tightened: topbar, status row, mode banner, cards, action cards and bottom navigation use less vertical space.
-- CENTER is prioritized so portfolio, market/risk, next action and best opportunity are more likely to fit within the first iPhone viewport.
-- Very short mobile viewports hide only the explanatory subline in the mode banner; all five real views and all data cards remain available.
-- Clean cache tags are bumped to `8.0-clean-r8`.
-- Regression coverage verifies R8 remains presentation-only and preserves five-view ownership.
+- Presentation-only compact mobile override in `v8-clean/r8-polish.css`.
+- CENTER prioritizes portfolio, market/risk, next action and best opportunity in the first viewport.
+- DEPOT / TRADE / PAPER / MORE remain fully scrollable and preserve fixed bottom navigation.
+- iPhone validation after merge commit `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749` showed no visual blocker.
 
 ## Current next steps
-1. Release Safety must pass on the exact R8 head before merge.
-2. Re-open the GitHub Pages clean URL and visually validate CENTER / DEPOT on iPhone with the compact layout.
-3. Confirm no clipping behind the fixed bottom navigation and that BEST OPPORTUNITY is reachable without awkward extra scroll.
-4. If clean, treat v8-clean R8 as the visual candidate for production cutover.
-5. Production entry migration remains a separate deliberate change and requires explicit approval.
+1. Release Safety must pass on the exact cutover head.
+2. Merge cutover only after the exact-head check is green.
+3. After deployment, verify the production root opens v8-clean directly and token persists.
+4. Validate CENTER / DEPOT / TRADE / PAPER / MORE once on production root.
+5. If any production-only issue appears, rollback by restoring `archive/v8-r11-production-pre-cutover` / commit `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
