@@ -47,12 +47,22 @@ Implemented and saved:
 - Spot vs Trading/Bots split and Top 4 exposures use the same valuation basis;
 - BETH is displayed as ETH exposure and OKSOL as SOL exposure for aggregation/display only.
 
+## Clean R3 — TRADE
+Implemented and saved:
+- native clean TRADE view driven only by the private `pionexRisk.bots` contract;
+- one bot normalization path in the data adapter; no Grid Commander or legacy DOM scraping;
+- critical bot = lowest finite liquidation buffer;
+- presentation ladder preserved: `<8% DANGER`, `8–<12% WATCH`, `>=12% SAFE`;
+- exactly one NEXT ACTION plus target/remaining percentage points when intervention is required;
+- active bots sorted by liquidation buffer with concise side / leverage / liquidation-price / buffer rows;
+- Trading Equity uses the same Pionex-equity adapter as DEPOT;
+- read-only presentation only; no margin move, order, sizing, stop or execution change.
+
 ## Next implementation order
-1. TRADE — direct private risk/bot adapter, critical bot, buffer and one action.
-2. PAPER — direct protected paper/research analytics, no execution effect.
-3. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
-4. Full iPhone verification of all five clean views.
-5. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
+1. PAPER — direct protected paper/research analytics, no execution effect.
+2. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
+3. Full iPhone verification of all five clean views.
+4. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
