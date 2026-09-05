@@ -1,4 +1,4 @@
-// MERIDIAN v8 R10 — Depot chart range + high/low overlay
+// MERIDIAN v8 R11 — Depot chart range + high/low overlay polish
 // Presentation/read-only enhancement. No execution or portfolio-contract changes.
 const API_BASE=(window.MERIDIAN_V8_CONFIG?.apiBase||'').replace(/\/$/,'');
 const TOKEN_KEY='meridian.v8.readToken';
@@ -31,17 +31,17 @@ async function history(range){
 }
 function chartSvg(points){
   if(points.length<2)return '<div class="chart-empty depot-r10-empty">KANONISCHE HISTORIE WIRD AUFGEBAUT</div>';
-  const vals=points.map(p=>p.v),lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(1,hi-lo),w=360,h=150,padX=14,padY=20;
+  const vals=points.map(p=>p.v),lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(1,hi-lo),w=360,h=150,padX=14,padY=22;
   const xy=points.map((p,i)=>({x:padX+(w-padX*2)*(i/(points.length-1)),y:padY+(h-padY*2)*(1-(p.v-lo)/span),v:p.v}));
   const path=xy.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
   const hiIndex=vals.indexOf(hi),loIndex=vals.indexOf(lo),hp=xy[hiIndex],lp=xy[loIndex];
-  const highLabelY=Math.max(13,hp.y-9),lowLabelY=Math.min(h-5,lp.y+16);
+  const highLabelY=Math.max(11,hp.y-14),lowLabelY=Math.min(h-6,lp.y+21);
   return `<svg class="depot-r10-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Portfolio Verlauf mit Hoch und Tief">
     <path class="depot-r10-line" d="${path}" fill="none" vector-effect="non-scaling-stroke"/>
     <circle class="depot-r10-point high" cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="3.2" vector-effect="non-scaling-stroke"/>
     <circle class="depot-r10-point low" cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="3.2" vector-effect="non-scaling-stroke"/>
-    <text class="depot-r10-label high" x="${Math.min(w-76,Math.max(4,hp.x-34)).toFixed(1)}" y="${highLabelY.toFixed(1)}">HIGH ${usd(hi)}</text>
-    <text class="depot-r10-label low" x="${Math.min(w-72,Math.max(4,lp.x-30)).toFixed(1)}" y="${lowLabelY.toFixed(1)}">LOW ${usd(lo)}</text>
+    <text class="depot-r10-label high" x="${Math.min(w-70,Math.max(5,hp.x-31)).toFixed(1)}" y="${highLabelY.toFixed(1)}">HIGH ${usd(hi)}</text>
+    <text class="depot-r10-label low" x="${Math.min(w-68,Math.max(5,lp.x-27)).toFixed(1)}" y="${lowLabelY.toFixed(1)}">LOW ${usd(lo)}</text>
   </svg>`;
 }
 function rangeStats(points){
