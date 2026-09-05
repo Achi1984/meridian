@@ -27,12 +27,20 @@ test('clean v8 does not load legacy compatibility renderer stack',()=>{
   assert.doesNotMatch(app,/legacy\.click|renderOne|primaryBottomNav|querySelector\([^\n]*data-view/);
 });
 
-test('clean GitHub Pages shell targets the real Northflank read API instead of same-origin Pages',()=>{
+test('v8 R9 presents canonical production identity without prototype wording',()=>{
+  assert.match(html,/<title>ACHI MERIDIAN v8<\/title>/);
+  assert.match(html,/v8\.0 · PROD/);
+  assert.match(html,/MERIDIAN v8 · CUSTOMER VIEW/);
+  assert.match(html,/Fünf Views · eine Datenquelle pro Kennzahl · Details nur auf Abruf/);
+  assert.doesNotMatch(html,/>v8\.0 CLEAN<|CLEAN CUSTOMER VIEW|v8 Clean<\/title>/);
+  assert.match(html,/app\.js\?v=8\.0-r9/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-r9/);
+  assert.match(html,/r8-polish\.css\?v=8\.0-r9/);
+});
+
+test('production shell targets the real Northflank read API instead of same-origin Pages',()=>{
   assert.match(html,/window\.MERIDIAN_V8_CONFIG/);
   assert.match(html,/apiBase:'https:\/\/p01--achi-meridian--ttvk44grdlp7\.code\.run'/);
-  assert.match(html,/app\.js\?v=8\.0-clean-r8/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r8/);
-  assert.match(html,/r8-polish\.css\?v=8\.0-clean-r8/);
   assert.doesNotMatch(html,/MERIDIAN_READ_TOKEN|MERIDIAN_WRITE_TOKEN|authorization\s*:/i);
 });
 
@@ -116,7 +124,6 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
 
 test('clean MORE is a real owned view with explicit read-only modules',()=>{
   assert.match(html,/id="view-more"/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r8/);
   assert.match(more,/export async function loadMore/);
   assert.match(more,/\/gateway-health/);
   assert.match(more,/\/api\/private\/dashboard/);

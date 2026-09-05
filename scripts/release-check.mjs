@@ -51,9 +51,11 @@ if(cleanCutover){
     must(clean.includes(`id="view-${key}"`),`clean production target missing view-${key}`);
     must(clean.includes(`data-route="${key}"`),`clean production target missing route ${key}`);
   }
-  must(clean.includes('r8-polish.css?v=8.0-clean-r8'),'clean production target must be R8 visual candidate');
-  must(clean.includes('app.js?v=8.0-clean-r8'),'clean production app tag mismatch');
-  must(clean.includes('more-runtime.js?v=8.0-clean-r8'),'clean production MORE tag mismatch');
+  must(clean.includes('r8-polish.css?v=8.0-r9'),'clean production target must include R8 mobile polish on R9 cache tag');
+  must(clean.includes('app.js?v=8.0-r9'),'clean production app tag mismatch');
+  must(clean.includes('more-runtime.js?v=8.0-r9'),'clean production MORE tag mismatch');
+  must(clean.includes('v8.0 · PROD'),'clean production status identity missing');
+  must(clean.includes('MERIDIAN v8 · CUSTOMER VIEW'),'clean production customer banner missing');
 }else{
   must(index.includes('app-v6.06.js'),'index compatibility loader missing');
   must(index.includes('id="versionBadge"'),'version badge missing');
