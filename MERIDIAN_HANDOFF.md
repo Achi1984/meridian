@@ -8,72 +8,64 @@
 - v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
 ## Current production main
-- The compatibility-based v8 line reached R11 and is still the current production UI on `main`.
-- R11 merge commit: `3c2c88280a8fd75e6b8bb4d38648b792a45e0965`.
-- Live iPhone verification proved the compatibility stack still allows legacy renderer/view ownership collisions.
-- PR #48 / R12 was deliberately closed unmerged and marked superseded.
+- Compatibility v8 R11 remains the production UI on `main` at `3c2c88280a8fd75e6b8bb4d38648b792a45e0965`.
+- PR #48 / R12 was closed unmerged and superseded after iPhone evidence showed legacy renderer/view collisions.
 
 ## Active v8 direction — CLEAN REBUILD
 - Active branch: `v8-clean/rebuild`.
 - Draft PR #49: `MERIDIAN v8 Clean Rebuild`.
 - Entry: `v8-clean/index.html`.
 - Architecture: `v8-clean/ARCHITECTURE.md`.
-- Promotion rule: do not switch production entry until all five clean views are complete, regression-tested and visually verified on iPhone.
+- Promotion rule: no production-entry switch until all five clean views pass regression checks and are visually verified on iPhone.
 
 ## Clean architecture invariants
 - Exactly five real root views: CENTER / DEPOT / TRADE / PAPER / MORE.
 - One deterministic navigation; no hidden legacy buttons.
 - No legacy renderer/view ownership inside `v8-clean/`.
-- One explicit data adapter layer using backend/API contracts; never scrape legacy DOM for values.
+- Explicit read-only adapters use backend/API contracts; never scrape legacy DOM for values.
 - No research auto-promotion.
 
-## Clean R1 — Shell + CENTER
-Implemented and saved:
-- standalone mobile-first shell and status/header;
-- one five-item bottom navigation and one explicit route state;
-- dedicated `v8-clean/data.js` protected-data adapter;
-- CENTER reads `/api/private/dashboard` and derives canonical total, market, risk, one next action and only READY/TRADE/ENTRY-quality opportunity;
-- private read token uses session storage only; no token or secret committed.
+## Clean R1 — CENTER
+- Native mobile-first shell and one five-item bottom navigation.
+- CENTER reads `/api/private/dashboard` for canonical total, market, risk, one next action and only READY/TRADE/ENTRY-quality opportunity.
+- Session-only read token; no committed secret.
 
 ## Clean R2 — DEPOT
-Implemented and saved:
-- native clean DEPOT view; no old Depot DOM or renderer involved;
-- total is only `spotUsd + tradingUsd`;
-- Spot is valued from private holdings and excludes Pionex holdings, matching canonical v7.63 behavior;
-- Trading/Bots uses canonical Pionex equity with compatible private fallback fields;
-- 1D chart reads only `/api/private/portfolio-history?range=1d`;
-- 1D performance is withheld until at least 16.8h canonical history coverage; no fabricated history;
-- cashflow-adjusted performance is used only when both endpoints can be represented on that basis, otherwise raw canonical total;
-- Spot vs Trading/Bots split and Top 4 exposures use the same valuation basis;
-- BETH is displayed as ETH exposure and OKSOL as SOL exposure for aggregation/display only.
+- Native clean DEPOT; total only `spotUsd + tradingUsd`.
+- Spot excludes Pionex holdings; Trading/Bots uses canonical Pionex equity.
+- 1D chart only from `/api/private/portfolio-history?range=1d` and performance withheld until >=16.8h canonical coverage.
+- No fabricated history; Top 4 exposures use the same valuation basis.
 
 ## Clean R3 — TRADE
-Implemented and saved:
-- native clean TRADE view driven only by the private `pionexRisk.bots` contract;
-- one bot normalization path in the data adapter; no Grid Commander or legacy DOM scraping;
-- critical bot = lowest finite liquidation buffer;
-- presentation ladder preserved: `<8% DANGER`, `8–<12% WATCH`, `>=12% SAFE`;
-- exactly one NEXT ACTION plus target/remaining percentage points when intervention is required;
-- active bots sorted by liquidation buffer with concise side / leverage / liquidation-price / buffer rows;
-- Trading Equity uses the same Pionex-equity adapter as DEPOT;
-- read-only presentation only; no margin move, order, sizing, stop or execution change.
+- Native clean TRADE from private `pionexRisk.bots` only.
+- Critical bot = lowest finite liquidation buffer.
+- Customer ladder preserved: `<8% DANGER`, `8–<12% WATCH`, `>=12% SAFE`.
+- Exactly one next action; active bots sorted by buffer.
+- Read-only presentation; no order, margin, stop, sizing or execution changes.
 
 ## Clean R4 — PAPER
-Implemented and saved:
-- native clean PAPER research board; no legacy PAPER cards or renderer involved;
-- reads only protected `/api/research-analytics` and `/api/activity-summary` endpoints;
-- Baseline, Shadow V1, Challenger V2 and Regime V1 normalized into one research comparison model;
-- displays closed trades, PnL, expectancy, profit factor, win rate and max drawdown;
-- Baseline remains explicit reference; no winner label and no automatic promotion;
-- common-window activity is shown separately so sample comparability is visible;
-- Challenger opportunity-cost telemetry shows missed winners, avoided losers and net counterfactual R when available;
-- audit flags remain visible, including Challenger Baseline-READY dependency and Regime V1 directional-score caveat;
-- research-only/read-only: no entry, exit, sizing, risk, ledger or execution effect.
+- Native clean PAPER from protected `/api/research-analytics` and `/api/activity-summary`.
+- Baseline / Shadow V1 / Challenger V2 / Regime V1 shown on one research board.
+- Full-ledger metrics and common-window activity are distinct.
+- Challenger opportunity cost and audit caveats remain visible.
+- Baseline is reference; no winner label or auto-promotion.
 
-## Next implementation order
-1. MORE — explicit Market / Forecast / Scanner / Research / Diagnostics / Settings modules.
-2. Full iPhone verification of all five clean views.
-3. Only after explicit approval: production entry migration from compatibility v8 to `v8-clean/`.
+## Clean R5 — MORE
+Implemented and saved:
+- MORE is the fifth real top-level root, not an overlay;
+- explicit child modules: MARKET / FORECAST / SCANNER / RESEARCH / DIAGNOSTICS / SETTINGS;
+- MARKET, FORECAST and SCANNER derive only from the private dashboard contract;
+- RESEARCH uses protected research analytics;
+- DIAGNOSTICS uses `/gateway-health` plus private revision/schema metadata;
+- SETTINGS owns the session-only read token;
+- `more-runtime.js` hydrates only `#view-more` and never delegates to legacy navigation;
+- malformed prototype `data-route` attributes were corrected before iPhone validation.
+
+## Current next steps
+1. Wait for Release Safety on the exact R5 head and fix any regression failure before visual testing.
+2. Expose the clean entry for controlled iPhone validation without replacing production R11 yet.
+3. Verify all five tabs: route/content ownership, no legacy bleed-through, data consistency, safe-area/mobile layout, token reconnect and refresh behavior.
+4. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
