@@ -46,6 +46,23 @@ test('clean DEPOT uses canonical spot plus Pionex equity and private history onl
   assert.doesNotMatch(app,/snapshotTotalIncludingPionexUsd|querySelector\([^\n]*(portfolio|depot)/i);
 });
 
+test('clean TRADE uses one private bot-risk adapter and fixed buffer ladder',()=>{
+  assert.match(data,/function normalizeBot/);
+  assert.match(data,/data\?\.pionexRisk\?\.bots/);
+  assert.match(data,/pionexLiqBufferPct/);
+  assert.match(data,/b\.buffer<8/);
+  assert.match(data,/b\.buffer<12/);
+  assert.match(data,/targetPct:8/);
+  assert.match(data,/targetPct:12/);
+  assert.match(data,/export async function loadTrade/);
+  assert.match(app,/function tradeHtml/);
+  assert.match(app,/TRADE · RISK FIRST/);
+  assert.match(app,/KRITISCHSTER BOT/);
+  assert.match(app,/NEXT ACTION/);
+  assert.match(app,/AKTIVE BOTS · NACH BUFFER SORTIERT/);
+  assert.doesNotMatch(app,/Grid Commander|Liquidation First|querySelector\([^\n]*(trade|bot|risk)/i);
+});
+
 test('clean v8 remains presentation/read-only',()=>{
   const all=html+app+data+arch;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|liveTrading\s*=\s*true/i);
