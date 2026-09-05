@@ -1,7 +1,7 @@
 /* MERIDIAN compatibility loader. The legacy filename remains referenced by index.html. */
 (function(){
   'use strict';
-  const TAG='7.65-R1';
+  const TAG='7.65-R2';
   const src=x=>x+'?v='+TAG;
   if(document.readyState==='loading'){
     document.write('<script src="'+src('app-v7.32-legacy.js')+'"><\/script>');
@@ -18,6 +18,7 @@
     document.write('<script src="'+src('app-v7.62-market-consistency.js')+'"><\/script>');
     document.write('<script src="'+src('trade-risk-presentation-v765.js')+'"><\/script>');
     document.write('<script src="'+src('app-v7.65-trade-risk-cleanup.js')+'"><\/script>');
+    document.write('<script src="'+src('app-v7.65-paper-activity-cleanup.js')+'"><\/script>');
     document.write('<script src="'+src('app-release-authority.js')+'"><\/script>');
     return;
   }
@@ -36,6 +37,7 @@
     .then(()=>load('app-v7.62-market-consistency.js'))
     .then(()=>load('trade-risk-presentation-v765.js'))
     .then(()=>load('app-v7.65-trade-risk-cleanup.js'))
+    .then(()=>load('app-v7.65-paper-activity-cleanup.js'))
     .then(()=>load('app-release-authority.js'))
     .catch(e=>console.error('MERIDIAN loader',e));
 })();
