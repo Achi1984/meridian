@@ -1,29 +1,24 @@
-/* MERIDIAN v8.0 R10 — deterministic five-item customer navigation. Presentation/navigation only. */
+/* MERIDIAN v8.0 R11 — deterministic five-item customer navigation. Presentation/navigation only. */
 (function(){
   'use strict';
   const VERSION='8.0';
-  const BUILD='8.0-20260905-R10';
+  const BUILD='8.0-20260905-R11';
   const ITEMS=[
-    {key:'center',label:'CENTER',patterns:[/^CENTER$/i,/^LIVE$/i,/^DASHBOARD$/i],ids:['view-live','view-dashboard','view-center'],runtime:'live'},
+    {key:'center',label:'CENTER',patterns:[/^CENTER$/i,/^LIVE$/i,/^DASHBOARD$/i],ids:['view-center','view-live','view-dashboard'],runtime:'center'},
     {key:'depot',label:'DEPOT',patterns:[/^DEPOT$/i],ids:['view-depot'],runtime:'depot'},
-    {key:'trade',label:'TRADE',patterns:[/^TRADE$/i,/^GRID$/i],ids:['view-trade','view-daytrade'],runtime:'trade'},
+    {key:'trade',label:'TRADE',patterns:[/^TRADE$/i,/^DAY[- ]?TRADE$/i,/^GRID$/i],ids:['view-daytrade','view-trade'],runtime:'daytrade'},
     {key:'paper',label:'PAPER',patterns:[/^PAPER$/i],ids:['view-paper'],runtime:'paper'},
     {key:'more',label:'MORE',patterns:[],ids:[],runtime:'more'}
   ];
   const text=el=>String(el?.textContent||'').replace(/\s+/g,' ').trim();
   const own=el=>!!el?.closest?.('#v8-bottom-nav');
-  function legacyCandidates(){
-    const roots=[...document.querySelectorAll('#primaryBottomNav,.bottom,.bottom-nav,nav,[class*="bottom"]')];
-    const set=new Set();
-    for(const r of roots){for(const el of r.querySelectorAll('button,a,[role="button"],.nav'))if(!own(el))set.add(el)}
-    if(!set.size){for(const el of document.querySelectorAll('button,a,[role="button"],.nav'))if(!own(el))set.add(el)}
-    return [...set];
-  }
+  function legacyCandidates(){const roots=[...document.querySelectorAll('#primaryBottomNav,.bottom,.bottom-nav,nav,[class*="bottom"]')],set=new Set();for(const r of roots){for(const el of r.querySelectorAll('button,a,[role="button"],.nav'))if(!own(el))set.add(el)}if(!set.size){for(const el of document.querySelectorAll('button,a,[role="button"],.nav'))if(!own(el))set.add(el)}return [...set]}
   function findLegacy(patterns){const xs=legacyCandidates();for(const re of patterns){const hit=xs.find(el=>re.test(text(el)));if(hit)return hit}return null}
   function resolveView(item){for(const id of item?.ids||[]){const v=document.getElementById(id);if(v)return v}return null}
   function inferActive(){
+    if(document.getElementById('v8-more-overlay'))return 'more';
     const bodyView=String(document.body?.dataset?.view||'').toLowerCase();
-    if(/market|forecast|fcst/.test(bodyView))return 'more';
+    if(/market|forecast|fcst|more/.test(bodyView))return 'more';
     if(/paper/.test(bodyView))return 'paper';if(/trade|grid|daytrade/.test(bodyView))return 'trade';if(/depot/.test(bodyView))return 'depot';if(/live|center|dashboard/.test(bodyView))return 'center';
     for(const item of ITEMS.slice(0,4)){const view=resolveView(item);if(!view)continue;try{const s=getComputedStyle(view);if(!view.classList.contains('hidden')&&s.display!=='none'&&s.visibility!=='hidden')return item.key}catch(_e){}}
     return 'center';
@@ -31,41 +26,23 @@
   function markActive(key){document.querySelectorAll('#v8-bottom-nav button').forEach(b=>{const on=b.dataset.view===key;b.classList.toggle('active',on);b.setAttribute('aria-current',on?'page':'false')});window.MERIDIAN_V8_NAV_STATUS={version:VERSION,build:BUILD,active:key,items:ITEMS.map(x=>x.key),executionImpact:false,updatedAt:new Date().toISOString()}}
   function forceView(item){
     const target=resolveView(item);if(!target)return false;
-    document.querySelectorAll('[id^="view-"]').forEach(v=>{
-      const on=v===target;
-      v.classList.toggle('hidden',!on);
-      if(on){v.removeAttribute('hidden');v.style.removeProperty('display');v.style.removeProperty('visibility')}
-    });
+    document.querySelectorAll('[id^="view-"]').forEach(v=>{const on=v===target;v.classList.toggle('hidden',!on);if(on){v.removeAttribute('hidden');v.style.removeProperty('display');v.style.removeProperty('visibility')}});
     if(document.body)document.body.dataset.view=item.runtime;
     try{if(typeof window.renderOne==='function')window.renderOne(item.runtime);else if(typeof renderOne==='function')renderOne(item.runtime)}catch(_e){}
-    markActive(item.key);
-    window.dispatchEvent(new CustomEvent('meridian:v8-viewchange',{detail:{view:item.key}}));
-    return true;
+    markActive(item.key);window.dispatchEvent(new CustomEvent('meridian:v8-viewchange',{detail:{view:item.key,runtime:item.runtime,targetId:target.id}}));return true;
   }
   function route(key){
     if(key==='more'){
       const more=document.getElementById('v8-more-open');
-      if(more){more.click();setTimeout(()=>markActive(inferActive()),30);return true}
-      return false;
+      if(more){more.click();if(document.body)document.body.dataset.view='more';markActive('more');setTimeout(()=>markActive('more'),30);return true}
+      markActive('more');return false;
     }
     const item=ITEMS.find(x=>x.key===key);if(!item)return false;
-    const legacy=findLegacy(item.patterns);
-    if(legacy){try{legacy.click()}catch(_e){}}
-    const ok=forceView(item);
-    if(!ok&&legacy){setTimeout(()=>markActive(key),30);return true}
-    return ok;
+    const legacy=findLegacy(item.patterns);if(legacy){try{legacy.click()}catch(_e){}}
+    const ok=forceView(item);if(!ok&&legacy){setTimeout(()=>markActive(key),30);return true}return ok;
   }
-  function hideLegacyBottom(){
-    const primary=document.getElementById('primaryBottomNav');if(primary)primary.classList.add('v8-legacy-bottom-hidden');
-    document.querySelectorAll('.bottom,.bottom-nav').forEach(el=>{if(el.id!=='v8-bottom-nav'&&!el.closest('#v8-bottom-nav'))el.classList.add('v8-legacy-bottom-hidden')});
-    document.documentElement.classList.add('v8-nav-ready');
-  }
-  function ensure(){
-    css();let nav=document.getElementById('v8-bottom-nav');
-    if(!nav){nav=document.createElement('nav');nav.id='v8-bottom-nav';nav.setAttribute('aria-label','MERIDIAN Hauptnavigation');nav.innerHTML=`<div class="v8-nav-inner">${ITEMS.map((x,i)=>`<button type="button" data-view="${x.key}" aria-label="${x.label}"><i aria-hidden="true">${i+1}</i><span>${x.label}</span></button>`).join('')}</div>`;document.body.appendChild(nav)}
-    nav.querySelectorAll('button').forEach(b=>{b.onclick=e=>{e.preventDefault();e.stopPropagation();route(b.dataset.view)}});
-    hideLegacyBottom();markActive(inferActive());
-  }
+  function hideLegacyBottom(){const primary=document.getElementById('primaryBottomNav');if(primary)primary.classList.add('v8-legacy-bottom-hidden');document.querySelectorAll('.bottom,.bottom-nav').forEach(el=>{if(el.id!=='v8-bottom-nav'&&!el.closest('#v8-bottom-nav'))el.classList.add('v8-legacy-bottom-hidden')});document.documentElement.classList.add('v8-nav-ready')}
+  function ensure(){css();let nav=document.getElementById('v8-bottom-nav');if(!nav){nav=document.createElement('nav');nav.id='v8-bottom-nav';nav.setAttribute('aria-label','MERIDIAN Hauptnavigation');nav.innerHTML=`<div class="v8-nav-inner">${ITEMS.map((x,i)=>`<button type="button" data-view="${x.key}" aria-label="${x.label}"><i aria-hidden="true">${i+1}</i><span>${x.label}</span></button>`).join('')}</div>`;document.body.appendChild(nav)}nav.querySelectorAll('button').forEach(b=>{b.onclick=e=>{e.preventDefault();e.stopPropagation();route(b.dataset.view)}});hideLegacyBottom();markActive(inferActive())}
   function css(){if(document.getElementById('v8-navigation-css'))return;const s=document.createElement('style');s.id='v8-navigation-css';s.textContent=`
     .v8-legacy-bottom-hidden{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
     html.v8-nav-ready #primaryBottomNav{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;height:0!important;min-height:0!important;overflow:hidden!important}
