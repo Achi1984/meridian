@@ -1,17 +1,30 @@
-/* MERIDIAN v8.0 R2 — customer-first TRADE summary. Presentation only; execution unchanged. */
+/* MERIDIAN v8.0 R8 — customer-first TRADE summary. Presentation only; execution unchanged. */
 (function(){
   'use strict';
   const VERSION='8.0';
-  const BUILD='8.0-20260905-R2';
-  const rules=window.MERIDIAN_TRADE_RISK_V765;
+  const BUILD='8.0-20260905-R8';
   const text=el=>String(el?.textContent||'').trim();
   const fmt=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
   const num=s=>{const x=String(s||'').replace(/\s/g,'').replace(/%/g,'').replace(/−/g,'-').replace(/\./g,'').replace(',','.');const m=x.match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
-  const root=()=>document.getElementById('view-trade')||document.querySelector('[data-view="trade"]');
+  const root=()=>document.getElementById('view-trade');
   const leafs=r=>r?[...r.querySelectorAll('*')].filter(el=>el.children.length===0):[];
   const findLeaf=(r,re)=>leafs(r).find(el=>re.test(text(el)))||null;
   function nearestCard(el){let n=el;for(let i=0;i<9&&n;i++,n=n.parentElement){const c=String(n.className||'');if(/card|panel|bot|grid|commander/i.test(c))return n}return el?.parentElement||null}
   function bufferFromCard(card){if(!card)return null;const lab=findLeaf(card,/^PUFFER$/i);if(!lab)return null;const vals=leafs(lab.parentElement||card).filter(x=>x!==lab).map(x=>num(text(x))).filter(Number.isFinite);return vals.length?vals[0]:null}
+  function canonicalBots(){
+    try{
+      if(typeof canonicalBotStates!=='function')return [];
+      const rows=canonicalBotStates();
+      if(!Array.isArray(rows))return [];
+      return rows.map(b=>({
+        id:String(b?.id||b?.botId||b?.symbol||'BOT'),
+        side:String(b?.side||b?.direction||'').toUpperCase()||'—',
+        leverage:Number(b?.leverage||b?.leverageX||b?.x),
+        buffer:Number(b?.buffer ?? b?.verifiedBuffer ?? b?.liquidationDistancePct ?? b?.liveEstimate),
+        status:String(b?.guard?.label||b?.management?.phase||b?.unified?.phase||b?.status||'').toUpperCase()
+      })).filter(b=>b.id);
+    }catch(_e){return []}
+  }
   function snapshotBots(){
     const active=window.MERIDIAN_PIONEX_SNAPSHOT?.activeBots;
     if(!active||typeof active!=='object')return [];
@@ -19,32 +32,39 @@
       id,
       side:String(b?.side||b?.direction||'').toUpperCase()||'—',
       leverage:Number(b?.leverage||b?.leverageX||b?.x),
-      buffer:Number(b?.pionexLiqBufferPct ?? b?.calculatedLiqBufferPct ?? b?.liqBufferPct),
+      buffer:Number(b?.pionexLiqBufferPct ?? b?.calculatedLiqBufferPct ?? b?.liqBufferPct ?? b?.liquidationDistancePct),
       status:String(b?.status||b?.riskState||'').toUpperCase()
     }));
   }
   function domBots(r){
-    const known=['BTC-S30','HBAR-L3','XRP-L5'];
-    return known.map(id=>{const h=findLeaf(r,new RegExp('^'+id+'$','i'));if(!h)return null;const c=nearestCard(h);const raw=text(c);return {id,side:/SHORT/i.test(raw)?'SHORT':/LONG/i.test(raw)?'LONG':'—',leverage:(raw.match(/(\d+)x/i)||[])[1],buffer:bufferFromCard(c),status:/DANGER/i.test(raw)?'DANGER':/TIGHT/i.test(raw)?'TIGHT':/SAFE/i.test(raw)?'SAFE':'—'};}).filter(Boolean);
+    const known=['BTC-S30','BTC-L100','BTC-L20','HBAR-L3','HBAR-L5','XRP-L5'];
+    return known.map(id=>{const h=findLeaf(r,new RegExp('^'+id+'$','i'));if(!h)return null;const c=nearestCard(h);const raw=text(c);return {id,side:/SHORT/i.test(raw)?'SHORT':/LONG/i.test(raw)?'LONG':'—',leverage:(raw.match(/(\d+)x/i)||[])[1],buffer:bufferFromCard(c),status:/CRITICAL/i.test(raw)?'CRITICAL':/DANGER/i.test(raw)?'DANGER':/TIGHT|WATCH/i.test(raw)?'WATCH':/PROTECTED/i.test(raw)?'PROTECTED':/SAFE/i.test(raw)?'SAFE':'—'};}).filter(Boolean);
   }
-  function bots(r){const s=snapshotBots();return s.length?s:domBots(r)}
-  function state(buffer){
+  function bots(r){const c=canonicalBots();if(c.length)return c;const s=snapshotBots();return s.length?s:domBots(r)}
+  function state(buffer,status=''){
+    const st=String(status||'').toUpperCase();
+    if(/PROTECTED/.test(st))return {label:'PROTECTED',tone:'green',target:'Schutz aktiv · Liquidationspuffer weiter überwachen'};
     if(!Number.isFinite(Number(buffer)))return {label:'CHECK DATA',tone:'muted',target:'Puffer verifizieren'};
     const b=Number(buffer);
     if(b<8)return {label:'DANGER',tone:'red',target:'Puffer zuerst auf ≥8% bringen'};
     if(b<12)return {label:'WATCH',tone:'amber',target:'Puffer auf SAFE ≥12% erhöhen'};
     return {label:'SAFE',tone:'green',target:'Keine akute Liquidationsmaßnahme'};
   }
-  function critical(xs){return xs.filter(x=>Number.isFinite(Number(x.buffer))).sort((a,b)=>Number(a.buffer)-Number(b.buffer))[0]||xs[0]||null}
-  function botRow(b){const s=state(b.buffer);return `<div class="v8-trade-row ${s.tone}"><div><b>${b.id}</b><span>${b.side}${Number.isFinite(Number(b.leverage))?' · '+fmt(b.leverage,0)+'x':''}</span></div><div><small>PUFFER</small><b>${Number.isFinite(Number(b.buffer))?fmt(b.buffer,2)+'%':'—'}</b></div><div><small>STATUS</small><b>${s.label}</b></div></div>`}
+  function critical(xs){
+    const unprotected=xs.filter(x=>!/PROTECTED/i.test(String(x.status||''))&&Number.isFinite(Number(x.buffer))).sort((a,b)=>Number(a.buffer)-Number(b.buffer));
+    if(unprotected.length)return unprotected[0];
+    return xs.filter(x=>Number.isFinite(Number(x.buffer))).sort((a,b)=>Number(a.buffer)-Number(b.buffer))[0]||xs[0]||null;
+  }
+  function botRow(b){const s=state(b.buffer,b.status);return `<div class="v8-trade-row ${s.tone}"><div><b>${b.id}</b><span>${b.side}${Number.isFinite(Number(b.leverage))?' · '+fmt(b.leverage,0)+'x':''}</span></div><div><small>PUFFER</small><b>${Number.isFinite(Number(b.buffer))?fmt(b.buffer,2)+'%':'—'}</b></div><div><small>STATUS</small><b>${s.label}</b></div></div>`}
   function ensureSummary(r){
-    let host=document.getElementById('v8-trade-summary');
+    if(!r||r.id!=='view-trade')return;
+    let host=r.querySelector(':scope > #v8-trade-summary');
     if(!host){host=document.createElement('section');host.id='v8-trade-summary';host.className='v8-customer-screen';r.prepend(host)}
-    const xs=bots(r);const c=critical(xs);const s=state(c?.buffer);
+    const xs=bots(r);const c=critical(xs);const s=state(c?.buffer,c?.status);
     host.innerHTML=`<div class="v8-trade-head ${s.tone}"><span>TRADE · RISK PRIORITY</span><b>${s.label}</b><small>${c?`${c.id} ist aktuell der kritischste Bot · Buffer ${Number.isFinite(Number(c.buffer))?fmt(c.buffer,2)+'%':'—'}`:'Keine belastbaren Bot-Risikodaten gefunden.'}</small><div class="v8-next"><span>NEXT ACTION</span><b>${s.target}</b></div></div><div class="v8-trade-list">${xs.length?xs.map(botRow).join(''):'<div class="v8-trade-empty">Keine aktiven Bots erkannt.</div>'}</div><button type="button" id="v8-trade-details-toggle">DETAILS ANZEIGEN</button>`;
     const btn=host.querySelector('#v8-trade-details-toggle');if(btn)btn.onclick=()=>{const open=r.classList.toggle('v8-trade-details-open');btn.textContent=open?'DETAILS AUSBLENDEN':'DETAILS ANZEIGEN'};
     [...r.children].forEach(ch=>{if(ch!==host)ch.classList.add('v8-trade-legacy')});
-    window.MERIDIAN_V8_TRADE_STATUS={version:VERSION,build:BUILD,criticalBot:c?.id||null,buffer:Number.isFinite(Number(c?.buffer))?Number(c.buffer):null,state:s.label,executionImpact:false,updatedAt:new Date().toISOString()};
+    window.MERIDIAN_V8_TRADE_STATUS={version:VERSION,build:BUILD,criticalBot:c?.id||null,buffer:Number.isFinite(Number(c?.buffer))?Number(c.buffer):null,state:s.label,botCount:xs.length,source:canonicalBots().length?'CANONICAL_BOT_STATES':snapshotBots().length?'PIONEX_SNAPSHOT':'TRADE_DOM',executionImpact:false,updatedAt:new Date().toISOString()};
   }
   function css(){if(document.getElementById('v8-trade-css'))return;const s=document.createElement('style');s.id='v8-trade-css';s.textContent=`
     #view-trade:not(.v8-trade-details-open)>.v8-trade-legacy{display:none!important}
@@ -60,7 +80,7 @@
   let busy=false,timer=null;
   function apply(){if(busy)return;const r=root();if(!r)return;busy=true;try{css();ensureSummary(r)}finally{busy=false}}
   function schedule(){clearTimeout(timer);timer=setTimeout(apply,100)}
-  function stamp(){window.MERIDIAN_RELEASE_VERSION=VERSION;window.MERIDIAN_UI_VERSION=VERSION;window.MERIDIAN_RELEASE_BUILD=BUILD;window.__MERIDIAN_BUILD__=BUILD;const badge=document.getElementById('versionBadge');if(badge)badge.textContent='v8.0 · PREVIEW'}
+  function stamp(){window.MERIDIAN_RELEASE_VERSION=VERSION;window.MERIDIAN_UI_VERSION=VERSION;window.MERIDIAN_RELEASE_BUILD=BUILD;window.__MERIDIAN_BUILD__=BUILD;const badge=document.getElementById('versionBadge');if(badge)badge.textContent='v8.0 · LIVE'}
   function start(){stamp();apply();if(typeof MutationObserver!=='undefined'){new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true})}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
   addEventListener('pageshow',()=>{stamp();apply()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)apply()});setInterval(()=>{if(!document.hidden)apply()},3000);
