@@ -1,11 +1,12 @@
-import {loadCenter,loadDepot,loadTrade,hasReadToken,setReadToken} from './data.js';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
 const fmtUsd=v=>Number.isFinite(Number(v))?'$'+Math.round(Number(v)).toLocaleString('de-DE'):'—';
 const fmtPct=(v,d=1)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+'%':'—';
+const fmtNum=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
 const fmtPrice=v=>Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{maximumFractionDigits:4}):'—';
-const state={view:'center',center:null,depot:null,trade:null};
+const state={view:'center',center:null,depot:null,trade:null,paper:null};
 
 function setView(key){
   if(!ROUTES.includes(key))return;
@@ -17,6 +18,7 @@ function setView(key){
   if(key==='center'&&!state.center)hydrateCenter();
   if(key==='depot'&&!state.depot)hydrateDepot();
   if(key==='trade'&&!state.trade)hydrateTrade();
+  if(key==='paper'&&!state.paper)hydratePaper();
 }
 
 function centerHtml(x){
@@ -79,6 +81,29 @@ function tradeHtml(x){
   <section class="action priority-action"><span>NEXT ACTION</span><b>${x.nextAction||'Risikodaten prüfen'}</b><small>${target}</small></section>
   <section class="card bots"><div class="eyebrow">AKTIVE BOTS · NACH BUFFER SORTIERT</div>${rows}</section>`;
 }
+
+function paperHtml(x){
+  if(!x)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · RESEARCH BOARD</div><div class="hero-value">LÄDT…</div><p class="muted">Geschützte Ledger-Telemetrie und Vergleichsdaten werden geladen.</p></section>`;
+  if(x.locked)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · PRIVATE RESEARCH</div><div class="hero-value">LOCKED</div><p class="muted">Read Token in MORE verbinden. Kein Fallback auf alte PAPER-Karten.</p></section>`;
+  if(!x.ok)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · DATA STATUS</div><div class="hero-value">CHECK</div><p class="muted">${x.error||'Research-Daten nicht verfügbar'}</p></section>`;
+  const rows=(x.rows||[]).map(r=>{
+    const pnlTone=r.pnl>0?'safe':r.pnl<0?'danger':'muted';
+    const ref=r.key==='baseline'?'REFERENCE':`RETENTION ${fmtPct(r.retentionPct,1)}`;
+    const sample=r.commonClosed!=null?`${r.commonClosed} closed im Common Window`:`${r.closedTrades} closed gesamt`;
+    return `<div class="research-row"><div class="research-head"><div><span>${r.name}</span><b>${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
+  }).join('')||'<div class="chart-empty">Keine Ledger-Telemetrie verfügbar</div>';
+  const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
+  const oc=x.opportunityCost||{};
+  const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
+  return `<section class="hero paper-hero"><div class="eyebrow">PAPER · RESEARCH BOARD</div><div class="paper-state">RESEARCH ONLY</div><p class="muted">Keine automatische Promotion · keine Ausführungswirkung · Baseline 6.2 bleibt Referenz</p></section>
+  <div class="grid2 paper-metrics">
+    <section class="metric"><span>COMMON WINDOW</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'BUILDING'}</b><small>${common}</small></section>
+    <section class="metric"><span>EXECUTION IMPACT</span><b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b><small>${x.schemaVersion}</small></section>
+  </div>
+  <section class="card research-board"><div class="eyebrow">BASELINE · SHADOW · CHALLENGER · REGIME</div>${rows}</section>
+  <section class="card"><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div></section>
+  <section class="card audit"><div class="eyebrow">AUDIT FLAGS</div>${warnings}</section>`;
+}
 function placeholder(title,sub){return `<section class="card placeholder"><div><div class="eyebrow">V8 CLEAN</div><b>${title}</b><small>${sub}</small></div></section>`}
 function moreHtml(){return `<section class="card"><div class="eyebrow">MORE · SYSTEM & DETAILS</div><h2>Saubere Tiefe statt Legacy-Overlay</h2><p class="muted">Hier kommen Markt, Forecast, Scanner, Research, Diagnostik und Einstellungen als explizite Module hinein.</p><div class="row"><span>Private Data</span><b>${hasReadToken()?'VERBUNDEN':'LOCKED'}</b></div><button id="connectToken" class="action" type="button"><span>READ TOKEN</span><b>${hasReadToken()?'Token ersetzen':'Token verbinden'}</b></button></section>`}
 function render(key){
@@ -86,16 +111,17 @@ function render(key){
   if(key==='center')root.innerHTML=centerHtml(state.center);
   if(key==='depot')root.innerHTML=depotHtml(state.depot);
   if(key==='trade')root.innerHTML=tradeHtml(state.trade);
-  if(key==='paper')root.innerHTML=placeholder('PAPER','Als nächstes: geschützte Ledgers + Research-Vergleich, weiterhin research-only.');
+  if(key==='paper')root.innerHTML=paperHtml(state.paper);
   if(key==='more')root.innerHTML=moreHtml();
-  $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;hydrateCenter();hydrateDepot();hydrateTrade();render('more')}});
+  $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;state.paper=null;hydrateCenter();hydrateDepot();hydrateTrade();hydratePaper();render('more')}});
 }
 async function hydrateCenter(){state.center=null;if(state.view==='center')render('center');state.center=await loadCenter();if(state.view==='center')render('center')}
 async function hydrateDepot(){state.depot=null;if(state.view==='depot')render('depot');state.depot=await loadDepot();if(state.view==='depot')render('depot')}
 async function hydrateTrade(){state.trade=null;if(state.view==='trade')render('trade');state.trade=await loadTrade();if(state.view==='trade')render('trade')}
+async function hydratePaper(){state.paper=null;if(state.view==='paper')render('paper');state.paper=await loadPaper();if(state.view==='paper')render('paper')}
 function wire(){document.querySelectorAll('#mainNav [data-route]').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.route;setView(b.dataset.route)}));window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(ROUTES.includes(k))setView(k)});}
 
 wire();
 setView(ROUTES.includes(location.hash.slice(1))?location.hash.slice(1):'center');
 hydrateCenter();
-setInterval(()=>{if(document.visibilityState!=='visible')return;if(state.view==='center')hydrateCenter();if(state.view==='depot')hydrateDepot();if(state.view==='trade')hydrateTrade()},30000);
+setInterval(()=>{if(document.visibilityState!=='visible')return;if(state.view==='center')hydrateCenter();if(state.view==='depot')hydrateDepot();if(state.view==='trade')hydrateTrade();if(state.view==='paper')hydratePaper()},30000);
