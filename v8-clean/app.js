@@ -1,10 +1,11 @@
-import {loadCenter,loadDepot,hasReadToken,setReadToken} from './data.js';
+import {loadCenter,loadDepot,loadTrade,hasReadToken,setReadToken} from './data.js';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
 const fmtUsd=v=>Number.isFinite(Number(v))?'$'+Math.round(Number(v)).toLocaleString('de-DE'):'—';
 const fmtPct=(v,d=1)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+'%':'—';
-const state={view:'center',center:null,depot:null};
+const fmtPrice=v=>Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{maximumFractionDigits:4}):'—';
+const state={view:'center',center:null,depot:null,trade:null};
 
 function setView(key){
   if(!ROUTES.includes(key))return;
@@ -15,6 +16,7 @@ function setView(key){
   render(key);
   if(key==='center'&&!state.center)hydrateCenter();
   if(key==='depot'&&!state.depot)hydrateDepot();
+  if(key==='trade'&&!state.trade)hydrateTrade();
 }
 
 function centerHtml(x){
@@ -56,22 +58,44 @@ function depotHtml(x){
   </div>
   <section class="card positions"><div class="eyebrow">TOP POSITIONEN</div>${rows}</section>`;
 }
+
+function tradeHtml(x){
+  if(!x)return `<section class="hero trade-hero"><div class="eyebrow">TRADE · RISK FIRST</div><div class="hero-value">LÄDT…</div><p class="muted">Aktive Bots und Liquidationspuffer werden geladen.</p></section>`;
+  if(x.locked)return `<section class="hero trade-hero"><div class="eyebrow">TRADE · PRIVATE DATA</div><div class="hero-value">LOCKED</div><p class="muted">Read Token in MORE verbinden. Keine Legacy-Risk-Karten werden ausgelesen.</p></section>`;
+  if(!x.ok)return `<section class="hero trade-hero"><div class="eyebrow">TRADE · DATA STATUS</div><div class="hero-value">CHECK</div><p class="muted">${x.error||'Risikodaten nicht verfügbar'}</p></section>`;
+  const risk=x.risk||{state:'CHECK',tone:'muted',bot:null};
+  const b=x.criticalBot;
+  const rows=(x.bots||[]).map(bot=>{
+    const tone=Number.isFinite(bot.buffer)?bot.buffer<8?'danger':bot.buffer<12?'watch':'safe':'muted';
+    const meta=[bot.side,bot.leverage!=null?`${bot.leverage}x`:null].filter(Boolean).join(' · ')||'—';
+    return `<div class="bot-row"><div><b>${bot.id}</b><small>${meta}${bot.symbol?` · ${bot.symbol}`:''}</small></div><div><b class="tone-${tone}">${fmtPct(bot.buffer,2)}</b><small>LIQ ${fmtPrice(bot.liquidationPrice)}</small></div></div>`;
+  }).join('')||'<div class="chart-empty">Keine aktiven Bot-Risikodaten verfügbar</div>';
+  const target=risk.targetPct!=null?`Ziel ≥${risk.targetPct}% · fehlen ${fmtPct(risk.remainingPct,2)}`:'Kein Recovery-Ziel offen';
+  return `<section class="hero trade-hero tone-border-${risk.tone}"><div class="eyebrow">TRADE · RISK FIRST</div><div class="trade-state tone-${risk.tone}">${risk.state}</div><p class="muted">${b?`${b.id} ist aktuell der kritischste Bot · ${fmtPct(b.buffer,2)} Buffer`:'Keine belastbaren Liquidationspuffer verfügbar'}</p></section>
+  <div class="grid2 trade-metrics">
+    <section class="metric"><span>KRITISCHSTER BOT</span><b>${b?.id||'—'}</b><small>${b?[b.side,b.leverage!=null?`${b.leverage}x`:null].filter(Boolean).join(' · '):'Keine Botdaten'}</small></section>
+    <section class="metric"><span>TRADING EQUITY</span><b>${fmtUsd(x.tradingEquityUsd)}</b><small>${x.activeCount} aktive Bot${x.activeCount===1?'':'s'}</small></section>
+  </div>
+  <section class="action priority-action"><span>NEXT ACTION</span><b>${x.nextAction||'Risikodaten prüfen'}</b><small>${target}</small></section>
+  <section class="card bots"><div class="eyebrow">AKTIVE BOTS · NACH BUFFER SORTIERT</div>${rows}</section>`;
+}
 function placeholder(title,sub){return `<section class="card placeholder"><div><div class="eyebrow">V8 CLEAN</div><b>${title}</b><small>${sub}</small></div></section>`}
 function moreHtml(){return `<section class="card"><div class="eyebrow">MORE · SYSTEM & DETAILS</div><h2>Saubere Tiefe statt Legacy-Overlay</h2><p class="muted">Hier kommen Markt, Forecast, Scanner, Research, Diagnostik und Einstellungen als explizite Module hinein.</p><div class="row"><span>Private Data</span><b>${hasReadToken()?'VERBUNDEN':'LOCKED'}</b></div><button id="connectToken" class="action" type="button"><span>READ TOKEN</span><b>${hasReadToken()?'Token ersetzen':'Token verbinden'}</b></button></section>`}
 function render(key){
   const root=document.getElementById(`view-${key}`);if(!root)return;
   if(key==='center')root.innerHTML=centerHtml(state.center);
   if(key==='depot')root.innerHTML=depotHtml(state.depot);
-  if(key==='trade')root.innerHTML=placeholder('TRADE','Als nächstes: Risk State + aktive Bots direkt aus einem Adaptervertrag.');
-  if(key==='paper')root.innerHTML=placeholder('PAPER','Research bleibt getrennt; keine Ausführungsänderung.');
+  if(key==='trade')root.innerHTML=tradeHtml(state.trade);
+  if(key==='paper')root.innerHTML=placeholder('PAPER','Als nächstes: geschützte Ledgers + Research-Vergleich, weiterhin research-only.');
   if(key==='more')root.innerHTML=moreHtml();
-  $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;hydrateCenter();hydrateDepot();render('more')}});
+  $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;hydrateCenter();hydrateDepot();hydrateTrade();render('more')}});
 }
 async function hydrateCenter(){state.center=null;if(state.view==='center')render('center');state.center=await loadCenter();if(state.view==='center')render('center')}
 async function hydrateDepot(){state.depot=null;if(state.view==='depot')render('depot');state.depot=await loadDepot();if(state.view==='depot')render('depot')}
+async function hydrateTrade(){state.trade=null;if(state.view==='trade')render('trade');state.trade=await loadTrade();if(state.view==='trade')render('trade')}
 function wire(){document.querySelectorAll('#mainNav [data-route]').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.route;setView(b.dataset.route)}));window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(ROUTES.includes(k))setView(k)});}
 
 wire();
 setView(ROUTES.includes(location.hash.slice(1))?location.hash.slice(1):'center');
 hydrateCenter();
-setInterval(()=>{if(document.visibilityState!=='visible')return;if(state.view==='center')hydrateCenter();if(state.view==='depot')hydrateDepot()},30000);
+setInterval(()=>{if(document.visibilityState!=='visible')return;if(state.view==='center')hydrateCenter();if(state.view==='depot')hydrateDepot();if(state.view==='trade')hydrateTrade()},30000);
