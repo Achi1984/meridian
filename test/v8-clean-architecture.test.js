@@ -31,6 +31,21 @@ test('clean CENTER consumes protected dashboard through a dedicated adapter',()=
   assert.match(data,/source:'PRIVATE_DASHBOARD'/);
 });
 
+test('clean DEPOT uses canonical spot plus Pionex equity and private history only',()=>{
+  assert.match(data,/function spotHoldings/);
+  assert.match(data,/toLowerCase\(\)!=='pionex'/);
+  assert.match(data,/function tradingValue/);
+  assert.match(data,/portfolio\?\.pionexEquityUsd/);
+  assert.match(data,/\/api\/private\/portfolio-history\?range=1d/);
+  assert.match(data,/coverageMs>=16\.8\*60\*60\*1000/);
+  assert.match(data,/CASHFLOW_ADJUSTED/);
+  assert.match(app,/function depotHtml/);
+  assert.match(app,/TOP POSITIONEN/);
+  assert.match(app,/TRADING \/ BOTS/);
+  assert.match(app,/KANONISCHE HISTORIE WIRD AUFGEBAUT/);
+  assert.doesNotMatch(app,/snapshotTotalIncludingPionexUsd|querySelector\([^\n]*(portfolio|depot)/i);
+});
+
 test('clean v8 remains presentation/read-only',()=>{
   const all=html+app+data+arch;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|liveTrading\s*=\s*true/i);
