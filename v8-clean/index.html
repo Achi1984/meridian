@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#03070c">
+  <title>ACHI MERIDIAN v8 Clean</title>
+  <link rel="stylesheet" href="./styles.css?v=8.0-clean-r1">
+</head>
+<body>
+  <div id="app" class="app-shell" data-view="center">
+    <header class="topbar">
+      <div class="brand">ACHI <span>MERIDIAN</span></div>
+      <div class="statusline" aria-label="Systemstatus">
+        <span>v8.0 CLEAN</span><span class="dot"></span><span id="runtimeStatus">SYNC</span><span class="dot live"></span><span>LIVE DASHBOARD</span>
+      </div>
+    </header>
+
+    <section class="mode-banner">
+      <b>MERIDIAN v8 · CLEAN CUSTOMER VIEW</b>
+      <small>Eine Shell · fünf Views · eine Datenquelle pro Kennzahl · Details nur auf Abruf</small>
+    </section>
+
+    <main id="views" class="views">
+      <section id="view-center" class="view is-active" data-view="center"></section>
+      <section id="view-depot" class="view" data-view="depot"></section>
+      <section id="view-trade" class="view" data-view="trade"></section>
+      <section id="view-paper" class="view" data-view="paper"></section>
+      <section id="view-more" class="view" data-view="more"></section>
+    </main>
+
+    <nav id="mainNav" class="main-nav" aria-label="MERIDIAN Hauptnavigation">
+      <button data-route="center" class="active"><i>1</i><span>CENTER</span></button>
+      <button data-route="depot"><i>2</i><span>DEPOT</span></button>
+      <button data-route="trade"><i>3</i><span>TRADE</span></button>
+      <button data-route="paper"><i>4</i><span>PAPER</span></button>
+      <button data-route="more"><i>•••</i><span>MORE</span></button>
+    </nav>
+  </div>
+
+  <script type="module" src="./app.js?v=8.0-clean-r1"></script>
+</body>
+</html>
