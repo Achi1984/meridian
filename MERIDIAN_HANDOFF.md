@@ -7,8 +7,9 @@
 
 ## v8 customer dashboard
 - PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
-- Active hotfix branch: `fix/v8-mobile-live-hotfix-r8`.
-- Current phase: v8.0 R8 — post-merge iPhone live hotfix.
+- PR #44 / R8 merged to `main` as `34d52c3cc98f0bc53015001d8dca71a203a0d7be`.
+- Active hotfix branch: `fix/v8-bootstrap-selfheal-r9`.
+- Current phase: v8.0 R9 — bootstrap/cache self-heal.
 - Goal: answer-first UX with details/research on demand.
 - Final top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
 
@@ -22,23 +23,31 @@
 ## R8 live iPhone findings and fixes
 The first production screenshots after the v8 merge showed a severe presentation collision: a TRADE summary was mounted inside the navigation area, the old six-item bottom nav remained visible, and CENTER reported missing bot data despite the legacy command center showing open risk.
 
-Root causes and fixes:
-- `app-v8.0-trade-summary.js` and `app-v8.0-depot-summary.js` used generic `[data-view=...]` fallbacks. Because v8 nav buttons also have `data-view`, a summary could mount inside a nav button if the real view was missing/late. R8 now binds only to `#view-trade` / `#view-depot`; CENTER also uses only explicit real view IDs.
-- Older inline CSS in `index.html` gives `#primaryBottomNav` high-specificity `display:block!important` restoration. R8 adds an ID-specific v8 rule and periodic guard so the legacy nav is definitively hidden after v8 nav activation.
-- TRADE/CENTER now prefer existing `canonicalBotStates()` live risk SSOT over the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT`; snapshot/DOM remain fallbacks only.
-- CENTER adds `DATA.btcRegime` fallbacks so the customer market card can populate from the same browser runtime model when cloud regime data is absent.
-- `test/v8-navigation.test.js` now protects these exact regressions.
+R8 fixed the direct UI/data-binding defects:
+- Customer summaries bind only to explicit real `#view-*` containers, never generic v8 nav buttons.
+- `#primaryBottomNav` is hard-hidden after v8 navigation activation.
+- TRADE/CENTER prefer existing `canonicalBotStates()` live risk SSOT over the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT`.
+- CENTER adds `DATA.btcRegime` fallbacks.
+
+## R9 stale-loader root cause and fix
+A second iPhone verification after R8 still showed the pre-R8 layout. GitHub `main` already contained R8 and push Release Safety + Runtime Smoke had completed successfully, so the remaining failure is a bootstrap/version-delivery problem rather than another copy of the same UI bug.
+
+R9 changes the compatibility layer:
+- `app-v6.06.js` no longer trusts its filename/query as release authority. It fetches fresh `version.json` with `cache: no-store`, derives the required build tag and loads every module with that tag.
+- If the running compatibility loader is stale, it injects a fresh loader URL with the authoritative tag and a timestamp.
+- Before hot rehydration it removes stale v8 customer summaries, navigation DOM and v8 CSS IDs so an older module graph cannot keep old layout rules alive.
+- `app-release-authority.js` independently detects loader/build divergence and can trigger the same bootstrap refresh.
+- New regression file: `test/v8-bootstrap-selfheal.test.js`.
+- Exact candidate build: `8.0-20260905-R9`.
+
+This is presentation/bootstrap only. It does not change Baseline, Paper execution, bot sizing/risk, private portfolio contracts or `server.js`.
 
 ## Release safety
-- Exact hotfix build: `8.0-20260905-R8`.
-- Compatibility loader tag and PWA manifest are synchronized to R8.
-- Baseline 6.2 execution, sizing, risk, exits and ledger behavior are unchanged.
+- Baseline 6.2 execution, sizing, risk, exits and ledger behavior remain unchanged.
 - Paper/live execution unchanged; live trading remains disabled.
 - `server.js` untouched.
 - v7.63/v7.64 canonical portfolio data/history contract remains authoritative.
-
-## Hotfix merge rule
-Do not merge R8 on an older successful run. Require both `MERIDIAN Release Safety` and `MERIDIAN Portfolio Contract v7.63` to succeed on the exact current hotfix head. The current screenshot message itself is treated as bug evidence, not a new blanket authorization to merge; keep the PR ready and request/await explicit merge approval after green checks.
+- R9 must pass Release Safety and Portfolio Contract on its exact final head before merge.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
@@ -46,5 +55,5 @@ Do not merge R8 on an older successful run. Require both `MERIDIAN Release Safet
 - Meta Allocator remains research-only.
 - No research result auto-promotes into Paper/live execution.
 
-## After hotfix merge
-Verify `main` points at the R8 merge commit, then verify Northflank deployment separately. On iPhone confirm: exactly one five-item bottom nav, no TRADE card inside navigation, CENTER and TRADE show canonical bot risk when available, and legacy detail stays hidden until explicitly opened.
+## After R9 merge
+Verify `main` points at the R9 merge commit. Then re-open MERIDIAN on iPhone and confirm: one five-item bottom nav only, no TRADE card embedded in CENTER/navigation, CENTER/TRADE consume real canonical bot risk when available, and the runtime loader tag matches authoritative `version.json`.

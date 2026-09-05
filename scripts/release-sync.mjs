@@ -23,8 +23,8 @@ function required(text,re,replacement,label){
 }
 
 // Runtime release authority is version.json. index.html remains a compatibility bootstrap;
-// app-release-authority.js corrects stale bootstrap painters immediately and observes later writes.
-apply('app-v6.06.js',src=>required(src,/const TAG='[^']+';/,`const TAG='${cacheTag}';`,'compat loader cache tag'));
+// R9's compatibility loader self-checks version.json and app-release-authority.js can hot-refresh stale module graphs.
+apply('app-v6.06.js',src=>required(src,/const LOCAL_TAG='[^']+';/,`const LOCAL_TAG='${cacheTag}';`,'compat loader cache tag'));
 
 apply('manifest.webmanifest',()=>JSON.stringify({
   name:`ACHI MERIDIAN v${version}`,
@@ -51,11 +51,13 @@ apply('package-lock.json',src=>{
 
 if(!fs.existsSync('app-release-authority.js'))throw new Error('app-release-authority.js missing');
 const authority=fs.readFileSync('app-release-authority.js','utf8');
-for(const marker of ["fetch('version.json?authority='+Date.now(),{cache:'no-store'})",'MERIDIAN_RELEASE_AUTHORITY','MutationObserver']){
+for(const marker of ["fetch('version.json?authority='+Date.now(),{cache:'no-store'})",'MERIDIAN_RELEASE_AUTHORITY','MutationObserver','bootstrapMismatch']){
   if(!authority.includes(marker))throw new Error(`release authority marker missing: ${marker}`);
 }
 const loader=fs.readFileSync('app-v6.06.js','utf8');
-if(!loader.includes("app-release-authority.js"))throw new Error('compat loader must load app-release-authority.js');
+for(const marker of ["app-release-authority.js",'version.json?bootstrap=','injectLatestLoader','MERIDIAN_LOADER_TAG']){
+  if(!loader.includes(marker))throw new Error(`compat loader marker missing: ${marker}`);
+}
 
 if(!write&&pending.length){
   throw new Error('release-generated files out of sync: '+pending.join(', '));

@@ -1,4 +1,4 @@
-/* MERIDIAN release authority — runtime version/build SSOT. Presentation/runtime metadata only; execution unchanged. */
+/* MERIDIAN release authority — runtime version/build SSOT plus stale-bootstrap recovery. Presentation/runtime metadata only; execution unchanged. */
 (function(){
   'use strict';
   const POLL_MS=30000;
@@ -12,6 +12,23 @@
     return /^\d+\.\d+$/.test(version)&&build.startsWith(version+'-')?{version,build}:null;
   }
   function cacheTag(x){return x.version+'-'+x.build.split('-').slice(-1)[0]}
+  function bootstrapMismatch(x){
+    const wanted=cacheTag(x);
+    const active=String(window.MERIDIAN_LOADER_TAG||window.__MERIDIAN_LOADER_ACTIVE__||'');
+    if(!active||active===wanted)return false;
+    window.__MERIDIAN_BOOTSTRAP_REDIRECTS__=window.__MERIDIAN_BOOTSTRAP_REDIRECTS__||{};
+    if(window.__MERIDIAN_BOOTSTRAP_REDIRECTS__[wanted])return false;
+    window.__MERIDIAN_BOOTSTRAP_REDIRECTS__[wanted]=true;
+    for(const id of ['v8-navigation-css','v8-trade-css','v8-center-css','v8-depot-css','v8-paper-css','v8-more-css'])document.getElementById(id)?.remove();
+    document.getElementById('v8-bottom-nav')?.remove();
+    for(const id of ['v8-center-summary','v8-depot-summary','v8-trade-summary','v8-paper-summary'])document.getElementById(id)?.remove();
+    document.documentElement.classList.remove('v8-nav-ready');
+    const s=document.createElement('script');
+    s.src=`app-v6.06.js?v=${encodeURIComponent(wanted)}&authority=${Date.now()}`;
+    s.async=false;s.dataset.meridianBootstrap='release-authority';
+    (document.head||document.documentElement).appendChild(s);
+    return true;
+  }
   function paint(x){
     if(!x)return;
     expected=x;
@@ -31,7 +48,7 @@
       if(manifest.getAttribute('href')!==href)manifest.setAttribute('href',href);
     }
     document.querySelectorAll('[data-ui-version]').forEach(el=>{if(el.textContent!==x.version)el.textContent=x.version});
-    window.MERIDIAN_RELEASE_AUTHORITY={...x,source:'version.json',appliedAt:new Date().toISOString()};
+    window.MERIDIAN_RELEASE_AUTHORITY={...x,source:'version.json',loaderTag:String(window.MERIDIAN_LOADER_TAG||''),appliedAt:new Date().toISOString()};
   }
   function observeBadge(){
     const badge=document.getElementById('versionBadge');
@@ -47,7 +64,9 @@
       if(!r.ok)throw new Error('version HTTP '+r.status);
       const x=valid(await r.json());
       if(!x)throw new Error('invalid version.json');
+      const refreshed=bootstrapMismatch(x);
       paint(x);observeBadge();
+      if(refreshed)window.MERIDIAN_RELEASE_AUTHORITY.bootstrapRefreshRequested=true;
     }catch(e){
       const fallback=valid({version:window.MERIDIAN_RELEASE_VERSION||window.MERIDIAN_UI_VERSION,buildId:window.MERIDIAN_RELEASE_BUILD||window.__MERIDIAN_BUILD__});
       if(fallback)paint(fallback);
