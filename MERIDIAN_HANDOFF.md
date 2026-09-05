@@ -1,59 +1,56 @@
 # MERIDIAN HANDOFF
 
-## Frozen legacy dashboard
-- Frozen branch: `archive/v7.65-dashboard-frozen-20260905`
-- Frozen source commit: `8ddca55f194fb517a244cd45ae142cf28e2a8fd4`
-- Legacy dashboard remains recoverable and must not be mutated by v8 migration work.
+## Frozen / protected references
+- Frozen legacy dashboard: `archive/v7.65-dashboard-frozen-20260905` at `8ddca55f194fb517a244cd45ae142cf28e2a8fd4`.
+- Baseline `6.2.0 / 6.2-SIGNAL-V1` remains frozen.
+- Paper/live execution, sizing, risk, exits and ledgers remain unchanged; live trading remains disabled.
+- `server.js` must remain untouched by v8 frontend work.
+- v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
-## v8 customer dashboard
-- PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
-- PR #44 / R8 merged to `main` as `34d52c3cc98f0bc53015001d8dca71a203a0d7be`.
-- Active hotfix branch: `fix/v8-bootstrap-selfheal-r9`.
-- Current phase: v8.0 R9 — bootstrap/cache self-heal.
-- Goal: answer-first UX with details/research on demand.
-- Final top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
+## Current production main
+- The compatibility-based v8 line reached R11 and is still the current production UI on `main`.
+- R11 merge commit: `3c2c88280a8fd75e6b8bb4d38648b792a45e0965`.
+- Live iPhone verification proved the compatibility stack still allows legacy renderer/view ownership collisions.
+- PR #48 / R12 was deliberately closed unmerged and marked superseded.
 
-## Implemented customer screens
-- PAPER: one answer card plus compact Baseline / Shadow / Challenger / Regime rows; research details remain on demand; relative leader is not promotion.
-- TRADE: risk state, critical bot, liquidation buffer, exactly one next action and compact active-bot rows; legacy detail remains on demand.
-- CENTER: canonical portfolio value, market regime, risk state, one next action and only actionable READY/TRADE/ENTRY-quality scanner opportunity; otherwise `NO READY SIGNAL`.
-- DEPOT: canonical total, 1D performance, canonical-history sparkline when mature, Spot vs Trading/Bots and top positions; no fabricated history.
-- MORE: Market, Forecast, Scanner, Research and Diagnostics grouped behind one secondary hub.
+## Active v8 direction — CLEAN REBUILD
+- Active branch: `v8-clean/rebuild`.
+- Goal: rebuild the v8 frontend from a clean shell instead of layering more wrappers over legacy v7 renderers.
+- Entry: `v8-clean/index.html`.
+- Architecture: `v8-clean/ARCHITECTURE.md`.
+- The clean app does not load `app-v6.06.js`, old v7 UI wrappers, hidden legacy nav buttons or legacy renderer functions.
 
-## R8 live iPhone findings and fixes
-The first production screenshots after the v8 merge showed a severe presentation collision: a TRADE summary was mounted inside the navigation area, the old six-item bottom nav remained visible, and CENTER reported missing bot data despite the legacy command center showing open risk.
+## Clean architecture
+Five real root views only:
+1. CENTER
+2. DEPOT
+3. TRADE
+4. PAPER
+5. MORE
 
-R8 fixed the direct UI/data-binding defects:
-- Customer summaries bind only to explicit real `#view-*` containers, never generic v8 nav buttons.
-- `#primaryBottomNav` is hard-hidden after v8 navigation activation.
-- TRADE/CENTER prefer existing `canonicalBotStates()` live risk SSOT over the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT`.
-- CENTER adds `DATA.btcRegime` fallbacks.
+One deterministic navigation owns those five roots. Data arrives only through explicit adapters. Details are child modules of the owning view, never fake top-level overlays. No legacy DOM is used as a data source.
 
-## R9 stale-loader root cause and fix
-A second iPhone verification after R8 still showed the pre-R8 layout. GitHub `main` already contained R8 and push Release Safety + Runtime Smoke had completed successfully, so the remaining failure is a bootstrap/version-delivery problem rather than another copy of the same UI bug.
+## Clean R1 implemented
+- Standalone mobile-first shell and status/header.
+- Exactly one five-item bottom navigation.
+- One explicit app-state route; no hidden-button delegation.
+- Dedicated `v8-clean/data.js` adapter.
+- CENTER R1 reads the protected `/api/private/dashboard` contract and derives portfolio/risk/next-action/opportunity without touching legacy renderers.
+- Private read token prototype uses session storage key `meridian.v8.readToken`; no token or secret is committed.
+- DEPOT / TRADE / PAPER / MORE are explicit placeholders for the next implementation stages.
+- Regression test: `test/v8-clean-architecture.test.js`.
 
-R9 changes the compatibility layer:
-- `app-v6.06.js` no longer trusts its filename/query as release authority. It fetches fresh `version.json` with `cache: no-store`, derives the required build tag and loads every module with that tag.
-- If the running compatibility loader is stale, it injects a fresh loader URL with the authoritative tag and a timestamp.
-- Before hot rehydration it removes stale v8 customer summaries, navigation DOM and v8 CSS IDs so an older module graph cannot keep old layout rules alive.
-- `app-release-authority.js` independently detects loader/build divergence and can trigger the same bootstrap refresh.
-- New regression file: `test/v8-bootstrap-selfheal.test.js`.
-- Exact candidate build: `8.0-20260905-R9`.
-
-This is presentation/bootstrap only. It does not change Baseline, Paper execution, bot sizing/risk, private portfolio contracts or `server.js`.
-
-## Release safety
-- Baseline 6.2 execution, sizing, risk, exits and ledger behavior remain unchanged.
-- Paper/live execution unchanged; live trading remains disabled.
-- `server.js` untouched.
-- v7.63/v7.64 canonical portfolio data/history contract remains authoritative.
-- R9 must pass Release Safety and Portfolio Contract on its exact final head before merge.
+## Build order
+1. Lock clean shell + CENTER contract.
+2. DEPOT from canonical portfolio + canonical history.
+3. TRADE from one bot-risk adapter.
+4. PAPER from protected ledgers/research endpoints, still research-only.
+5. MORE as explicit modules for Market / Forecast / Scanner / Research / Diagnostics / Settings.
+6. Full iPhone verification of all five views.
+7. Only after clean verification, deliberately switch the production entry to `v8-clean`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
 - v7.79 prospective holdout remains locked/prospective.
 - Meta Allocator remains research-only.
 - No research result auto-promotes into Paper/live execution.
-
-## After R9 merge
-Verify `main` points at the R9 merge commit. Then re-open MERIDIAN on iPhone and confirm: one five-item bottom nav only, no TRADE card embedded in CENTER/navigation, CENTER/TRADE consume real canonical bot risk when available, and the runtime loader tag matches authoritative `version.json`.
