@@ -1,0 +1,17 @@
+/* MERIDIAN v8 R10 — Depot chart range/high-low presentation only */
+.depot-r10-chart{display:flex;flex-direction:column;gap:10px;min-height:150px;padding:12px 14px!important}
+.depot-r10-toolbar{display:flex;gap:8px;justify-content:flex-end}
+.depot-r10-toolbar button{appearance:none;border:1px solid #214b63;background:#07131e;color:#7f94aa;border-radius:10px;padding:7px 11px;font:700 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}
+.depot-r10-toolbar button.active{border-color:#38bdf8;color:#7dd3fc;background:#0a2233;box-shadow:0 0 0 1px rgba(56,189,248,.12) inset}
+.depot-r10-stage{min-height:116px;display:flex;align-items:center}
+.depot-r10-svg{width:100%;height:124px;overflow:visible}
+.depot-r10-line{stroke:#67c7f5;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.depot-r10-point{stroke-width:2;fill:#07131e}
+.depot-r10-point.high{stroke:#4ade80}.depot-r10-point.low{stroke:#f87171}
+.depot-r10-label{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;paint-order:stroke;stroke:#07131e;stroke-width:3px;stroke-linejoin:round}
+.depot-r10-label.high{fill:#6ee7a1}.depot-r10-label.low{fill:#fb8b8b}
+.depot-r10-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid #163246;padding-top:9px;color:#7f94aa;font:600 10px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.depot-r10-meta span:nth-child(2){text-align:center}.depot-r10-meta span:nth-child(3){text-align:right}
+.depot-r10-meta b{display:block;color:#e8f0f8;font-size:12px;margin-top:3px}.depot-r10-meta b.up{color:#4ade80}.depot-r10-meta b.down{color:#f87171}
+.depot-r10-empty{width:100%}
+@media(max-width:520px){.depot-r10-chart{padding:10px 12px!important}.depot-r10-toolbar{justify-content:center}.depot-r10-toolbar button{min-width:54px;padding:7px 10px}.depot-r10-svg{height:118px}.depot-r10-label{font-size:9px}.depot-r10-meta{font-size:9px}.depot-r10-meta b{font-size:11px}}
