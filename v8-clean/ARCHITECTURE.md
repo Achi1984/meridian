@@ -36,8 +36,16 @@ Layers:
 - Top positions are derived from the same spot holdings valuation. BETH is displayed as ETH exposure and OKSOL as SOL exposure without changing underlying quantities or execution.
 - No fabricated history and no legacy chart fallback.
 
+## R3 — TRADE
+- TRADE is a real clean view driven only by the private `pionexRisk.bots` contract.
+- Bot rows are normalized once in the data adapter; the view never scrapes legacy cards or Grid Commander output.
+- Risk priority is liquidation buffer first. The critical bot is the lowest finite buffer.
+- Presentation ladder remains the existing v7.65 customer ladder: `<8% = DANGER`, `8–<12% = WATCH`, `>=12% = SAFE`.
+- NEXT ACTION exposes exactly one immediate action based on that ladder, plus the current target/remaining percentage points when a target exists.
+- Active bots are sorted by buffer and show only concise operational fields such as side, leverage, liquidation price and buffer.
+- This is read-only presentation. It does not place orders, change margin, resize bots, move stops or alter risk/execution logic.
+
 ## Remaining clean views
-- TRADE — direct risk/bot adapter.
 - PAPER — direct research ledger/analytics adapter, research-only.
 - MORE — explicit Market, Forecast, Scanner, Research, Diagnostics and settings modules.
 
@@ -48,6 +56,7 @@ Layers:
 - No overlay can leave the underlying page visually active.
 - Cache/versioning can be handled by one clean entry rather than a compatibility-loader chain.
 - DEPOT cannot disagree with a legacy DOM card because the clean app never reads legacy DOM values.
+- TRADE cannot bind to a wrong legacy view id because its root and data adapter are owned entirely by v8-clean.
 
 ## Promotion plan
 The clean rebuild stays isolated on `v8-clean/rebuild` until all five views are complete, regression-tested and visually verified on iPhone. Only then should the production entry switch from the current compatibility stack to the clean shell.
