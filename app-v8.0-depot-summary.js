@@ -1,0 +1,87 @@
+/* MERIDIAN v8.0 R4 — customer-first DEPOT summary. Presentation only. */
+(function(){
+  'use strict';
+  const VERSION='8.0';
+  const BUILD='8.0-20260905-R4';
+  const root=()=>document.getElementById('view-depot')||document.querySelector('[data-view="depot"]');
+  const data=()=>{try{return typeof DATA!=='undefined'?DATA:window.DATA}catch(_e){return window.DATA||null}};
+  const fmtUsd=(v,d=0)=>Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+  const fmtPct=v=>Number.isFinite(Number(v))?`${Number(v)>=0?'+':'−'}${Math.abs(Number(v)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}%`:'—';
+
+  function holdingValue(d,h){
+    const q=Number(h?.quantity),live=Number(d?.livePrices?.[h?.symbol]?.price),own=Number(h?.price),stored=Number(h?.value??h?.valueUsd);
+    if(Number.isFinite(q)&&Number.isFinite(live)&&live>0)return q*live;
+    if(Number.isFinite(q)&&Number.isFinite(own)&&own>0)return q*own;
+    return Number.isFinite(stored)?stored:0;
+  }
+  function snapshot(){
+    const d=data();
+    const c=window.MERIDIAN_PORTFOLIO_CANONICAL;
+    const hs=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];
+    const positions=hs.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex').map(h=>({symbol:String(h?.symbol||'—').toUpperCase(),venue:String(h?.venue||'—'),value:holdingValue(d,h)})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
+    const spot=Number(c?.spotUsd);
+    const trading=Number(c?.tradingUsd);
+    const total=Number(c?.totalUsd);
+    const fallbackSpot=positions.reduce((s,x)=>s+x.value,0);
+    const px=Number(d?.portfolio?.pionexEquityUsd);
+    return {
+      total:Number.isFinite(total)?total:fallbackSpot+(Number.isFinite(px)?px:0),
+      spot:Number.isFinite(spot)?spot:fallbackSpot,
+      trading:Number.isFinite(trading)?trading:(Number.isFinite(px)?px:0),
+      positions
+    };
+  }
+  function perf(){
+    const s=window.MERIDIAN_PORTFOLIO_1D_STATS;
+    if(s&&Number.isFinite(Number(s.delta))&&Number.isFinite(Number(s.pct)))return {delta:Number(s.delta),pct:Number(s.pct),source:s.source||'CANONICAL'};
+    const pts=window.MERIDIAN_PORTFOLIO_HISTORY?.points;
+    if(Array.isArray(pts)&&pts.length>1){
+      const vals=pts.map(p=>Number(p?.cashflowAdjustedTotalUsd??p?.totalUsd)).filter(Number.isFinite);
+      if(vals.length>1){const first=vals[0],last=vals.at(-1);return {delta:last-first,pct:first?(last-first)/first*100:null,source:'CANONICAL HISTORY'};}
+    }
+    return {delta:null,pct:null,source:'HISTORY BUILDING'};
+  }
+  function sparkline(){
+    const pts=window.MERIDIAN_PORTFOLIO_HISTORY?.points;
+    if(!Array.isArray(pts)||pts.length<3)return '<div class="v8-depot-chart-empty">KANONISCHE HISTORIE WIRD AUFGEBAUT</div>';
+    const vals=pts.map(p=>Number(p?.cashflowAdjustedTotalUsd??p?.totalUsd)).filter(Number.isFinite);
+    if(vals.length<3)return '<div class="v8-depot-chart-empty">KANONISCHE HISTORIE WIRD AUFGEBAUT</div>';
+    const min=Math.min(...vals),max=Math.max(...vals),span=Math.max(1,max-min),w=320,h=96;
+    const xy=vals.map((v,i)=>`${(i/(vals.length-1)*w).toFixed(1)},${(h-((v-min)/span)*(h-10)-5).toFixed(1)}`).join(' ');
+    return `<svg class="v8-depot-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Portfolio Performance Chart"><polyline points="${xy}" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  function topRows(xs,total){
+    return xs.slice(0,4).map((x,i)=>{const pct=total>0?x.value/total*100:0;return `<div class="v8-depot-position"><span><b>${i+1}. ${x.symbol}</b><small>${x.venue}</small></span><span><b>${fmtUsd(x.value)}</b><small>${pct.toLocaleString('de-DE',{maximumFractionDigits:1})}%</small></span></div>`}).join('');
+  }
+  function apply(){
+    const r=root();if(!r)return;
+    let host=document.getElementById('v8-depot-summary');
+    if(!host){host=document.createElement('section');host.id='v8-depot-summary';host.className='v8-customer-screen';r.prepend(host);}
+    const s=snapshot(),p=perf(),spotPct=s.total>0?s.spot/s.total*100:0,tradingPct=s.total>0?s.trading/s.total*100:0;
+    host.innerHTML=`
+      <div class="v8-depot-head"><span>DEPOT · VERMÖGEN</span><b>${fmtUsd(s.total)}</b><small>Gesamt = Spot + Trading/Bots · kanonische Portfolio-Basis</small></div>
+      <div class="v8-depot-perf"><div><small>1D</small><b class="${Number(p.pct)>=0?'up':'down'}">${fmtPct(p.pct)}</b><span>${Number.isFinite(Number(p.delta))?`${Number(p.delta)>=0?'+':'−'}${fmtUsd(Math.abs(Number(p.delta)))}`:'Noch keine ausreichende Historie'}</span></div><div class="v8-depot-chart-wrap">${sparkline()}</div></div>
+      <div class="v8-depot-split"><div><span>SPOT</span><b>${fmtUsd(s.spot)}</b><small>${spotPct.toLocaleString('de-DE',{maximumFractionDigits:1})}%</small></div><div><span>TRADING / BOTS</span><b>${fmtUsd(s.trading)}</b><small>${tradingPct.toLocaleString('de-DE',{maximumFractionDigits:1})}%</small></div></div>
+      <div class="v8-depot-top"><div class="v8-depot-title">TOP POSITIONEN</div>${s.positions.length?topRows(s.positions,s.total):'<div class="v8-depot-empty">Keine Positionsdaten verfügbar.</div>'}</div>
+      <button type="button" id="v8-depot-details-toggle">DETAILS ANZEIGEN</button>`;
+    const btn=host.querySelector('#v8-depot-details-toggle');if(btn)btn.onclick=()=>{const open=r.classList.toggle('v8-depot-details-open');btn.textContent=open?'DETAILS AUSBLENDEN':'DETAILS ANZEIGEN'};
+    [...r.children].forEach(ch=>{if(ch!==host)ch.classList.add('v8-depot-legacy')});
+    window.MERIDIAN_V8_DEPOT_STATUS={version:VERSION,build:BUILD,total:s.total,spot:s.spot,trading:s.trading,performancePct:p.pct,topPositions:s.positions.slice(0,4),executionImpact:false,updatedAt:new Date().toISOString()};
+  }
+  function css(){if(document.getElementById('v8-depot-css'))return;const s=document.createElement('style');s.id='v8-depot-css';s.textContent=`
+    #view-depot:not(.v8-depot-details-open)>.v8-depot-legacy{display:none!important}
+    #v8-depot-summary{max-width:980px;margin:14px auto 90px;padding:0 14px;color:#eef5fb}
+    .v8-depot-head{border:1px solid #1b4058;background:#06131e;border-radius:18px;padding:18px}.v8-depot-head>span{display:block;color:#55c8ff;font-size:9px;letter-spacing:.13em;font-weight:800}.v8-depot-head>b{display:block;margin-top:7px;font-size:28px}.v8-depot-head>small{display:block;margin-top:7px;color:#8294a8;font-size:10px}
+    .v8-depot-perf{display:grid;grid-template-columns:140px 1fr;gap:10px;margin-top:10px}.v8-depot-perf>div{border:1px solid #17354f;background:#07121c;border-radius:14px;padding:12px}.v8-depot-perf small{display:block;color:#71859a;font-size:8px;letter-spacing:.1em}.v8-depot-perf b{display:block;margin-top:4px;font-size:18px}.v8-depot-perf b.up{color:#4bc27d}.v8-depot-perf b.down{color:#ff6b70}.v8-depot-perf span{display:block;margin-top:3px;color:#8294a8;font-size:8px}.v8-depot-chart-wrap{height:104px;padding:8px!important;color:#55c8ff}.v8-depot-chart{width:100%;height:100%}.v8-depot-chart-empty{height:100%;display:grid;place-items:center;color:#71859a;font-size:8px;letter-spacing:.08em;text-align:center}
+    .v8-depot-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.v8-depot-split>div{border:1px solid #17354f;background:#07121c;border-radius:14px;padding:12px}.v8-depot-split span,.v8-depot-split small{display:block;color:#71859a;font-size:8px;letter-spacing:.08em}.v8-depot-split b{display:block;margin:5px 0 2px;font-size:14px}
+    .v8-depot-top{margin-top:10px;border:1px solid #17354f;background:#07121c;border-radius:14px;padding:12px}.v8-depot-title{color:#55c8ff;font-size:9px;letter-spacing:.1em;font-weight:800;margin-bottom:5px}.v8-depot-position{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #10283b}.v8-depot-position:first-of-type{border-top:0}.v8-depot-position>span:last-child{text-align:right}.v8-depot-position b{font-size:11px}.v8-depot-position small{display:block;margin-top:2px;color:#71859a;font-size:8px}.v8-depot-empty{color:#8294a8;font-size:10px;padding:8px 0}
+    #v8-depot-details-toggle{width:100%;margin-top:12px;padding:13px;border:1px solid #1c4a67;border-radius:13px;background:#071827;color:#55c8ff;font-size:10px;font-weight:800;letter-spacing:.09em}
+    @media(max-width:650px){#v8-depot-summary{padding:0 10px}.v8-depot-head>b{font-size:24px}.v8-depot-perf{grid-template-columns:105px 1fr}.v8-depot-split b{font-size:12px}}
+  `;document.head.appendChild(s)}
+  let busy=false,timer=null;
+  function schedule(){clearTimeout(timer);timer=setTimeout(()=>{if(!busy){busy=true;try{apply()}finally{busy=false}}},120)}
+  function stamp(){window.MERIDIAN_RELEASE_VERSION=VERSION;window.MERIDIAN_UI_VERSION=VERSION;window.MERIDIAN_RELEASE_BUILD=BUILD;window.__MERIDIAN_BUILD__=BUILD;const badge=document.getElementById('versionBadge');if(badge)badge.textContent='v8.0 · PREVIEW'}
+  function start(){stamp();css();apply();if(typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  addEventListener('pageshow',()=>{stamp();apply()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)apply()});setInterval(()=>{if(!document.hidden)apply()},3000);
+})();
