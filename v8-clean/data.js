@@ -1,12 +1,24 @@
 const API_BASE=(window.MERIDIAN_V8_CONFIG?.apiBase||'').replace(/\/$/,'');
 const TOKEN_KEY='meridian.v8.readToken';
 
+function readToken(){
+  let v='';
+  try{v=String(localStorage.getItem(TOKEN_KEY)||'').trim()}catch(_e){}
+  if(v)return v;
+  try{
+    v=String(sessionStorage.getItem(TOKEN_KEY)||'').trim();
+    if(v){localStorage.setItem(TOKEN_KEY,v);sessionStorage.removeItem(TOKEN_KEY)}
+  }catch(_e){}
+  return v;
+}
 export function setReadToken(token){
   const v=String(token||'').trim();
-  if(v) sessionStorage.setItem(TOKEN_KEY,v); else sessionStorage.removeItem(TOKEN_KEY);
+  try{if(v)localStorage.setItem(TOKEN_KEY,v);else localStorage.removeItem(TOKEN_KEY)}catch(_e){}
+  try{sessionStorage.removeItem(TOKEN_KEY)}catch(_e){}
+  try{window.dispatchEvent(new CustomEvent('meridian:v8-tokenchange',{detail:{connected:!!v}}))}catch(_e){}
 }
-export function hasReadToken(){return !!sessionStorage.getItem(TOKEN_KEY)}
-function authHeaders(){const t=sessionStorage.getItem(TOKEN_KEY);return t?{authorization:`Bearer ${t}`}:{}}
+export function hasReadToken(){return !!readToken()}
+function authHeaders(){const t=readToken();return t?{authorization:`Bearer ${t}`}:{}}
 export async function getJson(path){
   const r=await fetch(`${API_BASE}${path}`,{cache:'no-store',headers:{accept:'application/json',...authHeaders()}});
   if(!r.ok){const e=new Error(`HTTP ${r.status}`);e.status=r.status;throw e}
@@ -25,6 +37,17 @@ function spotHoldings(data){
   return Array.isArray(hs)?hs.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex'):[];
 }
 function holdingsValue(data){return spotHoldings(data).reduce((sum,h)=>sum+holdingValue(data,h),0)}
+function snapshotSpotValue(data){
+  const p=data?.portfolio||{};
+  return n(p?.canonicalSnapshot?.spotUsd)??n(p?.spotUsd)??n(p?.snapshotSpotValueUsd);
+}
+function spotValue(data){
+  const live=holdingsValue(data);
+  if(live>0)return {value:live,source:'HOLDINGS_LIVE'};
+  const snap=snapshotSpotValue(data);
+  if(snap!=null&&snap>=0)return {value:snap,source:'PRIVATE_SPOT_SNAPSHOT'};
+  return {value:0,source:'MISSING'};
+}
 function tradingValue(data){
   const direct=n(data?.portfolio?.pionexEquityUsd)??n(data?.pionexEquityUsd)??n(data?.pionexRisk?.equityUsd);
   if(direct!=null&&direct>=0)return direct;
@@ -32,7 +55,7 @@ function tradingValue(data){
   const row=rows.find(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex');
   return n(row?.value)??n(row?.valueUsd)??0;
 }
-function canonicalTotal(data){return holdingsValue(data)+tradingValue(data)}
+function canonicalTotal(data){return spotValue(data).value+tradingValue(data)}
 function normalizeBot(b){
   return {
     id:String(b?.id||b?.botId||b?.name||b?.symbol||'BOT'),
@@ -81,7 +104,13 @@ function topPositions(data,total){
     const symbol=exposureSymbol(h?.symbol),value=holdingValue(data,h),venue=String(h?.venue||'').trim();
     const row=map.get(symbol)||{symbol,value:0,venues:new Set()};row.value+=value;if(venue)row.venues.add(venue);map.set(symbol,row);
   }
-  return [...map.values()].sort((a,b)=>b.value-a.value).slice(0,4).map(x=>({symbol:x.symbol,value:x.value,pct:total>0?x.value/total*100:null,venue:[...x.venues].join(' + ')||'—'}));
+  const computed=[...map.values()].filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4).map(x=>({symbol:x.symbol,value:x.value,pct:total>0?x.value/total*100:null,venue:[...x.venues].join(' + ')||'—'}));
+  if(computed.length)return computed;
+  const snap=Array.isArray(data?.portfolio?.topPositions)?data.portfolio.topPositions:[];
+  return snap.map(x=>{
+    const value=n(x?.value)??n(x?.valueUsd)??n(x?.usdValue);
+    return {symbol:exposureSymbol(x?.symbol||x?.asset),value:value??0,pct:n(x?.pct)??n(x?.weightPct)??(value!=null&&total>0?value/total*100:null),venue:String(x?.venue||x?.custodian||'SNAPSHOT')};
+  }).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4);
 }
 function historyModel(raw,currentTotal,data){
   const points=Array.isArray(raw?.points)?raw.points.filter(p=>n(p?.timestamp)!=null&&n(p?.totalUsd)!=null).map(p=>({timestamp:n(p.timestamp),totalUsd:n(p.totalUsd),adjustedUsd:n(p.cashflowAdjustedTotalUsd)})):[];
@@ -140,9 +169,11 @@ export async function loadCenter(){
     const data=payload?.data||payload;
     const risk=riskState(data);
     const opp=bestOpportunity(data);
+    const spot=spotValue(data);
     return {
       ok:true,locked:false,source:'PRIVATE_DASHBOARD',
-      portfolioUsd:canonicalTotal(data),market:marketState(data),risk,
+      portfolioUsd:spot.value+tradingValue(data),market:marketState(data),risk,
+      portfolioSource:spot.source,
       nextAction:risk.next,
       opportunity:opp?{symbol:String(opp.symbol||opp.asset||'SETUP'),side:String(opp.side||opp.direction||''),confidence:n(opp.confidence)}:null
     };
@@ -156,11 +187,11 @@ export async function loadDepot(){
   try{
     const payload=await getJson('/api/private/dashboard');
     const data=payload?.data||payload;
-    const spotUsd=holdingsValue(data),tradingUsd=tradingValue(data),totalUsd=spotUsd+tradingUsd;
+    const spot=spotValue(data),spotUsd=spot.value,tradingUsd=tradingValue(data),totalUsd=spotUsd+tradingUsd;
     let historyRaw={source:'UNAVAILABLE',points:[]};
     try{historyRaw=await getJson('/api/private/portfolio-history?range=1d')}catch(_e){}
     return {
-      ok:true,locked:false,source:'PRIVATE_DASHBOARD',totalUsd,spotUsd,tradingUsd,
+      ok:true,locked:false,source:'PRIVATE_DASHBOARD',totalUsd,spotUsd,tradingUsd,spotSource:spot.source,
       spotPct:totalUsd>0?spotUsd/totalUsd*100:null,tradingPct:totalUsd>0?tradingUsd/totalUsd*100:null,
       topPositions:topPositions(data,totalUsd),history:historyModel(historyRaw,totalUsd,data)
     };

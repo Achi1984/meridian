@@ -10,6 +10,7 @@
 ## Current production main
 - Compatibility v8 R11 remains the production UI entry.
 - Clean rebuild R1-R5 was merged to `main` in PR #49 at merge commit `5540ff463546c96997814487329b4886ec2e3f78`, but only under `v8-clean/`; production `index.html` was not switched.
+- R6 GitHub Pages -> Northflank API binding was merged in PR #51 at `c71da83831e36e875190fab34fe6ba32fd6b4ce4`.
 - PR #48 / R12 was closed unmerged and superseded after iPhone evidence showed legacy renderer/view collisions.
 
 ## Clean architecture invariants
@@ -22,13 +23,13 @@
 ## Clean R1 — CENTER
 - Native mobile-first shell and one five-item bottom navigation.
 - CENTER reads `/api/private/dashboard` for canonical total, market, risk, one next action and only READY/TRADE/ENTRY-quality opportunity.
-- Session-only read token; no committed secret.
+- No committed read secret.
 
 ## Clean R2 — DEPOT
 - Native clean DEPOT; total only `spotUsd + tradingUsd`.
 - Spot excludes Pionex holdings; Trading/Bots uses canonical Pionex equity.
 - 1D chart only from `/api/private/portfolio-history?range=1d` and performance withheld until >=16.8h canonical coverage.
-- No fabricated history; Top 4 exposures use the same valuation basis.
+- No fabricated history; Top 4 exposures use the same valuation basis when available.
 
 ## Clean R3 — TRADE
 - Native clean TRADE from private `pionexRisk.bots` only.
@@ -50,24 +51,31 @@
 - MARKET, FORECAST and SCANNER derive only from the private dashboard contract.
 - RESEARCH uses protected research analytics.
 - DIAGNOSTICS uses `/gateway-health` plus private revision/schema metadata.
-- SETTINGS owns the session-only read token.
+- SETTINGS owns read-token connection UI.
 - `more-runtime.js` hydrates only `#view-more` and never delegates to legacy navigation.
 
 ## Clean R6 — GitHub Pages API binding
-- iPhone validation on `https://achi1984.github.io/meridian/v8-clean/` proved clean five-view routing is stable, but CENTER / DEPOT / TRADE / PAPER returned HTTP 404 because the standalone shell used same-origin GitHub Pages for API calls.
-- Fix branch: `fix/v8-clean-api-base-r6b`.
-- `window.MERIDIAN_V8_CONFIG.apiBase` is now defined before clean modules load and points to `https://p01--achi-meridian--ttvk44grdlp7.code.run`.
-- Gateway CORS already allows origin `https://achi1984.github.io`; no `server.js` or CORS widening is needed.
-- No read/write token is committed. The read token stays session-only and is entered through MORE / SETTINGS.
-- Clean cache tags are bumped to `8.0-clean-r6`.
-- Regression coverage prevents accidental fallback to same-origin GitHub Pages APIs.
+- iPhone validation on `https://achi1984.github.io/meridian/v8-clean/` proved clean five-view routing is stable, but protected views initially returned HTTP 404 because the standalone shell used same-origin GitHub Pages for API calls.
+- `window.MERIDIAN_V8_CONFIG.apiBase` now points to `https://p01--achi-meridian--ttvk44grdlp7.code.run` before clean modules load.
+- Gateway CORS already allows origin `https://achi1984.github.io`; no `server.js` or CORS widening was needed.
+
+## Clean R7 — Token persistence + canonical spot repair
+- iPhone validation showed a new browser/WebView session lost the read token because R6 used `sessionStorage` only; all protected views returned LOCKED again.
+- R7 branch: `fix/v8-clean-token-portfolio-r7`.
+- Read token is now stored on-device in `localStorage` under the existing `meridian.v8.readToken` key, with one-time migration from an existing session token. No token value is committed to the repository or sent anywhere except the authenticated gateway request header.
+- Connecting/replacing the token in MORE triggers an immediate page reload so CENTER / DEPOT / TRADE / PAPER all rehydrate from one authenticated state without waiting for the 30s refresh interval.
+- DEPOT/CENTER still prefer holdings valued with live/stored prices. If holdings exist but cannot currently be valued, R7 falls back only to the private `portfolio.snapshotSpotValueUsd` / canonical private spot snapshot. It does not use `snapshotTotalIncludingPionexUsd`, so Pionex cannot be double-counted.
+- Trading/Bots remains the preferred Pionex equity source. Total remains exactly `spot + trading`.
+- Top positions prefer computed holdings; if unavailable, private `portfolio.topPositions` snapshot rows may be shown. No legacy DOM fallback is reintroduced.
+- Clean cache tags bumped to `8.0-clean-r7` and regression coverage locks token persistence, remote API binding and spot fallback semantics.
 
 ## Current next steps
-1. Release Safety must pass on the exact R6 head before merge.
-2. Re-open the same GitHub Pages clean URL on iPhone. Without a read token, protected views should show LOCKED/401 semantics instead of HTTP 404; gateway diagnostics should resolve through Northflank.
-3. Enter the read token in MORE / SETTINGS and verify real data in CENTER / DEPOT / TRADE / PAPER / MORE.
-4. Validate data consistency, refresh behavior and mobile safe-area layout across all five views.
-5. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
+1. Release Safety must pass on the exact R7 head before merge.
+2. Re-open the GitHub Pages clean URL and verify the already connected token survives a fresh browser/WebView open.
+3. Verify CENTER / DEPOT / TRADE / PAPER load immediately without revisiting SETTINGS.
+4. Check DEPOT total: Spot must no longer collapse to $0 when the private spot snapshot is present; Trading/Bots must remain separate.
+5. Validate top positions/history source labels and mobile layout.
+6. Only after explicit approval: deliberately migrate the production entry to `v8-clean/`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.

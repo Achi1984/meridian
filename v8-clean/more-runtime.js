@@ -13,8 +13,7 @@ function bind(){
     const value=prompt('MERIDIAN Read Token');
     if(value===null)return;
     setReadToken(value);
-    model=null;
-    await hydrate(true);
+    location.reload();
   });
 }
 function paint(){
