@@ -1,4 +1,4 @@
-// MERIDIAN v8 R12 — TRADE detail upgrade
+// MERIDIAN v8 R13 — TRADE detail data hygiene
 // Read-only presentation layer. No order, margin, stop, sizing or execution writes.
 import {getJson} from './data.js';
 
@@ -6,6 +6,17 @@ const CACHE_MS=15000;
 let cache={at:0,data:null};
 
 function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
+function positive(v){const x=n(v);return x!=null&&x>0?x:null}
+function explicitNumber(obj,keys){
+  for(const key of keys){
+    if(!Object.prototype.hasOwnProperty.call(obj||{},key))continue;
+    const raw=obj?.[key];
+    if(raw===null||raw===undefined||raw==='')continue;
+    const x=Number(raw);
+    if(Number.isFinite(x))return x;
+  }
+  return null;
+}
 function usd(v,d=0){return Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—'}
 function pct(v,d=2){return Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+'%':'—'}
 function price(v){
@@ -23,11 +34,11 @@ function normalizeBot(b,data){
     side:String(b?.side||b?.direction||'').toUpperCase(),
     leverage:n(b?.leverage)??n(b?.leverageX),
     buffer:n(b?.pionexLiqBufferPct)??n(b?.liqBufferPct)??n(b?.liquidationDistancePct),
-    liq:n(b?.pionexLiquidationPrice)??n(b?.liquidationPrice)??n(b?.liqPrice),
-    be:n(b?.breakEvenPrice)??n(b?.breakevenPrice),
-    current:n(data?.livePrices?.[symbol]?.price)??n(b?.currentPrice)??n(b?.markPrice),
-    pnl:n(b?.pnlUsd)??n(b?.unrealizedPnlUsd)??n(b?.pnl),
-    investment:n(b?.investmentUsd)??n(b?.investedUsd)??n(b?.marginUsd)
+    liq:positive(b?.pionexLiquidationPrice)??positive(b?.liquidationPrice)??positive(b?.liqPrice),
+    be:positive(b?.breakEvenPrice)??positive(b?.breakevenPrice),
+    current:positive(data?.livePrices?.[symbol]?.price)??positive(b?.currentPrice)??positive(b?.markPrice),
+    pnl:explicitNumber(b,['pnlUsd','unrealizedPnlUsd','pnl']),
+    investment:positive(b?.investmentUsd)??positive(b?.investedUsd)??positive(b?.marginUsd)
   };
 }
 async function privateData(){
