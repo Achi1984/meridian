@@ -93,7 +93,7 @@ test('clean MORE is a real owned view with explicit read-only modules',()=>{
   assert.match(more,/kein Legacy-Overlay/);
   assert.match(moreRuntime,/location\.hash==='#more'/);
   assert.match(moreRuntime,/document\.getElementById\('view-more'\)/);
-  assert.doesNotMatch(more+moreRuntime,/primaryBottomNav|legacy\.click|data-view="market"|overlay/i);
+  assert.doesNotMatch(more+moreRuntime,/primaryBottomNav|legacy\.click|data-view="market"|id="v8-more-overlay"|class="[^"]*overlay/i);
 });
 
 test('clean v8 remains presentation/read-only',()=>{
