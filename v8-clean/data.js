@@ -33,23 +33,31 @@ function tradingValue(data){
   return n(row?.value)??n(row?.valueUsd)??0;
 }
 function canonicalTotal(data){return holdingsValue(data)+tradingValue(data)}
-function botRows(data){
-  const xs=data?.pionexRisk?.bots;
-  if(!Array.isArray(xs))return [];
-  return xs.map(b=>({
-    id:String(b?.id||b?.botId||b?.name||'BOT'),
+function normalizeBot(b){
+  return {
+    id:String(b?.id||b?.botId||b?.name||b?.symbol||'BOT'),
+    symbol:String(b?.symbol||b?.asset||'').toUpperCase(),
     buffer:n(b?.pionexLiqBufferPct)??n(b?.liqBufferPct)??n(b?.liquidationDistancePct),
     status:String(b?.status||b?.riskState||'').toUpperCase(),
-    side:String(b?.side||b?.direction||'').toUpperCase()
-  }));
+    side:String(b?.side||b?.direction||'').toUpperCase(),
+    leverage:n(b?.leverage)??n(b?.leverageX),
+    liquidationPrice:n(b?.pionexLiquidationPrice)??n(b?.liquidationPrice)??n(b?.liqPrice),
+    breakEvenPrice:n(b?.breakEvenPrice)??n(b?.breakevenPrice),
+    pnlUsd:n(b?.pnlUsd)??n(b?.unrealizedPnlUsd)??n(b?.pnl),
+    investmentUsd:n(b?.investmentUsd)??n(b?.investedUsd)??n(b?.marginUsd)
+  };
+}
+function botRows(data){
+  const xs=data?.pionexRisk?.bots;
+  return Array.isArray(xs)?xs.map(normalizeBot):[];
 }
 function riskState(data){
   const bots=botRows(data).filter(b=>Number.isFinite(b.buffer)).sort((a,b)=>a.buffer-b.buffer);
   const b=bots[0]||null;
-  if(!b)return {state:'CHECK',tone:'muted',bot:null,next:'Risikodaten prüfen'};
-  if(b.buffer<8)return {state:'DANGER',tone:'danger',bot:b,next:`${b.id}: Buffer zuerst auf ≥8% bringen`};
-  if(b.buffer<12)return {state:'WATCH',tone:'watch',bot:b,next:`${b.id}: Buffer auf SAFE ≥12% erhöhen`};
-  return {state:'SAFE',tone:'safe',bot:b,next:'Keine akute Liquidationsmaßnahme'};
+  if(!b)return {state:'CHECK',tone:'muted',bot:null,next:'Risikodaten prüfen',targetPct:null,remainingPct:null};
+  if(b.buffer<8)return {state:'DANGER',tone:'danger',bot:b,next:`${b.id}: Buffer zuerst auf ≥8% bringen`,targetPct:8,remainingPct:8-b.buffer};
+  if(b.buffer<12)return {state:'WATCH',tone:'watch',bot:b,next:`${b.id}: Buffer auf SAFE ≥12% erhöhen`,targetPct:12,remainingPct:12-b.buffer};
+  return {state:'SAFE',tone:'safe',bot:b,next:'Keine akute Liquidationsmaßnahme',targetPct:null,remainingPct:0};
 }
 function marketState(data){
   const r=data?.market?.regime||data?.btcRegime?.label||data?.regime?.label;
@@ -122,6 +130,28 @@ export async function loadDepot(){
       ok:true,locked:false,source:'PRIVATE_DASHBOARD',totalUsd,spotUsd,tradingUsd,
       spotPct:totalUsd>0?spotUsd/totalUsd*100:null,tradingPct:totalUsd>0?tradingUsd/totalUsd*100:null,
       topPositions:topPositions(data,totalUsd),history:historyModel(historyRaw,totalUsd,data)
+    };
+  }catch(e){
+    if(e?.status===401)return {ok:false,locked:true,source:'PRIVATE_DASHBOARD',error:'READ_TOKEN_REQUIRED'};
+    return {ok:false,locked:false,source:'PRIVATE_DASHBOARD',error:String(e?.message||e)};
+  }
+}
+
+export async function loadTrade(){
+  try{
+    const payload=await getJson('/api/private/dashboard');
+    const data=payload?.data||payload;
+    const bots=botRows(data).sort((a,b)=>{
+      const av=Number.isFinite(a.buffer)?a.buffer:999,bv=Number.isFinite(b.buffer)?b.buffer:999;
+      return av-bv;
+    });
+    const risk=riskState(data);
+    return {
+      ok:true,locked:false,source:'PRIVATE_DASHBOARD',
+      risk,criticalBot:risk.bot,bots,
+      activeCount:bots.length,
+      tradingEquityUsd:tradingValue(data),
+      nextAction:risk.next
     };
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'PRIVATE_DASHBOARD',error:'READ_TOKEN_REQUIRED'};
