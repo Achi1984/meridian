@@ -25,14 +25,18 @@ must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismat
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
 must(release.projectMemory==='7.50-CONTINUITY-V1','Project memory version mismatch');
 
-// Runtime version SSOT: version.json -> compatibility loader -> app-release-authority.js.
+// Runtime version SSOT: version.json -> authority-driven compatibility loader -> app-release-authority.js.
 const loader=read('app-v6.06.js');
-must(loader.includes(`const TAG='${tag}'`),'compat loader release tag mismatch');
+must(loader.includes(`const LOCAL_TAG='${tag}'`),'compat loader release tag mismatch');
 must(loader.includes('app-release-authority.js'),'release authority must load last');
+must(loader.includes('version.json?bootstrap='),'compat loader must fetch canonical version.json no-store');
+must(loader.includes('injectLatestLoader'),'compat loader stale-build refresh missing');
+must(loader.includes('MERIDIAN_LOADER_TAG'),'compat loader runtime tag export missing');
 const authority=read('app-release-authority.js');
 must(authority.includes("fetch('version.json?authority='+Date.now(),{cache:'no-store'})"),'release authority must fetch canonical version.json no-store');
 must(authority.includes('MERIDIAN_RELEASE_AUTHORITY'),'release authority status export missing');
 must(authority.includes('MutationObserver'),'release authority must heal stale badge painters');
+must(authority.includes('bootstrapMismatch'),'release authority stale-loader recovery missing');
 must(authority.includes('MERIDIAN_RELEASE_VERSION'),'release authority global version stamp missing');
 must(authority.includes('MERIDIAN_RELEASE_BUILD'),'release authority global build stamp missing');
 
