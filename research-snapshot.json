@@ -301,12 +301,12 @@
     "executionImpact": false,
     "independentLedger": true,
     "lastDecision": {
-      "candidate": 87,
-      "confidence": 67,
+      "candidate": 84,
+      "confidence": 71,
       "decision": "SKIP",
-      "distanceAtr": 1.823,
-      "distanceQuality": 14.9,
-      "evaluatedAt": "2026-09-05T09:16:18.129Z",
+      "distanceAtr": 1.211,
+      "distanceQuality": 43.5,
+      "evaluatedAt": "2026-09-05T09:30:21.603Z",
       "reasons": [
         "WAIT_ENTRY_ZONE"
       ],
@@ -317,16 +317,16 @@
       "side": "LONG",
       "status": "WAIT_ENTRY_ZONE",
       "symbol": "SOLUSDT",
-      "technical": 79
+      "technical": 76
     },
     "lastEvaluations": [
       {
-        "candidate": 87,
-        "confidence": 67,
+        "candidate": 84,
+        "confidence": 71,
         "decision": "SKIP",
-        "distanceAtr": 1.823,
-        "distanceQuality": 14.9,
-        "evaluatedAt": "2026-09-05T09:16:18.129Z",
+        "distanceAtr": 1.211,
+        "distanceQuality": 43.5,
+        "evaluatedAt": "2026-09-05T09:30:21.603Z",
         "reasons": [
           "WAIT_ENTRY_ZONE"
         ],
@@ -337,15 +337,15 @@
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 79
+        "technical": 76
       },
       {
         "candidate": 64,
         "confidence": 74,
         "decision": "SKIP",
-        "distanceAtr": 0.608,
-        "distanceQuality": 71.6,
-        "evaluatedAt": "2026-09-05T09:16:18.129Z",
+        "distanceAtr": 0.635,
+        "distanceQuality": 70.4,
+        "evaluatedAt": "2026-09-05T09:30:21.603Z",
         "reasons": [
           "BASE_NOT_READY"
         ],
@@ -359,26 +359,26 @@
         "technical": 61
       },
       {
-        "candidate": 39,
-        "confidence": 50,
+        "candidate": 37,
+        "confidence": 41,
         "decision": "SKIP",
-        "distanceAtr": 0.945,
-        "distanceQuality": 55.9,
-        "evaluatedAt": "2026-09-05T09:16:18.129Z",
+        "distanceAtr": 1.075,
+        "distanceQuality": 49.8,
+        "evaluatedAt": "2026-09-05T09:30:21.603Z",
         "reasons": [
           "BASE_NOT_READY"
         ],
         "regime": "RANGE",
-        "regimeAdjustment": 4,
+        "regimeAdjustment": -2,
         "researchOnly": true,
         "riskPct": 0,
-        "side": "SHORT",
+        "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
-        "technical": 47
+        "technical": 45
       }
     ],
-    "lastScanAt": "2026-09-05T09:16:18.129Z",
+    "lastScanAt": "2026-09-05T09:30:21.603Z",
     "lastSignal": {
       "atr": 2.9871492404197326,
       "candidate": 78,
@@ -833,24 +833,24 @@
     ],
     "researchOnly": true,
     "ruleset": "6.99-CHALLENGER-V2",
-    "updatedAt": "2026-09-05T09:16:18.129Z",
+    "updatedAt": "2026-09-05T09:30:21.603Z",
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 35,
+    "cycles": 7,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-05T09:16:17.829Z",
-    "lastGoodMarketAt": "2026-09-05T09:16:16.865Z",
-    "lastSignalScanAt": "2026-09-05T09:16:18.543Z",
+    "lastCycleAt": "2026-09-05T09:30:21.606Z",
+    "lastGoodMarketAt": "2026-09-05T09:30:20.218Z",
+    "lastSignalScanAt": "2026-09-05T09:30:22.192Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 18,
-    "startedAt": "2026-09-05T08:59:08.733Z",
+    "signalScans": 4,
+    "startedAt": "2026-09-05T09:27:12.498Z",
     "state": "RUNNING",
     "version": "6.2.0"
   },
@@ -2514,7 +2514,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-05T09:16:31.734Z",
+  "generatedAt": "2026-09-05T09:30:48.487Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -2879,11 +2879,11 @@
     "executionImpact": false,
     "independentLedger": true,
     "lastDecision": {
-      "atr": 0.22417481,
-      "candidate": 87,
-      "decision": "TRADE",
-      "distanceAtr": 1.823,
-      "entry": 102.69,
+      "atr": 0.21749907,
+      "candidate": 84,
+      "decision": "CAUTION",
+      "distanceAtr": 1.211,
+      "entry": 102.56,
       "entryQuality": 100,
       "executionImpact": false,
       "momentumFit": 15,
@@ -2893,27 +2893,27 @@
       "regime": "RANGE",
       "regimeQuality": 82,
       "researchOnly": true,
-      "riskPct": 0.65,
+      "riskPct": 0.325,
       "ruleset": "7.38-REGIME-V1",
-      "score": 76,
+      "score": 75,
       "side": "SHORT",
-      "sl": 102.9702185125,
+      "sl": 102.8318738375,
       "sourceSide": "LONG",
       "stopMult": 1.25,
       "symbol": "SOLUSDT",
-      "technical": 79,
-      "tp1": 102.4097814875,
+      "technical": 76,
+      "tp1": 102.2881261625,
       "tp1R": 1,
-      "tp2": 102.26967223125,
+      "tp2": 102.15218924375,
       "tp2R": 1.5
     },
     "lastEvaluations": [
       {
-        "atr": 0.22417481,
-        "candidate": 87,
-        "decision": "TRADE",
-        "distanceAtr": 1.823,
-        "entry": 102.69,
+        "atr": 0.21749907,
+        "candidate": 84,
+        "decision": "CAUTION",
+        "distanceAtr": 1.211,
+        "entry": 102.56,
         "entryQuality": 100,
         "executionImpact": false,
         "momentumFit": 15,
@@ -2923,27 +2923,27 @@
         "regime": "RANGE",
         "regimeQuality": 82,
         "researchOnly": true,
-        "riskPct": 0.65,
+        "riskPct": 0.325,
         "ruleset": "7.38-REGIME-V1",
-        "score": 76,
+        "score": 75,
         "side": "SHORT",
-        "sl": 102.9702185125,
+        "sl": 102.8318738375,
         "sourceSide": "LONG",
         "stopMult": 1.25,
         "symbol": "SOLUSDT",
-        "technical": 79,
-        "tp1": 102.4097814875,
+        "technical": 76,
+        "tp1": 102.2881261625,
         "tp1R": 1,
-        "tp2": 102.26967223125,
+        "tp2": 102.15218924375,
         "tp2R": 1.5
       },
       {
-        "atr": 71.59477223,
+        "atr": 66.55184394,
         "candidate": 64,
         "decision": "SKIP",
-        "distanceAtr": 0.608,
-        "entry": 79694.22,
-        "entryQuality": 58.6,
+        "distanceAtr": 0.635,
+        "entry": 79697.73,
+        "entryQuality": 57.1,
         "executionImpact": false,
         "momentumFit": 93,
         "reasons": [
@@ -2957,75 +2957,77 @@
         "ruleset": "7.38-REGIME-V1",
         "score": 61,
         "side": "LONG",
-        "sl": 79597.5670574895,
+        "sl": 79607.885010681,
         "sourceSide": "LONG",
         "stopMult": 1.35,
         "symbol": "BTCUSDT",
         "technical": 61,
-        "tp1": 79810.2035310126,
+        "tp1": 79805.5439871828,
         "tp1R": 1.2,
-        "tp2": 79868.1952965189,
+        "tp2": 79859.45098077419,
         "tp2R": 1.8
       },
       {
-        "atr": 2.83975759,
-        "candidate": 39,
+        "atr": 2.63763293,
+        "candidate": 37,
         "decision": "SKIP",
-        "distanceAtr": 0.945,
-        "entry": 2457.75,
+        "distanceAtr": 1.075,
+        "entry": 2458.25,
         "entryQuality": 100,
         "executionImpact": false,
         "momentumFit": 30,
         "reasons": [
-          "REGIME_SCORE_LT_CAUTION"
+          "REGIME_SCORE_LT_CAUTION",
+          "SIDE_ADAPTED_TO_REGIME"
         ],
         "regime": "RANGE",
         "regimeQuality": 82,
         "researchOnly": true,
         "riskPct": 0,
         "ruleset": "7.38-REGIME-V1",
-        "score": 58,
+        "score": 57,
         "side": "SHORT",
-        "sl": 2461.2996969875,
-        "sourceSide": "SHORT",
+        "sl": 2461.5470411625,
+        "sourceSide": "LONG",
         "stopMult": 1.25,
         "symbol": "ETHUSDT",
-        "technical": 47,
-        "tp1": 2454.2003030125,
+        "technical": 45,
+        "tp1": 2454.9529588375,
         "tp1R": 1,
-        "tp2": 2452.4254545187505,
+        "tp2": 2453.30443825625,
         "tp2R": 1.5
       }
     ],
-    "lastScanAt": "2026-09-05T09:16:18.234Z",
+    "lastScanAt": "2026-09-05T09:30:21.706Z",
     "lastSignal": {
-      "atr": 2.83975759,
-      "candidate": 39,
+      "atr": 2.63763293,
+      "candidate": 37,
       "decision": "SKIP",
-      "distanceAtr": 0.945,
-      "entry": 2457.75,
+      "distanceAtr": 1.075,
+      "entry": 2458.25,
       "entryQuality": 100,
       "executionImpact": false,
       "momentumFit": 30,
       "reasons": [
-        "REGIME_SCORE_LT_CAUTION"
+        "REGIME_SCORE_LT_CAUTION",
+        "SIDE_ADAPTED_TO_REGIME"
       ],
-      "receivedAt": "2026-09-05T09:16:18.450Z",
+      "receivedAt": "2026-09-05T09:30:21.988Z",
       "regime": "RANGE",
       "regimeQuality": 82,
       "researchOnly": true,
       "riskPct": 0,
       "ruleset": "7.38-REGIME-V1",
-      "score": 58,
+      "score": 57,
       "side": "SHORT",
-      "sl": 2461.2996969875,
-      "sourceSide": "SHORT",
+      "sl": 2461.5470411625,
+      "sourceSide": "LONG",
       "stopMult": 1.25,
       "symbol": "ETHUSDT",
-      "technical": 47,
-      "tp1": 2454.2003030125,
+      "technical": 45,
+      "tp1": 2454.9529588375,
       "tp1R": 1,
-      "tp2": 2452.4254545187505,
+      "tp2": 2453.30443825625,
       "tp2R": 1.5
     },
     "model": {
@@ -3445,7 +3447,7 @@
     ],
     "researchOnly": true,
     "ruleset": "7.38-REGIME-V1",
-    "updatedAt": "2026-09-05T09:16:18.450Z",
+    "updatedAt": "2026-09-05T09:30:21.988Z",
     "winRate": 34.5
   },
   "safety": {
@@ -3455,35 +3457,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 87,
-        "distanceAtr": 1.823,
-        "price": 102.69,
+        "candidate": 84,
+        "distanceAtr": 1.211,
+        "price": 102.56,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 79
+        "technical": 76
       },
       {
         "candidate": 64,
-        "distanceAtr": 0.608,
-        "price": 79694.22,
+        "distanceAtr": 0.635,
+        "price": 79697.73,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
         "technical": 61
       },
       {
-        "candidate": 39,
-        "distanceAtr": 0.945,
-        "price": 2457.75,
-        "side": "SHORT",
+        "candidate": 37,
+        "distanceAtr": 1.075,
+        "price": 2458.25,
+        "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
-        "technical": 47
+        "technical": 45
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-05T09:16:17.630Z"
+    "updatedAt": "2026-09-05T09:30:20.588Z"
   },
   "shadowV1": {
     "account": {
@@ -3512,10 +3514,10 @@
     "independentLedger": true,
     "lastDecision": {
       "baselineGateIndependent": true,
-      "candidate": 87,
+      "candidate": 84,
       "decision": "WAIT",
-      "distanceAtr": 1.823,
-      "evaluatedAt": "2026-09-05T09:16:17.949Z",
+      "distanceAtr": 1.211,
+      "evaluatedAt": "2026-09-05T09:30:21.302Z",
       "maxEntryDistanceAtr": 0.75,
       "reasons": [
         "WAIT_ENTRY_ZONE",
@@ -3525,15 +3527,15 @@
       "side": "LONG",
       "status": "WAIT_ENTRY_ZONE",
       "symbol": "SOLUSDT",
-      "technical": 79
+      "technical": 76
     },
     "lastEvaluations": [
       {
         "baselineGateIndependent": true,
-        "candidate": 87,
+        "candidate": 84,
         "decision": "WAIT",
-        "distanceAtr": 1.823,
-        "evaluatedAt": "2026-09-05T09:16:17.949Z",
+        "distanceAtr": 1.211,
+        "evaluatedAt": "2026-09-05T09:30:21.302Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "WAIT_ENTRY_ZONE",
@@ -3543,14 +3545,14 @@
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 79
+        "technical": 76
       },
       {
         "baselineGateIndependent": true,
         "candidate": 64,
         "decision": "BLOCK",
-        "distanceAtr": 0.608,
-        "evaluatedAt": "2026-09-05T09:16:17.949Z",
+        "distanceAtr": 0.635,
+        "evaluatedAt": "2026-09-05T09:30:21.303Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "BASE_NOT_READY",
@@ -3565,24 +3567,25 @@
       },
       {
         "baselineGateIndependent": true,
-        "candidate": 39,
+        "candidate": 37,
         "decision": "BLOCK",
-        "distanceAtr": 0.945,
-        "evaluatedAt": "2026-09-05T09:16:17.949Z",
+        "distanceAtr": 1.075,
+        "evaluatedAt": "2026-09-05T09:30:21.303Z",
         "maxEntryDistanceAtr": 0.75,
         "reasons": [
           "BASE_NOT_READY",
           "SHADOW_TECH_LT_75",
-          "SHADOW_CAND_LT_70"
+          "SHADOW_CAND_LT_70",
+          "SHADOW_LONG_ONLY_BULL"
         ],
         "regime": "RANGE",
-        "side": "SHORT",
+        "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
-        "technical": 47
+        "technical": 45
       }
     ],
-    "lastScanAt": "2026-09-05T09:16:17.949Z",
+    "lastScanAt": "2026-09-05T09:30:21.303Z",
     "lastSignal": {
       "atr": 2.9871492404197326,
       "candidate": 78,
@@ -5088,7 +5091,7 @@
     ],
     "researchOnly": true,
     "ruleset": "6.98-SHADOW-V1",
-    "updatedAt": "2026-09-05T09:16:17.949Z",
+    "updatedAt": "2026-09-05T09:30:21.303Z",
     "winRate": 34.8
   }
 }
