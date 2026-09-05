@@ -13,17 +13,26 @@ async function getJson(path){
   return r.json();
 }
 function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
-function holdingsValue(data){
+function livePrice(data,h){return n(data?.livePrices?.[h?.symbol]?.price)}
+function holdingValue(data,h){
+  const q=n(h?.quantity),live=livePrice(data,h),own=n(h?.price),stored=n(h?.value)??n(h?.valueUsd)??n(h?.usdValue);
+  if(q!=null&&q>=0&&live!=null&&live>0)return q*live;
+  if(q!=null&&q>=0&&own!=null&&own>0)return q*own;
+  return stored??0;
+}
+function spotHoldings(data){
   const hs=data?.portfolio?.holdings;
-  if(!Array.isArray(hs))return null;
-  return hs.reduce((sum,h)=>sum+(n(h?.usdValue)||n(h?.valueUsd)||0),0);
+  return Array.isArray(hs)?hs.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex'):[];
 }
-function canonicalTotal(data){
-  const spot=n(data?.portfolio?.spotUsd)??holdingsValue(data);
-  const trading=n(data?.portfolio?.pionexEquityUsd)??n(data?.pionexEquityUsd)??n(data?.pionexRisk?.equityUsd);
-  if(spot==null&&trading==null)return null;
-  return (spot||0)+(trading||0);
+function holdingsValue(data){return spotHoldings(data).reduce((sum,h)=>sum+holdingValue(data,h),0)}
+function tradingValue(data){
+  const direct=n(data?.portfolio?.pionexEquityUsd)??n(data?.pionexEquityUsd)??n(data?.pionexRisk?.equityUsd);
+  if(direct!=null&&direct>=0)return direct;
+  const rows=Array.isArray(data?.portfolio?.manualVenueBalances)?data.portfolio.manualVenueBalances:[];
+  const row=rows.find(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex');
+  return n(row?.value)??n(row?.valueUsd)??0;
 }
+function canonicalTotal(data){return holdingsValue(data)+tradingValue(data)}
 function botRows(data){
   const xs=data?.pionexRisk?.bots;
   if(!Array.isArray(xs))return [];
@@ -52,6 +61,38 @@ function bestOpportunity(data){
   const ready=xs.filter(x=>/READY|TRADE|ENTRY/.test(String(x?.status||x?.action||'').toUpperCase()));
   return ready.sort((a,b)=>(n(b?.confidence)||0)-(n(a?.confidence)||0))[0]||null;
 }
+function exposureSymbol(raw){
+  const s=String(raw||'—').toUpperCase();
+  if(s==='BETH')return 'ETH';
+  if(s==='OKSOL')return 'SOL';
+  return s;
+}
+function topPositions(data,total){
+  const map=new Map();
+  for(const h of spotHoldings(data)){
+    const symbol=exposureSymbol(h?.symbol),value=holdingValue(data,h),venue=String(h?.venue||'').trim();
+    const row=map.get(symbol)||{symbol,value:0,venues:new Set()};row.value+=value;if(venue)row.venues.add(venue);map.set(symbol,row);
+  }
+  return [...map.values()].sort((a,b)=>b.value-a.value).slice(0,4).map(x=>({symbol:x.symbol,value:x.value,pct:total>0?x.value/total*100:null,venue:[...x.venues].join(' + ')||'—'}));
+}
+function historyModel(raw,currentTotal,data){
+  const points=Array.isArray(raw?.points)?raw.points.filter(p=>n(p?.timestamp)!=null&&n(p?.totalUsd)!=null).map(p=>({timestamp:n(p.timestamp),totalUsd:n(p.totalUsd),adjustedUsd:n(p.cashflowAdjustedTotalUsd)})):[];
+  const now=Date.now();
+  if(currentTotal!=null)points.push({timestamp:now,totalUsd:currentTotal,adjustedUsd:null});
+  points.sort((a,b)=>a.timestamp-b.timestamp);
+  const first=points[0]||null,last=points.at(-1)||null;
+  const coverageMs=first&&last?last.timestamp-first.timestamp:0;
+  const mature=points.length>=2&&coverageMs>=16.8*60*60*1000;
+  const cumulative=n(data?.portfolio?.cumulativeCashflowUsd);
+  const currentAdjusted=currentTotal!=null&&cumulative!=null?currentTotal-cumulative:null;
+  let from=null,to=null,basis='RAW';
+  if(first&&currentAdjusted!=null&&first.adjustedUsd!=null){from=first.adjustedUsd;to=currentAdjusted;basis='CASHFLOW_ADJUSTED'}
+  else if(first&&currentTotal!=null){from=first.totalUsd;to=currentTotal}
+  const delta=from!=null&&to!=null?to-from:null;
+  const pct=delta!=null&&from?delta/from*100:null;
+  return {source:String(raw?.source||'UNKNOWN'),points,coverageMs,mature,basis,performance:mature&&delta!=null?{deltaUsd:delta,pct}:null};
+}
+
 export async function loadCenter(){
   try{
     const payload=await getJson('/api/private/dashboard');
@@ -63,6 +104,24 @@ export async function loadCenter(){
       portfolioUsd:canonicalTotal(data),market:marketState(data),risk,
       nextAction:risk.next,
       opportunity:opp?{symbol:String(opp.symbol||opp.asset||'SETUP'),side:String(opp.side||opp.direction||''),confidence:n(opp.confidence)}:null
+    };
+  }catch(e){
+    if(e?.status===401)return {ok:false,locked:true,source:'PRIVATE_DASHBOARD',error:'READ_TOKEN_REQUIRED'};
+    return {ok:false,locked:false,source:'PRIVATE_DASHBOARD',error:String(e?.message||e)};
+  }
+}
+
+export async function loadDepot(){
+  try{
+    const payload=await getJson('/api/private/dashboard');
+    const data=payload?.data||payload;
+    const spotUsd=holdingsValue(data),tradingUsd=tradingValue(data),totalUsd=spotUsd+tradingUsd;
+    let historyRaw={source:'UNAVAILABLE',points:[]};
+    try{historyRaw=await getJson('/api/private/portfolio-history?range=1d')}catch(_e){}
+    return {
+      ok:true,locked:false,source:'PRIVATE_DASHBOARD',totalUsd,spotUsd,tradingUsd,
+      spotPct:totalUsd>0?spotUsd/totalUsd*100:null,tradingPct:totalUsd>0?tradingUsd/totalUsd*100:null,
+      topPositions:topPositions(data,totalUsd),history:historyModel(historyRaw,totalUsd,data)
     };
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'PRIVATE_DASHBOARD',error:'READ_TOKEN_REQUIRED'};
