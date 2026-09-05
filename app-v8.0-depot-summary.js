@@ -1,9 +1,9 @@
-/* MERIDIAN v8.0 R4 — customer-first DEPOT summary. Presentation only. */
+/* MERIDIAN v8.0 R8 — customer-first DEPOT summary. Presentation only. */
 (function(){
   'use strict';
   const VERSION='8.0';
-  const BUILD='8.0-20260905-R4';
-  const root=()=>document.getElementById('view-depot')||document.querySelector('[data-view="depot"]');
+  const BUILD='8.0-20260905-R8';
+  const root=()=>document.getElementById('view-depot');
   const data=()=>{try{return typeof DATA!=='undefined'?DATA:window.DATA}catch(_e){return window.DATA||null}};
   const fmtUsd=(v,d=0)=>Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
   const fmtPct=v=>Number.isFinite(Number(v))?`${Number(v)>=0?'+':'−'}${Math.abs(Number(v)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}%`:'—';
@@ -55,7 +55,7 @@
   }
   function apply(){
     const r=root();if(!r)return;
-    let host=document.getElementById('v8-depot-summary');
+    let host=r.querySelector(':scope > #v8-depot-summary');
     if(!host){host=document.createElement('section');host.id='v8-depot-summary';host.className='v8-customer-screen';r.prepend(host);}
     const s=snapshot(),p=perf(),spotPct=s.total>0?s.spot/s.total*100:0,tradingPct=s.total>0?s.trading/s.total*100:0;
     host.innerHTML=`
@@ -80,7 +80,7 @@
   `;document.head.appendChild(s)}
   let busy=false,timer=null;
   function schedule(){clearTimeout(timer);timer=setTimeout(()=>{if(!busy){busy=true;try{apply()}finally{busy=false}}},120)}
-  function stamp(){window.MERIDIAN_RELEASE_VERSION=VERSION;window.MERIDIAN_UI_VERSION=VERSION;window.MERIDIAN_RELEASE_BUILD=BUILD;window.__MERIDIAN_BUILD__=BUILD;const badge=document.getElementById('versionBadge');if(badge)badge.textContent='v8.0 · PREVIEW'}
+  function stamp(){window.MERIDIAN_RELEASE_VERSION=VERSION;window.MERIDIAN_UI_VERSION=VERSION;window.MERIDIAN_RELEASE_BUILD=BUILD;window.__MERIDIAN_BUILD__=BUILD;const badge=document.getElementById('versionBadge');if(badge)badge.textContent='v8.0 · LIVE'}
   function start(){stamp();css();apply();if(typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,characterData:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
   addEventListener('pageshow',()=>{stamp();apply()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)apply()});setInterval(()=>{if(!document.hidden)apply()},3000);
