@@ -15,7 +15,7 @@ Target top-level structure:
 ## v8 checkpoints
 Branch: `v8/customer-dashboard`
 Draft PR: #43
-Current build: `8.0-20260905-R3`
+Current build: `8.0-20260905-R4`
 
 ### R1 PAPER
 `app-v8.0-paper-summary.js` provides one answer header plus four compact bot rows. Relative leadership is not promotion; promotion still requires adequate sample, positive OOS/walk-forward evidence, acceptable drawdown/stability and explicit human approval.
@@ -25,6 +25,9 @@ Current build: `8.0-20260905-R3`
 
 ### R3 CENTER
 `app-v8.0-center-summary.js` turns the start dashboard into a command view. Default visible information is restricted to canonical portfolio total, current market regime, current liquidation-risk state, one next action and the best available scanner opportunity. Missing/uncertain scanner data is shown as `NO READY SIGNAL` rather than promoted into an action.
+
+### R4 DEPOT
+`app-v8.0-depot-summary.js` reduces the default Depot view to canonical total wealth, 1D performance, a canonical-history sparkline when enough persisted history exists, Spot vs Trading/Bots split, and the four largest spot positions. If the history is not mature, it explicitly shows that history is still building instead of fabricating a chart. Full legacy Depot remains accessible via `DETAILS ANZEIGEN`.
 
 Legacy detail remains accessible on demand during the migration; no v7 dashboard capability is deleted yet.
 
@@ -49,4 +52,4 @@ v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: c
 - Meta Allocator work remains research-only until explicit promotion criteria are satisfied.
 
 ## Next v8 sequence
-DEPOT simplification -> MORE consolidation -> final five-item navigation and mobile polish.
+MORE consolidation -> final five-item navigation and mobile polish.
