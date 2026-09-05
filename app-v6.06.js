@@ -1,7 +1,7 @@
 /* MERIDIAN compatibility loader. Legacy filename is intentionally preserved; module cache tags are authority-driven. */
 (function(){
   'use strict';
-  const LOCAL_TAG='8.0-R10';
+  const LOCAL_TAG='8.0-R11';
   const FILES=[
     'app-v7.32-legacy.js','app-v7.33-hardening.js','app-runtime-monitor.js','app-v7.37-ui-polish.js',
     'app-v7.38-regime-ui.js','app-v7.39-paper-overview.js','app-v7.60-dashboard-consistency.js',
