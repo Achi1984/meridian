@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import api from '../trade-risk-presentation-v765.js';
+await import('../trade-risk-presentation-v765.js');
+const api=globalThis.MERIDIAN_TRADE_RISK_V765;
 
 test('8.99% buffer advances target to 12% safe gate',()=>{
   const s=api.recoveryState(8.99);
