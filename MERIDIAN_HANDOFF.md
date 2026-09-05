@@ -6,9 +6,9 @@
 - Legacy dashboard remains recoverable and must not be mutated by v8 migration work.
 
 ## v8 customer dashboard
-- Active branch: `v8/customer-dashboard`
-- PR: #43 — ready for review; user explicitly approved merge after final clean review
-- Current phase: v8.0 R7 — pre-merge hardening
+- PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
+- Active hotfix branch: `fix/v8-mobile-live-hotfix-r8`.
+- Current phase: v8.0 R8 — post-merge iPhone live hotfix.
 - Goal: answer-first UX with details/research on demand.
 - Final top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
 
@@ -19,29 +19,26 @@
 - DEPOT: canonical total, 1D performance, canonical-history sparkline when mature, Spot vs Trading/Bots and top positions; no fabricated history.
 - MORE: Market, Forecast, Scanner, Research and Diagnostics grouped behind one secondary hub.
 
-## Navigation / mobile
-- `app-v8.0-navigation.js` provides exactly CENTER / DEPOT / TRADE / PAPER / MORE.
-- First four items delegate to existing view handlers; MORE opens the hub.
-- Legacy bottom navigation is preserved but hidden only after v8 navigation is ready.
-- Market and Forecast remain reachable through preserved legacy handlers even while their old nav buttons are hidden; these secondary views map to MORE in the active five-item nav.
-- iPhone safe-area, card widths, banner spacing and small-screen nav density are normalized.
+## R8 live iPhone findings and fixes
+The first production screenshots after the v8 merge showed a severe presentation collision: a TRADE summary was mounted inside the navigation area, the old six-item bottom nav remained visible, and CENTER reported missing bot data despite the legacy command center showing open risk.
 
-## R7 pre-merge review fixes
-- Fixed CENTER fallback that could previously surface a non-ready scanner item as `BEST OPPORTUNITY`.
-- Fixed MORE Market/Forecast routing after R6 hid legacy bottom navigation.
-- Extended `test/v8-navigation.test.js` with regression assertions for both behaviors.
-- Restored canonical project/security/research invariants in `MERIDIAN_CONTEXT.md` so continuity is not weakened by the v8 rewrite.
+Root causes and fixes:
+- `app-v8.0-trade-summary.js` and `app-v8.0-depot-summary.js` used generic `[data-view=...]` fallbacks. Because v8 nav buttons also have `data-view`, a summary could mount inside a nav button if the real view was missing/late. R8 now binds only to `#view-trade` / `#view-depot`; CENTER also uses only explicit real view IDs.
+- Older inline CSS in `index.html` gives `#primaryBottomNav` high-specificity `display:block!important` restoration. R8 adds an ID-specific v8 rule and periodic guard so the legacy nav is definitively hidden after v8 nav activation.
+- TRADE/CENTER now prefer existing `canonicalBotStates()` live risk SSOT over the empty bootstrap `MERIDIAN_PIONEX_SNAPSHOT`; snapshot/DOM remain fallbacks only.
+- CENTER adds `DATA.btcRegime` fallbacks so the customer market card can populate from the same browser runtime model when cloud regime data is absent.
+- `test/v8-navigation.test.js` now protects these exact regressions.
 
 ## Release safety
-- Exact R7 release build: `8.0-20260905-R7`.
-- Compatibility loader tag and PWA manifest are synchronized to R7.
+- Exact hotfix build: `8.0-20260905-R8`.
+- Compatibility loader tag and PWA manifest are synchronized to R8.
 - Baseline 6.2 execution, sizing, risk, exits and ledger behavior are unchanged.
 - Paper/live execution unchanged; live trading remains disabled.
 - `server.js` untouched.
 - v7.63/v7.64 canonical portfolio data/history contract remains authoritative.
 
-## Merge rule for PR #43
-Do not merge on an older successful run. Require both `MERIDIAN Release Safety` and `MERIDIAN Portfolio Contract v7.63` to succeed on the exact current R7 head. If both are green and PR remains mergeable, merge to `main` using the user's explicit approval from this conversation.
+## Hotfix merge rule
+Do not merge R8 on an older successful run. Require both `MERIDIAN Release Safety` and `MERIDIAN Portfolio Contract v7.63` to succeed on the exact current hotfix head. The current screenshot message itself is treated as bug evidence, not a new blanket authorization to merge; keep the PR ready and request/await explicit merge approval after green checks.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
@@ -49,5 +46,5 @@ Do not merge on an older successful run. Require both `MERIDIAN Release Safety` 
 - Meta Allocator remains research-only.
 - No research result auto-promotes into Paper/live execution.
 
-## After merge
-Verify `main` points at the v8 merge commit and then verify Northflank deployment separately; do not infer successful deployment solely from the GitHub merge.
+## After hotfix merge
+Verify `main` points at the R8 merge commit, then verify Northflank deployment separately. On iPhone confirm: exactly one five-item bottom nav, no TRADE card inside navigation, CENTER and TRADE show canonical bot risk when available, and legacy detail stays hidden until explicitly opened.
