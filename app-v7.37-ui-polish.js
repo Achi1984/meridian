@@ -13,8 +13,8 @@
     s.textContent=`
       .brand{min-width:0;width:100%}
       .brandline{min-width:0!important;width:100%!important}
-      #${BRAND_IMG_ID}{display:block;width:min(100%,760px);height:auto;max-height:72px;filter:drop-shadow(0 0 8px rgba(32,164,255,.14))}
-      #${ROW_ID}{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-top:2px;min-height:18px;white-space:nowrap}
+      #${BRAND_IMG_ID}{display:block;width:min(100%,760px);height:auto;max-height:72px;margin-left:auto;margin-right:auto;filter:drop-shadow(0 0 8px rgba(32,164,255,.14))}
+      #${ROW_ID}{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap;margin:2px auto 0;min-height:18px;max-width:760px;width:100%;white-space:nowrap;text-align:center}
       #${ROW_ID} .version,#${ROW_ID} #meridian-runtime-badge,#${ROW_ID} .live{margin:0!important;flex:0 0 auto}
       #${ROW_ID} .live{display:flex!important;align-items:center!important}
       .top-actions{display:none!important}
@@ -22,7 +22,7 @@
       @media(max-width:650px){
         .topbar{display:block!important;margin-bottom:4px!important}
         #${BRAND_IMG_ID}{width:100%;max-height:60px}
-        #${ROW_ID}{gap:5px;margin-top:1px;min-height:17px;max-width:100%;overflow:visible}
+        #${ROW_ID}{justify-content:center;gap:5px;margin:1px auto 0;min-height:17px;max-width:100%;overflow:visible}
         #${ROW_ID} .version{font-size:7.2px!important;line-height:1!important;padding:3px 6px!important}
         #${ROW_ID} #meridian-runtime-badge{font-size:7.2px!important;line-height:1!important;padding:3px 6px!important;gap:4px!important}
         #${ROW_ID} #meridian-runtime-badge::before{width:5px!important;height:5px!important}
@@ -31,11 +31,11 @@
       }
       @media(max-width:390px){
         #${BRAND_IMG_ID}{max-height:56px}
-        #${ROW_ID}{gap:4px;margin-top:0}
+        #${ROW_ID}{justify-content:center;gap:4px;margin:0 auto}
         #${ROW_ID} .version,#${ROW_ID} #meridian-runtime-badge{font-size:6.8px!important;padding:3px 5px!important}
         #${ROW_ID} .live{font-size:6.8px!important;letter-spacing:.8px!important}
       }
-      @media(min-width:651px){#${ROW_ID}{margin-top:3px}}
+      @media(min-width:651px){#${ROW_ID}{margin:3px auto 0}}
     `;
     document.head.appendChild(s);
   }

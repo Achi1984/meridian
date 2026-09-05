@@ -16,7 +16,18 @@ test('v8 customer navigation contains exactly the five intended top-level items'
 test('v8 navigation is presentation-only and delegates existing routes',()=>{
   assert.match(nav,/executionImpact:false/);
   assert.match(nav,/legacy\.click\(\)/);
+  assert.match(nav,/forceView\(item\)/);
+  assert.match(nav,/document\.body\.dataset\.view=item\.runtime/);
   assert.doesNotMatch(nav,/placeOrder|createOrder|submitOrder|liveTrading\s*=\s*true|fetch\([^\n]*(order|trade)/i);
+});
+
+test('R10 routes each primary tab to a real view even if hidden legacy navigation does not repaint',()=>{
+  assert.match(nav,/ids:\['view-live','view-dashboard','view-center'\]/);
+  assert.match(nav,/ids:\['view-depot'\]/);
+  assert.match(nav,/ids:\['view-trade','view-daytrade'\]/);
+  assert.match(nav,/ids:\['view-paper'\]/);
+  assert.match(nav,/v\.classList\.toggle\('hidden',!on\)/);
+  assert.match(nav,/removeAttribute\('hidden'\)/);
 });
 
 test('legacy primary bottom navigation is forcibly removed after v8 nav is ready',()=>{
@@ -24,6 +35,14 @@ test('legacy primary bottom navigation is forcibly removed after v8 nav is ready
   assert.match(nav,/v8-legacy-bottom-hidden/);
   assert.match(nav,/html\.v8-nav-ready #primaryBottomNav\{display:none!important/);
   assert.match(nav,/safe-area-inset-bottom/);
+});
+
+test('Depot details toggle explicitly restores legacy detail children and persists open state',()=>{
+  assert.match(depot,/setDetails\(r,open\)/);
+  assert.match(depot,/v8-depot-details-open/);
+  assert.match(depot,/display','block','important'/);
+  assert.match(depot,/const wasOpen=r\.classList\.contains\('v8-depot-details-open'\)/);
+  assert.match(depot,/aria-expanded/);
 });
 
 test('MORE can route through hidden legacy navigation without clicking its own overlay buttons',()=>{
