@@ -1,0 +1,79 @@
+# MERIDIAN v8 Clean Rebuild
+
+## Decision
+v8 is rebuilt as an isolated frontend instead of layering more customer UI wrappers over the legacy v7 renderer tree.
+
+## Non-negotiable boundaries
+- Baseline `6.2.0 / 6.2-SIGNAL-V1` remains frozen.
+- No Paper/live execution, sizing, risk, exit or ledger behavior changes.
+- `server.js` remains untouched.
+- Existing PostgreSQL/private-dashboard and canonical portfolio contracts remain the data authority.
+- Legacy v7.65 remains frozen and recoverable.
+
+## Frontend architecture
+`v8-clean/` is a standalone app entry and does **not** load the legacy production `index.html`, `app-v6.06.js`, old UI wrappers, hidden legacy navigation buttons or legacy renderer functions.
+
+Layers:
+1. **Data adapters** — same-origin API contracts only. One canonical source per metric.
+2. **State** — one explicit application state with one active route.
+3. **Views** — exactly five real root containers: CENTER, DEPOT, TRADE, PAPER, MORE.
+4. **Details modules** — explicit child modules owned by their view; never overlays that impersonate a top-level route.
+5. **Navigation** — one five-item navigation controlling only v8-clean state.
+
+## R1 — Shell + CENTER
+- Standalone mobile-first shell.
+- Deterministic five-view navigation.
+- CENTER consumes `/api/private/dashboard` through a dedicated adapter.
+- Private read token exists only in session storage under `meridian.v8.readToken`; no secret is committed.
+
+## R2 — DEPOT
+- DEPOT is a real clean view, not a wrapper around the legacy Depot DOM.
+- Spot value is rebuilt from private holdings and excludes Pionex holdings exactly as the canonical v7.63 contract does.
+- Trading/Bots value uses canonical Pionex equity (`portfolio.pionexEquityUsd`, then compatible private fallbacks).
+- Total is always `spotUsd + tradingUsd`; no second headline-total source is accepted.
+- 1D history comes only from `/api/private/portfolio-history?range=1d`.
+- 1D performance is shown only after at least 16.8h canonical coverage. Cashflow-adjusted performance is used only when both sides can be represented on that basis; otherwise raw canonical total is used.
+- Top positions are derived from the same spot holdings valuation. BETH is displayed as ETH exposure and OKSOL as SOL exposure without changing underlying quantities or execution.
+- No fabricated history and no legacy chart fallback.
+
+## R3 — TRADE
+- TRADE is a real clean view driven only by the private `pionexRisk.bots` contract.
+- Bot rows are normalized once in the data adapter; the view never scrapes legacy cards or Grid Commander output.
+- Risk priority is liquidation buffer first. The critical bot is the lowest finite buffer.
+- Presentation ladder remains the existing v7.65 customer ladder: `<8% = DANGER`, `8–<12% = WATCH`, `>=12% = SAFE`.
+- NEXT ACTION exposes exactly one immediate action based on that ladder, plus the current target/remaining percentage points when a target exists.
+- Active bots are sorted by buffer and show only concise operational fields such as side, leverage, liquidation price and buffer.
+- This is read-only presentation. It does not place orders, change margin, resize bots, move stops or alter risk/execution logic.
+
+## R4 — PAPER
+- PAPER is a native clean research board. It reads only protected `/api/research-analytics` and `/api/activity-summary` contracts.
+- Baseline, Shadow V1, Challenger V2 and Regime V1 are normalized into one display model with closed trades, PnL, expectancy, profit factor, win rate and max drawdown.
+- Baseline remains the reference. No model is labeled a winner and no relative result can trigger promotion.
+- Common-window activity is shown separately from full-ledger analytics so sample coverage is visible rather than implied.
+- Challenger opportunity-cost telemetry exposes missed winners, avoided losers and net counterfactual R where available.
+- Existing audit flags are surfaced explicitly, including the Challenger Baseline-READY dependency and Regime V1 directional-score caveat.
+- PAPER remains research-only and read-only. It does not alter entries, exits, sizing, risk, ledger state or execution.
+
+## R5 — MORE
+- MORE is now the fifth real owned view, not an overlay over CENTER or any legacy screen.
+- It is composed of six explicit child modules: MARKET, FORECAST, SCANNER, RESEARCH, DIAGNOSTICS and SETTINGS.
+- MARKET, FORECAST and SCANNER derive only from the protected private dashboard contract. No legacy DOM or hidden route is read.
+- RESEARCH reads the protected `/api/research-analytics` contract and keeps execution impact visible.
+- DIAGNOSTICS reads `/gateway-health` plus private revision/schema metadata so runtime/build/data state can be inspected without switching UI ownership.
+- SETTINGS currently owns the session-only read-token connection. No write token or secret is committed.
+- `more-runtime.js` owns hydration of `#view-more`; the module never opens a top-level overlay and never delegates to a hidden legacy button.
+- During R5 the malformed `data-route` attributes in the clean prototype HTML were corrected so all five nav targets are valid HTML before iPhone validation.
+
+## Why this avoids the current failures
+- No renderer from another view can repaint the active view.
+- No hidden legacy button controls route state.
+- No `data-view` collision between navigation buttons and content roots.
+- No overlay can leave the underlying page visually active.
+- Cache/versioning can be handled by one clean entry rather than a compatibility-loader chain.
+- DEPOT cannot disagree with a legacy DOM card because the clean app never reads legacy DOM values.
+- TRADE cannot bind to a wrong legacy view id because its root and data adapter are owned entirely by v8-clean.
+- PAPER cannot inherit legacy card state or imply promotion because its research-only contract and presentation semantics are explicit.
+- MORE cannot expose the old CENTER underneath it because `#view-more` is a real root and its child modules stay inside that root.
+
+## Promotion plan
+All five clean views are now implemented. The clean rebuild remains isolated on `v8-clean/rebuild` until regression checks are green and the complete five-view flow is visually verified on iPhone. Only after explicit human approval should the production entry switch from the compatibility stack to the clean shell.
