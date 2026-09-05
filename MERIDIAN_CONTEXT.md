@@ -53,6 +53,7 @@ Legacy detail remains accessible on demand; no v7 capability is deleted by the v
 - `server.js` contains the paper-only safety invariant and must remain untouched by this v8 UI migration.
 
 ## Safety invariants
+Baseline 6.2 execution is a frozen reference.
 - Baseline entry, sizing, risk, exit and ledger behavior remain frozen unless explicitly approved.
 - Paper only; live trading remains disabled.
 - Research never silently changes execution.
