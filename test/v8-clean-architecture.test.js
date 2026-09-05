@@ -26,6 +26,14 @@ test('clean v8 does not load legacy compatibility renderer stack',()=>{
   assert.doesNotMatch(app,/legacy\.click|renderOne|primaryBottomNav|querySelector\([^\n]*data-view/);
 });
 
+test('clean GitHub Pages shell targets the real Northflank read API instead of same-origin Pages',()=>{
+  assert.match(html,/window\.MERIDIAN_V8_CONFIG/);
+  assert.match(html,/apiBase:'https:\/\/p01--achi-meridian--ttvk44grdlp7\.code\.run'/);
+  assert.match(html,/app\.js\?v=8\.0-clean-r6/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r6/);
+  assert.doesNotMatch(html,/MERIDIAN_READ_TOKEN|MERIDIAN_WRITE_TOKEN|authorization\s*:/i);
+});
+
 test('clean CENTER consumes protected dashboard through a dedicated adapter',()=>{
   assert.match(data,/\/api\/private\/dashboard/);
   assert.match(data,/authorization:`Bearer \$\{t\}`/);
@@ -84,7 +92,7 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
 
 test('clean MORE is a real owned view with explicit read-only modules',()=>{
   assert.match(html,/id="view-more"/);
-  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r5/);
+  assert.match(html,/more-runtime\.js\?v=8\.0-clean-r6/);
   assert.match(more,/export async function loadMore/);
   assert.match(more,/\/gateway-health/);
   assert.match(more,/\/api\/private\/dashboard/);
