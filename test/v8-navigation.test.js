@@ -21,13 +21,25 @@ test('v8 navigation is presentation-only and delegates existing routes',()=>{
   assert.doesNotMatch(nav,/placeOrder|createOrder|submitOrder|liveTrading\s*=\s*true|fetch\([^\n]*(order|trade)/i);
 });
 
-test('R10 routes each primary tab to a real view even if hidden legacy navigation does not repaint',()=>{
-  assert.match(nav,/ids:\['view-live','view-dashboard','view-center'\]/);
+test('R11 routes primary tabs to real runtime containers',()=>{
+  assert.match(nav,/ids:\['view-center','view-live','view-dashboard'\]/);
   assert.match(nav,/ids:\['view-depot'\]/);
-  assert.match(nav,/ids:\['view-trade','view-daytrade'\]/);
+  assert.match(nav,/ids:\['view-daytrade','view-trade'\],runtime:'daytrade'/);
   assert.match(nav,/ids:\['view-paper'\]/);
   assert.match(nav,/v\.classList\.toggle\('hidden',!on\)/);
   assert.match(nav,/removeAttribute\('hidden'\)/);
+});
+
+test('R11 Trade summary binds to the real daytrade container first',()=>{
+  assert.match(trade,/document\.getElementById\('view-daytrade'\)\|\|document\.getElementById\('view-trade'\)/);
+  assert.match(trade,/\['view-daytrade','view-trade'\]\.includes\(r\.id\)/);
+  assert.match(trade,/meridian:v8-viewchange/);
+});
+
+test('R11 MORE overlay owns active nav state while open',()=>{
+  assert.match(nav,/document\.getElementById\('v8-more-overlay'\)\)return 'more'/);
+  assert.match(nav,/document\.body\.dataset\.view='more'/);
+  assert.match(nav,/markActive\('more'\)/);
 });
 
 test('legacy primary bottom navigation is forcibly removed after v8 nav is ready',()=>{
@@ -53,7 +65,7 @@ test('MORE can route through hidden legacy navigation without clicking its own o
 });
 
 test('market and forecast detail screens keep MORE active in the five-item nav',()=>{
-  assert.match(nav,/market\|forecast\|fcst/);
+  assert.match(nav,/market\|forecast\|fcst\|more/);
   assert.match(nav,/return 'more'/);
 });
 
@@ -65,7 +77,7 @@ test('CENTER never promotes a non-ready scanner candidate as best opportunity',(
 });
 
 test('customer summaries bind only to real view containers, never data-view nav buttons',()=>{
-  assert.match(trade,/document\.getElementById\('view-trade'\)/);
+  assert.match(trade,/document\.getElementById\('view-daytrade'\)/);
   assert.match(depot,/document\.getElementById\('view-depot'\)/);
   assert.doesNotMatch(trade,/querySelector\('\[data-view="trade"\]'\)/);
   assert.doesNotMatch(depot,/querySelector\('\[data-view="depot"\]'\)/);
