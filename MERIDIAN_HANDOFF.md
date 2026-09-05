@@ -5,15 +5,16 @@
 - Pre-cutover production rollback branch: `archive/v8-r11-production-pre-cutover` at `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749`.
 - Baseline `6.2.0 / 6.2-SIGNAL-V1` remains frozen.
 - Paper/live execution, sizing, risk, exits and ledgers remain unchanged; live trading remains disabled.
-- `server.js` must remain untouched by v8 frontend work.
+- `server.js` remains untouched by v8 frontend work.
 - v7.63/v7.64 canonical portfolio contracts remain authoritative.
 
-## Production cutover candidate
-- Branch: `release/v8-clean-production-cutover`.
-- Production root `index.html` now redirects deterministically to `./v8-clean/`, preserving query string and hash.
-- The previous R11 production root is preserved on `archive/v8-r11-production-pre-cutover` for immediate rollback.
-- No clean data/auth/research/execution code is changed by the cutover itself.
-- Root entry is intentionally thin to prevent any legacy renderer from initializing before the clean shell.
+## Production status — v8 Clean LIVE
+- Production cutover PR #54 merged to `main` at `b075cff295311932fb777a61b329638d6ef5f2f1` after exact-head Release Safety run #688 succeeded.
+- Production root redirects deterministically to `./v8-clean/`, preserving query string and hash.
+- The previous R11 production root remains preserved on `archive/v8-r11-production-pre-cutover` for rollback.
+- Post-cutover iPhone validation on the production root completed successfully across CENTER / DEPOT / TRADE / PAPER / MORE.
+- No legacy renderer/view collision was observed after production cutover.
+- Persistent read-token state remained valid on production.
 
 ## Clean architecture invariants
 - Exactly five real root views: CENTER / DEPOT / TRADE / PAPER / MORE.
@@ -21,6 +22,13 @@
 - No legacy renderer/view ownership inside `v8-clean/`.
 - Explicit read-only adapters use backend/API contracts; never scrape legacy DOM for values.
 - No research auto-promotion.
+
+## Production validation snapshot — 2026-09-05
+- CENTER: total `$27.313`; Market `RISK-ON / SHORT-SQUEEZE`; Risk `WATCH`; BTC-S30 buffer `8.99%`; next action targets SAFE `>=12%`; Best Opportunity `NO READY SIGNAL`.
+- DEPOT: total `$27.313` = Spot `$26.417` + Trading/Bots `$896`; 1D `+1.72% / +$463`; canonical PostgreSQL history rendered; top positions remained coherent.
+- TRADE: BTC-S30 critical bot `8.99%`; HBAR-L3 `27.33%`; XRP-L5 `40.65%`; three active bots; Trading Equity `$896`.
+- PAPER: `RESEARCH ONLY`; Baseline remains reference; no automatic promotion/execution impact; research board and opportunity-cost/audit sections render correctly.
+- MORE: Market/Forecast/Research/Diagnostics/Settings render inside the real MORE view; token remains connected; no legacy overlay.
 
 ## Clean R1 — CENTER
 - Native mobile-first shell and one five-item bottom navigation.
@@ -66,20 +74,19 @@
 - DEPOT/CENTER prefer holdings valued with live/stored prices and use only private canonical spot snapshot as fallback.
 - `snapshotTotalIncludingPionexUsd` is intentionally not used, preventing Pionex double counting.
 - Trading/Bots remains separate; total remains exactly `spot + trading`.
-- iPhone validation showed CENTER and DEPOT at `$27.313`, with Spot `$26.417`, Trading/Bots `$896` and consistent history/top positions.
 
 ## Clean R8 — Visual & UX polish
 - Presentation-only compact mobile override in `v8-clean/r8-polish.css`.
 - CENTER prioritizes portfolio, market/risk, next action and best opportunity in the first viewport.
 - DEPOT / TRADE / PAPER / MORE remain fully scrollable and preserve fixed bottom navigation.
-- iPhone validation after merge commit `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749` showed no visual blocker.
+- iPhone production validation after cutover showed no visual blocker.
 
 ## Current next steps
-1. Release Safety must pass on the exact cutover head.
-2. Merge cutover only after the exact-head check is green.
-3. After deployment, verify the production root opens v8-clean directly and token persists.
-4. Validate CENTER / DEPOT / TRADE / PAPER / MORE once on production root.
-5. If any production-only issue appears, rollback by restoring `archive/v8-r11-production-pre-cutover` / commit `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749`.
+1. Treat v8 Clean as the canonical production UI.
+2. Keep the R11 rollback branch untouched unless a production regression requires rollback.
+3. Next product work should be incremental on v8 Clean only; do not reintroduce legacy renderer ownership.
+4. Prioritize data/model improvements separately from UI shell changes.
+5. Research remains isolated until evidence and explicit human approval justify any promotion.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
