@@ -25,7 +25,7 @@ must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismat
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
 must(release.projectMemory==='7.50-CONTINUITY-V1','Project memory version mismatch');
 
-// Runtime version SSOT: version.json -> authority-driven compatibility loader -> app-release-authority.js.
+// Runtime version SSOT for the retained compatibility stack.
 const loader=read('app-v6.06.js');
 must(loader.includes(`const LOCAL_TAG='${tag}'`),'compat loader release tag mismatch');
 must(loader.includes('app-release-authority.js'),'release authority must load last');
@@ -40,11 +40,24 @@ must(authority.includes('bootstrapMismatch'),'release authority stale-loader rec
 must(authority.includes('MERIDIAN_RELEASE_VERSION'),'release authority global version stamp missing');
 must(authority.includes('MERIDIAN_RELEASE_BUILD'),'release authority global build stamp missing');
 
-// index.html is intentionally a compatibility bootstrap and may contain historical inline painters;
-// it must still load the compatibility core. Runtime authority owns the final version/build state.
+// Production root may be either the retained compatibility bootstrap or the deliberate clean-shell cutover.
 const index=read('index.html');
-must(index.includes('app-v6.06.js'),'index compatibility loader missing');
-must(index.includes('id="versionBadge"'),'version badge missing');
+const cleanCutover=index.includes("var target='./v8-clean/'")&&index.includes('8.0-clean-r8-production');
+if(cleanCutover){
+  must(index.includes('location.replace(target+q+h)'),'clean root redirect must preserve query/hash');
+  must(!index.includes('app-v6.06.js'),'clean root must not initialize compatibility loader');
+  const clean=read('v8-clean/index.html');
+  for(const key of ['center','depot','trade','paper','more']){
+    must(clean.includes(`id="view-${key}"`),`clean production target missing view-${key}`);
+    must(clean.includes(`data-route="${key}"`),`clean production target missing route ${key}`);
+  }
+  must(clean.includes('r8-polish.css?v=8.0-clean-r8'),'clean production target must be R8 visual candidate');
+  must(clean.includes('app.js?v=8.0-clean-r8'),'clean production app tag mismatch');
+  must(clean.includes('more-runtime.js?v=8.0-clean-r8'),'clean production MORE tag mismatch');
+}else{
+  must(index.includes('app-v6.06.js'),'index compatibility loader missing');
+  must(index.includes('id="versionBadge"'),'version badge missing');
+}
 
 const manifest=json('manifest.webmanifest');
 must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
@@ -111,4 +124,4 @@ must(!/caches\.open\s*\(/.test(sw),'service worker must not create an applicatio
 const server=read('server.js');
 must(server.includes('if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");'),'paper-only invariant missing');
 
-console.log('MERIDIAN release check OK',v,build,'authority=version.json');
+console.log('MERIDIAN release check OK',v,build,cleanCutover?'entry=v8-clean':'entry=compatibility');
