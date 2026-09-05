@@ -8,9 +8,9 @@
 ## v8 customer dashboard
 - Active branch: `v8/customer-dashboard`
 - Draft PR: #43
-- Current phase: v8.0 R5 — MORE consolidation
+- Current phase: v8.0 R6 — final five-item navigation + mobile polish
 - Goal: answer-first UX with details/research on demand.
-- Target top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
+- Final top-level navigation: CENTER / DEPOT / TRADE / PAPER / MORE.
 
 ## v8 R1 PAPER
 - New module: `app-v8.0-paper-summary.js`
@@ -42,7 +42,15 @@
 - One secondary MORE entry point groups Market, Forecast, Scanner, Research and Diagnostics.
 - MORE routes into existing detailed/legacy views instead of duplicating decision logic or financial data.
 - Runtime status can be surfaced as context, but MORE does not produce a new trading verdict.
-- This is presentation/navigation only.
+
+## v8 R6 NAVIGATION / MOBILE
+- New module: `app-v8.0-navigation.js`.
+- Final bottom navigation contains exactly five items: CENTER / DEPOT / TRADE / PAPER / MORE.
+- CENTER, DEPOT, TRADE and PAPER delegate to the existing view handlers so navigation does not fork application state.
+- MORE opens the R5 hub.
+- Legacy bottom navigation remains in the frozen implementation but is hidden at presentation level after the v8 nav is ready.
+- iPhone bottom safe area, customer banner spacing, card width and small-screen nav density are normalized.
+- Added `test/v8-navigation.test.js` to assert the five-item contract and presentation-only boundary.
 
 ## Release safety note
 - v8 preview metadata must stay synchronized through `scripts/release-sync.mjs` outputs: loader cache tag, manifest, package.json and package-lock.json.
@@ -53,9 +61,9 @@
 - `server.js` untouched.
 
 ## Next v8 implementation order
-1. Final five-item navigation
-2. Mobile polish and consistency review
-3. Human review before any merge to main
+1. Review R6 on real iPhone screenshots across CENTER / DEPOT / TRADE / PAPER / MORE.
+2. Correct any display/navigation regression without changing execution.
+3. Human review before any merge to `main`.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
