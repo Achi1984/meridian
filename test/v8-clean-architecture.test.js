@@ -63,6 +63,23 @@ test('clean TRADE uses one private bot-risk adapter and fixed buffer ladder',()=
   assert.doesNotMatch(app,/Grid Commander|Liquidation First|querySelector\([^\n]*(trade|bot|risk)/i);
 });
 
+test('clean PAPER reads protected research telemetry and never promotes a model',()=>{
+  assert.match(data,/\/api\/research-analytics/);
+  assert.match(data,/\/api\/activity-summary/);
+  assert.match(data,/function paperModel/);
+  assert.match(data,/researchOnly:analytics\?\.researchOnly!==false/);
+  assert.match(data,/executionImpact:analytics\?\.executionImpact===true/);
+  assert.match(data,/challengerBaselineReadyDependency/);
+  assert.match(data,/regimeAdaptedSideUsesBaselineDirectionalScores/);
+  assert.match(app,/function paperHtml/);
+  assert.match(app,/PAPER · RESEARCH BOARD/);
+  assert.match(app,/RESEARCH ONLY/);
+  assert.match(app,/Keine automatische Promotion/);
+  assert.match(app,/BASELINE · SHADOW · CHALLENGER · REGIME/);
+  assert.match(app,/OPPORTUNITY COST · CHALLENGER/);
+  assert.doesNotMatch(app,/PROMOTE|AUTO[- ]?PROMOTION|best model|winner model/i);
+});
+
 test('clean v8 remains presentation/read-only',()=>{
   const all=html+app+data+arch;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|liveTrading\s*=\s*true/i);
