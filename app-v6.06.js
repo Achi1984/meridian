@@ -1,7 +1,7 @@
 /* MERIDIAN compatibility loader. The legacy filename remains referenced by index.html. */
 (function(){
   'use strict';
-  const TAG='8.0-R5';
+  const TAG='8.0-R6';
   const src=x=>x+'?v='+TAG;
   if(document.readyState==='loading'){
     document.write('<script src="'+src('app-v7.32-legacy.js')+'"><\/script>');
@@ -25,6 +25,7 @@
     document.write('<script src="'+src('app-v8.0-center-summary.js')+'"><\/script>');
     document.write('<script src="'+src('app-v8.0-depot-summary.js')+'"><\/script>');
     document.write('<script src="'+src('app-v8.0-more-hub.js')+'"><\/script>');
+    document.write('<script src="'+src('app-v8.0-navigation.js')+'"><\/script>');
     document.write('<script src="'+src('app-release-authority.js')+'"><\/script>');
     return;
   }
@@ -50,6 +51,7 @@
     .then(()=>load('app-v8.0-center-summary.js'))
     .then(()=>load('app-v8.0-depot-summary.js'))
     .then(()=>load('app-v8.0-more-hub.js'))
+    .then(()=>load('app-v8.0-navigation.js'))
     .then(()=>load('app-release-authority.js'))
     .catch(e=>console.error('MERIDIAN loader',e));
 })();
