@@ -1,7 +1,7 @@
 {
   "name": "ACHI MERIDIAN v8.0",
   "short_name": "MERIDIAN 8.0",
-  "start_url": "./?build=8.0-20260905-R6",
+  "start_url": "./?build=8.0-20260905-R7",
   "display": "standalone",
   "background_color": "#03070c",
   "theme_color": "#05080d"
