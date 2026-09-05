@@ -11,8 +11,8 @@ test('R10 depot chart exposes 4H 1T 1W and high low metrics',()=>{
   assert.match(html,/depot-chart-r10\.css\?v=8\.0-r10/);
   assert.match(js,/RANGE_MS=\{"4h":4\*60\*60\*1000,"1d":24\*60\*60\*1000,"1w":7\*24\*60\*60\*1000\}/);
   assert.match(js,/RANGE_LABEL=\{"4h":"4H","1d":"1T","1w":"1W"\}/);
-  assert.match(js,/HIGH \$\{usd\(s\.hi\)\}/);
-  assert.match(js,/LOW \$\{usd\(s\.lo\)\}/);
+  assert.match(js,/HIGH <b>\$\{usd\(s\.hi\)\}/);
+  assert.match(js,/LOW <b>\$\{usd\(s\.lo\)\}/);
   assert.match(js,/class="depot-r10-point high"/);
   assert.match(js,/class="depot-r10-point low"/);
 });
