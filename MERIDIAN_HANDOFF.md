@@ -67,23 +67,36 @@
 - Release Safety passed before R16 merge; main merge commit `4c3d194e4322e4a45073054228b7785781bdb50a`.
 
 ## Clean R17 — TRADE placeholder correctness + DEPOT label cleanup
-- Branch: `fix/v8-trade-hygiene-depot-label-r17`.
+- PR #63 merged after Release Safety run #725; main merge commit `f1418d950eba90644b0db80ed00fdba5580073c3`.
 - Root cause of visible `$0,0000` / `$0` placeholders: JavaScript formatters converted `null` to numeric zero via `Number(null)` even though normalization had correctly rejected the backend placeholder.
-- R17 formatters now reject `null`, `undefined` and empty-string values before numeric formatting, so unavailable Break-even / Investment / PnL fields render `—`.
+- R17 formatters reject `null`, `undefined` and empty-string values before numeric formatting, so unavailable Break-even / Investment / PnL fields render `—`.
 - Explicit real zero PnL remains valid only when an actual PnL field exists on the protected bot object.
 - DEPOT's technical `POSTGRES_*` history source identifier is presentation-only shortened to `Canonical History`; no history values or basis logic change.
-- Cache tags move TRADE detail and label cleanup to `8.0-r17`.
 - No backend contract, server.js, Baseline 6.2, Paper/live execution, sizing, risk, margin or order changes.
 
+## Research v7.87 — Paperbot Deep Dive telemetry
+- PR #64 merged; main merge commit `cfe357ef4c076c053603539c1b2218a5c116df44`.
+- Adds research-only Baseline vs Challenger V2 cohort telemetry by SIDE / REGIME / SYMBOL plus descriptive temporal slices and linked opportunity cost.
+- Sample adequacy is explicit (`n >= 8`).
+- Known Challenger Baseline-READY dependency remains flagged; no promotion.
+
+## Clean R18 — PAPER Cohort Board
+- Branch: `feature/v8-paper-cohort-board-r18`, PR #65.
+- Read-only module `v8-clean/paper-cohort-r18.js` reads protected `/api/research-analytics` and surfaces Challenger V2 cohort evidence directly inside PAPER.
+- Compact sections: SIDE / REGIME / ASSET, with Challenger expectancy, PF, delta expectancy and sample adequacy.
+- No private values are committed; the board renders only runtime protected telemetry.
+- No server.js, Baseline, execution, Pionex or research-promotion changes.
+
 ## Current next steps
-1. Run Release Safety on the exact R17 head and merge only if green.
-2. Validate on iPhone that missing BTC-S30 Break-even / Investment render `—` rather than fake zeroes, while Current / Liq / Buffer remain unchanged.
-3. Validate DEPOT 1D card shows concise `Canonical History` rather than a technical POSTGRES identifier.
-4. If clean, freeze visual-density work and move to CENTER enrichment / functional product work.
-5. Research remains isolated until evidence and explicit human approval justify promotion.
+1. Merge R18 only after Release Safety is green on the exact final head.
+2. Validate the PAPER cohort board on iPhone and inspect the real private SIDE / REGIME / ASSET results.
+3. Use adequate cohorts only to explain Challenger V2 improvement and the positive excluded counterfactual R; do not tune from tiny samples.
+4. Continue Hybrid Alpha V1 as a separate research branch; no execution connection.
+5. Pionex bots remain unchanged unless explicitly re-opened by the user.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
 - v7.79 prospective holdout remains locked/prospective.
 - Meta Allocator remains research-only.
+- v7.89 Hybrid Alpha V1 is being researched separately as a soft, regime-aware thesis blend.
 - No research result auto-promotes into Paper/live execution.
