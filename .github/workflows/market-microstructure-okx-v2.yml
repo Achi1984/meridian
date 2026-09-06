@@ -1,0 +1,32 @@
+name: Market Microstructure OKX V2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'market-microstructure-okx-v2.js'
+      - 'scripts/market-microstructure-okx-v2-evidence.mjs'
+      - 'test/market-microstructure-okx-v2.test.js'
+      - 'research/market-microstructure-okx-v2-design.md'
+      - 'research/market-microstructure-okx-v2-evidence-20260906.md'
+      - '.github/workflows/market-microstructure-okx-v2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/market-microstructure-okx-v2.test.js
+      - run: node scripts/market-microstructure-okx-v2-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-microstructure-okx-v2
+          path: artifacts/market-microstructure-okx-v2.json
+          if-no-files-found: error
