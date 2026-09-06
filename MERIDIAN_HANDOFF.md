@@ -51,18 +51,26 @@
 - On read failure the canonical compact TRADE card remains intact.
 
 ## Clean R13 — TRADE data hygiene
-- Branch: `fix/v8-trade-data-hygiene-r13`.
-- iPhone validation exposed backend placeholder zeros for BTC-S30 Break-even and Investment; these are not meaningful live values.
-- R13 treats non-positive Break-even, Investment, Liquidation and Current prices as unavailable and renders `—` instead of fake `$0` values.
-- PnL zero is accepted only when an actual PnL field is explicitly present on the protected bot object; missing/blank PnL stays unavailable.
+- PR #59 merged; main merge commit `a405cd9b024b29f9a42fbcb26107a50400a7c10d`.
+- Non-positive Break-even, Investment, Liquidation and Current prices render unavailable instead of fake `$0` values.
+- PnL zero is accepted only when an actual PnL field is explicitly present on the protected bot object.
 - No backend contract change, no invented values, no execution writes.
-- Trade detail module cache tag moves to `8.0-r13`.
+
+## Clean R14–R16 — production layout refinement
+- R14 removes the redundant `MERIDIAN v8 · CUSTOMER VIEW` banner to reclaim vertical space.
+- R15 establishes the approved CENTER mobile spacing rhythm; CENTER is now the visual reference and remains unchanged in R16.
+- R16 (`fix/v8-cross-view-density-r16`, PR #62) is a presentation-only consistency pass across DEPOT, TRADE, PAPER and MORE.
+- DEPOT gives the portfolio chart more width and clamps the long canonical-history source label so it no longer dominates the left 1D card.
+- TRADE keeps every read-only bot detail while reducing vertical travel inside expanded cards.
+- PAPER compresses model rows, opportunity-cost tiles and audit flags for faster scanning while preserving all research telemetry.
+- MORE adopts the same tighter mobile card cadence.
+- Release Safety run #720 passed on exact R16 head `dcad7e4642748e2fcd265c88da33c1c3451e73b4` before merge.
 
 ## Current next steps
-1. Run Release Safety on the exact R13 head and merge only if green.
-2. Validate BTC-S30 detail on iPhone: Break-even and Investment placeholder zeros should display `—`; Current/Liq/Buffer remain real.
-3. If the protected Pionex snapshot later exposes real Break-even/PnL/Investment values, consume them without changing the read-only UI contract.
-4. Next product work: CENTER enrichment or PAPER compaction; no architecture rewrite.
+1. Merge R16 only with expected exact head after the green Release Safety result.
+2. Validate DEPOT / TRADE / PAPER / MORE on iPhone after Pages deploy; CENTER should remain visually unchanged from approved R15.
+3. If clean, move next to CENTER enrichment as a data/content improvement rather than another architecture/layout rewrite.
+4. Keep all frontend work read-only; no Baseline 6.2, server.js, Paper/live execution, sizing, risk or exits changes.
 5. Research remains isolated until evidence and explicit human approval justify promotion.
 
 ## Research isolation
