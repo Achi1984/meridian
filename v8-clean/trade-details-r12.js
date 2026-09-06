@@ -1,4 +1,4 @@
-// MERIDIAN v8 R13 — TRADE detail data hygiene
+// MERIDIAN v8 R17 — TRADE detail data hygiene
 // Read-only presentation layer. No order, margin, stop, sizing or execution writes.
 import {getJson} from './data.js';
 
@@ -17,10 +17,11 @@ function explicitNumber(obj,keys){
   }
   return null;
 }
-function usd(v,d=0){return Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—'}
-function pct(v,d=2){return Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+'%':'—'}
+function present(v){return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))}
+function usd(v,d=0){return present(v)?'$'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—'}
+function pct(v,d=2){return present(v)?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+'%':'—'}
 function price(v){
-  if(!Number.isFinite(Number(v)))return '—';
+  if(!present(v))return '—';
   const x=Number(v),digits=x<1?4:x<100?2:1;
   return '$'+x.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
 }
