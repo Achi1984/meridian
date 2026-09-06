@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run public 30/60/90d evidence
+      - name: Run locked 7-asset public 30/60/90d robustness evidence
         env:
           HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
           HYBRID_WINDOWS: 30,60,90
