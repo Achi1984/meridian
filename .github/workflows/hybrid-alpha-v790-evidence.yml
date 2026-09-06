@@ -6,6 +6,9 @@ on:
     paths:
       - 'hybrid-alpha-v1.js'
       - 'hybrid-alpha-backtest-v790.js'
+      - 'hybrid-alpha-reliability-v791.js'
+      - 'hybrid-alpha-macro-v792.js'
+      - 'hybrid-alpha-transition-v793.js'
       - 'scripts/hybrid-alpha-v790-evidence.mjs'
       - '.github/workflows/hybrid-alpha-v790-evidence.yml'
 
@@ -23,7 +26,7 @@ jobs:
           node-version: '22'
       - name: Run public 30/60/90d evidence
         env:
-          HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT
+          HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
           HYBRID_WINDOWS: 30,60,90
         run: node scripts/hybrid-alpha-v790-evidence.mjs
       - name: Upload evidence artifact
