@@ -34,12 +34,12 @@ test('R18 clears stale persisted live prices when public feed is unavailable',()
   assert.equal(out.livePriceMeta.reason,'fail');
 });
 
-test('R18 bootstrap guarantees adapter before app and does not disclose holding symbols in market query',()=>{
+test('R18 adapter loads before canonical app and does not disclose holding symbols in market query',()=>{
   const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
-  const bootstrap=fs.readFileSync(new URL('../v8-clean/bootstrap-r18.js',import.meta.url),'utf8');
   const adapter=fs.readFileSync(new URL('../v8-clean/live-price-adapter-r18.js',import.meta.url),'utf8');
-  assert.match(html,/bootstrap-r18\.js/);
-  assert.ok(bootstrap.indexOf('live-price-adapter-r18.js')<bootstrap.indexOf('app.js'));
+  assert.match(html,/live-price-adapter-r18\.js\?v=8\.0-r18/);
+  assert.match(html,/app\.js\?v=8\.0-r9/);
+  assert.ok(html.indexOf('live-price-adapter-r18.js')<html.indexOf('app.js'));
   assert.match(adapter,/api\/v3\/ticker\/price/);
   assert.doesNotMatch(adapter,/symbols=/);
   assert.doesNotMatch(adapter,/quantity/);
