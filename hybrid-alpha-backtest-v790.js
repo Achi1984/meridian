@@ -32,9 +32,14 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     const grossR=signedOutcome*d.riskMultiplier;
     // Cost is specified per 1.0 research-risk unit and therefore scales with position/risk.
     const netR=(signedOutcome-costR)*d.riskMultiplier;
-    rows.push({timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(grossR),costR:round(costR*d.riskMultiplier),netR:round(netR)});
+    const row={timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(grossR),costR:round(costR*d.riskMultiplier),netR:round(netR)};
+    // Preserve optional decision metadata for audit/drill-down without coupling the generic harness to one overlay.
+    for(const key of ['macroTrend','macroAlignment','macroRiskFactor','reliability']){
+      const value=n(d?.[key]);if(value!=null)row[key]=round(value);
+    }
+    rows.push(row);
   }
-  return {schemaVersion:'7.90-HYBRID-BACKTEST-V3',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
+  return {schemaVersion:'7.90-HYBRID-BACKTEST-V4',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
 }
 
 export function walkForwardSlices(samples=[],opts={}){
