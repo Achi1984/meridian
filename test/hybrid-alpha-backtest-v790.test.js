@@ -17,6 +17,16 @@ test('backtest is research-only and applies side, risk and costs',()=>{
   assert.equal(out.bySide.SHORT.trades,1);
 });
 
+test('transaction cost scales down with research risk multiplier',()=>{
+  const out=runHybridAlphaBacktest([
+    s('2026-01-01T00:00:00Z','ETHUSDT',1,{regime:'BULL',trend:.8,momentum:.8,relativeStrength:.6,orderFlow:.4,volatilityRatio:2,liquidityQuality:.5,reversalRisk:.4})
+  ],{costR:.10});
+  assert.equal(out.executedResearchTrades,1);
+  assert.ok(out.rows[0].riskMultiplier<1);
+  assert.ok(out.rows[0].costR<.10);
+  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V2');
+});
+
 test('observe samples do not become trades',()=>{
   const out=runHybridAlphaBacktest([s('2026-01-01T00:00:00Z','SOLUSDT',1,{regime:'BULL',trend:.1,momentum:.1})]);
   assert.equal(out.executedResearchTrades,0);
