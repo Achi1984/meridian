@@ -35,9 +35,10 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     const netR=(signedOutcome-costR)*d.riskMultiplier;
     const row={timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(grossR),costR:round(costR*d.riskMultiplier),netR:round(netR)};
     // Preserve optional decision metadata for audit/drill-down without coupling the generic harness to one overlay.
-    for(const key of ['macroTrend','macroAlignment','macroRiskFactor','reliability']){
+    for(const key of ['macroTrend','macroAlignment','macroRiskFactor','reliability','weakAlphaRiskFactor']){
       const value=n(d?.[key]);if(value!=null)row[key]=round(value);
     }
+    if(d?.weakAlphaBand!=null)row.weakAlphaBand=String(d.weakAlphaBand);
     // v7.95 attribution only: copy decision-time diagnostics. These fields do not affect the decision or outcome.
     for(const key of ['trend','momentum','relativeStrength','meanReversion','volatilityRatio','liquidityQuality','reversalRisk']){
       const value=n(features?.[key]);if(value!=null)row[key]=round(value);
@@ -47,7 +48,7 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     }
     rows.push(row);
   }
-  return {schemaVersion:'7.90-HYBRID-BACKTEST-V5',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
+  return {schemaVersion:'7.90-HYBRID-BACKTEST-V6',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
 }
 
 export function walkForwardSlices(samples=[],opts={}){
