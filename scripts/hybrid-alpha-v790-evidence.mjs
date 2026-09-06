@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import {runHybridAlphaBacktest,walkForwardSlices} from '../hybrid-alpha-backtest-v790.js';
 import {runReliabilityRouterBacktest} from '../hybrid-alpha-reliability-v791.js';
 import {hybridAlphaMacroDecision} from '../hybrid-alpha-macro-v792.js';
+import {hybridAlphaTransitionDecision} from '../hybrid-alpha-transition-v793.js';
 
 const BASE='https://api.exchange.coinbase.com';
 const SYMBOLS=(process.env.HYBRID_SYMBOLS||'BTCUSDT,ETHUSDT,SOLUSDT').split(',').map(x=>x.trim()).filter(Boolean);
@@ -19,7 +20,7 @@ const ret=(a,b)=>a&&b?a/b-1:null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const product=s=>`${s.replace(/USDT$/,'')}-USD`;
 
-async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-research/7.92','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
+async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-research/7.93','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
 async function candles(symbol){
   let cursor=START,out=[];const p=product(symbol),chunkMs=299*BAR_MS;
   while(cursor<=END){
@@ -69,11 +70,16 @@ function buildSamples(data,symbol,horizonBars){
   return out;
 }
 function sliceDays(samples,days){const cut=END-days*86400000;return samples.filter(x=>Date.parse(x.timestamp)>=cut)}
-function summarize(samples,costR,horizonMs){return {v1:{result:runHybridAlphaBacktest(samples,{costR}),walkForward:walkForwardSlices(samples,{costR,folds:3})},v791:runReliabilityRouterBacktest(samples,{costR,horizonMs,lookbackMs:60*86400000,minSamples:8,priorStrength:20}),v792:{result:runHybridAlphaBacktest(samples,{costR,decisionFn:hybridAlphaMacroDecision}),walkForward:walkForwardSlices(samples,{costR,folds:3,decisionFn:hybridAlphaMacroDecision})}}}
+function summarize(samples,costR,horizonMs){return {
+  v1:{result:runHybridAlphaBacktest(samples,{costR}),walkForward:walkForwardSlices(samples,{costR,folds:3})},
+  v791:runReliabilityRouterBacktest(samples,{costR,horizonMs,lookbackMs:60*86400000,minSamples:8,priorStrength:20}),
+  v792:{result:runHybridAlphaBacktest(samples,{costR,decisionFn:hybridAlphaMacroDecision}),walkForward:walkForwardSlices(samples,{costR,folds:3,decisionFn:hybridAlphaMacroDecision})},
+  v793:{result:runHybridAlphaBacktest(samples,{costR,decisionFn:hybridAlphaTransitionDecision}),walkForward:walkForwardSlices(samples,{costR,folds:3,decisionFn:hybridAlphaTransitionDecision})}
+}}
 
 const data={};for(const s of SYMBOLS){console.log(`fetch ${s}`);data[s]=await candles(s)}if(!data.BTCUSDT)throw new Error('BTCUSDT required for market regime / relative strength');
 const horizons={h4:16,h12:48,h24:96};
-const evidence={schemaVersion:'7.92-HYBRID-EVIDENCE-V1',generatedAt:new Date().toISOString(),cutoff:new Date(END).toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Cutoff is anchored to latest completed 15m candle and decisions to UTC horizon boundaries.','Decision-time trend blends closed 15m,1h,4h evidence.','v7.92 macroTrend uses only prior BTC 7d/30d volatility-normalized drift and only attenuates opposing-side risk.','No funding/carry or true order-flow input; missing evidence is not fabricated.','Forward labels do not overlap within each symbol/horizon.']};
+const evidence={schemaVersion:'7.93-HYBRID-EVIDENCE-V1',generatedAt:new Date().toISOString(),cutoff:new Date(END).toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Cutoff is anchored to latest completed 15m candle and decisions to UTC horizon boundaries.','Decision-time trend blends closed 15m,1h,4h evidence.','v7.92 macroTrend uses only prior BTC 7d/30d volatility-normalized drift and only attenuates opposing-side risk.','v7.93 predeclares one soft factor: TRANSITION×SHORT risk is multiplied by 0.60; no trade is blocked and no LONG risk is boosted.','No funding/carry or true order-flow input; missing evidence is not fabricated.','Forward labels do not overlap within each symbol/horizon.']};
 for(const [name,bars] of Object.entries(horizons)){const all=SYMBOLS.flatMap(s=>buildSamples(data,s,bars));evidence.horizons[name]={};for(const days of WINDOWS)evidence.horizons[name][`${days}d`]=summarize(sliceDays(all,days),0.03,bars*BAR_MS)}
 await fs.mkdir('artifacts',{recursive:true});await fs.writeFile('artifacts/hybrid-alpha-v790-evidence.json',JSON.stringify(evidence,null,2));
-console.log(JSON.stringify(Object.fromEntries(Object.entries(evidence.horizons).map(([h,w])=>[h,Object.fromEntries(Object.entries(w).map(([k,v])=>[k,{v1:v.v1.result.summary,v791:v.v791.summary,v792:v.v792.result.summary}]))])),null,2));
+console.log(JSON.stringify(Object.fromEntries(Object.entries(evidence.horizons).map(([h,w])=>[h,Object.fromEntries(Object.entries(w).map(([k,v])=>[k,{v1:v.v1.result.summary,v791:v.v791.summary,v792:v.v792.result.summary,v793:v.v793.result.summary}]))])),null,2));
