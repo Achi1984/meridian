@@ -81,22 +81,31 @@
 - Known Challenger Baseline-READY dependency remains flagged; no promotion.
 
 ## Clean R18 — PAPER Cohort Board
-- Branch: `feature/v8-paper-cohort-board-r18`, PR #65.
+- PR #65 merged to main at `d3fc44c7174f432c5e53680a52409d6e2882dfaa`.
 - Read-only module `v8-clean/paper-cohort-r18.js` reads protected `/api/research-analytics` and surfaces Challenger V2 cohort evidence directly inside PAPER.
 - Compact sections: SIDE / REGIME / ASSET, with Challenger expectancy, PF, delta expectancy and sample adequacy.
 - No private values are committed; the board renders only runtime protected telemetry.
 - No server.js, Baseline, execution, Pionex or research-promotion changes.
 
+## Clean R18 — near-live Spot portfolio valuation
+- PR #70 fixes a separate stale-price issue discovered from CENTER remaining at `$27.313` despite the existing 30-second visible-view refresh.
+- Root cause: `/api/private/dashboard` returns persisted PostgreSQL private state and its `livePrices` field can itself be stale; repeated UI fetches therefore re-read the same prices.
+- The browser now overlays fresh public Binance spot prices on protected dashboard GET responses before the existing canonical `spot + trading` valuation runs.
+- Privacy rule: the adapter downloads the full public ticker table; held symbols, quantities and venues are never sent to Binance as holding-specific query parameters.
+- Wrapped exposure aliases are preserved for pricing (`BETH -> ETH`, `OKSOL -> SOL`); USD/USDT/USDC/FDUSD/DAI are valued at 1 USD. Unsupported assets keep the existing holding/snapshot fallback rather than receiving invented prices.
+- If the public market feed is unavailable, persisted `livePrices` are cleared for that read so stale prices are not mislabeled as live.
+- Spot valuation is near-live at the existing 30-second visible-view cadence. Pionex/Trading equity remains the protected snapshot/manual value; the aggregate total is therefore not claimed to be fully exchange-live.
+- R18 is read-only frontend valuation: no private write, no holdings mutation, no `server.js`, no Pionex-bot, no Baseline or execution change.
+
 ## Current next steps
-1. Merge R18 only after Release Safety is green on the exact final head.
-2. Validate the PAPER cohort board on iPhone and inspect the real private SIDE / REGIME / ASSET results.
-3. Use adequate cohorts only to explain Challenger V2 improvement and the positive excluded counterfactual R; do not tune from tiny samples.
-4. Continue Hybrid Alpha V1 as a separate research branch; no execution connection.
-5. Pionex bots remain unchanged unless explicitly re-opened by the user.
+1. Validate R18 near-live Spot valuation on iPhone after production deployment; compare CENTER/DEPOT across at least two 30-second refreshes.
+2. Continue Hybrid Alpha v7.96 as isolated RESEARCH ONLY; evaluate 30/60/90d and chronological folds before any further hypothesis.
+3. Do not tune factors, drop assets, or hard-gate regimes after seeing the v7.94/v7.95 evidence.
+4. Pionex bots remain unchanged unless explicitly re-opened by the user.
 
 ## Research isolation
 - v7.86 Retest/Hold Breakout V2 remains research-only and separate.
 - v7.79 prospective holdout remains locked/prospective.
 - Meta Allocator remains research-only.
-- v7.89 Hybrid Alpha V1 is being researched separately as a soft, regime-aware thesis blend.
+- v7.89–v7.96 Hybrid Alpha programme remains isolated research; no execution connection.
 - No research result auto-promotes into Paper/live execution.
