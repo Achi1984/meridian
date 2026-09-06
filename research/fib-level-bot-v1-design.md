@@ -55,6 +55,8 @@ Each level may fill only once per setup.
 - TP2: frozen 0.000 impulse extreme; close the remainder.
 - If stop and target are both reachable inside one candle, apply stop first.
 - A same-candle entry and stop is permitted and resolved conservatively at the stop.
+- A target cannot be credited on the same candle as a new fill; target processing starts on the next candle. The stop is active immediately.
+- After TP1, all still-unfilled ladder levels are cancelled; the remaining open basket alone continues to TP2 or stop.
 - Before the first fill, a newer valid confirmed swing may replace the pending map.
 - After the first fill, anchors and levels remain frozen until TP2 or stop.
 - Open baskets at the evidence cutoff are reported separately and excluded from closed-trade PF/expectancy. No invented terminal mark-to-market exit.
@@ -72,3 +74,10 @@ Each level may fill only once per setup.
 V1 is not promotionsfähig unless the primary 1h/365d result has PF > 1, positive expectancy, tolerable drawdown, both LONG and SHORT are not materially structurally broken, results are not dominated by one asset or one FIB level, and all three chronological folds are credible. Aggregate success with a negative middle fold or inadequate breadth is a failure.
 
 No parameter, pivot width, ATR multiple, level, tranche weight, stop, target, cost, symbol or timeframe may be changed after evidence is observed. Any later variant must be a new predeclared research version.
+
+## Deterministic implementation clarifications locked before evidence
+
+- A pivot high must be strictly higher than all six surrounding comparison highs; a pivot low must be strictly lower than all six surrounding lows.
+- Same-type confirmed pivots retain only the more extreme price before an alternating leg is accepted.
+- Descriptive regime telemetry uses only information known at setup creation: EMA(50), EMA(200) and ATR(14) of the same symbol/timeframe. RANGE means EMA spread <= 0.50 ATR; otherwise aligned close/EMA structure labels BULL or BEAR, with remaining cases TRANSITION. This label never changes a decision.
+- Multi-symbol equity and drawdown are ordered by basket close time.
