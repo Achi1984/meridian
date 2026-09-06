@@ -1,0 +1,38 @@
+name: Hybrid Alpha v7.96 Weak Alpha Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'hybrid-alpha-weak-v796.js'
+      - 'hybrid-alpha-backtest-v790.js'
+      - 'scripts/hybrid-alpha-v790-evidence.mjs'
+      - 'scripts/hybrid-alpha-v796-evidence.mjs'
+      - 'test/hybrid-alpha-weak-v796.test.js'
+      - '.github/workflows/hybrid-alpha-v796-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run locked 7-asset base evidence
+        env:
+          HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
+          HYBRID_WINDOWS: 30,60,90
+        run: node scripts/hybrid-alpha-v790-evidence.mjs
+      - name: Run v7.96 weak-alpha evidence
+        run: node scripts/hybrid-alpha-v796-evidence.mjs
+      - name: Upload v7.96 evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-alpha-v796-evidence
+          path: artifacts/hybrid-alpha-v796-evidence.json
+          if-no-files-found: error
