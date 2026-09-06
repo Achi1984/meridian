@@ -123,3 +123,10 @@ This section supersedes earlier research next-step text where it conflicts.
 - All FIB and Hybrid work remains isolated from production, Paper/live execution and Pionex.
 - R18 physical iPhone validation across two ~30-second cycles remains pending and must not be marked complete without user observation.
 - Next research must be structurally new and leakage-free; no additional threshold, pivot, asset, side, regime or FIB-level tuning.
+
+
+## R18 iPhone validation — completed
+
+Production screenshots supplied by the user at 20:18 show CENTER `$27,846` and DEPOT `$27,867`, versus the previously suspicious static value near `$27,313`. DEPOT reconciles as Spot `$26,972` + Trading/Bots `$896` ≈ `$27,868`, with one-dollar display rounding. The `$21` CENTER/DEPOT delta is only about `0.075%` and is plausible across independently timed refreshes.
+
+Decision: R18 near-live spot valuation is validated on iPhone. Do not investigate backend execution or Pionex. Trading/Bots remains snapshot/manual, so the aggregate must not be described as fully exchange-live.
