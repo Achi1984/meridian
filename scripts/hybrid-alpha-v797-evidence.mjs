@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 
 const INPUT='artifacts/hybrid-alpha-v796-evidence.json';
+const BASE_INPUT='artifacts/hybrid-alpha-v790-evidence.json';
 const OUTPUT='artifacts/hybrid-alpha-v797-evidence.json';
 const FACTOR=0.60;
 const THRESHOLD=0.50;
@@ -31,14 +32,15 @@ function transformResult(result){
 function transformFold(f){return {...f,result:transformResult(f.result)}}
 
 const base=JSON.parse(await fs.readFile(INPUT,'utf8'));
-const out={schemaVersion:'7.97-HYBRID-LOW-LIQUIDITY-EVIDENCE-V1',generatedAt:new Date().toISOString(),cutoff:base.cutoff,researchOnly:true,executionImpact:false,source:base.source,symbols:base.symbols,windows:base.windows,predeclared:{lowLiquidityThreshold:THRESHOLD,factor:FACTOR,tradeBlocking:false},horizons:{},notes:['Derived exactly from frozen v7.96 rows: v7.97 adds only research-risk attenuation when decision-time liquidityQuality <0.50.','Side selection and trade count are unchanged.','Existing 0.60 factor reused; no factor or threshold tuning.']};
+const frozen=JSON.parse(await fs.readFile(BASE_INPUT,'utf8'));
+const out={schemaVersion:'7.97-HYBRID-LOW-LIQUIDITY-EVIDENCE-V1',generatedAt:new Date().toISOString(),cutoff:base.cutoff,researchOnly:true,executionImpact:false,source:base.source,symbols:base.symbols,windows:base.windows,predeclared:{lowLiquidityThreshold:THRESHOLD,factor:FACTOR,tradeBlocking:false},horizons:{},notes:['Derived exactly from frozen v7.96 rows: v7.97 adds only research-risk attenuation when decision-time liquidityQuality <0.50.','Side selection and trade count are unchanged.','Existing 0.60 factor reused; no factor or threshold tuning.','Frozen v7.93 concentration telemetry is copied from the same base run for direct three-way comparison.']};
 for(const [h,windows] of Object.entries(base.horizons||{})){
   out.horizons[h]={};
   for(const [w,block] of Object.entries(windows||{})){
-    const v793=block?.v793;
+    const frozenV793=frozen?.horizons?.[h]?.[w]?.v793;
     const v796=block?.v796;
-    if(!v796?.result)continue;
-    out.horizons[h][w]={v793,v796:{summary:v796.result.summary,bySide:v796.result.bySide,byRegime:v796.result.byRegime,bySymbol:v796.result.bySymbol,walkForward:(v796.walkForward||[]).map(f=>({fold:f.fold,start:f.start,end:f.end,summary:f.result?.summary}))},v797:{result:transformResult(v796.result),walkForward:(v796.walkForward||[]).map(transformFold)}};
+    if(!frozenV793?.result||!v796?.result)continue;
+    out.horizons[h][w]={v793:{summary:frozenV793.result.summary,bySide:frozenV793.result.bySide,byRegime:frozenV793.result.byRegime,bySymbol:frozenV793.result.bySymbol,walkForward:(frozenV793.walkForward||[]).map(f=>({fold:f.fold,start:f.start,end:f.end,summary:f.result?.summary}))},v796:{summary:v796.result.summary,bySide:v796.result.bySide,byRegime:v796.result.byRegime,bySymbol:v796.result.bySymbol,walkForward:(v796.walkForward||[]).map(f=>({fold:f.fold,start:f.start,end:f.end,summary:f.result?.summary}))},v797:{result:transformResult(v796.result),walkForward:(v796.walkForward||[]).map(transformFold)}};
   }
 }
 await fs.mkdir('artifacts',{recursive:true});
