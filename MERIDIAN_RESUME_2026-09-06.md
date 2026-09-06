@@ -4,16 +4,20 @@
 - Canonical repository: `Achi1984/meridian`; production default branch `main`.
 - Baseline `6.2.0 / 6.2-SIGNAL-V1` is frozen. No live trading. No research auto-promotion.
 - Five production root views: CENTER / DEPOT / TRADE / PAPER / MORE.
-- Current production UI work through R17/R18 remains read-only. Pionex bots are explicitly out of scope for now.
+- Current production UI work through R18 remains read-only. Pionex bots are explicitly out of scope for now.
 - Current Pionex risk snapshot seen in UI: BTC-S30 WATCH 8.99% buffer, HBAR-L3 SAFE 27.33%, XRP-L5 SAFE 40.65%; do not modify unless user explicitly reopens Pionex work.
 
-## Portfolio valuation finding
+## Portfolio valuation finding + fix
 - User noticed CENTER repeatedly showing roughly `$27.313`, raising suspicion that the total was not actually live.
 - Existing `v8-clean/data.js` computes spot from holdings using `portfolio.livePrices` when present, then adds protected Pionex/trading equity.
-- Re-fetching `/api/private/dashboard` with `cache:no-store` does not guarantee fresh prices if the backend's persisted `livePrices` are stale.
-- Current handoff records a Clean R18 near-live Spot valuation approach: overlay fresh public Binance ticker prices client-side onto the protected dashboard snapshot, preserve aliases `BETH -> ETH` and `OKSOL -> SOL`, stablecoins at 1 USD, and retain canonical fallback for unsupported assets.
-- Important semantic constraint: Spot can be near-live on the frontend refresh cadence; Pionex/trading equity remains protected snapshot/manual data, so total portfolio must not be labeled fully exchange-live unless that trading component becomes live too.
-- Next validation: observe CENTER/DEPOT across at least two refresh cycles and verify value movement while coin prices move.
+- Root cause: `/api/private/dashboard` can return persisted PostgreSQL `livePrices`; repeated browser GETs with `cache:no-store` may therefore re-read the same stale market snapshot.
+- Clean R18 / PR #70 is merged. It overlays fresh public Binance spot ticker prices in-browser onto the protected dashboard snapshot before existing canonical `spot + trading` valuation runs.
+- Privacy rule: the browser fetches the full public ticker table; held symbols, quantities and venues are not sent as holding-specific Binance query parameters.
+- Pricing aliases preserved: `BETH -> ETH`, `OKSOL -> SOL`; USD/USDT/USDC/FDUSD/DAI are treated as 1 USD; unsupported assets keep the canonical fallback instead of receiving invented prices.
+- If the public feed is unavailable, persisted stale `livePrices` are cleared for that read so stale values are not mislabeled as live.
+- Spot valuation is near-live at the existing visible-view refresh cadence (~30s). Pionex/trading equity remains protected snapshot/manual data, therefore the aggregate total must not be called fully exchange-live.
+- PR #70 exact final head `53c20a90080dd35ec6944c20d5973ba7cc8c375f`, merge commit `11c22b128feb1d88f69fa5c12f411bd772cee609`, Release Safety #787 green.
+- Next validation in the new chat: observe CENTER and DEPOT across at least two 30-second refresh cycles while prices move and verify the value changes coherently.
 
 ## Paperbot / Challenger findings
 - Challenger V2 is the strongest legacy paperbot but still not promoted.
@@ -76,22 +80,42 @@ Two clean repeated failure states emerged:
 1. WEAK alpha `|alpha| 0.20–0.35`: fold2 n=52, EXP `-0.507R`; full 90d n=129, EXP `-0.261R`; negative in the other folds too.
 2. LOW liquidity `<0.50`: fold2 n=14, EXP `-1.411R`; full 90d n=52, EXP `-0.878R`; negative in the other folds too.
 Descriptive but not promoted to rules: `BULL × macro-aligned` and `LONG × macro-aligned` are negative across folds, likely requiring interpretation as overextension rather than universal anti-trend evidence.
+- PR #69 remains draft / research only. Exact-head Release Safety #780 and exact-head Failure Attribution run #44 both completed green on head `f0b42dbb292ed673016830643de60e49dda7daee`.
 
-### v7.96 next hypothesis
+### v7.96 weak-alpha risk attenuation — completed evidence
 - Isolated branch: `research/hybrid-alpha-v796-weak-alpha`.
-- Test exactly one hypothesis: WEAK-alpha risk attenuation for `|alpha| 0.20–0.35` using the already-existing fixed factor `0.60`.
-- No new parameter search, no hard gate, no trade blocking, no asset dropping, no factor tuning after seeing evidence.
-- Required evaluation: 30/60/90d, same 7-asset universe, 24h primary horizon, chronological 3-fold walk-forward, PF/EXP/DD/trade count, and compare directly against frozen v7.93.
-- Promotion remains prohibited unless common-window/OOS robustness, sample adequacy, positive expectancy/PF, acceptable DD, useful coverage and stability all pass with explicit human approval.
+- Candidate was locked before the run: for `|alpha|` in `[0.20, 0.35)`, multiply existing v7.93 research risk by the already-used factor `0.60`.
+- No new parameter search, no hard gate, no trade blocking, no asset dropping, no factor tuning after evidence.
+- 24h primary horizon versus frozen v7.93:
+  - 30d: PF `1.82 -> 1.96`; EXP `+1.473R -> +1.490R`; DD `46.753R -> 37.511R`; trades `131 -> 131`.
+  - 60d: PF `1.11 -> 1.15`; EXP `+0.233R -> +0.281R`; DD `144.889R -> 123.038R`; trades `274 -> 274`.
+  - 90d: PF `1.25 -> 1.32`; EXP `+0.470R -> +0.502R`; DD `125.899R -> 112.760R`; trades `421 -> 421`.
+- This is a genuine aggregate improvement on all three 24h windows with unchanged opportunity count.
+- 90d chronological folds under v7.96:
+  - Fold 1: PF `1.89`, EXP `+0.914R`, DD `27.406R`, 147 trades.
+  - Fold 2: PF `0.62`, EXP `-0.847R`, DD `126.798R`, 140 trades.
+  - Fold 3: PF `1.96`, EXP `+1.459R`, DD `118.890R`, 134 trades.
+- The middle fold remains materially negative. Chronological robustness still fails, therefore NO PROMOTION.
+- Horizon specificity matters: 4h remains negative and v7.96 slightly worsens it; 12h is mixed and weakened; 24h is the only horizon with consistent aggregate improvement.
+- Do not generalize v7.96 across horizons. Do not tune `0.60` or the `[0.20,0.35)` band.
+- Exact-head evidence run #3 on head `9f07a2c5b1f2d7919b2a917e3e5b798d759bf3f9`; artifact `9988042124`; digest `sha256:67475d7d66738a22fecf6f1db0da021b40b80a9ac253922663b6f0ba055cfc49`; cutoff `2026-09-06T10:45:00Z`.
+- Branch current head `b4478ff632ea7eb172f3aaba19da9cb38988e85e` pins the exact-head evidence reference.
 
 ## Research branches / PRs
 - PR #67: v7.89–v7.93 Hybrid Alpha research, draft/no promotion.
 - PR #68: v7.94 7-asset robustness gate, draft/no promotion.
 - PR #69: v7.95 failure-state attribution, draft/no promotion.
-- v7.96 branch exists for weak-alpha attenuation research.
+- v7.96 branch `research/hybrid-alpha-v796-weak-alpha`: evidence complete, still isolated/no promotion.
 - v7.79 prospective holdout remains locked and separate.
 - v7.86 Retest/Hold Breakout V2 remains separate research.
 - Meta Allocator remains design/research only.
+
+## Immediate next actions for new chat
+1. First read `MERIDIAN_RESUME_2026-09-06.md` and `MERIDIAN_HANDOFF.md` from canonical GitHub before changing code.
+2. Validate Clean R18 near-live portfolio value on iPhone across at least two ~30s refresh cycles; if stale, inspect only the read-only market overlay/refresh path first, not backend execution.
+3. Continue Hybrid Alpha from v7.96 evidence. The unresolved research problem is the persistent negative middle chronological fold. Any v7.97 hypothesis must be independently predeclared from already-known evidence; do not optimize against Fold 2 after seeing it.
+4. Strong candidate for future research from v7.95 is LOW liquidity `<0.50`, but it must be tested as one isolated soft risk attenuation hypothesis, not combined with weak-alpha changes in the same experiment unless predeclared as a separate interaction study.
+5. Pionex bots remain unchanged unless the user explicitly reopens them.
 
 ## Hard invariants for next chat
 - Pionex bots stay untouched for now.
