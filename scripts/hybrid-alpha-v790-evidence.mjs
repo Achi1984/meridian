@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import {runHybridAlphaBacktest,walkForwardSlices} from '../hybrid-alpha-backtest-v790.js';
+import {runReliabilityRouterBacktest} from '../hybrid-alpha-reliability-v791.js';
 
 const BASE='https://api.exchange.coinbase.com';
 const SYMBOLS=(process.env.HYBRID_SYMBOLS||'BTCUSDT,ETHUSDT,SOLUSDT').split(',').map(x=>x.trim()).filter(Boolean);
@@ -17,7 +18,7 @@ const ret=(a,b)=>a&&b?a/b-1:null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const product=s=>`${s.replace(/USDT$/,'')}-USD`;
 
-async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-research/7.90','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
+async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-research/7.91','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
 async function candles(symbol){
   let cursor=START,out=[];const p=product(symbol),chunkMs=299*BAR_MS;
   while(cursor<END){
@@ -82,18 +83,23 @@ function buildSamples(data,symbol,horizonBars){
   return out;
 }
 function sliceDays(samples,days){const cut=END-days*86400000;return samples.filter(x=>Date.parse(x.timestamp)>=cut)}
-function summarize(samples,costR){return {result:runHybridAlphaBacktest(samples,{costR}),walkForward:walkForwardSlices(samples,{costR,folds:3})}}
+function summarize(samples,costR,horizonMs){
+  return {
+    v1:{result:runHybridAlphaBacktest(samples,{costR}),walkForward:walkForwardSlices(samples,{costR,folds:3})},
+    v791:runReliabilityRouterBacktest(samples,{costR,horizonMs,lookbackMs:60*86400000,minSamples:8,priorStrength:20})
+  };
+}
 
 const data={};
 for(const s of SYMBOLS){console.log(`fetch ${s}`);data[s]=await candles(s)}
 if(!data.BTCUSDT)throw new Error('BTCUSDT required for market regime / relative strength');
 const horizons={h4:16,h12:48,h24:96};
-const evidence={schemaVersion:'7.90-HYBRID-EVIDENCE-V3',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Decision-time trend blends closed 15m, 1h and 4h evidence; no future candles enter the feature snapshot.','Forward labels are sampled at the horizon stride, so outcome windows do not overlap.','No funding/carry or true order-flow input in this first public-candle evidence pass; missing evidence is renormalized by Hybrid Alpha V1.','Coinbase base volume is converted to approximate quote volume only for a soft liquidity-quality haircut.','forwardR is future return divided by decision-time ATR14 percent; it is a normalized research outcome, not Baseline TP/SL R.']};
+const evidence={schemaVersion:'7.91-HYBRID-EVIDENCE-V1',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Decision-time trend blends closed 15m, 1h and 4h evidence; no future candles enter the feature snapshot.','Forward labels are sampled at the horizon stride, so outcome windows do not overlap.','No funding/carry or true order-flow input in this first public-candle evidence pass; missing evidence is renormalized by Hybrid Alpha V1.','v7.91 reliability uses only earlier matured outcomes inside a 60d lookback; it can only attenuate V1 risk and never hard-blocks a cohort.','forwardR is future return divided by decision-time ATR14 percent; it is a normalized research outcome, not Baseline TP/SL R.']};
 for(const [name,bars] of Object.entries(horizons)){
   const all=SYMBOLS.flatMap(s=>buildSamples(data,s,bars));
   evidence.horizons[name]={};
-  for(const days of WINDOWS)evidence.horizons[name][`${days}d`]=summarize(sliceDays(all,days),0.03);
+  for(const days of WINDOWS)evidence.horizons[name][`${days}d`]=summarize(sliceDays(all,days),0.03,bars*BAR_MS);
 }
 await fs.mkdir('artifacts',{recursive:true});
 await fs.writeFile('artifacts/hybrid-alpha-v790-evidence.json',JSON.stringify(evidence,null,2));
-console.log(JSON.stringify(Object.fromEntries(Object.entries(evidence.horizons).map(([h,w])=>[h,Object.fromEntries(Object.entries(w).map(([k,v])=>[k,v.result.summary]))])),null,2));
+console.log(JSON.stringify(Object.fromEntries(Object.entries(evidence.horizons).map(([h,w])=>[h,Object.fromEntries(Object.entries(w).map(([k,v])=>[k,{v1:v.v1.result.summary,v791:v.v791.summary}]))])),null,2));
