@@ -1,0 +1,1 @@
+Implementation plan: preserve decision-time feature diagnostics in research backtest rows; add deterministic state attribution for 24h/90d v7.93 and its chronological folds; upload a standalone v7.95 attribution artifact; do not alter decisions.
