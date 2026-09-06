@@ -8,6 +8,7 @@ on:
       - 'scripts/fib-level-bot-v3-holdout.mjs'
       - 'test/fib-level-bot-v3-holdout.test.js'
       - 'research/fib-level-bot-v3-prospective-holdout-protocol.md'
+      - 'research/fib-level-bot-v3-holdout-boundary-note.md'
       - '.github/workflows/fib-level-bot-v3-prospective-holdout.yml'
 
 permissions:
