@@ -26,7 +26,8 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
   for(const s of samples){
     const outcome=n(s?.forwardR);
     if(outcome==null){invalid++;continue}
-    const d=decisionFn(s?.features||s||{});
+    const features=s?.features||s||{};
+    const d=decisionFn(features);
     if(d.side==='OBSERVE'){observed++;continue}
     const signedOutcome=(d.side==='LONG'?1:-1)*outcome;
     const grossR=signedOutcome*d.riskMultiplier;
@@ -37,9 +38,16 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     for(const key of ['macroTrend','macroAlignment','macroRiskFactor','reliability']){
       const value=n(d?.[key]);if(value!=null)row[key]=round(value);
     }
+    // v7.95 attribution only: copy decision-time diagnostics. These fields do not affect the decision or outcome.
+    for(const key of ['trend','momentum','relativeStrength','meanReversion','volatilityRatio','liquidityQuality','reversalRisk']){
+      const value=n(features?.[key]);if(value!=null)row[key]=round(value);
+    }
+    for(const [src,dst] of [['trend15m','trend15m'],['trend1h','trend1h'],['trend4h','trend4h']]){
+      const value=n(features?.timeframeEvidence?.[src]);if(value!=null)row[dst]=round(value);
+    }
     rows.push(row);
   }
-  return {schemaVersion:'7.90-HYBRID-BACKTEST-V4',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
+  return {schemaVersion:'7.90-HYBRID-BACKTEST-V5',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
 }
 
 export function walkForwardSlices(samples=[],opts={}){
