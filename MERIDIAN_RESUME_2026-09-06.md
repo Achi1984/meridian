@@ -195,3 +195,17 @@ All FIB work is isolated, research-only and disconnected from Paper/live/Pionex.
 3. Do not perform further Hybrid Alpha threshold search; choose structurally new leakage-free evidence before another experiment.
 4. Keep PRs #67–#69 and #73–#77 draft/research-only until deliberate review.
 5. Pionex bots, Baseline 6.2, `server.js` and Paper/live execution remain untouched.
+
+
+## R18 iPhone production validation — completed 2026-09-06
+
+User-supplied iPhone screenshots at 20:18 local time validate that the near-live spot overlay is no longer stuck at the earlier approximately `$27,313` value.
+
+- CENTER displayed `$27,846`.
+- DEPOT displayed `$27,867`.
+- DEPOT components: Spot `$26,972` plus Trading/Bots `$896` = approximately `$27,868`; the displayed one-dollar difference is consistent with component rounding.
+- CENTER vs DEPOT difference: `$21` or about `0.075%`, plausible for independently timed visible-view refreshes while public spot prices move.
+- DEPOT 1D showed high `$27,989`, low `$27,349`, and approximately `+1.17%`; the current value lies inside that range.
+- Conclusion: R18 near-live browser pricing behaves plausibly in production. The stale `$27,313` symptom is not reproduced.
+- This validates only spot/portfolio presentation. Trading/Bots equity remains snapshot/manual and the aggregate is not fully exchange-live.
+- No backend execution, `server.js`, Paper/live trading or Pionex change is warranted.
