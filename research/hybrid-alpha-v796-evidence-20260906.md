@@ -2,9 +2,10 @@
 
 Status: RESEARCH ONLY — NO PROMOTION.
 
-Evidence run: GitHub Actions `Hybrid Alpha v7.96 Weak Alpha Evidence` run #1.
-Artifact: `9987935487`.
-Digest: `sha256:02655147b818529ae09d62fce8174ca256bcaafb11ef08d2fbe4d45efa49a56d`.
+Exact-head evidence run: GitHub Actions `Hybrid Alpha v7.96 Weak Alpha Evidence` run #3 on head `9f07a2c5b1f2d7919b2a917e3e5b798d759bf3f9`.
+Artifact: `9988042124`.
+Digest: `sha256:67475d7d66738a22fecf6f1db0da021b40b80a9ac253922663b6f0ba055cfc49`.
+Cutoff: `2026-09-06T10:45:00.000Z`.
 Universe locked: BTC, ETH, SOL, XRP, ADA, AVAX, LINK.
 Candidate change locked before the run: if `|alpha|` is in `[0.20, 0.35)`, multiply existing v7.93 research risk by the already-used factor `0.60`. Side selection and trade count stay unchanged.
 
