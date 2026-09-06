@@ -28,10 +28,12 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     const d=hybridAlphaDecision(s?.features||s||{});
     if(d.side==='OBSERVE'){observed++;continue}
     const signedOutcome=(d.side==='LONG'?1:-1)*outcome;
-    const netR=signedOutcome*d.riskMultiplier-costR;
-    rows.push({timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(signedOutcome*d.riskMultiplier),netR:round(netR)});
+    const grossR=signedOutcome*d.riskMultiplier;
+    // Cost is specified per 1.0 research-risk unit and therefore scales with position/risk.
+    const netR=(signedOutcome-costR)*d.riskMultiplier;
+    rows.push({timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(grossR),costR:round(costR*d.riskMultiplier),netR:round(netR)});
   }
-  return {schemaVersion:'7.90-HYBRID-BACKTEST-V1',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
+  return {schemaVersion:'7.90-HYBRID-BACKTEST-V2',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
 }
 
 export function walkForwardSlices(samples=[],opts={}){
