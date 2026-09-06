@@ -7,8 +7,8 @@ const src=fs.readFileSync(new URL('../scripts/hybrid-alpha-v790-evidence.mjs',im
 test('evidence runner stays research-only and public-data based',()=>{
   assert.match(src,/researchOnly:true/);
   assert.match(src,/executionImpact:false/);
-  assert.match(src,/fapi\.binance\.com/);
-  assert.doesNotMatch(src,/order|placeOrder|server\.js|pionex/i);
+  assert.match(src,/api\.exchange\.coinbase\.com/);
+  assert.doesNotMatch(src,/placeOrder|server\.js|pionex/i);
 });
 
 test('forward outcomes are non-overlapping and use decision-time ATR normalization',()=>{
@@ -23,7 +23,8 @@ test('trend contains 15m 1h and 4h decision-time evidence',()=>{
   assert.match(src,/closedBucketEma/);
 });
 
-test('missing carry is documented rather than fabricated',()=>{
-  assert.match(src,/No funding\/carry input/);
+test('missing carry and order flow are documented rather than fabricated',()=>{
+  assert.match(src,/No funding\/carry or true order-flow input/);
   assert.doesNotMatch(src,/carry:/);
+  assert.doesNotMatch(src,/orderFlow:/);
 });
