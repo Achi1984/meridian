@@ -1,0 +1,76 @@
+/* MERIDIAN v8 R16 — cross-view density & consistency only.
+   Presentation-only: no data, navigation, research or execution behavior changes. */
+
+@media (max-width:520px){
+  /* DEPOT: give the chart more room and keep the history source from dominating. */
+  #view-depot .depot-performance{
+    grid-template-columns:minmax(92px,.52fr) minmax(0,1.78fr);
+    gap:8px;
+  }
+  #view-depot .perf-card{
+    padding:10px 9px;
+  }
+  #view-depot .perf-card b{
+    margin-top:6px;
+    font-size:17px;
+  }
+  #view-depot .perf-card small{
+    margin-top:6px;
+    font-size:8px;
+    line-height:1.28;
+    overflow-wrap:anywhere;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:3;
+    overflow:hidden;
+  }
+  #view-depot .depot-split{margin-bottom:8px}
+  #view-depot .positions{padding-top:13px}
+  #view-depot .position-row{padding:10px 0}
+
+  /* TRADE: preserve all detail fields but reduce vertical travel. */
+  #view-trade .trade-r12-host{padding-top:13px}
+  #view-trade .trade-r12-hint{margin:6px 0 8px;font-size:8px;line-height:1.35}
+  #view-trade .trade-r12-bot{margin-top:7px}
+  #view-trade .trade-r12-bot summary{padding:10px 11px}
+  #view-trade .trade-r12-bot summary small{margin-top:3px}
+  #view-trade .trade-r12-detail{padding:8px 10px 10px}
+  #view-trade .trade-r12-ladder{margin-bottom:8px}
+  #view-trade .trade-r12-ladder span{padding:5px 3px;font-size:6.5px}
+  #view-trade .trade-r12-grid{gap:5px}
+  #view-trade .trade-r12-grid>div{padding:7px 8px}
+  #view-trade .trade-r12-grid b{margin-top:4px;font-size:10px}
+  #view-trade .trade-r12-safe{margin-top:7px;padding:8px 9px}
+  #view-trade .trade-r12-safe b{margin-top:4px;font-size:10px}
+
+  /* PAPER: make comparison the primary surface, secondary analysis denser. */
+  #view-paper .paper-hero{padding:13px 14px 12px}
+  #view-paper .paper-state{font-size:36px;margin-top:6px;line-height:1}
+  #view-paper .paper-hero .muted{margin:8px 0 0;font-size:10px;line-height:1.3}
+  #view-paper .paper-metrics{margin-bottom:8px}
+  #view-paper .research-board{padding:12px 13px}
+  #view-paper .research-row{padding:10px 0}
+  #view-paper .research-head span{font-size:12px}
+  #view-paper .research-head b{margin-top:3px;font-size:7px}
+  #view-paper .research-pnl{font-size:14px}
+  #view-paper .research-metrics{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}
+  #view-paper .research-metrics small{font-size:7px}
+  #view-paper .research-metrics small b{margin-top:3px;font-size:9px}
+  #view-paper .research-metrics small:last-child{grid-column:1/-1;margin-top:1px}
+  #view-paper .paper-oc{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  #view-paper .paper-oc>div{padding:8px 7px}
+  #view-paper .paper-oc span{font-size:6px;line-height:1.2}
+  #view-paper .paper-oc b{margin-top:4px;font-size:13px}
+  #view-paper .audit{padding:12px 13px}
+  #view-paper .audit-row{padding:7px 0;font-size:8px;line-height:1.35}
+
+  /* MORE: same card cadence as the primary views. */
+  #view-more .card{padding:13px 14px}
+  #view-more .more-kv{padding:8px 0}
+}
+
+@media (max-width:390px){
+  #view-depot .depot-performance{grid-template-columns:minmax(86px,.48fr) minmax(0,1.82fr)}
+  #view-paper .paper-state{font-size:34px}
+  #view-paper .paper-oc b{font-size:12px}
+}
