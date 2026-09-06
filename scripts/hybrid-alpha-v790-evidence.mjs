@@ -7,7 +7,7 @@ const SYMBOLS=(process.env.HYBRID_SYMBOLS||'BTCUSDT,ETHUSDT,SOLUSDT').split(',')
 const WINDOWS=(process.env.HYBRID_WINDOWS||'30,60,90').split(',').map(Number).filter(x=>x>0);
 const BAR_MS=15*60*1000;
 const MAX_DAYS=Math.max(...WINDOWS);
-const END=Date.now();
+const END=Math.floor(Date.now()/BAR_MS)*BAR_MS-BAR_MS;
 const START=END-(MAX_DAYS+12)*86400000;
 
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -21,11 +21,11 @@ const product=s=>`${s.replace(/USDT$/,'')}-USD`;
 async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-research/7.91','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
 async function candles(symbol){
   let cursor=START,out=[];const p=product(symbol),chunkMs=299*BAR_MS;
-  while(cursor<END){
+  while(cursor<=END){
     const chunkEnd=Math.min(END,cursor+chunkMs);
-    const url=`${BASE}/products/${p}/candles?granularity=900&start=${encodeURIComponent(new Date(cursor).toISOString())}&end=${encodeURIComponent(new Date(chunkEnd).toISOString())}`;
+    const url=`${BASE}/products/${p}/candles?granularity=900&start=${encodeURIComponent(new Date(cursor).toISOString())}&end=${encodeURIComponent(new Date(chunkEnd+BAR_MS).toISOString())}`;
     const xs=await getJson(url);if(!Array.isArray(xs))throw new Error(`unexpected candle payload for ${p}`);
-    for(const x of xs)out.push({t:+x[0]*1000,l:+x[1],h:+x[2],o:+x[3],c:+x[4],q:+x[5]*+x[4]});
+    for(const x of xs){const t=+x[0]*1000;if(t>=START&&t<=END)out.push({t,l:+x[1],h:+x[2],o:+x[3],c:+x[4],q:+x[5]*+x[4]})}
     cursor=chunkEnd+BAR_MS;await sleep(90);
   }
   out.sort((a,b)=>a.t-b.t);
@@ -51,7 +51,7 @@ function regimeOf(btc,i,ema20,ema50,ema200,atr14){
   return 'TRANSITION';
 }
 function buildSamples(data,symbol,horizonBars){
-  const xs=data[symbol],btc=data.BTCUSDT;
+  const xs=data[symbol],btc=data.BTCUSDT,horizonMs=horizonBars*BAR_MS;
   const closes=xs.map(x=>x.c),e20=ema(closes,20),e50=ema(closes,50),a14=atr(xs,14);
   const h1e20=closedBucketEma(xs,3600000,20),h1e50=closedBucketEma(xs,3600000,50);
   const h4e20=closedBucketEma(xs,14400000,20),h4e50=closedBucketEma(xs,14400000,50);
@@ -59,7 +59,8 @@ function buildSamples(data,symbol,horizonBars){
   const volMed=rollingMedian(xs.map(x=>x.q),96*7);
   const byTime=new Map(btc.map((x,i)=>[x.t,i]));
   const out=[];
-  for(let i=800;i<xs.length-horizonBars;i+=horizonBars){
+  for(let i=800;i<xs.length-horizonBars;i++){
+    if(xs[i].t%horizonMs!==0)continue;
     const bi=byTime.get(xs[i].t);if(bi==null||bi<200)continue;
     const c=xs[i].c,atrPct=a14[i]/c;if(!(atrPct>0)||h1e20[i]==null||h1e50[i]==null||h4e20[i]==null||h4e50[i]==null)continue;
     const r12=ret(c,xs[i-48]?.c)??0,r48=ret(c,xs[i-192]?.c)??0;
@@ -94,7 +95,7 @@ const data={};
 for(const s of SYMBOLS){console.log(`fetch ${s}`);data[s]=await candles(s)}
 if(!data.BTCUSDT)throw new Error('BTCUSDT required for market regime / relative strength');
 const horizons={h4:16,h12:48,h24:96};
-const evidence={schemaVersion:'7.91-HYBRID-EVIDENCE-V1',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Decision-time trend blends closed 15m, 1h and 4h evidence; no future candles enter the feature snapshot.','Forward labels are sampled at the horizon stride, so outcome windows do not overlap.','No funding/carry or true order-flow input in this first public-candle evidence pass; missing evidence is renormalized by Hybrid Alpha V1.','v7.91 reliability uses only earlier matured outcomes inside a 60d lookback; it can only attenuate V1 risk and never hard-blocks a cohort.','forwardR is future return divided by decision-time ATR14 percent; it is a normalized research outcome, not Baseline TP/SL R.']};
+const evidence={schemaVersion:'7.91-HYBRID-EVIDENCE-V2',generatedAt:new Date().toISOString(),cutoff:new Date(END).toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,horizons:{},notes:['Cutoff is anchored to the latest fully completed 15m candle.','Decision samples are anchored to UTC 4h/12h/24h boundaries, so reruns on the same completed-candle cutoff are reproducible.','Decision-time trend blends closed 15m, 1h and 4h evidence; no future candles enter the feature snapshot.','Forward labels do not overlap within each symbol/horizon.','No funding/carry or true order-flow input in this first public-candle evidence pass; missing evidence is renormalized by Hybrid Alpha V1.','v7.91 reliability uses only earlier matured outcomes inside a 60d lookback; it can only attenuate V1 risk and never hard-blocks a cohort.','forwardR is future return divided by decision-time ATR14 percent; it is a normalized research outcome, not Baseline TP/SL R.']};
 for(const [name,bars] of Object.entries(horizons)){
   const all=SYMBOLS.flatMap(s=>buildSamples(data,s,bars));
   evidence.horizons[name]={};
