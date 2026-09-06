@@ -1,0 +1,77 @@
+/* MERIDIAN v8 R15 — mobile spacing/rhythm polish only.
+   Presentation-only: no data, navigation, research or execution behavior changes. */
+
+@media (max-width:520px){
+  /* Keep the status row visually separate from the first content card. */
+  .views{padding-top:12px}
+
+  /* Global card rhythm: slightly denser without making tap/content areas cramped. */
+  .hero,.card{margin-bottom:8px}
+  .grid2{gap:8px}
+  .action{margin-bottom:8px}
+
+  /* CENTER is the most glanceable screen: reduce dead vertical space and
+     keep the hierarchy Portfolio -> Market/Risk -> Action -> Opportunity. */
+  #view-center .hero{
+    padding:13px 14px 12px;
+    margin-bottom:8px;
+  }
+  #view-center .eyebrow{line-height:1.2}
+  #view-center .hero-value{
+    margin-top:6px;
+    font-size:38px;
+    line-height:1;
+  }
+  #view-center .hero .muted{
+    margin:8px 0 0;
+    font-size:11px;
+    line-height:1.3;
+    letter-spacing:-.01em;
+  }
+  #view-center .grid2{
+    gap:8px;
+    margin-bottom:8px;
+  }
+  #view-center .metric{
+    padding:10px 12px;
+    min-height:0;
+  }
+  #view-center .metric span{line-height:1.2}
+  #view-center .metric b{
+    margin-top:5px;
+    font-size:16px;
+    line-height:1.22;
+  }
+  #view-center .metric small{
+    margin-top:5px;
+    font-size:10px;
+    line-height:1.3;
+  }
+  #view-center .action{
+    padding:10px 12px;
+    margin-bottom:8px;
+  }
+  #view-center .action span{line-height:1.2}
+  #view-center .action b{
+    margin-top:5px;
+    font-size:13px;
+    line-height:1.28;
+  }
+  #view-center .action small{
+    margin-top:4px;
+    font-size:10px;
+    line-height:1.28;
+  }
+
+  /* Keep the fixed navigation breathing room stable after denser content. */
+  .main-nav{border-top-color:rgba(39,119,162,.32)}
+}
+
+@media (max-width:390px){
+  .views{padding-top:10px}
+  #view-center .hero{padding:12px}
+  #view-center .hero-value{font-size:36px}
+  #view-center .hero .muted{font-size:10px}
+  #view-center .metric{padding:9px 10px}
+  #view-center .action{padding:9px 10px}
+}
