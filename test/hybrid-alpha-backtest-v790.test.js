@@ -24,7 +24,7 @@ test('transaction cost scales down with research risk multiplier',()=>{
   assert.equal(out.executedResearchTrades,1);
   assert.ok(out.rows[0].riskMultiplier<1);
   assert.ok(out.rows[0].costR<.10);
-  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V5');
+  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V6');
 });
 
 test('custom research decision function can be compared in same harness and preserves audit metadata',()=>{
