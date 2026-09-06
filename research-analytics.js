@@ -1,4 +1,4 @@
-// MERIDIAN v7.47 — research-only ledger telemetry.
+// MERIDIAN v7.87 — research-only ledger telemetry + Paperbot deep dive.
 // Pure analytics: no entry, exit, sizing, risk or execution effects.
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**d:null;
@@ -40,9 +40,45 @@ function scoreOf(t,bot){
   if(bot==='regime')return num(t.regimeScore,NaN);
   return NaN;
 }
+function closedTrades(state={}){return Array.isArray(state?.trades)?state.trades.filter(t=>t&&t.status==='CLOSED'):[];}
+function tradeTime(t){return isoMs(t?.closedAt)||isoMs(t?.openedAt);}
+function within(rows,startMs,endMs){
+  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return rows;
+  return rows.filter(t=>{const x=tradeTime(t);return Number.isFinite(x)&&x>=startMs&&x<=endMs;});
+}
+function cohortStats(rows=[]){
+  const wins=rows.filter(t=>num(t.realized)>0),losses=rows.filter(t=>num(t.realized)<0);
+  const gp=wins.reduce((a,t)=>a+num(t.realized),0),gl=Math.abs(losses.reduce((a,t)=>a+num(t.realized),0));
+  const pnl=rows.reduce((a,t)=>a+num(t.realized),0);
+  return {
+    trades:rows.length,pnl:round(pnl,2),expectancy:rows.length?round(pnl/rows.length,2):null,
+    profitFactor:gl>0?round(gp/gl,2):(gp>0?99:0),winRate:rows.length?round(wins.length/rows.length*100,1):null,
+    adequate:rows.length>=8
+  };
+}
+function cohortMap(rows,keyFn){
+  const buckets={};
+  for(const t of rows){const k=String(keyFn(t)||'UNKNOWN');(buckets[k]||(buckets[k]=[])).push(t);}
+  return Object.fromEntries(Object.entries(buckets).map(([k,v])=>[k,cohortStats(v)]));
+}
+function compareCohorts(base={},chall={}){
+  const keys=[...new Set([...Object.keys(base),...Object.keys(chall)])].sort();
+  return Object.fromEntries(keys.map(k=>{
+    const b=base[k]||cohortStats([]),c=chall[k]||cohortStats([]);
+    return [k,{baseline:b,challenger:c,delta:{trades:c.trades-b.trades,pnl:round((c.pnl||0)-(b.pnl||0),2),expectancy:round((c.expectancy||0)-(b.expectancy||0),2),profitFactor:round((c.profitFactor||0)-(b.profitFactor||0),2)}}];
+  }));
+}
+function temporalSlices(baseRows,challRows,startMs,endMs){
+  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return [];
+  const width=(endMs-startMs)/3;
+  return [0,1,2].map(i=>{
+    const a=startMs+i*width,b=i===2?endMs:startMs+(i+1)*width;
+    return {slice:i+1,start:new Date(a).toISOString(),end:new Date(b).toISOString(),baseline:cohortStats(within(baseRows,a,b)),challenger:cohortStats(within(challRows,a,b))};
+  });
+}
 
 export function ledgerAnalytics(state={},bot='baseline'){
-  const trades=Array.isArray(state?.trades)?state.trades.filter(t=>t&&t.status==='CLOSED'):[];
+  const trades=closedTrades(state);
   const open=Array.isArray(state?.positions)?state.positions.filter(p=>p&&p.status==='OPEN'):[];
   const wins=trades.filter(t=>num(t.realized)>0),losses=trades.filter(t=>num(t.realized)<0);
   const gp=wins.reduce((a,t)=>a+num(t.realized),0),gl=Math.abs(losses.reduce((a,t)=>a+num(t.realized),0));
@@ -91,6 +127,28 @@ export function challengerCounterfactual(state={}){
   };
 }
 
+export function paperBotDeepDive(states={},window={}){
+  const baselineAll=closedTrades(states.baseline||{}),challengerAll=closedTrades(states.challenger||{});
+  const startMs=isoMs(window?.start),endMs=isoMs(window?.end);
+  const baseline=within(baselineAll,startMs,endMs),challenger=within(challengerAll,startMs,endMs);
+  const baseRegime=t=>regimeOf(t,'baseline'),challRegime=t=>regimeOf(t,'challenger');
+  return {
+    schemaVersion:'7.87-PAPER-DEEP-DIVE-V1',researchOnly:true,executionImpact:false,
+    commonWindow:Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>startMs?{start:new Date(startMs).toISOString(),end:new Date(endMs).toISOString(),days:round((endMs-startMs)/86400000,2)}:null,
+    summary:{baseline:cohortStats(baseline),challenger:cohortStats(challenger)},
+    bySide:compareCohorts(cohortMap(baseline,t=>t.side),cohortMap(challenger,t=>t.side)),
+    byRegime:compareCohorts(cohortMap(baseline,baseRegime),cohortMap(challenger,challRegime)),
+    bySymbol:compareCohorts(cohortMap(baseline,t=>t.symbol),cohortMap(challenger,t=>t.symbol)),
+    temporalSlices:temporalSlices(baselineAll,challengerAll,startMs,endMs),
+    opportunityCost:challengerCounterfactual(states.challenger||{}),
+    caveats:[
+      'Challenger V2 historically depends on Baseline READY.',
+      'Temporal slices are descriptive out-of-time stability slices, not a retrained-model OOS test.',
+      'Cohorts with fewer than 8 closed trades are marked inadequate and must not drive promotion.'
+    ]
+  };
+}
+
 export function researchComparison(states={}){
   const baseline=ledgerAnalytics(states.baseline||{},'baseline');
   const shadow=ledgerAnalytics(states.shadow||{},'shadow');
@@ -107,6 +165,7 @@ export function researchComparison(states={}){
     schemaVersion:'7.47-TELEMETRY-V1',researchOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
     ledgers:{baseline,shadow,challenger,regime},
     opportunityCost:{challenger:challengerCounterfactual(states.challenger||{}),shadow:{available:false,reason:'NO_SHADOW_COUNTERFACTUAL_LEDGER_YET'},regime:{available:false,reason:'NO_REGIME_COUNTERFACTUAL_LEDGER_YET'}},
+    deepDive:paperBotDeepDive(states),
     auditFlags:{challengerBaselineReadyDependency:true,regimeAdaptedSideUsesBaselineDirectionalScores:true,liveBacktestExitSequencingMismatch:true}
   };
 }
