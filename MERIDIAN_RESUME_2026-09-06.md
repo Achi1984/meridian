@@ -126,3 +126,72 @@ Descriptive but not promoted to rules: `BULL × macro-aligned` and `LONG × macr
 - Do not over-filter: prefer soft scoring/risk attenuation over more hard entry gates.
 - Always track performance + trade frequency/opportunity cost, LONG/SHORT × regime, asset concentration, DD, sample adequacy and walk-forward OOS.
 - Save every meaningful checkpoint to GitHub with descriptive commits; research stays on named branches until deliberate review/merge.
+
+
+## SSOT UPDATE — 2026-09-06 16:30 UTC
+
+This section supersedes the earlier “Immediate next actions” and research-status sections where they conflict.
+
+### Hybrid Alpha v7.97 — low-liquidity attenuation complete
+
+- Draft PR #73; branch `research/hybrid-alpha-v797-low-liquidity`; current head `6905f7d2bc2386f0b5390acaff121718a52ce065`.
+- One predeclared change on frozen v7.96: when decision-time `liquidityQuality <0.50`, multiply existing research risk by fixed factor `0.60`.
+- No gate, trade blocking, parameter search, asset removal or opportunity-count change.
+- 24h direct v7.93 / v7.96 / v7.97:
+  - 30d PF `1.82 / 1.96 / 2.04`; EXP `+1.473 / +1.490 / +1.533R`; DD `46.753 / 37.511 / 34.327R`; n `131`.
+  - 60d PF `1.11 / 1.15 / 1.19`; EXP `+0.233 / +0.281 / +0.334R`; DD `144.889 / 123.038 / 112.477R`; n `274`.
+  - 90d PF `1.25 / 1.32 / 1.36`; EXP `+0.470 / +0.502 / +0.544R`; DD `125.899 / 112.760 / 101.560R`; n `421`.
+- v7.97 improves every aggregate 24h window with unchanged trades.
+- 90d Fold 2 remains negative: PF `0.63`, EXP `-0.782R`, DD `118.013R`, n `140`.
+- SHORT remains negative; only TRANSITION is positive; AVAX remains materially negative. None becomes a hard filter.
+- Decision: NO PROMOTION. Stop liquidity/alpha threshold search. Next Hybrid Alpha work requires structurally new, leakage-free evidence such as real funding/order-flow/microstructure or a clean meta-allocator.
+
+### Independent FIB Level Bot research
+
+All FIB work is isolated, research-only and disconnected from Paper/live/Pionex.
+
+#### V1 — intratimeframe pivots
+
+- Draft PR #74; branch `research/fib-level-bot-v1`; head `c3cc6dd38ab5bdb54abbee4863e4e9d444cdb12f`.
+- Fixed 0.382/0.500/0.618/0.786 entries, 1.000 stop, 0.236/0.000 targets and conservative fills.
+- Primary 1h fails; 15m rejected.
+- Diagnostic 4h/365d was positive: n `357`, PF `1.27`, EXP `+0.117R`, DD `10.410R`, but was not primary.
+- Exact-head Evidence #3 artifact `9991209951`, digest `sha256:7ac988811dff986d93dd24dd738454d9b428678e2a43dbe55886a40aa89ac103`; Release Safety #799 green.
+- NO PROMOTION.
+
+#### V2 — unchanged 4h replication
+
+- Draft PR #75; branch `research/fib-level-bot-v2-4h-replication`; head `b8fc8edf66394f4a2ab63b48f511e3a37a80b00d`.
+- Temporally disjoint primary year on seven assets fails: n `791`, PF `0.89`, EXP `-0.059R`, net `-46.962R`, DD `77.372R`.
+- Fold PF `1.02 / 1.14 / 0.65`; SHORT PF `0.76`; only four of seven assets positive; CORE PF `0.69`; LINK contributes `48.5%` of positive net R.
+- Discovery-year secondary remains positive but is not independent confirmation.
+- Exact-head Evidence #2 artifact `9991403533`, digest `sha256:e5b8ef90574d7469812afad0fbcea033b55b0ab9ea81264dea66a576be9b1170`; Release Safety #801 green.
+- HISTORICAL REPLICATION FAIL. NO PROMOTION.
+
+#### V3 — Daily anchors / 4h execution
+
+- Draft PR #76; branch `research/fib-level-bot-v3-daily-anchor`; head `7b15a8b37431af317bc5d8b50ef960024b353982`.
+- Structural change only: confirmed Daily swings anchor the unchanged FIB ladder; orders execute on 4h. No ATR/indicator/regime/asset/side gate.
+- Primary unused historical year: n `190`, PF `1.34`, EXP `+0.150R`, net `+28.416R`, DD `6.609R`.
+- Fold PF `1.31 / 1.01 / 1.74`; LONG PF `1.25`; SHORT PF `1.41`; CORE PF `1.50`; EXPANSION PF `1.22`.
+- Secondary years: PF `1.38` and `1.43`; two-year aggregate n `404`, PF `1.41`, EXP `+0.159R`, DD `14.009R`.
+- Eight of nine gates pass. Concentration fails because SOL contributes `59.2%` of positive primary net R versus locked maximum `40%`.
+- Exact-head Evidence #2 artifact `9992170844`, digest `sha256:f8013c81e199bf3090f2ecdbb5aadfdde1ddb1b3b8a1cb1f72ca6113b21dec5f`; Release Safety #803 green.
+- Strong near-pass, but `historicallyRobust=false`; NO PROMOTION and no retrospective SOL isolation/weighting.
+
+#### V3 prospective holdout
+
+- Draft PR #77; branch `research/fib-level-bot-v3-prospective-holdout`; head `3a5650a2c5b14276969bf5ef9c0dc818204f8d09`.
+- Strategy frozen to V3 head; holdout begins `2026-09-06T14:15:00Z`.
+- Formal evaluation requires both >=180 elapsed days and >=100 closed prospective baskets; earliest date `2027-03-05T14:15:00Z`.
+- Initial exact-head snapshot: zero prospective setups/fills/closed/open; six pre-cutoff carry-over baskets detected and excluded; full 4h coverage for all seven assets; status `NOT_ELIGIBLE`.
+- Exact-head artifact `9992985734`, digest `sha256:8948d353ba21e3615da405ea1aa2f375b254425d928c4141f8d9a9b6ad3c1c67`; Release Safety #805 green.
+- Passing later permits review only, never automatic promotion.
+
+### Current next actions
+
+1. User must still validate R18 on the physical iPhone across at least two ~30-second cycles. This has not been claimed complete.
+2. Do not modify the FIB V3 candidate during its prospective holdout.
+3. Do not perform further Hybrid Alpha threshold search; choose structurally new leakage-free evidence before another experiment.
+4. Keep PRs #67–#69 and #73–#77 draft/research-only until deliberate review.
+5. Pionex bots, Baseline 6.2, `server.js` and Paper/live execution remain untouched.

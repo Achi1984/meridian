@@ -109,3 +109,17 @@
 - Meta Allocator remains research-only.
 - v7.89–v7.96 Hybrid Alpha programme remains isolated research; no execution connection.
 - No research result auto-promotes into Paper/live execution.
+
+
+## SSOT UPDATE — Research closure 2026-09-06
+
+This section supersedes earlier research next-step text where it conflicts.
+
+- Hybrid Alpha v7.97 is complete on Draft PR #73 / head `6905f7d2bc2386f0b5390acaff121718a52ce065`. Low-liquidity `<0.50` risk attenuation by fixed `0.60` improves 30/60/90d aggregate PF, expectancy and DD without changing trade count, but 90d Fold 2 remains negative (PF `0.63`, EXP `-0.782R`). NO PROMOTION; stop threshold search.
+- FIB V1 Draft PR #74: 1h primary and 15m fail; 4h discovery positive but not confirmatory. Head `c3cc6dd38ab5bdb54abbee4863e4e9d444cdb12f`.
+- FIB V2 Draft PR #75: unchanged 4h unseen-year replication fails (n `791`, PF `0.89`, EXP `-0.059R`, DD `77.372R`). Head `b8fc8edf66394f4a2ab63b48f511e3a37a80b00d`.
+- FIB V3 Draft PR #76: Daily anchors with 4h execution are materially stronger across three historical years. Primary n `190`, PF `1.34`, EXP `+0.150R`, DD `6.609R`; both sides and all folds positive; secondary yearly PF `1.38 / 1.43`. Gate still fails because SOL supplies `59.2%` of positive primary net R. Head `7b15a8b37431af317bc5d8b50ef960024b353982`. NO PROMOTION and no SOL-specific reaction.
+- FIB V3 prospective holdout is locked on Draft PR #77 / head `3a5650a2c5b14276969bf5ef9c0dc818204f8d09`. Start `2026-09-06T14:15Z`; formal evaluation only after >=180 days and >=100 closed baskets; earliest `2027-03-05T14:15Z`. Initial status `NOT_ELIGIBLE`; zero prospective trades; six pre-cutoff carry-over baskets excluded.
+- All FIB and Hybrid work remains isolated from production, Paper/live execution and Pionex.
+- R18 physical iPhone validation across two ~30-second cycles remains pending and must not be marked complete without user observation.
+- Next research must be structurally new and leakage-free; no additional threshold, pivot, asset, side, regime or FIB-level tuning.
