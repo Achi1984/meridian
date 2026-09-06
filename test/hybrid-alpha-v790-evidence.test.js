@@ -11,8 +11,9 @@ test('evidence runner stays research-only and public-data based',()=>{
   assert.doesNotMatch(src,/placeOrder|server\.js|pionex/i);
 });
 
-test('forward outcomes are non-overlapping and use decision-time ATR normalization',()=>{
-  assert.match(src,/i\+=horizonBars/);
+test('forward outcomes are UTC-anchored non-overlapping and ATR normalized',()=>{
+  assert.match(src,/Math\.floor\(Date\.now\(\)\/BAR_MS\)\*BAR_MS-BAR_MS/);
+  assert.match(src,/xs\[i\]\.t%horizonMs!==0/);
   assert.match(src,/forwardR=fwd\/atrPct/);
 });
 
