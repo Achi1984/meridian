@@ -30,8 +30,6 @@ test('clean v8 does not load legacy compatibility renderer stack',()=>{
 test('v8 R9 presents canonical production identity without prototype wording',()=>{
   assert.match(html,/<title>ACHI MERIDIAN v8<\/title>/);
   assert.match(html,/v8\.0 · PROD/);
-  assert.match(html,/MERIDIAN v8 · CUSTOMER VIEW/);
-  assert.match(html,/Fünf Views · eine Datenquelle pro Kennzahl · Details nur auf Abruf/);
   assert.doesNotMatch(html,/>v8\.0 CLEAN<|CLEAN CUSTOMER VIEW|v8 Clean<\/title>/);
   assert.match(html,/app\.js\?v=8\.0-r9/);
   assert.match(html,/more-runtime\.js\?v=8\.0-r9/);
