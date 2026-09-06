@@ -59,18 +59,27 @@
 ## Clean R14–R16 — production layout refinement
 - R14 removes the redundant `MERIDIAN v8 · CUSTOMER VIEW` banner to reclaim vertical space.
 - R15 establishes the approved CENTER mobile spacing rhythm; CENTER is now the visual reference and remains unchanged in R16.
-- R16 (`fix/v8-cross-view-density-r16`, PR #62) is a presentation-only consistency pass across DEPOT, TRADE, PAPER and MORE.
+- R16 (PR #62) is a presentation-only consistency pass across DEPOT, TRADE, PAPER and MORE.
 - DEPOT gives the portfolio chart more width and clamps the long canonical-history source label so it no longer dominates the left 1D card.
 - TRADE keeps every read-only bot detail while reducing vertical travel inside expanded cards.
 - PAPER compresses model rows, opportunity-cost tiles and audit flags for faster scanning while preserving all research telemetry.
 - MORE adopts the same tighter mobile card cadence.
-- Release Safety run #720 passed on exact R16 head `dcad7e4642748e2fcd265c88da33c1c3451e73b4` before merge.
+- Release Safety passed before R16 merge; main merge commit `4c3d194e4322e4a45073054228b7785781bdb50a`.
+
+## Clean R17 — TRADE placeholder correctness + DEPOT label cleanup
+- Branch: `fix/v8-trade-hygiene-depot-label-r17`.
+- Root cause of visible `$0,0000` / `$0` placeholders: JavaScript formatters converted `null` to numeric zero via `Number(null)` even though normalization had correctly rejected the backend placeholder.
+- R17 formatters now reject `null`, `undefined` and empty-string values before numeric formatting, so unavailable Break-even / Investment / PnL fields render `—`.
+- Explicit real zero PnL remains valid only when an actual PnL field exists on the protected bot object.
+- DEPOT's technical `POSTGRES_*` history source identifier is presentation-only shortened to `Canonical History`; no history values or basis logic change.
+- Cache tags move TRADE detail and label cleanup to `8.0-r17`.
+- No backend contract, server.js, Baseline 6.2, Paper/live execution, sizing, risk, margin or order changes.
 
 ## Current next steps
-1. Merge R16 only with expected exact head after the green Release Safety result.
-2. Validate DEPOT / TRADE / PAPER / MORE on iPhone after Pages deploy; CENTER should remain visually unchanged from approved R15.
-3. If clean, move next to CENTER enrichment as a data/content improvement rather than another architecture/layout rewrite.
-4. Keep all frontend work read-only; no Baseline 6.2, server.js, Paper/live execution, sizing, risk or exits changes.
+1. Run Release Safety on the exact R17 head and merge only if green.
+2. Validate on iPhone that missing BTC-S30 Break-even / Investment render `—` rather than fake zeroes, while Current / Liq / Buffer remain unchanged.
+3. Validate DEPOT 1D card shows concise `Canonical History` rather than a technical POSTGRES identifier.
+4. If clean, freeze visual-density work and move to CENTER enrichment / functional product work.
 5. Research remains isolated until evidence and explicit human approval justify promotion.
 
 ## Research isolation
