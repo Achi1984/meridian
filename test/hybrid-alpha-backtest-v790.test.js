@@ -24,7 +24,7 @@ test('transaction cost scales down with research risk multiplier',()=>{
   assert.equal(out.executedResearchTrades,1);
   assert.ok(out.rows[0].riskMultiplier<1);
   assert.ok(out.rows[0].costR<.10);
-  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V4');
+  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V5');
 });
 
 test('custom research decision function can be compared in same harness and preserves audit metadata',()=>{
@@ -36,6 +36,18 @@ test('custom research decision function can be compared in same harness and pres
   assert.equal(out.rows[0].macroTrend,.4);
   assert.equal(out.rows[0].macroAlignment,.4);
   assert.equal(out.rows[0].macroRiskFactor,1);
+});
+
+test('decision-time diagnostics are copied for attribution without changing decisions',()=>{
+  const features={regime:'BULL',trend:.8,momentum:.7,relativeStrength:.5,meanReversion:-.2,orderFlow:.4,volatilityRatio:1.1,liquidityQuality:.8,reversalRisk:.3,timeframeEvidence:{trend15m:.6,trend1h:.7,trend4h:.9}};
+  const out=runHybridAlphaBacktest([s('2026-01-01T00:00:00Z','ETHUSDT',1,features)],{costR:0});
+  assert.equal(out.executedResearchTrades,1);
+  assert.equal(out.rows[0].trend,.8);
+  assert.equal(out.rows[0].liquidityQuality,.8);
+  assert.equal(out.rows[0].trend15m,.6);
+  assert.equal(out.rows[0].trend1h,.7);
+  assert.equal(out.rows[0].trend4h,.9);
+  assert.equal(out.rows[0].netR,out.rows[0].grossR);
 });
 
 test('observe samples do not become trades',()=>{
