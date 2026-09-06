@@ -1,4 +1,4 @@
-name: Hybrid Alpha v7.94 Robustness Evidence
+name: Hybrid Alpha v7.95 Failure Attribution
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
       - 'hybrid-alpha-macro-v792.js'
       - 'hybrid-alpha-transition-v793.js'
       - 'scripts/hybrid-alpha-v790-evidence.mjs'
+      - 'scripts/hybrid-alpha-v795-failure-attribution.mjs'
       - '.github/workflows/hybrid-alpha-v790-evidence.yml'
 
 permissions:
@@ -29,9 +30,13 @@ jobs:
           HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
           HYBRID_WINDOWS: 30,60,90
         run: node scripts/hybrid-alpha-v790-evidence.mjs
-      - name: Upload evidence artifact
+      - name: Run predeclared v7.95 failure-state attribution
+        run: node scripts/hybrid-alpha-v795-failure-attribution.mjs
+      - name: Upload v7.95 attribution artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hybrid-alpha-v794-evidence
-          path: artifacts/hybrid-alpha-v790-evidence.json
+          name: hybrid-alpha-v795-attribution
+          path: |
+            artifacts/hybrid-alpha-v790-evidence.json
+            artifacts/hybrid-alpha-v795-failure-attribution.json
           if-no-files-found: error
