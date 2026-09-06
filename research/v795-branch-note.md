@@ -1,0 +1,1 @@
+v7.95 failure-state attribution design was predeclared on the v7.94 research branch before any v7.95 output was read. Implementation continues on `research/hybrid-alpha-v795-failure-attribution` from this checkpoint.
