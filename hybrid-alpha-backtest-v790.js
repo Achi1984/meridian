@@ -21,11 +21,12 @@ function group(rows,keyFn){
 
 export function runHybridAlphaBacktest(samples=[],opts={}){
   const costR=Math.max(0,n(opts.costR)??0);
+  const decisionFn=typeof opts.decisionFn==='function'?opts.decisionFn:hybridAlphaDecision;
   const rows=[];let observed=0,invalid=0;
   for(const s of samples){
     const outcome=n(s?.forwardR);
     if(outcome==null){invalid++;continue}
-    const d=hybridAlphaDecision(s?.features||s||{});
+    const d=decisionFn(s?.features||s||{});
     if(d.side==='OBSERVE'){observed++;continue}
     const signedOutcome=(d.side==='LONG'?1:-1)*outcome;
     const grossR=signedOutcome*d.riskMultiplier;
@@ -33,7 +34,7 @@ export function runHybridAlphaBacktest(samples=[],opts={}){
     const netR=(signedOutcome-costR)*d.riskMultiplier;
     rows.push({timestamp:s.timestamp||null,symbol:String(s.symbol||'UNKNOWN'),regime:d.regime,side:d.side,alpha:d.alpha,confidence:d.confidence,riskMultiplier:d.riskMultiplier,grossR:round(grossR),costR:round(costR*d.riskMultiplier),netR:round(netR)});
   }
-  return {schemaVersion:'7.90-HYBRID-BACKTEST-V2',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
+  return {schemaVersion:'7.90-HYBRID-BACKTEST-V3',researchOnly:true,executionImpact:false,inputSamples:samples.length,invalidSamples:invalid,observedSamples:observed,executedResearchTrades:rows.length,costR,summary:stats(rows),bySide:group(rows,x=>x.side),byRegime:group(rows,x=>x.regime),bySymbol:group(rows,x=>x.symbol),rows};
 }
 
 export function walkForwardSlices(samples=[],opts={}){
