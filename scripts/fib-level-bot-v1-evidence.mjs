@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import {runFibLevelBot} from '../fib-level-bot-v1.js';
 
-const BASE='https://api.binance.com/api/v3/klines';
+const BASE='https://api.exchange.coinbase.com';
 const SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT'];
 const WINDOWS=[90,180,365];
 const BAR_MS=15*60*1000,MAX_DAYS=365,WARMUP_DAYS=45;
@@ -11,13 +11,15 @@ const round=(v,d=3)=>Number.isFinite(v)?Math.round(v*10**d)/10**d:null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function getJson(url){const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-FIB-research/1.0','accept':'application/json'}});if(!r.ok)throw new Error(`${r.status} ${url}`);return r.json()}
+const product=s=>`${s.replace(/USDT$/,'')}-USD`;
 async function candles(symbol){
-  const out=[];let cursor=START;
+  const out=[];let cursor=START;const p=product(symbol),chunkMs=299*BAR_MS;
   while(cursor<=END){
-    const url=`${BASE}?symbol=${symbol}&interval=15m&startTime=${cursor}&endTime=${END}&limit=1000`;
+    const chunkEnd=Math.min(END,cursor+chunkMs);
+    const url=`${BASE}/products/${p}/candles?granularity=900&start=${encodeURIComponent(new Date(cursor).toISOString())}&end=${encodeURIComponent(new Date(chunkEnd+BAR_MS).toISOString())}`;
     const rows=await getJson(url);if(!Array.isArray(rows)||!rows.length)break;
-    for(const x of rows){const t=Number(x[0]);if(t>=START&&t<=END)out.push({t,o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})}
-    const next=Number(rows.at(-1)[0])+BAR_MS;if(next<=cursor)break;cursor=next;await sleep(80);
+    for(const x of rows){const t=Number(x[0])*1000;if(t>=START&&t<=END)out.push({t,l:+x[1],h:+x[2],o:+x[3],c:+x[4],v:+x[5]})}
+    cursor=chunkEnd+BAR_MS;await sleep(90);
   }
   out.sort((a,b)=>a.t-b.t);return out.filter((x,i,a)=>!i||x.t!==a[i-1].t);
 }
@@ -41,7 +43,7 @@ function windowResult(runs,days){
 }
 
 const raw={};for(const s of SYMBOLS){console.log(`fetch ${s}`);raw[s]=await candles(s)}
-const frames={m15:BAR_MS,h1:4*BAR_MS,h4:16*BAR_MS},out={schemaVersion:'FIB-LEVEL-BOT-V1-EVIDENCE',generatedAt:new Date().toISOString(),cutoff:new Date(END).toISOString(),researchOnly:true,executionImpact:false,source:'BINANCE_SPOT_PUBLIC_KLINES',symbols:SYMBOLS,windows:WINDOWS,timeframes:{},notes:['Entries and exits use frozen FIB prices only.','Pivots become available only after three right bars close.','ATR only rejects micro-swings; regime is descriptive and has zero decision impact.','Open baskets are not force-closed at cutoff.']};
+const frames={m15:BAR_MS,h1:4*BAR_MS,h4:16*BAR_MS},out={schemaVersion:'FIB-LEVEL-BOT-V1-EVIDENCE',generatedAt:new Date().toISOString(),cutoff:new Date(END).toISOString(),researchOnly:true,executionImpact:false,source:'COINBASE_EXCHANGE_PUBLIC_15M',symbols:SYMBOLS,windows:WINDOWS,timeframes:{},notes:['Entries and exits use frozen FIB prices only.','Pivots become available only after three right bars close.','ATR only rejects micro-swings; regime is descriptive and has zero decision impact.','Open baskets are not force-closed at cutoff.','Binance transport returned HTTP 451 before any evidence; Coinbase Exchange is the pre-evidence transport replacement with strategy parameters unchanged.']};
 for(const [tf,ms] of Object.entries(frames)){
   const runs=[];for(const symbol of SYMBOLS){const bars=ms===BAR_MS?raw[symbol]:resample(raw[symbol],ms);const run=runFibLevelBot(bars,{symbol,timeframe:tf});run._setups=run.setups;runs.push(run)}
   out.timeframes[tf]={};for(const days of WINDOWS)out.timeframes[tf][`${days}d`]=windowResult(runs,days);

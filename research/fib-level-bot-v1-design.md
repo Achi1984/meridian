@@ -15,7 +15,7 @@ A price-only ladder placed on fixed Fibonacci retracement levels of objectively 
 - Evidence windows: 90d, 180d, 365d.
 - Primary evaluation: 1h / 365d. Other horizons remain required robustness diagnostics.
 - Walk-forward: three chronological folds of closed baskets for the primary window.
-- Public source: Binance Spot klines.
+- Public source: Coinbase Exchange Spot candles. Binance was the initially declared transport, but the first workflow returned HTTP 451 before producing any evidence; only the transport is replaced and every strategy parameter remains frozen.
 - Metrics: PF, expectancy in R, net R, max drawdown R, win rate, closed baskets, active/open baskets, setup count, touch/fill rate and time in market.
 - Concentration: LONG/SHORT, regime, symbol, first/deepest touched FIB level and chronological fold.
 - Sample adequacy: descriptive below 30 closed baskets per aggregate slice and below 12 per cohort.
