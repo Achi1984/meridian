@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const src=fs.readFileSync(new URL('../scripts/hybrid-alpha-v790-evidence.mjs',import.meta.url),'utf8');
+
+test('evidence runner stays research-only and public-data based',()=>{
+  assert.match(src,/researchOnly:true/);
+  assert.match(src,/executionImpact:false/);
+  assert.match(src,/api\.exchange\.coinbase\.com/);
+  assert.doesNotMatch(src,/placeOrder|server\.js|pionex/i);
+});
+
+test('forward outcomes are UTC-anchored non-overlapping and ATR normalized',()=>{
+  assert.match(src,/Math\.floor\(Date\.now\(\)\/BAR_MS\)\*BAR_MS-BAR_MS/);
+  assert.match(src,/xs\[i\]\.t%horizonMs!==0/);
+  assert.match(src,/forwardR=fwd\/atrPct/);
+});
+
+test('trend contains 15m 1h and 4h decision-time evidence',()=>{
+  assert.match(src,/trend15m:trend15/);
+  assert.match(src,/trend1h/);
+  assert.match(src,/trend4h/);
+  assert.match(src,/closedBucketEma/);
+});
+
+test('missing carry and order flow are documented rather than fabricated',()=>{
+  assert.match(src,/No funding\/carry or true order-flow input/);
+  assert.doesNotMatch(src,/carry:/);
+  assert.doesNotMatch(src,/orderFlow:/);
+});
