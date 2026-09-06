@@ -1,0 +1,42 @@
+name: Hybrid Alpha v7.97 Low Liquidity Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'hybrid-alpha-liquidity-v797.js'
+      - 'hybrid-alpha-weak-v796.js'
+      - 'hybrid-alpha-backtest-v790.js'
+      - 'scripts/hybrid-alpha-v790-evidence.mjs'
+      - 'scripts/hybrid-alpha-v796-evidence.mjs'
+      - 'scripts/hybrid-alpha-v797-evidence.mjs'
+      - 'test/hybrid-alpha-liquidity-v797.test.js'
+      - '.github/workflows/hybrid-alpha-v797-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run locked 7-asset base evidence
+        env:
+          HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
+          HYBRID_WINDOWS: 30,60,90
+        run: node scripts/hybrid-alpha-v790-evidence.mjs
+      - name: Run frozen v7.96 weak-alpha evidence
+        run: node scripts/hybrid-alpha-v796-evidence.mjs
+      - name: Run v7.97 low-liquidity evidence
+        run: node scripts/hybrid-alpha-v797-evidence.mjs
+      - name: Upload v7.97 evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-alpha-v797-evidence
+          path: artifacts/hybrid-alpha-v797-evidence.json
+          if-no-files-found: error
