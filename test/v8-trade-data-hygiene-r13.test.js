@@ -5,8 +5,8 @@ import fs from 'node:fs';
 const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v8-clean/trade-details-r12.js',import.meta.url),'utf8');
 
-test('R13 cache tag is wired',()=>{
-  assert.match(html,/trade-details-r12\.js\?v=8\.0-r13/);
+test('R13 hygiene module remains wired through current successor cache tag',()=>{
+  assert.match(html,/trade-details-r12\.js\?v=8\.0-r(?:13|17)/);
 });
 
 test('R13 suppresses zero placeholders for break-even and investment',()=>{
