@@ -24,15 +24,18 @@ test('transaction cost scales down with research risk multiplier',()=>{
   assert.equal(out.executedResearchTrades,1);
   assert.ok(out.rows[0].riskMultiplier<1);
   assert.ok(out.rows[0].costR<.10);
-  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V3');
+  assert.equal(out.schemaVersion,'7.90-HYBRID-BACKTEST-V4');
 });
 
-test('custom research decision function can be compared in same harness',()=>{
-  const decisionFn=()=>({side:'LONG',regime:'TEST',alpha:.5,confidence:50,riskMultiplier:.5});
+test('custom research decision function can be compared in same harness and preserves audit metadata',()=>{
+  const decisionFn=()=>({side:'LONG',regime:'TEST',alpha:.5,confidence:50,riskMultiplier:.5,macroTrend:.4,macroAlignment:.4,macroRiskFactor:1});
   const out=runHybridAlphaBacktest([s('2026-01-01T00:00:00Z','SOLUSDT',1,{})],{decisionFn,costR:0});
   assert.equal(out.executedResearchTrades,1);
   assert.equal(out.rows[0].regime,'TEST');
   assert.equal(out.rows[0].netR,.5);
+  assert.equal(out.rows[0].macroTrend,.4);
+  assert.equal(out.rows[0].macroAlignment,.4);
+  assert.equal(out.rows[0].macroRiskFactor,1);
 });
 
 test('observe samples do not become trades',()=>{
