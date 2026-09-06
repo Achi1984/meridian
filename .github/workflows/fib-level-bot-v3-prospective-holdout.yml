@@ -1,0 +1,32 @@
+name: FIB V3 Prospective Holdout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'fib-level-bot-v3-holdout.js'
+      - 'scripts/fib-level-bot-v3-holdout.mjs'
+      - 'test/fib-level-bot-v3-holdout.test.js'
+      - 'research/fib-level-bot-v3-prospective-holdout-protocol.md'
+      - 'research/fib-level-bot-v3-holdout-boundary-note.md'
+      - '.github/workflows/fib-level-bot-v3-prospective-holdout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/fib-level-bot-v3-holdout.test.js
+      - run: node scripts/fib-level-bot-v3-holdout.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fib-v3-prospective-holdout
+          path: artifacts/fib-v3-prospective-holdout.json
+          if-no-files-found: error
