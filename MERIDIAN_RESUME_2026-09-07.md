@@ -330,3 +330,69 @@ Research PRs stay open/draft as evidence branches; do not merge them into `main`
 ## 12. Resume-command convention
 
 When starting the next chat, the user should paste the companion prompt in `MERIDIAN_RESUME_PROMPT_2026-09-07.txt`. The new assistant must treat this file as current SSOT over older dated resume sections where they conflict.
+
+---
+
+## SSOT UPDATE — 2026-09-07 · R19 + Elliott closure
+
+This section supersedes earlier status and next-action sections where they conflict.
+
+### Hybrid v7.102 — correlation-cluster allocator
+
+- PR #87; research branch `research/hybrid-alpha-v7102-correlation-cluster`.
+- Decision: **rejected**; no promotion and no execution connection.
+- Frozen final head: `11ac5349bc7d0d2de66233f954c72fed5d5d193f`.
+- Evidence #2: run `34140663280`, artifact `10025793601`, digest `sha256:c8a14ff066a6d5bcf76bfd6bfaa8bab8f0635c7fc31538a2caa9766935ffa158`.
+- Release Safety: run `834`, successful.
+
+### Elliott Wave-3 V1 — recent window
+
+- PR #88; branch `research/elliott-wave-bot-v1-wave3`.
+- Result: 144 trades, PF 1.21, expectancy +0.088R, net +12.615R, max DD 8.814R.
+- Fold PF: 1.68 / 0.92 / 1.11; both LONG and SHORT positive.
+- Failed gates: sample 144 < 150, breadth 4 < 5 assets, ETH concentration 60.2% > 40%.
+- Decision: **frozen near-pass**, not promoted and not tuned.
+- Final head: `a1283b68419bdb2a5d22ff2b49fff5b4109354db`.
+- Evidence #2: run `34143541691`, artifact `10026843740`, digest `sha256:e33bd5ed04638a8502fc12b8801fd332b11dc5bc560c682688afac53f7719b51`.
+- Release Safety: run `837`, successful.
+
+### Elliott Wave-3 V2 — unchanged older-year replication
+
+- PR #89; branch `research/elliott-wave-bot-v2-historical-replication`.
+- Fixed interval: 2022-09-06 through 2023-09-06.
+- Result: 101 trades, PF 1.39, expectancy +0.158R, net +16.001R, max DD 9.514R.
+- Fold PF: 1.29 / 1.10 / 2.07; LONG PF 1.28; SHORT PF 1.53.
+- Five assets positive; ETH concentration 33.1%.
+- Only failed predeclared gate: sample 101 < 120. No interval extension and no tuning.
+- Decision: **frozen historical confirmation**, no holdout claim and no promotion.
+- Final head: `465555c16bc0d64f69ba3afe1f29fcf3fe73c6ea`.
+- Evidence #2: run `34145957770`, artifact `10027682729`, digest `sha256:bf09a5f29abe880f6d54538281f4684279cad5764ee251865b77368a768e3e43`.
+- Release Safety: run `840`, successful.
+
+### Elliott Wave-5 V1
+
+- PR #90; branch `research/elliott-wave5-bot-v1`.
+- Only 10 primary trades. Primary PF 1.30 is not decision-grade; fold PF 0.49 / 0.35 / 99.
+- LONG PF 0.42; secondary windows PF 0.38 and 0.96 with negative expectancy.
+- Decision: **rejected**. No tuning series.
+- Final head: `5f30cce5fc64778c83fcb03e33edc39dc3003f0c`.
+- Evidence #2: run `34147347479`, artifact `10028158787`, digest `sha256:709b9d63508f27f0a824d47177e2972f80030586af4ce5c32b527de123284700`.
+- Release Safety: run `843`, successful.
+
+### Production R19 — Research Control Board
+
+- PR #91, squash-merged to `main`.
+- Merge commit: `08686d71c62b1407c1be89c72387a0c137c15e53`.
+- Added `v8-clean/research-control-r19.js`, `v8-clean/research-control-r19.css`, and `test/v8-research-control-r19.test.js`; updated `v8-clean/index.html`.
+- The board makes candidate state and guardrails visible: Elliott Wave-3 frozen, FIB V3 prospective holdout, Hybrid v7.97 reference, Wave-5 rejected, portfolio allocators rejected, **EXECUTION NONE**, **AUTO-PROMOTION OFF**.
+- Local architecture/UI suite: 15/15 passed.
+- Release Safety: run `844`, successful on exact PR head `44eba43449a0cb6b4366143d26962aa9fd70bd65`.
+
+### Current operating state and next actions
+
+1. Baseline 6.2 remains frozen; PAPER only; live trading remains off.
+2. `server.js` remains untouched. Pionex remains untouched.
+3. Validate R19 once on a physical iPhone in PAPER when deployed.
+4. Keep Elliott Wave-3 frozen. Do not tune it, promote it, or call the older-year replication a holdout.
+5. Keep FIB V3's prospective holdout locked.
+6. Do not start an immediate ABC/Wave variant series merely to increase opportunity count. The next bot research must begin with a genuinely distinct, predeclared hypothesis and gates.
