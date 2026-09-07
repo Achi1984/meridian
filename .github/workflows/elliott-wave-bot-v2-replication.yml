@@ -1,0 +1,27 @@
+name: Elliott Wave Bot V2 Historical Replication
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/elliott-wave-bot-v2-replication.mjs'
+      - 'test/elliott-wave-bot-v2-replication.test.js'
+      - 'research/elliott-wave-bot-v2-historical-replication-design.md'
+      - '.github/workflows/elliott-wave-bot-v2-replication.yml'
+permissions:
+  contents: read
+jobs:
+  replication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/elliott-wave-bot-v1.test.js test/elliott-wave-bot-v2-replication.test.js
+      - run: node scripts/elliott-wave-bot-v2-replication.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elliott-wave-bot-v2-replication
+          path: artifacts/elliott-wave-bot-v2-replication.json
+          if-no-files-found: error
