@@ -130,3 +130,18 @@ This section supersedes earlier research next-step text where it conflicts.
 Production screenshots supplied by the user at 20:18 show CENTER `$27,846` and DEPOT `$27,867`, versus the previously suspicious static value near `$27,313`. DEPOT reconciles as Spot `$26,972` + Trading/Bots `$896` ≈ `$27,868`, with one-dollar display rounding. The `$21` CENTER/DEPOT delta is only about `0.075%` and is plausible across independently timed refreshes.
 
 Decision: R18 near-live spot valuation is validated on iPhone. Do not investigate backend execution or Pionex. Trading/Bots remains snapshot/manual, so the aggregate must not be described as fully exchange-live.
+
+---
+
+## SSOT UPDATE — 2026-09-07 · R19 / Elliott research closure
+
+This update supersedes earlier current-status and next-step text where it conflicts.
+
+- **Main:** `08686d71c62b1407c1be89c72387a0c137c15e53` after PR #91 (R19 Research Control Board), Release Safety #844 green on exact head.
+- **R19:** 15/15 local architecture/UI tests passed. UI explicitly shows candidate states plus `EXECUTION NONE` and `AUTO-PROMOTION OFF`.
+- **Hybrid v7.102:** rejected; PR #87; final head `11ac5349bc7d0d2de66233f954c72fed5d5d193f`; Evidence #2 run `34140663280`; artifact `10025793601`; Release Safety #834.
+- **Elliott Wave-3 V1:** frozen near-pass, not promoted. 144 trades, PF 1.21, +0.088R expectancy, DD 8.814R; failed sample, breadth and concentration gates. PR #88; final head `a1283b68419bdb2a5d22ff2b49fff5b4109354db`; Evidence #2 run `34143541691`; artifact `10026843740`; Release Safety #837.
+- **Elliott Wave-3 V2 unchanged historical replication:** 101 trades, PF 1.39, +0.158R expectancy, DD 9.514R; all five assets positive; only sample gate failed. Frozen confirmation, not a holdout and not promoted. PR #89; final head `465555c16bc0d64f69ba3afe1f29fcf3fe73c6ea`; Evidence #2 run `34145957770`; artifact `10027682729`; Release Safety #840.
+- **Elliott Wave-5 V1:** rejected for insufficient opportunity count and unstable/weak side/window evidence. PR #90; final head `5f30cce5fc64778c83fcb03e33edc39dc3003f0c`; Evidence #2 run `34147347479`; artifact `10028158787`; Release Safety #843.
+- **Guardrails unchanged:** Baseline 6.2 frozen, PAPER only, live off, no paper/live connection, `server.js` untouched, Pionex untouched.
+- **Next:** physical-iPhone PAPER validation of R19 when deployed; keep Wave-3 and FIB V3 frozen; no immediate Elliott ABC/variant tuning series. Any new bot starts from a distinct predeclared hypothesis, gates, assets, windows and folds.
