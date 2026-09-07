@@ -1,0 +1,35 @@
+name: Hybrid Alpha v7.101 Portfolio Budget Evidence
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'hybrid-alpha-portfolio-v7101.js'
+      - 'scripts/hybrid-alpha-v7101-evidence.mjs'
+      - 'test/hybrid-alpha-portfolio-v7101.test.js'
+      - 'research/hybrid-alpha-v7101-portfolio-budget-design.md'
+      - '.github/workflows/hybrid-alpha-v7101-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/hybrid-alpha-portfolio-v7101.test.js
+      - name: Build frozen v7.93 evidence
+        env:
+          HYBRID_SYMBOLS: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT
+          HYBRID_WINDOWS: 30,60,90
+        run: node scripts/hybrid-alpha-v790-evidence.mjs
+      - run: node scripts/hybrid-alpha-v796-evidence.mjs
+      - run: node scripts/hybrid-alpha-v797-evidence.mjs
+      - run: node scripts/hybrid-alpha-v7101-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-alpha-v7101-evidence
+          path: artifacts/hybrid-alpha-v7101-evidence.json
+          if-no-files-found: error
