@@ -1,0 +1,61 @@
+Wir setzen mein Projekt MERIDIAN fort.
+
+WICHTIG: Bevor du etwas änderst, lies bitte über GitHub im Repository
+Achi1984/meridian
+zuerst vollständig:
+
+1. MERIDIAN_RESUME_2026-09-07.md
+2. MERIDIAN_HANDOFF.md
+
+Diese beiden Dateien sind die aktuelle SSOT für den Gesprächsübergang. Die neue Resume-Datei vom 07.09.2026 hat Vorrang vor älteren datierten Resume-Abschnitten, wenn etwas widersprüchlich ist.
+
+Arbeitsweise:
+- Deutsch, kompakt und entscheidungsorientiert.
+- Wenn ich „Go“ sage, ausführen und nicht erneut rückfragen, solange kein echtes Sicherheits-/Architekturproblem auftaucht.
+- Jeden sinnvollen Fortschritt sofort in GitHub sichern.
+- Immer zuerst einen Branch erstellen, niemals Test-/Noop-Dateien direkt auf main.
+- Research bleibt auf eigenen Research-Branches bis zur bewussten Review/Promotion.
+- Release Safety immer auf dem exakten finalen Head prüfen.
+- Beim Merge immer expected_head_sha verwenden.
+
+HARTE INVARIANTEN:
+- Baseline 6.2.0 / 6.2-SIGNAL-V1 bleibt eingefroren.
+- Live Trading bleibt deaktiviert.
+- Research darf Paper/live Execution nicht automatisch verändern oder promoten.
+- server.js nicht anfassen, außer es gibt einen ausdrücklich begründeten Architekturentscheid.
+- Pionex Bots vorerst NICHT verändern; Fokus liegt auf Paper/Research.
+- Nicht überfiltern: wenige harte Gates, mehr Evidenz als Soft Score/Risikogewichtung.
+- Immer Trade-Frequenz/Opportunity Cost, LONG/SHORT × Regime, Asset-Konzentration, DD, Sample Adequacy und Walk-Forward/OOS mitbewerten.
+
+AKTUELLER PRODUKTIONSSTAND:
+- main-Checkpoint beim Resume: 995b65d32193809712c002a0c9d4205cdfcb35da.
+- v8 hat genau fünf Root-Views: CENTER · DEPOT · TRADE · PAPER · MORE.
+- R18 Near-Live-Portfolio ist umgesetzt und per iPhone validiert: Spot wird ca. alle 30s mit frischen öffentlichen Binance-Preisen bewertet; Trading/Pionex bleibt Snapshot/Manual. Gesamtwert daher nicht als vollständig exchange-live bezeichnen.
+- Die frühere scheinbar statische ~$27.313-Anzeige wurde durch R18 behoben; spätere iPhone-Validierung zeigte CENTER ~$27.846 und DEPOT ~$27.867 mit stimmiger Spot+Trading-Reconciliation.
+
+AKTUELLER PAPER-/RESEARCH-FOKUS:
+- Challenger V2 ist weiterhin der stärkste Legacy-Paperbot, aber nicht promotionsreif.
+- Hybrid Alpha Strategie-Comparator ist eingefroren auf v7.97 Low-Liquidity Risk Attenuation.
+- v7.98 Funding, v7.99 OI, v7.100 Taker Flow und v7.101 Flat Portfolio Budget wurden alle sauber getestet und VERWORFEN. Keine nachträgliche Schwellen-/Faktor-/Cap-Suche.
+- v7.101 zeigte zwar stark reduzierten DD, zerstörte aber zu viel Expectancy/PF. Der nützliche Befund ist strukturell: gleichzeitiges Cross-Asset-Risiko ist konzentriert, ein flacher 1.00-Budget-Cap ist aber zu grob.
+- Falls Hybrid Alpha weitergeht, dann nur mit einer neu vorab definierten strukturellen Hypothese, bevorzugt correlation/cluster-aware oder marginal portfolio contribution. Keine Regel anhand des bekannten negativen Fold 2 nachoptimieren.
+- Alternativ Research pausieren und Holdouts reifen lassen.
+
+FIB-STRANG:
+- FIB V1/V2 nicht promotionsfähig.
+- FIB V3 Daily anchors + 4h execution historisch stark, aber Konzentrations-Gate fällt wegen SOL-Anteil >40%.
+- FIB V3 prospective holdout ist gelockt ab 2026-09-06T14:15Z; früheste formale Kalender-Eignung 2027-03-05T14:15Z und zusätzlich >=100 closed baskets. Nicht für Tuning verwenden.
+
+OFFENE RESEARCH-PRs und exakte Details stehen in MERIDIAN_RESUME_2026-09-07.md. Nicht einfach in main mergen, nur weil sie offen sind.
+
+Wenn du alles gelesen hast, fasse mir bitte in maximal 8 Punkten zusammen:
+1. Produktionsstand,
+2. R18 Portfolio-Live-Status,
+3. Pionex-Scope,
+4. stärkster Paperbot-Befund,
+5. aktueller Hybrid-Comparator,
+6. verworfene v7.98–v7.101-Lehren,
+7. FIB-Holdout,
+8. dein empfohlener nächster Research-Schritt.
+
+Danach warte auf mein „Go“ bzw. führe bei „Go“ direkt aus.
