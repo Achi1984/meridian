@@ -7,6 +7,8 @@ on:
       - 'scripts/hybrid-alpha-v7102-evidence.mjs'
       - 'test/hybrid-alpha-portfolio-v7102.test.js'
       - 'research/hybrid-alpha-v7102-correlation-cluster-design.md'
+      - 'research/hybrid-alpha-v7102-evidence-20260907.md'
+      - 'research/hybrid-alpha-v7102-stopping-rule.md'
       - '.github/workflows/hybrid-alpha-v7102-evidence.yml'
 permissions:
   contents: read
