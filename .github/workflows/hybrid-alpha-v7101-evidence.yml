@@ -7,7 +7,7 @@ on:
       - 'scripts/hybrid-alpha-v7101-evidence.mjs'
       - 'test/hybrid-alpha-portfolio-v7101.test.js'
       - 'research/hybrid-alpha-v7101-portfolio-budget-design.md'
-      - 'research/hybrid-alpha-v7101-evidence-20260906.md'
+      - 'research/hybrid-alpha-v7101-evidence-*.md'
       - '.github/workflows/hybrid-alpha-v7101-evidence.yml'
 permissions:
   contents: read
