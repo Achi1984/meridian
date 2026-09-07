@@ -16,6 +16,9 @@ V1 tests exactly one setup: entry into Wave 3 after a confirmed Wave-2 retraceme
 - 4h defines waves, confirms pivots and executes orders.
 - LONG and SHORT rules are exact mirrors.
 - Coinbase Exchange public OHLC is the historical source.
+- Primary period: `2023-09-06T16:00:00Z` to `2024-09-06T16:00:00Z`.
+- Secondary stability periods: the following two disjoint years through `2026-09-06T16:00:00Z`.
+- Fixed total execution cost: `0.05R` per completed trade, including both partial exits.
 
 ## Mechanical wave count
 
