@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8'),js=fs.readFileSync(new URL('../v8-clean/research-control-r19.js',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../v8-clean/research-control-r19.css',import.meta.url),'utf8');
+test('R19 is loaded inside the real PAPER view',()=>{assert.match(html,/research-control-r19\.css/);assert.match(html,/research-control-r19\.js/);assert.match(js,/view-paper/);assert.doesNotMatch(js,/appendChild\([^)]*body|overlay/i)});
+test('R19 exposes the frozen registry and safety state',()=>{for(const x of ['ELLIOTT WAVE 3','FIB V3','HYBRID v7.97','ELLIOTT WAVE 5','PORTFOLIO ALLOCATORS'])assert.match(js,new RegExp(x.replace('.','\\.')));assert.match(js,/AUTO-PROMOTION/);assert.match(js,/EXECUTION/);assert.doesNotMatch(js,/fetch\(|placeOrder|submitOrder|PROMOTE_NOW/i)});
+test('R19 preserves compact mobile presentation',()=>{assert.match(css,/research-control-r19/);assert.match(css,/@media\(max-width:390px\)/);assert.doesNotMatch(css,/position\s*:\s*fixed|display\s*:\s*none/i)});

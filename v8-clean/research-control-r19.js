@@ -1,0 +1,12 @@
+// MERIDIAN v8 R19 — read-only research registry. No execution or promotion path.
+const ITEMS=Object.freeze([
+ {name:'ELLIOTT WAVE 3',status:'FROZEN CANDIDATE',tone:'watch',headline:'PF 1,21 · EXP +0,088R',detail:'V2 älteres Jahr: PF 1,39 · 7/8 Gates · Sample 101/120',action:'Unverändert lassen · keine Promotion'},
+ {name:'FIB V3',status:'PROSPECTIVE HOLDOUT',tone:'watch',headline:'Historisch PF 1,34',detail:'Eligibility frühestens 05.03.2027 und ≥100 geschlossene Baskets',action:'Holdout beobachten · Kandidat nicht verändern'},
+ {name:'HYBRID v7.97',status:'RESEARCH REFERENCE',tone:'muted',headline:'24h Comparator',detail:'Threshold- und Microstructure-Serie abgeschlossen',action:'Keine weitere Schwellenwertsuche'},
+ {name:'ELLIOTT WAVE 5',status:'REJECTED',tone:'danger',headline:'10 Trades · Folgejahre negativ',detail:'Zu geringe Opportunity und keine Stabilität',action:'Geschlossen · kein Tuning'},
+ {name:'PORTFOLIO ALLOCATORS',status:'REJECTED',tone:'danger',headline:'v7.101 / v7.102',detail:'Drawdown besser, aber zu viel Expectancy verloren',action:'Keine Budget- oder Korrelationsvarianten'}
+]);
+function card(x){return `<article class="research-control-item"><div class="research-control-head"><b>${x.name}</b><span class="tone-${x.tone}">${x.status}</span></div><strong>${x.headline}</strong><small>${x.detail}</small><div class="research-control-action">${x.action}</div></article>`}
+function render(){const root=document.getElementById('view-paper');if(!root||document.getElementById('researchControlR19'))return;const section=document.createElement('section');section.id='researchControlR19';section.className='card research-control-r19';section.innerHTML=`<div class="eyebrow">R19 · RESEARCH CONTROL</div><div class="research-control-summary"><div><span>EXECUTION</span><b class="tone-safe">NONE</b></div><div><span>AUTO-PROMOTION</span><b class="tone-safe">OFF</b></div></div>${ITEMS.map(card).join('')}<div class="research-control-foot">Answer first · Details on demand · Research bleibt von Paper/Live getrennt.</div>`;root.appendChild(section)}
+const observer=new MutationObserver(()=>{if(document.getElementById('app')?.dataset?.view==='paper')queueMicrotask(render)});const paper=document.getElementById('view-paper');if(paper)observer.observe(paper,{childList:true,subtree:false});document.getElementById('mainNav')?.addEventListener('click',e=>{if(e.target.closest('[data-route="paper"]'))setTimeout(render,0)});if(document.getElementById('app')?.dataset?.view==='paper')render();
+export {ITEMS};
