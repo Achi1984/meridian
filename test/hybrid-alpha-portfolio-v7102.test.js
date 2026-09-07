@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {applyCorrelationClusterBudget} from '../hybrid-alpha-portfolio-v7102.js';
+const row=(symbol,risk,side='LONG',timestamp='t')=>({timestamp,symbol,side,riskMultiplier:risk,grossR:2*risk,costR:.03*risk,netR:1.97*risk});
+const corr=values=>(t,a,b)=>values[`${a}:${b}`]??values[`${b}:${a}`]??(a===b?1:null);
+test('strong signed correlation shares the fixed cluster budget',()=>{const out=applyCorrelationClusterBudget([row('A',.8),row('B',.4)],corr({'A:B':.8}));assert.equal(out.reduce((a,x)=>a+x.riskMultiplier,0),1);assert.ok(out.every(x=>x.portfolioClusterSize===2&&x.portfolioScaled))});
+test('uncorrelated simultaneous positions retain independent risk',()=>{const input=[row('A',.8),row('B',.7)],out=applyCorrelationClusterBudget(input,corr({'A:B':.4}));assert.deepEqual(out.map(x=>x.riskMultiplier),[.8,.7]);assert.ok(out.every(x=>!x.portfolioScaled&&x.portfolioClusterSize===1))});
+test('opposite sides use signed exposure correlation',()=>{const out=applyCorrelationClusterBudget([row('A',.8),row('B',.7,'SHORT')],corr({'A:B':-.8}));assert.ok(out.every(x=>x.portfolioScaled&&x.portfolioClusterSize===2))});
+test('missing evidence is conservative and never raises risk',()=>{const input=[row('A',.8),row('B',.7),row('C',.4)],out=applyCorrelationClusterBudget(input,()=>null);assert.equal(out.length,input.length);assert.ok(out.every((x,i)=>x.riskMultiplier<=input[i].riskMultiplier));assert.ok(out.every(x=>x.portfolioCorrelationMissing));assert.ok(out.every(x=>x.portfolioClusterOutgoingRisk<=1))});
+test('clusters are transitive',()=>{const out=applyCorrelationClusterBudget([row('A',.6),row('B',.6),row('C',.6)],corr({'A:B':.8,'B:C':.8,'A:C':.2}));assert.ok(out.every(x=>x.portfolioClusterSize===3));assert.ok(Math.abs(out.reduce((a,x)=>a+x.riskMultiplier,0)-.999)<.002)});
