@@ -6,6 +6,8 @@ on:
       - 'scripts/elliott-wave-bot-v2-replication.mjs'
       - 'test/elliott-wave-bot-v2-replication.test.js'
       - 'research/elliott-wave-bot-v2-historical-replication-design.md'
+      - 'research/elliott-wave-bot-v2-replication-evidence-20260907.md'
+      - 'research/elliott-wave-bot-v2-stopping-rule.md'
       - '.github/workflows/elliott-wave-bot-v2-replication.yml'
 permissions:
   contents: read
