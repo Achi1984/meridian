@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r27';
+import {getJson} from './data.js?v=8.0-r28';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -80,8 +80,8 @@ function botAnswer(key,bot={}){
   const m=bot.metrics||{},lock=bot.gateReasons?.[0]||null;
   const waiting=bot.enabled===false,state=waiting?'WARTET':bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
   const tone=waiting?'watch':bot.riskLocked?'danger':bot.openCount>0?'safe':'watch';
-  const why=waiting?'Startet automatisch nach qualifiziertem V2-Stop':bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt`;
-  return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div><strong>${usd(m.pnl)} · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}</strong><small>${why}</small></div>`;
+  const why=waiting?'Startet automatisch nach qualifiziertem V2-Stop':bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt${bot.reasons?.length?` · ${gateLabel(bot.reasons[0].reason)}`:''}`;
+  return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div><strong>${usd(m.pnl)}${m.closedTrades>0?` · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}`:' · Noch keine abgeschlossenen Trades'}</strong><small>${why}</small></div>`;
 }
 function tradeHtml(t={}){
   const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
@@ -129,7 +129,8 @@ async function hydrate(){
   const el=root(); if(!el||loading||(document.getElementById('paperCohortR18')&&document.getElementById('paperExecutionAuditR22')))return;
   if(cached){accept(cached);return}
   loading=true;
-  try{const analytics=await getJson('/api/research-analytics');if(!cached)accept(analytics)}catch(_e){}finally{loading=false}
+  // The main loader owns requests; disclosures must not trigger a duplicate full-ledger fetch.
+  loading=false;
 }
 const observer=new MutationObserver(()=>{if(document.getElementById('app')?.dataset?.view==='paper')queueMicrotask(hydrate)});
 if(root())observer.observe(root(),{childList:true,subtree:false});
