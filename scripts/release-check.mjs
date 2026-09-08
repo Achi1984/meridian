@@ -8,6 +8,7 @@ const v=String(release.version||'');
 const build=String(release.buildId||'');
 const revision=build.split('-').slice(-1)[0]||'R1';
 const tag=`${v}-${revision}`;
+const cleanAssetTag=`${v}-${revision.toLowerCase()}`;
 
 must(/^\d+\.\d+$/.test(v),'invalid release version');
 must(build.startsWith(v+'-'),'buildId/version mismatch');
@@ -52,7 +53,7 @@ if(cleanCutover){
     must(clean.includes(`data-route="${key}"`),`clean production target missing route ${key}`);
   }
   must(clean.includes('r8-polish.css?v=8.0-r9'),'clean production target must include R8 mobile polish on R9 cache tag');
-  must(clean.includes('app.js?v=8.0-r9'),'clean production app tag mismatch');
+  must(clean.includes(`app.js?v=${cleanAssetTag}`),'clean production app tag mismatch');
   must(clean.includes('more-runtime.js?v=8.0-r9'),'clean production MORE tag mismatch');
   must(clean.includes('v8.0 · PROD'),'clean production status identity missing');
   must(!clean.includes('class="mode-banner"'),'clean production must not reintroduce redundant customer banner');
