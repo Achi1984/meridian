@@ -8,8 +8,8 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.css',import.meta
 
 test('R18 cohort board and R22 execution audit are wired into PAPER',()=>{
   assert.match(html,/paper-cohort-r18\.css\?v=8\.0-r22/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r27/);
-  assert.match(js,/\/api\/research-analytics/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r28/);
+  assert.doesNotMatch(js,/getJson\('\/api\/research-analytics'\)/);
   assert.match(js,/COHORT DEEP DIVE/);
   assert.match(js,/FULL LEDGER EXECUTION AUDIT/);
   assert.match(js,/renderExecutionAudit\(payload\.executionAudit,payload\.botHealth\)/);
