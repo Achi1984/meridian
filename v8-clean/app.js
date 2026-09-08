@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r27';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r28';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -97,10 +97,11 @@ function paperHtml(x){
   const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
-  return `<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
+  const full=`<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
   <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>V3 ${fmtUsd((x.rows||[]).find(r=>r.key==='challengerV3')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challengerV3')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
   <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
   <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
+  return x.detailsLoaded===false?full.slice(0,full.indexOf('<details'))+`<section class="card"><button id="loadPaperDetails" type="button">Analysen und archivierte Bots laden</button><p class="muted">Aktualisiert: ${new Date(x.loadedAt).toLocaleTimeString('de-AT')}</p></section>`:full;
 }
 function placeholder(title,sub){return `<section class="card placeholder"><div><div class="eyebrow">V8 CLEAN</div><b>${title}</b><small>${sub}</small></div></section>`}
 function moreHtml(){return `<section class="card"><div class="eyebrow">MORE · SYSTEM & DETAILS</div><h2>Saubere Tiefe statt Legacy-Overlay</h2><p class="muted">Hier kommen Markt, Forecast, Scanner, Research, Diagnostik und Einstellungen als explizite Module hinein.</p><div class="row"><span>Private Data</span><b>${hasReadToken()?'VERBUNDEN':'LOCKED'}</b></div><button id="connectToken" class="action" type="button"><span>READ TOKEN</span><b>${hasReadToken()?'Token ersetzen':'Token verbinden'}</b></button></section>`}
@@ -112,12 +113,25 @@ function render(key){
   if(key==='paper')root.innerHTML=paperHtml(state.paper);
   if(key==='more')root.innerHTML=moreHtml();
   if(key==='paper'&&state.paper?.ok)window.dispatchEvent(new CustomEvent('meridian:v8-paperdata',{detail:{deepDive:state.paper.deepDive,executionAudit:state.paper.executionAudit,botHealth:state.paper.botHealth}}));
+  $('#loadPaperDetails')?.addEventListener('click',()=>hydratePaper(true));
   $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;state.paper=null;hydrateCenter();hydrateDepot();hydrateTrade();hydratePaper();render('more')}});
 }
 async function hydrateCenter(){state.center=null;if(state.view==='center')render('center');state.center=await loadCenter();if(state.view==='center')render('center')}
 async function hydrateDepot(){state.depot=null;if(state.view==='depot')render('depot');state.depot=await loadDepot();if(state.view==='depot')render('depot')}
 async function hydrateTrade(){state.trade=null;if(state.view==='trade')render('trade');state.trade=await loadTrade();if(state.view==='trade')render('trade')}
-async function hydratePaper(){if(!state.paper&&state.view==='paper')render('paper');const next=await loadPaper();state.paper=next;if(state.view==='paper')render('paper')}
+let paperRequest=null,paperGeneration=0;
+window.addEventListener('meridian:v8-tokenchange',()=>{paperGeneration++;state.paper=null;paperRequest=null;});
+async function hydratePaper(details=state.paper?.detailsLoaded!==false&&!!state.paper){
+  if(paperRequest)return paperRequest;
+  const generation=paperGeneration;
+  paperRequest=(async()=>{
+    const next=await loadPaper({details});
+    if(generation!==paperGeneration)return;
+    state.paper=next;
+    if(state.view==='paper')render('paper');
+  })();
+  try{await paperRequest}finally{if(generation===paperGeneration)paperRequest=null;}
+}
 function wire(){document.querySelectorAll('#mainNav [data-route]').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.route;setView(b.dataset.route)}));window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(ROUTES.includes(k))setView(k)});}
 
 wire();

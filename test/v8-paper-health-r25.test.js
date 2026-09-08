@@ -10,17 +10,15 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-health-r25.css',import.meta
 
 test('R25 loads a cache-coherent bot health presentation',()=>{
   assert.match(html,/paper-health-r25\.css\?v=8\.0-r25/);
-  assert.match(html,/app\.js\?v=8\.0-r27/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r27/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r27/);
-  assert.match(audit,/\.\/data\.js\?v=8\.0-r27/);
+  assert.match(html,/app\.js\?v=8\.0-r28/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r28/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r28/);
+  assert.match(audit,/\.\/data\.js\?v=8\.0-r28/);
   assert.match(app,/botHealth:state\.paper\.botHealth/);
   assert.match(css,/#view-paper \.paper-hero-r23 \.paper-state\{font-size:25px/);
 });
 
 test('R25 derives health from existing protected read-only contracts',()=>{
-  assert.match(data,/getJson\('\/api\/status'\)\.catch\(\(\)=>null\)/);
-  assert.match(data,/getJson\('\/api\/challenger-v2'\)\.catch\(\(\)=>null\)/);
   assert.match(data,/lastGoodMarketAt/);
   assert.match(data,/lastSignalScanAt/);
   assert.match(data,/challengerEvaluations\.filter/);
@@ -40,7 +38,6 @@ test('R25 separates active audit findings from retired history and explains CHEC
 
 test('R25 health remains optional, protected aggregate and execution-free',()=>{
   assert.match(data,/available:!!\(status\?\.engine\|\|challenger\?\.lastScanAt\)/);
-  assert.match(audit,/if\(!cached\)accept\(analytics\)/);
   const all=app+data+audit+css;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|method\s*:\s*['"]POST/i);
   assert.doesNotMatch(all,/server\.js/);

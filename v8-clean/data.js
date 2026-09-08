@@ -265,7 +265,23 @@ export async function loadTrade(){
   }
 }
 
-export async function loadPaper(){
+function summaryLedger(raw={},baseline=false){
+  const a=raw?.account||{},tr=baseline?(raw?.trades||[]).filter(t=>t.status==='CLOSED'):null;
+  const count=baseline?tr.length:Number(raw?.closedCount||0);
+  const positions=baseline?(raw?.positions||[]):(raw?.openPositions||[]);
+  const realized=baseline?tr.reduce((sum,t)=>sum+Number(t.realized||0),0):Number(a.realizedPnl||0)+positions.reduce((sum,t)=>sum+Number(t.feeOpen||0),0);
+  const gp=tr?.reduce((sum,t)=>sum+Math.max(0,Number(t.realized||0)),0)||0,gl=tr?.reduce((sum,t)=>sum+Math.max(0,-Number(t.realized||0)),0)||0;
+  const eq=Number(a.equity),peak=Number(a.peakEquity);
+  return {closedTrades:count,openTrades:positions.length,pnl:eq-Number(a.startEquity),expectancy:count?realized/count:null,profitFactor:count?(baseline?(gl?gp/gl:gp?99:0):raw.profitFactor):null,winRate:count?(baseline?tr.filter(t=>t.realized>0).length/count*100:raw.winRate):null,maxDrawdownPct:peak>0?Math.max(0,(peak-eq)/peak*100):null};
+}
+export async function loadPaper({details=false}={}){
+  if(!details){
+    try{
+      const [status,challenger,challengerV3,baseline]=await Promise.all([getJson('/api/status'),getJson('/api/challenger-v2'),getJson('/api/challenger-v3'),getJson('/api/paper')]);
+      const ledgers={baseline:summaryLedger(baseline,true),challenger:summaryLedger(challenger),challengerV3:summaryLedger(challengerV3)};
+      return {...paperModel({ledgers},{},status,challenger,challengerV3,baseline),detailsLoaded:false,loadedAt:new Date().toISOString()};
+    }catch(e){return {ok:false,locked:e?.status===401,error:e?.status===401?'READ_TOKEN_REQUIRED':String(e?.message||e)};}
+  }
   try{
     const [analytics,activity,status,challenger,challengerV3,baseline]=await Promise.all([
       getJson('/api/research-analytics'),getJson('/api/activity-summary'),
