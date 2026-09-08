@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ledgerAnalytics, challengerCounterfactual, researchComparison } from '../research-analytics.js';
+import { ledgerAnalytics, challengerCounterfactual, paperExecutionAudit, researchComparison } from '../research-analytics.js';
 
 const trade=(pnl,extra={})=>({status:'CLOSED',symbol:'BTCUSDT',side:'LONG',openedAt:'2026-09-01T00:00:00Z',closedAt:'2026-09-01T01:00:00Z',realized:pnl,exitReason:pnl>0?'TP1':'SL',...extra});
 
@@ -44,4 +44,34 @@ test('comparison is research-only and exposes known audit flags',()=>{
   assert.equal(out.ledgers.regime.sideAdaptation.trades,1);
   assert.equal(out.auditFlags.challengerBaselineReadyDependency,true);
   assert.equal(out.auditFlags.regimeAdaptedSideUsesBaselineDirectionalScores,true);
+});
+
+
+test('full-ledger execution audit separates price overrun, fees and post-stop re-entry without raw trades',()=>{
+  const first=trade(-15,{entry:100,sl:99,exit:98.5,qty:10,feeOpen:1,feeClose:1,openedAt:'2026-09-01T00:00:00Z',closedAt:'2026-09-01T01:00:00Z'});
+  const second=trade(10,{entry:99,sl:98,exit:100,qty:10,feeOpen:1,feeClose:1,openedAt:'2026-09-01T01:30:00Z',closedAt:'2026-09-01T02:00:00Z'});
+  const out=paperExecutionAudit({baseline:{trades:[first,second]}});
+  const b=out.ledgers.baseline;
+  assert.equal(out.aggregateOnly,true);
+  assert.equal(out.protectedRouteRequired,true);
+  assert.equal(b.coverageComplete,true);
+  assert.equal(b.stopExecution.evaluable,1);
+  assert.equal(b.stopExecution.materialLosses,1);
+  assert.equal(b.stopExecution.maximumActualLossR,1.5);
+  assert.equal(b.stopExecution.averagePriceLossR,1.5);
+  assert.equal(b.stopExecution.averageFeeR,.2);
+  assert.equal(b.stopExecution.priceBeyondStop,1);
+  assert.equal(b.behavior.postStopReentries,1);
+  const keys=[];
+  const collect=x=>{if(!x||typeof x!=='object')return;for(const [key,value] of Object.entries(x)){keys.push(key);collect(value);}};
+  collect(out);
+  for(const forbidden of ['trades','entry','sl','stop','qty','symbol'])assert.equal(keys.includes(forbidden),false);
+});
+
+test('research comparison exposes protected aggregate execution audit',()=>{
+  const state={trades:[trade(-10,{entry:100,sl:99,exit:99,qty:10,feeOpen:0,feeClose:0})]};
+  const out=researchComparison({baseline:state});
+  assert.equal(out.executionAudit.schemaVersion,'8.21-PAPER-EXECUTION-AUDIT-V1');
+  assert.equal(out.executionAudit.total.closedTrades,1);
+  assert.equal(out.executionAudit.executionImpact,false);
 });

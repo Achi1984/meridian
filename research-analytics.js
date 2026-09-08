@@ -149,6 +149,68 @@ export function paperBotDeepDive(states={},window={}){
   };
 }
 
+export function paperExecutionAudit(states={},policy={}){
+  const cfg={materialLossR:1.25,closureClusterSeconds:90,reentryHours:6,bundleMinutes:30,...policy};
+  const timeGroups=(rows,key,windowMs)=>{
+    const sorted=rows.filter(x=>isoMs(x?.[key])!=null).slice().sort((x,y)=>isoMs(x[key])-isoMs(y[key]));
+    const groups=[];let current=[];
+    for(const row of sorted){
+      if(!current.length||isoMs(row[key])-isoMs(current.at(-1)[key])<=windowMs)current.push(row);
+      else{if(current.length>=2)groups.push(current);current=[row];}
+    }
+    if(current.length>=2)groups.push(current);
+    return groups;
+  };
+  const auditLedger=(state,bot)=>{
+    const trades=closedTrades(state);
+    const stopRows=trades.filter(x=>x.exitReason==='SL').map(x=>{
+      const entry=num(x.entry,NaN),stop=num(x.sl,NaN),exit=num(x.exit,NaN),qty=Math.abs(num(x.qty,NaN));
+      const risk=Number.isFinite(entry)&&Number.isFinite(stop)&&Number.isFinite(qty)?Math.abs(entry-stop)*qty:NaN;
+      const direction=String(x.side).toUpperCase()==='LONG'?1:-1;
+      const priceLoss=Number.isFinite(exit)&&Number.isFinite(entry)&&Number.isFinite(qty)?Math.max(0,-(exit-entry)*qty*direction):NaN;
+      const fees=Math.max(0,num(x.feeOpen))+Math.max(0,num(x.feeClose));
+      const slip=Number.isFinite(exit)&&Number.isFinite(stop)&&stop>0
+        ?(direction===1?Math.max(0,(stop-exit)/stop*10000):Math.max(0,(exit-stop)/stop*10000)):NaN;
+      return risk>0?{actualLossR:Math.abs(Math.min(0,num(x.realized)))/risk,priceLossR:priceLoss/risk,feeR:fees/risk,stopSlipBps:slip}:null;
+    }).filter(Boolean);
+    const openings=timeGroups(trades,'openedAt',cfg.bundleMinutes*60000)
+      .filter(g=>new Set(g.map(x=>x.symbol)).size>1&&new Set(g.map(x=>x.side)).size===1);
+    const closes=timeGroups(trades,'closedAt',cfg.closureClusterSeconds*1000);
+    const ordered=trades.filter(x=>isoMs(x.openedAt)!=null).slice().sort((x,y)=>isoMs(x.openedAt)-isoMs(y.openedAt));
+    let rapid=0,postStop=0,minMinutes=null;
+    for(let i=1;i<ordered.length;i++){
+      const cur=ordered[i];
+      for(let j=i-1;j>=0;j--){
+        const prev=ordered[j];
+        if(prev.symbol!==cur.symbol||prev.side!==cur.side)continue;
+        const delta=isoMs(cur.openedAt)-isoMs(prev.closedAt);
+        if(delta>=0&&delta<=cfg.reentryHours*3600000){rapid++;if(prev.exitReason==='SL')postStop++;const mins=delta/60000;minMinutes=minMinutes==null?mins:Math.min(minMinutes,mins);}
+        break;
+      }
+    }
+    const mean=key=>stopRows.length?round(stopRows.reduce((s,x)=>s+num(x[key]),0)/stopRows.length,3):null;
+    const max=key=>stopRows.length?round(Math.max(...stopRows.map(x=>num(x[key]))),3):null;
+    const last=trades.map(x=>isoMs(x.closedAt)).filter(Number.isFinite).sort((x,y)=>y-x)[0];
+    return {
+      bot,coverageComplete:true,closedTrades:trades.length,lastClosedAt:Number.isFinite(last)?new Date(last).toISOString():null,
+      stopExecution:{stopExits:trades.filter(x=>x.exitReason==='SL').length,evaluable:stopRows.length,materialLosses:stopRows.filter(x=>x.actualLossR>cfg.materialLossR).length,priceBeyondStop:stopRows.filter(x=>x.stopSlipBps>0).length,averageActualLossR:mean('actualLossR'),maximumActualLossR:max('actualLossR'),averagePriceLossR:mean('priceLossR'),averageFeeR:mean('feeR'),maximumStopSlipBps:max('stopSlipBps')},
+      behavior:{rapidSameDirectionReentries:rapid,postStopReentries:postStop,minimumReentryMinutes:round(minMinutes,1),directionalMultiAssetBundles:openings.length,tradesInsideBundles:openings.reduce((s,g)=>s+g.length,0),closureClusters:closes.length,tradesInsideClosureClusters:closes.reduce((s,g)=>s+g.length,0)}
+    };
+  };
+  const ledgers={
+    baseline:auditLedger(states.baseline||{},'baseline'),
+    shadow:auditLedger(states.shadow||{},'shadow'),
+    challenger:auditLedger(states.challenger||{},'challenger'),
+    regime:auditLedger(states.regime||{},'regime')
+  };
+  const values=Object.values(ledgers);
+  return {
+    schemaVersion:'8.21-PAPER-EXECUTION-AUDIT-V1',researchOnly:true,executionImpact:false,aggregateOnly:true,protectedRouteRequired:true,policy:cfg,ledgers,
+    total:{closedTrades:values.reduce((s,x)=>s+x.closedTrades,0),evaluableStops:values.reduce((s,x)=>s+x.stopExecution.evaluable,0),materialLosses:values.reduce((s,x)=>s+x.stopExecution.materialLosses,0),postStopReentries:values.reduce((s,x)=>s+x.behavior.postStopReentries,0),directionalMultiAssetBundles:values.reduce((s,x)=>s+x.behavior.directionalMultiAssetBundles,0),closureClusters:values.reduce((s,x)=>s+x.behavior.closureClusters,0)},
+    limitations:['Aggregate diagnostics do not expose raw trades.','Observed association is not causal proof; candle-level replay is required before changing execution.']
+  };
+}
+
 export function researchComparison(states={}){
   const baseline=ledgerAnalytics(states.baseline||{},'baseline');
   const shadow=ledgerAnalytics(states.shadow||{},'shadow');
@@ -165,6 +227,7 @@ export function researchComparison(states={}){
     schemaVersion:'7.47-TELEMETRY-V1',researchOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
     ledgers:{baseline,shadow,challenger,regime},
     opportunityCost:{challenger:challengerCounterfactual(states.challenger||{}),shadow:{available:false,reason:'NO_SHADOW_COUNTERFACTUAL_LEDGER_YET'},regime:{available:false,reason:'NO_REGIME_COUNTERFACTUAL_LEDGER_YET'}},
+    executionAudit:paperExecutionAudit(states),
     deepDive:paperBotDeepDive(states),
     auditFlags:{challengerBaselineReadyDependency:true,regimeAdaptedSideUsesBaselineDirectionalScores:true,liveBacktestExitSequencingMismatch:true}
   };
