@@ -31,7 +31,7 @@ test('v8 R9 presents canonical production identity without prototype wording',()
   assert.match(html,/<title>ACHI MERIDIAN v8<\/title>/);
   assert.match(html,/v8\.0 · PROD/);
   assert.doesNotMatch(html,/>v8\.0 CLEAN<|CLEAN CUSTOMER VIEW|v8 Clean<\/title>/);
-  assert.match(html,/app\.js\?v=8\.0-r26/);
+  assert.match(html,/app\.js\?v=8\.0-r27/);
   assert.match(html,/more-runtime\.js\?v=8\.0-r9/);
   assert.match(html,/r8-polish\.css\?v=8\.0-r9/);
 });
