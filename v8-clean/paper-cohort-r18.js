@@ -1,4 +1,4 @@
-import {getJson} from './data.js';
+import {getJson} from './data.js?v=8.0-r24';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -78,14 +78,22 @@ function renderExecutionAudit(audit){
     <div class="audit-r22-list">${Object.entries(ledgers).map(([key,value])=>ledgerHtml(key,value)).join('')}</div>
     <div class="cohort-r18-foot">Vollständige PostgreSQL-Ledger · nur geschützte Aggregate · beobachtete Zusammenhänge sind kein Kausalbeweis · keine Strategie- oder Ausführungswirkung.</div>`;
 }
-let loading=false;
+let loading=false,cached=null;
+function accept(payload){
+  if(!payload)return;
+  cached=payload;
+  render(payload.deepDive);
+  renderExecutionAudit(payload.executionAudit);
+}
 async function hydrate(){
   const el=root(); if(!el||loading||(document.getElementById('paperCohortR18')&&document.getElementById('paperExecutionAuditR22')))return;
+  if(cached){accept(cached);return}
   loading=true;
-  try{const a=await getJson('/api/research-analytics');render(a?.deepDive);renderExecutionAudit(a?.executionAudit)}catch(_e){}finally{loading=false}
+  try{accept(await getJson('/api/research-analytics'))}catch(_e){}finally{loading=false}
 }
 const observer=new MutationObserver(()=>{if(document.getElementById('app')?.dataset?.view==='paper')queueMicrotask(hydrate)});
 if(root())observer.observe(root(),{childList:true,subtree:false});
 document.getElementById('mainNav')?.addEventListener('click',e=>{if(e.target.closest('[data-route="paper"]'))setTimeout(hydrate,0)});
-window.addEventListener('meridian:v8-tokenchange',()=>{document.getElementById('paperCohortR18')?.remove();document.getElementById('paperExecutionAuditR22')?.remove();hydrate()});
+window.addEventListener('meridian:v8-tokenchange',()=>{cached=null;document.getElementById('paperCohortR18')?.remove();document.getElementById('paperExecutionAuditR22')?.remove();hydrate()});
+window.addEventListener('meridian:v8-paperdata',e=>accept(e.detail));
 if(document.getElementById('app')?.dataset?.view==='paper')hydrate();
