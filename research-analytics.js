@@ -26,17 +26,17 @@ function maxDrawdownPct(state={},fallbackEq=0){
 }
 function regimeOf(t,bot){
   if(bot==='regime')return t.regimeType||t.regime||null;
-  if(bot==='challenger')return t.challengerRegime||t.regime||null;
+  if(bot==='challenger'||bot==='challengerV3')return t.challengerRegime||t.regime||null;
   if(bot==='shadow')return t.shadowRegime||t.regime||null;
   return t.regime||t.evidenceSnapshot?.regime||null;
 }
 function decisionOf(t,bot){
-  if(bot==='challenger')return t.challengerDecision||null;
+  if(bot==='challenger'||bot==='challengerV3')return t.challengerDecision||null;
   if(bot==='regime')return t.regimeDecision||null;
   return null;
 }
 function scoreOf(t,bot){
-  if(bot==='challenger')return num(t.challengerConfidence,NaN);
+  if(bot==='challenger'||bot==='challengerV3')return num(t.challengerConfidence,NaN);
   if(bot==='regime')return num(t.regimeScore,NaN);
   return NaN;
 }
@@ -201,6 +201,7 @@ export function paperExecutionAudit(states={},policy={}){
     baseline:auditLedger(states.baseline||{},'baseline'),
     shadow:auditLedger(states.shadow||{},'shadow'),
     challenger:auditLedger(states.challenger||{},'challenger'),
+    challengerV3:auditLedger(states.challengerV3||{},'challengerV3'),
     regime:auditLedger(states.regime||{},'regime')
   };
   const values=Object.values(ledgers);
@@ -215,9 +216,10 @@ export function researchComparison(states={}){
   const baseline=ledgerAnalytics(states.baseline||{},'baseline');
   const shadow=ledgerAnalytics(states.shadow||{},'shadow');
   const challenger=ledgerAnalytics(states.challenger||{},'challenger');
+  const challengerV3=ledgerAnalytics(states.challengerV3||{},'challengerV3');
   const regime=ledgerAnalytics(states.regime||{},'regime');
   const baseTrades=Math.max(1,baseline.closedTrades);
-  for(const x of [shadow,challenger,regime]){
+  for(const x of [shadow,challenger,challengerV3,regime]){
     x.vsBaseline={
       pnlDelta:round(x.pnl-baseline.pnl,2),ddDeltaPctPoints:round(x.maxDrawdownPct-baseline.maxDrawdownPct,2),
       tradeDelta:x.closedTrades-baseline.closedTrades,retentionPct:round(x.closedTrades/baseTrades*100,1),expectancyDelta:round(x.expectancy-baseline.expectancy,2)
@@ -225,10 +227,10 @@ export function researchComparison(states={}){
   }
   return {
     schemaVersion:'7.47-TELEMETRY-V1',researchOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
-    ledgers:{baseline,shadow,challenger,regime},
+    ledgers:{baseline,shadow,challenger,challengerV3,regime},
     opportunityCost:{challenger:challengerCounterfactual(states.challenger||{}),shadow:{available:false,reason:'NO_SHADOW_COUNTERFACTUAL_LEDGER_YET'},regime:{available:false,reason:'NO_REGIME_COUNTERFACTUAL_LEDGER_YET'}},
     executionAudit:paperExecutionAudit(states),
     deepDive:paperBotDeepDive(states),
-    auditFlags:{challengerBaselineReadyDependency:true,regimeAdaptedSideUsesBaselineDirectionalScores:true,liveBacktestExitSequencingMismatch:true}
+    auditFlags:{challengerBaselineReadyDependency:true,challengerV3FrozenPostStopPlan:true,regimeAdaptedSideUsesBaselineDirectionalScores:true,liveBacktestExitSequencingMismatch:true}
   };
 }

@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r26';
+import {getJson} from './data.js?v=8.0-r27';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -38,7 +38,7 @@ function render(deep){
     <div class="cohort-r18-foot">Research only · Kohorten mit n&lt;8 sind nicht promotionsfähig · keine automatische Ausführungswirkung.</div></div>`;
 }
 
-const botNames={baseline:'BASELINE',shadow:'SHADOW · RETIRED',challenger:'CHALLENGER V2',regime:'REGIME · RETIRED'};
+const botNames={baseline:'BASELINE',shadow:'SHADOW · RETIRED',challenger:'CHALLENGER V2 · ELTERN-LEDGER',challengerV3:'CHALLENGER V3',regime:'REGIME · RETIRED'};
 function metric(label,value,tone=''){
   return `<div class="audit-r22-metric"><span>${label}</span><b class="${tone?`tone-${tone}`:''}">${value}</b></div>`;
 }
@@ -78,40 +78,42 @@ function sumLedgers(ledgers={},keys=[]){
 }
 function botAnswer(key,bot={}){
   const m=bot.metrics||{},lock=bot.gateReasons?.[0]||null;
-  const state=bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
-  const tone=bot.riskLocked?'danger':bot.openCount>0?'safe':'watch';
-  const why=bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt`;
+  const waiting=bot.enabled===false,state=waiting?'WARTET':bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
+  const tone=waiting?'watch':bot.riskLocked?'danger':bot.openCount>0?'safe':'watch';
+  const why=waiting?'Startet automatisch nach qualifiziertem V2-Stop':bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt`;
   return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div><strong>${usd(m.pnl)} · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}</strong><small>${why}</small></div>`;
 }
 function tradeHtml(t={}){
   const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
-  return `<div class="paper-r26-trade"><div><b>${t.bot==='challenger'?'CHALLENGER':'BASELINE'} · ${t.symbol} ${t.side}</b><small>${date(t.closedAt)} · ${t.exitReason}</small></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
+  const bot=t.bot==='challengerV3'?'V3':t.bot==='challenger'?'V2':'BASELINE';
+  return `<div class="paper-r26-trade"><div><b>${bot} · ${t.symbol} ${t.side}</b><small>${date(t.closedAt)} · ${t.exitReason}</small></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
 }
 function renderAnswer(health={}){
   const el=root();if(!el||!health?.bots)return;
   let card=document.getElementById('paperAnswerR26');
   if(!card){card=document.createElement('section');card.id='paperAnswerR26';card.className='card paper-answer-r26';el.appendChild(card)}
   const e=health.engine||{},bots=health.bots||{},trades=health.recentTrades||[];
-  const locked=[bots.baseline,bots.challenger].filter(x=>x?.riskLocked).length;
-  card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · KLARE ANTWORT</div><b>${locked?`${locked} BOTS DURCH RISIKO-LIMIT PAUSIERT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
-    <div class="paper-r26-bots">${botAnswer('challenger',bots.challenger)}${botAnswer('baseline',bots.baseline)}</div>
-    <div class="paper-r26-verdict"><span>FAZIT</span><b>Challenger deutlich besser als Baseline, aber mit PF ${fmt(bots.challenger?.metrics?.profitFactor,2)} noch ohne positiven Edge. Behalten, nicht promoten.</b></div>
+  const locked=[bots.baseline,bots.challenger,bots.challengerV3].filter(x=>x?.riskLocked).length,v3=bots.challengerV3||{};
+  const verdict=v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung erst nach Prüfung einer neuen Hypothese.':v3.enabled?`V3 läuft mit eingefrorenen Parametern: Risiko ${fmt(v3.parameters?.fullRiskPct,2)}% · Score ≥${v3.parameters?.tradeScore??'—'} · Re-Entry-Sperre ${v3.parameters?.postStopReentryMinutes??'—'} min. Erst prospektiv bewerten.`:'V3 wartet auf einen qualifizierten Stop mit mindestens 20 geschlossenen Trades.';
+  card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
+    <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}${botAnswer('challenger',bots.challenger)}</div>
+    <div class="paper-r26-verdict"><span>NÄCHSTER TEST</span><b>${verdict}</b></div>
     <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
 }
 function renderExecutionAudit(audit,health={}){
   const el=root(); if(!el||!audit?.aggregateOnly)return;
   let card=document.getElementById('paperExecutionAuditR22');
   if(!card){card=document.createElement('details');card.id='paperExecutionAuditR22';card.className='card audit-r22 paper-disclosure';el.appendChild(card)}
-  const ledgers=audit.ledgers||{},active=sumLedgers(ledgers,['baseline','challenger']),retired=sumLedgers(ledgers,['shadow','regime']);
+  const ledgers=audit.ledgers||{},active=sumLedgers(ledgers,['baseline','challenger','challengerV3']),retired=sumLedgers(ledgers,['shadow','regime']);
   const attention=(num(active.materialLosses)||0)>0||(num(active.postStopReentries)||0)>0;
-  card.innerHTML=`<summary><span>TECHNISCHE DIAGNOSE</span><b>Stop ${active.materialLosses}/${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}</b></summary><div class="paper-disclosure-body"><div class="audit-r22-head"><div><div class="eyebrow">FULL LEDGER EXECUTION AUDIT</div><b>R26 · ${attention?'ACTIVE CHECK':'ACTIVE OK'}</b></div><span class="audit-r22-pill tone-${attention?'danger':'safe'}">READ ONLY</span></div>
+  card.innerHTML=`<summary><span>TECHNISCHE DIAGNOSE</span><b>Stop ${active.materialLosses}/${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}</b></summary><div class="paper-disclosure-body"><div class="audit-r22-head"><div><div class="eyebrow">FULL LEDGER EXECUTION AUDIT</div><b>R27 · ${attention?'ACTIVE CHECK':'ACTIVE OK'}</b></div><span class="audit-r22-pill tone-${attention?'danger':'safe'}">READ ONLY</span></div>
     <div class="audit-r22-summary">
       ${metric('Aktive Trades',active.closedTrades)}
       ${metric('Stop-Verluste &gt;1,25R',`${active.materialLosses} / ${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}`,(num(active.materialLosses)||0)>0?'danger':'safe')}
       ${metric('Re-Entries nach Stop',active.postStopReentries,(num(active.postStopReentries)||0)>0?'danger':'safe')}
       ${metric('Richtungs-Bündel',active.directionalMultiAssetBundles)}
     </div>
-    <div class="audit-r22-list audit-r25-active">${['baseline','challenger'].map(key=>ledgerHtml(key,ledgers[key],health?.bots?.[key])).join('')}</div>
+    <div class="audit-r22-list audit-r25-active">${['baseline','challenger','challengerV3'].map(key=>ledgerHtml(key,ledgers[key],health?.bots?.[key])).join('')}</div>
     <details class="audit-r25-retired"><summary><span>HISTORISCHE RETIRED-AUFFÄLLIGKEITEN</span><b>${retired.closedTrades} Trades · getrennt von aktiv</b></summary><div class="audit-r22-list">${['shadow','regime'].map(key=>ledgerHtml(key,ledgers[key])).join('')}</div></details>
     <div class="cohort-r18-foot">Vollständige PostgreSQL-Ledger · nur geschützte Aggregate · keine Strategie- oder Ausführungswirkung.</div></div>`;
 }
@@ -132,6 +134,6 @@ async function hydrate(){
 const observer=new MutationObserver(()=>{if(document.getElementById('app')?.dataset?.view==='paper')queueMicrotask(hydrate)});
 if(root())observer.observe(root(),{childList:true,subtree:false});
 document.getElementById('mainNav')?.addEventListener('click',e=>{if(e.target.closest('[data-route="paper"]'))setTimeout(hydrate,0)});
-window.addEventListener('meridian:v8-tokenchange',()=>{cached=null;document.getElementById('paperCohortR18')?.remove();document.getElementById('paperExecutionAuditR22')?.remove();hydrate()});
+window.addEventListener('meridian:v8-tokenchange',()=>{cached=null;document.getElementById('paperAnswerR26')?.remove();document.getElementById('paperCohortR18')?.remove();document.getElementById('paperExecutionAuditR22')?.remove();hydrate()});
 window.addEventListener('meridian:v8-paperdata',e=>accept(e.detail));
 if(document.getElementById('app')?.dataset?.view==='paper')hydrate();

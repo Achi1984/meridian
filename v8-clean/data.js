@@ -131,7 +131,7 @@ function historyModel(raw,currentTotal,data){
 }
 function normalizeLedger(key,x={}){
   return {
-    key,name:key==='baseline'?'BASELINE':key==='shadow'?'SHADOW V1':key==='challenger'?'CHALLENGER V2':'REGIME V1',
+    key,name:key==='baseline'?'BASELINE':key==='shadow'?'SHADOW V1':key==='challenger'?'CHALLENGER V2':key==='challengerV3'?'CHALLENGER V3':'REGIME V1',
     closedTrades:n(x?.closedTrades)??0,openTrades:n(x?.openTrades)??0,pnl:n(x?.pnl),expectancy:n(x?.expectancy),profitFactor:n(x?.profitFactor),
     winRate:n(x?.winRate),maxDrawdownPct:n(x?.maxDrawdownPct),tradesPerDay:n(x?.tradesPerDay),activeSpanDays:n(x?.activeSpanDays),
     retentionPct:n(x?.vsBaseline?.retentionPct),expectancyDelta:n(x?.vsBaseline?.expectancyDelta),pnlDelta:n(x?.vsBaseline?.pnlDelta)
@@ -149,34 +149,38 @@ function gateReasons(lastSignal={}){
   const raw=Array.isArray(lastSignal?.gate?.reasons)?lastSignal.gate.reasons:Array.isArray(lastSignal?.reasons)?lastSignal.reasons:[];
   return [...new Set(raw.map(x=>String(x||'').toUpperCase()).filter(Boolean))];
 }
-function recentTrades(baseline={},challenger={}){
+function recentTrades(baseline={},challenger={},challengerV3={}){
   const base=Array.isArray(baseline?.trades)?baseline.trades.filter(x=>x?.status==='CLOSED').map(x=>({...x,bot:'baseline'})):[];
   const chall=Array.isArray(challenger?.recentClosed)?challenger.recentClosed.map(x=>({...x,bot:'challenger'})):[];
-  return [...base,...chall].map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase()})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
+  const v3=Array.isArray(challengerV3?.recentClosed)?challengerV3.recentClosed.map(x=>({...x,bot:'challengerV3'})):[];
+  return [...base,...chall,...v3].map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase()})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
 }
-function botHealthModel(status={},challenger={},baseline={},ledgerRows=[],audit={}){
+function botHealthModel(status={},challenger={},challengerV3={},baseline={},ledgerRows=[],audit={}){
   const engine=status?.engine||{};
   const scanner=status?.scanner||{};
   const rowMap=Object.fromEntries(ledgerRows.map(x=>[x.key,x]));
   const audits=audit?.ledgers||{};
   const baselineEvaluations=Array.isArray(scanner.assets)?scanner.assets:[];
   const challengerEvaluations=Array.isArray(challenger?.lastEvaluations)?challenger.lastEvaluations:[];
+  const v3Evaluations=Array.isArray(challengerV3?.lastEvaluations)?challengerV3.lastEvaluations:[];
   const baselineBlocked=baselineEvaluations.filter(x=>String(x?.status||'').toUpperCase()!=='READY');
   const challengerBlocked=challengerEvaluations.filter(x=>String(x?.decision||'').toUpperCase()==='SKIP');
-  const baseGate=gateReasons(baseline?.lastSignal),challengerGate=gateReasons(challenger?.lastSignal);
+  const v3Blocked=v3Evaluations.filter(x=>String(x?.decision||'').toUpperCase()==='SKIP');
+  const baseGate=gateReasons(baseline?.lastSignal),challengerGate=gateReasons(challenger?.lastSignal),v3Gate=gateReasons(challengerV3?.lastSignal);
   return {
     available:!!(status?.engine||challenger?.lastScanAt),
     engine:{state:String(engine.state||'UNKNOWN'),running:engine.running===true,marketFresh:engine.marketFresh===true,lastCycleAt:engine.lastCycleAt||null,lastGoodMarketAt:engine.lastGoodMarketAt||null,lastSignalScanAt:engine.lastSignalScanAt||scanner.updatedAt||null,signalScans:n(engine.signalScans),errors:n(engine.errors),signalErrors:Array.isArray(engine.signalErrors)?engine.signalErrors.length:0},
     bots:{
       baseline:{lifecycle:'ACTIVE',lastScanAt:scanner.updatedAt||engine.lastSignalScanAt||null,lastClosedAt:audits.baseline?.lastClosedAt||null,openCount:Array.isArray(baseline?.positions)?baseline.positions.filter(x=>x?.status==='OPEN').length:0,evaluated:baselineEvaluations.length,ready:baselineEvaluations.length-baselineBlocked.length,blocked:baselineBlocked.length,reasons:reasonCounts(baselineBlocked),gateReasons:baseGate,riskLocked:baseGate.some(x=>x.startsWith('MAX_')),metrics:rowMap.baseline||{}},
-      challenger:{lifecycle:'ACTIVE RESEARCH',lastScanAt:challenger?.lastScanAt||null,lastClosedAt:audits.challenger?.lastClosedAt||null,openCount:n(challenger?.openCount)??0,evaluated:challengerEvaluations.length,ready:challengerEvaluations.length-challengerBlocked.length,blocked:challengerBlocked.length,reasons:reasonCounts(challengerBlocked),gateReasons:challengerGate,riskLocked:challengerGate.some(x=>x.startsWith('MAX_')),metrics:rowMap.challenger||{}}
+      challenger:{lifecycle:'PARENT PAUSED',lastScanAt:challenger?.lastScanAt||null,lastClosedAt:audits.challenger?.lastClosedAt||null,openCount:n(challenger?.openCount)??0,evaluated:challengerEvaluations.length,ready:challengerEvaluations.length-challengerBlocked.length,blocked:challengerBlocked.length,reasons:reasonCounts(challengerBlocked),gateReasons:challengerGate,riskLocked:challengerGate.some(x=>x.startsWith('MAX_')),metrics:rowMap.challenger||{}},
+      challengerV3:{enabled:challengerV3?.enabled===true,lifecycle:String(challengerV3?.lifecycle?.status||'WAITING'),lastScanAt:challengerV3?.lastScanAt||null,lastClosedAt:audits.challengerV3?.lastClosedAt||null,openCount:n(challengerV3?.openCount)??0,evaluated:v3Evaluations.length,ready:v3Evaluations.length-v3Blocked.length,blocked:v3Blocked.length,reasons:reasonCounts(v3Blocked),gateReasons:v3Gate,riskLocked:challengerV3?.lifecycle?.status==='STOPPED_REVIEW'||Number(challengerV3?.account?.drawdownPct)>=Number(challengerV3?.parameters?.maxDrawdownPct)||v3Gate.some(x=>['MAX_DAILY_LOSS','MAX_DRAWDOWN'].includes(x)),metrics:rowMap.challengerV3||{},parameters:challengerV3?.parameters||null,analysis:challengerV3?.analysis||null}
     },
-    recentTrades:recentTrades(baseline,challenger)
+    recentTrades:recentTrades(baseline,challenger,challengerV3)
   };
 }
-function paperModel(analytics={},activity={},status={},challengerStatus={},baselineState={}){
+function paperModel(analytics={},activity={},status={},challengerStatus={},challengerV3Status={},baselineState={}){
   const ledgers=analytics?.ledgers||{};
-  const keys=['baseline','shadow','challenger','regime'];
+  const keys=['baseline','shadow','challenger','challengerV3','regime'];
   const rows=keys.map(k=>normalizeLedger(k,ledgers[k]||{}));
   const common=activity?.commonWindow||null;
   const commonRows=common?.ledgers||{};
@@ -194,7 +198,7 @@ function paperModel(analytics={},activity={},status={},challengerStatus={},basel
   return {
     ok:true,locked:false,source:'RESEARCH_ANALYTICS',researchOnly:analytics?.researchOnly!==false,executionImpact:analytics?.executionImpact===true,
     schemaVersion:String(analytics?.schemaVersion||'—'),rows,
-    deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,botHealth:botHealthModel(status,challengerStatus,baselineState,rows,analytics?.executionAudit),
+    deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,botHealth:botHealthModel(status,challengerStatus,challengerV3Status,baselineState,rows,analytics?.executionAudit),
     commonWindow:common?{days:n(common.days),start:common.start||null,end:common.end||null}:null,
     opportunityCost:{closed:n(challenger.closed)??0,missedWinners:n(challenger.missedWinners)??0,avoidedLosers:n(challenger.avoidedLosers)??0,netR:n(challenger.netCounterfactualR)},
     warnings
@@ -263,11 +267,11 @@ export async function loadTrade(){
 
 export async function loadPaper(){
   try{
-    const [analytics,activity,status,challenger,baseline]=await Promise.all([
+    const [analytics,activity,status,challenger,challengerV3,baseline]=await Promise.all([
       getJson('/api/research-analytics'),getJson('/api/activity-summary'),
-      getJson('/api/status').catch(()=>null),getJson('/api/challenger-v2').catch(()=>null),getJson('/api/paper').catch(()=>null)
+      getJson('/api/status').catch(()=>null),getJson('/api/challenger-v2').catch(()=>null),getJson('/api/challenger-v3').catch(()=>null),getJson('/api/paper').catch(()=>null)
     ]);
-    return paperModel(analytics,activity,status,challenger,baseline);
+    return paperModel(analytics,activity,status,challenger,challengerV3,baseline);
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'RESEARCH_ANALYTICS',error:'READ_TOKEN_REQUIRED'};
     return {ok:false,locked:false,source:'RESEARCH_ANALYTICS',error:String(e?.message||e)};
