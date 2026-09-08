@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r25';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r26';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -98,7 +98,7 @@ function paperHtml(x){
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
   return `<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
-  <section class="card research-board paper-active-board"><div class="eyebrow">AKTIVE PAPER-REFERENZEN · 2</div>${activeRows}</section>
+  <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>Challenger ${fmtUsd((x.rows||[]).find(r=>r.key==='challenger')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challenger')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
   <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
   <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
 }
