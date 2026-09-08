@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r24';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -111,12 +111,13 @@ function render(key){
   if(key==='trade')root.innerHTML=tradeHtml(state.trade);
   if(key==='paper')root.innerHTML=paperHtml(state.paper);
   if(key==='more')root.innerHTML=moreHtml();
+  if(key==='paper'&&state.paper?.ok)window.dispatchEvent(new CustomEvent('meridian:v8-paperdata',{detail:{deepDive:state.paper.deepDive,executionAudit:state.paper.executionAudit}}));
   $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;state.paper=null;hydrateCenter();hydrateDepot();hydrateTrade();hydratePaper();render('more')}});
 }
 async function hydrateCenter(){state.center=null;if(state.view==='center')render('center');state.center=await loadCenter();if(state.view==='center')render('center')}
 async function hydrateDepot(){state.depot=null;if(state.view==='depot')render('depot');state.depot=await loadDepot();if(state.view==='depot')render('depot')}
 async function hydrateTrade(){state.trade=null;if(state.view==='trade')render('trade');state.trade=await loadTrade();if(state.view==='trade')render('trade')}
-async function hydratePaper(){state.paper=null;if(state.view==='paper')render('paper');state.paper=await loadPaper();if(state.view==='paper')render('paper')}
+async function hydratePaper(){if(!state.paper&&state.view==='paper')render('paper');const next=await loadPaper();state.paper=next;if(state.view==='paper')render('paper')}
 function wire(){document.querySelectorAll('#mainNav [data-route]').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.route;setView(b.dataset.route)}));window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(ROUTES.includes(k))setView(k)});}
 
 wire();
