@@ -137,7 +137,31 @@ function normalizeLedger(key,x={}){
     retentionPct:n(x?.vsBaseline?.retentionPct),expectancyDelta:n(x?.vsBaseline?.expectancyDelta),pnlDelta:n(x?.vsBaseline?.pnlDelta)
   };
 }
-function paperModel(analytics={},activity={}){
+function reasonCounts(rows=[]){
+  const counts=new Map();
+  for(const row of rows){
+    const reasons=Array.isArray(row?.reasons)&&row.reasons.length?row.reasons:[row?.status].filter(Boolean);
+    for(const raw of reasons){const key=String(raw||'UNKNOWN').toUpperCase();counts.set(key,(counts.get(key)||0)+1)}
+  }
+  return [...counts.entries()].map(([reason,count])=>({reason,count})).sort((a,b)=>b.count-a.count||a.reason.localeCompare(b.reason));
+}
+function botHealthModel(status={},challenger={}){
+  const engine=status?.engine||{};
+  const scanner=status?.scanner||{};
+  const baselineEvaluations=Array.isArray(scanner.assets)?scanner.assets:[];
+  const challengerEvaluations=Array.isArray(challenger?.lastEvaluations)?challenger.lastEvaluations:[];
+  const baselineBlocked=baselineEvaluations.filter(x=>String(x?.status||'').toUpperCase()!=='READY');
+  const challengerBlocked=challengerEvaluations.filter(x=>String(x?.decision||'').toUpperCase()==='SKIP');
+  return {
+    available:!!(status?.engine||challenger?.lastScanAt),
+    engine:{state:String(engine.state||'UNKNOWN'),running:engine.running===true,marketFresh:engine.marketFresh===true,lastCycleAt:engine.lastCycleAt||null,lastGoodMarketAt:engine.lastGoodMarketAt||null,lastSignalScanAt:engine.lastSignalScanAt||scanner.updatedAt||null,signalScans:n(engine.signalScans),errors:n(engine.errors),signalErrors:Array.isArray(engine.signalErrors)?engine.signalErrors.length:0},
+    bots:{
+      baseline:{lifecycle:'ACTIVE',lastScanAt:scanner.updatedAt||engine.lastSignalScanAt||null,evaluated:baselineEvaluations.length,ready:baselineEvaluations.length-baselineBlocked.length,blocked:baselineBlocked.length,reasons:reasonCounts(baselineBlocked)},
+      challenger:{lifecycle:'ACTIVE RESEARCH',lastScanAt:challenger?.lastScanAt||null,evaluated:challengerEvaluations.length,ready:challengerEvaluations.length-challengerBlocked.length,blocked:challengerBlocked.length,reasons:reasonCounts(challengerBlocked)}
+    }
+  };
+}
+function paperModel(analytics={},activity={},status={},challengerStatus={}){
   const ledgers=analytics?.ledgers||{};
   const keys=['baseline','shadow','challenger','regime'];
   const rows=keys.map(k=>normalizeLedger(k,ledgers[k]||{}));
@@ -157,7 +181,7 @@ function paperModel(analytics={},activity={}){
   return {
     ok:true,locked:false,source:'RESEARCH_ANALYTICS',researchOnly:analytics?.researchOnly!==false,executionImpact:analytics?.executionImpact===true,
     schemaVersion:String(analytics?.schemaVersion||'—'),rows,
-    deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,
+    deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,botHealth:botHealthModel(status,challengerStatus),
     commonWindow:common?{days:n(common.days),start:common.start||null,end:common.end||null}:null,
     opportunityCost:{closed:n(challenger.closed)??0,missedWinners:n(challenger.missedWinners)??0,avoidedLosers:n(challenger.avoidedLosers)??0,netR:n(challenger.netCounterfactualR)},
     warnings
@@ -226,8 +250,11 @@ export async function loadTrade(){
 
 export async function loadPaper(){
   try{
-    const [analytics,activity]=await Promise.all([getJson('/api/research-analytics'),getJson('/api/activity-summary')]);
-    return paperModel(analytics,activity);
+    const [analytics,activity,status,challenger]=await Promise.all([
+      getJson('/api/research-analytics'),getJson('/api/activity-summary'),
+      getJson('/api/status').catch(()=>null),getJson('/api/challenger-v2').catch(()=>null)
+    ]);
+    return paperModel(analytics,activity,status,challenger);
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'RESEARCH_ANALYTICS',error:'READ_TOKEN_REQUIRED'};
     return {ok:false,locked:false,source:'RESEARCH_ANALYTICS',error:String(e?.message||e)};

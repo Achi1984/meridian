@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r24';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r25';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -111,7 +111,7 @@ function render(key){
   if(key==='trade')root.innerHTML=tradeHtml(state.trade);
   if(key==='paper')root.innerHTML=paperHtml(state.paper);
   if(key==='more')root.innerHTML=moreHtml();
-  if(key==='paper'&&state.paper?.ok)window.dispatchEvent(new CustomEvent('meridian:v8-paperdata',{detail:{deepDive:state.paper.deepDive,executionAudit:state.paper.executionAudit}}));
+  if(key==='paper'&&state.paper?.ok)window.dispatchEvent(new CustomEvent('meridian:v8-paperdata',{detail:{deepDive:state.paper.deepDive,executionAudit:state.paper.executionAudit,botHealth:state.paper.botHealth}}));
   $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;state.paper=null;hydrateCenter();hydrateDepot();hydrateTrade();hydratePaper();render('more')}});
 }
 async function hydrateCenter(){state.center=null;if(state.view==='center')render('center');state.center=await loadCenter();if(state.view==='center')render('center')}
