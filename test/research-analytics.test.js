@@ -75,3 +75,12 @@ test('research comparison exposes protected aggregate execution audit',()=>{
   assert.equal(out.executionAudit.total.closedTrades,1);
   assert.equal(out.executionAudit.executionImpact,false);
 });
+
+test('research comparison keeps successor V3 on its own ledger',()=>{
+  const v3={account:{startEquity:10000,equity:10025,peakEquity:10025},trades:[trade(25,{challengerDecision:'CAUTION',challengerConfidence:70,challengerRegime:'RANGE'})]};
+  const out=researchComparison({challengerV3:v3});
+  assert.equal(out.ledgers.challengerV3.pnl,25);
+  assert.equal(out.ledgers.challengerV3.byDecision.CAUTION.trades,1);
+  assert.equal(out.ledgers.challengerV3.byRegime.RANGE.trades,1);
+  assert.equal(out.executionAudit.ledgers.challengerV3.closedTrades,1);
+});
