@@ -2,12 +2,13 @@
 body::before{content:"";position:fixed;z-index:150;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--bg);pointer-events:none}
 #view-paper.is-active{display:flex;flex-direction:column}
 #view-paper>.paper-hero{order:1}
-#view-paper>#paperExecutionAuditR22{order:2}
+#view-paper>#paperAnswerR26{order:2}
 #view-paper>.paper-active-board{order:3}
 #view-paper>.paper-archive{order:4}
 #view-paper>#researchControlR19{order:5}
 #view-paper>#paperCohortR18{order:6}
-#view-paper>.paper-diagnostics{order:7}
+#view-paper>#paperExecutionAuditR22{order:7}
+#view-paper>.paper-diagnostics{order:8}
 .paper-hero-r23{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:13px 15px}
 .paper-hero-r23 .paper-state{font-size:25px;margin-top:4px}
 .paper-guardrails{display:grid;gap:3px;text-align:right}

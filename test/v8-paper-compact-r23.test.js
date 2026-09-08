@@ -10,22 +10,23 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-compact-r23.css',import.met
 
 test('R23 compact PAPER assets are wired with fresh cache tags',()=>{
   assert.match(html,/paper-compact-r23\.css\?v=8\.0-r23/);
-  assert.match(html,/app\.js\?v=8\.0-r25/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r25/);
+  assert.match(html,/app\.js\?v=8\.0-r26/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r26/);
   assert.match(html,/research-control-r19\.js\?v=8\.0-r23/);
 });
 
 test('R23 separates active references from retired ledgers',()=>{
   assert.match(app,/r\.key==='baseline'\|\|r\.key==='challenger'/);
   assert.match(app,/r\.key==='shadow'\|\|r\.key==='regime'/);
-  assert.match(app,/AKTIVE PAPER-REFERENZEN · 2/);
+  assert.match(app,/PERFORMANCE-DETAILS/);
   assert.match(app,/ARCHIVIERTE BOTS/);
   assert.match(app,/SHADOW · REGIME · RETIRED/);
   assert.match(app,/<details class="card paper-disclosure paper-archive">/);
 });
 
-test('R23 puts execution audit first and collapses secondary research',()=>{
-  assert.match(css,/#view-paper>#paperExecutionAuditR22\{order:2\}/);
+test('R23 keeps the successor answer first and collapses secondary research',()=>{
+  assert.match(css,/#view-paper>#paperAnswerR26\{order:2\}/);
+  assert.match(css,/#view-paper>#paperExecutionAuditR22\{order:7\}/);
   assert.match(css,/#view-paper>\.paper-active-board\{order:3\}/);
   assert.match(cohort,/document\.createElement\('details'\)/);
   assert.match(control,/document\.createElement\('details'\)/);

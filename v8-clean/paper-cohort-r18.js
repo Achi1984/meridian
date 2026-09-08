@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r25';
+import {getJson} from './data.js?v=8.0-r26';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -8,6 +8,7 @@ const pct=v=>num(v)==null?'—':`${fmt(v,1)}%`;
 const date=v=>{if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString('de-DE',{timeZone:'Europe/Vienna',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
 const rate=(a,b)=>num(b)>0?`${fmt(num(a)/num(b)*100,1)}%`:'—';
 const reasonLabel=x=>({WAIT_ENTRY_ZONE:'Wartet auf Entry-Zone',BASE_NOT_READY:'Baseline nicht READY',CONFIDENCE_LT_CAUTION:'Confidence unter CAUTION',MAX_OPEN_POSITIONS:'Max. Positionen erreicht',MAX_PORTFOLIO_RISK:'Portfolio-Risikolimit',SYMBOL_COOLDOWN:'Symbol-Cooldown',SAME_SYMBOL_POSITION_OPEN:'Position bereits offen'}[String(x||'').toUpperCase()]||String(x||'Keine Blockade').replaceAll('_',' '));
+const gateLabel=x=>({MAX_DRAWDOWN:'Max Drawdown erreicht',MAX_DAILY_LOSS:'Tagesverlust-Limit',MAX_OPEN_POSITIONS:'Max. Positionen erreicht',MAX_PORTFOLIO_RISK:'Portfolio-Risikolimit',MAX_TRADES_PER_DAY:'Tageslimit erreicht'}[String(x||'').toUpperCase()]||reasonLabel(x));
 
 function bestRows(map={},limit=3){
   return Object.entries(map)
@@ -75,26 +76,35 @@ function sumLedgers(ledgers={},keys=[]){
   const rows=keys.map(k=>ledgers[k]||{});
   return {closedTrades:rows.reduce((s,x)=>s+(num(x.closedTrades)||0),0),evaluableStops:rows.reduce((s,x)=>s+(num(x.stopExecution?.evaluable)||0),0),materialLosses:rows.reduce((s,x)=>s+(num(x.stopExecution?.materialLosses)||0),0),postStopReentries:rows.reduce((s,x)=>s+(num(x.behavior?.postStopReentries)||0),0),directionalMultiAssetBundles:rows.reduce((s,x)=>s+(num(x.behavior?.directionalMultiAssetBundles)||0),0)};
 }
-function healthHtml(health={}){
-  const e=health.engine||{},b=health.bots||{},base=b.baseline||{},chall=b.challenger||{};
-  const engineOk=health.available&&e.running&&e.marketFresh&&e.state==='RUNNING';
-  const top=chall.reasons?.[0]||base.reasons?.[0]||null;
-  return `<div class="audit-r25-health">
-    ${metric('ENGINE',health.available?(engineOk?'RUNNING':'CHECK'):'UNBEKANNT',engineOk?'safe':health.available?'danger':'')}
-    ${metric('MARKT',e.marketFresh?'FRESH':'CHECK',e.marketFresh?'safe':'danger')}
-    ${metric('LETZTER SCAN',date(e.lastSignalScanAt))}
-    ${metric('AKTUELL GEBLOCKT',`${chall.blocked??0} / ${chall.evaluated??0}`,(chall.blocked??0)>0?'watch':'safe')}
-    <div class="audit-r25-reason"><span>HÄUFIGSTER AKTUELLER GRUND</span><b>${top?`${reasonLabel(top.reason)} · ${top.count}×`:'Keine Blockade im aktuellen Scan'}</b></div>
-  </div>`;
+function botAnswer(key,bot={}){
+  const m=bot.metrics||{},lock=bot.gateReasons?.[0]||null;
+  const state=bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
+  const tone=bot.riskLocked?'danger':bot.openCount>0?'safe':'watch';
+  const why=bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt`;
+  return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div><strong>${usd(m.pnl)} · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}</strong><small>${why}</small></div>`;
+}
+function tradeHtml(t={}){
+  const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
+  return `<div class="paper-r26-trade"><div><b>${t.bot==='challenger'?'CHALLENGER':'BASELINE'} · ${t.symbol} ${t.side}</b><small>${date(t.closedAt)} · ${t.exitReason}</small></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
+}
+function renderAnswer(health={}){
+  const el=root();if(!el||!health?.bots)return;
+  let card=document.getElementById('paperAnswerR26');
+  if(!card){card=document.createElement('section');card.id='paperAnswerR26';card.className='card paper-answer-r26';el.appendChild(card)}
+  const e=health.engine||{},bots=health.bots||{},trades=health.recentTrades||[];
+  const locked=[bots.baseline,bots.challenger].filter(x=>x?.riskLocked).length;
+  card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · KLARE ANTWORT</div><b>${locked?`${locked} BOTS DURCH RISIKO-LIMIT PAUSIERT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
+    <div class="paper-r26-bots">${botAnswer('challenger',bots.challenger)}${botAnswer('baseline',bots.baseline)}</div>
+    <div class="paper-r26-verdict"><span>FAZIT</span><b>Challenger deutlich besser als Baseline, aber mit PF ${fmt(bots.challenger?.metrics?.profitFactor,2)} noch ohne positiven Edge. Behalten, nicht promoten.</b></div>
+    <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
 }
 function renderExecutionAudit(audit,health={}){
   const el=root(); if(!el||!audit?.aggregateOnly)return;
   let card=document.getElementById('paperExecutionAuditR22');
-  if(!card){card=document.createElement('section');card.id='paperExecutionAuditR22';card.className='card audit-r22';el.appendChild(card)}
+  if(!card){card=document.createElement('details');card.id='paperExecutionAuditR22';card.className='card audit-r22 paper-disclosure';el.appendChild(card)}
   const ledgers=audit.ledgers||{},active=sumLedgers(ledgers,['baseline','challenger']),retired=sumLedgers(ledgers,['shadow','regime']);
   const attention=(num(active.materialLosses)||0)>0||(num(active.postStopReentries)||0)>0;
-  card.innerHTML=`<div class="audit-r22-head"><div><div class="eyebrow">PAPER · FULL LEDGER EXECUTION AUDIT</div><b>R25 · ${attention?'ACTIVE CHECK':'ACTIVE OK'} · BOT HEALTH</b></div><span class="audit-r22-pill tone-${attention?'danger':'safe'}">READ ONLY</span></div>
-    ${healthHtml(health)}
+  card.innerHTML=`<summary><span>TECHNISCHE DIAGNOSE</span><b>Stop ${active.materialLosses}/${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}</b></summary><div class="paper-disclosure-body"><div class="audit-r22-head"><div><div class="eyebrow">FULL LEDGER EXECUTION AUDIT</div><b>R26 · ${attention?'ACTIVE CHECK':'ACTIVE OK'}</b></div><span class="audit-r22-pill tone-${attention?'danger':'safe'}">READ ONLY</span></div>
     <div class="audit-r22-summary">
       ${metric('Aktive Trades',active.closedTrades)}
       ${metric('Stop-Verluste &gt;1,25R',`${active.materialLosses} / ${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}`,(num(active.materialLosses)||0)>0?'danger':'safe')}
@@ -103,13 +113,14 @@ function renderExecutionAudit(audit,health={}){
     </div>
     <div class="audit-r22-list audit-r25-active">${['baseline','challenger'].map(key=>ledgerHtml(key,ledgers[key],health?.bots?.[key])).join('')}</div>
     <details class="audit-r25-retired"><summary><span>HISTORISCHE RETIRED-AUFFÄLLIGKEITEN</span><b>${retired.closedTrades} Trades · getrennt von aktiv</b></summary><div class="audit-r22-list">${['shadow','regime'].map(key=>ledgerHtml(key,ledgers[key])).join('')}</div></details>
-    <div class="cohort-r18-foot">Vollständige PostgreSQL-Ledger · nur geschützte Aggregate · aktive Bots und versiegelte Retired-Ledger getrennt · „aktuell geblockt“ bezieht sich nur auf den aktuellen geschützten Scan · keine Strategie- oder Ausführungswirkung.</div>`;
+    <div class="cohort-r18-foot">Vollständige PostgreSQL-Ledger · nur geschützte Aggregate · keine Strategie- oder Ausführungswirkung.</div></div>`;
 }
 let loading=false,cached=null;
 function accept(payload){
   if(!payload)return;
   cached=payload;
   render(payload.deepDive);
+  renderAnswer(payload.botHealth);
   renderExecutionAudit(payload.executionAudit,payload.botHealth);
 }
 async function hydrate(){
