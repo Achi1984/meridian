@@ -1,0 +1,32 @@
+name: Market Microstructure Data V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'market-microstructure-data-v1.js'
+      - 'scripts/market-microstructure-data-v1-evidence.mjs'
+      - 'test/market-microstructure-data-v1.test.js'
+      - 'research/market-microstructure-data-v1-design.md'
+      - 'research/market-microstructure-data-v1-evidence-20260906.md'
+      - '.github/workflows/market-microstructure-data-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/market-microstructure-data-v1.test.js
+      - run: node scripts/market-microstructure-data-v1-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-microstructure-data-v1
+          path: artifacts/market-microstructure-data-v1.json
+          if-no-files-found: error
