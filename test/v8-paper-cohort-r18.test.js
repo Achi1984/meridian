@@ -6,11 +6,13 @@ const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'ut
 const js=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.css',import.meta.url),'utf8');
 
-test('R18 cohort board is wired into v8 clean PAPER',()=>{
-  assert.match(html,/paper-cohort-r18\.css\?v=8\.0-r18/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r18/);
+test('R18 cohort board and R22 execution audit are wired into PAPER',()=>{
+  assert.match(html,/paper-cohort-r18\.css\?v=8\.0-r22/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r22/);
   assert.match(js,/\/api\/research-analytics/);
   assert.match(js,/CHALLENGER V2 · COHORT DEEP DIVE/);
+  assert.match(js,/FULL LEDGER EXECUTION AUDIT/);
+  assert.match(js,/renderExecutionAudit\(a\?\.executionAudit\)/);
 });
 
 test('R18 exposes side regime asset cohort views and sample adequacy',()=>{
@@ -21,9 +23,25 @@ test('R18 exposes side regime asset cohort views and sample adequacy',()=>{
   assert.match(js,/n&lt;8/);
 });
 
-test('R18 remains research-only and read-only',()=>{
+test('R22 exposes aggregate stop, re-entry and bundle diagnostics per bot',()=>{
+  assert.match(js,/audit\.total/);
+  assert.match(js,/audit\.ledgers/);
+  assert.match(js,/stop\.materialLosses/);
+  assert.match(js,/stop\.averageActualLossR/);
+  assert.match(js,/behavior\.postStopReentries/);
+  assert.match(js,/behavior\.directionalMultiAssetBundles/);
+  assert.match(js,/<details class="audit-r22-ledger">/);
+  assert.match(js,/SHADOW · RETIRED/);
+  assert.match(js,/REGIME · RETIRED/);
+});
+
+test('R22 is compact on mobile and remains protected aggregate read-only',()=>{
   const all=js+css;
-  assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|method\s*:\s*['\"]POST/i);
+  assert.match(css,/@media\(max-width:390px\)/);
+  assert.match(js,/audit\?\.aggregateOnly/);
+  assert.match(js,/nur geschützte Aggregate/);
+  assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|method\s*:\s*['"]POST/i);
   assert.doesNotMatch(all,/server\.js/);
   assert.match(js,/Research only/);
+  assert.match(js,/keine Strategie- oder Ausführungswirkung/);
 });
