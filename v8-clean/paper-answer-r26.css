@@ -1,0 +1,32 @@
+/* MERIDIAN v8 R26 — answer first, diagnostics on demand. */
+.paper-answer-r26{padding:13px 15px}
+.paper-r26-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.paper-r26-head>div>b{display:block;margin-top:5px;font-size:15px;line-height:1.2}
+.paper-r26-head>span{font-size:9px;font-weight:900;white-space:nowrap}
+.paper-r26-bots{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.paper-r26-bot{border:1px solid rgba(80,125,155,.25);border-radius:12px;padding:10px;background:var(--panel2)}
+.paper-r26-bot>div{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.paper-r26-bot span{font-size:10px;font-weight:900}
+.paper-r26-bot>div>b{font-size:8px}
+.paper-r26-bot strong{display:block;margin-top:7px;font-size:12px}
+.paper-r26-bot small{display:block;margin-top:5px;color:var(--muted);font-size:8px;line-height:1.35}
+.paper-r26-verdict{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:8px;padding:8px 10px;border-left:2px solid var(--amber);background:rgba(232,178,74,.05)}
+.paper-r26-verdict span,.paper-r26-title{color:var(--cyan);font-size:8px;font-weight:900;letter-spacing:.1em}
+.paper-r26-verdict b{font-size:9px;line-height:1.4}
+.paper-r26-title{margin-top:12px}
+.paper-r26-trades{margin-top:4px}
+.paper-r26-trade{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(80,125,155,.18)}
+.paper-r26-trade:last-child{border-bottom:0}
+.paper-r26-trade b{display:block;font-size:9px}
+.paper-r26-trade small{display:block;margin-top:3px;color:var(--muted);font-size:7px}
+.paper-r26-trade strong{font-size:10px;white-space:nowrap}
+#paperExecutionAuditR22.paper-disclosure{padding:0}
+#paperExecutionAuditR22>.paper-disclosure-body{padding-top:12px}
+
+@media(max-width:520px){
+  .paper-answer-r26{padding:11px 12px}
+  .paper-r26-head>div>b{font-size:13px}
+  .paper-r26-bots{grid-template-columns:1fr}
+  .paper-r26-bot{padding:9px}
+  .paper-r26-verdict{grid-template-columns:1fr;gap:4px}
+}
