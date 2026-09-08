@@ -86,23 +86,21 @@ function paperHtml(x){
   if(!x)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · RESEARCH BOARD</div><div class="hero-value">LÄDT…</div><p class="muted">Geschützte Ledger-Telemetrie und Vergleichsdaten werden geladen.</p></section>`;
   if(x.locked)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · PRIVATE RESEARCH</div><div class="hero-value">LOCKED</div><p class="muted">Read Token in MORE verbinden. Kein Fallback auf alte PAPER-Karten.</p></section>`;
   if(!x.ok)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · DATA STATUS</div><div class="hero-value">CHECK</div><p class="muted">${x.error||'Research-Daten nicht verfügbar'}</p></section>`;
-  const rows=(x.rows||[]).map(r=>{
+  const rowHtml=(r,archived=false)=>{
     const pnlTone=r.pnl>0?'safe':r.pnl<0?'danger':'muted';
-    const ref=r.key==='baseline'?'REFERENCE':`RETENTION ${fmtPct(r.retentionPct,1)}`;
+    const ref=archived?'RETIRED':r.key==='baseline'?'REFERENCE':'ACTIVE PAPER';
     const sample=r.commonClosed!=null?`${r.commonClosed} closed im Common Window`:`${r.closedTrades} closed gesamt`;
-    return `<div class="research-row"><div class="research-head"><div><span>${r.name}</span><b>${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
-  }).join('')||'<div class="chart-empty">Keine Ledger-Telemetrie verfügbar</div>';
+    return `<div class="research-row ${archived?'is-retired':''}"><div class="research-head"><div><span>${r.name}</span><b class="${archived?'tone-danger':''}">${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
+  };
+  const activeRows=(x.rows||[]).filter(r=>r.key==='baseline'||r.key==='challenger').map(r=>rowHtml(r)).join('')||'<div class="chart-empty">Keine aktive Ledger-Telemetrie verfügbar</div>';
+  const archivedRows=(x.rows||[]).filter(r=>r.key==='shadow'||r.key==='regime').map(r=>rowHtml(r,true)).join('')||'<div class="chart-empty">Keine archivierten Ledger.</div>';
   const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
-  return `<section class="hero paper-hero"><div class="eyebrow">PAPER · RESEARCH BOARD</div><div class="paper-state">RESEARCH ONLY</div><p class="muted">Keine automatische Promotion · keine Ausführungswirkung · Baseline 6.2 bleibt Referenz</p></section>
-  <div class="grid2 paper-metrics">
-    <section class="metric"><span>COMMON WINDOW</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'BUILDING'}</b><small>${common}</small></section>
-    <section class="metric"><span>EXECUTION IMPACT</span><b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b><small>${x.schemaVersion}</small></section>
-  </div>
-  <section class="card research-board"><div class="eyebrow">BASELINE · SHADOW · CHALLENGER · REGIME</div>${rows}</section>
-  <section class="card"><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div></section>
-  <section class="card audit"><div class="eyebrow">AUDIT FLAGS</div>${warnings}</section>`;
+  return `<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
+  <section class="card research-board paper-active-board"><div class="eyebrow">AKTIVE PAPER-REFERENZEN · 2</div>${activeRows}</section>
+  <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
+  <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
 }
 function placeholder(title,sub){return `<section class="card placeholder"><div><div class="eyebrow">V8 CLEAN</div><b>${title}</b><small>${sub}</small></div></section>`}
 function moreHtml(){return `<section class="card"><div class="eyebrow">MORE · SYSTEM & DETAILS</div><h2>Saubere Tiefe statt Legacy-Overlay</h2><p class="muted">Hier kommen Markt, Forecast, Scanner, Research, Diagnostik und Einstellungen als explizite Module hinein.</p><div class="row"><span>Private Data</span><b>${hasReadToken()?'VERBUNDEN':'LOCKED'}</b></div><button id="connectToken" class="action" type="button"><span>READ TOKEN</span><b>${hasReadToken()?'Token ersetzen':'Token verbinden'}</b></button></section>`}
