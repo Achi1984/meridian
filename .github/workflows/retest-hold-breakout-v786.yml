@@ -1,0 +1,40 @@
+name: MERIDIAN Retest Hold Breakout v7.86
+
+on:
+  push:
+    branches:
+      - research/retest-hold-breakout-v786
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Retest Hold tests
+        run: node --test test/retest-hold-breakout-v2.test.js test/retest-hold-evidence-v786.test.js
+      - name: Syntax checks
+        run: |
+          node --check retest-hold-breakout-v2.js
+          node --check retest-hold-evidence-v786.js
+          node --check retest-hold-source-v786.js
+          node --check scripts/retest-hold-evidence-live-v786.mjs
+      - name: Release safety
+        run: npm run release:check
+      - name: 12-asset 30/60/90d evidence
+        run: node scripts/retest-hold-evidence-live-v786.mjs
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: retest-hold-v786-r2
+          path: artifacts/retest-hold-v786-r2.*
+          if-no-files-found: error
