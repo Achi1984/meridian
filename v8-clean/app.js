@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r26';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r27';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -92,13 +92,13 @@ function paperHtml(x){
     const sample=r.commonClosed!=null?`${r.commonClosed} closed im Common Window`:`${r.closedTrades} closed gesamt`;
     return `<div class="research-row ${archived?'is-retired':''}"><div class="research-head"><div><span>${r.name}</span><b class="${archived?'tone-danger':''}">${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
   };
-  const activeRows=(x.rows||[]).filter(r=>r.key==='baseline'||r.key==='challenger').map(r=>rowHtml(r)).join('')||'<div class="chart-empty">Keine aktive Ledger-Telemetrie verfügbar</div>';
+  const activeRows=(x.rows||[]).filter(r=>r.key==='baseline'||r.key==='challenger'||r.key==='challengerV3').map(r=>rowHtml(r)).join('')||'<div class="chart-empty">Keine aktive Ledger-Telemetrie verfügbar</div>';
   const archivedRows=(x.rows||[]).filter(r=>r.key==='shadow'||r.key==='regime').map(r=>rowHtml(r,true)).join('')||'<div class="chart-empty">Keine archivierten Ledger.</div>';
   const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
   return `<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
-  <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>Challenger ${fmtUsd((x.rows||[]).find(r=>r.key==='challenger')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challenger')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
+  <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>V3 ${fmtUsd((x.rows||[]).find(r=>r.key==='challengerV3')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challengerV3')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
   <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
   <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
 }
