@@ -1,0 +1,26 @@
+/* MERIDIAN v8 R25 — active bot health and audit clarity. */
+#view-paper .paper-hero-r23{padding:11px 13px}
+#view-paper .paper-hero-r23 .paper-state{font-size:25px;line-height:1;margin-top:4px}
+.audit-r25-health{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0}
+.audit-r25-health .audit-r22-metric{min-width:0}
+.audit-r25-health .audit-r22-metric b{font-size:11px;overflow-wrap:anywhere}
+.audit-r25-reason{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid rgba(80,125,155,.22);border-radius:10px;background:rgba(5,17,27,.72)}
+.audit-r25-reason span{color:var(--muted);font-size:7px;letter-spacing:.08em}
+.audit-r25-reason b{color:var(--text);font-size:9px;text-align:right}
+.audit-r25-cause{color:var(--red)!important}
+.audit-r25-scan{color:var(--cyan)!important}
+.audit-r25-retired{margin-top:9px;border:1px solid rgba(80,125,155,.22);border-radius:11px;overflow:hidden}
+.audit-r25-retired>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px;cursor:pointer;list-style:none}
+.audit-r25-retired>summary::-webkit-details-marker{display:none}
+.audit-r25-retired>summary span{color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.08em}
+.audit-r25-retired>summary b{color:var(--muted);font-size:8px;text-align:right}
+.audit-r25-retired>.audit-r22-list{padding:0 9px 9px}
+
+@media(max-width:520px){
+  #view-paper .paper-hero-r23{padding:10px 12px}
+  #view-paper .paper-hero-r23 .paper-state{font-size:23px}
+  .audit-r25-health{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:10px 0}
+  .audit-r25-reason{padding:7px 8px}
+  .audit-r25-reason b{max-width:58%}
+  .audit-r25-retired>summary{padding:9px}
+}
