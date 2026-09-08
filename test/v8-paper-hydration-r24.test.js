@@ -8,10 +8,10 @@ const data=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8'
 const module=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.meta.url),'utf8');
 
 test('R24 loads one cache-coherent PAPER data module graph',()=>{
-  assert.match(html,/app\.js\?v=8\.0-r24/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r24/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r24/);
-  assert.match(module,/\.\/data\.js\?v=8\.0-r24/);
+  assert.match(html,/app\.js\?v=8\.0-r25/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r25/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r25/);
+  assert.match(module,/\.\/data\.js\?v=8\.0-r25/);
 });
 
 test('R24 carries protected audit aggregates through the primary PAPER model',()=>{
@@ -26,7 +26,7 @@ test('R24 restores audit and cohort synchronously after every PAPER render',()=>
   assert.match(module,/window\.addEventListener\('meridian:v8-paperdata',e=>accept\(e\.detail\)\)/);
   assert.match(module,/cached=payload/);
   assert.match(module,/render\(payload\.deepDive\)/);
-  assert.match(module,/renderExecutionAudit\(payload\.executionAudit\)/);
+  assert.match(module,/renderExecutionAudit\(payload\.executionAudit,payload\.botHealth\)/);
   assert.doesNotMatch(app,/async function hydratePaper\(\)\{state\.paper=null/);
 });
 
