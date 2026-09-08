@@ -62,8 +62,10 @@ test('full-ledger execution audit separates price overrun, fees and post-stop re
   assert.equal(b.stopExecution.averageFeeR,.2);
   assert.equal(b.stopExecution.priceBeyondStop,1);
   assert.equal(b.behavior.postStopReentries,1);
-  assert.equal(JSON.stringify(out).includes('entry'),false);
-  assert.equal(JSON.stringify(out).includes('symbol'),false);
+  const keys=[];
+  const collect=x=>{if(!x||typeof x!=='object')return;for(const [key,value] of Object.entries(x)){keys.push(key);collect(value);}};
+  collect(out);
+  for(const forbidden of ['trades','entry','sl','stop','qty','symbol'])assert.equal(keys.includes(forbidden),false);
 });
 
 test('research comparison exposes protected aggregate execution audit',()=>{
