@@ -9,11 +9,11 @@ const paper=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.met
 const css=fs.readFileSync(new URL('../v8-clean/paper-answer-r26.css',import.meta.url),'utf8');
 
 test('R26 loads answer-first PAPER assets coherently',()=>{
-  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r26/);
-  assert.match(html,/app\.js\?v=8\.0-r26/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r26/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r26/);
-  assert.match(paper,/\.\/data\.js\?v=8\.0-r26/);
+  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r27/);
+  assert.match(html,/app\.js\?v=8\.0-r27/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r27/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r27/);
+  assert.match(paper,/\.\/data\.js\?v=8\.0-r27/);
 });
 
 test('R26 exposes the actual risk lock instead of calling inactivity no opportunity',()=>{
@@ -22,16 +22,16 @@ test('R26 exposes the actual risk lock instead of calling inactivity no opportun
   assert.match(data,/riskLocked:baseGate\.some\(x=>x\.startsWith\('MAX_'\)\)/);
   assert.match(data,/riskLocked:challengerGate\.some\(x=>x\.startsWith\('MAX_'\)\)/);
   assert.match(paper,/MAX_DRAWDOWN:'Max Drawdown erreicht'/);
-  assert.match(paper,/DURCH RISIKO-LIMIT PAUSIERT/);
+  assert.match(paper,/BOTS PAUSIERT · ANALYSE LÄUFT/);
 });
 
 test('R26 shows five merged latest closed trades and a concise verdict',()=>{
-  assert.match(data,/recentTrades\(baseline,challenger\)/);
+  assert.match(data,/recentTrades\(baseline,challenger,challengerV3\)/);
   assert.match(data,/slice\(0,5\)/);
   assert.match(data,/bot:'baseline'/);
   assert.match(data,/bot:'challenger'/);
   assert.match(paper,/LETZTE TRADES/);
-  assert.match(paper,/Behalten, nicht promoten/);
+  assert.match(paper,/Erst prospektiv bewerten/);
   assert.match(paper,/renderAnswer\(payload\.botHealth\)/);
 });
 
@@ -46,5 +46,5 @@ test('R26 preserves drawdown protection and cannot execute',()=>{
   const all=app+data+paper+css;
   assert.doesNotMatch(all,/placeOrder|createOrder|submitOrder|dashboard-update|holdings-sync|x-meridian-write-token|method\s*:\s*['"]POST/i);
   assert.doesNotMatch(all,/server\.js/);
-  assert.match(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'),/MAX_DRAWDOWN remains enforced/);
+  assert.match(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'),/qualified MAX_DRAWDOWN stop/);
 });
