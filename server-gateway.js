@@ -23,7 +23,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const PUBLIC_PATHS = new Set(["/","/health","/api/public-status","/api/assistant"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
-  "/api/shadow-v1","/api/challenger-v2","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
+  "/api/shadow-v1","/api/challenger-v2","/api/challenger-v3","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
   "/api/private/"
 ];
 
@@ -176,10 +176,10 @@ async function activitySummary(){
 }
 async function researchAnalytics(){
   if(!pool())return {schemaVersion:"7.47-TELEMETRY-V1",researchOnly:true,executionImpact:false,source:"NO_DATABASE",generatedAt:new Date().toISOString(),ledgers:{}};
-  const [baseline,shadow,challenger,regime]=await Promise.all([
-    stateGet("paper"),stateGet("shadow_v1"),stateGet("challenger_v2"),stateGet("regime_v1")
+  const [baseline,shadow,challenger,challengerV3,regime]=await Promise.all([
+    stateGet("paper"),stateGet("shadow_v1"),stateGet("challenger_v2"),stateGet("challenger_v3"),stateGet("regime_v1")
   ]);
-  return {...researchComparison({baseline,shadow,challenger,regime}),source:"POSTGRES_STATE"};
+  return {...researchComparison({baseline,shadow,challenger,challengerV3,regime}),source:"POSTGRES_STATE"};
 }
 function portfolioHistoryRangeMs(raw){
   const key=String(raw||'1d').toLowerCase();
