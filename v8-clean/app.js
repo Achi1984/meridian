@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r28';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r30';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -88,7 +88,8 @@ function paperHtml(x){
   if(!x.ok)return `<section class="hero paper-hero"><div class="eyebrow">PAPER · DATA STATUS</div><div class="hero-value">CHECK</div><p class="muted">${x.error||'Research-Daten nicht verfügbar'}</p></section>`;
   const rowHtml=(r,archived=false)=>{
     const pnlTone=r.pnl>0?'safe':r.pnl<0?'danger':'muted';
-    const ref=archived?'RETIRED':r.key==='baseline'?'REFERENCE':'ACTIVE PAPER';
+    const paused=x.botHealth?.bots?.[r.key]?.riskLocked||(r.key==='challenger'&&x.botHealth?.bots?.challengerV3?.enabled);
+    const ref=archived?'RETIRED':r.key==='baseline'?'REFERENCE':paused?'PAUSIERT':'ACTIVE PAPER';
     const sample=r.commonClosed!=null?`${r.commonClosed} closed im Common Window`:`${r.closedTrades} closed gesamt`;
     return `<div class="research-row ${archived?'is-retired':''}"><div class="research-head"><div><span>${r.name}</span><b class="${archived?'tone-danger':''}">${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
   };

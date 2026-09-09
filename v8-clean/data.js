@@ -149,11 +149,18 @@ function gateReasons(lastSignal={}){
   const raw=Array.isArray(lastSignal?.gate?.reasons)?lastSignal.gate.reasons:Array.isArray(lastSignal?.reasons)?lastSignal.reasons:[];
   return [...new Set(raw.map(x=>String(x||'').toUpperCase()).filter(Boolean))];
 }
+export function tradeRiskDetails(x={}){
+  const finite=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
+  const entry=finite(x.entry),stop=finite(x.initialSl??x.sl),qty=finite(x.qty),realized=finite(x.realized);
+  const risk=entry>0&&stop>0&&qty>0?Math.abs(entry-stop)*qty:null;
+  const feeOpen=finite(x.feeOpen),feeClose=finite(x.feeClose),fees=feeOpen!=null&&feeClose!=null?feeOpen+feeClose:null;
+  return {entry,stop,exit:finite(x.exit),riskPct:finite(x.riskPct),plannedRiskUsd:risk>0?risk:null,netR:risk>0&&realized!=null?realized/risk:null,feesUsd:fees,grossR:risk>0&&realized!=null&&fees!=null?(realized+fees)/risk:null,decision:x.challengerDecision||null,unrealized:finite(x.unrealized),openedAt:x.openedAt||null};
+}
 function recentTrades(baseline={},challenger={},challengerV3={}){
   const base=Array.isArray(baseline?.trades)?baseline.trades.filter(x=>x?.status==='CLOSED').map(x=>({...x,bot:'baseline'})):[];
   const chall=Array.isArray(challenger?.recentClosed)?challenger.recentClosed.map(x=>({...x,bot:'challenger'})):[];
   const v3=Array.isArray(challengerV3?.recentClosed)?challengerV3.recentClosed.map(x=>({...x,bot:'challengerV3'})):[];
-  return [...base,...chall,...v3].map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase()})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
+  return [...base,...chall,...v3].map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase(),risk:tradeRiskDetails(x)})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
 }
 function botHealthModel(status={},challenger={},challengerV3={},baseline={},ledgerRows=[],audit={}){
   const engine=status?.engine||{};
@@ -175,6 +182,7 @@ function botHealthModel(status={},challenger={},challengerV3={},baseline={},ledg
       challenger:{lifecycle:'PARENT PAUSED',lastScanAt:challenger?.lastScanAt||null,lastClosedAt:audits.challenger?.lastClosedAt||null,openCount:n(challenger?.openCount)??0,evaluated:challengerEvaluations.length,ready:challengerEvaluations.length-challengerBlocked.length,blocked:challengerBlocked.length,reasons:reasonCounts(challengerBlocked),gateReasons:challengerGate,riskLocked:challengerGate.some(x=>x.startsWith('MAX_')),metrics:rowMap.challenger||{}},
       challengerV3:{enabled:challengerV3?.enabled===true,lifecycle:String(challengerV3?.lifecycle?.status||'WAITING'),lastScanAt:challengerV3?.lastScanAt||null,lastClosedAt:audits.challengerV3?.lastClosedAt||null,openCount:n(challengerV3?.openCount)??0,evaluated:v3Evaluations.length,ready:v3Evaluations.length-v3Blocked.length,blocked:v3Blocked.length,reasons:reasonCounts(v3Blocked),gateReasons:v3Gate,riskLocked:challengerV3?.lifecycle?.status==='STOPPED_REVIEW'||Number(challengerV3?.account?.drawdownPct)>=Number(challengerV3?.parameters?.maxDrawdownPct)||v3Gate.some(x=>['MAX_DAILY_LOSS','MAX_DRAWDOWN'].includes(x)),metrics:rowMap.challengerV3||{},parameters:challengerV3?.parameters||null,analysis:challengerV3?.analysis||null}
     },
+    openPositions:(challengerV3?.openPositions||[]).filter(p=>p.status==='OPEN').map(p=>({symbol:String(p.symbol||'—'),side:String(p.side||'—'),...tradeRiskDetails(p)})),
     recentTrades:recentTrades(baseline,challenger,challengerV3)
   };
 }
