@@ -1,7 +1,8 @@
-import {getJson} from './data.js?v=8.0-r28';
+import {getJson} from './data.js?v=8.0-r30';
 
 const root=()=>document.getElementById('view-paper');
-const num=v=>Number.isFinite(Number(v))?Number(v):null;
+const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
+const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=(v,d=2)=>num(v)==null?'—':Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=v=>num(v)==null?'—':`${Number(v)<0?'−':''}$${Math.abs(Math.round(Number(v))).toLocaleString('de-DE')}`;
 const pct=v=>num(v)==null?'—':`${fmt(v,1)}%`;
@@ -86,7 +87,11 @@ function botAnswer(key,bot={}){
 function tradeHtml(t={}){
   const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
   const bot=t.bot==='challengerV3'?'V3':t.bot==='challenger'?'V2':'BASELINE';
-  return `<div class="paper-r26-trade"><div><b>${bot} · ${t.symbol} ${t.side}</b><small>${date(t.closedAt)} · ${t.exitReason}</small></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
+  const r=t.risk||{};
+  return `<div class="paper-r26-trade"><div><b>${bot} · ${esc(t.symbol)} ${esc(t.side)}</b><small>${date(t.closedAt)} · ${esc(t.exitReason)}</small><small>Risiko ${usd(r.plannedRiskUsd)} (${fmt(r.riskPct,2)}%) · Ergebnis ${fmt(r.netR,2)}R netto</small><details><summary>Ausführung prüfen</summary><small>${esc(r.decision)} · Einstieg ${fmt(r.entry,4)} · Stop ${fmt(r.stop,4)} · Ausstieg ${fmt(r.exit,4)}</small><small>Gebühren ${fmt(r.feesUsd,2)} USD · Ergebnis vor Gebühren ${fmt(r.grossR,2)}R</small></details></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
+}
+function positionHtml(p={}){
+  return `<div class="paper-r26-bot"><b>OFFEN · ${esc(p.symbol)} ${esc(p.side)}</b><small>Einstieg ${fmt(p.entry,4)} · Stop ${fmt(p.stop,4)}</small><small>Risiko ${usd(p.plannedRiskUsd)} (${fmt(p.riskPct,2)}%) · Laufend ${usd(p.unrealized)}</small><small>Eröffnet ${date(p.openedAt)} · Bewertung vom letzten Kursstand</small></div>`;
 }
 function renderAnswer(health={}){
   const el=root();if(!el||!health?.bots)return;
@@ -94,10 +99,11 @@ function renderAnswer(health={}){
   if(!card){card=document.createElement('section');card.id='paperAnswerR26';card.className='card paper-answer-r26';el.appendChild(card)}
   const e=health.engine||{},bots=health.bots||{},trades=health.recentTrades||[];
   const locked=[bots.baseline,bots.challenger,bots.challengerV3].filter(x=>x?.riskLocked).length,v3=bots.challengerV3||{};
-  const verdict=v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung erst nach Prüfung einer neuen Hypothese.':v3.enabled?`V3 läuft mit eingefrorenen Parametern: Risiko ${fmt(v3.parameters?.fullRiskPct,2)}% · Score ≥${v3.parameters?.tradeScore??'—'} · Re-Entry-Sperre ${v3.parameters?.postStopReentryMinutes??'—'} min. Erst prospektiv bewerten.`:'V3 wartet auf einen qualifizierten Stop mit mindestens 20 geschlossenen Trades.';
+  const verdict=v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung erst nach Prüfung einer neuen Hypothese.':v3.enabled?`V3 läuft mit eingefrorenen Parametern: Risiko voll ${fmt(v3.parameters?.fullRiskPct,2)}% / reduziert ${fmt(v3.parameters?.cautionRiskPct,2)}% · Re-Entry-Sperre ${v3.parameters?.postStopReentryMinutes??'—'} min. Erst prospektiv bewerten.`:'V3 wartet auf einen qualifizierten Stop mit mindestens 20 geschlossenen Trades.';
   card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
     <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}${botAnswer('challenger',bots.challenger)}</div>
     <div class="paper-r26-verdict"><span>NÄCHSTER TEST</span><b>${verdict}</b></div>
+    ${(health.openPositions||[]).map(positionHtml).join('')}
     <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
 }
 function renderExecutionAudit(audit,health={}){
