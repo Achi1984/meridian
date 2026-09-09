@@ -208,6 +208,7 @@ function paperModel(analytics={},activity={},status={},challengerStatus={},chall
   return {
     ok:true,locked:false,source:'RESEARCH_ANALYTICS',researchOnly:analytics?.researchOnly!==false,executionImpact:analytics?.executionImpact===true,
     schemaVersion:String(analytics?.schemaVersion||'—'),rows,
+    fundingCarry:status?.fundingCarry||null,
     deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,botHealth:botHealthModel(status,challengerStatus,challengerV3Status,baselineState,rows,analytics?.executionAudit),
     commonWindow:common?{days:n(common.days),start:common.start||null,end:common.end||null}:null,
     opportunityCost:{closed:n(challenger.closed)??0,missedWinners:n(challenger.missedWinners)??0,avoidedLosers:n(challenger.avoidedLosers)??0,netR:n(challenger.netCounterfactualR)},

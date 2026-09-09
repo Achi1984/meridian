@@ -38,7 +38,7 @@ test('R18 adapter loads before canonical app and does not disclose holding symbo
   const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
   const adapter=fs.readFileSync(new URL('../v8-clean/live-price-adapter-r18.js',import.meta.url),'utf8');
   assert.match(html,/live-price-adapter-r18\.js\?v=8\.0-r18/);
-  assert.match(html,/app\.js\?v=8\.0-r33/);
+  assert.match(html,/app\.js\?v=8\.0-r36/);
   assert.ok(html.indexOf('live-price-adapter-r18.js')<html.indexOf('app.js'));
   assert.match(adapter,/api\/v3\/ticker\/price/);
   assert.doesNotMatch(adapter,/symbols=/);
