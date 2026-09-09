@@ -69,6 +69,8 @@ export function markFundingCarryPaper(state,snapshot,now=Date.now(),cfg=FUNDING_
   const net=basisPnl+out.basket.fundingIncome-totalCosts;
   Object.assign(out.basket,{spotMark:spot,perpMark:perp,basisPct:round((perp-spot)/spot*100,5),basisPnl:round(basisPnl,8),
     estimatedCloseCosts:round(closeFees,8),estimatedSlippage:round(slippage,8),totalEstimatedCosts:round(totalCosts,8),netPnl:round(net,8),lastMarkedAt:new Date(now).toISOString()});
+  if(Number(snapshot?.nextFundingTime)>0)out.basket.nextFundingTime=Number(snapshot.nextFundingTime);
+  if(snapshot?.lastFundingRate!=null&&Number.isFinite(Number(snapshot.lastFundingRate)))out.basket.referenceFundingRate=Number(snapshot.lastFundingRate);
   out.account.equity=round(out.account.startEquity+net,8);out.account.realizedPnl=round(out.basket.fundingIncome-out.basket.entryFees,8);
   out.updatedAt=new Date(now).toISOString();return out;
 }
@@ -90,8 +92,9 @@ export function closeFundingCarryPaper(state,snapshot,reason,now=Date.now(),cfg=
 }
 
 export function fundingCarryPaperStatus(state,cfg=FUNDING_CARRY_PAPER_V1_CONFIG){
-  const s=state||newFundingCarryPaperState();return {enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,
+  const s=state||newFundingCarryPaperState(),settlements=(s.settlements||[]).slice(-5).reverse(),basket=s.basket;
+  return {enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,
     ruleset:FUNDING_CARRY_PAPER_V1_RULESET,lifecycle:s.lifecycle,lastCheckedAt:s.lastCheckedAt,account:s.account,basket:s.basket,
-    lastEligibility:s.lastEligibility,settlements:(s.settlements||[]).slice(-5).reverse(),closedCycles:(s.closedCycles||[]).slice(-3).reverse(),
+    lastEligibility:s.lastEligibility,settlements,telemetry:{breakEvenRemaining:basket?round(Math.max(0,-Number(basket.netPnl||0)),2):null,nextFundingTime:basket?.nextFundingTime||null,referenceFundingRate:basket?.referenceFundingRate??null,lastSettlement:settlements[0]||null},closedCycles:(s.closedCycles||[]).slice(-3).reverse(),
     policy:{symbol:cfg.symbol,notionalPerLeg:cfg.notionalPerLeg,entryFundingMinimum:cfg.minRollingFundingRate,reviewDays:cfg.reviewDays,maxLossPct:cfg.maxLossPct}};
 }

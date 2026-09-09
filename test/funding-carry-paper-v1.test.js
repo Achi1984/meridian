@@ -34,6 +34,13 @@ test('30-day checkpoint stops one prospective cycle for review without re-entry'
   const status=fundingCarryPaperStatus(s);assert.equal(status.executionImpact,false);assert.equal(status.autoPromotion,false);
 });
 
+test('status exposes compact break-even and next-settlement telemetry',()=>{
+  const now=Date.UTC(2026,8,9),eligibility=fundingEligibility(fundingRows(now),now);
+  const s=openFundingCarryPaper(newFundingCarryPaperState(now),{spotPrice:100000,perpMarkPrice:100000,nextFundingTime:now+8*HOUR,lastFundingRate:.0001},eligibility,{now});
+  const status=fundingCarryPaperStatus(s);
+  assert.ok(status.telemetry.breakEvenRemaining>0);assert.equal(status.telemetry.nextFundingTime,now+8*HOUR);assert.equal(status.telemetry.referenceFundingRate,.0001);
+});
+
 test('basis divergence and account loss are explicit stop conditions',()=>{
   const now=Date.UTC(2026,8,9),eligibility=fundingEligibility(fundingRows(now),now);
   let s=openFundingCarryPaper(newFundingCarryPaperState(now),{spotPrice:100000,perpMarkPrice:100000},eligibility,{now});
