@@ -18,7 +18,7 @@ test('production target remains the five-view canonical v8 shell',()=>{
     assert.match(clean,new RegExp(`data-route="${key}"`));
   }
   assert.match(clean,/r8-polish\.css\?v=8\.0-r9/);
-  assert.match(clean,/app\.js\?v=8\.0-r36/);
+  assert.match(clean,/app\.js\?v=8\.0-r37/);
   assert.match(clean,/more-runtime\.js\?v=8\.0-r9/);
   assert.match(clean,/v8\.0 · PROD/);
   assert.doesNotMatch(clean,/class="mode-banner"|MERIDIAN v8 · CUSTOMER VIEW/);
