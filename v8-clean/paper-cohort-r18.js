@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r32';
+import {getJson} from './data.js?v=8.0-r33';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
@@ -78,11 +78,12 @@ function sumLedgers(ledgers={},keys=[]){
   return {closedTrades:rows.reduce((s,x)=>s+(num(x.closedTrades)||0),0),evaluableStops:rows.reduce((s,x)=>s+(num(x.stopExecution?.evaluable)||0),0),materialLosses:rows.reduce((s,x)=>s+(num(x.stopExecution?.materialLosses)||0),0),postStopReentries:rows.reduce((s,x)=>s+(num(x.behavior?.postStopReentries)||0),0),directionalMultiAssetBundles:rows.reduce((s,x)=>s+(num(x.behavior?.directionalMultiAssetBundles)||0),0)};
 }
 function botAnswer(key,bot={}){
-  const m=bot.metrics||{},lock=bot.gateReasons?.[0]||null;
-  const waiting=bot.enabled===false,state=waiting?'WARTET':bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
+  const total=bot.metrics||{},phase=key==='challengerV3'&&bot.learning?.phaseStarted?bot.learning.performance:null,m=phase||total,lock=bot.gateReasons?.[0]||null;
+  const retired=bot.lifecycle==='RETIRED_NO_EDGE',parent=key==='challenger'&&bot.lifecycle==='PARENT PAUSED';
+  const waiting=bot.enabled===false,state=retired?'AUSGEMUSTERT':parent?'VERSIEGELT':waiting?'WARTET':bot.riskLocked?'PAUSIERT':bot.openCount>0?'IM TRADE':'BEOBACHTET';
   const tone=waiting?'watch':bot.riskLocked?'danger':bot.openCount>0?'safe':'watch';
-  const why=waiting?'Startet automatisch nach qualifiziertem V2-Stop':bot.riskLocked?`${gateLabel(lock)} · DD ${fmt(m.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt${bot.reasons?.length?` · ${gateLabel(bot.reasons[0].reason)}`:''}`;
-  return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div><strong>${usd(m.pnl)}${m.closedTrades>0?` · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}`:' · Noch keine abgeschlossenen Trades'}</strong><small>${why}</small></div>`;
+  const why=retired?'Neue Einstiege beendet · Historie erhalten':parent?'Abgeschlossene Referenz für V3':waiting?'Startet automatisch nach qualifiziertem V2-Stop':bot.riskLocked?`${gateLabel(lock||bot.lifecycle)} · DD ${fmt(total.maxDrawdownPct,2)}%`:bot.openCount>0?`${bot.openCount} offene Position${bot.openCount===1?'':'en'}`:`Kein Entry · ${bot.blocked??0}/${bot.evaluated??0} im letzten Scan geblockt${bot.reasons?.length?` · ${gateLabel(bot.reasons[0].reason)}`:''}`;
+  return `<div class="paper-r26-bot"><div><span>${botNames[key]}</span><b class="tone-${tone}">${state}</b></div>${phase?'<small>Kostenphase · abgeschlossene Trades</small>':''}<strong>${usd(m.pnl)}${m.closedTrades>0?` · PF ${fmt(m.profitFactor,2)} · EXP ${usd(m.expectancy)}`:' · Noch keine abgeschlossenen Trades'}</strong>${phase?`<small>Gesamt inkl. Altphase und offener Bewertung ${usd(total.pnl)}</small>`:''}<small>${why}</small><small>Letzter Abschluss: ${date(bot.lastClosedAt)}</small></div>`;
 }
 function tradeHtml(t={}){
   const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
@@ -102,11 +103,12 @@ function renderAnswer(health={}){
   const e=health.engine||{},bots=health.bots||{},trades=health.recentTrades||[];
   const locked=[bots.baseline,bots.challenger,bots.challengerV3].filter(x=>x?.riskLocked).length,v3=bots.challengerV3||{};
   const learning=v3.learning||{},phase=learning.performance||{};
-  const verdict=v3.lifecycle==='RETIRED_NO_EDGE'?'V3 automatisch ausgemustert: nach belastbarer Stichprobe kein Netto-Edge.':v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung nur mit belegter Hypothese.':learning.phaseStarted?`${learning.status||'AUFBAU'} · ${phase.closedTrades??0}/${learning.targetClosedTrades??20} Trades · ${learning.reason||'Mit eingefrorenen Parametern. Erst prospektiv bewerten.'}`:'Kostenphase startet automatisch, sobald keine Altposition mehr offen ist; mit eingefrorenen Parametern. Erst prospektiv bewerten.';
-  card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
+  const learningLabel={BUILDING:'AUFBAU',CHECKPOINT:'ZWISCHENPRÜFUNG',PROMISING_EARLY:'FRÜH POSITIV',PROMISING:'POSITIV · WEITER PRÜFEN',EXTEND:'WEITER BEOBACHTEN',WATCH:'BEOBACHTEN',RETIRE:'AUSMUSTERN'}[learning.status]||'AUFBAU';
+  const verdict=v3.lifecycle==='RETIRED_NO_EDGE'?'V3 automatisch ausgemustert: nach belastbarer Stichprobe kein Netto-Edge.':v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung nur mit belegter Hypothese.':learning.phaseStarted?`${learningLabel} · ${phase.closedTrades??0}/${learning.targetClosedTrades??20} Trades · ${learning.reason||'Mit eingefrorenen Parametern. Erst prospektiv bewerten.'}`:'Kostenphase startet automatisch, sobald keine Altposition mehr offen ist; mit eingefrorenen Parametern. Erst prospektiv bewerten.';
+  card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.lifecycle==='RETIRED_NO_EDGE'?'V3 AUSGEMUSTERT':v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
     <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}${botAnswer('challenger',bots.challenger)}</div>
     <div class="paper-r26-verdict"><span>KLARE ENTSCHEIDUNG</span><b>${verdict}</b></div>
-    <small class="muted">${health.executionPolicy?'Kostenvariante aktiv · Historie und Verlustgrenzen bleiben erhalten':v3.riskLocked?'Kostenvariante startet nicht bei aktiver Risikosperre':'Kostenvariante wartet auf ein Konto ohne offene Positionen'}</small>
+    <small class="muted">${v3.lifecycle==='RETIRED_NO_EDGE'?'Kostenvariante beendet · Historie erhalten':health.executionPolicy?'Kostenvariante aktiv · Historie und Verlustgrenzen bleiben erhalten':v3.riskLocked?'Kostenvariante startet nicht bei aktiver Risikosperre':'Kostenvariante wartet auf ein Konto ohne offene Positionen'}</small>
     ${(health.openPositions||[]).map(positionHtml).join('')}
     <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
 }
