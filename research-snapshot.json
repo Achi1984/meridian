@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 506,
+    "cycles": 540,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-09T07:19:11.893Z",
-    "lastGoodMarketAt": "2026-09-09T07:19:11.557Z",
-    "lastSignalScanAt": "2026-09-09T07:18:38.089Z",
+    "lastCycleAt": "2026-09-09T07:36:12.590Z",
+    "lastGoodMarketAt": "2026-09-09T07:36:12.044Z",
+    "lastSignalScanAt": "2026-09-09T07:35:38.389Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 253,
+    "signalScans": 270,
     "startedAt": "2026-09-09T03:06:27.990Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2525,7 +2525,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-09T07:19:22.597Z",
+  "generatedAt": "2026-09-09T07:36:39.990Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3477,18 +3477,18 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 87,
-        "distanceAtr": 1.357,
-        "price": 2510.21,
+        "candidate": 98,
+        "distanceAtr": 1.589,
+        "price": 2513.39,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 79
+        "technical": 90
       },
       {
         "candidate": 77,
-        "distanceAtr": 1.382,
-        "price": 79242.01,
+        "distanceAtr": 1.171,
+        "price": 79223.03,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
@@ -3496,8 +3496,8 @@
       },
       {
         "candidate": 74,
-        "distanceAtr": 1.709,
-        "price": 104.84,
+        "distanceAtr": 1.243,
+        "price": 104.7,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
@@ -3505,7 +3505,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-09T07:18:37.984Z"
+    "updatedAt": "2026-09-09T07:36:38.692Z"
   },
   "shadowV1": {
     "account": {
