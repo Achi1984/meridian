@@ -4,14 +4,14 @@ import { compareExitModels, aggregateExitLab, EXIT_LAB_VERSION } from './exit-la
 
 const DAY=86400000;
 const round=(v,d=3)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**d:null;
-const openedMs=t=>Number.isFinite(Number(t.openedAt))?Number(t.openedAt):Date.parse(t.openedAt||'');
+const openedMs=t=>t.openedAt==null||t.openedAt===''?NaN:Number.isFinite(Number(t.openedAt))?Number(t.openedAt):Date.parse(t.openedAt);
 const regimeLabel=t=>t.regimeType||t.challengerRegime||t.regime||'UNKNOWN';
 
 function replayCandlesForTrade(trade,market,end,horizonDays){
   const symbol=String(trade.symbol||'').toUpperCase(),rows=market?.[symbol]?.['15m']||[];
   const opened=openedMs(trade);if(!Number.isFinite(opened))return[];
   const limit=Math.min(Number(end)||Infinity,opened+Math.max(1,Number(horizonDays||14))*DAY);
-  return rows.filter(c=>Number(c.closeTime)>opened&&Number(c.closeTime)<=limit).map(c=>({
+  return rows.filter(c=>Number.isFinite(Number(c.openTime))&&Number(c.openTime)>=opened&&Number(c.closeTime)>opened&&Number(c.closeTime)<=limit).slice().sort((a,b)=>Number(a.openTime)-Number(b.openTime)).map(c=>({
     ts:Number(c.closeTime),open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close)
   }));
 }
@@ -24,8 +24,14 @@ function groupReplay(rows,keyFn){
 
 export function replayExitCohort(trades,market,{end=Date.now(),horizonDays=14,feeBps=5,slippageBps=3,includeRows=false}={}){
   const source=(trades||[]).filter(t=>t&&t.symbol&&t.side&&Number(t.entry)>0&&Number(t.sl)>0&&Number(t.tp1)>0);
-  const rows=[];let noCandles=0;
+  const rows=[];let noCandles=0,excludedEntryBars=0;
   for(const trade of source){
+    const opened=openedMs(trade),marketRows=market?.[String(trade.symbol).toUpperCase()]?.['15m']||[];
+    // Dropping only the entry candle would hide possible post-entry stops.
+    // Exclude the entire trade until finer-grained entry-bar data is available.
+    if(marketRows.some(c=>c.openTime!=null&&Number(c.openTime)<opened&&Number(c.closeTime)>opened)){
+      excludedEntryBars++;continue;
+    }
     const candles=replayCandlesForTrade(trade,market,end,horizonDays);if(!candles.length){noCandles++;continue;}
     const normalized={...trade,regimeType:regimeLabel(trade)};
     const comparison=compareExitModels(normalized,candles,{feeBps,slippageBps});
@@ -33,8 +39,8 @@ export function replayExitCohort(trades,market,{end=Date.now(),horizonDays=14,fe
   }
   const aggregate=aggregateExitLab(rows.map(x=>x.comparison));
   return{
-    version:EXIT_LAB_VERSION,method:'FIXED_ENTRY_15M_EXIT_COHORT_REPLAY',researchOnly:true,executionImpact:false,
-    horizonDays,sourceTrades:source.length,replayedTrades:rows.length,noCandles,
+    version:EXIT_LAB_VERSION,auditVersion:'R29-CAUSAL-BARS-GAP-FILLS',entryBarPolicy:'FULL_BARS_AFTER_ENTRY_ONLY',method:'FIXED_ENTRY_15M_EXIT_COHORT_REPLAY',researchOnly:true,executionImpact:false,
+    horizonDays,sourceTrades:source.length,replayedTrades:rows.length,noCandles,excludedEntryBars,
     aggregate,bySide:groupReplay(rows,x=>x.side),bySymbol:groupReplay(rows,x=>x.symbol),byRegime:groupReplay(rows,x=>x.regime),
     rows:includeRows?rows:rows.slice(-20)
   };
@@ -48,6 +54,7 @@ export function replayExitLabForLedgers({ledgers={},market={},end=Date.now(),opt
   }
   const ranked={};
   for(const [name,x] of Object.entries(result)){
+    if(!x.replayedTrades){ranked[name]=[];continue;}
     ranked[name]=Object.entries(x.aggregate.models).sort((a,b)=>Number(b[1].totalR||0)-Number(a[1].totalR||0)).map(([model,m],i)=>({rank:i+1,model,totalR:round(m.totalR),avgR:round(m.avgR),deltaVsCurrent:round(m.deltaTotalRvsCurrent)}));
   }
   return{version:EXIT_LAB_VERSION,method:'SAME_HISTORICAL_ENTRIES_PARALLEL_EXIT_POLICIES',researchOnly:true,executionImpact:false,ledgers:result,ranked};
