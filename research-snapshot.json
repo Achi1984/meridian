@@ -853,24 +853,36 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 786,
+    "cycles": 817,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-09T09:39:14.898Z",
-    "lastGoodMarketAt": "2026-09-09T09:39:14.436Z",
-    "lastSignalScanAt": "2026-09-09T09:38:41.295Z",
+    "lastCycleAt": "2026-09-09T09:54:45.194Z",
+    "lastGoodMarketAt": "2026-09-09T09:54:44.932Z",
+    "lastSignalScanAt": "2026-09-09T09:54:39.899Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 393,
+    "signalScans": 409,
     "startedAt": "2026-09-09T03:06:27.990Z",
     "state": "RUNNING",
     "version": "6.2.0"
   },
   "events": [
+    {
+      "created_at": "2026-09-09T09:40:45.396Z",
+      "id": "18646",
+      "payload": {
+        "exitReason": "SL",
+        "parameterVersion": "8.27-CHALLENGER-V3-FROZEN-V1",
+        "realized": -26.96,
+        "side": "LONG",
+        "symbol": "SOLUSDT"
+      },
+      "type": "CHALLENGER_V3_POSITION_CLOSED"
+    },
     {
       "created_at": "2026-09-09T09:38:41.210Z",
       "id": "18645",
@@ -1909,31 +1921,6 @@
         "tp2": 79973.94185295723
       },
       "type": "SIGNAL_REJECTED"
-    },
-    {
-      "created_at": "2026-09-09T09:32:39.690Z",
-      "id": "18626",
-      "payload": {
-        "assets": [
-          {
-            "candidate": 90,
-            "price": 79400.01,
-            "side": "LONG",
-            "status": "READY",
-            "symbol": "BTCUSDT",
-            "technical": 78
-          },
-          {
-            "candidate": 71,
-            "price": 2507.57,
-            "side": "LONG",
-            "status": "READY",
-            "symbol": "ETHUSDT",
-            "technical": 68
-          }
-        ]
-      },
-      "type": "SIGNAL_SCAN_READY"
     }
   ],
   "evidence": {
@@ -2734,7 +2721,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-09T09:39:37.990Z",
+  "generatedAt": "2026-09-09T09:54:47.790Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3686,35 +3673,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 82,
-        "distanceAtr": 0.182,
-        "price": 79322,
-        "side": "LONG",
-        "status": "READY",
-        "symbol": "BTCUSDT",
-        "technical": 70
-      },
-      {
-        "candidate": 71,
-        "distanceAtr": 0.761,
-        "price": 2502.61,
-        "side": "LONG",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "ETHUSDT",
-        "technical": 68
-      },
-      {
-        "candidate": 37,
-        "distanceAtr": 1.098,
-        "price": 104.04,
-        "side": "LONG",
+        "candidate": 69,
+        "distanceAtr": 1.853,
+        "price": 103.63,
+        "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
-        "technical": 45
+        "technical": 63
+      },
+      {
+        "candidate": 56,
+        "distanceAtr": 1.409,
+        "price": 78980.61,
+        "side": "SHORT",
+        "status": "NO_SETUP",
+        "symbol": "BTCUSDT",
+        "technical": 60
+      },
+      {
+        "candidate": 47,
+        "distanceAtr": 1.636,
+        "price": 2493.71,
+        "side": "LONG",
+        "status": "NO_SETUP",
+        "symbol": "ETHUSDT",
+        "technical": 55
       }
     ],
-    "readyCount": 1,
-    "updatedAt": "2026-09-09T09:38:40.093Z"
+    "readyCount": 0,
+    "updatedAt": "2026-09-09T09:54:39.713Z"
   },
   "shadowV1": {
     "account": {
