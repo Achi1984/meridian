@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r30';
+import {getJson} from './data.js?v=8.0-r31';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
@@ -88,10 +88,12 @@ function tradeHtml(t={}){
   const tone=(num(t.realized)||0)>0?'safe':(num(t.realized)||0)<0?'danger':'muted';
   const bot=t.bot==='challengerV3'?'V3':t.bot==='challenger'?'V2':'BASELINE';
   const r=t.risk||{};
-  return `<div class="paper-r26-trade"><div><b>${bot} · ${esc(t.symbol)} ${esc(t.side)}</b><small>${date(t.closedAt)} · ${esc(t.exitReason)}</small><small>Risiko ${usd(r.plannedRiskUsd)} (${fmt(r.riskPct,2)}%) · Ergebnis ${fmt(r.netR,2)}R netto</small><details><summary>Ausführung prüfen</summary><small>${esc(r.decision)} · Einstieg ${fmt(r.entry,4)} · Stop ${fmt(r.stop,4)} · Ausstieg ${fmt(r.exit,4)}</small><small>Gebühren ${fmt(r.feesUsd,2)} USD · Ergebnis vor Gebühren ${fmt(r.grossR,2)}R</small></details></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
+  const riskLine=r.plannedRiskBudgetUsd!=null?`Budget inkl. Kosten ${usd(r.plannedRiskBudgetUsd)} (${fmt(r.riskPct,2)}%) · Ergebnis ${fmt(r.budgetResultR,2)} Budget-R`:`Stop-Risiko ${usd(r.plannedRiskUsd)} (${fmt(r.riskPct,2)}%) · Ergebnis ${fmt(r.netR,2)}R netto`;
+  return `<div class="paper-r26-trade"><div><b>${bot} · ${esc(t.symbol)} ${esc(t.side)}</b><small>${date(t.closedAt)} · ${esc(t.exitReason)}</small><small>${riskLine}</small><details><summary>Ausführung prüfen</summary><small>${esc(r.decision)} · Einstieg ${fmt(r.entry,4)} · Stop ${fmt(r.stop,4)} · Ausstieg ${fmt(r.exit,4)}</small><small>Gebühren ${fmt(r.feesUsd,2)} USD · Ergebnis vor Gebühren ${fmt(r.grossR,2)} Stop-R</small><small>${esc(r.executionPolicyVersion||'Bisherige Positionsgröße')} · Stop-Risiko ohne Kosten ${usd(r.plannedRiskUsd)}</small></details></div><strong class="tone-${tone}">${usd(t.realized)}</strong></div>`;
 }
 function positionHtml(p={}){
-  return `<div class="paper-r26-bot"><b>OFFEN · ${esc(p.symbol)} ${esc(p.side)}</b><small>Einstieg ${fmt(p.entry,4)} · Stop ${fmt(p.stop,4)}</small><small>Risiko ${usd(p.plannedRiskUsd)} (${fmt(p.riskPct,2)}%) · Laufend ${usd(p.unrealized)}</small><small>Eröffnet ${date(p.openedAt)} · Bewertung vom letzten Kursstand</small></div>`;
+  const budget=p.plannedRiskBudgetUsd!=null?`Budget inkl. Kosten ${usd(p.plannedRiskBudgetUsd)}`:`Stop-Risiko ${usd(p.plannedRiskUsd)}`;
+  return `<div class="paper-r26-bot"><b>OFFEN · ${esc(p.symbol)} ${esc(p.side)}</b><small>Einstieg ${fmt(p.entry,4)} · Stop ${fmt(p.stop,4)}</small><small>${budget} (${fmt(p.riskPct,2)}%) · Laufend ${usd(p.unrealized)}</small><small>Eröffnet ${date(p.openedAt)} · Bewertung vom letzten Kursstand</small></div>`;
 }
 function renderAnswer(health={}){
   const el=root();if(!el||!health?.bots)return;
@@ -103,6 +105,7 @@ function renderAnswer(health={}){
   card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
     <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}${botAnswer('challenger',bots.challenger)}</div>
     <div class="paper-r26-verdict"><span>NÄCHSTER TEST</span><b>${verdict}</b></div>
+    <small class="muted">${health.executionPolicy?'Kostenvariante aktiv · Historie und Verlustgrenzen bleiben erhalten':v3.riskLocked?'Kostenvariante startet nicht bei aktiver Risikosperre':'Kostenvariante wartet auf ein Konto ohne offene Positionen'}</small>
     ${(health.openPositions||[]).map(positionHtml).join('')}
     <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
 }

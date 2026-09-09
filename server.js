@@ -4,6 +4,7 @@ import pg from "pg";
 import { runCloudBacktest } from "./cloud-backtest.js";
 import { regimeDecision, REGIME_V1_RULESET, REGIME_V1_CONFIG } from "./regime-v1.js";
 import { buildSuccessorPlan, analyzePostStop } from "./post-stop-learning.js";
+import { costAwareSize, PAPER_COST_POLICY } from "./paper-cost-policy.js";
 
 const { Pool } = pg;
 const num=(k,f)=>Number.isFinite(Number(process.env[k]))?Number(process.env[k]):f;
@@ -411,6 +412,15 @@ async function ensureChallengerV3Unlocked(){
 }
 async function loadChallengerV3(){const s=await getState(CHALLENGER_V3_KEY,null);return s?rollover(structuredClone(s)):null;}
 async function saveChallengerV3(s){s.updatedAt=new Date().toISOString();await setState(CHALLENGER_V3_KEY,s);}
+async function activateChallengerCostPolicy(s){
+  if(s.executionPolicy?.version===PAPER_COST_POLICY)return true;
+  if(s.positions.some(p=>p.status==='OPEN')||s.lifecycle.status==='STOPPED_REVIEW')return false;
+  s.executionPolicy={version:PAPER_COST_POLICY,activatedAt:new Date().toISOString(),startingEquity:s.account.equity,startingClosedCount:s.trades.length,feeBps:config.feeBps,slippageBps:config.slippageBps};
+  s.lifecycle={...s.lifecycle,executionPolicy:PAPER_COST_POLICY,executionPolicyStartedAt:s.executionPolicy.activatedAt};
+  await saveChallengerV3(s);
+  await addEvent('CHALLENGER_COST_POLICY_STARTED',{...s.executionPolicy,ledgerReset:false});
+  return true;
+}
 function challengerV3Decision(signal,parameters){
   const regime=shadowRegime(signal),technical=Number(signal.technical||0),candidate=Number(signal.candidate||0),distanceAtr=Number(signal.distanceAtr);
   const distanceQuality=Number.isFinite(distanceAtr)?clamp(100-(distanceAtr/Math.max(config.maxEntryDistanceAtr,.01))*35,0,100):40;
@@ -424,7 +434,7 @@ function challengerV3Decision(signal,parameters){
   return{symbol:String(signal.symbol||"").toUpperCase(),side:String(signal.side||"").toUpperCase(),status:signal.status||null,decision,riskPct,confidence,technical,candidate,distanceAtr:Number.isFinite(distanceAtr)?distanceAtr:null,distanceQuality:round(distanceQuality,1),regime,regimeAdjustment:regimeAdj,reasons,evaluatedAt:new Date().toISOString(),researchOnly:true};
 }
 async function observeChallengerV3ScanUnlocked(candidates){
-  const s=await loadChallengerV3();if(!s)return [];const obs=(candidates||[]).map(x=>challengerV3Decision(x,s.parameters));
+  const s=await loadChallengerV3();if(!s)return [];await activateChallengerCostPolicy(s);const obs=(candidates||[]).map(x=>challengerV3Decision(x,s.parameters));
   s.lastEvaluations=obs.slice(0,10);s.lastDecision=obs[0]||null;s.lastScanAt=new Date().toISOString();await saveChallengerV3(s);return obs;
 }
 function challengerV3RiskGate({state,signal,riskPct}){
@@ -445,9 +455,9 @@ function challengerV3RiskGate({state,signal,riskPct}){
   return{ok:r.length===0,reasons:r,openRiskPct,dailyLossPct,drawdownPct};
 }
 function openChallengerV3Position({signal,state,riskPct,decision}){
-  const entry=slip(+signal.entry,signal.side,true),distance=Math.abs(entry-(+signal.sl)),qty=distance>0?state.account.equity*(riskPct/100)/distance:0;
+  const entry=slip(+signal.entry,signal.side,true),costPlan=costAwareSize({entry,sl:+signal.sl,side:signal.side,equity:state.account.equity,riskPct,feeBps:config.feeBps,slippageBps:config.slippageBps,tp1:signal.tp1}),qty=costPlan.qty;
   if(!Number.isFinite(qty)||!(qty>0))throw new Error("challenger v3 position size <=0");const feeOpen=qty*entry*config.feeBps/10000;
-  return{id:crypto.randomUUID(),symbol:signal.symbol,side:signal.side,status:"OPEN",entry,qty,sl:+signal.sl,tp1:+signal.tp1||null,tp2:+signal.tp2||null,openedAt:new Date().toISOString(),riskPct,feeOpen,source:"MERIDIAN-CHALLENGER-V3",ruleset:CHALLENGER_V3_RULESET,technical:signal.technical??null,candidate:signal.candidate??null,distanceAtr:signal.distanceAtr??null,challengerDecision:decision.decision,challengerConfidence:decision.confidence,challengerRegime:decision.regime,parameterVersion:state.parameters.parameterVersion};
+  return{...costPlan,id:crypto.randomUUID(),symbol:signal.symbol,side:signal.side,status:"OPEN",entry,qty,initialSl:+signal.sl,sl:+signal.sl,tp1:+signal.tp1||null,tp2:+signal.tp2||null,openedAt:new Date().toISOString(),riskPct,feeOpen,source:"MERIDIAN-CHALLENGER-V3",ruleset:CHALLENGER_V3_RULESET,technical:signal.technical??null,candidate:signal.candidate??null,distanceAtr:signal.distanceAtr??null,challengerDecision:decision.decision,challengerConfidence:decision.confidence,challengerRegime:decision.regime,parameterVersion:state.parameters.parameterVersion};
 }
 async function submitChallengerV3Unlocked(signal){
   const s=await loadChallengerV3();if(!s)return{accepted:false,reasons:["NOT_STARTED"]};
@@ -455,6 +465,9 @@ async function submitChallengerV3Unlocked(signal){
   const decision=challengerV3Decision(n,s.parameters);s.lastSignal={...n,receivedAt:new Date().toISOString(),challenger:decision};
   if(!["TRADE","CAUTION"].includes(decision.decision)){await saveChallengerV3(s);return{accepted:false,reasons:decision.reasons,decision};}
   const reject=async reason=>{s.lastSignal.gate={ok:false,reasons:[reason]};await saveChallengerV3(s);return{accepted:false,reasons:[reason],decision};};
+  if(s.lifecycle.status==='STOPPED_REVIEW')return reject('STOPPED_REVIEW');
+  if(!await activateChallengerCostPolicy(s))return reject('POLICY_UPGRADE_WAITING_FOR_FLAT');
+  if(s.executionPolicy.feeBps!==config.feeBps||s.executionPolicy.slippageBps!==config.slippageBps)return reject('COST_CONFIG_CHANGED');
   if(s.positions.some(x=>x.status==="OPEN"&&x.symbol===n.symbol))return reject("SAME_SYMBOL_POSITION_OPEN");
   const recent=(s.trades||[]).filter(x=>x.symbol===n.symbol).sort((a,b)=>new Date(b.closedAt||b.openedAt)-new Date(a.closedAt||a.openedAt))[0];
   const age=recent?Date.now()-new Date(recent.closedAt||recent.openedAt||0).getTime():Infinity;
@@ -462,7 +475,9 @@ async function submitChallengerV3Unlocked(signal){
   if(s.trades.some(t=>t.symbol===n.symbol&&t.side===n.side&&t.exitReason==="SL"&&Date.now()-Date.parse(t.closedAt)<s.parameters.postStopReentryMinutes*60000))return reject("POST_STOP_COOLDOWN");
   const gate=challengerV3RiskGate({state:s,signal:n,riskPct:decision.riskPct});s.lastSignal.gate=gate;
   if(!gate.ok){await saveChallengerV3(s);return{accepted:false,reasons:gate.reasons,gate,decision};}
-  const position=openChallengerV3Position({signal:n,state:s,riskPct:decision.riskPct,decision});s.positions.push(position);s.account.cash-=position.feeOpen;s.account.realizedPnl-=position.feeOpen;position.unrealized=-position.entry*position.qty*config.feeBps/10000;s.account.unrealizedPnl=s.positions.reduce((sum,p)=>sum+(p.unrealized||0),0);s.account.equity=s.account.cash+s.account.unrealizedPnl;s.lastSignal.decision=decision.decision;s.lastSignal.reasons=[];await saveChallengerV3(s);
+  const position=openChallengerV3Position({signal:n,state:s,riskPct:decision.riskPct,decision});
+  if(position.expectedTargetNetUsd==null||position.expectedTargetNetUsd<=0)return reject('NET_TARGET_NOT_POSITIVE');
+  s.positions.push(position);s.account.cash-=position.feeOpen;s.account.realizedPnl-=position.feeOpen;position.unrealized=-position.entry*position.qty*config.feeBps/10000;s.account.unrealizedPnl=s.positions.reduce((sum,p)=>sum+(p.unrealized||0),0);s.account.equity=s.account.cash+s.account.unrealizedPnl;s.lastSignal.decision=decision.decision;s.lastSignal.reasons=[];await saveChallengerV3(s);
   await addEvent("CHALLENGER_V3_POSITION_OPENED",{id:position.id,symbol:position.symbol,side:position.side,riskPct:position.riskPct,confidence:position.challengerConfidence,parameterVersion:position.parameterVersion});return{accepted:true,position,gate,decision};
 }
 async function challengerV3CycleUnlocked(m){
