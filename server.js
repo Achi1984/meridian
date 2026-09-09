@@ -5,6 +5,7 @@ import { runCloudBacktest } from "./cloud-backtest.js";
 import { regimeDecision, REGIME_V1_RULESET, REGIME_V1_CONFIG } from "./regime-v1.js";
 import { buildSuccessorPlan, analyzePostStop } from "./post-stop-learning.js";
 import { costAwareSize, PAPER_COST_POLICY } from "./paper-cost-policy.js";
+import { evaluatePaperLearning, PAPER_LEARNING_POLICY } from "./paper-learning-policy.js";
 
 const { Pool } = pg;
 const num=(k,f)=>Number.isFinite(Number(process.env[k]))?Number(process.env[k]):f;
@@ -444,7 +445,7 @@ function challengerV3RiskGate({state,signal,riskPct}){
   if(!Number.isFinite(signal.entry)||!Number.isFinite(signal.sl)||!(signal.entry>0&&signal.sl>0))r.push("INVALID_ENTRY_OR_SL");
   if(signal.side==="LONG"?signal.sl>=signal.entry:signal.sl<=signal.entry)r.push("INVALID_STOP_SIDE");
   if(!Number.isFinite(riskPct)||riskPct<=0)r.push("INVALID_RISK");
-  if(state.lifecycle?.status==="STOPPED_REVIEW")r.push("STOPPED_REVIEW");
+  if(state.lifecycle?.status!=="ACTIVE_PAPER")r.push(state.lifecycle?.status||"BOT_NOT_ACTIVE");
   if(positions.length>=p.maxOpenPositions)r.push("MAX_OPEN_POSITIONS");
   if([...state.trades,...positions].filter(t=>(t.openedAt||"").startsWith(today())).length>=p.maxTradesPerDay)r.push("MAX_TRADES_PER_DAY");
   const openRiskPct=openRisk(positions);if(openRiskPct+riskPct>p.maxPortfolioRiskPct+1e-9)r.push("MAX_PORTFOLIO_RISK");
@@ -484,8 +485,14 @@ async function challengerV3CycleUnlocked(m){
   let s=await loadChallengerV3();if(!s)return;const next=[],closed=[];let unrealized=0;
   for(const p of s.positions){if(p.status!=="OPEN")continue;const q=m.quotes[p.symbol];if(!q||!Number.isFinite(q.price)||q.price<=0||Date.now()-q.ts>config.marketStaleMs){unrealized+=p.unrealized||0;next.push(p);continue;}const marked=markPosition(p,q.price);marked.unrealized+=p.feeOpen;const reason=exitReason(marked,q.price);if(reason){const done=closePaperPosition(marked,q.price,reason);done.ruleset=CHALLENGER_V3_RULESET;done.parameterVersion=s.parameters.parameterVersion;s.account.cash+=done.realized+p.feeOpen;s.account.realizedPnl+=done.realized+p.feeOpen;s.trades.push(done);closed.push(done);}else{unrealized+=marked.unrealized;next.push(marked);}}
   s.positions=next;s.account.unrealizedPnl=unrealized;s.account.equity=s.account.cash+unrealized;s.account.peakEquity=Math.max(s.account.peakEquity||s.account.equity,s.account.equity);const latest=last(s.equityCurve);if(!latest||Date.now()-new Date(latest.ts).getTime()>=60000){s.equityCurve.push({ts:new Date().toISOString(),equity:s.account.equity});if(s.equityCurve.length>50000)s.equityCurve=s.equityCurve.slice(-50000);}
+  const learning=evaluatePaperLearning(s);
+  s.learning=learning;
+  if(learning.decision==='RETIRE_NO_EDGE'&&s.positions.length===0&&s.lifecycle.status==='ACTIVE_PAPER'){
+    s.lifecycle={...s.lifecycle,status:'RETIRED_NO_EDGE',retiredAt:new Date().toISOString(),retirementPolicy:PAPER_LEARNING_POLICY.version};
+    await addEvent('CHALLENGER_V3_RETIRED',{learning,ledgerReset:false,livePromotion:false});
+  }
   const review=analyzePostStop(s,s.parameters);
-  if(review.triggered&&s.lifecycle.status!=="STOPPED_REVIEW"){
+  if(review.triggered&&s.lifecycle.status==="ACTIVE_PAPER"){
     s.lifecycle={...s.lifecycle,status:"STOPPED_REVIEW",stoppedAt:new Date().toISOString()};
     s.stopAnalysis=review;
     await addEvent("CHALLENGER_V3_STOP_REVIEW",{analysis:review,nextAction:"VALIDATE_NEW_HYPOTHESIS",autoRestart:false});
@@ -495,7 +502,7 @@ async function challengerV3CycleUnlocked(m){
 async function challengerV3Status(){
   const s=await loadChallengerV3();if(!s)return{enabled:false,researchOnly:true,executionImpact:false,lifecycle:{status:"WAITING_FOR_V2_STOP",generation:3,parent:"CHALLENGER_V2"}};
   const a=s.account||{},tr=s.trades||[],op=(s.positions||[]).filter(x=>x.status==="OPEN"),wins=tr.filter(x=>Number(x.realized)>0),losses=tr.filter(x=>Number(x.realized)<0),gp=wins.reduce((q,x)=>q+Number(x.realized||0),0),gl=Math.abs(losses.reduce((q,x)=>q+Number(x.realized||0),0)),peak=Number(a.peakEquity??a.equity??CHALLENGER_V2_START),eq=Number(a.equity??CHALLENGER_V2_START),dd=peak>0?Math.max(0,(peak-eq)/peak*100):0;
-  return{enabled:true,researchOnly:true,independentLedger:true,executionImpact:false,ruleset:CHALLENGER_V3_RULESET,lifecycle:s.lifecycle,stopAnalysis:s.stopAnalysis||null,analysis:s.analysis,parameters:s.parameters,account:{startEquity:round(a.startEquity,2),cash:round(a.cash,2),equity:round(eq,2),peakEquity:round(peak,2),realizedPnl:round(a.realizedPnl,2),unrealizedPnl:round(a.unrealizedPnl,2),drawdownPct:round(dd,2)},openPositions:op,openCount:op.length,closedCount:tr.length,winRate:tr.length?round(wins.length/tr.length*100,1):0,profitFactor:gl>0?round(gp/gl,2):(gp>0?99:0),recentClosed:tr.slice(-12).reverse(),lastSignal:s.lastSignal||null,lastDecision:s.lastDecision||null,lastEvaluations:s.lastEvaluations||[],lastScanAt:s.lastScanAt||null,updatedAt:s.updatedAt};
+  return{enabled:true,researchOnly:true,independentLedger:true,executionImpact:false,ruleset:CHALLENGER_V3_RULESET,lifecycle:s.lifecycle,learning:evaluatePaperLearning(s),stopAnalysis:s.stopAnalysis||null,analysis:s.analysis,parameters:s.parameters,account:{startEquity:round(a.startEquity,2),cash:round(a.cash,2),equity:round(eq,2),peakEquity:round(peak,2),realizedPnl:round(a.realizedPnl,2),unrealizedPnl:round(a.unrealizedPnl,2),drawdownPct:round(dd,2)},openPositions:op,openCount:op.length,closedCount:tr.length,winRate:tr.length?round(wins.length/tr.length*100,1):0,profitFactor:gl>0?round(gp/gl,2):(gp>0?99:0),recentClosed:tr.slice(-12).reverse(),lastSignal:s.lastSignal||null,lastDecision:s.lastDecision||null,lastEvaluations:s.lastEvaluations||[],lastScanAt:s.lastScanAt||null,updatedAt:s.updatedAt};
 }
 
 // MERIDIAN REGIME V1 — research-only adaptive strategy selector.

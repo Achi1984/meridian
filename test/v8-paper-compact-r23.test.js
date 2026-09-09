@@ -10,8 +10,8 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-compact-r23.css',import.met
 
 test('R23 compact PAPER assets are wired with fresh cache tags',()=>{
   assert.match(html,/paper-compact-r23\.css\?v=8\.0-r23/);
-  assert.match(html,/app\.js\?v=8\.0-r31/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r31/);
+  assert.match(html,/app\.js\?v=8\.0-r32/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r32/);
   assert.match(html,/research-control-r19\.js\?v=8\.0-r23/);
 });
 

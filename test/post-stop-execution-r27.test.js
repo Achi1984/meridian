@@ -5,12 +5,13 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {analyzePostStop,buildSuccessorPlan} from '../post-stop-learning.js';
 import {costAwareSize,PAPER_COST_POLICY} from '../paper-cost-policy.js';
+import {evaluatePaperLearning,PAPER_LEARNING_POLICY} from '../paper-learning-policy.js';
 const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
 function harness(){
  let stored=null;const events=[];
  const params={tradeScore:74,cautionScore:66,fullRiskPct:.5,cautionRiskPct:.25,weights:{technical:.42,candidate:.38,entryDistance:.2},maxOpenPositions:1,maxTradesPerDay:8,maxPortfolioRiskPct:3,maxDailyLossPct:3,maxDrawdownPct:8,cooldownMinutes:180,postStopReentryMinutes:720,parameterVersion:'test'};
  const state={account:{cash:10000,equity:10000,peakEquity:10000,dayStartEquity:10000,realizedPnl:0},positions:[],trades:[],equityCurve:[],parameters:params,lifecycle:{status:'ACTIVE_PAPER'}};
- const context=vm.createContext({structuredClone,crypto,console,costAwareSize,PAPER_COST_POLICY,config:{symbols:['BTCUSDT','ETHUSDT'],maxEntryDistanceAtr:1,feeBps:5,slippageBps:0,marketStaleMs:60000},CHALLENGER_V2_START:10000,CHALLENGER_V2_TRADE_SCORE:72,CHALLENGER_V2_CAUTION_SCORE:62,CHALLENGER_V2_FULL_RISK_PCT:1,buildSuccessorPlan,analyzePostStop,
+ const context=vm.createContext({structuredClone,crypto,console,costAwareSize,PAPER_COST_POLICY,evaluatePaperLearning,PAPER_LEARNING_POLICY,config:{symbols:['BTCUSDT','ETHUSDT'],maxEntryDistanceAtr:1,feeBps:5,slippageBps:0,marketStaleMs:60000},CHALLENGER_V2_START:10000,CHALLENGER_V2_TRADE_SCORE:72,CHALLENGER_V2_CAUTION_SCORE:62,CHALLENGER_V2_FULL_RISK_PCT:1,buildSuccessorPlan,analyzePostStop,
  getState:async()=>structuredClone(stored),setState:async(k,v)=>{await Promise.resolve();stored=structuredClone(v);},addEvent:async(k,v)=>events.push({k,v}),rollover:x=>x,today:()=>new Date().toISOString().slice(0,10),shadowRegime:()=> 'TREND',challengerRegimeAdjustment:()=>0,clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),round:(v,d)=>+Number(v).toFixed(d),openRisk:p=>p.reduce((s,x)=>s+x.riskPct,0),slip:x=>x,last:a=>a.at(-1)});
  const mark=server.match(/function markPosition\(.*\n/)[0];
  const close=server.match(/function closePaperPosition\(.*\n/)[0];
@@ -63,4 +64,10 @@ test('cost-aware filled stop stays inside the planned net budget at quoted stop'
 test('target below round-trip cost is rejected without balance or position changes',async()=>{
  const h=harness();h.set(h.state);const r=await h.call('submitChallengerV3',{...signal,tp1:100.01});
  assert.equal(r.accepted,false);assert.equal(r.reasons[0],'NET_TARGET_NOT_POSITIVE');assert.equal(h.get().account.cash,10000);assert.equal(h.get().positions.length,0);
+});
+test('negative cost phase retires once flat and cannot reopen',async()=>{
+ const h=harness();h.state.executionPolicy={version:PAPER_COST_POLICY,startingClosedCount:0,feeBps:5,slippageBps:0};
+ h.state.trades=Array.from({length:30},()=>({status:'CLOSED',realized:-10}));h.state.account.cash=9700;h.state.account.equity=9700;h.state.account.peakEquity=10000;h.set(h.state);
+ await h.call('challengerV3Cycle',{quotes:{}});assert.equal(h.get().lifecycle.status,'RETIRED_NO_EDGE');assert.equal(h.events.filter(x=>x.k==='CHALLENGER_V3_RETIRED').length,1);
+ const result=await h.call('submitChallengerV3',signal);assert.equal(result.accepted,false);assert.ok(result.reasons.includes('RETIRED_NO_EDGE'));
 });
