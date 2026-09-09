@@ -8,10 +8,10 @@ const data=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8'
 const module=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.meta.url),'utf8');
 
 test('R24 loads one cache-coherent PAPER data module graph',()=>{
-  assert.match(html,/app\.js\?v=8\.0-r33/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r33/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r33/);
-  assert.match(module,/\.\/data\.js\?v=8\.0-r33/);
+  assert.match(html,/app\.js\?v=8\.0-r36/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r36/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r36/);
+  assert.match(module,/\.\/data\.js\?v=8\.0-r36/);
 });
 
 test('R24 carries protected audit aggregates through the primary PAPER model',()=>{

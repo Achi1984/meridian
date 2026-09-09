@@ -23,7 +23,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const PUBLIC_PATHS = new Set(["/","/health","/api/public-status","/api/assistant"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
-  "/api/shadow-v1","/api/challenger-v2","/api/challenger-v3","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
+  "/api/shadow-v1","/api/challenger-v2","/api/challenger-v3","/api/funding-carry-v1","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
   "/api/private/"
 ];
 
