@@ -9,11 +9,11 @@ const paper=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.met
 const css=fs.readFileSync(new URL('../v8-clean/paper-answer-r26.css',import.meta.url),'utf8');
 
 test('R26 loads answer-first PAPER assets coherently',()=>{
-  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r28/);
-  assert.match(html,/app\.js\?v=8\.0-r28/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r28/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r28/);
-  assert.match(paper,/\.\/data\.js\?v=8\.0-r28/);
+  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r30/);
+  assert.match(html,/app\.js\?v=8\.0-r30/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r30/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r30/);
+  assert.match(paper,/\.\/data\.js\?v=8\.0-r30/);
 });
 
 test('R26 exposes the actual risk lock instead of calling inactivity no opportunity',()=>{
