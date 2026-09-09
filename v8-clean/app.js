@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r37';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r38';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -98,14 +98,15 @@ function paperHtml(x){
   const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
-  const fc=x.fundingCarry||{},fb=fc.basket||null,fe=fc.lastEligibility||{};
+  const fc=x.fundingCarry||{},fb=fc.basket||null,fe=fc.lastEligibility||{},ft=fc.telemetry||{};
   const fundingState=fc.lifecycle==='ACTIVE_PAPER'?'IM TEST':fc.lifecycle==='STOPPED_REVIEW'?'REVIEW':'WARTET';
   const fundingStatusTone=fc.lifecycle==='ACTIVE_PAPER'?'safe':fc.lifecycle==='STOPPED_REVIEW'?'danger':'muted';
   const fundingPnlTone=fb?Number(fb.netPnl)>0?'safe':Number(fb.netPnl)<0?'danger':'muted':fe.eligible?'safe':'muted';
   const fundingLine=fb?`Funding ${fmtUsd(fb.fundingIncome)} · Basis ${fmtUsd(fb.basisPnl)} · Kosten ${fmtUsd(fb.totalEstimatedCosts)}`:`30D Funding ${fmtPct(Number(fe.sumFundingRate)*100,2)} · ${fe.periods||0} Messungen`;
+  const fundingMeta=ft.lastSettlement?`Letzte Gutschrift ${fmtUsd(ft.lastSettlement.income)} · ${new Date(ft.lastSettlement.at).toLocaleString('de-AT')}`:fb&&ft.nextFundingTime?`Bis Break-even ${fmtUsd(ft.breakEvenRemaining)} · nächste Funding-Abrechnung ${new Date(ft.nextFundingTime).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`:'';
   const fundingValue=fb?fmtUsd(fb.netPnl):fe.eligible?'ENTRY FREI':'KEIN ENTRY';
   const full=`<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
-  <section class="card"><div class="research-head"><div><span>BTC FUNDING CARRY V1</span><b class="tone-${fundingStatusTone}">${fundingState}</b></div><div class="research-pnl tone-${fundingPnlTone}">${fundingValue}</div></div><p class="muted">${fundingLine}</p></section>
+  <section class="card"><div class="research-head"><div><span>BTC FUNDING CARRY V1</span><b class="tone-${fundingStatusTone}">${fundingState}</b></div><div class="research-pnl tone-${fundingPnlTone}">${fundingValue}</div></div><p class="muted">${fundingLine}</p>${fundingMeta?`<small class="muted">${fundingMeta}</small>`:''}</section>
   <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>V3 ${fmtUsd((x.rows||[]).find(r=>r.key==='challengerV3')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challengerV3')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
   <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
   <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
