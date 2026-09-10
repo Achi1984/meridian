@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 3211,
+    "cycles": 3238,
     "errors": 2,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-10T23:28:22.261Z",
-    "lastGoodMarketAt": "2026-09-10T23:28:21.588Z",
-    "lastSignalScanAt": "2026-09-10T23:27:57.346Z",
+    "lastCycleAt": "2026-09-10T23:41:52.351Z",
+    "lastGoodMarketAt": "2026-09-10T23:41:51.686Z",
+    "lastSignalScanAt": "2026-09-10T23:41:58.059Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1607,
+    "signalScans": 1621,
     "startedAt": "2026-09-09T20:41:36.448Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2525,7 +2525,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-10T23:28:24.951Z",
+  "generatedAt": "2026-09-10T23:41:59.949Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3478,34 +3478,34 @@
     "assets": [
       {
         "candidate": 100,
-        "distanceAtr": 1.484,
-        "price": 76778.47,
+        "distanceAtr": 1.655,
+        "price": 76718.62,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 95
+        "technical": 94
       },
       {
         "candidate": 100,
-        "distanceAtr": 1.372,
-        "price": 99.11,
+        "distanceAtr": 1.422,
+        "price": 99.04,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 92
+        "technical": 94
       },
       {
-        "candidate": 82,
-        "distanceAtr": 1.064,
-        "price": 2446.01,
+        "candidate": 81,
+        "distanceAtr": 1.619,
+        "price": 2440.63,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 75
+        "technical": 74
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-10T23:27:57.157Z"
+    "updatedAt": "2026-09-10T23:41:58.027Z"
   },
   "shadowV1": {
     "account": {
