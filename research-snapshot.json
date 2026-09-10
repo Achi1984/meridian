@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 1997,
+    "cycles": 2030,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-10T13:20:07.957Z",
-    "lastGoodMarketAt": "2026-09-10T13:20:07.395Z",
-    "lastSignalScanAt": "2026-09-10T13:19:55.062Z",
+    "lastCycleAt": "2026-09-10T13:36:38.358Z",
+    "lastGoodMarketAt": "2026-09-10T13:36:37.783Z",
+    "lastSignalScanAt": "2026-09-10T13:36:55.063Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 999,
+    "signalScans": 1016,
     "startedAt": "2026-09-09T20:41:36.448Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-10T13:20:12.250Z",
+  "generatedAt": "2026-09-10T13:37:05.451Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,35 +3482,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 97,
-        "distanceAtr": 2.725,
-        "price": 99.18,
-        "side": "SHORT",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "SOLUSDT",
-        "technical": 85
-      },
-      {
-        "candidate": 95,
-        "distanceAtr": 3.731,
-        "price": 76768.01,
+        "candidate": 100,
+        "distanceAtr": 2.091,
+        "price": 77087.99,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 83
+        "technical": 97
       },
       {
-        "candidate": 91,
-        "distanceAtr": 3.927,
-        "price": 2411.26,
+        "candidate": 100,
+        "distanceAtr": 2.156,
+        "price": 2427.09,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 79
+        "technical": 89
+      },
+      {
+        "candidate": 100,
+        "distanceAtr": 1.826,
+        "price": 99.58,
+        "side": "SHORT",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "SOLUSDT",
+        "technical": 95
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-10T13:19:54.781Z"
+    "updatedAt": "2026-09-10T13:36:54.847Z"
   },
   "shadowV1": {
     "account": {
