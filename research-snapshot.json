@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 2062,
+    "cycles": 2095,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-10T13:52:38.547Z",
-    "lastGoodMarketAt": "2026-09-10T13:52:38.000Z",
-    "lastSignalScanAt": "2026-09-10T13:51:55.562Z",
+    "lastCycleAt": "2026-09-10T14:09:09.259Z",
+    "lastGoodMarketAt": "2026-09-10T14:09:08.498Z",
+    "lastSignalScanAt": "2026-09-10T14:08:55.361Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1031,
+    "signalScans": 1048,
     "startedAt": "2026-09-09T20:41:36.448Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-10T13:52:40.647Z",
+  "generatedAt": "2026-09-10T14:09:13.052Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3483,34 +3483,34 @@
     "assets": [
       {
         "candidate": 100,
-        "distanceAtr": 2.342,
-        "price": 76962,
+        "distanceAtr": 1.881,
+        "price": 77004.77,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 89
+        "technical": 94
       },
       {
         "candidate": 100,
-        "distanceAtr": 1.899,
-        "price": 2427.48,
+        "distanceAtr": 1.396,
+        "price": 2431.13,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 91
+        "technical": 90
       },
       {
         "candidate": 100,
-        "distanceAtr": 1.867,
-        "price": 99.46,
+        "distanceAtr": 1.549,
+        "price": 99.54,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 94
+        "technical": 92
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-10T13:51:55.349Z"
+    "updatedAt": "2026-09-10T14:08:55.047Z"
   },
   "shadowV1": {
     "account": {
