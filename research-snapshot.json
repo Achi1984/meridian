@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 4103,
+    "cycles": 4143,
     "errors": 2,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-11T06:54:35.463Z",
-    "lastGoodMarketAt": "2026-09-11T06:54:34.874Z",
-    "lastSignalScanAt": "2026-09-11T06:54:07.047Z",
+    "lastCycleAt": "2026-09-11T07:14:36.260Z",
+    "lastGoodMarketAt": "2026-09-11T07:14:35.687Z",
+    "lastSignalScanAt": "2026-09-11T07:14:07.360Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 2053,
+    "signalScans": 2073,
     "startedAt": "2026-09-09T20:41:36.448Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-11T06:55:04.150Z",
+  "generatedAt": "2026-09-11T07:14:56.052Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,18 +3482,18 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 69,
-        "distanceAtr": 1.272,
-        "price": 2467.13,
+        "candidate": 72,
+        "distanceAtr": 1.411,
+        "price": 2468.64,
         "side": "LONG",
-        "status": "NO_SETUP",
+        "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 66
+        "technical": 69
       },
       {
         "candidate": 68,
-        "distanceAtr": 0.39,
-        "price": 99.76,
+        "distanceAtr": 0.652,
+        "price": 99.86,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
@@ -3501,8 +3501,8 @@
       },
       {
         "candidate": 56,
-        "distanceAtr": 1.181,
-        "price": 77279.15,
+        "distanceAtr": 1.326,
+        "price": 77316.4,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
@@ -3510,7 +3510,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-11T06:54:06.861Z"
+    "updatedAt": "2026-09-11T07:14:07.148Z"
   },
   "shadowV1": {
     "account": {
