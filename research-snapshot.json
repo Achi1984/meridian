@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 4211,
+    "cycles": 4236,
     "errors": 2,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-11T07:48:37.348Z",
-    "lastGoodMarketAt": "2026-09-11T07:48:36.608Z",
-    "lastSignalScanAt": "2026-09-11T07:48:08.157Z",
+    "lastCycleAt": "2026-09-11T08:01:07.865Z",
+    "lastGoodMarketAt": "2026-09-11T08:01:07.179Z",
+    "lastSignalScanAt": "2026-09-11T08:01:08.962Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 2107,
+    "signalScans": 2120,
     "startedAt": "2026-09-09T20:41:36.448Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2525,7 +2525,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-11T07:48:47.250Z",
+  "generatedAt": "2026-09-11T08:01:23.247Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3477,35 +3477,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 72,
-        "distanceAtr": 0.942,
-        "price": 2467.46,
-        "side": "LONG",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "ETHUSDT",
-        "technical": 69
-      },
-      {
-        "candidate": 60,
-        "distanceAtr": 0.472,
-        "price": 99.85,
+        "candidate": 67,
+        "distanceAtr": 0.193,
+        "price": 99.77,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
-        "technical": 53
+        "technical": 60
       },
       {
-        "candidate": 56,
-        "distanceAtr": 0.66,
-        "price": 77257.56,
-        "side": "LONG",
+        "candidate": 63,
+        "distanceAtr": 0.475,
+        "price": 77235.26,
+        "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
-        "technical": 60
+        "technical": 56
+      },
+      {
+        "candidate": 58,
+        "distanceAtr": 0.872,
+        "price": 2467.39,
+        "side": "LONG",
+        "status": "NO_SETUP",
+        "symbol": "ETHUSDT",
+        "technical": 66
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-11T07:48:07.960Z"
+    "updatedAt": "2026-09-11T08:01:08.653Z"
   },
   "shadowV1": {
     "account": {
