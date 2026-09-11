@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 302,
+    "cycles": 337,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-11T13:19:57.610Z",
-    "lastGoodMarketAt": "2026-09-11T13:19:57.059Z",
-    "lastSignalScanAt": "2026-09-11T13:19:28.517Z",
+    "lastCycleAt": "2026-09-11T13:37:28.212Z",
+    "lastGoodMarketAt": "2026-09-11T13:37:27.409Z",
+    "lastSignalScanAt": "2026-09-11T13:37:28.617Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 151,
+    "signalScans": 169,
     "startedAt": "2026-09-11T10:49:19.710Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2726,7 +2726,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-11T13:20:18.008Z",
+  "generatedAt": "2026-09-11T13:37:31.810Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3678,35 +3678,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 90,
-        "distanceAtr": 2.041,
-        "price": 2501.02,
+        "candidate": 93,
+        "distanceAtr": 1.32,
+        "price": 2495.36,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 82
-      },
-      {
-        "candidate": 75,
-        "distanceAtr": 1.467,
-        "price": 77725.46,
-        "side": "LONG",
-        "status": "WAIT_ENTRY_ZONE",
-        "symbol": "BTCUSDT",
-        "technical": 68
+        "technical": 85
       },
       {
         "candidate": 74,
-        "distanceAtr": 2.232,
-        "price": 101.45,
+        "distanceAtr": 1.103,
+        "price": 100.84,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
         "technical": 67
+      },
+      {
+        "candidate": 73,
+        "distanceAtr": 0.24,
+        "price": 77356,
+        "side": "LONG",
+        "status": "NO_SETUP",
+        "symbol": "BTCUSDT",
+        "technical": 66
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-11T13:19:27.910Z"
+    "updatedAt": "2026-09-11T13:37:28.451Z"
   },
   "shadowV1": {
     "account": {
