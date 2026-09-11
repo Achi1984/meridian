@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 337,
+    "cycles": 367,
     "errors": 0,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-11T13:37:28.212Z",
-    "lastGoodMarketAt": "2026-09-11T13:37:27.409Z",
-    "lastSignalScanAt": "2026-09-11T13:37:28.617Z",
+    "lastCycleAt": "2026-09-11T13:52:28.220Z",
+    "lastGoodMarketAt": "2026-09-11T13:52:27.851Z",
+    "lastSignalScanAt": "2026-09-11T13:52:28.425Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 169,
+    "signalScans": 184,
     "startedAt": "2026-09-11T10:49:19.710Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2726,7 +2726,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-11T13:37:31.810Z",
+  "generatedAt": "2026-09-11T13:52:30.913Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3679,34 +3679,34 @@
     "assets": [
       {
         "candidate": 93,
-        "distanceAtr": 1.32,
-        "price": 2495.36,
+        "distanceAtr": 3.238,
+        "price": 78705.76,
+        "side": "LONG",
+        "status": "WAIT_ENTRY_ZONE",
+        "symbol": "BTCUSDT",
+        "technical": 78
+      },
+      {
+        "candidate": 92,
+        "distanceAtr": 5.307,
+        "price": 2595.67,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 85
+        "technical": 81
       },
       {
-        "candidate": 74,
-        "distanceAtr": 1.103,
-        "price": 100.84,
+        "candidate": 87,
+        "distanceAtr": 3.844,
+        "price": 103.46,
         "side": "LONG",
-        "status": "NO_SETUP",
+        "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 67
-      },
-      {
-        "candidate": 73,
-        "distanceAtr": 0.24,
-        "price": 77356,
-        "side": "LONG",
-        "status": "NO_SETUP",
-        "symbol": "BTCUSDT",
-        "technical": 66
+        "technical": 72
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-11T13:37:28.451Z"
+    "updatedAt": "2026-09-11T13:52:28.012Z"
   },
   "shadowV1": {
     "account": {
