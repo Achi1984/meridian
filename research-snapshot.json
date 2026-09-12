@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 2852,
+    "cycles": 2886,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T18:14:54.494Z",
-    "lastGoodMarketAt": "2026-09-12T18:14:54.023Z",
-    "lastSignalScanAt": "2026-09-12T18:14:34.110Z",
+    "lastCycleAt": "2026-09-12T18:31:55.542Z",
+    "lastGoodMarketAt": "2026-09-12T18:31:54.352Z",
+    "lastSignalScanAt": "2026-09-12T18:31:34.194Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1427,
+    "signalScans": 1444,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T18:15:17.699Z",
+  "generatedAt": "2026-09-12T18:32:19.995Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,17 +3482,17 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 86,
-        "distanceAtr": 2.7,
-        "price": 77181.58,
+        "candidate": 87,
+        "distanceAtr": 2.563,
+        "price": 77156.24,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
-        "technical": 78
+        "technical": 79
       },
       {
         "candidate": 48,
-        "distanceAtr": 2.028,
+        "distanceAtr": 1.673,
         "price": 2524,
         "side": "LONG",
         "status": "NO_SETUP",
@@ -3500,17 +3500,17 @@
         "technical": 56
       },
       {
-        "candidate": 44,
-        "distanceAtr": 1.17,
-        "price": 101.81,
+        "candidate": 43,
+        "distanceAtr": 1.627,
+        "price": 101.69,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
-        "technical": 52
+        "technical": 51
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T18:14:33.896Z"
+    "updatedAt": "2026-09-12T18:31:34.050Z"
   },
   "shadowV1": {
     "account": {
