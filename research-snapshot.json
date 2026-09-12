@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 2351,
+    "cycles": 2385,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T14:04:18.014Z",
-    "lastGoodMarketAt": "2026-09-12T14:04:17.838Z",
-    "lastSignalScanAt": "2026-09-12T14:03:32.009Z",
+    "lastCycleAt": "2026-09-12T14:21:18.494Z",
+    "lastGoodMarketAt": "2026-09-12T14:21:18.225Z",
+    "lastSignalScanAt": "2026-09-12T14:21:32.310Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1176,
+    "signalScans": 1194,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T14:04:31.798Z",
+  "generatedAt": "2026-09-12T14:21:38.102Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3483,26 +3483,26 @@
     "assets": [
       {
         "candidate": 99,
-        "distanceAtr": 1.543,
-        "price": 2542.54,
+        "distanceAtr": 1.336,
+        "price": 2541.84,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
         "technical": 91
       },
       {
-        "candidate": 42,
-        "distanceAtr": 0.687,
-        "price": 77366,
+        "candidate": 50,
+        "distanceAtr": 0.859,
+        "price": 77376.98,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
-        "technical": 50
+        "technical": 58
       },
       {
         "candidate": 42,
-        "distanceAtr": 0.191,
-        "price": 101.97,
+        "distanceAtr": 0.062,
+        "price": 101.99,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
@@ -3510,7 +3510,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T14:03:31.694Z"
+    "updatedAt": "2026-09-12T14:21:32.161Z"
   },
   "shadowV1": {
     "account": {
