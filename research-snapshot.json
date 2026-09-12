@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 1858,
+    "cycles": 1897,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T09:57:42.903Z",
-    "lastGoodMarketAt": "2026-09-12T09:58:12.603Z",
-    "lastSignalScanAt": "2026-09-12T09:57:30.917Z",
+    "lastCycleAt": "2026-09-12T10:17:13.595Z",
+    "lastGoodMarketAt": "2026-09-12T10:17:13.128Z",
+    "lastSignalScanAt": "2026-09-12T10:16:31.304Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 930,
+    "signalScans": 949,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T09:58:14.202Z",
+  "generatedAt": "2026-09-12T10:17:28.898Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,35 +3482,35 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 93,
-        "distanceAtr": 1.112,
-        "price": 2530.31,
+        "candidate": 92,
+        "distanceAtr": 1.612,
+        "price": 2533.66,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 85
+        "technical": 84
       },
       {
-        "candidate": 75,
-        "distanceAtr": 0.888,
-        "price": 102.02,
+        "candidate": 71,
+        "distanceAtr": 1.232,
+        "price": 102.14,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "SOLUSDT",
-        "technical": 69
+        "technical": 68
       },
       {
-        "candidate": 40,
-        "distanceAtr": 0.501,
-        "price": 77341,
+        "candidate": 50,
+        "distanceAtr": 1.336,
+        "price": 77398.01,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
-        "technical": 48
+        "technical": 58
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T09:57:30.494Z"
+    "updatedAt": "2026-09-12T10:16:31.036Z"
   },
   "shadowV1": {
     "account": {
