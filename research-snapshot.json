@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 1535,
+    "cycles": 1564,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T07:16:09.509Z",
-    "lastGoodMarketAt": "2026-09-12T07:16:09.094Z",
-    "lastSignalScanAt": "2026-09-12T07:15:30.310Z",
+    "lastCycleAt": "2026-09-12T07:30:39.905Z",
+    "lastGoodMarketAt": "2026-09-12T07:30:39.637Z",
+    "lastSignalScanAt": "2026-09-12T07:30:30.009Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 768,
+    "signalScans": 783,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T07:16:30.497Z",
+  "generatedAt": "2026-09-12T07:30:58.994Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3483,8 +3483,8 @@
     "assets": [
       {
         "candidate": 80,
-        "distanceAtr": 1.835,
-        "price": 2523.9,
+        "distanceAtr": 1.553,
+        "price": 2523.1,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
@@ -3492,8 +3492,8 @@
       },
       {
         "candidate": 61,
-        "distanceAtr": 1.01,
-        "price": 77343.95,
+        "distanceAtr": 0.544,
+        "price": 77311.1,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
@@ -3501,8 +3501,8 @@
       },
       {
         "candidate": 47,
-        "distanceAtr": 0.312,
-        "price": 101.81,
+        "distanceAtr": 0.107,
+        "price": 101.76,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
@@ -3510,7 +3510,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T07:15:29.968Z"
+    "updatedAt": "2026-09-12T07:30:29.627Z"
   },
   "shadowV1": {
     "account": {
