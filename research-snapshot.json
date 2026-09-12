@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 3483,
+    "cycles": 3507,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T23:30:32.908Z",
-    "lastGoodMarketAt": "2026-09-12T23:30:32.439Z",
-    "lastSignalScanAt": "2026-09-12T23:30:34.903Z",
+    "lastCycleAt": "2026-09-12T23:42:33.407Z",
+    "lastGoodMarketAt": "2026-09-12T23:42:32.825Z",
+    "lastSignalScanAt": "2026-09-12T23:42:35.104Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1743,
+    "signalScans": 1755,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T23:30:43.601Z",
+  "generatedAt": "2026-09-12T23:43:01.095Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,18 +3482,18 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 64,
-        "distanceAtr": 0.42,
-        "price": 77251.65,
+        "candidate": 62,
+        "distanceAtr": 0.385,
+        "price": 77250,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
-        "technical": 61
+        "technical": 59
       },
       {
         "candidate": 47,
-        "distanceAtr": 0.665,
-        "price": 101.75,
+        "distanceAtr": 0.802,
+        "price": 101.78,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
@@ -3501,8 +3501,8 @@
       },
       {
         "candidate": 46,
-        "distanceAtr": 0.093,
-        "price": 2524.49,
+        "distanceAtr": 0.237,
+        "price": 2525,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
@@ -3510,7 +3510,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T23:30:34.751Z"
+    "updatedAt": "2026-09-12T23:42:34.831Z"
   },
   "shadowV1": {
     "account": {
