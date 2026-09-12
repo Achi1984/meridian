@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 1808,
+    "cycles": 1833,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-12T09:32:42.881Z",
-    "lastGoodMarketAt": "2026-09-12T09:32:42.125Z",
-    "lastSignalScanAt": "2026-09-12T09:32:30.605Z",
+    "lastCycleAt": "2026-09-12T09:45:12.610Z",
+    "lastGoodMarketAt": "2026-09-12T09:45:12.342Z",
+    "lastSignalScanAt": "2026-09-12T09:45:30.903Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 905,
+    "signalScans": 918,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-12T09:32:46.000Z",
+  "generatedAt": "2026-09-12T09:45:42.899Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3482,18 +3482,18 @@
   "scanner": {
     "assets": [
       {
-        "candidate": 88,
-        "distanceAtr": 2.565,
-        "price": 2535.72,
+        "candidate": 92,
+        "distanceAtr": 1.7,
+        "price": 2532.61,
         "side": "LONG",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "ETHUSDT",
-        "technical": 80
+        "technical": 84
       },
       {
         "candidate": 69,
-        "distanceAtr": 1.362,
-        "price": 102.1,
+        "distanceAtr": 0.945,
+        "price": 102.02,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
@@ -3501,8 +3501,8 @@
       },
       {
         "candidate": 40,
-        "distanceAtr": 1.244,
-        "price": 77381.59,
+        "distanceAtr": 0.528,
+        "price": 77341.24,
         "side": "LONG",
         "status": "NO_SETUP",
         "symbol": "BTCUSDT",
@@ -3510,7 +3510,7 @@
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-12T09:32:30.367Z"
+    "updatedAt": "2026-09-12T09:45:30.494Z"
   },
   "shadowV1": {
     "account": {
