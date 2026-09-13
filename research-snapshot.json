@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 4002,
+    "cycles": 4031,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-13T03:50:11.212Z",
-    "lastGoodMarketAt": "2026-09-13T03:50:10.931Z",
-    "lastSignalScanAt": "2026-09-13T03:49:42.194Z",
+    "lastCycleAt": "2026-09-13T04:04:41.896Z",
+    "lastGoodMarketAt": "2026-09-13T04:04:41.333Z",
+    "lastSignalScanAt": "2026-09-13T04:04:42.213Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 2002,
+    "signalScans": 2017,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-13T03:50:29.600Z",
+  "generatedAt": "2026-09-13T04:05:09.801Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3483,8 +3483,8 @@
     "assets": [
       {
         "candidate": 78,
-        "distanceAtr": 1.165,
-        "price": 77196,
+        "distanceAtr": 0.924,
+        "price": 77204.81,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
@@ -3492,25 +3492,25 @@
       },
       {
         "candidate": 50,
-        "distanceAtr": 0.835,
-        "price": 2520.86,
+        "distanceAtr": 0.814,
+        "price": 2520.78,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
         "technical": 58
       },
       {
-        "candidate": 45,
-        "distanceAtr": 0.944,
-        "price": 101.65,
+        "candidate": 50,
+        "distanceAtr": 1.102,
+        "price": 101.6,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
-        "technical": 53
+        "technical": 58
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-13T03:49:41.897Z"
+    "updatedAt": "2026-09-13T04:04:42.137Z"
   },
   "shadowV1": {
     "account": {
