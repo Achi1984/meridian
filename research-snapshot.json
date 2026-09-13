@@ -220,9 +220,9 @@
         "SAME_SYMBOL_POSITION_OPEN"
       ],
       "closedTrades": 19,
-      "drawdownPct": 1.94,
+      "drawdownPct": 1.93,
       "lastClosedAt": "2026-09-11T15:54:00.914Z",
-      "lastScanAt": "2026-09-13T05:51:45.276Z",
+      "lastScanAt": "2026-09-13T06:14:45.376Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
       "openTrades": 1,
@@ -233,7 +233,7 @@
         "status": "BUILDING",
         "trades": 16
       },
-      "pnl": -150.99,
+      "pnl": -149.93,
       "profitFactor": 0.67,
       "recentClosed": [
         {
@@ -320,8 +320,8 @@
       "winRate": 42.1
     },
     "fundingCarry": {
-      "basisPnl": 0.22,
-      "breakEvenRemaining": 26.46,
+      "basisPnl": -1.55,
+      "breakEvenRemaining": 28.24,
       "eligibility": {
         "eligible": true,
         "periods": 90,
@@ -331,7 +331,7 @@
       },
       "estimatedCosts": 31.81,
       "fundingIncome": 5.12,
-      "lastCheckedAt": "2026-09-13T05:47:44.895Z",
+      "lastCheckedAt": "2026-09-13T06:13:45.478Z",
       "lastSettlement": {
         "at": "2026-09-13T00:00:00.002Z",
         "income": 0.47,
@@ -340,19 +340,19 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789286400000,
-      "pnl": -26.46
+      "pnl": -28.24
     }
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T05:51:44.778Z",
-    "lastSignalScanAt": "2026-09-13T05:51:45.304Z",
+    "lastCycleAt": "2026-09-13T06:14:45.092Z",
+    "lastSignalScanAt": "2026-09-13T06:14:45.474Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T05:52:06.279Z",
+  "generatedAt": "2026-09-13T06:14:50.078Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
