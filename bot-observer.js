@@ -41,21 +41,21 @@ function baseline(state={}){
     lastClosedAt:rows[0]?.closedAt||null,lastScanAt:null,blockedReasons:[],recentClosed:rows.map(trade)};
 }
 
-function carry(status={}){
+function carry(status={},name='BTC FUNDING CARRY V1'){
   const b=status.basket||{},t=status.telemetry||{},last=t.lastSettlement||null;
-  return {name:'BTC FUNDING CARRY V1',lifecycle:lifecycle(status),
+  return {name,lifecycle:lifecycle(status),
     pnl:round(b.netPnl??status.closedCycles?.[0]?.realizedPnl),fundingIncome:round(b.fundingIncome),basisPnl:round(b.basisPnl),estimatedCosts:round(b.totalEstimatedCosts),
     breakEvenRemaining:round(t.breakEvenRemaining),nextFundingTime:t.nextFundingTime||null,lastCheckedAt:status.lastCheckedAt||null,
     lastSettlement:last?{at:last.at||null,rate:round(last.rate,8),income:round(last.income)}:null,
-    eligibility:{eligible:!!status.lastEligibility?.eligible,reasons:(status.lastEligibility?.reasons||[]).map(String).slice(0,5),periods:number(status.lastEligibility?.periods),positiveShare:round(status.lastEligibility?.positiveShare,4),sumFundingRate:round(status.lastEligibility?.sumFundingRate,8)}
+    eligibility:{eligible:!!status.lastEligibility?.eligible,reasons:(status.lastEligibility?.reasons||[]).map(String).slice(0,5),periods:number(status.lastEligibility?.periods??status.lastEligibility?.periods30d),positiveShare:round(status.lastEligibility?.positiveShare,4),sumFundingRate:round(status.lastEligibility?.sumFundingRate??status.lastEligibility?.sum30dRate,8),costCoverage:round(status.lastEligibility?.grossCostCoverage)}
   };
 }
 
-export function buildBotObserver({engine={},safety={},baselineState={},challengerV2={},challengerV3={},fundingCarry={},botLifecycle={}}={}){
-  return {schemaVersion:'8.0-BOT-OBSERVER-V1',publicReadOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
+export function buildBotObserver({engine={},safety={},baselineState={},challengerV2={},challengerV3={},directionalV4={},fundingCarry={},fundingCarryV2={},botLifecycle={}}={}){
+  return {schemaVersion:'8.0-BOT-OBSERVER-V2',publicReadOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
     engine:{state:engine.state||null,running:!!engine.running,marketFresh:!!engine.marketFresh,lastCycleAt:engine.lastCycleAt||null,lastSignalScanAt:engine.lastSignalScanAt||null,errors:number(engine.errors,0)},
     safety:{paperTrading:!!safety.paperTrading,liveTrading:!!safety.liveTrading},
-    bots:{baseline:baseline(baselineState),challengerV2:directional('CHALLENGER V2',challengerV2,'SEALED_REFERENCE'),challengerV3:directional('CHALLENGER V3',challengerV3),fundingCarry:carry(fundingCarry)},
+    bots:{baseline:baseline(baselineState),challengerV2:directional('CHALLENGER V2',challengerV2,'SEALED_REFERENCE'),challengerV3:directional('CHALLENGER V3',challengerV3),directionalV4:directional('CHALLENGER V4 EXIT SHADOW',directionalV4,'PAIRED_SHADOW'),fundingCarry:carry(fundingCarry),fundingCarryV2:carry(fundingCarryV2,'BTC FUNDING CARRY V2')},
     archived:{shadow:botLifecycle.SHADOW_V1||null,regime:botLifecycle.REGIME_V1||null}
   };
 }
