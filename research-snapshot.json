@@ -220,12 +220,12 @@
         "SAME_SYMBOL_POSITION_OPEN"
       ],
       "closedTrades": 20,
-      "drawdownPct": 1.51,
+      "drawdownPct": 1.69,
       "lastClosedAt": "2026-09-13T08:39:48.378Z",
-      "lastScanAt": "2026-09-13T11:30:20.737Z",
+      "lastScanAt": "2026-09-13T11:44:21.034Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
-      "openTrades": 0,
+      "openTrades": 1,
       "phase": {
         "expectancy": -4.05,
         "profitFactor": 0.83,
@@ -233,7 +233,7 @@
         "status": "BUILDING",
         "trades": 17
       },
-      "pnl": -108.18,
+      "pnl": -125.9,
       "profitFactor": 0.76,
       "recentClosed": [
         {
@@ -322,12 +322,12 @@
     "directionalV4": {
       "blockedReasons": [],
       "closedTrades": 0,
-      "drawdownPct": 0,
+      "drawdownPct": 0.18,
       "lastClosedAt": null,
       "lastScanAt": null,
       "lifecycle": "PAIRED_SHADOW",
       "name": "CHALLENGER V4 EXIT SHADOW",
-      "openTrades": 0,
+      "openTrades": 1,
       "phase": {
         "expectancy": null,
         "profitFactor": null,
@@ -335,14 +335,14 @@
         "status": null,
         "trades": null
       },
-      "pnl": 0,
+      "pnl": -17.72,
       "profitFactor": 0,
       "recentClosed": [],
       "winRate": 0
     },
     "fundingCarry": {
-      "basisPnl": -0.95,
-      "breakEvenRemaining": 26.97,
+      "basisPnl": -0.4,
+      "breakEvenRemaining": 26.45,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -351,9 +351,9 @@
         "reasons": [],
         "sumFundingRate": 0.00589788
       },
-      "estimatedCosts": 31.68,
+      "estimatedCosts": 31.7,
       "fundingIncome": 5.65,
-      "lastCheckedAt": "2026-09-13T11:30:20.035Z",
+      "lastCheckedAt": "2026-09-13T11:40:50.335Z",
       "lastSettlement": {
         "at": "2026-09-13T08:00:00.000Z",
         "income": 0.53,
@@ -362,7 +362,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789315200000,
-      "pnl": -26.97
+      "pnl": -26.45
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -389,14 +389,14 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T11:30:49.735Z",
-    "lastSignalScanAt": "2026-09-13T11:30:20.847Z",
+    "lastCycleAt": "2026-09-13T11:44:20.145Z",
+    "lastSignalScanAt": "2026-09-13T11:44:21.247Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T11:30:55.139Z",
+  "generatedAt": "2026-09-13T11:44:25.742Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
