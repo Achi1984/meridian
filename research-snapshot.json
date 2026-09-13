@@ -853,19 +853,19 @@
     "winRate": 47.8
   },
   "engine": {
-    "cycles": 3974,
+    "cycles": 4002,
     "errors": 1,
     "intervalMs": 30000,
-    "lastCycleAt": "2026-09-13T03:36:10.809Z",
-    "lastGoodMarketAt": "2026-09-13T03:36:10.331Z",
-    "lastSignalScanAt": "2026-09-13T03:35:41.504Z",
+    "lastCycleAt": "2026-09-13T03:50:11.212Z",
+    "lastGoodMarketAt": "2026-09-13T03:50:10.931Z",
+    "lastSignalScanAt": "2026-09-13T03:49:42.194Z",
     "marketErrors": [],
     "marketFresh": true,
     "ruleset": "6.2-SIGNAL-V1",
     "running": true,
     "signalErrors": [],
     "signalIntervalMs": 60000,
-    "signalScans": 1988,
+    "signalScans": 2002,
     "startedAt": "2026-09-11T18:28:16.796Z",
     "state": "RUNNING",
     "version": "6.2.0"
@@ -2530,7 +2530,7 @@
     "outcomes": 6,
     "realized": 0
   },
-  "generatedAt": "2026-09-13T03:36:26.197Z",
+  "generatedAt": "2026-09-13T03:50:29.600Z",
   "health": {
     "db": {
       "mode": "postgres",
@@ -3483,8 +3483,8 @@
     "assets": [
       {
         "candidate": 78,
-        "distanceAtr": 0.765,
-        "price": 77223.06,
+        "distanceAtr": 1.165,
+        "price": 77196,
         "side": "SHORT",
         "status": "WAIT_ENTRY_ZONE",
         "symbol": "BTCUSDT",
@@ -3492,25 +3492,25 @@
       },
       {
         "candidate": 50,
-        "distanceAtr": 0.947,
-        "price": 2520.7,
+        "distanceAtr": 0.835,
+        "price": 2520.86,
         "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "ETHUSDT",
         "technical": 58
       },
       {
-        "candidate": 39,
-        "distanceAtr": 0.092,
-        "price": 101.84,
-        "side": "LONG",
+        "candidate": 45,
+        "distanceAtr": 0.944,
+        "price": 101.65,
+        "side": "SHORT",
         "status": "NO_SETUP",
         "symbol": "SOLUSDT",
-        "technical": 47
+        "technical": 53
       }
     ],
     "readyCount": 0,
-    "updatedAt": "2026-09-13T03:35:41.312Z"
+    "updatedAt": "2026-09-13T03:49:41.897Z"
   },
   "shadowV1": {
     "account": {
