@@ -220,9 +220,9 @@
         "SAME_SYMBOL_POSITION_OPEN"
       ],
       "closedTrades": 20,
-      "drawdownPct": 1.69,
+      "drawdownPct": 1.71,
       "lastClosedAt": "2026-09-13T08:39:48.378Z",
-      "lastScanAt": "2026-09-13T11:44:21.034Z",
+      "lastScanAt": "2026-09-13T11:56:21.036Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
       "openTrades": 1,
@@ -233,7 +233,7 @@
         "status": "BUILDING",
         "trades": 17
       },
-      "pnl": -125.9,
+      "pnl": -128.58,
       "profitFactor": 0.76,
       "recentClosed": [
         {
@@ -322,7 +322,7 @@
     "directionalV4": {
       "blockedReasons": [],
       "closedTrades": 0,
-      "drawdownPct": 0.18,
+      "drawdownPct": 0.2,
       "lastClosedAt": null,
       "lastScanAt": null,
       "lifecycle": "PAIRED_SHADOW",
@@ -335,14 +335,14 @@
         "status": null,
         "trades": null
       },
-      "pnl": -17.72,
+      "pnl": -20.4,
       "profitFactor": 0,
       "recentClosed": [],
       "winRate": 0
     },
     "fundingCarry": {
-      "basisPnl": -0.4,
-      "breakEvenRemaining": 26.45,
+      "basisPnl": -0.07,
+      "breakEvenRemaining": 26.12,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -353,7 +353,7 @@
       },
       "estimatedCosts": 31.7,
       "fundingIncome": 5.65,
-      "lastCheckedAt": "2026-09-13T11:40:50.335Z",
+      "lastCheckedAt": "2026-09-13T11:51:21.145Z",
       "lastSettlement": {
         "at": "2026-09-13T08:00:00.000Z",
         "income": 0.53,
@@ -362,7 +362,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789315200000,
-      "pnl": -26.45
+      "pnl": -26.12
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -389,14 +389,14 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T11:44:20.145Z",
-    "lastSignalScanAt": "2026-09-13T11:44:21.247Z",
+    "lastCycleAt": "2026-09-13T11:56:20.635Z",
+    "lastSignalScanAt": "2026-09-13T11:56:21.249Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T11:44:25.742Z",
+  "generatedAt": "2026-09-13T11:56:25.739Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
