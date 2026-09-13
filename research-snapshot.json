@@ -219,23 +219,31 @@
       "blockedReasons": [
         "CONFIDENCE_LT_CAUTION"
       ],
-      "closedTrades": 23,
-      "drawdownPct": 2.99,
-      "lastClosedAt": "2026-09-13T16:09:55.036Z",
-      "lastScanAt": "2026-09-13T20:46:09.220Z",
+      "closedTrades": 24,
+      "drawdownPct": 2.96,
+      "lastClosedAt": "2026-09-13T20:49:08.121Z",
+      "lastScanAt": "2026-09-13T20:59:09.122Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
-      "openTrades": 1,
+      "openTrades": 0,
       "phase": {
-        "expectancy": -11.51,
-        "profitFactor": 0.59,
-        "remainingTrades": 10,
+        "expectancy": -10.23,
+        "profitFactor": 0.61,
+        "remainingTrades": 9,
         "status": "CHECKPOINT",
-        "trades": 20
+        "trades": 21
       },
-      "pnl": -257.22,
-      "profitFactor": 0.57,
+      "pnl": -254.16,
+      "profitFactor": 0.59,
       "recentClosed": [
+        {
+          "closedAt": "2026-09-13T20:49:08.121Z",
+          "exitReason": "TP1",
+          "netR": 0.63,
+          "pnl": 15.37,
+          "side": "LONG",
+          "symbol": "ETHUSDT"
+        },
         {
           "closedAt": "2026-09-13T16:09:55.036Z",
           "exitReason": "SL",
@@ -307,22 +315,14 @@
           "pnl": 41.75,
           "side": "SHORT",
           "symbol": "BTCUSDT"
-        },
-        {
-          "closedAt": "2026-09-10T17:21:12.856Z",
-          "exitReason": "SL",
-          "netR": -1.01,
-          "pnl": -50.75,
-          "side": "SHORT",
-          "symbol": "ETHUSDT"
         }
       ],
-      "winRate": 39.1
+      "winRate": 41.7
     },
     "directionalV4": {
       "blockedReasons": [],
       "closedTrades": 3,
-      "drawdownPct": 1.67,
+      "drawdownPct": 1.66,
       "lastClosedAt": "2026-09-13T16:09:55.055Z",
       "lastScanAt": null,
       "lifecycle": "PAIRED_SHADOW",
@@ -335,7 +335,7 @@
         "status": null,
         "trades": null
       },
-      "pnl": -149.04,
+      "pnl": -147.54,
       "profitFactor": 0,
       "recentClosed": [
         {
@@ -366,8 +366,8 @@
       "winRate": 0
     },
     "fundingCarry": {
-      "basisPnl": -1.15,
-      "breakEvenRemaining": 26.67,
+      "basisPnl": -0.8,
+      "breakEvenRemaining": 26.33,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -376,9 +376,9 @@
         "reasons": [],
         "sumFundingRate": 0.00595609
       },
-      "estimatedCosts": 31.81,
+      "estimatedCosts": 31.82,
       "fundingIncome": 6.29,
-      "lastCheckedAt": "2026-09-13T20:45:38.025Z",
+      "lastCheckedAt": "2026-09-13T20:56:09.221Z",
       "lastSettlement": {
         "at": "2026-09-13T16:00:00.000Z",
         "income": 0.64,
@@ -387,7 +387,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789344000000,
-      "pnl": -26.67
+      "pnl": -26.33
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -414,14 +414,14 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T20:46:37.621Z",
-    "lastSignalScanAt": "2026-09-13T20:46:09.271Z",
+    "lastCycleAt": "2026-09-13T20:59:08.947Z",
+    "lastSignalScanAt": "2026-09-13T20:59:09.234Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T20:47:01.219Z",
+  "generatedAt": "2026-09-13T20:59:11.526Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
