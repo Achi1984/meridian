@@ -222,7 +222,7 @@
       "closedTrades": 20,
       "drawdownPct": 1.51,
       "lastClosedAt": "2026-09-13T08:39:48.378Z",
-      "lastScanAt": "2026-09-13T10:43:49.277Z",
+      "lastScanAt": "2026-09-13T10:56:19.838Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
       "openTrades": 0,
@@ -319,19 +319,41 @@
       ],
       "winRate": 45
     },
+    "directionalV4": {
+      "blockedReasons": [],
+      "closedTrades": 0,
+      "drawdownPct": 0,
+      "lastClosedAt": null,
+      "lastScanAt": null,
+      "lifecycle": "PAIRED_SHADOW",
+      "name": "CHALLENGER V4 EXIT SHADOW",
+      "openTrades": 0,
+      "phase": {
+        "expectancy": null,
+        "profitFactor": null,
+        "remainingTrades": null,
+        "status": null,
+        "trades": null
+      },
+      "pnl": 0,
+      "profitFactor": 0,
+      "recentClosed": [],
+      "winRate": 0
+    },
     "fundingCarry": {
-      "basisPnl": -1.86,
-      "breakEvenRemaining": 27.9,
+      "basisPnl": 0.03,
+      "breakEvenRemaining": 26,
       "eligibility": {
+        "costCoverage": null,
         "eligible": true,
         "periods": 90,
         "positiveShare": 0.9889,
         "reasons": [],
         "sumFundingRate": 0.00589788
       },
-      "estimatedCosts": 31.69,
+      "estimatedCosts": 31.68,
       "fundingIncome": 5.65,
-      "lastCheckedAt": "2026-09-13T10:41:51.174Z",
+      "lastCheckedAt": "2026-09-13T10:52:49.335Z",
       "lastSettlement": {
         "at": "2026-09-13T08:00:00.000Z",
         "income": 0.53,
@@ -340,23 +362,45 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789315200000,
-      "pnl": -27.9
+      "pnl": -26
+    },
+    "fundingCarryV2": {
+      "basisPnl": null,
+      "breakEvenRemaining": null,
+      "eligibility": {
+        "costCoverage": 1.11,
+        "eligible": false,
+        "periods": 90,
+        "positiveShare": 0.9889,
+        "reasons": [
+          "NET_CARRY_BELOW_HURDLE"
+        ],
+        "sumFundingRate": 0.00589788
+      },
+      "estimatedCosts": null,
+      "fundingIncome": null,
+      "lastCheckedAt": null,
+      "lastSettlement": null,
+      "lifecycle": "WAITING_ENTRY",
+      "name": "BTC FUNDING CARRY V2",
+      "nextFundingTime": null,
+      "pnl": null
     }
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T10:44:21.775Z",
-    "lastSignalScanAt": "2026-09-13T10:43:49.474Z",
+    "lastCycleAt": "2026-09-13T10:56:19.437Z",
+    "lastSignalScanAt": "2026-09-13T10:56:19.854Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T10:44:40.878Z",
+  "generatedAt": "2026-09-13T10:56:38.738Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
     "paperTrading": true
   },
-  "schemaVersion": "8.0-BOT-OBSERVER-V1"
+  "schemaVersion": "8.0-BOT-OBSERVER-V2"
 }
