@@ -49,7 +49,7 @@ async function smoke(){
   const legacyDetailed=await request(`${GATEWAY}/api/assistant?smoke=${nonce}`);
   if(legacyDetailed.status!==401)fail(`Anonymous legacy detailed API expected 401, got ${legacyDetailed.status}`);
   const observer=await json(`${GATEWAY}/api/bot-observer?smoke=${nonce}`);
-  if(observer?.schemaVersion!=='8.0-BOT-OBSERVER-V1'||observer?.publicReadOnly!==true||observer?.executionImpact!==false){
+  if(observer?.schemaVersion!=='8.0-BOT-OBSERVER-V2'||observer?.publicReadOnly!==true||observer?.executionImpact!==false){
     fail('Public bot observer safety contract invalid');
   }
   if(observer?.safety?.liveTrading!==false)fail('Public bot observer reports unsafe live execution');
