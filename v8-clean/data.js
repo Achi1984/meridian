@@ -288,17 +288,17 @@ function summaryLedger(raw={},baseline=false){
 export async function loadPaper({details=false}={}){
   if(!details){
     try{
-      const [status,challenger,challengerV3,baseline]=await Promise.all([getJson('/api/status'),getJson('/api/challenger-v2'),getJson('/api/challenger-v3'),getJson('/api/paper')]);
+      const overview=await getJson('/api/paper/overview');
+      const {status,challengerV2:challenger,challengerV3,baseline}=overview;
       const ledgers={baseline:summaryLedger(baseline,true),challenger:summaryLedger(challenger),challengerV3:summaryLedger(challengerV3)};
-      return {...paperModel({ledgers},{},status,challenger,challengerV3,baseline),detailsLoaded:false,loadedAt:new Date().toISOString()};
+      return {...paperModel({ledgers},{},status,challenger,challengerV3,baseline),directionalV4:overview.directionalV4||null,fundingCarryV2:overview.fundingCarryV2||null,detailsLoaded:false,loadedAt:new Date().toISOString()};
     }catch(e){return {ok:false,locked:e?.status===401,error:e?.status===401?'READ_TOKEN_REQUIRED':String(e?.message||e)};}
   }
   try{
-    const [analytics,activity,status,challenger,challengerV3,baseline]=await Promise.all([
-      getJson('/api/research-analytics'),getJson('/api/activity-summary'),
-      getJson('/api/status').catch(()=>null),getJson('/api/challenger-v2').catch(()=>null),getJson('/api/challenger-v3').catch(()=>null),getJson('/api/paper').catch(()=>null)
+    const [analytics,activity,overview]=await Promise.all([
+      getJson('/api/research-analytics'),getJson('/api/activity-summary'),getJson('/api/paper/overview')
     ]);
-    return paperModel(analytics,activity,status,challenger,challengerV3,baseline);
+    return {...paperModel(analytics,activity,overview.status,overview.challengerV2,overview.challengerV3,overview.baseline),directionalV4:overview.directionalV4||null,fundingCarryV2:overview.fundingCarryV2||null};
   }catch(e){
     if(e?.status===401)return {ok:false,locked:true,source:'RESEARCH_ANALYTICS',error:'READ_TOKEN_REQUIRED'};
     return {ok:false,locked:false,source:'RESEARCH_ANALYTICS',error:String(e?.message||e)};
