@@ -20,7 +20,7 @@ must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
 must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
-must(release.paperOverview==='7.41-OVERVIEW-FIRST','Paper overview UX version mismatch');
+must(release.paperOverview==='8.0-PAPER-OVERVIEW-V1','Paper overview UX version mismatch');
 must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
 must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');

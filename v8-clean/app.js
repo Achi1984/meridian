@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r40';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r41';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);

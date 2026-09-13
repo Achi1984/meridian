@@ -37,7 +37,8 @@ test('R27 exposes V3 through protected telemetry and the compact PAPER answer',(
   assert.match(gateway,/stateGet\("challenger_v3"\)/);
   assert.match(analytics,/const challengerV3=ledgerAnalytics/);
   assert.match(analytics,/challengerV3:auditLedger/);
-  assert.match(data,/getJson\('\/api\/challenger-v3'\)/);
+  assert.match(data,/challengerV2:challenger,challengerV3,baseline/);
+  assert.match(server,/"\/api\/paper\/overview"/);
   assert.match(data,/challengerV3:\{enabled:/);
   assert.match(paper,/V3 GESTARTET · V2 BLEIBT VERSIEGELT/);
   assert.match(paper,/eingefrorenen Parametern/);

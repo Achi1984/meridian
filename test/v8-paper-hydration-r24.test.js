@@ -6,12 +6,29 @@ const html=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'ut
 const app=fs.readFileSync(new URL('../v8-clean/app.js',import.meta.url),'utf8');
 const data=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8');
 const module=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.meta.url),'utf8');
+const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
+const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 
 test('R24 loads one cache-coherent PAPER data module graph',()=>{
-  assert.match(html,/app\.js\?v=8\.0-r40/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r40/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r40/);
-  assert.match(module,/\.\/data\.js\?v=8\.0-r40/);
+  assert.match(html,/app\.js\?v=8\.0-r41/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r41/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r41/);
+  assert.match(module,/\.\/data\.js\?v=8\.0-r41/);
+});
+
+test('R41 hydrates the primary PAPER board through one protected overview request',()=>{
+  assert.match(data,/getJson\('\/api\/paper\/overview'\)/);
+  const quick=data.match(/if\(!details\)\{([\s\S]*?)\n  \}/)?.[1]||'';
+  assert.equal((quick.match(/getJson\(/g)||[]).length,1);
+  assert.doesNotMatch(quick,/\/api\/challenger-v[23]|getJson\('\/api\/paper'\)|getJson\('\/api\/status'\)/);
+});
+
+test('R41 overview contract is read-only and covered by PAPER gateway protection',()=>{
+  assert.match(server,/req\.method==="GET"&&u\.pathname==="\/api\/paper\/overview"/);
+  assert.match(server,/schemaVersion:'8\.0-PAPER-OVERVIEW-V1'/);
+  assert.doesNotMatch(server,/req\.method==="POST"&&u\.pathname==="\/api\/paper\/overview"/);
+  assert.match(gateway,/const PROTECTED_PREFIXES = \[[\s\S]*"\/api\/paper"/);
+  assert.match(gateway,/pathname\.startsWith\(p\.endsWith\("\/"\)\?p:p\+"\/"\)/);
 });
 
 test('R24 carries protected audit aggregates through the primary PAPER model',()=>{

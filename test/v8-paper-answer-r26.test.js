@@ -9,15 +9,16 @@ const paper=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.met
 const css=fs.readFileSync(new URL('../v8-clean/paper-answer-r26.css',import.meta.url),'utf8');
 
 test('R26 loads answer-first PAPER assets coherently',()=>{
-  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r40/);
-  assert.match(html,/app\.js\?v=8\.0-r40/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r40/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r40/);
-  assert.match(paper,/\.\/data\.js\?v=8\.0-r40/);
+  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r41/);
+  assert.match(html,/app\.js\?v=8\.0-r41/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r41/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r41/);
+  assert.match(paper,/\.\/data\.js\?v=8\.0-r41/);
 });
 
 test('R26 exposes the actual risk lock instead of calling inactivity no opportunity',()=>{
-  assert.match(data,/getJson\('\/api\/paper'\)\.catch\(\(\)=>null\)/);
+  assert.match(data,/getJson\('\/api\/paper\/overview'\)/);
+  assert.match(data,/const \{status,challengerV2:challenger,challengerV3,baseline\}=overview/);
   assert.match(data,/lastSignal\?\.gate\?\.reasons/);
   assert.match(data,/riskLocked:baseGate\.some\(x=>x\.startsWith\('MAX_'\)\)/);
   assert.match(data,/riskLocked:challengerGate\.some\(x=>x\.startsWith\('MAX_'\)\)/);
