@@ -84,6 +84,11 @@ const gateway=read('server-gateway.js');
 must(gateway.includes('RELEASE.buildId'),'gateway health must expose canonical build');
 must(gateway.includes('NF_DEPLOYMENT_SHA'),'gateway health must expose deployment SHA when available');
 must(gateway.includes('privateData'),'gateway health must retain private store readiness');
+must(gateway.includes('"/api/bot-observer"'),'public bot observer gateway route missing');
+must(!/PUBLIC_PATHS[^\n]+api\/(assistant|public-status)/.test(gateway),'detailed legacy status must not remain public');
+const observer=read('bot-observer.js');
+must(observer.includes("schemaVersion:'8.0-BOT-OBSERVER-V1'"),'bot observer schema missing');
+must(observer.includes('executionImpact:false'),'bot observer must remain non-executing');
 
 const uiPolish=read('app-v7.37-ui-polish.js');
 must(uiPolish.includes('meridian-release-status-row'),'mobile release status row missing');
