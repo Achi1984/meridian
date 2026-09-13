@@ -87,7 +87,7 @@ must(gateway.includes('privateData'),'gateway health must retain private store r
 must(gateway.includes('"/api/bot-observer"'),'public bot observer gateway route missing');
 must(!/PUBLIC_PATHS[^\n]+api\/(assistant|public-status)/.test(gateway),'detailed legacy status must not remain public');
 const observer=read('bot-observer.js');
-must(observer.includes("schemaVersion:'8.0-BOT-OBSERVER-V1'"),'bot observer schema missing');
+must(observer.includes("schemaVersion:'8.0-BOT-OBSERVER-V2'"),'bot observer schema missing');
 must(observer.includes('executionImpact:false'),'bot observer must remain non-executing');
 
 const uiPolish=read('app-v7.37-ui-polish.js');
