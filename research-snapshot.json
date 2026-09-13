@@ -220,9 +220,9 @@
         "SAME_SYMBOL_POSITION_OPEN"
       ],
       "closedTrades": 22,
-      "drawdownPct": 2.63,
+      "drawdownPct": 2.56,
       "lastClosedAt": "2026-09-13T14:39:23.641Z",
-      "lastScanAt": "2026-09-13T15:43:24.140Z",
+      "lastScanAt": "2026-09-13T15:55:24.637Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
       "openTrades": 1,
@@ -233,7 +233,7 @@
         "status": "BUILDING",
         "trades": 19
       },
-      "pnl": -220.3,
+      "pnl": -213.14,
       "profitFactor": 0.63,
       "recentClosed": [
         {
@@ -322,7 +322,7 @@
     "directionalV4": {
       "blockedReasons": [],
       "closedTrades": 2,
-      "drawdownPct": 1.3,
+      "drawdownPct": 1.23,
       "lastClosedAt": "2026-09-13T14:39:23.753Z",
       "lastScanAt": null,
       "lifecycle": "PAIRED_SHADOW",
@@ -335,7 +335,7 @@
         "status": null,
         "trades": null
       },
-      "pnl": -112.12,
+      "pnl": -104.97,
       "profitFactor": 0,
       "recentClosed": [
         {
@@ -358,8 +358,8 @@
       "winRate": 0
     },
     "fundingCarry": {
-      "basisPnl": -0.97,
-      "breakEvenRemaining": 27.07,
+      "basisPnl": 0.25,
+      "breakEvenRemaining": 25.87,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -368,9 +368,9 @@
         "reasons": [],
         "sumFundingRate": 0.00589788
       },
-      "estimatedCosts": 31.76,
+      "estimatedCosts": 31.77,
       "fundingIncome": 5.65,
-      "lastCheckedAt": "2026-09-13T15:40:55.241Z",
+      "lastCheckedAt": "2026-09-13T15:51:25.639Z",
       "lastSettlement": {
         "at": "2026-09-13T08:00:00.000Z",
         "income": 0.53,
@@ -379,7 +379,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789315200000,
-      "pnl": -27.07
+      "pnl": -25.87
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -406,14 +406,14 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T15:43:25.335Z",
-    "lastSignalScanAt": "2026-09-13T15:43:24.840Z",
+    "lastCycleAt": "2026-09-13T15:55:54.742Z",
+    "lastSignalScanAt": "2026-09-13T15:55:25.338Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T15:43:28.537Z",
+  "generatedAt": "2026-09-13T15:55:57.340Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
