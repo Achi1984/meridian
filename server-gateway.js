@@ -20,10 +20,11 @@ const ALLOWED_ORIGINS = new Set(
 );
 const PRIVATE_STATE_KEY = "private_dashboard_v1";
 const DATABASE_URL = process.env.DATABASE_URL || "";
-const PUBLIC_PATHS = new Set(["/","/health","/api/public-status","/api/assistant"]);
+const PUBLIC_PATHS = new Set(["/","/health","/api/bot-observer"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
   "/api/shadow-v1","/api/challenger-v2","/api/challenger-v3","/api/funding-carry-v1","/api/regime-v1","/api/backtests","/api/activity-summary","/api/research-analytics",
+  "/api/public-status","/api/assistant",
   "/api/private/"
 ];
 

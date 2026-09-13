@@ -46,6 +46,13 @@ async function smoke(){
 
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
   if(protectedResponse.status!==401)fail(`Anonymous protected API expected 401, got ${protectedResponse.status}`);
+  const legacyDetailed=await request(`${GATEWAY}/api/assistant?smoke=${nonce}`);
+  if(legacyDetailed.status!==401)fail(`Anonymous legacy detailed API expected 401, got ${legacyDetailed.status}`);
+  const observer=await json(`${GATEWAY}/api/bot-observer?smoke=${nonce}`);
+  if(observer?.schemaVersion!=='8.0-BOT-OBSERVER-V1'||observer?.publicReadOnly!==true||observer?.executionImpact!==false){
+    fail('Public bot observer safety contract invalid');
+  }
+  if(observer?.safety?.liveTrading!==false)fail('Public bot observer reports unsafe live execution');
 
   const sha=shaInfo(health);
   if(REQUIRE_SHA&&sha.shaMatch!==true)fail(`Deployment SHA mismatch: expected ${EXPECTED_SHA||'unknown'}, got ${sha.deploymentSha||'missing'}`);
@@ -58,6 +65,8 @@ async function smoke(){
     gateway:true,
     privateData:true,
     anonymousProtectedStatus:protectedResponse.status,
+    anonymousLegacyDetailedStatus:legacyDetailed.status,
+    botObserver:true,
     ...sha,
     checkedAt:new Date().toISOString()
   };
