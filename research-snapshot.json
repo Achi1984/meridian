@@ -217,12 +217,12 @@
     },
     "challengerV3": {
       "blockedReasons": [
-        "CONFIDENCE_LT_CAUTION"
+        "POST_STOP_COOLDOWN"
       ],
       "closedTrades": 24,
       "drawdownPct": 2.96,
       "lastClosedAt": "2026-09-13T20:49:08.121Z",
-      "lastScanAt": "2026-09-13T23:56:12.422Z",
+      "lastScanAt": "2026-09-14T00:25:12.221Z",
       "lifecycle": "ACTIVE_PAPER",
       "name": "CHALLENGER V3",
       "openTrades": 0,
@@ -374,41 +374,41 @@
       "winRate": 25
     },
     "fundingCarry": {
-      "basisPnl": -1.24,
-      "breakEvenRemaining": 26.66,
+      "basisPnl": -1.88,
+      "breakEvenRemaining": 26.59,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
         "periods": 90,
         "positiveShare": 0.9889,
         "reasons": [],
-        "sumFundingRate": 0.00595609
+        "sumFundingRate": 0.00595965
       },
-      "estimatedCosts": 31.71,
-      "fundingIncome": 6.29,
-      "lastCheckedAt": "2026-09-13T23:55:40.923Z",
+      "estimatedCosts": 31.7,
+      "fundingIncome": 6.99,
+      "lastCheckedAt": "2026-09-14T00:21:41.327Z",
       "lastSettlement": {
-        "at": "2026-09-13T16:00:00.000Z",
-        "income": 0.64,
-        "rate": 6.45e-05
+        "at": "2026-09-14T00:00:00.000Z",
+        "income": 0.7,
+        "rate": 7.157e-05
       },
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
-      "nextFundingTime": 1789344000000,
-      "pnl": -26.66
+      "nextFundingTime": 1789372800000,
+      "pnl": -26.59
     },
     "fundingCarryV2": {
       "basisPnl": null,
       "breakEvenRemaining": null,
       "eligibility": {
-        "costCoverage": 1.14,
+        "costCoverage": 1.19,
         "eligible": false,
         "periods": 90,
         "positiveShare": 0.9889,
         "reasons": [
           "NET_CARRY_BELOW_HURDLE"
         ],
-        "sumFundingRate": 0.00595609
+        "sumFundingRate": 0.00595965
       },
       "estimatedCosts": null,
       "fundingIncome": null,
@@ -422,14 +422,14 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-13T23:56:12.122Z",
-    "lastSignalScanAt": "2026-09-13T23:56:12.442Z",
+    "lastCycleAt": "2026-09-14T00:25:11.722Z",
+    "lastSignalScanAt": "2026-09-14T00:25:12.334Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-13T23:56:19.619Z",
+  "generatedAt": "2026-09-14T00:25:26.419Z",
   "publicReadOnly": true,
   "safety": {
     "liveTrading": false,
