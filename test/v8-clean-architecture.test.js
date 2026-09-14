@@ -31,7 +31,7 @@ test('v8 R9 presents canonical production identity without prototype wording',()
   assert.match(html,/<title>ACHI MERIDIAN v8<\/title>/);
   assert.match(html,/v8\.0 · PROD/);
   assert.doesNotMatch(html,/>v8\.0 CLEAN<|CLEAN CUSTOMER VIEW|v8 Clean<\/title>/);
-  assert.match(html,/app\.js\?v=8\.0-r42/);
+  assert.match(html,/app\.js\?v=8\.0-r44/);
   assert.match(html,/more-runtime\.js\?v=8\.0-r9/);
   assert.match(html,/r8-polish\.css\?v=8\.0-r9/);
 });
@@ -116,7 +116,8 @@ test('clean PAPER reads protected research telemetry and never promotes a model'
   assert.match(app,/RESEARCH ONLY/);
   assert.match(app,/Keine automatische Promotion/);
   assert.match(app,/PERFORMANCE-DETAILS/);
-  assert.match(app,/ARCHIVIERTE BOTS/);
+  assert.match(app,/NÄCHSTES 24H-ERGEBNIS/);
+  assert.doesNotMatch(app,/ARCHIVIERTE BOTS|SHADOW · REGIME/);
   assert.match(app,/OPPORTUNITY COST · CHALLENGER/);
   assert.doesNotMatch(app,/PROMOTE|AUTO[- ]?PROMOTION|best model|winner model/i);
 });

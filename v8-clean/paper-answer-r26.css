@@ -22,6 +22,10 @@
 .paper-r26-trade strong{font-size:10px;white-space:nowrap}
 #paperExecutionAuditR22.paper-disclosure{padding:0}
 #paperExecutionAuditR22>.paper-disclosure-body{padding-top:12px}
+.alpha-timer-grid{margin:12px 0 9px}
+.alpha-timer-grid .metric{padding:11px 12px}
+.alpha-timer-grid .metric span{color:var(--muted);font-size:8px}
+.alpha-timer-grid .metric b{font-size:15px;line-height:1.2;white-space:nowrap}
 
 @media(max-width:520px){
   .paper-answer-r26{padding:11px 12px}
@@ -29,4 +33,5 @@
   .paper-r26-bots{grid-template-columns:1fr}
   .paper-r26-bot{padding:9px}
   .paper-r26-verdict{grid-template-columns:1fr;gap:4px}
+  .alpha-timer-grid .metric b{font-size:13px}
 }

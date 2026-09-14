@@ -1,0 +1,27 @@
+{
+  "policy": "MOMENTUM-WALKFORWARD-V1",
+  "executionImpact": false,
+  "asOf": 1789378690171,
+  "parameters": {
+    "grossUsd": 2000.0,
+    "lookbackDays": 30,
+    "holdDays": 7,
+    "roundTripCostsBps": 30.0,
+    "maxLossUsd": 100.0,
+    "maxDrawdownUsd": 500.0,
+    "maxNetBeta": 0.1
+  },
+  "scheduledRebalances": 38,
+  "rejectedRebalances": 16,
+  "closedBaskets": 22,
+  "winRate": 0.2727272727272727,
+  "profitFactor": 0.13625827806787985,
+  "pricePnlUsd": -302.595237672563,
+  "fundingPnlUsd": 2.539072497347774,
+  "costsUsd": 132.0,
+  "netPnlUsd": -432.0561651752152,
+  "maxDrawdownUsd": 432.0561651752152,
+  "openAtEnd": false,
+  "inputSha256": "2f8cccb820ea27c474d9c4e9f355e1ec792dcbafe580c463500849273a5de2d4",
+  "limitation": "Four-hour close simulation; fixed historical universe; no order-book replay or profitability claim"
+}

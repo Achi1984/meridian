@@ -12,6 +12,7 @@ import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recor
 import {buildBotObserver} from "./bot-observer.js";
 import {createSerialQueue,createSingleFlight} from "./state-serial.js";
 import {createResearchRuntime} from "./research/r42-runtime.js";
+import {ALPHA_LAB_R43_KEY,newAlphaLabState,observeAlphaScan,alphaAttributionSummary} from "./research/alpha-attribution-r43.js";
 
 const { Pool } = pg;
 const num=(k,f)=>Number.isFinite(Number(process.env[k]))?Number(process.env[k]):f;
@@ -229,6 +230,11 @@ function exitReason(p,x){if(p.side==="LONG"){if(x<=p.sl)return"SL";if(p.tp2&&x>=
 function closePaperPosition(p,x,reason){const exit=slip(x,p.side,false),d=p.side==="LONG"?1:-1,g=(exit-p.entry)*p.qty*d,fee=exit*p.qty*config.feeBps/10000;return{...p,status:"CLOSED",exit,closedAt:new Date().toISOString(),exitReason:reason,realized:g-p.feeOpen-fee,feeClose:fee};}
 
 let running=false,timer=null,signalTimer=null;let status={version:"6.2.0",startedAt:null,lastCycleAt:null,lastSignalScanAt:null,lastGoodMarketAt:null,cycles:0,signalScans:0,errors:0,marketErrors:[],signalErrors:[],state:"BOOTING"};let scannerCache={updatedAt:null,assets:[],readyCount:0};
+async function observeAlphaLabR43(candidates,now=Date.now()){
+  const current=await getState(ALPHA_LAB_R43_KEY,null)||newAlphaLabState(now,{feeBps:config.feeBps,slippageBps:config.slippageBps});
+  const next=observeAlphaScan(current,candidates,now,{feeBps:config.feeBps,slippageBps:config.slippageBps});
+  await setState(ALPHA_LAB_R43_KEY,next);return next;
+}
 const serializePaper=createSerialQueue(),serializeCycle=createSingleFlight(),serializeScan=createSingleFlight();
 const BOT_LIFECYCLE=Object.freeze({
   SHADOW_V1:Object.freeze({status:"RETIRED",active:false,ledgerFrozen:true,retiredAt:"2026-09-08T06:05:00Z",reason:"DOMINATED_BY_CHALLENGER_V2"}),
@@ -240,7 +246,34 @@ async function submitSignalUnlocked(signal){const s=rollover(await loadPaperStat
 try{await saveEvidence(p.evidenceSnapshot);await addEvent("POSITION_EVIDENCE_CAPTURED",{positionId:p.id,symbol:p.symbol,side:p.side,technical:p.technical,candidate:p.candidate,distanceAtr:p.distanceAtr,regime:p.evidenceSnapshot?.regime,captureVersion:"6.53-EVIDENCE"});}catch(e){await addEvent("EVIDENCE_CAPTURE_ERROR",{positionId:p.id,message:String(e?.message||e)}).catch(()=>{});}
 return{accepted:true,position:p,gate};}
 function submitSignal(signal){return BASELINE_REFERENCE_FROZEN?Promise.resolve({accepted:false,reasons:["REFERENCE_FROZEN"]}):serializePaper(()=>submitSignalUnlocked(signal));}
-async function signalScanUnlocked(){const errors=[],candidates=[];let challengerV3=null;try{for(const symbol of config.symbols){try{candidates.push(await analyzeSymbol(symbol));}catch(e){errors.push({symbol,error:String(e?.message||e)});}}candidates.sort((a,b)=>b.candidate-a.candidate);scannerCache={updatedAt:new Date().toISOString(),assets:candidates,readyCount:candidates.filter(c=>c.status==="READY").length};await setState("scanner",scannerCache);if(BOT_LIFECYCLE.SHADOW_V1.active)try{await observeShadowV1Scan(candidates);}catch(e){await addEvent("SHADOW_V1_ERROR",{stage:"observe",message:String(e?.message||e)}).catch(()=>{});}try{challengerV3=await ensureChallengerV3();if(!challengerV3){await observeChallengerV2Scan(candidates);challengerV3=await ensureChallengerV3();}if(challengerV3)await observeChallengerV3Scan(candidates,challengerV3);}catch(e){await addEvent("CHALLENGER_V3_ERROR",{stage:"ensure_or_observe",message:String(e?.message||e)}).catch(()=>{});}if(BOT_LIFECYCLE.REGIME_V1.active)try{await observeRegimeV1Scan(candidates);}catch(e){await addEvent("REGIME_V1_ERROR",{stage:"observe",message:String(e?.message||e)}).catch(()=>{});}if(BOT_LIFECYCLE.REGIME_V1.active)for(const c of candidates){try{await submitRegimeV1(c);}catch(e){await addEvent("REGIME_V1_ERROR",{stage:"signal",symbol:c.symbol,message:String(e?.message||e)}).catch(()=>{});}}const ready=candidates.filter(c=>c.status==="READY");if(ready.length)await addEvent("SIGNAL_SCAN_READY",{assets:ready.map(x=>({symbol:x.symbol,side:x.side,technical:x.technical,candidate:x.candidate,price:x.price,status:x.status}))});for(const c of ready){const r=await submitSignal({...c,source:"MERIDIAN-6.2-AUTO"});if(BOT_LIFECYCLE.SHADOW_V1.active)try{await submitShadowV1({...c,source:"MERIDIAN-SHADOW-V1"});}catch(e){await addEvent("SHADOW_V1_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}if(!challengerV3)try{await submitChallengerV2({...c,source:"MERIDIAN-CHALLENGER-V2"});}catch(e){await addEvent("CHALLENGER_V2_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}if(challengerV3)try{await submitChallengerV3({...c,source:"MERIDIAN-CHALLENGER-V3"});}catch(e){await addEvent("CHALLENGER_V3_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}if(!r.accepted&&r.reasons?.includes("MAX_OPEN_POSITIONS"))break;}status.lastSignalScanAt=new Date().toISOString();status.signalScans++;status.signalErrors=errors;}catch(e){status.errors++;status.signalErrors=[{error:String(e?.message||e)}];await addEvent("SIGNAL_ENGINE_ERROR",{message:String(e?.message||e),at:new Date().toISOString()}).catch(()=>{});}}
+async function signalScanUnlocked(){
+  const errors=[],candidates=[];let challengerV3=null;
+  try{
+    for(const symbol of config.symbols){try{candidates.push(await analyzeSymbol(symbol));}catch(e){errors.push({symbol,error:String(e?.message||e)});}}
+    candidates.sort((a,b)=>b.candidate-a.candidate);
+    scannerCache={updatedAt:new Date().toISOString(),assets:candidates,readyCount:candidates.filter(c=>c.status==="READY").length};
+    await setState("scanner",scannerCache);
+    try{await observeAlphaLabR43(candidates);}catch(e){await addEvent("ALPHA_LAB_R43_ERROR",{message:String(e?.message||e)}).catch(()=>{});}
+    if(BOT_LIFECYCLE.SHADOW_V1.active)try{await observeShadowV1Scan(candidates);}catch(e){await addEvent("SHADOW_V1_ERROR",{stage:"observe",message:String(e?.message||e)}).catch(()=>{});}
+    try{
+      challengerV3=await ensureChallengerV3();
+      if(!challengerV3){await observeChallengerV2Scan(candidates);challengerV3=await ensureChallengerV3();}
+      if(challengerV3)await observeChallengerV3Scan(candidates,challengerV3);
+    }catch(e){await addEvent("CHALLENGER_V3_ERROR",{stage:"ensure_or_observe",message:String(e?.message||e)}).catch(()=>{});}
+    if(BOT_LIFECYCLE.REGIME_V1.active)try{await observeRegimeV1Scan(candidates);}catch(e){await addEvent("REGIME_V1_ERROR",{stage:"observe",message:String(e?.message||e)}).catch(()=>{});}
+    if(BOT_LIFECYCLE.REGIME_V1.active)for(const c of candidates){try{await submitRegimeV1(c);}catch(e){await addEvent("REGIME_V1_ERROR",{stage:"signal",symbol:c.symbol,message:String(e?.message||e)}).catch(()=>{});}}
+    const ready=candidates.filter(c=>c.status==="READY");
+    if(ready.length)await addEvent("SIGNAL_SCAN_READY",{assets:ready.map(x=>({symbol:x.symbol,side:x.side,technical:x.technical,candidate:x.candidate,price:x.price,status:x.status}))});
+    for(const c of ready){
+      const r=await submitSignal({...c,source:"MERIDIAN-6.2-AUTO"});
+      if(BOT_LIFECYCLE.SHADOW_V1.active)try{await submitShadowV1({...c,source:"MERIDIAN-SHADOW-V1"});}catch(e){await addEvent("SHADOW_V1_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}
+      if(!challengerV3)try{await submitChallengerV2({...c,source:"MERIDIAN-CHALLENGER-V2"});}catch(e){await addEvent("CHALLENGER_V2_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}
+      if(challengerV3)try{await submitChallengerV3({...c,source:"MERIDIAN-CHALLENGER-V3"});}catch(e){await addEvent("CHALLENGER_V3_ERROR",{stage:"signal",message:String(e?.message||e)}).catch(()=>{});}
+      if(!r.accepted&&r.reasons?.includes("MAX_OPEN_POSITIONS"))break;
+    }
+    status.lastSignalScanAt=new Date().toISOString();status.signalScans++;status.signalErrors=errors;
+  }catch(e){status.errors++;status.signalErrors=[{error:String(e?.message||e)}];await addEvent("SIGNAL_ENGINE_ERROR",{message:String(e?.message||e),at:new Date().toISOString()}).catch(()=>{});}
+}
 function signalScan(){return serializeScan(signalScanUnlocked);}
 async function cycleUnlocked(){try{let s=rollover(await loadPaperState());const m=await getMarketSnapshot(config.symbols);status.marketErrors=m.errors;if(!Object.keys(m.quotes).length)throw new Error("No market quotes");status.lastGoodMarketAt=new Date().toISOString();const next=[],closed=[];let unreal=0;for(const p of s.positions){if(p.status!=="OPEN")continue;const q=m.quotes[p.symbol];if(!q||Date.now()-q.ts>config.marketStaleMs){next.push(p);continue;}const marked=markPosition(p,q.price),reason=exitReason(marked,q.price);if(reason){const done=closePaperPosition(marked,q.price,reason);s.account.cash+=done.realized+p.feeOpen;s.account.realizedPnl+=done.realized+p.feeOpen;s.trades.push(done);closed.push(done);}else{unreal+=marked.unrealized;next.push(marked);}}s.positions=next;s.account.unrealizedPnl=unreal;s.account.equity=s.account.cash+unreal;s.account.peakEquity=Math.max(s.account.peakEquity||s.account.equity,s.account.equity);const le=last(s.equityCurve);if(!le||Date.now()-new Date(le.ts).getTime()>=60000){s.equityCurve.push({ts:new Date().toISOString(),equity:s.account.equity});if(s.equityCurve.length>50000)s.equityCurve=s.equityCurve.slice(-50000);}await savePaperState(s);if(BOT_LIFECYCLE.SHADOW_V1.active)try{await shadowV1Cycle(m);}catch(e){await addEvent("SHADOW_V1_ERROR",{stage:"cycle",message:String(e?.message||e)}).catch(()=>{});}if(!await getState(CHALLENGER_V3_KEY,null))try{await challengerV2Cycle(m);}catch(e){await addEvent("CHALLENGER_V2_ERROR",{stage:"cycle",message:String(e?.message||e)}).catch(()=>{});}try{await challengerV3Cycle(m);}catch(e){await addEvent("CHALLENGER_V3_ERROR",{stage:"cycle",message:String(e?.message||e)}).catch(()=>{});}if(BOT_LIFECYCLE.REGIME_V1.active)try{await regimeV1Cycle(m);}catch(e){await addEvent("REGIME_V1_ERROR",{stage:"cycle",message:String(e?.message||e)}).catch(()=>{});}try{await fundingCarryCycle();}catch(e){await addEvent("FUNDING_CARRY_V1_ERROR",{stage:"cycle",message:String(e?.message||e)}).catch(()=>{});}for(const c of closed){await addEvent("POSITION_CLOSED",c);try{await closeEvidence(c.id,{closedAt:c.closedAt,exitReason:c.exitReason,exit:round(c.exit,8),realized:round(c.realized,8),side:c.side,symbol:c.symbol,ruleset:c.ruleset});await addEvent("POSITION_EVIDENCE_RESULT",{positionId:c.id,symbol:c.symbol,side:c.side,exitReason:c.exitReason,realized:round(c.realized,8)});}catch(e){await addEvent("EVIDENCE_RESULT_ERROR",{positionId:c.id,message:String(e?.message||e)}).catch(()=>{});}}status.state="RUNNING";status.lastCycleAt=new Date().toISOString();status.cycles++;}catch(e){status.errors++;status.state="DEGRADED";status.lastCycleAt=new Date().toISOString();await addEvent("ENGINE_ERROR",{message:String(e?.message||e),at:status.lastCycleAt}).catch(()=>{});}}
 function cycle(){return serializeCycle(()=>serializePaper(cycleUnlocked));}
@@ -582,8 +615,8 @@ function compactBaselinePaperState(state={}){
 }
 
 async function paperOverviewStatus(){
-  const [db,fundingCarry,baseline,challengerV2,challengerV3,directionalV4,fundingCarryV2]=await Promise.all([
-    dbPing(),fundingCarryStatus(),loadPaperState(),challengerV2Status(),challengerV3Status(),directionalV4PaperStatus(),fundingCarryV2PaperStatus()
+  const [db,fundingCarry,baseline,challengerV2,challengerV3,directionalV4,fundingCarryV2,alphaLabState]=await Promise.all([
+    dbPing(),fundingCarryStatus(),loadPaperState(),challengerV2Status(),challengerV3Status(),directionalV4PaperStatus(),fundingCarryV2PaperStatus(),getState(ALPHA_LAB_R43_KEY,null)
   ]);
   return {
     schemaVersion:'8.0-PAPER-OVERVIEW-V1',
@@ -597,7 +630,7 @@ async function paperOverviewStatus(){
       evidenceCapture:{version:'8.40-V3-EVIDENCE',enabled:true,executionImpact:false,storage:dbMode()},
       scanner:{updatedAt:scannerCache.updatedAt,readyCount:scannerCache.readyCount,assets:scannerCache.assets.map(a=>({symbol:a.symbol,side:a.side,technical:a.technical,candidate:a.candidate,status:a.status,price:a.price,distanceAtr:a.distanceAtr}))}
     },
-    baseline:compactBaselinePaperState(baseline),challengerV2,challengerV3,directionalV4,fundingCarryV2,researchR42:await researchR42.summary()
+    baseline:compactBaselinePaperState(baseline),challengerV2,challengerV3,directionalV4,fundingCarryV2,alphaLab:alphaAttributionSummary(alphaLabState||{}),researchR42:await researchR42.summary()
   };
 }
 

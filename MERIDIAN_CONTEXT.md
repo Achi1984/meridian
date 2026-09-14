@@ -15,8 +15,20 @@ Final top-level structure:
 ## v8 checkpoints
 PR #43 merged to `main` as `9f006fbaa50837eb8a3b98a67d24a2156e3d1339`.
 PR #44 / R8 merged to `main` as `34d52c3cc98f0bc53015001d8dca71a203a0d7be`.
-Active hotfix branch: `fix/v8-bootstrap-selfheal-r9`.
-Current hotfix build: `8.0-20260905-R9`.
+R42 was merged through PR #115 as `abc5a81a431fb4ea5d4ff48a67337f015523d0bb`.
+The Windows line-ending test fix was merged through PR #116 as `f78538f44b76757072e9f9a81132e7a5bf1e2af2`.
+Active development branch: `feat/r43-r44-alpha-timer`.
+Current development build: `8.0-20260914-R44`.
+
+### R43 ALPHA ATTRIBUTION
+Every successful scanner run feeds a separate research state. At most one snapshot per symbol and four-hour bucket is stored, including rejected scanner outputs. Forward labels cover 4h, 12h, 24h, 3d and 7d and deduct the frozen round-trip cost estimate. Missing feature telemetry remains missing. A late quote cannot stand in for an earlier horizon; missed label windows are explicitly invalid.
+
+The first descriptive screen requires at least 100 valid 24h labels, 25 distinct time buckets and three symbols. Any surviving factor is a research hypothesis, not evidence of profitable execution. Scanner-selected direction, correlated observations and excluded holding-period funding remain explicit limitations. No result can promote or modify a bot automatically.
+
+Historical attribution uses a separate `HISTORICAL_REPLAY` state and accepts only chronological closed-candle scanner snapshots. Historical results never count toward the prospective label threshold.
+
+### R44 EVALUATION CLOCK / ACTIVE PAPER VIEW
+PAPER shows a live countdown to the next expected 24h label and an estimated first descriptive factor check. When scanner telemetry is stale, the countdown changes to `DATEN FEHLEN` instead of implying progress. Sealed or retired bots are removed from the standard view while ledgers and execution guards remain intact. Any existing open position remains visible regardless of its bot lifecycle. Recent-trade presentation remains focused on the current V3 cycle.
 
 ### R1 PAPER
 `app-v8.0-paper-summary.js` provides one answer header plus four compact bot rows. Relative leadership is not promotion; promotion still requires adequate sample, positive OOS/walk-forward evidence, acceptable drawdown/stability and explicit human approval.
@@ -98,4 +110,4 @@ v8 release metadata must stay synchronized through `scripts/release-sync.mjs`: c
 Every meaningful implementation or research checkpoint must be committed to GitHub. Do not leave substantive MERIDIAN work only in chat.
 
 ## Next step
-Run Release Safety + Portfolio Contract on the exact R9 head. If both are green, merge under the user's already-established approval flow, then re-open MERIDIAN on iPhone and verify that only CENTER / DEPOT / TRADE / PAPER / MORE remains and that the TRADE summary is no longer embedded in CENTER.
+Run the complete test suite and release synchronization on the exact R44 head. Review the resulting diff and open a pull request only after explicit publication approval. After deployment, verify the PAPER countdown, stale-data state, active-only bot list, preserved open positions and compact recent trades on iPhone.

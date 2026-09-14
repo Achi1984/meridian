@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r42';
+import {getJson} from './data.js?v=8.0-r44';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
@@ -39,7 +39,7 @@ function render(deep){
     <div class="cohort-r18-foot">Research only · Kohorten mit n&lt;8 sind nicht promotionsfähig · keine automatische Ausführungswirkung.</div></div>`;
 }
 
-const botNames={baseline:'BASELINE',shadow:'SHADOW · RETIRED',challenger:'CHALLENGER V2 · ELTERN-LEDGER',challengerV3:'CHALLENGER V3',regime:'REGIME · RETIRED'};
+const botNames={challengerV3:'CHALLENGER V3'};
 function metric(label,value,tone=''){
   return `<div class="audit-r22-metric"><span>${label}</span><b class="${tone?`tone-${tone}`:''}">${value}</b></div>`;
 }
@@ -94,7 +94,8 @@ function tradeHtml(t={}){
 }
 function positionHtml(p={}){
   const budget=p.plannedRiskBudgetUsd!=null?`Budget inkl. Kosten ${usd(p.plannedRiskBudgetUsd)}`:`Stop-Risiko ${usd(p.plannedRiskUsd)}`;
-  return `<div class="paper-r26-bot"><b>OFFEN · ${esc(p.symbol)} ${esc(p.side)}</b><small>Einstieg ${fmt(p.entry,4)} · Stop ${fmt(p.stop,4)}</small><small>${budget} (${fmt(p.riskPct,2)}%) · Laufend ${usd(p.unrealized)}</small><small>Eröffnet ${date(p.openedAt)} · Bewertung vom letzten Kursstand</small></div>`;
+  const bot=p.bot==='challengerV3'?'V3':p.bot==='challenger'?'V2':'BASELINE';
+  return `<div class="paper-r26-bot"><b>OFFEN · ${bot} · ${esc(p.symbol)} ${esc(p.side)}</b><small>Einstieg ${fmt(p.entry,4)} · Stop ${fmt(p.stop,4)}</small><small>${budget} (${fmt(p.riskPct,2)}%) · Laufend ${usd(p.unrealized)}</small><small>Eröffnet ${date(p.openedAt)} · Bewertung vom letzten Kursstand</small></div>`;
 }
 function renderAnswer(health={}){
   const el=root();if(!el||!health?.bots)return;
@@ -106,7 +107,7 @@ function renderAnswer(health={}){
   const learningLabel={BUILDING:'AUFBAU',CHECKPOINT:'ZWISCHENPRÜFUNG',PROMISING_EARLY:'FRÜH POSITIV',PROMISING:'POSITIV · WEITER PRÜFEN',EXTEND:'WEITER BEOBACHTEN',WATCH:'BEOBACHTEN',RETIRE:'AUSMUSTERN'}[learning.status]||'AUFBAU';
   const verdict=v3.lifecycle==='RETIRED_NO_EDGE'?'V3 automatisch ausgemustert: nach belastbarer Stichprobe kein Netto-Edge.':v3.riskLocked?'V3 pausiert. Stop-Analyse gespeichert; nächste Änderung nur mit belegter Hypothese.':learning.phaseStarted?`${learningLabel} · ${phase.closedTrades??0}/${learning.targetClosedTrades??20} Trades · ${learning.reason||'Mit eingefrorenen Parametern. Erst prospektiv bewerten.'}`:'Kostenphase startet automatisch, sobald keine Altposition mehr offen ist; mit eingefrorenen Parametern. Erst prospektiv bewerten.';
   card.innerHTML=`<div class="paper-r26-head"><div><div class="eyebrow">PAPER · LERNZYKLUS</div><b>${v3.lifecycle==='RETIRED_NO_EDGE'?'V3 AUSGEMUSTERT':v3.riskLocked?'V3 PAUSIERT · STOP-ANALYSE':v3.enabled?'V3 GESTARTET · V2 BLEIBT VERSIEGELT':locked?`${locked} BOTS PAUSIERT · ANALYSE LÄUFT`:'BOTS BEOBACHTEN DEN MARKT'}</b></div><span class="tone-${e.running&&e.marketFresh?'safe':'danger'}">${e.running&&e.marketFresh?'ENGINE OK':'ENGINE CHECK'}</span></div>
-    <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}${botAnswer('challenger',bots.challenger)}</div>
+    <div class="paper-r26-bots">${botAnswer('challengerV3',v3)}</div>
     <div class="paper-r26-verdict"><span>KLARE ENTSCHEIDUNG</span><b>${verdict}</b></div>
     <small class="muted">${v3.lifecycle==='RETIRED_NO_EDGE'?'Kostenvariante beendet · Historie erhalten':health.executionPolicy?'Kostenvariante aktiv · Historie und Verlustgrenzen bleiben erhalten':v3.riskLocked?'Kostenvariante startet nicht bei aktiver Risikosperre':'Kostenvariante wartet auf ein Konto ohne offene Positionen'}</small>
     ${(health.openPositions||[]).map(positionHtml).join('')}
@@ -116,7 +117,7 @@ function renderExecutionAudit(audit,health={}){
   const el=root(); if(!el||!audit?.aggregateOnly)return;
   let card=document.getElementById('paperExecutionAuditR22');
   if(!card){card=document.createElement('details');card.id='paperExecutionAuditR22';card.className='card audit-r22 paper-disclosure';el.appendChild(card)}
-  const ledgers=audit.ledgers||{},active=sumLedgers(ledgers,['baseline','challenger','challengerV3']),retired=sumLedgers(ledgers,['shadow','regime']);
+  const ledgers=audit.ledgers||{},active=sumLedgers(ledgers,['challengerV3']);
   const attention=(num(active.materialLosses)||0)>0||(num(active.postStopReentries)||0)>0;
   card.innerHTML=`<summary><span>TECHNISCHE DIAGNOSE</span><b>Stop ${active.materialLosses}/${active.evaluableStops} · ${rate(active.materialLosses,active.evaluableStops)}</b></summary><div class="paper-disclosure-body"><div class="audit-r22-head"><div><div class="eyebrow">FULL LEDGER EXECUTION AUDIT</div><b>R27 · ${attention?'ACTIVE CHECK':'ACTIVE OK'}</b></div><span class="audit-r22-pill tone-${attention?'danger':'safe'}">READ ONLY</span></div>
     <div class="audit-r22-summary">
@@ -125,20 +126,18 @@ function renderExecutionAudit(audit,health={}){
       ${metric('Re-Entries nach Stop',active.postStopReentries,(num(active.postStopReentries)||0)>0?'danger':'safe')}
       ${metric('Richtungs-Bündel',active.directionalMultiAssetBundles)}
     </div>
-    <div class="audit-r22-list audit-r25-active">${['baseline','challenger','challengerV3'].map(key=>ledgerHtml(key,ledgers[key],health?.bots?.[key])).join('')}</div>
-    <details class="audit-r25-retired"><summary><span>HISTORISCHE RETIRED-AUFFÄLLIGKEITEN</span><b>${retired.closedTrades} Trades · getrennt von aktiv</b></summary><div class="audit-r22-list">${['shadow','regime'].map(key=>ledgerHtml(key,ledgers[key])).join('')}</div></details>
+    <div class="audit-r22-list audit-r25-active">${ledgerHtml('challengerV3',ledgers.challengerV3,health?.bots?.challengerV3)}</div>
     <div class="cohort-r18-foot">Vollständige PostgreSQL-Ledger · nur geschützte Aggregate · keine Strategie- oder Ausführungswirkung.</div></div>`;
 }
 let loading=false,cached=null;
 function accept(payload){
   if(!payload)return;
   cached=payload;
-  render(payload.deepDive);
   renderAnswer(payload.botHealth);
   renderExecutionAudit(payload.executionAudit,payload.botHealth);
 }
 async function hydrate(){
-  const el=root(); if(!el||loading||(document.getElementById('paperCohortR18')&&document.getElementById('paperExecutionAuditR22')))return;
+  const el=root(); if(!el||loading||document.getElementById('paperExecutionAuditR22'))return;
   if(cached){accept(cached);return}
   loading=true;
   // The main loader owns requests; disclosures must not trigger a duplicate full-ledger fetch.

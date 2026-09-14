@@ -1,0 +1,1115 @@
+{
+  "policy": "PAIRS-OFFLINE-V1",
+  "executionImpact": false,
+  "asOf": 1789365033230,
+  "hypotheses": 84,
+  "correction": "Bonferroni across fixed 28 pairs x 3 windows",
+  "roundTripCostsBps": 40.0,
+  "candidates": [
+    {
+      "pair": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.7601543385493875,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -1.7287721395350266,
+          "residual": -0.022473654526412368
+        },
+        {
+          "observations": 500,
+          "beta": 0.6492030062992806,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.6099096138355947,
+          "residual": -0.012033096621426154
+        },
+        {
+          "observations": 750,
+          "beta": 0.6571894375583931,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.9529722447652327,
+          "residual": -0.03561840731796462
+        }
+      ],
+      "convergenceScenarioBps": 72.96310142210903,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "SOLUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.6635555597925308,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.3895149059997478,
+          "residual": -0.007555198334520785
+        },
+        {
+          "observations": 500,
+          "beta": 0.6875397643781849,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.056230555354077186,
+          "residual": -0.0016573110853705941
+        },
+        {
+          "observations": 750,
+          "beta": 0.6508246003257985,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.4347907194345047,
+          "residual": -0.020413232686930183
+        }
+      ],
+      "convergenceScenarioBps": 9.820871308364522,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "XRPUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.6173293543568453,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.3550015680724742,
+          "residual": 0.006777689112228508
+        },
+        {
+          "observations": 500,
+          "beta": 0.7301931617321151,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.5251461476366394,
+          "residual": 0.01714360882767288
+        },
+        {
+          "observations": 750,
+          "beta": 0.7590313506816545,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6079470758535687,
+          "residual": 0.020784244533035318
+        }
+      ],
+      "convergenceScenarioBps": 41.90667221843478,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "ADAUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.047865609811409,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6901422835180289,
+          "residual": 0.040005926073514164
+        },
+        {
+          "observations": 500,
+          "beta": 0.6639354407711235,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.9700105637414569,
+          "residual": 0.05135888509340836
+        },
+        {
+          "observations": 750,
+          "beta": 0.5238198272817214,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.6175077004998564,
+          "residual": 0.08026433368479136
+        }
+      ],
+      "convergenceScenarioBps": 195.35425509293242,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "LINKUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.6154314195927839,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.4580211196731154,
+          "residual": 0.015297695054390603
+        },
+        {
+          "observations": 500,
+          "beta": 0.5557359624407282,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6260438179151856,
+          "residual": 0.016265144313613034
+        },
+        {
+          "observations": 750,
+          "beta": 0.5875002421134367,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.2672137317143252,
+          "residual": -0.011410893922445764
+        }
+      ],
+      "convergenceScenarioBps": 71.87963579302803,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.209359578281057,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.4117012106867974,
+          "residual": 0.01409566747957891
+        },
+        {
+          "observations": 500,
+          "beta": 1.2903351185011116,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6716769107926217,
+          "residual": 0.03010809271759962
+        },
+        {
+          "observations": 750,
+          "beta": 0.5802538481483018,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.7347193838685866,
+          "residual": 0.10808429560802368
+        }
+      ],
+      "convergenceScenarioBps": 63.79978894402391,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "BTCUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.8872812171508663,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.9111120495679564,
+          "residual": 0.02386479653783269
+        },
+        {
+          "observations": 500,
+          "beta": 0.968606457335071,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.9781964953290583,
+          "residual": 0.0469304162002353
+        },
+        {
+          "observations": 750,
+          "beta": 0.5186101072093059,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.7064294438967231,
+          "residual": 0.11569701631996954
+        }
+      ],
+      "convergenceScenarioBps": 126.45066522656423,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.8629730347955817,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7725561654797879,
+          "residual": 0.020820236043658458
+        },
+        {
+          "observations": 500,
+          "beta": 1.0013997016207805,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.47754883372230156,
+          "residual": 0.027810379232053428
+        },
+        {
+          "observations": 750,
+          "beta": 0.9738832734958887,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.5414573754097459,
+          "residual": 0.026861134266769504
+        }
+      ],
+      "convergenceScenarioBps": 111.75811809827402,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.7974955935517161,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 1.3213474184113658,
+          "residual": 0.04002782348180228
+        },
+        {
+          "observations": 500,
+          "beta": 1.032867722294594,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.8647518032171774,
+          "residual": 0.06032666676293308
+        },
+        {
+          "observations": 750,
+          "beta": 0.9197855914486545,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.4269483723280372,
+          "residual": 0.1187664496654513
+        }
+      ],
+      "convergenceScenarioBps": 222.68662924903373,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "ADAUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.3241307629496566,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.0500760212979217,
+          "residual": 0.08385943719967903
+        },
+        {
+          "observations": 500,
+          "beta": 1.038940492186489,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.3250691018140643,
+          "residual": 0.09549138663090173
+        },
+        {
+          "observations": 750,
+          "beta": 0.6316183266254646,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 2.021855392928984,
+          "residual": 0.1911245793737525
+        }
+      ],
+      "convergenceScenarioBps": 360.82064975229423,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "LINKUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.8117261757421504,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.2531139894575782,
+          "residual": 0.049494004675420644
+        },
+        {
+          "observations": 500,
+          "beta": 0.8484958308383775,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.3908090842228724,
+          "residual": 0.04525810549377196
+        },
+        {
+          "observations": 750,
+          "beta": 0.8931051698911344,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.1575336484115248,
+          "residual": 0.03703615588030784
+        }
+      ],
+      "convergenceScenarioBps": 195.63707536881142,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.5718772015117197,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.0723748651317326,
+          "residual": 0.04902241282313602
+        },
+        {
+          "observations": 500,
+          "beta": 1.8522602934318058,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.9632221021252684,
+          "residual": 0.07637273847711779
+        },
+        {
+          "observations": 750,
+          "beta": 0.5829228089772381,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.9515854970692441,
+          "residual": 0.22849635069126073
+        }
+      ],
+      "convergenceScenarioBps": 190.6094614249903,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ETHUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.152664099410574,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.7232540919732666,
+          "residual": 0.06175194590854227
+        },
+        {
+          "observations": 500,
+          "beta": 1.3223962814399999,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.169609169779633,
+          "residual": 0.10701518699079227
+        },
+        {
+          "observations": 750,
+          "beta": 0.4513062744866033,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.8918214459771456,
+          "residual": 0.2376769322631438
+        }
+      ],
+      "convergenceScenarioBps": 286.8628966565231,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "SOLUSDT",
+        "XRPUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.878525411833259,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.5670524625465685,
+          "residual": 0.02708436453678076
+        },
+        {
+          "observations": 500,
+          "beta": 1.001495660077312,
+          "pAdjusted": 0.9277776957035551,
+          "integrated": true,
+          "z": 0.7538433403936026,
+          "residual": 0.03748172509325881
+        },
+        {
+          "observations": 750,
+          "beta": 0.8750251794961985,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.2775201868184647,
+          "residual": 0.10409471536235487
+        }
+      ],
+      "convergenceScenarioBps": 144.1788562782818,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "SOLUSDT",
+        "ADAUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.3951303261831927,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7746281830321742,
+          "residual": 0.07731701089653775
+        },
+        {
+          "observations": 500,
+          "beta": 0.8710839478620056,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.082036645383765,
+          "residual": 0.08965228099160183
+        },
+        {
+          "observations": 750,
+          "beta": 0.5441603800738646,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.7595243831506107,
+          "residual": 0.1780035688354854
+        }
+      ],
+      "convergenceScenarioBps": 322.8092018681414,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "SOLUSDT",
+        "LINKUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.9140246800524378,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7532950314507543,
+          "residual": 0.03568202567452383
+        },
+        {
+          "observations": 500,
+          "beta": 0.7369054754108673,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7828070507085909,
+          "residual": 0.04188559153671978
+        },
+        {
+          "observations": 750,
+          "beta": 0.8112794421958843,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6686863180293257,
+          "residual": 0.03538675090622867
+        }
+      ],
+      "convergenceScenarioBps": 186.42406258599686,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "SOLUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.7369963589809634,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6127596320743757,
+          "residual": 0.036733362887609644
+        },
+        {
+          "observations": 500,
+          "beta": 1.8607218956660987,
+          "pAdjusted": 0.6566117495872774,
+          "integrated": true,
+          "z": 0.9162054737180028,
+          "residual": 0.04755849765102971
+        },
+        {
+          "observations": 750,
+          "beta": 0.5397409764724074,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.8279122511776258,
+          "residual": 0.20897031959343626
+        }
+      ],
+      "convergenceScenarioBps": 134.21049234163462,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "SOLUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.269529135354579,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.9760466554025236,
+          "residual": 0.05102946939238784
+        },
+        {
+          "observations": 500,
+          "beta": 1.3577986460607865,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.1704722797533174,
+          "residual": 0.07553792310958052
+        },
+        {
+          "observations": 750,
+          "beta": 0.40780003731768466,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.7765517450602968,
+          "residual": 0.21769240964405756
+        }
+      ],
+      "convergenceScenarioBps": 224.84606431111214,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "XRPUSDT",
+        "ADAUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.7674745810058896,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.6435541279567132,
+          "residual": 0.051678500662688975
+        },
+        {
+          "observations": 500,
+          "beta": 0.762057546456223,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.783088995458415,
+          "residual": 0.06637746849193737
+        },
+        {
+          "observations": 750,
+          "beta": 0.5979318098425753,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.1683279002270905,
+          "residual": 0.0866062384850379
+        }
+      ],
+      "convergenceScenarioBps": 186.73523152615724,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "XRPUSDT",
+        "LINKUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.9493285061374607,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.28478876889702415,
+          "residual": 0.0181962648697489
+        },
+        {
+          "observations": 500,
+          "beta": 0.6469849389658555,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.3791130306072854,
+          "residual": 0.024077106144274385
+        },
+        {
+          "observations": 750,
+          "beta": 0.6392046088246481,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.14164815537633918,
+          "residual": -0.010632269993721355
+        }
+      ],
+      "convergenceScenarioBps": 64.86237249750637,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "XRPUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.9422047409338312,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.2530112637689465,
+          "residual": 0.012661011794782961
+        },
+        {
+          "observations": 500,
+          "beta": 1.7350840467497246,
+          "pAdjusted": 0.071780797424111,
+          "integrated": true,
+          "z": 0.42704911204699714,
+          "residual": 0.02046786743846507
+        },
+        {
+          "observations": 750,
+          "beta": 0.7292856066959958,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.544103843855523,
+          "residual": 0.11616824329756503
+        }
+      ],
+      "convergenceScenarioBps": 43.03239546396919,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "XRPUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.4359872850615483,
+          "pAdjusted": 1.0,
+          "integrated": false,
+          "z": 0.9318064646364251,
+          "residual": 0.027749924032697937
+        },
+        {
+          "observations": 500,
+          "beta": 1.3667123959098664,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.970999680396365,
+          "residual": 0.03695482123327354
+        },
+        {
+          "observations": 750,
+          "beta": 0.7287421316257434,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.8158251212782126,
+          "residual": 0.12404403736907721
+        }
+      ],
+      "convergenceScenarioBps": 113.91653890343191,
+      "reasons": [
+        "I1_ASSUMPTION_FAILED",
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "ADAUSDT",
+        "LINKUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.3497148485593787,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.029796070216842913,
+          "residual": -0.0016404207143390082
+        },
+        {
+          "observations": 500,
+          "beta": 0.6219379950836516,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.07765279222370834,
+          "residual": -0.005198615300225917
+        },
+        {
+          "observations": 750,
+          "beta": 0.7438153414815978,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.718560550836746,
+          "residual": -0.08594982864524114
+        }
+      ],
+      "convergenceScenarioBps": 12.153831722974042,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "ADAUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.8678668780410003,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.2935838070726935,
+          "residual": -0.01099176417852088
+        },
+        {
+          "observations": 500,
+          "beta": 1.445340625690741,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.1300123424372947,
+          "residual": 0.010183741120541878
+        },
+        {
+          "observations": 750,
+          "beta": 1.1053565363472744,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7327062651026129,
+          "residual": 0.053187772123647115
+        }
+      ],
+      "convergenceScenarioBps": 41.645491076177805,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "ADAUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.6131514773893713,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": -0.06989009503463738,
+          "residual": -0.0026984790666941816
+        },
+        {
+          "observations": 500,
+          "beta": 0.9559094668619049,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.4453943468736162,
+          "residual": 0.041347144346858045
+        },
+        {
+          "observations": 750,
+          "beta": 0.920743295756239,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.6773897870058522,
+          "residual": 0.06916740849665848
+        }
+      ],
+      "convergenceScenarioBps": 16.72799550765834,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "LINKUSDT",
+        "AVAXUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.79553950824097,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.09911991674572516,
+          "residual": 0.006180826293007424
+        },
+        {
+          "observations": 500,
+          "beta": 2.150271654208111,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.44296919143754754,
+          "residual": 0.03944182069519808
+        },
+        {
+          "observations": 750,
+          "beta": 0.5884861877042795,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.6437769144474432,
+          "residual": 0.2164804359130439
+        }
+      ],
+      "convergenceScenarioBps": 22.109600936731418,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    },
+    {
+      "pair": [
+        "LINKUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 1.324543826232294,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.39815020420605507,
+          "residual": 0.020293750099801056
+        },
+        {
+          "observations": 500,
+          "beta": 1.5669428712692473,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.7217571911697809,
+          "residual": 0.07197993028842387
+        },
+        {
+          "observations": 750,
+          "beta": 0.4929447206437648,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 1.642559596768129,
+          "residual": 0.22492752045109787
+        }
+      ],
+      "convergenceScenarioBps": 87.30207566227699,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY"
+      ]
+    },
+    {
+      "pair": [
+        "AVAXUSDT",
+        "DOGEUSDT"
+      ],
+      "eligible": false,
+      "windows": [
+        {
+          "observations": 250,
+          "beta": 0.681671874147204,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.4805851276581958,
+          "residual": 0.010906549614092098
+        },
+        {
+          "observations": 500,
+          "beta": 0.6979111345033622,
+          "pAdjusted": 0.0017503924955903987,
+          "integrated": true,
+          "z": 0.6432495836166037,
+          "residual": 0.01807315254384556
+        },
+        {
+          "observations": 750,
+          "beta": 0.8604556391978192,
+          "pAdjusted": 1.0,
+          "integrated": true,
+          "z": 0.24147352180257897,
+          "residual": 0.013852274218544736
+        }
+      ],
+      "convergenceScenarioBps": 64.85539647633662,
+      "reasons": [
+        "COINTEGRATION_NOT_ROBUST",
+        "HEDGE_UNSTABLE",
+        "NO_CONSISTENT_ENTRY",
+        "INSUFFICIENT_COST_BUFFER"
+      ]
+    }
+  ],
+  "limitation": "Screen only; no profitability claim, live adapter or automatic activation",
+  "inputSha256": "905cd025b4a2910c49a198171ba6236d1bac0ddeee2d3e8cf528ceec64e69a98"
+}

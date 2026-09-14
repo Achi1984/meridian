@@ -27,11 +27,9 @@ test('retired bots cannot observe submit or cycle while their ledgers remain rea
   assert.doesNotMatch(server,/deleteState\(|TRUNCATE|DROP TABLE/);
 });
 
-test('Baseline and Challenger execution paths stay present and retirement is visible',()=>{
+test('retired execution guards stay present while retired bots are hidden from customer UI',()=>{
   assert.match(server,/const r=await submitSignal\(\{\.\.\.c,source:"MERIDIAN-6\.2-AUTO"\}\)/);
   assert.match(server,/await submitChallengerV2\(\{\.\.\.c,source:"MERIDIAN-CHALLENGER-V2"\}\)/);
   assert.match(server,/await challengerV2Cycle\(m\)/);
-  assert.match(ui,/SHADOW \/ REGIME/);
-  assert.match(ui,/status:'RETIRED'/);
-  assert.match(ui,/Challenger V2 bleibt/);
+  assert.doesNotMatch(ui,/SHADOW \/ REGIME|status:'RETIRED'|Challenger V2 bleibt/);
 });
