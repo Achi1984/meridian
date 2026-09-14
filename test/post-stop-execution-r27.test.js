@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import {analyzePostStop,buildSuccessorPlan} from '../post-stop-learning.js';
 import {costAwareSize,PAPER_COST_POLICY} from '../paper-cost-policy.js';
 import {evaluatePaperLearning,PAPER_LEARNING_POLICY} from '../paper-learning-policy.js';
-const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
+const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 function harness(){
  let stored=null;const events=[];
  const params={tradeScore:74,cautionScore:66,fullRiskPct:.5,cautionRiskPct:.25,weights:{technical:.42,candidate:.38,entryDistance:.2},maxOpenPositions:1,maxTradesPerDay:8,maxPortfolioRiskPct:3,maxDailyLossPct:3,maxDrawdownPct:8,cooldownMinutes:180,postStopReentryMinutes:720,parameterVersion:'test'};
