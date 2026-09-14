@@ -1,0 +1,21 @@
+{
+  "policy": "PAIRS-WALKFORWARD-V1",
+  "executionImpact": false,
+  "asOf": 1789378690171,
+  "parameters": {
+    "grossUsd": 2000.0,
+    "roundTripCostsBps": 40.0,
+    "maxLossUsd": 100.0,
+    "maxHoldBars": 42,
+    "cooldownBars": 12,
+    "scanEveryBars": 6
+  },
+  "closedTrades": 0,
+  "winRate": null,
+  "profitFactor": null,
+  "netPnlUsd": 0,
+  "trades": [],
+  "openAtEnd": false,
+  "limitation": "Candle-close simulation; no intrabar fills, order-book replay or profitability claim",
+  "inputSha256": "2f8cccb820ea27c474d9c4e9f355e1ec792dcbafe580c463500849273a5de2d4"
+}

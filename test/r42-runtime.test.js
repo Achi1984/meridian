@@ -37,8 +37,19 @@ test('R42 risk limit closes a losing basket; sealed ledger cannot restart',()=>{
   const out=stepLedger(s,m,now);assert.equal(out.trades[0].exitReason,'LOSS_LIMIT');
   out.lifecycle='SEALED';assert.equal(stepLedger(out,market(),now).basket,null);
 });
-test('R42 incomplete specialist evidence remains blocked',()=>{
-  for(const id of ['pairs','squeeze']){const s=stepLedger(newLedger(id),market(),now);assert.equal(s.lifecycle,'WAITING_DATA');assert.equal(s.basket,null);}
+test('R42 momentum manages its existing basket then seals without re-entry',()=>{
+  const input=newLedger('momentum');input.lifecycle='IN_TRADE';input.basket={openedAt:now-1000,closeAt:now,
+    legs:[{venue:'perp',symbol:'BTCUSDT',side:1,quantity:5,entry:100}],entryFees:0,funding:0,applied:[]};
+  const m=market();m.funding.BTCUSDT={complete:true,rows:[]};
+  const closed=stepLedger(input,m,now);assert.equal(closed.lifecycle,'SEALED');assert.equal(closed.trades.length,1);
+  assert.deepEqual(closed.lastDecision.reasons,['HISTORICAL_WALK_FORWARD_REJECTED']);
+  assert.equal(stepLedger(newLedger('momentum'),m,now).basket,null);
+});
+test('R42 rejects pairs after the frozen replay and keeps squeeze data-gated',()=>{
+  const pairs=stepLedger(newLedger('pairs'),market(),now);
+  assert.equal(pairs.lifecycle,'SEALED');assert.deepEqual(pairs.lastDecision.reasons,['NO_ROBUST_PAIR_IN_WALK_FORWARD']);assert.equal(pairs.basket,null);
+  const squeeze=stepLedger(newLedger('squeeze'),market(),now);
+  assert.equal(squeeze.lifecycle,'WAITING_DATA');assert.equal(squeeze.basket,null);
 });
 test('R42 history rejects incomplete candles, gaps and truncated funding',()=>{
   assert.equal(dailyHistory([],now),null);assert.equal(betaToBtc(null,null),null);

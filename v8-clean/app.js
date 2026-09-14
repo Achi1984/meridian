@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r42';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r44';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -7,6 +7,9 @@ const fmtPct=(v,d=1)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE
 const fmtNum=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
 const fmtPrice=v=>Number.isFinite(Number(v))?'$'+Number(v).toLocaleString('de-DE',{maximumFractionDigits:4}):'—';
 const state={view:'center',center:null,depot:null,trade:null,paper:null};
+const countdown=at=>{const ms=new Date(at).getTime()-Date.now();if(!Number.isFinite(ms))return'—';if(ms<=0)return'JETZT';const total=Math.ceil(ms/1000),days=Math.floor(total/86400),hours=Math.floor(total%86400/3600),minutes=Math.floor(total%3600/60),seconds=total%60;return days?`${days}T ${hours}H ${minutes}M`:`${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`};
+function updateCountdowns(){document.querySelectorAll('[data-countdown-at]').forEach(el=>{el.textContent=countdown(el.dataset.countdownAt)})}
+setInterval(updateCountdowns,1000);
 
 function setView(key){
   if(!ROUTES.includes(key))return;
@@ -93,8 +96,7 @@ function paperHtml(x){
     const sample=r.commonClosed!=null?`${r.commonClosed} closed im Common Window`:`${r.closedTrades} closed gesamt`;
     return `<div class="research-row ${archived?'is-retired':''}"><div class="research-head"><div><span>${r.name}</span><b class="${archived?'tone-danger':''}">${ref}</b></div><div class="research-pnl tone-${pnlTone}">${fmtUsd(r.pnl)}</div></div><div class="research-metrics"><small>PF <b>${fmtNum(r.profitFactor,2)}</b></small><small>EXP <b>${fmtUsd(r.expectancy)}</b></small><small>DD <b>${fmtPct(r.maxDrawdownPct,2)}</b></small><small>WIN <b>${fmtPct(r.winRate,1)}</b></small><small>${sample}</small></div></div>`;
   };
-  const activeRows=(x.rows||[]).filter(r=>r.key==='baseline'||r.key==='challenger'||r.key==='challengerV3').map(r=>rowHtml(r)).join('')||'<div class="chart-empty">Keine aktive Ledger-Telemetrie verfügbar</div>';
-  const archivedRows=(x.rows||[]).filter(r=>r.key==='shadow'||r.key==='regime').map(r=>rowHtml(r,true)).join('')||'<div class="chart-empty">Keine archivierten Ledger.</div>';
+  const activeRows=(x.rows||[]).filter(r=>r.key==='challengerV3'||Number(r.openTrades)>0).map(r=>rowHtml(r)).join('')||'<div class="chart-empty">Noch keine aktive Ledger-Telemetrie verfügbar.</div>';
   const common=x.commonWindow?`${fmtNum(x.commonWindow.days,1)} Tage gemeinsames Beobachtungsfenster`:'Noch kein vollständiges gemeinsames Beobachtungsfenster';
   const oc=x.opportunityCost||{};
   const warnings=(x.warnings||[]).map(w=>`<div class="audit-row">${w}</div>`).join('')||'<div class="audit-row">Keine zusätzlichen Audit-Flags gemeldet.</div>';
@@ -107,14 +109,21 @@ function paperHtml(x){
   const fundingValue=fb?fmtUsd(fb.netPnl):fe.eligible?'ENTRY FREI':'KEIN ENTRY';
   const researchNames={momentum:'RELATIVE MOMENTUM',pairs:'RESIDUAL PAIRS',squeeze:'SQUEEZE EXHAUSTION',carry:'CARRY SELECTOR'};
   const researchStates={WAITING_DATA:'DATEN FEHLEN',WAITING_ENTRY:'WARTET AUF SIGNAL',IN_TRADE:'IM PAPER-TRADE',DATA_STALE:'DATEN VERALTET',REVIEW:'BEWERTUNG',SEALED:'GESTOPPT',NOT_STARTED:'NOCH NICHT GESTARTET'};
-  const research=(x.researchR42||[]).map(b=>`<div class="audit-row"><b>${researchNames[b.id]||'EXPERIMENT'} · ${researchStates[b.lifecycle]||'PRÜFEN'}</b><p>${b.pnl==null?'—':fmtUsd(b.pnl)} · ${Number(b.closedTrades)||0} Abschlüsse · ${Number(b.openTrades)||0} offen</p><small>Letzter Abschluss: ${b.lastClosedAt?new Date(b.lastClosedAt).toLocaleString('de-AT'):'—'}${b.id==='pairs'?' · Statistikprüfung fehlt':b.id==='squeeze'?' · Liquidationsdaten fehlen':''}</small></div>`).join('');
+  const research=(x.researchR42||[]).filter(b=>Number(b.openTrades)>0||['WAITING_DATA','WAITING_ENTRY','IN_TRADE','DATA_STALE','REVIEW'].includes(b.lifecycle)).map(b=>`<div class="audit-row"><b>${researchNames[b.id]||'EXPERIMENT'} · ${researchStates[b.lifecycle]||'PRÜFEN'}</b><p>${b.pnl==null?'—':fmtUsd(b.pnl)} · ${Number(b.closedTrades)||0} Abschlüsse · ${Number(b.openTrades)||0} offen</p><small>Letzter Abschluss: ${b.lastClosedAt?new Date(b.lastClosedAt).toLocaleString('de-AT'):'—'}</small></div>`).join('');
+  const alpha=x.alphaLab||{},alphaLabels=alpha.coverage?.labels||{},alphaSamples=Number(alphaLabels.h24?.samples)||0,alphaNeed=Math.max(0,(Number(alpha.methodology?.minimumLabels)||100)-alphaSamples);
+  const alphaState=alpha.state==='BUILDING_FORWARD_LABELS'?'AUFBAU':alpha.state==='RESEARCH_HYPOTHESES_ONLY'?'HYPOTHESEN':'KEIN FAKTOR';
+  const alphaTone=alpha.state==='RESEARCH_HYPOTHESES_ONLY'?'watch':alpha.state==='NO_STABLE_FACTOR_OBSERVED'?'danger':'safe';
+  const timer=alpha.timer||{},dataLive=timer.dataStatus==='LIVE';
+  const evaluationText=timer.evaluationReached?(timer.factorHypothesisFound?'HYPOTHESE GEFUNDEN':'KEIN STABILER FAKTOR'):!dataLive?'DATEN FEHLEN':timer.evaluationAt?`<span data-countdown-at="${timer.evaluationAt}">${countdown(timer.evaluationAt)}</span>`:'WARTET AUF DATEN';
+  const nextLabelText=!dataLive?'DATEN FEHLEN':timer.nextLabelAt?`<span data-countdown-at="${timer.nextLabelAt}">${countdown(timer.nextLabelAt)}</span>`:'NOCH KEIN SNAPSHOT';
+  const alphaCard=`<section class="card alpha-lab-r44"><div class="research-head"><div><span>R43 · ALPHA LAB</span><b>SCANNER-SNAPSHOTS · KEINE AUSFÜHRUNG</b></div><div class="research-pnl tone-${alphaTone}">${alphaState}</div></div><div class="grid2 alpha-timer-grid"><div class="metric"><span>NÄCHSTES 24H-ERGEBNIS</span><b>${nextLabelText}</b></div><div class="metric"><span>ERSTER FAKTOR-CHECK</span><b class="tone-${timer.factorHypothesisFound?'safe':'watch'}">${evaluationText}</b></div></div><p class="muted">${Number(alpha.coverage?.observations)||0} Snapshots · ${alphaSamples}/${timer.labelTarget||100} Ergebnisse · ${Number(alpha.coverage?.distinctBuckets)||0} Zeitfenster</p><small class="muted">Alter Score: VERWORFEN · ${alphaNeed?`${alphaNeed} Ergebnisse bis zur ersten deskriptiven Auswertung`:`${(alpha.candidateFactors||[]).length} Forschungshypothesen – noch kein Profitabilitätsnachweis`}</small></section>`;
   const full=`<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
+  ${alphaCard}
   ${research?`<section class="card"><div class="eyebrow">R42 · PAPER-EXPERIMENTE</div>${research}</section>`:''}
   <section class="card"><div class="research-head"><div><span>BTC FUNDING CARRY V1</span><b class="tone-${fundingStatusTone}">${fundingState}</b></div><div class="research-pnl tone-${fundingPnlTone}">${fundingValue}</div></div><p class="muted">${fundingLine}</p>${fundingMeta?`<small class="muted">${fundingMeta}</small>`:''}</section>
   <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>V3 ${fmtUsd((x.rows||[]).find(r=>r.key==='challengerV3')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challengerV3')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
-  <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>
   <details class="card paper-disclosure paper-diagnostics"><summary><span>WEITERE DIAGNOSTIK</span><b>Opportunity Cost · Audit Flags</b></summary><div class="paper-disclosure-body"><div class="paper-window"><span>VERGLEICHSFENSTER</span><b>${x.commonWindow?fmtNum(x.commonWindow.days,1)+'D':'OFFEN'}</b><small>${common} · ${x.schemaVersion}</small></div><div class="eyebrow">OPPORTUNITY COST · CHALLENGER</div><div class="grid3 paper-oc"><div><span>MISSED WINNERS</span><b>${oc.missedWinners??0}</b></div><div><span>AVOIDED LOSERS</span><b>${oc.avoidedLosers??0}</b></div><div><span>NET COUNTERFACTUAL R</span><b>${fmtNum(oc.netR,3)}</b></div></div><div class="eyebrow paper-audit-title">AUDIT FLAGS</div>${warnings}</div></details>`;
-  return x.detailsLoaded===false?full.slice(0,full.indexOf('<details'))+`<section class="card"><button id="loadPaperDetails" type="button">Analysen und archivierte Bots laden</button><p class="muted">Aktualisiert: ${new Date(x.loadedAt).toLocaleTimeString('de-AT')}</p></section>`:full;
+  return x.detailsLoaded===false?full.slice(0,full.indexOf('<details'))+`<section class="card"><button id="loadPaperDetails" type="button">Weitere Analysen laden</button><p class="muted">Aktualisiert: ${new Date(x.loadedAt).toLocaleTimeString('de-AT')}</p></section>`:full;
 }
 function placeholder(title,sub){return `<section class="card placeholder"><div><div class="eyebrow">V8 CLEAN</div><b>${title}</b><small>${sub}</small></div></section>`}
 function moreHtml(){return `<section class="card"><div class="eyebrow">MORE · SYSTEM & DETAILS</div><h2>Saubere Tiefe statt Legacy-Overlay</h2><p class="muted">Hier kommen Markt, Forecast, Scanner, Research, Diagnostik und Einstellungen als explizite Module hinein.</p><div class="row"><span>Private Data</span><b>${hasReadToken()?'VERBUNDEN':'LOCKED'}</b></div><button id="connectToken" class="action" type="button"><span>READ TOKEN</span><b>${hasReadToken()?'Token ersetzen':'Token verbinden'}</b></button></section>`}
@@ -126,6 +135,7 @@ function render(key){
   if(key==='paper')root.innerHTML=paperHtml(state.paper);
   if(key==='more')root.innerHTML=moreHtml();
   if(key==='paper'&&state.paper?.ok)window.dispatchEvent(new CustomEvent('meridian:v8-paperdata',{detail:{deepDive:state.paper.deepDive,executionAudit:state.paper.executionAudit,botHealth:state.paper.botHealth}}));
+  updateCountdowns();
   $('#loadPaperDetails')?.addEventListener('click',()=>hydratePaper(true));
   $('#connectToken')?.addEventListener('click',()=>{const t=prompt('MERIDIAN Read Token');if(t!==null){setReadToken(t);state.center=null;state.depot=null;state.trade=null;state.paper=null;hydrateCenter();hydrateDepot();hydrateTrade();hydratePaper();render('more')}});
 }

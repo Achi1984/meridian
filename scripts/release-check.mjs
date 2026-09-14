@@ -15,13 +15,13 @@ must(build.startsWith(v+'-'),'buildId/version mismatch');
 must(release.ui===v,'version.json ui mismatch');
 must(release.engine==='6.2.0','Engine must remain 6.2.0');
 must(release.ruleset==='6.2-SIGNAL-V1','Ruleset must remain 6.2-SIGNAL-V1');
-must(release.research==='7.34-RESEARCH-V2','Research engine version mismatch');
+must(release.research==='8.43-ALPHA-ATTRIBUTION-V1','Research engine version mismatch');
 must(release.privacy==='7.33-HARDENED','Privacy layer version mismatch');
 must(release.runtime==='7.36-MONITORING','Runtime monitoring version mismatch');
 must(release.uiPolish==='7.46-PREMIUM-BANNER','Header UI polish version mismatch');
 must(release.regimeResearch==='7.38-REGIME-V1','Regime research ruleset mismatch');
 must(release.paperOverview==='8.0-PAPER-OVERVIEW-V1','Paper overview UX version mismatch');
-must(release.researchTelemetry==='7.47-TELEMETRY-V1','Research telemetry version mismatch');
+must(release.researchTelemetry==='8.43-ALPHA-ATTRIBUTION-V1','Research telemetry version mismatch');
 must(release.exitLab==='7.49-EXIT-LAB-REPLAY-V1','Exit Lab replay version mismatch');
 must(release.exitLabReplay==='7.49-FIXED-ENTRY-15M-REPLAY','Exit Lab fixed-entry replay metadata mismatch');
 must(release.projectMemory==='7.50-CONTINUITY-V1','Project memory version mismatch');
@@ -105,10 +105,15 @@ must(overview.includes('activateOverview'),'Paper overview default activation mi
 
 must(fs.existsSync('research-analytics.js'),'research telemetry module missing');
 const telemetry=read('research-analytics.js');
-must(telemetry.includes("schemaVersion:'7.47-TELEMETRY-V1'"),'research telemetry schema mismatch');
+must(telemetry.includes("schemaVersion:'8.43-ALPHA-ATTRIBUTION-V1'"),'research telemetry schema mismatch');
 must(telemetry.includes('executionImpact:false'),'research telemetry must remain non-executing');
 must(telemetry.includes('bySide'),'research telemetry side split missing');
 must(telemetry.includes('byRegime'),'research telemetry regime split missing');
+must(telemetry.includes('alphaAttributionSummary'),'R43 alpha attribution summary missing');
+const alphaLab=read('research/alpha-attribution-r43.js');
+must(alphaLab.includes("ALPHA_LAB_R43_KEY='alpha_lab_r43'"),'R43 alpha state key mismatch');
+must(alphaLab.includes('executionImpact:false'),'R43 alpha lab must remain non-executing');
+must(alphaLab.includes('autoPromotion:false'),'R43 alpha lab must not auto-promote');
 
 must(fs.existsSync('exit-lab.js'),'Exit Lab module missing');
 must(fs.existsSync('exit-lab-replay.js'),'Exit Lab replay module missing');

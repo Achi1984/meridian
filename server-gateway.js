@@ -176,11 +176,11 @@ async function activitySummary(){
   };
 }
 async function researchAnalytics(){
-  if(!pool())return {schemaVersion:"7.47-TELEMETRY-V1",researchOnly:true,executionImpact:false,source:"NO_DATABASE",generatedAt:new Date().toISOString(),ledgers:{}};
-  const [baseline,shadow,challenger,challengerV3,regime]=await Promise.all([
-    stateGet("paper"),stateGet("shadow_v1"),stateGet("challenger_v2"),stateGet("challenger_v3"),stateGet("regime_v1")
+  if(!pool())return {schemaVersion:"8.43-ALPHA-ATTRIBUTION-V1",researchOnly:true,executionImpact:false,source:"NO_DATABASE",generatedAt:new Date().toISOString(),ledgers:{}};
+  const [baseline,shadow,challenger,challengerV3,regime,alphaLab]=await Promise.all([
+    stateGet("paper"),stateGet("shadow_v1"),stateGet("challenger_v2"),stateGet("challenger_v3"),stateGet("regime_v1"),stateGet("alpha_lab_r43")
   ]);
-  return {...researchComparison({baseline,shadow,challenger,challengerV3,regime}),source:"POSTGRES_STATE"};
+  return {...researchComparison({baseline,shadow,challenger,challengerV3,regime,alphaLab}),source:"POSTGRES_STATE"};
 }
 function portfolioHistoryRangeMs(raw){
   const key=String(raw||'1d').toLowerCase();

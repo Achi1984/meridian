@@ -1,3 +1,5 @@
+import {alphaAttributionSummary} from './research/alpha-attribution-r43.js';
+
 // MERIDIAN v7.87 — research-only ledger telemetry + Paperbot deep dive.
 // Pure analytics: no entry, exit, sizing, risk or execution effects.
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -226,7 +228,8 @@ export function researchComparison(states={}){
     };
   }
   return {
-    schemaVersion:'7.47-TELEMETRY-V1',researchOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
+    schemaVersion:'8.43-ALPHA-ATTRIBUTION-V1',researchOnly:true,executionImpact:false,generatedAt:new Date().toISOString(),
+    alphaLab:alphaAttributionSummary(states.alphaLab||{}),
     ledgers:{baseline,shadow,challenger,challengerV3,regime},
     opportunityCost:{challenger:challengerCounterfactual(states.challenger||{}),shadow:{available:false,reason:'NO_SHADOW_COUNTERFACTUAL_LEDGER_YET'},regime:{available:false,reason:'NO_REGIME_COUNTERFACTUAL_LEDGER_YET'}},
     executionAudit:paperExecutionAudit(states),

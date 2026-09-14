@@ -10,18 +10,15 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-compact-r23.css',import.met
 
 test('R23 compact PAPER assets are wired with fresh cache tags',()=>{
   assert.match(html,/paper-compact-r23\.css\?v=8\.0-r23/);
-  assert.match(html,/app\.js\?v=8\.0-r42/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r42/);
-  assert.match(html,/research-control-r19\.js\?v=8\.0-r23/);
+  assert.match(html,/app\.js\?v=8\.0-r44/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r44/);
+  assert.match(html,/research-control-r19\.js\?v=8\.0-r44/);
 });
 
-test('R23 separates active references from retired ledgers',()=>{
-  assert.match(app,/r\.key==='baseline'\|\|r\.key==='challenger'/);
-  assert.match(app,/r\.key==='shadow'\|\|r\.key==='regime'/);
+test('R44 presents only the actively followed V3 ledger',()=>{
+  assert.match(app,/r\.key==='challengerV3'/);
   assert.match(app,/PERFORMANCE-DETAILS/);
-  assert.match(app,/ARCHIVIERTE BOTS/);
-  assert.match(app,/SHADOW · REGIME · RETIRED/);
-  assert.match(app,/<details class="card paper-disclosure paper-archive">/);
+  assert.doesNotMatch(app,/ARCHIVIERTE BOTS|SHADOW · REGIME · RETIRED|paper-archive/);
 });
 
 test('R23 keeps the successor answer first and collapses secondary research',()=>{

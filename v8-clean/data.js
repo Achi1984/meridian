@@ -157,11 +157,9 @@ export function tradeRiskDetails(x={}){
   const budget=finite(x.plannedRiskBudgetUsd);
   return {entry,stop,exit:finite(x.exit),riskPct:finite(x.riskPct),plannedRiskUsd:risk>0?risk:null,plannedRiskBudgetUsd:budget,budgetResultR:budget>0&&realized!=null?realized/budget:null,executionPolicyVersion:x.executionPolicyVersion||null,netR:risk>0&&realized!=null?realized/risk:null,feesUsd:fees,grossR:risk>0&&realized!=null&&fees!=null?(realized+fees)/risk:null,decision:x.challengerDecision||null,unrealized:finite(x.unrealized),openedAt:x.openedAt||null};
 }
-function recentTrades(baseline={},challenger={},challengerV3={}){
-  const base=Array.isArray(baseline?.trades)?baseline.trades.filter(x=>x?.status==='CLOSED').map(x=>({...x,bot:'baseline'})):[];
-  const chall=Array.isArray(challenger?.recentClosed)?challenger.recentClosed.map(x=>({...x,bot:'challenger'})):[];
+function recentTrades(challengerV3={}){
   const v3=Array.isArray(challengerV3?.recentClosed)?challengerV3.recentClosed.map(x=>({...x,bot:'challengerV3'})):[];
-  return [...base,...chall,...v3].map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase(),risk:tradeRiskDetails(x)})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
+  return v3.map(x=>({bot:x.bot,symbol:String(x.symbol||'—').toUpperCase(),side:String(x.side||'—').toUpperCase(),closedAt:x.closedAt||null,realized:n(x.realized),exitReason:String(x.exitReason||'—').toUpperCase(),risk:tradeRiskDetails(x)})).filter(x=>x.closedAt).sort((a,b)=>Date.parse(b.closedAt)-Date.parse(a.closedAt)).slice(0,5);
 }
 function botHealthModel(status={},challenger={},challengerV3={},baseline={},ledgerRows=[],audit={}){
   const engine=status?.engine||{};
@@ -184,8 +182,13 @@ function botHealthModel(status={},challenger={},challengerV3={},baseline={},ledg
       challengerV3:{enabled:challengerV3?.enabled===true,lifecycle:String(challengerV3?.lifecycle?.status||'WAITING'),lastScanAt:challengerV3?.lastScanAt||null,lastClosedAt:audits.challengerV3?.lastClosedAt||challengerV3?.recentClosed?.[0]?.closedAt||null,openCount:n(challengerV3?.openCount)??0,evaluated:v3Evaluations.length,ready:v3Evaluations.length-v3Blocked.length,blocked:v3Blocked.length,reasons:reasonCounts(v3Blocked),gateReasons:v3Gate,riskLocked:challengerV3?.lifecycle?.status!=='ACTIVE_PAPER'||Number(challengerV3?.account?.drawdownPct)>=Number(challengerV3?.parameters?.maxDrawdownPct)||v3Gate.some(x=>['MAX_DAILY_LOSS','MAX_DRAWDOWN'].includes(x)),metrics:rowMap.challengerV3||{},parameters:challengerV3?.parameters||null,analysis:challengerV3?.analysis||null,learning:challengerV3?.learning||null}
     },
     executionPolicy:challengerV3?.lifecycle?.executionPolicy||null,
-    openPositions:(challengerV3?.openPositions||[]).filter(p=>p.status==='OPEN').map(p=>({symbol:String(p.symbol||'—'),side:String(p.side||'—'),...tradeRiskDetails(p)})),
-    recentTrades:recentTrades(baseline,challenger,challengerV3)
+    // A discontinued bot can be hidden, but an existing position must never be hidden.
+    openPositions:[
+      ...(baseline?.positions||[]).filter(p=>p.status==='OPEN').map(p=>({...p,bot:'baseline'})),
+      ...(challenger?.openPositions||[]).filter(p=>p.status==='OPEN').map(p=>({...p,bot:'challenger'})),
+      ...(challengerV3?.openPositions||[]).filter(p=>p.status==='OPEN').map(p=>({...p,bot:'challengerV3'}))
+    ].map(p=>({bot:p.bot,symbol:String(p.symbol||'—'),side:String(p.side||'—'),...tradeRiskDetails(p)})),
+    recentTrades:recentTrades(challengerV3)
   };
 }
 function paperModel(analytics={},activity={},status={},challengerStatus={},challengerV3Status={},baselineState={}){
@@ -207,7 +210,7 @@ function paperModel(analytics={},activity={},status={},challengerStatus={},chall
   if(flags.liveBacktestExitSequencingMismatch)warnings.push('Live/Backtest Exit-Sequencing ist als Audit-Risiko markiert.');
   return {
     ok:true,locked:false,source:'RESEARCH_ANALYTICS',researchOnly:analytics?.researchOnly!==false,executionImpact:analytics?.executionImpact===true,
-    schemaVersion:String(analytics?.schemaVersion||'—'),rows,
+    schemaVersion:String(analytics?.schemaVersion||'—'),rows,alphaLab:analytics?.alphaLab||null,
     fundingCarry:status?.fundingCarry||null,
     deepDive:analytics?.deepDive||null,executionAudit:analytics?.executionAudit||null,botHealth:botHealthModel(status,challengerStatus,challengerV3Status,baselineState,rows,analytics?.executionAudit),
     commonWindow:common?{days:n(common.days),start:common.start||null,end:common.end||null}:null,
@@ -291,7 +294,7 @@ export async function loadPaper({details=false}={}){
       const overview=await getJson('/api/paper/overview');
       const {status,challengerV2:challenger,challengerV3,baseline}=overview;
       const ledgers={baseline:summaryLedger(baseline,true),challenger:summaryLedger(challenger),challengerV3:summaryLedger(challengerV3)};
-      return {...paperModel({ledgers},{},status,challenger,challengerV3,baseline),researchR42:overview.researchR42||[],directionalV4:overview.directionalV4||null,fundingCarryV2:overview.fundingCarryV2||null,detailsLoaded:false,loadedAt:new Date().toISOString()};
+      return {...paperModel({ledgers,alphaLab:overview.alphaLab},{},status,challenger,challengerV3,baseline),researchR42:overview.researchR42||[],directionalV4:overview.directionalV4||null,fundingCarryV2:overview.fundingCarryV2||null,detailsLoaded:false,loadedAt:new Date().toISOString()};
     }catch(e){return {ok:false,locked:e?.status===401,error:e?.status===401?'READ_TOKEN_REQUIRED':String(e?.message||e)};}
   }
   try{

@@ -34,11 +34,23 @@ export function stepLedger(input,m,now=Date.now()){
     if(!result||!complete){s.lifecycle='DATA_STALE';s.lastDecision={eligible:false,reasons:[!result?'STALE_EXECUTABLE_QUOTES':'INCOMPLETE_FUNDING_HISTORY']};return s;}
     s.equity=s.cash+result.gross+b.funding-result.exitFees;s.peak=Math.max(s.peak,s.equity);s.lifecycle='IN_TRADE';b.net=result.net;b.lastMarkedAt=now;
     const reason=result.net<=-p.maxLossUsd?'LOSS_LIMIT':s.peak-s.equity>=p.maxDrawdownUsd?'DRAWDOWN':now>=b.closeAt?'TIME_EXIT':null;
-    if(reason){s.cash+=result.gross+b.funding-result.exitFees;s.equity=s.cash;s.trades.push({...b,closedAt:new Date(now).toISOString(),exitReason:reason,realized:result.net});s.basket=null;s.lifecycle=s.peak-s.equity>=p.maxDrawdownUsd?'SEALED':s.trades.length>=(s.id==='carry'?12:30)?'REVIEW':'WAITING_ENTRY';}
+    if(reason){s.cash+=result.gross+b.funding-result.exitFees;s.equity=s.cash;s.trades.push({...b,closedAt:new Date(now).toISOString(),exitReason:reason,realized:result.net});s.basket=null;
+      if(s.id==='momentum'){s.lifecycle='SEALED';s.lastDecision={eligible:false,reasons:['HISTORICAL_WALK_FORWARD_REJECTED']};}
+      else s.lifecycle=s.peak-s.equity>=p.maxDrawdownUsd?'SEALED':s.trades.length>=(s.id==='carry'?12:30)?'REVIEW':'WAITING_ENTRY';}
     return s; // no close/reopen in the same cycle
   }
-  if(s.id==='pairs'||s.id==='squeeze'){
-    s.lifecycle='WAITING_DATA';s.lastDecision={eligible:false,reasons:[s.id==='pairs'?'COINTEGRATION_PIPELINE_REQUIRED':'COMPLETE_LIQUIDATION_FEED_REQUIRED']};return s;
+  if(s.id==='pairs'){
+    // PAIRS-WALKFORWARD-V1: 28 fixed pairs, 3 windows and 167 days yielded
+    // no eligible entry. Preserve the empty ledger and stop evaluating entries.
+    s.lifecycle='SEALED';s.lastDecision={eligible:false,reasons:['NO_ROBUST_PAIR_IN_WALK_FORWARD']};return s;
+  }
+  if(s.id==='squeeze'){
+    s.lifecycle='WAITING_DATA';s.lastDecision={eligible:false,reasons:['COMPLETE_LIQUIDATION_FEED_REQUIRED']};return s;
+  }
+  if(s.id==='momentum'){
+    // The existing basket is managed above until its frozen exit. Flat ledgers do not
+    // reopen after MOMENTUM-WALKFORWARD-V1 failed the independent historical replay.
+    s.lifecycle='SEALED';s.lastDecision={eligible:false,reasons:['HISTORICAL_WALK_FORWARD_REJECTED']};return s;
   }
   if(m.errors?.length||m.dataErrors?.length){s.lifecycle='WAITING_DATA';s.lastDecision={eligible:false,reasons:['INCOMPLETE_MARKET_UNIVERSE']};return s;}
   const decision=s.id==='momentum'?relativeMomentum(m.momentum||[],now):carrySelector(m.carry||[],now);s.lastDecision=decision;
