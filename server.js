@@ -11,6 +11,7 @@ import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFund
 import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recordDirectionalV3Close,directionalV4Status} from "./directional-v4-exit-shadow.js";
 import {buildBotObserver} from "./bot-observer.js";
 import {createSerialQueue,createSingleFlight} from "./state-serial.js";
+import {createResearchRuntime} from "./research/r42-runtime.js";
 
 const { Pool } = pg;
 const num=(k,f)=>Number.isFinite(Number(process.env[k]))?Number(process.env[k]):f;
@@ -283,7 +284,7 @@ async function botObserverStatus(){
   const [baselineState,challengerV2,challengerV3,directionalV4,fundingCarry,fundingCarryV2]=await Promise.all([
     loadPaperState(),challengerV2Status(),challengerV3Status(),directionalV4PaperStatus(),fundingCarryStatus(),fundingCarryV2PaperStatus()
   ]);
-  return buildBotObserver({engine:engineStatus(),safety:{paperTrading:config.paperTrading,liveTrading:config.liveTrading},baselineState,challengerV2,challengerV3,directionalV4,fundingCarry,fundingCarryV2,botLifecycle:BOT_LIFECYCLE});
+  return {...buildBotObserver({engine:engineStatus(),safety:{paperTrading:config.paperTrading,liveTrading:config.liveTrading},baselineState,challengerV2,challengerV3,directionalV4,fundingCarry,fundingCarryV2,botLifecycle:BOT_LIFECYCLE}),researchR42:await researchR42.summary()};
 }
 
 
@@ -596,7 +597,7 @@ async function paperOverviewStatus(){
       evidenceCapture:{version:'8.40-V3-EVIDENCE',enabled:true,executionImpact:false,storage:dbMode()},
       scanner:{updatedAt:scannerCache.updatedAt,readyCount:scannerCache.readyCount,assets:scannerCache.assets.map(a=>({symbol:a.symbol,side:a.side,technical:a.technical,candidate:a.candidate,status:a.status,price:a.price,distanceAtr:a.distanceAtr}))}
     },
-    baseline:compactBaselinePaperState(baseline),challengerV2,challengerV3,directionalV4,fundingCarryV2
+    baseline:compactBaselinePaperState(baseline),challengerV2,challengerV3,directionalV4,fundingCarryV2,researchR42:await researchR42.summary()
   };
 }
 
@@ -651,4 +652,9 @@ async function createBtJob(payload){
   await btJobPut(job);setTimeout(()=>runBtJob(job),25);return job;
 }
 const server=http.createServer(async(req,res)=>{try{if(req.method==="OPTIONS")return send(res,204,{});const u=new URL(req.url,`http://${req.headers.host||"localhost"}`);if(req.method==="GET"&&u.pathname==="/api/bot-observer")return send(res,200,await botObserverStatus());if(req.method==="GET"&&u.pathname==="/")return send(res,200,{app:"ACHI MERIDIAN Paperbot",version:"6.2.0",mode:"PAPER_ONLY",liveTrading:false,db:dbMode(),signalEngine:"AUTO",symbols:config.symbols,endpoints:["/health","/api/status","/api/paper","/api/paper/overview","/api/events","/api/signals","/api/evidence","/api/public-status","/api/assistant","/api/bot-observer","/api/backtests/latest","/api/backtests/:id","/api/shadow-v1","/api/challenger-v2","/api/challenger-v3","/api/funding-carry-v1","/api/regime-v1"]});if(req.method==="GET"&&u.pathname==="/health"){const db=await dbPing(),eng=engineStatus(),ok=db.ok&&eng.running&&eng.marketFresh;return send(res,ok?200:503,{ok,db,engine:eng,mode:"PAPER_ONLY"});}if(req.method==="GET"&&u.pathname==="/api/status")return send(res,200,{engine:engineStatus(),db:await dbPing(),safety:{paperTrading:config.paperTrading,liveTrading:config.liveTrading},fundingCarry:await fundingCarryStatus(),evidenceCapture:{version:"6.53-EVIDENCE",enabled:true,executionImpact:false,storage:dbMode()},scanner:{updatedAt:scannerCache.updatedAt,readyCount:scannerCache.readyCount,assets:scannerCache.assets.map(a=>({symbol:a.symbol,side:a.side,technical:a.technical,candidate:a.candidate,status:a.status,price:a.price,distanceAtr:a.distanceAtr}))}});if(req.method==="GET"&&u.pathname==="/api/signals")return send(res,200,scannerCache);if(req.method==="GET"&&u.pathname==="/api/shadow-v1")return send(res,200,await shadowV1Status());if(req.method==="GET"&&u.pathname==="/api/challenger-v2")return send(res,200,await challengerV2Status());if(req.method==="GET"&&u.pathname==="/api/challenger-v3")return send(res,200,await challengerV3Status());if(req.method==="GET"&&u.pathname==="/api/funding-carry-v1")return send(res,200,await fundingCarryStatus());if(req.method==="GET"&&u.pathname==="/api/regime-v1")return send(res,200,await regimeV1Status());if(req.method==="GET"&&u.pathname==="/api/paper/overview")return send(res,200,await paperOverviewStatus());if(req.method==="GET"&&u.pathname==="/api/paper")return send(res,200,await loadPaperState());if(req.method==="GET"&&u.pathname==="/api/events")return send(res,200,await recentEvents(+u.searchParams.get("limit")||100));if(req.method==="GET"&&u.pathname==="/api/evidence")return send(res,200,{captureVersion:"6.53-EVIDENCE",executionImpact:false,items:await recentEvidence(+u.searchParams.get("limit")||100)});if(req.method==="GET"&&(u.pathname==="/api/public-status"||u.pathname==="/api/assistant"))return send(res,200,await assistantStatus());if(req.method==="GET"&&u.pathname==="/api/backtests/latest")return send(res,200,(await btJobLatest())||{status:"NONE"});if(req.method==="GET"&&u.pathname.startsWith("/api/backtests/")){const id=u.pathname.split("/").pop();const j=await btJobGet(id);return j?send(res,200,j):send(res,404,{error:"backtest job not found"});}if(req.method==="POST"&&u.pathname==="/api/backtests"){const j=await createBtJob(await bodyJson(req));return send(res,202,{id:j.id,status:j.status,request:j.request,progress:j.progress});}if(req.method==="POST"&&u.pathname==="/api/paper/signal"){if(!authorized(req))return send(res,401,{error:"unauthorized"});const r=await submitSignal(await bodyJson(req));return send(res,r.accepted?201:409,r);}return send(res,404,{error:"not found"});}catch(e){return send(res,500,{error:String(e?.message||e)});}});
+const researchR42=createResearchRuntime({getState,setState,fetchJson:url=>fetchJson(url,25000),spotBase:BINANCE,perpBase:BINANCE_FUTURES});
 await initDb();await startEngine();server.listen(PORT,"0.0.0.0",()=>{console.log(`ACHI MERIDIAN 6.2 listening on :${PORT}`);console.log("PAPER ONLY / AUTO SIGNAL ENGINE ACTIVE");});
+// Independent polling: research data requests never hold up existing trading cycles.
+const runR42=()=>researchR42.tick().catch(e=>console.error('[R42] research cycle failed',String(e.message)));
+void runR42();
+const researchR42Timer=setInterval(runR42,5*60000);researchR42Timer.unref?.();
