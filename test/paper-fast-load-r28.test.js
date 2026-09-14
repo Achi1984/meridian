@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const source=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL('../v8-clean/data.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 async function model(){
  const calls=[];
  const account={equity:9970,startEquity:10000,peakEquity:10780,realizedPnl:-30};
@@ -24,7 +24,7 @@ test('missing authorization never becomes a zero-performance bot',async()=>{
  const {module}=await model();globalThis.fetch=async()=>({ok:false,status:401});const x=await module.loadPaper();assert.equal(x.locked,true);assert.equal(x.botHealth,undefined);
 });
 test('existing exit sampler closes whole position at TP1 and can realize more than planned SL risk',()=>{
- const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
+ const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
  const ctx=vm.createContext({config:{feeBps:0},slip:x=>x});
  vm.runInContext(server.match(/function exitReason\(.*\n/)[0]+server.match(/function closePaperPosition\(.*\n/)[0],ctx);
  const p={entry:100,sl:90,tp1:110,tp2:120,side:'LONG',qty:1,feeOpen:0};
