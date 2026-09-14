@@ -1,4 +1,4 @@
-import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r41';
+import {loadCenter,loadDepot,loadTrade,loadPaper,hasReadToken,setReadToken} from './data.js?v=8.0-r42';
 
 const ROUTES=['center','depot','trade','paper','more'];
 const $=s=>document.querySelector(s);
@@ -105,7 +105,11 @@ function paperHtml(x){
   const fundingLine=fb?`Funding ${fmtUsd(fb.fundingIncome)} · Basis ${fmtUsd(fb.basisPnl)} · Kosten ${fmtUsd(fb.totalEstimatedCosts)}`:`30D Funding ${fmtPct(Number(fe.sumFundingRate)*100,2)} · ${fe.periods||0} Messungen`;
   const fundingMeta=ft.lastSettlement?`Letzte Gutschrift ${fmtUsd(ft.lastSettlement.income)} · ${new Date(ft.lastSettlement.at).toLocaleString('de-AT')}`:fb&&ft.nextFundingTime?`Bis Break-even ${fmtUsd(ft.breakEvenRemaining)} · nächste Funding-Abrechnung ${new Date(ft.nextFundingTime).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'})}`:'';
   const fundingValue=fb?fmtUsd(fb.netPnl):fe.eligible?'ENTRY FREI':'KEIN ENTRY';
+  const researchNames={momentum:'RELATIVE MOMENTUM',pairs:'RESIDUAL PAIRS',squeeze:'SQUEEZE EXHAUSTION',carry:'CARRY SELECTOR'};
+  const researchStates={WAITING_DATA:'DATEN FEHLEN',WAITING_ENTRY:'WARTET AUF SIGNAL',IN_TRADE:'IM PAPER-TRADE',DATA_STALE:'DATEN VERALTET',REVIEW:'BEWERTUNG',SEALED:'GESTOPPT',NOT_STARTED:'NOCH NICHT GESTARTET'};
+  const research=(x.researchR42||[]).map(b=>`<div class="audit-row"><b>${researchNames[b.id]||'EXPERIMENT'} · ${researchStates[b.lifecycle]||'PRÜFEN'}</b><p>${b.pnl==null?'—':fmtUsd(b.pnl)} · ${Number(b.closedTrades)||0} Abschlüsse · ${Number(b.openTrades)||0} offen</p><small>Letzter Abschluss: ${b.lastClosedAt?new Date(b.lastClosedAt).toLocaleString('de-AT'):'—'}${b.id==='pairs'?' · Statistikprüfung fehlt':b.id==='squeeze'?' · Liquidationsdaten fehlen':''}</small></div>`).join('');
   const full=`<section class="hero paper-hero paper-hero-r23" aria-label="Keine automatische Promotion · keine Ausführungswirkung"><div><div class="eyebrow">PAPER · CONTROLLED RESEARCH</div><div class="paper-state">RESEARCH ONLY</div></div><div class="paper-guardrails"><span>EXECUTION <b class="tone-safe">${x.executionImpact?'CHECK':'NONE'}</b></span><span>PROMOTION <b class="tone-safe">OFF</b></span><span>BASELINE <b>6.2</b></span></div></section>
+  ${research?`<section class="card"><div class="eyebrow">R42 · PAPER-EXPERIMENTE</div>${research}</section>`:''}
   <section class="card"><div class="research-head"><div><span>BTC FUNDING CARRY V1</span><b class="tone-${fundingStatusTone}">${fundingState}</b></div><div class="research-pnl tone-${fundingPnlTone}">${fundingValue}</div></div><p class="muted">${fundingLine}</p>${fundingMeta?`<small class="muted">${fundingMeta}</small>`:''}</section>
   <details class="card research-board paper-active-board paper-disclosure"><summary><span>PERFORMANCE-DETAILS</span><b>V3 ${fmtUsd((x.rows||[]).find(r=>r.key==='challengerV3')?.pnl)} · PF ${fmtNum((x.rows||[]).find(r=>r.key==='challengerV3')?.profitFactor,2)}</b></summary><div class="paper-disclosure-body">${activeRows}</div></details>
   <details class="card paper-disclosure paper-archive"><summary><span>ARCHIVIERTE BOTS</span><b>SHADOW · REGIME · RETIRED</b></summary><div class="paper-disclosure-body">${archivedRows}</div></details>

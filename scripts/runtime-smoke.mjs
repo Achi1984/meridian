@@ -53,6 +53,11 @@ async function smoke(){
     fail('Public bot observer safety contract invalid');
   }
   if(observer?.safety?.liveTrading!==false)fail('Public bot observer reports unsafe live execution');
+  if(release.researchR42){
+    const experiments=observer.researchR42;
+    if(!Array.isArray(experiments)||experiments.length!==4||['momentum','pairs','squeeze','carry'].some(id=>!experiments.some(b=>b.id===id)))fail('R42 experiment summaries missing');
+    if(experiments.some(b=>['pairs','squeeze'].includes(b.id)&&b.openTrades!==0))fail('R42 unavailable specialist must not trade');
+  }
 
   const sha=shaInfo(health);
   if(REQUIRE_SHA&&sha.shaMatch!==true)fail(`Deployment SHA mismatch: expected ${EXPECTED_SHA||'unknown'}, got ${sha.deploymentSha||'missing'}`);

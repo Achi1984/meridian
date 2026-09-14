@@ -10,10 +10,10 @@ const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 
 test('R24 loads one cache-coherent PAPER data module graph',()=>{
-  assert.match(html,/app\.js\?v=8\.0-r41/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r41/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r41/);
-  assert.match(module,/\.\/data\.js\?v=8\.0-r41/);
+  assert.match(html,/app\.js\?v=8\.0-r42/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r42/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r42/);
+  assert.match(module,/\.\/data\.js\?v=8\.0-r42/);
 });
 
 test('R41 hydrates the primary PAPER board through one protected overview request',()=>{

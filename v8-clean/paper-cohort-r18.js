@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r41';
+import {getJson} from './data.js?v=8.0-r42';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
