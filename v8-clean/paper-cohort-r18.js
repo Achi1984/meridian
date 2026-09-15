@@ -1,4 +1,4 @@
-import {getJson} from './data.js?v=8.0-r44';
+import {getJson} from './data.js?v=8.0-r45';
 
 const root=()=>document.getElementById('view-paper');
 const num=v=>v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;
@@ -111,7 +111,7 @@ function renderAnswer(health={}){
     <div class="paper-r26-verdict"><span>KLARE ENTSCHEIDUNG</span><b>${verdict}</b></div>
     <small class="muted">${v3.lifecycle==='RETIRED_NO_EDGE'?'Kostenvariante beendet · Historie erhalten':health.executionPolicy?'Kostenvariante aktiv · Historie und Verlustgrenzen bleiben erhalten':v3.riskLocked?'Kostenvariante startet nicht bei aktiver Risikosperre':'Kostenvariante wartet auf ein Konto ohne offene Positionen'}</small>
     ${(health.openPositions||[]).map(positionHtml).join('')}
-    <div class="paper-r26-title">LETZTE TRADES</div><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div>`;
+    <details class="paper-r26-trades-disclosure"><summary><span>LETZTE TRADES</span><b>${trades.length} anzeigen</b></summary><div class="paper-r26-trades">${trades.length?trades.map(tradeHtml).join(''):'<small class="muted">Noch keine geschlossenen Trades verfügbar.</small>'}</div></details>`;
 }
 function renderExecutionAudit(audit,health={}){
   const el=root(); if(!el||!audit?.aggregateOnly)return;

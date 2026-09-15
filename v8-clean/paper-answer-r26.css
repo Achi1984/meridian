@@ -15,6 +15,13 @@
 .paper-r26-verdict b{font-size:9px;line-height:1.4}
 .paper-r26-title{margin-top:12px}
 .paper-r26-trades{margin-top:4px}
+.paper-r26-trades-disclosure{margin-top:9px;border-top:1px solid rgba(80,125,155,.2)}
+.paper-r26-trades-disclosure>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 2px;cursor:pointer;list-style:none}
+.paper-r26-trades-disclosure>summary::-webkit-details-marker{display:none}
+.paper-r26-trades-disclosure>summary span{color:var(--cyan);font-size:8px;font-weight:900;letter-spacing:.1em}
+.paper-r26-trades-disclosure>summary b{color:var(--muted);font-size:8px}
+.paper-r26-trades-disclosure>summary::after{content:"+";color:var(--cyan);font-size:14px}
+.paper-r26-trades-disclosure[open]>summary::after{content:"−"}
 .paper-r26-trade{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(80,125,155,.18)}
 .paper-r26-trade:last-child{border-bottom:0}
 .paper-r26-trade b{display:block;font-size:9px}

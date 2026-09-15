@@ -9,13 +9,13 @@ const control=fs.readFileSync(new URL('../v8-clean/research-control-r19.js',impo
 const css=fs.readFileSync(new URL('../v8-clean/paper-compact-r23.css',import.meta.url),'utf8');
 
 test('R23 compact PAPER assets are wired with fresh cache tags',()=>{
-  assert.match(html,/paper-compact-r23\.css\?v=8\.0-r23/);
-  assert.match(html,/app\.js\?v=8\.0-r44/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r44/);
-  assert.match(html,/research-control-r19\.js\?v=8\.0-r44/);
+  assert.match(html,/paper-compact-r23\.css\?v=8\.0-r45/);
+  assert.match(html,/app\.js\?v=8\.0-r45/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r45/);
+  assert.match(html,/research-control-r19\.js\?v=8\.0-r45/);
 });
 
-test('R44 presents only the actively followed V3 ledger',()=>{
+test('R45 presents only the actively followed V3 ledger',()=>{
   assert.match(app,/r\.key==='challengerV3'/);
   assert.match(app,/PERFORMANCE-DETAILS/);
   assert.doesNotMatch(app,/ARCHIVIERTE BOTS|SHADOW · REGIME · RETIRED|paper-archive/);
@@ -23,11 +23,16 @@ test('R44 presents only the actively followed V3 ledger',()=>{
 
 test('R23 keeps the successor answer first and collapses secondary research',()=>{
   assert.match(css,/#view-paper>#paperAnswerR26\{order:2\}/);
-  assert.match(css,/#view-paper>#paperExecutionAuditR22\{order:7\}/);
-  assert.match(css,/#view-paper>\.paper-active-board\{order:3\}/);
+  assert.match(css,/#view-paper>\.alpha-lab-r45\{order:3\}/);
+  assert.match(css,/#view-paper>\.paper-experiments-r45\{order:4\}/);
+  assert.match(css,/#view-paper>\.paper-funding-r45\{order:5\}/);
+  assert.match(css,/#view-paper>\.paper-active-board\{order:7\}/);
+  assert.match(css,/#view-paper>#paperExecutionAuditR22\{order:10\}/);
   assert.match(cohort,/document\.createElement\('details'\)/);
   assert.match(control,/document\.createElement\('details'\)/);
   assert.match(app,/paper-diagnostics/);
+  assert.match(app,/paper-secondary-r45/);
+  assert.match(app,/Vertiefung laden/);
   assert.doesNotMatch(app,/>BUILDING</);
 });
 

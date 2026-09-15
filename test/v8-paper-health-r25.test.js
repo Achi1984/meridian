@@ -10,10 +10,10 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-health-r25.css',import.meta
 
 test('R25 loads a cache-coherent bot health presentation',()=>{
   assert.match(html,/paper-health-r25\.css\?v=8\.0-r25/);
-  assert.match(html,/app\.js\?v=8\.0-r44/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r44/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r44/);
-  assert.match(audit,/\.\/data\.js\?v=8\.0-r44/);
+  assert.match(html,/app\.js\?v=8\.0-r45/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r45/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r45/);
+  assert.match(audit,/\.\/data\.js\?v=8\.0-r45/);
   assert.match(app,/botHealth:state\.paper\.botHealth/);
   assert.match(css,/#view-paper \.paper-hero-r23 \.paper-state\{font-size:25px/);
 });
@@ -26,7 +26,7 @@ test('R25 derives health from existing protected read-only contracts',()=>{
   assert.doesNotMatch(data,/\/api\/events/);
 });
 
-test('R44 limits visible audit findings to active V3 and explains CHECK',()=>{
+test('R45 limits visible audit findings to active V3 and explains CHECK',()=>{
   assert.match(audit,/sumLedgers\(ledgers,\['challengerV3'\]\)/);
   assert.doesNotMatch(audit,/sumLedgers\(ledgers,\['shadow','regime'\]\)|HISTORISCHE RETIRED-AUFFÄLLIGKEITEN/);
   assert.match(audit,/Stop-Verluste >1,25R/);
