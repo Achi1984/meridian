@@ -30,8 +30,8 @@ test('R43 browser cache tag and release metadata move together',()=>{
   const app=read('v8-clean/app.js');
   const release=JSON.parse(read('version.json'));
 
-  assert.match(index,/app\.js\?v=8\.0-r44/);
-  assert.match(app,/data\.js\?v=8\.0-r44/);
+  assert.match(index,/app\.js\?v=8\.0-r45/);
+  assert.match(app,/data\.js\?v=8\.0-r45/);
   assert.equal(release.alphaLab,'R43-ALPHA-ATTRIBUTION-V1');
   assert.equal(release.executionImpact,false);
 });

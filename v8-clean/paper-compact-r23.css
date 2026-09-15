@@ -3,12 +3,15 @@ body::before{content:"";position:fixed;z-index:150;top:0;left:0;right:0;height:e
 #view-paper.is-active{display:flex;flex-direction:column}
 #view-paper>.paper-hero{order:1}
 #view-paper>#paperAnswerR26{order:2}
-#view-paper>.paper-active-board{order:3}
-#view-paper>.paper-archive{order:4}
-#view-paper>#researchControlR19{order:5}
-#view-paper>#paperCohortR18{order:6}
-#view-paper>#paperExecutionAuditR22{order:7}
-#view-paper>.paper-diagnostics{order:8}
+#view-paper>.alpha-lab-r45{order:3}
+#view-paper>.paper-experiments-r45{order:4}
+#view-paper>.paper-funding-r45{order:5}
+#view-paper>.paper-load-r45{order:6}
+#view-paper>.paper-active-board{order:7}
+#view-paper>#researchControlR19{order:8}
+#view-paper>#paperCohortR18{order:9}
+#view-paper>#paperExecutionAuditR22{order:10}
+#view-paper>.paper-diagnostics{order:11}
 .paper-hero-r23{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:13px 15px}
 .paper-hero-r23 .paper-state{font-size:25px;margin-top:4px}
 .paper-guardrails{display:grid;gap:3px;text-align:right}
@@ -32,6 +35,15 @@ body::before{content:"";position:fixed;z-index:150;top:0;left:0;right:0;height:e
 .paper-window b{font-size:12px}
 .paper-window small{grid-column:1/-1;color:var(--muted);font-size:8px;line-height:1.4}
 .paper-audit-title{margin-top:14px}
+.paper-mode-r45{min-height:0}
+.paper-mode-r45 .paper-state{font-size:18px!important;letter-spacing:.01em}
+.paper-secondary-r45>summary>b{color:var(--text)}
+.paper-secondary-r45>summary>b .tone-watch{color:var(--amber)}
+.paper-load-r45{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px}
+.paper-load-r45 button{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.paper-load-r45 button span{color:var(--cyan);font-size:8px;font-weight:900;letter-spacing:.1em}
+.paper-load-r45 button b{font-size:10px}
+.paper-load-r45>small{color:var(--muted);font-size:8px;white-space:nowrap}
 #paperCohortR18.cohort-r18{display:block}
 #paperCohortR18 .paper-disclosure-body{display:grid;gap:8px}
 #researchControlR19 .paper-disclosure-body{display:grid;gap:9px}

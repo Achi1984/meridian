@@ -8,7 +8,7 @@ const css=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.css',import.meta
 
 test('R18 cohort board and R22 execution audit are wired into PAPER',()=>{
   assert.match(html,/paper-cohort-r18\.css\?v=8\.0-r22/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r44/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r45/);
   assert.doesNotMatch(js,/getJson\('\/api\/research-analytics'\)/);
   assert.match(js,/COHORT DEEP DIVE/);
   assert.match(js,/FULL LEDGER EXECUTION AUDIT/);
@@ -23,7 +23,7 @@ test('R18 exposes side regime asset cohort views and sample adequacy',()=>{
   assert.match(js,/n&lt;8/);
 });
 
-test('R44 exposes aggregate stop, re-entry and bundle diagnostics for active V3 only',()=>{
+test('R45 exposes aggregate stop, re-entry and bundle diagnostics for active V3 only',()=>{
   assert.match(js,/sumLedgers\(ledgers/);
   assert.match(js,/audit\.ledgers/);
   assert.match(js,/stop\.materialLosses/);

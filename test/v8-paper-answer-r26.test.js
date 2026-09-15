@@ -9,11 +9,11 @@ const paper=fs.readFileSync(new URL('../v8-clean/paper-cohort-r18.js',import.met
 const css=fs.readFileSync(new URL('../v8-clean/paper-answer-r26.css',import.meta.url),'utf8');
 
 test('R26 loads answer-first PAPER assets coherently',()=>{
-  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r44/);
-  assert.match(html,/app\.js\?v=8\.0-r44/);
-  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r44/);
-  assert.match(app,/\.\/data\.js\?v=8\.0-r44/);
-  assert.match(paper,/\.\/data\.js\?v=8\.0-r44/);
+  assert.match(html,/paper-answer-r26\.css\?v=8\.0-r45/);
+  assert.match(html,/app\.js\?v=8\.0-r45/);
+  assert.match(html,/paper-cohort-r18\.js\?v=8\.0-r45/);
+  assert.match(app,/\.\/data\.js\?v=8\.0-r45/);
+  assert.match(paper,/\.\/data\.js\?v=8\.0-r45/);
 });
 
 test('R26 exposes the actual risk lock instead of calling inactivity no opportunity',()=>{
@@ -26,16 +26,17 @@ test('R26 exposes the actual risk lock instead of calling inactivity no opportun
   assert.match(paper,/BOTS PAUSIERT · ANALYSE LÄUFT/);
 });
 
-test('R44 shows only current V3 trades and a concise verdict',()=>{
+test('R45 shows only current V3 trades and a concise verdict',()=>{
   assert.match(data,/recentTrades\(challengerV3\)/);
   assert.match(data,/slice\(0,5\)/);
   assert.doesNotMatch(data,/\.\.\.x,bot:'baseline'|\.\.\.x,bot:'challenger'/);
   assert.match(paper,/LETZTE TRADES/);
+  assert.match(paper,/paper-r26-trades-disclosure/);
   assert.match(paper,/Erst prospektiv bewerten/);
   assert.match(paper,/renderAnswer\(payload\.botHealth\)/);
 });
 
-test('R44 hides discontinued bot cards but never hides their open positions',()=>{
+test('R45 hides discontinued bot cards but never hides their open positions',()=>{
   assert.match(app,/r\.key==='challengerV3'\|\|Number\(r\.openTrades\)>0/);
   assert.match(data,/baseline\?\.positions/);
   assert.match(data,/challenger\?\.openPositions/);
