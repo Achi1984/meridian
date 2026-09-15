@@ -217,12 +217,12 @@
     },
     "challengerV3": {
       "blockedReasons": [
-        "POST_STOP_COOLDOWN"
+        "RETIRED_NO_EDGE"
       ],
       "closedTrades": 33,
       "drawdownPct": 2.44,
       "lastClosedAt": "2026-09-15T13:32:08.385Z",
-      "lastScanAt": "2026-09-15T18:00:35.488Z",
+      "lastScanAt": "2026-09-15T18:21:35.880Z",
       "lifecycle": "RETIRED_NO_EDGE",
       "name": "CHALLENGER V3",
       "openTrades": 0,
@@ -422,8 +422,8 @@
       "winRate": 53.8
     },
     "fundingCarry": {
-      "basisPnl": -1.39,
-      "breakEvenRemaining": 22.99,
+      "basisPnl": -2.12,
+      "breakEvenRemaining": 23.64,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -432,9 +432,9 @@
         "reasons": [],
         "sumFundingRate": 0.00608146
       },
-      "estimatedCosts": 31.74,
+      "estimatedCosts": 31.66,
       "fundingIncome": 10.14,
-      "lastCheckedAt": "2026-09-15T17:57:44.284Z",
+      "lastCheckedAt": "2026-09-15T18:18:44.285Z",
       "lastSettlement": {
         "at": "2026-09-15T16:00:00.001Z",
         "income": 0.96,
@@ -443,7 +443,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789516800000,
-      "pnl": -22.99
+      "pnl": -23.64
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -470,149 +470,30 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-15T18:00:13.889Z",
-    "lastSignalScanAt": "2026-09-15T18:00:35.904Z",
+    "lastCycleAt": "2026-09-15T18:21:43.890Z",
+    "lastSignalScanAt": "2026-09-15T18:21:36.980Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-15T18:00:45.186Z",
+  "generatedAt": "2026-09-15T18:22:08.483Z",
   "publicReadOnly": true,
   "researchR42": [
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789495047781,
-        "dataErrors": [
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "AVAXUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "DOGEUSDT"
-          }
-        ],
-        "requestErrors": [
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "AVAXUSDT"
-          }
-        ]
+        "collectedAt": 1789496248988,
+        "dataErrors": [],
+        "requestErrors": []
       },
       "id": "momentum",
       "lastClosedAt": null,
-      "lastMarkedAt": 1789495047781,
-      "lastScanAt": "2026-09-15T17:57:27.781Z",
+      "lastMarkedAt": 1789496249080,
+      "lastScanAt": "2026-09-15T18:17:29.080Z",
       "lifecycle": "IN_TRADE",
       "openTrades": 1,
-      "pnl": 2.334454212919809,
+      "pnl": 0.6520847434676398,
       "profitFactor": null,
       "reasons": [
         "INCOMPLETE_FUNDING_HISTORY"
@@ -622,133 +503,14 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789495047781,
-        "dataErrors": [
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "AVAXUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "DOGEUSDT"
-          }
-        ],
-        "requestErrors": [
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "AVAXUSDT"
-          }
-        ]
+        "collectedAt": 1789496248988,
+        "dataErrors": [],
+        "requestErrors": []
       },
       "id": "pairs",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-15T17:57:27.784Z",
+      "lastScanAt": "2026-09-15T18:17:29.084Z",
       "lifecycle": "SEALED",
       "openTrades": 0,
       "pnl": 0,
@@ -761,133 +523,14 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789495047781,
-        "dataErrors": [
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "AVAXUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "DOGEUSDT"
-          }
-        ],
-        "requestErrors": [
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "AVAXUSDT"
-          }
-        ]
+        "collectedAt": 1789496248988,
+        "dataErrors": [],
+        "requestErrors": []
       },
       "id": "squeeze",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-15T17:57:27.786Z",
+      "lastScanAt": "2026-09-15T18:17:29.180Z",
       "lifecycle": "WAITING_DATA",
       "openTrades": 0,
       "pnl": 0,
@@ -900,139 +543,20 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789495047781,
-        "dataErrors": [
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "AVAXUSDT"
-          },
-          {
-            "reason": "INCOMPLETE_DAILY_HISTORY",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "reason": "INVALID_VOLUME",
-            "symbol": "DOGEUSDT"
-          }
-        ],
-        "requestErrors": [
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ETHUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "BTCUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "XRPUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "SOLUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "ADAUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "LINKUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "ticker",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "DOGEUSDT"
-          },
-          {
-            "endpoint": "klines",
-            "reason": "MARKET_REQUEST_FAILED",
-            "symbol": "AVAXUSDT"
-          }
-        ]
+        "collectedAt": 1789496248988,
+        "dataErrors": [],
+        "requestErrors": []
       },
       "id": "carry",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-15T17:57:27.787Z",
-      "lifecycle": "WAITING_DATA",
+      "lastScanAt": "2026-09-15T18:17:29.182Z",
+      "lifecycle": "WAITING_ENTRY",
       "openTrades": 0,
       "pnl": 0,
       "profitFactor": null,
       "reasons": [
-        "INCOMPLETE_MARKET_UNIVERSE"
+        "NO_COST_COVERED_CARRY"
       ],
       "recentClosed": []
     }
