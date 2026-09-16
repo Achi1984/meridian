@@ -10,6 +10,7 @@ on:
       - research/bull_compound_backtest_v3.py
       - research/bull_compound_hedge_v4.py
       - research/bull_compound_hedge_v4_1.py
+      - research/bull_compound_hedge_v4_2.py
       - .github/workflows/bull-compound-backtest.yml
   workflow_dispatch:
 
@@ -25,14 +26,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run hedge activation and leverage safety backtest
-        run: python research/bull_compound_hedge_v4_1.py
+      - name: Run staged hedge sizing backtest
+        run: python research/bull_compound_hedge_v4_2.py
       - name: Upload research result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bull-compound-hedge-v4-1
+          name: bull-compound-hedge-v4-2
           path: |
-            bull-compound-hedge-v4-1.json
-            bull-compound-hedge-v4-1.md
+            bull-compound-hedge-v4-2.json
+            bull-compound-hedge-v4-2.md
           if-no-files-found: warn
