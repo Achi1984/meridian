@@ -15,6 +15,7 @@ on:
       - research/bull_compound_hedge_v4_4.py
       - research/bull_compound_hedge_v4_5.py
       - research/bull_compound_hedge_v4_6.py
+      - research/bull_compound_joint_v4_7.py
       - .github/workflows/bull-compound-backtest.yml
   workflow_dispatch:
 
@@ -30,14 +31,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run full-coverage funding and margin audit
-        run: python research/bull_compound_hedge_v4_6.py
+      - name: Run joint long-short dynamic margin stress test
+        run: python research/bull_compound_joint_v4_7.py
       - name: Upload research result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bull-compound-hedge-v4-6
+          name: bull-compound-joint-v4-7
           path: |
-            bull-compound-hedge-v4-6.json
-            bull-compound-hedge-v4-6.md
+            bull-compound-joint-v4-7.json
+            bull-compound-joint-v4-7.md
           if-no-files-found: warn
