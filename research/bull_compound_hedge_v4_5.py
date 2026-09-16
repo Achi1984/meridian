@@ -3,9 +3,9 @@
 
 Research only. The BTC core is never sold. This keeps the v0.4.1 static 20%
 COIN-M-style hedge trigger/TP/SL frozen and adds two realism layers:
-1) historical BTCUSD_PERP COIN-M funding from Binance as a proxy for Pionex;
-2) a Pionex-calibrated liquidation-distance approximation using the user's
-   observed current short (entry/liquidation/effective margin).
+1) historical BTCUSD_PERP COIN-M funding from Binance Vision as a Pionex proxy;
+2) a Pionex-calibrated liquidation-distance approximation using the observed
+   current short (entry/liquidation/effective margin).
 
 Daily OHLC cannot reconstruct exact intraday ordering of every 8h funding event,
 so funding is applied to the end-of-day remaining hedge notional. A conservative
@@ -14,8 +14,7 @@ positive funding only on the day's ending notional.
 """
 from __future__ import annotations
 
-import json, statistics, time, urllib.parse, urllib.request
-from dataclasses import dataclass
+import csv, io, json, urllib.error, urllib.request, zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,13 +34,11 @@ TP_WEIGHTS=(0.25,0.30,0.25)
 STOP_UP=0.12
 RESET_DD=0.15
 
-# Observed current Pionex short used only to calibrate an approximate maintenance haircut.
 OBS_SHORT_ENTRY=75784.8
 OBS_SHORT_LIQ=85007.9
 OBS_SHORT_NOTIONAL_BTC=0.20
 OBS_SHORT_TOTAL_MARGIN_BTC=0.02250
 
-# Observed current Pionex 4x long grid snapshot.
 OBS_LONG_ENTRY=75966.1
 OBS_LONG_LIQ=46837.5
 OBS_LONG_MARGIN_BTC=0.0492
@@ -61,40 +58,66 @@ def ir(ds,x):
 def pnl_btc_short(face,entry,exit_): return face*(1/exit_-1/entry)
 def fee_btc(face,px): return face*FEE/px
 
+
+def month_keys(start='2020-05',end='2025-12'):
+    y,m=map(int,start.split('-')); ey,em=map(int,end.split('-'))
+    while (y,m)<=(ey,em):
+        yield f'{y:04d}-{m:02d}'
+        y,m=(y+1,1) if m==12 else (y,m+1)
+
+
+def parse_funding_row(row):
+    """Handle Binance Vision funding CSV variants without relying on one header schema."""
+    vals=[]
+    for j,s in enumerate(row):
+        try: vals.append((j,float(s)))
+        except Exception: pass
+    ts=None; tsidx=None
+    for j,v in vals:
+        if abs(v)>1e11:
+            ts=v;tsidx=j;break
+    if ts is None:return None
+    if ts>1e14:ts/=1000.0
+    rate=None
+    for j,v in vals:
+        if j==tsidx:continue
+        if abs(v)<=0.1:
+            rate=v;break
+    if rate is None:return None
+    t=int(ts)
+    d=datetime.fromtimestamp(t/1000,tz=timezone.utc).date().isoformat()
+    return {'time':t,'date':d,'rate':rate,'mark':0.0}
+
+
 def fetch_coinm_funding(start='2020-05-12',end='2025-12-31'):
-    """Fetch Binance COIN-M BTCUSD_PERP funding history via public DAPI."""
-    def ms(d, endday=False):
-        dt=datetime.fromisoformat(d).replace(tzinfo=timezone.utc)
-        if endday: dt=dt.replace(hour=23,minute=59,second=59)
-        return int(dt.timestamp()*1000)
-    start_ms,end_ms=ms(start),ms(end,True)
-    cur=start_ms; rows=[]
-    while cur<=end_ms:
-        q=urllib.parse.urlencode({'symbol':'BTCUSD_PERP','startTime':cur,'endTime':end_ms,'limit':1000})
-        url='https://dapi.binance.com/dapi/v1/fundingRate?'+q
+    """Download Binance Vision monthly COIN-M BTCUSD_PERP funding archives."""
+    rows=[]; months_ok=0
+    for ym in month_keys(start[:7],end[:7]):
+        url=(f'https://data.binance.vision/data/futures/cm/monthly/fundingRate/'
+             f'BTCUSD_PERP/BTCUSD_PERP-fundingRate-{ym}.zip')
         req=urllib.request.Request(url,headers={'User-Agent':'MERIDIAN-RESEARCH/0.4.5'})
-        with urllib.request.urlopen(req,timeout=30) as r:
-            batch=json.loads(r.read().decode('utf-8'))
-        if not isinstance(batch,list): raise RuntimeError(f'funding API response: {batch}')
-        if not batch: break
-        rows.extend(batch)
-        nxt=int(batch[-1]['fundingTime'])+1
-        if nxt<=cur: break
-        cur=nxt
-        if len(batch)<1000: break
-        time.sleep(0.05)
-    out=[]
-    for x in rows:
-        t=int(x['fundingTime']); rate=float(x['fundingRate']); mark=float(x.get('markPrice') or 0)
-        d=datetime.fromtimestamp(t/1000,tz=timezone.utc).date().isoformat()
-        if start<=d<=end: out.append({'time':t,'date':d,'rate':rate,'mark':mark})
-    if len(out)<1000: raise RuntimeError(f'insufficient funding rows: {len(out)}')
-    return out
+        try:
+            with urllib.request.urlopen(req,timeout=60) as r: raw=r.read()
+        except urllib.error.HTTPError as e:
+            if e.code==404:continue
+            raise
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            name=z.namelist()[0]
+            text=z.read(name).decode('utf-8-sig')
+        got=0
+        for row in csv.reader(io.StringIO(text)):
+            x=parse_funding_row(row)
+            if x and start<=x['date']<=end:
+                rows.append(x);got+=1
+        if got:months_ok+=1
+    rows.sort(key=lambda x:x['time'])
+    if len(rows)<1000:raise RuntimeError(f'insufficient Binance Vision funding rows: {len(rows)} across {months_ok} months')
+    return rows,months_ok
 
 
 def funding_by_day(rows):
     out={}
-    for x in rows: out.setdefault(x['date'],[]).append(x)
+    for x in rows:out.setdefault(x['date'],[]).append(x)
     return out
 
 
@@ -106,8 +129,7 @@ def calibration():
     return effL,bank,obs,haircut
 
 
-def liq_distance_for_leverage(L,haircut):
-    return max(0.0,1/(L-1)-haircut)
+def liq_distance_for_leverage(L,haircut):return max(0.0,1/(L-1)-haircut)
 
 
 def close_face(pos,face,px,realized):
@@ -119,45 +141,36 @@ def close_face(pos,face,px,realized):
     return realized,net
 
 
-def mtm(pos,px):
-    return 0.0 if not pos else pnl_btc_short(pos['face_left'],pos['entry'],px)
+def mtm(pos,px):return 0.0 if not pos else pnl_btc_short(pos['face_left'],pos['entry'],px)
 
 
 def sim(ds,op,hi,lo,cl,e200,r14,fday,start,end,effective_leverage=8.0,funding_mode='eod'):
     s,e=il(ds,start),ir(ds,end)
-    _,_,_,haircut=calibration()
-    liq_up=liq_distance_for_leverage(effective_leverage,haircut)
-    realized=0.0; funding_total=0.0;pos=None;setup=None;pending=None;rearm=True
+    _,_,_,haircut=calibration();liq_up=liq_distance_for_leverage(effective_leverage,haircut)
+    realized=0.0;funding_total=0.0;pos=None;setup=None;pending=None;rearm=True
     trades=[];liq_events=0;peak=CORE_BTC*cl[s];maxdd=0;hp=cl[s];hdd=0;worst=CORE_BTC;max_margin=0
 
     for i in range(s,e+1):
-        # Execute prior close signal at today's open.
         if pending is not None and pos is None:
-            raw=op[i]; entry=raw*(1-SLIP); tb=CORE_BTC+realized
-            face=HEDGE_FRACTION*max(tb,0)*raw
+            raw=op[i];entry=raw*(1-SLIP);tb=CORE_BTC+realized;face=HEDGE_FRACTION*max(tb,0)*raw
             if face>0:
                 ef=fee_btc(face,entry);realized-=ef
-                pos={'entry':entry,'face_total':face,'face_left':face,'start_face_day':face,
+                pos={'entry':entry,'face_total':face,'face_left':face,
                      'tp':[entry*(1-d) for d in TP_DD],'done':[False]*3,
                      'stop':entry*(1+STOP_UP),'liq':entry*(1+liq_up),
                      'opened':ds[i],'rpnl':-ef,'funding':0.0}
             pending=None
-
         start_face=pos['face_left'] if pos else 0.0
 
-        # Gap liquidation check first; otherwise stop precedes TPs on same daily bar.
         if pos is not None:
             if op[i]>=pos['liq']:
-                ex=op[i]*(1+SLIP)
-                realized,r=close_face(pos,pos['face_left'],ex,realized);pos['rpnl']+=r
+                realized,r=close_face(pos,pos['face_left'],op[i],realized);pos['rpnl']+=r
                 liq_events+=1;trades.append({'opened':pos['opened'],'closed':ds[i],'reason':'LIQ_GAP','pnl_btc':pos['rpnl'],'funding_btc':pos['funding']});pos=None
             elif hi[i]>=pos['liq'] and pos['stop']>=pos['liq']:
                 realized,r=close_face(pos,pos['face_left'],pos['liq'],realized);pos['rpnl']+=r
                 liq_events+=1;trades.append({'opened':pos['opened'],'closed':ds[i],'reason':'LIQ','pnl_btc':pos['rpnl'],'funding_btc':pos['funding']});pos=None
             elif hi[i]>=pos['stop']:
-                # Gap-aware stop: if open is above stop but below liquidation, execute at open.
-                sx=max(pos['stop'],op[i])
-                realized,r=close_face(pos,pos['face_left'],sx,realized);pos['rpnl']+=r
+                sx=max(pos['stop'],op[i]);realized,r=close_face(pos,pos['face_left'],sx,realized);pos['rpnl']+=r
                 trades.append({'opened':pos['opened'],'closed':ds[i],'reason':'STOP','pnl_btc':pos['rpnl'],'funding_btc':pos['funding']});pos=None
             else:
                 for k,(lvl,w) in enumerate(zip(pos['tp'],TP_WEIGHTS)):
@@ -165,20 +178,14 @@ def sim(ds,op,hi,lo,cl,e200,r14,fday,start,end,effective_leverage=8.0,funding_mo
                     if not pos['done'][k] and lo[i]<=lvl:
                         realized,r=close_face(pos,pos['face_total']*w,lvl,realized);pos['rpnl']+=r;pos['done'][k]=True
 
-        # Funding proxy. Positive rate means shorts receive; negative means shorts pay.
         if pos is not None and ds[i] in fday:
             end_face=pos['face_left']
             for ev in fday[ds[i]]:
-                px=ev['mark'] if ev['mark']>0 else cl[i]
-                rate=ev['rate']
-                if funding_mode=='conservative':
-                    face=end_face if rate>=0 else max(start_face,end_face)
-                else:
-                    face=end_face
+                px=cl[i];rate=ev['rate']
+                face=(end_face if rate>=0 else max(start_face,end_face)) if funding_mode=='conservative' else end_face
                 fb=face/px*rate
                 realized+=fb;funding_total+=fb;pos['rpnl']+=fb;pos['funding']+=fb
 
-        # Reset after meaningful drawdown; close runner/remainder.
         if setup is not None:
             setup['peak']=max(setup['peak'],hi[i])
             if lo[i]<=setup['peak']*(1-RESET_DD):
@@ -187,7 +194,6 @@ def sim(ds,op,hi,lo,cl,e200,r14,fday,start,end,effective_leverage=8.0,funding_mo
                     trades.append({'opened':pos['opened'],'closed':ds[i],'reason':'RESET_RUNNER','pnl_btc':pos['rpnl'],'funding_btc':pos['funding']});pos=None
                 setup=None;pending=None;rearm=True
 
-        # Frozen v0.4.1 structure/trigger.
         if rearm and setup is None and i>=s+max(BREAKOUT_DAYS,180):
             ph=max(cl[i-BREAKOUT_DAYS:i])
             if cl[i]>ph:
@@ -202,8 +208,7 @@ def sim(ds,op,hi,lo,cl,e200,r14,fday,start,end,effective_leverage=8.0,funding_mo
                         setup['triggered'].add(f);pending=f;break
 
         tb=CORE_BTC+realized+mtm(pos,cl[i]);worst=min(worst,tb)
-        if pos is not None:
-            max_margin=max(max_margin,(pos['face_left']/cl[i])/effective_leverage)
+        if pos is not None:max_margin=max(max_margin,(pos['face_left']/cl[i])/effective_leverage)
         eq=tb*cl[i];peak=max(peak,eq);maxdd=max(maxdd,(peak-eq)/peak if peak else 0)
         hp=max(hp,cl[i]);hdd=max(hdd,(hp-cl[i])/hp if hp else 0)
 
@@ -221,8 +226,6 @@ def sim(ds,op,hi,lo,cl,e200,r14,fday,start,end,effective_leverage=8.0,funding_mo
 
 
 def long_snapshot_stress():
-    # Calibrate a local inverse-position equivalent face from the observed live grid snapshot.
-    # This is a snapshot sensitivity model only; grid inventory changes invalidate a static face assumption.
     face_eff=OBS_LONG_MARGIN_BTC/(1/OBS_LONG_LIQ-1/OBS_LONG_ENTRY)
     rows=[]
     for target in (OBS_LONG_FLOOR,41000,40000,38000,35000):
@@ -233,39 +236,33 @@ def long_snapshot_stress():
 
 def main():
     ds,op,hi,lo,cl=ohlcmod.fetch_ohlc();e200=base.ema(cl,200);r14=base.rsi(cl,14)
-    funding=fetch_coinm_funding();fday=funding_by_day(funding)
+    funding,months_ok=fetch_coinm_funding();fday=funding_by_day(funding)
     tr0,tr1='2020-05-12','2022-12-31';va0,va1='2023-01-01','2025-12-31'
-    effL,bank,obs,haircut=calibration()
-    tests=[]
+    effL,bank,obs,haircut=calibration();tests=[]
     for L in (7.0,8.0,effL,9.0):
         for fm in ('eod','conservative'):
             tests.append({'train':sim(ds,op,hi,lo,cl,e200,r14,fday,tr0,tr1,L,fm),
                           'oos':sim(ds,op,hi,lo,cl,e200,r14,fday,va0,va1,L,fm),
                           'continuous':sim(ds,op,hi,lo,cl,e200,r14,fday,tr0,va1,L,fm)})
     out={'method':{'name':'MERIDIAN Bull Compound v0.4.5 Funding + Liquidation Realism Audit',
-                   'funding_source':'Binance COIN-M BTCUSD_PERP funding as Pionex proxy','funding_events':len(funding),
+                   'funding_source':'Binance Vision COIN-M BTCUSD_PERP funding as Pionex proxy','funding_events':len(funding),'funding_months':months_ok,
                    'fees_bps':FEE*10000,'slippage_bps':SLIP*10000,'core_btc':CORE_BTC,'hedge_fraction':HEDGE_FRACTION},
          'pionex_short_calibration':{'observed_effective_leverage':effL,'theoretical_bankruptcy_up_pct':bank*100,
                                     'observed_liq_up_pct':obs*100,'calibrated_maintenance_haircut_pct_points':haircut*100},
          'tests':tests,'long_grid_snapshot_stress':long_snapshot_stress(),
          'baseline_without_funding_v4_1':{'train_btc':1.01863,'oos_btc':0.98438,'continuous_btc':1.03912}}
     Path('bull-compound-hedge-v4-5.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
-
     lines=['# MERIDIAN Bull Compound v0.4.5 — funding + liquidation realism','',
-           '> Static 20% hedge frozen. Historical Binance COIN-M funding is a proxy for Pionex; liquidation is calibrated from the observed current Pionex short.','',
-           f"Funding events loaded: **{len(funding)}**. Current-short calibration: effective {effL:.2f}x, theoretical bankruptcy +{bank*100:.2f}%, observed liquidation +{obs*100:.2f}%, maintenance haircut ≈ {haircut*100:.2f} percentage points.",'',
-           '## Continuous 2020–2025',
-           '| Eff short leverage | Funding treatment | BTC end | vs HODL | Funding BTC | Liq buffer above +12% stop | Liquidations | Max DD |',
-           '|---:|---|---:|---:|---:|---:|---:|---:|']
+           '> Static 20% hedge frozen. Historical Binance Vision COIN-M funding is a proxy for Pionex; liquidation is calibrated from the observed current Pionex short.','',
+           f"Funding events loaded: **{len(funding)}** across {months_ok} monthly archives. Current-short calibration: effective {effL:.2f}x, theoretical bankruptcy +{bank*100:.2f}%, observed liquidation +{obs*100:.2f}%, maintenance haircut ≈ {haircut*100:.2f} percentage points.",'',
+           '## Continuous 2020–2025','| Eff short leverage | Funding treatment | BTC end | vs HODL | Funding BTC | Liq buffer above +12% stop | Liquidations | Max DD |','|---:|---|---:|---:|---:|---:|---:|---:|']
     for x in tests:
         r=x['continuous'];lines.append(f"| {r['effective_short_leverage']:.2f}x | {r['funding_mode']} | {r['total_btc']:.5f} | {r['relative_to_hodl_btc_pct']:+.2f}% | {r['funding_btc']:+.5f} | {r['stop_to_liq_buffer_pct']:+.2f} pp | {r['liquidations']} | {r['max_drawdown_pct']:.2f}% |")
     lines+=['','## OOS 2023–2025','| Eff short leverage | Funding treatment | BTC end | vs HODL | Funding BTC | Stops | Liq | Max DD |','|---:|---|---:|---:|---:|---:|---:|---:|']
     for x in tests:
         r=x['oos'];lines.append(f"| {r['effective_short_leverage']:.2f}x | {r['funding_mode']} | {r['total_btc']:.5f} | {r['relative_to_hodl_btc_pct']:+.2f}% | {r['funding_btc']:+.5f} | {r['stops']} | {r['liquidations']} | {r['max_drawdown_pct']:.2f}% |")
-    ls=out['long_grid_snapshot_stress']
-    lines+=['','## Current 4x long-grid snapshot sensitivity','This is a local calibration to the observed Pionex entry/liquidation only; it is not a full grid-liquidation formula.','| Target liquidation | Est. total margin | Est. additional margin vs 0.0492 BTC |','|---:|---:|---:|']
+    ls=out['long_grid_snapshot_stress'];lines+=['','## Current 4x long-grid snapshot sensitivity','This is a local calibration to the observed Pionex entry/liquidation only; it is not a full grid-liquidation formula.','| Target liquidation | Est. total margin | Est. additional margin vs 0.0492 BTC |','|---:|---:|---:|']
     for r in ls['rows']:lines.append(f"| ${r['target_liq']:,.0f} | {r['estimated_total_margin_btc']:.5f} BTC | {r['estimated_additional_margin_btc']:.5f} BTC |")
-    Path('bull-compound-hedge-v4-5.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
-    print('\n'.join(lines))
+    Path('bull-compound-hedge-v4-5.md').write_text('\n'.join(lines)+'\n',encoding='utf-8');print('\n'.join(lines))
 
 if __name__=='__main__':main()
