@@ -13,6 +13,7 @@ on:
       - research/bull_compound_hedge_v4_2.py
       - research/bull_compound_hedge_v4_3.py
       - research/bull_compound_hedge_v4_4.py
+      - research/bull_compound_hedge_v4_5.py
       - .github/workflows/bull-compound-backtest.yml
   workflow_dispatch:
 
@@ -28,14 +29,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run regime-gated hedge backtest
-        run: python research/bull_compound_hedge_v4_4.py
+      - name: Run funding and liquidation realism audit
+        run: python research/bull_compound_hedge_v4_5.py
       - name: Upload research result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bull-compound-hedge-v4-4
+          name: bull-compound-hedge-v4-5
           path: |
-            bull-compound-hedge-v4-4.json
-            bull-compound-hedge-v4-4.md
+            bull-compound-hedge-v4-5.json
+            bull-compound-hedge-v4-5.md
           if-no-files-found: warn
