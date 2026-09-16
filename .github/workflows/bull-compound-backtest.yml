@@ -8,6 +8,7 @@ on:
       - research/bull_compound_backtest.py
       - research/bull_compound_backtest_v2.py
       - research/bull_compound_backtest_v3.py
+      - research/bull_compound_hedge_v4.py
       - .github/workflows/bull-compound-backtest.yml
   workflow_dispatch:
 
@@ -23,14 +24,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run OHLC research backtest
-        run: python research/bull_compound_backtest_v3.py
+      - name: Run core plus inverse hedge backtest
+        run: python research/bull_compound_hedge_v4.py
       - name: Upload research result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bull-compound-backtest-result-v3
+          name: bull-compound-hedge-v4
           path: |
-            bull-compound-result-v3.json
-            bull-compound-result-v3.md
+            bull-compound-hedge-v4.json
+            bull-compound-hedge-v4.md
           if-no-files-found: warn
