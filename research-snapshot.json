@@ -222,7 +222,7 @@
       "closedTrades": 33,
       "drawdownPct": 2.44,
       "lastClosedAt": "2026-09-15T13:32:08.385Z",
-      "lastScanAt": "2026-09-17T10:13:21.586Z",
+      "lastScanAt": "2026-09-17T10:31:22.581Z",
       "lifecycle": "RETIRED_NO_EDGE",
       "name": "CHALLENGER V3",
       "openTrades": 0,
@@ -422,8 +422,8 @@
       "winRate": 53.8
     },
     "fundingCarry": {
-      "basisPnl": -0.95,
-      "breakEvenRemaining": 20.05,
+      "basisPnl": -0.43,
+      "breakEvenRemaining": 19.51,
       "eligibility": {
         "costCoverage": null,
         "eligible": true,
@@ -432,9 +432,9 @@
         "reasons": [],
         "sumFundingRate": 0.00602469
       },
-      "estimatedCosts": 31.63,
+      "estimatedCosts": 31.61,
       "fundingIncome": 12.53,
-      "lastCheckedAt": "2026-09-17T10:12:20.180Z",
+      "lastCheckedAt": "2026-09-17T10:28:20.489Z",
       "lastSettlement": {
         "at": "2026-09-17T08:00:00.003Z",
         "income": 0.32,
@@ -443,7 +443,7 @@
       "lifecycle": "ACTIVE_PAPER",
       "name": "BTC FUNDING CARRY V1",
       "nextFundingTime": 1789660800000,
-      "pnl": -20.05
+      "pnl": -19.51
     },
     "fundingCarryV2": {
       "basisPnl": null,
@@ -470,30 +470,30 @@
   },
   "engine": {
     "errors": 0,
-    "lastCycleAt": "2026-09-17T10:13:50.181Z",
-    "lastSignalScanAt": "2026-09-17T10:13:21.880Z",
+    "lastCycleAt": "2026-09-17T10:31:20.784Z",
+    "lastSignalScanAt": "2026-09-17T10:31:22.680Z",
     "marketFresh": true,
     "running": true,
     "state": "RUNNING"
   },
   "executionImpact": false,
-  "generatedAt": "2026-09-17T10:13:51.788Z",
+  "generatedAt": "2026-09-17T10:31:41.183Z",
   "publicReadOnly": true,
   "researchR42": [
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789639964895,
+        "collectedAt": 1789640864282,
         "dataErrors": [],
         "requestErrors": []
       },
       "id": "momentum",
       "lastClosedAt": null,
-      "lastMarkedAt": 1789639964980,
-      "lastScanAt": "2026-09-17T10:12:44.980Z",
+      "lastMarkedAt": 1789640864284,
+      "lastScanAt": "2026-09-17T10:27:44.284Z",
       "lifecycle": "IN_TRADE",
       "openTrades": 1,
-      "pnl": -27.41261732450039,
+      "pnl": -28.19205655107362,
       "profitFactor": null,
       "reasons": [
         "INCOMPLETE_FUNDING_HISTORY"
@@ -503,14 +503,14 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789639964895,
+        "collectedAt": 1789640864282,
         "dataErrors": [],
         "requestErrors": []
       },
       "id": "pairs",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-17T10:12:44.984Z",
+      "lastScanAt": "2026-09-17T10:27:44.380Z",
       "lifecycle": "SEALED",
       "openTrades": 0,
       "pnl": 0,
@@ -523,14 +523,14 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789639964895,
+        "collectedAt": 1789640864282,
         "dataErrors": [],
         "requestErrors": []
       },
       "id": "squeeze",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-17T10:12:44.986Z",
+      "lastScanAt": "2026-09-17T10:27:44.382Z",
       "lifecycle": "WAITING_DATA",
       "openTrades": 0,
       "pnl": 0,
@@ -543,14 +543,14 @@
     {
       "closedTrades": 0,
       "dataHealth": {
-        "collectedAt": 1789639964895,
+        "collectedAt": 1789640864282,
         "dataErrors": [],
         "requestErrors": []
       },
       "id": "carry",
       "lastClosedAt": null,
       "lastMarkedAt": null,
-      "lastScanAt": "2026-09-17T10:12:44.987Z",
+      "lastScanAt": "2026-09-17T10:27:44.384Z",
       "lifecycle": "WAITING_ENTRY",
       "openTrades": 0,
       "pnl": 0,
