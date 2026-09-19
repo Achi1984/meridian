@@ -15,7 +15,37 @@ async function getJson(path){const r=await fetch(API_BASE+path,{cache:'no-store'
 function holdingValue(d,h){const q=num(h?.quantity),lp=num(d?.livePrices?.[h?.symbol]?.price),own=num(h?.price),stored=num(h?.value)??num(h?.valueUsd)??num(h?.usdValue);return q!=null&&q>=0&&lp>0?q*lp:q!=null&&q>=0&&own>0?q*own:stored||0}
 function portfolioModel(d){const hs=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];const by={};for(const h of hs){const venue=String(h?.venue||'OTHER').toUpperCase(),v=holdingValue(d,h);by[venue]=(by[venue]||0)+v}const liveBots=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];const botCapital=liveBots.reduce((s,b)=>s+(num(b.invest)||0)+(num(b.pnl)||0),0);const apiPionex=num(d?.pionex?.equityUsd)??num(d?.pionex?.totalEquityUsd)??num(d?.pionex?.accountValueUsd)??num(d?.pionexRisk?.accountEquityUsd)??num(d?.pionexRisk?.totalEquityUsd);const botRowsWithCapital=liveBots.filter(b=>b.invest!=null);const allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;const pionex=apiPionex??state.manual.pionex;const bitpanda=state.manual.bitpanda,ledger=state.manual.ledger,okx=state.manual.okx;const total=pionex+bitpanda+ledger+okx;return{total,pionex,bitpanda,ledger,okx,botCapital:allBotsHaveCapital?botCapital:null,pionexComplete:true,pionexSource:apiPionex!=null?'PRIVATE_EQUITY':'SCREENSHOT_TOTAL'}}
 function normalizeLive(b){return{id:String(b.id||b.botId||b.name||b.symbol||'BOT'),symbol:String(b.symbol||b.asset||'').replace(/USDT$/,'').toUpperCase(),leverage:num(b.leverage??b.leverageX),lower:num(b.lowerRange??b.rangeLower??b.lowerPrice),upper:num(b.upperRange??b.rangeUpper??b.upperPrice),be:num(b.breakEvenPrice??b.breakevenPrice),liq:num(b.pionexLiquidationPrice??b.liquidationPrice??b.liqPrice),tp:num(b.takeProfit??b.tpPrice??b.tp),price:num(b.currentPrice??b.price),buffer:num(b.pionexLiqBufferPct??b.liqBufferPct??b.liquidationDistancePct),pnl:num(b.totalProfitUsd??b.totalProfitUSDT??b.totalProfit??b.pnlUsd??b.unrealizedPnlUsd??b.pnl),invest:num(b.investmentUsd??b.investmentUSDT??b.investment??b.investedUsd??b.invested),profitPct:num(b.totalProfitPct??b.profitPct??b.pnlPct),side:String(b.side||b.direction||'LONG').toUpperCase()}}
-function mergeReference(live){const used=new Set;return FALLBACK.map(ref=>{const candidates=live.map((x,i)=>({x,i})).filter(o=>!used.has(o.i)&&o.x.symbol===ref.symbol&&o.x.side==='LONG');const hit=candidates.sort((a,b)=>Math.abs((a.x.leverage||0)-ref.leverage)-Math.abs((b.x.leverage||0)-ref.leverage))[0];if(!hit)return ref;used.add(hit.i);return{...ref,...Object.fromEntries(Object.entries(hit.x).filter(([,v])=>v!=null&&v!=='')),side:'LONG'}})}
+function relDiff(a,b){a=num(a);b=num(b);if(!(a>0&&b>0))return null;return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-12)}
+function botMatchScore(ref,x){
+  if(x.symbol!==ref.symbol||x.side!=='LONG')return 1e9;
+  let score=0,signals=0;
+  if(x.leverage!=null){score+=Math.abs(x.leverage-ref.leverage)*12;signals++}
+  for(const [k,w] of [['lower',30],['upper',30],['tp',24],['be',10],['liq',6]]){
+    const d=relDiff(x[k],ref[k]);if(d!=null){score+=Math.min(d,2)*w;signals++}
+  }
+  return score+(signals?0:500);
+}
+function mergeReference(live){
+  const used=new Set,refs=FALLBACK.map(ref=>({...ref})),matches=[];
+  for(let ri=0;ri<refs.length;ri++)for(let li=0;li<live.length;li++){
+    const score=botMatchScore(refs[ri],live[li]);if(score<1e9)matches.push({ri,li,score});
+  }
+  matches.sort((a,b)=>a.score-b.score);
+  const refUsed=new Set;
+  for(const m of matches){
+    if(refUsed.has(m.ri)||used.has(m.li))continue;
+    const ref=refs[m.ri],x=live[m.li];
+    /* Reject weak duplicate-coin guesses: live row must agree on leverage or a structural field. */
+    const levOk=x.leverage!=null&&x.leverage===ref.leverage;
+    const structureOk=['lower','upper','tp','be'].some(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
+    if(!levOk&&!structureOk)continue;
+    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),side:'LONG'};
+    refUsed.add(m.ri);used.add(m.li);
+  }
+  /* Preserve any genuine live bot not represented by the reference snapshot instead of silently dropping it. */
+  live.forEach((x,i)=>{if(!used.has(i)&&x.side==='LONG')refs.push(x)});
+  return refs;
+}
 
 function ema(v,p){if(v.length<p)return null;const k=2/(p+1);let e=v.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<v.length;i++)e=v[i]*k+e*(1-k);return e}
 function rsi(v,p=14){if(v.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=v[i]-v[i-1];g+=Math.max(0,d);l+=Math.max(0,-d)}g/=p;l/=p;for(let i=p+1;i<v.length;i++){const d=v[i]-v[i-1];g=(g*(p-1)+Math.max(0,d))/p;l=(l*(p-1)+Math.max(0,-d))/p}return l?100-100/(1+g/l):100}
