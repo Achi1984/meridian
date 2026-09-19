@@ -4,7 +4,7 @@ const FALLBACK=[
 {id:'BTC-10X',symbol:'BTC',leverage:10,lower:45000,upper:100000,be:81208,liq:56499.2,tp:100000},{id:'BTC-5X',symbol:'BTC',leverage:5,lower:50000,upper:85000,be:81203.5,liq:52018.7,tp:85000},
 {id:'ETH-5X',symbol:'ETH',leverage:5,lower:1750.02,upper:3000.03,be:2627.51,liq:1809.89,tp:3000.03},{id:'ETH-3X',symbol:'ETH',leverage:3,lower:1750.02,upper:3900,be:2627.46,liq:1694.86,tp:3900},
 {id:'XRP-7X',symbol:'XRP',leverage:7,lower:.85,upper:1.8501,be:1.4475,liq:.9897,tp:1.8501},{id:'XRP-5X',symbol:'XRP',leverage:5,lower:.9,upper:2.3004,be:1.432,liq:.9854,tp:2.3004},
-{id:'SOL-5X',symbol:'SOL',leverage:5,lower:55,upper:178.002,be:113.489,liq:70.053,tp:178.002},{id:'HBAR-5X',symbol:'HBAR',leverage:5,lower:.058,upper:.125,be:.07958,liq:.06078,tp:.125},
+{id:'SOL-5X',symbol:'SOL',leverage:5,lower:55,upper:178.002,be:113.489,liq:70.053,tp:178.002},{id:'HBAR-3X',symbol:'HBAR',leverage:3,lower:.058,upper:.125,be:.07958,liq:.06078,tp:.11},
 {id:'PEPE-4X',symbol:'PEPE',leverage:4,lower:.0000022,upper:.0000078,be:.000003864,liq:.0000025478,tp:.0000078},{id:'DOT-4X',symbol:'DOT',leverage:4,lower:.7,upper:2.2,be:1.137,liq:.768,tp:2.2},
 {id:'ADA-3X',symbol:'ADA',leverage:3,lower:.13,upper:.45,be:.2258,liq:.137,tp:.45},{id:'SUI-3X',symbol:'SUI',leverage:3,lower:.6,upper:1.5,be:.8274,liq:.556,tp:1.5},{id:'AVAX-5X',symbol:'AVAX',leverage:5,lower:5.5,upper:11.8,be:8.488,liq:5.984,tp:11.8}];
 const state={bots:FALLBACK,source:'REFERENCE',market:null,intel:null,portfolio:null,error:null,manual:{pionex:23326.51,bitpanda:5408.27,ledger:776.74,okx:138.21}};
@@ -47,8 +47,9 @@ function mergeReference(live){
     refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),side:'LONG'};
     refUsed.add(m.ri);used.add(m.li);
   }
-  /* Preserve any genuine live bot not represented by the reference snapshot instead of silently dropping it. */
-  live.forEach((x,i)=>{if(!used.has(i)&&x.side==='LONG')refs.push(x)});
+  /* Dashboard is intentionally pinned to the verified 13-bot COIN-M roster.
+     Unmatched API rows are often stale/partial bot records and must not create phantom cards.
+     Live values are allowed to enrich a verified reference bot only after a confident match. */
   return refs;
 }
 
