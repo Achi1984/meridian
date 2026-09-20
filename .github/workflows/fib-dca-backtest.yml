@@ -22,8 +22,11 @@ jobs:
         run: node research/run-btc-matrix.mjs | tee btc-backtest.json
       - name: Multi-asset walk-forward
         run: node research/run-multiasset-matrix.mjs | tee multiasset-backtest.json
-      - name: v0.2 multi-timeframe backtest
-        run: node research/run-v02-mtf.mjs | tee v02-mtf-backtest.json
+      - name: v0.3 multi-timeframe backtest
+        run: |
+          node research/run-v02-mtf.mjs
+          test -s v03-mtf-backtest.json
+          node -e 'JSON.parse(require("fs").readFileSync("v03-mtf-backtest.json","utf8")); console.log("v0.3 artifact valid JSON")'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -31,4 +34,4 @@ jobs:
           path: |
             btc-backtest.json
             multiasset-backtest.json
-            v02-mtf-backtest.json
+            v03-mtf-backtest.json
