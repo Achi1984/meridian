@@ -19,3 +19,10 @@ const r=backtestFibCycle(candles,100,200,{feeRate:0,slippageRate:0});
 assert.deepEqual(r.tpHits,[true,true,true]);
 assert.ok(r.realizedPnl>0);
 console.log("fib-dca research tests passed", {pnl:r.realizedPnl, entry:r.weightedEntry});
+
+const blocked=backtestFibCycle(candles,100,200,{feeRate:0,slippageRate:0,entryGate:()=>({pass:false})});
+assert.equal(blocked.fills.length,0);
+assert.ok(blocked.events.some(x=>x.type==="DCA_BLOCKED"));
+const selective=backtestFibCycle(candles,100,200,{feeRate:0,slippageRate:0,entryGate:({level})=>({pass:level===1})});
+assert.equal(selective.fills.length,1);
+assert.equal(selective.fills[0].level,0);
