@@ -5,7 +5,8 @@ Status: research/paper/backtest only. No live-order execution.
 ## Strategy
 - Direction: LONG perpetual futures.
 - Structure timeframe: 4H confirmed swing low -> swing high.
-- Execution confirmation: 15m + 1H, closed candles only.
+- Multi-timeframe stack: 4H defines confirmed swing/regime; 1H is the mandatory setup confirmation; 15m times execution. Closed candles only.
+- v0.2 gate: 4H and 1H must pass trend/momentum confirmation; 15m needs at least 2 confirmation points before a DCA fill.
 - DCA retracements: 0.382 / 0.500 / 0.618 / 0.786.
 - Capital weights: 15% / 20% / 30% / 35%.
 - Baseline leverage: 3x; backtest matrix 2x/3x/4x.
