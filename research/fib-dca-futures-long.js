@@ -63,7 +63,7 @@ export function backtestFibCycle(candles, swingLow, swingHigh, userCfg = {}) {
     }
 
     for (let i=0;i<lv.dca.length;i++) {
-      if (!used.has(i) && c.low <= lv.dca[i]) {
+      if (!used.has(i) && c.low <= lv.dca[i]) {\n        const gate = typeof cfg.entryGate === "function" ? cfg.entryGate({candle:c,level:i+1,target:lv.dca[i],fills:[...fills]}) : {pass:true};\n        if (!gate?.pass) { events.push({ts:c.ts,type:"DCA_BLOCKED",level:i+1,target:lv.dca[i],gate}); continue; }
         const px = adverseBuy(lv.dca[i], cfg.slippageRate);
         const notional = allocation * cfg.dcaWeights[i];
         const qty = notional / px;
