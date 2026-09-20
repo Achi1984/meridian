@@ -12,9 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with:
+          node-version: '24'
       - name: Unit tests
-        run: node research/fib-dca-futures-long.test.mjs\n          node research/mtf-sync.test.mjs
+        run: |
+          node research/fib-dca-futures-long.test.mjs
+          node research/mtf-sync.test.mjs
       - name: BTC walk-forward
         run: node research/run-btc-matrix.mjs | tee btc-backtest.json
       - name: Multi-asset walk-forward
