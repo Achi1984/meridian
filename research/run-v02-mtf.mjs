@@ -1,7 +1,7 @@
 import {writeFileSync} from "node:fs";
 import {fetchOkxHistory} from "./okx-history.js";
 import {bullishFibCycles} from "./swing-detector.js";
-import {backtestFibCycle,fibPrices} from "./fib-dca-futures-long.js";
+import {backtestFibCycle} from "./fib-dca-futures-long.js";
 import {mtfGateAt} from "./mtf-confirmation.js";
 import {commonWindow,splitByTimestamp} from "./mtf-sync.js";
 import {portfolioMetrics,buyHold} from "./portfolio-metrics.js";
@@ -41,4 +41,6 @@ for(const asset of assets){
   testCandles:Object.fromEntries(Object.entries(split.test).map(([k,v])=>[k,v.length])),
   v03:run(split.test.h4,split.test.h1,split.test.m15,fundingRaw.filter(x=>x.ts>=split.test.h4[0].ts&&x.ts<=split.test.h4.at(-1).ts)),buyHold:buyHold(split.test.h4)});
 }
-const payload=JSON.stringify(rows,null,2);\nwriteFileSync("v03-mtf-backtest.json",payload+"\\n");\nconsole.log(payload);
+const payload=JSON.stringify(rows,null,2);
+writeFileSync("v03-mtf-backtest.json",payload+"\n");
+console.log(payload);
