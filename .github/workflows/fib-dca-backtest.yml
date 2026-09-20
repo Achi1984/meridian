@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - name: Unit tests
-        run: node research/fib-dca-futures-long.test.mjs
+        run: node research/fib-dca-futures-long.test.mjs\n          node research/mtf-sync.test.mjs
       - name: BTC walk-forward
         run: node research/run-btc-matrix.mjs | tee btc-backtest.json
       - name: Multi-asset walk-forward
