@@ -108,6 +108,15 @@ function hedgeAtTp(bots){
   },0);
   return {count:shorts.length,pnl};
 }
+function coinCompounding(bots){
+  const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
+  if(!rows.length)return '';
+  const body=rows.map(b=>{
+    const bands=[0,.05,.10].map(x=>b.coinQty*(1+x));
+    return `<div><span>${esc(b.symbol)} · ${b.leverage?b.leverage+'x':'LONG'}</span><b>${bands[0].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[1].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[2].toLocaleString('de-DE',{maximumFractionDigits:6})}</b><small>heute · Basis · volatiler Pfad · TP ${price(b.tp)}</small></div>`;
+  }).join('');
+  return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">Basis/volatiler Pfad sind Szenariobänder (+5%/+10% Coin-Menge), keine garantierten Grid-Erträge. Sobald der private Backend-Verlauf ausgeführte Grids/Fees/Funding vollständig liefert, kann MERIDIAN die Bandbreite durch eine pfadbasierte COIN-M-Simulation ersetzen.</p></div></details>`;
+}
 function portfolioAtTp(data,bots){
   const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   const botBase=longs.reduce((s,b)=>s+b.coinQty*b.tp,0);
@@ -153,7 +162,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}${portfolioAtTp(data,bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${portfolioAtTp(data,bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
