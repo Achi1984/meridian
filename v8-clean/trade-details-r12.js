@@ -42,6 +42,10 @@ function normalizeBot(b,data){
     investment:positive(b?.investmentUsd)??positive(b?.investedUsd)??positive(b?.marginUsd),
     tp:positive(b?.takeProfit)??positive(b?.tp)??positive(b?.takeProfitPrice),
     strategyStatus:String(b?.strategyStatus||b?.actionStatus||'').toUpperCase(),
+    coinQty:positive(b?.coinQty)??positive(b?.currentInvestmentCoin)??positive(b?.investmentCoin),
+    gridCount:n(b?.gridCount)??n(b?.grids),
+    rangeLow:positive(b?.rangeLow)??positive(b?.lowerPrice),
+    rangeHigh:positive(b?.rangeHigh)??positive(b?.upperPrice),
     trendPnl:explicitNumber(b,['trendPnlUsd','trendPnl']),
     gridPnl:explicitNumber(b,['gridPnlUsd','gridProfitUsd','gridPnl']),
     support:positive(b?.support)??positive(b?.keySupport),
@@ -82,6 +86,14 @@ function safeText(b){
   const missing=12-b.buffer;
   return `Noch ${missing.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} Pkt Buffer bis SAFE`;
 }
+function tpProjection(bots){
+  const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
+  if(!rows.length)return '';
+  const gross=rows.reduce((s,b)=>s+b.coinQty*b.tp,0);
+  const scenarios=[['KONSERVATIV',0.00],['BASIS',0.05],['VOLATILER PFAD',0.10]];
+  const cards=scenarios.map(([name,bonus])=>`<div><span>${name}</span><b>${usd(gross*(1+bonus),0)}</b><small>Coin-Basis + ${Math.round(bonus*100)}% Grid-Ertragsband*</small></div>`).join('');
+  return `<details class="trade-r12-bot"><summary><div><b>TP PROJECTION</b><small>Long-Bots bis Take-Profit</small></div><div class="trade-r12-summary-right"><strong>${usd(gross,0)}</strong><small>Basiswert am TP</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${cards}</div><p class="trade-r12-hint">*Szenarioband, keine Prognose. Tatsächlicher COIN-M Grid-Ertrag hängt vom Kurspfad, ausgeführten Grids, Gebühren und Funding ab. BTC-Hedges sowie externe Spot-Bestände werden separat bilanziert.</p></div></details>`;
+}
 function commander(bots){
   const states=bots.map(actionState);
   const longs=bots.filter(b=>b.side==='LONG').length,shorts=bots.filter(b=>b.side==='SHORT').length;
@@ -111,7 +123,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
