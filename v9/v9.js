@@ -3,7 +3,7 @@ const TOKEN_KEY='meridian.v8.readToken';
 const FALLBACK=[
 {id:'BTC-10X',symbol:'BTC',leverage:10,lower:45000,upper:100000,be:81614.8,liq:53524.1,tp:100000,investCoin:.03097,dynamicMargin:.02107},
 {id:'ETH-3X-A',symbol:'ETH',leverage:3,lower:1750.02,upper:3900,be:2623.5,liq:1694.32,tp:3900,investCoin:.2518},{id:'ETH-4X-B',symbol:'ETH',leverage:4,lower:1750.02,upper:3500.05,be:2632.87,liq:1783.99,tp:3500.05,investCoin:.3405},
-{id:'SOL-5X-A',symbol:'SOL',leverage:5,lower:55,upper:178.002,be:113.34,liq:70.031,tp:178.002,investCoin:43.633},{id:'SOL-3X-B',symbol:'SOL',leverage:3,lower:50,upper:150.001,be:111.428,liq:55.266,tp:150.001,investCoin:14.259},
+{id:'SOL-4X',symbol:'SOL',leverage:4,lower:55,upper:185,be:115.655,liq:66.51,tp:185,investCoin:58.807,price:115.553,createdPrice:115.6,grids:374},
 {id:'XRP-4X',symbol:'XRP',leverage:4,lower:.85,upper:1.8501,be:1.4442,liq:.9163,tp:1.8501,investCoin:1868.17},
 {id:'HBAR-5X-A',symbol:'HBAR',leverage:5,lower:.06,upper:.12,be:.08569,liq:.0606,tp:.12,investCoin:10800,dynamicMargin:2200},{id:'HBAR-5X-B',symbol:'HBAR',leverage:5,lower:.06,upper:.125,be:.08622,liq:.06343,tp:.125,investCoin:5000},{id:'HBAR-3X-C',symbol:'HBAR',leverage:3,lower:.05,upper:.15,be:.08682,liq:.05198,tp:.15,investCoin:7990.15},
 {id:'SUI-4X-A',symbol:'SUI',leverage:4,lower:.6,upper:1.45,be:.834,liq:.616,tp:1.45,investCoin:1020.35},{id:'SUI-3X-B',symbol:'SUI',leverage:3,lower:.5,upper:1.5,be:.9382,liq:.5353,tp:1.5,investCoin:527.03},
