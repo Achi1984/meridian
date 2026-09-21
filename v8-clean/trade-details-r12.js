@@ -82,6 +82,18 @@ function safeText(b){
   const missing=12-b.buffer;
   return `Noch ${missing.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} Pkt Buffer bis SAFE`;
 }
+function commander(bots){
+  const states=bots.map(actionState);
+  const longs=bots.filter(b=>b.side==='LONG').length,shorts=bots.filter(b=>b.side==='SHORT').length;
+  const hold=states.filter(s=>s==='HOLD').length,watch=states.filter(s=>s==='WATCH PROFIT').length;
+  const lock=states.filter(s=>s==='PROFIT LOCK CANDIDATE').length,risk=states.filter(s=>s==='RISK REVIEW').length;
+  const unverified=states.filter(s=>s==='DATA UNVERIFIED').length;
+  const verified=bots.filter((b,i)=>states[i]!=='DATA UNVERIFIED'&&Number.isFinite(b.buffer));
+  const critical=verified.sort((a,b)=>a.buffer-b.buffer)[0]||null;
+  const status=risk?'RISK REVIEW':lock?'PROFIT LOCK':watch?'WATCH PROFIT':unverified?'DATA CHECK':'HOLD';
+  const criticalText=critical?`${critical.symbol} ${pct(critical.buffer)}`:'—';
+  return `<div class="trade-r12-commander tone-border-${risk?'danger':watch||lock||unverified?'watch':'safe'}"><div class="eyebrow">BOT COMMANDER · 15M</div><div class="trade-r12-grid"><div><span>STATUS</span><b>${esc(status)}</b></div><div><span>EXPOSURE</span><b>${longs} Long · ${shorts} Hedge/Short</b></div><div><span>HOLD</span><b>${hold}</b></div><div><span>WATCH / LOCK</span><b>${watch} / ${lock}</b></div><div><span>RISK REVIEW</span><b>${risk}</b></div><div><span>DATA CHECK</span><b>${unverified}</b></div><div><span>ENGSTER LIQ-PUFFER</span><b>${esc(criticalText)}</b></div></div><p class="trade-r12-hint">TP-or-Invalidation · keine Aktion bei normalem Rauschen · nur bestätigte Statuswechsel</p></div>`;
+}
 function card(b,index){
   const t=tone(b.buffer),action=actionState(b),meta=[b.side,b.leverage!=null?`${b.leverage}x`:null,b.symbol].filter(Boolean).join(' · ')||'—';
   return `<details class="trade-r12-bot tone-border-${t}"${index===0?' open':''}><summary><div><b>${esc(b.id)}</b><small>${esc(meta)}</small></div><div class="trade-r12-summary-right"><strong class="tone-${t}">${pct(b.buffer)}</strong><small>${state(b.buffer)}</small></div></summary><div class="trade-r12-detail">${ladder(b.buffer)}<div class="trade-r12-grid"><div><span>CURRENT</span><b>${price(b.current)}</b></div><div><span>BREAK-EVEN</span><b>${price(b.be)}</b></div><div><span>LIQ PRICE</span><b>${price(b.liq)}</b></div><div><span>PNL</span><b class="${Number(b.pnl)>0?'tone-safe':Number(b.pnl)<0?'tone-danger':''}">${usd(b.pnl,2)}</b></div><div><span>INVEST</span><b>${usd(b.investment,0)}</b></div><div><span>BUFFER</span><b class="tone-${t}">${pct(b.buffer)}</b></div><div><span>TP</span><b>${price(b.tp)}</b></div><div><span>GRID PNL</span><b>${usd(b.gridPnl,2)}</b></div><div><span>TREND PNL</span><b>${usd(b.trendPnl,2)}</b></div><div><span>SUPPORT</span><b>${price(b.support)}</b></div><div><span>RESISTANCE</span><b>${price(b.resistance)}</b></div></div><div class="trade-r12-safe ${t}"><span>${esc(action)}</span><b>${esc(actionText(b))}</b></div><div class="trade-r12-safe ${t}"><span>SAFE-PFAD</span><b>${safeText(b)}</b></div></div></details>`;
@@ -99,7 +111,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
