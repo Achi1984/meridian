@@ -168,6 +168,21 @@ function coinCompounding(bots){
   }).join('');
   return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">R54 berücksichtigt zusätzlich den Bot-Hebel als Futures-Notional, ohne die End-Coinmenge blind mit dem Hebel zu multiplizieren. Range, Gridzahl, Current und TP bestimmen die realisierten Grid-Level. Gebühren, Funding, Re-Entries und reale Oszillation benötigen weiterhin Execution-History.</p></div></details>`;
 }
+function reconciliation(data){
+  const p=data?.portfolio||{};
+  const venues=p?.venues||p?.exchanges||{};
+  const rows=[
+    ['PIONEX',26039.12,positive(venues?.pionex?.valueUsd)??positive(p?.pionexUsd)],
+    ['BITPANDA',5736.94,positive(venues?.bitpanda?.valueUsd)??positive(p?.bitpandaUsd)],
+    ['LEDGER',845.60,positive(venues?.ledger?.valueUsd)??positive(p?.ledgerUsd)],
+    ['OKX',144.96,positive(venues?.okx?.valueUsd)??positive(p?.okxUsd)]
+  ];
+  const screenshotTotal=rows.reduce((s,r)=>s+r[1],0);
+  const backendKnown=rows.filter(r=>Number.isFinite(r[2]));
+  const backendTotal=backendKnown.reduce((s,r)=>s+r[2],0);
+  const delta=backendKnown.length===rows.length?screenshotTotal-backendTotal:null;
+  return `<details class="trade-r12-bot" open><summary><div><b>DATA RECONCILIATION</b><small>Screenshot-Baseline · 21.09 · 20:01–20:02</small></div><div class="trade-r12-summary-right"><strong>${usd(screenshotTotal,2)}</strong><small>verifizierter Screenshot-Stand</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${rows.map(([name,shot,live])=>`<div><span>${name}</span><b>${usd(shot,2)}</b><small>Backend ${usd(live,2)}${Number.isFinite(live)?' · Δ '+usd(shot-live,2):' · Feed fehlt'}</small></div>`).join('')}<div><span>GESAMT</span><b>${usd(screenshotTotal,2)}</b><small>${Number.isFinite(delta)?'Backend '+usd(backendTotal,2)+' · Δ '+usd(delta,2):'Backend noch nicht vollständig venue-spezifisch'}</small></div></div><p class="trade-r12-hint">Diese Werte sind eine manuell verifizierte Reconciliation-Baseline aus den aktuellen Screenshots, kein Live-Feed. Live-Daten dürfen sie ersetzen, sobald alle vier Venue-Werte vollständig und konsistent vorliegen.</p></div></details>`;
+}
 function milestone100k(data,bots){
   const target=100000;
   const current=positive(data?.portfolio?.totalUsd)??positive(data?.portfolio?.totalValueUsd)??positive(data?.totalPortfolioUsd);
@@ -231,7 +246,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}${milestone100k(data,bots)}${portfolioAtTp(data,bots)}${beforeAfterTp(bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${reconciliation(data)}${milestone100k(data,bots)}${portfolioAtTp(data,bots)}${beforeAfterTp(bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
