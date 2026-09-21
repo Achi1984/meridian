@@ -69,6 +69,7 @@ function tradeHtml(x){
   if(x.locked)return `<section class="hero trade-hero"><div class="eyebrow">TRADE · PRIVATE DATA</div><div class="hero-value">LOCKED</div><p class="muted">Read Token in MORE verbinden. Keine Legacy-Risk-Karten werden ausgelesen.</p></section>`;
   if(!x.ok)return `<section class="hero trade-hero"><div class="eyebrow">TRADE · DATA STATUS</div><div class="hero-value">CHECK</div><p class="muted">${x.error||'Risikodaten nicht verfügbar'}</p></section>`;
   const risk=x.risk||{state:'CHECK',tone:'muted',bot:null};
+  const rec=x.botReconciliation||{};
   const b=x.criticalBot;
   const rows=(x.bots||[]).map(bot=>{
     const tone=Number.isFinite(bot.buffer)?bot.buffer<8?'danger':bot.buffer<12?'watch':'safe':'muted';
@@ -79,9 +80,9 @@ function tradeHtml(x){
   return `<section class="hero trade-hero tone-border-${risk.tone}"><div class="eyebrow">TRADE · RISK FIRST</div><div class="trade-state tone-${risk.tone}">${risk.state}</div><p class="muted">${b?`${b.id} ist aktuell der kritischste Bot · ${fmtPct(b.buffer,2)} Buffer`:'Keine belastbaren Liquidationspuffer verfügbar'}</p></section>
   <div class="grid2 trade-metrics">
     <section class="metric"><span>KRITISCHSTER BOT</span><b>${b?.id||'—'}</b><small>${b?[b.side,b.leverage!=null?`${b.leverage}x`:null].filter(Boolean).join(' · '):'Keine Botdaten'}</small></section>
-    <section class="metric"><span>TRADING EQUITY</span><b>${fmtUsd(x.tradingEquityUsd)}</b><small>${x.activeCount} aktive Bot${x.activeCount===1?'':'s'}</small></section>
+    <section class="metric"><span>TRADING EQUITY</span><b>${fmtUsd(x.tradingEquityUsd)}</b><small>${x.activeCount} aktiv · ${rec.longs??'—'} Long · ${rec.shorts??'—'} Short/Hedge</small></section>
   </div>
-  <section class="action priority-action"><span>NEXT ACTION</span><b>${x.nextAction||'Risikodaten prüfen'}</b><small>${target}</small></section>
+  <section class="action"><span>BOT DATA</span><b class="tone-${rec.consistent?'safe':'watch'}">${rec.consistent?'CONSISTENT':'CHECK'}</b><small>${rec.duplicateIds?.length?'Duplicate IDs: '+rec.duplicateIds.join(', '):rec.invalidLeverage?.length?'Hebel prüfen: '+rec.invalidLeverage.join(', '):'Aktive Quelle reconciliert · Closed/Inactive ausgeschlossen'}</small></section><section class="action priority-action"><span>NEXT ACTION</span><b>${x.nextAction||'Risikodaten prüfen'}</b><small>${target}</small></section>
   <section class="card bots"><div class="eyebrow">AKTIVE BOTS · NACH BUFFER SORTIERT</div>${rows}</section>`;
 }
 
