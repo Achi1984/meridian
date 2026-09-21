@@ -41,7 +41,13 @@ function normalizeBot(b,data){
     pnl:explicitNumber(b,['pnlUsd','unrealizedPnlUsd','pnl']),
     investment:positive(b?.investmentUsd)??positive(b?.investedUsd)??positive(b?.marginUsd),
     tp:positive(b?.takeProfit)??positive(b?.tp)??positive(b?.takeProfitPrice),
-    strategyStatus:String(b?.strategyStatus||b?.actionStatus||'').toUpperCase()
+    strategyStatus:String(b?.strategyStatus||b?.actionStatus||'').toUpperCase(),
+    trendPnl:explicitNumber(b,['trendPnlUsd','trendPnl']),
+    gridPnl:explicitNumber(b,['gridPnlUsd','gridProfitUsd','gridPnl']),
+    support:positive(b?.support)??positive(b?.keySupport),
+    resistance:positive(b?.resistance)??positive(b?.keyResistance),
+    dataVerified:b?.dataVerified!==false,
+    sourceSpreadPct:n(b?.sourceSpreadPct)
   };
 }
 async function privateData(){
@@ -52,6 +58,7 @@ async function privateData(){
   return data;
 }
 function actionState(b){
+  if(b.dataVerified===false||(Number.isFinite(b.sourceSpreadPct)&&b.sourceSpreadPct>0.5))return 'DATA UNVERIFIED';
   const explicit=['HOLD','WATCH PROFIT','PROFIT LOCK CANDIDATE','RISK REVIEW'].includes(b.strategyStatus)?b.strategyStatus:null;
   if(explicit)return explicit;
   if(Number.isFinite(b.buffer)&&b.buffer<12)return 'RISK REVIEW';
@@ -59,6 +66,7 @@ function actionState(b){
 }
 function actionText(b){
   const s=actionState(b);
+  if(s==='DATA UNVERIFIED')return 'Kein Aktionssignal · Quellenabweichung >0,50% oder Daten nicht verifiziert';
   if(s==='HOLD')return 'TP-or-Invalidation · laufen lassen';
   if(s==='WATCH PROFIT')return 'Gewinn beobachten · kein automatischer Exit';
   if(s==='PROFIT LOCK CANDIDATE')return 'Profit-Lock prüfen · technische Bestätigung erforderlich';
@@ -76,7 +84,7 @@ function safeText(b){
 }
 function card(b,index){
   const t=tone(b.buffer),action=actionState(b),meta=[b.side,b.leverage!=null?`${b.leverage}x`:null,b.symbol].filter(Boolean).join(' · ')||'—';
-  return `<details class="trade-r12-bot tone-border-${t}"${index===0?' open':''}><summary><div><b>${esc(b.id)}</b><small>${esc(meta)}</small></div><div class="trade-r12-summary-right"><strong class="tone-${t}">${pct(b.buffer)}</strong><small>${state(b.buffer)}</small></div></summary><div class="trade-r12-detail">${ladder(b.buffer)}<div class="trade-r12-grid"><div><span>CURRENT</span><b>${price(b.current)}</b></div><div><span>BREAK-EVEN</span><b>${price(b.be)}</b></div><div><span>LIQ PRICE</span><b>${price(b.liq)}</b></div><div><span>PNL</span><b class="${Number(b.pnl)>0?'tone-safe':Number(b.pnl)<0?'tone-danger':''}">${usd(b.pnl,2)}</b></div><div><span>INVEST</span><b>${usd(b.investment,0)}</b></div><div><span>BUFFER</span><b class="tone-${t}">${pct(b.buffer)}</b></div><div><span>TP</span><b>${price(b.tp)}</b></div></div><div class="trade-r12-safe ${t}"><span>${esc(action)}</span><b>${esc(actionText(b))}</b></div><div class="trade-r12-safe ${t}"><span>SAFE-PFAD</span><b>${safeText(b)}</b></div></div></details>`;
+  return `<details class="trade-r12-bot tone-border-${t}"${index===0?' open':''}><summary><div><b>${esc(b.id)}</b><small>${esc(meta)}</small></div><div class="trade-r12-summary-right"><strong class="tone-${t}">${pct(b.buffer)}</strong><small>${state(b.buffer)}</small></div></summary><div class="trade-r12-detail">${ladder(b.buffer)}<div class="trade-r12-grid"><div><span>CURRENT</span><b>${price(b.current)}</b></div><div><span>BREAK-EVEN</span><b>${price(b.be)}</b></div><div><span>LIQ PRICE</span><b>${price(b.liq)}</b></div><div><span>PNL</span><b class="${Number(b.pnl)>0?'tone-safe':Number(b.pnl)<0?'tone-danger':''}">${usd(b.pnl,2)}</b></div><div><span>INVEST</span><b>${usd(b.investment,0)}</b></div><div><span>BUFFER</span><b class="tone-${t}">${pct(b.buffer)}</b></div><div><span>TP</span><b>${price(b.tp)}</b></div><div><span>GRID PNL</span><b>${usd(b.gridPnl,2)}</b></div><div><span>TREND PNL</span><b>${usd(b.trendPnl,2)}</b></div><div><span>SUPPORT</span><b>${price(b.support)}</b></div><div><span>RESISTANCE</span><b>${price(b.resistance)}</b></div></div><div class="trade-r12-safe ${t}"><span>${esc(action)}</span><b>${esc(actionText(b))}</b></div><div class="trade-r12-safe ${t}"><span>SAFE-PFAD</span><b>${safeText(b)}</b></div></div></details>`;
 }
 async function enhance(){
   const root=document.getElementById('view-trade');
@@ -91,7 +99,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">TP-or-Invalidation · kleine Gewinne sind kein Exit · Current / BE / Liq / TP / PnL</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
