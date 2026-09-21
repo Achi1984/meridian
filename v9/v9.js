@@ -11,7 +11,7 @@ const FALLBACK=[
 {id:'PEPE-4X-A',symbol:'PEPE',leverage:4,lower:.000002,upper:.000006,be:.0000040029,liq:.000002368,tp:.000006,investCoin:73524672.71},{id:'PEPE-3X-B',symbol:'PEPE',leverage:3,lower:.000002,upper:.000006,be:.0000040029,liq:.0000021748,tp:.000006,investCoin:31670289.08},
 {id:'AVAX-5X',symbol:'AVAX',leverage:5,lower:6,upper:14.5,be:11.175,liq:7.115,tp:14.5,investCoin:108.55}
 ];
-const HEDGE={id:'BTC-HEDGE-3X',symbol:'BTC',side:'SHORT',leverage:3,investCoin:.01,entry:81095.5,be:81095.5,liq:121171.7,sl:85100,tps:[{price:79200,pct:24},{price:77040.7,pct:24},{price:76800,pct:34}],runnerPct:18,note:'Nach TP1: SL → Entry'};
+const HEDGE={id:'BTC-HEDGE-3X',symbol:'BTC',side:'SHORT',leverage:3,investCoin:.01,entry:81095.5,be:81095.5,liq:121171.7,sl:85100,tps:[{price:79200,pct:24},{price:76900,pct:24},{price:74900,pct:34}],runnerPct:18,note:'Nach TP1: SL → Entry'};
 const state={bots:FALLBACK,hedge:HEDGE,source:'REFERENCE',market:null,intel:null,assetIntel:{},portfolio:null,error:null,manual:{pionex:23326.51,bitpanda:5408.27,ledger:776.74,okx:138.21}};
 const $=s=>document.querySelector(s),num=v=>Number.isFinite(Number(v))?Number(v):null;
 const money=x=>{x=num(x);if(x==null)return'—';if(x<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
