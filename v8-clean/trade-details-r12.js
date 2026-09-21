@@ -118,10 +118,16 @@ function gridPathModel(b){
   // Conservative path-aware proxy: allocate coin inventory evenly across grid intervals,
   // count one upward realization per crossed level, and convert realized quote gain back to coin at TP.
   // This is deliberately fee/funding neutral until backend execution history is available.
-  const inventoryPerGrid=b.coinQty/b.gridCount;
+  const lev=Number.isFinite(b.leverage)&&b.leverage>0?b.leverage:1;
+  // coinQty is collateral/investment coin, not full futures notional.
+  // Approximate deployed notional as collateral × leverage, then distribute it across grid intervals.
+  // As price rises, long inventory is progressively realized; this avoids the incorrect shortcut
+  // of multiplying the final coin balance by leverage.
+  const notionalCoin=b.coinQty*lev;
+  const inventoryPerGrid=notionalCoin/b.gridCount;
   const realizedQuote=inventoryPerGrid*levels*stepReturn*tp;
   const extraQty=realizedQuote/tp;
-  return {baseQty:b.coinQty,estimatedExtraQty:extraQty,levels,stepReturn};
+  return {baseQty:b.coinQty,estimatedExtraQty:extraQty,levels,stepReturn,leverage:lev,notionalCoin};
 }
 function coinCompounding(bots){
   const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
@@ -130,7 +136,7 @@ function coinCompounding(bots){
     const bands=[0,.05,.10].map(x=>b.coinQty*(1+x));
     return `<div><span>${esc(b.symbol)} · ${b.leverage?b.leverage+'x':'LONG'}</span><b>${bands[0].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[1].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[2].toLocaleString('de-DE',{maximumFractionDigits:6})}</b><small>heute · Basis · volatiler Pfad · TP ${price(b.tp)}</small></div>`;
   }).join('');
-  return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">R52 ersetzt die pauschalen +5%/+10% durch ein Range-/Grid-/Current-/TP-basiertes Modell. Es ist weiterhin eine Modellrechnung: Gebühren, Funding, Re-Entries und reale Oszillation werden erst mit vollständiger Execution-History exakt replaybar.</p></div></details>`;
+  return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">R54 berücksichtigt zusätzlich den Bot-Hebel als Futures-Notional, ohne die End-Coinmenge blind mit dem Hebel zu multiplizieren. Range, Gridzahl, Current und TP bestimmen die realisierten Grid-Level. Gebühren, Funding, Re-Entries und reale Oszillation benötigen weiterhin Execution-History.</p></div></details>`;
 }
 function milestone100k(data,bots){
   const target=100000;
