@@ -108,6 +108,21 @@ function hedgeAtTp(bots){
   },0);
   return {count:shorts.length,pnl};
 }
+function gridPathModel(b){
+  if(!(b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.current)&&Number.isFinite(b.tp)&&Number.isFinite(b.rangeLow)&&Number.isFinite(b.rangeHigh)&&Number.isFinite(b.gridCount)&&b.gridCount>1))return null;
+  const lo=b.rangeLow,hi=b.rangeHigh,cur=Math.max(lo,Math.min(hi,b.current)),tp=Math.max(cur,Math.min(hi,b.tp));
+  if(!(hi>lo&&tp>cur))return {baseQty:b.coinQty,estimatedExtraQty:0,cycles:0};
+  const logStep=Math.log(hi/lo)/(b.gridCount-1);
+  const levels=Math.max(0,Math.floor(Math.log(tp/cur)/logStep));
+  const stepReturn=Math.exp(logStep)-1;
+  // Conservative path-aware proxy: allocate coin inventory evenly across grid intervals,
+  // count one upward realization per crossed level, and convert realized quote gain back to coin at TP.
+  // This is deliberately fee/funding neutral until backend execution history is available.
+  const inventoryPerGrid=b.coinQty/b.gridCount;
+  const realizedQuote=inventoryPerGrid*levels*stepReturn*tp;
+  const extraQty=realizedQuote/tp;
+  return {baseQty:b.coinQty,estimatedExtraQty:extraQty,levels,stepReturn};
+}
 function coinCompounding(bots){
   const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   if(!rows.length)return '';
@@ -115,7 +130,7 @@ function coinCompounding(bots){
     const bands=[0,.05,.10].map(x=>b.coinQty*(1+x));
     return `<div><span>${esc(b.symbol)} · ${b.leverage?b.leverage+'x':'LONG'}</span><b>${bands[0].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[1].toLocaleString('de-DE',{maximumFractionDigits:6})} → ${bands[2].toLocaleString('de-DE',{maximumFractionDigits:6})}</b><small>heute · Basis · volatiler Pfad · TP ${price(b.tp)}</small></div>`;
   }).join('');
-  return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">Basis/volatiler Pfad sind Szenariobänder (+5%/+10% Coin-Menge), keine garantierten Grid-Erträge. Sobald der private Backend-Verlauf ausgeführte Grids/Fees/Funding vollständig liefert, kann MERIDIAN die Bandbreite durch eine pfadbasierte COIN-M-Simulation ersetzen.</p></div></details>`;
+  return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">R52 ersetzt die pauschalen +5%/+10% durch ein Range-/Grid-/Current-/TP-basiertes Modell. Es ist weiterhin eine Modellrechnung: Gebühren, Funding, Re-Entries und reale Oszillation werden erst mit vollständiger Execution-History exakt replaybar.</p></div></details>`;
 }
 function portfolioAtTp(data,bots){
   const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
