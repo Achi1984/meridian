@@ -86,6 +86,36 @@ function safeText(b){
   const missing=12-b.buffer;
   return `Noch ${missing.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} Pkt Buffer bis SAFE`;
 }
+function spotAtTp(data,bots){
+  const spot=data?.portfolio?.assets||data?.portfolio?.holdings||data?.holdings||[];
+  if(!Array.isArray(spot))return {total:0,rows:[]};
+  const tpBySymbol=new Map(bots.filter(b=>Number.isFinite(b.tp)).map(b=>[b.symbol,b.tp]));
+  const rows=spot.map(x=>{
+    const symbol=String(x?.symbol||x?.asset||'').toUpperCase();
+    const qty=positive(x?.quantity)??positive(x?.qty)??positive(x?.amount);
+    const tp=tpBySymbol.get(symbol);
+    const current=positive(data?.livePrices?.[symbol]?.price)??positive(x?.price);
+    const valuation=Number.isFinite(qty)?qty*(tp||current||0):0;
+    return {symbol,qty,tp:tp||null,current:current||null,valuation};
+  }).filter(x=>x.qty&&x.valuation);
+  return {total:rows.reduce((s,x)=>s+x.valuation,0),rows};
+}
+function hedgeAtTp(bots){
+  const shorts=bots.filter(b=>b.side==='SHORT');
+  const pnl=shorts.reduce((s,b)=>{
+    if(!Number.isFinite(b.investment)||!Number.isFinite(b.current)||!Number.isFinite(b.tp))return s;
+    return s;
+  },0);
+  return {count:shorts.length,pnl};
+}
+function portfolioAtTp(data,bots){
+  const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
+  const botBase=longs.reduce((s,b)=>s+b.coinQty*b.tp,0);
+  const spot=spotAtTp(data,bots);
+  const base=botBase+spot.total;
+  const rows=[['KONSERVATIV',0],['BASIS',.05],['VOLATILER GRID-PFAD',.10]];
+  return `<details class="trade-r12-bot" open><summary><div><b>PORTFOLIO @ TP</b><small>Bots + erkannte Spot-Bestände</small></div><div class="trade-r12-summary-right"><strong>${usd(base,0)}</strong><small>vor Hedge-Anpassung</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid"><div><span>BOT-COINS @ TP</span><b>${usd(botBase,0)}</b></div><div><span>SPOT @ BOT-TP</span><b>${usd(spot.total,0)}</b></div><div><span>BTC SHORT/HEDGE</span><b>${hedgeAtTp(bots).count} Positionen</b></div>${rows.map(([name,x])=>`<div><span>${name}</span><b>${usd(base+botBase*x,0)}</b><small>Grid-Band auf Bot-Anteil</small></div>`).join('')}</div><p class="trade-r12-hint">Spot-Coins werden mit ihrem Bot-TP bewertet, sofern vorhanden; sonst mit verfügbarem Livepreis. Hedge-PnL wird erst eingerechnet, wenn der private Backend-Datensatz Zielkurs/Positionsgröße eindeutig liefert. Keine Scheingenauigkeit.</p></div></details>`;
+}
 function tpProjection(bots){
   const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   if(!rows.length)return '';
@@ -123,7 +153,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${portfolioAtTp(data,bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
