@@ -132,6 +132,21 @@ function coinCompounding(bots){
   }).join('');
   return `<details class="trade-r12-bot"><summary><div><b>COIN COMPOUNDING @ TP</b><small>Stückzahl-Projektion je Long-Bot</small></div><div class="trade-r12-summary-right"><strong>${rows.length}</strong><small>Assets/Bots</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${body}</div><p class="trade-r12-hint">R52 ersetzt die pauschalen +5%/+10% durch ein Range-/Grid-/Current-/TP-basiertes Modell. Es ist weiterhin eine Modellrechnung: Gebühren, Funding, Re-Entries und reale Oszillation werden erst mit vollständiger Execution-History exakt replaybar.</p></div></details>`;
 }
+function milestone100k(data,bots){
+  const target=100000;
+  const current=positive(data?.portfolio?.totalUsd)??positive(data?.portfolio?.totalValueUsd)??positive(data?.totalPortfolioUsd);
+  const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
+  const modeled=longs.reduce((s,b)=>{
+    const m=gridPathModel(b);
+    return s+(b.coinQty+(m?.estimatedExtraQty||0))*b.tp;
+  },0);
+  const spot=spotAtTp(data,bots).total;
+  const tpTotal=modeled+spot;
+  const currentPct=Number.isFinite(current)?Math.min(100,current/target*100):null;
+  const tpPct=Math.min(100,tpTotal/target*100);
+  const gap=Math.max(0,target-tpTotal);
+  return `<div class="trade-r12-commander tone-border-${tpTotal>=target?'safe':'watch'}"><div class="eyebrow">BULL-MARKET MILESTONE · $100K</div><div class="trade-r12-grid"><div><span>AKTUELL</span><b>${usd(current,0)}</b><small>${Number.isFinite(currentPct)?pct(currentPct,1):'Portfolio-Feed fehlt'}</small></div><div><span>MODELL @ TP</span><b>${usd(tpTotal,0)}</b><small>${pct(tpPct,1)} vom Ziel</small></div><div><span>ABSTAND ZU $100K</span><b>${usd(gap,0)}</b></div><div><span>ZIELSTATUS</span><b>${tpTotal>=target?'MODELL ≥ $100K':'NOCH OFFEN'}</b></div></div><p class="trade-r12-hint">Zieltracking, keine Prognose. TP-Modell berücksichtigt Long-Bot-Coins + pfadbasierten Grid-Proxy + erkannte Spotbestände. BTC-Hedge-PnL, Fees/Funding und reale Fill-Sequenz bleiben separat.</p></div>`;
+}
 function portfolioAtTp(data,bots){
   const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   const botBase=longs.reduce((s,b)=>s+b.coinQty*b.tp,0);
@@ -177,7 +192,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}${portfolioAtTp(data,bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${milestone100k(data,bots)}${portfolioAtTp(data,bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
