@@ -6,7 +6,7 @@ const FALLBACK=[
 {id:'SOL-4X',symbol:'SOL',leverage:4,lower:55,upper:185,be:115.655,liq:66.51,tp:185,investCoin:58.807,price:115.553,createdPrice:115.6,grids:374},
 {id:'XRP-4X',symbol:'XRP',leverage:4,lower:.85,upper:1.8501,be:1.4442,liq:.9163,tp:1.8501,investCoin:1868.17},
 {id:'HBAR-5X-A',symbol:'HBAR',leverage:5,lower:.06,upper:.12,be:.08569,liq:.0606,tp:.12,investCoin:10800,dynamicMargin:2200},{id:'HBAR-5X-B',symbol:'HBAR',leverage:5,lower:.06,upper:.125,be:.08622,liq:.06343,tp:.125,investCoin:5000},{id:'HBAR-3X-C',symbol:'HBAR',leverage:3,lower:.05,upper:.15,be:.08682,liq:.05198,tp:.15,investCoin:7990.15},
-{id:'SUI-4X-A',symbol:'SUI',leverage:4,lower:.6,upper:1.45,be:.834,liq:.616,tp:1.45,investCoin:1020.35},{id:'SUI-3X-B',symbol:'SUI',leverage:3,lower:.5,upper:1.5,be:.9382,liq:.5353,tp:1.5,investCoin:527.03},
+{id:'SUI-3X',symbol:'SUI',leverage:3,lower:.6,upper:1.5,be:1.038,liq:.6089,tp:1.5,investCoin:1820.26,price:1.0375,createdPrice:1.0375,grids:289},
 {id:'ADA-4X-A',symbol:'ADA',leverage:4,lower:.125,upper:.35,be:.2264,liq:.142,tp:.35,investCoin:4545.21},{id:'ADA-3X-B',symbol:'ADA',leverage:3,lower:.125,upper:.5,be:.2322,liq:.1361,tp:.5,investCoin:2154.21},
 {id:'PEPE-4X-A',symbol:'PEPE',leverage:4,lower:.000002,upper:.000006,be:.0000040029,liq:.000002368,tp:.000006,investCoin:73524672.71},{id:'PEPE-3X-B',symbol:'PEPE',leverage:3,lower:.000002,upper:.000006,be:.0000040029,liq:.0000021748,tp:.000006,investCoin:31670289.08},
 {id:'AVAX-5X',symbol:'AVAX',leverage:5,lower:6,upper:14.5,be:11.175,liq:7.115,tp:14.5,investCoin:108.55}
