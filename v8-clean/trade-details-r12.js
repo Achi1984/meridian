@@ -40,6 +40,9 @@ function normalizeBot(b,data){
     current:positive(data?.livePrices?.[symbol]?.price)??positive(b?.currentPrice)??positive(b?.markPrice),
     pnl:explicitNumber(b,['pnlUsd','unrealizedPnlUsd','pnl']),
     investment:positive(b?.investmentUsd)??positive(b?.investedUsd)??positive(b?.marginUsd),
+    entry:positive(b?.averageEntry)??positive(b?.entryPrice)??positive(b?.createdPrice),
+    positionQty:positive(b?.positionQty)??positive(b?.contractQty)??positive(b?.basePositionQty),
+    stopLoss:positive(b?.stopLoss)??positive(b?.sl),
     tp:positive(b?.takeProfit)??positive(b?.tp)??positive(b?.takeProfitPrice),
     strategyStatus:String(b?.strategyStatus||b?.actionStatus||'').toUpperCase(),
     coinQty:positive(b?.coinQty)??positive(b?.currentInvestmentCoin)??positive(b?.investmentCoin),
@@ -100,7 +103,25 @@ function spotAtTp(data,bots){
   }).filter(x=>x.qty&&x.valuation);
   return {total:rows.reduce((s,x)=>s+x.valuation,0),rows};
 }
-function hedgeAtTp(bots){
+function shortPnlAtTarget(b,target){
+  if(!(b.side==='SHORT'&&Number.isFinite(target)&&Number.isFinite(b.entry)))return null;
+  // Prefer explicit base position quantity. Otherwise approximate notional from USD investment × leverage.
+  if(Number.isFinite(b.positionQty))return b.positionQty*(b.entry-target);
+  if(Number.isFinite(b.investment)&&Number.isFinite(b.leverage)&&b.entry>0){
+    const notional=b.investment*b.leverage;
+    return notional*(b.entry-target)/b.entry;
+  }
+  return null;
+}
+function hedgeAtTp(bots,target=100000){
+  const shorts=bots.filter(b=>b.side==='SHORT');
+  const rows=shorts.map(b=>{
+    const effectiveTarget=Number.isFinite(b.stopLoss)&&target>=b.stopLoss?b.stopLoss:target;
+    return {b,target:effectiveTarget,pnl:shortPnlAtTarget(b,effectiveTarget)};
+  });
+  const known=rows.filter(x=>Number.isFinite(x.pnl));
+  return {count:shorts.length,known:known.length,pnl:known.reduce((s,x)=>s+x.pnl,0),rows};
+}
   const shorts=bots.filter(b=>b.side==='SHORT');
   const pnl=shorts.reduce((s,b)=>{
     if(!Number.isFinite(b.investment)||!Number.isFinite(b.current)||!Number.isFinite(b.tp))return s;
@@ -156,19 +177,22 @@ function milestone100k(data,bots){
     return s+(b.coinQty+(m?.estimatedExtraQty||0))*b.tp;
   },0);
   const spot=spotAtTp(data,bots).total;
-  const tpTotal=modeled+spot;
+  const hedge=hedgeAtTp(bots,100000);
+  const tpTotal=modeled+spot+hedge.pnl;
   const currentPct=Number.isFinite(current)?Math.min(100,current/target*100):null;
   const tpPct=Math.min(100,tpTotal/target*100);
   const gap=Math.max(0,target-tpTotal);
-  return `<div class="trade-r12-commander tone-border-${tpTotal>=target?'safe':'watch'}"><div class="eyebrow">BULL-MARKET MILESTONE · $100K</div><div class="trade-r12-grid"><div><span>AKTUELL</span><b>${usd(current,0)}</b><small>${Number.isFinite(currentPct)?pct(currentPct,1):'Portfolio-Feed fehlt'}</small></div><div><span>MODELL @ TP</span><b>${usd(tpTotal,0)}</b><small>${pct(tpPct,1)} vom Ziel</small></div><div><span>ABSTAND ZU $100K</span><b>${usd(gap,0)}</b></div><div><span>ZIELSTATUS</span><b>${tpTotal>=target?'MODELL ≥ $100K':'NOCH OFFEN'}</b></div></div><p class="trade-r12-hint">Zieltracking, keine Prognose. TP-Modell berücksichtigt Long-Bot-Coins + pfadbasierten Grid-Proxy + erkannte Spotbestände. BTC-Hedge-PnL, Fees/Funding und reale Fill-Sequenz bleiben separat.</p></div>`;
+  return `<div class="trade-r12-commander tone-border-${tpTotal>=target?'safe':'watch'}"><div class="eyebrow">BULL-MARKET MILESTONE · $100K</div><div class="trade-r12-grid"><div><span>AKTUELL</span><b>${usd(current,0)}</b><small>${Number.isFinite(currentPct)?pct(currentPct,1):'Portfolio-Feed fehlt'}</small></div><div><span>MODELL @ TP</span><b>${usd(tpTotal,0)}</b><small>${pct(tpPct,1)} vom Ziel</small></div><div><span>ABSTAND ZU $100K</span><b>${usd(gap,0)}</b></div><div><span>ZIELSTATUS</span><b>${tpTotal>=target?'MODELL ≥ $100K':'NOCH OFFEN'}</b></div></div><p class="trade-r12-hint">Zieltracking, keine Prognose. TP-Modell berücksichtigt Long-Bot-Coins + pfadbasierten Grid-Proxy + erkannte Spotbestände. BTC-Hedge-PnL wird soweit aus privaten Positionsdaten berechenbar netto einbezogen; Fees/Funding und reale Grid-Fill-Sequenz bleiben Modellgrenzen.</p></div>`;
 }
 function portfolioAtTp(data,bots){
   const longs=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   const botBase=longs.reduce((s,b)=>s+b.coinQty*b.tp,0);
   const spot=spotAtTp(data,bots);
+  const hedge=hedgeAtTp(bots,100000);
   const base=botBase+spot.total;
+  const net=base+hedge.pnl;
   const rows=[['KONSERVATIV',0],['BASIS',.05],['VOLATILER GRID-PFAD',.10]];
-  return `<details class="trade-r12-bot" open><summary><div><b>PORTFOLIO @ TP</b><small>Bots + erkannte Spot-Bestände</small></div><div class="trade-r12-summary-right"><strong>${usd(base,0)}</strong><small>vor Hedge-Anpassung</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid"><div><span>BOT-COINS @ TP</span><b>${usd(botBase,0)}</b></div><div><span>SPOT @ BOT-TP</span><b>${usd(spot.total,0)}</b></div><div><span>BTC SHORT/HEDGE</span><b>${hedgeAtTp(bots).count} Positionen</b></div>${rows.map(([name,x])=>`<div><span>${name}</span><b>${usd(base+botBase*x,0)}</b><small>Grid-Band auf Bot-Anteil</small></div>`).join('')}</div><p class="trade-r12-hint">Spot-Coins werden mit ihrem Bot-TP bewertet, sofern vorhanden; sonst mit verfügbarem Livepreis. Hedge-PnL wird erst eingerechnet, wenn der private Backend-Datensatz Zielkurs/Positionsgröße eindeutig liefert. Keine Scheingenauigkeit.</p></div></details>`;
+  return `<details class="trade-r12-bot" open><summary><div><b>PORTFOLIO @ TP</b><small>Bots + erkannte Spot-Bestände</small></div><div class="trade-r12-summary-right"><strong>${usd(base,0)}</strong><small>vor Hedge-Anpassung</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid"><div><span>BOT-COINS @ TP</span><b>${usd(botBase,0)}</b></div><div><span>SPOT @ BOT-TP</span><b>${usd(spot.total,0)}</b></div><div><span>BTC SHORT/HEDGE</span><b>${hedge.count} Positionen · ${hedge.known} berechnet</b><small>${usd(hedge.pnl,0)} @ BTC $100k/SL</small></div><div><span>NETTO @ TP</span><b>${usd(net,0)}</b></div>${rows.map(([name,x])=>`<div><span>${name}</span><b>${usd(base+botBase*x,0)}</b><small>Grid-Band auf Bot-Anteil</small></div>`).join('')}</div><p class="trade-r12-hint">Spot-Coins werden mit ihrem Bot-TP bewertet, sofern vorhanden; sonst mit verfügbarem Livepreis. BTC-Shorts werden bis BTC $100k bzw. bis zu einem vorher liegenden SL modelliert. Explizite Positionsgröße hat Vorrang; sonst wird Notional aus Investment × Hebel approximiert. Grid-Shorts bleiben ohne vollständigen Fill-Replay näherungsweise.</p></div></details>`;
 }
 function tpProjection(bots){
   const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
