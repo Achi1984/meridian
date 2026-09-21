@@ -72,7 +72,20 @@ function normalizeBot(b){
 }
 function botRows(data){
   const xs=data?.pionexRisk?.bots;
-  return Array.isArray(xs)?xs.map(normalizeBot):[];
+  if(!Array.isArray(xs))return [];
+  // One canonical active-bot source only. Ignore rows explicitly marked closed/inactive.
+  return xs.filter(b=>!['CLOSED','INACTIVE','STOPPED','ARCHIVED'].includes(String(b?.status||b?.botStatus||'').toUpperCase())).map(normalizeBot);
+}
+function botReconciliation(bots){
+  const longs=bots.filter(b=>b.side==='LONG'),shorts=bots.filter(b=>b.side==='SHORT');
+  const unknown=bots.filter(b=>!['LONG','SHORT'].includes(b.side));
+  const duplicateIds=bots.map(b=>b.id).filter((id,i,a)=>a.indexOf(id)!==i);
+  const invalidLeverage=bots.filter(b=>!Number.isFinite(b.leverage)||b.leverage<=0);
+  return {
+    total:bots.length,longs:longs.length,shorts:shorts.length,unknown:unknown.length,
+    duplicateIds:[...new Set(duplicateIds)],invalidLeverage:invalidLeverage.map(b=>b.id),
+    consistent:unknown.length===0&&duplicateIds.length===0&&invalidLeverage.length===0
+  };
 }
 function riskState(data){
   const bots=botRows(data).filter(b=>Number.isFinite(b.buffer)).sort((a,b)=>a.buffer-b.buffer);
@@ -269,7 +282,7 @@ export async function loadTrade(){
     return {
       ok:true,locked:false,source:'PRIVATE_DASHBOARD',
       risk,criticalBot:risk.bot,bots,
-      activeCount:bots.length,
+      activeCount:bots.length,botReconciliation:botReconciliation(bots),
       tradingEquityUsd:tradingValue(data),
       nextAction:risk.next
     };
