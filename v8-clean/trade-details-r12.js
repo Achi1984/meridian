@@ -129,6 +129,15 @@ function gridPathModel(b){
   const extraQty=realizedQuote/tp;
   return {baseQty:b.coinQty,estimatedExtraQty:extraQty,levels,stepReturn,leverage:lev,notionalCoin};
 }
+function beforeAfterTp(bots){
+  const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp)).map(b=>{
+    const m=gridPathModel(b),after=b.coinQty+(m?.estimatedExtraQty||0),delta=after-b.coinQty,value=after*b.tp;
+    return {...b,after,delta,value,levels:m?.levels??null,modelLev:m?.leverage??b.leverage??1};
+  }).sort((a,b)=>b.value-a.value);
+  if(!rows.length)return '';
+  const total=rows.reduce((s,b)=>s+b.value,0);
+  return `<details class="trade-r12-bot" open><summary><div><b>VORHER → NACHHER @ TP</b><small>Leverage-aware · nach TP-Wert sortiert</small></div><div class="trade-r12-summary-right"><strong>${usd(total,0)}</strong><small>modellierter Long-Bot-Wert</small></div></summary><div class="trade-r12-detail"><div class="trade-r12-grid">${rows.map(b=>`<div><span>${esc(b.symbol)} · ${b.modelLev}x · TP ${price(b.tp)}</span><b>${b.coinQty.toLocaleString('de-DE',{maximumFractionDigits:6})} → ${b.after.toLocaleString('de-DE',{maximumFractionDigits:6})}</b><small>+${b.delta.toLocaleString('de-DE',{maximumFractionDigits:6})} ${esc(b.symbol)} · ${usd(b.value,0)} @ TP · ${b.levels??'—'} Level</small></div>`).join('')}</div><p class="trade-r12-hint">Sortierung zeigt den modellierten Beitrag der Long-Bots am jeweiligen TP. BTC-Short/Hedge, Spot außerhalb der Bots, Funding und Fees sind hier bewusst nicht vermischt.</p></div></details>`;
+}
 function coinCompounding(bots){
   const rows=bots.filter(b=>b.side==='LONG'&&Number.isFinite(b.coinQty)&&Number.isFinite(b.tp));
   if(!rows.length)return '';
@@ -198,7 +207,7 @@ async function enhance(){
     if(!bots.length)return;
     compact.dataset.r12='1';
     compact.classList.add('trade-r12-host');
-    compact.innerHTML=`${commander(bots)}${milestone100k(data,bots)}${portfolioAtTp(data,bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
+    compact.innerHTML=`${commander(bots)}${milestone100k(data,bots)}${portfolioAtTp(data,bots)}${beforeAfterTp(bots)}${coinCompounding(bots)}${tpProjection(bots)}<div class="eyebrow">AKTIVE BOTS · DETAILS AUF ABRUF</div><p class="trade-r12-hint">15m Monitor · TP-or-Invalidation · nur neue handlungsrelevante Statuswechsel · Current / BE / Liq / TP / Grid vs Trend</p>${bots.map(card).join('')}`;
   }catch(_e){/* keep canonical compact TRADE card intact on read failure */}
 }
 
