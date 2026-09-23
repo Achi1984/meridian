@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const clean=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
 
-test('production root redirects only to clean v8 shell',()=>{
+test('production root redirects to canonical v9 shell',()=>{
   assert.match(root,/location\.replace\(target\+q\+h\)/);
   assert.match(root,/var target='\.\/v8-clean\/'/);
   assert.match(root,/8\.0-clean-r8-production/);
