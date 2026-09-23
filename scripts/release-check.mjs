@@ -43,8 +43,17 @@ must(authority.includes('MERIDIAN_RELEASE_BUILD'),'release authority global buil
 
 // Production root may be either the retained compatibility bootstrap or the deliberate clean-shell cutover.
 const index=read('index.html');
+const v9Cutover=/var target='\.\/v9\/(?:\?build=r\d+)?'/.test(index)&&/9\.0-r\d+-production/.test(index);
 const cleanCutover=index.includes("var target='./v8-clean/'")&&index.includes('8.0-clean-r8-production');
-if(cleanCutover){
+if(v9Cutover){
+  must(index.includes('location.replace(target+q+h)'),'v9 root redirect must preserve query/hash');
+  must(!index.includes('app-v6.06.js'),'v9 root must not initialize compatibility loader');
+  const v9=read('v9/index.html');
+  for(const key of ['command','bots','market','research','more']){
+    must(v9.includes(`id="view-${key}"`),`v9 production target missing view-${key}`);
+    must(v9.includes(`data-v="${key}"`),`v9 production target missing route ${key}`);
+  }
+}else if(cleanCutover){
   must(index.includes('location.replace(target+q+h)'),'clean root redirect must preserve query/hash');
   must(!index.includes('app-v6.06.js'),'clean root must not initialize compatibility loader');
   const clean=read('v8-clean/index.html');
@@ -137,4 +146,4 @@ must(!/caches\.open\s*\(/.test(sw),'service worker must not create an applicatio
 const server=read('server.js');
 must(server.includes('if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");'),'paper-only invariant missing');
 
-console.log('MERIDIAN release check OK',v,build,cleanCutover?'entry=v8-clean':'entry=compatibility');
+console.log('MERIDIAN release check OK',v,build,v9Cutover?'entry=v9':cleanCutover?'entry=v8-clean':'entry=compatibility');

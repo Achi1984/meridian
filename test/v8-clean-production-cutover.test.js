@@ -7,8 +7,8 @@ const clean=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'u
 
 test('production root redirects to canonical v9 shell',()=>{
   assert.match(root,/location\.replace\(target\+q\+h\)/);
-  assert.match(root,/var target='\.\/v9\/'/);
-  assert.match(root,/9\.0-command-r1-production/);
+  assert.match(root,/var target='\.\/v9\/(?:\?build=r\d+)?'/);
+  assert.match(root,/9\.0-r\d+-production/);
   assert.doesNotMatch(root,/app-v6\.06|app-v7\.|app-v8\.0-navigation|primaryBottomNav|legacy\.click/);
 });
 
