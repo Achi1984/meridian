@@ -24,7 +24,7 @@ const FALLBACK=[
 {id:'WIF-SHORT-6X',symbol:'WIF',side:'SHORT',leverage:6,lower:.1,upper:.5,be:.2441,liq:.3131,tp:.135,investCoin:408.44,price:.2275,createdPrice:.2435,grids:546,profitPct:27.92}
 ];
 const HEDGES=[
-{id:'BTC-HEDGE-PIONEX-20X',venue:'Pionex',symbol:'BTC',side:'SHORT',leverage:20,investCoin:.00818,entry:85098.8,be:85080.1,liq:105327.4,sl:null,lower:70990.5,upper:106485.7,tp:70990.5,dynamicMargin:.01537,price:85780.9,grids:181,note:'BTC Short Grid'},
+{id:'BTC-HEDGE-PIONEX-7X',venue:'Pionex',symbol:'BTC',side:'SHORT',leverage:7,investCoin:.00631,entry:84265.6,be:84246.2,liq:103105.8,sl:null,lower:65000,upper:105800,tp:65000,dynamicMargin:0,price:84334.3,grids:161,note:'BTC COIN-M Short Grid · confirmed 23.09.2026 21:01'},
 {id:'BTC-HEDGE-OKX-7X',venue:'OKX',symbol:'BTC',side:'SHORT',leverage:7,investCoin:.0116,entry:85990.6,be:85990.6,liq:97591.7,sl:97500,price:86016.6,tps:[{price:84600,coin:.0029},{price:81800,coin:.0034},{price:74300,coin:.0029}],runnerCoin:.0024,note:'TP1 → SL auf Entry ~85.990–86.050'}
 ];
 const OKX_POSITIONS=[
