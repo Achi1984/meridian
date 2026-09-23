@@ -38,7 +38,7 @@ const OKX_POSITIONS=[
 {id:'OKX-XRP-LONG-3X',venue:'OKX',symbol:'XRP',side:'LONG',leverage:3,sizeCoin:103,marginUsd:54.57,entry:1.5899,price:1.4987,liq:1.0824,pnlUsd:-9.39,pnlPct:-17.20}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,hedge:HEDGE,hedges:HEDGES,okxPositions:OKX_POSITIONS,manualPositions:MANUAL_POSITIONS,source:'REFERENCE',market:null,intel:null,assetIntel:{},portfolio:null,error:null,manual:{pionex:23326.51,bitpanda:0,ledger:776.74,okx:120.27}};
+const state={bots:FALLBACK,hedge:HEDGE,hedges:HEDGES,okxPositions:OKX_POSITIONS,manualPositions:MANUAL_POSITIONS,source:'REFERENCE',market:null,intel:null,assetIntel:{},portfolio:null,error:null,manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:120.27}};
 const $=s=>document.querySelector(s),num=v=>Number.isFinite(Number(v))?Number(v):null;
 const money=x=>{x=num(x);if(x==null)return'—';if(x<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function token(){try{return String(localStorage.getItem(TOKEN_KEY)||'').trim()}catch{return''}}
@@ -81,8 +81,8 @@ function mergeReference(live){
   /* Dashboard is intentionally pinned to the verified 13-bot COIN-M roster.
      Unmatched API rows are often stale/partial bot records and must not create phantom cards.
      Live values are allowed to enrich a verified reference bot only after a confident match. */
-  const extras=live.filter((x,i)=>!used.has(i)&&!refs.some(ref=>ref.symbol===x.symbol&&ref.side===(x.side||'LONG')));
-  return refs.concat(extras);
+  /* Never promote unmatched API rows into the active roster. */
+  return refs;
 }
 
 function ema(v,p){if(v.length<p)return null;const k=2/(p+1);let e=v.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<v.length;i++)e=v[i]*k+e*(1-k);return e}
