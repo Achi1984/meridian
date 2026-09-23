@@ -7,12 +7,12 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="meridian-build" content="9.0-command-r2-production">
+  <meta name="meridian-build" content="9.0-r11-production">
   <title>ACHI MERIDIAN</title>
   <script>
     (function(){
-      var target='./v9/';
-      var q=location.search||'';
+      var target='./v9/?build=r11';
+      var q=(location.search?'&'+location.search.slice(1):'');
       var h=location.hash||'';
       location.replace(target+q+h);
     })();
