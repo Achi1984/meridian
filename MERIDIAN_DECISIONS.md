@@ -200,3 +200,19 @@ This file records durable project decisions and the reasoning behind them. Read 
 - A mixed page must say MIXED rather than implying the whole dashboard is live.
 
 **Reason:** r16 iPhone validation exposed that stale reference PnL could still produce apparently actionable Profit Lock outputs and that the generic money formatter treated all negative numbers as tiny values. Source provenance is therefore part of decision correctness, not merely presentation.
+
+
+## D-026 — Private snapshot freshness is mandatory for trading actions
+
+**Decision:** Data returned by `/api/private/dashboard` is a private persisted snapshot unless an explicit Pionex section timestamp proves freshness. It must not be described as a live Pionex API feed.
+
+**Rules:**
+- A Pionex bot row may be matched to a tracked bot for context, but it is actionable only when the `pionexRisk` section carries a trusted `updatedAt` or `snapshotAt` no older than 15 minutes and the row contains PnL.
+- Generic `privateUpdatedAt` is display-only legacy provenance because other private sections can refresh it without refreshing bot state.
+- Stale or untimestamped bot snapshots cannot drive Profit Lock, NEXT ACTION, Risk Priority, aggregate bot exposure, or asset-pair Risk Cockpit recommendations.
+- Public market prices may remain fresh independently and are still cross-checked between OKX and Binance.
+- The dashboard must show raw private API bot-row count, matched count, unmatched count and snapshot age so a backend coverage problem is distinguishable from a matcher problem.
+- Bot top-right status labels are explicitly scoped to liquidation risk (LIQ SAFE/WATCH/MARGIN) rather than implying overall safety.
+- Any authenticated `pionexRisk` update without its own timestamp is stamped server-side with the update time.
+
+**Reason:** r17 iPhone validation showed only 2/25 tracked bots matched while 14 assets had two-source market prices. The private dashboard backend is a persisted snapshot store, not proof of a live Pionex bot feed. Correctness therefore requires freshness to be part of the action contract.

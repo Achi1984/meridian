@@ -177,3 +177,19 @@ Required invariants:
 - negative money formatting uses absolute magnitude
 - header reports MIXED when the page combines live market data with snapshots/reference data
 - Research label distinguishes Profit Lock Lab engine r15 from the current app release
+
+
+## v9 r18 — Source Freshness / Feed Coverage
+
+r17 iPhone acceptance exposed the next blocker: only 2/25 tracked bots are present/matched in the private bot data while public price coverage is broad.
+
+r18 requirements:
+- private dashboard bot data is labelled snapshot/private, never assumed live
+- `pionexRisk.updatedAt` or `snapshotAt` is required for trusted freshness
+- action freshness window is 15 minutes
+- generic `privateUpdatedAt` is not enough for trading actions
+- stale snapshots produce SYNC/STALE and cannot drive Profit Lock, NEXT ACTION, Risk Priority or bot exposure
+- Data Truth shows raw API rows, matched rows, unmatched rows, snapshot age, actionable rows, two-source price coverage
+- if raw rows == matched rows but tracked > matched, backend coverage is the bottleneck; if raw rows > matched, matcher coverage is the bottleneck
+- LIQ labels are explicitly scoped to liquidation status
+- future authenticated Pionex risk patches are server-stamped when no section timestamp is provided

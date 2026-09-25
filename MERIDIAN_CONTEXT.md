@@ -145,3 +145,16 @@ Physical iPhone validation of v9 r16 confirmed the cache fix and the new market-
 - the Research screen showed engine r15 while the app was r16 without clarifying that distinction
 
 r17 addresses these as correctness issues: source-aware action gating, two-source market price cross-check, live-only actionable risk/exposure paths, missing-value preservation, negative-money formatting, mixed-data status and clearer Research engine labeling.
+
+
+## v9 r18 Source Freshness checkpoint
+
+Physical iPhone validation of r17 confirmed:
+- r17 deployed correctly and reports MIXED instead of global LIVE.
+- negative PnL formatting is fixed (e.g. XRP -$71.39 rather than thousands-scale output).
+- public prices show PIONEX + OKX + BINANCE where cross-checking succeeds.
+- only 2 of 25 tracked bot rows are currently matched from the private bot snapshot.
+- 14 assets have two-source public price coverage.
+- the current UI can therefore distinguish price freshness from bot-state coverage, but r17 still used the misleading term LIVE MATCH and did not require a trusted bot-snapshot timestamp.
+
+r18 changes the contract from “matched = live” to “matched + timestamp freshness + PnL = actionable”. It also exposes PRIVATE API ROWS and UNMATCHED API to determine whether low coverage comes from the backend snapshot or the matcher.

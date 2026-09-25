@@ -37,3 +37,18 @@ test('receipt does not echo private payload',()=>{
   const receipt=privateDashboardPublicReceipt(merged,{dryRun:true});
   assert.deepEqual(receipt,{ok:true,dryRun:true,revision:1,previousRevision:0,updatedSections:['portfolio'],updatedAt:'2026-09-03T04:40:00.000Z'});
 });
+
+
+test('pionexRisk patches get a fresh section timestamp when caller omits one',()=>{
+  const current={privateRevision:2,pionexRisk:{updatedAt:'2026-09-01T00:00:00.000Z',bots:[{id:'old'}]}};
+  const x=mergePrivateDashboard(current,{expectedRevision:2,patch:{pionexRisk:{bots:[{id:'new'}]}}},{now:'2026-09-25T04:10:00.000Z'});
+  assert.equal(x.ok,true);
+  assert.equal(x.data.pionexRisk.updatedAt,'2026-09-25T04:10:00.000Z');
+});
+
+test('pionexRisk caller snapshotAt is preserved as authoritative section timestamp',()=>{
+  const x=mergePrivateDashboard({}, {patch:{pionexRisk:{snapshotAt:'2026-09-25T04:05:00.000Z',bots:[]}}},{now:'2026-09-25T04:10:00.000Z'});
+  assert.equal(x.ok,true);
+  assert.equal(x.data.pionexRisk.snapshotAt,'2026-09-25T04:05:00.000Z');
+  assert.equal(x.data.pionexRisk.updatedAt,undefined);
+});
