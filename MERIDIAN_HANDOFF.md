@@ -161,3 +161,19 @@ Operational defaults:
 - trading logic gets technical + methodology review
 - live financial data uses a second source when technically possible
 - if the runtime cannot instantiate the requested agent/model roles, do not fabricate them; disclose the actual verification level
+
+
+## v9 r17 — Data Truth
+
+r16 was physically validated on the user's iPhone. The next production checkpoint is r17 Data Truth.
+
+Required invariants:
+- tracked/reference bot rows remain visible for context but are non-actionable unless confidently live-matched
+- Profit Lock requires live bot match + live PnL
+- Risk Priority / NEXT ACTION cannot be driven by reference-only PnL
+- exposure figures use known live capital only and disclose incompleteness
+- market prices are cross-checked OKX + Binance when available
+- null/blank remains unavailable, never zero
+- negative money formatting uses absolute magnitude
+- header reports MIXED when the page combines live market data with snapshots/reference data
+- Research label distinguishes Profit Lock Lab engine r15 from the current app release
