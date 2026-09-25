@@ -145,3 +145,19 @@ This update supersedes earlier current-status and next-step text where it confli
 - **Elliott Wave-5 V1:** rejected for insufficient opportunity count and unstable/weak side/window evidence. PR #90; final head `5f30cce5fc64778c83fcb03e33edc39dc3003f0c`; Evidence #2 run `34147347479`; artifact `10028158787`; Release Safety #843.
 - **Guardrails unchanged:** Baseline 6.2 frozen, PAPER only, live off, no paper/live connection, `server.js` untouched, Pionex untouched.
 - **Next:** physical-iPhone PAPER validation of R19 when deployed; keep Wave-3 and FIB V3 frozen; no immediate Elliott ABC/variant tuning series. Any new bot starts from a distinct predeclared hypothesis, gates, assets, windows and folds.
+
+
+## Agent workflow handoff
+
+Before starting new work, read `MERIDIAN_AGENT_WORKFLOW.md` together with CONTEXT / DECISIONS / HANDOFF.
+
+Operational defaults:
+- quality over speed
+- user communicates only with Main Agent
+- specialist -> independent reviewer -> max 3 revision loops -> Main Agent integration
+- no merge without required GREEN LIGHT / available quality gates
+- autonomous PR/merge remains allowed after gates pass
+- iPhone review is mandatory for UI changes
+- trading logic gets technical + methodology review
+- live financial data uses a second source when technically possible
+- if the runtime cannot instantiate the requested agent/model roles, do not fabricate them; disclose the actual verification level
