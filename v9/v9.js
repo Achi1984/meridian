@@ -38,7 +38,7 @@ const OKX_POSITIONS=[
 {id:'OKX-XRP-LONG-3X',venue:'OKX',symbol:'XRP',side:'LONG',leverage:3,sizeCoin:103,marginUsd:54.57,entry:1.5899,price:1.4987,liq:1.0824,pnlUsd:-9.39,pnlPct:-17.20}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,hedge:HEDGE,hedges:HEDGES,okxPositions:OKX_POSITIONS,manualPositions:MANUAL_POSITIONS,source:'REFERENCE',market:null,intel:null,assetIntel:{},portfolio:null,error:null,manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:120.27}};
+const state={bots:FALLBACK,hedge:HEDGE,hedges:HEDGES,okxPositions:OKX_POSITIONS,manualPositions:MANUAL_POSITIONS,source:'REFERENCE',market:null,intel:null,assetIntel:{},portfolio:null,error:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:120.27}};
 const $=s=>document.querySelector(s),num=v=>Number.isFinite(Number(v))?Number(v):null;
 const money=x=>{x=num(x);if(x==null)return'—';if(x<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function token(){try{return String(localStorage.getItem(TOKEN_KEY)||'').trim()}catch{return''}}
@@ -237,9 +237,95 @@ function hedgeCard(){const hs=state.hedges||[state.hedge];return hs.map(h=>{cons
 function assetGroup(symbol,items){const exposure=items.reduce((s,b)=>s+(num(b.invest)||0),0),worst=Math.min(...items.map(b=>risk(b)??999)),rv=items.map(riskV2).sort((a,b)=>b.score-a.score)[0];return botGroup(symbol+' · '+items.length+' BOT'+(items.length===1?'':'S')+' · '+rv.label,(exposure?money(exposure)+' live capital · ':'')+(worst<999?worst.toFixed(1)+'% Liq · ':'')+rv.share.toFixed(1)+'% Exposure · Risk '+rv.score,items)}
 function bots(){const order=['BTC','ETH','SOL','XRP','HBAR','PEPE','DOT','ADA','SUI','AVAX','LINK','XLM','TRX','WIF'];const groups=order.map(s=>assetGroup(s,state.bots.filter(b=>b.symbol===s))).join('');return `<section class="hero bot-hero"><div class="eyebrow">BOT CONTROL CENTER · ${state.source}</div><h1>PIONEX COIN-M</h1><p class="muted">${state.bots.length} Referenz-Grid-Bots · ${new Set(state.bots.map(b=>b.symbol)).size} Assets · nach Asset gruppiert</p></section>${regimeStrip()}${exposureStrip()}${hedgeCard()}${manualPositionCard()}${groups}`}
 function market(){const i=state.intel;return `<section class="hero"><div class="eyebrow">MARKET + BODEN</div><h1>BTC REGIME</h1><p class="muted">1D Regime · 4h Struktur · 1h Setup · 15m Trigger · OKX USDT-SWAP</p></section><div class="grid"><section class="metric"><span>REGIME</span><b>${state.market||'SYNC'}</b><small>${i?money(i.price):'Market sync'}</small></section><section class="metric"><span>RSI 15m / 1h</span><b>${i?i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1):'SYNC'}</b><small>Trigger · Setup</small></section><section class="metric"><span>RSI 4h / 1D</span><b>${i?i.rsi4.toFixed(1)+' · '+i.rsi1d.toFixed(1):'SYNC'}</b><small>Struktur · Regime</small></section><section class="metric"><span>MACD 15m / 1h</span><b>${i&&i.macd15&&i.macd1h?i.macd15.hist.toFixed(2)+' · '+i.macd1h.hist.toFixed(2):'SYNC'}</b><small>Timing momentum</small></section><section class="metric"><span>MACD 4h</span><b>${i&&i.macd4?i.macd4.hist.toFixed(2):'SYNC'}</b><small>Structure momentum</small></section><section class="metric"><span>EMA 20 / 50</span><b>${i?money(i.ema20)+' / '+money(i.ema50):'SYNC'}</b><small>1D trend</small></section><section class="metric"><span>NEAREST FIB</span><b>${i?i.near.f.toFixed(3)+' · '+money(i.near.price):'SYNC'}</b><small>90 × 4h swing</small></section><section class="metric"><span>ATR 4H</span><b>${i?money(i.atr):'SYNC'}</b><small>Range width input</small></section><section class="metric"><span>NEXT RANGE SCORE</span><b class="${i&&i.status==='RE-ENTRY READY'?'tone-safe':'wait'}">${i?i.score+'/100':'SYNC'}</b><small>${i?i.status:'loading'}</small></section></div>`}
-function research(){return `<section class="hero"><div class="eyebrow">RESEARCH</div><h1>NEXT RANGE LAB</h1><p class="muted">Keine Auswirkung auf echte Pionex-Bots.</p></section><section class="card"><b>BTC NEXT RANGE / COMPOUND V1</b><p>TP → Reload Reserve → WAIT FOR RETRACE → bestätigter Re-Entry.</p><small>Fib · RSI · MACD · EMA · ATR · Walk-forward / Holdout</small></section>`}
+function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+async function binanceHistory(interval,limit,symbol){
+ let rows=[],endTime=null;const marketSymbol=({PEPE:'1000PEPE'}[symbol]||symbol)+'USDT';
+ while(rows.length<limit){
+  const take=Math.min(1000,limit-rows.length),u='https://api.binance.com/api/v3/klines?symbol='+marketSymbol+'&interval='+interval+'&limit='+take+(endTime!=null?'&endTime='+endTime:'');
+  const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('Binance history '+r.status);
+  const j=await r.json();if(!Array.isArray(j)||!j.length)break;
+  const batch=j.map(x=>({openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
+  rows=batch.concat(rows);endTime=batch[0].openTime-1;if(batch.length<take)break
+ }
+ const dedup=[...new Map(rows.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime);
+ return dedup.slice(-limit)
+}
+function latestIndexAt(rows,ts){let lo=0,hi=rows.length-1,ans=-1;while(lo<=hi){const m=(lo+hi)>>1;if(rows[m].openTime<=ts){ans=m;lo=m+1}else hi=m-1}return ans}
+function histSignal(rows1,i1,rows4,i4,side){
+ const s1=rows1.slice(Math.max(0,i1-119),i1+1),s4=rows4.slice(Math.max(0,i4-119),i4+1),c1=s1.map(x=>x.close),c4=s4.map(x=>x.close);
+ const R1=rsi(c1),R4=rsi(c4),M1=macd(c1),M4=macd(c4),e20=ema(c1,20),e50=ema(c1,50),p=c1.at(-1);
+ if([R1,R4,e20,e50,p].some(x=>x==null)||!M1||!M4)return null;
+ let score=0;
+ if(side==='LONG'){if(R1>=70)score++;if(R4>=68)score++;if(M1.hist<0)score+=2;if(M4.hist<0)score+=2;if(p<e20)score+=2;if(e20<e50)score++}
+ else{if(R1<=30)score++;if(R4<=32)score++;if(M1.hist>0)score+=2;if(M4.hist>0)score+=2;if(p>e20)score+=2;if(e20>e50)score++}
+ return{rsi1:R1,rsi4:R4,macd1:M1,macd4:M4,e20,e50,price:p,action:signalAction(score),score}
+}
+function entrySetup(rows1,i1,rows4,i4,side){
+ const s=histSignal(rows1,i1,rows4,i4,side);if(!s)return false;
+ if(side==='LONG')return s.rsi1>=42&&s.rsi1<=65&&s.rsi4>=40&&s.rsi4<=68&&s.macd1.hist>0;
+ return s.rsi1>=35&&s.rsi1<=58&&s.rsi4>=32&&s.rsi4<=60&&s.macd1.hist<0
+}
+function backtestLeverage(symbol,side){const a=state.bots.filter(b=>b.symbol===symbol&&(b.side||'LONG')===side).map(b=>num(b.leverage)).filter(x=>x>0).sort((a,b)=>a-b);return a.length?a[Math.floor(a.length/2)]:4}
+function desiredLock(action,pnl,tpRemain){
+ if(action==='WATCH PROFIT')return tpRemain<=5&&pnl>=8?.20:0;
+ if(action==='PROFIT LOCK CANDIDATE'){if(pnl>=20||(tpRemain<=5&&pnl>=10))return .25;if(pnl>=8)return .20;return 0}
+ if(action==='RISK REVIEW'){if(pnl>=20||(tpRemain<=3&&pnl>=12))return .50;if(pnl>=8)return .25;if(pnl>=3)return .20}
+ return 0
+}
+function simulatePolicyTrade(rows1,rows4,start,side,leverage,horizon=120){
+ const entry=rows1[start].close,i4=latestIndexAt(rows4,rows1[start].openTime);if(i4<20)return null;
+ const a4=atr(rows4.slice(Math.max(0,i4-30),i4+1),14),atrPct=a4&&entry>0?a4/entry*100:3,target=clamp(atrPct*2.5,4,14);
+ let locked=0,realized=0,lockEvents=0,maxFav=0,maxAdv=0,exit=start+horizon,hitTp=false,finalRet=0;
+ const dirRet=p=>side==='LONG'?(p-entry)/entry*100:(entry-p)/entry*100;
+ for(let i=start+1;i<=Math.min(rows1.length-1,start+horizon);i++){
+  const b=rows1[i],fav=side==='LONG'?dirRet(b.high):dirRet(b.low),adv=side==='LONG'?dirRet(b.low):dirRet(b.high);
+  maxFav=Math.max(maxFav,fav);maxAdv=Math.min(maxAdv,adv);
+  if(fav>=target){exit=i;hitTp=true;finalRet=target;break}
+  const ret=dirRet(b.close),j4=latestIndexAt(rows4,b.openTime),sig=j4>=0?histSignal(rows1,i,rows4,j4,side):null;
+  if(sig&&ret>0){
+   const pnl=ret*leverage,tpRemain=Math.max(0,target-ret),want=desiredLock(sig.action,pnl,tpRemain);
+   if(want>locked){const add=want-locked;realized+=add*ret;locked=want;lockEvents++}
+  }
+  finalRet=ret;exit=i
+ }
+ const baseline=hitTp?target:finalRet,policy=realized+(1-locked)*baseline;
+ return{baseline,policy,locked,lockEvents,target,hitTp,maxFav,maxAdv,exit}
+}
+function maxDrawdownFromReturns(rs){let eq=1,peak=1,dd=0;for(const r of rs){eq*=Math.max(.01,1+r/100);peak=Math.max(peak,eq);dd=Math.min(dd,(eq-peak)/peak*100)}return Math.abs(dd)}
+function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0}
+function summarizeBacktest(trades){
+ const b=trades.map(x=>x.baseline),p=trades.map(x=>x.policy),lost=trades.map(x=>Math.max(0,x.baseline-x.policy)),saved=trades.map(x=>Math.max(0,x.policy-x.baseline));
+ return{trades:trades.length,baselineAvg:avg(b),policyAvg:avg(p),delta:avg(p)-avg(b),baselineWin:b.filter(x=>x>0).length/(b.length||1)*100,policyWin:p.filter(x=>x>0).length/(p.length||1)*100,baselineDD:maxDrawdownFromReturns(b),policyDD:maxDrawdownFromReturns(p),lockTrades:trades.filter(x=>x.locked>0).length,avgLocked:avg(trades.filter(x=>x.locked>0).map(x=>x.locked*100)),missedUpside:avg(lost),savedDownside:avg(saved),tpHits:trades.filter(x=>x.hitTp).length}
+}
+function runSideBacktest(rows1,rows4,symbol,side){
+ const horizon=120,lev=backtestLeverage(symbol,side),trades=[];let i=Math.max(240,Math.floor(rows1.length*.1));
+ while(i<rows1.length-horizon&&trades.length<28){
+  const i4=latestIndexAt(rows4,rows1[i].openTime);
+  if(i4>60&&entrySetup(rows1,i,rows4,i4,side)){const t=simulatePolicyTrade(rows1,rows4,i,side,lev,horizon);if(t){trades.push(t);i=t.exit+18;continue}}
+  i+=6
+ }
+ return{side,leverage:lev,metrics:summarizeBacktest(trades),trades}
+}
+async function runProfitBacktest(symbol){
+ const [h1,h4]=await Promise.all([binanceHistory('1h',2600,symbol),binanceHistory('4h',760,symbol)]);
+ if(h1.length<600||h4.length<180)throw new Error('Zu wenig History für '+symbol);
+ const first=new Date(h1[0].openTime).toISOString().slice(0,10),last=new Date(h1.at(-1).openTime).toISOString().slice(0,10);
+ return{symbol,first,last,long:runSideBacktest(h1,h4,symbol,'LONG'),short:runSideBacktest(h1,h4,symbol,'SHORT'),method:'1h setup + 4h structure · 5d horizon · volatility-normalized TP · current leverage proxy'}
+}
+function btTone(m){return m.delta>0&&m.policyDD<=m.baselineDD?'safe':m.policyDD<m.baselineDD?'watch':'danger'}
+function btVerdict(m){return m.trades<6?'LOW SAMPLE':m.delta>0&&m.policyDD<=m.baselineDD?'PROMISING':m.policyDD+1<m.baselineDD?'DEFENSIVE EDGE':'NO CLEAR EDGE'}
+function btSideCard(x){const m=x.metrics,t=btTone(m);return `<article class="bt-side"><div class="bt-side-head"><div><span>${x.side}</span><b>${btVerdict(m)}</b></div><small>${m.trades} Trades · ${x.leverage}x PnL-Proxy</small></div><div class="bt-metrics"><div><span>RUN TO TP</span><b>${m.baselineAvg>=0?'+':''}${m.baselineAvg.toFixed(2)}%</b></div><div><span>LOCK V2</span><b class="tone-${t}">${m.policyAvg>=0?'+':''}${m.policyAvg.toFixed(2)}%</b></div><div><span>DELTA</span><b class="tone-${t}">${m.delta>=0?'+':''}${m.delta.toFixed(2)}%</b></div><div><span>MAX DD</span><b>${m.baselineDD.toFixed(1)} → ${m.policyDD.toFixed(1)}%</b></div><div><span>WIN RATE</span><b>${m.baselineWin.toFixed(0)} → ${m.policyWin.toFixed(0)}%</b></div><div><span>LOCK TRADES</span><b>${m.lockTrades}/${m.trades}</b></div><div><span>SAVED DOWNSIDE</span><b>+${m.savedDownside.toFixed(2)}%</b></div><div><span>MISSED UPSIDE</span><b>-${m.missedUpside.toFixed(2)}%</b></div></div></article>`}
+function research(){
+ const bt=state.backtest||{},r=bt.result,assets=['BTC','ETH','SOL','XRP','HBAR','PEPE','DOT','ADA','SUI','AVAX','LINK','XLM','TRX','WIF'];
+ return `<section class="hero"><div class="eyebrow">RESEARCH · r15</div><h1>PROFIT LOCK LAB</h1><p class="muted">Paired historical policy test · identische Entries · RUN TO TP vs Profit Lock V2.</p></section><section class="bt-control"><div><span>ASSET</span><select id="bt-asset">${assets.map(a=>'<option'+(a===(bt.symbol||'BTC')?' selected':'')+'>'+a+'</option>').join('')}</select></div><button id="bt-run" ${bt.running?'disabled':''}>${bt.running?'BACKTEST LÄUFT…':'BACKTEST STARTEN'}</button><small>History: ~100 Tage · 1h Setup + 4h Struktur · keine echten Orders · Ergebnisse sind Policy-Proxies, kein exakter Grid-PnL.</small></section>${bt.error?'<section class="bt-error">'+bt.error+'</section>':''}${r?'<section class="bt-result"><div class="section-title"><h2>'+r.symbol+' · POLICY TEST</h2><small>'+r.first+' → '+r.last+'</small></div><div class="bt-side-grid">'+btSideCard(r.long)+btSideCard(r.short)+'</div><div class="bt-method">'+r.method+' · Locks werden nur stufenweise bis 20/25/50% simuliert; Rest bleibt Runner bis TP/Horizont.</div></section>':'<section class="card"><b>Warum dieser Test?</b><p>Wir testen nur die Exit-/Profit-Lock-Logik auf denselben historischen Trades. Damit vermeiden wir, Entry und Exit gleichzeitig nachträglich zu optimieren.</p><small>Startet erst nach Klick, damit keine unnötigen API-Abfragen im normalen COMMAND entstehen.</small></section>'}`
+}
+function bindResearch(){
+ const sel=$('#bt-asset'),btn=$('#bt-run');if(!sel||!btn)return;
+ sel.onchange=()=>{state.backtest.symbol=sel.value};
+ btn.onclick=async()=>{state.backtest.symbol=sel.value;state.backtest.running=true;state.backtest.error=null;state.backtest.result=null;go('research');try{state.backtest.result=await runProfitBacktest(state.backtest.symbol)}catch(e){state.backtest.error=e?.message||String(e)}finally{state.backtest.running=false;go('research')}}
+}
 function more(){return `<section class="hero"><div class="eyebrow">MORE</div><h1>PORTFOLIO + SYSTEM</h1><p class="muted">Spot/Exchanges bleiben sekundär. Live-Quelle: ${state.source}.</p></section>`}
 const render={command,bots,market,research,more};let current='command';
-function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('#view-'+v).innerHTML=render[v]()}
+function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('#view-'+v).innerHTML=render[v]();if(v==='research')bindResearch()}
 async function sync(){try{const payload=await getJson('/api/private/dashboard'),d=payload?.data||payload,live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];state.bots=live.length?mergeReference(live):FALLBACK;state.source=live.length?'LIVE':'REFERENCE';state.market=String(d?.market?.regime||d?.btcRegime?.label||d?.regime?.label||'SYNC').toUpperCase();state.portfolio=portfolioModel(d);state.error=null}catch(e){state.error=e.message;state.source='REFERENCE'}go(current)}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
