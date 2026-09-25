@@ -36,6 +36,7 @@ export function mergePrivateDashboard(current,body,{now=new Date().toISOString()
   for(const key of check.keys){
     const previous=isObject(base[key])?base[key]:{};
     base[key]={...previous,...clone(body.patch[key])};
+    if(key==='pionexRisk'&&!base[key].updatedAt&&!base[key].snapshotAt)base[key].updatedAt=now;
   }
   base.privateStorageVersion=String(base.privateStorageVersion||'1');
   base.privateRevision=currentRevision+1;
