@@ -28,7 +28,7 @@ test('v9 r17 exposure is based on confirmed live capital only',()=>{
   assert.match(js,/unknownBots/);
   assert.match(js,/KNOWN LIVE BOT LONG/);
   assert.match(js,/pair\.hedgePct!=null&&pair\.hedgePct<15/);
-  assert.match(js,/Referenzwerte dürfen keine Profit-Lock\/Next-Action Entscheidung auslösen/);
+  assert.match(js,/Referenzwerte sind nicht handlungsrelevant/);
 });
 
 test('v9 r17 cross-checks market prices and labels mixed provenance',()=>{
