@@ -167,7 +167,7 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 ## D-024 — Mandatory Main-Agent / Specialist / Review workflow
 
-**Decision:** All substantive tasks use the workflow defined in `MERIDIAN_AGENT_WORKFLOW.md`. The Main Agent is the only user-facing orchestrator and owns decomposition, integration, quality gates, PR/merge, and final delivery.
+**Decision:** All tasks use the workflow defined in `MERIDIAN_AGENT_WORKFLOW.md`. The Main Agent is the only user-facing orchestrator and owns decomposition, integration, quality gates, PR/merge, and final delivery.
 
 **Review rule:** Every specialist deliverable receives an independent review where the runtime supports true separate agents. A reviewer returns GREEN LIGHT or REVISION REQUIRED. Revision loops are capped at three. Work without GREEN LIGHT after three cycles is not silently approved or merged.
 
