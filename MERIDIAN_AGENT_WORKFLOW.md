@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the default quality process for all substantive tasks, not only software work. The Main Agent is the only agent that communicates with the user. Work is decomposed into specialist tasks whenever that materially improves quality, verification, speed, or clarity.
+This document defines the default quality process for **all tasks**, not only software work. The Main Agent is the only agent that communicates with the user. Work is decomposed into specialist tasks whenever that materially improves quality, verification, speed, or clarity.
 
 **Priority:** Quality first. Speed is secondary.
 
@@ -10,7 +10,7 @@ No result may be described as independently reviewed, model-verified, tested, de
 
 ## 1. Scope
 
-This workflow applies to MERIDIAN software, trading and market analysis, research and backtesting, UI/UX, data reconciliation, documents, plans, comparisons, technical troubleshooting, and other larger tasks where decomposition helps.
+This workflow applies to **all work**: MERIDIAN software, trading and market analysis, research and backtesting, UI/UX, data reconciliation, documents, plans, comparisons, technical troubleshooting, and small/mechanical tasks.
 
 Even small changes such as text, CSS, labels, cache tags, version changes, or one-line code fixes pass through review. Review depth may scale with risk, but review is not skipped.
 
@@ -246,7 +246,7 @@ Default behavior:
 
 ## 17. Final Result Format
 
-For substantive completed work, the Main Agent reports:
+For completed work, the Main Agent reports the following when the sections are relevant:
 
 ### What changed
 Concrete integrated result.
