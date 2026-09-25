@@ -118,7 +118,7 @@ Run the complete test suite and release synchronization on the exact R45 head. R
 
 ## Agent orchestration quality process
 
-All future substantive MERIDIAN work follows the mandatory orchestration and review process in `MERIDIAN_AGENT_WORKFLOW.md`.
+All future MERIDIAN work follows the mandatory orchestration and review process in `MERIDIAN_AGENT_WORKFLOW.md`.
 
 Key rules:
 - Main Agent is the only user-facing agent.
