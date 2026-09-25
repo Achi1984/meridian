@@ -27,6 +27,7 @@ test('v9 r17 exposure is based on confirmed live capital only',()=>{
   assert.match(js,/const confirmed=state\.bots\.filter\(liveMatched\)/);
   assert.match(js,/unknownBots/);
   assert.match(js,/KNOWN LIVE BOT LONG/);
+  assert.match(js,/pair\.hedgePct!=null&&pair\.hedgePct<15/);
   assert.match(js,/Referenzwerte dürfen keine Profit-Lock\/Next-Action Entscheidung auslösen/);
 });
 
@@ -37,6 +38,8 @@ test('v9 r17 cross-checks market prices and labels mixed provenance',()=>{
   assert.match(js,/OKX \+ BINANCE/);
   assert.match(html,/id="data-status">● REFERENCE/);
   assert.match(html,/v9 · r17 · COIN-M COMMAND CENTER/);
+  assert.match(js,/OKX POSITIONS · SNAPSHOT/);
+  assert.match(js,/PIONEX MANUAL · SNAPSHOT/);
 });
 
 test('v9 r17 research uses Binance spot symbol names and distinguishes engine version',()=>{
