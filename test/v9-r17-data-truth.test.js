@@ -17,6 +17,8 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
   assert.match(js,/if\(!liveMatched\(b\)\)return\{code:'SYNC',label:'REFERENCE · VERIFY'/);
   assert.match(js,/if\(!livePnlAvailable\(b\)\)return\{code:'SYNC',label:'SYNC · PNL'/);
   assert.match(js,/function critical\(\)\{return \[\.\.\.state\.bots\]\.filter\(liveMatched\)/);
+  assert.match(js,/function status\(b\)\{if\(!liveMatched\(b\)\)return\['REF','muted'\]/);
+  assert.match(js,/price:num\(x\.price\),pnl:num\(x\.pnl\),profitPct:num\(x\.profitPct\),invest:num\(x\.invest\)/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)\.map/);
 });
 
@@ -24,7 +26,7 @@ test('v9 r17 exposure is based on confirmed live capital only',()=>{
   assert.match(js,/const botNotional=b=>liveInvestAvailable\(b\)\?/);
   assert.match(js,/const confirmed=state\.bots\.filter\(liveMatched\)/);
   assert.match(js,/unknownBots/);
-  assert.match(js,/KNOWN LIVE LONG/);
+  assert.match(js,/KNOWN LIVE BOT LONG/);
   assert.match(js,/Referenzwerte dürfen keine Profit-Lock\/Next-Action Entscheidung auslösen/);
 });
 
