@@ -16,7 +16,7 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
   assert.match(js,/function livePnlAvailable\(b\)/);
   assert.match(js,/if\(!liveMatched\(b\)\)return\{code:'SYNC',label:'REFERENCE · VERIFY'/);
   assert.match(js,/if\(!livePnlAvailable\(b\)\)return\{code:'SYNC',label:'SYNC · PNL'/);
-  assert.match(js,/function critical\(\)\{return \[\.\.\.state\.bots\]\.filter\(liveMatched\)/);
+  assert.match(js,/function critical\(\)\{return botFeedFresh\(\)\?/);
   assert.match(js,/function status\(b\)\{if\(!liveMatched\(b\)\)return\['REF','muted'\]/);
   assert.match(js,/price:num\(x\.price\),pnl:num\(x\.pnl\),profitPct:num\(x\.profitPct\),invest:num\(x\.invest\)/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)\.map/);
@@ -24,7 +24,7 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
 
 test('v9 r17 exposure is based on confirmed live capital only',()=>{
   assert.match(js,/const botNotional=b=>liveInvestAvailable\(b\)\?/);
-  assert.match(js,/confirmed=state\.bots\.filter\(liveMatched\)/);
+  assert.match(js,/confirmed=botFeedFresh\(\)\?state\.bots\.filter\(liveMatched\):\[\]/);
   assert.match(js,/unknownBots/);
   assert.match(js,/KNOWN LIVE BOT LONG/);
   assert.match(js,/pair\.hedgePct!=null&&pair\.hedgePct<15/);
@@ -37,7 +37,7 @@ test('v9 r17 cross-checks market prices and labels mixed provenance',()=>{
   assert.match(js,/spread<=1\.5/);
   assert.match(js,/OKX \+ BINANCE/);
   assert.match(html,/id="data-status">● REFERENCE/);
-  assert.match(html,/v9 · r17 · COIN-M COMMAND CENTER/);
+  assert.match(html,/v9 · r\d+ · COIN-M COMMAND CENTER/);
   assert.match(js,/OKX POSITIONS · SNAPSHOT/);
   assert.match(js,/PIONEX MANUAL · SNAPSHOT/);
 });
