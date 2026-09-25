@@ -158,3 +158,14 @@ Physical iPhone validation of r17 confirmed:
 - the current UI can therefore distinguish price freshness from bot-state coverage, but r17 still used the misleading term LIVE MATCH and did not require a trusted bot-snapshot timestamp.
 
 r18 changes the contract from “matched = live” to “matched + timestamp freshness + PnL = actionable”. It also exposes PRIVATE API ROWS and UNMATCHED API to determine whether low coverage comes from the backend snapshot or the matcher.
+
+
+## OKX update — 25.09.2026 06:22
+
+The user closed the previous OKX futures positions and replaced them with two OKX Futures DCA bots.
+
+Authoritative screenshot snapshot:
+- INJ LONG 3x Futures DCA: 65.32 USDC invested; +0.1729 USDC (+0.26%) total PnL; +0.1824 (+0.27%) variable PnL; last 7.977; TP 8.28; average cost 7.908; 0/7 safety orders; no estimated liquidation price shown.
+- XRP LONG 3x Futures DCA: 65.32 USDC invested; -0.014 USDC (-0.03%) total PnL; -0.0048 (-0.01%) variable PnL; last 1.5291; TP 1.5924; average cost 1.5296; 0/9 safety orders; no estimated liquidation price shown.
+
+Previous OKX INJ/XRP position records are stale and must not be used. The combined known DCA-bot equity from the screenshot is about 130.80 USDC, excluding any unshown OKX cash or other account balances.

@@ -59,3 +59,7 @@
 
 /* v9 r18 Source Freshness */
 .live.fresh{color:var(--green)}.data-truth-head .tone-safe{color:var(--green)}.data-truth-head .tone-watch{color:var(--amber)}
+
+/* v9 r19 OKX Futures DCA */
+.okx-dca-row{border-top:1px solid #102c40;padding:8px 0}.okx-dca-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.okx-dca-head strong,.okx-dca-head b{font-size:10px}.okx-dca-metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:6px}.okx-dca-metrics>span{background:#040d15;border-radius:7px;padding:5px;color:var(--muted);font-size:7px}.okx-dca-metrics b{display:block;color:var(--text);font-size:9px;margin-top:2px}.okx-dca-metrics small{display:block;font-size:6px;margin-top:2px;color:var(--cyan)}.okx-dca-note{display:block;margin-top:5px;color:var(--muted);font-size:7px}
+@media(max-width:600px){.okx-dca-metrics{grid-template-columns:repeat(3,1fr)}.okx-dca-head strong{font-size:9px}.okx-dca-metrics b{font-size:8.5px}}

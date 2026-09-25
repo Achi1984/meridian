@@ -38,7 +38,7 @@ test('v9 r17 cross-checks market prices and labels mixed provenance',()=>{
   assert.match(js,/OKX \+ BINANCE/);
   assert.match(html,/id="data-status">● REFERENCE/);
   assert.match(html,/v9 · r\d+ · COIN-M COMMAND CENTER/);
-  assert.match(js,/OKX POSITIONS · SNAPSHOT/);
+  assert.match(js,/OKX (POSITIONS · SNAPSHOT|FUTURES DCA · SCREENSHOT)/);
   assert.match(js,/PIONEX MANUAL · SNAPSHOT/);
 });
 

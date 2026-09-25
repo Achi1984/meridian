@@ -36,6 +36,6 @@ test('r18 scopes liquidation labels and production version correctly',()=>{
   assert.match(js,/LIQ SAFE/);
   assert.match(js,/LIQ WATCH/);
   assert.match(js,/LIQ MARGIN/);
-  assert.match(html,/v9 · r18 · COIN-M COMMAND CENTER/);
-  assert.match(html,/9\.0-r18/);
+  assert.match(html,/v9 · r\d+ · COIN-M COMMAND CENTER/);
+  assert.match(html,/9\.0-r\d+/);
 });

@@ -193,3 +193,17 @@ r18 requirements:
 - if raw rows == matched rows but tracked > matched, backend coverage is the bottleneck; if raw rows > matched, matcher coverage is the bottleneck
 - LIQ labels are explicitly scoped to liquidation status
 - future authenticated Pionex risk patches are server-stamped when no section timestamp is provided
+
+
+## v9 r19 — OKX Futures DCA migration
+
+Newest authoritative OKX state is the user screenshot from 25.09.2026 06:22:
+- previous INJ/XRP manual futures positions were closed
+- active OKX items are two LONG 3x Futures DCA bots: INJ and XRP
+- both use 65.32 USDC investment
+- INJ: last 7.977, avg 7.908, TP 8.28, total PnL +0.1729 (+0.26%), safety 0/7
+- XRP: last 1.5291, avg 1.5296, TP 1.5924, total PnL -0.014 (-0.03%), safety 0/9
+- no estimated liquidation price is shown for either DCA bot; never infer one
+- display these as OKX DCA snapshot rows, not old manual positions
+- cross-check only market price through public feeds; account-specific bot fields remain screenshot-source
+- known OKX bot equity is ~130.80 USDC, not guaranteed total account equity
