@@ -182,3 +182,21 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Merge rule:** The Main Agent may continue to create PRs and merge autonomously after all required gates are green.
 
 **Runtime honesty:** Requested GPT-6 role assignments are target policy only when those models/agents are actually available. The system must never claim a model or independent agent performed work when it did not.
+
+
+## D-025 — v9 Data Truth gates actions by source freshness
+
+**Decision:** MERIDIAN v9 may display reference/snapshot bot metadata for context, but reference rows must not drive Profit Lock, hedge, liquidation-priority or NEXT ACTION decisions as though they were live.
+
+**Rules:**
+- Profit Lock requires a confidently matched live bot and live PnL.
+- Live-matched bots without live PnL render SYNC and no Profit-Lock action.
+- Unmatched reference rows render REFERENCE / VERIFY and are non-actionable.
+- Risk Priority and signal summaries use live-matched bots only.
+- Aggregate exposure is calculated only from live-confirmed capital/notional inputs; unknown exposure remains explicitly incomplete.
+- Current market price is cross-checked between OKX and Binance when both are available; spread above the credibility threshold is not treated as two-source verified.
+- Missing numeric values must remain missing; null/blank values must never coerce to zero.
+- Small-value formatting must use absolute magnitude so negative USD values are not accidentally rendered as thousands-scale numbers.
+- A mixed page must say MIXED rather than implying the whole dashboard is live.
+
+**Reason:** r16 iPhone validation exposed that stale reference PnL could still produce apparently actionable Profit Lock outputs and that the generic money formatter treated all negative numbers as tiny values. Source provenance is therefore part of decision correctness, not merely presentation.
