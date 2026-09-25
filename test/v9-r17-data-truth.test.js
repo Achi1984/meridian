@@ -24,7 +24,7 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
 
 test('v9 r17 exposure is based on confirmed live capital only',()=>{
   assert.match(js,/const botNotional=b=>liveInvestAvailable\(b\)\?/);
-  assert.match(js,/const confirmed=state\.bots\.filter\(liveMatched\)/);
+  assert.match(js,/confirmed=state\.bots\.filter\(liveMatched\)/);
   assert.match(js,/unknownBots/);
   assert.match(js,/KNOWN LIVE BOT LONG/);
   assert.match(js,/pair\.hedgePct!=null&&pair\.hedgePct<15/);
