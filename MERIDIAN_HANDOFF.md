@@ -149,7 +149,7 @@ This update supersedes earlier current-status and next-step text where it confli
 
 ## Agent workflow handoff
 
-Before starting new substantive work, read `MERIDIAN_AGENT_WORKFLOW.md` together with CONTEXT / DECISIONS / HANDOFF.
+Before starting new work, read `MERIDIAN_AGENT_WORKFLOW.md` together with CONTEXT / DECISIONS / HANDOFF.
 
 Operational defaults:
 - quality over speed
