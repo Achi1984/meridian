@@ -216,3 +216,19 @@ This file records durable project decisions and the reasoning behind them. Read 
 - Any authenticated `pionexRisk` update without its own timestamp is stamped server-side with the update time.
 
 **Reason:** r17 iPhone validation showed only 2/25 tracked bots matched while 14 assets had two-source market prices. The private dashboard backend is a persisted snapshot store, not proof of a live Pionex bot feed. Correctness therefore requires freshness to be part of the action contract.
+
+
+## D-027 — OKX manual positions closed; Futures DCA bots become authoritative snapshot
+
+**Decision:** The previous OKX INJ/XRP manual futures-position snapshot is retired. User screenshots from 25.09.2026 06:22 are the new authoritative OKX state.
+
+**Current OKX bots:**
+- INJUSD UM X-Perp Futures DCA — LONG 3x — investment 65.32 USDC — total PnL +0.1729 USDC (+0.26%) — variable PnL +0.1824 (+0.27%) — last price 7.977 — TP 8.28 — average cost 7.908 — safety orders 0/7 — estimated liquidation unavailable in OKX UI.
+- XRPUSD UM X-Perp Futures DCA — LONG 3x — investment 65.32 USDC — total PnL -0.014 USDC (-0.03%) — variable PnL -0.0048 (-0.01%) — last price 1.5291 — TP 1.5924 — average cost 1.5296 — safety orders 0/9 — estimated liquidation unavailable in OKX UI.
+
+**Rules:**
+- Old OKX manual position records are removed from the active dashboard snapshot.
+- No liquidation price is inferred where OKX displays none.
+- OKX DCA rows are screenshot snapshots, not a live account feed; they do not drive Pionex Profit Lock / Risk Priority action logic.
+- Public price can be refreshed/cross-checked with OKX + Binance, while investment, PnL, TP, average cost and safety-order state remain screenshot provenance.
+- Known OKX bot equity is derived as investment plus total PnL for the screenshot-confirmed bots. This is a known-bot subtotal, not proof of total OKX account equity.
