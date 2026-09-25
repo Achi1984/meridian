@@ -114,3 +114,20 @@ Every meaningful implementation or research checkpoint must be committed to GitH
 
 ## Next step
 Run the complete test suite and release synchronization on the exact R45 head. Review the resulting diff and open a pull request only after explicit publication approval. After deployment, verify the answer-first PAPER order, collapsed Alpha/R42/Funding rows, preserved open positions and collapsed recent trades on iPhone.
+
+
+## Agent orchestration quality process
+
+All future substantive MERIDIAN work follows the mandatory orchestration and review process in `MERIDIAN_AGENT_WORKFLOW.md`.
+
+Key rules:
+- Main Agent is the only user-facing agent.
+- Specialist work is independently reviewed before integration.
+- Review loops are capped at three; unresolved work is not merged.
+- Quality gates include syntax/tests/release/runtime checks where available.
+- UI changes require iPhone/mobile review.
+- Trading logic requires both technical and methodology review.
+- Live/time-sensitive financial data follows the two-source rule when technically possible.
+- Quality takes priority over speed.
+- The Main Agent may merge autonomously after all agreed gates are green.
+- Actual runtime/model capabilities must be reported honestly; no review/model may be claimed unless it truly ran.
