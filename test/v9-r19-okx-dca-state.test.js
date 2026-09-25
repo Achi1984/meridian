@@ -30,7 +30,7 @@ test('r19 derives known OKX bot equity from the new DCA snapshot and removes sta
 
 test('r19 labels OKX correctly as DCA snapshot and keeps it outside live Pionex action logic',()=>{
   assert.match(js,/OKX FUTURES DCA · SCREENSHOT/);
-  assert.match(js,/DCA BOT SNAPSHOT/);
+  assert.match(js,/OKX BOT EQUITY/);\n  assert.match(js,/DCA SNAPSHOT/);
   assert.match(js,/state\.okxDcaBots/);
   assert.doesNotMatch(js,/state\.okxPositions/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)/);
