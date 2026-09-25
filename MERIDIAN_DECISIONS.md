@@ -163,3 +163,22 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Warm-up rule:** A newly deployed canonical history must not immediately replace a longer legacy chart with a tiny sample. v7.64 only switches a time range after minimum point count and coverage are met; otherwise v7.63 current-value alignment remains the fallback.
 
 **Privacy/safety:** The history endpoint remains bearer-protected and PostgreSQL-backed. This change does not alter Baseline 6.2, `server.js`, Paper execution or research logic.
+
+
+## D-024 — Mandatory Main-Agent / Specialist / Review workflow
+
+**Decision:** All substantive tasks use the workflow defined in `MERIDIAN_AGENT_WORKFLOW.md`. The Main Agent is the only user-facing orchestrator and owns decomposition, integration, quality gates, PR/merge, and final delivery.
+
+**Review rule:** Every specialist deliverable receives an independent review where the runtime supports true separate agents. A reviewer returns GREEN LIGHT or REVISION REQUIRED. Revision loops are capped at three. Work without GREEN LIGHT after three cycles is not silently approved or merged.
+
+**Quality rule:** Quality is priority 1. Even small code/UI changes are reviewed. Code changes use syntax, existing tests, targeted tests, release-check/release-sync, runtime smoke, diff review, and relevant UI/data/security review when those checks are available.
+
+**UI rule:** User-facing UI changes require dedicated iPhone/mobile review.
+
+**Trading rule:** Signals, risk, Profit Lock, hedge, FIB, liquidation, leverage, re-entry, regime and backtest changes require both technical and methodology review.
+
+**Data rule:** Material live/time-sensitive financial data requires a second source when technically possible. User screenshots can serve as an authoritative cross-check for current account/bot state.
+
+**Merge rule:** The Main Agent may continue to create PRs and merge autonomously after all required gates are green.
+
+**Runtime honesty:** Requested GPT-6 role assignments are target policy only when those models/agents are actually available. The system must never claim a model or independent agent performed work when it did not.
