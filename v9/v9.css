@@ -36,3 +36,7 @@
 
 .manual-strip{background:#071522;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:7px}.manual-row{display:grid;grid-template-columns:1.25fr repeat(3,1fr) 1fr;gap:6px;align-items:center;padding:6px 0;border-top:1px solid #102c40;font-size:9px}.manual-row span{color:var(--muted)}.manual-row>b{text-align:right}
 @media(max-width:600px){.manual-strip{padding:8px 10px}.manual-row{grid-template-columns:1.2fr 1fr 1fr}.manual-row strong{font-size:10px}.manual-row span:nth-of-type(2){display:none}.manual-row>b{grid-column:3;text-align:right}}
+
+/* Risk Cockpit V2 */
+.risk-v2{margin:12px 0}.risk-v2-grid{display:grid;gap:6px}.risk-v2-row{display:grid;grid-template-columns:1.15fr repeat(4,.85fr);gap:1px;align-items:center;background:#071521;border:1px solid var(--line);border-radius:11px;overflow:hidden}.risk-v2-row>div{padding:8px 7px;min-width:0}.risk-v2-row>div:first-child{display:flex;align-items:center;gap:6px}.risk-v2-row>div:not(:first-child){background:#05101a}.risk-v2-row span{display:block;color:var(--muted);font-size:7px}.risk-v2-row b,.risk-v2-row strong{font-size:9px;white-space:nowrap}.risk-v2-row>small{grid-column:1/-1;padding:5px 8px;background:#040c13;color:var(--muted);font-size:7px}
+@media(max-width:600px){.risk-v2-row{grid-template-columns:1.25fr repeat(2,1fr)}.risk-v2-row>div:nth-child(4),.risk-v2-row>div:nth-child(5){border-top:1px solid #102536}.risk-v2-row>small{font-size:6.5px}}
