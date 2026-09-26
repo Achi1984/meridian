@@ -99,6 +99,44 @@ function dayUrl(kind,day){
   if(kind==='swap')return `${VISION}/futures/um/daily/klines/${SYMBOL}/4h/${SYMBOL}-4h-${day}.zip`;
   return `${VISION}/futures/um/daily/fundingRate/${SYMBOL}/${SYMBOL}-fundingRate-${day}.zip`;
 }
+function spotLowerDayUrl(interval,day){return `${VISION}/spot/daily/klines/${SYMBOL}/${interval}/${SYMBOL}-${interval}-${day}.zip`;}
+function missing4hTimestamps(rows,start,end){
+  const have=new Set(rows.map(x=>x.t)),out=[];
+  for(let t=start;t<end;t+=H4)if(!have.has(t))out.push(t);
+  return out;
+}
+function resampleExact(rows,sourceMs,expected){
+  const m=new Map();
+  for(const x of rows){
+    const t=Math.floor(x.t/H4)*H4,b=m.get(t);
+    if(!b)m.set(t,{t,o:x.o,h:x.h,l:x.l,c:x.c,n:1,seen:new Set([x.t])});
+    else{b.h=Math.max(b.h,x.h);b.l=Math.min(b.l,x.l);b.c=x.c;b.n++;b.seen.add(x.t);}
+  }
+  return [...m.values()].filter(x=>x.n===expected&&x.seen.size===expected)
+    .map(({n,seen,...x})=>x).sort((a,b)=>a.t-b.t);
+}
+async function repairSpotEvaluation(rows,tmpDir,start,end){
+  const initial=missing4hTimestamps(rows,start,end),wanted=new Set(initial);
+  const days=[...new Set(initial.map(t=>new Date(t).toISOString().slice(0,10)))];
+  const oneHour=await poolMap(days,6,async d=>({d,text:await fetchZipCsv(spotLowerDayUrl('1h',d),tmpDir)}));
+  let repaired1h=oneHour.flatMap(x=>resampleExact(parseKlines(x.text),HOUR,4)).filter(x=>wanted.has(x.t));
+  let merged=uniqSort([...rows,...repaired1h],'t');
+  const after1h=missing4hTimestamps(merged,start,end),wanted1m=new Set(after1h);
+  const days1m=[...new Set(after1h.map(t=>new Date(t).toISOString().slice(0,10)))];
+  const oneMin=await poolMap(days1m,4,async d=>({d,text:await fetchZipCsv(spotLowerDayUrl('1m',d),tmpDir)}));
+  const repaired1m=oneMin.flatMap(x=>resampleExact(parseKlines(x.text),60000,240)).filter(x=>wanted1m.has(x.t));
+  merged=uniqSort([...merged,...repaired1m],'t');
+  const after1m=missing4hTimestamps(merged,start,end);
+  return{rows:merged,diagnostics:{
+    initialMissing:initial.map(t=>new Date(t).toISOString()),
+    repairedFrom1h:repaired1h.map(x=>new Date(x.t).toISOString()),
+    remainingAfter1h:after1h.map(t=>new Date(t).toISOString()),
+    repairedFrom1m:repaired1m.map(x=>new Date(x.t).toISOString()),
+    remainingAfter1m:after1m.map(t=>new Date(t).toISOString()),
+    oneHourFilesLoaded:oneHour.filter(x=>x.text).length,
+    oneMinuteFilesLoaded:oneMin.filter(x=>x.text).length
+  }};
+}
 async function loadVision(kind,tmpDir){
   const lastFullMonth=AUDIT_END;
   const months=monthsBetween(FUNDING_START,lastFullMonth),days=daysBetween(lastFullMonth,AUDIT_END);
@@ -140,7 +178,8 @@ try{
   const [spotRaw,swapRaw,fundRaw]=await Promise.all([
     loadVision('spot',tmpDir),loadVision('swap',tmpDir),loadVision('funding',tmpDir)
   ]);
-  const spot=spotRaw.rows,swap=swapRaw.rows,funding=fundRaw.rows;
+  const spotRepair=await repairSpotEvaluation(spotRaw.rows,tmpDir,AUDIT_START,AUDIT_END);
+  const spot=spotRepair.rows,swap=swapRaw.rows,funding=fundRaw.rows;
   const spotAt=new Map(spot.map(x=>[x.t,x])),swapAt=new Map(swap.map(x=>[x.t,x]));
   const timeline=spot.filter(x=>x.t>=AUDIT_START&&x.t<AUDIT_END&&swapAt.has(x.t)).map(x=>x.t);
 
@@ -246,7 +285,7 @@ try{
       entryCoverage:c.entryCoverage,entryPositiveShare:c.entryPositiveShare,fundingIncome:round(c.fundingIncome,2),basisPnl:round(c.basisPnl,2),
       totalEstimatedCosts:round(c.totalEstimatedCosts,2),netPnl:round(Number(c.realizedPnl??c.netPnl),2),activeFundingMaxGapHours:c.activeFundingMaxGapHours})),
     data:{
-      spot:{bars:spot.length,filesRequested:spotRaw.filesRequested,filesLoaded:spotRaw.filesLoaded,missing:spotRaw.missing,coverage:spotCov},
+      spot:{bars:spot.length,filesRequested:spotRaw.filesRequested,filesLoaded:spotRaw.filesLoaded,missing:spotRaw.missing,coverage:spotCov,repair:spotRepair.diagnostics},
       swap:{bars:swap.length,filesRequested:swapRaw.filesRequested,filesLoaded:swapRaw.filesLoaded,missing:swapRaw.missing,coverage:swapCov},
       funding:{periods:enrichedFunding.length,filesRequested:fundRaw.filesRequested,filesLoaded:fundRaw.filesLoaded,missing:fundRaw.missing,
         first:enrichedFunding[0]?new Date(enrichedFunding[0].fundingTime).toISOString():null,last:enrichedFunding.at(-1)?new Date(enrichedFunding.at(-1).fundingTime).toISOString():null,maxGapHours:round(fullFundingGap,2)},
