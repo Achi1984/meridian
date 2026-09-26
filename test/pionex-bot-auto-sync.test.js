@@ -9,6 +9,8 @@ import {
 test('Pionex GET signing is canonical and deterministic',()=>{
   const q=canonicalQuery({timestamp:1700000000000,status:'running'});
   assert.equal(q,'status=running&timestamp=1700000000000');
+  assert.equal(canonicalQuery({pageToken:'a/b=',timestamp:1},false),'pageToken=a/b=&timestamp=1');
+  assert.equal(canonicalQuery({pageToken:'a/b=',timestamp:1},true),'pageToken=a%2Fb%3D&timestamp=1');
   assert.equal(
     signPionexGet('/api/v1/bot/orders',{timestamp:1700000000000,status:'running'},'test-secret'),
     'a66fc134b331daa12ffc2f2a4cea1984adcc1729b3e53a8184883cff5f4ac6f2'
