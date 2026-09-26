@@ -7,7 +7,7 @@ import { buildSuccessorPlan, analyzePostStop } from "./post-stop-learning.js";
 import { costAwareSize, PAPER_COST_POLICY } from "./paper-cost-policy.js";
 import { evaluatePaperLearning, PAPER_LEARNING_POLICY } from "./paper-learning-policy.js";
 import {newFundingCarryPaperState,fundingEligibility,openFundingCarryPaper,applyFundingSettlements,markFundingCarryPaper,fundingCarryExitReason,closeFundingCarryPaper,fundingCarryPaperStatus,FUNDING_CARRY_PAPER_V1_CONFIG} from "./funding-carry-paper-v1.js";
-import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFundingSettlementsV2,markFundingCarryV2,fundingCarryV2ExitReason,closeFundingCarryV2,fundingCarryV2Status} from "./funding-carry-paper-v2.js";
+import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFundingSettlementsV2,markFundingCarryV2,fundingCarryV2ExitReason,closeFundingCarryV2,fundingCarryV2Status,FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED} from "./funding-carry-paper-v2.js";
 import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recordDirectionalV3Close,directionalV4Status} from "./directional-v4-exit-shadow.js";
 import {buildBotObserver} from "./bot-observer.js";
 import {createSerialQueue,createSingleFlight} from "./state-serial.js";
@@ -307,7 +307,7 @@ const FUNDING_CARRY_V2_STATE_KEY="funding_carry_v2";
 async function loadFundingCarryV2State(){const s=await getState(FUNDING_CARRY_V2_STATE_KEY,null);if(s)return s;const fresh=newFundingCarryV2State();await setState(FUNDING_CARRY_V2_STATE_KEY,fresh);return fresh;}
 async function fundingCarryV2Cycle(snapshot,rates,now=Date.now()){
   let s=await loadFundingCarryV2State(),eligibility=fundingEligibilityV2(rates,snapshot,now);s.lastCheckedAt=new Date(now).toISOString();s.lastEligibility=eligibility;
-  if(s.lifecycle==="WAITING_ENTRY"&&eligibility.eligible){s=openFundingCarryV2(s,snapshot,eligibility,now);await addEvent("FUNDING_CARRY_V2_OPENED",{basketId:s.basket.id,symbol:s.basket.symbol,entryBasisPct:s.basket.entryBasisPct,ruleset:s.ruleset});}
+  if(s.lifecycle==="WAITING_ENTRY"&&FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED&&eligibility.eligible){s=openFundingCarryV2(s,snapshot,eligibility,now);await addEvent("FUNDING_CARRY_V2_OPENED",{basketId:s.basket.id,symbol:s.basket.symbol,entryBasisPct:s.basket.entryBasisPct,ruleset:s.ruleset});}
   if(s.lifecycle==="ACTIVE_PAPER"&&s.basket){s=applyFundingSettlementsV2(s,rates,now);s=markFundingCarryV2(s,snapshot,now);const reason=fundingCarryV2ExitReason(s,rates,now);if(reason){const basketId=s.basket.id;s=closeFundingCarryV2(s,snapshot,reason,now);await addEvent("FUNDING_CARRY_V2_STOPPED",{basketId,reason,realizedPnl:s.closedCycles.at(-1)?.realizedPnl,ruleset:s.ruleset});}}
   await setState(FUNDING_CARRY_V2_STATE_KEY,s);return s;
 }
