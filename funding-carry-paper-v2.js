@@ -6,6 +6,8 @@ const copy=x=>structuredClone(x);
 const round=(v,d=8)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**d:null;
 
 export const FUNDING_CARRY_V2_RULESET='8.40-PAPER-BTC-FUNDING-CARRY-V2-COST-AMORTIZED';
+export const FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED=false;
+export const FUNDING_CARRY_V2_RETIREMENT_REASON='REPEATABILITY_SAMPLE_GATE_6_LT_8';
 export const FUNDING_CARRY_V2_CONFIG=Object.freeze({
   symbol:'BTCUSDT',startEquity:20000,notionalPerLeg:10000,spotFeeBps:10,perpFeeBps:5,slippageBps:3,
   projectionDays:30,minFundingPeriods30d:80,minFundingPeriods7d:18,minPositiveShare:.85,minGrossCostCoverage:2,
@@ -64,4 +66,4 @@ export function closeFundingCarryV2(state,snapshot,reason,now=Date.now()){
   const out=markFundingCarryV2(state,snapshot,now),done={...out.basket,status:'CLOSED',closedAt:new Date(now).toISOString(),exitReason:reason,realizedPnl:out.basket.netPnl};out.closedCycles.push(done);out.basket=null;out.lifecycle='STOPPED_REVIEW';out.account.realizedPnl=done.realizedPnl;out.account.equity=round(out.account.startEquity+done.realizedPnl,8);out.updatedAt=new Date(now).toISOString();return out;
 }
 
-export function fundingCarryV2Status(state){const s=state||newFundingCarryV2State(),b=s.basket;return{enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,ruleset:s.ruleset,lifecycle:s.lifecycle,policy:s.frozenPolicy,account:s.account,basket:b,lastEligibility:s.lastEligibility,settlements:(s.settlements||[]).slice(-5).reverse(),telemetry:{breakEvenRemaining:b?round(Math.max(0,-Number(b.netPnl||0)),2):null,projectedFundingUsd:s.lastEligibility?.projectedFundingUsd??null,costCoverage:s.lastEligibility?.grossCostCoverage??null},closedCycles:(s.closedCycles||[]).slice(-3).reverse()};}
+export function fundingCarryV2Status(state){const s=state||newFundingCarryV2State(),b=s.basket;return{enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,newEntriesAllowed:FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED,retirementReason:FUNDING_CARRY_V2_RETIREMENT_REASON,ruleset:s.ruleset,lifecycle:s.lifecycle,policy:s.frozenPolicy,account:s.account,basket:b,lastEligibility:s.lastEligibility,settlements:(s.settlements||[]).slice(-5).reverse(),telemetry:{breakEvenRemaining:b?round(Math.max(0,-Number(b.netPnl||0)),2):null,projectedFundingUsd:s.lastEligibility?.projectedFundingUsd??null,costCoverage:s.lastEligibility?.grossCostCoverage??null},closedCycles:(s.closedCycles||[]).slice(-3).reverse()};}
