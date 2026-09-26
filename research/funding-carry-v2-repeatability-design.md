@@ -74,7 +74,7 @@ For every cycle record:
 - entry cost coverage and basis
 - positive funding share at entry
 
-Portfolio statistics use closed-cycle P&L only.
+Portfolio statistics use closed-cycle P&L only. Calendar-year attribution uses each cycle's close timestamp.
 
 A friction stress is computed **after** the frozen simulation by subtracting an extra 8 bps of one-leg notional ($8 per $10,000 cycle) from every completed cycle. This is a sensitivity check only; it does not alter the production gate.
 
@@ -89,7 +89,7 @@ Funding Carry V2 is considered historically repeatable only if **all** condition
 5. Aggregate funding income minus modeled fees/slippage is > $0 even before basis P&L.
 6. Maximum closed-equity drawdown <= $250 (1.25% of conservative capital).
 7. At least 3 distinct calendar years contain completed cycles and each such year is net positive.
-8. No single cycle contributes more than 40% of total positive cycle P&L.
+8. No single profitable cycle contributes more than 40% of the sum of all positive cycle P&L.
 9. Under the +8 bps round-trip friction stress, aggregate net P&L remains > $0 and stressed dollar PF >= 1.10.
 10. Spot/swap 4h coverage is complete over the audit market window and funding data is sufficient to reproduce every admitted cycle.
 
