@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFundingSettlementsV2,markFundingCarryV2,fundingCarryV2ExitReason,FUNDING_CARRY_V2_CONFIG} from '../funding-carry-paper-v2.js';
+import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFundingSettlementsV2,markFundingCarryV2,fundingCarryV2ExitReason,fundingCarryV2Status,FUNDING_CARRY_V2_CONFIG,FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED,FUNDING_CARRY_V2_RETIREMENT_REASON} from '../funding-carry-paper-v2.js';
 
 const DAY=86400000,now=Date.UTC(2026,8,13),snapshot={spotAsk:100000,spotBid:99990,perpBid:100020,perpAsk:100030};
 function rows(rate=.0001){return Array.from({length:90},(_,i)=>({fundingTime:now-(89-i)*8*3600000,fundingRate:rate,markPrice:100000}));}
@@ -23,4 +23,12 @@ test('V2 basis exit uses change from entry, not absolute basis',()=>{
   const cfg={...FUNDING_CARRY_V2_CONFIG,minGrossCostCoverage:0,maxBasisChangePct:1.5,maxLossPct:100};let s=newFundingCarryV2State(now,cfg);s=openFundingCarryV2(s,snapshot,{eligible:true},now);
   s=markFundingCarryV2(s,{spotBid:100000,perpAsk:101500},now+1);assert.equal(fundingCarryV2ExitReason(s,[],now+1),null);
   s=markFundingCarryV2(s,{spotBid:100000,perpAsk:101800},now+2);assert.equal(fundingCarryV2ExitReason(s,[],now+2),'BASIS_CHANGE');
+});
+
+test('V2 is manage-only after repeatability sample gate result',()=>{
+  assert.equal(FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED,false);
+  assert.equal(FUNDING_CARRY_V2_RETIREMENT_REASON,'REPEATABILITY_SAMPLE_GATE_6_LT_8');
+  const s=fundingCarryV2Status(newFundingCarryV2State(now));
+  assert.equal(s.newEntriesAllowed,false);
+  assert.equal(s.retirementReason,'REPEATABILITY_SAMPLE_GATE_6_LT_8');
 });
