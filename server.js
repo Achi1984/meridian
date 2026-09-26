@@ -6,7 +6,7 @@ import { regimeDecision, REGIME_V1_RULESET, REGIME_V1_CONFIG } from "./regime-v1
 import { buildSuccessorPlan, analyzePostStop } from "./post-stop-learning.js";
 import { costAwareSize, PAPER_COST_POLICY } from "./paper-cost-policy.js";
 import { evaluatePaperLearning, PAPER_LEARNING_POLICY } from "./paper-learning-policy.js";
-import {newFundingCarryPaperState,fundingEligibility,openFundingCarryPaper,applyFundingSettlements,markFundingCarryPaper,fundingCarryExitReason,closeFundingCarryPaper,fundingCarryPaperStatus,FUNDING_CARRY_PAPER_V1_CONFIG} from "./funding-carry-paper-v1.js";
+import {newFundingCarryPaperState,fundingEligibility,openFundingCarryPaper,applyFundingSettlements,markFundingCarryPaper,fundingCarryExitReason,closeFundingCarryPaper,fundingCarryPaperStatus,FUNDING_CARRY_PAPER_V1_CONFIG,FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED} from "./funding-carry-paper-v1.js";
 import {newFundingCarryV2State,fundingEligibilityV2,openFundingCarryV2,applyFundingSettlementsV2,markFundingCarryV2,fundingCarryV2ExitReason,closeFundingCarryV2,fundingCarryV2Status,FUNDING_CARRY_V2_NEW_ENTRIES_ALLOWED} from "./funding-carry-paper-v2.js";
 import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recordDirectionalV3Close,directionalV4Status} from "./directional-v4-exit-shadow.js";
 import {buildBotObserver} from "./bot-observer.js";
@@ -297,7 +297,7 @@ async function fundingCarryCycle(force=false){
   if(!force&&s.lastCheckedAt&&now-new Date(s.lastCheckedAt).getTime()<FUNDING_CARRY_CHECK_MS)return s;
   const [snapshot,rates]=await Promise.all([fundingCarryMarket(),recentBtcFunding(now,30)]),eligibility=fundingEligibility(rates,now);
   s.lastCheckedAt=new Date(now).toISOString();s.lastEligibility=eligibility;
-  if(s.lifecycle==="WAITING_ENTRY"&&eligibility.eligible){s=openFundingCarryPaper(s,snapshot,eligibility,{now,id:crypto.randomUUID()});await addEvent("FUNDING_CARRY_V1_OPENED",{basketId:s.basket.id,symbol:s.basket.symbol,quantity:s.basket.quantity,spotEntry:s.basket.spotEntry,perpEntry:s.basket.perpEntry,reviewAt:s.basket.reviewAt,ruleset:s.ruleset});}
+  if(s.lifecycle==="WAITING_ENTRY"&&FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED&&eligibility.eligible){s=openFundingCarryPaper(s,snapshot,eligibility,{now,id:crypto.randomUUID()});await addEvent("FUNDING_CARRY_V1_OPENED",{basketId:s.basket.id,symbol:s.basket.symbol,quantity:s.basket.quantity,spotEntry:s.basket.spotEntry,perpEntry:s.basket.perpEntry,reviewAt:s.basket.reviewAt,ruleset:s.ruleset});}
   if(s.lifecycle==="ACTIVE_PAPER"&&s.basket){s=applyFundingSettlements(s,rates,now);s=markFundingCarryPaper(s,snapshot,now);const reason=fundingCarryExitReason(s,rates,now);if(reason){const basketId=s.basket.id;s=closeFundingCarryPaper(s,snapshot,reason,now);await addEvent("FUNDING_CARRY_V1_STOPPED",{basketId,reason,realizedPnl:s.closedCycles.at(-1)?.realizedPnl,ruleset:s.ruleset});}}
   await setState(FUNDING_CARRY_STATE_KEY,s);await fundingCarryV2Cycle(snapshot,rates,now);return s;
 }
