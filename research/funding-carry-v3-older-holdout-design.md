@@ -89,3 +89,10 @@ The older holdout is supportive enough to permit a new prospective V3 Paper shad
 ## Isolation
 
 Research only. No existing Paper state, V2 state, Pionex account, exchange account, live-trading path or API integration is changed by this holdout.
+
+
+## Evidence-run data QA note
+
+The first holdout execution produced favorable cycle economics but failed the predeclared data-adequacy gate: Binance Vision monthly archives did not provide the 2019-12 USD-M kline/funding files, and the monthly spot set contained one missing evaluation 4h bar. That run is treated as **invalid for promotion** regardless of its P&L.
+
+To satisfy the already-predeclared data-completeness requirement, the evidence loader is allowed to backfill only those missing archive intervals from Binance Vision's official daily ZIP archives. No strategy rule, gate, date, cost, re-arm rule, entry, exit or accounting assumption is changed. The repaired run is the only run eligible for a V3 decision.
