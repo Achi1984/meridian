@@ -42,16 +42,23 @@ function csvLines(text){
   return text.trim().split(/\r?\n/).map(line=>line.split(',').map(x=>x.replace(/^"|"$/g,'').trim()));
 }
 async function fetchZipCsv(url,tmpDir){
-  const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-FUNDING-CARRY-V2-AUDIT/2.0'}});
+  const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-FUNDING-CARRY-V3-HOLDOUT/1.0'}});
   if(r.status===404)return null;
   if(!r.ok)throw new Error(`HTTP ${r.status} ${url}`);
   const buf=Buffer.from(await r.arrayBuffer());
-  const p=path.join(tmpDir,`v2-${Math.random().toString(36).slice(2)}.zip`);
+  const p=path.join(tmpDir,`v3-${Math.random().toString(36).slice(2)}.zip`);
   await fs.writeFile(p,buf);
   let text;
   try{text=execFileSync('unzip',['-p',p],{encoding:'utf8',maxBuffer:20*1024*1024});}
   finally{await fs.unlink(p).catch(()=>{});}
   return text;
+}
+async function fetchJsonOptional(url){
+  try{
+    const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-FUNDING-CARRY-V3-HOLDOUT/1.0','accept':'application/json'}});
+    if(!r.ok)return{ok:false,status:r.status,rows:[]};
+    const j=await r.json();return{ok:Array.isArray(j),status:r.status,rows:Array.isArray(j)?j:[]};
+  }catch(e){return{ok:false,status:null,error:String(e?.message||e),rows:[]};}
 }
 async function poolMap(items,limit,fn){
   const out=new Array(items.length);let idx=0;
@@ -96,6 +103,36 @@ function dayUrl(kind,day){
   if(kind==='spot')return `${VISION}/spot/daily/klines/BTCUSDT/4h/BTCUSDT-4h-${day}.zip`;
   if(kind==='swap')return `${VISION}/futures/um/daily/klines/BTCUSDT/4h/BTCUSDT-4h-${day}.zip`;
   return `${VISION}/futures/um/daily/fundingRate/BTCUSDT/BTCUSDT-fundingRate-${day}.zip`;
+}
+function spot1hDayUrl(day){return `${VISION}/spot/daily/klines/BTCUSDT/1h/BTCUSDT-1h-${day}.zip`;}
+function resample1hTo4h(rows){
+  const m=new Map();
+  for(const x of rows){
+    const t=Math.floor(x.t/H4)*H4,b=m.get(t);
+    if(!b)m.set(t,{t,o:x.o,h:x.h,l:x.l,c:x.c,n:1});
+    else{b.h=Math.max(b.h,x.h);b.l=Math.min(b.l,x.l);b.c=x.c;b.n++;}
+  }
+  return [...m.values()].filter(x=>x.n===4).map(({n,...x})=>x).sort((a,b)=>a.t-b.t);
+}
+async function repairSpot4hFromVision1h(rows,tmpDir,start,end){
+  const missing=missing4hDays(rows,start,end),repaired=[];
+  for(const d of missing){
+    const text=await fetchZipCsv(spot1hDayUrl(d),tmpDir);
+    if(text)repaired.push(...resample1hTo4h(parseKlines(text)));
+  }
+  return{rows:uniqSort([...rows,...repaired],'t'),attemptedDays:missing,repairedBars:repaired.length};
+}
+async function recover2019WarmupFromBinanceRest(){
+  const start=FUNDING_START,end=AUDIT_START-1;
+  const [k,f]=await Promise.all([
+    fetchJsonOptional(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=4h&startTime=${start}&endTime=${end}&limit=1000`),
+    fetchJsonOptional(`https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&startTime=${start}&endTime=${end}&limit=1000`)
+  ]);
+  const swap=(k.rows||[]).map(x=>({t:tsNorm(x[0]),o:Number(x[1]),h:Number(x[2]),l:Number(x[3]),c:Number(x[4])}))
+    .filter(x=>[x.t,x.o,x.h,x.l,x.c].every(Number.isFinite));
+  const funding=(f.rows||[]).map(x=>({fundingTime:tsNorm(x.fundingTime),fundingRate:Number(x.fundingRate),markPrice:Number(x.markPrice)}))
+    .filter(x=>Number.isFinite(x.fundingTime)&&Number.isFinite(x.fundingRate));
+  return{swap,funding,diagnostics:{klines:{ok:k.ok,status:k.status,rows:swap.length,error:k.error||null},funding:{ok:f.ok,status:f.status,rows:funding.length,error:f.error||null}}};
 }
 function monthDays(ym){
   const [y,m]=ym.split('-').map(Number),start=Date.UTC(y,m-1,1),end=Date.UTC(y,m,1);
@@ -158,10 +195,11 @@ function activeFundingGapHours(rows,openedAt,closedAt){return fundingMaxGapHours
 const tmpDir=await fs.mkdtemp(path.join(os.tmpdir(),'meridian-v3-holdout-'));
 try{
   console.log('loading disjoint 2020-2021 Binance Vision BTCUSDT spot/perpetual/funding archives');
-  const [spotRaw,swapRaw,fundRaw]=await Promise.all([
-    loadVision('spot',tmpDir),loadVision('swap',tmpDir),loadVision('funding',tmpDir)
+  const [spotRaw,swapRaw,fundRaw,restWarmup]=await Promise.all([
+    loadVision('spot',tmpDir),loadVision('swap',tmpDir),loadVision('funding',tmpDir),recover2019WarmupFromBinanceRest()
   ]);
-  const spot=spotRaw.rows,swap=swapRaw.rows,funding=fundRaw.rows;
+  const spotRepair=await repairSpot4hFromVision1h(spotRaw.rows,tmpDir,AUDIT_START,AUDIT_END);
+  const spot=spotRepair.rows,swap=uniqSort([...swapRaw.rows,...restWarmup.swap],'t'),funding=uniqSort([...fundRaw.rows,...restWarmup.funding],'fundingTime');
   const spotAt=new Map(spot.map(x=>[x.t,x])),swapAt=new Map(swap.map(x=>[x.t,x]));
   const timeline=spot.filter(x=>x.t>=AUDIT_START&&x.t<AUDIT_END&&swapAt.has(x.t)).map(x=>x.t);
 
@@ -230,11 +268,11 @@ try{
   const yearStats=Object.fromEntries(Object.entries(byYear).map(([y,v])=>[y,{cycles:v.length,netPnl:round(v.reduce((a,b)=>a+b,0),2),profitFactor:round(pf(v),2)}]));
   const yearsWithCycles=Object.values(yearStats).filter(x=>x.cycles>0),positiveYears=yearsWithCycles.filter(x=>x.netPnl>0).length;
   const concentration=positiveSum>0?Math.max(0,...cycles.map(x=>{const v=Number(x.realizedPnl??x.netPnl??0);return v>0?v/positiveSum:0;})):1;
-  const spotCov=coverage(spot,AUDIT_START,AUDIT_END),swapCov=coverage(swap,AUDIT_START,AUDIT_END);
+  const spotCov=coverage(spot,AUDIT_START,AUDIT_END),swapCov=coverage(swap,AUDIT_START,AUDIT_END),swapWarmupCov=coverage(swap,FUNDING_START,AUDIT_END);
   const fullFundingGap=fundingMaxGapHours(enrichedFunding,FUNDING_START,AUDIT_END-8*HOUR);
   const fundingCoverage=enrichedFunding.length>0&&enrichedFunding[0].fundingTime<=FUNDING_START+8*HOUR&&enrichedFunding.at(-1).fundingTime>=AUDIT_END-16*HOUR&&fullFundingGap<=12;
   const cycleFundingComplete=cycles.every(x=>Number(x.activeFundingMaxGapHours)<=12);
-  const archiveComplete=[spotRaw,swapRaw,fundRaw].every(x=>x.missing.length===0);
+  const sourceRecoveryComplete=spotCov.complete&&swapWarmupCov.complete&&fundingCoverage;
 
   const gates={
     sample:cycles.length>=3,
@@ -246,7 +284,7 @@ try{
     calendarBreadth:['2020','2021'].every(y=>(yearStats[y]?.cycles||0)>=1&&(yearStats[y]?.netPnl||0)>=0),
     concentration:concentration<=.50,
     frictionStress:stressNet>0&&stressPf>=1.05,
-    dataAdequacy:archiveComplete&&spotCov.complete&&swapCov.complete&&fundingCoverage&&cycleFundingComplete
+    dataAdequacy:sourceRecoveryComplete&&swapCov.complete&&cycleFundingComplete
   };
 
   const summary={
@@ -267,11 +305,11 @@ try{
       entryCoverage:c.entryCoverage,entryPositiveShare:c.entryPositiveShare,fundingIncome:round(c.fundingIncome,2),basisPnl:round(c.basisPnl,2),
       totalEstimatedCosts:round(c.totalEstimatedCosts,2),netPnl:round(Number(c.realizedPnl??c.netPnl),2),activeFundingMaxGapHours:c.activeFundingMaxGapHours})),
     data:{
-      spot:{bars:spot.length,filesRequested:spotRaw.filesRequested,filesLoaded:spotRaw.filesLoaded,missing:spotRaw.missing,coverage:spotCov},
-      swap:{bars:swap.length,filesRequested:swapRaw.filesRequested,filesLoaded:swapRaw.filesLoaded,missing:swapRaw.missing,coverage:swapCov},
+      spot:{bars:spot.length,filesRequested:spotRaw.filesRequested,filesLoaded:spotRaw.filesLoaded,missing:spotRaw.missing,coverage:spotCov,repairFrom1h:spotRepair},
+      swap:{bars:swap.length,filesRequested:swapRaw.filesRequested,filesLoaded:swapRaw.filesLoaded,missing:swapRaw.missing,coverage:swapCov,warmupCoverage:swapWarmupCov},
       funding:{periods:enrichedFunding.length,filesRequested:fundRaw.filesRequested,filesLoaded:fundRaw.filesLoaded,missing:fundRaw.missing,
         first:enrichedFunding[0]?new Date(enrichedFunding[0].fundingTime).toISOString():null,last:enrichedFunding.at(-1)?new Date(enrichedFunding.at(-1).fundingTime).toISOString():null,maxGapHours:round(fullFundingGap,2)},
-      matchedTimelineBars:timeline.length,eligibleEntriesObserved:entrySnapshots.length
+      restWarmup:restWarmup.diagnostics,matchedTimelineBars:timeline.length,eligibleEntriesObserved:entrySnapshots.length
     }
   };
   await fs.mkdir('artifacts',{recursive:true});
