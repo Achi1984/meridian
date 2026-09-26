@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 import {RANGE_REVERSION_V1 as C,runRangeReversionV1} from '../range-reversion-v1.js';
 
-const BASE='https://api.binance.com',H4=4*3600000,DAY=86400000;
+const H4=4*3600000,DAY=86400000;
 const PRIMARY_START=Date.parse(C.primaryStart),PRIMARY_END=Date.parse(C.primaryEnd),SECONDARY_START=Date.parse(C.secondaryStart),SECONDARY_END=Date.parse(C.secondaryEnd);
 const FETCH_START=PRIMARY_START-C.warmupDays*DAY,FETCH_END=SECONDARY_END;
 const round=(v,d=3)=>Number.isFinite(v)?Math.round(v*10**d)/10**d:null;
@@ -38,7 +39,7 @@ function concentration(bySymbol){const pos=Object.fromEntries(Object.entries(byS
 
 const runs={};
 for(const symbol of C.symbols){
-  console.log('fetch',symbol);const raw=await candles(symbol),bars=raw.rows;
+  console.log('fetch',symbol);const raw=candles(symbol),bars=raw.rows;
   const expected=Math.floor((SECONDARY_END-PRIMARY_START)/H4),actual=bars.filter(x=>x.t>=PRIMARY_START&&x.t<SECONDARY_END).length;
   const primaryBars=bars.filter(x=>x.t>=PRIMARY_START-C.warmupDays*DAY&&x.t<PRIMARY_END);
   const secondaryBars=bars.filter(x=>x.t>=SECONDARY_START-C.warmupDays*DAY&&x.t<SECONDARY_END);
@@ -62,7 +63,7 @@ const gates={
   secondaryDrawdown:secondarySummary.maxDrawdownR<=20,
   dataAdequacy:Object.values(runs).every(x=>x.coverage.complete)
 };
-const out={schemaVersion:'RANGE-REVERSION-V1-HISTORICAL-EVIDENCE',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,predeclaredDesign:'research/range-reversion-v1-design.md',config:C,source:'BINANCE_PUBLIC_SPOT_4H',
+const out={schemaVersion:'RANGE-REVERSION-V1-HISTORICAL-EVIDENCE',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,predeclaredDesign:'research/range-reversion-v1-design.md',config:C,source:'BINANCE_VISION_PUBLIC_SPOT_4H_ARCHIVES',
   periods:{primary:{start:C.primaryStart,end:C.primaryEnd},secondary:{start:C.secondaryStart,end:C.secondaryEnd}},
   primary:{summary:primarySummary,walkForward,bySide:primaryBySide,bySymbol:primaryBySymbol,positiveNetRConcentrationPct:shares,opportunity:Object.fromEntries(Object.entries(runs).map(([k,x])=>[k,{signals:x.primary.signals.length,expiredGapTarget:x.primary.diagnostics.expiredGapTarget,openAtEnd:x.primary.open.length}]))},
   secondary:{summary:secondarySummary,bySide:secondaryBySide,bySymbol:secondaryBySymbol,opportunity:Object.fromEntries(Object.entries(runs).map(([k,x])=>[k,{signals:x.secondary.signals.length,expiredGapTarget:x.secondary.diagnostics.expiredGapTarget,openAtEnd:x.secondary.open.length}]))},
