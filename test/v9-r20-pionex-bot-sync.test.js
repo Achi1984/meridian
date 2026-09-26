@@ -19,6 +19,8 @@ test('r20 Data Truth exposes Pionex bot API health and coverage',()=>{
   assert.match(js,/BOT SOURCE/);
   assert.match(js,/DISABLED_MISSING_CREDENTIALS/);
   assert.match(js,/Pionex Bot API Sync-Fehler/);
+  assert.match(js,/EMPTY_GUARD/);
+  assert.match(js,/alter Snapshot wurde aus Sicherheitsgründen nicht überschrieben/);
 });
 
 test('r20 frontend accepts normalized Pionex Bot API field aliases',()=>{
