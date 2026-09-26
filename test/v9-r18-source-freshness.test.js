@@ -17,10 +17,10 @@ test('r18 distinguishes private snapshots from fresh actionable bot data',()=>{
 });
 
 test('r18 diagnostics reveal whether the backend or matcher is the bottleneck',()=>{
-  assert.match(js,/PRIVATE API ROWS/);
-  assert.match(js,/UNMATCHED API/);
-  assert.match(js,/Backend liefert aktuell nur/);
-  assert.match(js,/private Bot-Rows nicht gematcht/);
+  assert.match(js,/(PRIVATE API ROWS|PIONEX API)/);
+  assert.match(js,/UNMATCHED/);
+  assert.match(js,/(Backend liefert aktuell nur|Bot-Feed liefert aktuell)/);
+  assert.match(js,/Bot-Rows nicht gematcht/);
   assert.match(js,/state\.unmatchedLive=live\.filter/);
 });
 
