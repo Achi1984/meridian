@@ -84,7 +84,7 @@ If an official 4h spot or perpetual candle is absent:
 3. if 1h cannot reproduce it, use exactly 240 official 1m bars;
 4. otherwise data adequacy fails.
 
-Funding settlements are never interpolated. Any funding gap over 12h fails data adequacy.
+Funding settlements are never interpolated. If a monthly official fundingRate ZIP is unavailable, the loader may use the official Binance Vision daily fundingRate ZIPs for exactly the missing calendar days. Any unresolved funding gap over 12h fails data adequacy.
 
 ## Accounting
 
