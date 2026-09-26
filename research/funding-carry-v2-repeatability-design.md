@@ -41,7 +41,7 @@ No production threshold may be changed from this audit result.
 ## Historical data and timing
 
 - Source: official Binance Vision public archives: BTCUSDT spot 4h klines, BTCUSDT USD-M perpetual 4h klines, and BTCUSDT USD-M fundingRate archives.
-- Audit market window: 2022-01-01T00:00:00Z through 2026-09-06T00:00:00Z.
+- Audit market window: 2022-01-01T00:00:00Z through 2026-09-01T00:00:00Z.
 - Funding warm-up begins 2021-12-01T00:00:00Z.
 - Only data timestamped at or before the simulated decision time may be used.
 - Evaluation/marking occurs at matched confirmed 4h bar opens. The bar open is treated as the contemporaneous executable reference; V2's frozen slippage/fee model is charged separately.
@@ -52,7 +52,9 @@ No production threshold may be changed from this audit result.
 
 The first audit execution used OKX public funding history and produced **no eligible cycles because the endpoint only returned 227 recent settlements (2026-06-22 onward)**. That run therefore contained no usable strategy-performance sample. Before any cycle P&L was observed, the historical source was corrected to Binance Vision bulk archives, which provide multi-year official fundingRate and kline files and match the venue used by the production Funding Carry V2 runtime.
 
-No V2 policy threshold, audit window, cooldown, cost, decision gate or accounting rule changed.
+No V2 policy threshold, cooldown, cost, decision gate or accounting rule changed.
+
+A second data-QA pass found two archive mechanics before any completed strategy cycle existed: some official funding timestamps are offset by 1 ms from the corresponding 4h kline boundary, so mark-price enrichment must map each settlement to its containing 4h bar rather than require exact timestamp equality. Binance Vision also had no daily fundingRate ZIPs for 2026-09-01 through 2026-09-05 at audit time. To keep the evidence fully archive-reproducible, the audit end was moved back five days to 2026-09-01T00:00:00Z. This was done before observing any cycle P&L.
 
 ## Repeatability harness
 
