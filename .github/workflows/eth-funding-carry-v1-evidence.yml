@@ -1,0 +1,33 @@
+name: ETH Funding Carry V1 Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'funding-carry-paper-v2.js'
+      - 'scripts/eth-funding-carry-v1-evidence.mjs'
+      - 'research/eth-funding-carry-v1-design.md'
+      - 'test/funding-carry-v2-r40.test.js'
+      - '.github/workflows/eth-funding-carry-v1-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify transferred carry mechanics
+        run: node --test test/funding-carry-v2-r40.test.js
+      - name: Run ETH historical validation
+        run: node scripts/eth-funding-carry-v1-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eth-funding-carry-v1-evidence
+          path: artifacts/eth-funding-carry-v1-evidence.json
+          if-no-files-found: error
