@@ -6,26 +6,10 @@ const H4=4*3600000,DAY=86400000;
 const PRIMARY_START=Date.parse(C.primaryStart),PRIMARY_END=Date.parse(C.primaryEnd),SECONDARY_START=Date.parse(C.secondaryStart),SECONDARY_END=Date.parse(C.secondaryEnd);
 const FETCH_START=PRIMARY_START-C.warmupDays*DAY,FETCH_END=SECONDARY_END;
 const round=(v,d=3)=>Number.isFinite(v)?Math.round(v*10**d)/10**d:null;
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-
-async function getJson(url,attempt=0){
-  const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-Range-Reversion-V1/1.0','accept':'application/json'}});
-  if(r.ok)return r.json();
-  if((r.status===418||r.status===429||r.status>=500)&&attempt<5){await sleep(500*2**attempt);return getJson(url,attempt+1);}
-  throw new Error(`${r.status} ${url}`);
-}
-async function candles(symbol){
-  let cursor=FETCH_START,out=[],calls=0;
-  while(cursor<FETCH_END){
-    const url=`${BASE}/api/v3/klines?symbol=${symbol}&interval=4h&startTime=${cursor}&endTime=${FETCH_END-1}&limit=1000`;
-    const rows=await getJson(url);calls++;
-    if(!Array.isArray(rows)||!rows.length)break;
-    for(const k of rows){const t=Number(k[0]);if(t>=FETCH_START&&t<FETCH_END)out.push({t,o:Number(k[1]),h:Number(k[2]),l:Number(k[3]),c:Number(k[4])});}
-    const last=Number(rows.at(-1)?.[0]);if(!Number.isFinite(last)||last<cursor)break;
-    cursor=last+H4;if(rows.length<1000)break;await sleep(80);
-  }
-  out.sort((a,b)=>a.t-b.t);
-  return{calls,rows:out.filter((x,i,a)=>!i||x.t!==a[i-1].t)};
+function candles(symbol){
+  const raw=execFileSync('python3',['scripts/binance-vision-4h.py',symbol,String(FETCH_START),String(FETCH_END)],{encoding:'utf8',maxBuffer:64*1024*1024});
+  const rows=JSON.parse(raw);
+  return{calls:null,rows};
 }
 function stats(rows=[]){
   const xs=[...rows].sort((a,b)=>a.closedAt-b.closedAt),wins=xs.filter(x=>x.netR>0),losses=xs.filter(x=>x.netR<0);
