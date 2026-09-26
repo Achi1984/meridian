@@ -34,7 +34,7 @@ export function signPionexGet(path,params,secret){
 function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
 function firstNum(obj,keys){for(const k of keys){const x=n(obj?.[k]);if(x!=null)return x}return null}
 function baseSymbol(v){return String(v||'').toUpperCase().replace(/\.PERP$/,'').replace(/[-_/]?(USDT|USDC|USD)$/,'')}
-function direction(v){const x=String(v||'').toLowerCase();return x==='short'?'SHORT':x==='long'?'LONG':x==='no_trend'?'NEUTRAL':String(v||'LONG').toUpperCase()}
+function direction(v){const x=String(v||'').toLowerCase();return x==='short'?'SHORT':x==='long'?'LONG':x==='no_trend'?'NEUTRAL':null}
 function activeOrder(o){const status=String(o?.buOrderData?.status||o?.status||'').toLowerCase();return ACTIVE_STATUSES.has(status)}
 function liquidationFor(d,side){
   const direct=firstNum(d,['liquidationPrice']);
@@ -56,10 +56,10 @@ function reliableUsdInvestment(d){
   return null;
 }
 function optionalPnl(d){
-  return firstNum(d,['totalProfitUsd','totalProfitUSDT','pnlUsd','unrealizedPnlUsd','floatingProfitUsd','totalProfit','unrealizedProfit','floatingProfit']);
+  return firstNum(d,['totalProfitUsd','totalProfitUSDT','pnlUsd','unrealizedPnlUsd','floatingProfitUsd']);
 }
 function optionalPnlPct(d){
-  return firstNum(d,['totalProfitPct','pnlPct','profitPct','profitRate','profitRatio','floatingProfitRate']);
+  return firstNum(d,['totalProfitPct','pnlPct','profitPct']);
 }
 
 export function normalizePionexBotOrder(order){
@@ -192,9 +192,20 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       return {ok:false,reason:'missing_credentials'};
     }
     const {orders,pages,truncated}=await fetchRunningBotOrders({apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now});
+    if(truncated)throw new Error('pionex_bot_pagination_truncated');
     const risk=buildPionexRiskSnapshot(orders,at);
-    await updatePrivateState(env,current=>mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated}));
-    return {ok:true,botCount:risk.botCount,apiRows:risk.apiRows,pages,truncated};
+    let applied=false,guarded=false;
+    await updatePrivateState(env,current=>{
+      const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
+      if(previousCount>0&&risk.botCount===0){
+        guarded=true;
+        return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated:false});
+      }
+      applied=true;
+      return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated:false});
+    });
+    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,pages};
+    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,pages,truncated:false};
   }catch(e){
     const msg=String(e?.message||e);
     try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
