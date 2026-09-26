@@ -152,8 +152,8 @@ try{
     console.log('load',symbol);
     const [spot,perp,funding]=await Promise.all([loadMarket(symbol,'spot',tmpDir),loadMarket(symbol,'perp',tmpDir),loadFunding(symbol,tmpDir)]);
     const spotAt=new Map(spot.rows.map(x=>[x.t,x])),perpAt=new Map(perp.rows.map(x=>[x.t,x]));
-    const enrichedFunding=funding.rows.map(x=>({...x,markPrice:Number(perpAt.get(Math.floor(x.fundingTime/H4)*H4)?.o)})).filter(x=>x.markPrice>0);
-    data[symbol]={spot,perp,funding,enrichedFunding,spotAt,perpAt};
+    const fundingRows=funding.rows.map(x=>({...x,markPrice:Number(perpAt.get(Math.floor(x.fundingTime/H4)*H4)?.o)}));
+    data[symbol]={spot,perp,funding,fundingRows,spotAt,perpAt};
   }
 
   const ptr=Object.fromEntries(C.symbols.map(s=>[s,0])),cycles=[],selections=[];
@@ -161,14 +161,14 @@ try{
 
   for(let t=START;t<END;t+=H4){
     for(const symbol of C.symbols){
-      const rows=data[symbol].enrichedFunding;
+      const rows=data[symbol].fundingRows;
       while(ptr[symbol]<rows.length&&rows[ptr[symbol]].fundingTime<=t)ptr[symbol]++;
     }
 
     if(state&&activeSymbol){
       const d=data[activeSymbol],spot=d.spotAt.get(t),perp=d.perpAt.get(t);
       if(spot&&perp){
-        const recent=d.enrichedFunding.slice(Math.max(0,ptr[activeSymbol]-120),ptr[activeSymbol]);
+        const recent=d.fundingRows.slice(Math.max(0,ptr[activeSymbol]-120),ptr[activeSymbol]);
         state=applyFundingSettlementsV2(state,recent,t);
         state=markFundingCarryV2(state,{spotBid:spot.o,perpAsk:perp.o},t);
         const reason=fundingCarryV2ExitReason(state,recent,t);
@@ -191,7 +191,7 @@ try{
       for(const symbol of C.symbols){
         const d=data[symbol],spot=d.spotAt.get(t),perp=d.perpAt.get(t);
         if(!spot||!perp)continue;
-        const recent=d.enrichedFunding.slice(Math.max(0,ptr[symbol]-120),ptr[symbol]);
+        const recent=d.fundingRows.slice(Math.max(0,ptr[symbol]-120),ptr[symbol]);
         const cfg=Object.freeze({...BASE_CONFIG,symbol});
         const eligibility=fundingEligibilityV2(recent,{spotAsk:spot.o,perpBid:perp.o},t,cfg);
         candidates.push({symbol,eligibility,spot,perp,cfg});
@@ -219,9 +219,9 @@ try{
 
   const dataQuality={};
   for(const symbol of C.symbols){
-    const d=data[symbol],spotCov=coverage(d.spot.rows,START,END),perpCov=coverage(d.perp.rows,START,END),fundGap=maxFundingGapHours(d.enrichedFunding,FUNDING_START,END);
-    const fundingComplete=d.enrichedFunding.length>0&&d.enrichedFunding[0].fundingTime<=FUNDING_START+8*HOUR&&d.enrichedFunding.at(-1).fundingTime>=END-16*HOUR&&fundGap<=12&&d.funding.dailyMissing.length===0;
-    dataQuality[symbol]={spot:spotCov,perp:perpCov,fundingPeriods:d.enrichedFunding.length,fundingFirst:d.enrichedFunding[0]?new Date(d.enrichedFunding[0].fundingTime).toISOString():null,fundingLast:d.enrichedFunding.at(-1)?new Date(d.enrichedFunding.at(-1).fundingTime).toISOString():null,maxFundingGapHours:round(fundGap,2),fundingComplete,spotRepair:d.spot.repair,perpRepair:d.perp.repair,missingFundingMonths:d.funding.missingMonths,dailyFundingMissing:d.funding.dailyMissing};
+    const d=data[symbol],spotCov=coverage(d.spot.rows,START,END),perpCov=coverage(d.perp.rows,START,END),fundGap=maxFundingGapHours(d.fundingRows,FUNDING_START,END);
+    const fundingComplete=d.fundingRows.length>0&&d.fundingRows[0].fundingTime<=FUNDING_START+8*HOUR&&d.fundingRows.at(-1).fundingTime>=END-16*HOUR&&fundGap<=12&&d.funding.dailyMissing.length===0;
+    dataQuality[symbol]={spot:spotCov,perp:perpCov,fundingPeriods:d.fundingRows.length,fundingFirst:d.fundingRows[0]?new Date(d.fundingRows[0].fundingTime).toISOString():null,fundingLast:d.fundingRows.at(-1)?new Date(d.fundingRows.at(-1).fundingTime).toISOString():null,maxFundingGapHours:round(fundGap,2),fundingComplete,spotRepair:d.spot.repair,perpRepair:d.perp.repair,missingFundingMonths:d.funding.missingMonths,dailyFundingMissing:d.funding.dailyMissing};
   }
   const dataAdequacy=Object.values(dataQuality).every(x=>x.spot.complete&&x.perp.complete&&x.fundingComplete);
 
