@@ -34,8 +34,9 @@ function daysBetween(startMs,endMs){
   const out=[];for(let t=startMs;t<endMs;t+=DAY)out.push(new Date(t).toISOString().slice(0,10));return out;
 }
 function tsNorm(v){
-  const x=Number(v);if(!Number.isFinite(x))return null;
-  return x>1e14?Math.floor(x/1000):x;
+  const x=Number(v);
+  if(Number.isFinite(x))return x>1e14?Math.floor(x/1000):x;
+  const p=Date.parse(String(v||''));return Number.isFinite(p)?p:null;
 }
 function csvLines(text){
   return text.trim().split(/\r?\n/).map(line=>line.split(',').map(x=>x.replace(/^"|"$/g,'').trim()));
@@ -70,10 +71,16 @@ function parseKlines(text){
 }
 function parseFunding(text){
   if(!text)return[];
+  const rows=csvLines(text);if(!rows.length)return[];
+  const header=rows[0].map(x=>String(x).toLowerCase());
+  const hasHeader=header.some(x=>x.includes('calc_time')||x.includes('funding'));
+  const timeIdx=hasHeader?Math.max(0,header.findIndex(x=>x.includes('calc_time')||x==='fundingtime')):0;
+  let rateIdx=hasHeader?header.findIndex(x=>x.includes('last_funding_rate')||x==='fundingrate'):-1;
+  if(rateIdx<0)rateIdx=2;
   const out=[];
-  for(const row of csvLines(text)){
-    const t=tsNorm(row[0]);if(!Number.isFinite(t))continue;
-    const rate=Number(row[2]);if(Number.isFinite(rate))out.push({fundingTime:t,fundingRate:rate});
+  for(const row of rows.slice(hasHeader?1:0)){
+    const t=tsNorm(row[timeIdx]);if(!Number.isFinite(t))continue;
+    const rate=Number(row[rateIdx]);if(Number.isFinite(rate))out.push({fundingTime:t,fundingRate:rate});
   }
   return out;
 }
@@ -94,6 +101,10 @@ async function loadVision(kind,tmpDir){
   const lastFullMonth=Date.parse('2026-09-01T00:00:00Z');
   const months=monthsBetween(FUNDING_START,lastFullMonth),days=daysBetween(lastFullMonth,AUDIT_END);
   const monthly=await poolMap(months,8,async ym=>({tag:ym,text:await fetchZipCsv(monthUrl(kind,ym),tmpDir)}));
+  if(kind==='funding'){
+    const diag=monthly.find(x=>x.tag==='2024-01'&&x.text);
+    if(diag)console.log('FUNDING_ARCHIVE_2024_01_HEAD',diag.text.split(/\\r?\\n/).slice(0,6));
+  }
   const daily=await poolMap(days,8,async d=>({tag:d,text:await fetchZipCsv(dayUrl(kind,d),tmpDir)}));
   const missing=[...monthly,...daily].filter(x=>x.text==null).map(x=>x.tag);
   const rows=[...monthly,...daily].flatMap(x=>kind==='funding'?parseFunding(x.text):parseKlines(x.text));
