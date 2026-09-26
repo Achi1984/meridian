@@ -96,3 +96,12 @@ Research only. No existing Paper state, V2 state, Pionex account, exchange accou
 The first holdout execution produced favorable cycle economics but failed the predeclared data-adequacy gate: Binance Vision monthly archives did not provide the 2019-12 USD-M kline/funding files, and the monthly spot set contained one missing evaluation 4h bar. That run is treated as **invalid for promotion** regardless of its P&L.
 
 To satisfy the already-predeclared data-completeness requirement, the evidence loader is allowed to backfill only those missing archive intervals from Binance Vision's official daily ZIP archives. No strategy rule, gate, date, cost, re-arm rule, entry, exit or accounting assumption is changed. The repaired run is the only run eligible for a V3 decision.
+
+
+### Final data-source recovery rule
+
+The Binance Vision monthly and daily USD-M archives available to the runner begin at 2020-01 for this symbol, while the predeclared holdout requires a 2019-12 funding warm-up. The archive-only run is therefore invalid on data adequacy. To recover the already-required warm-up without changing the strategy, the evidence loader may query Binance's official public USD-M REST market-data endpoints **only for the missing 2019-12 warm-up interval**. If those endpoints are unavailable or incomplete, the gate remains failed.
+
+The single missing spot 4h evaluation candle may be reconstructed only from Binance Vision's official 1h archive for that exact day. No interpolation is allowed.
+
+These are data-completeness repairs only. The previously observed favorable P&L is not sufficient for promotion unless the repaired final run independently satisfies every frozen gate.
