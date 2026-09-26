@@ -1,0 +1,33 @@
+name: Range Reversion V1 Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'range-reversion-v1.js'
+      - 'scripts/range-reversion-v1-evidence.mjs'
+      - 'test/range-reversion-v1.test.js'
+      - 'research/range-reversion-v1-design.md'
+      - '.github/workflows/range-reversion-v1-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify frozen contract
+        run: node --test test/range-reversion-v1.test.js
+      - name: Run historical evidence
+        run: node scripts/range-reversion-v1-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: range-reversion-v1-evidence
+          path: artifacts/range-reversion-v1-evidence.json
+          if-no-files-found: error
