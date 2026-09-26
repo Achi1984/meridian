@@ -6,6 +6,7 @@ on:
     paths:
       - 'range-reversion-v1.js'
       - 'scripts/range-reversion-v1-evidence.mjs'
+      - 'scripts/binance-vision-4h.py'
       - 'test/range-reversion-v1.test.js'
       - 'research/range-reversion-v1-design.md'
       - '.github/workflows/range-reversion-v1-evidence.yml'
