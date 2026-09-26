@@ -1,0 +1,33 @@
+name: Funding Carry V3 Older Holdout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'funding-carry-paper-v2.js'
+      - 'scripts/funding-carry-v3-older-holdout.mjs'
+      - 'research/funding-carry-v3-older-holdout-design.md'
+      - 'test/funding-carry-v2-r40.test.js'
+      - '.github/workflows/funding-carry-v3-older-holdout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify frozen carry policy
+        run: node --test test/funding-carry-v2-r40.test.js
+      - name: Run disjoint older holdout
+        run: node scripts/funding-carry-v3-older-holdout.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: funding-carry-v3-older-holdout
+          path: artifacts/funding-carry-v3-older-holdout.json
+          if-no-files-found: error
