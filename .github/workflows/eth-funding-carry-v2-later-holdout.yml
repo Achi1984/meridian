@@ -1,0 +1,33 @@
+name: ETH Funding Carry V2 Later Holdout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'funding-carry-paper-v2.js'
+      - 'scripts/eth-funding-carry-v2-later-holdout.mjs'
+      - 'research/eth-funding-carry-v2-later-holdout-design.md'
+      - 'test/funding-carry-v2-r40.test.js'
+      - '.github/workflows/eth-funding-carry-v2-later-holdout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify transferred carry mechanics
+        run: node --test test/funding-carry-v2-r40.test.js
+      - name: Run later ETH holdout
+        run: node scripts/eth-funding-carry-v2-later-holdout.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eth-funding-carry-v2-later-holdout
+          path: artifacts/eth-funding-carry-v2-later-holdout.json
+          if-no-files-found: error
