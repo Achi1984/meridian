@@ -5,6 +5,8 @@ const round=(v,d=8)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**
 const copy=x=>JSON.parse(JSON.stringify(x));
 
 export const FUNDING_CARRY_PAPER_V1_RULESET='8.0-PAPER-BTC-FUNDING-CARRY-V1';
+export const FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED=false;
+export const FUNDING_CARRY_V1_RETIREMENT_REASON='SUPERSEDED_BY_STRICTER_COST_AMORTIZED_V2';
 export const FUNDING_CARRY_PAPER_V1_CONFIG=Object.freeze({
   symbol:'BTCUSDT',startEquity:20000,notionalPerLeg:10000,
   feeBps:5,slippageBps:3,entryLookbackDays:30,minFundingPeriods:80,
@@ -93,7 +95,7 @@ export function closeFundingCarryPaper(state,snapshot,reason,now=Date.now(),cfg=
 
 export function fundingCarryPaperStatus(state,cfg=FUNDING_CARRY_PAPER_V1_CONFIG){
   const s=state||newFundingCarryPaperState(),settlements=(s.settlements||[]).slice(-5).reverse(),basket=s.basket;
-  return {enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,
+  return {enabled:true,researchOnly:true,executionImpact:false,autoPromotion:false,newEntriesAllowed:FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED,retirementReason:FUNDING_CARRY_V1_RETIREMENT_REASON,
     ruleset:FUNDING_CARRY_PAPER_V1_RULESET,lifecycle:s.lifecycle,lastCheckedAt:s.lastCheckedAt,account:s.account,basket:s.basket,
     lastEligibility:s.lastEligibility,settlements,telemetry:{breakEvenRemaining:basket?round(Math.max(0,-Number(basket.netPnl||0)),2):null,nextFundingTime:basket?.nextFundingTime||null,referenceFundingRate:basket?.referenceFundingRate??null,lastSettlement:settlements[0]||null},closedCycles:(s.closedCycles||[]).slice(-3).reverse(),
     policy:{symbol:cfg.symbol,notionalPerLeg:cfg.notionalPerLeg,entryFundingMinimum:cfg.minRollingFundingRate,reviewDays:cfg.reviewDays,maxLossPct:cfg.maxLossPct}};
