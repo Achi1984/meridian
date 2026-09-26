@@ -51,9 +51,10 @@ test('round-trip cost is charged in R units',()=>{
 });
 
 test('entry window rejects signals outside the frozen evaluation period',()=>{
-  const rows=sample(),start=rows.at(-2).t,end=rows.at(-1).t;
+  const rows=sample(),start=rows.at(-1).t+10*H4,end=start+H4;
   const r=runVolCompressionExpansionV1(rows,{symbol:'SOLUSDT',entryStart:start,entryEnd:end},cfg);
   assert.equal(r.closed.length+r.open.length,0);
+  assert.equal(r.signals.length,0);
 });
 
 test('engine is research-only and exposes no execution hook',()=>{
