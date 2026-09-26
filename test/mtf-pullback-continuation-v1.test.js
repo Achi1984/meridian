@@ -10,7 +10,7 @@ function sample(){
   const push=(o,h,l,c)=>{rows.push({t,o,h,l,c});t+=H4;p=c;};
   for(let i=0;i<42;i++){const o=p,c=p+.20;push(o,c+.08,o-.08,c);}
   const peak=p;
-  push(p,p+.05,p-.60,p-.50);
+  push(p,p+.05,p-.30,p-.20);
   push(p,p+.95,p-.05,peak+.45);
   push(p,p+.90,p-.10,p+.60);
   push(p,p+.40,p-.50,p-.20);
