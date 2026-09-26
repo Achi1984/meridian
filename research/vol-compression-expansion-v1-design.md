@@ -14,7 +14,7 @@ Crypto markets that spend several 4h bars in unusually compressed volatility may
 ### Universe and data
 
 - Universe: BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, LINKUSDT.
-- Historical source: Binance public spot 1h OHLC, resampled to complete UTC 4h bars.
+- Historical source: OKX public spot 4h candles (`*-USDT`). Only confirmed completed candles are used.
 - Signals are symmetric LONG/SHORT.
 - No daily trend filter, RSI, MACD, ADX, volume filter, funding filter, asset filter or discretionary override.
 
@@ -60,6 +60,10 @@ Warm-up starts 260 days before the primary start.
 - Any candles after the secondary end are excluded.
 
 The strategy parameters, dates and gates may not be changed after the first result is inspected.
+
+### Pre-result data-source correction
+
+The first evidence attempt produced no market-performance result because Binance returned HTTP 451 to the GitHub Actions runner on the first BTC history request. Before any historical metric was observed, the evidence source was changed from Binance 1h/resampled 4h to OKX public confirmed 4h spot candles. Strategy logic, universe, costs, evidence windows and all decision gates remained unchanged.
 
 ## Predeclared historical gate
 
