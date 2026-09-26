@@ -15,7 +15,7 @@ import {
 
 const VISION='https://data.binance.vision/data',H4=4*3600000,HOUR=3600000,DAY=86400000;
 const AUDIT_START=Date.parse('2022-01-01T00:00:00.000Z');
-const AUDIT_END=Date.parse('2026-09-06T00:00:00.000Z');
+const AUDIT_END=Date.parse('2026-09-01T00:00:00.000Z');
 const FUNDING_START=Date.parse('2021-12-01T00:00:00.000Z');
 const COOLDOWN=DAY,EXTRA_STRESS_USD=8;
 const round=(v,d=4)=>Number.isFinite(Number(v))?Math.round(Number(v)*10**d)/10**d:null;
@@ -144,7 +144,7 @@ try{
 
   // Funding archives do not include mark price; use contemporaneous perpetual 4h open.
   const enrichedFunding=funding.map(x=>{
-    const px=swapAt.get(x.fundingTime)?.o;
+    const px=swapAt.get(Math.floor(x.fundingTime/H4)*H4)?.o;
     return {...x,markPrice:Number(px)};
   }).filter(x=>x.markPrice>0);
 
