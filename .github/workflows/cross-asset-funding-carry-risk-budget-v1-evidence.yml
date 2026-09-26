@@ -1,0 +1,34 @@
+name: Cross-Asset Funding Carry Risk Budget V1 Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'cross-asset-funding-carry-risk-budget-v1.js'
+      - 'scripts/cross-asset-funding-carry-risk-budget-v1-evidence.mjs'
+      - 'test/cross-asset-funding-carry-risk-budget-v1.test.js'
+      - 'research/cross-asset-funding-carry-risk-budget-v1-design.md'
+      - 'funding-carry-paper-v2.js'
+      - '.github/workflows/cross-asset-funding-carry-risk-budget-v1-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify frozen risk-budget contract
+        run: node --test test/cross-asset-funding-carry-risk-budget-v1.test.js test/funding-carry-v2-r40.test.js
+      - name: Run historical evidence
+        run: node scripts/cross-asset-funding-carry-risk-budget-v1-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-asset-funding-carry-risk-budget-v1-evidence
+          path: artifacts/cross-asset-funding-carry-risk-budget-v1-evidence.json
+          if-no-files-found: error
