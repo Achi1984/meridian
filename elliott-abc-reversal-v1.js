@@ -20,14 +20,14 @@ function normalize(bars=[]){
     .filter(x=>[x.t,x.o,x.h,x.l,x.c].every(Number.isFinite)&&x.o>0&&x.c>0&&x.h>=x.l)
     .sort((a,b)=>a.t-b.t).filter((x,i,a)=>!i||x.t!==a[i-1].t);
 }
-function confirmedPivots(xs,width){
+function confirmedPivots(xs,width,barMs=H4){
   const out=[];
   for(let i=width;i<xs.length-width;i++){
     const b=xs[i],left=xs.slice(i-width,i),right=xs.slice(i+1,i+width+1);
     const high=left.every(x=>b.h>x.h)&&right.every(x=>b.h>=x.h);
     const low=left.every(x=>b.l<x.l)&&right.every(x=>b.l<=x.l);
     if(high===low)continue;
-    out.push({type:high?'HIGH':'LOW',price:high?b.h:b.l,index:i,t:b.t,confirmedIndex:i+width,confirmedAt:xs[i+width].t+H4});
+    out.push({type:high?'HIGH':'LOW',price:high?b.h:b.l,index:i,t:b.t,confirmedIndex:i+width,confirmedAt:xs[i+width].t+barMs});
   }
   return out;
 }
@@ -41,7 +41,7 @@ function dailyBars(xs){
   return [...m.values()].filter(x=>x.count===6).sort((a,b)=>a.t-b.t);
 }
 function dailyContexts(xs){
-  const ds=dailyBars(xs),ps=confirmedPivots(ds,PIVOT1D),out=[];
+  const ds=dailyBars(xs),ps=confirmedPivots(ds,PIVOT1D,DAY),out=[];
   for(let i=1;i<ps.length;i++){
     const a=ps[i-1],b=ps[i];if(a.type===b.type)continue;
     out.push({confirmedAt:b.confirmedAt,direction:a.type==='LOW'&&b.type==='HIGH'?'LONG':'SHORT'});
