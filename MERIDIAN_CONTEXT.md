@@ -169,3 +169,19 @@ Authoritative screenshot snapshot:
 - XRP LONG 3x Futures DCA: 65.32 USDC invested; -0.014 USDC (-0.03%) total PnL; -0.0048 (-0.01%) variable PnL; last 1.5291; TP 1.5924; average cost 1.5296; 0/9 safety orders; no estimated liquidation price shown.
 
 Previous OKX INJ/XRP position records are stale and must not be used. The combined known DCA-bot equity from the screenshot is about 130.80 USDC, excluding any unshown OKX cash or other account balances.
+
+
+## v9 r20 Pionex Bot Read Sync checkpoint
+
+r19 iPhone acceptance on 26.09.2026 showed:
+- MERIDIAN r19 deployed correctly.
+- OKX Futures DCA migration rendered correctly.
+- Data Truth exposed 3 private Pionex bot rows, 2/25 matches, 1 unmatched stale BTC SHORT 30x row, snapshot age 23d 8h, ACTIONABLE 0.
+- Risk Cockpit correctly stayed on SYNC and Risk Priority refused to act.
+
+Repository inspection confirmed the underlying cause:
+- `/api/private/dashboard` is a persisted Postgres snapshot.
+- Existing automatic exchange sync covers OKX/Bitpanda holdings only.
+- No runtime component refreshed `pionexRisk.bots`.
+
+r20 adds a dedicated, read-only Pionex Bot API runtime sync. It uses Pionex's Bot-reading endpoint and fails closed: stale snapshots remain stale on authentication/API/network errors.
