@@ -232,3 +232,27 @@ This file records durable project decisions and the reasoning behind them. Read 
 - OKX DCA rows are screenshot snapshots, not a live account feed; they do not drive Pionex Profit Lock / Risk Priority action logic.
 - Public price can be refreshed/cross-checked with OKX + Binance, while investment, PnL, TP, average cost and safety-order state remain screenshot provenance.
 - Known OKX bot equity is derived as investment plus total PnL for the screenshot-confirmed bots. This is a known-bot subtotal, not proof of total OKX account equity.
+
+
+## D-028 — Pionex bot state must come from read-only Bot API or remain non-actionable
+
+**Decision:** MERIDIAN no longer treats the persisted `pionexRisk` snapshot as self-refreshing. A dedicated read-only Pionex Bot API synchronizer is the authoritative path for live bot-structure refreshes.
+
+**Runtime contract:**
+- Read endpoint only: `GET /api/v1/bot/orders`.
+- Credentials: `PIONEX_BOT_READ_API_KEY` + `PIONEX_BOT_READ_API_SECRET`; generic `PIONEX_API_KEY/SECRET` are accepted only as read-call fallback.
+- Recommended API-key permission: Pionex **Bot reading** only.
+- Successful reads update `pionexRisk.source=PIONEX_BOT_API`, `snapshotAt`, `updatedAt`, raw API-row count and normalized running futures bot rows.
+- Failed reads update only `pionexBotSync` diagnostics; they do **not** refresh the old `pionexRisk.updatedAt` timestamp or make stale rows actionable.
+- Missing credentials publish one disabled diagnostic on startup and do not create a repeated write loop.
+- Refresh cadence defaults to 5 minutes and remains read-only.
+- Public market prices stay independently cross-checked through OKX/Binance.
+- Account-specific PnL is used only when Pionex actually returns a recognized PnL field; it is never inferred from margin or withdrawn-profit fields.
+- Coin-margined investment is not labeled USD unless Pionex exposes `usdtInvestment` or explicitly declares the investment coin as USDT.
+
+**UI contract:**
+- Data Truth r20 exposes Pionex raw API rows, normalized bot rows, match coverage, Bot API state, bot source, snapshot age, PnL coverage and actionable count.
+- Existing 15-minute freshness gate remains mandatory for Risk Priority / Profit Lock / NEXT ACTION.
+- A fresh structural bot row may restore liquidation-risk monitoring even when PnL is absent; Profit Lock still requires fresh PnL.
+
+**Reason:** r19 physical iPhone validation showed 3 private rows, only 2/25 matched, and a 23-day-old bot snapshot. The root cause was absence of a Pionex bot-data producer, not the frontend matcher.

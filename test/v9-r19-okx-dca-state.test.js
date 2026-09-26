@@ -43,6 +43,6 @@ test('r19 cross-checks OKX DCA symbols with the public market feed',()=>{
 });
 
 test('r19 production version is consistent',()=>{
-  assert.match(html,/v9 · r19 · COIN-M COMMAND CENTER/);
-  assert.match(html,/9\.0-r19/);
+  assert.match(html,/v9 · r\d+ · COIN-M COMMAND CENTER/);
+  assert.match(html,/9\.0-r\d+/);
 });

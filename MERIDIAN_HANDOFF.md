@@ -207,3 +207,29 @@ Newest authoritative OKX state is the user screenshot from 25.09.2026 06:22:
 - display these as OKX DCA snapshot rows, not old manual positions
 - cross-check only market price through public feeds; account-specific bot fields remain screenshot-source
 - known OKX bot equity is ~130.80 USDC, not guaranteed total account equity
+
+
+## v9 r20 — Pionex Bot API read-only refresh
+
+Root cause from r19 acceptance: private Pionex risk data was 23 days stale because no runtime producer refreshed it.
+
+New module: `pionex-bot-auto-sync.js`
+- starts from `scripts/start-gateway.mjs`
+- read-only `GET /api/v1/bot/orders`
+- default 5-minute cadence
+- paginated running-order fetch
+- supports futures_grid and future_hedge_grid rows
+- normalizes range, leverage, liquidation, TP, USD investment only when trustworthy, and optional PnL fields
+- never calls create/adjust/reduce/cancel
+- successful sync stamps `pionexRisk.updatedAt/snapshotAt`
+- failed sync preserves prior bot timestamp and rows while writing diagnostic status only
+- missing credentials produce one startup diagnostic, no repeated private-state churn
+
+Expected deployment secrets:
+- `PIONEX_BOT_READ_API_KEY`
+- `PIONEX_BOT_READ_API_SECRET`
+Recommended Pionex permission: Bot reading only.
+
+Frontend r20 Data Truth now shows PIONEX API, BOT ROWS, BOT MATCH, SNAPSHOT PNL, BOT SNAPSHOT AGE, ACTIONABLE, 2-SOURCE PRICE, UNMATCHED, BOT API, BOT SOURCE and PORTFOLIO source.
+
+Important: until read-only Pionex credentials are configured in the runtime, r20 should show BOT API = OFF and continue refusing trading actions from stale bot data.
