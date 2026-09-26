@@ -11,19 +11,22 @@ const ACTIVE_STATUSES=new Set([
   'pre_pause','pausing','paused','pre_resume','resuming'
 ]);
 
-export function canonicalQuery(params={}){
+function canonicalRows(params={}){
   const rows=[];
   for(const [k,v] of Object.entries(params)){
     if(v===undefined||v===null||v==='')continue;
-    if(Array.isArray(v)){for(const item of v)if(item!==undefined&&item!==null&&item!=='')rows.push([k,String(item)]);}
-    else rows.push([k,String(v)]);
+    if(Array.isArray(v)){for(const item of v)if(item!==undefined&&item!==null&&item!=='')rows.push([String(k),String(item)]);}
+    else rows.push([String(k),String(v)]);
   }
   rows.sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
-  return rows.map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+  return rows;
+}
+export function canonicalQuery(params={},encode=true){
+  return canonicalRows(params).map(([k,v])=>(encode?encodeURIComponent(k):k)+'='+(encode?encodeURIComponent(v):v)).join('&');
 }
 
 export function signPionexGet(path,params,secret){
-  const query=canonicalQuery(params);
+  const query=canonicalQuery(params,false);
   const payload='GET'+path+(query?'?'+query:'');
   return crypto.createHmac('sha256',String(secret||'')).update(payload).digest('hex');
 }
@@ -95,7 +98,7 @@ export function normalizePionexBotOrder(order){
 
 export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
   if(!apiKey||!apiSecret)throw new Error('pionex_bot_credentials_missing');
-  const all={...params,timestamp:now()},query=canonicalQuery(all),sig=signPionexGet(path,all,apiSecret);
+  const all={...params,timestamp:now()},query=canonicalQuery(all,true),sig=signPionexGet(path,all,apiSecret);
   const r=await fetchImpl(API_BASE+path+'?'+query,{
     method:'GET',
     headers:{accept:'application/json','PIONEX-KEY':apiKey,'PIONEX-SIGNATURE':sig},
@@ -204,7 +207,11 @@ export function startPionexBotAutoSync({env=process.env,fetchImpl=fetch}={}){
   if(!env.DATABASE_URL){console.log('[PIONEX_BOT_SYNC] disabled · missing database');return {enabled:false,reason:'no_database'};}
   const tick=async()=>{const r=await runPionexBotSyncOnce({env,fetchImpl});console.log('[PIONEX_BOT_SYNC]',r.ok?'ok':'not-ready',r);};
   setTimeout(tick,12000);
+  if(!creds.ok){
+    console.log('[PIONEX_BOT_SYNC] waiting for read-only credentials · diagnostic will be published once');
+    return {enabled:false,configured:false,intervalMin:mins,readOnly:true,reason:'missing_credentials'};
+  }
   const timer=setInterval(tick,mins*60000);timer.unref?.();
-  console.log('[PIONEX_BOT_SYNC] '+(creds.ok?'enabled':'waiting for read-only credentials')+' · every '+mins+' min');
-  return {enabled:creds.ok,configured:creds.ok,intervalMin:mins,readOnly:true};
+  console.log('[PIONEX_BOT_SYNC] enabled · every '+mins+' min');
+  return {enabled:true,configured:true,intervalMin:mins,readOnly:true};
 }
