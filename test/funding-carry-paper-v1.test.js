@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newFundingCarryPaperState,fundingEligibility,openFundingCarryPaper,applyFundingSettlements,markFundingCarryPaper,fundingCarryExitReason,closeFundingCarryPaper,fundingCarryPaperStatus,FUNDING_CARRY_PAPER_V1_RULESET} from '../funding-carry-paper-v1.js';
+import {newFundingCarryPaperState,fundingEligibility,openFundingCarryPaper,applyFundingSettlements,markFundingCarryPaper,fundingCarryExitReason,closeFundingCarryPaper,fundingCarryPaperStatus,FUNDING_CARRY_PAPER_V1_RULESET,FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED,FUNDING_CARRY_V1_RETIREMENT_REASON} from '../funding-carry-paper-v1.js';
 
 const HOUR=3600000,DAY=86400000;
 function fundingRows(now,rate=.00006,count=90){return Array.from({length:count},(_,i)=>({fundingTime:now-(count-i)*8*HOUR,fundingRate:rate,markPrice:100000}));}
@@ -46,4 +46,12 @@ test('basis divergence and account loss are explicit stop conditions',()=>{
   let s=openFundingCarryPaper(newFundingCarryPaperState(now),{spotPrice:100000,perpMarkPrice:100000},eligibility,{now});
   s=markFundingCarryPaper(s,{spotPrice:100000,perpMarkPrice:101600},now+HOUR);
   assert.equal(fundingCarryExitReason(s,[],now+HOUR),'BASIS_DIVERGENCE');
+});
+
+test('V1 is manage-only after V2 supersession',()=>{
+  assert.equal(FUNDING_CARRY_V1_NEW_ENTRIES_ALLOWED,false);
+  assert.equal(FUNDING_CARRY_V1_RETIREMENT_REASON,'SUPERSEDED_BY_STRICTER_COST_AMORTIZED_V2');
+  const status=fundingCarryPaperStatus(newFundingCarryPaperState(Date.UTC(2026,8,26)));
+  assert.equal(status.newEntriesAllowed,false);
+  assert.equal(status.retirementReason,'SUPERSEDED_BY_STRICTER_COST_AMORTIZED_V2');
 });
