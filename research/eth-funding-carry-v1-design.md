@@ -84,3 +84,16 @@ ETH Funding Carry V1 may become an isolated prospective Paper shadow only if **a
 ## Isolation
 
 Research only. No existing Paper state, BTC V2 state, Pionex account, exchange account or live execution path is modified by this validation.
+
+
+## Evidence-run data QA note
+
+The first validation run produced favorable cycle economics but failed the predeclared data-adequacy gate because the official Binance Vision ETHUSDT spot 4h archive contains exactly one missing evaluation bar. That run is invalid for promotion regardless of P&L.
+
+To satisfy the already-frozen completeness gate, the evidence loader may reconstruct only the missing 4h spot bar from official Binance Vision lower-timeframe archives for the exact affected UTC day:
+
+1. Prefer complete 1h bars and aggregate exactly four contiguous 1h bars.
+2. If the 1h archive cannot reproduce the missing 4h bucket, use complete 1m bars and aggregate exactly 240 one-minute bars.
+3. No interpolation, neighboring-price substitution or external venue data is allowed.
+
+No strategy rule, validation date, gate, fee, slippage, entry, exit or re-arm policy is changed. Only a final run with complete reproducible data may pass.
