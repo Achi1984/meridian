@@ -135,3 +135,10 @@ All conditions must pass before a prospective Paper shadow can be created:
 ## Isolation
 
 Research only. Funding Carry V1/V2 remain manage-only. Challenger/FIB/Elliott/Pionex/live execution are untouched.
+
+
+## Evidence-run data QA correction
+
+The first evidence execution is invalid for promotion because the loader mistakenly dropped funding rows from the December 2020 warm-up whenever no contemporaneous 4h perpetual mark existed. A mark price is not required for the V2 eligibility calculation; it is required only when applying funding settlements to an already-open basket.
+
+The evidence loader is corrected to preserve every official funding rate for eligibility/data-adequacy checks and attach a mark price only where a settlement can actually belong to an evaluation-period open basket. This is a data-join correction only. No symbol, selector, threshold, cost, evidence date, exit rule or decision gate changes after the observed first-run P&L.
