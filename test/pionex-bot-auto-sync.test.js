@@ -88,3 +88,12 @@ test('runtime implementation is Pionex read-only',()=>{
   assert.doesNotMatch(src,/futuresGrid\/create/);
   assert.doesNotMatch(src,/futuresGrid\/cancel/);
 });
+
+
+test('unknown futures bot direction is rejected instead of assumed LONG',()=>{
+  const x=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'mystery',base:'BTC.PERP',status:'running',
+    buOrderData:{status:'running',leverage:5,bottom:'1',top:'2'}
+  });
+  assert.equal(x,null);
+});
