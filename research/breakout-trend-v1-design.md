@@ -51,7 +51,7 @@ Historical research is considered promising only if all conditions pass:
 1. Primary has at least 120 closed trades.
 2. Primary PF >= 1.15 and expectancy >= +0.05R.
 3. Primary maximum drawdown <= 20R.
-4. Four chronological primary folds each have at least 20 trades; at least three folds have PF > 1 and positive expectancy; no fold has PF < 0.80.
+4. Four equal-calendar chronological primary folds each have at least 20 trades; at least three folds have PF > 1 and positive expectancy; no fold has PF < 0.80.
 5. LONG and SHORT each have at least 30 primary trades and PF > 1.
 6. At least five of seven assets with at least 12 primary trades have PF > 1 and positive expectancy.
 7. No asset contributes more than 40% of positive primary net R.
