@@ -12,7 +12,7 @@ This is not a parameter repair of any prior bot. No result from Breakout Trend V
 ## Frozen hypothesis
 
 - Universe: BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, LINKUSDT.
-- Evidence source: Binance public 4h spot OHLC.
+- Evidence source: Binance public 4h spot OHLC from the official data.binance.vision archive.
 - Signals use completed 4h candles only.
 - Mean and dispersion: 20-bar simple moving average and population standard deviation of closes.
 - Trend-strength filter: Wilder ADX(14) < 20.
