@@ -46,6 +46,18 @@ The 24-hour re-arm after a closed historical cycle is a sampling harness only. C
 
 This interval is disjoint from ETH Funding Carry V1's evaluation period and ends before the recent 2026 discovery screen used as current-context research.
 
+## Frozen data-repair policy
+
+If an official Binance Vision 4h spot/perpetual candle is absent, the loader may repair that exact UTC 4h bucket only from official Binance Vision lower-timeframe archives:
+
+1. Prefer exactly four contiguous confirmed 1h bars.
+2. If unavailable, use exactly 240 contiguous 1m bars.
+3. All constituent bars must belong to the exact missing 4h bucket.
+4. No interpolation, neighboring-price substitution, external venue data or synthetic OHLC is allowed.
+5. Funding settlements may not be interpolated. Any funding gap > 12h fails the data gate.
+
+This rule is declared before the first V2 holdout result.
+
 ## Accounting
 
 Use the existing Funding Carry V2 state-machine functions with a copied config whose only instrument change is `symbol: ETHUSDT`.
