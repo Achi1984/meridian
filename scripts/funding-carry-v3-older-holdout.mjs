@@ -97,18 +97,41 @@ function dayUrl(kind,day){
   if(kind==='swap')return `${VISION}/futures/um/daily/klines/BTCUSDT/4h/BTCUSDT-4h-${day}.zip`;
   return `${VISION}/futures/um/daily/fundingRate/BTCUSDT/BTCUSDT-fundingRate-${day}.zip`;
 }
+function monthDays(ym){
+  const [y,m]=ym.split('-').map(Number),start=Date.UTC(y,m-1,1),end=Date.UTC(y,m,1);
+  return daysBetween(start,end);
+}
+function missing4hDays(rows,start,end){
+  const have=new Set(rows.map(x=>x.t)),days=new Set();
+  for(let t=start;t<end;t+=H4)if(!have.has(t))days.add(new Date(t).toISOString().slice(0,10));
+  return [...days];
+}
 async function loadVision(kind,tmpDir){
-  const lastFullMonth=AUDIT_END;
-  const months=monthsBetween(FUNDING_START,lastFullMonth),days=daysBetween(lastFullMonth,AUDIT_END);
+  const months=monthsBetween(FUNDING_START,AUDIT_END);
   const monthly=await poolMap(months,8,async ym=>({tag:ym,text:await fetchZipCsv(monthUrl(kind,ym),tmpDir)}));
-  if(kind==='funding'){
-    const diag=monthly.find(x=>x.tag==='2024-01'&&x.text);
-    if(diag)console.log('FUNDING_ARCHIVE_2024_01_HEAD',diag.text.split(/\\r?\\n/).slice(0,6));
+  const missingMonths=monthly.filter(x=>x.text==null).map(x=>x.tag);
+  const fallbackDays=[...new Set(missingMonths.flatMap(monthDays))].filter(d=>Date.parse(d+'T00:00:00Z')<AUDIT_END);
+  let daily=await poolMap(fallbackDays,8,async d=>({tag:d,text:await fetchZipCsv(dayUrl(kind,d),tmpDir)}));
+  let rows=[...monthly,...daily].flatMap(x=>kind==='funding'?parseFunding(x.text):parseKlines(x.text));
+  rows=uniqSort(rows,kind==='funding'?'fundingTime':'t');
+  if(kind!=='funding'){
+    const gapDays=missing4hDays(rows,FUNDING_START,AUDIT_END);
+    const already=new Set(daily.map(x=>x.tag));
+    const extraDays=gapDays.filter(d=>!already.has(d));
+    const extra=await poolMap(extraDays,8,async d=>({tag:d,text:await fetchZipCsv(dayUrl(kind,d),tmpDir)}));
+    daily=[...daily,...extra];
+    rows=uniqSort([...rows,...extra.flatMap(x=>parseKlines(x.text))],'t');
   }
-  const daily=await poolMap(days,8,async d=>({tag:d,text:await fetchZipCsv(dayUrl(kind,d),tmpDir)}));
-  const missing=[...monthly,...daily].filter(x=>x.text==null).map(x=>x.tag);
-  const rows=[...monthly,...daily].flatMap(x=>kind==='funding'?parseFunding(x.text):parseKlines(x.text));
-  return{rows:uniqSort(rows,kind==='funding'?'fundingTime':'t'),missing,filesRequested:monthly.length+daily.length,filesLoaded:monthly.filter(x=>x.text!=null).length+daily.filter(x=>x.text!=null).length};
+  const dailyMissing=daily.filter(x=>x.text==null).map(x=>x.tag);
+  const unresolvedMonthly=missingMonths.filter(ym=>monthDays(ym).filter(d=>Date.parse(d+'T00:00:00Z')<AUDIT_END).some(d=>dailyMissing.includes(d)));
+  return{
+    rows,
+    missing:dailyMissing.length?dailyMissing:unresolvedMonthly,
+    filesRequested:monthly.length+daily.length,
+    filesLoaded:monthly.filter(x=>x.text!=null).length+daily.filter(x=>x.text!=null).length,
+    monthlyFallbacks:missingMonths,
+    dailyBackfills:daily.map(x=>x.tag)
+  };
 }
 
 function coverage(rows,start,end){
