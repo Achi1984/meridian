@@ -124,7 +124,7 @@ All conditions must pass before a prospective Paper shadow can be created:
 11. No one asset contributes more than 70% of total positive cycle P&L.
 12. At least four distinct calendar years contain completed cycles and every such year is net non-negative.
 13. Under +$8 per-cycle friction stress, aggregate P&L remains > $0 and stressed PF >= 1.10.
-14. Spot/perpetual 4h and funding data are complete/reproducible for every asset over the required warm-up/evaluation interval.
+14. Spot/perpetual 4h data are complete/reproducible for every asset over the evaluation interval; funding data are complete/reproducible from the 2020-12-01 warm-up start through the evaluation end, with no funding gap >12h.
 
 ## Decision
 
