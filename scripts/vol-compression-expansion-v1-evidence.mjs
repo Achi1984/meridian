@@ -1,44 +1,39 @@
 import fs from 'node:fs/promises';
 import {VOL_COMPRESSION_EXPANSION_V1 as C,runVolCompressionExpansionV1} from '../vol-compression-expansion-v1.js';
 
-const BASE='https://api.binance.com',HOUR=3600000,H4=4*HOUR,DAY=86400000;
+const BASE='https://www.okx.com',H4=4*3600000,DAY=86400000;
 const PRIMARY_START=Date.parse(C.primaryStart),PRIMARY_END=Date.parse(C.primaryEnd),SECONDARY_START=Date.parse(C.secondaryStart),SECONDARY_END=Date.parse(C.secondaryEnd);
-const FETCH_START=Math.floor((PRIMARY_START-C.warmupDays*DAY)/HOUR)*HOUR,FETCH_END=SECONDARY_END-HOUR;
+const FETCH_START=Math.floor((PRIMARY_START-C.warmupDays*DAY)/H4)*H4;
 const round=(v,d=3)=>Number.isFinite(v)?Math.round(v*10**d)/10**d:null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const instId=s=>`${s.replace(/USDT$/,'')}-USDT`;
 
 async function getJson(url,attempt=0){
-  const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-VCE-V1/1.0','accept':'application/json'}});
-  if(r.ok)return r.json();
+  const r=await fetch(url,{headers:{'user-agent':'MERIDIAN-VCE-V1/1.1','accept':'application/json'}});
+  if(r.ok){const j=await r.json();if(String(j?.code||'0')==='0')return j;throw new Error(`OKX code ${j?.code}: ${j?.msg||'unknown'}`);}
   if((r.status===429||r.status>=500)&&attempt<6){await sleep(500*2**attempt);return getJson(url,attempt+1);}
   throw new Error(`${r.status} ${url}`);
 }
 
 async function candles(symbol){
-  let cursor=FETCH_START,out=[],calls=0;
-  while(cursor<=FETCH_END){
-    const url=`${BASE}/api/v3/klines?symbol=${symbol}&interval=1h&startTime=${cursor}&endTime=${FETCH_END}&limit=1000`;
-    const rows=await getJson(url);calls++;
-    if(!Array.isArray(rows)||!rows.length)break;
+  let cursor=SECONDARY_END,out=[],calls=0;
+  while(cursor>FETCH_START){
+    const url=`${BASE}/api/v5/market/history-candles?instId=${instId(symbol)}&bar=4H&after=${cursor}&limit=100`;
+    const j=await getJson(url),rows=Array.isArray(j?.data)?j.data:[];calls++;
+    if(!rows.length)break;
+    let oldest=Infinity;
     for(const k of rows){
-      const t=Number(k[0]);if(t>=FETCH_START&&t<=FETCH_END)out.push({t,o:Number(k[1]),h:Number(k[2]),l:Number(k[3]),c:Number(k[4])});
+      const t=Number(k[0]);if(Number.isFinite(t))oldest=Math.min(oldest,t);
+      const confirmed=String(k[8]??'1')==='1';
+      if(confirmed&&t>=FETCH_START&&t<SECONDARY_END)out.push({t,o:Number(k[1]),h:Number(k[2]),l:Number(k[3]),c:Number(k[4])});
     }
-    const last=Number(rows.at(-1)?.[0]);if(!Number.isFinite(last)||last<cursor)throw new Error(`${symbol} non-advancing history cursor`);
-    cursor=last+HOUR;await sleep(50);
+    if(!Number.isFinite(oldest)||oldest>=cursor)throw new Error(`${symbol} non-advancing OKX history cursor`);
+    cursor=oldest;await sleep(120);
   }
   out.sort((a,b)=>a.t-b.t);
   return {calls,rows:out.filter((x,i,a)=>!i||x.t!==a[i-1].t)};
 }
 
-function resample(rows){
-  const m=new Map();
-  for(const r of rows){
-    const t=Math.floor(r.t/H4)*H4,b=m.get(t);
-    if(!b)m.set(t,{t,o:r.o,h:r.h,l:r.l,c:r.c,count:1,hours:new Set([r.t])});
-    else{b.h=Math.max(b.h,r.h);b.l=Math.min(b.l,r.l);b.c=r.c;b.count++;b.hours.add(r.t);}
-  }
-  return [...m.values()].filter(x=>x.count===4&&x.hours.size===4).map(({count,hours,...x})=>x).sort((a,b)=>a.t-b.t);
-}
 function stats(rows=[]){
   const xs=[...rows].sort((a,b)=>a.closedAt-b.closedAt),wins=xs.filter(x=>x.netR>0),losses=xs.filter(x=>x.netR<0);
   const gp=wins.reduce((a,x)=>a+x.netR,0),gl=Math.abs(losses.reduce((a,x)=>a+x.netR,0)),net=xs.reduce((a,x)=>a+x.netR,0);
@@ -67,11 +62,11 @@ function coverage(bars,start,end){
 const collected={};
 for(const symbol of C.symbols){
   console.log('fetch',symbol);
-  const raw=await candles(symbol),bars=resample(raw.rows);
+  const raw=await candles(symbol),bars=raw.rows;
   const primaryBars=bars.filter(x=>x.t<PRIMARY_END);
   const secondaryBars=bars.filter(x=>x.t>=SECONDARY_START-C.warmupDays*DAY&&x.t<SECONDARY_END);
   collected[symbol]={
-    rawCalls:raw.calls,hourly:raw.rows.length,bars,
+    rawCalls:raw.calls,bars,
     primaryCoverage:coverage(bars,PRIMARY_START,PRIMARY_END),secondaryCoverage:coverage(bars,SECONDARY_START,SECONDARY_END),
     first:bars[0]?.t??null,last:bars.at(-1)?.t??null,
     primary:runVolCompressionExpansionV1(primaryBars,{symbol,entryStart:PRIMARY_START,entryEnd:PRIMARY_END}),
@@ -98,13 +93,13 @@ const gates={
 };
 const out={
   schemaVersion:'VOL-COMPRESSION-EXPANSION-V1-HISTORICAL-EVIDENCE',generatedAt:new Date().toISOString(),researchOnly:true,executionImpact:false,
-  predeclaredDesign:'research/vol-compression-expansion-v1-design.md',config:C,source:'BINANCE_PUBLIC_SPOT_1H_RESAMPLED_4H',
+  predeclaredDesign:'research/vol-compression-expansion-v1-design.md',config:C,source:'OKX_PUBLIC_SPOT_CONFIRMED_4H',
   periods:{primary:{start:C.primaryStart,end:C.primaryEnd},secondary:{start:C.secondaryStart,end:C.secondaryEnd}},
   primary:{summary:primarySummary,walkForward,bySide:primaryBySide,bySymbol:primaryBySymbol,positiveNetRConcentrationPct:shares,
     opportunity:Object.fromEntries(Object.entries(collected).map(([k,x])=>[k,{armed:x.primary.armedHistory.length,signals:x.primary.signals.length,openAtEnd:x.primary.open.length,pendingAtEnd:x.primary.pending.length}]))},
   secondary:{summary:secondarySummary,bySide:secondaryBySide,bySymbol:secondaryBySymbol,
     opportunity:Object.fromEntries(Object.entries(collected).map(([k,x])=>[k,{armed:x.secondary.armedHistory.length,signals:x.secondary.signals.length,openAtEnd:x.secondary.open.length,pendingAtEnd:x.secondary.pending.length}]))},
-  coverage:Object.fromEntries(Object.entries(collected).map(([k,x])=>[k,{hourly:x.hourly,rawCalls:x.rawCalls,first:x.first==null?null:new Date(x.first).toISOString(),last:x.last==null?null:new Date(x.last).toISOString(),primary:x.primaryCoverage,secondary:x.secondaryCoverage}])),
+  coverage:Object.fromEntries(Object.entries(collected).map(([k,x])=>[k,{bars:x.bars.length,rawCalls:x.rawCalls,first:x.first==null?null:new Date(x.first).toISOString(),last:x.last==null?null:new Date(x.last).toISOString(),primary:x.primaryCoverage,secondary:x.secondaryCoverage}])),
   gate:{gates,positiveAssets,historicallyPromising:Object.values(gates).every(Boolean),paperShadowPermitted:Object.values(gates).every(Boolean)}
 };
 await fs.mkdir('artifacts',{recursive:true});
