@@ -67,7 +67,7 @@ test('r16 exposes ambiguous rows in the Data Guard',()=>{
   assert.match(v10,/ambiguous/);
   assert.match(v10,/AMBIGUOUS MATCH/);
   assert.match(v10,/mehrere nahezu gleich gute Referenztreffer/);
-  assert.match(v10,/g\.ambiguous\+' ambiguous'/);
+  assert.match(v10,/g\.ambiguous\+' ambiguous<\\/small>/);
 });
 
 test('r16 release identity is canonical',()=>{
