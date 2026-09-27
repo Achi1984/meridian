@@ -1,0 +1,39 @@
+name: MERIDIAN ETH Funding Holdout
+
+on:
+  pull_request:
+    paths:
+      - funding-carry-eth-holdout.js
+      - scripts/eth-funding-carry-holdout.mjs
+      - test/eth-funding-carry-holdout-v1.test.js
+      - .github/workflows/eth-funding-holdout.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax
+        run: |
+          node --check funding-carry-eth-holdout.js
+          node --check scripts/eth-funding-carry-holdout.mjs
+      - name: Unit tests
+        run: node --test test/eth-funding-carry-holdout-v1.test.js
+      - name: Run frozen ETH holdout
+        run: node scripts/eth-funding-carry-holdout.mjs
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: eth-funding-carry-holdout-v1
+          path: |
+            research/eth-funding-carry-holdout-v1.json
+            research/eth-funding-carry-holdout-v1.md
+          if-no-files-found: error
