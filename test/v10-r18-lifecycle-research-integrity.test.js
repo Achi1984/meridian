@@ -41,8 +41,8 @@ test('r18 market refresh is single-flight, sequential at startup and prunes ghos
 });
 
 test('r18 UI separates market stale versus missing and bot READY PARTIAL SAFETY REF states',()=>{
-  assert.match(v10,/staleAssets:Math\.max\(0,knownAssets-freshAssets\)/);
-  assert.match(v10,/missingAssets:Math\.max\(0,totalAssets-knownAssets\)/);
+  assert.match(v10,/staleAssets=Math\.max\(0,knownAssets-freshAssets\)/);
+  assert.match(v10,/missingAssets=Math\.max\(0,totalAssets-knownAssets\)/);
   assert.match(v10,/function botReadiness\(g\)/);
   for(const token of ["label:'READY'","label:'PARTIAL'","label:'SAFETY'","label:'REF'"])assert.ok(v10.includes(token),token);
   assert.match(v10,/function marketReadiness\(m\)/);
