@@ -118,9 +118,10 @@ test('v10 r10 scanner ranks confirmed setups before raw pressure',()=>{
   assert.match(js,/TOP SETUPS/);
 });
 
-test('v10 r10 lab separates SK research from the retained paired Profit Lock backtest',()=>{
+test('v10 r10 lab prioritizes documented edges while retaining SK and paired Profit Lock research',()=>{
   assert.match(js,/RESEARCH HUB/);
-  assert.match(js,/ACTIVE LABS/);
+  assert.match(js,/PRIMARY LAB/);
+  assert.match(js,/DOCUMENTED EDGE LAB/);
   assert.match(js,/SK SYSTEM LAB/);
   assert.match(js,/PROFIT LOCK LAB/);
   assert.match(js,/Paired Exit-Policy Test/);
