@@ -7,10 +7,10 @@ const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8').replac
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8').replaceAll('\r\n','\n');
 const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 
-test('v10 r2 keeps validated v9 engine and isolated adapter',()=>{
-  assert.match(html,/10\.0-r2/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r2/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r2/);
+test('v10 r3 keeps validated v9 engine and isolated adapter',()=>{
+  assert.match(html,/10\.0-r3/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r3/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r3/);
   assert.match(js,/No trading logic lives here/);
   assert.match(engine,/MERIDIAN_V10_BRIDGE/);
 });
@@ -36,7 +36,7 @@ test('v10 safety/data guard pre-empts trading statuses',()=>{
 test('v10 renders one actionable asset card for long plus short and hides reference bots',()=>{
   assert.match(js,/function pairCard/);
   assert.match(js,/PIONEX · LONG \+ SHORT/);
-  assert.match(js,/Fallback-\/Referenzbots erzeugen keine Action-Cards/);
+  assert.match(js,/Referenzbots bleiben aus dieser Ansicht entfernt/);
   assert.match(js,/KEINE ACTIONABLE BOT-DATEN/);
   assert.match(js,/private API-Rows sind UNVERIFIED und aus Actions ausgeschlossen/);
 });
