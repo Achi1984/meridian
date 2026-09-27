@@ -414,7 +414,7 @@ async function sync(){try{
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone},
+  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
