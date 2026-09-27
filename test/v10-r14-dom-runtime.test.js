@@ -26,3 +26,11 @@ test('r14 terminal cache identity is canonical across production entry points',(
 test('r14 adapter remains syntactically valid after DOM hotfix',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
+
+test('r14 blocks stale market intel from Profit Lock and pair actions',()=>{
+  const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+  assert.match(v9,/label:'MARKET · STALE'/);
+  assert.match(v9,/if\(!pi\)return\{code:'SYNC'/);
+  assert.match(v10,/code:'MARKET_STALE'/);
+  assert.match(v10,/\['DATA_STALE','MARKET_STALE','UNVERIFIED'\]/);
+});
