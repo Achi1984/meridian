@@ -280,3 +280,20 @@ This file records durable project decisions and the reasoning behind them. Read 
 **OKX DCA rule:** Screenshot-confirmed OKX Futures DCA equity remains a separate reference subtotal. It is not silently added to the canonical Spot + Pionex total unless the canonical portfolio contract is explicitly extended in a future decision.
 
 **Safety:** This is display/data consistency only. Trading signals, Paper-bot parameters, bot matching, leverage, risk logic and execution paths are unchanged.
+
+
+## D-031 — Portfolio freshness must describe component coverage, not just successful transport
+
+**Decision:** A successful public Spot ticker fetch does not make the full portfolio “live/current”. Portfolio provenance must account for both Spot price coverage and the independent Pionex equity source.
+
+**Classification:**
+- **CANONICAL MIXED** — all non-Pionex holdings are resolved by the fresh public Spot overlay, while Pionex remains canonical private snapshot provenance.
+- **CANONICAL PARTIAL** — the public Spot feed is available but one or more holdings require fallback valuation, or Pionex is using the explicit screenshot fallback.
+- **PRIVATE SNAPSHOT** — no fresh public Spot overlay is available and the canonical valuation relies on private/stored fallback values.
+- **INCOMPLETE** — the holdings basis required for the canonical total is unavailable.
+
+**Rule:** Neither CANONICAL MIXED nor CANONICAL PARTIAL may be described as a fully live/exchange-live portfolio. Spot coverage is surfaced as resolved/requested counts. Pionex snapshot provenance remains explicit.
+
+**Reason:** The privacy-safe all-ticker overlay can succeed while some held assets remain unsupported; separately, Pionex equity is intentionally a private/screenshot snapshot rather than a live account feed. A single transport-level `fresh=true` flag therefore cannot represent whole-portfolio freshness.
+
+**Safety:** Valuation math stays Spot + Pionex. This decision changes provenance and UI semantics only; trading, Paper, risk and execution logic are unchanged.
