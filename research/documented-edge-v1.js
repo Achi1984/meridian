@@ -149,17 +149,17 @@ export function runTsmomClassic(dataset,config={}){
     let turnover=0;for(const symbol of weightKeys)turnover+=Math.abs((currentWeights.get(symbol)||0)-(prevWeights.get(symbol)||0));
     const grossReturn=candidates.reduce((sum,x)=>sum+(currentWeights.get(x.symbol)||0)*x.assetReturn,0),costReturn=turnover*cfg.costBps/10000,netReturn=grossReturn-costReturn;
 
-    const currentSymbols=new Set(currentRaw.keys());
+    const currentSymbols=new Set(currentRaw.keys()),exitLegs=[];
     for(const oldSymbol of prevRawPos.keys()){
       if(currentSymbols.has(oldSymbol))continue;
-      const exitCost=Math.abs(prevRawPos.get(oldSymbol)||0)*cfg.costBps/10000;
-      perAsset[oldSymbol]?.push({symbol:oldSymbol,at,nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true});
+      const exitCost=Math.abs(prevRawPos.get(oldSymbol)||0)*cfg.costBps/10000,exitLeg={symbol:oldSymbol,at,nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true};
+      perAsset[oldSymbol]?.push(exitLeg);exitLegs.push(exitLeg);
     }
     const legs=candidates.map(x=>{
       const prev=prevRawPos.get(x.symbol)||0,cost=Math.abs(x.position-prev)*cfg.costBps/10000,leg={...x,costReturn:cost,netReturn:x.grossReturn-cost};
       perAsset[x.symbol].push(leg);return leg;
     });
-    periods.push({at,nextAt,activeAssets:nActive,turnover,grossReturn,costReturn,netReturn,legs});
+    periods.push({at,nextAt,activeAssets:nActive,turnover,grossReturn,costReturn,netReturn,legs:[...legs,...exitLegs]});
     prevRawPos.clear();for(const [symbol,pos] of currentRaw)prevRawPos.set(symbol,pos);
     prevWeights.clear();for(const [symbol,w] of currentWeights)prevWeights.set(symbol,w);
   }
@@ -167,8 +167,8 @@ export function runTsmomClassic(dataset,config={}){
     const last=periods.at(-1),closeCost=[...prevWeights.values()].reduce((sum,x)=>sum+Math.abs(x),0)*cfg.costBps/10000;
     last.costReturn+=closeCost;last.netReturn-=closeCost;
     for(const [symbol,pos] of prevRawPos){
-      const exitCost=Math.abs(pos)*cfg.costBps/10000;
-      perAsset[symbol]?.push({symbol,at:last.nextAt,nextAt:last.nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true});
+      const exitCost=Math.abs(pos)*cfg.costBps/10000,exitLeg={symbol,at:last.nextAt,nextAt:last.nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true};
+      perAsset[symbol]?.push(exitLeg);last.legs.push(exitLeg);
     }
   }
   const assets=Object.entries(perAsset).map(([symbol,rows])=>({symbol,summary:windowStats(rows.map(x=>x.netReturn),cfg.startEquity),periods:rows.length})).filter(x=>x.periods);
