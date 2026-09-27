@@ -91,6 +91,7 @@ function botFeedAgeMs(){return state.botFeedUpdatedAt?Math.max(0,Date.now()-stat
 function botFeedFresh(){const age=botFeedAgeMs(),future=state.botFeedUpdatedAt!=null&&state.botFeedUpdatedAt>Date.now()+5*60*1000;return state.botFeedTimestampTrusted&&!future&&age!=null&&age<=15*60*1000}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
+function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[])].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
 function actionableBot(b){return liveMatched(b)&&livePnlAvailable(b)&&botFeedFresh()}
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
@@ -216,7 +217,7 @@ async function syncCrossPrices(){
   const [or,br]=await Promise.all([fetchTimed('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'},8000),fetchTimed('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'},8000)]);
   if(!or.ok||!br.ok)throw new Error('cross-price http');
   const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={},now=Date.now();
-  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
+  for(const symbol of trackedMarketSymbols()){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
   state.priceChecks=out;state.marketPriceSyncedAt=now;state.marketPriceError=null
  }catch(e){state.priceChecks={};state.marketPriceError=String(e?.message||e)}
 }
@@ -258,7 +259,7 @@ async function syncIntel(){
   if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
   const now=Date.now();state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D'};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:now,confirmationBars:'CLOSED_1H_4H'};btcRows=true
  }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
- const assets=[...new Set(state.bots.map(b=>b.symbol))].filter(symbol=>symbol!=='BTC');
+ const universe=trackedMarketSymbols(),assets=universe.filter(symbol=>symbol!=='BTC');
  for(let i=0;i<assets.length;i+=4){
   const batch=assets.slice(i,i+4);
   await Promise.all(batch.map(async symbol=>{try{
@@ -268,7 +269,7 @@ async function syncIntel(){
   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth();return true
+ const allowed=new Set(universe);state.assetIntel=Object.fromEntries(Object.entries(out).filter(([symbol])=>allowed.has(symbol)));if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,6).join(' · '):null;await cross;renderHeaderTruth();return true
  }finally{syncIntelBusy=false}
 }
 
@@ -503,8 +504,12 @@ window.MERIDIAN_V10_BRIDGE={
   bindResearch:(target='research')=>bindResearch(target)
 };
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
-function refreshNow(){void sync();void syncIntel().then(changed=>{if(changed)notifyData()})}
-go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());
+async function refreshNow(){
+ await sync();
+ const changed=await syncIntel();
+ if(changed)notifyData();
+}
+go('command');void refreshNow();
 setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNow()});
-window.addEventListener('online',refreshNow);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshNow()});
+window.addEventListener('online',()=>{void refreshNow()});
