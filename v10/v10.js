@@ -228,7 +228,7 @@ function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
   const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[]),...(s?.unmatchedLive||[])],set=new Set();
   rows.forEach(x=>{if(x?.symbol)set.add(String(x.symbol).toUpperCase())});
-  return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(b))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
+  return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
 }
 function marketSignal(i){
   if(!i)return{label:'SYNC',tone:'muted',score:0,rank:0,confirmed:false};
