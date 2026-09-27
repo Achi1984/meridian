@@ -486,7 +486,8 @@ function scannerV10(){
   return v10ModeBand('LIVE')+'<section class="hero"><div class="eyebrow">MULTI-TIMEFRAME SCANNER</div><h1>15m · 1h · 4h</h1><p class="muted">Safety/Data Guard bleibt vorgeschaltet. Scanner allein löst keinen Exit aus.</p></section><div class="scan-stack">'+(cards||'<section class="card">Keine Assets im privaten Feed.</section>')+'</div>';
 }
 
-const render={command:commandV10,bots:botsV10,market,scanner:scannerV10,lab:research};let current='command';
+function labV10(){return v10ModeBand('PAPER')+research()}
+const render={command:commandV10,bots:botsV10,market:()=>v10ModeBand('LIVE')+market(),scanner:scannerV10,lab:labV10};let current='command';
 function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('#view-'+v).innerHTML=render[v]();if(v==='lab')bindResearch()}
 async function sync(){try{
  const payload=await getJson('/api/private/dashboard'),d=payload?.data||payload,live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];
