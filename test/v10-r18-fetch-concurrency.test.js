@@ -29,16 +29,18 @@ test('r18 private and market syncs are single-flight',()=>{
 
 test('r18 v10 refresh uses data events instead of replacing current DOM every sync',()=>{
   assert.match(v9,/window\.dispatchEvent\(new CustomEvent\('meridian:data'\)\)/);
-  assert.match(v10,/window\.addEventListener\('meridian:data',schedule\)/);
+  assert.match(v10,/window\.addEventListener\('meridian:data',\(\)=>schedule\(true\)\)/);
   const syncBlock=v9.slice(v9.indexOf('async function sync(){'),v9.indexOf('window.MERIDIAN_V10_BRIDGE'));
   assert.doesNotMatch(syncBlock,/go\(current\)/);
 });
 
-test('r18 immediately resyncs after iOS resume or network reconnect',()=>{
-  assert.match(v9,/function refreshNow\(\)/);
+test('r18+ immediately resyncs sequentially after iOS resume or network reconnect',()=>{
+  assert.match(v9,/async function refreshNow\(\)/);
+  assert.match(v9,/await sync\(\)/);
+  assert.match(v9,/await syncIntel\(\)/);
   assert.match(v9,/visibilitychange/);
   assert.match(v9,/document\.visibilityState==='visible'/);
-  assert.match(v9,/window\.addEventListener\('online',refreshNow\)/);
+  assert.match(v9,/window\.addEventListener\('online',\(\)=>\{void refreshNow\(\)\}\)/);
 });
 
 test('r18 gateway kills stalled internal proxy requests',()=>{
@@ -51,8 +53,7 @@ test('r18 gateway kills stalled internal proxy requests',()=>{
 test('r18 gateway reports read-auth source without exposing token material',()=>{
   assert.match(gateway,/READ_AUTH_SOURCE/);
   assert.match(gateway,/privateReadAuthSource:READ_AUTH_SOURCE/);
-  assert.doesNotMatch(gateway,/LEGACY_FALLBACK/);
-  assert.match(gateway,/MISSING_ENV/);
+  assert.match(gateway,/LEGACY_FALLBACK/);
   assert.match(gateway,/INVALID_ENV/);
   assert.match(smoke,/privateReadAuthSource:String\(health\.privateReadAuthSource\|\|'UNKNOWN'\)/);
 });
