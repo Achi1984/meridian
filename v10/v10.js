@@ -734,7 +734,7 @@ function renderLab(){
       mod.innerHTML='<summary><span>PROFIT LOCK LAB</span><small>Paired Exit-Policy Test</small></summary><div class="research-module-body"></div>';
       control.insertAdjacentElement('beforebegin',mod);
       const body=$('.research-module-body',mod);
-      const nodes=[control,$('.bt-error',view),$('.bt-result',view),...$('.card',view).filter(x=>/Warum dieser Test/i.test(x.textContent||''))].filter(Boolean);
+      const nodes=[control,$('.bt-error',view),$('.bt-result',view),...$$('.card',view).filter(x=>/Warum dieser Test/i.test(x.textContent||''))].filter(Boolean);
       nodes.forEach(n=>body.appendChild(n));
     }
   }
