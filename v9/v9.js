@@ -94,11 +94,11 @@ function actionableBot(b){return liveMatched(b)&&livePnlAvailable(b)&&botFeedFre
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
  if(b&&b._liveMatched===false)return{value:num(b.pnl),source:'REFERENCE',corrected:false};
- const raw=num(b&&b.pnl),invest=num(b&&b.invest),pct=num(b&&b.profitPct),implied=invest>0&&pct!=null?invest*pct/100:null;
+ const raw=num(b&&b.pnl),investUsd=num(b&&b.investUsd),pct=num(b&&b.profitPct),implied=investUsd>0&&pct!=null?investUsd*pct/100:null;
  if(implied!=null){
-  if(raw==null)return{value:implied,source:'PCT_X_INVEST',corrected:false};
+  if(raw==null)return{value:implied,source:'PCT_X_USD_INVEST',corrected:false};
   const tolerance=Math.max(1,Math.abs(implied)*.35);
-  if(Math.abs(raw-implied)>tolerance)return{value:implied,source:'PCT_X_INVEST',corrected:true,raw:raw}
+  if(Math.abs(raw-implied)>tolerance)return{value:implied,source:'PCT_X_USD_INVEST',corrected:true,raw:raw}
  }
  return{value:raw,source:raw==null?'NONE':'LIVE_USD',corrected:false}
 }
@@ -254,7 +254,7 @@ function riskCockpitV2(){
 }
 function tpDist(b){const p=botMarketPrice(b),tp=num(b.tp);if(!(p>0&&tp>0))return null;return b.side==='SHORT'?(p-tp)/p*100:(tp-p)/p*100}
 function status(b){if(!liveMatched(b))return['REF','muted'];if(!botFeedFresh())return['STALE','muted'];const r=risk(b),t=tpDist(b);if(t!=null&&t<=5)return['TP ZONE','tp'];if(r==null)return['LIQ CHECK','muted'];if(r<5)return['LIQ URGENT','danger'];if(r<10)return['LIQ MARGIN','danger'];if(r<18)return['LIQ WATCH','watch'];return['LIQ SAFE','safe']}
-function botProfitPct(b){const direct=num(b.profitPct);if(direct!=null)return direct;const pnl=botPnlUsd(b).value,invest=num(b.invest);return pnl!=null&&invest>0?pnl/invest*100:null}
+function botProfitPct(b){const direct=num(b.profitPct);if(direct!=null)return direct;const pnl=botPnlUsd(b).value,investUsd=num(b.investUsd);return pnl!=null&&investUsd>0?pnl/investUsd*100:null}
 function profitPlanRank(code){return code==='SAFETY'?7:code==='LOCK50'?6:code==='LOCK25'?5:code==='LOCK20'?4:code==='HEDGE'?3:code==='WATCH'?2:code==='HOLD'?1:0}
 function profitLockPlan(b){
  const side=b.side||'LONG',pi=state.assetIntel[b.symbol],signal=actionForSide(pi,side),reasons=reasonsForSide(pi,side),pnl=botProfitPct(b),t=tpDist(b),liq=risk(b),pair=assetPairRisk(b.symbol),hedgeLow=side==='LONG'&&pair.longUsd>0&&pair.hedgePct!=null&&pair.hedgePct<15;
