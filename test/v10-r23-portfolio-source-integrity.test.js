@@ -8,7 +8,8 @@ const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r23 COMMAND consumes canonical private Pionex equity snapshot',()=>{
-  assert.ok(v9.includes("import {pionexEquitySnapshot} from '../portfolio-data-contract.js?v="+release.terminalBuild+"'"));
+  assert.match(v9,/import \{[^}]*pionexEquitySnapshot[^}]*\} from '\.\.\/portfolio-data-contract\.js\?v=10\.0-r\d+'/);
+  assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
   assert.match(block,/pionex=privatePionex\.found\?privatePionex\.value:state\.manual\.pionex/);
