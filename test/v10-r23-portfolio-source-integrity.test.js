@@ -8,7 +8,7 @@ const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r23 COMMAND consumes canonical private Pionex equity snapshot',()=>{
-  assert.match(v9,/import \{pionexEquitySnapshot\} from '\.\.\/portfolio-data-contract\.js\?v=10\.0-r23'/);
+  assert.ok(v9.includes("import {pionexEquitySnapshot} from '../portfolio-data-contract.js?v="+release.terminalBuild+"'"));
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
   assert.match(block,/pionex=privatePionex\.found\?privatePionex\.value:state\.manual\.pionex/);
@@ -31,7 +31,8 @@ test('r23 labels canonical Pionex value as snapshot rather than live account',()
 });
 
 test('r23 release identity is canonical and browser adapters parse',()=>{
-  assert.equal(release.terminalBuild,'10.0-r23');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=23);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));

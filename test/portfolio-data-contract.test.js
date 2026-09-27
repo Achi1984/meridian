@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -46,4 +46,11 @@ test('Pionex equity snapshot preserves canonical private provenance',()=>{
   const row=pionexEquitySnapshot({portfolio:{manualVenueBalances:[{venue:'Pionex',valueUsd:2999,source:'MANUAL_SNAPSHOT',updatedAt:'2026-09-26T10:00:00Z'}]}});
   assert.deepEqual(row,{found:true,value:2999,source:'MANUAL_SNAPSHOT',updatedAt:'2026-09-26T10:00:00Z'});
   assert.deepEqual(pionexEquitySnapshot({}),{found:false,value:0,source:'MISSING',updatedAt:null});
+});
+
+
+test('missing holding quantity never coerces to zero over a stored USD value',()=>{
+  assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:null,valueUsd:1234.56}),1234.56);
+  assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:'',value:'',usdValue:987.65}),987.65);
+  assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:0,valueUsd:1234.56}),0);
 });

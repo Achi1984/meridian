@@ -4,15 +4,16 @@
 export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V1';
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
+const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 
 export function holdingUsd(data={},holding={}){
-  const q=Number(holding.quantity);
-  const live=Number(data?.livePrices?.[holding.symbol]?.price);
-  const own=Number(holding.price);
-  const stored=Number(holding.value??holding.valueUsd);
-  if(Number.isFinite(q)&&q>=0&&Number.isFinite(live)&&live>0)return q*live;
-  if(Number.isFinite(q)&&q>=0&&Number.isFinite(own)&&own>0)return q*own;
-  return Number.isFinite(stored)?stored:0;
+  const q=finite(holding.quantity);
+  const live=finite(data?.livePrices?.[holding.symbol]?.price);
+  const own=finite(holding.price);
+  const stored=finite(holding.value)??finite(holding.valueUsd)??finite(holding.usdValue);
+  if(q!=null&&q>=0&&live!=null&&live>0)return q*live;
+  if(q!=null&&q>=0&&own!=null&&own>0)return q*own;
+  return stored??0;
 }
 
 export function pionexEquitySnapshot(data={}){

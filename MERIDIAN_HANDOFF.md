@@ -253,3 +253,12 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Pionex source is explicitly a private portfolio snapshot, with provenance and timestamp carried through the model.
 - If canonical private Pionex equity is missing, MERIDIAN fails closed to the existing screenshot fallback rather than guessing from `pionexRisk` or generic `pionex` fields.
 - No trading logic, bot matching, execution, orders or research rules changed.
+
+
+## v10 r24 — Portfolio null integrity
+
+- Canonical holding valuation no longer lets `null` or blank quantity coerce to numeric zero.
+- Missing quantity now falls through to explicit stored USD value (`value`, `valueUsd`, `usdValue`) rather than silently erasing it.
+- An explicit quantity of zero remains zero and correctly overrides stale stored value.
+- This enforces the existing Data Truth invariant: missing numeric data is unavailable, never zero.
+- No trading logic, execution, bot state or research logic changed.
