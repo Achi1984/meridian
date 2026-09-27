@@ -157,11 +157,11 @@ function intel(rows15,rows1h,rows4,rows1d){
  const c15=rows15.map(x=>x.close),c1h=rows1h.map(x=>x.close),c4=rows4.map(x=>x.close),c1d=rows1d.map(x=>x.close),p=c15.at(-1);
  const R15=rsi(c15),R1H=rsi(c1h),R4=rsi(c4),R1D=rsi(c1d),M15=macd(c15),M1H=macd(c1h),M4=macd(c4),M1D=macd(c1d),A=atr(rows4);
  const e20=ema(c1d,20),e50=ema(c1d,50),e100=ema(c1d,100),e200=ema(c1d,200);
- const w=rows4.slice(-90),lo=Math.min(...w.map(x=>x.low)),hi=Math.max(...w.map(x=>x.high)),span=hi-lo,fibs=[.382,.5,.618,.786].map(f=>({f,price:hi-span*f})),near=fibs.reduce((a,b)=>Math.abs(b.price-p)<Math.abs(a.price-p)?b:a);
+ const w=rows4.slice(-90),lo=Math.min(...w.map(x=>x.low)),hi=Math.max(...w.map(x=>x.high)),loIdx=w.reduce((m,x,i)=>x.low<w[m].low?i:m,0),hiIdx=w.reduce((m,x,i)=>x.high>w[m].high?i:m,0),swingDirection=loIdx<=hiIdx?'BULL':'BEAR',span=hi-lo,fibs=[.382,.5,.618,.786].map(f=>({f,price:hi-span*f})),near=fibs.reduce((a,b)=>Math.abs(b.price-p)<Math.abs(a.price-p)?b:a);
  const dailyBull=p>e200&&e20>e50;
  const score=(dailyBull?25:0)+(R15>=40&&R15<=68?10:0)+(R1H>=42&&R1H<=68?15:0)+(R4>=42&&R4<=68?15:0)+(M15&&M15.hist>0?5:0)+(M1H&&M1H.hist>0?10:0)+(M4&&M4.hist>0?10:0)+(Math.abs(p-near.price)<=Math.max(A*.75,p*.012)?10:0);
  const status=score>=70&&dailyBull&&M1H?.hist>0?'RE-ENTRY READY':score>=55?'SETUP FORMING':'WAIT FOR RETRACE';
- return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,near,score,status}
+ return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,swingDirection,near,score,status}
 }
 function signalAction(score){return score>=6?'RISK REVIEW':score>=4?'PROFIT LOCK CANDIDATE':score>=2?'WATCH PROFIT':'HOLD'}
 function signalRank(action){return action==='RISK REVIEW'?3:action==='PROFIT LOCK CANDIDATE'?2:action==='WATCH PROFIT'?1:0}
@@ -170,7 +170,7 @@ function actionForSide(pi,side){return side==='SHORT'?(pi?.shortAction||'SYNC'):
 function reasonsForSide(pi,side){return side==='SHORT'?(pi?.shortReasons||[]):(pi?.longReasons||[])}
 function profitLockIntel(rows15,rows1h,rows4){
  const c15=rows15.map(x=>x.close),c1h=rows1h.map(x=>x.close),c4=rows4.map(x=>x.close),p=c15.at(-1);
- const R15=rsi(c15),R1H=rsi(c1h),R4=rsi(c4),M15=macd(c15),M1H=macd(c1h),M4=macd(c4),e20=ema(c1h,20),e50=ema(c1h,50);
+ const R15=rsi(c15),R1H=rsi(c1h),R4=rsi(c4),M15=macd(c15),M1H=macd(c1h),M4=macd(c4),e20=ema(c1h,20),e50=ema(c1h,50),w=rows4.slice(-90),swingLo=Math.min(...w.map(x=>x.low)),swingHi=Math.max(...w.map(x=>x.high)),loIdx=w.reduce((m,x,i)=>x.low<w[m].low?i:m,0),hiIdx=w.reduce((m,x,i)=>x.high>w[m].high?i:m,0),swingDirection=loIdx<=hiIdx?'BULL':'BEAR';
  let bear=0,bull=0,longReasons=[],shortReasons=[];
  if(R15>=72){bear++;longReasons.push('RSI15m heiß')}if(R1H>=70){bear++;longReasons.push('RSI1h heiß')}if(R4>=68){bear++;longReasons.push('RSI4h heiß')}
  if(M15&&M15.hist<0){bear++;longReasons.push('MACD15m ↓')}if(M1H&&M1H.hist<0){bear+=2;longReasons.push('MACD1h ↓')}if(M4&&M4.hist<0){bear+=2;longReasons.push('MACD4h ↓')}
@@ -179,7 +179,7 @@ function profitLockIntel(rows15,rows1h,rows4){
  if(M15&&M15.hist>0){bull++;shortReasons.push('MACD15m ↑')}if(M1H&&M1H.hist>0){bull+=2;shortReasons.push('MACD1h ↑')}if(M4&&M4.hist>0){bull+=2;shortReasons.push('MACD4h ↑')}
  if(e20&&p>e20){bull+=2;shortReasons.push('über EMA20 1h')}if(e20&&e50&&e20>e50){bull++;shortReasons.push('EMA20>50 1h')}
  const longAction=signalAction(bear),shortAction=signalAction(bull),bias=bull-bear>=3?'BULLISH':bear-bull>=3?'BEARISH':'MIXED';
- return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p}
+ return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection}
 }
 async function syncIntel(){
  const cross=syncCrossPrices();
