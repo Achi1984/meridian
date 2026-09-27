@@ -24,8 +24,8 @@ function intelFresh(i){return !!i&&freshTs(i.updatedAt)}
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length;
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,missingAssets:Math.max(0,totalAssets-knownAssets),totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -143,6 +143,19 @@ function syncHealth(){
   else if(status==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched.length+'.';
   return{apiRows,supported,raw:supported,matched:matched.length,safetyReady,pnlReady,decisionReady,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
 }
+function marketReadiness(m){
+  if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
+  if(m.fresh)return{label:'PARTIAL',tone:'watch'};
+  return{label:'STALE',tone:'mixed'};
+}
+function botReadiness(g){
+  if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
+  if(!g.fresh)return{label:'REF',tone:'reference'};
+  if(g.matched>0&&g.coverageComplete&&g.decisionReady===g.matched)return{label:'READY',tone:'safe'};
+  if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
+  if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
+  return{label:'BLOCKED',tone:'muted'};
+}
 function dataGuardCard(){
   const g=syncHealth(),completeDecision=g.decisionReady>0&&g.coverageComplete,tone=completeDecision?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionReady>0?(g.coverageComplete?'DECISION READY':'PARTIAL READY'):g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
   return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small></section>';
@@ -169,16 +182,14 @@ function snapshotDetails(openByDefault=false){
   return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>27.09.2026 · ca. 19:47–19:52</b><span>'+stamp+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
 }
 function commandDataStrip(){
-  const g=syncHealth(),m=marketHealth(),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE';
-  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(m.fresh&&m.coverageComplete?'safe':'watch')+'">'+marketLabel+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+'</small></div><div><span>BOT LAYER</span><b class="tone-'+(g.fresh?'safe':'watch')+'">'+(g.fresh?'FRESH':'REFERENCE')+'</b><small>'+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—';
+  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(mr.tone==='mixed'?'watch':mr.tone)+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing</small></div><div><span>BOT LAYER</span><b class="tone-'+(br.tone==='reference'?'muted':br.tone)+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
 }
 function renderSystemHeader(){
-  const g=syncHealth(),m=marketHealth(),market=$('#market-status'),bot=$('#data-status');
+  const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  const marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE',marketClass=m.fresh&&m.coverageComplete?'fresh':'mixed';
-  set(market,'● MKT '+marketLabel,'live '+marketClass,m.fresh?(m.coverageComplete?'Öffentliche Futures-Marktdaten vollständig frisch':'Marktdaten frisch, aber Asset-Coverage unvollständig'):'Marktdaten nicht frisch genug');
-  const bad=g.status==='ERROR',botLabel=g.fresh?(g.coverageComplete?'FRESH':'PARTIAL'):bad?'ERROR':'REF',botClass=g.fresh&&g.coverageComplete?'fresh':bad?'error':g.fresh?'mixed':'reference';
-  set(bot,'● BOT '+botLabel,'live '+botClass,g.detail);
+  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
+  set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
@@ -215,9 +226,9 @@ function renderBots(){
 }
 function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
-  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[])],set=new Set(Object.keys(s?.assetIntel||{}));
+  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[]),...(s?.unmatchedLive||[])],set=new Set();
   rows.forEach(x=>{if(x?.symbol)set.add(String(x.symbol).toUpperCase())});
-  return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
+  return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(b))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
 }
 function marketSignal(i){
   if(!i)return{label:'SYNC',tone:'muted',score:0,rank:0,confirmed:false};
