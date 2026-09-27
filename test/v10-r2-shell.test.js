@@ -28,8 +28,8 @@ test('v10 makes Data Guard and asset-pair risk explicit without changing trading
 
 test('v10 visually separates live execution surfaces from paper research',()=>{
   assert.match(js,/POSITION LAYER/);
-  assert.match(js,/PAPER \/ RESEARCH ONLY/);
-  assert.match(js,/Keine automatische Promotion/);
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/keine automatische Promotion/i);
   assert.match(css,/data-tone="live"/);
   assert.match(css,/data-tone="paper"/);
 });
