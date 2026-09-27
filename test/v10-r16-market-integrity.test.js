@@ -34,7 +34,7 @@ test('r16 market coverage denominator comes from expected tracked universe, not 
   assert.match(v10,/\.\.\.\(s\?\.referenceBots\|\|\[\]\)/);
   assert.match(v10,/\.\.\.\(s\?\.okxDcaBots\|\|\[\]\)/);
   assert.match(v10,/universe=marketUniverse\(\)/);
-  assert.match(v10,/missingAssets:Math\.max\(0,totalAssets-knownAssets\)/);
+  assert.match(v10,/missingAssets=Math\.max\(0,totalAssets-knownAssets\)/);
   assert.match(v10,/coverageComplete:totalAssets>0&&freshAssets===totalAssets/);
 });
 
