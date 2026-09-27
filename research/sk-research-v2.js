@@ -111,7 +111,8 @@ export function aggregateSkResearchV2(assetRuns){
   doubleTrades.sort((a,b)=>(a.openedAt??0)-(b.openedAt??0));
   const pooled={
     core:summarizeSkTradeCohort(coreTrades),
-    double:summarizeSkTradeCohort(doubleTrades)
+    double:summarizeSkTradeCohort(doubleTrades),
+    entryDepth:skEntryDepthCohorts(coreTrades)
   };
   const stability=skChronologicalStability(doubleTrades,5);
   const batch={ruleset:SK_RESEARCH_V2_RULESET,researchOnly:true,executionImpact:false,autoPromotion:false,assets,pooled,stability};
