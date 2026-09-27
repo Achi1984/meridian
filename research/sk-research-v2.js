@@ -4,6 +4,7 @@ import {
 } from './sk-paperbot-v1.js';
 
 export const SK_RESEARCH_V2_RULESET='SK-RESEARCH-V2-AB-FROZEN';
+export const SK_RESEARCH_V2_ENGINE_REVISION='PREENTRY-CLOSED-BAR-R2';
 export const SK_RESEARCH_V2_ASSETS=Object.freeze(['BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI']);
 export const SK_RESEARCH_V2_GATE=Object.freeze({
   minDoubleTrades:20,
@@ -24,7 +25,7 @@ export function isPreEntryDoubleAdvantage(trade){
     trade?.doubleAdvantageBeforeEntry===true &&
     finite(trade?.doubleAdvantageAt) &&
     finite(trade?.openedAt) &&
-    num(trade.doubleAdvantageAt)<=num(trade.openedAt)
+    num(trade.doubleAdvantageAt)<num(trade.openedAt)
   );
 }
 
@@ -115,7 +116,7 @@ export function aggregateSkResearchV2(assetRuns){
     entryDepth:skEntryDepthCohorts(coreTrades)
   };
   const stability=skChronologicalStability(doubleTrades,5);
-  const batch={ruleset:SK_RESEARCH_V2_RULESET,researchOnly:true,executionImpact:false,autoPromotion:false,assets,pooled,stability};
+  const batch={ruleset:SK_RESEARCH_V2_RULESET,engineRevision:SK_RESEARCH_V2_ENGINE_REVISION,researchOnly:true,executionImpact:false,autoPromotion:false,assets,pooled,stability};
   return{...batch,gate:evaluateSkResearchV2(batch)};
 }
 
