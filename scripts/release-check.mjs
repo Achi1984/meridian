@@ -56,8 +56,8 @@ if(v10Cutover){
   for(const label of ['COMMAND','BOTS','MARKET','SCANNER','LAB']){
     must(v10.includes('>'+label+'<'),`v10 production target missing nav label ${label}`);
   }
-  must(v10.includes('../v9/v9.js?v=10.0-r8'),'v10 must load validated v9 engine');
-  must(v10.includes('./v10.js?v=10.0-r8'),'v10 presentation adapter missing');
+  must(v10.includes('../v9/v9.js?v=10.0-r9'),'v10 must load validated v9 engine');
+  must(v10.includes('./v10.js?v=10.0-r9'),'v10 presentation adapter missing');
 }else if(v9Cutover){
   must(index.includes('location.replace(target+q+h)'),'v9 root redirect must preserve query/hash');
   must(!index.includes('app-v6.06.js'),'v9 root must not initialize compatibility loader');
