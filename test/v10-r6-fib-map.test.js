@@ -137,3 +137,44 @@ test('r6 zone overlap is strict geometry, not a proximity guess',()=>{
   assert.deepEqual(zoneOverlap(a,b),{low:94,high:95,width:1,overlapPct:25});
   assert.equal(zoneOverlap(a,c),null);
 });
+
+
+test('SK turn zones use 50 55.9 61.8 66.7 correction levels and 1.618 to 2.0 targets',()=>{
+  const levels=buildFibLevels(100,200,'UP');
+  for(const ratio of [.5,.559,.618,.667,1.618,2]){
+    assert.ok(levels.some(x=>Math.abs(x.ratio-ratio)<1e-12),'missing SK ratio '+ratio);
+  }
+  const up=buildSkZones(100,200,'UP');
+  assert.equal(up.bullTurn.low,200-100*.667);
+  assert.equal(up.bullTurn.high,200-100*.5);
+  assert.equal(up.activeTurn.key,'BULL_TURN');
+  assert.equal(up.activeTarget.key,'BULL_TARGET');
+  const down=buildSkZones(100,200,'DOWN');
+  assert.equal(down.activeTurn.key,'BEAR_TURN');
+  assert.equal(down.activeTarget.key,'BEAR_TARGET');
+});
+
+test('Double Advantage requires overlap from a distinct second Fib structure',()=>{
+  const primary={low:100,high:200,direction:'UP',window:90};
+  const same={low:100,high:200,direction:'UP',window:60};
+  assert.equal(buildSkConfluences(primary,[same]).length,0,'identical swing is not independent confluence');
+  const shifted={low:110,high:210,direction:'UP',window:60};
+  const conf=buildSkConfluences(primary,[shifted]);
+  assert.ok(conf.length>0,'expected overlapping independent structure');
+  assert.ok(conf.some(x=>x.side==='BULL'));
+  assert.ok(conf.every(x=>x.coverage>=.15));
+  const ov=zoneOverlap({low:140,high:160},{low:150,high:170});
+  assert.deepEqual({low:ov.low,high:ov.high},{low:150,high:160});
+});
+
+test('Fib UI labels SK bull bear turn areas and double advantage as decision support only',()=>{
+  assert.match(js,/FIB MAP · SK OVERLAY/);
+  assert.match(js,/BULL TURN · LONG/);
+  assert.match(js,/BEAR TURN · SHORT/);
+  assert.match(js,/DOUBLE ADVANTAGE · /);
+  assert.match(js,/Reaktion beobachten, nicht automatisch handeln/);
+  assert.match(js,/keine Orders/i);
+  assert.match(css,/\.fib-zone-bull/);
+  assert.match(css,/\.fib-zone-bear/);
+  assert.match(css,/\.fib-zone-double/);
+});
