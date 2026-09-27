@@ -1,8 +1,9 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r8';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r8';
-// MERIDIAN v10 r8 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r9';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r9';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r9';
+// MERIDIAN v10 r9 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r8';
+const BUILD='10.0-r9';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -10,6 +11,7 @@ const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
 const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
+const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -350,6 +352,77 @@ function skRulesCard(){
   const c=SK_PAPERBOT_V1_CONFIG;
   return '<details class="sk-rules"><summary>FROZEN RULESET · '+SK_PAPERBOT_V1_RULESET+'</summary><div class="sk-rule-grid"><div><span>TIMEFRAME</span><b>4H</b></div><div><span>GATE</span><b>0.382</b></div><div><span>ENTRIES</span><b>'+c.entryRatios.join(' · ')+'</b></div><div><span>TARGETS</span><b>'+c.targetRatios.join(' · ')+'</b></div><div><span>INVALIDATION</span><b>ORIGIN 0</b></div><div><span>RISK</span><b>'+c.riskPct+'% TOTAL</b></div><div><span>FEES</span><b>'+c.feeBps+' BPS</b></div><div><span>SLIPPAGE</span><b>'+c.slippageBps+' BPS</b></div></div><small>Vier Entry-Tranchen teilen das Gesamtrisiko. Doppelter Vorteil wird gemessen, aber ist in V1 kein Pflichtfilter. Keine automatische Promotion.</small></details>';
 }
+
+function skV2Metric(summary,label){
+  if(!summary)return '<div><span>'+label+'</span><b>—</b></div>';
+  return '<div><span>'+label+'</span><b>'+summary.trades+' T · PF '+skNum(summary.profitFactor,2)+'</b><small>'+skMoney(summary.pnl)+' · Exp '+skMoney(summary.expectancy)+'</small></div>';
+}
+function skV2DepthHtml(depth){
+  return Object.values(depth||{}).map(x=>'<div><span>'+x.ratio.toFixed(3)+'</span><b>'+x.trades+' T</b><small>PF '+skNum(x.summary?.profitFactor,2)+' · '+skMoney(x.summary?.pnl)+'</small></div>').join('');
+}
+function skV2AssetRows(assets){
+  return (assets||[]).map(a=>'<div class="sk-v2-asset-row"><strong>'+a.symbol+'</strong><span>CORE '+a.core.trades+'T · PF '+skNum(a.core.profitFactor,2)+' · '+skMoney(a.core.pnl)+'</span><span>2×ADV '+a.double.trades+'T · PF '+skNum(a.double.profitFactor,2)+' · '+skMoney(a.double.pnl)+'</span></div>').join('');
+}
+function skV2ResultHtml(){
+  if(skV2Ui.running)return '<div class="sk-v2-loading"><b>'+skV2Ui.progress+'</b><small>'+skV2Ui.completed+'/'+skV2Ui.total+' Assets · öffentliche 4h-Historie · sequenziell</small></div>';
+  if(skV2Ui.error)return '<div class="sk-paper-error"><b>V2 BATCH FEHLER</b><small>'+skV2Ui.error+'</small></div>';
+  const r=skV2Ui.result;
+  if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN V2-BATCH</b><small>Core V1 bleibt unverändert. V2 vergleicht nur Core vs. vor Entry bestätigten Double Advantage.</small></div>';
+  const g=r.gate,st=r.stability||{},core=r.pooled?.core,double=r.pooled?.double,depth=r.pooled?.entryDepth||{};
+  const windows=(st.windows||[]).map(w=>'<div class="'+(w.positive?'positive':'negative')+'"><span>W'+w.i+' · '+w.trades+'T</span><b>'+skMoney(w.pnl)+'</b><small>PF '+skNum(w.profitFactor,2)+'</small></div>').join('');
+  return '<div class="sk-v2-ab"><div><span>A · SK CORE V1</span><b>'+core.trades+' Trades</b><small>PF '+skNum(core.profitFactor,2)+' · '+skMoney(core.pnl)+' · Exp '+skMoney(core.expectancy)+'</small></div><div class="'+(double?.expectancy>core?.expectancy?'candidate':'')+'"><span>B · DOUBLE ADV ONLY</span><b>'+double.trades+' Trades</b><small>PF '+skNum(double.profitFactor,2)+' · '+skMoney(double.pnl)+' · Exp '+skMoney(double.expectancy)+'</small></div></div>'+
+    '<div class="sk-v2-metrics">'+
+      skV2Metric(core,'CORE')+skV2Metric(double,'DOUBLE ADV')+
+      '<div><span>LONG / SHORT · DA</span><b>'+double.longTrades+' / '+double.shortTrades+'</b><small>'+skMoney(double.longPnl)+' / '+skMoney(double.shortPnl)+'</small></div>'+
+      '<div><span>CLOSED DD · DA</span><b>'+skNum(double.maxDrawdownPct,2)+'%</b><small>Trade-sequence DD, kein Portfolio-DD</small></div>'+
+      '<div><span>POSITIVE ASSETS</span><b>'+g.positiveAssets+'/'+r.assets.length+'</b><small>Breite vor Promotion</small></div>'+
+      '<div><span>PNL CONCENTRATION</span><b>'+skNum(g.positivePnlConcentrationPct,1)+'%</b><small>max. positiver Asset-Anteil</small></div>'+
+    '</div>'+
+    '<div class="sk-gate"><span>V2 FROZEN GATE</span><b>'+(g.pass?'PASS · KEINE AUTO-PROMOTION':'FAIL / INSUFFICIENT')+'</b><small>'+((g.reasons||[]).join(' · ')||'Alle V2 Research-Gates erfüllt; Forward-/Paper-Shadow wäre trotzdem Pflicht.')+'</small></div>'+
+    '<div class="sk-section-title"><b>ENTRY-TIEFE · CORE</b><small>tiefster gefüllter SK-Level</small></div><div class="sk-v2-depth">'+skV2DepthHtml(depth)+'</div>'+
+    '<div class="sk-section-title"><b>ASSET BREITE</b><small>'+r.assets.length+' Assets · '+skV2Ui.days+' Tage angefordert</small></div><div class="sk-v2-assets">'+skV2AssetRows(r.assets)+'</div>'+
+    '<div class="sk-section-title"><b>DOUBLE ADV · 5 ZEITFENSTER</b><small>'+((st.positiveWindows||0))+'/5 positiv</small></div><div class="sk-window-grid">'+windows+'</div>'+
+    '<div class="sk-source-note">V2 nutzt nur Double Advantage, wenn es spätestens beim ersten Entry bekannt war. Kein Lookahead · keine Auto-Promotion · keine Orders.</div>';
+}
+function skV2Panel(){
+  return '<section class="sk-v2-shell"><div class="sk-paper-head"><div><span>SK RESEARCH V2</span><b>CORE vs DOUBLE ADVANTAGE</b><small>A/B-Test · Multi-Asset · Frozen Gate</small></div><strong>RESEARCH ONLY</strong></div>'+
+    '<div class="sk-paper-controls sk-v2-controls"><label>HISTORY<select id="sk-v2-days"><option value="365" '+(skV2Ui.days===365?'selected':'')+'>365 TAGE</option><option value="730" '+(skV2Ui.days===730?'selected':'')+'>730 TAGE</option><option value="1460" '+(skV2Ui.days===1460?'selected':'')+'>1460 TAGE</option></select></label><div class="sk-v2-universe"><span>UNIVERSE</span><b>'+SK_RESEARCH_V2_ASSETS.join(' · ')+'</b></div><button id="sk-v2-run" type="button" '+(skV2Ui.running?'disabled':'')+'>'+(skV2Ui.running?'BATCH LÄUFT …':'V2 MULTI-ASSET STARTEN')+'</button></div>'+
+    '<details class="sk-rules"><summary>V2 FROZEN GATE · '+SK_RESEARCH_V2_RULESET+'</summary><small>Mind. 20 Double-Advantage-Trades · PF ≥1,2 · positive Expectancy · Closed-Trade-DD ≤10% · 3/5 positive Zeitfenster · ≥3 positive Assets · max. 50% positive PnL-Konzentration.</small></details>'+
+    '<div id="sk-v2-result">'+skV2ResultHtml()+'</div></section>';
+}
+async function runSkV2Batch(view){
+  if(skV2Ui.running)return;
+  skV2Ui.days=Number($('#sk-v2-days',view)?.value)||730;skV2Ui.running=true;skV2Ui.error=null;skV2Ui.result=null;skV2Ui.completed=0;
+  const out=$('#sk-v2-result',view),btn=$('#sk-v2-run',view),loader=H().marketKlinesHistory;
+  if(typeof loader!=='function'){skV2Ui.running=false;skV2Ui.error='Historical 4h data bridge fehlt';if(out)out.innerHTML=skV2ResultHtml();return}
+  if(btn){btn.disabled=true;btn.textContent='BATCH LÄUFT …'}
+  const runs=[],bars=Math.min(9000,skV2Ui.days*6+40);
+  try{
+    for(const symbol of SK_RESEARCH_V2_ASSETS){
+      skV2Ui.progress='LADE '+symbol; if(out)out.innerHTML=skV2ResultHtml();
+      try{
+        const rows=await loader('4h',bars,symbol);
+        if(Array.isArray(rows)&&rows.length>=200){
+          runs.push({symbol,replay:replaySkPaperBot(rows),bars:rows.length,first:rows[0].openTime,last:rows.at(-1).openTime});
+        }
+      }catch(e){}
+      skV2Ui.completed++;skV2Ui.progress='ANALYSIERE '+symbol;if(out)out.innerHTML=skV2ResultHtml();
+      await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    if(runs.length<3)throw new Error('Zu wenige Assets mit ausreichender Historie: '+runs.length);
+    skV2Ui.result=aggregateSkResearchV2(runs);
+  }catch(e){skV2Ui.error=String(e?.message||e)}
+  finally{
+    skV2Ui.running=false;skV2Ui.progress='';
+    if(out)out.innerHTML=skV2ResultHtml();
+    if(btn){btn.disabled=false;btn.textContent='V2 MULTI-ASSET STARTEN'}
+  }
+}
+function bindSkV2(view){
+  const d=$('#sk-v2-days',view),b=$('#sk-v2-run',view);
+  if(d)d.onchange=()=>{skV2Ui.days=Number(d.value)||730};
+  if(b)b.onclick=()=>runSkV2Batch(view);
+}
 function skPaperPanel(){
   const assets=fibAssets(),opts=assets.map(x=>'<option value="'+x+'" '+(x===skLabUi.symbol?'selected':'')+'>'+x+'</option>').join('');
   return '<section class="sk-paper-shell"><div class="sk-paper-head"><div><span>SK PAPERBOT V1</span><b>SEQUENCE BOT · CORE</b><small>0→A→B→C · frozen research rules · 4h</small></div><strong>PAPER ONLY</strong></div>'+
@@ -412,25 +485,29 @@ function renderLab(){
   banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
   $('.hero',view)?.remove();
 
-  if(!$('.sk-paper-shell',view)){
-    const host=$('.bt-control',view);
-    if(host)host.insertAdjacentHTML('beforebegin',skPaperPanel());
-    else view.insertAdjacentHTML('afterbegin',skPaperPanel());
-    bindSkPaper(view);
+  if(!$('.sk-system-module',view)){
+    const module=document.createElement('details');module.className='research-module sk-system-module';module.open=true;
+    module.innerHTML='<summary><span>SK SYSTEM LAB</span><small>Core V1 + Research V2 A/B</small></summary><div class="research-module-body">'+skPaperPanel()+skV2Panel()+'</div>';
+    const host=$('.bt-control',view);(host||view.firstElementChild)?.insertAdjacentElement(host?'beforebegin':'afterend',module);
+    bindSkPaper(view);bindSkV2(view);
+  }
+
+  if(!$('.profit-lock-module',view)){
+    const control=$('.bt-control',view);
+    if(control){
+      const mod=document.createElement('details');mod.className='research-module profit-lock-module';
+      mod.innerHTML='<summary><span>PROFIT LOCK LAB</span><small>Paired Exit-Policy Test</small></summary><div class="research-module-body"></div>';
+      control.insertAdjacentElement('beforebegin',mod);
+      const body=$('.research-module-body',mod);
+      const nodes=[control,$('.bt-error',view),$('.bt-result',view),...$('.card',view).filter(x=>/Warum dieser Test/i.test(x.textContent||''))].filter(Boolean);
+      nodes.forEach(n=>body.appendChild(n));
+    }
   }
 
   if(!$('.lab-overview',view)){
-    const bt=S()?.backtest||{},r=bt.result;
     const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>METHODS</span><b>FROZEN 4H + PAIRED TEST</b><small>SK Entry-Regeln · Profit-Lock gleiche Entries</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
-    const sk=$('.sk-paper-shell',view),control=$('.bt-control',view);
-    (sk||control)?.insertAdjacentElement('beforebegin',o);
-  }
-
-  const why=$$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
-  if(why&&!why.closest('details')){
-    const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
-    why.replaceWith(d);
+    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK V1 + V2</b><small>Core gegen Double Advantage</small></div><div><span>HORIZON</span><b>365 / 730 / 1460D</b><small>8-Asset Batch</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>V2 GATE</span><b>'+(skV2Ui.result?.gate?.label||'NO RUN')+'</b><small>keine Auto-Promotion</small></div>';
+    $('.sk-system-module',view)?.insertAdjacentElement('beforebegin',o);
   }
 }
 function decorate(){
