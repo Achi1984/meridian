@@ -7,7 +7,7 @@ import {isPreEntryDoubleAdvantage,SK_RESEARCH_V2_ENGINE_REVISION} from '../resea
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
-const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8');
+const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 const DAY=86400000;
 function series(days,drift=.001,skip=()=>false){
