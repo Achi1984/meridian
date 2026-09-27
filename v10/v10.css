@@ -368,7 +368,7 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 }
 
 
-/* v10 r13 · deep-audit clarity + mobile safety */
+/* v10 r14 · DOM runtime hotfix + deep-audit clarity */
 .system-status{display:flex;gap:5px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .live.error{color:var(--red);border-color:#5b2d35;background:#14090c}
 .command-source-strip,.market-health{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px}
