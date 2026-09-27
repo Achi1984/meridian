@@ -171,8 +171,10 @@ function commandDataStrip(){
 }
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),market=$('#market-status'),bot=$('#data-status');
-  if(market){market.textContent='● MKT '+(m.fresh?'FRESH':'STALE');market.className='live '+(m.fresh?'fresh':'mixed');market.title=m.fresh?'Öffentliche Futures-Marktdaten frisch':'Marktdaten nicht frisch genug';}
-  if(bot){const bad=g.status==='ERROR',label=g.fresh?'FRESH':bad?'ERROR':'REF';bot.textContent='● BOT '+label;bot.className='live '+(g.fresh?'fresh':bad?'error':'reference');bot.title=g.detail;}
+  const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
+  set(market,'● MKT '+(m.fresh?'FRESH':'STALE'),'live '+(m.fresh?'fresh':'mixed'),m.fresh?'Öffentliche Futures-Marktdaten frisch':'Marktdaten nicht frisch genug');
+  const bad=g.status==='ERROR',label=g.fresh?'FRESH':bad?'ERROR':'REF';
+  set(bot,'● BOT '+label,'live '+(g.fresh?'fresh':bad?'error':'reference'),g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
@@ -309,7 +311,7 @@ async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
   fibUi.symbol=$('#fib-asset',view)?.value||fibUi.symbol;
   fibUi.window=Number($('#fib-window',view)?.value)||fibUi.window||90;
-  out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
+  out.setAttribute('aria-busy','true');out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
   try{
     const fetchRows=H().marketKlines;
     let rows=null;
@@ -320,17 +322,18 @@ async function updateFibMap(view){
     if(fibUi.mode==='AUTO'){
       if(!rows?.length)throw new Error('4h-Marktdaten-Bridge nicht verfügbar');
       const sw=detectSwing(rows,fibUi.window);
-      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h · PUBLIC';
+      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h · '+(rows.source||'PUBLIC FUTURES');
       fibUi.autoLow=low;fibUi.autoHigh=high;fibUi.lastDirection=direction;
     }else{
       low=fibParse($('#fib-low',view)?.value??fibUi.manualLow);
       high=fibParse($('#fib-high',view)?.value??fibUi.manualHigh);
       direction=$('#fib-direction',view)?.value||fibUi.lastDirection||'UP';
       fibUi.manualLow=low;fibUi.manualHigh=high;fibUi.direction=direction;
+      source='MANUAL SWING · '+(rows?.source||'PRICE FEED');
     }
-    let current=marketPrice(fibUi.symbol).value;
-    if(!(current>0)&&rows?.length)current=Number(rows.at(-1)?.close);
-    if(!(current>0))current=Number(S()?.assetIntel?.[fibUi.symbol]?.price);
+    if(!(low>0&&high>0&&high>low))throw new Error('Swing High muss über Swing Low liegen');
+    let current=rows?.length?Number(rows.at(-1)?.close):null;
+    if(!(current>0))current=marketPrice(fibUi.symbol).value;
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
     let doubleAdvantage=null;
@@ -340,8 +343,8 @@ async function updateFibMap(view){
     }
     out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
   }catch(e){
-    out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+String(e?.message||e)+'</small></div>';
-  }
+    out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+esc(e?.message||e)+'</small></div>';
+  }finally{out.setAttribute('aria-busy','false')}
 }
 function refreshFibMap(view){
   const old=$('.fib-map-shell',view);if(!old)return;
@@ -669,6 +672,10 @@ function bindDocumentedEdge(view){
   if(b)b.onclick=()=>runDocumentedEdgeBatch(view);
 }
 
+function labOverviewHtml(){
+  const discovery=edgeUi.tsmom?(edgeUi.tsmom.gate?.pass?'PASS':'FAIL'):'NOT RUN',holdout=holdoutUi.combined?(holdoutUi.combined.pass?'PASS':'FAIL'):'NOT RUN',sk=skV2Ui.result?(skV2Ui.result.gate?.pass?'V2 PASS':'V2 FAIL'):'FROZEN';
+  return '<div><span>TSMOM DISCOVERY</span><b class="tone-'+(discovery==='PASS'?'safe':discovery==='FAIL'?'watch':'muted')+'">'+discovery+'</b><small>interner Gate · kein Beweis</small></div><div><span>TSMOM HOLDOUT</span><b class="tone-'+(holdout==='PASS'?'safe':holdout==='FAIL'?'watch':'muted')+'">'+holdout+'</b><small>unabhängige Validierung</small></div><div><span>SK SYSTEM</span><b>'+sk+'</b><small>V1/V2 Research-Benchmark</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only · keine Orders</small></div>';
+}
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
   if(!$('.bt-control',view)&&!$('.bt-result',view)){
@@ -704,15 +711,17 @@ function renderLab(){
     }
   }
 
-  if(!$('.lab-overview',view)){
-    const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>PRIMARY LAB</span><b>DOCUMENTED EDGE</b><small>Replikation vor Eigenoptimierung</small></div><div><span>UNIVERSE</span><b>8 ASSETS</b><small>Daily + bestehende Carry-Evidenz</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>SK STATUS</span><b>FROZEN</b><small>V1/V2 bleiben Benchmark</small></div>';
-    $('.documented-edge-module',view)?.insertAdjacentElement('beforebegin',o);
-  }
+  let overview=$('.lab-overview',view);
+  if(!overview){overview=document.createElement('section');overview.className='lab-overview';$('.documented-edge-module',view)?.insertAdjacentElement('beforebegin',overview);}
+  const nextOverview=labOverviewHtml();if(overview&&overview.innerHTML!==nextOverview)overview.innerHTML=nextOverview;
+  let note=$('.lab-validation-note',view);
+  if(!note){note=document.createElement('section');note.className='lab-validation-note';overview?.insertAdjacentElement('afterend',note);}
+  const nextNote='<b>VALIDATION LADDER</b><small>Discovery PASS ≠ bestätigtes Edge. Holdout muss unabhängig bestehen; danach höchstens Paper-Shadow/Forward-Test, nie Auto-Promotion.</small>';
+  if(note&&note.innerHTML!==nextNote)note.innerHTML=nextNote;
 }
 function decorate(){
   document.documentElement.dataset.meridianBuild=BUILD;
-  renderCommand();renderBots();renderMarket();renderScanner();renderLab();
+  renderCommand();renderBots();renderMarket();renderScanner();renderLab();renderSystemHeader();decorateA11y();
 }
 let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;decorate();});};
 new MutationObserver(schedule).observe($('#app')||document.body,{childList:true,subtree:true});
