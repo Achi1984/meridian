@@ -419,3 +419,6 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 .market-row-missing,.scan-missing{border-style:dashed;opacity:.86}
 .market-row-missing .market-symbol span,.scan-missing .scan-head b{color:var(--amber)}
 .market-row-missing>div:not(.market-symbol),.scan-missing .scan-grid span,.scan-missing .scan-actions span{background:#0d0c09;border-color:#3b321f}
+
+/* v10 r22 semantic live-status tones */
+.live.safe{color:var(--green)}.live.watch{color:var(--amber)}.live.danger{color:var(--red)}.live.muted{color:var(--muted)}

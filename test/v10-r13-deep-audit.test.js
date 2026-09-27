@@ -49,7 +49,7 @@ test('r13 separates market freshness, bot freshness and Asset Watch reference',(
 test('r13 suppresses stale bot action cards but keeps the 34-bot screenshot roster visible',()=>{
   assert.match(v10,/if\(!fresh&&!compact\)return ''/);
   assert.match(v10,/KEINE FRISCHEN LIVE-AKTIONSKARTEN/);
-  assert.match(v10,/snapshotDetails\(!g\.fresh\)/);
+  assert.match(v10,/snapshotDetails\((?:snapshotOpen\?\?)?!g\.fresh\)/);
   assert.match(v10,/ASSET WATCH SNAPSHOT/);
 });
 

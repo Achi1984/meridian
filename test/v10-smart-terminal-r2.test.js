@@ -96,7 +96,7 @@ test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
 test('v10 r13 bots suppress stale action cards and expose Asset Watch reference instead',()=>{
   assert.match(js,/if\(!fresh&&!compact\)return ''/);
   assert.match(js,/KEINE FRISCHEN LIVE-AKTIONSKARTEN/);
-  assert.match(js,/snapshotDetails\(!g\.fresh\)/);
+  assert.match(js,/snapshotDetails\((?:snapshotOpen\?\?)?!g\.fresh\)/);
   assert.match(js,/function marketPrice/);
 });
 

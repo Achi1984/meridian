@@ -57,7 +57,8 @@ test('r21 market coverage separates stale and missing technical feeds',()=>{
 });
 
 test('r21 release identity is canonical and browser adapter parses',()=>{
-  assert.equal(release.terminalBuild,'10.0-r21');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=21);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   for(const modulePath of ['./fib-core.js','../research/sk-paperbot-v1.js','../research/sk-research-v2.js','../research/documented-edge-v1.js','../research/tsmom-holdout-v1.js'])assert.ok(v10.includes(modulePath+'?v='+release.terminalBuild),modulePath);
