@@ -103,8 +103,9 @@ test('r20 keeps corrected DOM collection selector and audited LAB labels',()=>{
   assert.match(v10,/frühere TSMOM\/SK-Ergebnisse müssen neu gerechnet werden/);
 });
 
-test('r20 release identity is canonical and adapter parses',()=>{
-  assert.equal(release.terminalBuild,'10.0-r20');
+test('r20+ release identity remains canonical and adapter parses',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=20);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   for(const modulePath of ['./fib-core.js','../research/sk-paperbot-v1.js','../research/sk-research-v2.js','../research/documented-edge-v1.js','../research/tsmom-holdout-v1.js'])assert.ok(v10.includes(modulePath+'?v='+release.terminalBuild),modulePath);
