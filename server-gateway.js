@@ -12,10 +12,8 @@ const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.
 const DEPLOYMENT_SHA=String(process.env.NF_DEPLOYMENT_SHA||process.env.GITHUB_SHA||"").trim();
 const EXTERNAL_PORT = Number(process.env.PORT || 10000);
 const INTERNAL_PORT = Number(process.env.MERIDIAN_INTERNAL_PORT || (EXTERNAL_PORT + 1));
-const LEGACY_READ_TOKEN_HASH="bd92c80bb4a43ea04788f2ee21591bad56052c5d609696402357597a43cbe4bc";
-const READ_TOKEN_ENV_HASH=String(process.env.MERIDIAN_READ_TOKEN_SHA256||"").trim().toLowerCase();
-const READ_TOKEN_HASH=READ_TOKEN_ENV_HASH||LEGACY_READ_TOKEN_HASH;
-const READ_AUTH_SOURCE=/^[a-f0-9]{64}$/.test(READ_TOKEN_ENV_HASH)?"ENV":READ_TOKEN_ENV_HASH?"INVALID_ENV":"LEGACY_FALLBACK";
+const READ_TOKEN_HASH=String(process.env.MERIDIAN_READ_TOKEN_SHA256||"").trim().toLowerCase();
+const READ_AUTH_SOURCE=/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH)?"ENV":READ_TOKEN_HASH?"INVALID_ENV":"MISSING_ENV";
 const WRITE_TOKEN_HASH = String(process.env.MERIDIAN_WRITE_TOKEN_SHA256 || "").trim().toLowerCase();
 const ALLOWED_ORIGINS = new Set(
   String(process.env.MERIDIAN_ALLOWED_ORIGINS || "https://achi1984.github.io,http://localhost:3000,http://127.0.0.1:3000")
@@ -225,8 +223,8 @@ process.env.PORT=originalPort==null?String(EXTERNAL_PORT):originalPort;
 
 const migration=await migrateStaticDashboardOnce();
 console.log("[GATEWAY] private dashboard migration",migration);
-if(READ_AUTH_SOURCE==="LEGACY_FALLBACK")console.warn("[GATEWAY] MERIDIAN_READ_TOKEN_SHA256 not configured; legacy read-auth fallback remains active");
-if(READ_AUTH_SOURCE==="INVALID_ENV")console.error("[GATEWAY] MERIDIAN_READ_TOKEN_SHA256 is invalid; protected reads will fail closed");
+if(READ_AUTH_SOURCE==="MISSING_ENV")console.error("[GATEWAY] MERIDIAN_READ_TOKEN_SHA256 missing; protected reads fail closed");
+if(READ_AUTH_SOURCE==="INVALID_ENV")console.error("[GATEWAY] MERIDIAN_READ_TOKEN_SHA256 is invalid; protected reads fail closed");
 
 const server=http.createServer(async(req,res)=>{
   try{
