@@ -422,7 +422,7 @@ function renderLab(){
   if(!$('.lab-overview',view)){
     const bt=S()?.backtest||{},r=bt.result;
     const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>SK METHOD</span><b>FROZEN 4H</b><small>keine nachträgliche Optimierung</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
+    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>METHODS</span><b>FROZEN 4H + PAIRED TEST</b><small>SK Entry-Regeln · Profit-Lock gleiche Entries</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
     const sk=$('.sk-paper-shell',view),control=$('.bt-control',view);
     (sk||control)?.insertAdjacentElement('beforebegin',o);
   }
