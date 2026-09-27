@@ -107,7 +107,7 @@ function mergeReference(live){
     const levOk=x.leverage!=null&&x.leverage===ref.leverage;
     const structureOk=['lower','upper','tp','be'].some(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
     if(!levOk&&!structureOk)continue;
-    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_source:'LIVE_MATCH'};
+    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_source:'LIVE_MATCH'};
     refUsed.add(m.ri);used.add(m.li);
   }
   /* Dashboard is intentionally pinned to the verified 13-bot COIN-M roster.
@@ -403,4 +403,10 @@ async function sync(){try{
  }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false}
  renderHeaderTruth();go(current)
 }
+window.MERIDIAN_V10_BRIDGE={
+  getState:()=>state,
+  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone},
+  renderResearch:()=>research(),
+  bindResearch:()=>bindResearch()
+};
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
