@@ -178,7 +178,7 @@ function stats(trades,startEquity,maxDrawdownPct){
 
 export function replaySkPaperBot(input,{config={},closeAtEnd=true}={}){
   const cfg={...SK_PAPERBOT_V1_CONFIG,...config,entryRatios:[...(config.entryRatios||SK_PAPERBOT_V1_CONFIG.entryRatios)],targetRatios:[...(config.targetRatios||SK_PAPERBOT_V1_CONFIG.targetRatios)],targetFractions:[...(config.targetFractions||SK_PAPERBOT_V1_CONFIG.targetFractions)]};
-  const rows=normalizeSkCandles(input);if(rows.length<20)return{ruleset:SK_PAPERBOT_V1_RULESET,researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary:stats([],cfg.startEquity,0),trades:[],events:[],latestState:'WAITING_DATA',latestSequence:null};
+  const rows=normalizeSkCandles(input),minBars=Math.max(8,cfg.pivotLeft+cfg.pivotRight+5);if(rows.length<minBars)return{ruleset:SK_PAPERBOT_V1_RULESET,researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary:stats([],cfg.startEquity,0),trades:[],events:[],latestState:'WAITING_DATA',latestSequence:null};
   let seed=null,seq=null,seqNo=0,realized=0,peak=cfg.startEquity,maxDD=0;
   const trades=[],events=[];
   for(let i=0;i<rows.length;i++){
@@ -202,7 +202,7 @@ export function replaySkPaperBot(input,{config={},closeAtEnd=true}={}){
         if(seq){
           if(seq.position?.remainingQty>0&&stopTouched(bar,seq.zero,seq.side)){closeStop(seq,bar,cfg,events);realized+=seq.position.realizedPnl;trades.push(tradeRecord(seq));seq=null;seed=null}
           else{
-            const equity=Math.max(1,cfg.startEquity+realized+unrealized(seq,bar.close));
+            const equity=Math.max(1,cfg.startEquity+realized+Number(seq?.position?.realizedPnl||0)+unrealized(seq,bar.close));
             fillEntries(seq,bar,i,equity,cfg,events);
             if(seq?.position?.remainingQty>0){processTargets(seq,bar,cfg,events);if(['COMPLETE'].includes(seq.state)){realized+=seq.position.realizedPnl;trades.push(tradeRecord(seq));seq=null;seed=null}}
           }
@@ -222,7 +222,7 @@ export function replaySkPaperBot(input,{config={},closeAtEnd=true}={}){
         }
       }
     }
-    const equity=cfg.startEquity+realized+unrealized(seq,bar.close);peak=Math.max(peak,equity);const dd=peak>0?(peak-equity)/peak*100:0;maxDD=Math.max(maxDD,dd);
+    const equity=cfg.startEquity+realized+Number(seq?.position?.realizedPnl||0)+unrealized(seq,bar.close);peak=Math.max(peak,equity);const dd=peak>0?(peak-equity)/peak*100:0;maxDD=Math.max(maxDD,dd);
   }
   const latestSequence=seq?clone(seq):null,latestState=seq?.state||events.at(-1)?.type||'SEARCH';
   if(closeAtEnd&&seq?.position?.remainingQty>0){
