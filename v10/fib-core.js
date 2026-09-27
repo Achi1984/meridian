@@ -1,5 +1,5 @@
 export const RETRACEMENTS=[0,0.236,0.382,0.5,0.559,0.618,0.667,0.786,1];
-export const EXTENSIONS=[1.272,1.414,1.618,2];
+export const EXTENSIONS=[1.272,1.414,1.618,1.809,2];
 
 const finite=n=>Number.isFinite(Number(n));
 const n=v=>Number(v);
@@ -57,7 +57,7 @@ export function zoneOverlap(a,b){
   const low=Math.max(n(a.low),n(b.low)),high=Math.min(n(a.high),n(b.high));
   if(!(high>low))return null;
   const width=high-low,den=Math.max(1e-12,Math.min(n(a.high)-n(a.low),n(b.high)-n(b.low)));
-  return{low,high,width,coverage:width/den};
+  return{low,high,width,overlapPct:width/den*100};
 }
 
 export function buildSkConfluences(primary,contexts=[]){
@@ -78,11 +78,58 @@ export function buildSkConfluences(primary,contexts=[]){
     ];
     for(const [side,a,b,type] of checks){
       const ov=zoneOverlap(a,b);
-      if(!ov||ov.coverage<.15)continue;
-      out.push({...ov,side,type,contextWindow:c.window??null,contextDirection:c.direction,contextLow:c.low,contextHigh:c.high});
+      if(!ov||ov.overlapPct<15)continue;
+      out.push({...ov,coverage:ov.overlapPct/100,side,type,contextWindow:c.window??null,contextDirection:c.direction,contextLow:c.low,contextHigh:c.high});
     }
   }
   return out.sort((a,b)=>b.coverage-a.coverage||b.width-a.width);
+}
+
+
+export function skLongShortZones(lowInput,highInput){
+  const low=n(lowInput),high=n(highInput);
+  if(!finite(low)||!finite(high)||!(high>low))throw new Error('Ungültige SK Swing-Spanne');
+  const span=high-low;
+  return{
+    long:normZone(high-span*.667,high-span*.5,{side:'LONG',label:'BULLISH TRENDWENDE',basis:'0.500–0.667'}),
+    short:normZone(low+span*.5,low+span*.667,{side:'SHORT',label:'BEARISH TRENDWENDE',basis:'0.500–0.667'})
+  };
+}
+
+export function skTargetZone(lowInput,highInput,direction='UP'){
+  const low=n(lowInput),high=n(highInput),dir=String(direction||'UP').toUpperCase();
+  if(!finite(low)||!finite(high)||!(high>low))throw new Error('Ungültige SK Swing-Spanne');
+  const span=high-low;
+  return dir==='UP'
+    ?normZone(high+span*.618,high+span,{side:'LONG',label:'BULLISH ZIELBEREICH',basis:'1.618–2.000'})
+    :normZone(low-span,low-span*.618,{side:'SHORT',label:'BEARISH ZIELBEREICH',basis:'1.618–2.000'});
+}
+
+export function detectOpposingChildSwing(rows,parent,windowSize=90){
+  const clean=(Array.isArray(rows)?rows:[]).filter(r=>finite(r?.high)&&finite(r?.low));
+  if(!parent||clean.length<3)return null;
+  const start=(parent.direction==='UP'?parent.highIndex:parent.lowIndex)+1;
+  const tail=clean.slice(start);
+  if(tail.length<2)return null;
+  try{
+    const child=detectSwing(tail,Math.min(windowSize,tail.length));
+    if(child.direction===parent.direction)return null;
+    return{...child,lowIndex:child.lowIndex+start,highIndex:child.highIndex+start,parentDirection:parent.direction};
+  }catch{return null}
+}
+
+export function skDoubleAdvantage(parent,child){
+  if(!parent||!child||parent.direction===child.direction)return{candidate:false,side:null,overlap:null};
+  const parentZones=skLongShortZones(parent.low,parent.high);
+  if(parent.direction==='UP'&&child.direction==='DOWN'){
+    const target=skTargetZone(child.low,child.high,'DOWN'),overlap=zoneOverlap(parentZones.long,target);
+    return{candidate:!!overlap,side:'LONG',overlap,type:'Gegen-Ziel ∩ GKL',parentZone:parentZones.long,childTarget:target};
+  }
+  if(parent.direction==='DOWN'&&child.direction==='UP'){
+    const target=skTargetZone(child.low,child.high,'UP'),overlap=zoneOverlap(parentZones.short,target);
+    return{candidate:!!overlap,side:'SHORT',overlap,type:'Gegen-Ziel ∩ GKL',parentZone:parentZones.short,childTarget:target};
+  }
+  return{candidate:false,side:null,overlap:null};
 }
 
 export function adjacentFibLevels(levels,currentInput){
