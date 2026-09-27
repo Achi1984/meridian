@@ -24,8 +24,24 @@ function intelFresh(i){return !!i&&freshTs(i.updatedAt)}
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length;
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,missingAssets:Math.max(0,totalAssets-knownAssets),totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+}
+function botReadiness(g){
+  if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
+  if(!g.fresh)return{label:'REF',tone:'reference'};
+  if(g.matched>0&&g.coverageComplete&&g.decisionReady===g.matched)return{label:'READY',tone:'safe'};
+  if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
+  if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
+  return{label:'BLOCKED',tone:'muted'};
+}
+function marketReadiness(m){
+  if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
+  if(m.fresh)return{label:'PARTIAL',tone:'watch'};
+  return{label:'STALE',tone:'mixed'};
+}
+function activeOrFirst(view){
+  return !!view&&(view.classList.contains('active')||view.dataset.v10Ready!=='1');
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -166,27 +182,26 @@ function snapshotDetails(openByDefault=false){
     .map(symbol=>{const rows=refs.filter(x=>x.symbol===symbol),l=rows.filter(x=>(x.side||'LONG')==='LONG').length,sh=rows.filter(x=>x.side==='SHORT').length;return '<section class="snapshot-asset"><div class="snapshot-asset-head"><b>'+symbol+'</b><span>'+l+' LONG · '+sh+' SHORT</span></div>'+rows.map(snapshotBotLine).join('')+'</section>'}).join('');
   const p=manual.map(x=>'<div class="snapshot-row"><b>'+x.symbol+' '+(x.side||'')+' · '+(x.leverage||'—')+'x</b><span>PIONEX MANUAL · REFERENCE</span></div>').join('');
   const o=okx.map(x=>'<div class="snapshot-row"><b>'+x.symbol+' '+(x.side||'')+' · '+(x.leverage||'—')+'x</b><span>OKX DCA · '+(x.snapshotAt||'SNAPSHOT')+'</span></div>').join('');
-  return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>27.09.2026 · ca. 19:47–19:52</b><span>'+stamp+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
+  const stampMs=Date.parse(String(stamp||'')),stampLabel=Number.isFinite(stampMs)?new Date(stampMs).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Snapshot-Zeit unbekannt';
+  return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>'+esc(stampLabel)+'</b><span>'+esc(stamp)+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
 }
 function commandDataStrip(){
-  const g=syncHealth(),m=marketHealth(),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE';
-  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(m.fresh&&m.coverageComplete?'safe':'watch')+'">'+marketLabel+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+'</small></div><div><span>BOT LAYER</span><b class="tone-'+(g.fresh?'safe':'watch')+'">'+(g.fresh?'FRESH':'REFERENCE')+'</b><small>'+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—';
+  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(mr.tone==='mixed'?'watch':mr.tone)+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing</small></div><div><span>BOT LAYER</span><b class="tone-'+(br.tone==='reference'?'muted':br.tone)+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
 }
 function renderSystemHeader(){
-  const g=syncHealth(),m=marketHealth(),market=$('#market-status'),bot=$('#data-status');
+  const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  const marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE',marketClass=m.fresh&&m.coverageComplete?'fresh':'mixed';
-  set(market,'● MKT '+marketLabel,'live '+marketClass,m.fresh?(m.coverageComplete?'Öffentliche Futures-Marktdaten vollständig frisch':'Marktdaten frisch, aber Asset-Coverage unvollständig'):'Marktdaten nicht frisch genug');
-  const bad=g.status==='ERROR',botLabel=g.fresh?(g.coverageComplete?'FRESH':'PARTIAL'):bad?'ERROR':'REF',botClass=g.fresh&&g.coverageComplete?'fresh':bad?'error':g.fresh?'mixed':'reference';
-  set(bot,'● BOT '+botLabel,'live '+botClass,g.detail);
+  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
+  set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
   $$('#nav button').forEach(b=>{b.type='button';const label=$('span',b)?.textContent||'MERIDIAN';b.setAttribute('aria-label',label);if(b.classList.contains('active'))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 function renderCommand(){
-  const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
-  if($('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
+  const view=$('#view-command');if(!view||!$('.portfolio-hero',view)||!activeOrFirst(view))return;
+  view.dataset.v10Ready='1';
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Market, Bot-Layer und Referenz-Snapshot werden getrennt bewertet','live');
   dataGuardDecorate();
   $$('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.command-source-strip',view).forEach(x=>x.remove());
@@ -206,8 +221,9 @@ function renderCommand(){
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
 }
 function renderBots(){
-  const view=$('#view-bots');if(!view||$('.v10-pair-stack',view))return;
-  if(!$('.bot-hero',view)&&!$('.bot-group',view))return;
+  const view=$('#view-bots');if(!view||!activeOrFirst(view))return;
+  const baseReady=$('.bot-hero',view)||$('.bot-group',view),already=view.dataset.v10Ready==='1';if(!baseReady&&!already)return;
+  view.dataset.v10Ready='1';
   const s=S(),g=syncHealth(),syms=g.fresh?symbols():[],unmatched=g.unmatched;
   const api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' ');
   const liveCards=syms.map(symbol=>pairCard(symbol)).filter(Boolean).join('');
@@ -215,7 +231,7 @@ function renderBots(){
 }
 function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
-  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[])],set=new Set(Object.keys(s?.assetIntel||{}));
+  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[]),...(s?.unmatchedLive||[])],set=new Set();
   rows.forEach(x=>{if(x?.symbol)set.add(String(x.symbol).toUpperCase())});
   return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
 }
@@ -371,8 +387,9 @@ function bindFibMap(view){
 }
 
 function renderMarket(){
-  const view=$('#view-market');if(!view||$('.v10-market-board',view))return;
-  if(!$('.hero',view)&&!$('.grid',view))return;
+  const view=$('#view-market');if(!view||!activeOrFirst(view))return;
+  const baseReady=$('.hero',view)||$('.grid',view),already=view.dataset.v10Ready==='1';if(!baseReady&&!already)return;
+  view.dataset.v10Ready='1';
   const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),mh=marketHealth(),verified=Object.values(s?.priceChecks||{}).filter(x=>x?.verified&&freshTs(x.updatedAt)).length;
   const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
   const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
@@ -386,8 +403,9 @@ function scannerCard(symbol){
   return '<article class="scan-card compact-scan"><div class="scan-head"><div><strong>'+esc(symbol)+'</strong><small>'+link+' · '+esc(age)+'</small></div><b class="tone-'+sig.tone+'">'+sig.label+'</b></div><div class="scan-grid compact"><span>RSI 15m / 1h <b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></span><span>RSI 4h <b>'+fmt(i.rsi4)+'</b></span><span>MACD 1h / 4h <b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></span><span>RAW PRESSURE <b>'+sig.score+'/9</b></span></div><div class="scan-actions"><span>LONG VIEW <b>'+(intelFresh(i)?esc(i.longAction):'DATA STALE')+'</b></span><span>SHORT VIEW <b>'+(intelFresh(i)?esc(i.shortAction):'DATA STALE')+'</b></span></div><small>'+esc(reasons.slice(0,2).join(' · ')||'Kein starkes Momentum-Warnsignal')+' · CONFIRMED nur mit frischen, geschlossenen 1h + 4h Kerzen</small></article>';
 }
 function renderScanner(){
-  const view=$('#view-research');if(!view||$('.v10-scanner-stack',view))return;
-  if(!$('.bt-control',view)&&!$('.hero',view))return;
+  const view=$('#view-research');if(!view||!activeOrFirst(view))return;
+  const baseReady=$('.bt-control',view)||$('.hero',view),already=view.dataset.v10Ready==='1';if(!baseReady&&!already)return;
+  view.dataset.v10Ready='1';
   const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(s?.assetIntel?.[x])).sort((a,b)=>{const A=marketSignal(s.assetIntel[a]),B=marketSignal(s.assetIntel[b]);return B.rank-A.rank||B.score-A.score}),stale=all.filter(x=>!intelFresh(s?.assetIntel?.[x]));
   const confirmed=fresh.filter(x=>marketSignal(s.assetIntel[x]).confirmed),top=fresh.slice(0,4),rest=fresh.slice(4),liveLinked=h.botFeedFresh?.()?all.filter(x=>matchedRows(x).length).length:0,refLinked=all.filter(referenceLinked).length;
   const stack=top.length?top.map(scannerCard).join(''):'<section class="v10-live-blocked market-stale"><b>SCANNER BLOCKED</b><small>Keine frischen Multi-Timeframe-Marktdaten · keine bestätigten Setups ausgeben.</small></section>';
