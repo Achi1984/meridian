@@ -29,7 +29,7 @@ export function buildFibLevels(lowInput,highInput,direction='UP'){
     kind:'retracement',
     price:dir==='UP'?high-span*r:low+span*r
   }));
-  const ext=[1.272,1.618].map(r=>({
+  const ext=[1.272,1.414,1.618].map(r=>({
     ratio:r,
     label:'EXT '+r.toFixed(3),
     kind:'extension',
