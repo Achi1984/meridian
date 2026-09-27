@@ -1,3 +1,12 @@
+// Legacy-route kill switch: cached /v9/ shells must migrate to v10.
+if(!window.MERIDIAN_V10){
+  const qs=new URLSearchParams(location.search);
+  if(qs.get('legacy')!=='1'){
+    qs.delete('legacy');
+    qs.set('build','r2');
+    location.replace('../v10/?'+qs.toString()+(location.hash||''));
+  }
+}
 const API_BASE=(window.MERIDIAN_V9_CONFIG?.apiBase||'https://p01--achi-meridian--ttvk44grdlp7.code.run').replace(/\/$/,'');
 const TOKEN_KEY='meridian.v8.readToken';
 const FALLBACK=[
