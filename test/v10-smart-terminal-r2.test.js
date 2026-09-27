@@ -99,6 +99,8 @@ test('v10 r4 bots collapse stale private fields instead of rendering empty actio
 });
 
 test('v10 r4 market is a multi-asset public-data board independent from bot freshness',()=>{
+  assert.match(js,/function btcRegimeLabel/);
+  assert.doesNotMatch(js,/BTC REGIME<\/span><b>'\+String\(s\.market/);
   assert.match(js,/function marketUniverse/);
   assert.match(js,/REGIME \+ ASSET TAPE/);
   assert.match(js,/Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot/);
