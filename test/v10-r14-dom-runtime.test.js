@@ -15,12 +15,13 @@ test('r14 never treats the single-element selector helper as a collection',()=>{
   assert.match(v10,/\$\$\(sel,view\)\.forEach/);
 });
 
-test('r14 terminal cache identity is canonical across production entry points',()=>{
-  assert.equal(release.terminalBuild,'10.0-r14');
-  assert.match(html,/content="10\.0-r14"/);
-  assert.match(html,/v=10\.0-r14/);
-  assert.match(v10,/const BUILD='10\.0-r14'/);
-  assert.match(root,/build=r14/);
+test('r14+ terminal cache identity remains canonical across production entry points',()=>{
+  const build=String(release.terminalBuild||'');
+  assert.match(build,/^10\.0-r\d+$/);
+  assert.ok(html.includes('content="'+build+'"'));
+  assert.ok(html.includes('v='+build));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(root.includes('build='+build.split('-').at(-1)));
 });
 
 test('r14 adapter remains syntactically valid after DOM hotfix',()=>{
