@@ -5,6 +5,7 @@ import {
 } from '../funding-carry-paper-v2.js';
 
 export const DOCUMENTED_EDGE_V1_RULESET='DOCUMENTED-EDGE-LAB-V1-FROZEN';
+export const TSMOM_ENGINE_REVISION='WEIGHTED-TURNOVER-R2';
 export const DOCUMENTED_EDGE_ASSETS=Object.freeze(['BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI']);
 
 export const TSMOM_CLASSIC_CONFIG=Object.freeze({
@@ -131,34 +132,52 @@ export function runTsmomClassic(dataset,config={}){
   const series=Object.fromEntries(Object.entries(dataset||{}).map(([k,v])=>[k,indexSeries(v)]).filter(([,v])=>v.rows.length));
   const master=series.BTC||Object.values(series).sort((a,b)=>b.rows.length-a.rows.length)[0];
   if(!master)return emptyTsmom(cfg);
-  const warm=Math.max(...cfg.lookbacks,cfg.volLookbackDays),periods=[],perAsset={};
-  const prevPos=new Map();
+  const warm=Math.max(...cfg.lookbacks,cfg.volLookbackDays),periods=[],perAsset={},prevRawPos=new Map(),prevWeights=new Map();
   for(const symbol of Object.keys(series))perAsset[symbol]=[];
   for(let i=warm;i+cfg.rebalanceDays<master.rows.length;i+=cfg.rebalanceDays){
-    const at=master.rows[i].openTime,nextAt=master.rows[i+cfg.rebalanceDays].openTime,legs=[];
+    const at=master.rows[i].openTime,nextAt=master.rows[i+cfg.rebalanceDays].openTime,candidates=[];
     for(const [symbol,ser] of Object.entries(series)){
       const cur=getAt(ser,at),future=getAt(ser,nextAt),sig=tsmomSignal(ser,at,cfg),vol=realizedVol(ser,at,cfg.volLookbackDays,cfg.annualizationDays);
       if(!cur||!future||!sig||!(vol>0))continue;
-      const leverage=Math.min(cfg.maxLeverage,cfg.targetVolAnnual/vol),position=sig.signal*leverage,prev=prevPos.get(symbol)||0;
-      const gross=position*(future.close/cur.close-1),cost=Math.abs(position-prev)*cfg.costBps/10000,net=gross-cost;
-      prevPos.set(symbol,position);
-      const leg={symbol,at,nextAt,signal:sig.signal,signs:sig.signs,vol,leverage,position,grossReturn:gross,costReturn:cost,netReturn:net};
-      legs.push(leg);perAsset[symbol].push(leg);
+      const leverage=Math.min(cfg.maxLeverage,cfg.targetVolAnnual/vol),position=sig.signal*leverage,assetReturn=future.close/cur.close-1,gross=position*assetReturn;
+      candidates.push({symbol,at,nextAt,signal:sig.signal,signs:sig.signs,vol,leverage,position,assetReturn,grossReturn:gross});
     }
-    if(legs.length<cfg.minActiveAssets)continue;
-    periods.push({at,nextAt,activeAssets:legs.length,grossReturn:mean(legs.map(x=>x.grossReturn)),costReturn:mean(legs.map(x=>x.costReturn)),netReturn:mean(legs.map(x=>x.netReturn)),legs});
+    if(candidates.length<cfg.minActiveAssets)continue;
+
+    const nActive=candidates.length,currentRaw=new Map(candidates.map(x=>[x.symbol,x.position])),currentWeights=new Map(candidates.map(x=>[x.symbol,x.position/nActive]));
+    const weightKeys=new Set([...prevWeights.keys(),...currentWeights.keys()]);
+    let turnover=0;for(const symbol of weightKeys)turnover+=Math.abs((currentWeights.get(symbol)||0)-(prevWeights.get(symbol)||0));
+    const grossReturn=candidates.reduce((sum,x)=>sum+(currentWeights.get(x.symbol)||0)*x.assetReturn,0),costReturn=turnover*cfg.costBps/10000,netReturn=grossReturn-costReturn;
+
+    const currentSymbols=new Set(currentRaw.keys());
+    for(const oldSymbol of prevRawPos.keys()){
+      if(currentSymbols.has(oldSymbol))continue;
+      const exitCost=Math.abs(prevRawPos.get(oldSymbol)||0)*cfg.costBps/10000;
+      perAsset[oldSymbol]?.push({symbol:oldSymbol,at,nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true});
+    }
+    const legs=candidates.map(x=>{
+      const prev=prevRawPos.get(x.symbol)||0,cost=Math.abs(x.position-prev)*cfg.costBps/10000,leg={...x,costReturn:cost,netReturn:x.grossReturn-cost};
+      perAsset[x.symbol].push(leg);return leg;
+    });
+    periods.push({at,nextAt,activeAssets:nActive,turnover,grossReturn,costReturn,netReturn,legs});
+    prevRawPos.clear();for(const [symbol,pos] of currentRaw)prevRawPos.set(symbol,pos);
+    prevWeights.clear();for(const [symbol,w] of currentWeights)prevWeights.set(symbol,w);
   }
   if(periods.length){
-    const last=periods.at(-1),closeCost=[...prevPos.values()].reduce((a,x)=>a+Math.abs(x)*cfg.costBps/10000,0)/Math.max(1,prevPos.size);
+    const last=periods.at(-1),closeCost=[...prevWeights.values()].reduce((sum,x)=>sum+Math.abs(x),0)*cfg.costBps/10000;
     last.costReturn+=closeCost;last.netReturn-=closeCost;
+    for(const [symbol,pos] of prevRawPos){
+      const exitCost=Math.abs(pos)*cfg.costBps/10000;
+      perAsset[symbol]?.push({symbol,at:last.nextAt,nextAt:last.nextAt,signal:0,signs:[],vol:null,leverage:0,position:0,grossReturn:0,costReturn:exitCost,netReturn:-exitCost,exitOnly:true});
+    }
   }
   const assets=Object.entries(perAsset).map(([symbol,rows])=>({symbol,summary:windowStats(rows.map(x=>x.netReturn),cfg.startEquity),periods:rows.length})).filter(x=>x.periods);
   const summary=windowStats(periods.map(x=>x.netReturn),cfg.startEquity),stability=chronoWindows(periods,5);
   const gate=evaluateTsmomGate(summary,stability,assets,cfg);
-  return{ruleset:DOCUMENTED_EDGE_V1_RULESET,strategy:'TSMOM_CLASSIC',researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary,stability,assets,periods,gate,positivePnlConcentrationPct:round(positiveAssetConcentration(assets),2)};
+  return{ruleset:DOCUMENTED_EDGE_V1_RULESET,engineRevision:TSMOM_ENGINE_REVISION,strategy:'TSMOM_CLASSIC',researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary,stability,assets,periods,gate,positivePnlConcentrationPct:round(positiveAssetConcentration(assets),2)};
 }
 function emptyTsmom(cfg){
-  return{ruleset:DOCUMENTED_EDGE_V1_RULESET,strategy:'TSMOM_CLASSIC',researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary:windowStats([],cfg.startEquity),stability:{windows:[],positiveWindows:0},assets:[],periods:[],gate:{pass:false,reasons:['NO_DATA'],autoPromotion:false}};
+  return{ruleset:DOCUMENTED_EDGE_V1_RULESET,engineRevision:TSMOM_ENGINE_REVISION,strategy:'TSMOM_CLASSIC',researchOnly:true,executionImpact:false,autoPromotion:false,config:cfg,summary:windowStats([],cfg.startEquity),stability:{windows:[],positiveWindows:0},assets:[],periods:[],gate:{pass:false,reasons:['NO_DATA'],autoPromotion:false}};
 }
 export function evaluateTsmomGate(summary,stability,assets,cfg=TSMOM_CLASSIC_CONFIG){
   const g=DOCUMENTED_EDGE_GATE.tsmom,reasons=[];
