@@ -108,6 +108,6 @@ test('V2 batch remains click-to-run research only and sequential',()=>{
   assert.match(js,/for\(const symbol of SK_RESEARCH_V2_ASSETS\)/);
   assert.match(js,/await loader\('4h',bars,symbol\)/);
   assert.match(js,/await new Promise\(resolve=>setTimeout\(resolve,120\)\)/);
-  assert.match(js,/Kein Lookahead/);
+  assert.match(js,/Same-Bar-OHLC zählt nicht/);
   assert.doesNotMatch(js,/submitOrder|placeOrder|createOrder/);
 });
