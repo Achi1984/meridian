@@ -16,6 +16,15 @@ function series(days,drift=.001,phase=0){
   }
   return rows;
 }
+function stableSeries(days,drift=.001,phase=0){
+  let p=100;const rows=[];
+  for(let i=0;i<days;i++){
+    const r=drift+Math.sin((i+phase)/11)*.00015;
+    const open=p;p=Math.max(.01,p*(1+r));
+    rows.push({openTime:Date.UTC(2020,0,1)+i*DAY,closeTime:Date.UTC(2020,0,1)+(i+1)*DAY-1,open,high:Math.max(open,p)*1.001,low:Math.min(open,p)*.999,close:p,volume:1000+i});
+  }
+  return rows;
+}
 
 test('documented-edge universe is frozen to eight research assets',()=>{
   assert.deepEqual([...DOCUMENTED_EDGE_ASSETS],['BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI']);
@@ -30,7 +39,7 @@ test('TSMOM frozen mechanics use 1m 3m 12m crypto-calendar signals',()=>{
 });
 
 test('TSMOM signal is long when all frozen lookbacks are positive',()=>{
-  const rows=normalizeDaily(series(500,.001));
+  const rows=normalizeDaily(stableSeries(500,.0015));
   const ser={rows,by:new Map(rows.map((r,i)=>[r.openTime,i]))};
   const sig=tsmomSignal(ser,rows[400].openTime);
   assert.equal(sig.signal,1);
@@ -79,7 +88,7 @@ test('XSMOM proxy uses 3-week formation, one-day skip and weekly rebalance',()=>
 
 test('XSMOM price-only proxy can detect persistent cross-sectional continuation but can never promote',()=>{
   const drifts=[.0014,.0011,.0008,.0005,-.0002,-.0005,-.0008,-.0011];
-  const data=Object.fromEntries(DOCUMENTED_EDGE_ASSETS.map((a,i)=>[a,series(500,drifts[i],i*5)]));
+  const data=Object.fromEntries(DOCUMENTED_EDGE_ASSETS.map((a,i)=>[a,stableSeries(500,drifts[i],i*5)]));
   const r=runXsmom3wPriceProxy(data);
   assert.equal(r.exactReplication,false);
   assert.equal(r.autoPromotion,false);
