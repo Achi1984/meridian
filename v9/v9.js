@@ -3,7 +3,7 @@ if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r17');
+    qs.set('build','r18');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -104,7 +104,14 @@ function botPnlUsd(b){
  return{value:raw,source:raw==null?'NONE':'LIVE_USD',corrected:false}
 }
 function token(){try{return String(localStorage.getItem(TOKEN_KEY)||'').trim()}catch{return''}}
-async function getJson(path){const r=await fetch(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+const FETCH_TIMEOUT_MS=10000;
+async function fetchTimed(url,options={},timeoutMs=FETCH_TIMEOUT_MS){
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),Math.max(1000,Number(timeoutMs)||FETCH_TIMEOUT_MS));
+ try{return await fetch(url,{...options,signal:c.signal})}
+ catch(e){if(e?.name==='AbortError'){let host='REMOTE';try{host=new URL(url,typeof location!=='undefined'?location.href:'http://localhost').hostname}catch{}throw new Error('FETCH_TIMEOUT '+host)}throw e}
+ finally{clearTimeout(t)}
+}
+async function getJson(path){const r=await fetchTimed(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function holdingValue(d,h){const q=num(h?.quantity),lp=num(d?.livePrices?.[h?.symbol]?.price),own=num(h?.price),stored=num(h?.value)??num(h?.valueUsd)??num(h?.usdValue);return q!=null&&q>=0&&lp>0?q*lp:q!=null&&q>=0&&own>0?q*own:stored||0}
 function okxKnownBotEquity(){const rows=state.okxDcaBots||[];return rows.length?rows.reduce((s,x)=>s+(num(x.investUsd)||0)+(num(x.totalPnlUsd)||0),0):null}
 function portfolioModel(d){const hs=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];const by={};for(const h of hs){const venue=String(h?.venue||'OTHER').toUpperCase(),v=holdingValue(d,h);by[venue]=(by[venue]||0)+v}const liveBots=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];const botCapital=liveBots.reduce((s,b)=>s+(num(b.investUsd)||0)+(botPnlUsd(b).value||0),0);const apiPionex=num(d?.pionex?.equityUsd)??num(d?.pionex?.totalEquityUsd)??num(d?.pionex?.accountValueUsd)??num(d?.pionexRisk?.accountEquityUsd)??num(d?.pionexRisk?.totalEquityUsd);const botRowsWithCapital=liveBots.filter(b=>b.investUsd!=null);const allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;/* The current private API equity field is COIN-M bot equity, not Pionex account total.
@@ -181,13 +188,13 @@ function closedMarketRows(rows){
 async function marketKlines(interval,limit,symbol='BTC'){
  const barMap={'15m':'15m','1h':'1H','4h':'4H','1d':'1D'},bar=barMap[interval]||interval;
  try{
-  const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetch(u,{cache:'no-store'});
+  const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetchTimed(u,{cache:'no-store'},7000);
   if(!r.ok)throw new Error('OKX '+r.status);
   const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
   const span=MARKET_INTERVAL_MS[interval]||0,rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]+Math.max(1,span)-1})).reverse();
   rows.source='OKX USDT-SWAP';return rows
  }catch(okxError){
-  const r=await fetch('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'});
+  const r=await fetchTimed('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'},7000);
   if(!r.ok)throw new Error('BINANCE FUTURES '+r.status+' / '+String(okxError?.message||okxError));
   const rows=(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
   rows.source='BINANCE USD-M FUTURES';return rows
@@ -197,7 +204,7 @@ async function marketKlinesHistory(interval,bars,symbol='BTC'){
  const want=Math.max(50,Math.min(9000,Math.floor(Number(bars)||1000))),out=[];let end=Date.now(),guard=0;
  while(out.length<want&&guard++<12){
   const limit=Math.min(1000,want-out.length),u='https://api.binance.com/api/v3/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+limit+'&endTime='+Math.floor(end);
-  const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('BINANCE HISTORY '+r.status);
+  const r=await fetchTimed(u,{cache:'no-store'},8000);if(!r.ok)throw new Error('BINANCE HISTORY '+r.status);
   const rows=(await r.json()).map(x=>({openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]}));
   if(!rows.length)break;out.unshift(...rows);end=rows[0].openTime-1;
   if(out.length<want)await new Promise(resolve=>setTimeout(resolve,80));
@@ -206,7 +213,7 @@ async function marketKlinesHistory(interval,bars,symbol='BTC'){
 }
 async function syncCrossPrices(){
  try{
-  const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'})]);
+  const [or,br]=await Promise.all([fetchTimed('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'},8000),fetchTimed('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'},8000)]);
   if(!or.ok||!br.ok)throw new Error('cross-price http');
   const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={},now=Date.now();
   for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
@@ -241,8 +248,11 @@ function profitLockIntel(rows15,rows1h,rows4){
  const longAction=signalAction(bear),shortAction=signalAction(bull),bias=bull-bear>=3?'BULLISH':bear-bull>=3?'BEARISH':'MIXED';
  return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection,source:rows15.source||'MARKET FEED'}
 }
+let syncIntelBusy=false;
 async function syncIntel(){
+ if(syncIntelBusy)return false;syncIntelBusy=true;
  const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
+ try{
  try{
   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
   if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
@@ -258,7 +268,8 @@ async function syncIntel(){
   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth()
+ state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth();return true
+ }finally{syncIntelBusy=false}
 }
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
@@ -373,7 +384,7 @@ async function binanceHistory(interval,limit,symbol){
  let rows=[],endTime=null;const marketSymbol=symbol+'USDT';
  while(rows.length<limit){
   const take=Math.min(1000,limit-rows.length),u='https://api.binance.com/api/v3/klines?symbol='+marketSymbol+'&interval='+interval+'&limit='+take+(endTime!=null?'&endTime='+endTime:'');
-  const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('Binance history '+r.status);
+  const r=await fetchTimed(u,{cache:'no-store'},8000);if(!r.ok)throw new Error('Binance history '+r.status);
   const j=await r.json();if(!Array.isArray(j)||!j.length)break;
   const batch=j.map(x=>({openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
   rows=batch.concat(rows);endTime=batch[0].openTime-1;if(batch.length<take)break
@@ -458,7 +469,15 @@ function bindResearch(target='research'){
 function more(){return `<section class="hero"><div class="eyebrow">MORE</div><h1>PORTFOLIO + SYSTEM</h1><p class="muted">Spot/Exchanges bleiben sekundär. Live-Quelle: ${state.source}.</p></section>`}
 const render={command,bots,market,research,more};let current='command';
 function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('#view-'+v).innerHTML=render[v]();if(v==='research')bindResearch()}
-async function sync(){try{
+function notifyData(){
+ renderHeaderTruth();
+ if(window.MERIDIAN_V10)window.dispatchEvent(new CustomEvent('meridian:data'));
+ else go(current)
+}
+let syncBusy=false;
+async function sync(){
+ if(syncBusy)return false;syncBusy=true;
+ try{
  const payload=await getJson('/api/private/dashboard'),d=payload?.data||payload,live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];
  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
  if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;}
@@ -473,8 +492,9 @@ async function sync(){try{
  state.source=botFeedFresh()&&matched===state.bots.length&&matched?'FRESH':matched?'MIXED':'REFERENCE';
  state.market=String(d?.market?.regime||d?.btcRegime?.label||d?.regime?.label||'SYNC').toUpperCase();
  state.portfolio=portfolioModel(d);state.syncedAt=Date.now();state.error=null
- }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false}
- renderHeaderTruth();go(current)
+ }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false;return false}
+ finally{syncBusy=false;notifyData()}
+ return true
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
@@ -482,4 +502,9 @@ window.MERIDIAN_V10_BRIDGE={
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+function refreshNow(){void sync();void syncIntel().then(changed=>{if(changed)notifyData()})}
+go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());
+setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNow()});
+window.addEventListener('online',refreshNow);

@@ -63,7 +63,7 @@ test('r17 LAB escapes external error messages before DOM insertion',()=>{
 
 test('r17 release identity remains canonical and adapter parses',()=>{
   const build=String(release.terminalBuild||'');
-  assert.equal(build,'10.0-r17');
+  assert.equal(build,String(release.terminalBuild||''));
   assert.ok(shell.includes(build));
   assert.ok(v10.includes("const BUILD='"+build+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));

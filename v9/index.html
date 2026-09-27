@@ -5,7 +5,7 @@
   var p=new URLSearchParams(location.search);
   if(p.get('legacy')!=='1'){
     p.delete('legacy');
-    p.set('build','r17');
+    p.set('build','r18');
     location.replace('../v10/?'+p.toString()+(location.hash||''));
   }
 })();
