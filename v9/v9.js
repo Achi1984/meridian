@@ -107,7 +107,7 @@ function mergeReference(live){
     const levOk=x.leverage!=null&&x.leverage===ref.leverage;
     const structureOk=['lower','upper','tp','be'].some(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
     if(!levOk&&!structureOk)continue;
-    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_source:'LIVE_MATCH'};
+    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_source:'LIVE_MATCH'};
     refUsed.add(m.ri);used.add(m.li);
   }
   /* Dashboard is intentionally pinned to the verified 13-bot COIN-M roster.
@@ -377,10 +377,10 @@ function research(){
  const bt=state.backtest||{},r=bt.result,assets=['BTC','ETH','SOL','XRP','HBAR','PEPE','DOT','ADA','SUI','AVAX','LINK','XLM','TRX','WIF'];
  return `<section class="hero"><div class="eyebrow">PROFIT LOCK LAB · ENGINE r15</div><h1>PROFIT LOCK LAB</h1><p class="muted">Paired historical policy test · identische Entries · RUN TO TP vs Profit Lock V2.</p></section><section class="bt-control"><div><span>ASSET</span><select id="bt-asset">${assets.map(a=>'<option'+(a===(bt.symbol||'BTC')?' selected':'')+'>'+a+'</option>').join('')}</select></div><button id="bt-run" ${bt.running?'disabled':''}>${bt.running?'BACKTEST LÄUFT…':'BACKTEST STARTEN'}</button><small>History: ~100 Tage · 1h Setup + 4h Struktur · keine echten Orders · Ergebnisse sind Policy-Proxies, kein exakter Grid-PnL.</small></section>${bt.error?'<section class="bt-error">'+bt.error+'</section>':''}${r?'<section class="bt-result"><div class="section-title"><h2>'+r.symbol+' · POLICY TEST</h2><small>'+r.first+' → '+r.last+'</small></div><div class="bt-side-grid">'+btSideCard(r.long)+btSideCard(r.short)+'</div><div class="bt-method">'+r.method+' · Locks werden nur stufenweise bis 20/25/50% simuliert; Rest bleibt Runner bis TP/Horizont.</div></section>':'<section class="card"><b>Warum dieser Test?</b><p>Wir testen nur die Exit-/Profit-Lock-Logik auf denselben historischen Trades. Damit vermeiden wir, Entry und Exit gleichzeitig nachträglich zu optimieren.</p><small>Startet erst nach Klick, damit keine unnötigen API-Abfragen im normalen COMMAND entstehen.</small></section>'}`
 }
-function bindResearch(){
- const sel=$('#bt-asset'),btn=$('#bt-run');if(!sel||!btn)return;
+function bindResearch(target='research'){
+ const root=$('#view-'+target)||document,sel=root.querySelector('#bt-asset'),btn=root.querySelector('#bt-run');if(!sel||!btn)return;
  sel.onchange=()=>{state.backtest.symbol=sel.value};
- btn.onclick=async()=>{state.backtest.symbol=sel.value;state.backtest.running=true;state.backtest.error=null;state.backtest.result=null;go('research');try{state.backtest.result=await runProfitBacktest(state.backtest.symbol)}catch(e){state.backtest.error=e?.message||String(e)}finally{state.backtest.running=false;go('research')}}
+ btn.onclick=async()=>{state.backtest.symbol=sel.value;state.backtest.running=true;state.backtest.error=null;state.backtest.result=null;go(target);try{state.backtest.result=await runProfitBacktest(state.backtest.symbol)}catch(e){state.backtest.error=e?.message||String(e)}finally{state.backtest.running=false;go(target)}}
 }
 function more(){return `<section class="hero"><div class="eyebrow">MORE</div><h1>PORTFOLIO + SYSTEM</h1><p class="muted">Spot/Exchanges bleiben sekundär. Live-Quelle: ${state.source}.</p></section>`}
 const render={command,bots,market,research,more};let current='command';
@@ -403,4 +403,10 @@ async function sync(){try{
  }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false}
  renderHeaderTruth();go(current)
 }
+window.MERIDIAN_V10_BRIDGE={
+  getState:()=>state,
+  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone},
+  renderResearch:()=>research(),
+  bindResearch:(target='research')=>bindResearch(target)
+};
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
