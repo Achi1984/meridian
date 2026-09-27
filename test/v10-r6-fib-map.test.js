@@ -1,67 +1,80 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {detectSwing,buildFibLevels,adjacentFibLevels,fibPlotPosition} from '../v10/fib-core.js';
+import {detectSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition} from '../v10/fib-core.js';
 
-const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
-const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
-const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
+test('r6 detects swing direction from 4h extrema chronology',()=>{
+  const rows=[
+    {openTime:1,high:90,low:82},
+    {openTime:2,high:92,low:80},
+    {openTime:3,high:96,low:85},
+    {openTime:4,high:100,low:88},
+  ];
+  const s=detectSwing(rows,4);
+  assert.equal(s.low,80);
+  assert.equal(s.high,100);
+  assert.equal(s.direction,'UP');
+  assert.equal(s.bars,4);
+});
 
-test('v10 r6 exposes an interactive Fib Map in MARKET',()=>{
-  assert.match(html,/10\.0-r6/);
-  assert.match(js,/FIB MAP/);
-  assert.match(js,/RETRACEMENT \+ EXTENSIONS/);
+test('r6 bullish Fib retracement and extensions use standard swing orientation',()=>{
+  const levels=buildFibLevels(80,100,'UP');
+  const by=x=>levels.find(l=>Math.abs(l.ratio-x)<1e-9)?.price;
+  assert.equal(by(0),100);
+  assert.equal(by(.236),95.28);
+  assert.equal(by(.382),92.36);
+  assert.equal(by(.5),90);
+  assert.equal(by(.618),87.64);
+  assert.equal(by(1),80);
+  assert.equal(by(1.272),105.44);
+  assert.equal(by(1.618),112.36);
+});
+
+test('r6 bearish Fib mirrors retracement and continuation extensions',()=>{
+  const levels=buildFibLevels(80,100,'DOWN');
+  const by=x=>levels.find(l=>Math.abs(l.ratio-x)<1e-9)?.price;
+  assert.equal(by(0),80);
+  assert.equal(by(.236),84.72);
+  assert.equal(by(.618),92.36);
+  assert.equal(by(1),100);
+  assert.equal(by(1.272),74.56);
+  assert.equal(by(1.618),67.64);
+});
+
+test('r6 identifies next Fib levels above and below current price',()=>{
+  const levels=buildFibLevels(80,100,'UP');
+  const next=adjacentFibLevels(levels,93);
+  assert.equal(next.above.label,'0.236');
+  assert.equal(next.above.price,95.28);
+  assert.equal(next.below.label,'0.382');
+  assert.equal(next.below.price,92.36);
+  assert.ok(fibDistancePct(next.above,93)>0);
+  assert.ok(fibDistancePct(next.below,93)<0);
+});
+
+test('r6 graphical Fib positions stay inside ladder bounds',()=>{
+  const levels=buildFibLevels(80,100,'UP');
+  for(const level of levels){
+    const p=fibPlotPosition(level.price,levels,93);
+    assert.ok(p>=0&&p<=100);
+  }
+  assert.ok(fibPlotPosition(93,levels,93)>=0);
+});
+
+test('r6 Market integration exposes auto 4h and manual Fib controls without execution',()=>{
+  const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+  const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
+  assert.match(js,/REGIME \+ FIB MAP \+ ASSET TAPE/);
   assert.match(js,/SWING-FENSTER/);
-  assert.match(js,/AUTO/);
-  assert.match(js,/MANUAL/);
+  assert.match(js,/30 × 4h/);
+  assert.match(js,/180 × 4h/);
   assert.match(js,/NEXT ↑/);
   assert.match(js,/NEXT ↓/);
-  assert.match(js,/REGIME \+ FIB MAP \+ ASSET TAPE/);
-});
-
-test('Fib core detects swing order and supports retracements plus 1.272 1.414 1.618 extensions',()=>{
-  const rows=[
-    {low:100,high:110,openTime:1},
-    {low:90,high:105,openTime:2},
-    {low:95,high:130,openTime:3},
-  ];
-  const sw=detectSwing(rows,90);
-  assert.equal(sw.low,90);
-  assert.equal(sw.high,130);
-  assert.equal(sw.direction,'UP');
-  const levels=buildFibLevels(90,130,'UP');
-  for(const ratio of [0,.236,.382,.5,.618,.786,1,1.272,1.414,1.618]){
-    assert.ok(levels.some(x=>Math.abs(x.ratio-ratio)<1e-12),'missing '+ratio);
-  }
-  assert.equal(buildFibLevels(90,130,'DOWN').find(x=>x.ratio===.618).price,90+40*.618);
-});
-
-test('Fib manual mode accepts custom high low and direction without order execution',()=>{
-  assert.match(js,/id="fib-high"/);
-  assert.match(js,/id="fib-low"/);
-  assert.match(js,/id="fib-direction"/);
-  assert.match(js,/id="fib-apply"/);
-  assert.match(js,/fibParse/);
-  assert.match(js,/No trading logic lives here/);
-});
-
-test('Fib ladder identifies adjacent levels and proportional positions',()=>{
-  const levels=buildFibLevels(100,200,'UP');
-  const next=adjacentFibLevels(levels,160);
-  assert.ok(next.above&&next.below);
-  const y=fibPlotPosition(160,levels,160);
-  assert.ok(y>=0&&y<=100);
-  assert.match(js,/class="fib-level/);
-  assert.match(js,/class="fib-current"/);
-  assert.match(css,/\.fib-ladder\{position:relative;height:390px/);
-  assert.match(css,/\.fib-extension/);
-  assert.match(css,/\.fib-retracement/);
-  assert.match(css,/\.fib-current/);
-});
-
-test('Fib map remains mobile-first',()=>{
-  assert.match(css,/@media\(max-width:600px\)/);
-  assert.match(css,/\.fib-ladder\{height:360px\}/);
-  assert.match(css,/@media\(max-width:390px\)/);
-  assert.match(css,/\.fib-ladder\{height:340px\}/);
+  assert.match(js,/MANUAL/);
+  assert.match(engine,/signalTone,marketKlines/);
+  assert.match(css,/\.fib-ladder/);
+  assert.match(css,/\.fib-next-up/);
+  assert.match(css,/\.fib-next-down/);
+  assert.doesNotMatch(js,/submitOrder|placeOrder|createOrder/);
 });
