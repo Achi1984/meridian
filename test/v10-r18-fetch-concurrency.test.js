@@ -34,11 +34,13 @@ test('r18 v10 refresh uses data events instead of replacing current DOM every sy
   assert.doesNotMatch(syncBlock,/go\(current\)/);
 });
 
-test('r18 immediately resyncs after iOS resume or network reconnect',()=>{
-  assert.match(v9,/function refreshNow\(\)/);
+test('r18+ immediately resyncs sequentially after iOS resume or network reconnect',()=>{
+  assert.match(v9,/async function refreshNow\(\)/);
+  assert.match(v9,/await sync\(\)/);
+  assert.match(v9,/await syncIntel\(\)/);
   assert.match(v9,/visibilitychange/);
   assert.match(v9,/document\.visibilityState==='visible'/);
-  assert.match(v9,/window\.addEventListener\('online',refreshNow\)/);
+  assert.match(v9,/window\.addEventListener\('online',\(\)=>\{void refreshNow\(\)\}\)/);
 });
 
 test('r18 gateway kills stalled internal proxy requests',()=>{
