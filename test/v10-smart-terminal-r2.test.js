@@ -33,11 +33,11 @@ test('v10 safety/data guard pre-empts trading statuses',()=>{
   for(const label of ['LIQ RISK','RISK REVIEW','PROFIT LOCK','WATCH PROFIT','HOLD'])assert.match(fn,new RegExp(label));
 });
 
-test('v10 renders one actionable asset card for long plus short and hides reference bots',()=>{
+test('v10 renders actionable pair cards only from fresh private rows and keeps reference bots separate',()=>{
   assert.match(js,/function pairCard/);
-  assert.match(js,/function pairCard/);
-  assert.match(js,/Referenzbots bleiben aus dieser Ansicht entfernt/);
-  assert.match(js,/KEINE BESTÄTIGTEN BOT-ROWS/);
+  assert.match(js,/KEINE FRISCHEN BOT-ROWS/);
+  assert.match(js,/Live-Aktionskarten bleiben gesperrt/);
+  assert.match(js,/ASSET WATCH SNAPSHOT/);
   assert.match(js,/private API-Row ist UNVERIFIED und aus Actions ausgeschlossen/);
 });
 
@@ -86,8 +86,9 @@ test('v10 blocked-live command collapses legacy risk clutter and fixes private m
 
 test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
   assert.match(js,/function snapshotDetails/);
-  assert.match(js,/REFERENCE SNAPSHOTS/);
-  assert.match(js,/Nur Ansicht · keine Risk-\/Next-Action-Ableitung/);
+  assert.match(js,/ASSET WATCH SNAPSHOT/);
+  assert.match(js,/Nur Referenz, solange BOT API nicht frisch ist/);
+  assert.match(js,/keine Risk-\/Next-Action-Ableitung/);
   assert.match(css,/\.v10-snapshot-details/);
 });
 
