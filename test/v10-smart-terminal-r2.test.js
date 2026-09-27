@@ -118,11 +118,13 @@ test('v10 r9 scanner ranks confirmed setups before raw pressure',()=>{
   assert.match(js,/TOP SETUPS/);
 });
 
-test('v10 r9 lab is a compact research hub over the existing paired backtest',()=>{
+test('v10 r9 lab separates SK research from the retained paired Profit Lock backtest',()=>{
   assert.match(js,/RESEARCH HUB/);
-  assert.match(js,/ACTIVE LAB/);
-  assert.match(js,/PAIRED TEST/);
-  assert.match(js,/METHODIK & WARUM/);
-  assert.match(js,/\$\$\('\.card',view\)\.find/);
+  assert.match(js,/ACTIVE LABS/);
+  assert.match(js,/SK SYSTEM LAB/);
+  assert.match(js,/PROFIT LOCK LAB/);
+  assert.match(js,/Paired Exit-Policy Test/);
+  assert.match(js,/profit-lock-module/);
   assert.match(css,/\.lab-overview/);
+  assert.match(css,/\.research-module/);
 });
