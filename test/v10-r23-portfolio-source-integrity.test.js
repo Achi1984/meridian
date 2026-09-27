@@ -12,7 +12,9 @@ test('r23 COMMAND consumes canonical private Pionex equity snapshot',()=>{
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
-  assert.match(block,/pionex=privatePionex\.found\?privatePionex\.value:state\.manual\.pionex/);
+  assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
+  assert.match(block,/canonicalInput=privatePionex\.found\?d:.*pionexEquityUsd:state\.manual\.pionex/s);
+  assert.match(block,/pionex=snapshot\.tradingUsd/);
   assert.match(block,/pionexSource:privatePionex\.found\?'PRIVATE_PORTFOLIO_SNAPSHOT':'SCREENSHOT_TOTAL'/);
   assert.match(block,/pionexProvenance:privatePionex\.found\?privatePionex\.source:'FALLBACK_SCREENSHOT'/);
 });
