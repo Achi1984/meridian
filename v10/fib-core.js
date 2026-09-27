@@ -1,10 +1,9 @@
-export const RETRACEMENTS=[0,0.236,0.382,0.5,0.559,0.618,0.667,0.786,0.882,1];
-export const EXTENSIONS=[1.272,1.414,1.618,1.809,2];
-export const SK_CORRECTION=[0.5,0.559,0.618,0.667];
-export const SK_TARGET=[1.618,1.809,2];
+export const RETRACEMENTS=[0,0.236,0.382,0.5,0.559,0.618,0.667,0.786,1];
+export const EXTENSIONS=[1.272,1.414,1.618,2];
 
 const finite=n=>Number.isFinite(Number(n));
 const n=v=>Number(v);
+const normZone=(a,b,meta={})=>({low:Math.min(n(a),n(b)),high:Math.max(n(a),n(b)),...meta});
 
 export function detectSwing(rows,windowSize=90){
   const clean=(Array.isArray(rows)?rows:[]).filter(r=>finite(r?.high)&&finite(r?.low));
@@ -21,22 +20,6 @@ export function detectSwing(rows,windowSize=90){
   return{low,high,lowIndex,highIndex,lowTime,highTime,direction:lowIndex<highIndex?'UP':'DOWN',bars:slice.length};
 }
 
-export function detectOpposingChildSwing(rows,parent,windowSize=90){
-  if(!parent)return null;
-  const clean=(Array.isArray(rows)?rows:[]).filter(r=>finite(r?.high)&&finite(r?.low));
-  const win=Math.max(10,Math.min(Number(windowSize)||90,clean.length));
-  const slice=clean.slice(-win);
-  const endIndex=parent.direction==='UP'?parent.highIndex:parent.lowIndex;
-  const tail=slice.slice(Math.max(0,endIndex));
-  if(tail.length<4)return null;
-  try{
-    const child=detectSwing(tail,tail.length);
-    const expected=parent.direction==='UP'?'DOWN':'UP';
-    if(child.direction!==expected)return null;
-    return child;
-  }catch{return null}
-}
-
 export function buildFibLevels(lowInput,highInput,direction='UP'){
   const low=n(lowInput),high=n(highInput),dir=String(direction||'UP').toUpperCase();
   if(!finite(low)||!finite(high)||!(high>low))throw new Error('Swing High muss über Swing Low liegen');
@@ -46,64 +29,60 @@ export function buildFibLevels(lowInput,highInput,direction='UP'){
     ratio:r,
     label:r===0?'0.000':r===1?'1.000':r.toFixed(3),
     kind:'retracement',
-    skCorrection:SK_CORRECTION.includes(r),
     price:dir==='UP'?high-span*r:low+span*r
   }));
   const ext=EXTENSIONS.map(r=>({
     ratio:r,
     label:'EXT '+r.toFixed(3),
     kind:'extension',
-    skTarget:SK_TARGET.includes(r),
     price:dir==='UP'?high+span*(r-1):low-span*(r-1)
   }));
   return [...retrace,...ext].sort((a,b)=>b.price-a.price);
 }
 
-export function zoneForRatios(levels,ratios,label,side,kind){
-  const rows=ratios.map(r=>(Array.isArray(levels)?levels:[]).find(x=>Math.abs(x.ratio-r)<1e-9)).filter(Boolean);
-  if(!rows.length)return null;
-  const prices=rows.map(x=>n(x.price)).filter(finite);
-  if(!prices.length)return null;
-  return{label,side,kind,low:Math.min(...prices),high:Math.max(...prices),levels:rows};
-}
-
-export function skCorrectionZone(low,high,direction){
-  const dir=String(direction).toUpperCase(),levels=buildFibLevels(low,high,dir);
-  return zoneForRatios(levels,SK_CORRECTION,dir==='UP'?'BULLISH TRENDWENDE':'BEARISH TRENDWENDE',dir==='UP'?'LONG':'SHORT','correction');
-}
-
-export function skTargetZone(low,high,direction){
-  const dir=String(direction).toUpperCase(),levels=buildFibLevels(low,high,dir);
-  return zoneForRatios(levels,SK_TARGET,dir==='UP'?'BULLISH TARGET':'BEARISH TARGET',dir==='UP'?'LONG':'SHORT','target');
-}
-
-export function skLongShortZones(low,high){
-  return{
-    long:skCorrectionZone(low,high,'UP'),
-    short:skCorrectionZone(low,high,'DOWN')
-  };
+export function buildSkZones(lowInput,highInput,direction='UP'){
+  const low=n(lowInput),high=n(highInput),dir=String(direction||'UP').toUpperCase();
+  if(!finite(low)||!finite(high)||!(high>low))throw new Error('Ungültige SK Swing-Spanne');
+  const span=high-low;
+  const bullTurn=normZone(high-span*.667,high-span*.5,{key:'BULL_TURN',side:'LONG',label:'BULL TURN',basis:'KL 0.500–0.667'});
+  const bearTurn=normZone(low+span*.5,low+span*.667,{key:'BEAR_TURN',side:'SHORT',label:'BEAR TURN',basis:'KL 0.500–0.667'});
+  const bullTarget=normZone(high+span*.618,high+span,{key:'BULL_TARGET',side:'SHORT_WATCH',label:'UP TARGET',basis:'EXT 1.618–2.000'});
+  const bearTarget=normZone(low-span,low-span*.618,{key:'BEAR_TARGET',side:'LONG_WATCH',label:'DOWN TARGET',basis:'EXT 1.618–2.000'});
+  const activeTurn=dir==='UP'?bullTurn:bearTurn,activeTarget=dir==='UP'?bullTarget:bearTarget;
+  return{bullTurn,bearTurn,bullTarget,bearTarget,activeTurn,activeTarget,direction:dir};
 }
 
 export function zoneOverlap(a,b){
   if(!a||!b)return null;
   const low=Math.max(n(a.low),n(b.low)),high=Math.min(n(a.high),n(b.high));
-  if(!(high>=low))return null;
-  const width=Math.max(0,high-low),small=Math.max(1e-12,Math.min(n(a.high)-n(a.low),n(b.high)-n(b.low)));
-  return{low,high,width,overlapPct:width/small*100};
+  if(!(high>low))return null;
+  const width=high-low,den=Math.max(1e-12,Math.min(n(a.high)-n(a.low),n(b.high)-n(b.low)));
+  return{low,high,width,coverage:width/den};
 }
 
-export function skDoubleAdvantage(parent,child){
-  if(!parent||!child)return{candidate:false,side:null,parentZone:null,childTarget:null,overlap:null};
-  const parentZone=skCorrectionZone(parent.low,parent.high,parent.direction);
-  const childTarget=skTargetZone(child.low,child.high,child.direction);
-  const overlap=zoneOverlap(parentZone,childTarget);
-  const opposing=(parent.direction==='UP'&&child.direction==='DOWN')||(parent.direction==='DOWN'&&child.direction==='UP');
-  return{
-    candidate:!!(opposing&&overlap),
-    side:parent.direction==='UP'?'LONG':'SHORT',
-    parentZone,childTarget,overlap,
-    label:opposing&&overlap?'DOPPELTER VORTEIL · KANDIDAT':'KEIN DOPPELTER VORTEIL'
-  };
+export function buildSkConfluences(primary,contexts=[]){
+  if(!primary)return[];
+  const p=buildSkZones(primary.low,primary.high,primary.direction);
+  const out=[];
+  for(const c of Array.isArray(contexts)?contexts:[]){
+    if(!c||!(n(c.high)>n(c.low)))continue;
+    const distinct=Math.abs(n(c.low)-n(primary.low))/Math.max(n(primary.low),1e-9)>.0025||
+      Math.abs(n(c.high)-n(primary.high))/Math.max(n(primary.high),1e-9)>.0025;
+    if(!distinct)continue;
+    const z=buildSkZones(c.low,c.high,c.direction);
+    const checks=[
+      ['BULL',p.bullTurn,z.bullTurn,'KL × KL'],
+      ['BULL',p.bullTurn,z.bearTarget,'KL × OPP TARGET'],
+      ['BEAR',p.bearTurn,z.bearTurn,'KL × KL'],
+      ['BEAR',p.bearTurn,z.bullTarget,'KL × OPP TARGET']
+    ];
+    for(const [side,a,b,type] of checks){
+      const ov=zoneOverlap(a,b);
+      if(!ov||ov.coverage<.15)continue;
+      out.push({...ov,side,type,contextWindow:c.window??null,contextDirection:c.direction,contextLow:c.low,contextHigh:c.high});
+    }
+  }
+  return out.sort((a,b)=>b.coverage-a.coverage||b.width-a.width);
 }
 
 export function adjacentFibLevels(levels,currentInput){
