@@ -206,7 +206,12 @@ function proxy(req,res,origin){
     res.writeHead(up.statusCode||502,h);
     up.pipe(res);
   });
-  p.on("error",e=>writeJson(res,502,{error:"upstream_unavailable",detail:String(e.message||e)},origin||""));
+  p.setTimeout(15000,()=>p.destroy(new Error("upstream_timeout")));
+  p.on("error",e=>{
+    if(res.headersSent){res.destroy();return}
+    const timeout=String(e?.message||e)==="upstream_timeout";
+    writeJson(res,timeout?504:502,{error:timeout?"upstream_timeout":"upstream_unavailable"},origin||"");
+  });
   req.pipe(p);
 }
 
