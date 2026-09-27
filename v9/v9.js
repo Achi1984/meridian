@@ -3,7 +3,7 @@ if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r15');
+    qs.set('build','r16');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -67,7 +67,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,unmatchedLive:[],botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,unmatchedLive:[],matchAmbiguous:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
@@ -113,7 +113,7 @@ const verifiedPionexTotal=state.manual.pionex;
 const apiLooksLikeAccountTotal=apiPionex!=null&&apiPionex>=verifiedPionexTotal*.8;
 const pionex=apiLooksLikeAccountTotal?apiPionex:verifiedPionexTotal;
 const bitpanda=0,ledger=state.manual.ledger,okx=okxKnownBotEquity()??state.manual.okx;const total=pionex+ledger+okx;return{total,pionex,bitpanda,ledger,okx,botCapital:allBotsHaveCapital?botCapital:null,pionexComplete:true,pionexSource:apiLooksLikeAccountTotal?'PRIVATE_ACCOUNT_TOTAL':'SCREENSHOT_TOTAL',bitpandaSource:'REMOVED'}}
-function pick(b,keys){for(const k of keys){const v=num(b?.[k]);if(v!=null)return v}return null}function normalizeLive(b){const nested=b?.bot||b?.position||b?.data||{},x={...nested,...b},investUsd=pick(x,['investmentUsd','investmentUSDT','investmentUsdt','usdtInvestment','investedUsd','investment_usdt']),investAny=investUsd??pick(x,['invest','investment','invested','invested_amount','initialInvestment','initial_investment']);return{id:String(x.id||x.botId||x.bot_id||x.name||x.symbol||'BOT'),symbol:String(x.symbol||x.asset||x.baseAsset||x.base_asset||'').replace(/[-_/]?(USDT|USDC|USD)$/,'').replace(/\.PERP$/,'').toUpperCase(),leverage:pick(x,['leverage','leverageX','leverage_x']),lower:pick(x,['lower','lowerRange','rangeLower','lowerPrice','lower_price','minPrice','min_price']),upper:pick(x,['upper','upperRange','rangeUpper','upperPrice','upper_price','maxPrice','max_price']),be:pick(x,['be','breakEvenPrice','breakevenPrice','break_even_price','avgEntryPrice','averageEntryPrice','breakEven','break_even','entryPrice','entry_price']),liq:pick(x,['liq','pionexLiquidationPrice','liquidationPrice','liqPrice','liquidation_price']),tp:pick(x,['tp','takeProfit','tpPrice','take_profit_price']),sl:pick(x,['sl','stopLoss','stopLossPrice','lossStop','stop_loss_price']),price:pick(x,['price','currentPrice','markPrice','lastPrice','mark_price','last_price']),buffer:pick(x,['buffer','pionexLiqBufferPct','liqBufferPct','liquidationDistancePct']),pnl:pick(x,['pnl','totalProfitUsd','totalProfitUSDT','totalProfitUsdt','total_profit_usdt','pnlUsd','unrealizedPnlUsd','unrealizedPnl','unrealized_profit','totalProfit','total_profit','profit']),invest:investAny,investUsd,profitPct:pick(x,['profitPct','totalProfitPct','pnlPct','total_profit_pct','profit_rate','profitRate']),side:String(x.side||x.direction||x.positionSide||'LONG').toUpperCase()}}
+function pick(b,keys){for(const k of keys){const v=num(b?.[k]);if(v!=null)return v}return null}function normalizeLive(b){const nested=b?.bot||b?.position||b?.data||{},x={...nested,...b},investUsd=pick(x,['investmentUsd','investmentUSDT','investmentUsdt','usdtInvestment','investedUsd','investment_usdt']),investAny=investUsd??pick(x,['invest','investment','invested','invested_amount','initialInvestment','initial_investment']);return{id:String(x.id||x.botId||x.bot_id||x.name||x.symbol||'BOT'),symbol:String(x.symbol||x.asset||x.baseAsset||x.base_asset||'').replace(/[-_/]?(USDT|USDC|USD)$/,'').replace(/\.PERP$/,'').toUpperCase(),leverage:pick(x,['leverage','leverageX','leverage_x']),lower:pick(x,['lower','lowerRange','rangeLower','lowerPrice','lower_price','minPrice','min_price']),upper:pick(x,['upper','upperRange','rangeUpper','upperPrice','upper_price','maxPrice','max_price']),be:pick(x,['be','breakEvenPrice','breakevenPrice','break_even_price','avgEntryPrice','averageEntryPrice','breakEven','break_even','entryPrice','entry_price','positionOpenPrice','position_open_price']),liq:pick(x,['liq','pionexLiquidationPrice','liquidationPrice','liqPrice','liquidation_price']),tp:pick(x,['tp','takeProfit','tpPrice','take_profit_price']),sl:pick(x,['sl','stopLoss','stopLossPrice','lossStop','stop_loss_price']),price:pick(x,['price','currentPrice','markPrice','lastPrice','mark_price','last_price']),buffer:pick(x,['buffer','pionexLiqBufferPct','liqBufferPct','liquidationDistancePct']),pnl:pick(x,['pnl','totalProfitUsd','totalProfitUSDT','totalProfitUsdt','total_profit_usdt','pnlUsd','unrealizedPnlUsd','unrealizedPnl','unrealized_profit','totalProfit','total_profit','profit']),invest:investAny,investUsd,profitPct:pick(x,['profitPct','totalProfitPct','pnlPct','total_profit_pct','profit_rate','profitRate']),side:String(x.side||x.direction||x.positionSide||'LONG').toUpperCase()}}
 function relDiff(a,b){a=num(a);b=num(b);if(!(a>0&&b>0))return null;return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-12)}
 function botMatchScore(ref,x){
   if(x.symbol!==ref.symbol||x.side!==(ref.side||'LONG'))return 1e9;
@@ -124,28 +124,48 @@ function botMatchScore(ref,x){
   }
   return score+(signals?0:500);
 }
+const MATCH_MAX_SCORE=4,MATCH_MIN_GAP=.05;
+function botMatchEvidence(ref,x){
+  const score=botMatchScore(ref,x);if(!(score<1e9))return null;
+  const levExact=x.leverage!=null&&x.leverage===ref.leverage;
+  const structural=['lower','upper','be','liq'].filter(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
+  const strong=score<=MATCH_MAX_SCORE&&((levExact&&structural.length>=1)||structural.length>=2);
+  return{score,levExact,structural,strong};
+}
 function mergeReference(live){
-  const used=new Set,refs=FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'})),matches=[];
+  const used=new Set,refs=FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'})),candidates=[];
   for(let ri=0;ri<refs.length;ri++)for(let li=0;li<live.length;li++){
-    const score=botMatchScore(refs[ri],live[li]);if(score<1e9)matches.push({ri,li,score});
+    const ev=botMatchEvidence(refs[ri],live[li]);if(ev?.strong)candidates.push({ri,li,...ev});
   }
-  matches.sort((a,b)=>a.score-b.score);
+  const byLive=new Map,byRef=new Map;
+  for(const c of candidates){
+    if(!byLive.has(c.li))byLive.set(c.li,[]);byLive.get(c.li).push(c);
+    if(!byRef.has(c.ri))byRef.set(c.ri,[]);byRef.get(c.ri).push(c);
+  }
+  for(const rows of byLive.values())rows.sort((a,b)=>a.score-b.score);
+  for(const rows of byRef.values())rows.sort((a,b)=>a.score-b.score);
+  const accepted=[];
+  for(const c of candidates){
+    const l=byLive.get(c.li)||[],r=byRef.get(c.ri)||[];
+    if(l[0]!==c||r[0]!==c)continue;
+    const liveGap=l[1]?l[1].score-c.score:Infinity,refGap=r[1]?r[1].score-c.score:Infinity;
+    if(liveGap<MATCH_MIN_GAP||refGap<MATCH_MIN_GAP)continue;
+    accepted.push({...c,liveGap,refGap});
+  }
+  accepted.sort((a,b)=>a.score-b.score);
   const refUsed=new Set;
-  for(const m of matches){
+  for(const m of accepted){
     if(refUsed.has(m.ri)||used.has(m.li))continue;
     const ref=refs[m.ri],x=live[m.li];
-    /* Reject weak duplicate-coin guesses: live row must agree on leverage or a structural field. */
-    const levOk=x.leverage!=null&&x.leverage===ref.leverage;
-    const structureOk=['lower','upper','tp','be'].some(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
-    if(!levOk&&!structureOk)continue;
-    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),sl:num(x.sl),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),investUsd:num(x.investUsd),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveInvestUsd:num(x.investUsd)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_liveSl:num(x.sl)>0,_source:'LIVE_MATCH'};
+    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),sl:num(x.sl),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),investUsd:num(x.investUsd),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveInvestUsd:num(x.investUsd)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_liveSl:num(x.sl)>0,_matchScore:m.score,_matchLiveGap:m.liveGap,_matchRefGap:m.refGap,_matchEvidence:m.structural.join('+')+(m.levExact?'+LEV':''),_source:'LIVE_MATCH'};
     refUsed.add(m.ri);used.add(m.li);
   }
-  /* Dashboard is intentionally pinned to the latest verified Asset Watch COIN-M roster.
-     Unmatched API rows are often stale/partial bot records and must not create phantom cards.
-     Live values are allowed to enrich a verified reference bot only after a confident match. */
-  /* Never promote unmatched API rows into the active roster. */
-  state.unmatchedLive=live.filter((_,i)=>!used.has(i)).map(x=>({symbol:x.symbol||'?',side:x.side||'?',leverage:x.leverage,id:x.id||'?',hasPnl:num(x.pnl)!=null||num(x.profitPct)!=null,hasInvest:num(x.invest)!=null}));
+  state.unmatchedLive=live.map((x,i)=>{
+    if(used.has(i))return null;
+    const rows=byLive.get(i)||[],ambiguous=rows.length>1&&(rows[1].score-rows[0].score)<MATCH_MIN_GAP;
+    return{symbol:x.symbol||'?',side:x.side||'?',leverage:x.leverage,id:x.id||'?',hasPnl:num(x.pnl)!=null||num(x.profitPct)!=null,hasInvestUsd:num(x.investUsd)!=null,reason:ambiguous?'AMBIGUOUS_MATCH':'NO_CONFIDENT_MATCH'};
+  }).filter(Boolean);
+  state.matchAmbiguous=state.unmatchedLive.filter(x=>x.reason==='AMBIGUOUS_MATCH').length;
   return refs;
 }
 
@@ -434,7 +454,7 @@ function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classLi
 async function sync(){try{
  const payload=await getJson('/api/private/dashboard'),d=payload?.data||payload,live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];
  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
- if(!live.length)state.unmatchedLive=[];
+ if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;}
  state.liveRows=live.length;
  state.botApiRows=num(d?.pionexRisk?.apiRows)??live.length;
  state.pionexBotSync=d?.pionexBotSync||null;

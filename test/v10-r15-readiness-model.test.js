@@ -48,15 +48,14 @@ test('r15 mobile layouts account for expanded readiness fields',()=>{
   assert.match(css,/@media\(max-width:430px\)/);
 });
 
-test('r15 release identity is consistent across production and legacy entrypoints',()=>{
-  assert.equal(version.terminalBuild,'10.0-r15');
-  assert.match(shell,/10\.0-r15/);
-  assert.match(root,/build=r15/);
-  assert.match(v9html,/p\.set\('build','r15'\)/);
-  assert.match(v9,/qs\.set\('build','r15'\)/);
-  assert.match(js,/const BUILD='10\.0-r15'/);
-  assert.doesNotMatch(root,/build=r14/);
-  assert.doesNotMatch(v9html,/build','r13/);
+test('r15+ release identity stays consistent across production and legacy entrypoints',()=>{
+  const build=String(version.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.match(build,/^10\.0-r\d+$/);
+  assert.ok(shell.includes(build));
+  assert.ok(root.includes('build='+rev));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(js.includes("const BUILD='"+build+"'"));
 });
 
 test('r15 browser adapter remains syntactically valid',()=>{

@@ -21,7 +21,7 @@ test('r18 diagnostics reveal whether the backend or matcher is the bottleneck',(
   assert.match(js,/UNMATCHED/);
   assert.match(js,/(Backend liefert aktuell nur|Bot-Feed liefert aktuell)/);
   assert.match(js,/Bot-Rows nicht gematcht/);
-  assert.match(js,/state\.unmatchedLive=live\.filter/);
+  assert.match(js,/state\.unmatchedLive=live\.(?:filter|map)/);
 });
 
 test('r18 prevents stale snapshot data from driving risk and exposure actions',()=>{
