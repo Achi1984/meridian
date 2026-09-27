@@ -733,5 +733,6 @@ function decorate(){
   renderCommand();renderBots();renderMarket();renderScanner();renderLab();renderSystemHeader();decorateA11y();
 }
 let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;decorate();});};
+window.addEventListener('meridian:data',schedule);
 new MutationObserver(schedule).observe($('#app')||document.body,{childList:true,subtree:true});
 decorate();
