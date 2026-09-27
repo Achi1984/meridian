@@ -157,7 +157,7 @@ function tradeRecord(seq){
     sequenceId:seq.id,side:seq.side,state:seq.state,zero:seq.zero,a:seq.a,gate:seq.gate,
     longShortZone:skLongShortZones(Math.min(seq.zero,seq.a),Math.max(seq.zero,seq.a)),
     targetZone:skTargetZone(Math.min(seq.zero,seq.a),Math.max(seq.zero,seq.a),seq.side==='LONG'?'UP':'DOWN'),
-    doubleAdvantage:!!seq.doubleAdvantage?.candidate,doubleAdvantageAt:seq.doubleAdvantage?.detectedAt??null,doubleAdvantageBeforeEntry:!!(seq.doubleAdvantage?.candidate&&seq.doubleAdvantage?.detectedAt!=null&&p.openedAt!=null&&seq.doubleAdvantage.detectedAt<=p.openedAt),doubleAdvantageOverlap:seq.doubleAdvantage?.overlap||null,
+    doubleAdvantage:!!seq.doubleAdvantage?.candidate,doubleAdvantageAt:seq.doubleAdvantage?.detectedAt??null,doubleAdvantageBeforeEntry:!!(seq.doubleAdvantage?.candidate&&seq.doubleAdvantage?.detectedAt!=null&&p.openedAt!=null&&seq.doubleAdvantage.detectedAt<p.openedAt),doubleAdvantageOverlap:seq.doubleAdvantage?.overlap||null,
     openedAt:p.openedAt,closedAt:p.closedAt,exitReason:p.exitReason,avgEntry:round(p.avgEntry),qty:round(p.initialQty,8),
     entryRatios:seq.entries.filter(x=>x.filled).map(x=>x.ratio),targetRatios:p.targetHits.map(x=>x.ratio),
     fees:round(p.fees),realizedPnl:round(p.realizedPnl),tranches:clone(p.tranches)
