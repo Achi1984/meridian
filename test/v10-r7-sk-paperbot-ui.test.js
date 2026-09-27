@@ -28,7 +28,7 @@ test('SK V1 uses paged historical 4h bridge instead of live private bot data',()
 
 test('SK V1 UI reports state, costs, double advantage and chronological windows',()=>{
   for(const token of ['CURRENT STATE','DOUBLE ADV','5 ZEITFENSTER','Gebühren + Slippage aktiv','Doppelter Vorteil wird gemessen']){
-    assert.match(js,new RegExp(token));
+    assert.ok(js.includes(token),`missing UI token: ${token}`);
   }
   assert.match(css,/\.sk-paper-shell/);
   assert.match(css,/\.sk-window-grid/);
