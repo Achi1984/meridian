@@ -7,10 +7,10 @@ const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8').replac
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8').replaceAll('\r\n','\n');
 const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 
-test('v10 r3 keeps validated v9 engine and isolated adapter',()=>{
-  assert.match(html,/10\.0-r3/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r3/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r3/);
+test('v10 r4 keeps validated v9 engine and isolated adapter',()=>{
+  assert.match(html,/10\.0-r4/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r4/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r4/);
   assert.match(js,/No trading logic lives here/);
   assert.match(engine,/MERIDIAN_V10_BRIDGE/);
 });
