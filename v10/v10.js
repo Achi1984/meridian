@@ -1,11 +1,13 @@
-// MERIDIAN v10 r5 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r6';
+// MERIDIAN v10 r6 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r5';
+const BUILD='10.0-r6';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
 const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
+const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -61,7 +63,7 @@ function exposure(rows,side){
 function marketPrice(symbol){
   const s=S(),h=H(),c=s?.priceChecks?.[symbol],vals=c?.verified?[Number(c.okx),Number(c.binance)].filter(x=>x>0):[];
   if(vals.length===2)return{value:(vals[0]+vals[1])/2,source:'OKX + BINANCE',verified:true,spread:Number(c.spreadPct)||0};
-  const p=Number(s?.assetIntel?.[symbol]?.price);
+  const p=Number(s?.assetIntel?.[symbol]?.price??(symbol==='BTC'?s?.intel?.price:null));
   return{value:p>0?p:null,source:p>0?'MARKET FEED':'UNVERIFIED',verified:false,spread:null};
 }
 function legRow(b){
@@ -188,12 +190,132 @@ function btcRegimeLabel(i){
   if(p<e50&&p<e200)return'RISK-OFF / TRANSITION';
   return'NEUTRAL / RANGE';
 }
+
+function fibParse(v){
+  const n=Number(String(v??'').trim().replace(',','.'));return Number.isFinite(n)&&n>0?n:null;
+}
+function fibFmt(v){
+  const n=Number(v);if(!Number.isFinite(n))return'—';
+  const d=Math.abs(n)>=1000?2:Math.abs(n)>=1?4:Math.abs(n)>=.01?5:8;
+  return '$'+new Intl.NumberFormat('de-DE',{maximumFractionDigits:d}).format(n);
+}
+function fibPct(v){
+  const n=Number(v);return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(2)+'%':'—';
+}
+function fibAssets(){
+  return [...new Set(['BTC',...marketUniverse()])];
+}
+function fibManualControls(){
+  const hi=fibUi.manualHigh??fibUi.autoHigh??'',lo=fibUi.manualLow??fibUi.autoLow??'',dir=fibUi.direction==='AUTO'?fibUi.lastDirection:fibUi.direction;
+  return '<div class="fib-manual" id="fib-manual"><label>SWING LOW<input id="fib-low" inputmode="decimal" value="'+lo+'" placeholder="Low"></label><label>SWING HIGH<input id="fib-high" inputmode="decimal" value="'+hi+'" placeholder="High"></label><label>RICHTUNG<select id="fib-direction"><option value="UP" '+(dir==='UP'?'selected':'')+'>UP SWING ↑</option><option value="DOWN" '+(dir==='DOWN'?'selected':'')+'>DOWN SWING ↓</option></select></label><button id="fib-apply" type="button">BERECHNEN</button></div>';
+}
+function fibMapHtml(){
+  const options=fibAssets().map(x=>'<option value="'+x+'" '+(x===fibUi.symbol?'selected':'')+'>'+x+'</option>').join('');
+  return '<section class="fib-map-shell"><div class="fib-head"><div><span>FIB MAP · SK OVERLAY</span><b>RETRACEMENT + TURN AREAS</b><small>Auto-Swing aus öffentlichen 4h-Kerzen · keine Orders</small></div><strong>'+fibUi.symbol+'</strong></div>'+
+  '<div class="fib-controls"><label>ASSET<select id="fib-asset">'+options+'</select></label><label>SWING-FENSTER<select id="fib-window"><option value="30" '+(fibUi.window===30?'selected':'')+'>30 × 4h</option><option value="60" '+(fibUi.window===60?'selected':'')+'>60 × 4h</option><option value="90" '+(fibUi.window===90?'selected':'')+'>90 × 4h</option><option value="180" '+(fibUi.window===180?'selected':'')+'>180 × 4h</option></select></label><div class="fib-mode"><button type="button" data-fib-mode="AUTO" class="'+(fibUi.mode==='AUTO'?'active':'')+'">AUTO</button><button type="button" data-fib-mode="MANUAL" class="'+(fibUi.mode==='MANUAL'?'active':'')+'">MANUAL</button></div></div>'+
+  (fibUi.mode==='MANUAL'?fibManualControls():'')+'<div id="fib-output" class="fib-output"><div class="fib-loading">Fib-Level und SK-Zonen werden geladen …</div></div></section>';
+}
+function fibLevelRow(level,next,current,levels){
+  const top=fibPlotPosition(level.price,levels,current);
+  const up=next.above&&Math.abs(next.above.price-level.price)<1e-12,down=next.below&&Math.abs(next.below.price-level.price)<1e-12;
+  const sk=[.5,.559,.618,.667].some(x=>Math.abs(level.ratio-x)<1e-12),gate=Math.abs(level.ratio-.382)<1e-12;
+  const label=(sk?'SK ':'')+level.label+(gate?' · GATE':'')+(up?' · NEXT ↑':down?' · NEXT ↓':'');
+  return '<div class="fib-level '+(level.kind==='extension'?'fib-extension':'fib-retracement')+' '+(sk?'fib-sk-core ':'')+(up?'fib-next-up ':'')+(down?'fib-next-down':'')+'" style="top:'+top.toFixed(2)+'%"><span>'+label+'</span><i></i><b>'+fibFmt(level.price)+'</b></div>';
+}
+function fibZoneState(zone,current){
+  const c=Number(current);if(!(c>0)||!zone)return'—';
+  if(c>=zone.low&&c<=zone.high)return'IN ZONE';
+  const edge=c<zone.low?zone.low:zone.high,d=Math.abs((edge-c)/c*100);
+  return d.toFixed(2)+'% entfernt';
+}
+function fibZoneBand(zone,levels,current,kind,label,active=false){
+  const y1=fibPlotPosition(zone.high,levels,current),y2=fibPlotPosition(zone.low,levels,current),top=Math.min(y1,y2),height=Math.max(2,Math.abs(y2-y1));
+  return '<div class="fib-zone fib-zone-'+kind+' '+(active?'active':'')+'" style="top:'+top.toFixed(2)+'%;height:'+height.toFixed(2)+'%"><span>'+label+'</span></div>';
+}
+function fibSkCards(low,high,direction,current,doubleAdvantage){
+  const zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction),targetSide=direction==='UP'?'BULLISH TARGET / SHORT WATCH':'BEARISH TARGET / LONG WATCH';
+  const da=doubleAdvantage?.candidate
+    ?'<div class="sk-double '+doubleAdvantage.side.toLowerCase()+'"><span>DOPPELTER VORTEIL · '+doubleAdvantage.side+'</span><b>'+fibFmt(doubleAdvantage.overlap.low)+' – '+fibFmt(doubleAdvantage.overlap.high)+'</b><small>Gegen-Ziel ∩ GKL · '+doubleAdvantage.overlap.overlapPct.toFixed(0)+'% Überlappung · Bestätigung über Struktur nötig</small></div>'
+    :'<div class="sk-double muted"><span>DOPPELTER VORTEIL</span><b>—</b><small>Keine bestätigte Gegen-Ziel ∩ GKL Überlappung</small></div>';
+  return '<div class="sk-zone-grid"><div class="sk-zone bull"><span>LONG TRENDWENDE · BULLISH</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear"><span>SHORT TRENDWENDE · BEARISH</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
+}
+function fibResultHtml(model){
+  const {symbol,low,high,direction,current,levels,source,bars,doubleAdvantage=null}=model,next=adjacentFibLevels(levels,current),currentTop=fibPlotPosition(current,levels,current),zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction);
+  const doubleBand=doubleAdvantage?.candidate?fibZoneBand(doubleAdvantage.overlap,levels,current,'double','DOPPELTER VORTEIL',true):'';
+  return '<div class="fib-anchor-row"><div><span>SWING LOW</span><b>'+fibFmt(low)+'</b></div><div><span>SWING HIGH</span><b>'+fibFmt(high)+'</b></div><div><span>CURRENT</span><b>'+fibFmt(current)+'</b></div></div>'+
+  '<div class="fib-next"><div><span>NEXT ↑</span><b>'+(next.above?next.above.label+' · '+fibFmt(next.above.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.above,current))+'</small></div><div><span>NEXT ↓</span><b>'+(next.below?next.below.label+' · '+fibFmt(next.below.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.below,current))+'</small></div></div>'+
+  fibSkCards(low,high,direction,current,doubleAdvantage)+
+  '<div class="fib-meta"><span>'+direction+' SWING</span><span>'+source+(bars?' · '+bars+' Bars':'')+'</span></div>'+
+  '<div class="fib-ladder">'+
+    fibZoneBand(zones.long,levels,current,'long','LONG TRENDWENDE',direction==='UP')+
+    fibZoneBand(zones.short,levels,current,'short','SHORT TRENDWENDE',direction==='DOWN')+
+    fibZoneBand(target,levels,current,'target','1.618–2.000 TARGET',true)+doubleBand+
+    levels.map(x=>fibLevelRow(x,next,current,levels)).join('')+
+    '<div class="fib-current" style="top:'+currentTop.toFixed(2)+'%"><span>CURRENT · '+symbol+'</span><i></i><b>'+fibFmt(current)+'</b></div></div>'+
+  '<div class="fib-legend"><span>GKL: .500 · .559 · .618 · .667</span><span>Targets: 1.618 · 1.809 · 2.000 · Double = Gegen-Ziel ∩ GKL</span></div>';
+}
+async function updateFibMap(view){
+  const out=$('#fib-output',view);if(!out)return;
+  fibUi.symbol=$('#fib-asset',view)?.value||fibUi.symbol;
+  fibUi.window=Number($('#fib-window',view)?.value)||fibUi.window||90;
+  out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
+  try{
+    const fetchRows=H().marketKlines;
+    let rows=null;
+    if(typeof fetchRows==='function'){
+      try{rows=await fetchRows('4h',180,fibUi.symbol)}catch(e){if(fibUi.mode==='AUTO')throw e}
+    }
+    let low,high,direction,bars=0,source='MANUAL';
+    if(fibUi.mode==='AUTO'){
+      if(!rows?.length)throw new Error('4h-Marktdaten-Bridge nicht verfügbar');
+      const sw=detectSwing(rows,fibUi.window);
+      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h · PUBLIC';
+      fibUi.autoLow=low;fibUi.autoHigh=high;fibUi.lastDirection=direction;
+    }else{
+      low=fibParse($('#fib-low',view)?.value??fibUi.manualLow);
+      high=fibParse($('#fib-high',view)?.value??fibUi.manualHigh);
+      direction=$('#fib-direction',view)?.value||fibUi.lastDirection||'UP';
+      fibUi.manualLow=low;fibUi.manualHigh=high;fibUi.direction=direction;
+    }
+    let current=marketPrice(fibUi.symbol).value;
+    if(!(current>0)&&rows?.length)current=Number(rows.at(-1)?.close);
+    if(!(current>0))current=Number(S()?.assetIntel?.[fibUi.symbol]?.price);
+    if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
+    const levels=buildFibLevels(low,high,direction);
+    let doubleAdvantage=null;
+    if(fibUi.mode==='AUTO'&&rows?.length){
+      const parent=detectSwing(rows,fibUi.window),child=detectOpposingChildSwing(rows,parent,fibUi.window);
+      if(child)doubleAdvantage=skDoubleAdvantage(parent,child);
+    }
+    out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
+  }catch(e){
+    out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+String(e?.message||e)+'</small></div>';
+  }
+}
+function refreshFibMap(view){
+  const old=$('.fib-map-shell',view);if(!old)return;
+  old.outerHTML=fibMapHtml();bindFibMap(view);
+}
+function bindFibMap(view){
+  const asset=$('#fib-asset',view),win=$('#fib-window',view);
+  if(asset)asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;refreshFibMap(view)};
+  if(win)win.onchange=()=>{fibUi.window=Number(win.value)||90;if(fibUi.mode==='AUTO')updateFibMap(view)};
+  $$('[data-fib-mode]',view).forEach(btn=>btn.onclick=()=>{
+    const next=btn.dataset.fibMode;
+    if(next==='MANUAL'&&fibUi.mode!=='MANUAL'){fibUi.manualHigh=fibUi.autoHigh;fibUi.manualLow=fibUi.autoLow;fibUi.direction=fibUi.lastDirection}
+    fibUi.mode=next;refreshFibMap(view);
+  });
+  const apply=$('#fib-apply',view);if(apply)apply.onclick=()=>updateFibMap(view);
+  updateFibMap(view);
+}
+
 function renderMarket(){
   const view=$('#view-market');if(!view||$('.v10-market-board',view))return;
   if(!$('.hero',view)&&!$('.grid',view))return;
   const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),age=s?.marketSyncedAt?h.ageText?.(Date.now()-s.marketSyncedAt):'—';
   const btc=i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · market sync '+age+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+i.status+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1)+'</b></div><div><span>RSI 4h / 1D</span><b>'+i.rsi4.toFixed(1)+' · '+i.rsi1d.toFixed(1)+'</b></div><div><span>MACD 1h / 4h</span><b>'+i.macd1h.hist.toFixed(2)+' · '+i.macd4.hist.toFixed(2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+i.near.f.toFixed(3)+' · '+h.money?.(i.near.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="card">BTC Markt-Sync läuft.</section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + FIB MAP + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  bindFibMap(view);
 }
 function scannerCard(symbol){
   const s=S(),i=s?.assetIntel?.[symbol],sig=marketSignal(i),linked=matchedRows(symbol).length>0,fresh=H().botFeedFresh?.();
