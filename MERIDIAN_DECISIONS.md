@@ -267,3 +267,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Fallback:** When canonical private Pionex equity is unavailable, retain the explicit screenshot/manual fallback and label it as a snapshot. Never infer a live account total from bot rows.
 
 **Reason:** The canonical portfolio/history contract already defines Pionex equity through the private portfolio section; using a separate heuristic path made COMMAND capable of disagreeing with persisted portfolio history and overstating source freshness.
+
+
+## D-030 — COMMAND portfolio current value reuses the canonical Spot + Pionex basis
+
+**Decision:** MERIDIAN v10 COMMAND must use the same current valuation basis as DEPOT: non-Pionex holdings valued through the canonical portfolio contract plus canonical Pionex equity. COMMAND must not independently reconstruct the headline total from static Ledger values, screenshot-only OKX DCA bot equity, or other venue subtotals.
+
+**Current-price rule:** Public spot prices are overlaid by downloading the full Binance spot ticker table, preserving the existing privacy rule that holding symbols, quantities and venues are never sent as holding-specific market queries. If that market overlay fails, stale persisted live prices are cleared and the canonical private snapshot fallback is labelled as such.
+
+**History rule:** PostgreSQL canonical history remains the source for historical performance. Its latest point may be compared against current valuation and shown as drift diagnostics, but it does not replace the current canonical total.
+
+**OKX DCA rule:** Screenshot-confirmed OKX Futures DCA equity remains a separate reference subtotal. It is not silently added to the canonical Spot + Pionex total unless the canonical portfolio contract is explicitly extended in a future decision.
+
+**Safety:** This is display/data consistency only. Trading signals, Paper-bot parameters, bot matching, leverage, risk logic and execution paths are unchanged.

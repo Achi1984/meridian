@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r24';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r24';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r24';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r24';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r24';
-// MERIDIAN v10 r24 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r25';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r25';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r25';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r25';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r25';
+// MERIDIAN v10 r25 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r24';
+const BUILD='10.0-r25';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -182,8 +182,8 @@ function snapshotDetails(openByDefault=false){
   return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>27.09.2026 · ca. 19:47–19:52</b><span>'+stamp+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
 }
 function commandDataStrip(){
-  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—';
-  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(mr.tone==='mixed'?'watch':mr.tone)+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing</small></div><div><span>BOT LAYER</span><b class="tone-'+(br.tone==='reference'?'muted':br.tone)+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',ps=s?.portfolio?.source||'INCOMPLETE',portfolioLabel=ps==='CANONICAL_CURRENT'?'CANONICAL CURRENT':ps==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',histDelta=Number(s?.portfolio?.historyDeltaUsd),histText=Number.isFinite(histDelta)?' · HIST Δ '+(h.money?.(histDelta)||histDelta.toFixed(2)):' · HIST Δ —';
+  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(mr.tone==='mixed'?'watch':mr.tone)+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing</small></div><div><span>BOT LAYER</span><b class="tone-'+(br.tone==='reference'?'muted':br.tone)+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>'+portfolioLabel+'</b><small>Spot + Pionex SSOT'+histText+' · OKX DCA Ref separat</small></div></section>';
 }
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');

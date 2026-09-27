@@ -16,11 +16,12 @@ test('r24 canonical holdings are missing-aware',()=>{
 });
 
 test('r24 v9 cache identity follows canonical contract revision',()=>{
-  assert.match(v9,/portfolio-data-contract\.js\?v=10\.0-r24/);
+  assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
 });
 
 test('r24 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r24');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=24);
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
