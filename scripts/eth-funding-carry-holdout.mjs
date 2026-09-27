@@ -1,66 +1,14 @@
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {evaluateEthFundingHoldout,classifyEthFundingHoldout,ETH_FUNDING_HOLDOUT_CONFIG,ETH_FUNDING_HOLDOUT_RULESET} from '../funding-carry-eth-holdout.js';
 
-const SPOT='https://api.binance.com';
-const FUT='https://fapi.binance.com';
-const HOUR=3600000;
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-
-async function json(url){
-  let last;
-  for(let i=0;i<5;i++){
-    try{
-      const r=await fetch(url,{headers:{'user-agent':'ACHI-MERIDIAN-ETH-HOLDOUT/1'}});
-      if(!r.ok)throw new Error(`HTTP ${r.status} ${url}`);
-      return await r.json();
-    }catch(e){
-      last=e;
-      await sleep(500*2**i);
-    }
-  }
-  throw last;
+const INPUT=process.env.ETH_HOLDOUT_INPUT||'/tmp/meridian-eth-holdout-input.json';
+if(!fs.existsSync(INPUT)){
+  execFileSync('python3',['scripts/collect-eth-funding-holdout.py'],{stdio:'inherit',env:{...process.env,ETH_HOLDOUT_INPUT:INPUT}});
 }
-
-async function boundary(base,symbol,t){
-  const path=base===SPOT?'api/v3':'fapi/v1';
-  const start=t-12*HOUR,end=t+HOUR;
-  const rows=await json(`${base}/${path}/klines?symbol=${symbol}&interval=1h&startTime=${start}&endTime=${end}&limit=32`);
-  return (Array.isArray(rows)?rows:[]).map(k=>({ts:+k[6],close:+k[4]})).filter(x=>Number.isFinite(x.ts)&&x.close>0);
-}
-
-async function funding(symbol,start,end){
-  const out=[];let cursor=start+1;
-  while(cursor<=end){
-    const rows=await json(`${FUT}/fapi/v1/fundingRate?symbol=${symbol}&startTime=${cursor}&endTime=${end}&limit=1000`);
-    if(!Array.isArray(rows)||!rows.length)break;
-    for(const x of rows)out.push({ts:+x.fundingTime,rate:+x.fundingRate,markPrice:+x.markPrice});
-    const last=+rows.at(-1).fundingTime,next=last+1;
-    if(!(next>cursor))break;
-    cursor=next;
-    if(rows.length<1000)break;
-    await sleep(120);
-  }
-  return [...new Map(out.map(x=>[x.ts,x])).values()].sort((a,b)=>a.ts-b.ts);
-}
-
-const SYMBOL=ETH_FUNDING_HOLDOUT_CONFIG.symbol;
-const boundaries=[
-  Date.UTC(2024,0,1),
-  Date.UTC(2025,0,1),
-  Date.UTC(2026,0,1),
-  Date.UTC(2026,5,1)
-];
-const [fundingRows,...boundarySets]=await Promise.all([
-  funding(SYMBOL,ETH_FUNDING_HOLDOUT_CONFIG.start,ETH_FUNDING_HOLDOUT_CONFIG.end),
-  ...boundaries.flatMap(t=>[boundary(SPOT,SYMBOL,t),boundary(FUT,SYMBOL,t)])
-]);
-const spot=[],perp=[];
-for(let i=0;i<boundaries.length;i++){
-  spot.push(...boundarySets[i*2]);
-  perp.push(...boundarySets[i*2+1]);
-}
-const dedupe=a=>[...new Map(a.map(x=>[x.ts,x])).values()].sort((a,b)=>a.ts-b.ts);
-const market={spot:dedupe(spot),perp:dedupe(perp),funding:fundingRows};
+const raw=JSON.parse(fs.readFileSync(INPUT,'utf8'));
+const market={spot:raw.spot||[],perp:raw.perp||[],funding:raw.funding||[]};
+if(!market.spot.length||!market.perp.length||!market.funding.length)throw new Error('holdout archive input incomplete');
 
 const windows=[
   {label:'2024',start:Date.UTC(2024,0,1),end:Date.UTC(2025,0,1)},
@@ -75,7 +23,7 @@ const classification=classifyEthFundingHoldout(full,blocks);
 const out={
   schemaVersion:ETH_FUNDING_HOLDOUT_RULESET,
   generatedAt:new Date().toISOString(),
-  source:'Binance Spot + Binance USD-M perpetual public market data',
+  source:raw.source||'Binance Vision official public archive',
   method:'FROZEN_LONG_SPOT_SHORT_PERPETUAL_EQUAL_BASE_QUANTITY',
   holdout:{start:new Date(ETH_FUNDING_HOLDOUT_CONFIG.start).toISOString(),end:new Date(ETH_FUNDING_HOLDOUT_CONFIG.end).toISOString()},
   assumptions:{
@@ -88,6 +36,7 @@ const out={
     researchOnly:true,
     executionImpact:false
   },
+  coverage:raw.coverage||null,
   classification,
   full,
   blocks
