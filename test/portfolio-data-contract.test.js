@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -37,4 +37,13 @@ test('1d performance is derived from same adjusted basis',()=>{
   const p=oneDayPerformance(27783,28314);
   assert.equal(p.deltaUsd,-531);
   assert.equal(p.pct,-1.88);
+});
+
+
+test('Pionex equity snapshot preserves canonical private provenance',()=>{
+  const direct=pionexEquitySnapshot({portfolio:{pionexEquityUsd:3123.45,pionexEquitySource:'KNOWN_SEED',pionexEquityUpdatedAt:'2026-09-27T20:00:00Z'}});
+  assert.deepEqual(direct,{found:true,value:3123.45,source:'KNOWN_SEED',updatedAt:'2026-09-27T20:00:00Z'});
+  const row=pionexEquitySnapshot({portfolio:{manualVenueBalances:[{venue:'Pionex',valueUsd:2999,source:'MANUAL_SNAPSHOT',updatedAt:'2026-09-26T10:00:00Z'}]}});
+  assert.deepEqual(row,{found:true,value:2999,source:'MANUAL_SNAPSHOT',updatedAt:'2026-09-26T10:00:00Z'});
+  assert.deepEqual(pionexEquitySnapshot({}),{found:false,value:0,source:'MISSING',updatedAt:null});
 });
