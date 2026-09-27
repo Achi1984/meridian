@@ -29,7 +29,7 @@ test('r18 private and market syncs are single-flight',()=>{
 
 test('r18 v10 refresh uses data events instead of replacing current DOM every sync',()=>{
   assert.match(v9,/window\.dispatchEvent\(new CustomEvent\('meridian:data'\)\)/);
-  assert.match(v10,/window\.addEventListener\('meridian:data',schedule\)/);
+  assert.match(v10,/window\.addEventListener\('meridian:data',\(\)=>schedule\(true\)\)/);
   const syncBlock=v9.slice(v9.indexOf('async function sync(){'),v9.indexOf('window.MERIDIAN_V10_BRIDGE'));
   assert.doesNotMatch(syncBlock,/go\(current\)/);
 });
