@@ -9,6 +9,7 @@ export const TSMOM_HOLDOUT_V1_RULESET='TSMOM-HOLDOUT-V1-FROZEN';
 export const TSMOM_TRANSFER_ASSETS=Object.freeze(['BNB','ADA','DOGE','DOT','XLM','TRX','LTC','BCH']);
 export const TSMOM_LEGACY_START=Date.UTC(2020,4,1);
 export const TSMOM_LEGACY_END=Date.UTC(2022,6,31,23,59,59,999);
+export const TSMOM_TRANSFER_DAYS=1460;
 
 const finite=v=>Number.isFinite(Number(v));
 const n=v=>Number(v);
@@ -97,13 +98,11 @@ export function runLegacyTimeHoldout(dataset){
   return filterTsmomWindow(base,{start:TSMOM_LEGACY_START,end:TSMOM_LEGACY_END});
 }
 export function runTransferUniverseHoldout(dataset){
-  const base=runTsmomClassic(dataset);
-  return {
-    ...base,
-    ruleset:TSMOM_HOLDOUT_V1_RULESET,
-    diagnostics:diagnostics(base.periods||[]),
-    transferUniverse:[...TSMOM_TRANSFER_ASSETS]
-  };
+  const base=runTsmomClassic(dataset),last=base.periods?.at(-1)?.at??null;
+  if(last==null)return{...base,ruleset:TSMOM_HOLDOUT_V1_RULESET,diagnostics:diagnostics([]),transferUniverse:[...TSMOM_TRANSFER_ASSETS],transferDays:TSMOM_TRANSFER_DAYS};
+  const start=last-TSMOM_TRANSFER_DAYS*86400000;
+  const filtered=filterTsmomWindow(base,{start,end:last});
+  return {...filtered,transferUniverse:[...TSMOM_TRANSFER_ASSETS],transferDays:TSMOM_TRANSFER_DAYS};
 }
 export function evaluateCombinedTsmomHoldout({legacy,transfer}){
   const reasons=[];
@@ -126,6 +125,7 @@ export function holdoutProtocol(){
     ruleset:TSMOM_HOLDOUT_V1_RULESET,
     discoveryUniverse:[...DOCUMENTED_EDGE_ASSETS],
     transferUniverse:[...TSMOM_TRANSFER_ASSETS],
+    transferDays:TSMOM_TRANSFER_DAYS,
     legacyWindow:{start:TSMOM_LEGACY_START,end:TSMOM_LEGACY_END},
     unchangedConfig:{...TSMOM_CLASSIC_CONFIG},
     requirements:'Both independent holdouts must pass the same frozen TSMOM gate. No parameter changes, no asset dropping, no auto-promotion.'
