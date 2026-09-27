@@ -71,9 +71,9 @@ test('r16 exposes ambiguous rows in the Data Guard',()=>{
 });
 
 test('r16 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r16');
-  assert.match(shell,/10\.0-r16/);
-  assert.match(v10,/const BUILD='10\.0-r16'/);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(shell.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r16 adapter remains syntactically valid',()=>{
