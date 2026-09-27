@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -53,4 +53,21 @@ test('missing holding quantity never coerces to zero over a stored USD value',()
   assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:null,valueUsd:1234.56}),1234.56);
   assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:'',value:'',usdValue:987.65}),987.65);
   assert.equal(holdingUsd({livePrices:{BTC:{price:80000}}},{symbol:'BTC',quantity:0,valueUsd:1234.56}),0);
+});
+
+
+test('latest canonical history point must be fresh and internally consistent',()=>{
+  const now=2_000_000;
+  const fresh=latestPortfolioHistorySnapshot({source:'POSTGRES_CANONICAL_HISTORY',points:[
+    {timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120},
+    {timestamp:1_950_000,spotUsd:110,tradingUsd:25,totalUsd:135}
+  ]},now,100_000);
+  assert.equal(fresh.found,true);
+  assert.equal(fresh.fresh,true);
+  assert.equal(fresh.totalUsd,135);
+  const stale=latestPortfolioHistorySnapshot({points:[{timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120}]},now,100_000);
+  assert.equal(stale.fresh,false);
+  const inconsistent=latestPortfolioHistorySnapshot({points:[{timestamp:1_950_000,spotUsd:100,tradingUsd:20,totalUsd:999}]},now,100_000);
+  assert.equal(inconsistent.consistent,false);
+  assert.equal(inconsistent.fresh,false);
 });
