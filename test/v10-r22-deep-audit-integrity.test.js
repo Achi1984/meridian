@@ -33,7 +33,8 @@ test('r22 forced live refresh preserves expandable UI state',()=>{
 
 test('r22 conflict and neutral scanner diagnostics include both side reason sets',()=>{
   const card=v10.slice(v10.indexOf('function scannerCard'),v10.indexOf('function renderScanner'));
-  assert.ok(card.includes("sig.label.startsWith('BEAR')?(i.longReasons||[]):sig.label.startsWith('BULL')?(i.shortReasons||[]):[...(i.longReasons||[]),...(i.shortReasons||[])]"));
+  assert.ok(card.includes("bearReasons=i.longReasons||[],bullReasons=i.shortReasons||[]"));
+  assert.ok(card.includes("[bearReasons[0],bullReasons[0],...bearReasons.slice(1),...bullReasons.slice(1)].filter(Boolean)"));
   assert.ok(card.includes('reasons=[...new Set(reasonSet)]'));
 });
 
