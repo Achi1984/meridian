@@ -77,3 +77,14 @@ Because historical market-cap weights are missing:
 - No changing gates to rescue a near-pass.
 - Any new hypothesis becomes a separately named version with a new frozen protocol.
 - No strategy in this lab can submit live orders.
+
+## Deep-audit implementation revision
+
+The strategy rules above remain frozen. MERIDIAN engine revision `WEIGHTED-TURNOVER-R2` corrects implementation accounting only:
+
+- skipped under-breadth periods no longer mutate position state;
+- portfolio turnover is measured on equal-weighted portfolio exposures;
+- assets leaving the active universe incur explicit exit turnover cost;
+- final portfolio/asset close costs are included.
+
+Results produced before this engine revision must be rerun before they are treated as current evidence. No gate or strategy parameter was relaxed.
