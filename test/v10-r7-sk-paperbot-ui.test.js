@@ -8,8 +8,8 @@ const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 
-test('v10 r7 exposes SK PaperBot V1 as LAB-only research',()=>{
-  assert.match(html,/10\.0-r7/);
+test('v10 r8 exposes SK PaperBot V1 as LAB-only research',()=>{
+  assert.match(html,/10\.0-r8/);
   assert.match(js,/SK PAPERBOT V1/);
   assert.match(js,/SEQUENCE BOT · CORE/);
   assert.match(js,/PAPER ONLY/);
@@ -51,14 +51,30 @@ test('SK V1 freezes gate, entries, targets, invalidation and total risk',()=>{
 });
 
 
-test('v10 r7 browser adapter is syntactically valid after removing ESM imports',()=>{
+test('v10 r8 browser adapter is syntactically valid after removing ESM imports',()=>{
   const body=js.replace(/^import .*$/gm,'');
   assert.doesNotThrow(()=>new Function(body));
 });
 
-test('v10 r7 LAB renderer is unique and contains SK panel wiring',()=>{
+test('v10 r8 LAB renderer is unique and contains SK panel wiring',()=>{
   assert.equal((js.match(/function renderLab\(\)/g)||[]).length,1);
   assert.equal((js.match(/function skPaperPanel\(\)/g)||[]).length,1);
   assert.match(js,/bindSkPaper\(view\)/);
   assert.match(js,/\.sk-paper-shell/);
+});
+
+
+test('v10 r8 cache key is unique across production entrypoints',()=>{
+  const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
+  const legacy=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
+  const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+  for(const txt of [root,shell,legacy,engine,js]){
+    assert.doesNotMatch(txt,/10\.0-r7|build=r7|build','r7/);
+  }
+  assert.match(root,/build=r8/);
+  assert.match(shell,/v10\.js\?v=10\.0-r8/);
+  assert.match(shell,/v9\.js\?v=10\.0-r8/);
+  assert.match(js,/fib-core\.js\?v=10\.0-r8/);
+  assert.match(js,/sk-paperbot-v1\.js\?v=10\.0-r8/);
 });
