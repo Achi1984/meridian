@@ -11,7 +11,8 @@ const protocol=fs.readFileSync(new URL('../research/DOCUMENTED-EDGE-LAB-V1-FROZE
 test('r10 promotes Documented Edge Lab to primary research module',()=>{
   assert.match(html,/10\.0-r13/);
   assert.match(js,/DOCUMENTED EDGE LAB/);
-  assert.match(js,/PRIMARY LAB/);
+  assert.match(js,/VALIDATION LADDER/);
+  assert.match(js,/Discovery PASS ≠ bestätigtes Edge/);
   assert.match(js,/PUBLISHED STRATEGY REPLICATIONS/);
   assert.match(js,/TSMOM CLASSIC/);
   assert.match(js,/DELTA-NEUTRAL EVIDENCE/);
