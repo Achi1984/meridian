@@ -9,7 +9,7 @@ const engine=fs.readFileSync(new URL('../research/tsmom-holdout-v1.js',import.me
 const protocol=fs.readFileSync(new URL('../research/TSMOM-HOLDOUT-V1-FROZEN.md',import.meta.url),'utf8');
 
 test('r11 exposes TSMOM Holdout V1 inside Documented Edge Lab',()=>{
-  assert.match(html,/10\.0-r13/);
+  assert.match(html,/10\.0-r\d+/);
   assert.match(js,/TSMOM HOLDOUT V1/);
   assert.match(js,/INDEPENDENT VALIDATION/);
   assert.match(js,/TSMOM HOLDOUT STARTEN/);

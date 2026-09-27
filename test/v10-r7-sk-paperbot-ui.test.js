@@ -9,7 +9,7 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 
 test('v10 r13 exposes SK PaperBot V1 as LAB-only research',()=>{
-  assert.match(html,/10\.0-r13/);
+  assert.match(html,/10\.0-r\d+/);
   assert.match(js,/SK PAPERBOT V1/);
   assert.match(js,/SEQUENCE BOT · CORE/);
   assert.match(js,/PAPER ONLY/);
@@ -74,12 +74,12 @@ test('v10 r13 cache key is unique across production entrypoints',()=>{
   for(const txt of [root,shell,legacy,engine,js]){
     assert.doesNotMatch(txt,/10\.0-r7|10\.0-r8|build=r7|build=r8|build','r7|build','r8/);
   }
-  assert.match(root,/build=r13/);
-  assert.match(shell,/v10\.js\?v=10\.0-r13/);
-  assert.match(shell,/v9\.js\?v=10\.0-r13/);
-  assert.match(js,/fib-core\.js\?v=10\.0-r13/);
-  assert.match(js,/sk-paperbot-v1\.js\?v=10\.0-r13/);
-  assert.match(js,/sk-research-v2\.js\?v=10\.0-r13/);
+  assert.match(root,/build=r\d+/);
+  assert.match(shell,/v10\.js\?v=10\.0-r\d+/);
+  assert.match(shell,/v9\.js\?v=10\.0-r\d+/);
+  assert.match(js,/fib-core\.js\?v=10\.0-r\d+/);
+  assert.match(js,/sk-paperbot-v1\.js\?v=10\.0-r\d+/);
+  assert.match(js,/sk-research-v2\.js\?v=10\.0-r\d+/);
 });
 
 

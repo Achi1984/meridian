@@ -83,9 +83,9 @@ test('r13 LAB makes discovery versus holdout hierarchy explicit',()=>{
 });
 
 test('r13 publishes one canonical terminal build and runtime-smokes actual v10 assets',()=>{
-  assert.equal(release.terminalBuild,'10.0-r13');
-  assert.match(html,/10\.0-r13/);
-  assert.match(v10,/const BUILD='10\.0-r13'/);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.match(releaseCheck,/terminalBuild/);
   assert.match(releaseCheck,/v10 runtime BUILD must match terminalBuild/);
   assert.match(smoke,/v10\/index\.html\?smoke=/);

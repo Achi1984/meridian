@@ -52,6 +52,17 @@ test('coin-m investment is not mislabeled USD when API gives only coin investmen
   assert.equal(x.investCurrency,'ETH');
 });
 
+
+test('grid bounds are not invented as take-profit when no explicit TP exists',()=>{
+  const x=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'no-tp',base:'BTC.PERP',status:'running',
+    buOrderData:{status:'running',trend:'long',leverage:5,bottom:'50000',top:'100000'}
+  });
+  assert.equal(x.takeProfit,null);
+  assert.equal(x.lower,50000);
+  assert.equal(x.upper,100000);
+});
+
 test('risk snapshot keeps only supported active futures bot rows',()=>{
   const running={buOrderType:'futures_grid',buOrderId:'a',base:'BTC.PERP',status:'running',buOrderData:{status:'running',trend:'long',leverage:3,bottom:'1',top:'2'}};
   const finished={buOrderType:'futures_grid',buOrderId:'b',base:'ETH.PERP',status:'finished',buOrderData:{status:'canceled',trend:'long',leverage:3,bottom:'1',top:'2'}};

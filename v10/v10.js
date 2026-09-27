@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r13';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r13';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r13';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r13';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r13';
-// MERIDIAN v10 r13 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r14';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r14';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r14';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r14';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r14';
+// MERIDIAN v10 r14 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r13';
+const BUILD='10.0-r14';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -78,6 +78,7 @@ function pairStatus(symbol){
   if(min!=null&&min<10)return{code:'LIQ_RISK',label:'LIQ RISK',tone:'danger',rank:80,reason:'Liq-Puffer nur '+min.toFixed(1)+'%'};
   if(nearProtection)return{code:'PROTECTION_RISK',label:'RISK REVIEW',tone:'danger',rank:75,reason:nearProtection.reason};
   if(rows.some(b=>!h.livePnlAvailable?.(b))||risks.length!==rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:'Mindestens ein Action-Feld (PnL/Liq) fehlt live'};
+  if(!intelFresh(s.assetIntel?.[symbol]))return{code:'MARKET_STALE',label:'MARKET STALE',tone:'muted',rank:95,reason:'15m/1h/4h Marktdaten sind nicht frisch · nur Safety-Daten bleiben gültig'};
   const plans=rows.map(b=>h.profitLockPlan?.(b)).filter(Boolean);
   const signals=rows.map(b=>intelFresh(s.assetIntel?.[b.symbol])?h.actionForSide?.(s.assetIntel?.[b.symbol],b.side||'LONG'):'SYNC');
   if(plans.some(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)))return{code:'PROFIT_LOCK',label:'PROFIT LOCK',tone:'watch',rank:60,reason:'Technische Schwäche + ausreichendes Gewinnpolster'};
@@ -120,7 +121,7 @@ function criticalPair(){
 function nextAction(){
   const c=criticalPair();if(!c)return{title:'DATEN SYNC',detail:'Keine privaten Bot-Rows · keine Aktion aus Referenzdaten'};
   const s=c.status;
-  if(['DATA_STALE','UNVERIFIED'].includes(s.code))return{title:'KEINE AKTION · DATEN PRÜFEN',detail:c.symbol+' · '+s.reason};
+  if(['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(s.code))return{title:'KEINE AKTION · DATEN PRÜFEN',detail:c.symbol+' · '+s.reason};
   if(s.code==='LIQ_RISK')return{title:c.symbol+' · LIQ-PUFFER PRÜFEN',detail:s.reason+' · Safety vor Profit-Lock'};
   if(['RISK_REVIEW','PROTECTION_RISK'].includes(s.code))return{title:c.symbol+' · RISK REVIEW',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
   if(s.code==='PROFIT_LOCK')return{title:c.symbol+' · PROFIT LOCK PRÜFEN',detail:s.reason+' · Teilgewinn/Reload-Reserve statt Komplettausstieg'};
@@ -178,18 +179,18 @@ function renderSystemHeader(){
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
-  $('#nav button').forEach(b=>{b.type='button';const label=$('span',b)?.textContent||'MERIDIAN';b.setAttribute('aria-label',label);if(b.classList.contains('active'))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  $$('#nav button').forEach(b=>{b.type='button';const label=$('span',b)?.textContent||'MERIDIAN';b.setAttribute('aria-label',label);if(b.classList.contains('active'))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 function renderCommand(){
   const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
   if($('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Market, Bot-Layer und Referenz-Snapshot werden getrennt bewertet','live');
   dataGuardDecorate();
-  $('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.command-source-strip',view).forEach(x=>x.remove());
+  $$('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.command-source-strip',view).forEach(x=>x.remove());
   const hero=$('.portfolio-hero',view),c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataStrip();const sourceNode=source.firstElementChild;
   hero.insertAdjacentElement('afterend',sourceNode);
   const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
-  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
+  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
   wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Safety/Data Guard überstimmt Trading-Signal</small></div>'+criticalHtml;
   sourceNode.insertAdjacentElement('afterend',wrap);
   const action=$('.command-action',view);
@@ -198,8 +199,8 @@ function renderCommand(){
   (action||wrap).insertAdjacentElement('afterend',liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard();liveNode.insertAdjacentElement('afterend',guard.firstElementChild);
 
-  for(const sel of ['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth']) $(sel,view).forEach(x=>x.remove());
-  $('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
+  for(const sel of ['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth']) $$(sel,view).forEach(x=>x.remove());
+  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
 }
 function renderBots(){
   const view=$('#view-bots');if(!view||$('.v10-pair-stack',view))return;

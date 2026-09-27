@@ -9,7 +9,7 @@ const engine=fs.readFileSync(new URL('../research/documented-edge-v1.js',import.
 const protocol=fs.readFileSync(new URL('../research/DOCUMENTED-EDGE-LAB-V1-FROZEN.md',import.meta.url),'utf8');
 
 test('r10 promotes Documented Edge Lab to primary research module',()=>{
-  assert.match(html,/10\.0-r13/);
+  assert.match(html,/10\.0-r\d+/);
   assert.match(js,/DOCUMENTED EDGE LAB/);
   assert.match(js,/VALIDATION LADDER/);
   assert.match(js,/Discovery PASS ≠ bestätigtes Edge/);
