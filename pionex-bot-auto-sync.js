@@ -41,11 +41,11 @@ function liquidationFor(d,side){
   if(direct!=null)return direct;
   return side==='SHORT'?firstNum(d,['estimateLiquidationPriceUp','estimateLiquidationPriceDown']):firstNum(d,['estimateLiquidationPriceDown','estimateLiquidationPriceUp']);
 }
-function tpFor(d,side){
+function tpFor(d){
   if(String(d?.profitStopType||'').toLowerCase()==='price'){
     const x=n(d?.profitStop);if(x>0)return x;
   }
-  return side==='SHORT'?n(d?.bottom):n(d?.top);
+  return null;
 }
 function slFor(d){
   if(String(d?.lossStopType||'').toLowerCase()==='price'){
@@ -83,7 +83,7 @@ export function normalizePionexBotOrder(order){
     lower:n(d.bottom),
     upper:n(d.top),
     liquidationPrice:liquidationFor(d,side),
-    takeProfit:tpFor(d,side),
+    takeProfit:tpFor(d),
     stopLoss:slFor(d),
     investmentUsd:reliableUsdInvestment(d),
     pnlUsd:optionalPnl(d),
