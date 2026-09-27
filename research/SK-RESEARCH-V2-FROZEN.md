@@ -10,7 +10,7 @@ The first SK Core V1 BTC run did not pass its frozen research gate. A small subg
 V2 tests one narrow hypothesis without changing SK Core V1:
 
 - **A — Core V1:** every valid SK PaperBot V1 trade.
-- **B — Double Advantage only:** only Core V1 trades where the strict opposing-target × parent-GKL overlap was known **no later than the first fill**.
+- **B — Double Advantage only:** only Core V1 trades where the strict opposing-target × parent-GKL overlap was known **before the first-fill bar**.
 
 This is a filter comparison, not a parameter search.
 
@@ -34,7 +34,7 @@ A trade belongs to cohort B only when:
 
 1. strict SK Double Advantage geometry exists;
 2. the overlap is detected from information available at that time; and
-3. `doubleAdvantageAt <= openedAt`.
+3. the Double Advantage condition is confirmed on a strictly earlier 4h bar than the first fill (`doubleAdvantageAt < openedAt`). Same-bar OHLC cannot prove event order and is excluded.
 
 A Double Advantage condition discovered after the first fill stays in Core A and is excluded from B.
 
