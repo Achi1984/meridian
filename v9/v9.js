@@ -258,11 +258,12 @@ function status(b){if(!liveMatched(b))return['REF','muted'];if(!botFeedFresh())r
 function botProfitPct(b){const direct=num(b.profitPct);if(direct!=null)return direct;const pnl=botPnlUsd(b).value,investUsd=num(b.investUsd);return pnl!=null&&investUsd>0?pnl/investUsd*100:null}
 function profitPlanRank(code){return code==='SAFETY'?7:code==='LOCK50'?6:code==='LOCK25'?5:code==='LOCK20'?4:code==='HEDGE'?3:code==='WATCH'?2:code==='HOLD'?1:0}
 function profitLockPlan(b){
- const side=b.side||'LONG',pi=state.assetIntel[b.symbol],signal=actionForSide(pi,side),reasons=reasonsForSide(pi,side),pnl=botProfitPct(b),t=tpDist(b),liq=risk(b),pair=assetPairRisk(b.symbol),hedgeLow=side==='LONG'&&pair.longUsd>0&&pair.hedgePct!=null&&pair.hedgePct<15;
+ const side=b.side||'LONG',rawPi=state.assetIntel[b.symbol],pi=marketIntelFresh(rawPi)?rawPi:null,signal=pi?actionForSide(pi,side):'SYNC',reasons=pi?reasonsForSide(pi,side):[],pnl=botProfitPct(b),t=tpDist(b),liq=risk(b),pair=assetPairRisk(b.symbol),hedgeLow=side==='LONG'&&pair.longUsd>0&&pair.hedgePct!=null&&pair.hedgePct<15;
  const why=reasons.slice(0,3).join(' · '),tpText=t==null?'TP-Distanz —':Math.max(0,t).toFixed(1)+'% zum TP',pnlText=pnl==null?'PnL —':(pnl>=0?'+':'')+pnl.toFixed(1)+'% PnL';
  if(!liveMatched(b))return{code:'SYNC',label:'REFERENCE · VERIFY',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Bot nicht im privaten Bot-Snapshot bestätigt · Referenzwerte sind nicht handlungsrelevant'};
  if(!botFeedFresh())return{code:'SYNC',label:'SNAPSHOT · STALE',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Bot-Snapshot '+ageText(botFeedAgeMs())+' alt/ohne belastbaren Timestamp · keine Trading-Aktion ableiten'};
  if(liq!=null&&liq<10)return{code:'SAFETY',label:'SAFETY FIRST',tone:'danger',reducePct:0,signal,pnl,tp:t,detail:'Liq-Puffer '+liq.toFixed(1)+'% · zuerst Margin/Exposure prüfen · keine Profit-Lock-Aktion'};
+ if(!pi)return{code:'SYNC',label:'MARKET · STALE',tone:'muted',reducePct:0,signal:'SYNC',pnl,tp:t,detail:'Technische 15m/1h/4h-Daten sind nicht frisch · kein Profit-Lock/Exit-Signal ableiten'};
  if(!livePnlAvailable(b))return{code:'SYNC',label:'SYNC · PNL',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Snapshot-PnL fehlt · '+tpText+' · keine Aktion ableiten'};
  if(pnl==null)return{code:'SYNC',label:'SYNC · PNL',tone:'muted',reducePct:0,signal,pnl,tp:t,detail:'Live-PnL unvollständig · keine Aktion ableiten'};
  if(pnl<=0){
