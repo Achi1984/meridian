@@ -9,45 +9,65 @@ if(!window.MERIDIAN_V10){
 }
 const API_BASE=(window.MERIDIAN_V9_CONFIG?.apiBase||'https://p01--achi-meridian--ttvk44grdlp7.code.run').replace(/\/$/,'');
 const TOKEN_KEY='meridian.v8.readToken';
+const ASSET_WATCH_SNAPSHOT_AT='2026-09-27T19:50:00+02:00';
 const FALLBACK=[
-{id:'BTC-7X',symbol:'BTC',leverage:7,lower:55000,upper:100000,be:85907.2,liq:62001.6,tp:100000,investCoin:.03,price:85704.2,createdPrice:85866,grids:174},
-{id:'ETH-3X-A',symbol:'ETH',leverage:3,lower:1750.02,upper:3900,be:2623.5,liq:1694.32,tp:3900,investCoin:.2518},{id:'ETH-4X-B',symbol:'ETH',leverage:4,lower:1750.02,upper:3500.05,be:2632.87,liq:1783.99,tp:3500.05,investCoin:.3405},
-{id:'SOL-4X',symbol:'SOL',leverage:4,lower:55,upper:185,be:115.655,liq:66.51,tp:185,investCoin:58.807,price:115.553,createdPrice:115.6,grids:374},
-{id:'XRP-4X',symbol:'XRP',leverage:4,lower:.85,upper:1.8501,be:1.4442,liq:.9163,tp:1.8501,investCoin:1868.17},
-{id:'HBAR-5X-A',symbol:'HBAR',leverage:5,lower:.06,upper:.12,be:.08569,liq:.0606,tp:.12,investCoin:10800,dynamicMargin:2200},{id:'HBAR-5X-B',symbol:'HBAR',leverage:5,lower:.06,upper:.125,be:.08622,liq:.06343,tp:.125,investCoin:5000},{id:'HBAR-3X-C',symbol:'HBAR',leverage:3,lower:.05,upper:.15,be:.08682,liq:.05198,tp:.15,investCoin:7990.15},
-{id:'SUI-LONG-4X',symbol:'SUI',side:'LONG',leverage:4,lower:.6,upper:1.5,be:1.0196,liq:.6543,tp:1.5,investCoin:1365.2,price:.9686,createdPrice:1.0375,grids:289,pnlCoin:-75.89,profitPct:-5.56},
-{id:'ADA-LONG-5X',symbol:'ADA',side:'LONG',leverage:5,lower:.125,upper:.5,be:.2572,liq:.1616,tp:.5,investCoin:5891.35,price:.2398,createdPrice:.259,grids:482,profitPct:-8.33},
-{id:'PEPE-4X-A',symbol:'PEPE',leverage:4,lower:.000002,upper:.000006,be:.0000040029,liq:.000002368,tp:.000006,investCoin:73524672.71},{id:'PEPE-3X-B',symbol:'PEPE',leverage:3,lower:.000002,upper:.000006,be:.0000040029,liq:.0000021748,tp:.000006,investCoin:31670289.08},
-{id:'AVAX-LONG-6X',symbol:'AVAX',side:'LONG',leverage:6,lower:6,upper:14.5,be:10.889,liq:7.169,tp:14.5,investCoin:90.46,dynamicMargin:13.1,price:10.295,createdPrice:11.189,grids:253,pnlCoin:-6.58,profitPct:-7.28,note:'Screenshot 24.09.2026 16:06 · authoritative'},
-{id:'DOT-SHORT-5X',symbol:'DOT',side:'SHORT',leverage:5,lower:.7,upper:2,be:1.195,liq:1.604,tp:.7,investCoin:244.66,price:1.099,createdPrice:1.188,grids:364,profitPct:24.18},
-{id:'ADA-SHORT-3X',symbol:'ADA',side:'SHORT',leverage:3,lower:.125,upper:.5,be:.2596,liq:.477,tp:.125,investCoin:1443.37,price:.2398,createdPrice:.2587,grids:483,profitPct:13.54},
-{id:'SUI-SHORT-4X',symbol:'SUI',side:'SHORT',leverage:4,lower:.75,upper:2,be:1.0148,liq:1.7314,tp:.75,investCoin:455.06,price:.9681,createdPrice:1.0077,grids:413,profitPct:6.22},
-{id:'AVAX-SHORT-10X',symbol:'AVAX',side:'SHORT',leverage:10,lower:8,upper:20,be:11.085,liq:14.499,tp:8,investCoin:4.99,dynamicMargin:0,price:10.295,createdPrice:10.908,grids:366,pnlCoin:.935,profitPct:18.74,note:'Screenshot 24.09.2026 16:06 · authoritative'},
-{id:'LINK-LONG-5X',symbol:'LINK',side:'LONG',leverage:5,lower:6.5,upper:21,be:12.707,liq:8.178,tp:21,investCoin:147.37,price:12.292,createdPrice:12.734,grids:379,profitPct:-3.69},
-{id:'LINK-SHORT-4X',symbol:'LINK',side:'SHORT',leverage:4,lower:8,upper:25,be:12.737,liq:19.959,tp:8,investCoin:36.84,price:12.292,createdPrice:12.72,grids:445,profitPct:7.03},
-{id:'XLM-LONG-5X',symbol:'XLM',side:'LONG',leverage:5,lower:.12,upper:.36001,be:.21304,liq:.14327,tp:.36001,investCoin:5430.54,price:.20386,createdPrice:.21364,grids:373,profitPct:-6.09},
-{id:'XLM-SHORT-5X',symbol:'XLM',side:'SHORT',leverage:5,lower:.145,upper:.4,be:.2141,liq:.32662,tp:.145,investCoin:1357.63,price:.20386,createdPrice:.21345,grids:398,profitPct:9.33},
-{id:'TRX-LONG-6X',symbol:'TRX',side:'LONG',leverage:6,lower:.25,upper:.44,be:.3417,liq:.26389,tp:.44,investCoin:3533.43,price:.33943,createdPrice:.34163,grids:185,profitPct:-1.32},
-{id:'TRX-SHORT-5X',symbol:'TRX',side:'SHORT',leverage:5,lower:.275,upper:.45,be:.34139,liq:.45975,tp:.275,investCoin:706.68,price:.33943,createdPrice:.34154,grids:170,profitPct:1.37},
-{id:'WIF-LONG-6X',symbol:'WIF',side:'LONG',leverage:6,lower:.1,upper:.45,be:.2418,liq:.1385,tp:.45,investCoin:2042.24,price:.2275,createdPrice:.2432,grids:480,profitPct:-5.09},
-{id:'WIF-SHORT-6X',symbol:'WIF',side:'SHORT',leverage:6,lower:.1,upper:.5,be:.2441,liq:.3131,tp:.135,investCoin:408.44,price:.2275,createdPrice:.2435,grids:546,profitPct:27.92}
+{id:'BTC-SHORT-10X-2709',symbol:'BTC',side:'SHORT',leverage:10,investCoin:.00178,lower:70000,upper:95000,be:84125.1,liq:96344,tp:70000,sl:95000,price:84500,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'BTC-LONG-5X-2309',symbol:'BTC',side:'LONG',leverage:5,investCoin:.0014,lower:55000,upper:95000,be:86075.9,liq:57497.4,tp:95000,price:84500,createdAt:'2026-09-23T05:23:00+02:00',snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'BTC-LONG-11X-2709A',symbol:'BTC',side:'LONG',leverage:11,investCoin:.03829,lower:55000,upper:95000,be:85825.5,liq:65667.7,tp:95000,price:84500,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'BTC-LONG-7X-2709',symbol:'BTC',side:'LONG',leverage:7,investCoin:.00371,lower:55000,upper:95000,be:85664.2,liq:60896.4,tp:95000,dynamicMargin:.00003,price:84500,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'BTC-LONG-5X-2709B',symbol:'BTC',side:'LONG',leverage:5,investCoin:.01625,lower:55000,upper:95000,be:84384.5,liq:57047.5,tp:95000,price:84500,createdAt:'2026-09-27T19:07:00+02:00',snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'ETH-SHORT-10X-2709',symbol:'ETH',side:'SHORT',leverage:10,investCoin:.0165,lower:1700.01,upper:3500.05,be:2659.73,liq:3442.24,tp:1700.01,sl:3500.05,price:2689,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'ETH-LONG-5X-2709A',symbol:'ETH',side:'LONG',leverage:5,investCoin:.5005,lower:1450.01,upper:3500.05,be:2769.91,liq:1700.99,tp:3500.05,price:2689,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'ETH-LONG-5X-2709B',symbol:'ETH',side:'LONG',leverage:5,investCoin:.0788,lower:1650,upper:3500.05,be:2705.94,liq:1781.8,tp:3500.05,price:2689,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'ETH-LONG-5X-2709C',symbol:'ETH',side:'LONG',leverage:5,investCoin:.036,lower:1500.01,upper:3400.08,be:2691.24,liq:1565.47,tp:3400.08,price:2689,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'SOL-SHORT-5X-2709',symbol:'SOL',side:'SHORT',leverage:5,investCoin:1.302,lower:65,upper:220.002,be:116.71,liq:203.413,tp:65,sl:200,price:122.05,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'SOL-LONG-5X-2709',symbol:'SOL',side:'LONG',leverage:5,investCoin:59.31,lower:50,upper:200,be:121.999,liq:68.851,tp:200,price:122.05,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'XRP-LONG-5X-2709A',symbol:'XRP',side:'LONG',leverage:5,investCoin:1698.51,lower:.85,upper:2,be:1.5768,liq:.9961,tp:2,price:1.5243,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'XRP-LONG-6X-2709',symbol:'XRP',side:'LONG',leverage:6,investCoin:247.32,lower:.8,upper:2,be:1.5518,liq:.9943,tp:2,price:1.5243,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'XRP-LONG-5X-2709B',symbol:'XRP',side:'LONG',leverage:5,investCoin:141.77,lower:.85,upper:2,be:1.5253,liq:.9807,tp:2,price:1.5243,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'HBAR-LONG-5X-2709',symbol:'HBAR',side:'LONG',leverage:5,investCoin:25643.82,lower:.06,upper:.14,be:.09927,liq:.06851,tp:.14,price:.09397,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'HBAR-LONG-4X-2709',symbol:'HBAR',side:'LONG',leverage:4,investCoin:5673.87,lower:.06,upper:.15,be:.09368,liq:.06328,tp:.15,price:.09397,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'PEPE-LONG-5X-2709A',symbol:'PEPE',side:'LONG',leverage:5,investCoin:89815127.4,lower:.000002,upper:.000008,be:.0000048233,liq:.0000027725,tp:.000008,price:.0000043853,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'PEPE-LONG-5X-2709B',symbol:'PEPE',side:'LONG',leverage:5,investCoin:28169419.21,lower:.000002,upper:.0000055,be:.0000044261,liq:.0000025114,tp:.0000055,price:.0000043853,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'DOT-SHORT-4X-2709',symbol:'DOT',side:'SHORT',leverage:4,investCoin:266.82,lower:.75,upper:2,be:1.165,liq:1.848,tp:.75,sl:1.8,price:1.242,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'DOT-LONG-3X-2709',symbol:'DOT',side:'LONG',leverage:3,investCoin:1272.83,lower:.65,upper:1.8,be:1.242,liq:.678,tp:1.8,price:1.242,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'ADA-SHORT-3X-2709',symbol:'ADA',side:'SHORT',leverage:3,investCoin:1614.65,lower:.16,upper:.5,be:.247,liq:.5501,tp:.16,sl:.5,price:.2545,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'ADA-LONG-5X-2709',symbol:'ADA',side:'LONG',leverage:5,investCoin:5891.35,lower:.125,upper:.5,be:.2573,liq:.1614,tp:.5,price:.2545,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'SUI-SHORT-4X-2709',symbol:'SUI',side:'SHORT',leverage:4,investCoin:459.61,lower:.65,upper:1.85,be:1.0363,liq:1.5591,tp:.65,sl:1.55,price:1.25,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'SUI-LONG-4X-2709',symbol:'SUI',side:'LONG',leverage:4,investCoin:1546.59,lower:.6,upper:1.55,be:1.2467,liq:.6867,tp:1.55,price:1.25,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'AVAX-SHORT-5X-2709',symbol:'AVAX',side:'SHORT',leverage:5,investCoin:10.6,lower:7,upper:15,be:10.351,liq:14.02,tp:7,sl:null,price:11.005,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'AVAX-LONG-5X-2709',symbol:'AVAX',side:'LONG',leverage:5,investCoin:94.89,lower:6,upper:14,be:10.941,liq:6.994,tp:14,price:11.005,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'LINK-SHORT-4X-2709',symbol:'LINK',side:'SHORT',leverage:4,investCoin:36.84,lower:8,upper:25,be:12.872,liq:20.057,tp:8,sl:20.5,price:14.14,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'LINK-LONG-4X-2709',symbol:'LINK',side:'LONG',leverage:4,investCoin:153.79,lower:6,upper:20.5,be:14.122,liq:7.459,tp:20.5,price:14.14,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'XLM-SHORT-5X-2709',symbol:'XLM',side:'SHORT',leverage:5,investCoin:1133.01,lower:.15,upper:.5,be:.21429,liq:.33408,tp:.15,sl:.335,price:.2159,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'XLM-LONG-4X-2709',symbol:'XLM',side:'LONG',leverage:4,investCoin:5794.51,lower:.125,upper:.335,be:.21607,liq:.13769,tp:.335,price:.2159,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'TRX-LONG-6X-2709',symbol:'TRX',side:'LONG',leverage:6,investCoin:3533.43,lower:.25,upper:.44,be:.34067,liq:.26371,tp:.44,price:.3337,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'TRX-LONG-5X-2709',symbol:'TRX',side:'LONG',leverage:5,investCoin:738.37,lower:.26,upper:.4,be:.33399,liq:.25093,tp:.4,price:.3337,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+
+{id:'WIF-SHORT-4X-2709',symbol:'WIF',side:'SHORT',leverage:4,investCoin:470.88,lower:.135,upper:.45,be:.235,liq:.348,tp:.135,sl:.35,price:.2455,snapshotAt:ASSET_WATCH_SNAPSHOT_AT},
+{id:'WIF-LONG-4X-2709',symbol:'WIF',side:'LONG',leverage:4,investCoin:2071.43,lower:.13,upper:.35,be:.2461,liq:.1415,tp:.35,price:.2455,snapshotAt:ASSET_WATCH_SNAPSHOT_AT}
 ];
-const HEDGES=[
-{id:'BTC-HEDGE-PIONEX-GRID-7X',venue:'Pionex',symbol:'BTC',side:'SHORT',leverage:7,investCoin:.00631,entry:84265.6,be:84246.2,liq:103105.8,sl:null,lower:65000,upper:105800,tp:65000,dynamicMargin:0,price:84334.3,grids:161,note:'BTC COIN-M Short Grid · bestätigt 23.09.2026 21:01'},
-{id:'BTC-HEDGE-PIONEX-MANUAL-7X',venue:'Pionex',symbol:'BTC',side:'SHORT',leverage:7,investCoin:.00428,entry:81095.5,be:81095.5,liq:100054.2,sl:100000,tp:79200,dynamicMargin:.00149,price:84277,note:'Separater manueller BTC COIN-M Short · bestätigt 23.09.2026 21:02'}
-];
-const MANUAL_POSITIONS=[
-{id:'PIONEX-PEPE-MANUAL-3X',venue:'Pionex',symbol:'PEPE',side:'LONG',leverage:3,investCoin:3746504.29,entry:.0000047394,be:.0000047394,price:.0000043636,liq:.0000035907,dynamicMargin:0,note:'Separater manueller PEPE COIN-M Long · bestätigt 23.09.2026 21:02'}
-];
-const PIONEX_MANUAL=[
-{id:'PIONEX-XRP-MANUAL-LONG-5X',venue:'Pionex',type:'MANUAL',marginMode:'CROSS',symbol:'XRP',side:'LONG',leverage:5,sizeCoin:105,marginUsd:31.39,notionalUsd:156.97,entry:1.5725,be:1.5725,price:1.495,liq:1.262,pnlUsd:-8.14,pnlPct:-24.65,marginRatio:2.52,note:'Confirmed screenshot 23.09.2026 21:02'}
-];
+const HEDGES=[];
+const MANUAL_POSITIONS=[];
+const PIONEX_MANUAL=[];
 const OKX_DCA_BOTS=[
 {id:'OKX-INJ-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'INJ',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:.1729,totalPnlPct:.26,variablePnlUsd:.1824,variablePnlPct:.27,price:7.977,tp:8.28,avgCost:7.908,liq:null,safetyExecuted:0,safetyMax:7,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'},
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,liveRows:0,botApiRows:0,unmatchedLive:[],botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,liveRows:0,botApiRows:0,unmatchedLive:[],botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
@@ -119,7 +139,7 @@ function mergeReference(live){
     refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_source:'LIVE_MATCH'};
     refUsed.add(m.ri);used.add(m.li);
   }
-  /* Dashboard is intentionally pinned to the verified 13-bot COIN-M roster.
+  /* Dashboard is intentionally pinned to the latest verified Asset Watch COIN-M roster.
      Unmatched API rows are often stale/partial bot records and must not create phantom cards.
      Live values are allowed to enrich a verified reference bot only after a confident match. */
   /* Never promote unmatched API rows into the active roster. */
