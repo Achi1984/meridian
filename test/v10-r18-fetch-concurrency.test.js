@@ -29,7 +29,7 @@ test('r18 private and market syncs are single-flight',()=>{
 
 test('r18 v10 refresh uses data events instead of replacing current DOM every sync',()=>{
   assert.match(v9,/window\.dispatchEvent\(new CustomEvent\('meridian:data'\)\)/);
-  assert.match(v10,/window\.addEventListener\('meridian:data',\(\)=>schedule\(true\)\)/);
+  assert.match(v10,/window\.addEventListener\('meridian:data',schedule\)/);
   const syncBlock=v9.slice(v9.indexOf('async function sync(){'),v9.indexOf('window.MERIDIAN_V10_BRIDGE'));
   assert.doesNotMatch(syncBlock,/go\(current\)/);
 });
@@ -50,12 +50,14 @@ test('r18 gateway kills stalled internal proxy requests',()=>{
   assert.match(gateway,/if\(res\.headersSent\)\{res\.destroy\(\);return\}/);
 });
 
-test('r18 gateway reports read-auth source without exposing token material',()=>{
+test('r18+ gateway reports env-only read-auth source without embedded fallback material',()=>{
   assert.match(gateway,/READ_AUTH_SOURCE/);
   assert.match(gateway,/privateReadAuthSource:READ_AUTH_SOURCE/);
-  assert.match(gateway,/LEGACY_FALLBACK/);
+  assert.doesNotMatch(gateway,/LEGACY_FALLBACK/);
   assert.match(gateway,/INVALID_ENV/);
-  assert.match(smoke,/privateReadAuthSource:String\(health\.privateReadAuthSource\|\|'UNKNOWN'\)/);
+  assert.match(gateway,/MISSING_ENV/);
+  assert.match(smoke,/privateReadAuthSource\|\|'UNKNOWN'/);
+  assert.match(smoke,/!=='ENV'/);
 });
 
 test('r18 v10 browser adapter still parses',()=>{
