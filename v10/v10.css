@@ -171,3 +171,41 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 @media(max-width:390px){
   .sk-zone-grid{grid-template-columns:1fr}
 }
+
+
+/* v10 r6 · SK turn areas + double advantage */
+.sk-zone-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.sk-zone{background:#070c12;border:1px solid #1b2c3d;border-radius:10px;padding:8px}
+.sk-zone.target{grid-column:1/-1}
+.sk-zone span,.sk-double span{display:block;font-size:7px;font-weight:800;letter-spacing:.07em}
+.sk-zone b,.sk-double b{display:block;margin-top:2px;font-size:10px}
+.sk-zone small,.sk-double small{display:block;margin-top:3px;font-size:7px;color:var(--muted);line-height:1.35}
+.sk-zone.bull{border-color:#1f5a4a}.sk-zone.bull span{color:#53d6a5}
+.sk-zone.bear{border-color:#6a333b}.sk-zone.bear span{color:#ff747f}
+.sk-zone.target{border-color:#5e4f28}.sk-zone.target span{color:var(--amber)}
+.sk-double-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px}
+.sk-double{border:1px solid #284660;border-radius:10px;padding:8px;background:#08121b}
+.sk-double.bull{border-color:#1f5a4a}.sk-double.bull span{color:#53d6a5}
+.sk-double.bear{border-color:#6a333b}.sk-double.bear span{color:#ff747f}
+.sk-double.muted{opacity:.68}.sk-double.muted span{color:#8493a3}
+.fib-zone{position:absolute;left:4px;right:4px;border-radius:7px;z-index:1;pointer-events:none;overflow:hidden}
+.fib-zone span{position:absolute;right:5px;top:3px;font-size:6px;font-weight:900;letter-spacing:.06em;opacity:.85}
+.fib-zone-bull{background:rgba(54,197,145,.08);border:1px solid rgba(54,197,145,.28)}
+.fib-zone-bull span{color:#55dbaa}
+.fib-zone-bear{background:rgba(255,89,102,.07);border:1px solid rgba(255,89,102,.26)}
+.fib-zone-bear span{color:#ff7782}
+.fib-zone-target{background:rgba(255,183,66,.06);border:1px dashed rgba(255,183,66,.28)}
+.fib-zone-target span{color:var(--amber)}
+.fib-zone-double{left:18%;right:18%;background:rgba(64,167,255,.08);border:1px dashed rgba(64,167,255,.42)}
+.fib-zone-double span{left:5px;right:auto;color:var(--cyan)}
+.fib-zone.active{box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.fib-sk-core span{color:#d6e8f7}.fib-sk-core i{background:#4e718f}
+@media(max-width:600px){
+  .sk-zone-grid,.sk-double-grid{grid-template-columns:1fr 1fr}
+  .sk-zone.target{grid-column:1/-1}
+  .fib-zone span{font-size:5.5px}
+}
+@media(max-width:390px){
+  .sk-zone-grid,.sk-double-grid{grid-template-columns:1fr}
+  .sk-zone.target{grid-column:auto}
+}
