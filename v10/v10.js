@@ -1,6 +1,6 @@
-// MERIDIAN v10 r4 — isolated presentation/command adapter over the validated v9 engine.
+// MERIDIAN v10 r5 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r4';
+const BUILD='10.0-r5';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -71,10 +71,16 @@ function legRow(b){
   return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>PRIVATE</span></div><div class="leg-grid"><span>INVEST <b>'+(h.liveInvestAvailable?.(b)?h.money(b.invest):'—')+'</b></span><span>PNL <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
 }
 function pairCard(symbol,compact=false){
-  const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longUsd=fresh?exposure(rows,'LONG'):0,shortUsd=fresh?exposure(rows,'SHORT'):0;
+  const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
+  if(!fresh&&!compact){
+    const sides=[longs.length?longs.length+' LONG':'',shorts.length?shorts.length+' SHORT':''].filter(Boolean).join(' · ')||'BOT LINK UNKNOWN';
+    const leverage=[...new Set(rows.map(b=>Number(b.leverage)).filter(x=>x>0))].map(x=>x+'x').join(' / ');
+    return '<article class="asset-pair stale-pair-card"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+sides+(leverage?' · '+leverage:'')+'</small></div><b class="pair-status tone-muted">DATA STALE</b></div><div class="stale-pair-line"><div><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+mp.source+'</small></div><p>Private Bot-Felder ausgeblendet · kein Risk/PNL/Next-Action aus altem Snapshot</p></div></article>';
+  }
+  const longUsd=fresh?exposure(rows,'LONG'):0,shortUsd=fresh?exposure(rows,'SHORT'):0;
   const pnl=fresh?rows.filter(b=>h.livePnlAvailable?.(b)).map(b=>h.botPnlUsd?.(b)?.value).filter(x=>x!=null).reduce((a,b)=>a+b,0):null;
-  const mp=marketPrice(symbol),hedge=longUsd>0?shortUsd/longUsd*100:null;
-  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+rows.filter(b=>(b.side||'LONG')==='LONG').length+' LONG · '+rows.filter(b=>b.side==='SHORT').length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+mp.source+'</small></div><div><span>NET EXPOSURE</span><b>'+(fresh?h.money?.(longUsd-shortUsd):'—')+'</b></div><div><span>HEDGE</span><b>'+(fresh&&hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+st.reason+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
+  const hedge=longUsd>0?shortUsd/longUsd*100:null;
+  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+longs.length+' LONG · '+shorts.length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+mp.source+'</small></div><div><span>NET EXPOSURE</span><b>'+(fresh?h.money?.(longUsd-shortUsd):'—')+'</b></div><div><span>HEDGE</span><b>'+(fresh&&hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+st.reason+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
 }
 function criticalPair(){
   const s=S();if(!s)return null;
@@ -154,14 +160,18 @@ function marketUniverse(){
   return keys.sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
 }
 function marketSignal(i){
-  if(!i)return{label:'SYNC',tone:'muted',score:0};
+  if(!i)return{label:'SYNC',tone:'muted',score:0,rank:0,confirmed:false};
   const bull=Number(i.bullish)||0,bear=Number(i.bearish)||0,peak=Math.max(bull,bear);
-  if(Math.abs(bull-bear)<=1&&peak>=4)return{label:'CONFLICT',tone:'watch',score:peak};
-  if(bear>=6)return{label:'BEAR PRESSURE',tone:'danger',score:bear};
-  if(bull>=6)return{label:'BULL PRESSURE',tone:'safe',score:bull};
-  if(bear>=4)return{label:'BEAR WATCH',tone:'watch',score:bear};
-  if(bull>=4)return{label:'BULL WATCH',tone:'safe',score:bull};
-  return{label:i.bias||'MIXED',tone:'muted',score:peak};
+  const m1=Number(i.macd1h?.hist),m4=Number(i.macd4?.hist),r1=Number(i.rsi1h),r4=Number(i.rsi4);
+  const bear1=m1<0&&r1<50,bear4=m4<0&&r4<50,bull1=m1>0&&r1>50,bull4=m4>0&&r4>50;
+  if(Math.abs(bull-bear)<=1&&peak>=4)return{label:'CONFLICT',tone:'watch',score:peak,rank:2,confirmed:false};
+  if(bear>=6&&bear1&&bear4)return{label:'BEAR CONFIRMED',tone:'danger',score:bear,rank:4,confirmed:true};
+  if(bull>=6&&bull1&&bull4)return{label:'BULL CONFIRMED',tone:'safe',score:bull,rank:4,confirmed:true};
+  if(bear>=5&&(bear1||bear4))return{label:'BEAR WATCH',tone:'watch',score:bear,rank:3,confirmed:false};
+  if(bull>=5&&(bull1||bull4))return{label:'BULL WATCH',tone:'safe',score:bull,rank:3,confirmed:false};
+  if(bear>=4)return{label:'BEAR EARLY',tone:'muted',score:bear,rank:2,confirmed:false};
+  if(bull>=4)return{label:'BULL EARLY',tone:'muted',score:bull,rank:2,confirmed:false};
+  return{label:'NEUTRAL',tone:'muted',score:peak,rank:1,confirmed:false};
 }
 function marketRow(symbol){
   const s=S(),h=H(),i=s?.assetIntel?.[symbol],m=marketPrice(symbol),sig=marketSignal(i);
@@ -186,17 +196,17 @@ function renderMarket(){
   view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
 }
 function scannerCard(symbol){
-  const s=S(),i=s?.assetIntel?.[symbol],sig=marketSignal(i),bot=matchedRows(symbol).length?'BOT LINKED':'NO LIVE BOT',fresh=H().botFeedFresh?.();
+  const s=S(),i=s?.assetIntel?.[symbol],sig=marketSignal(i),linked=matchedRows(symbol).length>0,fresh=H().botFeedFresh?.();
   if(!i)return'';
   const reasons=(sig.label.startsWith('BEAR')?i.longReasons:i.shortReasons)||[];
-  return '<article class="scan-card"><div class="scan-head"><div><strong>'+symbol+'</strong><small>'+bot+(matchedRows(symbol).length?' · '+(fresh?'BOT FRESH':'BOT STALE'):'')+'</small></div><b class="tone-'+sig.tone+'">'+sig.label+'</b></div><div class="scan-grid"><span>BIAS <b>'+i.bias+'</b></span><span>PRESSURE <b>'+sig.score+'/9</b></span><span>RSI 15m <b>'+i.rsi15.toFixed(1)+'</b></span><span>RSI 1h <b>'+i.rsi1h.toFixed(1)+'</b></span><span>RSI 4h <b>'+i.rsi4.toFixed(1)+'</b></span><span>MACD 4h <b>'+i.macd4.hist.toFixed(2)+'</b></span></div><div class="scan-actions"><span>LONG <b>'+i.longAction+'</b></span><span>SHORT <b>'+i.shortAction+'</b></span></div><small>'+(reasons.slice(0,2).join(' · ')||'Kein starkes Momentum-Warnsignal')+' · 4h bestätigt, 15m/1h warnt früh</small></article>';
+  return '<article class="scan-card compact-scan"><div class="scan-head"><div><strong>'+symbol+'</strong><small>'+(linked?'BOT LINKED · '+(fresh?'FRESH':'STALE'):'MARKET ONLY')+'</small></div><b class="tone-'+sig.tone+'">'+sig.label+'</b></div><div class="scan-grid compact"><span>RSI 15m / 1h <b>'+i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1)+'</b></span><span>RSI 4h <b>'+i.rsi4.toFixed(1)+'</b></span><span>MACD 1h / 4h <b>'+i.macd1h.hist.toFixed(2)+' · '+i.macd4.hist.toFixed(2)+'</b></span><span>RAW PRESSURE <b>'+sig.score+'/9</b></span></div><div class="scan-actions"><span>LONG VIEW <b>'+i.longAction+'</b></span><span>SHORT VIEW <b>'+i.shortAction+'</b></span></div><small>'+(reasons.slice(0,2).join(' · ')||'Kein starkes Momentum-Warnsignal')+' · CONFIRMED nur bei 1h + 4h Alignment</small></article>';
 }
 function renderScanner(){
   const view=$('#view-research');if(!view||$('.v10-scanner-stack',view))return;
   if(!$('.bt-control',view)&&!$('.hero',view))return;
-  const s=S(),syms=marketUniverse().filter(x=>s?.assetIntel?.[x]).sort((a,b)=>marketSignal(s.assetIntel[b]).score-marketSignal(s.assetIntel[a]).score);
-  const top=syms.slice(0,6),rest=syms.slice(6);
-  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>MARKET SIGNALS</b></div><small>Marktdaten ≠ Bot-Daten · Safety/Data Guard bleibt vor Trading-Aktionen</small></section><section class="scanner-summary"><div><span>MARKETS</span><b>'+syms.length+'</b></div><div><span>STRONG SIGNALS</span><b>'+syms.filter(x=>marketSignal(s.assetIntel[x]).score>=6).length+'</b></div><div><span>BOT LINKED</span><b>'+syms.filter(x=>matchedRows(x).length).length+'</b></div><div><span>BOT DATA</span><b class="'+(H().botFeedFresh?.()?'tone-safe':'tone-watch')+'">'+(H().botFeedFresh?.()?'FRESH':'STALE/OFF')+'</b></div></section><div class="section-title"><h2>TOP SIGNALS</h2><small>nach Momentum-Druck sortiert</small></div><div class="v10-scanner-stack">'+top.map(scannerCard).join('')+'</div>'+(rest.length?'<details class="scanner-more"><summary>WEITERE '+rest.length+' MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'');
+  const s=S(),syms=marketUniverse().filter(x=>s?.assetIntel?.[x]).sort((a,b)=>{const A=marketSignal(s.assetIntel[a]),B=marketSignal(s.assetIntel[b]);return B.rank-A.rank||B.score-A.score});
+  const confirmed=syms.filter(x=>marketSignal(s.assetIntel[x]).confirmed),top=syms.slice(0,4),rest=syms.slice(4);
+  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>MARKET SIGNALS</b></div><small>CONFIRMED braucht 1h + 4h Alignment · Marktdaten bleiben getrennt von Bot-Daten</small></section><section class="scanner-summary"><div><span>MARKETS</span><b>'+syms.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>BOT LINKED</span><b>'+syms.filter(x=>matchedRows(x).length).length+'</b></div><div><span>BOT DATA</span><b class="'+(H().botFeedFresh?.()?'tone-safe':'tone-watch')+'">'+(H().botFeedFresh?.()?'FRESH':'STALE/OFF')+'</b></div></section><div class="section-title"><h2>TOP SETUPS</h2><small>Bestätigung vor Roh-Pressure</small></div><div class="v10-scanner-stack">'+top.map(scannerCard).join('')+'</div>'+(rest.length?'<details class="scanner-more"><summary>WEITERE '+rest.length+' MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'');
 }
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
