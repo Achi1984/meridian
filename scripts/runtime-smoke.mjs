@@ -69,6 +69,7 @@ async function smoke(){
     pages:true,
     gateway:true,
     privateData:true,
+    pionexBotReadConfigured:health.pionexBotReadConfigured===true,
     anonymousProtectedStatus:protectedResponse.status,
     anonymousLegacyDetailedStatus:legacyDetailed.status,
     botObserver:true,
