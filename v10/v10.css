@@ -318,3 +318,27 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .edge-window-grid{grid-template-columns:repeat(3,1fr)}
   .edge-funding-list{grid-template-columns:1fr}
 }
+
+
+/* v10 r11 · TSMOM Holdout V1 */
+.holdout-shell{margin:10px 0;padding:10px;border:1px solid #31516e;border-radius:14px;background:#07101a}
+.holdout-protocol{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;padding:8px;border:1px dashed #35536c;border-radius:10px;background:#060b11}
+.holdout-protocol span{font-size:7px;color:var(--amber);font-weight:800}.holdout-protocol b{font-size:8px}.holdout-protocol small{grid-column:1/-1;font-size:7px;color:var(--muted);line-height:1.4}
+.holdout-run{width:100%;height:38px;margin:8px 0;border:1px solid var(--blue);background:#0a1826;color:var(--cyan);border-radius:10px;font-size:9px;font-weight:900;letter-spacing:.04em}
+.holdout-run:disabled{opacity:.55}
+.holdout-combined{margin:7px 0;padding:9px;border:1px solid #5a362f;border-radius:11px;background:#100a09}.holdout-combined.pass{border-color:#205b48;background:#07120f}
+.holdout-combined span{display:block;font-size:7px;color:var(--muted)}.holdout-combined b{display:block;margin-top:2px;font-size:11px}.holdout-combined small{display:block;margin-top:4px;font-size:7px;color:var(--muted);line-height:1.4}
+.holdout-card{margin-top:8px;padding:8px;border:1px solid #193149;border-radius:12px;background:#060b11}
+.holdout-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.holdout-card-head>div{display:flex;flex-direction:column;gap:2px}.holdout-card-head span{font-size:7px;color:var(--cyan);letter-spacing:.06em}.holdout-card-head b{font-size:10px}.holdout-card-head small{font-size:7px;color:var(--muted)}
+.holdout-card-head>strong{font-size:7px;border:1px solid currentColor;border-radius:999px;padding:4px 6px;white-space:nowrap}
+.holdout-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px}.holdout-metrics>div{padding:6px;border:1px solid #142538;border-radius:8px;background:#05090e}
+.holdout-metrics span,.holdout-diag span{display:block;font-size:6px;color:var(--muted)}.holdout-metrics b,.holdout-diag b{display:block;margin-top:2px;font-size:9px}
+.holdout-gate{margin-top:7px;padding:7px;border:1px solid #3a3120;border-radius:9px;background:#0f0d08}.holdout-gate b{display:block;font-size:8px}.holdout-gate small{display:block;margin-top:3px;font-size:7px;color:var(--muted);line-height:1.35}
+.holdout-diag{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:7px 0}.holdout-diag>div{padding:6px;border:1px solid #142538;border-radius:8px;background:#05090e}
+@media(max-width:600px){
+  .holdout-metrics,.holdout-diag{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:390px){
+  .holdout-card-head{flex-direction:column}.holdout-card-head>strong{align-self:flex-start}
+}
