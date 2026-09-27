@@ -334,38 +334,12 @@ function renderScanner(){
 }
 
 function skNum(v,d=2){
-  const n=Number(v);return Number.isFinite(n)?new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d}).format(n):'—';
+  const n=Number(v);
+  return Number.isFinite(n)?new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d}).format(n):'—';
 }
 function skMoney(v){
-  const n=Number(v);return Number.isFinite(n)?(n>=0?'+':'−')+'
-  const view=$('#view-more'),b=bridge();if(!view||!b)return;
-  if(!$('.bt-control',view)&&!$('.bt-result',view)){
-    view.innerHTML=b.renderResearch?.()||'<section class="card">LAB nicht verfügbar.</section>';
-    b.bindResearch?.('more');
-  }
-  banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
-  $('.hero',view)?.remove();
-  if(!$('.lab-overview',view)){
-    const bt=S()?.backtest||{},r=bt.result;
-    const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>SK METHOD</span><b>FROZEN 4H</b><small>keine nachträgliche Optimierung</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
-    const control=$('.bt-control',view);control?.insertAdjacentElement('beforebegin',o);
-    o.insertAdjacentHTML('afterend',skPaperPanel());bindSkPaper(view);
-  }
-  const why=$$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
-  if(why&&!why.closest('details')){
-    const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
-    why.replaceWith(d);
-  }
-}
-function decorate(){
-  document.documentElement.dataset.meridianBuild=BUILD;
-  renderCommand();renderBots();renderMarket();renderScanner();renderLab();
-}
-let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;decorate();});};
-new MutationObserver(schedule).observe($('#app')||document.body,{childList:true,subtree:true});
-decorate();
-+new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(Math.abs(n)):'—';
+  const n=Number(v);
+  return Number.isFinite(n)?(n>=0?'+':'−')+'$'+new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(Math.abs(n)):'—';
 }
 function skBotStateLabel(r){
   const state=String(r?.latestState||'WAITING_DATA');
@@ -387,13 +361,13 @@ function skPaperResultHtml(){
   if(skLabUi.error)return '<div class="sk-paper-error"><b>BACKTEST FEHLER</b><small>'+skLabUi.error+'</small></div>';
   const r=skLabUi.result,s=r?.summary,g=skLabUi.gate,st=skLabUi.stability;
   if(!r||!s)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>Backtest startet nur nach Klick. Keine API-Abfragen im normalen COMMAND.</small></div>';
-  const daPf=s.doubleAdvantageTrades?skMoney(s.doubleAdvantagePnl):'—',gateTone=g?.pass?'safe':'watch';
+  const daPnl=s.doubleAdvantageTrades?skMoney(s.doubleAdvantagePnl):'—',gateTone=g?.pass?'safe':'watch';
   const state=skBotStateLabel(r),seq=r.latestSequence;
   const stateDetail=seq?seq.side+' · 0 '+fibFmt(seq.zero)+' · A '+fibFmt(seq.a)+(seq.gateTouched?' · GATE ✓':' · GATE offen'):'Keine offene Sequenz am Stichprobenende';
   const windows=(st?.windows||[]).map(w=>'<div class="'+(w.positive?'positive':'negative')+'"><span>W'+w.i+' · '+w.trades+' Trades</span><b>'+skMoney(w.pnl)+'</b><small>PF '+skNum(w.profitFactor,2)+'</small></div>').join('');
   const recent=(r.trades||[]).slice(-5).reverse().map(t=>'<div class="sk-trade-row"><span>'+t.side+(t.doubleAdvantage?' · 2×ADV':'')+'</span><b>'+skMoney(t.realizedPnl)+'</b><small>'+t.entryRatios.map(x=>x.toFixed(3)).join('/')+' → '+(t.exitReason||'—')+'</small></div>').join('');
   return '<div class="sk-state-card"><div><span>CURRENT STATE</span><b>'+state+'</b><small>'+stateDetail+'</small></div><strong class="tone-'+gateTone+'">'+(g?.label||'RESEARCH')+'</strong></div>'+
-    '<div class="sk-metrics"><div><span>TRADES</span><b>'+s.trades+'</b></div><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>PF</span><b>'+skNum(s.profitFactor,2)+'</b></div><div><span>WIN RATE</span><b>'+skNum(s.winRate,1)+'%</b></div><div><span>EXPECTANCY</span><b>'+skMoney(s.expectancy)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>LONG / SHORT</span><b>'+s.longTrades+' / '+s.shortTrades+'</b></div><div><span>DOUBLE ADV</span><b>'+s.doubleAdvantageTrades+'</b><small>'+daPf+'</small></div></div>'+
+    '<div class="sk-metrics"><div><span>TRADES</span><b>'+s.trades+'</b></div><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>PF</span><b>'+skNum(s.profitFactor,2)+'</b></div><div><span>WIN RATE</span><b>'+skNum(s.winRate,1)+'%</b></div><div><span>EXPECTANCY</span><b>'+skMoney(s.expectancy)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>LONG / SHORT</span><b>'+s.longTrades+' / '+s.shortTrades+'</b></div><div><span>DOUBLE ADV</span><b>'+s.doubleAdvantageTrades+'</b><small>'+daPnl+'</small></div></div>'+
     '<div class="sk-gate"><span>RESEARCH GATE</span><b>'+(g?.pass?'PASS · KEINE AUTO-PROMOTION':'FAIL / INSUFFICIENT')+'</b><small>'+((g?.reasons||[]).join(' · ')||'Frozen Mindestkriterien erfüllt; unabhängiger Forward-Test bleibt Pflicht.')+'</small></div>'+
     '<div class="sk-section-title"><b>5 ZEITFENSTER</b><small>'+((st?.positiveWindows||0))+'/5 positiv · kein Parameter-Refit</small></div><div class="sk-window-grid">'+windows+'</div>'+
     '<details class="sk-trades"><summary>LETZTE TRADES · '+Math.min(5,s.trades)+'</summary><div>'+recent+'</div></details>'+
@@ -402,17 +376,26 @@ function skPaperResultHtml(){
 async function runSkPaperBacktest(view){
   if(skLabUi.running)return;
   skLabUi.symbol=$('#sk-asset',view)?.value||skLabUi.symbol;
-  skLabUi.days=Number($('#sk-days',view)?.value)||180;skLabUi.running=true;skLabUi.error=null;
-  const out=$('#sk-result',view),btn=$('#sk-run',view);if(out)out.innerHTML=skPaperResultHtml();if(btn){btn.disabled=true;btn.textContent='LÄUFT …'}
+  skLabUi.days=Number($('#sk-days',view)?.value)||180;
+  skLabUi.running=true;skLabUi.error=null;
+  const out=$('#sk-result',view),btn=$('#sk-run',view);
+  if(out)out.innerHTML=skPaperResultHtml();
+  if(btn){btn.disabled=true;btn.textContent='LÄUFT …'}
   try{
-    const loader=H().marketKlinesHistory;if(typeof loader!=='function')throw new Error('Historical 4h data bridge fehlt');
+    const loader=H().marketKlinesHistory;
+    if(typeof loader!=='function')throw new Error('Historical 4h data bridge fehlt');
     const bars=Math.min(2500,skLabUi.days*6+40),rows=await loader('4h',bars,skLabUi.symbol);
     if(!Array.isArray(rows)||rows.length<100)throw new Error('Zu wenige 4h-Kerzen: '+(rows?.length||0));
     const result=replaySkPaperBot(rows),stability=skChronologicalStability(result.trades,5),gate=evaluateSkPaperGate(result.summary,stability);
     skLabUi.result=result;skLabUi.stability=stability;skLabUi.gate=gate;
     skLabUi.range=new Date(rows[0].openTime).toLocaleDateString('de-DE')+' → '+new Date(rows.at(-1).openTime).toLocaleDateString('de-DE')+' · '+rows.length+'×4h';
-  }catch(e){skLabUi.error=String(e?.message||e)}
-  finally{skLabUi.running=false;if(out)out.innerHTML=skPaperResultHtml();if(btn){btn.disabled=false;btn.textContent='SK BACKTEST STARTEN'}}
+  }catch(e){
+    skLabUi.error=String(e?.message||e);
+  }finally{
+    skLabUi.running=false;
+    if(out)out.innerHTML=skPaperResultHtml();
+    if(btn){btn.disabled=false;btn.textContent='SK BACKTEST STARTEN'}
+  }
 }
 function bindSkPaper(view){
   const a=$('#sk-asset',view),d=$('#sk-days',view),b=$('#sk-run',view);
@@ -428,12 +411,22 @@ function renderLab(){
   }
   banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
   $('.hero',view)?.remove();
+
+  if(!$('.sk-paper-shell',view)){
+    const host=$('.bt-control',view);
+    if(host)host.insertAdjacentHTML('beforebegin',skPaperPanel());
+    else view.insertAdjacentHTML('afterbegin',skPaperPanel());
+    bindSkPaper(view);
+  }
+
   if(!$('.lab-overview',view)){
     const bt=S()?.backtest||{},r=bt.result;
     const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>ACTIVE LAB</span><b>PROFIT LOCK V2</b><small>Exit-Policy isoliert testen</small></div><div><span>METHOD</span><b>PAIRED TEST</b><small>gleiche Entries · andere Exit-Policy</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST RESULT</span><b>'+(r?r.symbol:'—')+'</b><small>'+(r?(r.first+' → '+r.last):'noch kein Lauf')+'</small></div>';
-    const control=$('.bt-control',view);control?.insertAdjacentElement('beforebegin',o);
+    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>METHODS</span><b>FROZEN 4H + PAIRED TEST</b><small>SK Entry-Regeln · Profit-Lock gleiche Entries</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
+    const sk=$('.sk-paper-shell',view),control=$('.bt-control',view);
+    (sk||control)?.insertAdjacentElement('beforebegin',o);
   }
+
   const why=$$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
   if(why&&!why.closest('details')){
     const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
