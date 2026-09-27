@@ -36,6 +36,13 @@ jobs:
           node --check app-v7.33-hardening.js
           node --check app-runtime-monitor.js
           node --check app-v7.37-ui-polish.js
+          node --check v9/v9.js
+          node --check v10/v10.js
+          node --check v10/fib-core.js
+          node --check research/sk-paperbot-v1.js
+          node --check research/sk-research-v2.js
+          node --check research/documented-edge-v1.js
+          node --check research/tsmom-holdout-v1.js
       - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Release authority consistency
