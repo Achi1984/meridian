@@ -83,6 +83,8 @@ async function smoke(){
     terminalBuild:EXPECTED_TERMINAL,
     gateway:true,
     privateData:true,
+    privateReadConfigured:health.privateReadConfigured===true,
+    privateReadAuthSource:String(health.privateReadAuthSource||'UNKNOWN'),
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,
     anonymousProtectedStatus:protectedResponse.status,
     anonymousLegacyDetailedStatus:legacyDetailed.status,
