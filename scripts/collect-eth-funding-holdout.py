@@ -82,7 +82,7 @@ def at_or_before(rows,t):
 
 # Perpetual 1h closes are needed across the full holdout because funding is paid
 # on fixed base quantity and therefore scales with mark/notional through time.
-perp=[]
+perp=download_klines('futures/um',2023,12)
 funding=[]
 for y,m in months(START,datetime(2026,5,1,tzinfo=timezone.utc)):
     sys.stderr.write(f'archive {y:04d}-{m:02d}\n')
