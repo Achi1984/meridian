@@ -51,10 +51,11 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
   assert.match(js,/\.data-truth/);
 });
 
-test('v10 scanner uses 4h confirmation with 15m and 1h warning context',()=>{
+test('v10 scanner requires aligned 1h and 4h confirmation',()=>{
   assert.match(js,/MARKET SIGNALS/);
-  assert.match(js,/4h bestätigt, 15m\/1h warnt früh/);
-  assert.match(js,/Safety\/Data Guard bleibt vor Trading-Aktionen/);
+  assert.match(js,/CONFIRMED braucht 1h \+ 4h Alignment/);
+  assert.match(js,/bear1&&bear4/);
+  assert.match(js,/bull1&&bull4/);
 });
 
 test('v10 visually separates live and paper but keeps one engine',()=>{
@@ -92,10 +93,10 @@ test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
 
 
 test('v10 r5 bots collapse stale private fields instead of rendering empty action grids',()=>{
-  assert.match(js,/pair-leg-stale/);
-  assert.match(js,/Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten/);
+  assert.match(js,/stale-pair-card/);
+  assert.match(js,/Private Bot-Felder ausgeblendet/);
+  assert.match(js,/kein Risk\/PNL\/Next-Action aus altem Snapshot/);
   assert.match(js,/function marketPrice/);
-  assert.match(js,/MARKET PRICE/);
 });
 
 test('v10 r5 market is a multi-asset public-data board independent from bot freshness',()=>{
@@ -108,13 +109,13 @@ test('v10 r5 market is a multi-asset public-data board independent from bot fres
   assert.match(js,/market-list/);
 });
 
-test('v10 r5 scanner ranks market signals independently and labels bot linkage separately',()=>{
-  assert.match(js,/marketUniverse\(\).*sort/);
-  assert.match(js,/MARKET SIGNALS/);
-  assert.match(js,/Marktdaten ≠ Bot-Daten/);
-  assert.match(js,/BOT LINKED/);
-  assert.match(js,/BOT DATA/);
-  assert.match(js,/TOP SIGNALS/);
+test('v10 r5 scanner ranks confirmed setups before raw pressure',()=>{
+  assert.match(js,/B\.rank-A\.rank\|\|B\.score-A\.score/);
+  assert.match(js,/BEAR CONFIRMED/);
+  assert.match(js,/BULL CONFIRMED/);
+  assert.match(js,/const confirmed=/);
+  assert.match(js,/slice\(0,4\)/);
+  assert.match(js,/TOP SETUPS/);
 });
 
 test('v10 r5 lab is a compact research hub over the existing paired backtest',()=>{
@@ -122,5 +123,6 @@ test('v10 r5 lab is a compact research hub over the existing paired backtest',()
   assert.match(js,/ACTIVE LAB/);
   assert.match(js,/PAIRED TEST/);
   assert.match(js,/METHODIK & WARUM/);
+  assert.match(js,/\$\$\('\.card',view\)\.find/);
   assert.match(css,/\.lab-overview/);
 });
