@@ -108,7 +108,7 @@ test('r6 identifies nearest Fib levels and graphical positions safely',()=>{
 });
 
 test('r6 Market integrates graphical SK Fib zones without execution',()=>{
-  assert.match(html,/10\.0-r6/);
+  assert.match(html,/10\.0-r7/);
   assert.match(js,/REGIME \+ FIB MAP \+ ASSET TAPE/);
   assert.match(js,/FIB MAP · SK OVERLAY/);
   assert.match(js,/SWING-FENSTER/);
