@@ -1,9 +1,10 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r9';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r9';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r9';
-// MERIDIAN v10 r9 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r10';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r10';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r10';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r10';
+// MERIDIAN v10 r10 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r9';
+const BUILD='10.0-r10';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -12,6 +13,7 @@ const H=()=>bridge()?.helpers||{};
 const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
+const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -476,18 +478,100 @@ function bindSkPaper(view){
   if(d)d.onchange=()=>{skLabUi.days=Number(d.value)||180};
   if(b)b.onclick=()=>runSkPaperBacktest(view);
 }
+
+function edgeWindowGrid(stability){
+  return '<div class="edge-window-grid">'+(stability?.windows||[]).map(w=>'<div class="'+(w.positive?'positive':'negative')+'"><span>W'+w.i+' · '+w.periods+' P</span><b>'+skNum(w.totalReturnPct,2)+'%</b><small>PF '+skNum(w.profitFactor,2)+'</small></div>').join('')+'</div>';
+}
+function edgeAssetRows(rows){
+  return '<div class="edge-asset-list">'+(rows||[]).map(a=>'<div><strong>'+a.symbol+'</strong><span>'+a.periods+' P</span><b>'+skMoney(a.summary?.pnl)+'</b><small>PF '+skNum(a.summary?.profitFactor,2)+'</small></div>').join('')+'</div>';
+}
+function tsmomEdgeHtml(){
+  if(edgeUi.running)return '<div class="edge-loading"><b>'+edgeUi.progress+'</b><small>'+edgeUi.completed+'/'+edgeUi.total+' Assets · Daily public candles</small></div>';
+  if(edgeUi.error)return '<div class="sk-paper-error"><b>EDGE BATCH FEHLER</b><small>'+edgeUi.error+'</small></div>';
+  const r=edgeUi.tsmom;if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>TSMOM startet nur nach Klick. 30/90/365d Signal · monatliches Rebalancing · Vol-Sizing.</small></div>';
+  const g=r.gate,s=r.summary;
+  return '<div class="edge-ab"><div><span>TSMOM CLASSIC</span><b>'+s.periods+' Perioden</b><small>Return '+skNum(s.totalReturnPct,2)+'% · PF '+skNum(s.profitFactor,2)+'</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
+    '<div class="edge-metrics"><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>POSITIVE ASSETS</span><b>'+g.positiveAssets+'/'+r.assets.length+'</b></div><div><span>PNL CONCENTRATION</span><b>'+skNum(r.positivePnlConcentrationPct,1)+'%</b></div><div><span>5 WINDOWS</span><b>'+r.stability.positiveWindows+'/5</b></div><div><span>MODEL COST</span><b>'+r.config.costBps+' bps</b><small>pro Exposure-Turnover</small></div></div>'+
+    '<div class="edge-gate"><span>FROZEN INTERNAL GATE</span><b>'+(g.pass?'PASS · RESEARCH ONLY':'FAIL / INSUFFICIENT')+'</b><small>'+((g.reasons||[]).join(' · ')||'Keine Live-Freigabe; separater Holdout bleibt Pflicht.')+'</small></div>'+
+    '<div class="edge-section-title"><b>ASSET ROBUSTHEIT</b><small>kein Asset-Dropping nach Ergebnis</small></div>'+edgeAssetRows(r.assets)+
+    '<div class="edge-section-title"><b>5 ZEITFENSTER</b><small>chronologisch</small></div>'+edgeWindowGrid(r.stability);
+}
+function xsmomEdgeHtml(){
+  if(edgeUi.running)return '<div class="edge-loading"><b>WARTET AUF BATCH</b><small>Gleicher Daily-Datensatz wie TSMOM</small></div>';
+  const r=edgeUi.xsmom;if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>3-Wochen Cross-Sectional Momentum wird im selben Batch berechnet.</small></div>';
+  const s=r.summary;
+  return '<div class="edge-ab"><div><span>XSMOM 3W · PRICE PROXY</span><b>'+s.periods+' Wochen</b><small>Return '+skNum(s.totalReturnPct,2)+'% · PF '+skNum(s.profitFactor,2)+'</small></div><strong class="tone-watch">PROXY ONLY</strong></div>'+
+    '<div class="edge-metrics"><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>POSITIVE WINDOWS</span><b>'+r.stability.positiveWindows+'/5</b></div><div><span>REBALANCE</span><b>7D</b></div></div>'+
+    '<div class="edge-gate"><span>DATA GATE</span><b>NO PROMOTION</b><small>'+r.limitation+' · publizierter Krypto-Faktor benötigt historische Market-Cap-Gewichtung.</small></div>'+
+    edgeWindowGrid(r.stability);
+}
+function fundingEdgeHtml(){
+  const e=fundingCarryEvidence();
+  const rows=e.evidence.map(x=>'<div><strong>'+x.asset+' · '+x.window+'</strong><b>'+skMoney(x.netUsd)+'</b><small>'+skNum(x.capitalReturnPct,3)+'% Kapitalreturn</small></div>').join('');
+  return '<div class="edge-ab"><div><span>FUNDING CARRY</span><b>EXISTING MERIDIAN EVIDENCE</b><small>'+e.ruleset+'</small></div><strong class="tone-watch">'+(e.newEntriesAllowed?'ENTRY ON':'NEW ENTRIES OFF')+'</strong></div>'+
+    '<div class="edge-funding-list">'+rows+'</div><div class="edge-gate"><span>STATUS</span><b>'+e.retirementReason.replaceAll('_',' ')+'</b><small>'+e.note+'</small></div>';
+}
+function documentedEdgePanel(){
+  return '<section class="documented-edge-shell"><div class="edge-head"><div><span>DOCUMENTED EDGE LAB</span><b>PUBLISHED STRATEGY REPLICATIONS</b><small>Evidenz ≠ Garantie · Regeln vor Ergebnis eingefroren</small></div><strong>RESEARCH ONLY</strong></div>'+
+    '<div class="edge-controls"><label>HISTORY<select id="edge-days"><option value="730" '+(edgeUi.days===730?'selected':'')+'>730 TAGE</option><option value="1460" '+(edgeUi.days===1460?'selected':'')+'>1460 TAGE</option></select></label><div><span>UNIVERSE</span><b>'+DOCUMENTED_EDGE_ASSETS.join(' · ')+'</b></div><button id="edge-run" type="button" '+(edgeUi.running?'disabled':'')+'>'+(edgeUi.running?'BATCH LÄUFT …':'EDGE BATCH STARTEN')+'</button></div>'+
+    '<details class="edge-rules"><summary>FROZEN PROTOCOL · '+DOCUMENTED_EDGE_V1_RULESET+'</summary><small>TSMOM: 30/90/365d, monatlich, Vol-Sizing, Kosten. XSMOM: 21d + 1d Skip, wöchentlich, Price-only Proxy. Funding Carry: bestehender Meridian-Pfad bleibt eingefroren.</small></details>'+
+    '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>01 · TIME-SERIES MOMENTUM</span><b>TSMOM CLASSIC</b></div><small>höchste Replikationsqualität</small></div><div id="edge-tsmom">'+tsmomEdgeHtml()+'</div></section>'+
+    '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>02 · FUNDING / CARRY</span><b>DELTA-NEUTRAL EVIDENCE</b></div><small>bestehender Research-Pfad</small></div>'+fundingEdgeHtml()+'</section>'+
+    '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>03 · CROSS-SECTIONAL MOMENTUM</span><b>3W PRICE-SORT</b></div><small>Proxy bis Market-Cap-Historie verfügbar</small></div><div id="edge-xsmom">'+xsmomEdgeHtml()+'</div></section>';
+}
+async function runDocumentedEdgeBatch(view){
+  if(edgeUi.running)return;
+  edgeUi.days=Number($('#edge-days',view)?.value)||1460;edgeUi.running=true;edgeUi.error=null;edgeUi.tsmom=null;edgeUi.xsmom=null;edgeUi.completed=0;edgeUi.loadedAssets=[];
+  const t=$('#edge-tsmom',view),x=$('#edge-xsmom',view),btn=$('#edge-run',view),loader=H().marketKlinesHistory;
+  if(typeof loader!=='function'){edgeUi.running=false;edgeUi.error='Historical daily data bridge fehlt';if(t)t.innerHTML=tsmomEdgeHtml();return}
+  if(btn){btn.disabled=true;btn.textContent='BATCH LÄUFT …'}
+  const data={},bars=Math.min(9000,edgeUi.days+400);
+  try{
+    for(const symbol of DOCUMENTED_EDGE_ASSETS){
+      edgeUi.progress='LADE '+symbol; if(t)t.innerHTML=tsmomEdgeHtml();if(x)x.innerHTML=xsmomEdgeHtml();
+      try{
+        const rows=await loader('1d',bars,symbol);
+        if(Array.isArray(rows)&&rows.length>=400){data[symbol]=rows;edgeUi.loadedAssets.push(symbol)}
+      }catch(e){}
+      edgeUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    if(Object.keys(data).length<3)throw new Error('Zu wenige Assets mit >=400 Daily-Kerzen: '+Object.keys(data).length);
+    edgeUi.progress='BERECHNE TSMOM';if(t)t.innerHTML=tsmomEdgeHtml();
+    edgeUi.tsmom=runTsmomClassic(data);
+    edgeUi.progress='BERECHNE XSMOM';if(x)x.innerHTML=xsmomEdgeHtml();
+    edgeUi.xsmom=runXsmom3wPriceProxy(data);
+  }catch(e){edgeUi.error=String(e?.message||e)}
+  finally{
+    edgeUi.running=false;edgeUi.progress='';
+    if(t)t.innerHTML=tsmomEdgeHtml();if(x)x.innerHTML=xsmomEdgeHtml();
+    if(btn){btn.disabled=false;btn.textContent='EDGE BATCH STARTEN'}
+  }
+}
+function bindDocumentedEdge(view){
+  const d=$('#edge-days',view),b=$('#edge-run',view);
+  if(d)d.onchange=()=>{edgeUi.days=Number(d.value)||1460};
+  if(b)b.onclick=()=>runDocumentedEdgeBatch(view);
+}
+
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
   if(!$('.bt-control',view)&&!$('.bt-result',view)){
     view.innerHTML=b.renderResearch?.()||'<section class="card">LAB nicht verfügbar.</section>';
     b.bindResearch?.('more');
   }
-  banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
+  banner('#view-more','LAB','RESEARCH HUB','Dokumentierte Strategien + interne Hypothesen · keine Orders','paper');
   $('.hero',view)?.remove();
 
+  if(!$('.documented-edge-module',view)){
+    const module=document.createElement('details');module.className='research-module documented-edge-module';module.open=true;
+    module.innerHTML='<summary><span>DOCUMENTED EDGE LAB</span><small>TSMOM · Funding Carry · XSMOM</small></summary><div class="research-module-body">'+documentedEdgePanel()+'</div>';
+    const host=$('.bt-control',view);(host||view.firstElementChild)?.insertAdjacentElement(host?'beforebegin':'afterend',module);
+    bindDocumentedEdge(view);
+  }
+
   if(!$('.sk-system-module',view)){
-    const module=document.createElement('details');module.className='research-module sk-system-module';module.open=true;
-    module.innerHTML='<summary><span>SK SYSTEM LAB</span><small>Core V1 + Research V2 A/B</small></summary><div class="research-module-body">'+skPaperPanel()+skV2Panel()+'</div>';
+    const module=document.createElement('details');module.className='research-module sk-system-module';
+    module.innerHTML='<summary><span>SK SYSTEM LAB</span><small>Core V1 + Research V2 A/B · eingefroren</small></summary><div class="research-module-body">'+skPaperPanel()+skV2Panel()+'</div>';
     const host=$('.bt-control',view);(host||view.firstElementChild)?.insertAdjacentElement(host?'beforebegin':'afterend',module);
     bindSkPaper(view);bindSkV2(view);
   }
@@ -499,15 +583,15 @@ function renderLab(){
       mod.innerHTML='<summary><span>PROFIT LOCK LAB</span><small>Paired Exit-Policy Test</small></summary><div class="research-module-body"></div>';
       control.insertAdjacentElement('beforebegin',mod);
       const body=$('.research-module-body',mod);
-      const nodes=[control,$('.bt-error',view),$('.bt-result',view),...$('.card',view).filter(x=>/Warum dieser Test/i.test(x.textContent||''))].filter(Boolean);
+      const nodes=[control,$('.bt-error',view),$('.bt-result',view),...$$('.card',view).filter(x=>/Warum dieser Test/i.test(x.textContent||''))].filter(Boolean);
       nodes.forEach(n=>body.appendChild(n));
     }
   }
 
   if(!$('.lab-overview',view)){
     const o=document.createElement('section');o.className='lab-overview';
-    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK V1 + V2</b><small>Core gegen Double Advantage</small></div><div><span>HORIZON</span><b>365 / 730 / 1460D</b><small>8-Asset Batch</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>V2 GATE</span><b>'+(skV2Ui.result?.gate?.label||'NO RUN')+'</b><small>keine Auto-Promotion</small></div>';
-    $('.sk-system-module',view)?.insertAdjacentElement('beforebegin',o);
+    o.innerHTML='<div><span>PRIMARY LAB</span><b>DOCUMENTED EDGE</b><small>Replikation vor Eigenoptimierung</small></div><div><span>UNIVERSE</span><b>8 ASSETS</b><small>Daily + bestehende Carry-Evidenz</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>SK STATUS</span><b>FROZEN</b><small>V1/V2 bleiben Benchmark</small></div>';
+    $('.documented-edge-module',view)?.insertAdjacentElement('beforebegin',o);
   }
 }
 function decorate(){
