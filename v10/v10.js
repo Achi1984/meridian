@@ -232,26 +232,27 @@ function fibZoneBand(zone,levels,current,kind,label,active=false){
   const y1=fibPlotPosition(zone.high,levels,current),y2=fibPlotPosition(zone.low,levels,current),top=Math.min(y1,y2),height=Math.max(2,Math.abs(y2-y1));
   return '<div class="fib-zone fib-zone-'+kind+' '+(active?'active':'')+'" style="top:'+top.toFixed(2)+'%;height:'+height.toFixed(2)+'%"><span>'+label+'</span></div>';
 }
-function fibSkCards(zones,current,confluences){
-  const activeTarget=zones.activeTarget,targetSide=zones.direction==='UP'?'BEAR REACTION WATCH':'BULL REACTION WATCH';
-  const bull=confluences.find(x=>x.side==='BULL'),bear=confluences.find(x=>x.side==='BEAR');
-  const conf=(x,side)=>x?'<div class="sk-double '+side.toLowerCase()+'"><span>DOUBLE ADVANTAGE · '+side+'</span><b>'+fibFmt(x.low)+' – '+fibFmt(x.high)+'</b><small>'+x.type+' · '+(x.contextWindow?x.contextWindow+'×4h':'2. Struktur')+' · '+Math.round(x.coverage*100)+'% Overlap</small></div>':'<div class="sk-double muted"><span>DOUBLE ADVANTAGE · '+side+'</span><b>—</b><small>keine zweite unabhängige Fib-Überlappung</small></div>';
-  return '<div class="sk-zone-grid"><div class="sk-zone bull"><span>BULL TURN · LONG</span><b>'+fibFmt(zones.bullTurn.low)+' – '+fibFmt(zones.bullTurn.high)+'</b><small>SK KL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.bullTurn,current)+'</small></div><div class="sk-zone bear"><span>BEAR TURN · SHORT</span><b>'+fibFmt(zones.bearTurn.low)+' – '+fibFmt(zones.bearTurn.high)+'</b><small>SK KL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.bearTurn,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(activeTarget.low)+' – '+fibFmt(activeTarget.high)+'</b><small>SK Zielbereich EXT 1.618–2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+conf(bull,'BULL')+conf(bear,'BEAR')+'</div>';
+function fibSkCards(low,high,direction,current,doubleAdvantage){
+  const zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction),targetSide=direction==='UP'?'BULLISH TARGET / SHORT WATCH':'BEARISH TARGET / LONG WATCH';
+  const da=doubleAdvantage?.candidate
+    ?'<div class="sk-double '+doubleAdvantage.side.toLowerCase()+'"><span>DOPPELTER VORTEIL · '+doubleAdvantage.side+'</span><b>'+fibFmt(doubleAdvantage.overlap.low)+' – '+fibFmt(doubleAdvantage.overlap.high)+'</b><small>Gegen-Ziel ∩ GKL · '+doubleAdvantage.overlap.overlapPct.toFixed(0)+'% Überlappung · Bestätigung über Struktur nötig</small></div>'
+    :'<div class="sk-double muted"><span>DOPPELTER VORTEIL</span><b>—</b><small>Keine bestätigte Gegen-Ziel ∩ GKL Überlappung</small></div>';
+  return '<div class="sk-zone-grid"><div class="sk-zone bull"><span>LONG TRENDWENDE · BULLISH</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear"><span>SHORT TRENDWENDE · BEARISH</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
 }
 function fibResultHtml(model){
-  const {symbol,low,high,direction,current,levels,source,bars,confluences=[]}=model,next=adjacentFibLevels(levels,current),currentTop=fibPlotPosition(current,levels,current),zones=buildSkZones(low,high,direction);
-  const confBands=confluences.slice(0,3).map(x=>fibZoneBand(x,levels,current,'double','2× '+x.side,false)).join('');
+  const {symbol,low,high,direction,current,levels,source,bars,doubleAdvantage=null}=model,next=adjacentFibLevels(levels,current),currentTop=fibPlotPosition(current,levels,current),zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction);
+  const doubleBand=doubleAdvantage?.candidate?fibZoneBand(doubleAdvantage.overlap,levels,current,'double','DOPPELTER VORTEIL',true):'';
   return '<div class="fib-anchor-row"><div><span>SWING LOW</span><b>'+fibFmt(low)+'</b></div><div><span>SWING HIGH</span><b>'+fibFmt(high)+'</b></div><div><span>CURRENT</span><b>'+fibFmt(current)+'</b></div></div>'+
   '<div class="fib-next"><div><span>NEXT ↑</span><b>'+(next.above?next.above.label+' · '+fibFmt(next.above.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.above,current))+'</small></div><div><span>NEXT ↓</span><b>'+(next.below?next.below.label+' · '+fibFmt(next.below.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.below,current))+'</small></div></div>'+
-  fibSkCards(zones,current,confluences)+
+  fibSkCards(low,high,direction,current,doubleAdvantage)+
   '<div class="fib-meta"><span>'+direction+' SWING</span><span>'+source+(bars?' · '+bars+' Bars':'')+'</span></div>'+
   '<div class="fib-ladder">'+
-    fibZoneBand(zones.bullTurn,levels,current,'bull','BULL TURN',direction==='UP')+
-    fibZoneBand(zones.bearTurn,levels,current,'bear','BEAR TURN',direction==='DOWN')+
-    fibZoneBand(zones.activeTarget,levels,current,'target','TARGET / TURN WATCH',true)+confBands+
+    fibZoneBand(zones.long,levels,current,'long','LONG TRENDWENDE',direction==='UP')+
+    fibZoneBand(zones.short,levels,current,'short','SHORT TRENDWENDE',direction==='DOWN')+
+    fibZoneBand(target,levels,current,'target','1.618–2.000 TARGET',true)+doubleBand+
     levels.map(x=>fibLevelRow(x,next,current,levels)).join('')+
     '<div class="fib-current" style="top:'+currentTop.toFixed(2)+'%"><span>CURRENT · '+symbol+'</span><i></i><b>'+fibFmt(current)+'</b></div></div>'+
-  '<div class="fib-legend"><span>SK KL: .500 · .559 · .618 · .667</span><span>Target: 1.618–2.000 · Double = unabhängige Überlappung</span></div>';
+  '<div class="fib-legend"><span>GKL: .500 · .559 · .618 · .667</span><span>Targets: 1.618 · 1.809 · 2.000 · Double = Gegen-Ziel ∩ GKL</span></div>';
 }
 async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
@@ -281,10 +282,12 @@ async function updateFibMap(view){
     if(!(current>0))current=Number(S()?.assetIntel?.[fibUi.symbol]?.price);
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
-    const contextWindows=[30,60,90,180].filter(w=>fibUi.mode==='MANUAL'||w!==fibUi.window);
-    const contexts=(rows?.length?contextWindows.map(w=>{try{const x=detectSwing(rows,w);return{...x,window:w}}catch{return null}}).filter(Boolean):[]);
-    const confluences=buildSkConfluences({low,high,direction,window:fibUi.window},contexts);
-    out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,confluences});
+    let doubleAdvantage=null;
+    if(fibUi.mode==='AUTO'&&rows?.length){
+      const parent=detectSwing(rows,fibUi.window),child=detectOpposingChildSwing(rows,parent,fibUi.window);
+      if(child)doubleAdvantage=skDoubleAdvantage(parent,child);
+    }
+    out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
   }catch(e){
     out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+String(e?.message||e)+'</small></div>';
   }
