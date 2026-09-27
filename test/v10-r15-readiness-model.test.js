@@ -29,7 +29,7 @@ test('r15 keeps safety visible while blocking stale-market profit decisions',()=
 });
 
 test('r15 data guard no longer calls safety-only data actionable',()=>{
-  assert.match(js,/label=g\.decisionReady>0\?'DECISION READY':g\.safetyReady>0\?'SAFETY ONLY':'BLOCKED'/);
+  assert.match(js,/label=g\.decisionReady>0\?\(g\.coverageComplete\?'DECISION READY':'PARTIAL READY'\):g\.safetyReady>0\?'SAFETY ONLY':'BLOCKED'/);
   assert.match(js,/actionable=decisionReady/);
   assert.doesNotMatch(js,/g\.actionable>0\?'ACTIONABLE'/);
 });
