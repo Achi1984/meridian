@@ -233,3 +233,14 @@ Recommended Pionex permission: Bot reading only.
 Frontend r20 Data Truth now shows PIONEX API, BOT ROWS, BOT MATCH, SNAPSHOT PNL, BOT SNAPSHOT AGE, ACTIONABLE, 2-SOURCE PRICE, UNMATCHED, BOT API, BOT SOURCE and PORTFOLIO source.
 
 Important: until read-only Pionex credentials are configured in the runtime, r20 should show BOT API = OFF and continue refusing trading actions from stale bot data.
+
+
+## v10 r22 — Deep-audit integrity follow-up
+
+- Continues the v10 deep audit after r21 without changing trading rules, paper-bot parameters, execution, Pionex orders, or research promotion logic.
+- Header live-status classes now have explicit semantic colors for SAFE / WATCH / DANGER / MUTED.
+- MARKET two-source coverage counts only the currently rendered market universe, preventing transient numerator/denominator drift after tracked-asset changes.
+- Forced BOTS refresh preserves the user's Asset Watch details open/closed state.
+- Forced SCANNER refresh preserves expanded fresh/stale detail groups.
+- CONFLICT/neutral scanner explanations use both long-adverse and short-adverse reason sets instead of presenting only one side.
+- Requires Release Safety plus targeted r22 regression coverage before merge.
