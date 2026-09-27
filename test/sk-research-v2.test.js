@@ -6,12 +6,13 @@ import {
 } from '../research/sk-research-v2.js';
 
 const t=(pnl,{da=false,daAt=null,open=1000,side='LONG',depth=.5}={})=>({
-  realizedPnl:pnl,doubleAdvantage:da,doubleAdvantageBeforeEntry:da&&daAt!=null&&daAt<=open,
+  realizedPnl:pnl,doubleAdvantage:da,doubleAdvantageBeforeEntry:da&&daAt!=null&&daAt<open,
   doubleAdvantageAt:daAt,openedAt:open,side,entryRatios:[depth],fees:1
 });
 
 test('V2 Double Advantage cohort forbids post-entry lookahead',()=>{
   assert.equal(isPreEntryDoubleAdvantage(t(10,{da:true,daAt:900,open:1000})),true);
+  assert.equal(isPreEntryDoubleAdvantage(t(10,{da:true,daAt:1000,open:1000})),false);
   assert.equal(isPreEntryDoubleAdvantage(t(10,{da:true,daAt:1100,open:1000})),false);
   assert.equal(isPreEntryDoubleAdvantage(t(10,{da:false,daAt:null,open:1000})),false);
 });
@@ -34,8 +35,8 @@ test('V2 A/B comparison leaves Core untouched and filters only pre-entry DA',()=
   ]};
   const c=compareSkCoreVsDouble(replay);
   assert.equal(c.core.trades,4);
-  assert.equal(c.double.trades,2);
-  assert.equal(c.nonDouble.trades,2);
+  assert.equal(c.double.trades,1);
+  assert.equal(c.nonDouble.trades,3);
   assert.ok(c.double.pnl>0);
 });
 
@@ -53,7 +54,7 @@ test('V2 batch aggregates assets and keeps research-only semantics',()=>{
   assert.equal(b.autoPromotion,false);
   assert.equal(b.assets.length,3);
   assert.equal(b.pooled.core.trades,9);
-  assert.equal(b.pooled.double.trades,6);
+  assert.equal(b.pooled.double.trades,5);
 });
 
 test('V2 frozen gate checks sample PF expectancy DD windows asset breadth and concentration',()=>{
