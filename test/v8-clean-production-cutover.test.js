@@ -5,10 +5,10 @@ import fs from 'node:fs';
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const clean=fs.readFileSync(new URL('../v8-clean/index.html',import.meta.url),'utf8');
 
-test('production root redirects to canonical v9 shell',()=>{
+test('production root redirects to canonical v10 shell',()=>{
   assert.match(root,/location\.replace\(target\+q\+h\)/);
-  assert.match(root,/var target='\.\/v9\/(?:\?build=r\d+)?'/);
-  assert.match(root,/9\.0-r\d+-production/);
+  assert.match(root,/var target='\.\/v10\/(?:\?build=r\d+)?'/);
+  assert.match(root,/10\.0-r\d+-production/);
   assert.doesNotMatch(root,/app-v6\.06|app-v7\.|app-v8\.0-navigation|primaryBottomNav|legacy\.click/);
 });
 
