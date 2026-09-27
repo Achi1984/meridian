@@ -14,7 +14,7 @@ function fallbackBlock(){
 }
 
 test('r12 imports the authoritative 27 Sep Asset Watch snapshot',()=>{
-  assert.match(html,/10\.0-r12/);
+  assert.match(html,/10\.0-r13/);
   assert.match(v9,/ASSET_WATCH_SNAPSHOT_AT='2026-09-27T19:50:00\+02:00'/);
   const block=fallbackBlock();
   assert.equal((block.match(/snapshotAt:ASSET_WATCH_SNAPSHOT_AT/g)||[]).length,34);
