@@ -62,3 +62,19 @@ test('v10 r8 LAB renderer is unique and contains SK panel wiring',()=>{
   assert.match(js,/bindSkPaper\(view\)/);
   assert.match(js,/\.sk-paper-shell/);
 });
+
+
+test('v10 r8 cache key is unique across production entrypoints',()=>{
+  const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
+  const legacy=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
+  const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+  for(const txt of [root,shell,legacy,engine,js]){
+    assert.doesNotMatch(txt,/10\.0-r7|build=r7|build','r7/);
+  }
+  assert.match(root,/build=r8/);
+  assert.match(shell,/v10\.js\?v=10\.0-r8/);
+  assert.match(shell,/v9\.js\?v=10\.0-r8/);
+  assert.match(js,/fib-core\.js\?v=10\.0-r8/);
+  assert.match(js,/sk-paperbot-v1\.js\?v=10\.0-r8/);
+});
