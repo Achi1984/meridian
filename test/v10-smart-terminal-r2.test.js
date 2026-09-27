@@ -59,8 +59,8 @@ test('v10 scanner uses 4h confirmation with 15m and 1h warning context',()=>{
 
 test('v10 visually separates live and paper but keeps one engine',()=>{
   assert.match(js,/POSITION LAYER/);
-  assert.match(js,/PAPER \/ RESEARCH ONLY/);
-  assert.match(js,/Keine automatische Promotion/);
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/keine automatische Promotion/i);
   assert.match(css,/data-tone="live"/);
   assert.match(css,/data-tone="paper"/);
 });
