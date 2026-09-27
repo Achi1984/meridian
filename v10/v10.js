@@ -222,7 +222,7 @@ function renderLab(){
     o.innerHTML='<div><span>ACTIVE LAB</span><b>PROFIT LOCK V2</b><small>Exit-Policy isoliert testen</small></div><div><span>METHOD</span><b>PAIRED TEST</b><small>gleiche Entries · andere Exit-Policy</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST RESULT</span><b>'+(r?r.symbol:'—')+'</b><small>'+(r?(r.first+' → '+r.last):'noch kein Lauf')+'</small></div>';
     const control=$('.bt-control',view);control?.insertAdjacentElement('beforebegin',o);
   }
-  const why=$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
+  const why=$$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
   if(why&&!why.closest('details')){
     const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
     why.replaceWith(d);
