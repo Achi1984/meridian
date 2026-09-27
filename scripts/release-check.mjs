@@ -6,6 +6,8 @@ const must=(ok,msg)=>{if(!ok)throw new Error(msg)};
 const release=json('version.json');
 const v=String(release.version||'');
 const build=String(release.buildId||'');
+const terminalBuild=String(release.terminalBuild||'');
+const terminalRevision=terminalBuild.split('-').slice(-1)[0]||'';
 const revision=build.split('-').slice(-1)[0]||'R1';
 const tag=`${v}-${revision}`;
 const cleanAssetTag=`${v}-${revision.toLowerCase()}`;
@@ -47,17 +49,22 @@ const v10Cutover=/var target='\.\/v10\/(?:\?build=r\d+)?'/.test(index)&&/10\.0-r
 const v9Cutover=/var target='\.\/v9\/(?:\?build=r\d+)?'/.test(index)&&/9\.0-r\d+-production/.test(index);
 const cleanCutover=index.includes("var target='./v8-clean/'")&&index.includes('8.0-clean-r8-production');
 if(v10Cutover){
+  must(/^10\.0-r\d+$/.test(terminalBuild),'canonical terminalBuild missing or invalid');
   must(index.includes('location.replace(target+q+h)'),'v10 root redirect must preserve query/hash');
+  must(index.includes("var target='./v10/?build="+terminalRevision+"'"),'v10 root redirect cache tag must match terminalBuild');
   must(!index.includes('app-v6.06.js'),'v10 root must not initialize compatibility loader');
-  const v10=read('v10/index.html');
+  const v10=read('v10/index.html'),v10js=read('v10/v10.js');
+  must(v10.includes('content="'+terminalBuild+'"'),'v10 meta build must match terminalBuild');
+  must(v10js.includes("const BUILD='"+terminalBuild+"'"),'v10 runtime BUILD must match terminalBuild');
   for(const key of ['command','bots','market','research','more']){
     must(v10.includes(`id="view-${key}"`),`v10 production target missing view-${key}`);
   }
   for(const label of ['COMMAND','BOTS','MARKET','SCANNER','LAB']){
     must(v10.includes('>'+label+'<'),`v10 production target missing nav label ${label}`);
   }
-  must(v10.includes('../v9/v9.js?v=10.0-r12'),'v10 must load validated v9 engine');
-  must(v10.includes('./v10.js?v=10.0-r12'),'v10 presentation adapter missing');
+  must(v10.includes('../v9/v9.js?v='+terminalBuild),'v10 must load validated v9 engine at terminalBuild');
+  must(v10.includes('./v10.js?v='+terminalBuild),'v10 presentation adapter missing or stale');
+  for(const modulePath of ['./fib-core.js','../research/sk-paperbot-v1.js','../research/sk-research-v2.js','../research/documented-edge-v1.js','../research/tsmom-holdout-v1.js'])must(v10js.includes(modulePath+'?v='+terminalBuild),'v10 module cache tag mismatch: '+modulePath);
 }else if(v9Cutover){
   must(index.includes('location.replace(target+q+h)'),'v9 root redirect must preserve query/hash');
   must(!index.includes('app-v6.06.js'),'v9 root must not initialize compatibility loader');

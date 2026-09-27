@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const release=JSON.parse(fs.readFileSync('version.json','utf8'));
 const EXPECTED_VERSION=String(release.version||'');
 const EXPECTED_BUILD=String(release.buildId||'');
+const EXPECTED_TERMINAL=String(release.terminalBuild||'');
 const PAGES_BASE=String(process.env.MERIDIAN_PAGES_BASE||'https://achi1984.github.io/meridian').replace(/\/$/,'');
 const GATEWAY=String(process.env.MERIDIAN_GATEWAY_URL||'https://p01--achi-meridian--ttvk44grdlp7.code.run').replace(/\/$/,'');
 const RETRIES=Math.max(1,Number(process.env.MERIDIAN_SMOKE_RETRIES||1));
@@ -25,6 +26,11 @@ async function json(url){
   if(!r.ok)fail(`${url} HTTP ${r.status}`);
   return await r.json();
 }
+async function textBody(url){
+  const r=await request(url);
+  if(!r.ok)fail(`${url} HTTP ${r.status}`);
+  return await r.text();
+}
 function sameRelease(x){
   return String(x?.version||'')===EXPECTED_VERSION&&String(x?.buildId||'')===EXPECTED_BUILD;
 }
@@ -38,10 +44,16 @@ async function smoke(){
   const nonce=Date.now();
   const pages=await json(`${PAGES_BASE}/version.json?smoke=${nonce}`);
   if(!sameRelease(pages))fail(`GitHub Pages stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${pages?.version}/${pages?.buildId}`);
+  if(!EXPECTED_TERMINAL||String(pages?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`GitHub Pages terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${pages?.terminalBuild}`);
+  const [terminalHtml,terminalJs]=await Promise.all([textBody(`${PAGES_BASE}/v10/index.html?smoke=${nonce}`),textBody(`${PAGES_BASE}/v10/v10.js?smoke=${nonce}`)]);
+  if(!terminalHtml.includes(`content="${EXPECTED_TERMINAL}"`))fail('v10 index terminal build mismatch');
+  if(!terminalHtml.includes(`./v10.js?v=${EXPECTED_TERMINAL}`))fail('v10 index points to stale adapter');
+  if(!terminalJs.includes(`const BUILD='${EXPECTED_TERMINAL}'`))fail('v10 adapter BUILD mismatch');
 
   const health=await json(`${GATEWAY}/gateway-health?smoke=${nonce}`);
   if(!health?.ok)fail('Gateway health not ok');
   if(!sameRelease(health))fail(`Northflank stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${health?.version}/${health?.buildId}`);
+  if(String(health?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`Gateway terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${health?.terminalBuild}`);
   if(health.privateData!==true)fail('Private dashboard store is not ready');
 
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
@@ -67,6 +79,8 @@ async function smoke(){
     version:EXPECTED_VERSION,
     buildId:EXPECTED_BUILD,
     pages:true,
+    terminal:true,
+    terminalBuild:EXPECTED_TERMINAL,
     gateway:true,
     privateData:true,
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,

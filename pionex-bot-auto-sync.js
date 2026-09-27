@@ -47,6 +47,12 @@ function tpFor(d,side){
   }
   return side==='SHORT'?n(d?.bottom):n(d?.top);
 }
+function slFor(d){
+  if(String(d?.lossStopType||'').toLowerCase()==='price'){
+    const x=n(d?.lossStop);if(x>0)return x;
+  }
+  return firstNum(d,['stopLoss','stopLossPrice','lossStopPrice']);
+}
 function reliableUsdInvestment(d){
   const usd=firstNum(d,['usdtInvestment','investmentUsd','investmentUSDT']);
   if(usd!=null&&usd>=0)return usd;
@@ -78,6 +84,7 @@ export function normalizePionexBotOrder(order){
     upper:n(d.top),
     liquidationPrice:liquidationFor(d,side),
     takeProfit:tpFor(d,side),
+    stopLoss:slFor(d),
     investmentUsd:reliableUsdInvestment(d),
     pnlUsd:optionalPnl(d),
     totalProfitPct:optionalPnlPct(d),

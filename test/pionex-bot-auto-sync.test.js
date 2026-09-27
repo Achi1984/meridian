@@ -22,7 +22,7 @@ test('running futures-grid rows normalize without inventing unsupported values',
     buOrderType:'futures_grid',buOrderId:'bot-1',base:'BTC.PERP',quote:'BTC',status:'running',
     buOrderData:{
       status:'running',trend:'long',leverage:7,bottom:'55000',top:'100000',row:174,
-      liquidationPrice:'62001.6',profitStopType:'price',profitStop:'100000',
+      liquidationPrice:'62001.6',profitStopType:'price',profitStop:'100000',lossStopType:'price',lossStop:'61000',
       usdtInvestment:'123.45',position:'0.03',positionOpenPrice:'85900',extraMargin:'0.002',
       cateType:'FUTURE_GRID_COIN_MARGINED',totalProfitUsd:'12.34',totalProfitPct:'4.5'
     }
@@ -34,6 +34,7 @@ test('running futures-grid rows normalize without inventing unsupported values',
   assert.equal(x.upper,100000);
   assert.equal(x.liquidationPrice,62001.6);
   assert.equal(x.takeProfit,100000);
+  assert.equal(x.stopLoss,61000);
   assert.equal(x.investmentUsd,123.45);
   assert.equal(x.pnlUsd,12.34);
   assert.equal(x.totalProfitPct,4.5);

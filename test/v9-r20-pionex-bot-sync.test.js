@@ -27,8 +27,10 @@ test('r20 frontend accepts normalized Pionex Bot API field aliases',()=>{
   assert.match(js,/\['lower','lowerRange'/);
   assert.match(js,/\['upper','upperRange'/);
   assert.match(js,/\['liq','pionexLiquidationPrice'/);
-  assert.match(js,/\['invest','investmentUsd'/);
+  assert.match(js,/investUsd=pick\(x,\['investmentUsd'/);
+  assert.match(js,/investAny=investUsd\?\?/);
   assert.match(js,/\['pnl','totalProfitUsd'/);
+  assert.match(js,/\['sl','stopLoss'/);
   assert.match(js,/replace\(\/\\\.PERP\$\//);
 });
 

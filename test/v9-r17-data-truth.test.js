@@ -18,12 +18,13 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
   assert.match(js,/if\(!livePnlAvailable\(b\)\)return\{code:'SYNC',label:'SYNC · PNL'/);
   assert.match(js,/function critical\(\)\{return botFeedFresh\(\)\?/);
   assert.match(js,/function status\(b\)\{if\(!liveMatched\(b\)\)return\['REF','muted'\]/);
-  assert.match(js,/price:num\(x\.price\),pnl:num\(x\.pnl\),profitPct:num\(x\.profitPct\),invest:num\(x\.invest\)/);
+  assert.match(js,/investUsd:num\(x\.investUsd\)/);
+  assert.match(js,/_liveInvestUsd:num\(x\.investUsd\)!=null/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)\.map/);
 });
 
 test('v9 r17 exposure is based on confirmed live capital only',()=>{
-  assert.match(js,/const botNotional=b=>liveInvestAvailable\(b\)\?/);
+  assert.match(js,/const botNotional=b=>liveInvestUsdAvailable\(b\)\?/);
   assert.match(js,/confirmed=botFeedFresh\(\)\?state\.bots\.filter\(liveMatched\):\[\]/);
   assert.match(js,/unknownBots/);
   assert.match(js,/KNOWN LIVE BOT LONG/);
@@ -33,9 +34,9 @@ test('v9 r17 exposure is based on confirmed live capital only',()=>{
 
 test('v9 r17 cross-checks market prices and labels mixed provenance',()=>{
   assert.match(js,/market\/tickers\?instType=SWAP/);
-  assert.match(js,/api\/v3\/ticker\/price/);
-  assert.match(js,/spread<=1\.5/);
-  assert.match(js,/OKX \+ BINANCE/);
+  assert.match(js,/fapi\.binance\.com\/fapi\/v1\/ticker\/price/);
+  assert.match(js,/spread<=\.5/);
+  assert.match(js,/OKX SWAP \+ BINANCE USD-M/);
   assert.match(html,/id="data-status">● REFERENCE/);
   assert.match(html,/v9 · r\d+ · COIN-M COMMAND CENTER/);
   assert.match(js,/OKX (POSITIONS · SNAPSHOT|FUTURES DCA · SCREENSHOT)/);

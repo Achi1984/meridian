@@ -3,7 +3,7 @@ if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r12');
+    qs.set('build','r13');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -67,37 +67,39 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,liveRows:0,botApiRows:0,unmatchedLive:[],botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,unmatchedLive:[],botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
- const feed=num(state.assetIntel&&b&&state.assetIntel[b.symbol]&&state.assetIntel[b.symbol].price),direct=num(b&&b.price),check=state.priceChecks&&b?state.priceChecks[b.symbol]:null;
- const verified=check&&check.verified?[num(check.okx),num(check.binance)].filter(x=>x>0):[];
+ const intel=state.assetIntel&&b?state.assetIntel[b.symbol]:null,feed=marketIntelFresh(intel)?num(intel.price):null,direct=num(b&&b.price),check=state.priceChecks&&b?state.priceChecks[b.symbol]:null,checkFresh=check?.updatedAt&&Date.now()-Number(check.updatedAt)<=3*60*1000;
+ const verified=check&&check.verified&&checkFresh?[num(check.okx),num(check.binance)].filter(x=>x>0):[];
  if(b&&b._livePrice&&direct>0){
   if(verified.length===2){const all=[direct,...verified],avg=all.reduce((a,x)=>a+x,0)/all.length,credible=all.filter(x=>Math.abs(x-avg)/avg<=.025);if(credible.length>=2)return b.side==='SHORT'?Math.max(...credible):Math.min(...credible)}
   return direct
  }
  if(verified.length===2)return b&&b.side==='SHORT'?Math.max(...verified):Math.min(...verified);
  if(feed>0)return feed;
- return direct>0?direct:null
+ return b&&b._livePrice&&direct>0?direct:null
 }
-function botPriceSource(b){const c=state.priceChecks&&b?state.priceChecks[b.symbol]:null;if(b&&b._livePrice&&c&&c.verified)return'PIONEX + OKX + BINANCE';if(c&&c.verified)return'OKX + BINANCE';if(b&&b._livePrice)return'PIONEX LIVE';if(state.assetIntel&&b&&state.assetIntel[b.symbol]&&state.assetIntel[b.symbol].price)return'SINGLE MARKET';return'REFERENCE'}
+function botPriceSource(b){const c=state.priceChecks&&b?state.priceChecks[b.symbol]:null,cf=c?.updatedAt&&Date.now()-Number(c.updatedAt)<=3*60*1000,i=state.assetIntel&&b?state.assetIntel[b.symbol]:null;if(b&&b._livePrice&&c&&c.verified&&cf)return'PIONEX + OKX SWAP + BINANCE USD-M';if(c&&c.verified&&cf)return'OKX SWAP + BINANCE USD-M';if(b&&b._livePrice)return'PIONEX LIVE';if(marketIntelFresh(i)&&i.price)return i.source||'FRESH MARKET';return'UNVERIFIED'}
 function liveMatched(b){return !!(b&&b._liveMatched)}
 function livePnlAvailable(b){return liveMatched(b)&&!!b._livePnl}
 function liveInvestAvailable(b){return liveMatched(b)&&!!b._liveInvest}
+function liveInvestUsdAvailable(b){return liveMatched(b)&&!!b._liveInvestUsd}
 function parseTs(v){const t=Date.parse(String(v||''));return Number.isFinite(t)?t:null}
 function botFeedAgeMs(){return state.botFeedUpdatedAt?Math.max(0,Date.now()-state.botFeedUpdatedAt):null}
 function botFeedFresh(){const age=botFeedAgeMs(),future=state.botFeedUpdatedAt!=null&&state.botFeedUpdatedAt>Date.now()+5*60*1000;return state.botFeedTimestampTrusted&&!future&&age!=null&&age<=15*60*1000}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
+function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
 function actionableBot(b){return liveMatched(b)&&livePnlAvailable(b)&&botFeedFresh()}
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
  if(b&&b._liveMatched===false)return{value:num(b.pnl),source:'REFERENCE',corrected:false};
- const raw=num(b&&b.pnl),invest=num(b&&b.invest),pct=num(b&&b.profitPct),implied=invest>0&&pct!=null?invest*pct/100:null;
+ const raw=num(b&&b.pnl),investUsd=num(b&&b.investUsd),pct=num(b&&b.profitPct),implied=investUsd>0&&pct!=null?investUsd*pct/100:null;
  if(implied!=null){
-  if(raw==null)return{value:implied,source:'PCT_X_INVEST',corrected:false};
+  if(raw==null)return{value:implied,source:'PCT_X_USD_INVEST',corrected:false};
   const tolerance=Math.max(1,Math.abs(implied)*.35);
-  if(Math.abs(raw-implied)>tolerance)return{value:implied,source:'PCT_X_INVEST',corrected:true,raw:raw}
+  if(Math.abs(raw-implied)>tolerance)return{value:implied,source:'PCT_X_USD_INVEST',corrected:true,raw:raw}
  }
  return{value:raw,source:raw==null?'NONE':'LIVE_USD',corrected:false}
 }
@@ -105,13 +107,13 @@ function token(){try{return String(localStorage.getItem(TOKEN_KEY)||'').trim()}c
 async function getJson(path){const r=await fetch(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function holdingValue(d,h){const q=num(h?.quantity),lp=num(d?.livePrices?.[h?.symbol]?.price),own=num(h?.price),stored=num(h?.value)??num(h?.valueUsd)??num(h?.usdValue);return q!=null&&q>=0&&lp>0?q*lp:q!=null&&q>=0&&own>0?q*own:stored||0}
 function okxKnownBotEquity(){const rows=state.okxDcaBots||[];return rows.length?rows.reduce((s,x)=>s+(num(x.investUsd)||0)+(num(x.totalPnlUsd)||0),0):null}
-function portfolioModel(d){const hs=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];const by={};for(const h of hs){const venue=String(h?.venue||'OTHER').toUpperCase(),v=holdingValue(d,h);by[venue]=(by[venue]||0)+v}const liveBots=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];const botCapital=liveBots.reduce((s,b)=>s+(num(b.invest)||0)+(botPnlUsd(b).value||0),0);const apiPionex=num(d?.pionex?.equityUsd)??num(d?.pionex?.totalEquityUsd)??num(d?.pionex?.accountValueUsd)??num(d?.pionexRisk?.accountEquityUsd)??num(d?.pionexRisk?.totalEquityUsd);const botRowsWithCapital=liveBots.filter(b=>b.invest!=null);const allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;/* The current private API equity field is COIN-M bot equity, not Pionex account total.
+function portfolioModel(d){const hs=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];const by={};for(const h of hs){const venue=String(h?.venue||'OTHER').toUpperCase(),v=holdingValue(d,h);by[venue]=(by[venue]||0)+v}const liveBots=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];const botCapital=liveBots.reduce((s,b)=>s+(num(b.investUsd)||0)+(botPnlUsd(b).value||0),0);const apiPionex=num(d?.pionex?.equityUsd)??num(d?.pionex?.totalEquityUsd)??num(d?.pionex?.accountValueUsd)??num(d?.pionexRisk?.accountEquityUsd)??num(d?.pionexRisk?.totalEquityUsd);const botRowsWithCapital=liveBots.filter(b=>b.investUsd!=null);const allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;/* The current private API equity field is COIN-M bot equity, not Pionex account total.
    Never let that partial figure overwrite the verified account-total snapshot. */
 const verifiedPionexTotal=state.manual.pionex;
 const apiLooksLikeAccountTotal=apiPionex!=null&&apiPionex>=verifiedPionexTotal*.8;
 const pionex=apiLooksLikeAccountTotal?apiPionex:verifiedPionexTotal;
 const bitpanda=0,ledger=state.manual.ledger,okx=okxKnownBotEquity()??state.manual.okx;const total=pionex+ledger+okx;return{total,pionex,bitpanda,ledger,okx,botCapital:allBotsHaveCapital?botCapital:null,pionexComplete:true,pionexSource:apiLooksLikeAccountTotal?'PRIVATE_ACCOUNT_TOTAL':'SCREENSHOT_TOTAL',bitpandaSource:'REMOVED'}}
-function pick(b,keys){for(const k of keys){const v=num(b?.[k]);if(v!=null)return v}return null}function normalizeLive(b){const nested=b?.bot||b?.position||b?.data||{};const x={...nested,...b};return{id:String(x.id||x.botId||x.bot_id||x.name||x.symbol||'BOT'),symbol:String(x.symbol||x.asset||x.baseAsset||x.base_asset||'').replace(/[-_/]?(USDT|USDC|USD)$/,'').replace(/\.PERP$/,'').toUpperCase(),leverage:pick(x,['leverage','leverageX','leverage_x']),lower:pick(x,['lower','lowerRange','rangeLower','lowerPrice','lower_price','minPrice','min_price']),upper:pick(x,['upper','upperRange','rangeUpper','upperPrice','upper_price','maxPrice','max_price']),be:pick(x,['be','breakEvenPrice','breakevenPrice','break_even_price','avgEntryPrice','averageEntryPrice','breakEven','break_even','entryPrice','entry_price']),liq:pick(x,['liq','pionexLiquidationPrice','liquidationPrice','liqPrice','liquidation_price']),tp:pick(x,['tp','takeProfit','tpPrice','take_profit_price']),price:pick(x,['price','currentPrice','markPrice','lastPrice','mark_price','last_price']),buffer:pick(x,['buffer','pionexLiqBufferPct','liqBufferPct','liquidationDistancePct']),pnl:pick(x,['pnl','totalProfitUsd','totalProfitUSDT','totalProfitUsdt','total_profit_usdt','pnlUsd','unrealizedPnlUsd','unrealizedPnl','unrealized_profit','totalProfit','total_profit','profit']),invest:pick(x,['invest','investmentUsd','investmentUSDT','investmentUsdt','investment','investedUsd','invested','investment_usdt','invested_amount','initialInvestment','initial_investment']),profitPct:pick(x,['profitPct','totalProfitPct','pnlPct','total_profit_pct','profit_rate','profitRate']),side:String(x.side||x.direction||x.positionSide||'LONG').toUpperCase()}}
+function pick(b,keys){for(const k of keys){const v=num(b?.[k]);if(v!=null)return v}return null}function normalizeLive(b){const nested=b?.bot||b?.position||b?.data||{},x={...nested,...b},investUsd=pick(x,['investmentUsd','investmentUSDT','investmentUsdt','usdtInvestment','investedUsd','investment_usdt']),investAny=investUsd??pick(x,['invest','investment','invested','invested_amount','initialInvestment','initial_investment']);return{id:String(x.id||x.botId||x.bot_id||x.name||x.symbol||'BOT'),symbol:String(x.symbol||x.asset||x.baseAsset||x.base_asset||'').replace(/[-_/]?(USDT|USDC|USD)$/,'').replace(/\.PERP$/,'').toUpperCase(),leverage:pick(x,['leverage','leverageX','leverage_x']),lower:pick(x,['lower','lowerRange','rangeLower','lowerPrice','lower_price','minPrice','min_price']),upper:pick(x,['upper','upperRange','rangeUpper','upperPrice','upper_price','maxPrice','max_price']),be:pick(x,['be','breakEvenPrice','breakevenPrice','break_even_price','avgEntryPrice','averageEntryPrice','breakEven','break_even','entryPrice','entry_price']),liq:pick(x,['liq','pionexLiquidationPrice','liquidationPrice','liqPrice','liquidation_price']),tp:pick(x,['tp','takeProfit','tpPrice','take_profit_price']),sl:pick(x,['sl','stopLoss','stopLossPrice','lossStop','stop_loss_price']),price:pick(x,['price','currentPrice','markPrice','lastPrice','mark_price','last_price']),buffer:pick(x,['buffer','pionexLiqBufferPct','liqBufferPct','liquidationDistancePct']),pnl:pick(x,['pnl','totalProfitUsd','totalProfitUSDT','totalProfitUsdt','total_profit_usdt','pnlUsd','unrealizedPnlUsd','unrealizedPnl','unrealized_profit','totalProfit','total_profit','profit']),invest:investAny,investUsd,profitPct:pick(x,['profitPct','totalProfitPct','pnlPct','total_profit_pct','profit_rate','profitRate']),side:String(x.side||x.direction||x.positionSide||'LONG').toUpperCase()}}
 function relDiff(a,b){a=num(a);b=num(b);if(!(a>0&&b>0))return null;return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-12)}
 function botMatchScore(ref,x){
   if(x.symbol!==ref.symbol||x.side!==(ref.side||'LONG'))return 1e9;
@@ -136,7 +138,7 @@ function mergeReference(live){
     const levOk=x.leverage!=null&&x.leverage===ref.leverage;
     const structureOk=['lower','upper','tp','be'].some(k=>{const d=relDiff(x[k],ref[k]);return d!=null&&d<.03});
     if(!levOk&&!structureOk)continue;
-    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_source:'LIVE_MATCH'};
+    refs[m.ri]={...ref,...Object.fromEntries(Object.entries(x).filter(([,v])=>v!=null&&v!=='')),lower:num(x.lower),upper:num(x.upper),be:num(x.be),liq:num(x.liq),tp:num(x.tp),sl:num(x.sl),buffer:num(x.buffer),price:num(x.price),pnl:num(x.pnl),profitPct:num(x.profitPct),invest:num(x.invest),investUsd:num(x.investUsd),side:x.side||ref.side||'LONG',_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveInvestUsd:num(x.investUsd)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_liveSl:num(x.sl)>0,_source:'LIVE_MATCH'};
     refUsed.add(m.ri);used.add(m.li);
   }
   /* Dashboard is intentionally pinned to the latest verified Asset Watch COIN-M roster.
@@ -157,11 +159,13 @@ async function marketKlines(interval,limit,symbol='BTC'){
   const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetch(u,{cache:'no-store'});
   if(!r.ok)throw new Error('OKX '+r.status);
   const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
-  return j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]})).reverse()
- }catch(e){
-  const r=await fetch('https://api.binance.com/api/v3/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+limit,{cache:'no-store'});
-  if(!r.ok)throw e;
-  return(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}))
+  const rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]})).reverse();
+  rows.source='OKX USDT-SWAP';return rows
+ }catch(okxError){
+  const r=await fetch('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'});
+  if(!r.ok)throw new Error('BINANCE FUTURES '+r.status+' / '+String(okxError?.message||okxError));
+  const rows=(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
+  rows.source='BINANCE USD-M FUTURES';return rows
  }
 }
 async function marketKlinesHistory(interval,bars,symbol='BTC'){
@@ -177,12 +181,12 @@ async function marketKlinesHistory(interval,bars,symbol='BTC'){
 }
 async function syncCrossPrices(){
  try{
-  const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://api.binance.com/api/v3/ticker/price',{cache:'no-store'})]);
+  const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'})]);
   if(!or.ok||!br.ok)throw new Error('cross-price http');
-  const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={};
-  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=1.5}}
-  state.priceChecks=out;state.marketSyncedAt=Date.now()
- }catch(e){state.priceChecks={}}
+  const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={},now=Date.now();
+  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
+  state.priceChecks=out;state.marketPriceSyncedAt=now;state.marketPriceError=null
+ }catch(e){state.priceChecks={};state.marketPriceError=String(e?.message||e)}
 }
 function intel(rows15,rows1h,rows4,rows1d){
  const c15=rows15.map(x=>x.close),c1h=rows1h.map(x=>x.close),c4=rows4.map(x=>x.close),c1d=rows1d.map(x=>x.close),p=c15.at(-1);
@@ -192,7 +196,7 @@ function intel(rows15,rows1h,rows4,rows1d){
  const dailyBull=p>e200&&e20>e50;
  const score=(dailyBull?25:0)+(R15>=40&&R15<=68?10:0)+(R1H>=42&&R1H<=68?15:0)+(R4>=42&&R4<=68?15:0)+(M15&&M15.hist>0?5:0)+(M1H&&M1H.hist>0?10:0)+(M4&&M4.hist>0?10:0)+(Math.abs(p-near.price)<=Math.max(A*.75,p*.012)?10:0);
  const status=score>=70&&dailyBull&&M1H?.hist>0?'RE-ENTRY READY':score>=55?'SETUP FORMING':'WAIT FOR RETRACE';
- return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,swingDirection,near,score,status}
+ return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,swingDirection,near,score,status,source:rows15.source||'MARKET FEED'}
 }
 function signalAction(score){return score>=6?'RISK REVIEW':score>=4?'PROFIT LOCK CANDIDATE':score>=2?'WATCH PROFIT':'HOLD'}
 function signalRank(action){return action==='RISK REVIEW'?3:action==='PROFIT LOCK CANDIDATE'?2:action==='WATCH PROFIT'?1:0}
@@ -210,30 +214,30 @@ function profitLockIntel(rows15,rows1h,rows4){
  if(M15&&M15.hist>0){bull++;shortReasons.push('MACD15m ↑')}if(M1H&&M1H.hist>0){bull+=2;shortReasons.push('MACD1h ↑')}if(M4&&M4.hist>0){bull+=2;shortReasons.push('MACD4h ↑')}
  if(e20&&p>e20){bull+=2;shortReasons.push('über EMA20 1h')}if(e20&&e50&&e20>e50){bull++;shortReasons.push('EMA20>50 1h')}
  const longAction=signalAction(bear),shortAction=signalAction(bull),bias=bull-bear>=3?'BULLISH':bear-bull>=3?'BEARISH':'MIXED';
- return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection}
+ return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection,source:rows15.source||'MARKET FEED'}
 }
 async function syncIntel(){
- const cross=syncCrossPrices();
+ const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
  try{
   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]);
-  state.intel=intel(m15,h1,h4,d1)
- }catch(e){state.intel=null}
- const assets=[...new Set(state.bots.map(b=>b.symbol))],out={};
+  const now=Date.now();state.intel={...intel(m15,h1,h4,d1),updatedAt:now};out.BTC={...profitLockIntel(m15,h1,h4),updatedAt:now};btcRows=true
+ }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
+ const assets=[...new Set(state.bots.map(b=>b.symbol))].filter(symbol=>symbol!=='BTC');
  for(let i=0;i<assets.length;i+=4){
   const batch=assets.slice(i,i+4);
   await Promise.all(batch.map(async symbol=>{try{
    const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]);
-   out[symbol]=profitLockIntel(m15,h1,h4)
-  }catch{}}));
+   out[symbol]={...profitLockIntel(m15,h1,h4),updatedAt:Date.now()}
+  }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- state.assetIntel=out;await cross;renderHeaderTruth()
+ state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth()
 }
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
 function assetPairRisk(symbol){
  const rows=botFeedFresh()?state.bots.filter(b=>b.symbol===symbol&&liveMatched(b)):[],longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT');
- const notional=b=>liveInvestAvailable(b)?(num(b.invest)||0)*(num(b.leverage)||1):null;
+ const notional=b=>liveInvestUsdAvailable(b)?(num(b.investUsd)||0)*(num(b.leverage)||1):null;
  const longKnown=longs.map(notional).filter(x=>x!=null),shortKnown=shorts.map(notional).filter(x=>x!=null),longUsd=longKnown.reduce((s,x)=>s+x,0),shortUsd=shortKnown.reduce((s,x)=>s+x,0),unknownExposure=rows.filter(b=>notional(b)==null).length,hedgePct=longUsd>0&&unknownExposure===0?shortUsd/longUsd*100:null;
  const buffers=rows.map(risk).filter(x=>x!=null),minBuffer=buffers.length?Math.min(...buffers):null,pi=state.assetIntel[symbol];
  let score=0,reasons=[];
@@ -251,7 +255,7 @@ function riskCockpitV2(){
 }
 function tpDist(b){const p=botMarketPrice(b),tp=num(b.tp);if(!(p>0&&tp>0))return null;return b.side==='SHORT'?(p-tp)/p*100:(tp-p)/p*100}
 function status(b){if(!liveMatched(b))return['REF','muted'];if(!botFeedFresh())return['STALE','muted'];const r=risk(b),t=tpDist(b);if(t!=null&&t<=5)return['TP ZONE','tp'];if(r==null)return['LIQ CHECK','muted'];if(r<5)return['LIQ URGENT','danger'];if(r<10)return['LIQ MARGIN','danger'];if(r<18)return['LIQ WATCH','watch'];return['LIQ SAFE','safe']}
-function botProfitPct(b){const direct=num(b.profitPct);if(direct!=null)return direct;const pnl=botPnlUsd(b).value,invest=num(b.invest);return pnl!=null&&invest>0?pnl/invest*100:null}
+function botProfitPct(b){const direct=num(b.profitPct);if(direct!=null)return direct;const pnl=botPnlUsd(b).value,investUsd=num(b.investUsd);return pnl!=null&&investUsd>0?pnl/investUsd*100:null}
 function profitPlanRank(code){return code==='SAFETY'?7:code==='LOCK50'?6:code==='LOCK25'?5:code==='LOCK20'?4:code==='HEDGE'?3:code==='WATCH'?2:code==='HOLD'?1:0}
 function profitLockPlan(b){
  const side=b.side||'LONG',pi=state.assetIntel[b.symbol],signal=actionForSide(pi,side),reasons=reasonsForSide(pi,side),pnl=botProfitPct(b),t=tpDist(b),liq=risk(b),pair=assetPairRisk(b.symbol),hedgeLow=side==='LONG'&&pair.longUsd>0&&pair.hedgePct!=null&&pair.hedgePct<15;
@@ -292,14 +296,14 @@ function profitLockRadar(){
 }
 function botCard(b){const [st,tone]=status(b),r=risk(b),t=tpDist(b),pct=botProfitPct(b),pl=profitLockPlan(b),px=botMarketPrice(b),pu=botPnlUsd(b),truth=liveMatched(b)?(botFeedFresh()?(livePnlAvailable(b)?'FRESH SNAPSHOT':'FRESH SNAPSHOT · PNL SYNC'):'PRIVATE SNAPSHOT · STALE'):'REFERENCE';return `<article class="bot bot-v2"><div class="bothead"><div><h3>${b.symbol}</h3><small>${b.side||'LONG'} · ${b.leverage||'—'}x</small></div><span class="tag tone-${tone}">${st}</span></div><div class="truth-badge ${liveMatched(b)?'truth-live':'truth-ref'}">${truth}</div><div class="profit-lock-v2 pl-${pl.tone}"><div class="pl-top"><span>PROFIT LOCK V2</span><b class="tone-${pl.tone}">${pl.label}</b></div><small>${pl.detail}</small></div><div class="profit-row"><div><span>INVEST</span><b>${b.invest==null?'—':money(b.invest)}</b></div><div><span>GESAMTPROFIT</span><b class="${pu.value>0?'profit-pos':pu.value<0?'profit-neg':''}">${pu.value==null?'—':money(pu.value)}${pct==null?'':' · '+(pct>=0?'+':'')+pct.toFixed(1)+'%'}</b>${pu.corrected?'<small class="data-guard">VALIDATED FROM % × INVEST</small>':''}</div></div><div class="bot-details"><span>PRICE <b>${money(px)}</b><small class="data-guard">${botPriceSource(b)}</small></span><span>BE <b>${money(b.be)}</b></span><span>LIQ <b>${money(b.liq)}</b></span><span>TP <b>${money(b.tp)}</b></span></div><div class="range-line">RANGE <b>${money(b.lower)} – ${money(b.upper)}</b></div><div class="risk"><i style="width:${Math.max(2,Math.min(100,r||0)*3)}%"></i></div><small class="distance">${r==null?'Liq —':r.toFixed(1)+'% Liq'} · ${t==null?'TP —':Math.max(0,t).toFixed(1)+'% TP'}</small></article>`}
 function critical(){return botFeedFresh()?([...state.bots].filter(liveMatched).sort((a,b)=>(risk(a)??999)-(risk(b)??999))[0]||null):null}
-function beDistance(b){const p=botMarketPrice(b),be=num(b.be);return p>0&&be>0?(p-be)/be*100:null}
-function assetExposureShare(symbol){const e=exposureModel(),x=state.bots.filter(b=>b.symbol===symbol&&liveInvestAvailable(b)).reduce((s,b)=>s+(num(b.invest)||0)*(num(b.leverage)||1),0);return e.longUsd>0?x/e.longUsd*100:0}
-function riskV2(b){const liq=risk(b),be=beDistance(b),share=assetExposureShare(b.symbol),mom=state.assetIntel[b.symbol];let score=0,reasons=[];if(liq!=null&&liq<18){score+=3;reasons.push('LIQ')}else if(liq!=null&&liq<28){score+=2;reasons.push('Liq')}else if(liq!=null&&liq<38){score+=1;reasons.push('liq')}if((b.leverage||0)>=7){score+=2;reasons.push('Hebel')}else if((b.leverage||0)>=5){score+=1;reasons.push('hebel')}if(share>=25){score+=3;reasons.push('Konzentration')}else if(share>=15){score+=2;reasons.push('Exposure')}else if(share>=10){score+=1;reasons.push('exposure')}if(be!=null&&be<-8){score+=2;reasons.push('unter BE')}else if(be!=null&&be<0){score+=1;reasons.push('BE')}const momAction=actionForSide(mom,b.side||'LONG');if(momAction==='RISK REVIEW'){score+=3;reasons.push('Momentum')}else if(momAction==='PROFIT LOCK CANDIDATE'){score+=2;reasons.push('Momentum')}else if(momAction==='WATCH PROFIT'){score+=1;reasons.push('Momentum')}const label=score>=8?'RISK REVIEW':score>=5?'WATCH':score>=3?'ATTENTION':'HOLD',tone=score>=8?'danger':score>=5?'watch':score>=3?'watch':'safe';return{score,label,tone,reasons,liq,be,share}}
+function beDistance(b){const p=botMarketPrice(b),be=num(b.be);if(!(p>0&&be>0))return null;return b.side==='SHORT'?(be-p)/be*100:(p-be)/be*100}
+function assetExposureShare(symbol){const e=exposureModel(),rows=botFeedFresh()?state.bots.filter(b=>b.symbol===symbol&&liveMatched(b)):[],complete=rows.length>0&&rows.every(liveInvestUsdAvailable);if(!complete||!(e.grossUsd>0))return null;const x=rows.reduce((sum,b)=>sum+(num(b.investUsd)||0)*(num(b.leverage)||1),0);return x/e.grossUsd*100}
+function riskV2(b){const liq=risk(b),be=beDistance(b),share=assetExposureShare(b.symbol),rawMom=state.assetIntel[b.symbol],mom=marketIntelFresh(rawMom)?rawMom:null;let score=0,reasons=[];if(liq!=null&&liq<18){score+=3;reasons.push('LIQ')}else if(liq!=null&&liq<28){score+=2;reasons.push('Liq')}else if(liq!=null&&liq<38){score+=1;reasons.push('liq')}if((b.leverage||0)>=7){score+=2;reasons.push('Hebel')}else if((b.leverage||0)>=5){score+=1;reasons.push('hebel')}if(share!=null&&share>=25){score+=3;reasons.push('Konzentration')}else if(share!=null&&share>=15){score+=2;reasons.push('Exposure')}else if(share!=null&&share>=10){score+=1;reasons.push('exposure')}if(be!=null&&be<-8){score+=2;reasons.push('unter BE')}else if(be!=null&&be<0){score+=1;reasons.push('BE')}const momAction=actionForSide(mom,b.side||'LONG');if(momAction==='RISK REVIEW'){score+=3;reasons.push('Momentum')}else if(momAction==='PROFIT LOCK CANDIDATE'){score+=2;reasons.push('Momentum')}else if(momAction==='WATCH PROFIT'){score+=1;reasons.push('Momentum')}const label=score>=8?'RISK REVIEW':score>=5?'WATCH':score>=3?'ATTENTION':'HOLD',tone=score>=8?'danger':score>=5?'watch':score>=3?'watch':'safe';return{score,label,tone,reasons,liq,be,share}}
 
 function signalSummary(){const out={hold:0,watch:0,lock:0,risk:0,sync:0};for(const b of state.bots){const p=profitLockPlan(b);if(p.code==='SYNC')out.sync++;else if(['LOCK20','LOCK25','LOCK50'].includes(p.code))out.lock++;else if(p.code==='WATCH')out.watch++;else if(['SAFETY','HEDGE'].includes(p.code))out.risk++;else out.hold++}return out}
 function topSignalBot(){return botFeedFresh()?(state.bots.filter(liveMatched).map(b=>({b,action:actionForSide(state.assetIntel[b.symbol],b.side||'LONG')})).filter(x=>x.action!=='SYNC'&&x.action!=='HOLD').sort((a,b)=>signalRank(b.action)-signalRank(a.action)||((num(b.b.profitPct)||0)-(num(a.b.profitPct)||0)))[0]||null):null}
-function exposureModel(){const botNotional=b=>liveInvestAvailable(b)?(num(b.invest)||0)*(num(b.leverage)||1):null,confirmed=botFeedFresh()?state.bots.filter(liveMatched):[],rows=confirmed.map(b=>({...b,notional:botNotional(b)})).filter(b=>b.notional!=null),unknownBots=confirmed.filter(b=>botNotional(b)==null).length,longUsd=rows.filter(b=>(b.side||'LONG')==='LONG').reduce((x,b)=>x+b.notional,0),shortUsd=rows.filter(b=>b.side==='SHORT').reduce((x,b)=>x+b.notional,0),grossUsd=longUsd+shortUsd,netUsd=longUsd-shortUsd,coverage=longUsd>0?shortUsd/longUsd*100:null;return{longUsd,shortUsd,hedgeUsd:shortUsd,grossUsd,netUsd,coverage,unknownBots,confirmedBots:confirmed.length,complete:confirmed.length>0&&unknownBots===0}}
-function portfolioRegime(){const e=exposureModel(),i=state.intel,confirmed=state.bots.filter(liveMatched);let points=0,reasons=[];if(i){if(i.price>i.ema20&&i.ema20>i.ema50){points+=2;reasons.push('BTC > EMA20/50')}else if(i.price<i.ema20){points-=2;reasons.push('BTC < EMA20')}if(i.macd4?.hist>0){points++;reasons.push('4h MACD +')}else if(i.macd4?.hist<0){points--;reasons.push('4h MACD -')}if(i.rsi4>=70){points--;reasons.push('4h RSI heiß')}else if(i.rsi4>=50){points++;reasons.push('4h RSI >50')}}const avgRisk=confirmed.length?confirmed.reduce((s,b)=>s+riskV2(b).score,0)/confirmed.length:0;if(avgRisk>=6){points-=2;reasons.push('Bot-Risiko hoch')}else if(avgRisk>=4){points--;reasons.push('Bot-Risiko erhöht')}const regime=points>=2?'RISK-ON':points<=-2?'DEFENSIVE':'NEUTRAL';const hedge=e.coverage==null?'UNVOLLSTÄNDIG':e.coverage>=15?'AUSREICHEND':e.coverage>=7?'MITTEL':'KLEIN';const tone=regime==='RISK-ON'?'safe':regime==='DEFENSIVE'?'danger':'watch';return{regime,hedge,tone,points,avgRisk,reasons}}
+function exposureModel(){const botNotional=b=>liveInvestUsdAvailable(b)?(num(b.investUsd)||0)*(num(b.leverage)||1):null,confirmed=botFeedFresh()?state.bots.filter(liveMatched):[],rows=confirmed.map(b=>({...b,notional:botNotional(b)})).filter(b=>b.notional!=null),unknownBots=confirmed.filter(b=>botNotional(b)==null).length,longUsd=rows.filter(b=>(b.side||'LONG')==='LONG').reduce((x,b)=>x+b.notional,0),shortUsd=rows.filter(b=>b.side==='SHORT').reduce((x,b)=>x+b.notional,0),grossUsd=longUsd+shortUsd,netUsd=longUsd-shortUsd,coverage=longUsd>0&&unknownBots===0?shortUsd/longUsd*100:null;return{longUsd,shortUsd,hedgeUsd:shortUsd,grossUsd,netUsd,coverage,unknownBots,confirmedBots:confirmed.length,complete:confirmed.length>0&&unknownBots===0}}
+function portfolioRegime(){const e=exposureModel(),i=state.marketSyncedAt&&Date.now()-state.marketSyncedAt<=3*60*1000?state.intel:null,confirmed=botFeedFresh()?state.bots.filter(liveMatched):[];let points=0,reasons=[];if(i){if(i.price>i.ema20&&i.ema20>i.ema50){points+=2;reasons.push('BTC > EMA20/50')}else if(i.price<i.ema20){points-=2;reasons.push('BTC < EMA20')}if(i.macd4?.hist>0){points++;reasons.push('4h MACD +')}else if(i.macd4?.hist<0){points--;reasons.push('4h MACD -')}if(i.rsi4>=70){points--;reasons.push('4h RSI heiß')}else if(i.rsi4>=50){points++;reasons.push('4h RSI >50')}}const avgRisk=confirmed.length?confirmed.reduce((s,b)=>s+riskV2(b).score,0)/confirmed.length:0;if(avgRisk>=6){points-=2;reasons.push('Bot-Risiko hoch')}else if(avgRisk>=4){points--;reasons.push('Bot-Risiko erhöht')}const regime=points>=2?'RISK-ON':points<=-2?'DEFENSIVE':'NEUTRAL';const hedge=e.coverage==null?'UNVOLLSTÄNDIG':e.coverage>=15?'AUSREICHEND':e.coverage>=7?'MITTEL':'KLEIN';const tone=regime==='RISK-ON'?'safe':regime==='DEFENSIVE'?'danger':'watch';return{regime,hedge,tone,points,avgRisk,reasons}}
 function regimeStrip(){const r=portfolioRegime();return `<section class="regime-strip"><div><span>PORTFOLIO REGIME</span><b class="tone-${r.tone}">${r.regime}</b></div><div><span>HEDGE</span><b>${r.hedge}</b></div><div><span>AVG RISK</span><b>${r.avgRisk.toFixed(1)}</b></div><small>${r.reasons.slice(0,4).join(' · ')||'Market sync'}</small></section>`}
 function exposureStrip(){const e=exposureModel(),tone=e.coverage==null?'muted':e.coverage>=15?'safe':e.coverage>=7?'watch':'danger';return `<section class="exposure-strip"><div><span>KNOWN LIVE BOT LONG</span><b>${money(e.longUsd)}</b></div><div><span>KNOWN LIVE BOT SHORT</span><b>${money(e.hedgeUsd)}</b></div><div><span>KNOWN NET</span><b>${money(e.netUsd)}</b></div><div><span>SHORT / LONG</span><b class="tone-${tone}">${e.coverage==null?'—':e.coverage.toFixed(1)+'%'}</b></div><small class="exposure-note">${e.unknownBots?e.unknownBots+' live-matched Bots ohne belastbare Investition · Exposure unvollständig':'nur live bestätigte Kapitalwerte'}</small></section>`}
 function manualRisk(x){const p=num(x.price),l=num(x.liq);return p>0&&l>0?(p-l)/p*100:null}
@@ -332,7 +336,7 @@ function command(){
 function botGroup(title,subtitle,items){if(!items.length)return '';return `<section class="bot-group"><div class="group-head"><div><h2>${title}</h2><small>${subtitle}</small></div><b>${items.length}</b></div><div class="bots">${items.map(botCard).join('')}</div></section>`}
 function manualPositionCard(){return (state.manualPositions||[]).map(b=>{const p=num(b.price),l=num(b.liq),buffer=p>0&&l>0?(p-l)/p*100:null;return `<section class="bot-group"><div class="group-head"><div><h2>${b.symbol} · MANUAL ${b.side}</h2><small>${b.venue} · separate offene Position, kein Grid-Bot</small></div><b>${b.leverage}x</b></div><article class="bot bot-v2"><div class="bot-details"><span>MARK <b>${money(b.price)}</b></span><span>ENTRY <b>${money(b.entry)}</b></span><span>LIQ <b>${money(b.liq)}</b></span><span>LIQ PUFFER <b>${buffer==null?'—':buffer.toFixed(1)+'%'}</b></span></div><div class="range-line">SIZE <b>${b.investCoin.toLocaleString('de-DE')} ${b.symbol}</b> · DYN. MARGIN <b>${b.dynamicMargin||0}</b></div></article></section>`}).join('')}
 function hedgeCard(){const hs=state.hedges||[state.hedge];return hs.map(h=>{const tp=(h.tps||[{price:h.tp,pct:100}]).map(x=>money(x.price)+' · '+(x.pct!=null?x.pct+'%':x.coin+' BTC')).join(' / '),runner=h.runnerPct!=null?h.runnerPct+'%':h.runnerCoin!=null?h.runnerCoin+' BTC':'—';return `<section class="bot-group hedge-group"><div class="group-head"><div><h2>BTC HEDGE · ${h.venue||'Pionex'}</h2><small>separate Versicherung · nicht als Long-Bot gezählt</small></div><b>SHORT ${h.leverage}x</b></div><article class="bot bot-v2"><div class="bot-details"><span>ENTRY <b>${money(h.entry)}</b></span><span>SL <b>${money(h.sl)}</b></span><span>LIQ <b>${money(h.liq)}</b></span><span>SIZE <b>${h.investCoin} BTC</b></span></div><div class="range-line">TP <b>${tp}</b></div><div class="profit-lock"><span>RUNNER</span><b class="tone-safe">${runner}</b><small>${h.note||''}</small></div></article></section>`}).join('')}
-function assetGroup(symbol,items){const matched=items.filter(liveMatched),fresh=botFeedFresh()?matched:[],exposure=fresh.reduce((s,b)=>s+(liveInvestAvailable(b)?num(b.invest)||0:0),0),worst=fresh.length?Math.min(...fresh.map(b=>risk(b)??999)):999,rv=fresh.length?fresh.map(riskV2).sort((a,b)=>b.score-a.score)[0]:{label:matched.length?'STALE':'REFERENCE',share:0,score:0};return botGroup(symbol+' · '+items.length+' TRACKED · '+matched.length+' PRIVATE · '+rv.label,(exposure?money(exposure)+' fresh capital · ':'')+(worst<999?worst.toFixed(1)+'% Liq · ':'')+(fresh.length?rv.share.toFixed(1)+'% Exposure · Risk '+rv.score:matched.length?'Snapshot nicht frisch genug für Action':'keine Action aus Referenzdaten'),items)}
+function assetGroup(symbol,items){const matched=items.filter(liveMatched),fresh=botFeedFresh()?matched:[],capitalComplete=fresh.length>0&&fresh.every(liveInvestUsdAvailable),exposure=capitalComplete?fresh.reduce((sum,b)=>sum+(num(b.investUsd)||0),0):null,worst=fresh.length?Math.min(...fresh.map(b=>risk(b)??999)):999,rv=fresh.length?fresh.map(riskV2).sort((a,b)=>b.score-a.score)[0]:{label:matched.length?'STALE':'REFERENCE',share:null,score:0},shareText=rv.share==null?'Exposure —':rv.share.toFixed(1)+'% Exposure';return botGroup(symbol+' · '+items.length+' TRACKED · '+matched.length+' PRIVATE · '+rv.label,(exposure!=null?money(exposure)+' known USD capital · ':'')+(worst<999?worst.toFixed(1)+'% Liq · ':'')+(fresh.length?shareText+' · Risk '+rv.score:matched.length?'Snapshot nicht frisch genug für Action':'keine Action aus Referenzdaten'),items)}
 function bots(){const order=['BTC','ETH','SOL','XRP','HBAR','PEPE','DOT','ADA','SUI','AVAX','LINK','XLM','TRX','WIF'];const groups=order.map(s=>assetGroup(s,state.bots.filter(b=>b.symbol===s))).join('');return `<section class="hero bot-hero"><div class="eyebrow">BOT CONTROL CENTER · ${state.source}</div><h1>PIONEX COIN-M</h1><p class="muted">${state.bots.length} tracked rows · ${state.bots.filter(liveMatched).length} private matched · ${state.liveRows} API rows · ${new Set(state.bots.map(b=>b.symbol)).size} Assets · Snapshot ≠ Live-API</p></section>${regimeStrip()}${exposureStrip()}${hedgeCard()}${manualPositionCard()}${groups}`}
 function market(){const i=state.intel;return `<section class="hero"><div class="eyebrow">MARKET + BODEN</div><h1>BTC REGIME</h1><p class="muted">1D Regime · 4h Struktur · 1h Setup · 15m Trigger · OKX USDT-SWAP</p></section><div class="grid"><section class="metric"><span>REGIME</span><b>${state.market||'SYNC'}</b><small>${i?money(i.price):'Market sync'}</small></section><section class="metric"><span>RSI 15m / 1h</span><b>${i?i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1):'SYNC'}</b><small>Trigger · Setup</small></section><section class="metric"><span>RSI 4h / 1D</span><b>${i?i.rsi4.toFixed(1)+' · '+i.rsi1d.toFixed(1):'SYNC'}</b><small>Struktur · Regime</small></section><section class="metric"><span>MACD 15m / 1h</span><b>${i&&i.macd15&&i.macd1h?i.macd15.hist.toFixed(2)+' · '+i.macd1h.hist.toFixed(2):'SYNC'}</b><small>Timing momentum</small></section><section class="metric"><span>MACD 4h</span><b>${i&&i.macd4?i.macd4.hist.toFixed(2):'SYNC'}</b><small>Structure momentum</small></section><section class="metric"><span>EMA 20 / 50</span><b>${i?money(i.ema20)+' / '+money(i.ema50):'SYNC'}</b><small>1D trend</small></section><section class="metric"><span>NEAREST FIB</span><b>${i?i.near.f.toFixed(3)+' · '+money(i.near.price):'SYNC'}</b><small>90 × 4h swing</small></section><section class="metric"><span>ATR 4H</span><b>${i?money(i.atr):'SYNC'}</b><small>Range width input</small></section><section class="metric"><span>NEXT RANGE SCORE</span><b class="${i&&i.status==='RE-ENTRY READY'?'tone-safe':'wait'}">${i?i.score+'/100':'SYNC'}</b><small>${i?i.status:'loading'}</small></section></div>`}
 function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
@@ -445,7 +449,7 @@ async function sync(){try{
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
