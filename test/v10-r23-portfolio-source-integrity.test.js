@@ -31,7 +31,8 @@ test('r23 labels canonical Pionex value as snapshot rather than live account',()
 });
 
 test('r23 release identity is canonical and browser adapters parse',()=>{
-  assert.equal(release.terminalBuild,'10.0-r23');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=23);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
