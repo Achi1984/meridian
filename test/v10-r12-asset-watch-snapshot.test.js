@@ -71,10 +71,11 @@ test('r12 shows Asset Watch only as guarded reference when private bot feed is s
   assert.match(css,/\.snapshot-bot-line/);
 });
 
-test('r12 does not weaken actionable live data guard',()=>{
+test('r12 reference isolation remains intact under the stricter readiness model',()=>{
   assert.match(v9,/function actionableBot\(b\)\{return liveMatched\(b\)&&livePnlAvailable\(b\)&&botFeedFresh\(\)\}/);
-  assert.match(js,/Frische private Bot-Daten = Actions · Asset Watch = Referenz/);
-  assert.match(js,/ACTIONABLE/);
+  assert.match(js,/Asset Watch = Referenz/);
+  assert.match(js,/SAFETY READY/);
+  assert.match(js,/DECISION READY/);
   assert.doesNotMatch(js,/submitOrder|placeOrder|createOrder/);
 });
 

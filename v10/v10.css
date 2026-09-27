@@ -399,3 +399,17 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+
+/* v10 r15 · readiness model */
+.bot-tab-head{grid-template-columns:repeat(5,minmax(0,1fr))}
+.v10-live-overview{grid-template-columns:repeat(7,minmax(0,1fr))}
+.guard-grid b,.bot-tab-head b,.v10-live-overview b{word-break:break-word}
+@media(max-width:760px){
+  .bot-tab-head{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .v10-live-overview{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:430px){
+  .bot-tab-head{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v10-live-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
