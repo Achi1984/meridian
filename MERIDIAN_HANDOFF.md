@@ -262,3 +262,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - An explicit quantity of zero remains zero and correctly overrides stale stored value.
 - This enforces the existing Data Truth invariant: missing numeric data is unavailable, never zero.
 - No trading logic, execution, bot state or research logic changed.
+
+
+## v10 r25 — COMMAND portfolio SSOT reconciliation
+
+- Continues the deep audit after r24.
+- COMMAND headline now uses the same current canonical basis as DEPOT: Spot holdings + Pionex equity.
+- Public Spot valuation reuses the privacy-safe all-ticker Binance overlay; no holding-specific symbol/quantity query is sent.
+- If public Spot pricing fails, stale live prices are cleared and COMMAND falls back to a labelled private canonical snapshot instead of claiming fresh valuation.
+- PostgreSQL portfolio history is diagnostic/historical only; current-vs-history delta is surfaced but history does not overwrite current valuation.
+- OKX Futures DCA screenshot equity remains visible as reference and is explicitly outside the canonical total.
+- Removed the COMMAND total dependency on the hard-coded Ledger snapshot and OKX DCA subtotal.
+- No trading rules, Paper-bot parameters, execution logic, Pionex mutations or research promotion changed.
