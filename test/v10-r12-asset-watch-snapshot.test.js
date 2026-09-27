@@ -63,7 +63,8 @@ test('r12 shows Asset Watch only as guarded reference when private bot feed is s
   assert.ok(js.includes("refs.length+' PIONEX BOTS"));
   assert.match(js,/Autoritativer letzter Screenshot-Stand/);
   assert.match(js,/Nur Referenz, solange BOT API nicht frisch ist/);
-  assert.match(js,/Live-Aktionskarten bleiben gesperrt/);
+  assert.match(js,/KEINE FRISCHEN LIVE-AKTIONSKARTEN/);
+  assert.match(js,/snapshotDetails\(!g\.fresh\)/);
   assert.match(js,/function snapshotBotLine/);
   assert.match(css,/\.asset-watch-reference/);
   assert.match(css,/\.snapshot-asset/);
@@ -72,7 +73,7 @@ test('r12 shows Asset Watch only as guarded reference when private bot feed is s
 
 test('r12 does not weaken actionable live data guard',()=>{
   assert.match(v9,/function actionableBot\(b\)\{return liveMatched\(b\)&&livePnlAvailable\(b\)&&botFeedFresh\(\)\}/);
-  assert.match(js,/Nur private Bot-Daten steuern Risk\/Profit-Aktionen/);
+  assert.match(js,/Frische private Bot-Daten = Actions · Asset Watch = Referenz/);
   assert.match(js,/ACTIONABLE/);
   assert.doesNotMatch(js,/submitOrder|placeOrder|createOrder/);
 });
