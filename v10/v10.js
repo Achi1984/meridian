@@ -452,7 +452,7 @@ function skV2ResultHtml(){
     '<div class="sk-section-title"><b>ENTRY-TIEFE · CORE</b><small>tiefster gefüllter SK-Level</small></div><div class="sk-v2-depth">'+skV2DepthHtml(depth)+'</div>'+
     '<div class="sk-section-title"><b>ASSET BREITE</b><small>'+r.assets.length+' Assets · '+skV2Ui.days+' Tage angefordert</small></div><div class="sk-v2-assets">'+skV2AssetRows(r.assets)+'</div>'+
     '<div class="sk-section-title"><b>DOUBLE ADV · 5 ZEITFENSTER</b><small>'+((st.positiveWindows||0))+'/5 positiv</small></div><div class="sk-window-grid">'+windows+'</div>'+
-    '<div class="sk-source-note">V2 nutzt nur Double Advantage, wenn es spätestens beim ersten Entry bekannt war. Kein Lookahead · keine Auto-Promotion · keine Orders.</div>';
+    '<div class="sk-source-note">V2 zählt Double Advantage nur, wenn es bereits auf einer früheren 4h-Kerze bestätigt war. Same-Bar-OHLC zählt nicht · '+esc(r.engineRevision||'ENGINE')+' · keine Auto-Promotion · keine Orders.</div>';
 }
 function skV2Panel(){
   return '<section class="sk-v2-shell"><div class="sk-paper-head"><div><span>SK RESEARCH V2</span><b>CORE vs DOUBLE ADVANTAGE</b><small>A/B-Test · Multi-Asset · Frozen Gate</small></div><strong>RESEARCH ONLY</strong></div>'+
@@ -557,7 +557,7 @@ function tsmomEdgeHtml(){
   if(edgeUi.error)return '<div class="sk-paper-error"><b>EDGE BATCH FEHLER</b><small>'+esc(edgeUi.error)+'</small></div>';
   const r=edgeUi.tsmom;if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>TSMOM startet nur nach Klick. 30/90/365d Signal · monatliches Rebalancing · Vol-Sizing.</small></div>';
   const g=r.gate,s=r.summary;
-  return '<div class="edge-ab"><div><span>TSMOM CLASSIC</span><b>'+s.periods+' Perioden</b><small>Return '+skNum(s.totalReturnPct,2)+'% · PF '+skNum(s.profitFactor,2)+'</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
+  return '<div class="edge-ab"><div><span>TSMOM CLASSIC</span><b>'+s.periods+' Perioden</b><small>Return '+skNum(s.totalReturnPct,2)+'% · PF '+skNum(s.profitFactor,2)+' · '+esc(r.engineRevision||'ENGINE')+'</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
     '<div class="edge-metrics"><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>POSITIVE ASSETS</span><b>'+g.positiveAssets+'/'+r.assets.length+'</b></div><div><span>PNL CONCENTRATION</span><b>'+skNum(r.positivePnlConcentrationPct,1)+'%</b></div><div><span>5 WINDOWS</span><b>'+r.stability.positiveWindows+'/5</b></div><div><span>MODEL COST</span><b>'+r.config.costBps+' bps</b><small>pro Exposure-Turnover</small></div></div>'+
     '<div class="edge-gate"><span>FROZEN INTERNAL GATE</span><b>'+(g.pass?'PASS · RESEARCH ONLY':'FAIL / INSUFFICIENT')+'</b><small>'+((g.reasons||[]).join(' · ')||'Keine Live-Freigabe; separater Holdout bleibt Pflicht.')+'</small></div>'+
     '<div class="edge-section-title"><b>ASSET ROBUSTHEIT</b><small>kein Asset-Dropping nach Ergebnis</small></div>'+edgeAssetRows(r.assets)+
@@ -586,7 +586,7 @@ function holdoutDiagHtml(d){
 function holdoutResultCard(title,subtitle,r){
   if(!r)return '<section class="holdout-card"><div class="holdout-card-head"><div><span>'+title+'</span><b>'+subtitle+'</b></div><strong>NO RUN</strong></div></section>';
   const g=r.gate,s=r.summary;
-  return '<section class="holdout-card"><div class="holdout-card-head"><div><span>'+title+'</span><b>'+subtitle+'</b><small>'+r.assets.length+' Assets · '+s.periods+' Perioden</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
+  return '<section class="holdout-card"><div class="holdout-card-head"><div><span>'+title+'</span><b>'+subtitle+'</b><small>'+r.assets.length+' Assets · '+s.periods+' Perioden · '+esc(r.engineRevision||'ENGINE')+'</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
     '<div class="holdout-metrics"><div><span>RETURN</span><b>'+skNum(s.totalReturnPct,2)+'%</b></div><div><span>PF</span><b>'+skNum(s.profitFactor,2)+'</b></div><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>POS ASSETS</span><b>'+g.positiveAssets+'/'+r.assets.length+'</b></div><div><span>WINDOWS</span><b>'+r.stability.positiveWindows+'/5</b></div></div>'+
     '<div class="holdout-gate"><b>'+(g.pass?'PASS · HOLDOUT TEILBESTANDEN':'FAIL / INSUFFICIENT')+'</b><small>'+((g.reasons||[]).join(' · ')||'Frozen TSMOM Gate erfüllt.')+'</small></div>'+
     holdoutDiagHtml(r.diagnostics)+edgeWindowGrid(r.stability)+'</section>';
@@ -736,7 +736,7 @@ function renderLab(){
   const nextOverview=labOverviewHtml();if(overview&&overview.innerHTML!==nextOverview)overview.innerHTML=nextOverview;
   let note=$('.lab-validation-note',view);
   if(!note){note=document.createElement('section');note.className='lab-validation-note';overview?.insertAdjacentElement('afterend',note);}
-  const nextNote='<b>VALIDATION LADDER</b><small>Discovery PASS ≠ bestätigtes Edge. Holdout muss unabhängig bestehen; danach höchstens Paper-Shadow/Forward-Test, nie Auto-Promotion.</small>';
+  const nextNote='<b>VALIDATION LADDER</b><small>Discovery PASS ≠ bestätigtes Edge. Deep-Audit r20 korrigiert Accounting/Lookahead; frühere TSMOM/SK-Ergebnisse müssen neu gerechnet werden. Holdout muss unabhängig bestehen; danach höchstens Paper-Shadow/Forward-Test, nie Auto-Promotion.</small>';
   if(note&&note.innerHTML!==nextNote)note.innerHTML=nextNote;
 }
 function decorate(){
