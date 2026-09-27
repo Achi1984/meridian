@@ -139,15 +139,15 @@ export function runTsmomClassic(dataset,config={}){
     for(const [symbol,ser] of Object.entries(series)){
       const cur=getAt(ser,at),future=getAt(ser,nextAt),sig=tsmomSignal(ser,at,cfg),vol=realizedVol(ser,at,cfg.volLookbackDays,cfg.annualizationDays);
       if(!cur||!future||!sig||!(vol>0))continue;
-      const leverage=Math.min(cfg.maxLeverage,cfg.targetVolAnnual/vol),position=sig.signal*leverage,gross=position*(future.close/cur.close-1);
-      candidates.push({symbol,at,nextAt,signal:sig.signal,signs:sig.signs,vol,leverage,position,grossReturn:gross});
+      const leverage=Math.min(cfg.maxLeverage,cfg.targetVolAnnual/vol),position=sig.signal*leverage,assetReturn=future.close/cur.close-1,gross=position*assetReturn;
+      candidates.push({symbol,at,nextAt,signal:sig.signal,signs:sig.signs,vol,leverage,position,assetReturn,grossReturn:gross});
     }
     if(candidates.length<cfg.minActiveAssets)continue;
 
     const nActive=candidates.length,currentRaw=new Map(candidates.map(x=>[x.symbol,x.position])),currentWeights=new Map(candidates.map(x=>[x.symbol,x.position/nActive]));
     const weightKeys=new Set([...prevWeights.keys(),...currentWeights.keys()]);
     let turnover=0;for(const symbol of weightKeys)turnover+=Math.abs((currentWeights.get(symbol)||0)-(prevWeights.get(symbol)||0));
-    const grossReturn=candidates.reduce((a,x)=>a+(currentWeights.get(x.symbol)||0)*(x.grossReturn/x.position||0),0);
+    const grossReturn=candidates.reduce((a,x)=>a+(currentWeights.get(x.symbol)||0)*x.assetReturn,0);
     const costReturn=turnover*cfg.costBps/10000,netReturn=grossReturn-costReturn;
 
     const currentSymbols=new Set(currentRaw.keys());
