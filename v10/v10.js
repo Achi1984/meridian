@@ -1,10 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r10';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r10';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r10';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r10';
-// MERIDIAN v10 r10 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r11';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r11';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r11';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r11';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r11';
+// MERIDIAN v10 r11 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r10';
+const BUILD='10.0-r11';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -14,6 +15,7 @@ const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,d
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
+const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -511,11 +513,80 @@ function fundingEdgeHtml(){
   return '<div class="edge-ab"><div><span>FUNDING CARRY</span><b>EXISTING MERIDIAN EVIDENCE</b><small>'+e.ruleset+'</small></div><strong class="tone-watch">'+(e.newEntriesAllowed?'ENTRY ON':'NEW ENTRIES OFF')+'</strong></div>'+
     '<div class="edge-funding-list">'+rows+'</div><div class="edge-gate"><span>STATUS</span><b>'+e.retirementReason.replaceAll('_',' ')+'</b><small>'+e.note+'</small></div>';
 }
+
+function holdoutDiagHtml(d){
+  if(!d)return'';
+  return '<div class="holdout-diag"><div><span>LONG CONTRIB</span><b>'+skNum(d.longContributionPct,2)+'%</b></div><div><span>SHORT CONTRIB</span><b>'+skNum(d.shortContributionPct,2)+'%</b></div><div><span>LONG / SHORT SIGNAL</span><b>'+skNum(d.longSignalSharePct,0)+' / '+skNum(d.shortSignalSharePct,0)+'%</b></div><div><span>AVG EXPOSURE</span><b>'+skNum(d.avgAbsPosition,2)+'×</b></div><div><span>AVG LEVERAGE</span><b>'+skNum(d.avgLeverage,2)+'×</b></div><div><span>COST / |GROSS|</span><b>'+skNum(d.modeledCostVsGrossAbsPct,1)+'%</b></div></div>';
+}
+function holdoutResultCard(title,subtitle,r){
+  if(!r)return '<section class="holdout-card"><div class="holdout-card-head"><div><span>'+title+'</span><b>'+subtitle+'</b></div><strong>NO RUN</strong></div></section>';
+  const g=r.gate,s=r.summary;
+  return '<section class="holdout-card"><div class="holdout-card-head"><div><span>'+title+'</span><b>'+subtitle+'</b><small>'+r.assets.length+' Assets · '+s.periods+' Perioden</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
+    '<div class="holdout-metrics"><div><span>RETURN</span><b>'+skNum(s.totalReturnPct,2)+'%</b></div><div><span>PF</span><b>'+skNum(s.profitFactor,2)+'</b></div><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>POS ASSETS</span><b>'+g.positiveAssets+'/'+r.assets.length+'</b></div><div><span>WINDOWS</span><b>'+r.stability.positiveWindows+'/5</b></div></div>'+
+    '<div class="holdout-gate"><b>'+(g.pass?'PASS · HOLDOUT TEILBESTANDEN':'FAIL / INSUFFICIENT')+'</b><small>'+((g.reasons||[]).join(' · ')||'Frozen TSMOM Gate erfüllt.')+'</small></div>'+
+    holdoutDiagHtml(r.diagnostics)+edgeWindowGrid(r.stability)+'</section>';
+}
+function tsmomHoldoutHtml(){
+  if(holdoutUi.running)return '<div class="edge-loading"><b>'+holdoutUi.progress+'</b><small>'+holdoutUi.completed+'/'+holdoutUi.total+' Asset-Ladevorgänge · Regeln unverändert</small></div>';
+  if(holdoutUi.error)return '<div class="sk-paper-error"><b>HOLDOUT FEHLER</b><small>'+holdoutUi.error+'</small></div>';
+  if(!holdoutUi.legacy||!holdoutUi.transfer)return '<div class="sk-paper-empty"><b>NOCH KEIN HOLDOUT</b><small>H1: 05/2020–07/2022 · H2: neues 8-Asset-Universum über 1460 Tage.</small></div>';
+  const c=holdoutUi.combined;
+  return '<div class="holdout-combined '+(c.pass?'pass':'fail')+'"><span>COMBINED HOLDOUT</span><b>'+c.label+'</b><small>'+(c.reasons.length?c.reasons.join(' · '):'Beide unabhängigen Gates bestanden · trotzdem keine Auto-Promotion.')+'</small></div>'+
+    holdoutResultCard('H1 · TIME HOLDOUT','2020-05 → 2022-07',holdoutUi.legacy)+
+    holdoutResultCard('H2 · TRANSFER HOLDOUT',TSMOM_TRANSFER_ASSETS.join(' · '),holdoutUi.transfer);
+}
+function tsmomHoldoutPanel(){
+  return '<section class="holdout-shell"><div class="edge-strategy-head"><div><span>01B · TSMOM HOLDOUT V1</span><b>INDEPENDENT VALIDATION</b></div><small>gleiche Regeln · neue Zeit / neue Assets</small></div>'+
+    '<div class="holdout-protocol"><span>FROZEN</span><b>'+TSMOM_HOLDOUT_V1_RULESET+'</b><small>H1 und H2 müssen beide denselben TSMOM-Gate bestehen. Kein Asset-Dropping.</small></div>'+
+    '<button id="holdout-run" class="holdout-run" type="button" '+(holdoutUi.running?'disabled':'')+'>'+(holdoutUi.running?'HOLDOUT LÄUFT …':'TSMOM HOLDOUT STARTEN')+'</button>'+
+    '<div id="holdout-result">'+tsmomHoldoutHtml()+'</div></section>';
+}
+async function runTsmomHoldout(view){
+  if(holdoutUi.running)return;
+  holdoutUi.running=true;holdoutUi.error=null;holdoutUi.legacy=null;holdoutUi.transfer=null;holdoutUi.combined=null;holdoutUi.completed=0;
+  const out=$('#holdout-result',view),btn=$('#holdout-run',view),loader=H().marketKlinesHistory;
+  if(typeof loader!=='function'){holdoutUi.running=false;holdoutUi.error='Historical daily data bridge fehlt';if(out)out.innerHTML=tsmomHoldoutHtml();return}
+  if(btn){btn.disabled=true;btn.textContent='HOLDOUT LÄUFT …'}
+  const legacyData={},transferData={};
+  try{
+    for(const symbol of DOCUMENTED_EDGE_ASSETS){
+      holdoutUi.progress='H1 ALTZEIT · '+symbol;if(out)out.innerHTML=tsmomHoldoutHtml();
+      try{
+        const rows=await loader('1d',2800,symbol);
+        if(Array.isArray(rows)&&rows.length>=500)legacyData[symbol]=rows;
+      }catch(e){}
+      holdoutUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    if(Object.keys(legacyData).length<4)throw new Error('H1 Datenbreite <4 Assets');
+    holdoutUi.legacy=runLegacyTimeHoldout(legacyData);
+
+    for(const symbol of TSMOM_TRANSFER_ASSETS){
+      holdoutUi.progress='H2 TRANSFER · '+symbol;if(out)out.innerHTML=tsmomHoldoutHtml();
+      try{
+        const rows=await loader('1d',1860,symbol);
+        if(Array.isArray(rows)&&rows.length>=1700)transferData[symbol]=rows;
+      }catch(e){}
+      holdoutUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    if(Object.keys(transferData).length<TSMOM_TRANSFER_ASSETS.length)throw new Error('H2 benötigt alle 8 Transfer-Assets; geladen: '+Object.keys(transferData).length+'/8');
+    holdoutUi.transfer=runTransferUniverseHoldout(transferData);
+    holdoutUi.combined=evaluateCombinedTsmomHoldout({legacy:holdoutUi.legacy,transfer:holdoutUi.transfer});
+  }catch(e){holdoutUi.error=String(e?.message||e)}
+  finally{
+    holdoutUi.running=false;holdoutUi.progress='';
+    if(out)out.innerHTML=tsmomHoldoutHtml();
+    if(btn){btn.disabled=false;btn.textContent='TSMOM HOLDOUT STARTEN'}
+  }
+}
+function bindTsmomHoldout(view){
+  const b=$('#holdout-run',view);if(b)b.onclick=()=>runTsmomHoldout(view);
+}
+
 function documentedEdgePanel(){
   return '<section class="documented-edge-shell"><div class="edge-head"><div><span>DOCUMENTED EDGE LAB</span><b>PUBLISHED STRATEGY REPLICATIONS</b><small>Evidenz ≠ Garantie · Regeln vor Ergebnis eingefroren</small></div><strong>RESEARCH ONLY</strong></div>'+
     '<div class="edge-controls"><label>HISTORY<select id="edge-days"><option value="730" '+(edgeUi.days===730?'selected':'')+'>730 TAGE</option><option value="1460" '+(edgeUi.days===1460?'selected':'')+'>1460 TAGE</option></select></label><div><span>UNIVERSE</span><b>'+DOCUMENTED_EDGE_ASSETS.join(' · ')+'</b></div><button id="edge-run" type="button" '+(edgeUi.running?'disabled':'')+'>'+(edgeUi.running?'BATCH LÄUFT …':'EDGE BATCH STARTEN')+'</button></div>'+
     '<details class="edge-rules"><summary>FROZEN PROTOCOL · '+DOCUMENTED_EDGE_V1_RULESET+'</summary><small>TSMOM: 30/90/365d, monatlich, Vol-Sizing, Kosten. XSMOM: 21d + 1d Skip, wöchentlich, Price-only Proxy. Funding Carry: bestehender Meridian-Pfad bleibt eingefroren.</small></details>'+
-    '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>01 · TIME-SERIES MOMENTUM</span><b>TSMOM CLASSIC</b></div><small>höchste Replikationsqualität</small></div><div id="edge-tsmom">'+tsmomEdgeHtml()+'</div></section>'+
+    '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>01 · TIME-SERIES MOMENTUM</span><b>TSMOM CLASSIC</b></div><small>höchste Replikationsqualität</small></div><div id="edge-tsmom">'+tsmomEdgeHtml()+'</div></section>'+tsmomHoldoutPanel()+
     '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>02 · FUNDING / CARRY</span><b>DELTA-NEUTRAL EVIDENCE</b></div><small>bestehender Research-Pfad</small></div>'+fundingEdgeHtml()+'</section>'+
     '<section class="edge-strategy"><div class="edge-strategy-head"><div><span>03 · CROSS-SECTIONAL MOMENTUM</span><b>3W PRICE-SORT</b></div><small>Proxy bis Market-Cap-Historie verfügbar</small></div><div id="edge-xsmom">'+xsmomEdgeHtml()+'</div></section>';
 }
@@ -566,7 +637,7 @@ function renderLab(){
     const module=document.createElement('details');module.className='research-module documented-edge-module';module.open=true;
     module.innerHTML='<summary><span>DOCUMENTED EDGE LAB</span><small>TSMOM · Funding Carry · XSMOM</small></summary><div class="research-module-body">'+documentedEdgePanel()+'</div>';
     const host=$('.bt-control',view);(host||view.firstElementChild)?.insertAdjacentElement(host?'beforebegin':'afterend',module);
-    bindDocumentedEdge(view);
+    bindDocumentedEdge(view);bindTsmomHoldout(view);
   }
 
   if(!$('.sk-system-module',view)){
