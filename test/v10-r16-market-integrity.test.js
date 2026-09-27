@@ -18,7 +18,7 @@ test('r16 safety risks outrank stale-market and unverified states globally',()=>
 
 test('r16 derives OKX close times and confirms higher timeframes on closed candles',()=>{
   assert.match(v9,/MARKET_INTERVAL_MS/);
-  assert.match(v9,/closeTime:+x\[0\]\+Math\.max\(1,span\)-1/);
+  assert.ok(v9.includes('closeTime:+x[0]+Math.max(1,span)-1'));
   assert.match(v9,/function closedMarketRows\(rows\)/);
   assert.match(v9,/h1c=closedMarketRows\(h1\),h4c=closedMarketRows\(h4\),d1c=closedMarketRows\(d1\)/);
   assert.match(v9,/confirmationBars:'CLOSED_1H_4H_1D'/);
