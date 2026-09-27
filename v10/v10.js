@@ -24,8 +24,21 @@ function intelFresh(i){return !!i&&freshTs(i.updatedAt)}
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length;
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,missingAssets:Math.max(0,totalAssets-knownAssets),totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+}
+function botReadiness(g){
+  if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
+  if(!g.fresh)return{label:'REF',tone:'reference'};
+  if(g.matched>0&&g.decisionReady===g.matched)return{label:'READY',tone:'safe'};
+  if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
+  if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
+  return{label:'BLOCKED',tone:'muted'};
+}
+function marketReadiness(m){
+  if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
+  if(m.fresh)return{label:'PARTIAL',tone:'watch'};
+  return{label:'STALE',tone:'mixed'};
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -145,7 +158,7 @@ function syncHealth(){
   return{apiRows,supported,raw:supported,matched:matched.length,safetyReady,pnlReady,decisionReady,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
 }
 function dataGuardCard(){
-  const g=syncHealth(),tone=g.decisionReady>0?'safe':g.safetyReady>0?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionReady>0?'DECISION READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
+  const g=syncHealth(),ready=botReadiness(g),tone=ready.tone==='reference'?'muted':ready.tone,api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=ready.label==='READY'?'DECISION READY':ready.label==='PARTIAL'?'PARTIAL':ready.label==='SAFETY'?'SAFETY ONLY':'BLOCKED';
   return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small></section>';
 }
 function liveOverview(){
@@ -167,18 +180,18 @@ function snapshotDetails(openByDefault=false){
     .map(symbol=>{const rows=refs.filter(x=>x.symbol===symbol),l=rows.filter(x=>(x.side||'LONG')==='LONG').length,sh=rows.filter(x=>x.side==='SHORT').length;return '<section class="snapshot-asset"><div class="snapshot-asset-head"><b>'+symbol+'</b><span>'+l+' LONG · '+sh+' SHORT</span></div>'+rows.map(snapshotBotLine).join('')+'</section>'}).join('');
   const p=manual.map(x=>'<div class="snapshot-row"><b>'+x.symbol+' '+(x.side||'')+' · '+(x.leverage||'—')+'x</b><span>PIONEX MANUAL · REFERENCE</span></div>').join('');
   const o=okx.map(x=>'<div class="snapshot-row"><b>'+x.symbol+' '+(x.side||'')+' · '+(x.leverage||'—')+'x</b><span>OKX DCA · '+(x.snapshotAt||'SNAPSHOT')+'</span></div>').join('');
-  return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>27.09.2026 · ca. 19:47–19:52</b><span>'+stamp+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
+  const stampMs=Date.parse(String(stamp||'')),stampLabel=Number.isFinite(stampMs)?new Date(stampMs).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Snapshot-Zeit unbekannt';
+  return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>'+esc(stampLabel)+'</b><span>'+esc(stamp)+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
 }
 function commandDataStrip(){
-  const g=syncHealth(),m=marketHealth(),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE';
-  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(m.fresh&&m.coverageComplete?'safe':'watch')+'">'+marketLabel+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+'</small></div><div><span>BOT LAYER</span><b class="tone-'+(g.fresh?'safe':'watch')+'">'+(g.fresh?'FRESH':'REFERENCE')+'</b><small>'+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—';
+  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+(mr.tone==='mixed'?'watch':mr.tone)+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing</small></div><div><span>BOT LAYER</span><b class="tone-'+(br.tone==='reference'?'muted':br.tone)+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>MIXED SOURCES</b><small>nicht Bot-Freshness</small></div></section>';
 }
 function renderSystemHeader(){
-  const g=syncHealth(),m=marketHealth(),market=$('#market-status'),bot=$('#data-status');
+  const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  set(market,'● MKT '+(m.fresh?'FRESH':'STALE'),'live '+(m.fresh?'fresh':'mixed'),m.fresh?'Öffentliche Futures-Marktdaten frisch':'Marktdaten nicht frisch genug');
-  const bad=g.status==='ERROR',label=g.fresh?'FRESH':bad?'ERROR':'REF';
-  set(bot,'● BOT '+label,'live '+(g.fresh?'fresh':bad?'error':'reference'),g.detail);
+  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
+  set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
@@ -215,7 +228,7 @@ function renderBots(){
 }
 function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
-  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[])],set=new Set(Object.keys(s?.assetIntel||{}));
+  const rows=[...(s?.referenceBots||[]),...(s?.bots||[]),...(s?.okxDcaBots||[]),...(s?.unmatchedLive||[])],set=new Set();
   rows.forEach(x=>{if(x?.symbol)set.add(String(x.symbol).toUpperCase())});
   return [...set].sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
 }
@@ -373,7 +386,7 @@ function renderMarket(){
   const view=$('#view-market');if(!view||$('.v10-market-board',view))return;
   if(!$('.hero',view)&&!$('.grid',view))return;
   const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),mh=marketHealth(),verified=Object.values(s?.priceChecks||{}).filter(x=>x?.verified&&freshTs(x.updatedAt)).length;
-  const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
+  const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
   const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + FIB MAP + ASSET TAPE</b></div><small>Öffentliche Futures-Marktdaten · 1h/4h/1D bestätigt nur auf geschlossenen Kerzen</small></section><div class="v10-market-board">'+health+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · '+mh.freshAssets+' frisch · 15m/1h/4h</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
   bindFibMap(view);
