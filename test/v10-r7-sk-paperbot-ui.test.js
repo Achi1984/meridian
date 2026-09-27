@@ -62,7 +62,7 @@ test('v10 r9 LAB renderer is unique and contains SK panel wiring',()=>{
   assert.equal((js.match(/function renderLab\(\)/g)||[]).length,1);
   assert.equal((js.match(/function skPaperPanel\(\)/g)||[]).length,1);
   assert.match(js,/bindSkPaper\(view\)/);
-  assert.match(js,/\.sk-paper-shell/);
+  assert.match(js,/class="sk-paper-shell"/);
 });
 
 
