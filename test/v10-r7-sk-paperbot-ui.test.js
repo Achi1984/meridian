@@ -49,3 +49,16 @@ test('SK V1 freezes gate, entries, targets, invalidation and total risk',()=>{
   assert.match(engine,/exitReason='ORIGIN_INVALIDATION'/);
   assert.match(engine,/riskPct:1/);
 });
+
+
+test('v10 r7 browser adapter is syntactically valid after removing ESM imports',()=>{
+  const body=js.replace(/^import .*$/gm,'');
+  assert.doesNotThrow(()=>new Function(body));
+});
+
+test('v10 r7 LAB renderer is unique and contains SK panel wiring',()=>{
+  assert.equal((js.match(/function renderLab\(\)/g)||[]).length,1);
+  assert.equal((js.match(/function skPaperPanel\(\)/g)||[]).length,1);
+  assert.match(js,/bindSkPaper\(view\)/);
+  assert.match(js,/\.sk-paper-shell/);
+});
