@@ -504,8 +504,12 @@ window.MERIDIAN_V10_BRIDGE={
   bindResearch:(target='research')=>bindResearch(target)
 };
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
-function refreshNow(){void sync();void syncIntel().then(changed=>{if(changed)notifyData()})}
-go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());
+async function refreshNow(){
+ await sync();
+ const changed=await syncIntel();
+ if(changed)notifyData();
+}
+go('command');void refreshNow();
 setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNow()});
-window.addEventListener('online',refreshNow);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshNow()});
+window.addEventListener('online',()=>{void refreshNow()});
