@@ -97,3 +97,14 @@ These diagnostics cannot be used to remove a side or alter parameters inside Hol
 - no gate changes;
 - no date changes after results;
 - any new hypothesis requires a separately named version and protocol.
+
+## Deep-audit implementation revision
+
+The strategy rules above remain frozen. MERIDIAN engine revision `WEIGHTED-TURNOVER-R2` corrects implementation accounting only:
+
+- skipped under-breadth periods no longer mutate position state;
+- portfolio turnover is measured on equal-weighted portfolio exposures;
+- assets leaving the active universe incur explicit exit turnover cost;
+- final portfolio/asset close costs are included.
+
+Results produced before this engine revision must be rerun before they are treated as current evidence. No gate or strategy parameter was relaxed.
