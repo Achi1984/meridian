@@ -1,6 +1,7 @@
 import {
   DOCUMENTED_EDGE_ASSETS,
   TSMOM_CLASSIC_CONFIG,
+  TSMOM_ENGINE_REVISION,
   runTsmomClassic,
   evaluateTsmomGate
 } from './documented-edge-v1.js';
@@ -87,6 +88,7 @@ export function filterTsmomWindow(base,{start,end}){
   const gate=evaluateTsmomGate(summary,stability,assets,base?.config||TSMOM_CLASSIC_CONFIG);
   return{
     ruleset:TSMOM_HOLDOUT_V1_RULESET,
+    engineRevision:base?.engineRevision||TSMOM_ENGINE_REVISION,
     researchOnly:true,executionImpact:false,autoPromotion:false,
     config:base?.config||TSMOM_CLASSIC_CONFIG,
     summary,stability,assets,periods,gate,diagnostics:diagnostics(periods),
@@ -123,6 +125,7 @@ export function evaluateCombinedTsmomHoldout({legacy,transfer}){
 export function holdoutProtocol(){
   return{
     ruleset:TSMOM_HOLDOUT_V1_RULESET,
+    engineRevision:TSMOM_ENGINE_REVISION,
     discoveryUniverse:[...DOCUMENTED_EDGE_ASSETS],
     transferUniverse:[...TSMOM_TRANSFER_ASSETS],
     transferDays:TSMOM_TRANSFER_DAYS,
