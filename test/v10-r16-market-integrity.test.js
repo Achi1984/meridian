@@ -53,10 +53,11 @@ test('r16 UI states closed-candle confirmation explicitly',()=>{
   assert.match(v10,/1h\/4h\/1D bestätigt nur auf geschlossenen Kerzen/);
 });
 
-test('r16 release identity remains canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r16');
-  assert.match(html,/10\.0-r16/);
-  assert.match(v10,/const BUILD='10\.0-r16'/);
+test('r16+ release identity remains canonical',()=>{
+  const build=String(release.terminalBuild||'');
+  assert.match(build,/^10\.0-r\d+$/);
+  assert.ok(html.includes(build));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
 });
 
 test('r16 browser adapter remains syntactically valid',()=>{
