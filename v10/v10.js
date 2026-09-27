@@ -1,13 +1,15 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r6';
-// MERIDIAN v10 r6 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r7';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r7';
+// MERIDIAN v10 r7 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r6';
+const BUILD='10.0-r7';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
 const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
 const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
+const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -329,6 +331,94 @@ function renderScanner(){
   const s=S(),syms=marketUniverse().filter(x=>s?.assetIntel?.[x]).sort((a,b)=>{const A=marketSignal(s.assetIntel[a]),B=marketSignal(s.assetIntel[b]);return B.rank-A.rank||B.score-A.score});
   const confirmed=syms.filter(x=>marketSignal(s.assetIntel[x]).confirmed),top=syms.slice(0,4),rest=syms.slice(4);
   view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>MARKET SIGNALS</b></div><small>CONFIRMED braucht 1h + 4h Alignment · Marktdaten bleiben getrennt von Bot-Daten</small></section><section class="scanner-summary"><div><span>MARKETS</span><b>'+syms.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>BOT LINKED</span><b>'+syms.filter(x=>matchedRows(x).length).length+'</b></div><div><span>BOT DATA</span><b class="'+(H().botFeedFresh?.()?'tone-safe':'tone-watch')+'">'+(H().botFeedFresh?.()?'FRESH':'STALE/OFF')+'</b></div></section><div class="section-title"><h2>TOP SETUPS</h2><small>Bestätigung vor Roh-Pressure</small></div><div class="v10-scanner-stack">'+top.map(scannerCard).join('')+'</div>'+(rest.length?'<details class="scanner-more"><summary>WEITERE '+rest.length+' MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'');
+}
+
+function skNum(v,d=2){
+  const n=Number(v);return Number.isFinite(n)?new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d}).format(n):'—';
+}
+function skMoney(v){
+  const n=Number(v);return Number.isFinite(n)?(n>=0?'+':'−')+'
+  const view=$('#view-more'),b=bridge();if(!view||!b)return;
+  if(!$('.bt-control',view)&&!$('.bt-result',view)){
+    view.innerHTML=b.renderResearch?.()||'<section class="card">LAB nicht verfügbar.</section>';
+    b.bindResearch?.('more');
+  }
+  banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
+  $('.hero',view)?.remove();
+  if(!$('.lab-overview',view)){
+    const bt=S()?.backtest||{},r=bt.result;
+    const o=document.createElement('section');o.className='lab-overview';
+    o.innerHTML='<div><span>ACTIVE LABS</span><b>SK CORE + PROFIT LOCK</b><small>Entry-System + Exit-Policy getrennt</small></div><div><span>SK METHOD</span><b>FROZEN 4H</b><small>keine nachträgliche Optimierung</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST SK</span><b>'+(skLabUi.result?skLabUi.symbol:'—')+'</b><small>'+(skLabUi.result?(skLabUi.result.summary.trades+' Trades'):'noch kein Lauf')+'</small></div>';
+    const control=$('.bt-control',view);control?.insertAdjacentElement('beforebegin',o);
+    o.insertAdjacentHTML('afterend',skPaperPanel());bindSkPaper(view);
+  }
+  const why=$$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
+  if(why&&!why.closest('details')){
+    const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
+    why.replaceWith(d);
+  }
+}
+function decorate(){
+  document.documentElement.dataset.meridianBuild=BUILD;
+  renderCommand();renderBots();renderMarket();renderScanner();renderLab();
+}
+let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;decorate();});};
+new MutationObserver(schedule).observe($('#app')||document.body,{childList:true,subtree:true});
+decorate();
++new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(Math.abs(n)):'—';
+}
+function skBotStateLabel(r){
+  const state=String(r?.latestState||'WAITING_DATA');
+  const map={SEQUENCE:'SEQUENCE',B_FORMING:'B FORMING',ACTIVE:'ACTIVE PAPER',TP1:'TP1 HIT',TP2:'TP2 HIT',COMPLETE:'COMPLETE',INVALID:'INVALID',WAITING_DATA:'WAITING DATA',SEARCH:'SEARCH'};
+  return map[state]||state.replaceAll('_',' ');
+}
+function skRulesCard(){
+  const c=SK_PAPERBOT_V1_CONFIG;
+  return '<details class="sk-rules"><summary>FROZEN RULESET · '+SK_PAPERBOT_V1_RULESET+'</summary><div class="sk-rule-grid"><div><span>TIMEFRAME</span><b>4H</b></div><div><span>GATE</span><b>0.382</b></div><div><span>ENTRIES</span><b>'+c.entryRatios.join(' · ')+'</b></div><div><span>TARGETS</span><b>'+c.targetRatios.join(' · ')+'</b></div><div><span>INVALIDATION</span><b>ORIGIN 0</b></div><div><span>RISK</span><b>'+c.riskPct+'% TOTAL</b></div><div><span>FEES</span><b>'+c.feeBps+' BPS</b></div><div><span>SLIPPAGE</span><b>'+c.slippageBps+' BPS</b></div></div><small>Vier Entry-Tranchen teilen das Gesamtrisiko. Doppelter Vorteil wird gemessen, aber ist in V1 kein Pflichtfilter. Keine automatische Promotion.</small></details>';
+}
+function skPaperPanel(){
+  const assets=fibAssets(),opts=assets.map(x=>'<option value="'+x+'" '+(x===skLabUi.symbol?'selected':'')+'>'+x+'</option>').join('');
+  return '<section class="sk-paper-shell"><div class="sk-paper-head"><div><span>SK PAPERBOT V1</span><b>SEQUENCE BOT · CORE</b><small>0→A→B→C · frozen research rules · 4h</small></div><strong>PAPER ONLY</strong></div>'+
+    '<div class="sk-paper-controls"><label>ASSET<select id="sk-asset">'+opts+'</select></label><label>HISTORY<select id="sk-days"><option value="90" '+(skLabUi.days===90?'selected':'')+'>90 TAGE</option><option value="180" '+(skLabUi.days===180?'selected':'')+'>180 TAGE</option><option value="365" '+(skLabUi.days===365?'selected':'')+'>365 TAGE</option></select></label><button id="sk-run" type="button" '+(skLabUi.running?'disabled':'')+'>'+(skLabUi.running?'LÄUFT …':'SK BACKTEST STARTEN')+'</button></div>'+
+    skRulesCard()+'<div id="sk-result" class="sk-paper-result">'+skPaperResultHtml()+'</div></section>';
+}
+function skPaperResultHtml(){
+  if(skLabUi.running)return '<div class="sk-paper-loading"><b>SK CORE V1</b><small>4h-Historie laden · Sequenzen chronologisch replayen · Kosten anwenden …</small></div>';
+  if(skLabUi.error)return '<div class="sk-paper-error"><b>BACKTEST FEHLER</b><small>'+skLabUi.error+'</small></div>';
+  const r=skLabUi.result,s=r?.summary,g=skLabUi.gate,st=skLabUi.stability;
+  if(!r||!s)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>Backtest startet nur nach Klick. Keine API-Abfragen im normalen COMMAND.</small></div>';
+  const daPf=s.doubleAdvantageTrades?skMoney(s.doubleAdvantagePnl):'—',gateTone=g?.pass?'safe':'watch';
+  const state=skBotStateLabel(r),seq=r.latestSequence;
+  const stateDetail=seq?seq.side+' · 0 '+fibFmt(seq.zero)+' · A '+fibFmt(seq.a)+(seq.gateTouched?' · GATE ✓':' · GATE offen'):'Keine offene Sequenz am Stichprobenende';
+  const windows=(st?.windows||[]).map(w=>'<div class="'+(w.positive?'positive':'negative')+'"><span>W'+w.i+' · '+w.trades+' Trades</span><b>'+skMoney(w.pnl)+'</b><small>PF '+skNum(w.profitFactor,2)+'</small></div>').join('');
+  const recent=(r.trades||[]).slice(-5).reverse().map(t=>'<div class="sk-trade-row"><span>'+t.side+(t.doubleAdvantage?' · 2×ADV':'')+'</span><b>'+skMoney(t.realizedPnl)+'</b><small>'+t.entryRatios.map(x=>x.toFixed(3)).join('/')+' → '+(t.exitReason||'—')+'</small></div>').join('');
+  return '<div class="sk-state-card"><div><span>CURRENT STATE</span><b>'+state+'</b><small>'+stateDetail+'</small></div><strong class="tone-'+gateTone+'">'+(g?.label||'RESEARCH')+'</strong></div>'+
+    '<div class="sk-metrics"><div><span>TRADES</span><b>'+s.trades+'</b></div><div><span>PNL</span><b>'+skMoney(s.pnl)+'</b></div><div><span>PF</span><b>'+skNum(s.profitFactor,2)+'</b></div><div><span>WIN RATE</span><b>'+skNum(s.winRate,1)+'%</b></div><div><span>EXPECTANCY</span><b>'+skMoney(s.expectancy)+'</b></div><div><span>MAX DD</span><b>'+skNum(s.maxDrawdownPct,2)+'%</b></div><div><span>LONG / SHORT</span><b>'+s.longTrades+' / '+s.shortTrades+'</b></div><div><span>DOUBLE ADV</span><b>'+s.doubleAdvantageTrades+'</b><small>'+daPf+'</small></div></div>'+
+    '<div class="sk-gate"><span>RESEARCH GATE</span><b>'+(g?.pass?'PASS · KEINE AUTO-PROMOTION':'FAIL / INSUFFICIENT')+'</b><small>'+((g?.reasons||[]).join(' · ')||'Frozen Mindestkriterien erfüllt; unabhängiger Forward-Test bleibt Pflicht.')+'</small></div>'+
+    '<div class="sk-section-title"><b>5 ZEITFENSTER</b><small>'+((st?.positiveWindows||0))+'/5 positiv · kein Parameter-Refit</small></div><div class="sk-window-grid">'+windows+'</div>'+
+    '<details class="sk-trades"><summary>LETZTE TRADES · '+Math.min(5,s.trades)+'</summary><div>'+recent+'</div></details>'+
+    '<div class="sk-source-note">'+(skLabUi.range||'')+' · Gebühren + Slippage aktiv · Ergebnis ist Research, kein Profitabilitätsnachweis.</div>';
+}
+async function runSkPaperBacktest(view){
+  if(skLabUi.running)return;
+  skLabUi.symbol=$('#sk-asset',view)?.value||skLabUi.symbol;
+  skLabUi.days=Number($('#sk-days',view)?.value)||180;skLabUi.running=true;skLabUi.error=null;
+  const out=$('#sk-result',view),btn=$('#sk-run',view);if(out)out.innerHTML=skPaperResultHtml();if(btn){btn.disabled=true;btn.textContent='LÄUFT …'}
+  try{
+    const loader=H().marketKlinesHistory;if(typeof loader!=='function')throw new Error('Historical 4h data bridge fehlt');
+    const bars=Math.min(2500,skLabUi.days*6+40),rows=await loader('4h',bars,skLabUi.symbol);
+    if(!Array.isArray(rows)||rows.length<100)throw new Error('Zu wenige 4h-Kerzen: '+(rows?.length||0));
+    const result=replaySkPaperBot(rows),stability=skChronologicalStability(result.trades,5),gate=evaluateSkPaperGate(result.summary,stability);
+    skLabUi.result=result;skLabUi.stability=stability;skLabUi.gate=gate;
+    skLabUi.range=new Date(rows[0].openTime).toLocaleDateString('de-DE')+' → '+new Date(rows.at(-1).openTime).toLocaleDateString('de-DE')+' · '+rows.length+'×4h';
+  }catch(e){skLabUi.error=String(e?.message||e)}
+  finally{skLabUi.running=false;if(out)out.innerHTML=skPaperResultHtml();if(btn){btn.disabled=false;btn.textContent='SK BACKTEST STARTEN'}}
+}
+function bindSkPaper(view){
+  const a=$('#sk-asset',view),d=$('#sk-days',view),b=$('#sk-run',view);
+  if(a)a.onchange=()=>{skLabUi.symbol=a.value};
+  if(d)d.onchange=()=>{skLabUi.days=Number(d.value)||180};
+  if(b)b.onclick=()=>runSkPaperBacktest(view);
 }
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
