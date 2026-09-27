@@ -7,10 +7,10 @@ const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8').replac
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8').replaceAll('\r\n','\n');
 const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 
-test('v10 r11 keeps validated v9 engine and isolated adapter',()=>{
-  assert.match(html,/10\.0-r11/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r11/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r11/);
+test('v10 r12 keeps validated v9 engine and isolated adapter',()=>{
+  assert.match(html,/10\.0-r12/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r12/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r12/);
   assert.match(js,/No trading logic lives here/);
   assert.match(engine,/MERIDIAN_V10_BRIDGE/);
 });
@@ -33,11 +33,11 @@ test('v10 safety/data guard pre-empts trading statuses',()=>{
   for(const label of ['LIQ RISK','RISK REVIEW','PROFIT LOCK','WATCH PROFIT','HOLD'])assert.match(fn,new RegExp(label));
 });
 
-test('v10 renders one actionable asset card for long plus short and hides reference bots',()=>{
+test('v10 renders actionable pair cards only from fresh private rows and keeps reference bots separate',()=>{
   assert.match(js,/function pairCard/);
-  assert.match(js,/function pairCard/);
-  assert.match(js,/Referenzbots bleiben aus dieser Ansicht entfernt/);
-  assert.match(js,/KEINE BESTÄTIGTEN BOT-ROWS/);
+  assert.match(js,/KEINE FRISCHEN BOT-ROWS/);
+  assert.match(js,/Live-Aktionskarten bleiben gesperrt/);
+  assert.match(js,/ASSET WATCH SNAPSHOT/);
   assert.match(js,/private API-Row ist UNVERIFIED und aus Actions ausgeschlossen/);
 });
 
@@ -86,20 +86,21 @@ test('v10 blocked-live command collapses legacy risk clutter and fixes private m
 
 test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
   assert.match(js,/function snapshotDetails/);
-  assert.match(js,/REFERENCE SNAPSHOTS/);
-  assert.match(js,/Nur Ansicht · keine Risk-\/Next-Action-Ableitung/);
+  assert.match(js,/ASSET WATCH SNAPSHOT/);
+  assert.match(js,/Nur Referenz, solange BOT API nicht frisch ist/);
+  assert.match(js,/keine Risk-\/Next-Action-Ableitung/);
   assert.match(css,/\.v10-snapshot-details/);
 });
 
 
-test('v10 r11 bots collapse stale private fields instead of rendering empty action grids',()=>{
+test('v10 r12 bots collapse stale private fields instead of rendering empty action grids',()=>{
   assert.match(js,/stale-pair-card/);
   assert.match(js,/Private Bot-Felder ausgeblendet/);
   assert.match(js,/kein Risk\/PNL\/Next-Action aus altem Snapshot/);
   assert.match(js,/function marketPrice/);
 });
 
-test('v10 r11 market is a multi-asset public-data board independent from bot freshness',()=>{
+test('v10 r12 market is a multi-asset public-data board independent from bot freshness',()=>{
   assert.match(js,/function btcRegimeLabel/);
   assert.doesNotMatch(js,/BTC REGIME<\/span><b>'\+String\(s\.market/);
   assert.match(js,/function marketUniverse/);
@@ -109,7 +110,7 @@ test('v10 r11 market is a multi-asset public-data board independent from bot fre
   assert.match(js,/market-list/);
 });
 
-test('v10 r11 scanner ranks confirmed setups before raw pressure',()=>{
+test('v10 r12 scanner ranks confirmed setups before raw pressure',()=>{
   assert.match(js,/B\.rank-A\.rank\|\|B\.score-A\.score/);
   assert.match(js,/BEAR CONFIRMED/);
   assert.match(js,/BULL CONFIRMED/);
@@ -118,7 +119,7 @@ test('v10 r11 scanner ranks confirmed setups before raw pressure',()=>{
   assert.match(js,/TOP SETUPS/);
 });
 
-test('v10 r11 lab prioritizes documented edges while retaining SK and paired Profit Lock research',()=>{
+test('v10 r12 lab prioritizes documented edges while retaining SK and paired Profit Lock research',()=>{
   assert.match(js,/RESEARCH HUB/);
   assert.match(js,/PRIMARY LAB/);
   assert.match(js,/DOCUMENTED EDGE LAB/);

@@ -342,3 +342,27 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 @media(max-width:390px){
   .holdout-card-head{flex-direction:column}.holdout-card-head>strong{align-self:flex-start}
 }
+
+
+/* v10 r12 · Asset Watch reference snapshot */
+.asset-watch-reference{border-color:#31516e;background:#07101a}
+.snapshot-meta{display:flex;justify-content:space-between;gap:10px;margin:8px 0 6px;padding:7px 8px;border:1px solid #1a2d40;border-radius:9px;background:#060b11}
+.snapshot-meta b{font-size:8px;color:var(--cyan)}.snapshot-meta span{font-size:7px;color:var(--muted);text-align:right}
+.snapshot-assets{display:grid;gap:7px;margin:8px 0}
+.snapshot-asset{border:1px solid #1a2d40;border-radius:11px;background:#060b11;overflow:hidden}
+.snapshot-asset-head{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 8px;border-bottom:1px solid #142538;background:#08111b}
+.snapshot-asset-head b{font-size:10px}.snapshot-asset-head span{font-size:7px;color:var(--muted)}
+.snapshot-bot-line{display:grid;grid-template-columns:.7fr 2fr;gap:8px;align-items:center;padding:7px 8px;border-top:1px solid #101c28}
+.snapshot-bot-line:first-of-type{border-top:0}
+.snapshot-bot-line>div{display:flex;flex-direction:column;gap:2px}
+.snapshot-bot-line b{font-size:8px}.snapshot-bot-line small{font-size:7px;color:var(--muted)}
+.snapshot-bot-line>span{font-size:7px;color:#9eb0c0;text-align:right;line-height:1.45}
+@media(max-width:600px){
+  .snapshot-bot-line{grid-template-columns:.8fr 1.7fr}
+}
+@media(max-width:390px){
+  .snapshot-meta{align-items:flex-start;flex-direction:column}
+  .snapshot-meta span{text-align:left}
+  .snapshot-bot-line{grid-template-columns:1fr}
+  .snapshot-bot-line>span{text-align:left}
+}

@@ -6,10 +6,10 @@ const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 
-test('v10 r11 loads validated v9 engine plus isolated v10 presentation adapter',()=>{
-  assert.match(html,/10\.0-r11/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r11/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r11/);
+test('v10 r12 loads validated v9 engine plus isolated v10 presentation adapter',()=>{
+  assert.match(html,/10\.0-r12/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r12/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r12/);
   assert.match(html,/window\.MERIDIAN_V10=true/);
 });
 
