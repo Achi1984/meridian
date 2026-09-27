@@ -64,7 +64,7 @@ test('r12 shows Asset Watch only as guarded reference when private bot feed is s
   assert.match(js,/Autoritativer letzter Screenshot-Stand/);
   assert.match(js,/Nur Referenz, solange BOT API nicht frisch ist/);
   assert.match(js,/KEINE FRISCHEN LIVE-AKTIONSKARTEN/);
-  assert.match(js,/snapshotDetails\(!g\.fresh\)/);
+  assert.match(js,/snapshotDetails\((?:snapshotOpen\?\?)?!g\.fresh\)/);
   assert.match(js,/function snapshotBotLine/);
   assert.match(css,/\.asset-watch-reference/);
   assert.match(css,/\.snapshot-asset/);
