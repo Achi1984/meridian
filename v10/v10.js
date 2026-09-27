@@ -418,7 +418,7 @@ function skV2AssetRows(assets){
 }
 function skV2ResultHtml(){
   if(skV2Ui.running)return '<div class="sk-v2-loading"><b>'+skV2Ui.progress+'</b><small>'+skV2Ui.completed+'/'+skV2Ui.total+' Assets · öffentliche 4h-Historie · sequenziell</small></div>';
-  if(skV2Ui.error)return '<div class="sk-paper-error"><b>V2 BATCH FEHLER</b><small>'+skV2Ui.error+'</small></div>';
+  if(skV2Ui.error)return '<div class="sk-paper-error"><b>V2 BATCH FEHLER</b><small>'+esc(skV2Ui.error)+'</small></div>';
   const r=skV2Ui.result;
   if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN V2-BATCH</b><small>Core V1 bleibt unverändert. V2 vergleicht nur Core vs. vor Entry bestätigten Double Advantage.</small></div>';
   const g=r.gate,st=r.stability||{},core=r.pooled?.core,double=r.pooled?.double,depth=r.pooled?.entryDepth||{};
@@ -484,7 +484,7 @@ function skPaperPanel(){
 }
 function skPaperResultHtml(){
   if(skLabUi.running)return '<div class="sk-paper-loading"><b>SK CORE V1</b><small>4h-Historie laden · Sequenzen chronologisch replayen · Kosten anwenden …</small></div>';
-  if(skLabUi.error)return '<div class="sk-paper-error"><b>BACKTEST FEHLER</b><small>'+skLabUi.error+'</small></div>';
+  if(skLabUi.error)return '<div class="sk-paper-error"><b>BACKTEST FEHLER</b><small>'+esc(skLabUi.error)+'</small></div>';
   const r=skLabUi.result,s=r?.summary,g=skLabUi.gate,st=skLabUi.stability;
   if(!r||!s)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>Backtest startet nur nach Klick. Keine API-Abfragen im normalen COMMAND.</small></div>';
   const daPnl=s.doubleAdvantageTrades?skMoney(s.doubleAdvantagePnl):'—',gateTone=g?.pass?'safe':'watch';
@@ -538,7 +538,7 @@ function edgeAssetRows(rows){
 }
 function tsmomEdgeHtml(){
   if(edgeUi.running)return '<div class="edge-loading"><b>'+edgeUi.progress+'</b><small>'+edgeUi.completed+'/'+edgeUi.total+' Assets · Daily public candles</small></div>';
-  if(edgeUi.error)return '<div class="sk-paper-error"><b>EDGE BATCH FEHLER</b><small>'+edgeUi.error+'</small></div>';
+  if(edgeUi.error)return '<div class="sk-paper-error"><b>EDGE BATCH FEHLER</b><small>'+esc(edgeUi.error)+'</small></div>';
   const r=edgeUi.tsmom;if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN LAUF</b><small>TSMOM startet nur nach Klick. 30/90/365d Signal · monatliches Rebalancing · Vol-Sizing.</small></div>';
   const g=r.gate,s=r.summary;
   return '<div class="edge-ab"><div><span>TSMOM CLASSIC</span><b>'+s.periods+' Perioden</b><small>Return '+skNum(s.totalReturnPct,2)+'% · PF '+skNum(s.profitFactor,2)+'</small></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+g.label+'</strong></div>'+
@@ -577,7 +577,7 @@ function holdoutResultCard(title,subtitle,r){
 }
 function tsmomHoldoutHtml(){
   if(holdoutUi.running)return '<div class="edge-loading"><b>'+holdoutUi.progress+'</b><small>'+holdoutUi.completed+'/'+holdoutUi.total+' Asset-Ladevorgänge · Regeln unverändert</small></div>';
-  if(holdoutUi.error)return '<div class="sk-paper-error"><b>HOLDOUT FEHLER</b><small>'+holdoutUi.error+'</small></div>';
+  if(holdoutUi.error)return '<div class="sk-paper-error"><b>HOLDOUT FEHLER</b><small>'+esc(holdoutUi.error)+'</small></div>';
   if(!holdoutUi.legacy||!holdoutUi.transfer)return '<div class="sk-paper-empty"><b>NOCH KEIN HOLDOUT</b><small>H1: 05/2020–07/2022 · H2: neues 8-Asset-Universum über 1460 Tage.</small></div>';
   const c=holdoutUi.combined;
   return '<div class="holdout-combined '+(c.pass?'pass':'fail')+'"><span>COMBINED HOLDOUT</span><b>'+c.label+'</b><small>'+(c.reasons.length?c.reasons.join(' · '):'Beide unabhängigen Gates bestanden · trotzdem keine Auto-Promotion.')+'</small></div>'+
