@@ -101,6 +101,18 @@ test('r13 expands release syntax coverage and mobile accessibility guardrails',(
   assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
 });
 
+test('r13 legacy bridge cannot crash on unknown USD exposure and COMMAND is idempotent',()=>{
+  assert.match(v9,/shareText=rv\.share==null\?'Exposure —':rv\.share\.toFixed\(1\)/);
+  assert.match(v9,/capitalComplete=fresh\.length>0&&fresh\.every\(liveInvestUsdAvailable\)/);
+  assert.match(v10,/if\(\$\('\.command-source-strip',view\)&&\$\('\.v10-critical-wrap',view\)&&\$\('\.v10-data-guard',view\)\)return/);
+});
+
+test('r13 stale public prices cannot drive bot risk fallbacks',()=>{
+  assert.match(v9,/checkFresh=check\?\.updatedAt&&Date\.now\(\)-Number\(check\.updatedAt\)<=3\*60\*1000/);
+  assert.match(v9,/feed=marketIntelFresh\(intel\)\?num\(intel\.price\):null/);
+  assert.match(v9,/return b&&b\._livePrice&&direct>0\?direct:null/);
+});
+
 test('r13 browser adapter remains syntactically valid',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
