@@ -248,8 +248,11 @@ function profitLockIntel(rows15,rows1h,rows4){
  const longAction=signalAction(bear),shortAction=signalAction(bull),bias=bull-bear>=3?'BULLISH':bear-bull>=3?'BEARISH':'MIXED';
  return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection,source:rows15.source||'MARKET FEED'}
 }
+let syncIntelBusy=false;
 async function syncIntel(){
+ if(syncIntelBusy)return false;syncIntelBusy=true;
  const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
+ try{
  try{
   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
   if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
@@ -265,7 +268,8 @@ async function syncIntel(){
   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth()
+ state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth();return true
+ }finally{syncIntelBusy=false}
 }
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
@@ -465,7 +469,15 @@ function bindResearch(target='research'){
 function more(){return `<section class="hero"><div class="eyebrow">MORE</div><h1>PORTFOLIO + SYSTEM</h1><p class="muted">Spot/Exchanges bleiben sekundär. Live-Quelle: ${state.source}.</p></section>`}
 const render={command,bots,market,research,more};let current='command';
 function go(v){current=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));$('#view-'+v).innerHTML=render[v]();if(v==='research')bindResearch()}
-async function sync(){try{
+function notifyData(){
+ renderHeaderTruth();
+ if(window.MERIDIAN_V10)window.dispatchEvent(new CustomEvent('meridian:data'));
+ else go(current)
+}
+let syncBusy=false;
+async function sync(){
+ if(syncBusy)return false;syncBusy=true;
+ try{
  const payload=await getJson('/api/private/dashboard'),d=payload?.data||payload,live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];
  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
  if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;}
@@ -480,8 +492,9 @@ async function sync(){try{
  state.source=botFeedFresh()&&matched===state.bots.length&&matched?'FRESH':matched?'MIXED':'REFERENCE';
  state.market=String(d?.market?.regime||d?.btcRegime?.label||d?.regime?.label||'SYNC').toUpperCase();
  state.portfolio=portfolioModel(d);state.syncedAt=Date.now();state.error=null
- }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false}
- renderHeaderTruth();go(current)
+ }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false;return false}
+ finally{syncBusy=false;notifyData()}
+ return true
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
@@ -489,4 +502,4 @@ window.MERIDIAN_V10_BRIDGE={
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
