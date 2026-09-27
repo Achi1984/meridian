@@ -98,3 +98,20 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .market-row{grid-template-columns:1fr 1.35fr}.market-row>div:nth-child(3){display:none}
   .scan-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+
+/* v10 r5 · signal discipline + denser stale/live cards */
+.stale-pair-card{padding:9px 10px}
+.stale-pair-line{display:grid;grid-template-columns:minmax(120px,.8fr) 1.6fr;gap:8px;align-items:center}
+.stale-pair-line>div{background:#070c12;border:1px solid #152231;border-radius:9px;padding:7px}
+.stale-pair-line span{display:block;font-size:7px;color:var(--muted)}.stale-pair-line b{display:block;margin-top:2px;font-size:11px}.stale-pair-line small{display:block;margin-top:2px;font-size:7px;color:var(--muted)}
+.stale-pair-line p{margin:0;color:#8f9cac;font-size:8px;line-height:1.45}
+.compact-scan{padding:9px 10px}.compact-scan .scan-grid.compact{grid-template-columns:repeat(4,1fr)}.compact-scan .scan-actions{margin-bottom:5px}.compact-scan>small{display:block;line-height:1.35}
+.lab-method{margin-top:8px}.lab-method[open] .lab-method-body{padding-top:8px}
+@media(max-width:600px){
+  .stale-pair-line{grid-template-columns:1fr 1.45fr}
+  .compact-scan .scan-grid.compact{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:390px){
+  .stale-pair-line{grid-template-columns:1fr}.stale-pair-line p{padding:0 2px}
+}
