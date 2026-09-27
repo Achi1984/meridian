@@ -1,11 +1,12 @@
-// MERIDIAN v10 r5 — isolated presentation/command adapter over the validated v9 engine.
+// MERIDIAN v10 r6 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r5';
+const BUILD='10.0-r6';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
 const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
+const fibUi={symbol:'BTC',mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO'};
 
 function banner(viewId,kicker,title,note,tone='neutral'){
   const view=$(viewId);if(!view)return;
@@ -61,7 +62,7 @@ function exposure(rows,side){
 function marketPrice(symbol){
   const s=S(),h=H(),c=s?.priceChecks?.[symbol],vals=c?.verified?[Number(c.okx),Number(c.binance)].filter(x=>x>0):[];
   if(vals.length===2)return{value:(vals[0]+vals[1])/2,source:'OKX + BINANCE',verified:true,spread:Number(c.spreadPct)||0};
-  const p=Number(s?.assetIntel?.[symbol]?.price);
+  const p=Number(s?.assetIntel?.[symbol]?.price??(symbol==='BTC'?s?.intel?.price:null));
   return{value:p>0?p:null,source:p>0?'MARKET FEED':'UNVERIFIED',verified:false,spread:null};
 }
 function legRow(b){
@@ -188,12 +189,71 @@ function btcRegimeLabel(i){
   if(p<e50&&p<e200)return'RISK-OFF / TRANSITION';
   return'NEUTRAL / RANGE';
 }
+
+function fibParse(v){
+  const n=Number(String(v??'').trim().replace(',','.'));return Number.isFinite(n)&&n>0?n:null;
+}
+function fibSource(symbol){
+  const s=S(),a=s?.assetIntel?.[symbol],b=symbol==='BTC'?s?.intel:null,src=a||b||{};
+  const lo=Number(src.swingLo??src.lo),hi=Number(src.swingHi??src.hi),dir=String(src.swingDirection||'BULL').toUpperCase();
+  const current=marketPrice(symbol).value??Number(src.price);
+  return{lo:lo>0?lo:null,hi:hi>0?hi:null,direction:dir==='BEAR'?'BEAR':'BULL',current:current>0?current:null};
+}
+function fibModel(){
+  const auto=fibSource(fibUi.symbol);
+  let lo=auto.lo,hi=auto.hi,dir=auto.direction,source='AUTO · 90×4h';
+  if(fibUi.mode==='MANUAL'){
+    lo=fibParse(fibUi.manualLow);hi=fibParse(fibUi.manualHigh);
+    dir=fibUi.direction==='BEAR'?'BEAR':'BULL';source='MANUAL';
+  }
+  if(!(hi>lo&&lo>0))return{valid:false,symbol:fibUi.symbol,current:auto.current,source};
+  const span=hi-lo,current=auto.current;
+  const ret=[0,.236,.382,.5,.618,.786,1].map(r=>({
+    ratio:r,label:r.toFixed(3),kind:'retracement',
+    price:dir==='BULL'?hi-span*r:lo+span*r
+  }));
+  const ext=[1.272,1.414,1.618].map(r=>({
+    ratio:r,label:r.toFixed(3),kind:'extension',
+    price:dir==='BULL'?hi+span*(r-1):lo-span*(r-1)
+  }));
+  const levels=[...ret,...ext].sort((a,b)=>b.price-a.price);
+  const above=current?levels.filter(x=>x.price>current).sort((a,b)=>a.price-b.price)[0]:null;
+  const below=current?levels.filter(x=>x.price<current).sort((a,b)=>b.price-a.price)[0]:null;
+  const vals=levels.map(x=>x.price).concat(current||[]),min=Math.min(...vals),max=Math.max(...vals),range=Math.max(max-min,span*.01);
+  return{valid:true,symbol:fibUi.symbol,lo,hi,dir,current,source,levels,above,below,min,max,range};
+}
+function fibLine(level,m){
+  const h=H(),y=Math.max(2,Math.min(98,(m.max-level.price)/m.range*100));
+  return '<div class="fib-level '+(level.kind==='extension'?'fib-extension':'fib-retracement')+'" style="top:'+y.toFixed(2)+'%"><span>'+level.label+'</span><i></i><b>'+h.money?.(level.price)+'</b></div>';
+}
+function fibMapHtml(){
+  const h=H(),m=fibModel(),assets=[...new Set(['BTC',...marketUniverse()])];
+  const options=assets.map(x=>'<option value="'+x+'" '+(x===fibUi.symbol?'selected':'')+'>'+x+'</option>').join('');
+  if(!m.valid)return '<section class="fib-map-shell"><div class="fib-head"><div><span>FIB MAP</span><b>RETRACEMENT + EXTENSIONS</b></div><strong>'+fibUi.symbol+'</strong></div><div class="fib-controls"><label>ASSET<select id="fib-asset">'+options+'</select></label><div class="fib-mode"><button data-fib-mode="AUTO" class="'+(fibUi.mode==='AUTO'?'active':'')+'">AUTO 4H</button><button data-fib-mode="MANUAL" class="'+(fibUi.mode==='MANUAL'?'active':'')+'">MANUAL</button></div></div>'+(fibUi.mode==='MANUAL'?fibManualControls():'')+'<div class="fib-empty">Für dieses Asset fehlen noch gültige Swing-Anker.</div></section>';
+  const currentY=m.current?Math.max(2,Math.min(98,(m.max-m.current)/m.range*100)):null;
+  return '<section class="fib-map-shell"><div class="fib-head"><div><span>FIB MAP</span><b>RETRACEMENT + EXTENSIONS</b><small>'+m.source+' · '+m.dir+' SWING</small></div><strong>'+m.symbol+'</strong></div><div class="fib-controls"><label>ASSET<select id="fib-asset">'+options+'</select></label><div class="fib-mode"><button data-fib-mode="AUTO" class="'+(fibUi.mode==='AUTO'?'active':'')+'">AUTO 4H</button><button data-fib-mode="MANUAL" class="'+(fibUi.mode==='MANUAL'?'active':'')+'">MANUAL</button></div></div>'+(fibUi.mode==='MANUAL'?fibManualControls():'')+'<div class="fib-anchor-row"><div><span>SWING HIGH</span><b>'+h.money?.(m.hi)+'</b></div><div><span>SWING LOW</span><b>'+h.money?.(m.lo)+'</b></div><div><span>CURRENT</span><b>'+h.money?.(m.current)+'</b></div></div><div class="fib-next"><div><span>NEXT ABOVE</span><b>'+(m.above?m.above.label+' · '+h.money?.(m.above.price):'—')+'</b></div><div><span>NEXT BELOW</span><b>'+(m.below?m.below.label+' · '+h.money?.(m.below.price):'—')+'</b></div></div><div class="fib-ladder">'+m.levels.map(x=>fibLine(x,m)).join('')+(currentY!=null?'<div class="fib-current" style="top:'+currentY.toFixed(2)+'%"><span>CURRENT</span><i></i><b>'+h.money?.(m.current)+'</b></div>':'')+'</div><div class="fib-legend"><span>0–1 = Retracement</span><span>1.272 / 1.414 / 1.618 = Extension</span></div></section>';
+}
+function fibManualControls(){
+  const auto=fibSource(fibUi.symbol),hi=fibUi.manualHigh??auto.hi??'',lo=fibUi.manualLow??auto.lo??'',dir=fibUi.direction==='AUTO'?auto.direction:fibUi.direction;
+  return '<div class="fib-manual"><label>HIGH<input id="fib-high" inputmode="decimal" value="'+hi+'"></label><label>LOW<input id="fib-low" inputmode="decimal" value="'+lo+'"></label><label>RICHTUNG<select id="fib-direction"><option value="BULL" '+(dir==='BULL'?'selected':'')+'>BULL ↑</option><option value="BEAR" '+(dir==='BEAR'?'selected':'')+'>BEAR ↓</option></select></label><button id="fib-apply">ANWENDEN</button></div>';
+}
+function refreshFibMap(view){
+  const old=$('.fib-map-shell',view);if(!old)return;
+  old.outerHTML=fibMapHtml();bindFibMap(view);
+}
+function bindFibMap(view){
+  const asset=$('#fib-asset',view);if(asset)asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;fibUi.direction='AUTO';refreshFibMap(view)};
+  $('[data-fib-mode]',view).forEach(btn=>btn.onclick=()=>{const next=btn.dataset.fibMode;if(next==='MANUAL'&&fibUi.mode!=='MANUAL'){const a=fibSource(fibUi.symbol);fibUi.manualHigh=a.hi;fibUi.manualLow=a.lo;fibUi.direction=a.direction}fibUi.mode=next;refreshFibMap(view)});
+  const apply=$('#fib-apply',view);if(apply)apply.onclick=()=>{fibUi.manualHigh=$('#fib-high',view)?.value;fibUi.manualLow=$('#fib-low',view)?.value;fibUi.direction=$('#fib-direction',view)?.value||'BULL';refreshFibMap(view)};
+}
+
 function renderMarket(){
   const view=$('#view-market');if(!view||$('.v10-market-board',view))return;
   if(!$('.hero',view)&&!$('.grid',view))return;
   const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),age=s?.marketSyncedAt?h.ageText?.(Date.now()-s.marketSyncedAt):'—';
   const btc=i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · market sync '+age+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+i.status+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1)+'</b></div><div><span>RSI 4h / 1D</span><b>'+i.rsi4.toFixed(1)+' · '+i.rsi1d.toFixed(1)+'</b></div><div><span>MACD 1h / 4h</span><b>'+i.macd1h.hist.toFixed(2)+' · '+i.macd4.hist.toFixed(2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+i.near.f.toFixed(3)+' · '+h.money?.(i.near.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="card">BTC Markt-Sync läuft.</section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + FIB MAP + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  bindFibMap(view);
 }
 function scannerCard(symbol){
   const s=S(),i=s?.assetIntel?.[symbol],sig=marketSignal(i),linked=matchedRows(symbol).length>0,fresh=H().botFeedFresh?.();
