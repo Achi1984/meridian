@@ -8,8 +8,8 @@ const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 
-test('v10 r7 exposes SK PaperBot V1 as LAB-only research',()=>{
-  assert.match(html,/10\.0-r7/);
+test('v10 r8 exposes SK PaperBot V1 as LAB-only research',()=>{
+  assert.match(html,/10\.0-r8/);
   assert.match(js,/SK PAPERBOT V1/);
   assert.match(js,/SEQUENCE BOT · CORE/);
   assert.match(js,/PAPER ONLY/);
@@ -51,12 +51,12 @@ test('SK V1 freezes gate, entries, targets, invalidation and total risk',()=>{
 });
 
 
-test('v10 r7 browser adapter is syntactically valid after removing ESM imports',()=>{
+test('v10 r8 browser adapter is syntactically valid after removing ESM imports',()=>{
   const body=js.replace(/^import .*$/gm,'');
   assert.doesNotThrow(()=>new Function(body));
 });
 
-test('v10 r7 LAB renderer is unique and contains SK panel wiring',()=>{
+test('v10 r8 LAB renderer is unique and contains SK panel wiring',()=>{
   assert.equal((js.match(/function renderLab\(\)/g)||[]).length,1);
   assert.equal((js.match(/function skPaperPanel\(\)/g)||[]).length,1);
   assert.match(js,/bindSkPaper\(view\)/);
