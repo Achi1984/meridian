@@ -33,11 +33,14 @@ test('r19 market universe follows current tracked sources and includes unmatched
 });
 
 test('r19 market refresh is single-flight, sequential at startup and prunes ghost intel',()=>{
-  assert.match(v9,/let intelSyncPromise=null/);
-  assert.match(v9,/if\(intelSyncPromise\)return intelSyncPromise/);
+  assert.match(v9,/let syncIntelBusy=false/);
+  assert.match(v9,/if\(syncIntelBusy\)return false;syncIntelBusy=true/);
   assert.match(v9,/const allowed=new Set\(universe\)/);
   assert.match(v9,/state\.assetIntel=Object\.fromEntries\(Object\.entries\(out\)\.filter/);
-  assert.match(v9,/sync\(\)\.then\(\(\)=>syncIntel\(\)\)\.then\(\(\)=>go\(current\)\)/);
+  assert.match(v9,/async function refreshNow\(\)/);
+  assert.match(v9,/await sync\(\)/);
+  assert.match(v9,/const changed=await syncIntel\(\)/);
+  assert.match(v9,/go\('command'\);void refreshNow\(\)/);
 });
 
 test('r19 UI separates market stale versus missing and bot READY PARTIAL SAFETY REF states',()=>{
