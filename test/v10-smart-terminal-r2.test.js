@@ -53,7 +53,7 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
 
 test('v10 scanner requires aligned 1h and 4h confirmation',()=>{
   assert.match(js,/MARKET SIGNALS/);
-  assert.match(js,/CONFIRMED braucht frische 1h \+ 4h Alignment/);
+  assert.match(js,/CONFIRMED braucht geschlossene 1h \+ 4h Alignment/);
   assert.match(js,/bear1&&bear4/);
   assert.match(js,/bull1&&bull4/);
 });
@@ -105,7 +105,7 @@ test('v10 r13 market is a multi-asset public-data board independent from bot fre
   assert.doesNotMatch(js,/BTC REGIME<\/span><b>'\+String\(s\.market/);
   assert.match(js,/function marketUniverse/);
   assert.match(js,/REGIME \+ FIB MAP \+ ASSET TAPE/);
-  assert.match(js,/Öffentliche Futures-Marktdaten · Freshness unabhängig vom Bot-Layer/);
+  assert.match(js,/Öffentliche Futures-Marktdaten · 1h\/4h\/1D bestätigt nur auf geschlossenen Kerzen/);
   assert.match(js,/ASSET TAPE/);
   assert.match(js,/market-list/);
 });
