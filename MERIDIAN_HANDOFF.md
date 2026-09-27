@@ -274,3 +274,17 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - OKX Futures DCA screenshot equity remains visible as reference and is explicitly outside the canonical total.
 - Removed the COMMAND total dependency on the hard-coded Ledger snapshot and OKX DCA subtotal.
 - No trading rules, Paper-bot parameters, execution logic, Pionex mutations or research promotion changed.
+
+
+## v10 r26 — Portfolio provenance / coverage integrity
+
+- Deep-audit continuation after r25.
+- Portfolio math is unchanged: canonical total remains Spot + Pionex.
+- Adds explicit Spot live-price coverage metadata (holding count, requested, resolved, feed freshness, complete/partial).
+- COMMAND no longer calls the whole portfolio “CANONICAL CURRENT”.
+- Complete Spot overlay + canonical private Pionex snapshot is labelled CANONICAL MIXED.
+- Partial Spot coverage or screenshot Pionex fallback is labelled CANONICAL PARTIAL.
+- No fresh Spot overlay is labelled PRIVATE CANONICAL SNAPSHOT.
+- Spot resolved/requested coverage is shown in COMMAND; Pionex remains explicitly snapshot provenance.
+- OKX DCA remains reference-only outside the canonical total.
+- No trading-rule, Paper-bot, signal, leverage, execution or research-promotion change.

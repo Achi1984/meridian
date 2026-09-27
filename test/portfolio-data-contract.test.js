@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot, portfolioPriceCoverage } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -70,4 +70,29 @@ test('latest canonical history point must be fresh and internally consistent',()
   const inconsistent=latestPortfolioHistorySnapshot({points:[{timestamp:1_950_000,spotUsd:100,tradingUsd:20,totalUsd:999}]},now,100_000);
   assert.equal(inconsistent.consistent,false);
   assert.equal(inconsistent.fresh,false);
+});
+
+
+test('portfolio price coverage distinguishes complete, partial and fallback valuation',()=>{
+  const base={portfolio:{holdings:[
+    {symbol:'BTC',venue:'Ledger',quantity:1},
+    {symbol:'USDC',venue:'OKX',quantity:100}
+  ]}};
+  const complete=portfolioPriceCoverage({...base,livePriceMeta:{fresh:true,requestedCount:2,resolvedCount:2}});
+  assert.deepEqual({complete:complete.complete,partial:complete.partial,requested:complete.requested,resolved:complete.resolved},{complete:true,partial:false,requested:2,resolved:2});
+  const partial=portfolioPriceCoverage({...base,livePriceMeta:{fresh:true,requestedCount:2,resolvedCount:1}});
+  assert.equal(partial.complete,false);
+  assert.equal(partial.partial,true);
+  const fallback=portfolioPriceCoverage({...base,livePriceMeta:{fresh:false,requestedCount:2,resolvedCount:0}});
+  assert.equal(fallback.complete,false);
+  assert.equal(fallback.partial,false);
+});
+
+test('canonical snapshot exposes valuation provenance without changing Spot + Pionex math',()=>{
+  const d={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}],pionexEquityUsd:50,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT'},livePrices:{BTC:{price:100}},livePriceMeta:{fresh:true,requestedCount:1,resolvedCount:1}};
+  const snap=canonicalPortfolioSnapshot(d,123);
+  assert.equal(snap.totalUsd,150);
+  assert.equal(snap.priceCoverage.complete,true);
+  assert.equal(snap.sourceDetail.spot,'LIVE_PRICE_COMPLETE');
+  assert.equal(snap.sourceDetail.trading,'PRIVATE_PORTFOLIO_SNAPSHOT');
 });

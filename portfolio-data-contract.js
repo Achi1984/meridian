@@ -30,12 +30,21 @@ export function pionexEquitySnapshot(data={}){
 }
 export function pionexEquityUsd(data={}){return pionexEquitySnapshot(data).value}
 
+export function portfolioPriceCoverage(data={}){
+  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex'):[];
+  const meta=data?.livePriceMeta||{},requestedRaw=finite(meta.requestedCount),resolvedRaw=finite(meta.resolvedCount);
+  const requested=requestedRaw==null?holdings.length:Math.max(0,Math.floor(requestedRaw));
+  const resolved=resolvedRaw==null?holdings.filter(h=>finite(data?.livePrices?.[h?.symbol]?.price)>0).length:Math.max(0,Math.floor(resolvedRaw));
+  const feedFresh=meta.fresh===true,complete=holdings.length>0&&feedFresh&&requested===holdings.length&&resolved===requested,partial=holdings.length>0&&feedFresh&&resolved>0&&!complete;
+  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial};
+}
+
 export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
-  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[];
+  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],priceCoverage=portfolioPriceCoverage(data);
   const spotUsd=holdings
     .filter(h=>String(h?.venue||'').toLowerCase()!=='pionex')
     .reduce((s,h)=>s+holdingUsd(data,h),0);
-  const tradingUsd=pionexEquityUsd(data);
+  const tradingSnapshot=pionexEquitySnapshot(data),tradingUsd=tradingSnapshot.value;
   const totalUsd=spotUsd+tradingUsd;
   return{
     version:PORTFOLIO_CONTRACT_VERSION,
@@ -43,7 +52,9 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
     spotUsd:round(spotUsd),
     tradingUsd:round(tradingUsd),
     totalUsd:round(totalUsd),
-    sourceStatus:{spot:holdings.length?'HOLDINGS_PLUS_LIVE_PRICE':'MISSING',trading:tradingUsd>0?'PIONEX_EQUITY':'MISSING'}
+    priceCoverage,
+    sourceStatus:{spot:holdings.length?'HOLDINGS_PLUS_LIVE_PRICE':'MISSING',trading:tradingUsd>0?'PIONEX_EQUITY':'MISSING'},
+    sourceDetail:{spot:priceCoverage.complete?'LIVE_PRICE_COMPLETE':priceCoverage.partial?'LIVE_PRICE_PARTIAL':holdings.length?'SNAPSHOT_FALLBACK':'MISSING',trading:tradingSnapshot.found?tradingSnapshot.source:'MISSING'}
   };
 }
 
