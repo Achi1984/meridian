@@ -256,3 +256,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 - A fresh structural bot row may restore liquidation-risk monitoring even when PnL is absent; Profit Lock still requires fresh PnL.
 
 **Reason:** r19 physical iPhone validation showed 3 private rows, only 2/25 matched, and a 23-day-old bot snapshot. The root cause was absence of a Pionex bot-data producer, not the frontend matcher.
+
+
+## D-029 — Portfolio account totals require explicit canonical provenance
+
+**Decision:** Pionex account equity in COMMAND/portfolio valuation must come from the canonical private portfolio fields (`portfolio.pionexEquityUsd` or its Pionex manual-venue balance fallback). Bot-risk or generic Pionex fields are not promoted to account-total authority by numerical similarity.
+
+**Rule:** Magnitude heuristics such as “within 80% of the previous snapshot” are forbidden for source classification. A partial bot/COIN-M subtotal can be close to the account total by coincidence and must remain a partial diagnostic, not an account valuation.
+
+**Fallback:** When canonical private Pionex equity is unavailable, retain the explicit screenshot/manual fallback and label it as a snapshot. Never infer a live account total from bot rows.
+
+**Reason:** The canonical portfolio/history contract already defines Pionex equity through the private portfolio section; using a separate heuristic path made COMMAND capable of disagreeing with persisted portfolio history and overstating source freshness.
