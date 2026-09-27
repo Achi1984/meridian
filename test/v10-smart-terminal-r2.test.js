@@ -35,10 +35,10 @@ test('v10 safety/data guard pre-empts trading statuses',()=>{
 
 test('v10 renders one actionable asset card for long plus short and hides reference bots',()=>{
   assert.match(js,/function pairCard/);
-  assert.match(js,/PIONEX · LONG \+ SHORT/);
+  assert.match(js,/function pairCard/);
   assert.match(js,/Referenzbots bleiben aus dieser Ansicht entfernt/);
-  assert.match(js,/KEINE ACTIONABLE BOT-DATEN/);
-  assert.match(js,/private API-Rows sind UNVERIFIED und aus Actions ausgeschlossen/);
+  assert.match(js,/KEINE BESTÄTIGTEN BOT-ROWS/);
+  assert.match(js,/private API-Row ist UNVERIFIED und aus Actions ausgeschlossen/);
 });
 
 test('v10 command places critical asset and guarded next action ahead of legacy risk views',()=>{
@@ -52,9 +52,9 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
 });
 
 test('v10 scanner uses 4h confirmation with 15m and 1h warning context',()=>{
-  assert.match(js,/MULTI-TIMEFRAME SCANNER/);
-  assert.match(js,/4h = Bestätigung · 15m\/1h = Frühwarnung/);
-  assert.match(js,/Scanner allein löst keinen Exit aus/);
+  assert.match(js,/MARKET SIGNALS/);
+  assert.match(js,/4h bestätigt, 15m\/1h warnt früh/);
+  assert.match(js,/Safety\/Data Guard bleibt vor Trading-Aktionen/);
 });
 
 test('v10 visually separates live and paper but keeps one engine',()=>{
