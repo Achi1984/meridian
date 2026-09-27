@@ -384,7 +384,7 @@ async function binanceHistory(interval,limit,symbol){
  let rows=[],endTime=null;const marketSymbol=symbol+'USDT';
  while(rows.length<limit){
   const take=Math.min(1000,limit-rows.length),u='https://api.binance.com/api/v3/klines?symbol='+marketSymbol+'&interval='+interval+'&limit='+take+(endTime!=null?'&endTime='+endTime:'');
-  const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('Binance history '+r.status);
+  const r=await fetchTimed(u,{cache:'no-store'},8000);if(!r.ok)throw new Error('Binance history '+r.status);
   const j=await r.json();if(!Array.isArray(j)||!j.length)break;
   const batch=j.map(x=>({openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
   rows=batch.concat(rows);endTime=batch[0].openTime-1;if(batch.length<take)break
