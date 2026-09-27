@@ -453,7 +453,7 @@ function skV2ResultHtml(){
     '<div class="sk-section-title"><b>ENTRY-TIEFE · CORE</b><small>tiefster gefüllter SK-Level</small></div><div class="sk-v2-depth">'+skV2DepthHtml(depth)+'</div>'+
     '<div class="sk-section-title"><b>ASSET BREITE</b><small>'+r.assets.length+' Assets · '+skV2Ui.days+' Tage angefordert</small></div><div class="sk-v2-assets">'+skV2AssetRows(r.assets)+'</div>'+
     '<div class="sk-section-title"><b>DOUBLE ADV · 5 ZEITFENSTER</b><small>'+((st.positiveWindows||0))+'/5 positiv</small></div><div class="sk-window-grid">'+windows+'</div>'+
-    '<div class="sk-source-note">V2 nutzt nur Double Advantage, wenn es spätestens beim ersten Entry bekannt war. Kein Lookahead · keine Auto-Promotion · keine Orders.</div>';
+    '<div class="sk-source-note">V2 zählt Double Advantage nur, wenn es bereits auf einer früheren 4h-Kerze bestätigt war. Same-Bar-OHLC zählt nicht · keine Auto-Promotion · keine Orders.</div>';
 }
 function skV2Panel(){
   return '<section class="sk-v2-shell"><div class="sk-paper-head"><div><span>SK RESEARCH V2</span><b>CORE vs DOUBLE ADVANTAGE</b><small>A/B-Test · Multi-Asset · Frozen Gate</small></div><strong>RESEARCH ONLY</strong></div>'+
