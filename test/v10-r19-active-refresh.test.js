@@ -26,7 +26,7 @@ test('r19 command bots market and scanner accept explicit refresh without removi
 
 test('r19 does not reintroduce the known LAB single-selector collection bug',()=>{
   assert.ok(!v10.includes("...$('.card',view).filter"),'single-element $ selector must not be treated as a collection');
-  assert.ok(v10.includes("...$('.card',view).filter"),'LAB cards must use the collection selector');
+  assert.match(v10,/\.\.\.\$\$\('\.card',view\)\.filter/,'LAB cards must use the collection selector');
 });
 
 test('r19 stale MARKET rows never present an old bull bear signal as current',()=>{
