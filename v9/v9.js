@@ -158,11 +158,13 @@ async function marketKlines(interval,limit,symbol='BTC'){
   const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetch(u,{cache:'no-store'});
   if(!r.ok)throw new Error('OKX '+r.status);
   const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
-  return j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]})).reverse()
- }catch(e){
-  const r=await fetch('https://api.binance.com/api/v3/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+limit,{cache:'no-store'});
-  if(!r.ok)throw e;
-  return(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}))
+  const rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]})).reverse();
+  rows.source='OKX USDT-SWAP';return rows
+ }catch(okxError){
+  const r=await fetch('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'});
+  if(!r.ok)throw new Error('BINANCE FUTURES '+r.status+' / '+String(okxError?.message||okxError));
+  const rows=(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
+  rows.source='BINANCE USD-M FUTURES';return rows
  }
 }
 async function marketKlinesHistory(interval,bars,symbol='BTC'){
@@ -178,12 +180,12 @@ async function marketKlinesHistory(interval,bars,symbol='BTC'){
 }
 async function syncCrossPrices(){
  try{
-  const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://api.binance.com/api/v3/ticker/price',{cache:'no-store'})]);
+  const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'})]);
   if(!or.ok||!br.ok)throw new Error('cross-price http');
-  const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={};
-  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=1.5}}
-  state.priceChecks=out;state.marketSyncedAt=Date.now()
- }catch(e){state.priceChecks={}}
+  const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={},now=Date.now();
+  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
+  state.priceChecks=out;state.marketPriceSyncedAt=now;state.marketPriceError=null
+ }catch(e){state.priceChecks={};state.marketPriceError=String(e?.message||e)}
 }
 function intel(rows15,rows1h,rows4,rows1d){
  const c15=rows15.map(x=>x.close),c1h=rows1h.map(x=>x.close),c4=rows4.map(x=>x.close),c1d=rows1d.map(x=>x.close),p=c15.at(-1);
@@ -193,7 +195,7 @@ function intel(rows15,rows1h,rows4,rows1d){
  const dailyBull=p>e200&&e20>e50;
  const score=(dailyBull?25:0)+(R15>=40&&R15<=68?10:0)+(R1H>=42&&R1H<=68?15:0)+(R4>=42&&R4<=68?15:0)+(M15&&M15.hist>0?5:0)+(M1H&&M1H.hist>0?10:0)+(M4&&M4.hist>0?10:0)+(Math.abs(p-near.price)<=Math.max(A*.75,p*.012)?10:0);
  const status=score>=70&&dailyBull&&M1H?.hist>0?'RE-ENTRY READY':score>=55?'SETUP FORMING':'WAIT FOR RETRACE';
- return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,swingDirection,near,score,status}
+ return{price:p,rsi15:R15,rsi1h:R1H,rsi4:R4,rsi1d:R1D,rsi1:R1D,macd15:M15,macd1h:M1H,macd4:M4,macd1d:M1D,macd1:M1D,atr:A,ema20:e20,ema50:e50,ema100:e100,ema200:e200,lo,hi,swingDirection,near,score,status,source:rows15.source||'MARKET FEED'}
 }
 function signalAction(score){return score>=6?'RISK REVIEW':score>=4?'PROFIT LOCK CANDIDATE':score>=2?'WATCH PROFIT':'HOLD'}
 function signalRank(action){return action==='RISK REVIEW'?3:action==='PROFIT LOCK CANDIDATE'?2:action==='WATCH PROFIT'?1:0}
@@ -211,24 +213,24 @@ function profitLockIntel(rows15,rows1h,rows4){
  if(M15&&M15.hist>0){bull++;shortReasons.push('MACD15m ↑')}if(M1H&&M1H.hist>0){bull+=2;shortReasons.push('MACD1h ↑')}if(M4&&M4.hist>0){bull+=2;shortReasons.push('MACD4h ↑')}
  if(e20&&p>e20){bull+=2;shortReasons.push('über EMA20 1h')}if(e20&&e50&&e20>e50){bull++;shortReasons.push('EMA20>50 1h')}
  const longAction=signalAction(bear),shortAction=signalAction(bull),bias=bull-bear>=3?'BULLISH':bear-bull>=3?'BEARISH':'MIXED';
- return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection}
+ return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection,source:rows15.source||'MARKET FEED'}
 }
 async function syncIntel(){
- const cross=syncCrossPrices();
+ const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
  try{
   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]);
-  state.intel=intel(m15,h1,h4,d1)
- }catch(e){state.intel=null}
- const assets=[...new Set(state.bots.map(b=>b.symbol))],out={};
+  const now=Date.now();state.intel={...intel(m15,h1,h4,d1),updatedAt:now};out.BTC={...profitLockIntel(m15,h1,h4),updatedAt:now};btcRows=true
+ }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
+ const assets=[...new Set(state.bots.map(b=>b.symbol))].filter(symbol=>symbol!=='BTC');
  for(let i=0;i<assets.length;i+=4){
   const batch=assets.slice(i,i+4);
   await Promise.all(batch.map(async symbol=>{try{
    const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]);
-   out[symbol]=profitLockIntel(m15,h1,h4)
-  }catch{}}));
+   out[symbol]={...profitLockIntel(m15,h1,h4),updatedAt:Date.now()}
+  }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- state.assetIntel=out;await cross;renderHeaderTruth()
+ state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth()
 }
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
