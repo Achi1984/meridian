@@ -7,10 +7,10 @@ const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8').replac
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8').replaceAll('\r\n','\n');
 const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 
-test('v10 r3 keeps validated v9 engine and isolated adapter',()=>{
-  assert.match(html,/10\.0-r3/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r3/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r3/);
+test('v10 r4 keeps validated v9 engine and isolated adapter',()=>{
+  assert.match(html,/10\.0-r4/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r4/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r4/);
   assert.match(js,/No trading logic lives here/);
   assert.match(engine,/MERIDIAN_V10_BRIDGE/);
 });
@@ -35,10 +35,10 @@ test('v10 safety/data guard pre-empts trading statuses',()=>{
 
 test('v10 renders one actionable asset card for long plus short and hides reference bots',()=>{
   assert.match(js,/function pairCard/);
-  assert.match(js,/PIONEX · LONG \+ SHORT/);
+  assert.match(js,/function pairCard/);
   assert.match(js,/Referenzbots bleiben aus dieser Ansicht entfernt/);
-  assert.match(js,/KEINE ACTIONABLE BOT-DATEN/);
-  assert.match(js,/private API-Rows sind UNVERIFIED und aus Actions ausgeschlossen/);
+  assert.match(js,/KEINE BESTÄTIGTEN BOT-ROWS/);
+  assert.match(js,/private API-Row ist UNVERIFIED und aus Actions ausgeschlossen/);
 });
 
 test('v10 command places critical asset and guarded next action ahead of legacy risk views',()=>{
@@ -52,15 +52,15 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
 });
 
 test('v10 scanner uses 4h confirmation with 15m and 1h warning context',()=>{
-  assert.match(js,/MULTI-TIMEFRAME SCANNER/);
-  assert.match(js,/4h = Bestätigung · 15m\/1h = Frühwarnung/);
-  assert.match(js,/Scanner allein löst keinen Exit aus/);
+  assert.match(js,/MARKET SIGNALS/);
+  assert.match(js,/4h bestätigt, 15m\/1h warnt früh/);
+  assert.match(js,/Safety\/Data Guard bleibt vor Trading-Aktionen/);
 });
 
 test('v10 visually separates live and paper but keeps one engine',()=>{
   assert.match(js,/POSITION LAYER/);
-  assert.match(js,/PAPER \/ RESEARCH ONLY/);
-  assert.match(js,/Keine automatische Promotion/);
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/keine automatische Promotion/i);
   assert.match(css,/data-tone="live"/);
   assert.match(css,/data-tone="paper"/);
 });
@@ -88,4 +88,39 @@ test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
   assert.match(js,/REFERENCE SNAPSHOTS/);
   assert.match(js,/Nur Ansicht · keine Risk-\/Next-Action-Ableitung/);
   assert.match(css,/\.v10-snapshot-details/);
+});
+
+
+test('v10 r4 bots collapse stale private fields instead of rendering empty action grids',()=>{
+  assert.match(js,/pair-leg-stale/);
+  assert.match(js,/Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten/);
+  assert.match(js,/function marketPrice/);
+  assert.match(js,/MARKET PRICE/);
+});
+
+test('v10 r4 market is a multi-asset public-data board independent from bot freshness',()=>{
+  assert.match(js,/function btcRegimeLabel/);
+  assert.doesNotMatch(js,/BTC REGIME<\/span><b>'\+String\(s\.market/);
+  assert.match(js,/function marketUniverse/);
+  assert.match(js,/REGIME \+ ASSET TAPE/);
+  assert.match(js,/Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot/);
+  assert.match(js,/ASSET TAPE/);
+  assert.match(js,/market-list/);
+});
+
+test('v10 r4 scanner ranks market signals independently and labels bot linkage separately',()=>{
+  assert.match(js,/marketUniverse\(\).*sort/);
+  assert.match(js,/MARKET SIGNALS/);
+  assert.match(js,/Marktdaten ≠ Bot-Daten/);
+  assert.match(js,/BOT LINKED/);
+  assert.match(js,/BOT DATA/);
+  assert.match(js,/TOP SIGNALS/);
+});
+
+test('v10 r4 lab is a compact research hub over the existing paired backtest',()=>{
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/ACTIVE LAB/);
+  assert.match(js,/PAIRED TEST/);
+  assert.match(js,/METHODIK & WARUM/);
+  assert.match(css,/\.lab-overview/);
 });

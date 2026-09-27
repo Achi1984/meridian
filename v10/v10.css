@@ -63,3 +63,38 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .v10-live-blocked{align-items:flex-start}.v10-live-blocked small{max-width:62%}
   .snapshot-row{align-items:flex-start}.snapshot-row span{max-width:55%}
 }
+
+
+/* v10 r4 · tab evolution */
+.bot-tab-head{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}
+.bot-tab-head>div,.scanner-summary>div,.market-kpis>div,.lab-overview>div{background:#080e15;border:1px solid var(--line);border-radius:11px;padding:7px}
+.bot-tab-head span,.scanner-summary span,.market-kpis span,.lab-overview span{display:block;font-size:7px;color:var(--muted);letter-spacing:.05em}
+.bot-tab-head b,.scanner-summary b,.market-kpis b,.lab-overview b{display:block;margin-top:2px;font-size:11px}
+.pair-leg-stale{padding:8px 9px}.pair-leg-stale small{display:block;color:var(--muted);font-size:8px;line-height:1.4}
+.market-regime{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid #20344b;border-radius:15px;background:linear-gradient(145deg,rgba(10,20,31,.98),rgba(6,11,18,.98));margin-bottom:8px}
+.market-regime>div{display:flex;flex-direction:column;gap:2px}.market-regime span{font-size:8px;color:var(--cyan);letter-spacing:.11em}.market-regime b{font-size:17px}.market-regime small{font-size:8px;color:var(--muted)}.market-regime>strong{font-size:10px;text-align:right}
+.market-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.market-list{display:grid;gap:6px}.market-row{display:grid;grid-template-columns:1.1fr 1.3fr 1fr 1fr .8fr;gap:6px;align-items:stretch;background:#080d14;border:1px solid var(--line);border-radius:12px;padding:7px}
+.market-row>div{display:flex;flex-direction:column;justify-content:center}.market-row>div:not(.market-symbol){background:#060b11;border:1px solid #14212e;border-radius:8px;padding:6px}.market-row span{font-size:7px;color:var(--muted)}.market-row b{font-size:9px}.market-row small{font-size:7px;color:var(--muted)}.market-symbol strong{font-size:14px}.market-symbol span{margin-top:3px;font-weight:800}
+.scanner-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.scan-head>div{display:flex;flex-direction:column;gap:2px}.scan-head small{font-size:7px;color:var(--muted);letter-spacing:.04em}
+.scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:0 0 6px}.scan-actions span{background:#070c12;border:1px solid #152231;border-radius:8px;padding:6px;font-size:7px;color:var(--muted)}.scan-actions b{display:block;margin-top:2px;color:var(--text);font-size:9px}
+.scanner-more{margin-top:10px;border:1px dashed #26394d;border-radius:12px;padding:8px}.scanner-more summary{cursor:pointer;font-size:9px;color:var(--cyan);font-weight:800;letter-spacing:.06em}.scanner-more .v10-scanner-stack{margin-top:8px}
+.lab-overview{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}.lab-overview small{display:block;margin-top:3px;font-size:7px;color:var(--muted)}
+.lab-method{margin-top:10px;border:1px dashed #29394a;border-radius:12px;padding:9px 10px;background:#080d14}.lab-method summary{cursor:pointer;font-size:9px;color:var(--cyan);font-weight:800;letter-spacing:.06em}.lab-method-body{padding-top:8px;color:var(--muted);font-size:10px;line-height:1.5}.lab-method-body b{color:var(--text)}
+@media(max-width:600px){
+  .bot-tab-head,.scanner-summary{grid-template-columns:repeat(4,1fr)}
+  .bot-tab-head>div,.scanner-summary>div{padding:6px 5px}
+  .bot-tab-head b,.scanner-summary b{font-size:9px}
+  .market-regime{padding:9px 10px}.market-regime b{font-size:14px}.market-regime>strong{max-width:42%}
+  .market-kpis{grid-template-columns:repeat(2,1fr)}
+  .market-row{grid-template-columns:1.05fr 1.2fr 1fr}
+  .market-row>div:nth-child(4),.market-row>div:nth-child(5){display:none}
+  .lab-overview{grid-template-columns:repeat(2,1fr)}
+  .scan-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:390px){
+  .bot-tab-head,.scanner-summary{grid-template-columns:repeat(2,1fr)}
+  .market-row{grid-template-columns:1fr 1.35fr}.market-row>div:nth-child(3){display:none}
+  .scan-grid{grid-template-columns:repeat(2,1fr)}
+}

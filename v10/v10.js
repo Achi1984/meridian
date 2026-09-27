@@ -1,6 +1,6 @@
-// MERIDIAN v10 r2 — isolated presentation/command adapter over the validated v9 engine.
+// MERIDIAN v10 r4 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r3';
+const BUILD='10.0-r4';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -58,16 +58,23 @@ function exposure(rows,side){
   const h=H();return rows.filter(b=>(b.side||'LONG')===side&&h.liveInvestAvailable?.(b))
     .reduce((n,b)=>n+(Number(b.invest)||0)*(Number(b.leverage)||1),0);
 }
+function marketPrice(symbol){
+  const s=S(),h=H(),c=s?.priceChecks?.[symbol],vals=c?.verified?[Number(c.okx),Number(c.binance)].filter(x=>x>0):[];
+  if(vals.length===2)return{value:(vals[0]+vals[1])/2,source:'OKX + BINANCE',verified:true,spread:Number(c.spreadPct)||0};
+  const p=Number(s?.assetIntel?.[symbol]?.price);
+  return{value:p>0?p:null,source:p>0?'MARKET FEED':'UNVERIFIED',verified:false,spread:null};
+}
 function legRow(b){
   const h=H(),fresh=h.botFeedFresh?.(),verified=fresh&&h.liveMatched?.(b),pnl=verified&&h.livePnlAvailable?.(b)?h.botPnlUsd?.(b)?.value:null,r=verified?h.risk?.(b):null;
-  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>'+(!fresh?'STALE':verified?'PRIVATE':'UNVERIFIED')+'</span></div><div class="leg-grid"><span>INVEST <b>'+(verified&&h.liveInvestAvailable?.(b)?h.money(b.invest):'—')+'</b></span><span>PNL <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(verified&&Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(verified&&Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(verified&&Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
+  if(!fresh)return '<div class="pair-leg pair-leg-stale '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>STALE</span></div><small>Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten</small></div>';
+  if(!verified)return '<div class="pair-leg pair-leg-stale"><div class="leg-head"><strong>'+(b.side||'BOT')+' · '+(b.leverage||'—')+'x</strong><span>UNVERIFIED</span></div><small>Nicht handlungsrelevant</small></div>';
+  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>PRIVATE</span></div><div class="leg-grid"><span>INVEST <b>'+(h.liveInvestAvailable?.(b)?h.money(b.invest):'—')+'</b></span><span>PNL <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
 }
 function pairCard(symbol,compact=false){
-  const s=S(),h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longUsd=fresh?exposure(rows,'LONG'):0,shortUsd=fresh?exposure(rows,'SHORT'):0;
+  const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longUsd=fresh?exposure(rows,'LONG'):0,shortUsd=fresh?exposure(rows,'SHORT'):0;
   const pnl=fresh?rows.filter(b=>h.livePnlAvailable?.(b)).map(b=>h.botPnlUsd?.(b)?.value).filter(x=>x!=null).reduce((a,b)=>a+b,0):null;
-  const px=fresh&&rows.length?h.botMarketPrice?.(rows[0]):null,cross=s?.priceChecks?.[symbol],src=cross?.verified?'PIONEX + OKX + BINANCE':fresh?'PIONEX PRIVATE':'UNVERIFIED';
-  const hedge=longUsd>0?shortUsd/longUsd*100:null;
-  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+rows.filter(b=>(b.side||'LONG')==='LONG').length+' LONG · '+rows.filter(b=>b.side==='SHORT').length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>PRICE</span><b>'+h.money?.(px)+'</b><small>'+src+'</small></div><div><span>NET EXPOSURE</span><b>'+h.money?.(longUsd-shortUsd)+'</b></div><div><span>HEDGE</span><b>'+(hedge==null?'—':hedge.toFixed(1)+'%')+'</b></div><div><span>PAIR PNL</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+st.reason+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
+  const mp=marketPrice(symbol),hedge=longUsd>0?shortUsd/longUsd*100:null;
+  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+rows.filter(b=>(b.side||'LONG')==='LONG').length+' LONG · '+rows.filter(b=>b.side==='SHORT').length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+mp.source+'</small></div><div><span>NET EXPOSURE</span><b>'+(fresh?h.money?.(longUsd-shortUsd):'—')+'</b></div><div><span>HEDGE</span><b>'+(fresh&&hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+st.reason+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
 }
 function criticalPair(){
   const s=S();if(!s)return null;
@@ -138,14 +145,58 @@ function renderBots(){
   const view=$('#view-bots');if(!view||$('.v10-pair-stack',view))return;
   if(!$('.bot-hero',view)&&!$('.bot-group',view))return;
   const s=S(),syms=symbols(),unmatched=(s?.unmatchedLive||[]).length,g=syncHealth();
-  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Pionex privat → OKX/Binance → Snapshot nur Referenz</small></section><section class="hero bot-hero"><div class="eyebrow">ASSET PAIR CONTROL</div><h1>PIONEX · LONG + SHORT</h1><p class="muted">'+g.matched+'/'+g.raw+' private Rows sicher gematcht · '+g.actionable+' actionable.</p></section>'+(unmatched?'<section class="v10-unverified-note">'+unmatched+' private API-Rows sind UNVERIFIED und aus Actions ausgeschlossen.</section>':'')+'<div class="v10-pair-stack">'+(syms.length?syms.map(s=>pairCard(s)).join(''):'<section class="card"><b>KEINE ACTIONABLE BOT-DATEN</b><p>Referenzbots bleiben aus dieser Ansicht entfernt.</p></section>')+'</div>'+snapshotDetails();
+  const api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' ');
+  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Nur private Bot-Daten steuern Risk/Profit-Aktionen</small></section><section class="bot-tab-head"><div><span>BOT API</span><b>'+api+'</b></div><div><span>MATCH</span><b>'+g.matched+'/'+g.raw+'</b></div><div><span>ACTIONABLE</span><b>'+g.actionable+'</b></div><div><span>AGE</span><b>'+g.age+'</b></div></section>'+(unmatched?'<section class="v10-unverified-note">'+unmatched+' private API-Row ist UNVERIFIED und aus Actions ausgeschlossen.</section>':'')+'<div class="v10-pair-stack">'+(syms.length?syms.map(s=>pairCard(s)).join(''):'<section class="card"><b>KEINE BESTÄTIGTEN BOT-ROWS</b><p>Referenzbots bleiben aus dieser Ansicht entfernt.</p></section>')+'</div>'+snapshotDetails();
+}
+function marketUniverse(){
+  const pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
+  const keys=Object.keys(S()?.assetIntel||{});
+  return keys.sort((a,b)=>(pref.indexOf(a)<0?999:pref.indexOf(a))-(pref.indexOf(b)<0?999:pref.indexOf(b))||a.localeCompare(b));
+}
+function marketSignal(i){
+  if(!i)return{label:'SYNC',tone:'muted',score:0};
+  const bull=Number(i.bullish)||0,bear=Number(i.bearish)||0,peak=Math.max(bull,bear);
+  if(Math.abs(bull-bear)<=1&&peak>=4)return{label:'CONFLICT',tone:'watch',score:peak};
+  if(bear>=6)return{label:'BEAR PRESSURE',tone:'danger',score:bear};
+  if(bull>=6)return{label:'BULL PRESSURE',tone:'safe',score:bull};
+  if(bear>=4)return{label:'BEAR WATCH',tone:'watch',score:bear};
+  if(bull>=4)return{label:'BULL WATCH',tone:'safe',score:bull};
+  return{label:i.bias||'MIXED',tone:'muted',score:peak};
+}
+function marketRow(symbol){
+  const s=S(),h=H(),i=s?.assetIntel?.[symbol],m=marketPrice(symbol),sig=marketSignal(i);
+  if(!i)return'';
+  const macd4=Number(i.macd4?.hist),trend=Number(i.ema20)>Number(i.ema50)?'EMA20 > 50':'EMA20 ≤ 50';
+  return '<article class="market-row"><div class="market-symbol"><strong>'+symbol+'</strong><span class="tone-'+sig.tone+'">'+sig.label+'</span></div><div><span>PRICE</span><b>'+h.money?.(m.value)+'</b><small>'+m.source+'</small></div><div><span>RSI 1h / 4h</span><b>'+i.rsi1h.toFixed(1)+' · '+i.rsi4.toFixed(1)+'</b></div><div><span>TREND 1h</span><b>'+trend+'</b></div><div><span>MACD 4h</span><b class="'+(macd4>0?'tone-safe':macd4<0?'tone-danger':'')+'">'+(Number.isFinite(macd4)?macd4.toFixed(2):'—')+'</b></div></article>';
+}
+function btcRegimeLabel(i){
+  if(!i)return'SYNC';
+  const p=Number(i.price),e20=Number(i.ema20),e50=Number(i.ema50),e200=Number(i.ema200),r=Number(i.rsi1d),m=Number(i.macd4?.hist);
+  if(p>e20&&e20>e50&&p>e200&&r>=55)return m>=0?'BULL TREND':'BULL PULLBACK';
+  if(p<e20&&e20<e50&&p<e200&&r<=45)return m<=0?'BEAR TREND':'BEAR BOUNCE';
+  if(p>e50&&p>e200)return'RISK-ON / TRANSITION';
+  if(p<e50&&p<e200)return'RISK-OFF / TRANSITION';
+  return'NEUTRAL / RANGE';
+}
+function renderMarket(){
+  const view=$('#view-market');if(!view||$('.v10-market-board',view))return;
+  if(!$('.hero',view)&&!$('.grid',view))return;
+  const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),age=s?.marketSyncedAt?h.ageText?.(Date.now()-s.marketSyncedAt):'—';
+  const btc=i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · market sync '+age+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+i.status+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+i.rsi15.toFixed(1)+' · '+i.rsi1h.toFixed(1)+'</b></div><div><span>RSI 4h / 1D</span><b>'+i.rsi4.toFixed(1)+' · '+i.rsi1d.toFixed(1)+'</b></div><div><span>MACD 1h / 4h</span><b>'+i.macd1h.hist.toFixed(2)+' · '+i.macd4.hist.toFixed(2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+i.near.f.toFixed(3)+' · '+h.money?.(i.near.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="card">BTC Markt-Sync läuft.</section>';
+  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>MARKET</span><b>REGIME + ASSET TAPE</b></div><small>Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot</small></section><div class="v10-market-board">'+btc+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · 15m/1h/4h Momentum</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+}
+function scannerCard(symbol){
+  const s=S(),i=s?.assetIntel?.[symbol],sig=marketSignal(i),bot=matchedRows(symbol).length?'BOT LINKED':'NO LIVE BOT',fresh=H().botFeedFresh?.();
+  if(!i)return'';
+  const reasons=(sig.label.startsWith('BEAR')?i.longReasons:i.shortReasons)||[];
+  return '<article class="scan-card"><div class="scan-head"><div><strong>'+symbol+'</strong><small>'+bot+(matchedRows(symbol).length?' · '+(fresh?'BOT FRESH':'BOT STALE'):'')+'</small></div><b class="tone-'+sig.tone+'">'+sig.label+'</b></div><div class="scan-grid"><span>BIAS <b>'+i.bias+'</b></span><span>PRESSURE <b>'+sig.score+'/9</b></span><span>RSI 15m <b>'+i.rsi15.toFixed(1)+'</b></span><span>RSI 1h <b>'+i.rsi1h.toFixed(1)+'</b></span><span>RSI 4h <b>'+i.rsi4.toFixed(1)+'</b></span><span>MACD 4h <b>'+i.macd4.hist.toFixed(2)+'</b></span></div><div class="scan-actions"><span>LONG <b>'+i.longAction+'</b></span><span>SHORT <b>'+i.shortAction+'</b></span></div><small>'+(reasons.slice(0,2).join(' · ')||'Kein starkes Momentum-Warnsignal')+' · 4h bestätigt, 15m/1h warnt früh</small></article>';
 }
 function renderScanner(){
   const view=$('#view-research');if(!view||$('.v10-scanner-stack',view))return;
   if(!$('.bt-control',view)&&!$('.hero',view))return;
-  const s=S(),syms=symbols();
-  const cards=syms.map(symbol=>{const i=s?.assetIntel?.[symbol],st=pairStatus(symbol);return '<article class="scan-card"><div class="scan-head"><strong>'+symbol+'</strong><b class="tone-'+st.tone+'">'+st.label+'</b></div>'+(i?'<div class="scan-grid"><span>BIAS <b>'+i.bias+'</b></span><span>RSI 15m <b>'+i.rsi15.toFixed(1)+'</b></span><span>RSI 1h <b>'+i.rsi1h.toFixed(1)+'</b></span><span>RSI 4h <b>'+i.rsi4.toFixed(1)+'</b></span><span>LONG <b>'+i.longAction+'</b></span><span>SHORT <b>'+i.shortAction+'</b></span></div>':'<small>Daten-Sync läuft</small>')+'<small>4h = Bestätigung · 15m/1h = Frühwarnung</small></article>';}).join('');
-  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>SIGNAL RESEARCH</b></div><small>Safety/Data Guard vorgeschaltet · kein automatischer Trade</small></section><section class="hero"><div class="eyebrow">MULTI-TIMEFRAME SCANNER</div><h1>15m · 1h · 4h</h1><p class="muted">Scanner allein löst keinen Exit aus.</p></section><div class="v10-scanner-stack">'+(cards||'<section class="card">Keine privaten Assets verfügbar.</section>')+'</div>';
+  const s=S(),syms=marketUniverse().filter(x=>s?.assetIntel?.[x]).sort((a,b)=>marketSignal(s.assetIntel[b]).score-marketSignal(s.assetIntel[a]).score);
+  const top=syms.slice(0,6),rest=syms.slice(6);
+  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>MARKET SIGNALS</b></div><small>Marktdaten ≠ Bot-Daten · Safety/Data Guard bleibt vor Trading-Aktionen</small></section><section class="scanner-summary"><div><span>MARKETS</span><b>'+syms.length+'</b></div><div><span>STRONG SIGNALS</span><b>'+syms.filter(x=>marketSignal(s.assetIntel[x]).score>=6).length+'</b></div><div><span>BOT LINKED</span><b>'+syms.filter(x=>matchedRows(x).length).length+'</b></div><div><span>BOT DATA</span><b class="'+(H().botFeedFresh?.()?'tone-safe':'tone-watch')+'">'+(H().botFeedFresh?.()?'FRESH':'STALE/OFF')+'</b></div></section><div class="section-title"><h2>TOP SIGNALS</h2><small>nach Momentum-Druck sortiert</small></div><div class="v10-scanner-stack">'+top.map(scannerCard).join('')+'</div>'+(rest.length?'<details class="scanner-more"><summary>WEITERE '+rest.length+' MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'');
 }
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
@@ -153,12 +204,23 @@ function renderLab(){
     view.innerHTML=b.renderResearch?.()||'<section class="card">LAB nicht verfügbar.</section>';
     b.bindResearch?.('more');
   }
-  banner('#view-more','LAB','PAPER / RESEARCH ONLY','Keine automatische Promotion · kein Einfluss auf Live-Positionen','paper');
+  banner('#view-more','LAB','RESEARCH HUB','Paper/Research isoliert · keine automatische Promotion · keine Orders','paper');
+  $('.hero',view)?.remove();
+  if(!$('.lab-overview',view)){
+    const bt=S()?.backtest||{},r=bt.result;
+    const o=document.createElement('section');o.className='lab-overview';
+    o.innerHTML='<div><span>ACTIVE LAB</span><b>PROFIT LOCK V2</b><small>Exit-Policy isoliert testen</small></div><div><span>METHOD</span><b>PAIRED TEST</b><small>gleiche Entries · andere Exit-Policy</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only</small></div><div><span>LAST RESULT</span><b>'+(r?r.symbol:'—')+'</b><small>'+(r?(r.first+' → '+r.last):'noch kein Lauf')+'</small></div>';
+    const control=$('.bt-control',view);control?.insertAdjacentElement('beforebegin',o);
+  }
+  const why=$('.card',view).find(x=>/Warum dieser Test/i.test(x.textContent||''));
+  if(why&&!why.closest('details')){
+    const d=document.createElement('details');d.className='lab-method';d.innerHTML='<summary>METHODIK & WARUM</summary><div class="lab-method-body">'+why.innerHTML+'</div>';
+    why.replaceWith(d);
+  }
 }
 function decorate(){
   document.documentElement.dataset.meridianBuild=BUILD;
-  banner('#view-market','MARKET','TECHNICAL LAYER','Preis- und Multi-Timeframe-Kontext · keine Ausführung aus diesem Layer allein','market');
-  renderCommand();renderBots();renderScanner();renderLab();
+  renderCommand();renderBots();renderMarket();renderScanner();renderLab();
 }
 let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;decorate();});};
 new MutationObserver(schedule).observe($('#app')||document.body,{childList:true,subtree:true});

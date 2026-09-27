@@ -6,10 +6,10 @@ const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 
-test('v10 r3 loads validated v9 engine plus isolated v10 presentation adapter',()=>{
-  assert.match(html,/10\.0-r3/);
-  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r3/);
-  assert.match(html,/\.\/v10\.js\?v=10\.0-r3/);
+test('v10 r4 loads validated v9 engine plus isolated v10 presentation adapter',()=>{
+  assert.match(html,/10\.0-r4/);
+  assert.match(html,/\.\.\/v9\/v9\.js\?v=10\.0-r4/);
+  assert.match(html,/\.\/v10\.js\?v=10\.0-r4/);
   assert.match(html,/window\.MERIDIAN_V10=true/);
 });
 
@@ -28,8 +28,8 @@ test('v10 makes Data Guard and asset-pair risk explicit without changing trading
 
 test('v10 visually separates live execution surfaces from paper research',()=>{
   assert.match(js,/POSITION LAYER/);
-  assert.match(js,/PAPER \/ RESEARCH ONLY/);
-  assert.match(js,/Keine automatische Promotion/);
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/keine automatische Promotion/i);
   assert.match(css,/data-tone="live"/);
   assert.match(css,/data-tone="paper"/);
 });
