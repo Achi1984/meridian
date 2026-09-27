@@ -244,3 +244,12 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Forced SCANNER refresh preserves expanded fresh/stale detail groups.
 - CONFLICT/neutral scanner explanations use both long-adverse and short-adverse reason sets instead of presenting only one side.
 - Requires Release Safety plus targeted r22 regression coverage before merge.
+
+
+## v10 r23 — Portfolio source integrity
+
+- COMMAND Pionex equity now follows the canonical private portfolio contract: `portfolio.pionexEquityUsd`, then the Pionex row in `portfolio.manualVenueBalances`.
+- The old 80% magnitude heuristic is removed. Bot/COIN-M partial equity can no longer be promoted to an account total because it happens to be numerically close to the snapshot.
+- Pionex source is explicitly a private portfolio snapshot, with provenance and timestamp carried through the model.
+- If canonical private Pionex equity is missing, MERIDIAN fails closed to the existing screenshot fallback rather than guessing from `pionexRisk` or generic `pionex` fields.
+- No trading logic, bot matching, execution, orders or research rules changed.

@@ -15,14 +15,19 @@ export function holdingUsd(data={},holding={}){
   return Number.isFinite(stored)?stored:0;
 }
 
-export function pionexEquityUsd(data={}){
-  const direct=Number(data?.portfolio?.pionexEquityUsd);
-  if(Number.isFinite(direct)&&direct>=0)return direct;
+export function pionexEquitySnapshot(data={}){
+  const raw=data?.portfolio?.pionexEquityUsd,direct=Number(raw);
+  if(raw!==null&&raw!==undefined&&raw!==''&&Number.isFinite(direct)&&direct>=0){
+    return{found:true,value:direct,source:String(data?.portfolio?.pionexEquitySource||'PRIVATE_PORTFOLIO_SNAPSHOT'),updatedAt:data?.portfolio?.pionexEquityUpdatedAt||null};
+  }
   const rows=Array.isArray(data?.portfolio?.manualVenueBalances)?data.portfolio.manualVenueBalances:[];
-  const row=rows.find(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex');
-  const value=Number(row?.value??row?.valueUsd);
-  return Number.isFinite(value)&&value>=0?value:0;
+  const row=rows.find(x=>String(x?.venue||x?.name||'').toLowerCase()==='pionex'),rowRaw=row?.valueUsd??row?.value,value=Number(rowRaw);
+  if(rowRaw!==null&&rowRaw!==undefined&&rowRaw!==''&&Number.isFinite(value)&&value>=0){
+    return{found:true,value,source:String(row?.source||'PRIVATE_VENUE_BALANCE'),updatedAt:row?.updatedAt||null};
+  }
+  return{found:false,value:0,source:'MISSING',updatedAt:null};
 }
+export function pionexEquityUsd(data={}){return pionexEquitySnapshot(data).value}
 
 export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
   const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[];
