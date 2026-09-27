@@ -34,7 +34,7 @@ A trade belongs to cohort B only when:
 
 1. strict SK Double Advantage geometry exists;
 2. the overlap is detected from information available at that time; and
-3. `doubleAdvantageAt <= openedAt`.
+3. the Double Advantage condition was confirmed on a strictly earlier 4h bar than the first fill (`doubleAdvantageAt < openedAt`). Same-bar OHLC cannot prove event order and is therefore excluded.
 
 A Double Advantage condition discovered after the first fill stays in Core A and is excluded from B.
 
