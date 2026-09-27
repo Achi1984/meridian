@@ -91,7 +91,7 @@ function updateDoubleAdvantage(seq,bar){
     :{low:seq.a,high:seq.correctionExtreme,direction:'UP'};
   if(!(child.high>child.low))return;
   const da=skDoubleAdvantage(parent,child);
-  if(da.candidate&&!seq.doubleAdvantage)seq.doubleAdvantage={...da,detected:true};
+  if(da.candidate&&!seq.doubleAdvantage)seq.doubleAdvantage={...da,detected:true,detectedAt:bar.openTime};
 }
 
 function newPosition(seq){
@@ -157,7 +157,7 @@ function tradeRecord(seq){
     sequenceId:seq.id,side:seq.side,state:seq.state,zero:seq.zero,a:seq.a,gate:seq.gate,
     longShortZone:skLongShortZones(Math.min(seq.zero,seq.a),Math.max(seq.zero,seq.a)),
     targetZone:skTargetZone(Math.min(seq.zero,seq.a),Math.max(seq.zero,seq.a),seq.side==='LONG'?'UP':'DOWN'),
-    doubleAdvantage:!!seq.doubleAdvantage?.candidate,doubleAdvantageOverlap:seq.doubleAdvantage?.overlap||null,
+    doubleAdvantage:!!seq.doubleAdvantage?.candidate,doubleAdvantageAt:seq.doubleAdvantage?.detectedAt??null,doubleAdvantageBeforeEntry:!!(seq.doubleAdvantage?.candidate&&seq.doubleAdvantage?.detectedAt!=null&&p.openedAt!=null&&seq.doubleAdvantage.detectedAt<=p.openedAt),doubleAdvantageOverlap:seq.doubleAdvantage?.overlap||null,
     openedAt:p.openedAt,closedAt:p.closedAt,exitReason:p.exitReason,avgEntry:round(p.avgEntry),qty:round(p.initialQty,8),
     entryRatios:seq.entries.filter(x=>x.filled).map(x=>x.ratio),targetRatios:p.targetHits.map(x=>x.ratio),
     fees:round(p.fees),realizedPnl:round(p.realizedPnl),tranches:clone(p.tranches)
@@ -253,4 +253,20 @@ export function evaluateSkPaperGate(summary,stability,cfg=SK_PAPERBOT_V1_CONFIG)
   if((summary?.maxDrawdownPct??Infinity)>g.maxDrawdownPct)reasons.push('DRAWDOWN_GT_'+g.maxDrawdownPct+'PCT');
   if((stability?.positiveWindows||0)<g.minPositiveWindows)reasons.push('POSITIVE_WINDOWS_LT_'+g.minPositiveWindows);
   return{pass:reasons.length===0,reasons,autoPromotion:false,label:reasons.length?'RESEARCH_GATE_FAIL':'RESEARCH_GATE_PASS'};
+}
+
+
+export function summarizeSkTradeCohort(trades,{startEquity=10000}={}){
+  const rows=(Array.isArray(trades)?trades:[]).filter(t=>finite(t?.realizedPnl)).sort((a,b)=>(a.openedAt??0)-(b.openedAt??0));
+  let equity=startEquity,peak=startEquity,maxDD=0;
+  for(const t of rows){
+    equity+=num(t.realizedPnl)||0;peak=Math.max(peak,equity);
+    if(peak>0)maxDD=Math.max(maxDD,(peak-equity)/peak*100);
+  }
+  return stats(rows,startEquity,maxDD);
+}
+
+export function deepestSkEntryRatio(trade){
+  const xs=(trade?.entryRatios||[]).map(Number).filter(Number.isFinite);
+  return xs.length?Math.max(...xs):null;
 }
