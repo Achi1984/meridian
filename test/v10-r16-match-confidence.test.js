@@ -70,10 +70,11 @@ test('r16 exposes ambiguous rows in the Data Guard',()=>{
   assert.ok(v10.includes("g.ambiguous+' ambiguous</small>"));
 });
 
-test('r16 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r16');
-  assert.match(shell,/10\.0-r16/);
-  assert.match(v10,/const BUILD='10\.0-r16'/);
+test('r16+ release identity remains canonical',()=>{
+  const build=String(release.terminalBuild||'');
+  assert.match(build,/^10\.0-r\d+$/);
+  assert.ok(shell.includes(build));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
 });
 
 test('r16 adapter remains syntactically valid',()=>{
