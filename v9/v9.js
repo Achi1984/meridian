@@ -145,12 +145,13 @@ async function marketKlines(interval,limit,symbol='BTC'){
  }
 }
 async function marketKlinesHistory(interval,bars,symbol='BTC'){
- const want=Math.max(50,Math.min(2500,Math.floor(Number(bars)||1000))),out=[];let end=Date.now(),guard=0;
- while(out.length<want&&guard++<6){
+ const want=Math.max(50,Math.min(9000,Math.floor(Number(bars)||1000))),out=[];let end=Date.now(),guard=0;
+ while(out.length<want&&guard++<12){
   const limit=Math.min(1000,want-out.length),u='https://api.binance.com/api/v3/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+limit+'&endTime='+Math.floor(end);
   const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('BINANCE HISTORY '+r.status);
   const rows=(await r.json()).map(x=>({openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]}));
   if(!rows.length)break;out.unshift(...rows);end=rows[0].openTime-1;
+  if(out.length<want)await new Promise(resolve=>setTimeout(resolve,80));
  }
  return [...new Map(out.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime).slice(-want)
 }
