@@ -70,3 +70,22 @@ test('v10 paired cards are mobile first',()=>{
   assert.match(css,/\.pair-legs\{grid-template-columns:1fr\}/);
   assert.match(css,/@media\(max-width:390px\)/);
 });
+
+
+test('v10 blocked-live command collapses legacy risk clutter and fixes private match denominator',()=>{
+  assert.match(js,/function syncHealth/);
+  assert.match(js,/PRIVATE MATCH/);
+  assert.match(js,/g\.matched\+'\/'\+g\.raw/);
+  assert.match(js,/LIVE LAYER BLOCKED/);
+  for(const sel of ['risk-cockpit','exposure-card','manual-strip','okx-strip','risk-v2','lock-radar','quick-grid','command-bots','data-truth']){
+    assert.match(js,new RegExp(sel.replaceAll('-','\\-')));
+  }
+  assert.match(js,/PIONEX_BOT_READ_API_KEY \+ PIONEX_BOT_READ_API_SECRET/);
+});
+
+test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
+  assert.match(js,/function snapshotDetails/);
+  assert.match(js,/REFERENCE SNAPSHOTS/);
+  assert.match(js,/Nur Ansicht · keine Risk-\/Next-Action-Ableitung/);
+  assert.match(css,/\.v10-snapshot-details/);
+});
