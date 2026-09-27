@@ -20,6 +20,8 @@ test('v10 r9 exposes SK PaperBot V1 as LAB-only research',()=>{
 
 test('SK V1 uses paged historical 4h bridge instead of live private bot data',()=>{
   assert.match(v9,/async function marketKlinesHistory/);
+  assert.match(v9,/Math\.min\(9000/);
+  assert.match(v9,/guard\+\+<12/);
   assert.match(v9,/limit=Math\.min\(1000,want-out\.length\)/);
   assert.match(v9,/signalTone,marketKlines,marketKlinesHistory/);
   assert.match(js,/H\(\)\.marketKlinesHistory/);
@@ -70,11 +72,42 @@ test('v10 r9 cache key is unique across production entrypoints',()=>{
   const legacy=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
   const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
   for(const txt of [root,shell,legacy,engine,js]){
-    assert.doesNotMatch(txt,/10\.0-r7|build=r7|build','r7/);
+    assert.doesNotMatch(txt,/10\.0-r7|10\.0-r8|build=r7|build=r8|build','r7|build','r8/);
   }
   assert.match(root,/build=r9/);
   assert.match(shell,/v10\.js\?v=10\.0-r9/);
   assert.match(shell,/v9\.js\?v=10\.0-r9/);
   assert.match(js,/fib-core\.js\?v=10\.0-r9/);
   assert.match(js,/sk-paperbot-v1\.js\?v=10\.0-r9/);
+  assert.match(js,/sk-research-v2\.js\?v=10\.0-r9/);
+});
+
+
+test('SK Research V2 exposes frozen A/B multi-asset controls',()=>{
+  for(const token of ['SK RESEARCH V2','CORE vs DOUBLE ADVANTAGE','365 TAGE','730 TAGE','1460 TAGE','V2 MULTI-ASSET STARTEN','V2 FROZEN GATE']){
+    assert.ok(js.includes(token),`missing V2 UI token: ${token}`);
+  }
+  for(const asset of ['BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI']){
+    assert.ok(js.includes(asset),`missing V2 asset: ${asset}`);
+  }
+  assert.match(css,/\.sk-v2-shell/);
+  assert.match(css,/\.sk-v2-assets/);
+});
+
+test('LAB separates SK System Lab from collapsed Profit Lock Lab',()=>{
+  assert.match(js,/sk-system-module/);
+  assert.match(js,/module\.open=true/);
+  assert.match(js,/profit-lock-module/);
+  assert.match(js,/PROFIT LOCK LAB/);
+  assert.match(js,/SK SYSTEM LAB/);
+  assert.match(css,/\.research-module/);
+});
+
+test('V2 batch remains click-to-run research only and sequential',()=>{
+  assert.match(js,/async function runSkV2Batch/);
+  assert.match(js,/for\(const symbol of SK_RESEARCH_V2_ASSETS\)/);
+  assert.match(js,/await loader\('4h',bars,symbol\)/);
+  assert.match(js,/await new Promise\(resolve=>setTimeout\(resolve,120\)\)/);
+  assert.match(js,/Kein Lookahead/);
+  assert.doesNotMatch(js,/submitOrder|placeOrder|createOrder/);
 });
