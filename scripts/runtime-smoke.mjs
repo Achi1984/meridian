@@ -55,6 +55,8 @@ async function smoke(){
   if(!sameRelease(health))fail(`Northflank stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${health?.version}/${health?.buildId}`);
   if(String(health?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`Gateway terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${health?.terminalBuild}`);
   if(health.privateData!==true)fail('Private dashboard store is not ready');
+  if(health.privateReadConfigured!==true)fail('Gateway private read auth is not configured');
+  if(String(health.privateReadAuthSource||'')!=='ENV')fail(`Gateway private read auth must come from ENV, got ${health.privateReadAuthSource||'UNKNOWN'}`);
 
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
   if(protectedResponse.status!==401)fail(`Anonymous protected API expected 401, got ${protectedResponse.status}`);
