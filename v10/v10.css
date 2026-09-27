@@ -190,10 +190,10 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 .sk-double.muted{opacity:.68}.sk-double.muted span{color:#8493a3}
 .fib-zone{position:absolute;left:4px;right:4px;border-radius:7px;z-index:1;pointer-events:none;overflow:hidden}
 .fib-zone span{position:absolute;right:5px;top:3px;font-size:6px;font-weight:900;letter-spacing:.06em;opacity:.85}
-.fib-zone-bull{background:rgba(54,197,145,.08);border:1px solid rgba(54,197,145,.28)}
-.fib-zone-bull span{color:#55dbaa}
-.fib-zone-bear{background:rgba(255,89,102,.07);border:1px solid rgba(255,89,102,.26)}
-.fib-zone-bear span{color:#ff7782}
+.fib-zone-bull,.fib-zone-long{background:rgba(54,197,145,.08);border:1px solid rgba(54,197,145,.28)}
+.fib-zone-bull span,.fib-zone-long span{color:#55dbaa}
+.fib-zone-bear,.fib-zone-short{background:rgba(255,89,102,.07);border:1px solid rgba(255,89,102,.26)}
+.fib-zone-bear span,.fib-zone-short span{color:#ff7782}
 .fib-zone-target{background:rgba(255,183,66,.06);border:1px dashed rgba(255,183,66,.28)}
 .fib-zone-target span{color:var(--amber)}
 .fib-zone-double{left:18%;right:18%;background:rgba(64,167,255,.08);border:1px dashed rgba(64,167,255,.42)}
