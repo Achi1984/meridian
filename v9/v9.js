@@ -173,13 +173,18 @@ function ema(v,p){if(v.length<p)return null;const k=2/(p+1);let e=v.slice(0,p).r
 function rsi(v,p=14){if(v.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=v[i]-v[i-1];g+=Math.max(0,d);l+=Math.max(0,-d)}g/=p;l/=p;for(let i=p+1;i<v.length;i++){const d=v[i]-v[i-1];g=(g*(p-1)+Math.max(0,d))/p;l=(l*(p-1)+Math.max(0,-d))/p}return l?100-100/(1+g/l):100}
 function macd(v){if(v.length<35)return null;const series=p=>{const k=2/(p+1),o=[v[0]];for(let i=1;i<v.length;i++)o.push(v[i]*k+o[i-1]*(1-k));return o};const a=series(12),b=series(26),m=v.map((_,i)=>a[i]-b[i]);const k=2/10;let s=m[0];for(let i=1;i<m.length;i++)s=m[i]*k+s*(1-k);return{line:m.at(-1),signal:s,hist:m.at(-1)-s}}
 function atr(rows,p=14){if(rows.length<p+1)return null;const t=[];for(let i=1;i<rows.length;i++)t.push(Math.max(rows[i].high-rows[i].low,Math.abs(rows[i].high-rows[i-1].close),Math.abs(rows[i].low-rows[i-1].close)));let a=t.slice(0,p).reduce((x,y)=>x+y,0)/p;for(let i=p;i<t.length;i++)a=(a*(p-1)+t[i])/p;return a}
+const MARKET_INTERVAL_MS={'15m':15*60*1000,'1h':60*60*1000,'4h':4*60*60*1000,'1d':24*60*60*1000};
+function closedMarketRows(rows){
+ const source=rows?.source||null,now=Date.now(),out=(Array.isArray(rows)?rows:[]).filter(x=>num(x?.closeTime)!=null&&num(x.closeTime)<now-1000);
+ if(source)out.source=source;return out
+}
 async function marketKlines(interval,limit,symbol='BTC'){
  const barMap={'15m':'15m','1h':'1H','4h':'4H','1d':'1D'},bar=barMap[interval]||interval;
  try{
   const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetch(u,{cache:'no-store'});
   if(!r.ok)throw new Error('OKX '+r.status);
   const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
-  const rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]})).reverse();
+  const span=MARKET_INTERVAL_MS[interval]||0,rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]+Math.max(1,span)-1})).reverse();
   rows.source='OKX USDT-SWAP';return rows
  }catch(okxError){
   const r=await fetch('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'});
@@ -197,7 +202,7 @@ async function marketKlinesHistory(interval,bars,symbol='BTC'){
   if(!rows.length)break;out.unshift(...rows);end=rows[0].openTime-1;
   if(out.length<want)await new Promise(resolve=>setTimeout(resolve,80));
  }
- return [...new Map(out.map(x=>[x.openTime,x])).values()].sort((a,b)=>a.openTime-b.openTime).slice(-want)
+ return [...new Map(out.map(x=>[x.openTime,x])).values()].filter(x=>num(x.closeTime)!=null&&num(x.closeTime)<Date.now()-1000).sort((a,b)=>a.openTime-b.openTime).slice(-want)
 }
 async function syncCrossPrices(){
  try{
@@ -239,15 +244,17 @@ function profitLockIntel(rows15,rows1h,rows4){
 async function syncIntel(){
  const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
  try{
-  const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]);
-  const now=Date.now();state.intel={...intel(m15,h1,h4,d1),updatedAt:now};out.BTC={...profitLockIntel(m15,h1,h4),updatedAt:now};btcRows=true
+  const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
+  if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
+  const now=Date.now();state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D'};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:now,confirmationBars:'CLOSED_1H_4H'};btcRows=true
  }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
  const assets=[...new Set(state.bots.map(b=>b.symbol))].filter(symbol=>symbol!=='BTC');
  for(let i=0;i<assets.length;i+=4){
   const batch=assets.slice(i,i+4);
   await Promise.all(batch.map(async symbol=>{try{
-   const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]);
-   out[symbol]={...profitLockIntel(m15,h1,h4),updatedAt:Date.now()}
+   const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4);
+   if(h1c.length<60||h4c.length<100)throw new Error('insufficient closed confirmation bars');
+   out[symbol]={...profitLockIntel(m15,h1c,h4c),updatedAt:Date.now(),confirmationBars:'CLOSED_1H_4H'}
   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
