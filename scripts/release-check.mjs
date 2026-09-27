@@ -56,6 +56,7 @@ if(v10Cutover){
   const v10=read('v10/index.html'),v10js=read('v10/v10.js');
   must(v10.includes('content="'+terminalBuild+'"'),'v10 meta build must match terminalBuild');
   must(v10js.includes("const BUILD='"+terminalBuild+"'"),'v10 runtime BUILD must match terminalBuild');
+  must(!/(^|[^$])\$\([^()\n]*\)\.(?:forEach|filter|map|some|every|reduce|find)\s*\(/m.test(v10js),'v10 single-element selector used as collection');
   for(const key of ['command','bots','market','research','more']){
     must(v10.includes(`id="view-${key}"`),`v10 production target missing view-${key}`);
   }
