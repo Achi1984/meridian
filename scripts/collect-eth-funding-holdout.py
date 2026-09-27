@@ -67,12 +67,12 @@ def parse_funding(lines):
 
 def month_url(market,dataset,year,month,interval=None):
     ym=f'{year:04d}-{month:02d}'
-    if dataset=='klines':
-        return f'{BASE}/{market}/monthly/klines/{SYMBOL}/{interval}/{SYMBOL}-{interval}-{ym}.zip'
+    if dataset in ('klines','markPriceKlines'):
+        return f'{BASE}/{market}/monthly/{dataset}/{SYMBOL}/{interval}/{SYMBOL}-{interval}-{ym}.zip'
     return f'{BASE}/{market}/monthly/{dataset}/{SYMBOL}/{SYMBOL}-{dataset}-{ym}.zip'
 
-def download_klines(market,year,month):
-    return parse_klines(fetch_zip(month_url(market,'klines',year,month,'1h')))
+def download_klines(market,year,month,dataset='klines'):
+    return parse_klines(fetch_zip(month_url(market,dataset,year,month,'1h')))
 
 def at_or_before(rows,t):
     best=None
@@ -83,10 +83,12 @@ def at_or_before(rows,t):
 # Perpetual 1h closes are needed across the full holdout because funding is paid
 # on fixed base quantity and therefore scales with mark/notional through time.
 perp=download_klines('futures/um',2023,12)
+mark=[]
 funding=[]
 for y,m in months(START,datetime(2026,5,1,tzinfo=timezone.utc)):
     sys.stderr.write(f'archive {y:04d}-{m:02d}\n')
     perp.extend(download_klines('futures/um',y,m))
+    mark.extend(download_klines('futures/um',y,m,'markPriceKlines'))
     funding.extend(parse_funding(fetch_zip(month_url('futures/um','fundingRate',y,m))))
 
 # Spot is only needed at frozen window boundaries for basis P&L.
@@ -98,17 +100,16 @@ def dedupe(rows,key='ts'):
     d={x[key]:x for x in rows}
     return [d[k] for k in sorted(d)]
 
-perp=dedupe(perp); funding=dedupe(funding); spot=dedupe(spot)
+perp=dedupe(perp); mark=dedupe(mark); funding=dedupe(funding); spot=dedupe(spot)
 start_ms=int(START.timestamp()*1000); end_ms=int(END.timestamp()*1000)
 
-# Attach the closest preceding perpetual close to each funding settlement as a
-# conservative public proxy for settlement markPrice; archive funding files
-# themselves contain rate/time but not mark price.
+# Attach the closest preceding official Mark Price kline close to each funding
+# settlement. Binance Vision funding archives contain rate/time but not mark price.
 priced=[]
 for x in funding:
     if not (start_ms < x['ts'] <= end_ms): continue
-    p=at_or_before(perp,x['ts'])
-    if p is None: raise RuntimeError(f'missing perp price before funding {x["ts"]}')
+    p=at_or_before(mark,x['ts'])
+    if p is None: raise RuntimeError(f'missing mark price before funding {x["ts"]}')
     priced.append({'ts':x['ts'],'rate':x['rate'],'markPrice':p['close']})
 
 payload={
@@ -122,6 +123,7 @@ payload={
     'end':END.isoformat(),
     'spotRows':len(spot),
     'perpRows':len(perp),
+    'markPriceRows':len(mark),
     'fundingRows':len(priced)
   }
 }
