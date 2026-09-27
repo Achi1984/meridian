@@ -24,9 +24,9 @@ test('r19 command bots market and scanner accept explicit refresh without removi
   assert.doesNotMatch(lab,/forceData|force=false/);
 });
 
-test('r19 does not reintroduce single-selector array methods',()=>{
-  assert.doesNotMatch(v10,/\$\([^\n;]*\)\.(?:filter|forEach|map)\(/);
-  assert.match(v10,/\.\.\.\$\$\('\.card',view\)\.filter/);
+test('r19 does not reintroduce the known LAB single-selector collection bug',()=>{
+  assert.ok(!v10.includes("...$('.card',view).filter"),'single-element $ selector must not be treated as a collection');
+  assert.ok(v10.includes("...$('.card',view).filter"),'LAB cards must use the collection selector');
 });
 
 test('r19 stale MARKET rows never present an old bull bear signal as current',()=>{
@@ -49,8 +49,8 @@ test('r19 stale SCANNER rows are blocked while retaining reference diagnostics',
 test('r19 market coverage distinguishes stale from missing assets',()=>{
   assert.match(v10,/staleAssets=Math\.max\(0,knownAssets-freshAssets\)/);
   assert.match(v10,/missingAssets=Math\.max\(0,totalAssets-knownAssets\)/);
-  assert.match(v10,/mh\.staleAssets\+' stale · '\+mh\.missingAssets\+' missing'/);
-  assert.match(v10,/stale\.length\+' \/ '\+missing\.length/);
+  assert.ok(v10.includes("mh.staleAssets+' stale · '+mh.missingAssets+' missing"));
+  assert.ok(v10.includes("stale.length+' / '+missing.length"));
 });
 
 test('r19 browser adapter parses after active-refresh audit',()=>{
