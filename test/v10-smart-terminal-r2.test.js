@@ -89,3 +89,36 @@ test('v10 keeps stale venue snapshots behind a reference-only disclosure',()=>{
   assert.match(js,/Nur Ansicht · keine Risk-\/Next-Action-Ableitung/);
   assert.match(css,/\.v10-snapshot-details/);
 });
+
+
+test('v10 r4 bots collapse stale private fields instead of rendering empty action grids',()=>{
+  assert.match(js,/pair-leg-stale/);
+  assert.match(js,/Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten/);
+  assert.match(js,/function marketPrice/);
+  assert.match(js,/MARKET PRICE/);
+});
+
+test('v10 r4 market is a multi-asset public-data board independent from bot freshness',()=>{
+  assert.match(js,/function marketUniverse/);
+  assert.match(js,/REGIME \+ ASSET TAPE/);
+  assert.match(js,/Öffentliche Marktdaten · unabhängig vom privaten Bot-Snapshot/);
+  assert.match(js,/ASSET TAPE/);
+  assert.match(js,/market-list/);
+});
+
+test('v10 r4 scanner ranks market signals independently and labels bot linkage separately',()=>{
+  assert.match(js,/marketUniverse\(\).*sort/);
+  assert.match(js,/MARKET SIGNALS/);
+  assert.match(js,/Marktdaten ≠ Bot-Daten/);
+  assert.match(js,/BOT LINKED/);
+  assert.match(js,/BOT DATA/);
+  assert.match(js,/TOP SIGNALS/);
+});
+
+test('v10 r4 lab is a compact research hub over the existing paired backtest',()=>{
+  assert.match(js,/RESEARCH HUB/);
+  assert.match(js,/ACTIVE LAB/);
+  assert.match(js,/PAIRED TEST/);
+  assert.match(js,/METHODIK & WARUM/);
+  assert.match(css,/\.lab-overview/);
+});
