@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r16';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r16';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r16';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r16';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r16';
-// MERIDIAN v10 r16 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r17';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r17';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r17';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r17';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r17';
+// MERIDIAN v10 r17 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r16';
+const BUILD='10.0-r17';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -113,10 +113,9 @@ function pairCard(symbol,compact=false){
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
   if(!h.botFeedFresh?.())return{symbol:'BOT DATA',status:{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:100,reason:'Live-Bot-Layer ist nicht frisch · Asset Watch bleibt nur Referenz'}};
-  const pairs=symbols().map(symbol=>({symbol,status:pairStatus(symbol)})).sort((a,b)=>b.status.rank-a.status.rank);
-  if(pairs.length)return pairs[0];
-  if((s.unmatchedLive||[]).length)return{symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:(s.unmatchedLive||[]).length+' private Bot-Rows sind nicht sicher gematcht'}};
-  return null;
+  const candidates=symbols().map(symbol=>({symbol,status:pairStatus(symbol)})),unmatched=s.unmatchedLive||[];
+  if(unmatched.length)candidates.push({symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:unmatched.length+' private Bot-Rows sind nicht sicher gematcht'+(Number(s.matchAmbiguous||0)?' · '+Number(s.matchAmbiguous)+' ambiguous':'')}});
+  return candidates.sort((a,b)=>b.status.rank-a.status.rank)[0]||null;
 }
 function nextAction(){
   const c=criticalPair();if(!c)return{title:'DATEN SYNC',detail:'Keine privaten Bot-Rows · keine Aktion aus Referenzdaten'};
@@ -145,7 +144,7 @@ function syncHealth(){
   return{apiRows,supported,raw:supported,matched:matched.length,safetyReady,pnlReady,decisionReady,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
 }
 function dataGuardCard(){
-  const g=syncHealth(),tone=g.decisionReady>0?'safe':g.safetyReady>0?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionReady>0?'DECISION READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
+  const g=syncHealth(),completeDecision=g.decisionReady>0&&g.coverageComplete,tone=completeDecision?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionReady>0?(g.coverageComplete?'DECISION READY':'PARTIAL READY'):g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
   return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small></section>';
 }
 function liveOverview(){
@@ -176,9 +175,10 @@ function commandDataStrip(){
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  set(market,'● MKT '+(m.fresh?'FRESH':'STALE'),'live '+(m.fresh?'fresh':'mixed'),m.fresh?'Öffentliche Futures-Marktdaten frisch':'Marktdaten nicht frisch genug');
-  const bad=g.status==='ERROR',label=g.fresh?'FRESH':bad?'ERROR':'REF';
-  set(bot,'● BOT '+label,'live '+(g.fresh?'fresh':bad?'error':'reference'),g.detail);
+  const marketLabel=m.fresh?(m.coverageComplete?'FRESH':'PARTIAL'):'STALE',marketClass=m.fresh&&m.coverageComplete?'fresh':'mixed';
+  set(market,'● MKT '+marketLabel,'live '+marketClass,m.fresh?(m.coverageComplete?'Öffentliche Futures-Marktdaten vollständig frisch':'Marktdaten frisch, aber Asset-Coverage unvollständig'):'Marktdaten nicht frisch genug');
+  const bad=g.status==='ERROR',botLabel=g.fresh?(g.coverageComplete?'FRESH':'PARTIAL'):bad?'ERROR':'REF',botClass=g.fresh&&g.coverageComplete?'fresh':bad?'error':g.fresh?'mixed':'reference';
+  set(bot,'● BOT '+botLabel,'live '+botClass,g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
@@ -322,13 +322,14 @@ async function updateFibMap(view){
     const fetchRows=H().marketKlines;
     let rows=null;
     if(typeof fetchRows==='function'){
-      try{rows=await fetchRows('4h',180,fibUi.symbol)}catch(e){if(fibUi.mode==='AUTO')throw e}
+      try{rows=await fetchRows('4h',Math.min(300,Math.max(180,fibUi.window+5)),fibUi.symbol)}catch(e){if(fibUi.mode==='AUTO')throw e}
     }
+    const swingRows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x?.closeTime)>0&&Number(x.closeTime)<Date.now()-1000);if(rows?.source)swingRows.source=rows.source;
     let low,high,direction,bars=0,source='MANUAL';
     if(fibUi.mode==='AUTO'){
-      if(!rows?.length)throw new Error('4h-Marktdaten-Bridge nicht verfügbar');
-      const sw=detectSwing(rows,fibUi.window);
-      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h · '+(rows.source||'PUBLIC FUTURES');
+      if(!swingRows.length)throw new Error('Keine geschlossenen 4h-Kerzen verfügbar');
+      const sw=detectSwing(swingRows,fibUi.window);
+      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h CLOSED · '+(swingRows.source||'PUBLIC FUTURES');
       fibUi.autoLow=low;fibUi.autoHigh=high;fibUi.lastDirection=direction;
     }else{
       low=fibParse($('#fib-low',view)?.value??fibUi.manualLow);
@@ -343,8 +344,8 @@ async function updateFibMap(view){
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
     let doubleAdvantage=null;
-    if(fibUi.mode==='AUTO'&&rows?.length){
-      const parent=detectSwing(rows,fibUi.window),child=detectOpposingChildSwing(rows,parent,fibUi.window);
+    if(fibUi.mode==='AUTO'&&swingRows.length){
+      const parent=detectSwing(swingRows,fibUi.window),child=detectOpposingChildSwing(swingRows,parent,fibUi.window);
       if(child)doubleAdvantage=skDoubleAdvantage(parent,child);
     }
     out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
@@ -454,20 +455,19 @@ async function runSkV2Batch(view){
   const out=$('#sk-v2-result',view),btn=$('#sk-v2-run',view),loader=H().marketKlinesHistory;
   if(typeof loader!=='function'){skV2Ui.running=false;skV2Ui.error='Historical 4h data bridge fehlt';if(out)out.innerHTML=skV2ResultHtml();return}
   if(btn){btn.disabled=true;btn.textContent='BATCH LÄUFT …'}
-  const runs=[],bars=Math.min(9000,skV2Ui.days*6+40);
+  const runs=[],failures=[],bars=Math.min(9000,skV2Ui.days*6+40);
   try{
     for(const symbol of SK_RESEARCH_V2_ASSETS){
       skV2Ui.progress='LADE '+symbol; if(out)out.innerHTML=skV2ResultHtml();
       try{
         const rows=await loader('4h',bars,symbol);
-        if(Array.isArray(rows)&&rows.length>=200){
-          runs.push({symbol,replay:replaySkPaperBot(rows),bars:rows.length,first:rows[0].openTime,last:rows.at(-1).openTime});
-        }
-      }catch(e){}
+        if(Array.isArray(rows)&&rows.length>=200)runs.push({symbol,replay:replaySkPaperBot(rows),bars:rows.length,first:rows[0].openTime,last:rows.at(-1).openTime});
+        else failures.push(symbol+' <200 Bars');
+      }catch(e){failures.push(symbol+' '+String(e?.message||e).slice(0,60))}
       skV2Ui.completed++;skV2Ui.progress='ANALYSIERE '+symbol;if(out)out.innerHTML=skV2ResultHtml();
       await new Promise(resolve=>setTimeout(resolve,120));
     }
-    if(runs.length<3)throw new Error('Zu wenige Assets mit ausreichender Historie: '+runs.length);
+    if(failures.length||runs.length!==SK_RESEARCH_V2_ASSETS.length)throw new Error('V2 DATA GATE · '+(failures.join(' · ')||('geladen '+runs.length+'/'+SK_RESEARCH_V2_ASSETS.length)));
     skV2Ui.result=aggregateSkResearchV2(runs);
   }catch(e){skV2Ui.error=String(e?.message||e)}
   finally{
@@ -601,17 +601,18 @@ async function runTsmomHoldout(view){
   const out=$('#holdout-result',view),btn=$('#holdout-run',view),loader=H().marketKlinesHistory;
   if(typeof loader!=='function'){holdoutUi.running=false;holdoutUi.error='Historical daily data bridge fehlt';if(out)out.innerHTML=tsmomHoldoutHtml();return}
   if(btn){btn.disabled=true;btn.textContent='HOLDOUT LÄUFT …'}
-  const legacyData={},transferData={};
+  const legacyData={},transferData={},h1Failures=[],h2Failures=[];
   try{
     for(const symbol of DOCUMENTED_EDGE_ASSETS){
       holdoutUi.progress='H1 ALTZEIT · '+symbol;if(out)out.innerHTML=tsmomHoldoutHtml();
       try{
         const rows=await loader('1d',2800,symbol);
         if(Array.isArray(rows)&&rows.length>=500)legacyData[symbol]=rows;
-      }catch(e){}
+        else h1Failures.push(symbol+' <500 Bars');
+      }catch(e){h1Failures.push(symbol+' '+String(e?.message||e).slice(0,60))}
       holdoutUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
     }
-    if(Object.keys(legacyData).length<4)throw new Error('H1 Datenbreite <4 Assets');
+    if(h1Failures.length||Object.keys(legacyData).length!==DOCUMENTED_EDGE_ASSETS.length)throw new Error('H1 SOURCE GATE · '+(h1Failures.join(' · ')||('geladen '+Object.keys(legacyData).length+'/'+DOCUMENTED_EDGE_ASSETS.length)));
     holdoutUi.legacy=runLegacyTimeHoldout(legacyData);
 
     for(const symbol of TSMOM_TRANSFER_ASSETS){
@@ -619,10 +620,11 @@ async function runTsmomHoldout(view){
       try{
         const rows=await loader('1d',1860,symbol);
         if(Array.isArray(rows)&&rows.length>=1700)transferData[symbol]=rows;
-      }catch(e){}
+        else h2Failures.push(symbol+' <1700 Bars');
+      }catch(e){h2Failures.push(symbol+' '+String(e?.message||e).slice(0,60))}
       holdoutUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
     }
-    if(Object.keys(transferData).length<TSMOM_TRANSFER_ASSETS.length)throw new Error('H2 benötigt alle 8 Transfer-Assets; geladen: '+Object.keys(transferData).length+'/8');
+    if(h2Failures.length||Object.keys(transferData).length!==TSMOM_TRANSFER_ASSETS.length)throw new Error('H2 SOURCE GATE · '+(h2Failures.join(' · ')||('geladen '+Object.keys(transferData).length+'/'+TSMOM_TRANSFER_ASSETS.length)));
     holdoutUi.transfer=runTransferUniverseHoldout(transferData);
     holdoutUi.combined=evaluateCombinedTsmomHoldout({legacy:holdoutUi.legacy,transfer:holdoutUi.transfer});
   }catch(e){holdoutUi.error=String(e?.message||e)}
@@ -650,17 +652,18 @@ async function runDocumentedEdgeBatch(view){
   const t=$('#edge-tsmom',view),x=$('#edge-xsmom',view),btn=$('#edge-run',view),loader=H().marketKlinesHistory;
   if(typeof loader!=='function'){edgeUi.running=false;edgeUi.error='Historical daily data bridge fehlt';if(t)t.innerHTML=tsmomEdgeHtml();return}
   if(btn){btn.disabled=true;btn.textContent='BATCH LÄUFT …'}
-  const data={},bars=Math.min(9000,edgeUi.days+400);
+  const data={},failures=[],bars=Math.min(9000,edgeUi.days+400);
   try{
     for(const symbol of DOCUMENTED_EDGE_ASSETS){
       edgeUi.progress='LADE '+symbol; if(t)t.innerHTML=tsmomEdgeHtml();if(x)x.innerHTML=xsmomEdgeHtml();
       try{
         const rows=await loader('1d',bars,symbol);
         if(Array.isArray(rows)&&rows.length>=400){data[symbol]=rows;edgeUi.loadedAssets.push(symbol)}
-      }catch(e){}
+        else failures.push(symbol+' <400 Bars');
+      }catch(e){failures.push(symbol+' '+String(e?.message||e).slice(0,60))}
       edgeUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
     }
-    if(Object.keys(data).length<3)throw new Error('Zu wenige Assets mit >=400 Daily-Kerzen: '+Object.keys(data).length);
+    if(failures.length||Object.keys(data).length!==DOCUMENTED_EDGE_ASSETS.length)throw new Error('EDGE DATA GATE · '+(failures.join(' · ')||('geladen '+Object.keys(data).length+'/'+DOCUMENTED_EDGE_ASSETS.length)));
     edgeUi.progress='BERECHNE TSMOM';if(t)t.innerHTML=tsmomEdgeHtml();
     edgeUi.tsmom=runTsmomClassic(data);
     edgeUi.progress='BERECHNE XSMOM';if(x)x.innerHTML=xsmomEdgeHtml();
