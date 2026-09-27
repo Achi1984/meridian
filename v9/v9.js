@@ -91,6 +91,8 @@ function botFeedAgeMs(){return state.botFeedUpdatedAt?Math.max(0,Date.now()-stat
 function botFeedFresh(){const age=botFeedAgeMs(),future=state.botFeedUpdatedAt!=null&&state.botFeedUpdatedAt>Date.now()+5*60*1000;return state.botFeedTimestampTrusted&&!future&&age!=null&&age<=15*60*1000}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
+function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[])].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
+let intelSyncPromise=null;
 function actionableBot(b){return liveMatched(b)&&livePnlAvailable(b)&&botFeedFresh()}
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
@@ -209,7 +211,7 @@ async function syncCrossPrices(){
   const [or,br]=await Promise.all([fetch('https://www.okx.com/api/v5/market/tickers?instType=SWAP',{cache:'no-store'}),fetch('https://fapi.binance.com/fapi/v1/ticker/price',{cache:'no-store'})]);
   if(!or.ok||!br.ok)throw new Error('cross-price http');
   const [oj,bj]=await Promise.all([or.json(),br.json()]),om=new Map((oj.data||[]).map(x=>[x.instId,num(x.last)])),bm=new Map((Array.isArray(bj)?bj:[]).map(x=>[x.symbol,num(x.price)])),out={},now=Date.now();
-  for(const symbol of [...new Set([...state.bots.map(b=>b.symbol),...(state.okxDcaBots||[]).map(b=>b.symbol)])]){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
+  for(const symbol of trackedMarketSymbols()){const okx=om.get(symbol+'-USDT-SWAP')||null,binance=bm.get(symbol+'USDT')||null,spread=okx>0&&binance>0?Math.abs(okx-binance)/Math.min(okx,binance)*100:null;out[symbol]={okx,binance,spreadPct:spread,verified:spread!=null&&spread<=.5,updatedAt:now,sources:'OKX SWAP + BINANCE USD-M'}}
   state.priceChecks=out;state.marketPriceSyncedAt=now;state.marketPriceError=null
  }catch(e){state.priceChecks={};state.marketPriceError=String(e?.message||e)}
 }
@@ -242,23 +244,31 @@ function profitLockIntel(rows15,rows1h,rows4){
  return{action:longAction,longAction,shortAction,bearish:bear,bullish:bull,bias,longReasons,shortReasons,reasons:longReasons,rsi15:R15,rsi1h:R1H,rsi4:R4,macd15:M15,macd1h:M1H,macd4:M4,ema20:e20,ema50:e50,price:p,swingLo,swingHi,swingDirection,source:rows15.source||'MARKET FEED'}
 }
 async function syncIntel(){
- const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
- try{
-  const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
-  if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
-  const now=Date.now();state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D'};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:now,confirmationBars:'CLOSED_1H_4H'};btcRows=true
- }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
- const assets=[...new Set(state.bots.map(b=>b.symbol))].filter(symbol=>symbol!=='BTC');
- for(let i=0;i<assets.length;i+=4){
-  const batch=assets.slice(i,i+4);
-  await Promise.all(batch.map(async symbol=>{try{
-   const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4);
-   if(h1c.length<60||h4c.length<100)throw new Error('insufficient closed confirmation bars');
-   out[symbol]={...profitLockIntel(m15,h1c,h4c),updatedAt:Date.now(),confirmationBars:'CLOSED_1H_4H'}
-  }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
-  if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
- }
- state.assetIntel=out;if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,4).join(' · '):null;await cross;renderHeaderTruth()
+ if(intelSyncPromise)return intelSyncPromise;
+ intelSyncPromise=(async()=>{
+  const cross=syncCrossPrices(),out={...state.assetIntel},errors=[];let btcRows=null;
+  try{
+   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
+   if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
+   const now=Date.now();state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D'};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:now,confirmationBars:'CLOSED_1H_4H'};btcRows=true
+  }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
+  const universe=trackedMarketSymbols(),assets=universe.filter(symbol=>symbol!=='BTC');
+  for(let i=0;i<assets.length;i+=4){
+   const batch=assets.slice(i,i+4);
+   await Promise.all(batch.map(async symbol=>{try{
+    const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4);
+    if(h1c.length<60||h4c.length<100)throw new Error('insufficient closed confirmation bars');
+    out[symbol]={...profitLockIntel(m15,h1c,h4c),updatedAt:Date.now(),confirmationBars:'CLOSED_1H_4H'}
+   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
+   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
+  }
+  const allowed=new Set(universe);
+  state.assetIntel=Object.fromEntries(Object.entries(out).filter(([symbol])=>allowed.has(symbol)));
+  if(btcRows)state.marketSyncedAt=Date.now();
+  state.marketError=errors.length?errors.slice(0,6).join(' · '):null;
+  await cross;renderHeaderTruth()
+ })();
+ try{return await intelSyncPromise}finally{intelSyncPromise=null}
 }
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
@@ -482,4 +492,4 @@ window.MERIDIAN_V10_BRIDGE={
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');sync().then(()=>syncIntel()).then(()=>go(current));setInterval(sync,30000);setInterval(()=>syncIntel().then(()=>{if(['command','bots','market'].includes(current))go(current)}),60000);
