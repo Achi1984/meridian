@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot, portfolioPriceCoverage } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot, portfolioPriceCoverage, sourceTimestampAge } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -95,4 +95,26 @@ test('canonical snapshot exposes valuation provenance without changing Spot + Pi
   assert.equal(snap.priceCoverage.complete,true);
   assert.equal(snap.sourceDetail.spot,'LIVE_PRICE_COMPLETE');
   assert.equal(snap.sourceDetail.trading,'PRIVATE_PORTFOLIO_SNAPSHOT');
+});
+
+
+test('source timestamp age is explicit, missing-aware and future-aware',()=>{
+  const now=Date.parse('2026-09-27T21:00:00Z');
+  const known=sourceTimestampAge('2026-09-27T20:00:00Z',now);
+  assert.equal(known.known,true);
+  assert.equal(known.future,false);
+  assert.equal(known.ageMs,60*60*1000);
+  const missing=sourceTimestampAge(null,now);
+  assert.deepEqual(missing,{known:false,future:false,timestampMs:null,ageMs:null});
+  const future=sourceTimestampAge('2026-09-27T21:02:00Z',now);
+  assert.equal(future.known,true);
+  assert.equal(future.future,true);
+});
+
+test('Pionex equity snapshot never borrows generic privateUpdatedAt as its own timestamp',()=>{
+  const direct=pionexEquitySnapshot({privateUpdatedAt:'2026-09-27T21:00:00Z',portfolio:{pionexEquityUsd:1234,pionexEquitySource:'PORTFOLIO_EQUITY'}});
+  assert.equal(direct.found,true);
+  assert.equal(direct.updatedAt,null);
+  const venue=pionexEquitySnapshot({privateUpdatedAt:'2026-09-27T21:00:00Z',portfolio:{manualVenueBalances:[{venue:'Pionex',valueUsd:1234,updatedAt:'2026-09-20T00:00:00Z'}]}});
+  assert.equal(venue.updatedAt,'2026-09-20T00:00:00Z');
 });
