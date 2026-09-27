@@ -24,7 +24,7 @@ test('r21 LAB is not force-rebuilt by background data refresh',()=>{
 });
 
 test('r21 force refresh preserves manual Fib input before MARKET rerender',()=>{
-  const block=v10.slice(v10.indexOf('function renderMarket(force=false)'),v10.indexOf('function btcRegimeLabel'));
+  const block=v10.slice(v10.indexOf('function renderMarket(force=false)'),v10.indexOf('function scannerCard'));
   assert.match(block,/if\(force&&fibUi\.mode==='MANUAL'\)/);
   assert.match(block,/fibUi\.manualLow=lo/);
   assert.match(block,/fibUi\.manualHigh=hi/);
@@ -50,10 +50,10 @@ test('r21 stale SCANNER diagnostics are visible but actions and ranking are bloc
 });
 
 test('r21 market coverage separates stale and missing technical feeds',()=>{
-  assert.match(v10,/mh\.staleAssets\+' stale · '\+mh\.missingAssets\+' missing'/);
-  assert.match(v10,/stale=all\.filter\(x=>!!s\?\.assetIntel\?\.\[x\]&&!intelFresh/);
-  assert.match(v10,/missing=all\.filter\(x=>!s\?\.assetIntel\?\.\[x\]\)/);
-  assert.match(v10,/stale\.length\+' \/ '\+missing\.length/);
+  assert.ok(v10.includes("mh.staleAssets+' stale · '+mh.missingAssets+' missing"));
+  assert.ok(v10.includes("stale=all.filter(x=>!!s?.assetIntel?.[x]&&!intelFresh(s.assetIntel[x]))"));
+  assert.ok(v10.includes("missing=all.filter(x=>!s?.assetIntel?.[x])"));
+  assert.ok(v10.includes("stale.length+' / '+missing.length"));
 });
 
 test('r21 release identity is canonical and browser adapter parses',()=>{
