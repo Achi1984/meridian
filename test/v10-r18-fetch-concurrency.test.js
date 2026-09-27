@@ -51,7 +51,8 @@ test('r18 gateway kills stalled internal proxy requests',()=>{
 test('r18 gateway reports read-auth source without exposing token material',()=>{
   assert.match(gateway,/READ_AUTH_SOURCE/);
   assert.match(gateway,/privateReadAuthSource:READ_AUTH_SOURCE/);
-  assert.match(gateway,/LEGACY_FALLBACK/);
+  assert.doesNotMatch(gateway,/LEGACY_FALLBACK/);
+  assert.match(gateway,/MISSING_ENV/);
   assert.match(gateway,/INVALID_ENV/);
   assert.match(smoke,/privateReadAuthSource:String\(health\.privateReadAuthSource\|\|'UNKNOWN'\)/);
 });
