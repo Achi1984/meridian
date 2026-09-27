@@ -226,7 +226,7 @@ function fibResultHtml(model){
   '<div class="fib-next"><div><span>NEXT ↑</span><b>'+(next.above?next.above.label+' · '+fibFmt(next.above.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.above,current))+'</small></div><div><span>NEXT ↓</span><b>'+(next.below?next.below.label+' · '+fibFmt(next.below.price):'—')+'</b><small>'+fibPct(fibDistancePct(next.below,current))+'</small></div></div>'+
   '<div class="fib-meta"><span>'+direction+' SWING</span><span>'+source+(bars?' · '+bars+' Bars':'')+'</span></div>'+
   '<div class="fib-ladder">'+levels.map(x=>fibLevelRow(x,next,current,levels)).join('')+'<div class="fib-current" style="top:'+currentTop.toFixed(2)+'%"><span>CURRENT · '+symbol+'</span><i></i><b>'+fibFmt(current)+'</b></div></div>'+
-  '<div class="fib-legend"><span>Retracement: 0 · .236 · .382 · .500 · .618 · .786 · 1</span><span>Extension: 1.272 · 1.618</span></div>';
+  '<div class="fib-legend"><span>Retracement: 0 · .236 · .382 · .500 · .618 · .786 · 1</span><span>Extension: 1.272 · 1.414 · 1.618</span></div>';
 }
 async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
