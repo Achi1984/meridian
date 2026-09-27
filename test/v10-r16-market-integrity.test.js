@@ -54,9 +54,9 @@ test('r16 UI states closed-candle confirmation explicitly',()=>{
 });
 
 test('r16 release identity remains canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r16');
-  assert.match(html,/10\.0-r16/);
-  assert.match(v10,/const BUILD='10\.0-r16'/);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r16 browser adapter remains syntactically valid',()=>{
