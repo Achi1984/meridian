@@ -43,9 +43,22 @@ must(authority.includes('MERIDIAN_RELEASE_BUILD'),'release authority global buil
 
 // Production root may be either the retained compatibility bootstrap or the deliberate clean-shell cutover.
 const index=read('index.html');
+const v10Cutover=/var target='\.\/v10\/(?:\?build=r\d+)?'/.test(index)&&/10\.0-r\d+-production/.test(index);
 const v9Cutover=/var target='\.\/v9\/(?:\?build=r\d+)?'/.test(index)&&/9\.0-r\d+-production/.test(index);
 const cleanCutover=index.includes("var target='./v8-clean/'")&&index.includes('8.0-clean-r8-production');
-if(v9Cutover){
+if(v10Cutover){
+  must(index.includes('location.replace(target+q+h)'),'v10 root redirect must preserve query/hash');
+  must(!index.includes('app-v6.06.js'),'v10 root must not initialize compatibility loader');
+  const v10=read('v10/index.html');
+  for(const key of ['command','bots','market','research','more']){
+    must(v10.includes(`id="view-${key}"`),`v10 production target missing view-${key}`);
+  }
+  for(const label of ['COMMAND','BOTS','MARKET','SCANNER','LAB']){
+    must(v10.includes('>'+label+'<'),`v10 production target missing nav label ${label}`);
+  }
+  must(v10.includes('../v9/v9.js?v=10.0-r2'),'v10 must load validated v9 engine');
+  must(v10.includes('./v10.js?v=10.0-r2'),'v10 presentation adapter missing');
+}else if(v9Cutover){
   must(index.includes('location.replace(target+q+h)'),'v9 root redirect must preserve query/hash');
   must(!index.includes('app-v6.06.js'),'v9 root must not initialize compatibility loader');
   const v9=read('v9/index.html');
@@ -146,4 +159,4 @@ must(!/caches\.open\s*\(/.test(sw),'service worker must not create an applicatio
 const server=read('server.js');
 must(server.includes('if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");'),'paper-only invariant missing');
 
-console.log('MERIDIAN release check OK',v,build,v9Cutover?'entry=v9':cleanCutover?'entry=v8-clean':'entry=compatibility');
+console.log('MERIDIAN release check OK',v,build,v10Cutover?'entry=v10':v9Cutover?'entry=v9':cleanCutover?'entry=v8-clean':'entry=compatibility');
