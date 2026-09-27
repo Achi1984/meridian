@@ -143,3 +143,31 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .fib-anchor-row{grid-template-columns:1fr 1fr}.fib-anchor-row>div:last-child{grid-column:1/-1}
   .fib-level,.fib-current{grid-template-columns:46px 1fr auto;gap:5px}.fib-ladder{height:340px}
 }
+
+
+/* v10 r6 · SK trend-reversal zones */
+.sk-zone-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:8px 0}
+.sk-zone-grid>div{background:#070c12;border:1px solid #172b3d;border-radius:10px;padding:7px}
+.sk-zone-grid span{display:block;font-size:7px;letter-spacing:.05em;color:var(--muted)}
+.sk-zone-grid b{display:block;margin-top:2px;font-size:10px}
+.sk-zone-grid small{display:block;margin-top:2px;font-size:7px;color:var(--muted)}
+.sk-long{border-color:#1f5546!important}.sk-long b{color:#48d5a1}
+.sk-short{border-color:#5c2d35!important}.sk-short b{color:#ff6b72}
+.sk-target{border-color:#244c69!important}.sk-target b{color:var(--cyan)}
+.sk-double.active{border-color:#80602a!important;background:#171207!important}.sk-double.active b{color:var(--amber)}
+.fib-zone{position:absolute;left:2px;right:2px;z-index:1;border-radius:8px;pointer-events:none}
+.fib-zone span{position:absolute;right:7px;top:4px;font-size:7px;font-weight:900;letter-spacing:.05em;opacity:.82}
+.fib-zone-long{background:rgba(72,213,161,.08);border:1px solid rgba(72,213,161,.24)}.fib-zone-long span{color:#48d5a1}
+.fib-zone-short{background:rgba(255,107,114,.07);border:1px solid rgba(255,107,114,.22)}.fib-zone-short span{color:#ff6b72}
+.fib-zone-target{background:rgba(77,171,247,.06);border:1px dashed rgba(77,171,247,.26)}.fib-zone-target span{color:var(--cyan)}
+.fib-zone-double{background:rgba(255,184,67,.16);border:1px solid rgba(255,184,67,.55);box-shadow:0 0 16px rgba(255,184,67,.10)}.fib-zone-double span{color:var(--amber)}
+.fib-sk-correction span:after{content:" · SK";font-size:6px;color:var(--muted)}
+.fib-sk-target span:after{content:" · SK";font-size:6px;color:var(--muted)}
+.sk-sequence-note{display:grid;gap:3px;margin-top:8px;padding:8px 9px;border:1px dashed #2c4053;border-radius:10px;background:#070c12}.sk-sequence-note b{font-size:8px;color:var(--cyan);letter-spacing:.07em}.sk-sequence-note span{font-size:9px;color:var(--text)}.sk-sequence-note small{font-size:7px;color:var(--muted);line-height:1.4}
+@media(max-width:600px){
+  .sk-zone-grid{grid-template-columns:1fr 1fr}
+  .fib-zone span{font-size:6px}
+}
+@media(max-width:390px){
+  .sk-zone-grid{grid-template-columns:1fr}
+}
