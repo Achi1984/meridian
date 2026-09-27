@@ -60,7 +60,7 @@ test('r12 removes superseded legacy Pionex hedge/manual snapshot arrays',()=>{
 
 test('r12 shows Asset Watch only as guarded reference when private bot feed is stale/off',()=>{
   assert.match(js,/ASSET WATCH SNAPSHOT/);
-  assert.match(js,/34 PIONEX BOTS|refs\.length\+' PIONEX BOTS'/);
+  assert.ok(js.includes("refs.length+' PIONEX BOTS"));
   assert.match(js,/Autoritativer letzter Screenshot-Stand/);
   assert.match(js,/Nur Referenz, solange BOT API nicht frisch ist/);
   assert.match(js,/Live-Aktionskarten bleiben gesperrt/);
