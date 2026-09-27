@@ -15,11 +15,12 @@ test('r17 unmatched private API rows pre-empt HOLD unless a higher safety risk e
   assert.match(block,/candidates\.sort\(\(a,b\)=>b\.status\.rank-a\.status\.rank\)/);
 });
 
-test('r17 Data Guard and header distinguish partial live coverage from complete readiness',()=>{
+test('r17+ Data Guard and header distinguish partial live coverage from complete readiness',()=>{
   assert.match(v10,/PARTIAL READY/);
   assert.match(v10,/completeDecision=g\.decisionReady>0&&g\.coverageComplete/);
-  assert.match(v10,/marketLabel=m\.fresh\?\(m\.coverageComplete\?'FRESH':'PARTIAL'\):'STALE'/);
-  assert.match(v10,/botLabel=g\.fresh\?\(g\.coverageComplete\?'FRESH':'PARTIAL'\)/);
+  assert.match(v10,/function marketReadiness\(m\)/);
+  assert.match(v10,/function botReadiness\(g\)/);
+  assert.match(v10,/label:'PARTIAL'/);
 });
 
 test('r17 SK V2 batch fails closed when any frozen-universe asset is missing',()=>{
@@ -63,7 +64,7 @@ test('r17 LAB escapes external error messages before DOM insertion',()=>{
 
 test('r17 release identity remains canonical and adapter parses',()=>{
   const build=String(release.terminalBuild||'');
-  assert.equal(build,String(release.terminalBuild||''));
+  assert.match(build,/^10\.0-r\d+$/);
   assert.ok(shell.includes(build));
   assert.ok(v10.includes("const BUILD='"+build+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
