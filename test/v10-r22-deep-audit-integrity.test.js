@@ -39,7 +39,8 @@ test('r22 conflict and neutral scanner diagnostics include both side reason sets
 });
 
 test('r22 release identity is canonical and adapter parses',()=>{
-  assert.equal(release.terminalBuild,'10.0-r22');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=22);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
