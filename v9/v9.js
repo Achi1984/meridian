@@ -108,7 +108,7 @@ const FETCH_TIMEOUT_MS=10000;
 async function fetchTimed(url,options={},timeoutMs=FETCH_TIMEOUT_MS){
  const c=new AbortController(),t=setTimeout(()=>c.abort(),Math.max(1000,Number(timeoutMs)||FETCH_TIMEOUT_MS));
  try{return await fetch(url,{...options,signal:c.signal})}
- catch(e){if(e?.name==='AbortError')throw new Error('FETCH_TIMEOUT '+new URL(url,location.href).hostname);throw e}
+ catch(e){if(e?.name==='AbortError'){let host='REMOTE';try{host=new URL(url,typeof location!=='undefined'?location.href:'http://localhost').hostname}catch{}throw new Error('FETCH_TIMEOUT '+host)}throw e}
  finally{clearTimeout(t)}
 }
 async function getJson(path){const r=await fetchTimed(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
@@ -502,4 +502,9 @@ window.MERIDIAN_V10_BRIDGE={
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+function refreshNow(){void sync();void syncIntel().then(changed=>{if(changed)notifyData()})}
+go('command');Promise.all([sync(),syncIntel()]).then(()=>notifyData());
+setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNow()});
+window.addEventListener('online',refreshNow);
