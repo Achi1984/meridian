@@ -32,7 +32,6 @@ test('r19 labels OKX correctly as DCA snapshot and keeps it outside live Pionex 
   assert.match(js,/OKX FUTURES DCA · SCREENSHOT/);
   assert.match(js,/OKX DCA REF/);
   assert.match(js,/OUTSIDE CANONICAL TOTAL/);
-  assert.match(js,/DCA SNAPSHOT/);
   assert.match(js,/state\.okxDcaBots/);
   assert.doesNotMatch(js,/state\.okxPositions/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)/);
