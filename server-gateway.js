@@ -255,6 +255,10 @@ const server=http.createServer(async(req,res)=>{
         pionexWalletBotDetailCandidateCount:Number(account?.walletBotProbe?.candidateCount)||0,
         pionexWalletBotDetailSuccessCount:Number(account?.walletBotProbe?.successCount)||0,
         pionexWalletBotDetailFailureCount:Number(account?.walletBotProbe?.failureCount)||0,
+        pionexWalletRiskRows:Number(account?.walletBotRisk?.botCount)||0,
+        pionexWalletRiskSupportedRows:Number(account?.walletBotRisk?.supportedRows)||0,
+        pionexWalletRiskDetailsComplete:account?.walletBotRisk?.detailsComplete===true,
+        pionexWalletRiskRejectedCount:Number(account?.walletBotRisk?.rejectedCount)||0,
         pionexWalletSuccessBuOrderTypeCounts:account?.walletBotProbe?.successBuOrderTypeCounts||{},
         pionexWalletSuccessCateTypeCounts:account?.walletBotProbe?.successCateTypeCounts||{},
         pionexWalletBotCategories:Array.isArray(account?.wallet?.botCategories)?account.wallet.botCategories.slice(0,12).map(x=>({
