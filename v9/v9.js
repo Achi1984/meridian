@@ -607,6 +607,13 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
+  refreshCurrentView:()=>{
+    const v=current,host=$('#view-'+v),fn=render[v];
+    if(!host||typeof fn!=='function')return false;
+    host.innerHTML=fn();
+    if(v==='research')bindResearch();
+    return true;
+  },
   helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,pnlIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
