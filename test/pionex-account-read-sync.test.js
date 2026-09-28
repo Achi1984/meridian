@@ -128,6 +128,13 @@ test('wallet bot risk promotes only fully hydrated futures_grid rows',()=>{
   assert.equal(risk.bots[0].side,'LONG');
   assert.equal(risk.bots[0].leverage,5);
   assert.equal(risk.bots[0].source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.deepEqual(risk.statusCounts,{running:1});
+  assert.deepEqual(risk.trendCounts,{long:1});
+  assert.deepEqual(risk.rejectReasonCounts,{});
+  assert.equal(risk.detailBasePresentCount,1);
+  assert.equal(risk.missingBaseCount,0);
+  assert.ok(risk.detailEnvelopeFields.includes('buOrderData'));
+  assert.ok(risk.detailBotDataFields.includes('trend'));
 });
 
 test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{
@@ -140,6 +147,10 @@ test('wallet bot risk fails closed when any supported detail cannot normalize',(
   assert.equal(risk.botCount,0);
   assert.equal(risk.detailsComplete,false);
   assert.equal(risk.rejectedCount,1);
+  assert.deepEqual(risk.rejectReasonCounts,{missing_base:1});
+  assert.deepEqual(risk.statusCounts,{running:1});
+  assert.deepEqual(risk.trendCounts,{unknown:1});
+  assert.equal(risk.missingBaseCount,1);
 });
 
 test('wallet overview keeps structural bot-account metadata without inventing entry values',()=>{
