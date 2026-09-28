@@ -437,3 +437,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Ordering rule:** DATA_STALE / MARKET_STALE / UNVERIFIED still fail closed first; LIQ_RISK and PROTECTION_RISK preserve safety priority; the coverage guard then blocks RISK_REVIEW, PROFIT_LOCK, WATCH_PROFIT and HOLD when coverage is incomplete.
 
 **Isolation:** Pair-status formulas, signal ranks, liquidation thresholds, stop-loss checks, Profit Lock thresholds/percentages, hedge threshold, Paper-bot parameters, leverage and execution are unchanged. r37 changes only eligibility/precedence of the global displayed recommendation.
+
+
+## D-043 — OKX DCA reference equity requires a complete snapshot
+
+**Decision:** OKX Futures DCA remains a reference-only snapshot outside the canonical portfolio total. Its displayed equity may be shown as an exact value only when every snapshot row has both an explicit USD investment and an explicit USD total PnL.
+
+**Null-integrity rule:** Missing investment or missing totalPnlUsd makes the OKX DCA reference equity incomplete. Missing values must not be coerced to zero. Explicit zero PnL remains valid data.
+
+**Fallback rule:** The stale manual OKX fallback must not replace an incomplete DCA snapshot with a numeric zero or another unrelated value. Incomplete reference equity is shown as unavailable and labelled REFERENCE PARTIAL.
+
+**Canonical isolation:** OKX DCA remains outside CANONICAL TOTAL, which stays Spot + Pionex.
+
+**Continuity:** r37 global NEXT ACTION coverage behavior remains unchanged.
+
+**Trading isolation:** No bot matching, Decision Ready, Profit Lock, hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation behavior changes.
