@@ -40,7 +40,7 @@ test('r25+ legacy OKX DCA snapshot remains reference-only outside the canonical 
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
   assert.match(command,/OKX DCA (?:REF|OLD REF)/);
   assert.match(command,/(?:OUTSIDE CANONICAL TOTAL|NICHT IM TOTAL)/);
-  assert.match(command,/CANONICAL TOTAL · (?:SPOT|EXTERNAL) \+ PIONEX/);
+  assert.match(command,/CANONICAL TOTAL · (?:SPOT|EXTERNAL|LEDGER AUTO \+ OKX) \+ PIONEX/);
 });
 
 test('r25 release identity is canonical and adapters parse',()=>{
