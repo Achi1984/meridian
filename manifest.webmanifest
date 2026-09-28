@@ -2,9 +2,9 @@
   "name": "ACHI MERIDIAN v10",
   "short_name": "MERIDIAN",
   "start_url": "./v10/?build=r62&fresh=r62",
+  "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#03070c",
-  "theme_color": "#05080d",
-  "scope": "./",
-  "id": "./"
+  "theme_color": "#05080d"
 }
