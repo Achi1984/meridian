@@ -236,3 +236,8 @@ r51 trims surrounding whitespace before the existing type/status/trend allowlist
 r51 live sync still returned RISK NORMALIZED 0/32 after the enum-whitespace fix. The remaining production normalizer gates are now measured directly through a shared inspector to prevent diagnostic drift.
 
 r52 reports aggregate TYPE PASS, STATUS PASS, SYMBOL PASS, SIDE PASS and ALL PASS counts for the 32 supported Wallet futures_grid details. It also reports coarse BASE/QUOTE asset classes without revealing actual symbols or values. No guard is relaxed in this release.
+## v10 r53 inverse Coin-M symbol resolution
+
+r52 live evidence isolated the final normalization blocker: TYPE 32/32, STATUS 32/32, SIDE 32/32, SYMBOL 0/32, with BASE stable_quote 32 and QUOTE asset 32.
+
+r53 keeps ordinary symbol resolution on `base`, but for explicit inverse/Coin-M rows only, when base is stable/quote-side and quote is an asset, it resolves the bot asset from `quote`. This addresses Pionex's inverse pair orientation without broadening other bot types.

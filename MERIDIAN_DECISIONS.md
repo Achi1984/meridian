@@ -601,3 +601,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Privacy:** Public diagnostics expose only aggregate pass counts and coarse asset classes (asset, stable_quote, missing, unresolved). They do not expose bot IDs, symbols, balances, prices, investments or PnL.
 
 **Safety:** r52 is diagnostic-only. It does not change any accepted bot type/status/direction, source-selection rule, matching rule, Safety Ready, Decision Ready, Profit Lock, hedge threshold, PaperBot or execution behavior.
+## D-059 — Resolve inverse Coin-M symbols from quote when base is the stable side
+
+**Decision:** For Pionex futures-grid details that are explicitly marked `inverse`, MERIDIAN resolves the asset symbol from `quote` only when `base` classifies as a stable/quote currency and `quote` classifies as an asset.
+
+**Reason:** r52 live diagnostics showed all 32 supported Wallet futures-grid rows passed type, status and side checks, while symbol resolution failed 32/32. The same rows classified as BASE=stable_quote 32 and QUOTE=asset 32.
+
+**Safety:** The fallback is restricted to explicit inverse semantics. Normal/non-inverse futures-grid rows continue to resolve symbols from `base`. No matching threshold, Safety Ready, Decision Ready, Profit Lock, hedge, PaperBot or execution rule changes.

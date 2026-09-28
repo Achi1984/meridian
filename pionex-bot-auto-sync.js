@@ -43,15 +43,26 @@ function assetClass(v){
   if(/^(USDT|USDC|USD)(\.PERP)?$/.test(raw))return 'stable_quote';
   return baseSymbol(raw)?'asset':'unresolved';
 }
+function inverseCoinM(order){
+  const d=order?.buOrderData||{};
+  return [d?.cateType,d?.gridType,order?.cateType].some(v=>String(v||'').trim().toLowerCase()==='inverse');
+}
+function resolvedSymbol(order){
+  const baseClass=assetClass(order?.base),quoteClass=assetClass(order?.quote);
+  if(baseClass==='asset')return{symbol:baseSymbol(order?.base),source:'base',baseClass,quoteClass};
+  if(inverseCoinM(order)&&baseClass==='stable_quote'&&quoteClass==='asset')return{symbol:baseSymbol(order?.quote),source:'quote_inverse',baseClass,quoteClass};
+  return{symbol:'',source:'none',baseClass,quoteClass};
+}
 export function inspectPionexBotOrder(order){
-  const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),side=direction(d?.trend),symbol=baseSymbol(order?.base);
+  const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),side=direction(d?.trend),resolved=resolvedSymbol(order);
   return {
     typePass:!!order&&ACTIVE_TYPES.has(type),
     statusPass:ACTIVE_STATUSES.has(status),
-    symbolPass:!!symbol,
+    symbolPass:!!resolved.symbol,
     sidePass:['LONG','SHORT','NEUTRAL'].includes(side),
-    baseClass:assetClass(order?.base),
-    quoteClass:assetClass(order?.quote),
+    baseClass:resolved.baseClass,
+    quoteClass:resolved.quoteClass,
+    symbolSource:resolved.source,
     status,
     side
   };
@@ -91,7 +102,7 @@ function optionalPnlPct(d){
 export function normalizePionexBotOrder(order){
   const check=inspectPionexBotOrder(order);
   if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
-  const d=order.buOrderData||{},side=check.side,symbol=baseSymbol(order.base);
+  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol;
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),

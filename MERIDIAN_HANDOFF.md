@@ -591,3 +591,10 @@ Durable mitigation:
 - After interruption, repo state is authoritative and no write is replayed before preflight.
 
 This is infrastructure/process-only. Terminal build, trading logic, PaperBots and execution behavior are unchanged.
+## v10 r53 — inverse Coin-M symbol resolution
+
+- Live r52 diagnostics: TYPE 32/32, STATUS 32/32, SIDE 32/32, SYMBOL 0/32; BASE stable_quote 32; QUOTE asset 32.
+- Adds a strict inverse-only symbol fallback: stable base + asset quote -> symbol from quote.
+- Normal/non-inverse bots still resolve symbol from base.
+- Existing live-bot completeness, freshness, reference matching and action guards remain unchanged.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
