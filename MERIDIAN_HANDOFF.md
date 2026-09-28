@@ -440,3 +440,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - A post-main workflow closes stale open release PRs automatically.
 - Superseded PR #204 was closed rather than reusing the already-consumed r37 release number.
 - No trading/Paper/risk/leverage/execution logic is part of this process hardening.
+
+
+## v10 r39 — OKX DCA reference equity provenance
+
+- Continues the deep audit after runtime-verified r38 and the single-writer release coordinator hardening.
+- Adds a complete/partial snapshot contract for OKX Futures DCA reference equity.
+- Exact OKX DCA REF equity requires explicit investUsd and totalPnlUsd on every DCA row.
+- Missing fields no longer enter the reference sum as implicit zero; explicit zero PnL remains valid.
+- The stale manual OKX fallback is no longer used when the DCA snapshot is incomplete.
+- COMMAND labels OKX DCA REF as REFERENCE COMPLETE or REFERENCE PARTIAL and reports missing investment/PnL counts when partial.
+- OKX remains outside the canonical Spot + Pionex portfolio total.
+- r37 global NEXT ACTION and r38 per-asset match-completeness guards are preserved unchanged.
+- No trading rules, Profit Lock thresholds, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
