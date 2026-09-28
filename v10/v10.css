@@ -536,3 +536,18 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .v10-bot-diagnostics>summary{flex-direction:column}
   .v10-bot-diagnostics>summary small{max-width:none;text-align:left}
 }
+
+
+/* v10 r68 · Paper Bot Profit Special Agent */
+.profit-agent-shell{margin:10px 0 0;padding:10px;border:1px solid #315a78;border-radius:16px;background:linear-gradient(145deg,rgba(7,18,29,.99),rgba(5,10,16,.99))}
+.profit-agent-decision{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;margin:9px 0;padding:9px;border:1px solid #1e3b52;border-radius:11px;background:#07101a}
+.profit-agent-decision span{font-size:7px;color:var(--cyan);letter-spacing:.08em;font-weight:900}.profit-agent-decision b{font-size:11px}.profit-agent-decision small{grid-column:1/-1;font-size:7px;color:var(--muted);line-height:1.35}
+.profit-agent-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.profit-agent-candidate{border:1px solid #1a2c3e;border-radius:11px;background:#060b11;padding:8px}
+.profit-agent-candidate.pass{border-color:#1f5a4a;background:#07120f}.profit-agent-candidate.fail{border-color:#4d3d23}
+.profit-agent-candidate-head{display:flex;align-items:flex-start;justify-content:space-between;gap:7px}.profit-agent-candidate-head>div{display:flex;flex-direction:column;gap:2px}.profit-agent-candidate-head span{font-size:7px;color:var(--cyan);font-weight:900;letter-spacing:.05em}.profit-agent-candidate-head b{font-size:9px}.profit-agent-candidate-head strong{font-size:7px;border:1px solid currentColor;border-radius:999px;padding:4px 6px}
+.profit-agent-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin:7px 0}.profit-agent-metrics>div{background:#05090e;border:1px solid #142538;border-radius:8px;padding:6px}.profit-agent-metrics span{display:block;font-size:6px;color:var(--muted)}.profit-agent-metrics b{display:block;margin-top:2px;font-size:9px}
+.profit-agent-candidate>small,.profit-agent-note{display:block;font-size:7px;color:var(--muted);line-height:1.4}.profit-agent-note{margin-top:7px}
+.profit-agent-module>summary span{color:#76c7ff}
+@media(max-width:760px){.profit-agent-grid{grid-template-columns:1fr}.lab-overview{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:390px){.profit-agent-metrics{grid-template-columns:repeat(2,1fr)}}

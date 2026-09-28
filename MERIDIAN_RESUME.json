@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "project": "MERIDIAN",
+  "build": "10.0-r68",
+  "branch": "v10-r68",
+  "issue": 243,
+  "phase": "R68_RELEASE_CI",
+  "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
+  "r67Merged": true,
+  "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
+  "completed": [
+    "r67 collapsible asset cards merged",
+    "r67 release and portfolio CI green",
+    "profit special-agent protocol frozen",
+    "profit candidate engine added",
+    "profit lab UI added",
+    "r68 cache/build routing updated"
+  ],
+  "nextAction": "Open v10-r68 PR, run CI, fix only verified failures, then merge. After merge run Profit Batch in LAB and freeze the first real discovery result before any parameter change.",
+  "executionImpact": false
+}
