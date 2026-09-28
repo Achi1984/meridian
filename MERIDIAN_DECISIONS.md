@@ -553,3 +553,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Forbidden inference:** An account position must not be assigned to a specific Grid Bot unless an independently verified bot identifier/match exists. Account positions therefore cannot unlock bot-specific Grid/TP/Profit-Lock decisions.
 
 **Safety:** Bot decision readiness remains bound to the existing Bot API matching/freshness guards. The account position layer is informational/risk visibility only. No trading/Paper/execution behavior changes.
+## D-053 — Discover Pionex Bot Account through full-wallet read before bot mapping
+
+**Decision:** MERIDIAN adds the read-only `GET /api/v1/wallet/balancesFull` endpoint to discover Bot Account categories and entry structure before attempting any further bot mapping.
+
+**Reason:** Live r46 proved the Futures Trader Account exposes only one XRP position while the user's Asset Watch reference contains many active Pionex bots. Pionex's Wallet API explicitly separates Bot Account and Trader Account, so the Bot Account is the next authoritative read surface.
+
+**Safety:** The Wallet call is fail-soft and cannot invalidate the existing Futures position snapshot. Diagnostics expose only category types/counts and returned field names. No list entry values are made public and no category unlocks bot actions without an independently verified mapping.
