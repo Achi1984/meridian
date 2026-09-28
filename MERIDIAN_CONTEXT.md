@@ -251,3 +251,10 @@ r54 preserves Wallet `cateType` in the summary and through mergePionexOrderDetai
 r54 completed the read-only Pionex ingestion path: Wallet detail is the active Bot source and 32/32 supported futures-grid rows normalize successfully. Live matching remains 0/32 against the 27.09 Asset-Watch reference snapshot.
 
 r55 instruments the existing conservative matcher without changing it. The Data Guard shows ASSET PASS, SIDE PASS, LEVERAGE PASS, STRUCTURE PASS, STRONG CANDIDATE and ACCEPTED counts, together with live/reference side distributions and aggregate live field availability.
+## v10 r56 Economic-side diagnostics
+
+r55 live evidence: ASSET 32/32, SIDE 24/32, LEVERAGE 10/32, STRUCTURE 2/32, STRONG 0, ACCEPTED 0. Live declared trend distribution is SHORT 27 / LONG 5, while the 27.09 reference snapshot is SHORT 10 / LONG 24. All 32 live rows contain leverage, lower, upper, BE, LIQ and TP fields.
+
+Official Pionex Bot API documentation defines `trend` as grid direction (long/short/no_trend), so r56 does not invert it. Instead r56 adds a diagnostic economic-side classifier from BE/LIQ geometry and compares declared trend vs economic side, plus asset-only leverage/structure matching that ignores declared side.
+
+No production matching or trading decision is changed.

@@ -612,3 +612,11 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Adds aggregate LIVE vs REFERENCE side distributions and field availability for leverage/lower/upper/BE/LIQ/TP.
 - No bot IDs or private numeric position values are exposed by the new diagnostic.
 - No matcher threshold, ambiguity rule, trading, PaperBot, Profit Lock, hedge or execution change.
+## v10 r56 — economic-side diagnostics
+
+- Input evidence from r55: ASSET 32/32; SIDE 24/32; LEVERAGE 10/32; STRUCTURE 2/32; STRONG 0; ACCEPTED 0.
+- Live declared side distribution: SHORT 27 / LONG 5.
+- Reference distribution: SHORT 10 / LONG 24.
+- Live matching fields present on all 32 rows: leverage/lower/upper/BE/LIQ/TP.
+- Adds aggregate ECON side from liquidation geometry, TREND↔ECON agreement/opposition, asset-only leverage/structure pass and ECON-side-to-reference pass counts.
+- Diagnostic only: no side remap, threshold change, action unlock, PaperBot change or execution change.
