@@ -651,3 +651,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Implication:** Economic side remains derived for explicit inverse/Coin-M rows from direct positionOpenPrice vs liquidationPrice when clear. Complete fresh Wallet-detail rows with unique bot IDs remain the current identity source. Older Asset-Watch screenshots and newer spot-check screenshots are historical/validation evidence only and cannot justify global assumptions such as "all current bots are LONG" or "there are no SHORT bots."
 
 **Safety:** This changes documentation and validation evidence only. No trading, transfer, PaperBot, Profit Lock, hedge threshold, leverage, matcher threshold or execution behavior changes.
+
+
+## D-065 — Normalize quote-inverse Coin-M prices before side or risk interpretation
+
+**Decision:** When a Pionex futures-grid row is explicitly inverse and resolves its asset from `quote` because `base` is a stable quote currency, MERIDIAN treats positive API price fields as reciprocal pair prices and converts them to asset/USD with `1 / raw` before using them for display, matching, liquidation geometry or action-readiness inputs.
+
+**Scope:** The conversion is restricted to rows whose production symbol resolver reports `quote_inverse`. Normal asset-base rows remain unchanged.
+
+**Direction:** The original Pionex `trend` remains available as `declaredSide`, but quote-inverse LONG/SHORT is translated into the asset perspective as `assetDeclaredSide`. When normalized entry and liquidation are both available and clearly separated, economic liquidation geometry remains authoritative for the normalized side.
+
+**Liquidation safety:** Estimated liquidation candidates are converted first and accepted only if they fall on the correct side of normalized entry for the resolved asset direction. Ambiguous candidates remain unavailable rather than being guessed.
+
+**Evidence:** r57 live UI showed BTC reciprocal values such as BE 0.000011999 and TP 0.000010526 against a market price near 83,530 USD, and reported an implausible BTC 0 LONG / 5 SHORT distribution. The current SUI screenshots provide simultaneous LONG and SHORT control samples with conventional asset prices.
+
+**Safety:** This is a data-normalization correction. No execution permission, trading logic, PaperBot strategy, leverage, Profit Lock, hedge threshold, matcher acceptance threshold or fail-closed decision gate is loosened.
