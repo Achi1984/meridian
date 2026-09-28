@@ -13,7 +13,8 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 test('r62 root and PWA launch use a cache-distinct current terminal URL',()=>{
   assert.equal(release.terminalBuild,'10.0-r62');
   assert.match(root,/meridian-build" content="10\.0-r62-production"/);
-  assert.match(root,/p\.set\('build','r62'\)/);
+  assert.match(root,/var target='\.\/v10\/\?build=r62'/);
+  assert.match(root,/p\.delete\('build'\)/);
   assert.match(root,/p\.set\('fresh','r62'\)/);
   assert.equal(manifest.start_url,'./v10/?build=r62&fresh=r62');
   assert.equal(manifest.scope,'./');
