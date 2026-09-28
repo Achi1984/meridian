@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import pg from 'pg';
+import {PIONEX_FUTURES_GRID_DETAIL_PATH,hydratePionexBotSummaries} from './pionex-bot-detail-read.js';
 
 const { Pool }=pg;
 const API_BASE='https://api.pionex.com';
@@ -131,6 +132,14 @@ export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,no
   return {orders:results,pages,truncated:!!pageToken};
 }
 
+export async function fetchFuturesGridOrderDetail({buOrderId,apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
+  const id=String(buOrderId||'').trim();
+  if(!id)throw new Error('pionex_bot_detail_missing_id');
+  const j=await pionexGet(PIONEX_FUTURES_GRID_DETAIL_PATH,{buOrderId:id},{apiKey,apiSecret,fetchImpl,now});
+  if(!j?.data||typeof j.data!=='object')throw new Error('pionex_bot_detail_invalid');
+  return j.data;
+}
+
 export function buildPionexRiskSnapshot(orders,iso=new Date().toISOString()){
   const bots=(orders||[]).map(normalizePionexBotOrder).filter(Boolean);
   return {
@@ -200,7 +209,18 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
     }
     const {orders,pages,truncated}=await fetchRunningBotOrders({apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now});
     if(truncated)throw new Error('pionex_bot_pagination_truncated');
-    const risk=buildPionexRiskSnapshot(orders,at);
+    const hydrated=await hydratePionexBotSummaries(orders,{
+      loadDetail:buOrderId=>fetchFuturesGridOrderDetail({buOrderId,apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now}),
+      validateDetail:row=>normalizePionexBotOrder(row)!=null
+    });
+    const risk={
+      ...buildPionexRiskSnapshot(hydrated.orders,at),
+      apiRows:hydrated.listRows,
+      supportedRows:hydrated.supportedRows,
+      detailRows:hydrated.detailRows,
+      detailsComplete:hydrated.detailsComplete,
+      syncMode:'BOT_READING_DETAIL_HYDRATED'
+    };
     let applied=false,guarded=false;
     await updatePrivateState(env,current=>{
       const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
@@ -211,8 +231,8 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       applied=true;
       return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated:false});
     });
-    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,pages};
-    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,pages,truncated:false};
+    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages};
+    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,detailsComplete:risk.detailsComplete,pages,truncated:false};
   }catch(e){
     const msg=String(e?.message||e);
     try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
