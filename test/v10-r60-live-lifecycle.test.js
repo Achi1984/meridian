@@ -32,8 +32,9 @@ test('r60 wallet diagnostics expose total bot and trader account totals without 
   assert.match(v10,/totalInUsdt · portfolio candidate/);
 });
 
-test('r60 remains display and lifecycle only',()=>{
-  assert.equal(release.terminalBuild,'10.0-r60');
+test('r60 remains display and lifecycle only in successor releases',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=60);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
