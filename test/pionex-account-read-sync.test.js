@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {canonicalPionexQuery,signPionexReadGet,pionexReadGet} from '../pionex-read-client.js';
 import {
-  normalizeSpotBalances,normalizeFuturesBalances,normalizeFuturesPositions,
+  normalizeSpotBalances,normalizeFuturesBalances,normalizeFuturesPositions,normalizeWalletOverview,
   fetchPionexReadSnapshot,readCredentials,mergePionexAccountState
 } from '../pionex-account-read-sync.js';
 
@@ -38,6 +38,7 @@ test('read snapshot normalizes spot, futures balances and active positions witho
     if(url.includes('/api/v1/account/balances'))data={balances:[{coin:'BTC',free:'0.1',frozen:'0'}]};
     else if(url.includes('/uapi/v1/account/balances'))data={balances:[{coin:'USDT',free:'10',frozen:'2',debts:'0'}],isolates:[]};
     else if(url.includes('/uapi/v1/account/positions'))data={positions:[{positionId:'p1',symbol:'BTC_USDT_PERP',positionSide:'LONG',netSize:'0.01',avgPrice:'80000',unrealizedPnL:'12.5',markPrice:'81250',liquidationPrice:'60000',leverage:'5'}]};
+    else if(url.includes('/api/v1/wallet/balancesFull'))data={totalInUsdt:'123',botAccount:{totalInUsdt:'100',detail:[{type:'bot',title:'Bots',count:2,hasMore:false,list:[{foo:'x',bar:'y'},{foo:'z'}]}]},traderAccount:{totalInUsdt:'23',detail:[]}};
     return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data})};
   };
   const snap=await fetchPionexReadSnapshot({
@@ -51,6 +52,43 @@ test('read snapshot normalizes spot, futures balances and active positions witho
   assert.equal(snap.futuresPositions[0].side,'LONG');
   assert.equal(snap.futuresPositions[0].asset,'BTC');
   assert.equal(snap.futuresPositions[0].liquidationPrice,60000);
+  assert.equal(snap.walletStatus,'OK');
+  assert.equal(snap.wallet.botCategoryCount,1);
+  assert.equal(snap.wallet.botReportedCount,2);
+  assert.equal(snap.wallet.botListCount,2);
+  assert.deepEqual(snap.wallet.botCategories[0].entryFields,['bar','foo']);
+});
+
+
+test('wallet overview keeps structural bot-account metadata without inventing entry values',()=>{
+  const x=normalizeWalletOverview({
+    totalInUsdt:'500',
+    botAccount:{totalInUsdt:'400',detail:[
+      {type:'futures_grid',title:'Grid',count:34,hasMore:true,list:[{buOrderId:'x',symbol:'BTC',leverage:'5'}]}
+    ]},
+    traderAccount:{totalInUsdt:'100',detail:[]}
+  });
+  assert.equal(x.botCategoryCount,1);
+  assert.equal(x.botReportedCount,34);
+  assert.equal(x.botListCount,1);
+  assert.deepEqual(x.botCategories[0].entryFields,['buOrderId','leverage','symbol']);
+  assert.equal(Object.hasOwn(x.botCategories[0],'entries'),false);
+});
+
+test('wallet read fails soft without invalidating futures position snapshot',async()=>{
+  const fetchImpl=async url=>{
+    if(url.includes('/api/v1/wallet/balancesFull'))return {ok:false,status:403,text:async()=>JSON.stringify({result:false,code:'NO_PERMISSION',message:'denied'})};
+    let data={};
+    if(url.includes('/api/v1/account/balances'))data={balances:[]};
+    else if(url.includes('/uapi/v1/account/balances'))data={balances:[],isolates:[]};
+    else if(url.includes('/uapi/v1/account/positions'))data={positions:[{symbol:'XRP_USDT_PERP',positionSide:'LONG',markPrice:'1.5',liquidationPrice:'1.2'}]};
+    return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data})};
+  };
+  const snap=await fetchPionexReadSnapshot({apiKey:'k',apiSecret:'s',fetchImpl,now:()=>1700000000000});
+  assert.equal(snap.futuresPositionCount,1);
+  assert.equal(snap.walletStatus,'ERROR');
+  assert.equal(snap.wallet,null);
+  assert.ok(snap.walletError);
 });
 
 test('normalizers preserve missing values as null',()=>{
@@ -80,6 +118,7 @@ test('Pionex account runtime contains no mutation HTTP paths',()=>{
   assert.match(sync,/\/api\/v1\/account\/balances/);
   assert.match(sync,/\/uapi\/v1\/account\/balances/);
   assert.match(sync,/\/uapi\/v1\/account\/positions/);
+  assert.match(sync,/\/api\/v1\/wallet\/balancesFull/);
   assert.doesNotMatch(client,/method:'POST'|method:'DELETE'|method:'PUT'|method:'PATCH'/);
   assert.doesNotMatch(sync,/trade\/order|assets\/transfer|account\/leverage.*post|isolatedMode.*post/);
 });
