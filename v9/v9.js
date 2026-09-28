@@ -607,6 +607,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
+  goView:(v)=>{if(render[v]){go(v);return true}return false},
   refreshCurrentView:()=>{
     const v=current,host=$('#view-'+v),fn=render[v];
     if(!host||typeof fn!=='function')return false;
