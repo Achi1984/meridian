@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r34';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r34';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r35';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r35';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r34');
+    qs.set('build','r35');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -104,6 +104,11 @@ function exposureIntegrity(symbol=null){
  const scope=String(symbol||'').trim().toUpperCase(),inScope=x=>!scope||String(x?.symbol||'').trim().toUpperCase()===scope,fresh=botFeedFresh();
  const matched=fresh?state.bots.filter(b=>liveMatched(b)&&inScope(b)):[],unmatched=fresh?(state.unmatchedLive||[]).filter(inScope):[],missingCapital=matched.filter(b=>!liveInvestUsdAvailable(b)).length,unknown=unmatched.length+missingCapital;
  return{fresh,matched:matched.length,unmatched:unmatched.length,missingCapital,unknown,complete:fresh&&matched.length>0&&unmatched.length===0&&missingCapital===0}
+}
+function pnlIntegrity(symbol=null){
+ const scope=String(symbol||'').trim().toUpperCase(),inScope=x=>!scope||String(x?.symbol||'').trim().toUpperCase()===scope,fresh=botFeedFresh();
+ const matched=fresh?state.bots.filter(b=>liveMatched(b)&&inScope(b)):[],unmatched=fresh?(state.unmatchedLive||[]).filter(inScope):[],missingPnl=matched.filter(b=>!livePnlAvailable(b)).length,unknown=unmatched.length+missingPnl;
+ return{fresh,matched:matched.length,unmatched:unmatched.length,missingPnl,unknown,complete:fresh&&matched.length>0&&unmatched.length===0&&missingPnl===0}
 }
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
@@ -532,7 +537,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,pnlIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
