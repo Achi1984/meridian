@@ -516,9 +516,9 @@ function notifyData(){
  else go(current)
 }
 function selectPionexRisk(d={}){
- const primary=d?.pionexRisk||null,wallet=d?.pionexAccount?.walletBotRisk||null,primaryStatus=String(d?.pionexBotSync?.status||'UNKNOWN'),accountStatus=String(d?.pionexAccountSync?.status||'UNKNOWN');
- const primaryOk=primaryStatus==='OK'&&Array.isArray(primary?.bots)&&primary.bots.length>0&&primary?.detailsComplete===true;
- const walletOk=accountStatus==='OK'&&wallet?.detailsComplete===true&&Array.isArray(wallet?.bots)&&wallet.bots.length>0;
+ const primary=d?.pionexRisk||null,wallet=d?.pionexAccount?.walletBotRisk||null,primaryStatus=String(d?.pionexBotSync?.status||'UNKNOWN'),accountStatus=String(d?.pionexAccountSync?.status||'UNKNOWN'),freshRisk=x=>{const ts=parseTs(x?.updatedAt||x?.snapshotAt);return ts!=null&&ts<=Date.now()+5*60*1000&&Date.now()-ts<=15*60*1000};
+ const primaryOk=primaryStatus==='OK'&&freshRisk(primary)&&Array.isArray(primary?.bots)&&primary.bots.length>0&&primary?.detailsComplete===true;
+ const walletOk=accountStatus==='OK'&&freshRisk(wallet)&&wallet?.detailsComplete===true&&Array.isArray(wallet?.bots)&&wallet.bots.length>0;
  if(primaryOk)return{risk:primary,status:'BOT_API_OK',kind:'BOT_API'};
  if(walletOk)return{risk:wallet,status:'WALLET_DETAIL_OK',kind:'WALLET_DETAIL'};
  return{risk:primary,status:primaryStatus,kind:'BOT_API'};
