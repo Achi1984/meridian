@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { historySnapshot, appendPortfolioHistory, readPortfolioHistory, normalizeHistoryRows } from '../portfolio-history-store.js';
 
-function sample(){return{privateRevision:7,livePrices:{BTC:{price:100},SOL:{price:20}},portfolio:{holdings:[{symbol:'BTC',quantity:2,venue:'Ledger'},{symbol:'SOL',quantity:3,venue:'Pionex'}],pionexEquityUsd:50,cumulativeCashflowUsd:25}}}
+function sample(){return{privateRevision:7,livePrices:{BTC:{price:100},SOL:{price:20}},portfolio:{
+  holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900},{symbol:'SOL',quantity:3,venue:'Pionex'}],
+  manualVenueBalances:[{venue:'Ledger',valueUsd:200,updatedAt:900},{venue:'OKX',valueUsd:0,updatedAt:900}],
+  pionexEquityUsd:50,cumulativeCashflowUsd:25
+}}}
 
 test('history snapshot persists canonical Spot + Pionex basis',()=>{
   const s=historySnapshot(sample(),{timestamp:1000});
@@ -10,6 +14,8 @@ test('history snapshot persists canonical Spot + Pionex basis',()=>{
   assert.equal(s.tradingUsd,50);
   assert.equal(s.totalUsd,250);
   assert.equal(s.cashflowAdjustedTotalUsd,225);
+  assert.equal(s.authorityComplete,true);
+  assert.equal(s.sourceStatus.spot,'STRICT_AUTHORITY');
   assert.equal(s.sourceRevision,7);
 });
 
@@ -40,4 +46,16 @@ test('history reader returns one basis with nullable adjusted value',async()=>{
 test('row normalization preserves timestamp and components',()=>{
   const x=normalizeHistoryRows([{captured_at:'2026-09-04T20:00:00Z',spot_usd:10,trading_usd:2,total_usd:12,cashflow_adjusted_total_usd:11,cumulative_cashflow_usd:1,source_revision:3,source_status:{}}]);
   assert.equal(x[0].spotUsd,10);assert.equal(x[0].totalUsd,12);assert.equal(x[0].sourceRevision,3);
+});
+
+
+test('history capture fails closed when expected external venue authority is incomplete',async()=>{
+  const calls=[];
+  const data={portfolio:{holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900}],manualVenueBalances:[{venue:'Ledger',valueUsd:200,updatedAt:900}],pionexEquityUsd:50}};
+  const db={query:async(sql,args)=>{calls.push([sql,args]);return{rows:[]}}};
+  const out=await appendPortfolioHistory(db,data,{timestamp:2000});
+  assert.equal(out.ok,false);
+  assert.equal(out.reason,'PORTFOLIO_AUTHORITY_INCOMPLETE');
+  assert.equal(out.snapshot.authorityComplete,false);
+  assert.equal(calls.length,0);
 });
