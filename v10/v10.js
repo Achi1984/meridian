@@ -217,8 +217,9 @@ function walletDiscoveryHealth(){
 }
 function walletDiscoveryLayer(){
   const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[],probe=w.probe||{},risk=w.risk||{},h=H();
-  const walletTotal=Number(w.wallet?.totalInUsdt),botTotal=Number(w.wallet?.botAccountTotalInUsdt),traderTotal=Number(w.wallet?.traderAccountTotalInUsdt);
-  const walletMoney=v=>Number.isFinite(v)?(h.money?.(v)||('
+  const walletAmount=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+  const walletTotal=walletAmount(w.wallet?.totalInUsdt),botTotal=walletAmount(w.wallet?.botAccountTotalInUsdt),traderTotal=walletAmount(w.wallet?.traderAccountTotalInUsdt);
+  const walletMoney=v=>v==null?'—':(h.money?.(v)||String(v));
   if(w.status==='ERROR')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API ERROR</b><small>'+esc(String(w.error||'Pionex Wallet API nicht verfügbar').slice(0,160))+' · Futures POSITION API bleibt davon unabhängig.</small></section>';
   if(w.status!=='OK')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API WAIT</b><small>Wallet/Bot-Account-Read noch nicht verfügbar · Positionslayer bleibt separat.</small></section>';
   const cards=rows.map(x=>{
