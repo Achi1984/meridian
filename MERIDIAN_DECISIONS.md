@@ -646,7 +646,7 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **Decision:** User screenshots may be used as point-in-time validation samples for individual bot direction and structural fields, but they must not be promoted into a canonical statement about the full current Pionex bot inventory.
 
-**Evidence:** On 28.09.2026 at 18:58, the user supplied simultaneous DOT COIN-M samples in both directions: a SHORT 4x bot with creation price 1.155, break-even 1.165 and liquidation 1.854, and a LONG 3x bot with creation price 1.242, break-even 1.232 and liquidation 0.677.
+**Evidence:** The earlier DOT SHORT sample from 28.09.2026 18:58 was closed immediately afterwards and is historical only. The fresher 19:05–19:06 SUI COIN-M screenshots show both directions simultaneously: a SHORT 4x bot with current price 1.1556, creation price 1.0043, break-even 1.0252 and liquidation 1.5636, and a LONG 4x bot with current price 1.1556, creation price 1.2463, break-even 1.2218 and liquidation 0.6859.
 
 **Implication:** Economic side remains derived for explicit inverse/Coin-M rows from direct positionOpenPrice vs liquidationPrice when clear. Complete fresh Wallet-detail rows with unique bot IDs remain the current identity source. Older Asset-Watch screenshots and newer spot-check screenshots are historical/validation evidence only and cannot justify global assumptions such as "all current bots are LONG" or "there are no SHORT bots."
 
