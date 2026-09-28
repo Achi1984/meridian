@@ -237,7 +237,18 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
-      return writeJson(res,200,{ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,privateData:!!(await stateGet(PRIVATE_STATE_KEY)),privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,migration},origin||"");
+      const current=await stateGet(PRIVATE_STATE_KEY),account=current?.pionexAccount||{},accountSync=current?.pionexAccountSync||{},botSync=current?.pionexBotSync||{};
+      return writeJson(res,200,{
+        ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
+        privateData:!!current,privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),
+        pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,
+        pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
+        pionexAccountLastSuccessAt:accountSync.lastSuccessAt||null,
+        pionexFuturesPositionCount:Array.isArray(account.futuresPositions)?account.futuresPositions.length:0,
+        pionexBotStatus:String(botSync.status||"UNKNOWN"),
+        pionexBotListRows:Number(botSync?.diagnostics?.listRows)||0,
+        migration
+      },origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/write-check"){
       if(!authorizedWrite(req))return writeJson(res,401,{error:"write_token_required"},origin||"");
