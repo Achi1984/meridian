@@ -15,10 +15,11 @@ test('r60 refreshes the active legacy view before v10 command decoration on data
   assert.match(v10,/schedule\(true\)/);
 });
 
-test('r60 forces v10 decoration after every navigation tab click',()=>{
-  assert.match(v10,/\$\('#nav'\)\?\.addEventListener\('click',e=>\{/);
-  assert.match(v10,/e\.target\?\.closest\?\.\('button\[data-v\]'\)/);
-  assert.match(v10,/schedule\(true\)/);
+test('r60+ keeps v10 authoritative after every navigation tab action',()=>{
+  assert.match(v10,/function bindV10NavigationAuthority\(\)/);
+  assert.match(v10,/\$\$\('#nav button\[data-v\]'\)\.forEach/);
+  assert.match(v10,/bridge\(\)\?\.goView\?\.\(v\)/);
+  assert.match(v10,/renderActiveView\(v,true\)/);
 });
 
 test('r60 wallet diagnostics expose total bot and trader account totals without converting missing to zero',()=>{
