@@ -639,3 +639,11 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - r58 converts quote-inverse entry/range/LIQ/TP/SL into asset/USD before side/risk use, flips pair-direction trend into the asset perspective, and keeps raw trend only as diagnostics.
 - Current SUI LONG 4x and SHORT 4x screenshots plus the BTC reciprocal sample are regression fixtures.
 - Safety remains fail-closed: missing PnL or unverified LIQ still blocks Decision Ready; no execution or trading behavior is enabled.
+
+
+## v10 r59 — post-r58 live acceptance
+
+- r58 side/price normalization is live-confirmed: current SUI renders 1 LONG + 1 SHORT and the stop-loss/liquidation relationship is coherent.
+- Wallet Detail currently supplies 28/28 API-native supported bot identities from 31 wallet source rows; Decision Ready remains 0 because PnL is still unavailable, which is intentional fail-closed behavior.
+- r59 removes legacy COMMAND repaint duplicates, relabels leveraged exposure as NOTIONAL, and promotes fresh `pionexAccount.wallet.totalInUsdt` ahead of screenshot equity fallback.
+- Do not infer total-profit figures from wallet `profit` until its unit/semantics are independently validated.

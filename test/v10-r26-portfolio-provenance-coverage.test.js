@@ -20,7 +20,7 @@ test('r26 canonical contract exposes Spot price coverage and source detail',()=>
 test('r26 portfolio model never overstates snapshot-backed total as fully current/live',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/priceCoverage=snapshot\.priceCoverage\|\|\{\}/);
-  assert.match(block,/priceCoverage\.complete&&privatePionex\.found\?'CANONICAL_MIXED'/);
+  assert.match(block,/priceCoverage\.complete&&resolvedPionex\.found\?'CANONICAL_MIXED'/);
   assert.match(block,/priceCoverage\.feedFresh\?'CANONICAL_PARTIAL':'PRIVATE_CANONICAL_SNAPSHOT'/);
   assert.match(block,/spotRequested:Number\(priceCoverage\.requested\)\|\|0/);
   assert.match(block,/spotResolved:Number\(priceCoverage\.resolved\)\|\|0/);

@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r58';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r58';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r58';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r58';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r58';
-// MERIDIAN v10 r58 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r59';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r59';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r59';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r59';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r59';
+// MERIDIAN v10 r59 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r58';
+const BUILD='10.0-r59';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -109,7 +109,7 @@ function pairCard(symbol,compact=false){
   const exposureState=h.exposureIntegrity?.(symbol),exposureComplete=exposureState?!!exposureState.complete:(fresh&&rows.length>0&&rows.every(b=>h.liveInvestUsdAvailable?.(b))),longUsd=exposureComplete?exposure(rows,'LONG'):null,shortUsd=exposureComplete?exposure(rows,'SHORT'):null;
   const pnlState=h.pnlIntegrity?.(symbol),pnlVals=fresh?rows.map(b=>h.botPnlUsd?.(b)?.value):[],pnlComplete=(pnlState?!!pnlState.complete:(fresh&&rows.length>0))&&pnlVals.length===rows.length&&pnlVals.every(x=>x!=null),pnl=pnlComplete?pnlVals.reduce((a,b)=>a+b,0):null;
   const hedge=longUsd>0&&shortUsd!=null?shortUsd/longUsd*100:null,net=longUsd!=null&&shortUsd!=null?longUsd-shortUsd:null;
-  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+longs.length+' LONG · '+shorts.length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET USD</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+esc(st.reason)+(exposureComplete?'':' · Exposure-Einheit unvollständig')+(pnlComplete?'':' · PnL-Summe unvollständig')+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
+  return '<article class="asset-pair '+(compact?'pair-compact':'')+'"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+longs.length+' LONG · '+shorts.length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b>'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+esc(st.reason)+(exposureComplete?'':' · Exposure-Einheit unvollständig')+(pnlComplete?'':' · PnL-Summe unvollständig')+'</div>'+(compact?'':'<div class="pair-legs">'+rows.map(legRow).join('')+'</div>')+'</article>';
 }
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
@@ -233,7 +233,7 @@ function liveOverview(){
   if(!g.safetyReady)return '<section class="v10-live-blocked"><b>LIVE LAYER BLOCKED</b><small>Keine frischen verifizierten Safety-Daten. Asset Watch ist Referenz, nicht Live-Aktion.</small></section>';
   const exposureState=h.exposureIntegrity?.(),exposureComplete=exposureState?!!exposureState.complete:(g.coverageComplete&&rows.length>0&&rows.every(b=>h.liveInvestUsdAvailable?.(b))),long=exposureComplete?exposure(rows,'LONG'):null,short=exposureComplete?exposure(rows,'SHORT'):null,net=long!=null&&short!=null?long-short:null;
   const decisionRows=rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(S()?.assetIntel?.[b.symbol]))),plans=decisionRows.map(b=>h.profitLockPlan?.(b)).filter(Boolean),lock=plans.filter(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)).length,watch=plans.filter(p=>['WATCH','HEDGE'].includes(p.code)).length;
-  return '<section class="v10-live-overview"><div><span>KNOWN LONG USD</span><b>'+(long==null?'—':h.money?.(long))+'</b></div><div><span>KNOWN SHORT USD</span><b>'+(short==null?'—':h.money?.(short))+'</b></div><div><span>KNOWN NET USD</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'/'+g.matched+'</b></div><div><span>PROFIT WATCH / LOCK</span><b>'+(g.decisionReady?watch+' / '+lock:'— / —')+'</b></div><div><span>EXPOSURE</span><b class="tone-'+(exposureComplete?'safe':'watch')+'">'+(exposureComplete?'COMPLETE':'PARTIAL')+'</b></div></section>';
+  return '<section class="v10-live-overview"><div><span>KNOWN LONG NOTIONAL</span><b>'+(long==null?'—':h.money?.(long))+'</b></div><div><span>KNOWN SHORT NOTIONAL</span><b>'+(short==null?'—':h.money?.(short))+'</b></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'/'+g.matched+'</b></div><div><span>PROFIT WATCH / LOCK</span><b>'+(g.decisionReady?watch+' / '+lock:'— / —')+'</b></div><div><span>EXPOSURE</span><b class="tone-'+(exposureComplete?'safe':'watch')+'">'+(exposureComplete?'COMPLETE':'PARTIAL')+'</b></div></section>';
 }
 function snapshotBotLine(x){
   const h=H(),side=x.side||'LONG',sl=Number(x.sl)>0?' · SL '+h.money?.(x.sl):'',dm=Number(x.dynamicMargin)>0?' · DM '+Number(x.dynamicMargin).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+x.symbol:'';
@@ -265,7 +265,9 @@ function decorateA11y(){
 }
 function renderCommand(force=false){
   const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
-  if(!force&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
+  const legacyCommandSelectors=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
+  const legacyCommandPresent=legacyCommandSelectors.some(sel=>$(sel,view));
+  if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Market, Bot-Layer und Referenz-Snapshot werden getrennt bewertet','live');
   dataGuardDecorate();
   view.querySelectorAll('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-strip').forEach(x=>x.remove());
@@ -282,7 +284,7 @@ function renderCommand(force=false){
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard();liveNode.insertAdjacentElement('afterend',guard.firstElementChild);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);guard.firstElementChild.insertAdjacentElement('afterend',account.firstElementChild);
   const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();account.firstElementChild.insertAdjacentElement('afterend',wallet.firstElementChild);
-  for(const sel of ['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth']) $$(sel,view).forEach(x=>x.remove());
+  for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
 }
 function renderBots(force=false){

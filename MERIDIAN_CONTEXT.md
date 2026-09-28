@@ -293,3 +293,15 @@ r58:
 - retains the original raw trend as `declaredSide` and exposes translated `assetDeclaredSide` for diagnostics.
 
 Validation fixtures use the current SUI LONG/SHORT pair and the observed BTC reciprocal sample. No trading permission, execution, PaperBot, Profit Lock, leverage, hedge threshold, matcher threshold or decision gate is relaxed.
+
+
+## v10 r59 — live acceptance cleanup after r58
+
+Fresh r58 screenshots confirmed the reciprocal Coin-M fix: SUI is now recognized as one LONG plus one SHORT, the live Wallet Detail layer is API Native, and safety normalization can detect the SUI short stop-loss only ~0.88% before liquidation.
+
+The same screenshots exposed three presentation/data-authority issues:
+- the legacy v9 COMMAND cards could repaint after the v10 adapter and reintroduce a second stale DATA GUARD / exposure / OKX snapshot layer;
+- leveraged exposure totals were labeled as generic USD although the calculation is investment USD × leverage, i.e. notional;
+- the fresh `/wallet/balancesFull` total was available in `pionexAccount.wallet.totalInUsdt` but the canonical portfolio path still fell back to a screenshot value when no older private Pionex equity snapshot existed.
+
+r59 makes the v10 command layer authoritative after asynchronous v9 repaints, labels live long/short/net values explicitly as NOTIONAL, and uses the fresh Wallet API total as the Pionex equity fallback before any screenshot fallback. Decision readiness remains fail-closed while bot PnL is unavailable.
