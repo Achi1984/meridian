@@ -38,7 +38,7 @@ test('r25 history is diagnostic and cannot replace the current canonical total',
 test('r25 OKX DCA snapshot remains reference-only outside canonical portfolio total',()=>{
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
   assert.match(command,/OKX DCA REF/);
-  assert.match(command,/REFERENCE · OUTSIDE CANONICAL TOTAL/);
+  assert.match(command,/REFERENCE (?:COMPLETE|PARTIAL)'\} · OUTSIDE CANONICAL TOTAL|REFERENCE (?:COMPLETE|PARTIAL).*OUTSIDE CANONICAL TOTAL/);
   assert.match(command,/CANONICAL TOTAL · SPOT \+ PIONEX/);
 });
 
