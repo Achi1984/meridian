@@ -10,10 +10,10 @@ const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
-test('r43 bot list requests only supported running futures types',()=>{
+test('r43+ bot list stays restricted to supported running futures types',()=>{
   assert.match(bot,/status:'running'/);
-  assert.match(bot,/buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES/);
   assert.match(bot,/PIONEX_SUPPORTED_BOT_TYPES/);
+  assert.match(bot,/buOrderTypes:type/);
   assert.match(detail,/future_hedge_grid/);
   assert.match(detail,/futures_grid/);
 });
