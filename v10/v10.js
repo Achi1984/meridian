@@ -325,10 +325,11 @@ async function assetWatchShareAction(action){
   }finally{assetWatchShareUi.busy=false;renderBots(true)}
 }
 function bindBotOverviewControls(view){
-  const setOpen=open=>$('.asset-pair-details',view).forEach(x=>{x.open=open});
+  const setOpen=open=>[...view.querySelectorAll('.asset-pair-details')].forEach(x=>{x.open=open});
   const openBtn=$('[data-assets-action="open"]',view),closeBtn=$('[data-assets-action="close"]',view);
   if(openBtn)openBtn.onclick=()=>setOpen(true);
   if(closeBtn)closeBtn.onclick=()=>setOpen(false);
+  [...view.querySelectorAll('[data-asset-watch-share]')].forEach(btn=>{btn.onclick=()=>assetWatchShareAction(btn.dataset.assetWatchShare)});
 }
 function renderBots(force=false){
   const view=$('#view-bots');if(!view)return;
