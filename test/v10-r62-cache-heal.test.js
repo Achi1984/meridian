@@ -36,3 +36,14 @@ test('r62 runtime smoke rejects stale manifest and missing cache-heal',()=>{
 test('r62 remains display bootstrap only',()=>{
   assert.equal(release.terminalExecutionImpact,false);
 });
+
+
+test('r62 v10 owns navigation after legacy bridge render',()=>{
+  assert.match(v9,/goView:\(v\)=>\{if\(render\[v\]\)\{go\(v\);return true\}return false\}/);
+  assert.match(v10,/function bindV10NavigationAuthority\(\)/);
+  assert.match(v10,/b\.onclick=e=>\{/);
+  assert.match(v10,/bridge\(\)\?\.goView\?\.\(v\)/);
+  assert.match(v10,/queueMicrotask\(\(\)=>\{/);
+  assert.match(v10,/renderActiveView\(v,true\)/);
+  assert.match(v10,/V10 VIEW RENDER ERROR/);
+});
