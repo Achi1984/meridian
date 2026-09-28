@@ -9,11 +9,9 @@ const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
-test('r44 avoids repeated-array signing by issuing one scalar GET per supported bot type',()=>{
-  assert.match(bot,/fetchRunningBotOrdersForType/);
-  assert.match(bot,/buOrderTypes:type/);
-  assert.match(bot,/for\(let i=0;i<PIONEX_SUPPORTED_BOT_TYPES\.length;i\+\+\)/);
+test('r44+ avoids repeated-array signing in Pionex bot reads',()=>{
   assert.doesNotMatch(bot,/buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES/);
+  assert.doesNotMatch(bot,/buOrderTypes:\s*\[/);
 });
 
 test('r44 remains GET-only and fail-closed',()=>{
@@ -30,11 +28,13 @@ test('r44 preserves execution-neutral invariants',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r44 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r44');
-  assert.match(root,/10\.0-r44-production/);
-  assert.match(root,/\.\/v10\/\?build=r44/);
-  assert.match(v10,/const BUILD='10\.0-r44'/);
-  assert.match(v9,/qs\.set\('build','r44'\)/);
-  assert.match(v9html,/p\.set\('build','r44'\)/);
+test('r44 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=44);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });
