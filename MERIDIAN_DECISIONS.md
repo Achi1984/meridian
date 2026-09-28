@@ -711,4 +711,6 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **Limitation:** A client already executing a pre-r62 cached shell does not contain the new recovery code. That client needs one explicit cache-busted load once; r62 then provides the ongoing recovery mechanism.
 
-**Safety:** Bootstrap/cache behavior only. No market, bot, PnL, decision, strategy or execution behavior changes.
+**Navigation authority:** Once the v10 adapter is loaded, it owns bottom-tab onclick handlers. It may use the v9 bridge to update the underlying source state/view, but the visible tab must then be rendered directly by v10. A renderer exception must surface as a visible diagnostic instead of silently leaving legacy markup.
+
+**Safety:** Bootstrap/cache and presentation lifecycle behavior only. No market, bot, PnL, decision, strategy or execution behavior changes.
