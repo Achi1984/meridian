@@ -193,6 +193,21 @@ function accountPositionLayer(compact=false){
   }).join(''):cards;
   return '<section class="v10-account-position-layer"><div class="section-title"><h2>PIONEX ACCOUNT POSITIONS</h2><small>READ-ONLY · '+esc(p.age)+' · '+p.rows.length+' POSITION(S) · NICHT BOT-GEMATCHT</small></div><div class="'+(compact?'v10-live-overview':'v10-pair-stack')+'">'+body+'</div>'+(compact&&p.rows.length>shown?'<small>+'+(p.rows.length-shown)+' weitere Position(en) im BOTS-Tab.</small>':'')+'</section>';
 }
+function walletDiscoveryHealth(){
+  const s=S(),account=s?.pionexAccount||{},sync=s?.pionexAccountSync||{},wallet=account?.wallet||{},status=String(account?.walletStatus||'UNKNOWN'),ts=Date.parse(String(account.updatedAt||account.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=String(sync.status||'UNKNOWN')==='OK'&&status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';
+  const label=status==='OK'?(fresh?'LIVE':'STALE'):status==='ERROR'?'ERROR':'WAIT',tone=label==='LIVE'?'safe':label==='ERROR'?'danger':'watch';
+  return{status,label,tone,wallet,fresh,age,error:account?.walletError||null};
+}
+function walletDiscoveryLayer(){
+  const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[];
+  if(w.status==='ERROR')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API ERROR</b><small>'+esc(String(w.error||'Pionex Wallet API nicht verfügbar').slice(0,160))+' · Futures POSITION API bleibt davon unabhängig.</small></section>';
+  if(w.status!=='OK')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API WAIT</b><small>Wallet/Bot-Account-Read noch nicht verfügbar · Positionslayer bleibt separat.</small></section>';
+  const cards=rows.map(x=>{
+    const fields=Array.isArray(x?.entryFields)&&x.entryFields.length?x.entryFields.join(', '):'keine List-Felder',count=Number.isFinite(Number(x?.count))?Number(x.count):Number(x?.listCount)||0;
+    return '<div><span>'+esc(String(x?.type||x?.title||'CATEGORY').toUpperCase())+'</span><b>'+count+' gemeldet · '+(Number(x?.listCount)||0)+' geladen</b><small>FELDER '+esc(fields)+'</small></div>';
+  }).join('');
+  return '<section class="v10-data-guard v10-wallet-discovery"><div class="guard-head"><div><span>BOT ACCOUNT API</span><b>WALLET DISCOVERY</b></div><strong class="tone-'+w.tone+'">'+esc(w.label)+'</strong></div><div class="guard-grid"><div><span>KATEGORIEN</span><b>'+Number(w.wallet?.botCategoryCount||0)+'</b></div><div><span>BOT-EINTRÄGE GEMELDET</span><b>'+Number(w.wallet?.botReportedCount||0)+'</b></div><div><span>LISTEN-EINTRÄGE GELADEN</span><b>'+Number(w.wallet?.botListCount||0)+'</b></div></div>'+(cards?'<div class="v10-wallet-categories">'+cards+'</div>':'')+'<small>Read-only Strukturdiagnose. Noch keine automatische Bot-Zuordnung; Werte und Bot-Aktionen bleiben fail-closed.</small></section>';
+}
 function liveOverview(){
   const g=syncHealth(),h=H(),rows=g.fresh?(S()?.bots||[]).filter(b=>h.liveMatched?.(b)):[];
   if(!g.safetyReady)return '<section class="v10-live-blocked"><b>LIVE LAYER BLOCKED</b><small>Keine frischen verifizierten Safety-Daten. Asset Watch ist Referenz, nicht Live-Aktion.</small></section>';
@@ -233,7 +248,7 @@ function renderCommand(force=false){
   if(!force&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Market, Bot-Layer und Referenz-Snapshot werden getrennt bewertet','live');
   dataGuardDecorate();
-  view.querySelectorAll('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.command-source-strip').forEach(x=>x.remove());
+  view.querySelectorAll('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-strip').forEach(x=>x.remove());
   const hero=$('.portfolio-hero',view),c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataStrip();const sourceNode=source.firstElementChild;
   hero.insertAdjacentElement('afterend',sourceNode);
   const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
@@ -246,6 +261,7 @@ function renderCommand(force=false){
   (action||wrap).insertAdjacentElement('afterend',liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard();liveNode.insertAdjacentElement('afterend',guard.firstElementChild);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);guard.firstElementChild.insertAdjacentElement('afterend',account.firstElementChild);
+  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();account.firstElementChild.insertAdjacentElement('afterend',wallet.firstElementChild);
   for(const sel of ['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth']) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
 }
@@ -257,7 +273,7 @@ function renderBots(force=false){
   const s=S(),g=syncHealth(),ph=accountPositionHealth(),syms=g.fresh?symbols():[],unmatched=g.unmatched;
   const api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' ');
   const liveCards=syms.map(symbol=>pairCard(symbol)).filter(Boolean).join('');
-  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Account-Positionen = echte Futures-Risk-Daten · Bot-Aktionen fail-closed · Asset Watch = Referenz</small></section><section class="bot-tab-head"><div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b></div></section>'+accountPositionLayer(false)+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+unmatchedDiagnostics(unmatchedOpen??false)+'<div class="v10-pair-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Der aktuelle Asset-Watch-Snapshot folgt als Referenz.</small></section>')+'</div>'+snapshotDetails(snapshotOpen??!g.fresh);
+  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Account-Positionen = echte Futures-Risk-Daten · Bot-Aktionen fail-closed · Asset Watch = Referenz</small></section><section class="bot-tab-head"><div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b></div></section>'+accountPositionLayer(false)+walletDiscoveryLayer()+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+unmatchedDiagnostics(unmatchedOpen??false)+'<div class="v10-pair-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Der aktuelle Asset-Watch-Snapshot folgt als Referenz.</small></section>')+'</div>'+snapshotDetails(snapshotOpen??!g.fresh);
 }
 function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
