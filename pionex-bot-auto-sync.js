@@ -1,11 +1,11 @@
 import crypto from 'node:crypto';
 import pg from 'pg';
-import {PIONEX_FUTURES_GRID_DETAIL_PATH,hydratePionexBotSummaries} from './pionex-bot-detail-read.js';
+import {PIONEX_FUTURES_GRID_DETAIL_PATH,PIONEX_SUPPORTED_BOT_TYPES,hydratePionexBotSummaries} from './pionex-bot-detail-read.js';
 
 const { Pool }=pg;
 const API_BASE='https://api.pionex.com';
 const PRIVATE_STATE_KEY='private_dashboard_v1';
-const ACTIVE_TYPES=new Set(['futures_grid','future_hedge_grid']);
+const ACTIVE_TYPES=new Set(PIONEX_SUPPORTED_BOT_TYPES);
 const ACTIVE_STATUSES=new Set([
   'prepare','lock_currency','condition_lock','open_position','init_grid','running',
   'adjust_params','adjust_params_open_position','adjust_params_init_grid',
@@ -122,7 +122,11 @@ export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,no
 export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=20}={}){
   const results=[];let pageToken=null,pages=0;
   do{
-    const j=await pionexGet('/api/v1/bot/orders',{status:'running',...(pageToken?{pageToken}:{})},{apiKey,apiSecret,fetchImpl,now});
+    const j=await pionexGet('/api/v1/bot/orders',{
+      status:'running',
+      buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES,
+      ...(pageToken?{pageToken}:{})
+    },{apiKey,apiSecret,fetchImpl,now});
     const data=j?.data||{},rows=Array.isArray(data?.results)?data.results:[];
     results.push(...rows);
     pageToken=data?.nextPageToken?String(data.nextPageToken):null;
@@ -130,6 +134,22 @@ export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,no
     if(pageToken)await new Promise(r=>setTimeout(r,125));
   }while(pageToken&&pages<maxPages);
   return {orders:results,pages,truncated:!!pageToken};
+}
+
+export function summarizePionexBotList(orders=[]){
+  const typeCounts={},statusCounts={};
+  for(const row of Array.isArray(orders)?orders:[]){
+    const type=String(row?.buOrderType||'UNKNOWN').trim()||'UNKNOWN';
+    const status=String(row?.buOrderData?.status||row?.status||'UNKNOWN').trim().toLowerCase()||'unknown';
+    typeCounts[type]=(typeCounts[type]||0)+1;
+    statusCounts[status]=(statusCounts[status]||0)+1;
+  }
+  return {
+    requestedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
+    listRows:Array.isArray(orders)?orders.length:0,
+    typeCounts,
+    statusCounts
+  };
 }
 
 export async function fetchFuturesGridOrderDetail({buOrderId,apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
@@ -160,19 +180,21 @@ function configured(env){
   return {apiKey,apiSecret,ok:!!(apiKey&&apiSecret)};
 }
 
-export function mergePionexSyncState(current,{risk=null,status,error=null,attemptAt,successAt=null,configured:cfg=false,pages=0,truncated=false}={}){
-  const base=clone(current)||{},prevRisk=base.pionexRisk||{};
+export function mergePionexSyncState(current,{risk=null,status,error=null,attemptAt,successAt=null,configured:cfg=false,pages=0,truncated=false,diagnostics=null}={}){
+  const base=clone(current)||{},prevRisk=base.pionexRisk||{},prevSync=base.pionexBotSync||{};
   if(risk)base.pionexRisk={...prevRisk,...risk};
   base.pionexBotSync={
     configured:!!cfg,
     readOnly:true,
     endpoint:'GET /api/v1/bot/orders',
+    requestedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
     status:String(status||'UNKNOWN'),
     lastAttemptAt:attemptAt||new Date().toISOString(),
-    lastSuccessAt:successAt||base?.pionexBotSync?.lastSuccessAt||null,
+    lastSuccessAt:successAt||prevSync.lastSuccessAt||null,
     error:error?String(error):null,
     pages:Number(pages)||0,
-    truncated:!!truncated
+    truncated:!!truncated,
+    diagnostics:diagnostics?clone(diagnostics):(prevSync.diagnostics||null)
   };
   base.privateRevision=(Number.isInteger(base.privateRevision)?base.privateRevision:0)+1;
   base.privateUpdatedAt=attemptAt||new Date().toISOString();
@@ -208,6 +230,7 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       return {ok:false,reason:'missing_credentials'};
     }
     const {orders,pages,truncated}=await fetchRunningBotOrders({apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now});
+    const diagnostics=summarizePionexBotList(orders);
     if(truncated)throw new Error('pionex_bot_pagination_truncated');
     const hydrated=await hydratePionexBotSummaries(orders,{
       loadDetail:buOrderId=>fetchFuturesGridOrderDetail({buOrderId,apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now}),
@@ -226,13 +249,13 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
       if(previousCount>0&&risk.botCount===0){
         guarded=true;
-        return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated:false});
+        return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated:false,diagnostics});
       }
       applied=true;
-      return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated:false});
+      return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated:false,diagnostics});
     });
-    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages};
-    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,detailsComplete:risk.detailsComplete,pages,truncated:false};
+    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages,diagnostics};
+    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,detailsComplete:risk.detailsComplete,pages,truncated:false,diagnostics};
   }catch(e){
     const msg=String(e?.message||e);
     try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
