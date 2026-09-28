@@ -372,3 +372,22 @@ r63 introduces strict venue authority for the production portfolio path:
 - the old OKX DCA screenshot remains a legacy diagnostic only and is explicitly outside the total.
 
 No personal screenshot balances are committed to the repository. The user enters the current Ledger and OKX totals locally through the COMMAND reconcile control.
+
+
+## v10 r64 — Ledger mark-to-market from confirmed holdings
+
+After r63 corrected the false portfolio total, the live acceptance showed that Ledger should not remain a manually entered USD total. The private portfolio already contains Ledger asset quantities, while the browser already downloads the full Binance Spot ticker table without sending holdings to a public price endpoint.
+
+r64 therefore adds a local Ledger authority layer:
+- a current Ledger confirmation is stored only in localStorage;
+- for migration, the timestamp of the existing r63 local Ledger total may bootstrap the first confirmation window;
+- when confirmation is fresh (24h) and private Ledger holdings exist, only those Ledger holdings are admitted to the canonical holdings set;
+- their quantities are valued against the existing browser-side live price overlay;
+- the old Ledger USD total is removed from external balances while auto mode is active, preventing double counting;
+- OKX remains a separate current local venue balance;
+- Pionex remains fresh Wallet API equity;
+- all other private historical holdings are excluded from the production total.
+
+The strict contract now supports required current holding venues in addition to required external venue balances. A total is complete only if the required Ledger venue exists, every admitted Ledger holding is priced from a fresh market overlay, OKX authority is current, and Pionex equity is valid.
+
+No user asset quantities or current account values are committed to GitHub.

@@ -32,7 +32,7 @@ test('r27 COMMAND displays Pionex source age, missing timestamp and future times
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
   assert.match(command,/pionexAge=portfolioPionexAgeText\(p\)/);
   assert.match(command,/pionexSourceText=portfolioPionexSourceText\(p\)/);
-  assert.match(command,/PIONEX '\+pionexSourceText\+' '\+pionexAge/);
+  assert.match(command,/pionexSourceText\+' · '\+pionexAge/);
   const strip=v10.slice(v10.indexOf('function commandDataStrip'),v10.indexOf('function renderSystemHeader'));
   assert.match(strip,/FUTURE TS/);
   assert.match(strip,/NO TIMESTAMP/);

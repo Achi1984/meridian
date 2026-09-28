@@ -87,7 +87,7 @@ export function externalVenueBalanceSnapshot(data={},now=Date.now(),maxAgeMs=POR
 export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFOLIO_AUTHORITY_MAX_AGE_MS){
   const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings.filter(h=>venueKey(h?.venue)!=='pionex'):[];
   const strict=String(data?.portfolio?.authorityMode||'').toUpperCase()==='STRICT_VENUE_SNAPSHOT';
-  if(!strict)return{strict:false,current:holdings,stale:[],superseded:[],external:externalVenueBalanceSnapshot(data,now,maxAgeMs)};
+  if(!strict)return{strict:false,current:holdings,stale:[],superseded:[],external:externalVenueBalanceSnapshot(data,now,maxAgeMs),requiredHoldingVenues:[],missingRequiredHoldingVenues:[]};
   const external=externalVenueBalanceSnapshot(data,now,maxAgeMs),covered=new Set(external.rows.map(x=>x.key)),current=[],stale=[],superseded=[];
   const nowMs=finite(now)??Date.now();
   for(const h of holdings){
@@ -96,7 +96,9 @@ export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFO
     const ts=rowTimestamp(h);
     if(currentTimestamp(ts,nowMs,maxAgeMs))current.push(h);else stale.push(h);
   }
-  return{strict:true,current,stale,superseded,external};
+  const requiredHoldingVenues=Array.isArray(data?.portfolio?.requiredHoldingVenues)?data.portfolio.requiredHoldingVenues.map(x=>String(x||'').trim()).filter(Boolean):[],currentHoldingKeys=new Set(current.map(h=>venueKey(h?.venue)));
+  const missingRequiredHoldingVenues=requiredHoldingVenues.filter(v=>!currentHoldingKeys.has(venueKey(v)));
+  return{strict:true,current,stale,superseded,external,requiredHoldingVenues,missingRequiredHoldingVenues};
 }
 
 export function portfolioPriceCoverage(data={},now=Date.now()){
@@ -114,17 +116,25 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
   const externalUsd=strict?auth.external.totalUsd:0;
   const spotUsd=strict?externalUsd+holdingsUsd:holdingsUsd;
   const tradingSnapshot=pionexEquitySnapshot(data),tradingUsd=tradingSnapshot.value,totalUsd=spotUsd+tradingUsd;
+  const requiredHoldingsComplete=!strict||auth.missingRequiredHoldingVenues.length===0;
+  const holdingsPricingComplete=!strict||priceCoverage.complete;
+  const strictComplete=strict&&auth.external.complete&&requiredHoldingsComplete&&holdingsPricingComplete;
   const spotAuthority={
     strict,
-    complete:strict?auth.external.complete:false,
+    complete:strict?strictComplete:false,
     venueCount:strict?auth.external.venueCount:0,
     venues:strict?auth.external.venues:[],
+    externalRows:strict?auth.external.rows.map(x=>({venue:x.venue,valueUsd:round(x.valueUsd),updatedAt:x.updatedAt,source:x.source})):[],
     externalUsd:round(externalUsd),
     holdingsUsd:round(holdingsUsd),
     currentHoldings:auth.current.length,
+    currentHoldingVenues:[...new Set(auth.current.map(h=>String(h?.venue||'').trim()).filter(Boolean))],
+    requiredHoldingVenues:auth.requiredHoldingVenues||[],
+    missingRequiredHoldingVenues:auth.missingRequiredHoldingVenues||[],
+    holdingsPricingComplete,
     excludedStaleHoldings:auth.stale.length,
     supersededHoldings:auth.superseded.length,
-    maxAgeMs:strict?auth.external.maxAgeMs:null
+    maxAgeMs:strict?Math.max(auth.external.maxAgeMs||0,...auth.current.map(h=>{const ts=rowTimestamp(h);return Number.isFinite(ts)?Math.max(0,nowMs-ts):0})):null
   };
   const spotDetail=strict
     ?(auth.external.venueCount&&auth.current.length?'VENUE_BALANCE_PLUS_FRESH_HOLDINGS':auth.external.venueCount?'VENUE_BALANCE_SNAPSHOT':auth.current.length?(priceCoverage.complete?'FRESH_HOLDINGS':'PARTIAL_HOLDINGS'):'MISSING')
