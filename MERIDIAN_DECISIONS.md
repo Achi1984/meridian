@@ -578,3 +578,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Precedence:** A fresh, complete classic Bot API snapshot remains preferred. A stale classic snapshot must never override a fresh, complete Wallet-detail fallback.
 
 **Safety:** Promotion changes data provenance only. Existing reference matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution rules remain unchanged.
+## D-056 — Diagnose Wallet live-risk normalization before relaxing any guard
+
+**Decision:** When Wallet detail probing succeeds but the Wallet-derived risk snapshot is not complete, MERIDIAN exposes only aggregate normalization diagnostics before changing any source-selection or action-readiness rule.
+
+**Diagnostics:** Aggregate status counts, trend counts, reject reasons, missing-base count, and returned field-name sets. No bot IDs, asset amounts, PnL values, prices, or other private row values are exposed publicly.
+
+**Safety:** r50 is diagnostic-only. Wallet detail still requires complete normalization before it can become the active live Bot source. Existing matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots, and execution logic are unchanged.
