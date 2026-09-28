@@ -17,26 +17,25 @@ test('r26 canonical contract exposes Spot price coverage and source detail',()=>
   assert.match(contract,/SNAPSHOT_FALLBACK/);
 });
 
-test('r26 portfolio model never overstates snapshot-backed total as fully current/live',()=>{
+test('r26+ portfolio model never overstates stale holdings as current',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/priceCoverage=snapshot\.priceCoverage\|\|\{\}/);
-  assert.match(block,/priceCoverage\.complete&&resolvedPionex\.found\?'CANONICAL_MIXED'/);
-  assert.match(block,/priceCoverage\.feedFresh\?'CANONICAL_PARTIAL':'PRIVATE_CANONICAL_SNAPSHOT'/);
+  assert.match(block,/spotAuthority=snapshot\.spotAuthority\|\|\{\}/);
+  assert.match(block,/privateComplete=spotAuthority\.complete===true&&resolvedPionex\.found===true/);
+  assert.match(block,/authorityMode:'STRICT_VENUE_SNAPSHOT'/);
   assert.match(block,/spotRequested:Number\(priceCoverage\.requested\)\|\|0/);
   assert.match(block,/spotResolved:Number\(priceCoverage\.resolved\)\|\|0/);
   assert.doesNotMatch(block,/CANONICAL_CURRENT/);
 });
 
-test('r26 COMMAND visibly distinguishes mixed, partial and snapshot portfolio provenance',()=>{
+test('r26+ COMMAND visibly identifies portfolio provenance and fail-closed stale holdings',()=>{
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/MIXED · SPOT/);
-  assert.match(command,/PIONEX SNAPSHOT/);
-  assert.match(command,/PARTIAL · SPOT/);
-  assert.match(command,/PRIVATE SNAPSHOT/);
-  assert.match(command,/OKX DCA REF/);
+  assert.match(command,/CANONICAL TOTAL · EXTERNAL \+ PIONEX/);
+  assert.match(command,/STALE HOLDINGS AUSGESCHLOSSEN/);
+  assert.match(command,/OKX DCA OLD REF/);
   const strip=v10.slice(v10.indexOf('function commandDataStrip'),v10.indexOf('function renderSystemHeader'));
   assert.match(strip,/CANONICAL_MIXED/);
-  assert.match(strip,/CANONICAL PARTIAL/);
+  assert.match(strip,/stale Holdings fail-closed/);
   assert.doesNotMatch(strip,/CANONICAL CURRENT/);
 });
 
