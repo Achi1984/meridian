@@ -34,9 +34,28 @@ export function signPionexGet(path,params,secret){
 
 function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
 function firstNum(obj,keys){for(const k of keys){const x=n(obj?.[k]);if(x!=null)return x}return null}
-function baseSymbol(v){return String(v||'').toUpperCase().replace(/\.PERP$/,'').replace(/[-_/]?(USDT|USDC|USD)$/,'')}
+function baseSymbol(v){return String(v||'').trim().toUpperCase().replace(/\.PERP$/,'').replace(/[-_/]?(USDT|USDC|USD)$/,'')}
 function direction(v){const x=String(v||'').trim().toLowerCase();return x==='short'?'SHORT':x==='long'?'LONG':x==='no_trend'?'NEUTRAL':null}
 function activeOrder(o){const status=String(o?.buOrderData?.status||o?.status||'').trim().toLowerCase();return ACTIVE_STATUSES.has(status)}
+function assetClass(v){
+  const raw=String(v||'').trim().toUpperCase();
+  if(!raw)return 'missing';
+  if(/^(USDT|USDC|USD)(\.PERP)?$/.test(raw))return 'stable_quote';
+  return baseSymbol(raw)?'asset':'unresolved';
+}
+export function inspectPionexBotOrder(order){
+  const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),side=direction(d?.trend),symbol=baseSymbol(order?.base);
+  return {
+    typePass:!!order&&ACTIVE_TYPES.has(type),
+    statusPass:ACTIVE_STATUSES.has(status),
+    symbolPass:!!symbol,
+    sidePass:['LONG','SHORT','NEUTRAL'].includes(side),
+    baseClass:assetClass(order?.base),
+    quoteClass:assetClass(order?.quote),
+    status,
+    side
+  };
+}
 function liquidationFor(d,side){
   const direct=firstNum(d,['liquidationPrice']);
   if(direct!=null)return direct;
@@ -70,10 +89,9 @@ function optionalPnlPct(d){
 }
 
 export function normalizePionexBotOrder(order){
-  if(!order||!ACTIVE_TYPES.has(String(order.buOrderType||'').trim()))return null;
-  if(!activeOrder(order))return null;
-  const d=order.buOrderData||{},side=direction(d.trend),symbol=baseSymbol(order.base);
-  if(!symbol||!['LONG','SHORT','NEUTRAL'].includes(side))return null;
+  const check=inspectPionexBotOrder(order);
+  if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
+  const d=order.buOrderData||{},side=check.side,symbol=baseSymbol(order.base);
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),
