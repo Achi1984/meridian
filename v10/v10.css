@@ -445,3 +445,16 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 .v10-wallet-categories span{display:block;font-size:8px;color:var(--cyan);font-weight:800;letter-spacing:.05em}
 .v10-wallet-categories b{display:block;margin-top:2px;font-size:10px;color:var(--text)}
 .v10-wallet-categories small{display:block;margin-top:3px;font-size:7px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+
+
+/* v10 r59 · COMMAND authority guard
+   v9 may repaint legacy panels after the v10 adapter. Keep one authoritative command layer. */
+#view-command .data-truth,
+#view-command .risk-cockpit,
+#view-command .exposure-card,
+#view-command .manual-strip,
+#view-command .okx-strip,
+#view-command .risk-v2,
+#view-command .lock-radar,
+#view-command .quick-grid,
+#view-command .command-bots{display:none!important}
