@@ -13,7 +13,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 test('r51 trims documented bot enum strings before allowlist checks',()=>{
   assert.match(bot,/String\(v\|\|''\)\.trim\(\)\.toLowerCase\(\)/);
   assert.match(bot,/String\(o\?\.buOrderData\?\.status\|\|o\?\.status\|\|''\)\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(bot,/ACTIVE_TYPES\.has\(String\(order\.buOrderType\|\|''\)\.trim\(\)\)/);
+  assert.match(bot,/const d=order\?\.buOrderData\|\|\{\},type=String\(order\?\.buOrderType\|\|''\)\.trim\(\)/);
   assert.match(detail,/SUPPORTED\.has\(String\(o\?\.buOrderType\|\|''\)\.trim\(\)\)/);
 });
 
