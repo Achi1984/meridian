@@ -93,9 +93,17 @@ if(v10Cutover){
 }
 
 const manifest=json('manifest.webmanifest');
-must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
-must(manifest.short_name===`MERIDIAN ${v}`,'manifest short_name mismatch');
-must(manifest.start_url===`./?build=${build}`,'manifest start_url mismatch');
+if(v10Cutover){
+  must(manifest.name==='ACHI MERIDIAN v10','manifest name mismatch');
+  must(manifest.short_name==='MERIDIAN','manifest short_name mismatch');
+  must(manifest.start_url===`./v10/?build=${terminalRevision}&fresh=${terminalRevision}`,'manifest start_url mismatch');
+  must(manifest.scope==='./','manifest scope mismatch');
+  must(manifest.id==='./','manifest id mismatch');
+}else{
+  must(manifest.name===`ACHI MERIDIAN v${v}`,'manifest name mismatch');
+  must(manifest.short_name===`MERIDIAN ${v}`,'manifest short_name mismatch');
+  must(manifest.start_url===`./?build=${build}`,'manifest start_url mismatch');
+}
 
 const pkg=json('package.json');
 must(pkg.version===v+'.0','package version mismatch');
