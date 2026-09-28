@@ -13,7 +13,8 @@ test('r21 data events force-refresh only the active live-data view',()=>{
   assert.match(v10,/renderBots\(forceData&&active==='bots'\)/);
   assert.match(v10,/renderMarket\(forceData&&active==='market'\)/);
   assert.match(v10,/renderScanner\(forceData&&active==='research'\)/);
-  assert.match(v10,/window\.addEventListener\('meridian:data',\(\)=>schedule\(true\)\)/);
+  assert.match(v10,/window\.addEventListener\('meridian:data',[\s\S]*schedule\(true\)/);
+  assert.match(v10,/activeViewKey\(\)==='command'[\s\S]*refreshCurrentView/);
   assert.match(v10,/new MutationObserver\(\(\)=>schedule\(false\)\)/);
 });
 
