@@ -335,3 +335,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Safety-ready distinction:** Safety-ready remains a weaker state: fresh matched bot data plus usable liquidation/safety information. It is intentionally allowed without fresh PnL or market-intel so liquidation protection can remain visible even when decision support is blocked.
 
 **Isolation:** This aligns status/count semantics only. It does not change market indicators, risk thresholds, Profit Lock rules, NEXT ACTION ordering, Paper-bot parameters, leverage or execution.
+
+
+## D-035 — Bot snapshot age must respect timestamp trust and the existing future-tolerance rule
+
+**Decision:** Bot snapshot age displayed to the user must be derived from the same timestamp state used by bot-feed freshness. A generic private-state timestamp that is explicitly marked untrusted must never be shown as if it were the age of the Pionex bot snapshot.
+
+**Display rule:** NO TRUSTED TIMESTAMP is shown when the bot feed has no trusted Pionex-specific timestamp. FUTURE TIMESTAMP is shown when the trusted timestamp exceeds the existing +5 minute future tolerance. Otherwise the normal relative age is shown.
+
+**No threshold change:** r30 preserves the existing freshness behavior exactly: a trusted timestamp may be at most 15 minutes old, and timestamps up to 5 minutes in the future remain tolerated. The change only makes the displayed provenance match that behavior.
+
+**SSOT rule:** v9 DATA TRUTH, stale-action explanations and v10 DATA GUARD consume the same botFeedAgeLabel/time-state helpers.
+
+**Isolation:** No matching, PnL, signal, risk, Profit Lock, NEXT ACTION, Paper-bot, leverage or execution logic changes.
