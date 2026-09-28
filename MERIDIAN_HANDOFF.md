@@ -583,7 +583,7 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 A repeated ChatGPT UI streaming interruption was traced to orchestration pressure rather than lost repository state: long sequences of serial GitHub calls, repeated workflow polling, and unnecessarily large source/log payloads increased the chance of the response stream disconnecting while GitHub mutations had already completed.
 
 Durable mitigation:
-- `npm run stream:preflight` returns a compact resume checkpoint with main SHA, terminal build, current branch/head, PR state/distance and gate summaries.
+- `node scripts/stream-safe-preflight.mjs` returns a compact resume checkpoint with main SHA, terminal build, current branch/head, PR state/distance and gate summaries.
 - Interactive work is limited to at most 3 consecutive tool calls before a user-visible checkpoint.
 - Same-status workflow polling is limited to 2 consecutive polls.
 - Tool output is normally capped below 8 KB and large logs/diffs/files must be reduced to relevant windows.
