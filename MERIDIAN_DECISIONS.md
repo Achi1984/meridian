@@ -437,3 +437,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Ordering rule:** DATA_STALE / MARKET_STALE / UNVERIFIED still fail closed first; LIQ_RISK and PROTECTION_RISK preserve safety priority; the coverage guard then blocks RISK_REVIEW, PROFIT_LOCK, WATCH_PROFIT and HOLD when coverage is incomplete.
 
 **Isolation:** Pair-status formulas, signal ranks, liquidation thresholds, stop-loss checks, Profit Lock thresholds/percentages, hedge threshold, Paper-bot parameters, leverage and execution are unchanged. r37 changes only eligibility/precedence of the global displayed recommendation.
+
+
+## D-043 — Per-asset pair status fails closed on same-asset unmatched rows, except safety
+
+**Decision:** An asset pair may emit PROFIT LOCK, RISK REVIEW, WATCH PROFIT or HOLD only when every current supported live row for that same asset is safely matched. If an additional same-asset row remains unmatched or ambiguous, the pair status is UNVERIFIED.
+
+**Asset scope:** An unmatched ETH row does not invalidate an otherwise complete BTC pair. The guard is scoped to the asset shown on the card, matching the exposure and Pair-PnL scoping established in r33–r36.
+
+**Safety exception:** Known LIQ_RISK and explicit stop/protection risks from safely matched rows remain ahead of the match-completeness guard. A known urgent safety condition must remain visible even when another row for the same asset is unresolved.
+
+**Reason:** r33–r36 already withhold incomplete asset aggregates, and r37 blocks global non-safety NEXT ACTION on incomplete coverage. The individual pair status must not still present a trading decision from a partial same-asset leg set.
+
+**Isolation:** Matching thresholds themselves, pair-status ranks, signal formulas, liquidation thresholds, stop-loss checks, Profit Lock thresholds/percentages, hedge threshold, Paper-bot parameters, leverage and execution are unchanged.
