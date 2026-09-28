@@ -8,6 +8,7 @@ import { mergeVenueHoldings } from "./private-holdings-sync.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
 import { marketKlinesSnapshot } from "./market-feed-gateway.js";
 import { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
+import { createAssetWatchShareToken,verifyAssetWatchShareToken,rotateAssetWatchShareState,revokeAssetWatchShareState,assetWatchShareEnabled } from "./asset-watch-share.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -22,6 +23,7 @@ const ALLOWED_ORIGINS = new Set(
     .split(",").map(x=>x.trim()).filter(Boolean)
 );
 const PRIVATE_STATE_KEY = "private_dashboard_v1";
+const ASSET_WATCH_SHARE_STATE_KEY = "asset_watch_share_v1";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
@@ -52,6 +54,12 @@ function authorizedRead(req){return hashAuthorized(bearer(req),READ_TOKEN_HASH);
 function writeToken(req){return String(req.headers["x-meridian-write-token"]||"").trim();}
 function authorizedWrite(req){return hashAuthorized(writeToken(req),WRITE_TOKEN_HASH);}
 function authorizedWriteToken(token){return hashAuthorized(String(token||"").trim(),WRITE_TOKEN_HASH);}
+async function authorizedAssetWatchShare(u){
+  const token=String(u?.searchParams?.get("share")||"").trim();
+  if(!token)return false;
+  const state=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
+  return assetWatchShareEnabled(state)&&verifyAssetWatchShareToken(token,state.tokenHash);
+}
 function isProtected(pathname){
   return PROTECTED_PREFIXES.some(p=>pathname===p || pathname.startsWith(p.endsWith("/")?p:p+"/"));
 }
@@ -244,6 +252,7 @@ const server=http.createServer(async(req,res)=>{
         ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
         privateData:!!current,privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),
         pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,
+        assetWatchShareConfigured:assetWatchShareEnabled(await stateGet(ASSET_WATCH_SHARE_STATE_KEY)),
         pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
         pionexAccountLastSuccessAt:accountSync.lastSuccessAt||null,
         pionexFuturesPositionCount:Array.isArray(account.futuresPositions)?account.futuresPositions.length:0,
@@ -378,7 +387,39 @@ const server=http.createServer(async(req,res)=>{
       await stateSet(PRIVATE_STATE_KEY,merged.data);
       return writeJson(res,200,receipt,origin||"");
     }
-    if(isProtected(u.pathname)&&!authorizedRead(req)){
+    if(req.method==="POST"&&u.pathname==="/api/private/asset-watch-share"){
+      if(!authorizedRead(req))return writeJson(res,401,{error:"read_token_required"},origin||"");
+      let body;
+      try{body=await readJsonBody(req,8192);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      const action=String(body?.action||"rotate").trim().toLowerCase();
+      if(action==="revoke"){
+        const current=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
+        const next=revokeAssetWatchShareState(current);
+        await stateSet(ASSET_WATCH_SHARE_STATE_KEY,next);
+        return writeJson(res,200,{ok:true,enabled:false,scope:next.scope,revokedAt:next.revokedAt},origin||"");
+      }
+      if(action!=="rotate")return writeJson(res,400,{error:"invalid_asset_watch_share_action"},origin||"");
+      const issued=createAssetWatchShareToken();
+      const next=rotateAssetWatchShareState(await stateGet(ASSET_WATCH_SHARE_STATE_KEY),{tokenHash:issued.tokenHash});
+      await stateSet(ASSET_WATCH_SHARE_STATE_KEY,next);
+      return writeJson(res,200,{
+        ok:true,
+        enabled:true,
+        scope:next.scope,
+        createdAt:next.createdAt,
+        shareToken:issued.token,
+        sharePath:"/api/private/asset-watch?share="+encodeURIComponent(issued.token),
+        note:"Token is returned once and is not stored in plaintext. Rotate or revoke to invalidate it."
+      },origin||"");
+    }
+    const assetWatchShareAuthorized=req.method==="GET"&&u.pathname==="/api/private/asset-watch"
+      ? await authorizedAssetWatchShare(u)
+      : false;
+    if(isProtected(u.pathname)&&!authorizedRead(req)&&!assetWatchShareAuthorized){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
