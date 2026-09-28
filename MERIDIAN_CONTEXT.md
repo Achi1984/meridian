@@ -204,3 +204,8 @@ The user has not configured Pionex credentials yet. r42 is therefore code-ready 
 Live r45 proved that authenticated, correctly signed Bot API list calls return zero running bot rows for the user's existing Pionex bots. Rather than weakening Bot API guards, r46 surfaces the already implemented read-only Futures account positions as a separate live layer.
 
 The position layer shows current Pionex Futures account risk data without claiming bot identity. Bot-specific actions remain fail-closed. Gateway health now exposes only aggregate Pionex account/bot status and position/list counts, not private position values.
+## v10 r47 Pionex Wallet / Bot Account discovery
+
+r46 is operational: the Futures account position feed is fresh and currently returns one XRP long position, while the Bot API returns zero running bot rows. Official Pionex Wallet OpenAPI documents a full-account read endpoint that separates Bot Account and Trader Account.
+
+r47 adds `GET /api/v1/wallet/balancesFull` as a fail-soft fourth read source. MERIDIAN stores normalized private totals/categories but exposes only privacy-safe category counts, list counts and entry field names for diagnostics. This release is discovery-only; it does not map Wallet entries into actionable bots.
