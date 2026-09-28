@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r27';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r27';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r28';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r28';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r27');
+    qs.set('build','r28');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -91,6 +91,7 @@ function liveInvestUsdAvailable(b){return liveMatched(b)&&!!b._liveInvestUsd}
 function parseTs(v){const t=Date.parse(String(v||''));return Number.isFinite(t)?t:null}
 function botFeedAgeMs(){return state.botFeedUpdatedAt?Math.max(0,Date.now()-state.botFeedUpdatedAt):null}
 function botFeedFresh(){const age=botFeedAgeMs(),future=state.botFeedUpdatedAt!=null&&state.botFeedUpdatedAt>Date.now()+5*60*1000;return state.botFeedTimestampTrusted&&!future&&age!=null&&age<=15*60*1000}
+function botFeedCoverage(){const matched=state.bots.filter(liveMatched).length,supported=Math.max(0,Number(state.liveRows)||0),unmatched=Math.max(0,supported-matched),ambiguous=Number(state.matchAmbiguous||0),fresh=botFeedFresh(),coverageComplete=fresh&&supported>0&&unmatched===0&&ambiguous===0;return{matched,supported,unmatched,ambiguous,fresh,coverageComplete}}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
 function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[])].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
@@ -367,17 +368,17 @@ function okxDcaPrice(x){const c=state.priceChecks&&state.priceChecks[x.symbol];r
 function okxDcaTpDist(x){const p=okxDcaPrice(x),tp=num(x.tp);return p>0&&tp>0?(tp-p)/p*100:null}
 function okxStrip(){const ps=state.okxDcaBots||[];if(!ps.length)return'';return `<section class="okx-strip okx-dca-strip"><div class="okx-title"><span>OKX FUTURES DCA · SCREENSHOT</span><b>${ps.length} BOTS · 3x LONG</b></div>${ps.map(x=>{const px=okxDcaPrice(x),td=okxDcaTpDist(x),pnl=num(x.totalPnlPct),tone=pnl==null?'muted':pnl>=0?'safe':'danger',src=state.priceChecks?.[x.symbol]?.verified?'OKX + BINANCE PRICE':'SCREENSHOT PRICE';return `<div class="okx-dca-row"><div class="okx-dca-head"><strong>${x.symbol} · FUTURES DCA · ${x.leverage}x</strong><b class="tone-${tone}">${pnl==null?'—':(pnl>=0?'+':'')+pnl.toFixed(2)+'%'}</b></div><div class="okx-dca-metrics"><span>INVEST <b>${okxAmount(x.investUsd,2)} ${x.quote||'USDC'}</b></span><span>PRICE <b>${money(px)}</b><small>${src}</small></span><span>AVG <b>${money(x.avgCost)}</b></span><span>TP <b>${money(x.tp)}</b><small>${td==null?'—':td.toFixed(1)+'% entfernt'}</small></span><span>PNL <b>${x.totalPnlUsd==null?'—':okxAmount(x.totalPnlUsd,4)+' '+(x.quote||'USDC')}</b></span><span>SAFETY <b>${x.safetyExecuted||0}/${x.safetyMax||0}</b></span></div><small class="okx-dca-note">Gesch. Liq: — · Snapshot 25.09.2026 06:22 · vorherige OKX Position geschlossen</small></div>`}).join('')}</section>`}
 function dataTruthCard(){
- const matched=state.bots.filter(liveMatched).length,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=botFeedFresh(),age=ageText(botFeedAgeMs())+(state.botFeedTimestampTrusted?'':' · UNTRUSTED'),mode=fresh&&matched===state.bots.length?'FRESH':matched?'MIXED':'REFERENCE',unmatched=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch';
+ const coverage=botFeedCoverage(),matched=coverage.matched,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=coverage.fresh,age=ageText(botFeedAgeMs())+(state.botFeedTimestampTrusted?'':' · UNTRUSTED'),mode=coverage.coverageComplete?'FRESH':matched?'MIXED':'REFERENCE',unmatchedRows=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch';
  let diag='';
  if(syncStatus==='DISABLED_MISSING_CREDENTIALS')diag='Pionex Bot API nicht konfiguriert · alter Snapshot bleibt bewusst nicht handlungsrelevant.';
  else if(syncStatus==='ERROR')diag='Pionex Bot API Sync-Fehler · '+String(sync.error||'unbekannt').slice(0,120);
  else if(syncStatus==='EMPTY_GUARD')diag='Pionex Bot API meldete 0 unterstützte laufende Futures-Bots · alter Snapshot wurde aus Sicherheitsgründen nicht überschrieben.';
- else if(state.liveRows===matched&&matched<state.bots.length)diag='Bot-Feed liefert aktuell '+state.liveRows+' unterstützte Rows · Matcher ist nicht der Engpass.';
- else if(state.liveRows>matched)diag=(state.liveRows-matched)+' Bot-Rows nicht gematcht'+(unmatched.length?' · '+unmatched.slice(0,4).map(x=>x.symbol+' '+x.side+' '+(x.leverage||'—')+'x').join(' / '):'');
+ else if(coverage.coverageComplete&&matched<state.bots.length)diag='Bot-Feed liefert aktuell '+coverage.supported+' unterstützte Rows · alle sicher gematcht · Referenzkatalog '+state.bots.length+' Rows.';
+ else if(coverage.unmatched>0)diag=coverage.unmatched+' Bot-Rows nicht gematcht'+(unmatchedRows.length?' · '+unmatchedRows.slice(0,4).map(x=>x.symbol+' '+x.side+' '+(x.leverage||'—')+'x').join(' / '):'');
  else diag='Keine zusätzlichen Bot-Rows im privaten Feed.';
- return `<section class="data-truth"><div class="data-truth-head"><span>DATA TRUTH · r20</span><b class="${fresh?'tone-safe':'tone-watch'}">${mode}</b></div><div class="truth-grid"><div><span>PIONEX API</span><b>${state.botApiRows}</b></div><div><span>BOT ROWS</span><b>${state.liveRows}</b></div><div><span>BOT MATCH</span><b>${matched}/${state.bots.length}</b></div><div><span>SNAPSHOT PNL</span><b>${pnl}</b></div><div><span>BOT SNAPSHOT AGE</span><b>${age}</b></div><div><span>ACTIONABLE</span><b>${state.bots.filter(actionableBot).length}</b></div><div><span>2-SOURCE PRICE</span><b>${verified}</b></div><div><span>UNMATCHED</span><b>${Math.max(0,state.liveRows-matched)}</b></div><div><span>BOT API</span><b class="tone-${apiTone}">${apiLabel}</b></div><div><span>BOT SOURCE</span><b>${String(state.botFeedSource||'—').replaceAll('_',' ')}</b></div><div><span>PORTFOLIO</span><b>${pSource}</b></div></div><small>${diag}<br>Profit-Lock/NEXT ACTION benötigen Bot-Match + Snapshot-PnL + vertrauenswürdigen Bot-Timestamp ≤15 Min.</small></section>`
+ return `<section class="data-truth"><div class="data-truth-head"><span>DATA TRUTH · r20</span><b class="${coverage.coverageComplete?'tone-safe':'tone-watch'}">${mode}</b></div><div class="truth-grid"><div><span>PIONEX API</span><b>${state.botApiRows}</b></div><div><span>BOT ROWS</span><b>${coverage.supported}</b></div><div><span>BOT MATCH</span><b>${matched}/${coverage.supported}</b></div><div><span>SNAPSHOT PNL</span><b>${pnl}</b></div><div><span>BOT SNAPSHOT AGE</span><b>${age}</b></div><div><span>ACTIONABLE</span><b>${state.bots.filter(actionableBot).length}</b></div><div><span>2-SOURCE PRICE</span><b>${verified}</b></div><div><span>UNMATCHED</span><b>${coverage.unmatched}</b></div><div><span>BOT API</span><b class="tone-${apiTone}">${apiLabel}</b></div><div><span>BOT SOURCE</span><b>${String(state.botFeedSource||'—').replaceAll('_',' ')}</b></div><div><span>PORTFOLIO</span><b>${pSource}</b></div></div><small>${diag}<br>Profit-Lock/NEXT ACTION benötigen Bot-Match + Snapshot-PnL + vertrauenswürdigen Bot-Timestamp ≤15 Min.</small></section>`
 }
-function renderHeaderTruth(){const el=$('#data-status');if(!el)return;const matched=state.bots.filter(liveMatched).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,fresh=botFeedFresh();el.textContent=fresh&&matched===state.bots.length?'● FRESH':matched||verified?'● MIXED':'● REFERENCE';el.className='live '+(fresh&&matched===state.bots.length?'fresh':matched||verified?'mixed':'reference')}
+function renderHeaderTruth(){const el=$('#data-status');if(!el)return;const coverage=botFeedCoverage(),verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length;el.textContent=coverage.coverageComplete?'● FRESH':coverage.matched||verified?'● MIXED':'● REFERENCE';el.className='live '+(coverage.coverageComplete?'fresh':coverage.matched||verified?'mixed':'reference')}
 function portfolioPionexAgeText(p){
  if(p?.pionexTimestampFuture)return'FUTURE TIMESTAMP';
  return p?.pionexTimestampKnown?ageText(p.pionexAgeMs):'NO TIMESTAMP'
@@ -512,8 +513,8 @@ async function sync(){
  state.botFeedUpdatedAt=specificTs||parseTs(d?.privateUpdatedAt);
  state.botFeedTimestampTrusted=!!specificTs;
  state.botFeedSource=String(d?.pionexRisk?.source|| (specificTs?'PRIVATE_PIONEX_SNAPSHOT':'PRIVATE_STATE_LEGACY_TIMESTAMP'));
- const matched=state.bots.filter(liveMatched).length;
- state.source=botFeedFresh()&&matched===state.bots.length&&matched?'FRESH':matched?'MIXED':'REFERENCE';
+ const coverage=botFeedCoverage();
+ state.source=coverage.coverageComplete?'FRESH':coverage.matched?'MIXED':'REFERENCE';
  state.market=String(d?.market?.regime||d?.btcRegime?.label||d?.regime?.label||'SYNC').toUpperCase();
  state.portfolioHistory=history;state.portfolioHistoryError=history?.error||null;state.portfolio=portfolioModel(d,history);state.syncedAt=Date.now();state.error=null
  }catch(e){state.error=e.message;state.source='REFERENCE';state.botFeedTimestampTrusted=false;return false}
@@ -522,7 +523,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedFresh,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedFresh,botFeedCoverage,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
