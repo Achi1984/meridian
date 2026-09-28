@@ -39,7 +39,7 @@ test('read snapshot normalizes spot, futures balances and active positions witho
     if(url.includes('/api/v1/account/balances'))data={balances:[{coin:'BTC',free:'0.1',frozen:'0'}]};
     else if(url.includes('/uapi/v1/account/balances'))data={balances:[{coin:'USDT',free:'10',frozen:'2',debts:'0'}],isolates:[]};
     else if(url.includes('/uapi/v1/account/positions'))data={positions:[{positionId:'p1',symbol:'BTC_USDT_PERP',positionSide:'LONG',netSize:'0.01',avgPrice:'80000',unrealizedPnL:'12.5',markPrice:'81250',liquidationPrice:'60000',leverage:'5'}]};
-    else if(url.includes('/api/v1/wallet/balancesFull'))data={totalInUsdt:'123',botAccount:{totalInUsdt:'100',detail:[{type:'TRADING_BOT',title:'Bots',count:2,hasMore:false,list:[{buOrderId:'bot-a',buOrderType:'futures_grid',cateType:'FUTURE_GRID_COIN_MARGINED',foo:'x',bar:'y'},{buOrderId:'bot-b',buOrderType:'future_hedge_grid',cateType:'FULLY_HEDGING',foo:'z'}]}]},traderAccount:{totalInUsdt:'23',detail:[]}};
+    else if(url.includes('/api/v1/wallet/balancesFull'))data={totalInUsdt:'123',botAccount:{totalInUsdt:'100',detail:[{type:'TRADING_BOT',title:'Bots',count:2,hasMore:false,list:[{buOrderId:'bot-a',buOrderType:'futures_grid',cateType:'FUTURE_GRID_COIN_MARGINED',baseList:['BTC.PERP'],foo:'x',bar:'y'},{buOrderId:'bot-b',buOrderType:'future_hedge_grid',cateType:'FULLY_HEDGING',foo:'z'}]}]},traderAccount:{totalInUsdt:'23',detail:[]}};
     else if(url.includes('/api/v1/bot/orders/futuresGrid/order'))data={buOrderData:{status:'running',trend:'long'}};
     return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data})};
   };
