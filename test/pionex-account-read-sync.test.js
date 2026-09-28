@@ -135,6 +135,13 @@ test('wallet bot risk promotes only fully hydrated futures_grid rows',()=>{
   assert.equal(risk.missingBaseCount,0);
   assert.ok(risk.detailEnvelopeFields.includes('buOrderData'));
   assert.ok(risk.detailBotDataFields.includes('trend'));
+  assert.equal(risk.typePassCount,1);
+  assert.equal(risk.statusPassCount,1);
+  assert.equal(risk.symbolPassCount,1);
+  assert.equal(risk.sidePassCount,1);
+  assert.equal(risk.allStagePassCount,1);
+  assert.deepEqual(risk.baseClassCounts,{asset:1});
+  assert.deepEqual(risk.quoteClassCounts,{asset:1});
 });
 
 test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{
@@ -151,6 +158,12 @@ test('wallet bot risk fails closed when any supported detail cannot normalize',(
   assert.deepEqual(risk.statusCounts,{running:1});
   assert.deepEqual(risk.trendCounts,{unknown:1});
   assert.equal(risk.missingBaseCount,1);
+  assert.equal(risk.typePassCount,1);
+  assert.equal(risk.statusPassCount,1);
+  assert.equal(risk.symbolPassCount,0);
+  assert.equal(risk.sidePassCount,0);
+  assert.equal(risk.allStagePassCount,0);
+  assert.deepEqual(risk.baseClassCounts,{missing:1});
 });
 
 test('wallet overview keeps structural bot-account metadata without inventing entry values',()=>{

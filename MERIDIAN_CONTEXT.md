@@ -231,3 +231,8 @@ r50 adds aggregate diagnostics to the private Wallet risk object and BOTS UI: no
 r50 live diagnostics isolated the Wallet risk blocker: 32/32 supported details reached the normalizer with status=running, valid long/short trends and no missing base, yet 0/32 normalized. The diagnostic path trimmed strings while normalizePionexBotOrder/activeOrder/direction and detail-candidate filtering did not.
 
 r51 trims surrounding whitespace before the existing type/status/trend allowlist comparisons. It does not add any accepted enum value. This is intended to let semantically identical documented Pionex values pass the same existing safety checks.
+## v10 r52 Exact Pionex normalizer stage diagnostics
+
+r51 live sync still returned RISK NORMALIZED 0/32 after the enum-whitespace fix. The remaining production normalizer gates are now measured directly through a shared inspector to prevent diagnostic drift.
+
+r52 reports aggregate TYPE PASS, STATUS PASS, SYMBOL PASS, SIDE PASS and ALL PASS counts for the 32 supported Wallet futures_grid details. It also reports coarse BASE/QUOTE asset classes without revealing actual symbols or values. No guard is relaxed in this release.

@@ -13,7 +13,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 test('r51 trims documented bot enum strings before allowlist checks',()=>{
   assert.match(bot,/String\(v\|\|''\)\.trim\(\)\.toLowerCase\(\)/);
   assert.match(bot,/String\(o\?\.buOrderData\?\.status\|\|o\?\.status\|\|''\)\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(bot,/ACTIVE_TYPES\.has\(String\(order\.buOrderType\|\|''\)\.trim\(\)\)/);
+  assert.match(bot,/const d=order\?\.buOrderData\|\|\{\},type=String\(order\?\.buOrderType\|\|''\)\.trim\(\)/);
   assert.match(detail,/SUPPORTED\.has\(String\(o\?\.buOrderType\|\|''\)\.trim\(\)\)/);
 });
 
@@ -33,11 +33,13 @@ test('r51 leaves decision thresholds and execution invariants unchanged',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r51 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r51');
-  assert.match(root,/10\.0-r51-production/);
-  assert.match(root,/\.\/v10\/\?build=r51/);
-  assert.match(v10,/const BUILD='10\.0-r51'/);
-  assert.match(v9,/qs\.set\('build','r51'\)/);
-  assert.match(v9html,/p\.set\('build','r51'\)/);
+test('r51 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=51);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });

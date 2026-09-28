@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  canonicalQuery,signPionexGet,normalizePionexBotOrder,
+  canonicalQuery,signPionexGet,inspectPionexBotOrder,normalizePionexBotOrder,
   buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail,
   fetchRunningBotOrders,summarizePionexBotList
 } from '../pionex-bot-auto-sync.js';
@@ -87,6 +87,28 @@ test('documented bot enums tolerate surrounding whitespace without broadening al
     buOrderData:{status:' running ',trend:' long '}
   });
   assert.equal(unknown,null);
+});
+
+
+test('normalizer inspector reports the exact four gating stages',()=>{
+  const good=inspectPionexBotOrder({
+    buOrderType:'futures_grid',base:'BTC.PERP',quote:'USDT',status:'running',
+    buOrderData:{status:'running',trend:'long'}
+  });
+  assert.deepEqual(
+    {typePass:good.typePass,statusPass:good.statusPass,symbolPass:good.symbolPass,sidePass:good.sidePass,baseClass:good.baseClass,quoteClass:good.quoteClass},
+    {typePass:true,statusPass:true,symbolPass:true,sidePass:true,baseClass:'asset',quoteClass:'stable_quote'}
+  );
+  const quoteAsBase=inspectPionexBotOrder({
+    buOrderType:'futures_grid',base:'USD',quote:'BTC',status:'running',
+    buOrderData:{status:'running',trend:'short'}
+  });
+  assert.equal(quoteAsBase.typePass,true);
+  assert.equal(quoteAsBase.statusPass,true);
+  assert.equal(quoteAsBase.symbolPass,false);
+  assert.equal(quoteAsBase.sidePass,true);
+  assert.equal(quoteAsBase.baseClass,'stable_quote');
+  assert.equal(quoteAsBase.quoteClass,'asset');
 });
 
 test('coin-m investment is not mislabeled USD when API gives only coin investment',()=>{

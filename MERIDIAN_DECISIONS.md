@@ -592,3 +592,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r50 live diagnostics showed all 32 Wallet futures_grid detail rows had valid semantic values (running; long/short; base present) while the production normalizer rejected all 32. The diagnostic path trimmed enum strings whereas the production normalizer did not.
 
 **Safety:** Trimming does not broaden any allowlist. Supported types remain futures_grid and future_hedge_grid; active statuses remain unchanged; directions remain long, short and no_trend only. No action-readiness, trading, PaperBot, Profit Lock, hedge or execution thresholds change.
+## D-058 — Use the production normalizer itself for stage diagnostics
+
+**Decision:** MERIDIAN exposes a shared `inspectPionexBotOrder()` path used by the production normalizer and by Wallet-risk diagnostics.
+
+**Reason:** r51 proved that separate diagnostic normalization can still diverge from production behavior. r52 therefore measures the exact four production gates: supported bot type, active status, symbol resolution and side/direction resolution.
+
+**Privacy:** Public diagnostics expose only aggregate pass counts and coarse asset classes (asset, stable_quote, missing, unresolved). They do not expose bot IDs, symbols, balances, prices, investments or PnL.
+
+**Safety:** r52 is diagnostic-only. It does not change any accepted bot type/status/direction, source-selection rule, matching rule, Safety Ready, Decision Ready, Profit Lock, hedge threshold, PaperBot or execution behavior.

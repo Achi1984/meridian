@@ -1,7 +1,7 @@
 import pg from 'pg';
 import {pionexReadGet} from './pionex-read-client.js';
 import {PIONEX_FUTURES_GRID_DETAIL_PATH,mergePionexOrderDetail} from './pionex-bot-detail-read.js';
-import {normalizePionexBotOrder} from './pionex-bot-auto-sync.js';
+import {inspectPionexBotOrder,normalizePionexBotOrder} from './pionex-bot-auto-sync.js';
 
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
@@ -146,8 +146,8 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
 
 export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
   const details=Array.isArray(probe?.details)?probe.details:[],expected=Number(probe?.buOrderTypeCounts?.futures_grid)||0,detailSuccess=Number(probe?.successBuOrderTypeCounts?.futures_grid)||0,unsupported=Math.max(0,(Number(probe?.candidateCount)||0)-expected);
-  const bots=[],rejected=[],seen=new Set(),statusCounts={},trendCounts={},rejectReasonCounts={},envelopeFields=new Set(),botDataFields=new Set();
-  let detailBasePresentCount=0,walletBaseFallbackCount=0,missingBaseCount=0;
+  const bots=[],rejected=[],seen=new Set(),statusCounts={},trendCounts={},rejectReasonCounts={},envelopeFields=new Set(),botDataFields=new Set(),baseClassCounts={},quoteClassCounts={};
+  let detailBasePresentCount=0,walletBaseFallbackCount=0,missingBaseCount=0,typePassCount=0,statusPassCount=0,symbolPassCount=0,sidePassCount=0,allStagePassCount=0;
   const bump=(obj,key)=>{const k=String(key||'UNKNOWN');obj[k]=(obj[k]||0)+1;};
   const reject=reason=>{const r=String(reason||'unknown').slice(0,80);rejected.push({reason:r});bump(rejectReasonCounts,r);};
   for(const item of details){
@@ -171,8 +171,13 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
         status:detail?.status||detail?.buOrderData?.status||'running',
         buOrderData:{}
       };
-      const merged=mergePionexOrderDetail(summary,detail),d=merged?.buOrderData||{},status=String(d?.status||merged?.status||'UNKNOWN').trim().toLowerCase()||'unknown',trend=String(d?.trend||'UNKNOWN').trim().toLowerCase()||'unknown';
-      bump(statusCounts,status);bump(trendCounts,trend);
+      const merged=mergePionexOrderDetail(summary,detail),d=merged?.buOrderData||{},status=String(d?.status||merged?.status||'UNKNOWN').trim().toLowerCase()||'unknown',trend=String(d?.trend||'UNKNOWN').trim().toLowerCase()||'unknown',check=inspectPionexBotOrder(merged);
+      bump(statusCounts,status);bump(trendCounts,trend);bump(baseClassCounts,check.baseClass);bump(quoteClassCounts,check.quoteClass);
+      if(check.typePass)typePassCount++;
+      if(check.statusPass)statusPassCount++;
+      if(check.symbolPass)symbolPassCount++;
+      if(check.sidePass)sidePassCount++;
+      if(check.typePass&&check.statusPass&&check.symbolPass&&check.sidePass)allStagePassCount++;
       const row=normalizePionexBotOrder(merged);
       if(!row){
         if(!String(merged?.base||'').trim())reject('missing_base');
@@ -203,6 +208,13 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
     rejectReasonCounts,
     statusCounts,
     trendCounts,
+    typePassCount,
+    statusPassCount,
+    symbolPassCount,
+    sidePassCount,
+    allStagePassCount,
+    baseClassCounts,
+    quoteClassCounts,
     detailBasePresentCount,
     walletBaseFallbackCount,
     missingBaseCount,
@@ -354,6 +366,10 @@ export async function runPionexAccountReadOnce({env=process.env,fetchImpl=fetch,
       walletBotRiskRows:snapshot.walletBotRisk?.botCount??0,
       walletBotRiskSupportedRows:snapshot.walletBotRisk?.supportedRows??0,
       walletBotRiskRejectedCount:snapshot.walletBotRisk?.rejectedCount??0,
+      walletBotRiskTypePassCount:snapshot.walletBotRisk?.typePassCount??0,
+      walletBotRiskStatusPassCount:snapshot.walletBotRisk?.statusPassCount??0,
+      walletBotRiskSymbolPassCount:snapshot.walletBotRisk?.symbolPassCount??0,
+      walletBotRiskSidePassCount:snapshot.walletBotRisk?.sidePassCount??0,
       walletBotRiskComplete:snapshot.walletBotRisk?.detailsComplete===true
     };
   }catch(e){
