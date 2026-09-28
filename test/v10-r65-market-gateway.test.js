@@ -93,10 +93,11 @@ test('r65 gateway route is protected by the existing private API authorization b
   assert.ok(authIndex>=0&&routeIndex>authIndex);
 });
 
-test('r65 exposes transport/error diagnostics without changing execution safety',()=>{
+test('r65 exposes transport/error diagnostics without changing execution safety in successor releases',()=>{
   assert.match(v10,/transport:String\(s\?\.marketTransport\|\|s\?\.intel\?\.transport\|\|'UNKNOWN'\)/);
   assert.match(v10,/m\.transport/);
-  assert.equal(release.terminalBuild,'10.0-r65');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=65);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
