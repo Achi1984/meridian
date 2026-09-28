@@ -258,3 +258,13 @@ r55 live evidence: ASSET 32/32, SIDE 24/32, LEVERAGE 10/32, STRUCTURE 2/32, STRO
 Official Pionex Bot API documentation defines `trend` as grid direction (long/short/no_trend), so r56 does not invert it. Instead r56 adds a diagnostic economic-side classifier from BE/LIQ geometry and compares declared trend vs economic side, plus asset-only leverage/structure matching that ignores declared side.
 
 No production matching or trading decision is changed.
+## v10 r57 API-native bot identity
+
+Current user screenshots on 28.09.2026 show multiple active BTC COIN-M Futures Grid bots as LONG (5x/7x/11x) with liquidation prices below break-even/open prices. The old 27.09 Asset-Watch snapshot is confirmed stale and must not remain the canonical identity gate.
+
+r57:
+- economically validates inverse Coin-M side from direct positionOpenPrice vs liquidationPrice when available;
+- preserves Pionex trend as declaredSide;
+- accepts complete Wallet-detail rows as API-native identity only when detailsComplete and IDs are unique;
+- keeps the old Asset-Watch snapshot as historical/reference data only;
+- does not promote rows to Decision Ready unless existing PnL, risk, market and capital gates also pass.
