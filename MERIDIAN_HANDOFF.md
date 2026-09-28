@@ -288,3 +288,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Spot resolved/requested coverage is shown in COMMAND; Pionex remains explicitly snapshot provenance.
 - OKX DCA remains reference-only outside the canonical total.
 - No trading-rule, Paper-bot, signal, leverage, execution or research-promotion change.
+
+
+## v10 r27 — Pionex portfolio equity age provenance
+
+- Continues the deep audit after runtime-verified r26.
+- Adds a missing-aware, future-aware timestamp helper for snapshot provenance.
+- COMMAND now shows the age of the selected Pionex portfolio-equity snapshot when an explicit equity timestamp exists.
+- Missing source timestamp is shown as NO TIMESTAMP; a timestamp >30 seconds in the future is shown as FUTURE TIMESTAMP.
+- KNOWN_SEED provenance is shown as STATIC SEED.
+- Generic private dashboard update time is never substituted for Pionex equity update time.
+- No arbitrary Pionex-equity stale cutoff is introduced; this release improves transparency only.
+- Portfolio math remains Spot + Pionex and r26 coverage classification remains unchanged.
+- No trading-rule, Paper-bot, signal, leverage, execution, Pionex mutation or research-promotion change.
