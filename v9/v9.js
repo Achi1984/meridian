@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r28';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r28';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r29';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r29';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r28');
+    qs.set('build','r29');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -95,7 +95,9 @@ function botFeedCoverage(){const matched=state.bots.filter(liveMatched).length,s
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
 function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[])].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
-function actionableBot(b){return liveMatched(b)&&livePnlAvailable(b)&&botFeedFresh()}
+function safetyReadyBot(b){return liveMatched(b)&&botFeedFresh()&&risk(b)!=null}
+function decisionReadyBot(b){return safetyReadyBot(b)&&livePnlAvailable(b)&&marketIntelFresh(state.assetIntel?.[b.symbol])}
+function actionableBot(b){return decisionReadyBot(b)}
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
  if(b&&b._liveMatched===false)return{value:num(b.pnl),source:'REFERENCE',corrected:false};
@@ -376,7 +378,7 @@ function dataTruthCard(){
  else if(coverage.coverageComplete&&matched<state.bots.length)diag='Bot-Feed liefert aktuell '+coverage.supported+' unterstützte Rows · alle sicher gematcht · Referenzkatalog '+state.bots.length+' Rows.';
  else if(coverage.unmatched>0)diag=coverage.unmatched+' Bot-Rows nicht gematcht'+(unmatchedRows.length?' · '+unmatchedRows.slice(0,4).map(x=>x.symbol+' '+x.side+' '+(x.leverage||'—')+'x').join(' / '):'');
  else diag='Keine zusätzlichen Bot-Rows im privaten Feed.';
- return `<section class="data-truth"><div class="data-truth-head"><span>DATA TRUTH · r20</span><b class="${coverage.coverageComplete?'tone-safe':'tone-watch'}">${mode}</b></div><div class="truth-grid"><div><span>PIONEX API</span><b>${state.botApiRows}</b></div><div><span>BOT ROWS</span><b>${coverage.supported}</b></div><div><span>BOT MATCH</span><b>${matched}/${coverage.supported}</b></div><div><span>SNAPSHOT PNL</span><b>${pnl}</b></div><div><span>BOT SNAPSHOT AGE</span><b>${age}</b></div><div><span>ACTIONABLE</span><b>${state.bots.filter(actionableBot).length}</b></div><div><span>2-SOURCE PRICE</span><b>${verified}</b></div><div><span>UNMATCHED</span><b>${coverage.unmatched}</b></div><div><span>BOT API</span><b class="tone-${apiTone}">${apiLabel}</b></div><div><span>BOT SOURCE</span><b>${String(state.botFeedSource||'—').replaceAll('_',' ')}</b></div><div><span>PORTFOLIO</span><b>${pSource}</b></div></div><small>${diag}<br>Profit-Lock/NEXT ACTION benötigen Bot-Match + Snapshot-PnL + vertrauenswürdigen Bot-Timestamp ≤15 Min.</small></section>`
+ return `<section class="data-truth"><div class="data-truth-head"><span>DATA TRUTH · r20</span><b class="${coverage.coverageComplete?'tone-safe':'tone-watch'}">${mode}</b></div><div class="truth-grid"><div><span>PIONEX API</span><b>${state.botApiRows}</b></div><div><span>BOT ROWS</span><b>${coverage.supported}</b></div><div><span>BOT MATCH</span><b>${matched}/${coverage.supported}</b></div><div><span>SNAPSHOT PNL</span><b>${pnl}</b></div><div><span>BOT SNAPSHOT AGE</span><b>${age}</b></div><div><span>ACTIONABLE</span><b>${state.bots.filter(decisionReadyBot).length}</b></div><div><span>2-SOURCE PRICE</span><b>${verified}</b></div><div><span>UNMATCHED</span><b>${coverage.unmatched}</b></div><div><span>BOT API</span><b class="tone-${apiTone}">${apiLabel}</b></div><div><span>BOT SOURCE</span><b>${String(state.botFeedSource||'—').replaceAll('_',' ')}</b></div><div><span>PORTFOLIO</span><b>${pSource}</b></div></div><small>${diag}<br>ACTIONABLE = DECISION READY · benötigt Bot-Match + Liq + Snapshot-PnL + frische Asset-Marktdaten + vertrauenswürdigen Bot-Timestamp ≤15 Min.</small></section>`
 }
 function renderHeaderTruth(){const el=$('#data-status');if(!el)return;const coverage=botFeedCoverage(),verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length;el.textContent=coverage.coverageComplete?'● FRESH':coverage.matched||verified?'● MIXED':'● REFERENCE';el.className='live '+(coverage.coverageComplete?'fresh':coverage.matched||verified?'mixed':'reference')}
 function portfolioPionexAgeText(p){
@@ -523,7 +525,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedFresh,botFeedCoverage,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedFresh,botFeedCoverage,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
