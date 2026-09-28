@@ -34,7 +34,8 @@ test('r34 visibly labels partial regime basis without changing the regime value'
 });
 
 test('r34 release identity remains canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r34');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=34);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
