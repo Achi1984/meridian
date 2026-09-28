@@ -131,13 +131,15 @@ function nextAction(){
   return{title:'HOLD · RUNNER WEITERLAUFEN',detail:'Kein 4h-bestätigtes Exit-Signal'};
 }
 function syncHealth(){
-  const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.();
+  const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.(),identityMode=String(s?.botIdentityMode||'REFERENCE_MATCH'),apiNative=identityMode==='API_NATIVE';
   const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
   const safetyReady=safetyRows.length,pnlReady=pnlRows.length,decisionReady=decisionRows.length,actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
   const botApiStatus=String(s?.pionexBotSync?.status||'UNKNOWN'),status=String(s?.botFeedStatus||botApiStatus),walletFeed=status==='WALLET_DETAIL_OK',age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
   const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=walletFeed?apiRows:(botApiStatus==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows);
   let detail='Private Bot-Daten werden geprüft.';
   if(walletFeed&&!fresh)detail='Wallet-Detail-Fallback ist validiert, aber der Bot-Snapshot ist nicht frisch genug.';
+  else if(walletFeed&&fresh&&apiNative&&decisionReady<matched)detail='API-native Bot-Identität ist vollständig und frisch; '+(matched-decisionReady)+' Row(s) bleiben mangels PnL oder Marktfeed nicht decision-ready.';
+  else if(walletFeed&&fresh&&apiNative)detail='API-native Bot-Identität ist vollständig und frisch · '+decisionReady+'/'+matched+' decision-ready.';
   else if(walletFeed&&fresh&&ambiguous)detail=ambiguous+' Wallet-Detail-Row(s) haben mehrere nahezu gleich gute Referenztreffer · keine automatische Zuordnung.';
   else if(walletFeed&&fresh&&unmatched)detail=unmatched+' Wallet-Detail-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(walletFeed&&fresh&&decisionReady<matched)detail='Wallet-Detail-Botdaten sind frisch; '+(matched-decisionReady)+' gematchte Row(s) bleiben mangels PnL oder Marktfeed nicht decision-ready.';
@@ -153,7 +155,7 @@ function syncHealth(){
   else if(botApiStatus==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(botApiStatus==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
   else if(botApiStatus==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,age,fresh,coverageComplete,detail};
+  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail};
 }
 function marketReadiness(m){
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
@@ -169,7 +171,12 @@ function botReadiness(g){
   return{label:'BLOCKED',tone:'muted'};
 }
 function matchStageDiagnosticsCard(){
-  const d=S()?.matchDiagnostics;if(!d||!Number(d.rows))return'';
+  const s=S(),d=s?.matchDiagnostics;
+  if(String(s?.botIdentityMode||'')==='API_NATIVE'){
+    const rows=Number(s?.apiNativeRows||s?.liveRows||0);
+    return rows?'<div class="v10-wallet-categories v10-match-stage-diagnostics"><div><span>IDENTITY MODE</span><b>API NATIVE '+rows+'/'+rows+'</b><small>Eindeutige private Bot-ID + vollständiger Wallet-Detail-Snapshot · Asset Watch bleibt historische Referenz.</small></div></div>':'';
+  }
+  if(!d||!Number(d.rows))return'';
   const counts=obj=>Object.entries(obj||{}).map(([k,v])=>esc(k)+' '+Number(v||0)).join(' · ')||'—',f=d.fields||{},rows=Number(d.rows||0);
   return '<div class="v10-wallet-categories v10-match-stage-diagnostics"><div><span>MATCH STAGES</span><b>ASSET '+Number(d.assetPass||0)+'/'+rows+' · SIDE '+Number(d.sidePass||0)+'/'+rows+'</b><small>LEVERAGE '+Number(d.leveragePass||0)+'/'+rows+' · STRUCTURE '+Number(d.structurePass||0)+'/'+rows+' · STRONG '+Number(d.strongCandidate||0)+' · ACCEPTED '+Number(d.acceptedRows||0)+'</small></div><div><span>SIDE SANITY</span><b>ECON '+counts(d.economicSideCounts)+'</b><small>TREND↔ECON AGREE '+Number(d.economicAgree||0)+'/'+Number(d.economicKnown||0)+' · OPPOSITE '+Number(d.economicOpposite||0)+'</small></div><div><span>IGNORE DECLARED SIDE</span><b>LEV '+Number(d.assetLeveragePass||0)+'/'+rows+' · STRUCT '+Number(d.assetStructurePass||0)+'/'+rows+'</b><small>Asset ist bereits '+Number(d.assetPass||0)+'/'+rows+' vollständig erkannt</small></div><div><span>ECONOMIC SIDE → REFERENCE</span><b>SIDE '+Number(d.economicReferenceSidePass||0)+'/'+rows+' · LEV '+Number(d.economicReferenceLeveragePass||0)+'/'+rows+'</b><small>STRUCT '+Number(d.economicReferenceStructurePass||0)+'/'+rows+' · Diagnose only, keine automatische Side-Änderung</small></div><div><span>SIDE DISTRIBUTION</span><b>LIVE '+counts(d.liveSideCounts)+'</b><small>REFERENCE '+counts(d.referenceSideCounts)+'</small></div><div><span>LIVE MATCH FIELDS</span><b>LEV '+Number(f.leverage||0)+' · LOWER '+Number(f.lower||0)+' · UPPER '+Number(f.upper||0)+'</b><small>BE '+Number(f.be||0)+' · LIQ '+Number(f.liq||0)+' · TP '+Number(f.tp||0)+' · von '+rows+'</small></div></div>';
 }
@@ -179,8 +186,8 @@ function unmatchedDiagnostics(open=false){
   return '<details class="v10-unmatched-details" '+(open?'open':'')+'><summary>UNMATCHED DETAILS · '+rows.length+'</summary><div class="unmatched-list">'+body+'</div><small>Nur Diagnose-Metadaten · keine Bot-ID oder privaten Beträge.</small></details>';
 }
 function dataGuardCard(){
-  const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
-  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+matchStageDiagnosticsCard()+unmatchedDiagnostics()+'</section>';
+  const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED',identityLabel=g.apiNative?'API IDENTITY':'SUPPORTED MATCH';
+  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>'+identityLabel+'</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNVERIFIED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+matchStageDiagnosticsCard()+unmatchedDiagnostics()+'</section>';
 }
 function accountPositionHealth(){
   const s=S(),sync=s?.pionexAccountSync||{},snap=s?.pionexAccount||{},rows=Array.isArray(snap?.futuresPositions)?snap.futuresPositions:[],status=String(sync.status||'UNKNOWN'),ts=Date.parse(String(snap.updatedAt||snap.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';
