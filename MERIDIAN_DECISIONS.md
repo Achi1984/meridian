@@ -493,3 +493,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Decision isolation:** Diagnostics do not change bot matching, match thresholds, coverageComplete, pairStatus, NEXT ACTION, Profit Lock, hedge thresholds, market signals or risk calculations. r37/r38 fail-closed behavior remains authoritative.
 
 **Execution isolation:** No Paper-bot parameter, leverage, execution or Pionex mutation path changes.
+## D-047 — Pionex running-bot summaries require complete read-only detail hydration
+
+**Decision:** A successful Pionex Bot API snapshot is built in two read-only stages: list running bot summaries, then load the official Futures Grid detail endpoint for every supported active futures-grid / hedge-grid row before publishing fresh bot structure.
+
+**Fail-closed rule:** Missing IDs, duplicate IDs, detail-ID mismatches, incomplete detail payloads, pagination truncation, authentication/API/network failures, or any failed supported-row detail load must not publish a partial bot set as a fresh snapshot. The previous Pionex risk snapshot remains authoritative-but-stale under the existing freshness gates.
+
+**Coverage rule:** The snapshot records listRows, supportedRows, detailRows and detailsComplete separately. DATA TRUTH exposes BOT DETAIL independently from BOT MATCH so API retrieval completeness and local matching completeness cannot be conflated.
+
+**Read-only boundary:** The implementation uses only GET /api/v1/bot/orders and GET /api/v1/bot/orders/futuresGrid/order. It introduces no create, adjust, reduce, cancel, transfer or other mutation call.
+
+**Isolation:** Matching thresholds, Decision Ready, Profit Lock, hedge threshold, market signals, portfolio math, Paper-bot parameters, leverage and execution are unchanged. Live trading remains disabled.

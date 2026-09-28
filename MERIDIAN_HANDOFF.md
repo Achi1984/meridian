@@ -464,3 +464,14 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - BOTS preserves the unmatched-details disclosure state across forced refreshes.
 - r37 global NEXT ACTION coverage guard and r38 per-asset match-completeness guard remain unchanged.
 - No matcher thresholds, Profit Lock rules, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
+## v10 r41 — Read-only Pionex bot detail hydration
+
+- Continues after merged r40 unmatched-row diagnostics.
+- Keeps the existing Pionex Bot API list read, but no longer assumes list rows contain complete futures-grid risk data.
+- Hydrates every supported active futures_grid / future_hedge_grid row through GET /api/v1/bot/orders/futuresGrid/order.
+- Fails closed on missing/duplicate IDs, ID mismatch, incomplete details, truncated pagination or any detail-read error.
+- Publishes listRows, supportedRows, detailRows and detailsComplete in the fresh Pionex risk snapshot.
+- DATA TRUTH adds BOT DETAIL x/y separately from BOT MATCH.
+- All Pionex calls remain GET-only; no create/adjust/reduce/cancel/transfer path is added.
+- Existing r37 global coverage guard, r38 per-asset guard and r40 privacy-safe unmatched diagnostics remain unchanged.
+- No matching threshold, Profit Lock rule, hedge threshold, market signal, portfolio math, Paper-bot parameter, leverage or execution behavior changes.
