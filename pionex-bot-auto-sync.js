@@ -144,7 +144,8 @@ export function summarizePionexBotList(orders=[]){
     statusCounts[status]=(statusCounts[status]||0)+1;
   }
   return {
-    requestedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
+    requestMode:'ALL_RUNNING_LOCAL_ALLOWLIST',
+    localSupportedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
     listRows:Array.isArray(orders)?orders.length:0,
     typeCounts,
     statusCounts
@@ -186,7 +187,8 @@ export function mergePionexSyncState(current,{risk=null,status,error=null,attemp
     configured:!!cfg,
     readOnly:true,
     endpoint:'GET /api/v1/bot/orders',
-    requestedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
+    queryMode:'ALL_RUNNING_LOCAL_ALLOWLIST',
+    supportedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
     status:String(status||'UNKNOWN'),
     lastAttemptAt:attemptAt||new Date().toISOString(),
     lastSuccessAt:successAt||prevSync.lastSuccessAt||null,
