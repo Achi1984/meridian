@@ -146,26 +146,43 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
 
 export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
   const details=Array.isArray(probe?.details)?probe.details:[],expected=Number(probe?.buOrderTypeCounts?.futures_grid)||0,detailSuccess=Number(probe?.successBuOrderTypeCounts?.futures_grid)||0,unsupported=Math.max(0,(Number(probe?.candidateCount)||0)-expected);
-  const bots=[],rejected=[],seen=new Set();
+  const bots=[],rejected=[],seen=new Set(),statusCounts={},trendCounts={},rejectReasonCounts={},envelopeFields=new Set(),botDataFields=new Set();
+  let detailBasePresentCount=0,walletBaseFallbackCount=0,missingBaseCount=0;
+  const bump=(obj,key)=>{const k=String(key||'UNKNOWN');obj[k]=(obj[k]||0)+1;};
+  const reject=reason=>{const r=String(reason||'unknown').slice(0,80);rejected.push({reason:r});bump(rejectReasonCounts,r);};
   for(const item of details){
     const wallet=item?.wallet||{},detail=item?.detail||{};
     if(String(wallet?.buOrderType||'')!=='futures_grid')continue;
+    Object.keys(detail||{}).forEach(k=>envelopeFields.add(String(k)));
+    Object.keys(detail?.buOrderData||{}).forEach(k=>botDataFields.add(String(k)));
     const id=String(wallet?.buOrderId||'').trim();
-    if(!id||seen.has(id)){rejected.push({reason:id?'duplicate_id':'missing_id'});continue;}
+    if(!id||seen.has(id)){reject(id?'duplicate_id':'missing_id');continue;}
     seen.add(id);
     try{
+      const directBase=String(detail?.base||'').trim(),walletBase=String(wallet?.baseList?.[0]||'').trim();
+      if(directBase)detailBasePresentCount++;
+      else if(walletBase)walletBaseFallbackCount++;
+      else missingBaseCount++;
       const summary={
         buOrderType:'futures_grid',
         buOrderId:id,
-        base:detail?.base||wallet?.baseList?.[0]||null,
+        base:directBase||walletBase||null,
         quote:detail?.quote||wallet?.investmentToken||null,
         status:detail?.status||detail?.buOrderData?.status||'running',
         buOrderData:{}
       };
-      const merged=mergePionexOrderDetail(summary,detail),row=normalizePionexBotOrder(merged);
-      if(!row){rejected.push({reason:'normalizer_rejected'});continue;}
+      const merged=mergePionexOrderDetail(summary,detail),d=merged?.buOrderData||{},status=String(d?.status||merged?.status||'UNKNOWN').trim().toLowerCase()||'unknown',trend=String(d?.trend||'UNKNOWN').trim().toLowerCase()||'unknown';
+      bump(statusCounts,status);bump(trendCounts,trend);
+      const row=normalizePionexBotOrder(merged);
+      if(!row){
+        if(!String(merged?.base||'').trim())reject('missing_base');
+        else if(!['long','short','no_trend'].includes(trend))reject('invalid_trend');
+        else if(['destroy_grid','close_position','unlock_currency','canceled'].includes(status))reject('inactive_status');
+        else reject('normalizer_rejected');
+        continue;
+      }
       bots.push({...row,source:'PIONEX_WALLET_BOT_DETAIL'});
-    }catch(e){rejected.push({reason:String(e?.message||e).slice(0,80)})}
+    }catch(e){reject(String(e?.message||e))}
   }
   const ids=new Set(bots.map(x=>String(x?.botOrderId||x?.id||'')));
   const unique=ids.size===bots.length,detailsComplete=expected>0&&detailSuccess===expected&&bots.length===expected&&rejected.length===0&&unique;
@@ -183,6 +200,14 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
     bots,
     botCount:bots.length,
     rejectedCount:rejected.length,
+    rejectReasonCounts,
+    statusCounts,
+    trendCounts,
+    detailBasePresentCount,
+    walletBaseFallbackCount,
+    missingBaseCount,
+    detailEnvelopeFields:[...envelopeFields].sort().slice(0,40),
+    detailBotDataFields:[...botDataFields].sort().slice(0,80),
     rejected
   };
 }
@@ -327,6 +352,8 @@ export async function runPionexAccountReadOnce({env=process.env,fetchImpl=fetch,
       walletBotDetailSuccessCount:snapshot.walletBotProbe?.successCount??0,
       walletBotDetailFailureCount:snapshot.walletBotProbe?.failureCount??0,
       walletBotRiskRows:snapshot.walletBotRisk?.botCount??0,
+      walletBotRiskSupportedRows:snapshot.walletBotRisk?.supportedRows??0,
+      walletBotRiskRejectedCount:snapshot.walletBotRisk?.rejectedCount??0,
       walletBotRiskComplete:snapshot.walletBotRisk?.detailsComplete===true
     };
   }catch(e){
