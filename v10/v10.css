@@ -68,7 +68,7 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 
 
 /* v10 r4 · tab evolution */
-.bot-tab-head{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}
+.bot-tab-head{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 10px}
 .bot-tab-head>div,.scanner-summary>div,.market-kpis>div,.lab-overview>div{background:#080e15;border:1px solid var(--line);border-radius:11px;padding:7px}
 .bot-tab-head span,.scanner-summary span,.market-kpis span,.lab-overview span{display:block;font-size:7px;color:var(--muted);letter-spacing:.05em}
 .bot-tab-head b,.scanner-summary b,.market-kpis b,.lab-overview b{display:block;margin-top:2px;font-size:11px}
@@ -424,3 +424,15 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 
 /* v10 r22 semantic live-status tones */
 .live.safe{color:var(--green)}.live.watch{color:var(--amber)}.live.danger{color:var(--red)}.live.muted{color:var(--muted)}
+
+
+/* v10 r46 · read-only Pionex account position layer */
+.v10-account-position-layer{margin:10px 0 12px}
+.v10-account-position-layer>.section-title{margin:0 0 8px}
+.v10-account-position-layer>.section-title small{max-width:62%;text-align:right}
+.v10-account-position-layer .asset-pair>small{display:block;margin-top:7px;color:var(--muted);font-size:8px;line-height:1.45}
+@media(max-width:600px){
+  .bot-tab-head{grid-template-columns:repeat(2,1fr)}
+  .v10-account-position-layer>.section-title{align-items:flex-start}
+  .v10-account-position-layer>.section-title small{max-width:58%;font-size:7px}
+}
