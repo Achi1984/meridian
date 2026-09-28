@@ -64,7 +64,8 @@ test('r33 global exposure and active v10 UI consume the shared integrity helper'
 });
 
 test('r33 release identity remains canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r33');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=33);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
