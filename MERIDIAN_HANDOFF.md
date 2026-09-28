@@ -453,3 +453,14 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - OKX remains outside the canonical Spot + Pionex portfolio total.
 - r37 global NEXT ACTION and r38 per-asset match-completeness guards are preserved unchanged.
 - No trading rules, Profit Lock thresholds, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
+
+
+## v10 r40 — Unmatched live-row diagnostics
+
+- Continues the deep audit after runtime-verified r39.
+- Adds one shared privacy-safe unmatched-row details renderer to active v10 COMMAND and BOTS surfaces.
+- Each unresolved live row identifies asset, side, leverage, NO CONFIDENT MATCH vs AMBIGUOUS MATCH, and only PnL/USD-capital availability flags.
+- Bot IDs and private numeric values are intentionally not rendered in this diagnostic.
+- BOTS preserves the unmatched-details disclosure state across forced refreshes.
+- r37 global NEXT ACTION coverage guard and r38 per-asset match-completeness guard remain unchanged.
+- No matcher thresholds, Profit Lock rules, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.

@@ -480,3 +480,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Continuity:** r37 global NEXT ACTION coverage guard and r38 per-asset match-completeness guard remain unchanged.
 
 **Trading isolation:** No bot matching, Decision Ready, Profit Lock, hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation behavior changes.
+
+
+## D-046 — Unmatched live-row blocks must expose privacy-safe diagnostics
+
+**Decision:** When current supported Pionex bot rows are unmatched or ambiguous, the active v10 UI must expose enough row-level metadata to explain the block: asset, side, leverage, match reason, and whether PnL / USD capital fields are present.
+
+**Privacy rule:** Diagnostics do not render bot IDs or private numeric amounts. They expose only resolution metadata already required to understand why matching/coverage failed.
+
+**SSOT rule:** COMMAND Data Guard and the BOTS view reuse the same unmatchedDiagnostics renderer over state.unmatchedLive. The BOTS details disclosure preserves its open/closed state across forced refreshes.
+
+**Decision isolation:** Diagnostics do not change bot matching, match thresholds, coverageComplete, pairStatus, NEXT ACTION, Profit Lock, hedge thresholds, market signals or risk calculations. r37/r38 fail-closed behavior remains authoritative.
+
+**Execution isolation:** No Paper-bot parameter, leverage, execution or Pionex mutation path changes.
