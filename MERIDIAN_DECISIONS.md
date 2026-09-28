@@ -374,3 +374,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r22 added explicit semantic header colors, but the runtime still emitted legacy mixed/reference class names and depended on inherited v9 CSS. The visible state therefore had two vocabularies for the same readiness result.
 
 **Isolation:** Readiness conditions and labels are unchanged. This is presentation/status semantics only; no market signal, bot matching, risk, Profit Lock, Paper-bot, leverage or execution logic changes.
+
+
+## D-038 — Exposure completeness includes unmatched current live rows
+
+**Decision:** A bot exposure or hedge percentage is complete only when the current bot snapshot is fresh, at least one bot is safely matched in the requested scope, every matched bot in that scope has a usable USD investment, and no current supported live row in that scope remains unmatched.
+
+**Scope rule:** Asset-level exposure checks only unmatched rows for the same asset. Portfolio-level exposure checks all current unmatched live rows. Known matched notional may still be shown as known exposure, but an exact hedge ratio is withheld while exposure is incomplete.
+
+**Hedge safety:** assetPairRisk may calculate hedgePct only when same-asset exposureIntegrity is complete. An unmatched same-asset live row therefore makes hedgePct unavailable and prevents the existing hedgeLow branch from treating an incomplete ratio as below 15%. The 15% threshold itself is unchanged.
+
+**UI rule:** Active v10 pair cards and the COMMAND live overview consume the same exposureIntegrity helper. They show PARTIAL/unknown values instead of COMPLETE when supported live exposure is not fully reconciled.
+
+**Isolation:** No PnL formula, market signal, liquidation threshold, Profit Lock percentage, hedge threshold, Paper-bot parameter, leverage or execution logic is changed. r33 only changes whether incomplete exposure data is eligible to produce an exact exposure/hedge statement.
