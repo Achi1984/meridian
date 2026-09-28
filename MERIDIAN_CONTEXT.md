@@ -424,3 +424,22 @@ r66 keeps the existing read-only source hierarchy and adds a narrowly scoped nor
 - fail closed if category, token, asset, or USD price does not match.
 
 The UI now reports separate PnL and market blocker counts plus aggregate PnL-source coverage. No private bot IDs or PnL values are exposed on public gateway health.
+
+
+## v10 r67 — risk-first collapsible BOTS overview
+
+After r66 closed the live data chain (API-native identity, PnL normalization, market data and decision readiness), the BOTS tab became information-dense: every asset and every diagnostic block was expanded simultaneously.
+
+r67 is a presentation-only simplification:
+- asset cards are native `details/summary` disclosures;
+- collapsed asset rows show asset, Long/Short count, status, aggregate PnL, minimum liquidation buffer and hedge ratio;
+- expanded asset rows retain market price, Long/Short/Net notional, reason and the existing per-bot Capital/PnL/BE/TP/Liq/SL/Buffer fields;
+- assets are ordered by the existing pair-status risk rank;
+- on first render only the current critical asset opens automatically;
+- subsequent refreshes preserve the user's open/closed asset state;
+- ALL OPEN / ALL CLOSED controls are available;
+- account-position, Wallet discovery, normalizer fields and historical reference data move behind one TECHNICAL DETAILS disclosure;
+- healthy mode shows only four top status cards; match/safety cards reappear automatically when health is incomplete;
+- raw Pionex trend diagnostics are explicitly labeled RAW API TREND to distinguish them from normalized economic Long/Short side.
+
+No risk score, signal, Profit Lock, hedge, leverage, bot or execution logic changes.

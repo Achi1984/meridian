@@ -774,3 +774,20 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Rationale:** Pionex documents inverse Futures Grid as investing and realizing profit in the same non-stablecoin. This allows a unit-safe conversion without treating an undocumented bare `profit` number as USD.
 
 **Safety:** Read-only normalization only. No order creation, reduction, cancellation, leverage change, strategy threshold or execution behavior is modified.
+
+
+## D-074 — Default BOTS view optimizes for decisions, diagnostics are progressive disclosure
+
+**Decision:** The primary BOTS surface shows only information needed for rapid risk review. Deep API/normalizer/source diagnostics remain available but are collapsed by default when the data chain is healthy.
+
+**Asset summary:** Always-visible fields are status, Long/Short count, aggregate PnL, minimum liquidation buffer and hedge ratio. Full market/notional and individual bot parameters require opening the asset card.
+
+**Ordering:** Existing `pairStatus.rank` remains the only ordering authority. No new scoring model is introduced.
+
+**Default open state:** On initial render the current critical asset is opened. User-chosen open/closed states persist across refreshes.
+
+**Diagnostics:** Account positions, Wallet discovery, normalizer stages/fields and historical references are grouped under TECHNICAL DETAILS. If health is incomplete, the diagnostics disclosure opens automatically.
+
+**Semantics:** Pionex raw trend metadata is labeled RAW API TREND; normalized economic bot side remains the operative Long/Short representation.
+
+**Safety:** Presentation-only. Existing Safety > Data Guard > signal precedence and all execution-neutral behavior are unchanged.
