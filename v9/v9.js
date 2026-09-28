@@ -69,7 +69,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
@@ -142,7 +142,7 @@ async function portfolioSpotTickers(){
 }
 function okxDcaEquitySnapshot(){const rows=state.okxDcaBots||[],missingInvest=rows.filter(x=>num(x.investUsd)==null).length,missingPnl=rows.filter(x=>num(x.totalPnlUsd)==null).length,complete=rows.length>0&&missingInvest===0&&missingPnl===0,value=complete?rows.reduce((sum,x)=>sum+num(x.investUsd)+num(x.totalPnlUsd),0):null;return{value,complete,rows:rows.length,missingInvest,missingPnl}}function okxKnownBotEquity(){return okxDcaEquitySnapshot().value}
 function portfolioModel(d,history){
- const liveBots=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[],botCapital=liveBots.reduce((sum,b)=>sum+(num(b.investUsd)||0)+(botPnlUsd(b).value||0),0),botRowsWithCapital=liveBots.filter(b=>b.investUsd!=null),allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;
+ const selectedRisk=selectPionexRisk(d).risk,liveBots=Array.isArray(selectedRisk?.bots)?selectedRisk.bots.map(normalizeLive):[],botCapital=liveBots.reduce((sum,b)=>sum+(num(b.investUsd)||0)+(botPnlUsd(b).value||0),0),botRowsWithCapital=liveBots.filter(b=>b.investUsd!=null),allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;
  const historyPoint=latestPortfolioHistorySnapshot(history),privatePionex=pionexEquitySnapshot(d),holdings=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings:[];
  const canonicalInput=privatePionex.found?d:{...d,portfolio:{...(d?.portfolio||{}),pionexEquityUsd:state.manual.pionex,pionexEquitySource:'FALLBACK_SCREENSHOT'}},snapshot=canonicalPortfolioSnapshot(canonicalInput,Date.now()),privateComplete=holdings.length>0,priceCoverage=snapshot.priceCoverage||{},pionexTime=sourceTimestampAge(privatePionex.updatedAt);
  const total=privateComplete?snapshot.totalUsd:null,spot=privateComplete?snapshot.spotUsd:null,pionex=snapshot.tradingUsd,source=!privateComplete?'INCOMPLETE':priceCoverage.complete&&privatePionex.found?'CANONICAL_MIXED':priceCoverage.feedFresh?'CANONICAL_PARTIAL':'PRIVATE_CANONICAL_SNAPSHOT',okxSnapshot=okxDcaEquitySnapshot(),okxReference=okxSnapshot.value;
@@ -382,10 +382,11 @@ function okxDcaPrice(x){const c=state.priceChecks&&state.priceChecks[x.symbol];r
 function okxDcaTpDist(x){const p=okxDcaPrice(x),tp=num(x.tp);return p>0&&tp>0?(tp-p)/p*100:null}
 function okxStrip(){const ps=state.okxDcaBots||[];if(!ps.length)return'';return `<section class="okx-strip okx-dca-strip"><div class="okx-title"><span>OKX FUTURES DCA · SCREENSHOT</span><b>${ps.length} BOTS · 3x LONG</b></div>${ps.map(x=>{const px=okxDcaPrice(x),td=okxDcaTpDist(x),pnl=num(x.totalPnlPct),tone=pnl==null?'muted':pnl>=0?'safe':'danger',src=state.priceChecks?.[x.symbol]?.verified?'OKX + BINANCE PRICE':'SCREENSHOT PRICE';return `<div class="okx-dca-row"><div class="okx-dca-head"><strong>${x.symbol} · FUTURES DCA · ${x.leverage}x</strong><b class="tone-${tone}">${pnl==null?'—':(pnl>=0?'+':'')+pnl.toFixed(2)+'%'}</b></div><div class="okx-dca-metrics"><span>INVEST <b>${okxAmount(x.investUsd,2)} ${x.quote||'USDC'}</b></span><span>PRICE <b>${money(px)}</b><small>${src}</small></span><span>AVG <b>${money(x.avgCost)}</b></span><span>TP <b>${money(x.tp)}</b><small>${td==null?'—':td.toFixed(1)+'% entfernt'}</small></span><span>PNL <b>${x.totalPnlUsd==null?'—':okxAmount(x.totalPnlUsd,4)+' '+(x.quote||'USDC')}</b></span><span>SAFETY <b>${x.safetyExecuted||0}/${x.safetyMax||0}</b></span></div><small class="okx-dca-note">Gesch. Liq: — · Snapshot 25.09.2026 06:22 · vorherige OKX Position geschlossen</small></div>`}).join('')}</section>`}
 function dataTruthCard(){
- const coverage=botFeedCoverage(),matched=coverage.matched,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=coverage.fresh,age=botFeedAgeLabel(),mode=coverage.coverageComplete?'FRESH':matched?'MIXED':'REFERENCE',unmatchedRows=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch',detailLabel=syncStatus==='OK'?(state.botDetailRows+'/'+state.botSupportedRows):'—',detailTone=syncStatus==='OK'&&state.botDetailsComplete?'safe':syncStatus==='ERROR'?'danger':'watch',accountSync=state.pionexAccountSync||{},accountStatus=String(accountSync.status||'UNKNOWN'),accountLabel=accountStatus==='OK'?'OK':accountStatus==='ERROR'?'ERROR':accountStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',accountTone=accountLabel==='OK'?'safe':accountLabel==='ERROR'?'danger':'watch',futPos=Array.isArray(state.pionexAccount?.futuresPositions)?state.pionexAccount.futuresPositions.length:0;
- const guardApiRows=num(sync?.diagnostics?.listRows),apiRowsDisplay=syncStatus==='EMPTY_GUARD'&&guardApiRows!=null?guardApiRows:state.botApiRows;
+ const coverage=botFeedCoverage(),matched=coverage.matched,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=coverage.fresh,age=botFeedAgeLabel(),mode=coverage.coverageComplete?'FRESH':matched?'MIXED':'REFERENCE',unmatchedRows=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),feedStatus=String(state.botFeedStatus||syncStatus),walletFeed=feedStatus==='WALLET_DETAIL_OK',apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch',detailLabel=(syncStatus==='OK'||walletFeed)?(state.botDetailRows+'/'+state.botSupportedRows):'—',detailTone=(syncStatus==='OK'||walletFeed)&&state.botDetailsComplete?'safe':syncStatus==='ERROR'?'danger':'watch',accountSync=state.pionexAccountSync||{},accountStatus=String(accountSync.status||'UNKNOWN'),accountLabel=accountStatus==='OK'?'OK':accountStatus==='ERROR'?'ERROR':accountStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',accountTone=accountLabel==='OK'?'safe':accountLabel==='ERROR'?'danger':'watch',futPos=Array.isArray(state.pionexAccount?.futuresPositions)?state.pionexAccount.futuresPositions.length:0;
+ const guardApiRows=num(sync?.diagnostics?.listRows),apiRowsDisplay=walletFeed?state.botApiRows:(syncStatus==='EMPTY_GUARD'&&guardApiRows!=null?guardApiRows:state.botApiRows);
  let diag='';
- if(syncStatus==='DISABLED_MISSING_CREDENTIALS')diag='Pionex Bot API nicht konfiguriert · alter Snapshot bleibt bewusst nicht handlungsrelevant.';
+ if(walletFeed)diag='Live-Bot-Fallback aus Wallet + Futures-Grid-Detail · '+state.botDetailRows+'/'+state.botSupportedRows+' unterstützte Detailreads validiert · klassische Bot-Liste bleibt separat im Guard.';
+ else if(syncStatus==='DISABLED_MISSING_CREDENTIALS')diag='Pionex Bot API nicht konfiguriert · alter Snapshot bleibt bewusst nicht handlungsrelevant.';
  else if(syncStatus==='ERROR')diag='Pionex Bot API Sync-Fehler · '+String(sync.error||'unbekannt').slice(0,120);
  else if(syncStatus==='EMPTY_GUARD'){const d=sync.diagnostics||{},types=Object.entries(d.typeCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—',states=Object.entries(d.statusCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—';diag='Pionex Bot-Liste: '+String(d.listRows??'—')+' laufende Row(s) · Typen '+types+' · Status '+states+' · lokale Futures-Allowlist blieb leer · alter Snapshot wurde aus Sicherheitsgründen nicht überschrieben.';}
  else if(coverage.coverageComplete&&matched<state.bots.length)diag='Bot-Feed liefert aktuell '+coverage.supported+' unterstützte Rows · alle sicher gematcht · Referenzkatalog '+state.bots.length+' Rows.';
@@ -514,25 +515,34 @@ function notifyData(){
  if(window.MERIDIAN_V10)window.dispatchEvent(new CustomEvent('meridian:data'));
  else go(current)
 }
+function selectPionexRisk(d={}){
+ const primary=d?.pionexRisk||null,wallet=d?.pionexAccount?.walletBotRisk||null,primaryStatus=String(d?.pionexBotSync?.status||'UNKNOWN'),accountStatus=String(d?.pionexAccountSync?.status||'UNKNOWN');
+ const primaryOk=primaryStatus==='OK'&&Array.isArray(primary?.bots)&&primary.bots.length>0&&primary?.detailsComplete===true;
+ const walletOk=accountStatus==='OK'&&wallet?.detailsComplete===true&&Array.isArray(wallet?.bots)&&wallet.bots.length>0;
+ if(primaryOk)return{risk:primary,status:'BOT_API_OK',kind:'BOT_API'};
+ if(walletOk)return{risk:wallet,status:'WALLET_DETAIL_OK',kind:'WALLET_DETAIL'};
+ return{risk:primary,status:primaryStatus,kind:'BOT_API'};
+}
 let syncBusy=false;
 async function sync(){
  if(syncBusy)return false;syncBusy=true;
  try{
- const [payload,history,tickers]=await Promise.all([getJson('/api/private/dashboard'),getJson('/api/private/portfolio-history?range=1d').catch(e=>({source:'UNAVAILABLE',points:[],error:String(e?.message||e)})),portfolioSpotTickers().catch(e=>({error:String(e?.message||e)}))]),raw=payload?.data||payload,d=Array.isArray(tickers)?buildLivePriceOverlay(raw,tickers,Date.now()):clearStaleLivePrices(raw,Date.now(),tickers?.error||'MARKET_FEED_UNAVAILABLE'),live=Array.isArray(d?.pionexRisk?.bots)?d.pionexRisk.bots.map(normalizeLive):[];
+ const [payload,history,tickers]=await Promise.all([getJson('/api/private/dashboard'),getJson('/api/private/portfolio-history?range=1d').catch(e=>({source:'UNAVAILABLE',points:[],error:String(e?.message||e)})),portfolioSpotTickers().catch(e=>({error:String(e?.message||e)}))]),raw=payload?.data||payload,d=Array.isArray(tickers)?buildLivePriceOverlay(raw,tickers,Date.now()):clearStaleLivePrices(raw,Date.now(),tickers?.error||'MARKET_FEED_UNAVAILABLE'),selected=selectPionexRisk(d),feed=selected.risk,live=Array.isArray(feed?.bots)?feed.bots.map(normalizeLive):[];
  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
  if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;}
  state.liveRows=live.length;
- state.botApiRows=num(d?.pionexRisk?.apiRows)??live.length;
- state.botSupportedRows=num(d?.pionexRisk?.supportedRows)??live.length;
- state.botDetailRows=num(d?.pionexRisk?.detailRows)??0;
- state.botDetailsComplete=d?.pionexRisk?.detailsComplete===true;
+ state.botApiRows=num(feed?.apiRows)??live.length;
+ state.botSupportedRows=num(feed?.supportedRows)??live.length;
+ state.botDetailRows=num(feed?.detailRows)??0;
+ state.botDetailsComplete=feed?.detailsComplete===true;
+ state.botFeedStatus=selected.status;
  state.pionexBotSync=d?.pionexBotSync||null;
  state.pionexAccountSync=d?.pionexAccountSync||null;
  state.pionexAccount=d?.pionexAccount||null;
- const specificTs=parseTs(d?.pionexRisk?.updatedAt||d?.pionexRisk?.snapshotAt);
+ const specificTs=parseTs(feed?.updatedAt||feed?.snapshotAt);
  state.botFeedUpdatedAt=specificTs||parseTs(d?.privateUpdatedAt);
  state.botFeedTimestampTrusted=!!specificTs;
- state.botFeedSource=String(d?.pionexRisk?.source|| (specificTs?'PRIVATE_PIONEX_SNAPSHOT':'PRIVATE_STATE_LEGACY_TIMESTAMP'));
+ state.botFeedSource=String(feed?.source|| (specificTs?'PRIVATE_PIONEX_SNAPSHOT':'PRIVATE_STATE_LEGACY_TIMESTAMP'));
  const coverage=botFeedCoverage();
  state.source=coverage.coverageComplete?'FRESH':coverage.matched?'MIXED':'REFERENCE';
  state.market=String(d?.market?.regime||d?.btcRegime?.label||d?.regime?.label||'SYNC').toUpperCase();
