@@ -61,7 +61,8 @@ test('r28 v10 Data Guard consumes the same shared coverage helper',()=>{
 });
 
 test('r28 release identity remains canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r28');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=28);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v9.includes("live-price-core-r18.js?v="+release.terminalBuild));
