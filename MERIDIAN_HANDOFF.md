@@ -535,3 +535,13 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Public gateway health exposes only aggregate/category structure metadata, not balances, position values or bot IDs.
 - No automatic Wallet-to-bot mapping yet.
 - No API writes, trading permissions, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
+## v10 r48 — Wallet Bot detail hydration discovery
+
+- Keeps r47 Wallet/Bot Account discovery and r46 Futures POSITION API intact.
+- Privately normalizes TRADING_BOT and FUTURES_LITE wallet entries.
+- Probes each unique buOrderId with GET /api/v1/bot/orders/futuresGrid/order at safe pacing.
+- Stores successful detail payloads privately for later validation; individual failures are fail-soft.
+- Public diagnostics expose only aggregate buOrderType/cateType counts and detail success/failure counts.
+- Recognizes FUTURE_GRID_COIN_MARGINED as the documented Coin-M Futures Grid cateType.
+- Does not promote probe results into bot decision readiness.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.

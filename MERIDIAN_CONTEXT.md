@@ -209,3 +209,8 @@ The position layer shows current Pionex Futures account risk data without claimi
 r46 is operational: the Futures account position feed is fresh and currently returns one XRP long position, while the Bot API returns zero running bot rows. Official Pionex Wallet OpenAPI documents a full-account read endpoint that separates Bot Account and Trader Account.
 
 r47 adds `GET /api/v1/wallet/balancesFull` as a fail-soft fourth read source. MERIDIAN stores normalized private totals/categories but exposes only privacy-safe category counts, list counts and entry field names for diagnostics. This release is discovery-only; it does not map Wallet entries into actionable bots.
+## v10 r48 Wallet Bot detail probes
+
+r47 live discovery returned 53 wallet entries: 32 TRADING_BOT, 3 FUTURES_LITE, 17 SPOT and 1 ARBITRAGE. The bot-adjacent entries expose buOrderId, buOrderType, cateType, baseList, investmentAmount, investmentToken, profit and title.
+
+r48 privately normalizes the TRADING_BOT/FUTURES_LITE entries and performs GET-only detail probes by buOrderId against the Pionex Futures Grid detail endpoint. The UI shows aggregate buOrderType/cateType counts and detail-probe coverage only. No detail result is promoted to Action Ready in this release.

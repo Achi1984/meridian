@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {canonicalPionexQuery,signPionexReadGet,pionexReadGet} from '../pionex-read-client.js';
 import {
   normalizeSpotBalances,normalizeFuturesBalances,normalizeFuturesPositions,normalizeWalletOverview,
+  normalizeWalletBotEntries,probeWalletBotDetails,
   fetchPionexReadSnapshot,readCredentials,mergePionexAccountState
 } from '../pionex-account-read-sync.js';
 
@@ -38,7 +39,8 @@ test('read snapshot normalizes spot, futures balances and active positions witho
     if(url.includes('/api/v1/account/balances'))data={balances:[{coin:'BTC',free:'0.1',frozen:'0'}]};
     else if(url.includes('/uapi/v1/account/balances'))data={balances:[{coin:'USDT',free:'10',frozen:'2',debts:'0'}],isolates:[]};
     else if(url.includes('/uapi/v1/account/positions'))data={positions:[{positionId:'p1',symbol:'BTC_USDT_PERP',positionSide:'LONG',netSize:'0.01',avgPrice:'80000',unrealizedPnL:'12.5',markPrice:'81250',liquidationPrice:'60000',leverage:'5'}]};
-    else if(url.includes('/api/v1/wallet/balancesFull'))data={totalInUsdt:'123',botAccount:{totalInUsdt:'100',detail:[{type:'bot',title:'Bots',count:2,hasMore:false,list:[{foo:'x',bar:'y'},{foo:'z'}]}]},traderAccount:{totalInUsdt:'23',detail:[]}};
+    else if(url.includes('/api/v1/wallet/balancesFull'))data={totalInUsdt:'123',botAccount:{totalInUsdt:'100',detail:[{type:'TRADING_BOT',title:'Bots',count:2,hasMore:false,list:[{buOrderId:'bot-a',buOrderType:'futures_grid',cateType:'FUTURE_GRID_COIN_MARGINED',foo:'x',bar:'y'},{buOrderId:'bot-b',buOrderType:'future_hedge_grid',cateType:'FULLY_HEDGING',foo:'z'}]}]},traderAccount:{totalInUsdt:'23',detail:[]}};
+    else if(url.includes('/api/v1/bot/orders/futuresGrid/order'))data={buOrderData:{status:'running',trend:'long'}};
     return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data})};
   };
   const snap=await fetchPionexReadSnapshot({
@@ -56,9 +58,50 @@ test('read snapshot normalizes spot, futures balances and active positions witho
   assert.equal(snap.wallet.botCategoryCount,1);
   assert.equal(snap.wallet.botReportedCount,2);
   assert.equal(snap.wallet.botListCount,2);
-  assert.deepEqual(snap.wallet.botCategories[0].entryFields,['bar','foo']);
+  assert.deepEqual(snap.wallet.botCategories[0].entryFields,['bar','buOrderId','buOrderType','cateType','foo']);
+  assert.equal(snap.wallet.botEntryCount,2);
+  assert.equal(snap.walletBotProbe.candidateCount,2);
+  assert.equal(snap.walletBotProbe.successCount,2);
 });
 
+
+
+test('wallet bot entries retain private IDs/types for internal detail hydration only',()=>{
+  const rows=normalizeWalletBotEntries([
+    {type:'TRADING_BOT',list:[
+      {buOrderId:'id-1',buOrderType:'futures_grid',cateType:'FUTURE_GRID_COIN_MARGINED',baseList:['BTC'],investmentAmount:'0.1',investmentToken:'BTC',profit:'12.3'},
+      {buOrderId:'id-2',buOrderType:'spot_grid',cateType:'SPOT',baseList:['ETH']}
+    ]},
+    {type:'SPOT',list:[{buOrderId:'ignored',buOrderType:'spot_grid'}]},
+    {type:'FUTURES_LITE',list:[{buOrderId:'id-3',buOrderType:'future_hedge_grid',cateType:'FULLY_HEDGING'}]}
+  ]);
+  assert.equal(rows.length,3);
+  assert.equal(rows[0].buOrderId,'id-1');
+  assert.equal(rows[0].cateType,'FUTURE_GRID_COIN_MARGINED');
+  assert.deepEqual(rows[0].baseList,['BTC']);
+  assert.equal(rows[2].walletCategory,'FUTURES_LITE');
+});
+
+test('wallet bot detail probe is read-only, aggregate-safe, and fail-soft per candidate',async()=>{
+  const calls=[];
+  const fetchImpl=async url=>{
+    calls.push(url);
+    const id=new URL(url).searchParams.get('buOrderId');
+    if(id==='bad')return {ok:true,status:200,text:async()=>JSON.stringify({result:false,code:'BOT_INVALID_ARGUMENT',message:'no detail'})};
+    return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{buOrderId:id,status:'running',buOrderData:{status:'running',trend:'long'}}})};
+  };
+  const result=await probeWalletBotDetails([
+    {buOrderId:'good',buOrderType:'futures_grid',cateType:'FUTURE_GRID_COIN_MARGINED'},
+    {buOrderId:'bad',buOrderType:'other',cateType:'UNKNOWN'}
+  ],{apiKey:'k',apiSecret:'s',fetchImpl,now:()=>1700000000000,delayMs:0});
+  assert.equal(calls.length,2);
+  assert.equal(result.candidateCount,2);
+  assert.equal(result.successCount,1);
+  assert.equal(result.failureCount,1);
+  assert.deepEqual(result.buOrderTypeCounts,{futures_grid:1,other:1});
+  assert.deepEqual(result.successCateTypeCounts,{FUTURE_GRID_COIN_MARGINED:1});
+  assert.equal(result.details[0].wallet.buOrderId,'good');
+});
 
 test('wallet overview keeps structural bot-account metadata without inventing entry values',()=>{
   const x=normalizeWalletOverview({

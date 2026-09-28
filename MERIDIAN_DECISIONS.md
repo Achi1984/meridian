@@ -560,3 +560,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** Live r46 proved the Futures Trader Account exposes only one XRP position while the user's Asset Watch reference contains many active Pionex bots. Pionex's Wallet API explicitly separates Bot Account and Trader Account, so the Bot Account is the next authoritative read surface.
 
 **Safety:** The Wallet call is fail-soft and cannot invalidate the existing Futures position snapshot. Diagnostics expose only category types/counts and returned field names. No list entry values are made public and no category unlocks bot actions without an independently verified mapping.
+## D-054 — Wallet Bot IDs may be probed read-only before promotion
+
+**Decision:** MERIDIAN may retain private Bot Account entries from `TRADING_BOT` and `FUTURES_LITE` and probe their `buOrderId` values through `GET /api/v1/bot/orders/futuresGrid/order`.
+
+**Reason:** r47 proved that Wallet API exposes the user's bot-account entries with `buOrderId`, `buOrderType` and `cateType`, while the Bot list endpoint itself returns zero rows.
+
+**Privacy:** Bot IDs, investment amounts, profit and detail payloads remain in private state only. Public health/UI diagnostics expose only aggregate type/category counts and probe success/failure counts.
+
+**Promotion rule:** Successful detail reads are discovery evidence only in r48. They do not enter the actionable Bot Risk layer until a later release explicitly validates normalization/matching and passes release gates.

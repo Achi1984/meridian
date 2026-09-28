@@ -32,9 +32,9 @@ test('r47 UI keeps wallet discovery separate from bot actions',()=>{
   assert.match(v10,/function walletDiscoveryHealth\(\)/);
   assert.match(v10,/function walletDiscoveryLayer\(\)/);
   assert.match(v10,/BOT ACCOUNT API/);
-  assert.match(v10,/WALLET DISCOVERY/);
-  assert.match(v10,/Noch keine automatische Bot-Zuordnung/);
-  assert.match(v10,/Werte und Bot-Aktionen bleiben fail-closed/);
+  assert.match(v10,/WALLET(?: \+ DETAIL)? DISCOVERY/);
+  assert.match(v10,/keine automatische Bot-Zuordnung|Detaildaten bleiben privat/);
+  assert.match(v10,/Bot-Aktionen bleiben fail-closed/);
 });
 
 test('r47 does not alter bot decision readiness or execution rules',()=>{
@@ -47,11 +47,13 @@ test('r47 does not alter bot decision readiness or execution rules',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r47 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r47');
-  assert.match(root,/10\.0-r47-production/);
-  assert.match(root,/\.\/v10\/\?build=r47/);
-  assert.match(v10,/const BUILD='10\.0-r47'/);
-  assert.match(v9,/qs\.set\('build','r47'\)/);
-  assert.match(v9html,/p\.set\('build','r47'\)/);
+test('r47 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=47);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });

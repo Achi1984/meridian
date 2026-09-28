@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r47';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r47';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r47';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r47';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r47';
-// MERIDIAN v10 r47 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r48';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r48';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r48';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r48';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r48';
+// MERIDIAN v10 r48 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r47';
+const BUILD='10.0-r48';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -196,17 +196,19 @@ function accountPositionLayer(compact=false){
 function walletDiscoveryHealth(){
   const s=S(),account=s?.pionexAccount||{},sync=s?.pionexAccountSync||{},wallet=account?.wallet||{},status=String(account?.walletStatus||'UNKNOWN'),ts=Date.parse(String(account.updatedAt||account.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=String(sync.status||'UNKNOWN')==='OK'&&status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';
   const label=status==='OK'?(fresh?'LIVE':'STALE'):status==='ERROR'?'ERROR':'WAIT',tone=label==='LIVE'?'safe':label==='ERROR'?'danger':'watch';
-  return{status,label,tone,wallet,fresh,age,error:account?.walletError||null};
+  return{status,label,tone,wallet,probe:account?.walletBotProbe||null,fresh,age,error:account?.walletError||null};
 }
 function walletDiscoveryLayer(){
-  const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[];
+  const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[],probe=w.probe||{};
   if(w.status==='ERROR')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API ERROR</b><small>'+esc(String(w.error||'Pionex Wallet API nicht verfügbar').slice(0,160))+' · Futures POSITION API bleibt davon unabhängig.</small></section>';
   if(w.status!=='OK')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API WAIT</b><small>Wallet/Bot-Account-Read noch nicht verfügbar · Positionslayer bleibt separat.</small></section>';
   const cards=rows.map(x=>{
     const fields=Array.isArray(x?.entryFields)&&x.entryFields.length?x.entryFields.join(', '):'keine List-Felder',count=Number.isFinite(Number(x?.count))?Number(x.count):Number(x?.listCount)||0;
     return '<div><span>'+esc(String(x?.type||x?.title||'CATEGORY').toUpperCase())+'</span><b>'+count+' gemeldet · '+(Number(x?.listCount)||0)+' geladen</b><small>FELDER '+esc(fields)+'</small></div>';
   }).join('');
-  return '<section class="v10-data-guard v10-wallet-discovery"><div class="guard-head"><div><span>BOT ACCOUNT API</span><b>WALLET DISCOVERY</b></div><strong class="tone-'+w.tone+'">'+esc(w.label)+'</strong></div><div class="guard-grid"><div><span>KATEGORIEN</span><b>'+Number(w.wallet?.botCategoryCount||0)+'</b></div><div><span>BOT-EINTRÄGE GEMELDET</span><b>'+Number(w.wallet?.botReportedCount||0)+'</b></div><div><span>LISTEN-EINTRÄGE GELADEN</span><b>'+Number(w.wallet?.botListCount||0)+'</b></div></div>'+(cards?'<div class="v10-wallet-categories">'+cards+'</div>':'')+'<small>Read-only Strukturdiagnose. Noch keine automatische Bot-Zuordnung; Werte und Bot-Aktionen bleiben fail-closed.</small></section>';
+  const counts=obj=>Object.entries(obj||{}).map(([k,v])=>esc(k)+' '+Number(v||0)).join(' · ')||'—';
+  const success=Number(probe.successCount||0),candidates=Number(probe.candidateCount||0),fail=Number(probe.failureCount||0),probeTone=candidates&&success===candidates?'safe':success>0?'watch':'muted';
+  return '<section class="v10-data-guard v10-wallet-discovery"><div class="guard-head"><div><span>BOT ACCOUNT API</span><b>WALLET + DETAIL DISCOVERY</b></div><strong class="tone-'+w.tone+'">'+esc(w.label)+'</strong></div><div class="guard-grid"><div><span>KATEGORIEN</span><b>'+Number(w.wallet?.botCategoryCount||0)+'</b></div><div><span>BOT-EINTRÄGE GELADEN</span><b>'+Number(w.wallet?.botEntryCount||0)+'</b></div><div><span>DETAIL PROBE</span><b class="tone-'+probeTone+'">'+success+'/'+candidates+'</b><small>'+fail+' fehlgeschlagen</small></div></div><div class="v10-wallet-categories"><div><span>BUORDERTYPE</span><b>'+counts(w.wallet?.botBuOrderTypeCounts)+'</b><small>Private IDs bleiben verborgen</small></div><div><span>CATETYPE</span><b>'+counts(w.wallet?.botCateTypeCounts)+'</b><small>FUTURE_GRID_COIN_MARGINED = Coin-M Futures Grid</small></div><div><span>DETAIL ERFOLG CATETYPE</span><b>'+counts(probe.successCateTypeCounts)+'</b><small>Nur erfolgreiche read-only Detailreads</small></div></div>'+(cards?'<div class="v10-wallet-categories">'+cards+'</div>':'')+'<small>Read-only Discovery. Detaildaten bleiben privat und sind noch nicht Action-ready; Bot-Aktionen bleiben fail-closed.</small></section>';
 }
 function liveOverview(){
   const g=syncHealth(),h=H(),rows=g.fresh?(S()?.bots||[]).filter(b=>h.liveMatched?.(b)):[];
