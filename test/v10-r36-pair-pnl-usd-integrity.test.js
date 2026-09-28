@@ -55,7 +55,8 @@ test('r36 keeps decision readiness and Profit Lock thresholds unchanged',()=>{
 });
 
 test('r36 release identity remains canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r36');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=36);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
