@@ -10,18 +10,20 @@ const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
-test('r62 root and PWA launch use a cache-distinct current terminal URL',()=>{
-  assert.equal(release.terminalBuild,'10.0-r62');
-  assert.match(root,/meridian-build" content="10\.0-r62-production"/);
-  assert.match(root,/var target='\.\/v10\/\?build=r62'/);
+test('r62+ root and PWA launch use the current cache-distinct terminal URL',()=>{
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(rev.slice(1))>=62);
+  assert.ok(root.includes('meridian-build" content="'+release.terminalBuild+'-production"'));
+  assert.ok(root.includes("var target='./v10/?build="+rev+"'"));
   assert.match(root,/p\.delete\('build'\)/);
-  assert.match(root,/p\.set\('fresh','r62'\)/);
-  assert.equal(manifest.start_url,'./v10/?build=r62&fresh=r62');
+  assert.ok(root.includes("p.set('fresh','"+rev+"')"));
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
   assert.equal(manifest.scope,'./');
 });
 
-test('r62 v10 shell probes version.json with no-store and self-heals stale builds',()=>{
-  assert.match(shell,/const LOCAL_BUILD='10\.0-r62'/);
+test('r62+ v10 shell probes version.json with no-store and self-heals stale builds',()=>{
+  assert.ok(shell.includes("const LOCAL_BUILD='"+release.terminalBuild+"'"));
   assert.match(shell,/fetch\('\.\.\/version\.json\?boot='\+Date\.now\(\),\{cache:'no-store'\}\)/);
   assert.match(shell,/latest===LOCAL_BUILD/);
   assert.match(shell,/u\.searchParams\.set\('build',rev\)/);
