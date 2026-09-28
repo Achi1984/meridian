@@ -450,3 +450,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r33–r36 already withhold incomplete asset aggregates, and r37 blocks global non-safety NEXT ACTION on incomplete coverage. The individual pair status must not still present a trading decision from a partial same-asset leg set.
 
 **Isolation:** Matching thresholds themselves, pair-status ranks, signal formulas, liquidation thresholds, stop-loss checks, Profit Lock thresholds/percentages, hedge threshold, Paper-bot parameters, leverage and execution are unchanged.
+
+
+## D-043 — Terminal releases are single-writer and lease-based
+
+**Decision:** Only the Main Agent may allocate terminalBuild, own a terminal release branch, open the release PR, or merge it. Parallel specialists/subagents may analyze, test, review, or prepare isolated patch proposals, but they may not independently allocate release numbers or merge competing terminal releases.
+
+**Lease rule:** A terminal release must be exactly one revision ahead of current main. The v10-rNN branch suffix and version.json terminalBuild must agree. If multiple open PRs target the same revision, the oldest open PR owns that revision; later contenders are invalid.
+
+**Freshness rule:** Release Safety results are bound to one exact PR head SHA. Immediately before merge, the Main Agent must re-read current main, PR head/base, branch compare, competing release PRs, and gate results. If main advanced or the branch is behind, the release plan is invalidated and the scoped work is ported to the next free revision with fresh gates.
+
+**Interruption rule:** After any streaming/tool interruption or resumed conversation, repo state is re-read before the next write. Already-landed changes are never replayed from chat state alone.
+
+**Automation:** scripts/release-coordinator.mjs enforces release-number/branch consistency and same-revision lease ownership inside Release Safety. A main-push sweep automatically closes stale open v10-rNN PRs whose revision is now current or older.
+
+**Isolation:** This is release orchestration only. It changes no trading rules, Paper-bot parameters, signals, risk thresholds, leverage, portfolio math or execution behavior.
