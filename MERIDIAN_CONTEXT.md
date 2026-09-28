@@ -272,8 +272,8 @@ r57:
 
 ## v10 r57 follow-up — current side samples supersede screenshot inventory assumptions
 
-A later user screenshot pair on 28.09.2026 at 18:58 confirms that current Pionex COIN-M inventory can contain both directions at the same time. The supplied DOT samples are:
-- SHORT 4x: creation price 1.155, break-even 1.165, liquidation 1.854.
-- LONG 3x: creation price 1.242, break-even 1.232, liquidation 0.677.
+A fresh user screenshot pair on 28.09.2026 at 19:05–19:06 confirms that current Pionex COIN-M inventory can contain both directions at the same time. The earlier DOT SHORT sample from 18:58 was closed immediately afterwards and is therefore historical only. Use the SUI pair as the current manual side-validation sample:
+- SHORT 4x: current price 1.1556, creation price 1.0043, break-even 1.0252, liquidation 1.5636, range 0.65–1.85.
+- LONG 4x: current price 1.1556, creation price 1.2463, break-even 1.2218, liquidation 0.6859, range 0.60–1.55.
 
-Both samples agree with r57 economic-side geometry (LIQ above entry/BE => SHORT; LIQ below entry/BE => LONG). Screenshot inventories are point-in-time validation evidence only. Current Wallet-detail API rows with unique bot IDs remain the live identity source; the 27.09 Asset-Watch screenshots and later manual screenshots must not be treated as canonical inventory.
+Both SUI samples agree with r57 economic-side geometry (LIQ above entry/BE => SHORT; LIQ below entry/BE => LONG). Screenshot inventories are point-in-time validation evidence only. Current Wallet-detail API rows with unique bot IDs remain the live identity source; the 27.09 Asset-Watch screenshots and later manual screenshots must not be treated as canonical inventory.
