@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r29';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r29';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r30';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r30';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r29');
+    qs.set('build','r30');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -89,8 +89,10 @@ function livePnlAvailable(b){return liveMatched(b)&&!!b._livePnl}
 function liveInvestAvailable(b){return liveMatched(b)&&!!b._liveInvest}
 function liveInvestUsdAvailable(b){return liveMatched(b)&&!!b._liveInvestUsd}
 function parseTs(v){const t=Date.parse(String(v||''));return Number.isFinite(t)?t:null}
-function botFeedAgeMs(){return state.botFeedUpdatedAt?Math.max(0,Date.now()-state.botFeedUpdatedAt):null}
-function botFeedFresh(){const age=botFeedAgeMs(),future=state.botFeedUpdatedAt!=null&&state.botFeedUpdatedAt>Date.now()+5*60*1000;return state.botFeedTimestampTrusted&&!future&&age!=null&&age<=15*60*1000}
+function botFeedTimeState(){const updatedAt=state.botFeedUpdatedAt??null,trusted=!!state.botFeedTimestampTrusted,future=updatedAt!=null&&updatedAt>Date.now()+5*60*1000,ageMs=updatedAt!=null?Math.max(0,Date.now()-updatedAt):null;return{updatedAt,trusted,future,ageMs}}
+function botFeedAgeMs(){return botFeedTimeState().ageMs}
+function botFeedFresh(){const t=botFeedTimeState();return t.trusted&&!t.future&&t.ageMs!=null&&t.ageMs<=15*60*1000}
+function botFeedAgeLabel(){const t=botFeedTimeState();if(!t.trusted)return'NO TRUSTED TIMESTAMP';if(t.future)return'FUTURE TIMESTAMP';return ageText(t.ageMs)}
 function botFeedCoverage(){const matched=state.bots.filter(liveMatched).length,supported=Math.max(0,Number(state.liveRows)||0),unmatched=Math.max(0,supported-matched),ambiguous=Number(state.matchAmbiguous||0),fresh=botFeedFresh(),coverageComplete=fresh&&supported>0&&unmatched===0&&ambiguous===0;return{matched,supported,unmatched,ambiguous,fresh,coverageComplete}}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
@@ -316,7 +318,7 @@ function profitLockPlan(b){
  const side=b.side||'LONG',rawPi=state.assetIntel[b.symbol],pi=marketIntelFresh(rawPi)?rawPi:null,signal=pi?actionForSide(pi,side):'SYNC',reasons=pi?reasonsForSide(pi,side):[],pnl=botProfitPct(b),t=tpDist(b),liq=risk(b),pair=assetPairRisk(b.symbol),hedgeLow=side==='LONG'&&pair.longUsd>0&&pair.hedgePct!=null&&pair.hedgePct<15;
  const why=reasons.slice(0,3).join(' · '),tpText=t==null?'TP-Distanz —':Math.max(0,t).toFixed(1)+'% zum TP',pnlText=pnl==null?'PnL —':(pnl>=0?'+':'')+pnl.toFixed(1)+'% PnL';
  if(!liveMatched(b))return{code:'SYNC',label:'REFERENCE · VERIFY',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Bot nicht im privaten Bot-Snapshot bestätigt · Referenzwerte sind nicht handlungsrelevant'};
- if(!botFeedFresh())return{code:'SYNC',label:'SNAPSHOT · STALE',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Bot-Snapshot '+ageText(botFeedAgeMs())+' alt/ohne belastbaren Timestamp · keine Trading-Aktion ableiten'};
+ if(!botFeedFresh())return{code:'SYNC',label:'SNAPSHOT · STALE',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Bot-Snapshot '+botFeedAgeLabel()+' · keine Trading-Aktion ableiten'};
  if(liq!=null&&liq<10)return{code:'SAFETY',label:'SAFETY FIRST',tone:'danger',reducePct:0,signal,pnl,tp:t,detail:'Liq-Puffer '+liq.toFixed(1)+'% · zuerst Margin/Exposure prüfen · keine Profit-Lock-Aktion'};
  if(!pi)return{code:'SYNC',label:'MARKET · STALE',tone:'muted',reducePct:0,signal:'SYNC',pnl,tp:t,detail:'Technische 15m/1h/4h-Daten sind nicht frisch · kein Profit-Lock/Exit-Signal ableiten'};
  if(!livePnlAvailable(b))return{code:'SYNC',label:'SYNC · PNL',tone:'muted',reducePct:0,signal,pnl:null,tp:t,detail:'Snapshot-PnL fehlt · '+tpText+' · keine Aktion ableiten'};
@@ -370,7 +372,7 @@ function okxDcaPrice(x){const c=state.priceChecks&&state.priceChecks[x.symbol];r
 function okxDcaTpDist(x){const p=okxDcaPrice(x),tp=num(x.tp);return p>0&&tp>0?(tp-p)/p*100:null}
 function okxStrip(){const ps=state.okxDcaBots||[];if(!ps.length)return'';return `<section class="okx-strip okx-dca-strip"><div class="okx-title"><span>OKX FUTURES DCA · SCREENSHOT</span><b>${ps.length} BOTS · 3x LONG</b></div>${ps.map(x=>{const px=okxDcaPrice(x),td=okxDcaTpDist(x),pnl=num(x.totalPnlPct),tone=pnl==null?'muted':pnl>=0?'safe':'danger',src=state.priceChecks?.[x.symbol]?.verified?'OKX + BINANCE PRICE':'SCREENSHOT PRICE';return `<div class="okx-dca-row"><div class="okx-dca-head"><strong>${x.symbol} · FUTURES DCA · ${x.leverage}x</strong><b class="tone-${tone}">${pnl==null?'—':(pnl>=0?'+':'')+pnl.toFixed(2)+'%'}</b></div><div class="okx-dca-metrics"><span>INVEST <b>${okxAmount(x.investUsd,2)} ${x.quote||'USDC'}</b></span><span>PRICE <b>${money(px)}</b><small>${src}</small></span><span>AVG <b>${money(x.avgCost)}</b></span><span>TP <b>${money(x.tp)}</b><small>${td==null?'—':td.toFixed(1)+'% entfernt'}</small></span><span>PNL <b>${x.totalPnlUsd==null?'—':okxAmount(x.totalPnlUsd,4)+' '+(x.quote||'USDC')}</b></span><span>SAFETY <b>${x.safetyExecuted||0}/${x.safetyMax||0}</b></span></div><small class="okx-dca-note">Gesch. Liq: — · Snapshot 25.09.2026 06:22 · vorherige OKX Position geschlossen</small></div>`}).join('')}</section>`}
 function dataTruthCard(){
- const coverage=botFeedCoverage(),matched=coverage.matched,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=coverage.fresh,age=ageText(botFeedAgeMs())+(state.botFeedTimestampTrusted?'':' · UNTRUSTED'),mode=coverage.coverageComplete?'FRESH':matched?'MIXED':'REFERENCE',unmatchedRows=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch';
+ const coverage=botFeedCoverage(),matched=coverage.matched,pnl=state.bots.filter(livePnlAvailable).length,verified=Object.values(state.priceChecks||{}).filter(x=>x&&x.verified).length,portfolioSource=state.portfolio?.source||'INCOMPLETE',pSource=portfolioSource==='CANONICAL_MIXED'?'CANONICAL MIXED':portfolioSource==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':portfolioSource==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',fresh=coverage.fresh,age=botFeedAgeLabel(),mode=coverage.coverageComplete?'FRESH':matched?'MIXED':'REFERENCE',unmatchedRows=state.unmatchedLive||[],sync=state.pionexBotSync||{},syncStatus=String(sync.status||'UNKNOWN'),apiLabel=syncStatus==='OK'?'OK':syncStatus==='ERROR'?'ERROR':syncStatus==='EMPTY_GUARD'?'GUARD':syncStatus==='DISABLED_MISSING_CREDENTIALS'?'OFF':'WAIT',apiTone=apiLabel==='OK'?'safe':apiLabel==='ERROR'?'danger':'watch';
  let diag='';
  if(syncStatus==='DISABLED_MISSING_CREDENTIALS')diag='Pionex Bot API nicht konfiguriert · alter Snapshot bleibt bewusst nicht handlungsrelevant.';
  else if(syncStatus==='ERROR')diag='Pionex Bot API Sync-Fehler · '+String(sync.error||'unbekannt').slice(0,120);
@@ -525,7 +527,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedFresh,botFeedCoverage,botFeedAgeMs,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
