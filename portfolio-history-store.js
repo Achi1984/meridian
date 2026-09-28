@@ -7,15 +7,17 @@ export const PORTFOLIO_HISTORY_VERSION='7.64-CANONICAL-PORTFOLIO-HISTORY-V1';
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
 
 export function historySnapshot(data={},opts={}){
-  const base=canonicalPortfolioSnapshot(data,opts.timestamp??Date.now());
-  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd);
+  const strictData={...data,portfolio:{...(data?.portfolio||{}),authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:['Ledger','OKX']}};
+  const base=canonicalPortfolioSnapshot(strictData,opts.timestamp??Date.now());
+  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),authorityComplete=base?.spotAuthority?.complete===true;
   return{
     version:PORTFOLIO_HISTORY_VERSION,
     timestamp:base.timestamp,
     spotUsd:base.spotUsd,
     tradingUsd:base.tradingUsd,
     totalUsd:base.totalUsd,
-    cashflowAdjustedTotalUsd:cumulative==null?null:Math.round((base.totalUsd-cumulative)*100)/100,
+    authorityComplete,
+    cashflowAdjustedTotalUsd:authorityComplete&&cumulative!=null?Math.round((base.totalUsd-cumulative)*100)/100:null,
     cumulativeCashflowUsd:cumulative,
     sourceRevision:Number.isInteger(data?.privateRevision)?data.privateRevision:null,
     sourceStatus:base.sourceStatus
@@ -42,6 +44,7 @@ export async function ensurePortfolioHistorySchema(db){
 export async function appendPortfolioHistory(db,data={},opts={}){
   if(!db)return{ok:false,reason:'NO_DATABASE'};
   const s=historySnapshot(data,opts);
+  if(s.authorityComplete!==true)return{ok:false,reason:'PORTFOLIO_AUTHORITY_INCOMPLETE',snapshot:s};
   if(!(s.totalUsd>=0))return{ok:false,reason:'INVALID_TOTAL'};
   const dedupeMs=Math.max(0,Number(opts.dedupeMs??5*60*1000)||0);
   const latest=await db.query(`SELECT captured_at,spot_usd,trading_usd,total_usd,cashflow_adjusted_total_usd
