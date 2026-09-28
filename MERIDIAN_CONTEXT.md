@@ -185,3 +185,10 @@ Repository inspection confirmed the underlying cause:
 - No runtime component refreshed `pionexRisk.bots`.
 
 r20 adds a dedicated, read-only Pionex Bot API runtime sync. It uses Pionex's Bot-reading endpoint and fails closed: stale snapshots remain stale on authentication/API/network errors.
+## v10 r41 Pionex Bot Detail Hydration checkpoint
+
+The read-only Pionex Bot API path introduced in v9 r20 is now split into list and detail phases. Running bot summaries are no longer assumed to contain complete risk fields. MERIDIAN hydrates every supported active futures-grid / hedge-grid row through the Futures Grid detail read endpoint before publishing a fresh snapshot.
+
+r41 records API list rows, supported futures rows, hydrated detail rows and completeness separately. The active Data Truth surface adds BOT DETAIL coverage. Any missing/duplicate bot ID, detail mismatch, incomplete detail payload, truncated pagination or detail-read failure fails closed and leaves the prior risk snapshot stale rather than partially refreshing it.
+
+This is data-ingestion hardening only. Trading rules, matching thresholds, Profit Lock, hedging, Paper bots, leverage and execution remain unchanged; no Pionex mutation endpoint is introduced.
