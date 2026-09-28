@@ -75,6 +75,8 @@ Examples: UI review plus data-integrity review; trading-method review plus code 
 
 Run work serially when task B depends on task A, tasks modify the same code path, one establishes canonical data needed by another, review follows implementation, or integration can be tested only after all parts exist.
 
+**Repository mutation is single-writer by default.** Parallel agents may research, audit, review, draft tests, or prepare isolated patch proposals, but they must not independently allocate release numbers, bump `terminalBuild`, open competing release PRs, merge to `main`, or mutate the same release branch. Release integration is serialized through the Main Agent.
+
 Typical software sequence:
 
 1. Architecture/task design.
@@ -204,22 +206,56 @@ If only one source exists, the result is marked single-source/not cross-verified
 
 Default flow:
 
-1. Start from current main.
-2. Create dedicated feature/fix branch.
-3. Implement scoped changes.
-4. Run specialist self-checks.
-5. Run independent review.
-6. Revise up to three times if required.
-7. Run integration quality gates.
-8. Inspect final diff against main.
-9. Create PR documenting change, reason, checks, limitations, and execution impact.
-10. Confirm PR is mergeable.
-11. Merge autonomously when all gates are green.
-12. Verify main contains the intended change.
-13. Verify production/deployment behavior when possible.
-14. Update continuity documentation for durable architecture/rule/limitation/next-step changes.
+1. **Resume preflight:** before any write, re-read the actual current `main` SHA, `version.json`, relevant branch head, open PR state, and current workflow runs. Never trust interrupted-stream or chat state as authoritative repo state.
+2. Determine whether the task is a terminal release or an infrastructure/non-terminal change.
+3. For a terminal release, the Main Agent alone allocates the next revision from the freshly read `main` value. The target must be exactly `main + 1`.
+4. Create one dedicated branch from the exact current `main` SHA. Release branches use `fix/v10-rNN-...` with NN equal to `version.json.terminalBuild`.
+5. Specialists/subagents may implement or review scoped work, but release-number ownership, release metadata, PR creation, and merge remain with the Main Agent.
+6. Run specialist self-checks and the required review loop.
+7. Integrate serially into the single release branch.
+8. Run targeted tests and the full repository quality gates.
+9. Inspect the final diff against current `main`.
+10. Create one release PR documenting change, reason, checks, limitations, and execution impact.
+11. **Gate binding:** gate results are valid only for the exact current PR head SHA. Any new commit invalidates earlier approvals and requires fresh gates.
+12. **Pre-merge atomic recheck:** immediately before merge, re-read current `main`, PR metadata, branch compare, competing release PRs, and workflow results. Require all of:
+    - PR head SHA equals the SHA that passed the gates;
+    - PR base SHA/current merge base still corresponds to current `main`;
+    - branch is not behind current `main`;
+    - candidate terminal revision is still exactly current `main + 1`;
+    - no older open PR owns the same release revision;
+    - all mandatory gates are green on the exact head.
+13. If any pre-merge condition fails, **do not merge**. Close/supersede the stale release PR, rebase/port the scoped change onto fresh `main`, allocate the next free revision, and rerun all gates.
+14. Merge with `expected_head_sha`.
+15. Verify `main` contains the intended change and release identity.
+16. Verify production/deployment behavior with Runtime Smoke when available.
+17. Update continuity documentation for durable architecture/rule/limitation/next-step changes.
 
 The user does not need to approve each merge once the agreed gates pass.
+
+### 14.1 Single-Writer Release Lease
+
+MERIDIAN terminal releases use a single-writer lease:
+
+- Only the Main Agent may allocate or change `terminalBuild`.
+- A release PR must be exactly one revision ahead of current `main`.
+- Branch revision and `version.json.terminalBuild` must agree.
+- If multiple open PRs target the same revision, the oldest open PR owns the lease; later contenders are invalid.
+- After `main` advances, open release PRs targeting the current or older revision are stale and must be closed, never merged.
+- A stale branch/release number is never repurposed. Its scoped work may be ported to a new branch using the next free revision.
+- Infrastructure/docs/process PRs may keep the current terminal build, but may not change it.
+
+The repository enforces this with `scripts/release-coordinator.mjs`, the Release Safety guard, and the post-main stale-PR sweep workflow.
+
+### 14.2 Interruption / Streaming Recovery
+
+After a tool interruption, streaming interruption, resumed conversation, or user “Fortsetzen” request:
+
+1. Perform the Resume preflight before any mutation.
+2. Treat repo state as authoritative over chat summaries.
+3. Detect already-completed commits/PRs/merges and skip them.
+4. If a parallel actor advanced `main`, invalidate the old release plan and recompute the next revision.
+5. Never replay a write merely because the previous response was interrupted; verify whether it already landed first.
+6. Never merge a PR whose gates belong to an older head SHA or an older `main` base.
 
 ## 15. Documentation and Continuity
 

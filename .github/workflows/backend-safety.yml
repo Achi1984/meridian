@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   syntax:
@@ -21,6 +22,11 @@ jobs:
           cache: npm
       - name: Deterministic install
         run: npm ci --ignore-scripts
+      - name: Release coordination guard
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-coordinator.mjs --guard
       - name: Backend syntax
         run: |
           node --check server.js
