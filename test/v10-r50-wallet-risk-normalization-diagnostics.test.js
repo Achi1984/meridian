@@ -44,11 +44,13 @@ test('r50 leaves source selection and trading decisions unchanged',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r50 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r50');
-  assert.match(root,/10\.0-r50-production/);
-  assert.match(root,/\.\/v10\/\?build=r50/);
-  assert.match(v10,/const BUILD='10\.0-r50'/);
-  assert.match(v9,/qs\.set\('build','r50'\)/);
-  assert.match(v9html,/p\.set\('build','r50'\)/);
+test('r50 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=50);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });

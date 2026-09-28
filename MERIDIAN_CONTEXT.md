@@ -226,3 +226,8 @@ The selected Wallet detail rows still pass through the existing conservative ref
 r49 deployed correctly but live UI still selected the classic Bot API EMPTY_GUARD instead of WALLET DETAIL, while Wallet discovery remained fresh and 32/35 detail probes succeeded. This isolates the blocker to the Wallet detail -> normalized live-risk step.
 
 r50 adds aggregate diagnostics to the private Wallet risk object and BOTS UI: normalized/supported count, rejected count and reasons, detail status/trend counts, missing-base count, and top-level/buOrderData field names. No guard is relaxed in this release.
+## v10 r51 Pionex enum whitespace normalization
+
+r50 live diagnostics isolated the Wallet risk blocker: 32/32 supported details reached the normalizer with status=running, valid long/short trends and no missing base, yet 0/32 normalized. The diagnostic path trimmed strings while normalizePionexBotOrder/activeOrder/direction and detail-candidate filtering did not.
+
+r51 trims surrounding whitespace before the existing type/status/trend allowlist comparisons. It does not add any accepted enum value. This is intended to let semantically identical documented Pionex values pass the same existing safety checks.
