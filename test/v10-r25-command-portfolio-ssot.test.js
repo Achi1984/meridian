@@ -30,7 +30,8 @@ test('r25 current Spot valuation uses privacy-safe all-ticker overlay with fail-
 test('r25 history is diagnostic and cannot replace the current canonical total',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/historyPoint=latestPortfolioHistorySnapshot\(history\)/);
-  assert.match(block,/historyDeltaUsd=total!=null&&historyPoint\.found/);
+  assert.match(block,/historyComparable=total!=null&&historyPoint\.found/);
+  assert.match(block,/historyDeltaUsd=historyComparable\?historyPoint\.totalUsd-total:null/);
   assert.doesNotMatch(block,/total=useHistory/);
   assert.match(v10,/HIST Δ/);
 });
