@@ -185,6 +185,8 @@ async function fetchTimed(url,options={},timeoutMs=FETCH_TIMEOUT_MS){
  finally{clearTimeout(t)}
 }
 async function getJson(path){const r=await fetchTimed(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function postJson(path,body={}){const r=await fetchTimed(API_BASE+path,{method:'POST',cache:'no-store',headers:{accept:'application/json','content-type':'application/json',...(token()?{authorization:'Bearer '+token()}:{})},body:JSON.stringify(body)},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function manageAssetWatchShare(action='rotate'){const j=await postJson('/api/private/asset-watch-share',{action});return{...j,shareUrl:j?.sharePath?API_BASE+j.sharePath:null}}
 const PORTFOLIO_TICKER_CACHE_MS=25000;
 let portfolioTickerCache={at:0,rows:null};
 async function portfolioSpotTickers(){
@@ -689,7 +691,7 @@ window.MERIDIAN_V10_BRIDGE={
     if(v==='command')bindPortfolioRefEditor();
     return true;
   },
-  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,pnlIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,pnlIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory,manageAssetWatchShare},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
