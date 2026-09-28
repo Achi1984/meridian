@@ -24,7 +24,7 @@ test('r59 live exposure labels explicitly identify leveraged notional',()=>{
 test('r59 uses fresh Pionex Wallet total before screenshot equity fallback',()=>{
   assert.match(v9,/walletEquity=num\(d\?\.pionexAccount\?\.wallet\?\.totalInUsdt\)/);
   assert.match(v9,/source:'PIONEX_WALLET_READ_API'/);
-  assert.match(v9,/resolvedPionex=privatePionex\.found\?privatePionex:\(walletPionex\|\|/);
+  assert.match(v9,/resolvedPionex=walletPionex&&\(!privateFresh\|\|walletTs>=privateTs\)\?walletPionex:privatePionex\.found\?privatePionex:/);
   assert.match(v9,/pionexEquityUsd:resolvedPionex\.value/);
   assert.match(v9,/return'WALLET API'/);
 });
