@@ -268,3 +268,12 @@ r57:
 - accepts complete Wallet-detail rows as API-native identity only when detailsComplete and IDs are unique;
 - keeps the old Asset-Watch snapshot as historical/reference data only;
 - does not promote rows to Decision Ready unless existing PnL, risk, market and capital gates also pass.
+
+
+## v10 r57 follow-up — current side samples supersede screenshot inventory assumptions
+
+A later user screenshot pair on 28.09.2026 at 18:58 confirms that current Pionex COIN-M inventory can contain both directions at the same time. The supplied DOT samples are:
+- SHORT 4x: creation price 1.155, break-even 1.165, liquidation 1.854.
+- LONG 3x: creation price 1.242, break-even 1.232, liquidation 0.677.
+
+Both samples agree with r57 economic-side geometry (LIQ above entry/BE => SHORT; LIQ below entry/BE => LONG). Screenshot inventories are point-in-time validation evidence only. Current Wallet-detail API rows with unique bot IDs remain the live identity source; the 27.09 Asset-Watch screenshots and later manual screenshots must not be treated as canonical inventory.

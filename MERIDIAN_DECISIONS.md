@@ -640,3 +640,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Side validation:** For explicit inverse/Coin-M rows, when direct positionOpenPrice and direct liquidationPrice are both present and clearly separated, MERIDIAN derives economic side from liquidation geometry. The original Pionex trend is retained as declaredSide for diagnostics.
 
 **Safety:** API-native identity replaces only legacy screenshot identity matching. Freshness, risk availability, PnL availability, capital completeness, market-data freshness, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution remain independently fail-closed.
+
+
+## D-064 — Manual screenshots validate live identity but never define current inventory
+
+**Decision:** User screenshots may be used as point-in-time validation samples for individual bot direction and structural fields, but they must not be promoted into a canonical statement about the full current Pionex bot inventory.
+
+**Evidence:** On 28.09.2026 at 18:58, the user supplied simultaneous DOT COIN-M samples in both directions: a SHORT 4x bot with creation price 1.155, break-even 1.165 and liquidation 1.854, and a LONG 3x bot with creation price 1.242, break-even 1.232 and liquidation 0.677.
+
+**Implication:** Economic side remains derived for explicit inverse/Coin-M rows from direct positionOpenPrice vs liquidationPrice when clear. Complete fresh Wallet-detail rows with unique bot IDs remain the current identity source. Older Asset-Watch screenshots and newer spot-check screenshots are historical/validation evidence only and cannot justify global assumptions such as "all current bots are LONG" or "there are no SHORT bots."
+
+**Safety:** This changes documentation and validation evidence only. No trading, transfer, PaperBot, Profit Lock, hedge threshold, leverage, matcher threshold or execution behavior changes.
