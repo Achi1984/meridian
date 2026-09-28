@@ -96,7 +96,7 @@ function botFeedAgeLabel(){const t=botFeedTimeState();if(!t.trusted)return'NO TR
 function botFeedCoverage(){const matched=state.bots.filter(liveMatched).length,supported=Math.max(0,Number(state.liveRows)||0),unmatched=Math.max(0,supported-matched),ambiguous=Number(state.matchAmbiguous||0),fresh=botFeedFresh(),coverageComplete=fresh&&supported>0&&unmatched===0&&ambiguous===0;return{matched,supported,unmatched,ambiguous,fresh,coverageComplete}}
 function ageText(ms){if(ms==null)return'NO TIMESTAMP';const m=Math.floor(ms/60000);if(m<1)return'<1 MIN';if(m<60)return m+' MIN';const h=Math.floor(m/60);return h<48?h+'H '+(m%60)+'M':Math.floor(h/24)+'D '+(h%24)+'H'}
 function marketIntelFresh(i,maxAge=3*60*1000){const ts=num(i?.updatedAt);return !!i&&ts!=null&&ts<=Date.now()+30000&&Date.now()-ts<=maxAge}
-function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[])].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
+function trackedMarketSymbols(){const accountPositions=Array.isArray(state.pionexAccount?.futuresPositions)?state.pionexAccount.futuresPositions.map(x=>({symbol:x?.asset||String(x?.symbol||'').replace(/[-_/](USDT|USDC|USD)_?PERP$/,'').replace(/\.PERP$/,'')})):[];return [...new Set([...(state.referenceBots||[]),...(state.bots||[]),...(state.okxDcaBots||[]),...(state.unmatchedLive||[]),...accountPositions].map(x=>String(x?.symbol||'').trim().toUpperCase()).filter(Boolean))]}
 function safetyReadyBot(b){return liveMatched(b)&&botFeedFresh()&&risk(b)!=null}
 function decisionReadyBot(b){return safetyReadyBot(b)&&livePnlAvailable(b)&&marketIntelFresh(state.assetIntel?.[b.symbol])}
 function actionableBot(b){return decisionReadyBot(b)}
