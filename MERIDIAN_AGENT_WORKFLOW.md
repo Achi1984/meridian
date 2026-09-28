@@ -257,6 +257,23 @@ After a tool interruption, streaming interruption, resumed conversation, or user
 5. Never replay a write merely because the previous response was interrupted; verify whether it already landed first.
 6. Never merge a PR whose gates belong to an older head SHA or an older `main` base.
 
+### 14.3 Streaming-Safe Execution Protocol
+
+To reduce chat-stream interruptions and make every interruption harmless:
+
+1. Prefer compact metadata queries over full diffs, full logs, or whole-file dumps.
+2. Fetch full diff/log content only when a failed gate or review defect requires it, and then only the relevant failure window.
+3. Keep each user-visible work cycle short: one implementation milestone, one gate milestone, or one merge milestone per update rather than one very long uninterrupted response.
+4. After every durable mutation, treat GitHub state (commit SHA, PR head, merge state, workflow run) as the checkpoint. Never rely on unsent chat text as the only record of progress.
+5. Before any post-interruption mutation, rerun the Resume preflight from 14.2.
+6. Batch independent read-only checks where possible, but serialize repository writes.
+7. Tool outputs should normally be reduced to the fields needed for the next decision: SHA, PR number, branch distance, gate status, failing step, and concise file list.
+8. Do not paste large raw CI logs into the conversation. Extract only the failing tests and the minimal surrounding evidence.
+9. When a long-running release is healthy, send short checkpoint updates instead of holding the entire result until the end.
+10. A streaming interruption must never trigger blind replay of a merge, commit, release bump, or external action.
+
+This protocol reduces transport/output pressure, while the existing GitHub checkpoint and exact-head rules ensure correctness even if the UI stream still disconnects.
+
 ## 15. Documentation and Continuity
 
 Canonical continuity documents:
