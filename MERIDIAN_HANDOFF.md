@@ -475,3 +475,10 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - All Pionex calls remain GET-only; no create/adjust/reduce/cancel/transfer path is added.
 - Existing r37 global coverage guard, r38 per-asset guard and r40 privacy-safe unmatched diagnostics remain unchanged.
 - No matching threshold, Profit Lock rule, hedge threshold, market signal, portfolio math, Paper-bot parameter, leverage or execution behavior changes.
+
+## Current Pionex API configuration status — 28.09.2026
+
+- The r41 read-only Pionex Bot API integration is implemented, but the user has confirmed that no Pionex API credentials have been created/configured yet.
+- Until PIONEX_BOT_READ_API_KEY and PIONEX_BOT_READ_API_SECRET exist in the runtime secret store, MERIDIAN must treat Pionex Bot API as OFF / not configured.
+- Do not claim live Pionex bot synchronization from GitHub connectivity alone. GitHub repository access and Pionex exchange credentials are separate concerns.
+- Pionex credentials must never be committed to the repository. When created, use Bot-reading/read-only permissions and inject them only through the deployment/runtime secret store.
