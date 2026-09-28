@@ -35,11 +35,11 @@ test('r25 history is diagnostic and cannot replace the current canonical total',
   assert.match(v10,/HIST Δ/);
 });
 
-test('r25 OKX DCA snapshot remains reference-only outside canonical portfolio total',()=>{
+test('r25+ legacy OKX DCA snapshot remains reference-only outside the canonical total',()=>{
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/OKX DCA REF/);
-  assert.match(command,/REFERENCE (?:COMPLETE|PARTIAL).*OUTSIDE CANONICAL TOTAL/);
-  assert.match(command,/CANONICAL TOTAL · SPOT \+ PIONEX/);
+  assert.match(command,/OKX DCA (?:REF|OLD REF)/);
+  assert.match(command,/(?:OUTSIDE CANONICAL TOTAL|NICHT IM TOTAL)/);
+  assert.match(command,/CANONICAL TOTAL · (?:SPOT|EXTERNAL) \+ PIONEX/);
 });
 
 test('r25 release identity is canonical and adapters parse',()=>{
