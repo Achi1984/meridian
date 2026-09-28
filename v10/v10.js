@@ -840,14 +840,14 @@ function decorate(forceData=false){
   renderLab();renderSystemHeader();decorateA11y();
 }
 function bindV10NavigationAuthority(){
-  $('#nav button[data-v]').forEach(b=>{
+  $$('#nav button[data-v]').forEach(b=>{
     b.onclick=e=>{
       e?.preventDefault?.();
       const v=String(b.dataset.v||'command');
       const ok=bridge()?.goView?.(v);
       if(!ok){
-        $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
-        $('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));
+        $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
+        $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));
       }
       queueMicrotask(()=>{
         try{renderActiveView(v,true);renderSystemHeader();decorateA11y();}
