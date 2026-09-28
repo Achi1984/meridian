@@ -842,6 +842,7 @@ window.addEventListener('meridian:data',()=>{
   if(activeViewKey()==='command')bridge()?.refreshCurrentView?.();
   schedule(true);
 });
+window.addEventListener('meridian:view',()=>schedule(true));
 $('#nav')?.addEventListener('click',e=>{
   if(e.target?.closest?.('button[data-v]'))schedule(true);
 });
