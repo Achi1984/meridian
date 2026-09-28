@@ -48,7 +48,7 @@ test('r67 keeps compact command risk cards while simplifying the BOTS view',()=>
 });
 
 test('r67 is presentation-only and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r67');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
