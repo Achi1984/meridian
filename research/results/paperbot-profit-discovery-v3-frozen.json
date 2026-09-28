@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-09-28T21:10:04.840Z",
+  "workflowRunId": 36484206755,
+  "artifactId": 10997792449,
+  "artifactSha256": "ebc26e749a8ebc102d3ec4ad9bf9d3057da5fb43c1e7a352228561aed1f37b65",
+  "ruleset": "PAPERBOT-PROFIT-SPECIAL-AGENT-V3-FROZEN",
+  "strategy": "ADAPTIVE_UP_TREND_6H_V3",
+  "periods": 1194,
+  "totalReturnPct": 19.398602374094054,
+  "pnl": 1939.8602374094062,
+  "profitFactor": 1.1751737304592498,
+  "maxDrawdownPct": 7.850969653091777,
+  "positiveWindows": 3,
+  "positiveAssets": 7,
+  "positivePnlConcentrationPct": 32.3968151299869,
+  "gatePass": false,
+  "gateReasons": ["PF_LT_1.2","POSITIVE_WINDOWS_LT_4"],
+  "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+  "interpretation": "V3 is profitable with broad positive asset contribution and low drawdown, but it fails the pre-committed Profit Factor and chronological-stability gates. The gate is not relaxed and V3 is not promoted.",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false
+}
