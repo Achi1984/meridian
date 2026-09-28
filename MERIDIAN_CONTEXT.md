@@ -241,3 +241,8 @@ r52 reports aggregate TYPE PASS, STATUS PASS, SYMBOL PASS, SIDE PASS and ALL PAS
 r52 live evidence isolated the final normalization blocker: TYPE 32/32, STATUS 32/32, SIDE 32/32, SYMBOL 0/32, with BASE stable_quote 32 and QUOTE asset 32.
 
 r53 keeps ordinary symbol resolution on `base`, but for explicit inverse/Coin-M rows only, when base is stable/quote-side and quote is an asset, it resolves the bot asset from `quote`. This addresses Pionex's inverse pair orientation without broadening other bot types.
+## v10 r54 Wallet cateType preservation
+
+r53 deployed successfully but remained at RISK NORMALIZED 0/32 and SYMBOL 0/32. The inverse symbol fallback itself was correct, but the Wallet-origin `cateType=inverse` was dropped while constructing the internal summary used for detail normalization.
+
+r54 preserves Wallet `cateType` in the summary and through mergePionexOrderDetail. This allows the existing strict inverse-only symbol fallback to see the already validated Wallet category without expanding any allowlist or trading rule.
