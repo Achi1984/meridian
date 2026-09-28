@@ -1,0 +1,31 @@
+name: MERIDIAN Release Coordinator Sweep
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: meridian-release-coordinator-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Close stale release PRs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-coordinator.mjs --sweep
