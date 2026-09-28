@@ -350,3 +350,25 @@ r62 therefore adds both permanent stale-shell recovery and direct v10 navigation
 - if a v10 view renderer throws, the legacy view is not silently left behind: a visible V10 VIEW RENDER ERROR diagnostic is shown instead.
 
 This cannot retroactively modify an already cached r60 document, so one one-time cache-busted navigation is still required for a client currently stuck on r60. After r62 is loaded once, future terminal releases can self-heal without manual cache clearing.
+
+
+## v10 r63 — strict external portfolio authority
+
+Live r62 reconciliation on 28.09.2026 exposed a portfolio double-count/staleness defect. Pionex Wallet API was internally coherent (~35.6k USD), but COMMAND added ~32.5k USD from historical `portfolio.holdings`, producing an impossible ~68k headline total while fresh user screenshots showed only Pionex + a small OKX balance + a Ledger balance.
+
+Root cause:
+- legacy holdings were valued whenever present, regardless of per-row freshness;
+- partial venue updates preserve other venues by design, so removed/obsolete venues can remain in the private holdings set indefinitely;
+- the current canonical total therefore treated historical asset quantities as current simply because fresh market prices were available.
+
+r63 introduces strict venue authority for the production portfolio path:
+- Pionex remains sourced from fresh Wallet API when available;
+- external venues are represented by explicit, timestamped venue-balance references;
+- expected external venues are Ledger + OKX;
+- external references are stored only in the local browser and expire from authority after 24h;
+- holdings covered by a current venue-balance reference are superseded, preventing double counting;
+- stale holdings without a current venue authority are excluded from the canonical total;
+- the total is fail-closed until every expected external venue has a current reference;
+- the old OKX DCA screenshot remains a legacy diagnostic only and is explicitly outside the total.
+
+No personal screenshot balances are committed to the repository. The user enters the current Ledger and OKX totals locally through the COMMAND reconcile control.
