@@ -61,8 +61,8 @@ test('r13 distinguishes live bot links from reference bot links in scanner',()=>
 });
 
 test('r13 normalizes stop loss read-only and checks protection before profit logic',()=>{
-  assert.match(pionex,/function slFor\\(order,d\\)/);
-  assert.match(pionex,/stopLoss:slFor\\(order,d\\)/);
+  assert.match(pionex,/function slFor\(order,d\)/);
+  assert.match(pionex,/stopLoss:slFor\(order,d\)/);
   assert.match(v10,/function stopLossIssue\(b\)/);
   const pair=v10.slice(v10.indexOf('function pairStatus'),v10.indexOf('function exposure',v10.indexOf('function pairStatus')));
   assert.ok(pair.indexOf('PROTECTION_RISK')<pair.indexOf('PROFIT_LOCK'));
