@@ -10,7 +10,7 @@ test('Asset Watch share management requires full private read auth',()=>{
   const route=gateway.indexOf('u.pathname==="/api/private/asset-watch-share"');
   assert.ok(route>=0);
   const block=gateway.slice(route,route+800);
-  assert.match(block,/if(!authorizedRead(req))return writeJson(res,401/);
+  assert.ok(block.includes('if(!authorizedRead(req))return writeJson(res,401'));
   assert.match(block,/createAssetWatchShareToken()/);
   assert.match(block,/rotateAssetWatchShareState/);
   assert.match(block,/revokeAssetWatchShareState/);
