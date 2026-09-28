@@ -130,7 +130,7 @@ export function runUpUpRiskManagedMomentumProxyV1(dataset,config={}){
       realizedVol=sd*Math.sqrt(cfg.annualizationWeeks);
       if(upup&&rawWeights.size&&realizedVol>0)scale=Math.min(cfg.maxGrossLeverage,cfg.targetVolAnnual/realizedVol);
     }
-    const weights=new Map([...rawWeights].map(([symbol,w])=>[symbol,w*scale]));
+    const weights=scale>0?new Map([...rawWeights].map(([symbol,w])=>[symbol,w*scale])):new Map();
     const keys=new Set([...prevWeights.keys(),...weights.keys()]);let turnover=0;
     for(const symbol of keys)turnover+=Math.abs((weights.get(symbol)||0)-(prevWeights.get(symbol)||0));
     const costReturn=turnover*cfg.costBps/10000;
