@@ -274,6 +274,22 @@ To reduce chat-stream interruptions and make every interruption harmless:
 
 This protocol reduces transport/output pressure, while the existing GitHub checkpoint and exact-head rules ensure correctness even if the UI stream still disconnects.
 
+
+### 14.4 Hard Streaming Budgets
+
+The following limits are mandatory for interactive repository work:
+
+- **Tool-call budget:** after at most 3 consecutive repository/tool calls, emit a short user-visible checkpoint before continuing.
+- **Polling budget:** do not poll the same workflow/status more than 2 consecutive times without a checkpoint or a state-changing event.
+- **Output budget:** a single tool result surfaced back into the orchestration context should normally stay below 8 KB. Filter, slice, or summarize inside the tool call before returning text.
+- **Log/diff budget:** never emit a complete large CI log, full large diff, or whole large source file when a targeted search/window is sufficient. Return only the failing test, relevant lines, SHA/status, or a concise file list.
+- **Retry budget:** after 2 identical tool failures, stop repeating the same call. Re-read state, switch method, or report the blocker.
+- **Mutation checkpoint:** every commit, PR creation/update, merge, release bump, or deployment state change must be followed by a durable identifier (SHA/PR/run/deploy status) before the next mutation.
+- **Resume command:** after any interruption, prefer `node scripts/stream-safe-preflight.mjs` (or the equivalent GitHub metadata query when operating remotely) before any mutation.
+- **No blind continuation:** a resumed stream may continue analysis immediately, but must not write/merge/release until the preflight confirms current state.
+
+These are transport-safety limits, not quality shortcuts. Large investigations are split into multiple small verified milestones rather than one oversized streamed response.
+
 ## 15. Documentation and Continuity
 
 Canonical continuity documents:

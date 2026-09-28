@@ -578,3 +578,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Shows only coarse BASE/QUOTE classes: asset, stable_quote, missing, unresolved.
 - No bot IDs, symbols, prices, balances, investment values or PnL exposed publicly.
 - No source-selection, matching, trading, PaperBot, Profit Lock, hedge or execution changes.
+## Streaming-safe execution hardening — 28.09.2026
+
+A repeated ChatGPT UI streaming interruption was traced to orchestration pressure rather than lost repository state: long sequences of serial GitHub calls, repeated workflow polling, and unnecessarily large source/log payloads increased the chance of the response stream disconnecting while GitHub mutations had already completed.
+
+Durable mitigation:
+- `node scripts/stream-safe-preflight.mjs` returns a compact resume checkpoint with main SHA, terminal build, current branch/head, PR state/distance and gate summaries.
+- Interactive work is limited to at most 3 consecutive tool calls before a user-visible checkpoint.
+- Same-status workflow polling is limited to 2 consecutive polls.
+- Tool output is normally capped below 8 KB and large logs/diffs/files must be reduced to relevant windows.
+- Every mutation is checkpointed by a durable SHA/PR/run/deploy identifier.
+- After interruption, repo state is authoritative and no write is replayed before preflight.
+
+This is infrastructure/process-only. Terminal build, trading logic, PaperBots and execution behavior are unchanged.
