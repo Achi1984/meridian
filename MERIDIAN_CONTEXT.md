@@ -214,3 +214,10 @@ r47 adds `GET /api/v1/wallet/balancesFull` as a fail-soft fourth read source. ME
 r47 live discovery returned 53 wallet entries: 32 TRADING_BOT, 3 FUTURES_LITE, 17 SPOT and 1 ARBITRAGE. The bot-adjacent entries expose buOrderId, buOrderType, cateType, baseList, investmentAmount, investmentToken, profit and title.
 
 r48 privately normalizes the TRADING_BOT/FUTURES_LITE entries and performs GET-only detail probes by buOrderId against the Pionex Futures Grid detail endpoint. The UI shows aggregate buOrderType/cateType counts and detail-probe coverage only. No detail result is promoted to Action Ready in this release.
+## v10 r49 Wallet-detail live Bot fallback
+
+r48 live discovery proved 32/35 Wallet bot detail probes succeed. All 32 successful detail reads correspond to `buOrderType=futures_grid`; the 3 `futures_lite` entries remain unsupported by the Futures Grid detail endpoint.
+
+r49 builds a separate `PIONEX_WALLET_BOT_DETAIL` risk snapshot from the successfully hydrated futures_grid details. The UI selects it only when the complete supported set normalizes successfully and the snapshot is fresh (≤15 min). The classic Bot API remains separately visible and retains precedence whenever it is fresh and complete.
+
+The selected Wallet detail rows still pass through the existing conservative reference matcher. No match means no Bot action. Missing PnL/capital continues to block Decision Ready / exposure completeness as before.
