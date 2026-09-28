@@ -517,3 +517,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Secrets rule:** Credentials live only in the runtime secret store. No API key or secret may be committed, logged, embedded in frontend assets, issues, PR text, screenshots or chat.
 
 **Execution isolation:** Trading rules, Profit Lock, hedge thresholds, market signals, Paper-bot parameters, leverage and execution remain unchanged. Live trading stays disabled.
+## D-049 — Pionex Bot list must explicitly request supported Futures bot types
+
+**Decision:** The read-only Bot API list request must send `status=running` plus `buOrderTypes=futures_grid` and `buOrderTypes=future_hedge_grid` instead of relying on an unfiltered list response.
+
+**Reason:** The first live r42 connection reached Pionex successfully but entered `EMPTY_GUARD`. The dashboard was also showing stale API row counts from the preserved snapshot, which obscured the current list result.
+
+**Diagnostics:** On `EMPTY_GUARD`, MERIDIAN may persist only aggregate `listRows`, `typeCounts`, `statusCounts`, and requested type names. No bot IDs, symbols, amounts, prices, PnL, or other private row data are added to diagnostics.
+
+**Safety:** The zero-bot guard remains fail-closed. Trading rules, PaperBots, leverage, Profit Lock, hedge thresholds and execution logic are unchanged.
