@@ -427,3 +427,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - LIQ_RISK and explicit SL/protection risk stay ahead of this guard so known safety issues remain visible.
 - r37 global NEXT ACTION coverage guard remains unchanged.
 - No matcher threshold, signal/risk rank, Profit Lock formula, hedge threshold, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
+
+
+## Agent/release coordinator hardening
+
+- Release ownership is now serialized through the Main Agent; subagents may not independently bump terminalBuild, open competing release PRs or merge to main.
+- Every resumed/interrupted workflow begins with a live repo/PR/workflow preflight before any write.
+- Terminal release branches must be exactly main+1 and use matching v10-rNN branch/build identity.
+- The oldest open PR for a target revision owns that revision lease; later contenders fail Release Safety.
+- Any branch commit invalidates earlier gate results; merges require green gates on the exact current head SHA.
+- Immediately before merge, main/base/head/behind status/competing PRs/gates are re-read. If main advanced, the stale release is not merged and its scoped work moves to the next free revision.
+- A post-main workflow closes stale open release PRs automatically.
+- Superseded PR #204 was closed rather than reusing the already-consumed r37 release number.
+- No trading/Paper/risk/leverage/execution logic is part of this process hardening.
