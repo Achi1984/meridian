@@ -704,3 +704,14 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - The diagnostic label `TREND` is renamed to `API TREND` so it cannot be confused with economic LONG/SHORT side.
 - History capture remains fail-closed until a server-side authority path is designed for the new local-only external basis.
 - Execution impact remains false.
+
+
+## v10 r65 — market stale remediation
+
+- r64 live acceptance: portfolio is coherent, but technical market health can drop to `NO TIMESTAMP · 0/15` while private/Pionex data remains fresh.
+- Root path identified: technical candles were still fetched directly by the iOS browser from OKX/Binance Futures.
+- r65 adds protected `/api/private/market-klines` on the Northflank gateway with OKX -> Binance fallback and timestamp-preserving cache.
+- v9 market adapter now requests the gateway first and only uses direct browser requests as fallback.
+- Feed timestamps propagate through closed-candle normalization into `assetIntel.updatedAt` and `marketSyncedAt`; stale cache cannot masquerade as a new sample.
+- COMMAND and MARKET show `MERIDIAN_GATEWAY`, `DIRECT_FALLBACK`, or `UNKNOWN` plus market errors.
+- Execution impact remains false.
