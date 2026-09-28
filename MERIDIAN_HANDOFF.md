@@ -622,8 +622,8 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Diagnostic only: no side remap, threshold change, action unlock, PaperBot change or execution change.
 ## v10 r57 — API-native bot identity
 
-- User confirmed current Pionex bot inventory no longer has short bots; supplied current BTC LONG samples on 28.09.2026.
-- Sample checks are consistent with LONG economics: liquidation price below break-even/open price.
+- Initial 28.09.2026 BTC spot-check screenshots showed LONG bots, but a later 18:58 follow-up confirms the current inventory can also contain SHORT bots; do not carry forward any global "no shorts" assumption.
+- Current side-validation samples from 28.09.2026 18:58: DOT COIN-M SHORT 4x has creation price 1.155, break-even 1.165 and liquidation 1.854; DOT COIN-M LONG 3x has creation price 1.242, break-even 1.232 and liquidation 0.677. These screenshots are validation samples only, not a canonical bot inventory.
 - The 27.09 Asset-Watch snapshot is stale and is no longer suitable as an identity gate.
 - Complete fresh Wallet-detail rows with unique bot IDs can now identify themselves directly.
 - Inverse Coin-M side is economically validated from direct positionOpenPrice/liquidationPrice when clear; original trend remains diagnostic.
