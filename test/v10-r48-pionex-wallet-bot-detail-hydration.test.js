@@ -49,11 +49,13 @@ test('r48 does not alter bot decision readiness or execution rules',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r48 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r48');
-  assert.match(root,/10\.0-r48-production/);
-  assert.match(root,/\.\/v10\/\?build=r48/);
-  assert.match(v10,/const BUILD='10\.0-r48'/);
-  assert.match(v9,/qs\.set\('build','r48'\)/);
-  assert.match(v9html,/p\.set\('build','r48'\)/);
+test('r48 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=48);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });
