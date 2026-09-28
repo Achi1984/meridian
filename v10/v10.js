@@ -138,7 +138,10 @@ function syncHealth(){
   let detail='Private Bot-Daten werden geprüft.';
   if(status==='DISABLED_MISSING_CREDENTIALS')detail='Pionex Read API fehlt am Backend · letzter Asset-Watch-Snapshot bleibt nur Referenz';
   else if(status==='ERROR')detail='Pionex Bot API Sync-Fehler · '+String(s?.pionexBotSync?.error||'unbekannt').slice(0,110);
-  else if(status==='EMPTY_GUARD')detail='API meldet 0 unterstützte laufende Futures-Bots · alter Snapshot bleibt blockiert.';
+  else if(status==='EMPTY_GUARD'){
+    const d=s?.pionexBotSync?.diagnostics||{},types=Object.entries(d.typeCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—',states=Object.entries(d.statusCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—';
+    detail='Futures-Filter lieferte '+String(d.listRows??'—')+' Row(s) · Typen '+types+' · Status '+states+' · alter Snapshot bleibt blockiert.';
+  }
   else if(status==='OK'&&!fresh)detail='API ist konfiguriert, aber der letzte Bot-Snapshot ist nicht frisch genug.';
   else if(status==='OK'&&fresh&&ambiguous)detail=ambiguous+' Bot-Row(s) haben mehrere nahezu gleich gute Referenztreffer · keine automatische Zuordnung.';
   else if(status==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
