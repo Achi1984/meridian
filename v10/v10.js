@@ -233,7 +233,7 @@ function renderCommand(force=false){
   if(!force&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Market, Bot-Layer und Referenz-Snapshot werden getrennt bewertet','live');
   dataGuardDecorate();
-  $('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.command-source-strip',view).forEach(x=>x.remove());
+  view.querySelectorAll('.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.command-source-strip').forEach(x=>x.remove());
   const hero=$('.portfolio-hero',view),c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataStrip();const sourceNode=source.firstElementChild;
   hero.insertAdjacentElement('afterend',sourceNode);
   const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
