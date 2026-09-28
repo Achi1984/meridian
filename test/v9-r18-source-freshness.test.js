@@ -7,9 +7,11 @@ const html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8').r
 
 test('r18 distinguishes private snapshots from fresh actionable bot data',()=>{
   assert.match(js,/function botFeedFresh\(\)/);
-  assert.match(js,/state\.botFeedTimestampTrusted&&!future&&age!=null&&age<=15\*60\*1000/);
+  assert.match(js,/function botFeedTimeState\(\)/);
+  assert.match(js,/t\.trusted&&!t\.future&&t\.ageMs!=null&&t\.ageMs<=15\*60\*1000/);
   assert.match(js,/Date\.now\(\)\+5\*60\*1000/);
-  assert.match(js,/UNTRUSTED/);
+  assert.match(js,/NO TRUSTED TIMESTAMP/);
+  assert.match(js,/FUTURE TIMESTAMP/);
   assert.match(js,/SNAPSHOT · STALE/);
   assert.match(js,/FRESH SNAPSHOT/);
   assert.match(js,/PRIVATE SNAPSHOT · STALE/);
