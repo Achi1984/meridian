@@ -6,7 +6,7 @@ import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
-import { marketKlinesSnapshot } from "./market-feed-gateway.js";
+import { marketKlinesSnapshot } from "./market-feed-gateway.js";\nimport { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -387,6 +387,11 @@ const server=http.createServer(async(req,res)=>{
         limit:u.searchParams.get("limit")
       });
       return writeJson(res,snapshot.status|| (snapshot.ok?200:502),snapshot,origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/asset-watch"){
+      const data=await stateGet(PRIVATE_STATE_KEY);
+      if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      return writeJson(res,200,buildAssetWatchApiSnapshot(data),origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/dashboard"){
       const data=await stateGet(PRIVATE_STATE_KEY);
