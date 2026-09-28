@@ -688,3 +688,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Wallet diagnostics:** Wallet total, Bot Account total and Trader Account total are displayed independently from their existing read-only normalized fields. Missing values remain unknown and are not replaced by zero or inferred sums.
 
 **Safety:** This decision changes rendering and diagnostics only. It does not alter trading rules, PnL interpretation, leverage, Profit Lock, hedge logic, matcher thresholds, decision readiness or execution.
+
+
+## D-068 — Explicit view lifecycle event and freshness-based Pionex equity precedence
+
+**View authority:** Every legacy `go(v)` render emits `meridian:view` in v10 mode. The v10 adapter must force decoration from that event. DOM mutation and delegated click listeners remain defensive aids, not the sole authority.
+
+**Pionex equity authority:** Source precedence is freshness-based. A successful Wallet API `totalInUsdt` may replace an untimestamped or older private equity snapshot. A valid fresher private snapshot may still outrank Wallet API.
+
+**Reason:** r60 live acceptance showed COMMAND using current state while BOTS could remain on v9 markup, and showed an untimestamped private Pionex snapshot still displayed despite a fresh account-read layer.
+
+**Safety:** This changes UI lifecycle and portfolio presentation provenance only. PnL, trading, leverage, Profit Lock, hedging, matcher thresholds and execution remain unchanged and fail-closed.
