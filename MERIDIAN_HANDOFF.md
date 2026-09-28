@@ -301,3 +301,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - No arbitrary Pionex-equity stale cutoff is introduced; this release improves transparency only.
 - Portfolio math remains Spot + Pionex and r26 coverage classification remains unchanged.
 - No trading-rule, Paper-bot, signal, leverage, execution, Pionex mutation or research-promotion change.
+
+
+## v10 r28 — Bot feed coverage SSOT
+
+- Continues the deep audit after runtime-verified r27.
+- Adds one shared botFeedCoverage helper in the v9 data engine.
+- Coverage denominator is now the current supported private API rows, not the full historical Asset Watch/reference catalog.
+- A fresh 3/3 supported-row match can be FRESH even if the reference catalog contains additional older entries.
+- Any unmatched or ambiguous supported API row keeps coverage incomplete.
+- v9 DATA TRUTH, v9 header/source state and v10 DATA GUARD now consume the same coverage contract.
+- DATA TRUTH BOT MATCH now shows matched / supported live rows.
+- No bot-matching thresholds, trading rules, Paper-bot parameters, risk calculations, leverage, execution or Pionex mutation paths changed.

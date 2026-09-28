@@ -313,3 +313,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Seed rule:** A selected KNOWN_SEED source is shown as **STATIC SEED** rather than being implied to be live.
 
 **Isolation:** Portfolio-equity age does not affect Bot API freshness, Risk Priority, NEXT ACTION, Paper-bot logic, leverage, signals or execution.
+
+
+## D-033 — Bot coverage is measured against supported live rows, not the reference catalog
+
+**Decision:** Bot-feed coverage is complete only when the current private bot snapshot is fresh, contains at least one supported live row, every supported live row is safely matched, and no ambiguous match remains. The historical reference catalog size is not a coverage denominator.
+
+**Reason:** The reference catalog intentionally retains older/screenshot-known bots for reconciliation. A current API snapshot may legitimately expose fewer supported running bots. Comparing live matches against the full reference catalog can incorrectly label a fully reconciled live snapshot MIXED; conversely, comparing only reference matches can miss extra unmatched API rows.
+
+**SSOT rule:** v9 DATA TRUTH, the legacy header source state, and v10 DATA GUARD must consume the same botFeedCoverage helper. BOT MATCH is displayed as matched / supported-live-rows. Extra or ambiguous API rows fail coverage closed.
+
+**Isolation:** This changes bot data-status semantics only. Matching thresholds, PnL handling, liquidation calculations, Profit Lock, NEXT ACTION, Paper bots, leverage and execution are unchanged.
