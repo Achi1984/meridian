@@ -563,3 +563,10 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Public health receives aggregate diagnostics only; no IDs, balances, prices, investments or PnL values.
 - Wallet source selection remains unchanged: it still requires fresh, complete Wallet risk.
 - No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
+## v10 r51 — Pionex enum whitespace normalization
+
+- Live r50 evidence: DETAIL PROBE 32/35; RISK NORMALIZED 0/32; status running 32; trends long 5 / short 27; missing base 0; reject reason normalizer_rejected 32.
+- Root-cause mismatch: diagnostic normalization trimmed enum strings, production allowlist checks did not.
+- r51 trims surrounding whitespace for buOrderType, status and trend before the existing allowlist checks.
+- Supported bot types/statuses/directions are otherwise unchanged.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
