@@ -671,5 +671,6 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 
 - Production r61 was verified by runtime smoke before the user still observed r60, proving the issue was a stale mobile/PWA shell rather than deployment state.
 - r62 updates the PWA launch target, links the manifest, adds a no-store version probe/self-reload to the v10 shell, and extends runtime smoke to guard these invariants.
+- r61 live evidence also showed BOTS still falling back to the legacy renderer; r62 now makes v10 own the bottom-tab onclick handlers and directly renders the selected v10 view after the bridge updates the underlying view.
 - Existing clients already stuck on a pre-r62 shell require one cache-busted open. Once r62 is running, later stale builds can self-heal.
 - Execution impact remains false.
