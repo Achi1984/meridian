@@ -17,7 +17,8 @@ test('r17 unmatched private API rows pre-empt HOLD unless a higher safety risk e
 
 test('r17+ Data Guard and header distinguish partial live coverage from complete readiness',()=>{
   assert.match(v10,/PARTIAL READY/);
-  assert.match(v10,/completeDecision=g\.decisionReady>0&&g\.coverageComplete/);
+  assert.match(v10,/decisionComplete=matched>0&&coverageComplete&&decisionReady===matched/);
+  assert.match(v10,/label=g\.decisionComplete\?'DECISION READY':g\.decisionReady>0\?'PARTIAL READY'/);
   assert.match(v10,/function marketReadiness\(m\)/);
   assert.match(v10,/function botReadiness\(g\)/);
   assert.match(v10,/label:'PARTIAL'/);
