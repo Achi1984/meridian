@@ -58,6 +58,17 @@ test('direct detail data is merged into buOrderData without losing list identity
   assert.equal(merged.buOrderData.trend,'short');
 });
 
+
+test('detail merge preserves summary cateType when detail envelope omits it',()=>{
+  const merged=mergePionexOrderDetail(
+    {buOrderType:'futures_grid',buOrderId:'coinm-1',base:'USD',quote:'BTC',cateType:'inverse',status:'running',buOrderData:{}},
+    {status:'running',buOrderData:{status:'running',trend:'short'}}
+  );
+  assert.equal(merged.cateType,'inverse');
+  assert.equal(merged.base,'USD');
+  assert.equal(merged.quote,'BTC');
+});
+
 test('detail hydration fails closed on missing, duplicate, mismatched or incomplete rows',async()=>{
   await assert.rejects(
     hydratePionexBotSummaries([{buOrderType:'futures_grid',status:'running'}],{delayMs:0,loadDetail:async()=>({})}),

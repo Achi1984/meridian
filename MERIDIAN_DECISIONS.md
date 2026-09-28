@@ -608,3 +608,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r52 live diagnostics showed all 32 supported Wallet futures-grid rows passed type, status and side checks, while symbol resolution failed 32/32. The same rows classified as BASE=stable_quote 32 and QUOTE=asset 32.
 
 **Safety:** The fallback is restricted to explicit inverse semantics. Normal/non-inverse futures-grid rows continue to resolve symbols from `base`. No matching threshold, Safety Ready, Decision Ready, Profit Lock, hedge, PaperBot or execution rule changes.
+## D-060 — Preserve Wallet cateType through bot-detail normalization
+
+**Decision:** When Wallet Bot Account discovery supplies a bot `cateType`, MERIDIAN carries that category into the internal futures-grid summary and preserves it through detail merging.
+
+**Reason:** r53 live diagnostics still showed SYMBOL 0/32 even though BASE=stable_quote and QUOTE=asset. Code inspection showed the Wallet row already carried `cateType=inverse`, but buildWalletBotRisk omitted that field before calling the production normalizer, so the inverse-only symbol fallback could not activate reliably.
+
+**Safety:** r54 does not synthesize or broaden category values. It only preserves the category already returned by the read-only Wallet API. Existing bot-type/status/direction allowlists, matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution rules remain unchanged.

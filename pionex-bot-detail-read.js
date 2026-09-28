@@ -33,6 +33,7 @@ export function mergePionexOrderDetail(summary,detail){
     buOrderType:String(summary.buOrderType||envelope.buOrderType||''),
     base:envelope.base||summary.base,
     quote:envelope.quote||summary.quote,
+    cateType:envelope.cateType||summary.cateType||detailData?.cateType||null,
     status:envelope.status||summary.status,
     buOrderData:{...(summary.buOrderData||{}),...(detailData||{})}
   };
