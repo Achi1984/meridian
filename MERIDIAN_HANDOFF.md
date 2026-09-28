@@ -416,3 +416,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - LIQ_RISK and PROTECTION_RISK remain ahead of the coverage guard so known liquidation/SL safety is never hidden.
 - Existing DATA_STALE / MARKET_STALE / UNVERIFIED blocking remains unchanged.
 - Pair-status formulas, risk/signal ranks, Profit Lock formulas and thresholds, hedge threshold, Paper-bot parameters, leverage and execution are unchanged.
+
+
+## v10 r38 — OKX DCA reference equity provenance
+
+- Continues the deep audit after runtime-verified r37.
+- Adds a complete/partial snapshot contract for OKX Futures DCA reference equity.
+- Exact OKX DCA REF equity requires explicit investUsd and totalPnlUsd on every DCA row.
+- Missing fields no longer enter the reference sum as implicit zero; explicit zero PnL remains valid.
+- The stale manual OKX fallback is no longer used when the DCA snapshot is incomplete.
+- COMMAND labels OKX DCA REF as REFERENCE COMPLETE or REFERENCE PARTIAL and reports missing investment/PnL counts when partial.
+- OKX remains outside the canonical Spot + Pionex portfolio total.
+- r37 global NEXT ACTION coverage guard is preserved unchanged.
+- No trading rules, Profit Lock thresholds, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
