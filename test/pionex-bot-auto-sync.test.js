@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   canonicalQuery,signPionexGet,normalizePionexBotOrder,
-  buildPionexRiskSnapshot,mergePionexSyncState
+  buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail
 } from '../pionex-bot-auto-sync.js';
 
 test('Pionex GET signing is canonical and deterministic',()=>{
@@ -93,9 +93,32 @@ test('successful sync replaces bot rows and stamps a fresh Pionex source',()=>{
   assert.equal(next.pionexBotSync.status,'OK');
 });
 
+test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{
+  const calls=[];
+  const fetchImpl=async(url,options)=>{
+    calls.push({url,options});
+    return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{status:'running',trend:'long',leverage:'5',bottom:'1',top:'2'}})};
+  };
+  const detail=await fetchFuturesGridOrderDetail({
+    buOrderId:'bot-42',
+    apiKey:'read-key',
+    apiSecret:'read-secret',
+    fetchImpl,
+    now:()=>1700000000000
+  });
+  assert.equal(detail.trend,'long');
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].options.method,'GET');
+  assert.match(calls[0].url,/\/api\/v1\/bot\/orders\/futuresGrid\/order\?/);
+  assert.match(calls[0].url,/buOrderId=bot-42/);
+  assert.match(calls[0].url,/timestamp=1700000000000/);
+});
+
 test('runtime implementation is Pionex read-only',()=>{
   const src=fs.readFileSync(new URL('../pionex-bot-auto-sync.js',import.meta.url),'utf8');
   assert.match(src,/GET \/api\/v1\/bot\/orders/);
+  assert.match(src,/PIONEX_FUTURES_GRID_DETAIL_PATH/);
+  assert.match(src,/hydratePionexBotSummaries/);
   assert.doesNotMatch(src,/method:'POST'/);
   assert.doesNotMatch(src,/futuresGrid\/create/);
   assert.doesNotMatch(src,/futuresGrid\/cancel/);
