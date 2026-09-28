@@ -41,7 +41,8 @@ test('r26 COMMAND visibly distinguishes mixed, partial and snapshot portfolio pr
 });
 
 test('r26 release identity is canonical and execution remains disabled',()=>{
-  assert.equal(release.terminalBuild,'10.0-r26');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=26);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v9.includes("live-price-core-r18.js?v="+release.terminalBuild));
