@@ -348,3 +348,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **SSOT rule:** v9 DATA TRUTH, stale-action explanations and v10 DATA GUARD consume the same botFeedAgeLabel/time-state helpers.
 
 **Isolation:** No matching, PnL, signal, risk, Profit Lock, NEXT ACTION, Paper-bot, leverage or execution logic changes.
+
+
+## D-036 — Full DECISION READY requires every matched live row to be decision-ready
+
+**Decision:** A bot layer may be labelled DECISION READY / READY only when match coverage is complete and every currently matched supported live row satisfies the shared decisionReadyBot contract. Any nonzero but incomplete decision-ready subset is PARTIAL READY.
+
+**Reason:** Match coverage and decision readiness are different dimensions. Complete matching alone must not promote 2/3 decision-ready rows to a fully ready state.
+
+**Action-count rule:** PROFIT WATCH / LOCK summaries must be calculated only from rows that satisfy the same shared decisionReadyBot contract. A matched row missing usable liquidation/safety data must not contribute to action counts even if PnL and market intel are present.
+
+**SSOT rule:** syncHealth exposes decisionComplete; both the header readiness and DATA GUARD use that field.
+
+**Isolation:** No Profit Lock formula, signal threshold, liquidation threshold, NEXT ACTION priority, Paper-bot parameter, leverage or execution behavior changes.
