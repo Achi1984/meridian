@@ -526,3 +526,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Diagnostics:** On `EMPTY_GUARD`, MERIDIAN may persist only aggregate `listRows`, `typeCounts`, `statusCounts`, and requested type names. No bot IDs, symbols, amounts, prices, PnL, or other private row data are added to diagnostics.
 
 **Safety:** The zero-bot guard remains fail-closed. Trading rules, PaperBots, leverage, Profit Lock, hedge thresholds and execution logic are unchanged.
+## D-050 — Avoid repeated-array query parameters in Pionex signed GETs
+
+**Decision:** For Bot API list reads, MERIDIAN issues one signed GET per supported bot type (`futures_grid`, `future_hedge_grid`) instead of sending a repeated `buOrderTypes` array in one signed query.
+
+**Reason:** The first live r43 request returned `INVALID_SIGNATURE` only after the repeated array filter was introduced. Pionex documents `buOrderTypes` as an array and requires HMAC over the sorted GET query. Separate scalar requests remove duplicate-key serialization ambiguity while preserving the same read scope.
+
+**Safety:** Requests remain GET-only, the zero-bot guard remains fail-closed, and no trading/Paper/execution behavior changes.
