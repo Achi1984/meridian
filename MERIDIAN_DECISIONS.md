@@ -699,3 +699,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r60 live acceptance showed COMMAND using current state while BOTS could remain on v9 markup, and showed an untimestamped private Pionex snapshot still displayed despite a fresh account-read layer.
 
 **Safety:** This changes UI lifecycle and portfolio presentation provenance only. PnL, trading, leverage, Profit Lock, hedging, matcher thresholds and execution remain unchanged and fail-closed.
+
+
+## D-069 — Terminal shell must self-heal across cached releases
+
+**Decision:** A successful deployment is not sufficient evidence that an installed/mobile client is on the current terminal shell. The v10 shell must compare its local build against a no-store `version.json` probe and navigate to a cache-distinct URL when they differ.
+
+**PWA launch:** The manifest start URL must track the current v10 terminal revision and must not remain pinned to a historical release.
+
+**Release gate:** Runtime smoke verifies terminal HTML/JS, manifest launch revision, and the presence of the stale-build self-heal.
+
+**Limitation:** A client already executing a pre-r62 cached shell does not contain the new recovery code. That client needs one explicit cache-busted load once; r62 then provides the ongoing recovery mechanism.
+
+**Safety:** Bootstrap/cache behavior only. No market, bot, PnL, decision, strategy or execution behavior changes.
