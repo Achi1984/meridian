@@ -322,3 +322,14 @@ The private Wallet + Detail diagnostic block now shows:
 - wallet snapshot age.
 
 Missing wallet values remain unknown (`—`), never coerced to zero. No PnL field is promoted and no decision gate is relaxed.
+
+
+## v10 r61 — explicit view authority + fresher Wallet equity precedence
+
+Live r60 screenshots on 28.09.2026 confirmed that the COMMAND hero now refreshes after API sync, but the BOTS tab could still remain in the legacy v9 renderer after navigation. The root cause is lifecycle authority: a nav click can rebuild the legacy view without a guaranteed semantic event for the v10 adapter.
+
+r61 makes the source renderer emit a dedicated `meridian:view` event after every `go(v)`. The v10 adapter listens to that event and forces the active view decoration, independent of click bubbling and MutationObserver timing.
+
+The same screenshots also showed a Pionex private snapshot with no timestamp still outranking a fresh Wallet API account snapshot. r61 changes only portfolio-source precedence: a fresh successful Wallet API `totalInUsdt` is preferred when the private equity snapshot is not fresh, or when Wallet API is at least as new. A fresh newer private snapshot still retains priority.
+
+No bot PnL is inferred; no decision or execution rule changes.
