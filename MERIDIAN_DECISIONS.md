@@ -759,3 +759,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Diagnostics:** Market health surfaces transport and error state so `STALE` can be distinguished from an absent timestamp, gateway failure, or partial symbol coverage.
 
 **Safety:** No market indicator, trading signal, strategy, leverage, PnL, Profit Lock, hedge, matcher or execution thresholds are modified.
+
+
+## D-073 — Inverse bot Wallet profit may become USD PnL only under settlement-token validation
+
+**Decision:** For Pionex inverse Futures Grid bots, Wallet-level `profit` is eligible for decision-support PnL only when the row is explicitly `cateType=inverse`, the Wallet `investmentToken` exactly equals the normalized bot asset, and the same Pionex Wallet snapshot contains a positive USD price for that token.
+
+**Conversion:** `PnL USD = Wallet profit × Pionex Wallet priceInUsd`.
+
+**Precedence:** An explicit USD-PnL from the bot detail/API remains authoritative over the Wallet-derived value.
+
+**Fail-closed cases:** non-inverse category, token mismatch, missing native profit, missing/invalid Wallet USD price, or incomplete bot detail normalization.
+
+**Rationale:** Pionex documents inverse Futures Grid as investing and realizing profit in the same non-stablecoin. This allows a unit-safe conversion without treating an undocumented bare `profit` number as USD.
+
+**Safety:** Read-only normalization only. No order creation, reduction, cancellation, leverage change, strategy threshold or execution behavior is modified.
