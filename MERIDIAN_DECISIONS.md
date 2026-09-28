@@ -714,3 +714,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Navigation authority:** Once the v10 adapter is loaded, it owns bottom-tab onclick handlers. It may use the v9 bridge to update the underlying source state/view, but the visible tab must then be rendered directly by v10. A renderer exception must surface as a visible diagnostic instead of silently leaving legacy markup.
 
 **Safety:** Bootstrap/cache and presentation lifecycle behavior only. No market, bot, PnL, decision, strategy or execution behavior changes.
+
+
+## D-070 — Portfolio total requires current venue authority, not merely fresh prices
+
+**Decision:** A holding row is not current evidence of ownership simply because its symbol can be priced live. In the production v10 portfolio path, historical holdings are excluded unless they have current timestamped authority or are represented by a current venue-level balance.
+
+**External venue contract:** Ledger and OKX are the currently expected non-Pionex venues. Their current account totals are stored as local device references with timestamps. Both expected venues must be current (24h authority window) before the external portfolio component is complete.
+
+**Double-count prevention:** A current venue-balance reference supersedes asset-level holdings from the same venue. Old holdings from any other venue are excluded when their own timestamps are stale or missing.
+
+**Pionex:** Fresh Wallet API equity remains authoritative. Private snapshots may remain fallback/reference sources but do not override a fresher Wallet API value.
+
+**Privacy:** Current personal venue balances are not hard-coded or committed to GitHub. They remain local to the user device.
+
+**Safety:** If current Ledger/OKX references are missing or stale, COMMAND must display an incomplete portfolio rather than reuse old quantities. No trading, PnL, leverage, Profit Lock, hedge, matcher or execution rules change.

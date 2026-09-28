@@ -674,3 +674,22 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - r61 live evidence also showed BOTS still falling back to the legacy renderer; r62 now makes v10 own the bottom-tab onclick handlers and directly renders the selected v10 view after the bridge updates the underlying view.
 - Existing clients already stuck on a pre-r62 shell require one cache-busted open. Once r62 is running, later stale builds can self-heal.
 - Execution impact remains false.
+
+
+## v10 r63 — portfolio reconciliation fix
+
+- r62 navigation and Wallet API integration are live-confirmed.
+- Current screenshots showed Pionex ~35.5k USD, OKX ~119 USD and Ledger ~799 USD; the ~68k MERIDIAN headline was caused by ~32.5k of stale historical holdings being repriced as if still owned.
+- r63 production portfolio mode is STRICT_VENUE_SNAPSHOT:
+  - Pionex = fresh Wallet API;
+  - Ledger + OKX = current local venue references;
+  - stale holdings = excluded;
+  - holdings from a venue with a current venue total = superseded;
+  - canonical total = fail-closed until both expected external venues are current.
+- COMMAND contains a local-only Ledger + OKX reconcile action. No personal balances are committed.
+- Expected current total after entering the 28.09.2026 screenshot values is approximately 36.4k–36.5k USD depending on the Pionex Wallet API timestamp.
+- Execution impact remains false.
+
+
+### r63 history note
+Portfolio history capture is also fail-closed now: the backend will not append another canonical history point unless current Ledger + OKX venue authority is complete. Existing pre-r63 history may contain the stale-holdings basis, so COMMAND suppresses HIST Δ comparison until the history point itself reports STRICT_AUTHORITY.

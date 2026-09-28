@@ -1,7 +1,8 @@
 // MERIDIAN v7.63 — Canonical Portfolio Data Contract
 // Pure helpers used to keep headline total, chart endpoint and 1D math on one valuation basis.
 
-export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V1';
+export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V2';
+export const PORTFOLIO_AUTHORITY_MAX_AGE_MS=24*60*60*1000;
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
 const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
@@ -41,44 +42,116 @@ export function sourceTimestampAge(updatedAt,now=Date.now()){
   return{known:true,future,timestampMs,ageMs};
 }
 
-export function portfolioPriceCoverage(data={}){
-  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex'):[];
-  const meta=data?.livePriceMeta||{},requestedRaw=finite(meta.requestedCount),resolvedRaw=finite(meta.resolvedCount);
+function venueKey(v){return String(v||'').trim().toLowerCase()}
+function rowTimestamp(row={}){
+  const raw=row?.updatedAt??row?.snapshotAt??row?.asOf??null;
+  if(raw==null||raw==='')return null;
+  const n=finite(raw);if(n!=null)return n;
+  const parsed=Date.parse(String(raw));return Number.isFinite(parsed)?parsed:null;
+}
+function rowValueUsd(row={}){
+  return finite(row?.valueUsd)??finite(row?.value)??finite(row?.totalUsd)??finite(row?.equityUsd);
+}
+function currentTimestamp(timestamp,now,maxAgeMs){
+  if(!Number.isFinite(timestamp))return false;
+  if(timestamp>now+30000)return false;
+  return now-timestamp<=Math.max(0,finite(maxAgeMs)??PORTFOLIO_AUTHORITY_MAX_AGE_MS);
+}
+
+export function externalVenueBalanceSnapshot(data={},now=Date.now(),maxAgeMs=PORTFOLIO_AUTHORITY_MAX_AGE_MS){
+  const nowMs=finite(now)??Date.now(),rows=Array.isArray(data?.portfolio?.manualVenueBalances)?data.portfolio.manualVenueBalances:[];
+  const normalized=rows
+    .map((row,index)=>{
+      const venue=String(row?.venue||row?.name||'').trim(),key=venueKey(venue),valueUsd=rowValueUsd(row),timestamp=rowTimestamp(row);
+      return{index,venue,key,valueUsd,timestamp,updatedAt:row?.updatedAt||row?.snapshotAt||row?.asOf||null,source:String(row?.source||'PRIVATE_VENUE_BALANCE')};
+    })
+    .filter(x=>x.key&&x.key!=='pionex'&&x.valueUsd!=null&&x.valueUsd>=0);
+  const newest=new Map();
+  for(const row of normalized){
+    const prev=newest.get(row.key);
+    const rowTs=Number.isFinite(row.timestamp)?row.timestamp:-Infinity,prevTs=Number.isFinite(prev?.timestamp)?prev.timestamp:-Infinity;
+    if(!prev||rowTs>=prevTs)newest.set(row.key,row);
+  }
+  const selected=[...newest.values()],current=selected.filter(x=>currentTimestamp(x.timestamp,nowMs,maxAgeMs)),stale=selected.filter(x=>!currentTimestamp(x.timestamp,nowMs,maxAgeMs));
+  const totalUsd=current.reduce((sum,x)=>sum+x.valueUsd,0),ages=current.map(x=>Math.max(0,nowMs-x.timestamp)),currentKeys=new Set(current.map(x=>x.key));
+  const expectedVenues=Array.isArray(data?.portfolio?.externalVenueExpectedVenues)?data.portfolio.externalVenueExpectedVenues.map(x=>String(x||'').trim()).filter(Boolean):[],expectedKeys=[...new Set(expectedVenues.map(venueKey).filter(Boolean))];
+  const declaredComplete=data?.portfolio?.externalVenueSnapshotComplete===true,complete=declaredComplete&&(expectedKeys.length?expectedKeys.every(k=>currentKeys.has(k)):current.length>0);
+  return{
+    rows:current,staleRows:stale,venueCount:current.length,venues:current.map(x=>x.venue),
+    expectedVenues,missingExpectedVenues:expectedVenues.filter(v=>!currentKeys.has(venueKey(v))),
+    totalUsd:round(totalUsd),complete,
+    maxAgeMs:ages.length?Math.max(...ages):null,minAgeMs:ages.length?Math.min(...ages):null
+  };
+}
+
+export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFOLIO_AUTHORITY_MAX_AGE_MS){
+  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings.filter(h=>venueKey(h?.venue)!=='pionex'):[];
+  const strict=String(data?.portfolio?.authorityMode||'').toUpperCase()==='STRICT_VENUE_SNAPSHOT';
+  if(!strict)return{strict:false,current:holdings,stale:[],superseded:[],external:externalVenueBalanceSnapshot(data,now,maxAgeMs)};
+  const external=externalVenueBalanceSnapshot(data,now,maxAgeMs),covered=new Set(external.rows.map(x=>x.key)),current=[],stale=[],superseded=[];
+  const nowMs=finite(now)??Date.now();
+  for(const h of holdings){
+    const key=venueKey(h?.venue);
+    if(covered.has(key)){superseded.push(h);continue}
+    const ts=rowTimestamp(h);
+    if(currentTimestamp(ts,nowMs,maxAgeMs))current.push(h);else stale.push(h);
+  }
+  return{strict:true,current,stale,superseded,external};
+}
+
+export function portfolioPriceCoverage(data={},now=Date.now()){
+  const auth=authoritativeSpotHoldings(data,now),holdings=auth.current,meta=data?.livePriceMeta||{},strict=auth.strict;
+  const requestedRaw=strict?null:finite(meta.requestedCount),resolvedRaw=strict?null:finite(meta.resolvedCount);
   const requested=requestedRaw==null?holdings.length:Math.max(0,Math.floor(requestedRaw));
   const resolved=resolvedRaw==null?holdings.filter(h=>finite(data?.livePrices?.[h?.symbol]?.price)>0).length:Math.max(0,Math.floor(resolvedRaw));
-  const feedFresh=meta.fresh===true,complete=holdings.length>0&&feedFresh&&requested===holdings.length&&resolved===requested,partial=holdings.length>0&&feedFresh&&resolved>0&&!complete;
-  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial};
+  const feedFresh=holdings.length===0?true:meta.fresh===true,complete=holdings.length===0?true:feedFresh&&requested===holdings.length&&resolved===requested,partial=holdings.length>0&&feedFresh&&resolved>0&&!complete;
+  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount};
 }
 
 export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
-  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],priceCoverage=portfolioPriceCoverage(data);
-  const spotUsd=holdings
-    .filter(h=>String(h?.venue||'').toLowerCase()!=='pionex')
-    .reduce((s,h)=>s+holdingUsd(data,h),0);
-  const tradingSnapshot=pionexEquitySnapshot(data),tradingUsd=tradingSnapshot.value;
-  const totalUsd=spotUsd+tradingUsd;
+  const nowMs=num(timestamp,Date.now()),auth=authoritativeSpotHoldings(data,nowMs),priceCoverage=portfolioPriceCoverage(data,nowMs),strict=auth.strict;
+  const holdingsUsd=auth.current.reduce((sum,h)=>sum+holdingUsd(data,h),0);
+  const externalUsd=strict?auth.external.totalUsd:0;
+  const spotUsd=strict?externalUsd+holdingsUsd:holdingsUsd;
+  const tradingSnapshot=pionexEquitySnapshot(data),tradingUsd=tradingSnapshot.value,totalUsd=spotUsd+tradingUsd;
+  const spotAuthority={
+    strict,
+    complete:strict?auth.external.complete:false,
+    venueCount:strict?auth.external.venueCount:0,
+    venues:strict?auth.external.venues:[],
+    externalUsd:round(externalUsd),
+    holdingsUsd:round(holdingsUsd),
+    currentHoldings:auth.current.length,
+    excludedStaleHoldings:auth.stale.length,
+    supersededHoldings:auth.superseded.length,
+    maxAgeMs:strict?auth.external.maxAgeMs:null
+  };
+  const spotDetail=strict
+    ?(auth.external.venueCount&&auth.current.length?'VENUE_BALANCE_PLUS_FRESH_HOLDINGS':auth.external.venueCount?'VENUE_BALANCE_SNAPSHOT':auth.current.length?(priceCoverage.complete?'FRESH_HOLDINGS':'PARTIAL_HOLDINGS'):'MISSING')
+    :(priceCoverage.complete?'LIVE_PRICE_COMPLETE':priceCoverage.partial?'LIVE_PRICE_PARTIAL':auth.current.length?'SNAPSHOT_FALLBACK':'MISSING');
   return{
     version:PORTFOLIO_CONTRACT_VERSION,
-    timestamp:num(timestamp,Date.now()),
+    timestamp:nowMs,
     spotUsd:round(spotUsd),
     tradingUsd:round(tradingUsd),
     totalUsd:round(totalUsd),
     priceCoverage,
-    sourceStatus:{spot:holdings.length?'HOLDINGS_PLUS_LIVE_PRICE':'MISSING',trading:tradingUsd>0?'PIONEX_EQUITY':'MISSING'},
-    sourceDetail:{spot:priceCoverage.complete?'LIVE_PRICE_COMPLETE':priceCoverage.partial?'LIVE_PRICE_PARTIAL':holdings.length?'SNAPSHOT_FALLBACK':'MISSING',trading:tradingSnapshot.found?tradingSnapshot.source:'MISSING'}
+    spotAuthority,
+    sourceStatus:{spot:strict?(spotAuthority.complete?'STRICT_AUTHORITY':'STRICT_PARTIAL'):(auth.current.length?'HOLDINGS_PLUS_LIVE_PRICE':'MISSING'),trading:tradingUsd>0?'PIONEX_EQUITY':'MISSING'},
+    sourceDetail:{spot:spotDetail,trading:tradingSnapshot.found?tradingSnapshot.source:'MISSING'}
   };
 }
 
 export function latestPortfolioHistorySnapshot(history={},now=Date.now(),maxAgeMs=15*60*1000){
   const points=Array.isArray(history?.points)?history.points:[];
   const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null);
-  if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,source:String(history?.source||'MISSING')};
+  if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,sourceStatus:null,source:String(history?.source||'MISSING')};
   const timestamp=finite(point.timestamp),spotUsd=finite(point.spotUsd),tradingUsd=finite(point.tradingUsd),totalUsd=finite(point.totalUsd);
   const nowMs=finite(now)??Date.now(),future=timestamp!=null&&timestamp>nowMs+30000,ageMs=timestamp==null?null:Math.max(0,nowMs-timestamp);
   const complete=[spotUsd,tradingUsd,totalUsd].every(x=>x!=null&&x>=0);
   const consistent=complete&&Math.abs(totalUsd-(spotUsd+tradingUsd))<=1;
   const fresh=consistent&&!future&&ageMs!=null&&ageMs<=Math.max(0,finite(maxAgeMs)??0);
-  return{found:true,fresh,complete,consistent,ageMs,timestamp,spotUsd,tradingUsd,totalUsd,source:String(history?.source||'POSTGRES_CANONICAL_HISTORY')};
+  return{found:true,fresh,complete,consistent,ageMs,timestamp,spotUsd,tradingUsd,totalUsd,sourceStatus:point?.sourceStatus||null,source:String(history?.source||'POSTGRES_CANONICAL_HISTORY')};
 }
 
 export function alignSeriesToSnapshot(series=[],snapshot={},opts={}){

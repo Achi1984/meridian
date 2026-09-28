@@ -26,13 +26,14 @@ test('r19 derives OKX bot equity from the DCA snapshot without reviving the stal
   assert.match(js,/function okxKnownBotEquity\(\)\{return okxDcaEquitySnapshot\(\)\.value\}/);
   assert.match(js,/num\(x\.investUsd\).*num\(x\.totalPnlUsd\)/);
   assert.doesNotMatch(js,/okxReference=okxKnownBotEquity\(\)\?\?state\.manual\.okx/);
-  assert.match(js,/manual:\{pionex:3126\.12,bitpanda:0,ledger:776\.74,okx:0\}/);
+  assert.match(js,/manual:\{pionex:3126\.12,bitpanda:0,ledger:null,okx:null\}/);
+  assert.match(js,/EXTERNAL_VENUE_REF_KEY='meridian\.v10\.externalVenueRefs'/);
 });
 
 test('r19 labels OKX correctly as DCA snapshot and keeps it outside live Pionex action logic',()=>{
   assert.match(js,/OKX FUTURES DCA · SCREENSHOT/);
-  assert.match(js,/OKX DCA REF/);
-  assert.match(js,/OUTSIDE CANONICAL TOTAL/);
+  assert.match(js,/OKX DCA OLD REF/);
+  assert.match(js,/NICHT IM TOTAL/);
   assert.match(js,/state\.okxDcaBots/);
   assert.doesNotMatch(js,/state\.okxPositions/);
   assert.match(js,/state\.bots\.filter\(liveMatched\)/);

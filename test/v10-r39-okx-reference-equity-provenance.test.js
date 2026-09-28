@@ -53,11 +53,9 @@ test('r39 COMMAND does not fall back to stale manual OKX equity',()=>{
   assert.doesNotMatch(model,/okxKnownBotEquity\(\)\?\?state\.manual\.okx/);
 
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/REFERENCE COMPLETE/);
-  assert.match(command,/REFERENCE PARTIAL/);
-  assert.match(command,/MISSING INVEST/);
-  assert.match(command,/MISSING .*PNL/);
-  assert.match(command,/OUTSIDE CANONICAL TOTAL/);
+  assert.match(command,/LEGACY REFERENCE COMPLETE/);
+  assert.match(command,/LEGACY REFERENCE PARTIAL/);
+  assert.match(command,/NICHT IM TOTAL/);
 });
 
 test('r39 preserves r37 global and r38 per-asset coverage guards',()=>{
@@ -68,7 +66,7 @@ test('r39 preserves r37 global and r38 per-asset coverage guards',()=>{
   assert.match(pair,/if\(unmatchedAsset\.length\)return\{code:'UNVERIFIED'/);
 
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/CANONICAL TOTAL · SPOT \+ PIONEX/);
+  assert.match(command,/CANONICAL TOTAL · EXTERNAL \+ PIONEX/);
   const plan=v9.slice(v9.indexOf('function profitLockPlan'),v9.indexOf('function topProfitPlan'));
   for(const token of ["pnl>=20","pnl>=12","pnl>=10","pnl>=8","pnl>=3"])assert.ok(plan.includes(token),token);
   assert.match(v9,/hedgePct<15/);

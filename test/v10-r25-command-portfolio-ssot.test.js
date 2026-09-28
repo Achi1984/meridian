@@ -30,16 +30,17 @@ test('r25 current Spot valuation uses privacy-safe all-ticker overlay with fail-
 test('r25 history is diagnostic and cannot replace the current canonical total',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/historyPoint=latestPortfolioHistorySnapshot\(history\)/);
-  assert.match(block,/historyDeltaUsd=total!=null&&historyPoint\.found/);
+  assert.match(block,/historyComparable=total!=null&&historyPoint\.found/);
+  assert.match(block,/historyDeltaUsd=historyComparable\?historyPoint\.totalUsd-total:null/);
   assert.doesNotMatch(block,/total=useHistory/);
   assert.match(v10,/HIST Δ/);
 });
 
-test('r25 OKX DCA snapshot remains reference-only outside canonical portfolio total',()=>{
+test('r25+ legacy OKX DCA snapshot remains reference-only outside the canonical total',()=>{
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/OKX DCA REF/);
-  assert.match(command,/REFERENCE (?:COMPLETE|PARTIAL).*OUTSIDE CANONICAL TOTAL/);
-  assert.match(command,/CANONICAL TOTAL · SPOT \+ PIONEX/);
+  assert.match(command,/OKX DCA (?:REF|OLD REF)/);
+  assert.match(command,/(?:OUTSIDE CANONICAL TOTAL|NICHT IM TOTAL)/);
+  assert.match(command,/CANONICAL TOTAL · (?:SPOT|EXTERNAL) \+ PIONEX/);
 });
 
 test('r25 release identity is canonical and adapters parse',()=>{
