@@ -406,3 +406,13 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Same-asset unmatched-row scoping from r35 is unchanged.
 - Decision Ready and Profit Lock still use the existing generic live-PnL/percentage contract; their thresholds and behavior are unchanged.
 - No hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
+
+
+## v10 r37 — Global NEXT ACTION coverage guard
+
+- Continues the deep audit after runtime-verified r36.
+- Global NEXT ACTION now requires complete supported bot coverage before emitting non-safety momentum/profit/HOLD guidance.
+- Any unmatched or ambiguous supported current row changes non-safety NEXT ACTION to KEINE AKTION · DATEN PRÜFEN and shows matched/supported coverage.
+- LIQ_RISK and PROTECTION_RISK remain ahead of the coverage guard so known liquidation/SL safety is never hidden.
+- Existing DATA_STALE / MARKET_STALE / UNVERIFIED blocking remains unchanged.
+- Pair-status formulas, risk/signal ranks, Profit Lock formulas and thresholds, hedge threshold, Paper-bot parameters, leverage and execution are unchanged.
