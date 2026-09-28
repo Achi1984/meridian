@@ -6,6 +6,7 @@ import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
+import { marketKlinesSnapshot } from "./market-feed-gateway.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -375,6 +376,14 @@ const server=http.createServer(async(req,res)=>{
     }
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
+      const snapshot=await marketKlinesSnapshot({
+        symbol:u.searchParams.get("symbol"),
+        interval:u.searchParams.get("interval"),
+        limit:u.searchParams.get("limit")
+      });
+      return writeJson(res,snapshot.status|| (snapshot.ok?200:502),snapshot,origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/dashboard"){
       const data=await stateGet(PRIVATE_STATE_KEY);
