@@ -24,7 +24,7 @@ test('r38 OKX reference equity requires complete investment and USD PnL fields',
   assert.equal(full.snapshot.rows,2);
   assert.equal(full.snapshot.missingInvest,0);
   assert.equal(full.snapshot.missingPnl,0);
-  assert.equal(full.known,130.7989);
+  assert.ok(Math.abs(full.known-130.7989)<1e-9);
 
   const missingPnl=okxRuntime([
     {investUsd:65.32,totalPnlUsd:.1729},
