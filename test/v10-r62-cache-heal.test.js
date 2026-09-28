@@ -6,6 +6,8 @@ const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 const smoke=fs.readFileSync(new URL('../scripts/runtime-smoke.mjs',import.meta.url),'utf8');
+const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r62 root and PWA launch use a cache-distinct current terminal URL',()=>{
