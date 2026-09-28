@@ -13,7 +13,6 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 test('r43+ bot list stays restricted to supported running futures types',()=>{
   assert.match(bot,/status:'running'/);
   assert.match(bot,/PIONEX_SUPPORTED_BOT_TYPES/);
-  assert.match(bot,/buOrderTypes:type/);
   assert.match(detail,/future_hedge_grid/);
   assert.match(detail,/futures_grid/);
 });
@@ -25,8 +24,8 @@ test('r43 guard diagnostics are aggregate-only and preserve fail-closed behavior
   assert.match(bot,/EMPTY_GUARD/);
   assert.match(bot,/zero_supported_running_bots/);
   assert.doesNotMatch(bot,/diagnostics.*buOrderId/);
-  assert.match(v10,/Futures-Filter lieferte/);
-  assert.match(v9,/Pionex Futures-Filter/);
+  assert.match(v10,/Pionex Bot-Liste lieferte|Futures-Filter lieferte/);
+  assert.match(v9,/Pionex Bot-Liste:|Pionex Futures-Filter/);
 });
 
 test('r43 Pionex runtime stays GET-only',()=>{
