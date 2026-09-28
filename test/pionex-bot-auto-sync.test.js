@@ -19,21 +19,18 @@ test('Pionex GET signing is canonical and deterministic',()=>{
 });
 
 
-test('running bot list requests supported futures types as separate scalar signed GETs',async()=>{
+test('running bot list uses one unfiltered signed GET and filters supported types locally',async()=>{
   const calls=[];
   const fetchImpl=async(url,options)=>{
     calls.push({url,options});
     return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{results:[]}})};
   };
   await fetchRunningBotOrders({apiKey:'read-key',apiSecret:'read-secret',fetchImpl,now:()=>1700000000000});
-  assert.equal(calls.length,2);
-  for(const call of calls){
-    assert.equal(call.options.method,'GET');
-    const u=new URL(call.url);
-    assert.equal(u.searchParams.get('status'),'running');
-    assert.equal(u.searchParams.getAll('buOrderTypes').length,1);
-  }
-  assert.deepEqual(calls.map(x=>new URL(x.url).searchParams.get('buOrderTypes')).sort(),['future_hedge_grid','futures_grid']);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].options.method,'GET');
+  const u=new URL(calls[0].url);
+  assert.equal(u.searchParams.get('status'),'running');
+  assert.equal(u.searchParams.has('buOrderTypes'),false);
 });
 
 test('bot list diagnostics expose only privacy-safe aggregate types and statuses',()=>{
@@ -42,6 +39,8 @@ test('bot list diagnostics expose only privacy-safe aggregate types and statuses
     {buOrderType:'future_hedge_grid',buOrderId:'secret-2',buOrderData:{status:'paused'},base:'ETH'}
   ]);
   assert.equal(d.listRows,2);
+  assert.equal(d.requestMode,'ALL_RUNNING_LOCAL_ALLOWLIST');
+  assert.deepEqual(d.localSupportedTypes,['futures_grid','future_hedge_grid']);
   assert.deepEqual(d.typeCounts,{futures_grid:1,future_hedge_grid:1});
   assert.deepEqual(d.statusCounts,{running:1,paused:1});
   assert.equal(JSON.stringify(d).includes('secret-1'),false);
@@ -122,7 +121,8 @@ test('successful sync replaces bot rows and stamps a fresh Pionex source',()=>{
   assert.deepEqual(next.pionexRisk.bots,[{id:'new'}]);
   assert.equal(next.pionexBotSync.readOnly,true);
   assert.equal(next.pionexBotSync.status,'OK');
-  assert.deepEqual(next.pionexBotSync.requestedTypes,['futures_grid','future_hedge_grid']);
+  assert.equal(next.pionexBotSync.queryMode,'ALL_RUNNING_LOCAL_ALLOWLIST');
+  assert.deepEqual(next.pionexBotSync.supportedTypes,['futures_grid','future_hedge_grid']);
 });
 
 test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{
