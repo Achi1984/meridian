@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r61';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r61';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r61';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r61';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r61';
-// MERIDIAN v10 r61 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r62';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r62';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r62';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r62';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r62';
+// MERIDIAN v10 r62 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r61';
+const BUILD='10.0-r62';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -823,6 +823,13 @@ function renderLab(){
   if(note&&note.innerHTML!==nextNote)note.innerHTML=nextNote;
 }
 function activeViewKey(){return String($('.view.active')?.id||'view-command').replace(/^view-/,'')}
+function renderActiveView(active,force=true){
+  if(active==='command')return renderCommand(force);
+  if(active==='bots')return renderBots(force);
+  if(active==='market')return renderMarket(force);
+  if(active==='research')return renderScanner(force);
+  if(active==='more')return renderLab();
+}
 function decorate(forceData=false){
   document.documentElement.dataset.meridianBuild=BUILD;
   const active=activeViewKey();
@@ -831,6 +838,26 @@ function decorate(forceData=false){
   renderMarket(forceData&&active==='market');
   renderScanner(forceData&&active==='research');
   renderLab();renderSystemHeader();decorateA11y();
+}
+function bindV10NavigationAuthority(){
+  $$('#nav button[data-v]').forEach(b=>{
+    b.onclick=e=>{
+      e?.preventDefault?.();
+      const v=String(b.dataset.v||'command');
+      const ok=bridge()?.goView?.(v);
+      if(!ok){
+        $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
+        $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));
+      }
+      queueMicrotask(()=>{
+        try{renderActiveView(v,true);renderSystemHeader();decorateA11y();}
+        catch(err){
+          const host=$('#view-'+v);
+          if(host)host.innerHTML='<section class="v10-live-blocked"><b>V10 VIEW RENDER ERROR</b><small>'+esc(String(err?.message||err).slice(0,180))+'</small></section>';
+        }
+      });
+    };
+  });
 }
 let raf=0,pendingDataRefresh=false;
 const schedule=(forceData=false)=>{
@@ -843,8 +870,6 @@ window.addEventListener('meridian:data',()=>{
   schedule(true);
 });
 window.addEventListener('meridian:view',()=>schedule(true));
-$('#nav')?.addEventListener('click',e=>{
-  if(e.target?.closest?.('button[data-v]'))schedule(true);
-});
 new MutationObserver(()=>schedule(false)).observe($('#app')||document.body,{childList:true,subtree:true});
+bindV10NavigationAuthority();
 decorate();

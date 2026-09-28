@@ -20,8 +20,9 @@ test('r61 prefers fresh Wallet API equity when an older private snapshot has no 
   assert.match(block,/source:'PIONEX_WALLET_READ_API'/);
 });
 
-test('r61 changes lifecycle and portfolio source precedence only',()=>{
-  assert.equal(release.terminalBuild,'10.0-r61');
+test('r61 changes lifecycle and portfolio source precedence only in successor releases',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=61);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });

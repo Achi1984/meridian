@@ -25,8 +25,13 @@ test('release authority can replace a stale compatibility loader without changin
   assert.doesNotMatch(authority,/placeOrder|createOrder|submitOrder|liveTrading\s*=\s*true/i);
 });
 
-test('release metadata and manifest identify the same authoritative build',()=>{
-  assert.equal(manifest.start_url,`./?build=${version.buildId}`);
+test('release metadata and manifest identify the active production build',()=>{
+  if(/^10\.0-r\d+$/.test(String(version.terminalBuild||''))){
+    const rev=String(version.terminalBuild).split('-').at(-1);
+    assert.equal(manifest.start_url,`./v10/?build=${rev}&fresh=${rev}`);
+  }else{
+    assert.equal(manifest.start_url,`./?build=${version.buildId}`);
+  }
   assert.equal(version.v8Bootstrap,'8.0-AUTHORITY-DRIVEN-LOADER-V1');
   assert.equal(version.executionImpact,false);
 });

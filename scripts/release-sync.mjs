@@ -4,9 +4,12 @@ const write=process.argv.includes('--write');
 const release=JSON.parse(fs.readFileSync('version.json','utf8'));
 const version=String(release.version||release.ui||'').trim();
 const build=String(release.buildId||'').trim();
+const terminalBuild=String(release.terminalBuild||'').trim();
 if(!/^\d+\.\d+$/.test(version)) throw new Error(`invalid release version: ${version}`);
 if(!build.startsWith(version+'-')) throw new Error(`buildId ${build} does not match version ${version}`);
+if(!/^10\.0-r\d+$/.test(terminalBuild)) throw new Error(`invalid terminalBuild: ${terminalBuild}`);
 const revision=build.split('-').slice(-1)[0]||'R1';
+const terminalRevision=terminalBuild.split('-').at(-1);
 const cacheTag=`${version}-${revision}`;
 const pending=[];
 
@@ -27,9 +30,11 @@ function required(text,re,replacement,label){
 apply('app-v6.06.js',src=>required(src,/const LOCAL_TAG='[^']+';/,`const LOCAL_TAG='${cacheTag}';`,'compat loader cache tag'));
 
 apply('manifest.webmanifest',()=>JSON.stringify({
-  name:`ACHI MERIDIAN v${version}`,
-  short_name:`MERIDIAN ${version}`,
-  start_url:`./?build=${build}`,
+  name:'ACHI MERIDIAN v10',
+  short_name:'MERIDIAN',
+  start_url:`./v10/?build=${terminalRevision}&fresh=${terminalRevision}`,
+  scope:'./',
+  id:'./',
   display:'standalone',
   background_color:'#03070c',
   theme_color:'#05080d'
