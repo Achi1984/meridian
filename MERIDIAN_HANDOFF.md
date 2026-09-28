@@ -324,3 +324,14 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - v10 syncHealth consumes the same safety/decision helpers instead of re-deriving them independently.
 - SAFETY READY remains intentionally available without PnL or fresh market intel when liquidation data is usable.
 - No signal formula, risk threshold, Profit Lock rule, NEXT ACTION priority, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
+
+
+## v10 r30 — Bot timestamp provenance integrity
+
+- Continues the deep audit after runtime-verified r29.
+- Centralizes bot snapshot time state in botFeedTimeState.
+- Bot freshness keeps the exact existing rules: trusted timestamp, no more than 15 minutes old, and no more than 5 minutes in the future.
+- Untrusted fallback timestamps are displayed as NO TRUSTED TIMESTAMP instead of a misleading young age.
+- Trusted timestamps beyond the existing +5 minute tolerance are displayed as FUTURE TIMESTAMP instead of <1 MIN.
+- DATA TRUTH, stale Profit-Lock/action explanations and v10 DATA GUARD now use the same timestamp label.
+- No trading-rule, matching, PnL, risk, Paper-bot, leverage, execution or Pionex mutation change.
