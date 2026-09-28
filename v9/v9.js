@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r32';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r32';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r33';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r33';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r32');
+    qs.set('build','r33');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -100,6 +100,11 @@ function trackedMarketSymbols(){return [...new Set([...(state.referenceBots||[])
 function safetyReadyBot(b){return liveMatched(b)&&botFeedFresh()&&risk(b)!=null}
 function decisionReadyBot(b){return safetyReadyBot(b)&&livePnlAvailable(b)&&marketIntelFresh(state.assetIntel?.[b.symbol])}
 function actionableBot(b){return decisionReadyBot(b)}
+function exposureIntegrity(symbol=null){
+ const scope=String(symbol||'').trim().toUpperCase(),inScope=x=>!scope||String(x?.symbol||'').trim().toUpperCase()===scope,fresh=botFeedFresh();
+ const matched=fresh?state.bots.filter(b=>liveMatched(b)&&inScope(b)):[],unmatched=fresh?(state.unmatchedLive||[]).filter(inScope):[],missingCapital=matched.filter(b=>!liveInvestUsdAvailable(b)).length,unknown=unmatched.length+missingCapital;
+ return{fresh,matched:matched.length,unmatched:unmatched.length,missingCapital,unknown,complete:fresh&&matched.length>0&&unmatched.length===0&&missingCapital===0}
+}
 function botPnlUsd(b){
  if(b&&b._liveMatched===true&&b._livePnl===false)return{value:null,source:'NONE',corrected:false};
  if(b&&b._liveMatched===false)return{value:num(b.pnl),source:'REFERENCE',corrected:false};
@@ -293,9 +298,9 @@ async function syncIntel(){
 
 function risk(b){const p=botMarketPrice(b),liq=num(b.liq),api=num(b.buffer);if(api!=null&&api>0&&api<100)return api;if(!(p>0&&liq>0))return null;return b.side==='SHORT'?(liq-p)/p*100:(p-liq)/p*100}
 function assetPairRisk(symbol){
- const rows=botFeedFresh()?state.bots.filter(b=>b.symbol===symbol&&liveMatched(b)):[],longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT');
+ const rows=botFeedFresh()?state.bots.filter(b=>b.symbol===symbol&&liveMatched(b)):[],longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),integrity=exposureIntegrity(symbol);
  const notional=b=>liveInvestUsdAvailable(b)?(num(b.investUsd)||0)*(num(b.leverage)||1):null;
- const longKnown=longs.map(notional).filter(x=>x!=null),shortKnown=shorts.map(notional).filter(x=>x!=null),longUsd=longKnown.reduce((s,x)=>s+x,0),shortUsd=shortKnown.reduce((s,x)=>s+x,0),unknownExposure=rows.filter(b=>notional(b)==null).length,hedgePct=longUsd>0&&unknownExposure===0?shortUsd/longUsd*100:null;
+ const longKnown=longs.map(notional).filter(x=>x!=null),shortKnown=shorts.map(notional).filter(x=>x!=null),longUsd=longKnown.reduce((s,x)=>s+x,0),shortUsd=shortKnown.reduce((s,x)=>s+x,0),unknownExposure=integrity.unknown,hedgePct=longUsd>0&&integrity.complete?shortUsd/longUsd*100:null;
  const buffers=rows.map(risk).filter(x=>x!=null),minBuffer=buffers.length?Math.min(...buffers):null,pi=state.assetIntel[symbol];
  let score=0,reasons=[];
  if(minBuffer!=null&&minBuffer<10){score+=5;reasons.push('Liq <10%')}else if(minBuffer!=null&&minBuffer<18){score+=4;reasons.push('Liq <18%')}else if(minBuffer!=null&&minBuffer<28){score+=2;reasons.push('Liq <28%')}
@@ -303,7 +308,7 @@ function assetPairRisk(symbol){
  if(profitAction==='RISK REVIEW'){score+=3;reasons.push('Struktur/Momentum')}else if(profitAction==='PROFIT LOCK CANDIDATE'){score+=2;reasons.push('Profit-Lock')}else if(profitAction==='WATCH PROFIT'){score+=1;reasons.push('Profit-Watch')}
  const btc=state.intel;if(symbol!=='BTC'&&btc&&btc.price<btc.ema20){score+=1;reasons.push('BTC < EMA20')}
  const label=score>=7?'LIQ RISK':score>=4?'RISK REVIEW':score>=2?'WATCH':'SAFE',tone=score>=7?'danger':score>=4?'danger':score>=2?'watch':'safe';
- return{symbol,rows,longUsd,shortUsd,netUsd:longUsd-shortUsd,hedgePct,minBuffer,unknownExposure,score,label,tone,reasons,profitAction,dominantSide,bias:pi?.bias||'SYNC'};
+ return{symbol,rows,longUsd,shortUsd,netUsd:longUsd-shortUsd,hedgePct,minBuffer,unknownExposure,exposureComplete:integrity.complete,score,label,tone,reasons,profitAction,dominantSide,bias:pi?.bias||'SYNC'};
 }
 function riskCockpitV2(){
  const order=['BTC','ETH','SOL','XRP','HBAR','PEPE','DOT','ADA','SUI','AVAX','LINK','XLM','TRX','WIF'];
@@ -361,10 +366,10 @@ function riskV2(b){const liq=risk(b),be=beDistance(b),share=assetExposureShare(b
 
 function signalSummary(){const out={hold:0,watch:0,lock:0,risk:0,sync:0};for(const b of state.bots){const p=profitLockPlan(b);if(p.code==='SYNC')out.sync++;else if(['LOCK20','LOCK25','LOCK50'].includes(p.code))out.lock++;else if(p.code==='WATCH')out.watch++;else if(['SAFETY','HEDGE'].includes(p.code))out.risk++;else out.hold++}return out}
 function topSignalBot(){return botFeedFresh()?(state.bots.filter(liveMatched).map(b=>({b,action:actionForSide(state.assetIntel[b.symbol],b.side||'LONG')})).filter(x=>x.action!=='SYNC'&&x.action!=='HOLD').sort((a,b)=>signalRank(b.action)-signalRank(a.action)||((num(b.b.profitPct)||0)-(num(a.b.profitPct)||0)))[0]||null):null}
-function exposureModel(){const botNotional=b=>liveInvestUsdAvailable(b)?(num(b.investUsd)||0)*(num(b.leverage)||1):null,confirmed=botFeedFresh()?state.bots.filter(liveMatched):[],rows=confirmed.map(b=>({...b,notional:botNotional(b)})).filter(b=>b.notional!=null),unknownBots=confirmed.filter(b=>botNotional(b)==null).length,longUsd=rows.filter(b=>(b.side||'LONG')==='LONG').reduce((x,b)=>x+b.notional,0),shortUsd=rows.filter(b=>b.side==='SHORT').reduce((x,b)=>x+b.notional,0),grossUsd=longUsd+shortUsd,netUsd=longUsd-shortUsd,coverage=longUsd>0&&unknownBots===0?shortUsd/longUsd*100:null;return{longUsd,shortUsd,hedgeUsd:shortUsd,grossUsd,netUsd,coverage,unknownBots,confirmedBots:confirmed.length,complete:confirmed.length>0&&unknownBots===0}}
+function exposureModel(){const botNotional=b=>liveInvestUsdAvailable(b)?(num(b.investUsd)||0)*(num(b.leverage)||1):null,integrity=exposureIntegrity(),confirmed=botFeedFresh()?state.bots.filter(liveMatched):[],rows=confirmed.map(b=>({...b,notional:botNotional(b)})).filter(b=>b.notional!=null),unknownBots=integrity.unknown,longUsd=rows.filter(b=>(b.side||'LONG')==='LONG').reduce((x,b)=>x+b.notional,0),shortUsd=rows.filter(b=>b.side==='SHORT').reduce((x,b)=>x+b.notional,0),grossUsd=longUsd+shortUsd,netUsd=longUsd-shortUsd,coverage=longUsd>0&&integrity.complete?shortUsd/longUsd*100:null;return{longUsd,shortUsd,hedgeUsd:shortUsd,grossUsd,netUsd,coverage,unknownBots,confirmedBots:confirmed.length,complete:integrity.complete}}
 function portfolioRegime(){const e=exposureModel(),i=state.marketSyncedAt&&Date.now()-state.marketSyncedAt<=3*60*1000?state.intel:null,confirmed=botFeedFresh()?state.bots.filter(liveMatched):[];let points=0,reasons=[];if(i){if(i.price>i.ema20&&i.ema20>i.ema50){points+=2;reasons.push('BTC > EMA20/50')}else if(i.price<i.ema20){points-=2;reasons.push('BTC < EMA20')}if(i.macd4?.hist>0){points++;reasons.push('4h MACD +')}else if(i.macd4?.hist<0){points--;reasons.push('4h MACD -')}if(i.rsi4>=70){points--;reasons.push('4h RSI heiß')}else if(i.rsi4>=50){points++;reasons.push('4h RSI >50')}}const avgRisk=confirmed.length?confirmed.reduce((s,b)=>s+riskV2(b).score,0)/confirmed.length:0;if(avgRisk>=6){points-=2;reasons.push('Bot-Risiko hoch')}else if(avgRisk>=4){points--;reasons.push('Bot-Risiko erhöht')}const regime=points>=2?'RISK-ON':points<=-2?'DEFENSIVE':'NEUTRAL';const hedge=e.coverage==null?'UNVOLLSTÄNDIG':e.coverage>=15?'AUSREICHEND':e.coverage>=7?'MITTEL':'KLEIN';const tone=regime==='RISK-ON'?'safe':regime==='DEFENSIVE'?'danger':'watch';return{regime,hedge,tone,points,avgRisk,reasons}}
 function regimeStrip(){const r=portfolioRegime();return `<section class="regime-strip"><div><span>PORTFOLIO REGIME</span><b class="tone-${r.tone}">${r.regime}</b></div><div><span>HEDGE</span><b>${r.hedge}</b></div><div><span>AVG RISK</span><b>${r.avgRisk.toFixed(1)}</b></div><small>${r.reasons.slice(0,4).join(' · ')||'Market sync'}</small></section>`}
-function exposureStrip(){const e=exposureModel(),tone=e.coverage==null?'muted':e.coverage>=15?'safe':e.coverage>=7?'watch':'danger';return `<section class="exposure-strip"><div><span>KNOWN LIVE BOT LONG</span><b>${money(e.longUsd)}</b></div><div><span>KNOWN LIVE BOT SHORT</span><b>${money(e.hedgeUsd)}</b></div><div><span>KNOWN NET</span><b>${money(e.netUsd)}</b></div><div><span>SHORT / LONG</span><b class="tone-${tone}">${e.coverage==null?'—':e.coverage.toFixed(1)+'%'}</b></div><small class="exposure-note">${e.unknownBots?e.unknownBots+' live-matched Bots ohne belastbare Investition · Exposure unvollständig':'nur live bestätigte Kapitalwerte'}</small></section>`}
+function exposureStrip(){const e=exposureModel(),tone=e.coverage==null?'muted':e.coverage>=15?'safe':e.coverage>=7?'watch':'danger';return `<section class="exposure-strip"><div><span>KNOWN LIVE BOT LONG</span><b>${money(e.longUsd)}</b></div><div><span>KNOWN LIVE BOT SHORT</span><b>${money(e.hedgeUsd)}</b></div><div><span>KNOWN NET</span><b>${money(e.netUsd)}</b></div><div><span>SHORT / LONG</span><b class="tone-${tone}">${e.coverage==null?'—':e.coverage.toFixed(1)+'%'}</b></div><small class="exposure-note">${e.unknownBots?e.unknownBots+' Live-Exposure-Row(s) unbekannt/nicht sicher zugeordnet · Exposure unvollständig':'nur live bestätigte Kapitalwerte'}</small></section>`}
 function manualRisk(x){const p=num(x.price),l=num(x.liq);return p>0&&l>0?(p-l)/p*100:null}
 function manualStrip(){const ps=state.pionexManual||[];if(!ps.length)return'';return `<section class="manual-strip"><div class="okx-title"><span>PIONEX MANUAL · SNAPSHOT</span><b>${ps.length} POSITION</b></div>${ps.map(x=>{const bf=manualRisk(x);return `<div class="manual-row"><strong>${x.symbol} ${x.side} · ${x.leverage}x ${x.marginMode}</strong><span>Mark ${money(x.price)}</span><span>BE ${money(x.be)}</span><span>Liq ${money(x.liq)}</span><b class="${bf<10?'tone-danger':bf<18?'tone-watch':'tone-safe'}">${bf.toFixed(1)}% Puffer</b></div>`}).join('')}</section>`}
 function okxAmount(x,d=4){x=num(x);return x==null?'—':x.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d})}
@@ -527,7 +532,7 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
-  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
+  helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
 };
