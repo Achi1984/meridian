@@ -13,7 +13,7 @@ test('r23 COMMAND consumes canonical private Pionex equity snapshot',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
   assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
   assert.match(block,/walletEquity=num\(d\?\.pionexAccount\?\.wallet\?\.totalInUsdt\)/);
-  assert.match(block,/resolvedPionex=privatePionex\.found\?privatePionex:\(walletPionex\|\|/);
+  assert.match(block,/resolvedPionex=walletPionex&&\(!privateFresh\|\|walletTs>=privateTs\)\?walletPionex:privatePionex\.found\?privatePionex:/);
   assert.match(block,/canonicalInput=resolvedPionex\.found\?.*pionexEquityUsd:resolvedPionex\.value.*:.*pionexEquityUsd:state\.manual\.pionex/s);
   assert.match(block,/pionex=snapshot\.tradingUsd/);
   assert.match(block,/pionexSource:resolvedPionex\.source/);

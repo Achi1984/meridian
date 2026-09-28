@@ -656,3 +656,12 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Wallet diagnostics now expose TOTAL / BOT ACCOUNT / TRADER ACCOUNT plus wallet age to determine why canonical Pionex equity may still be unavailable.
 - Missing totals remain `—`; no wallet profit field is treated as PnL.
 - Execution and decision gates remain unchanged and fail-closed.
+
+
+## v10 r61 — live acceptance follow-up
+
+- r60 COMMAND refresh is confirmed live.
+- BOTS still showed legacy v9 rendering after tab navigation; r61 adds a semantic `meridian:view` event from the source renderer and forces v10 decoration from it.
+- Pionex portfolio source now prefers a fresh Wallet API total over an untimestamped/older private snapshot; newer fresh private snapshots remain valid.
+- Market technical freshness remains independently fail-closed and is not changed by this patch.
+- Execution impact remains false.
