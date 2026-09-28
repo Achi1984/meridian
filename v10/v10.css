@@ -458,3 +458,9 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 #view-command .lock-radar,
 #view-command .quick-grid,
 #view-command .command-bots{display:none!important}
+
+
+/* v10 r63 · strict portfolio authority */
+#view-command .portfolio-reconcile{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(111,184,255,.18)}
+#view-command .portfolio-reconcile button{appearance:none;border:1px solid rgba(111,184,255,.45);background:rgba(7,20,31,.92);color:#7fc7ff;border-radius:12px;padding:10px 12px;font:inherit;font-weight:700;letter-spacing:.04em}
+#view-command .portfolio-reconcile small{color:#8390a0;text-align:right}
