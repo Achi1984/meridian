@@ -620,3 +620,13 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Live matching fields present on all 32 rows: leverage/lower/upper/BE/LIQ/TP.
 - Adds aggregate ECON side from liquidation geometry, TREND↔ECON agreement/opposition, asset-only leverage/structure pass and ECON-side-to-reference pass counts.
 - Diagnostic only: no side remap, threshold change, action unlock, PaperBot change or execution change.
+## v10 r57 — API-native bot identity
+
+- User confirmed current Pionex bot inventory no longer has short bots; supplied current BTC LONG samples on 28.09.2026.
+- Sample checks are consistent with LONG economics: liquidation price below break-even/open price.
+- The 27.09 Asset-Watch snapshot is stale and is no longer suitable as an identity gate.
+- Complete fresh Wallet-detail rows with unique bot IDs can now identify themselves directly.
+- Inverse Coin-M side is economically validated from direct positionOpenPrice/liquidationPrice when clear; original trend remains diagnostic.
+- Asset Watch remains historical/reference only.
+- No trading, transfer, PaperBot, Profit Lock, hedge-threshold, leverage or execution change.
+- Missing PnL, capital, risk or fresh market data still blocks Decision Ready.
