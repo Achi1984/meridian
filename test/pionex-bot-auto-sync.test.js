@@ -72,6 +72,23 @@ test('running futures-grid rows normalize without inventing unsupported values',
   assert.equal(x.source,'PIONEX_BOT_API');
 });
 
+
+test('documented bot enums tolerate surrounding whitespace without broadening allowlists',()=>{
+  const x=normalizePionexBotOrder({
+    buOrderType:' futures_grid ',buOrderId:'trimmed',base:'BTC.PERP',status:' running ',
+    buOrderData:{status:' running ',trend:' short ',leverage:5,bottom:'1',top:'2'}
+  });
+  assert.ok(x);
+  assert.equal(x.symbol,'BTC');
+  assert.equal(x.side,'SHORT');
+  assert.equal(x.botType,' futures_grid ');
+  const unknown=normalizePionexBotOrder({
+    buOrderType:' future_magic_grid ',buOrderId:'nope',base:'BTC.PERP',status:' running ',
+    buOrderData:{status:' running ',trend:' long '}
+  });
+  assert.equal(unknown,null);
+});
+
 test('coin-m investment is not mislabeled USD when API gives only coin investment',()=>{
   const x=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'bot-2',base:'ETH.PERP',status:'running',
