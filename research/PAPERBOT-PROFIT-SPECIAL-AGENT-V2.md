@@ -30,6 +30,7 @@ Frozen rules:
 - long top 25%, short bottom 25%, equal weight within each side; gross raw exposure = 1.0;
 - no position outside UP-UP;
 - volatility scale uses only prior realized strategy returns: trailing 8 weekly observations;
+- warm-up: no position until 8 prior weekly raw strategy returns exist; flat weeks are included as zero returns;
 - target annualized strategy volatility = 10%;
 - max gross leverage = 2x;
 - modeled turnover cost = 8 bps;
