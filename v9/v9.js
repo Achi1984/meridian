@@ -70,7 +70,7 @@ const OKX_DCA_BOTS=[
 ];
 const HEDGE=HEDGES[0];
 const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:null,okx:null}};
-const EXTERNAL_VENUE_REF_KEY='meridian.v10.externalVenueRefs',EXTERNAL_VENUE_EXPECTED=['Ledger','OKX'];
+const EXTERNAL_VENUE_REF_KEY='meridian.v10.externalVenueRefs',LEDGER_AUTH_KEY='meridian.v10.ledgerAuthority',EXTERNAL_VENUE_EXPECTED=['Ledger','OKX'],LEDGER_AUTH_MAX_AGE_MS=24*60*60*1000;
 function loadExternalVenueRefs(){
  try{
   const raw=JSON.parse(localStorage.getItem(EXTERNAL_VENUE_REF_KEY)||'[]');
@@ -80,6 +80,25 @@ function loadExternalVenueRefs(){
  }catch{return[]}
 }
 function saveExternalVenueRefs(rows){try{localStorage.setItem(EXTERNAL_VENUE_REF_KEY,JSON.stringify(rows));return true}catch{return false}}
+function loadLedgerAuthority(){
+ try{
+  const raw=JSON.parse(localStorage.getItem(LEDGER_AUTH_KEY)||'null'),ts=Date.parse(String(raw?.updatedAt||''));
+  return Number.isFinite(ts)?{updatedAt:String(raw.updatedAt),source:'LOCAL_LEDGER_CONFIRMATION'}:null;
+ }catch{return null}
+}
+function saveLedgerAuthority(updatedAt=new Date().toISOString()){
+ try{localStorage.setItem(LEDGER_AUTH_KEY,JSON.stringify({updatedAt,source:'LOCAL_LEDGER_CONFIRMATION'}));return true}catch{return false}
+}
+function latestLedgerAuthority(){
+ const explicit=loadLedgerAuthority(),legacy=loadExternalVenueRefs().find(x=>String(x.venue).toLowerCase()==='ledger'),rows=[explicit,legacy].filter(Boolean);
+ rows.sort((a,b)=>Date.parse(String(b.updatedAt||''))-Date.parse(String(a.updatedAt||'')));
+ return rows[0]||null
+}
+function ledgerAutoState(d){
+ const authority=latestLedgerAuthority(),ts=Date.parse(String(authority?.updatedAt||'')),ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=Number.isFinite(ts)&&ts<=Date.now()+30000&&ageMs<=LEDGER_AUTH_MAX_AGE_MS;
+ const rows=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()==='ledger'&&num(h?.quantity)!=null&&num(h.quantity)>0):[];
+ return{active:fresh&&rows.length>0,authorityAt:authority?.updatedAt||null,ageMs,fresh,rowCount:rows.length,rows:fresh?rows.map(h=>({...h,updatedAt:authority.updatedAt,authoritySource:'LOCAL_LEDGER_CONFIRMATION'})):[]};
+}
 function parseMoneyInput(v){
  const raw=String(v??'').trim().replace(/\s/g,'');if(!raw)return null;
  let x=raw;
@@ -87,20 +106,22 @@ function parseMoneyInput(v){
  else if(raw.includes(','))x=raw.replace(',','.');
  const n=Number(x);return Number.isFinite(n)&&n>=0?n:null
 }
-function portfolioVenueBalances(d){
- const existing=Array.isArray(d?.portfolio?.manualVenueBalances)?d.portfolio.manualVenueBalances:[];
- return [...existing,...loadExternalVenueRefs()];
+function portfolioVenueBalances(d,ledgerAuto){
+ const existing=Array.isArray(d?.portfolio?.manualVenueBalances)?d.portfolio.manualVenueBalances:[],local=loadExternalVenueRefs(),rows=[...existing,...local];
+ return ledgerAuto?.active?rows.filter(x=>String(x?.venue||x?.name||'').trim().toLowerCase()!=='ledger'):rows;
 }
 function bindPortfolioRefEditor(){
- const b=$('#portfolio-ref-edit');if(!b)return;
- b.onclick=()=>{
-  const current=Object.fromEntries(loadExternalVenueRefs().map(x=>[x.venue,x.valueUsd]));
-  const ledgerRaw=prompt('Ledger Gesamtwert in USD',current.Ledger??'');if(ledgerRaw===null)return;
-  const okxRaw=prompt('OKX Gesamtwert in USD',current.OKX??'');if(okxRaw===null)return;
-  const ledger=parseMoneyInput(ledgerRaw),okx=parseMoneyInput(okxRaw);
-  if(ledger==null||okx==null){alert('Ungültiger Wert. Bitte nur den USD-Gesamtwert eingeben.');return}
-  const updatedAt=new Date().toISOString();
-  if(!saveExternalVenueRefs([{venue:'Ledger',valueUsd:ledger,source:'LOCAL_USER_REFERENCE',updatedAt},{venue:'OKX',valueUsd:okx,source:'LOCAL_USER_REFERENCE',updatedAt}])){alert('Lokaler Portfolio-Snapshot konnte nicht gespeichert werden.');return}
+ const ledgerBtn=$('#ledger-authority-confirm'),okxBtn=$('#okx-ref-edit');
+ if(ledgerBtn)ledgerBtn.onclick=()=>{
+  if(!saveLedgerAuthority()){alert('Ledger-Bestätigung konnte lokal nicht gespeichert werden.');return}
+  sync().catch(()=>{});
+ };
+ if(okxBtn)okxBtn.onclick=()=>{
+  const refs=loadExternalVenueRefs(),current=refs.find(x=>String(x.venue).toLowerCase()==='okx');
+  const raw=prompt('OKX Gesamtwert in USD',current?.valueUsd??'');if(raw===null)return;
+  const value=parseMoneyInput(raw);if(value==null){alert('Ungültiger OKX-Wert. Bitte nur den USD-Gesamtwert eingeben.');return}
+  const updatedAt=new Date().toISOString(),kept=refs.filter(x=>String(x.venue).toLowerCase()!=='okx');
+  if(!saveExternalVenueRefs([...kept,{venue:'OKX',valueUsd:value,source:'LOCAL_USER_REFERENCE',updatedAt}])){alert('OKX-Referenz konnte lokal nicht gespeichert werden.');return}
   sync().catch(()=>{});
  };
 }
@@ -178,10 +199,11 @@ function okxDcaEquitySnapshot(){const rows=state.okxDcaBots||[],missingInvest=ro
 function portfolioModel(d,history){
  const selectedRisk=selectPionexRisk(d).risk,liveBots=Array.isArray(selectedRisk?.bots)?selectedRisk.bots.map(normalizeLive):[],botCapital=liveBots.reduce((sum,b)=>sum+(num(b.investUsd)||0)+(botPnlUsd(b).value||0),0),botRowsWithCapital=liveBots.filter(b=>b.investUsd!=null),allBotsHaveCapital=liveBots.length>0&&botRowsWithCapital.length===liveBots.length;
  const historyPoint=latestPortfolioHistorySnapshot(history),privatePionex=pionexEquitySnapshot(d),walletEquity=num(d?.pionexAccount?.wallet?.totalInUsdt),walletUpdatedAt=d?.pionexAccount?.updatedAt||d?.pionexAccount?.snapshotAt||null,walletTs=Date.parse(String(walletUpdatedAt||'')),privateTs=Date.parse(String(privatePionex?.updatedAt||'')),now=Date.now(),walletFresh=String(d?.pionexAccountSync?.status||'UNKNOWN')==='OK'&&String(d?.pionexAccount?.walletStatus||'UNKNOWN')==='OK'&&Number.isFinite(walletTs)&&walletTs<=now+5*60*1000&&now-walletTs<=15*60*1000,privateFresh=privatePionex.found&&Number.isFinite(privateTs)&&privateTs<=now+5*60*1000&&now-privateTs<=15*60*1000,walletPionex=walletFresh&&walletEquity!=null&&walletEquity>=0?{found:true,value:walletEquity,source:'PIONEX_WALLET_READ_API',updatedAt:walletUpdatedAt}:null,resolvedPionex=walletPionex&&(!privateFresh||walletTs>=privateTs)?walletPionex:privatePionex.found?privatePionex:(walletPionex||{found:false,value:0,source:'MISSING',updatedAt:null});
- const venueBalances=portfolioVenueBalances(d),strictPortfolio={...(d?.portfolio||{}),authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:EXTERNAL_VENUE_EXPECTED,manualVenueBalances:venueBalances},canonicalInput=resolvedPionex.found?{...d,portfolio:{...strictPortfolio,pionexEquityUsd:resolvedPionex.value,pionexEquitySource:resolvedPionex.source,pionexEquityUpdatedAt:resolvedPionex.updatedAt}}:{...d,portfolio:{...strictPortfolio,pionexEquityUsd:state.manual.pionex,pionexEquitySource:'FALLBACK_SCREENSHOT'}},snapshot=canonicalPortfolioSnapshot(canonicalInput,Date.now()),spotAuthority=snapshot.spotAuthority||{},priceCoverage=snapshot.priceCoverage||{},pionexTime=sourceTimestampAge(resolvedPionex.updatedAt);
- const privateComplete=spotAuthority.complete===true&&resolvedPionex.found===true,total=privateComplete?snapshot.totalUsd:null,spot=spotAuthority.complete===true?snapshot.spotUsd:null,pionex=resolvedPionex.found?snapshot.tradingUsd:null,source=!privateComplete?'INCOMPLETE':resolvedPionex.source==='PIONEX_WALLET_READ_API'?'CANONICAL_MIXED':'PRIVATE_CANONICAL_SNAPSHOT',okxSnapshot=okxDcaEquitySnapshot(),okxReference=okxSnapshot.value;
+ const ledgerAuto=ledgerAutoState(d),venueBalances=portfolioVenueBalances(d,ledgerAuto),strictHoldings=ledgerAuto.active?ledgerAuto.rows:[],expectedExternal=ledgerAuto.active?['OKX']:EXTERNAL_VENUE_EXPECTED,requiredHoldingVenues=ledgerAuto.active?['Ledger']:[],ignoredPrivateHoldings=Math.max(0,(Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex').length:0)-strictHoldings.length);
+ const strictPortfolio={...(d?.portfolio||{}),holdings:strictHoldings,authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:expectedExternal,requiredHoldingVenues,manualVenueBalances:venueBalances},canonicalInput=resolvedPionex.found?{...d,portfolio:{...strictPortfolio,pionexEquityUsd:resolvedPionex.value,pionexEquitySource:resolvedPionex.source,pionexEquityUpdatedAt:resolvedPionex.updatedAt}}:{...d,portfolio:{...strictPortfolio,pionexEquityUsd:state.manual.pionex,pionexEquitySource:'FALLBACK_SCREENSHOT'}},snapshot=canonicalPortfolioSnapshot(canonicalInput,Date.now()),spotAuthority=snapshot.spotAuthority||{},priceCoverage=snapshot.priceCoverage||{},pionexTime=sourceTimestampAge(resolvedPionex.updatedAt);
+ const privateComplete=spotAuthority.complete===true&&resolvedPionex.found===true,total=privateComplete?snapshot.totalUsd:null,spot=spotAuthority.complete===true?snapshot.spotUsd:null,pionex=resolvedPionex.found?snapshot.tradingUsd:null,source=!privateComplete?'INCOMPLETE':resolvedPionex.source==='PIONEX_WALLET_READ_API'?'CANONICAL_MIXED':'PRIVATE_CANONICAL_SNAPSHOT',okxSnapshot=okxDcaEquitySnapshot(),okxReference=okxSnapshot.value,externalRows=Array.isArray(spotAuthority.externalRows)?spotAuthority.externalRows:[],okxVenue=externalRows.find(x=>String(x?.venue||'').toLowerCase()==='okx'),ledgerAutoUsd=ledgerAuto.active&&priceCoverage.complete?num(spotAuthority.holdingsUsd):null;
  const historyComparable=total!=null&&historyPoint.found&&historyPoint.complete&&historyPoint.consistent&&historyPoint?.sourceStatus?.spot==='STRICT_AUTHORITY',historyDeltaUsd=historyComparable?historyPoint.totalUsd-total:null;
- return{total,spot,pionex,okx:okxReference,okxComplete:okxSnapshot.complete,okxRows:okxSnapshot.rows,okxMissingInvest:okxSnapshot.missingInvest,okxMissingPnl:okxSnapshot.missingPnl,botCapital:allBotsHaveCapital?botCapital:null,complete:privateComplete,source,sourceAgeMs:spotAuthority.maxAgeMs,spotRequested:Number(priceCoverage.requested)||0,spotResolved:Number(priceCoverage.resolved)||0,spotCoverageComplete:!!priceCoverage.complete,externalVenueCount:Number(spotAuthority.venueCount)||0,externalVenues:Array.isArray(spotAuthority.venues)?spotAuthority.venues:[],excludedStaleHoldings:Number(spotAuthority.excludedStaleHoldings)||0,supersededHoldings:Number(spotAuthority.supersededHoldings)||0,externalSnapshotAgeMs:spotAuthority.maxAgeMs,historySource:historyPoint.source,historyAgeMs:historyPoint.ageMs,historyComparable,historyDeltaUsd,livePriceMeta:d?.livePriceMeta||null,pionexSource:resolvedPionex.source,pionexProvenance:resolvedPionex.source,pionexUpdatedAt:resolvedPionex.updatedAt,pionexTimestampKnown:pionexTime.known,pionexTimestampFuture:pionexTime.future,pionexTimestampMs:pionexTime.timestampMs,pionexAgeMs:pionexTime.ageMs};
+ return{total,spot,pionex,okx:okxReference,okxComplete:okxSnapshot.complete,okxRows:okxSnapshot.rows,okxMissingInvest:okxSnapshot.missingInvest,okxMissingPnl:okxSnapshot.missingPnl,okxVenueUsd:num(okxVenue?.valueUsd),okxVenueUpdatedAt:okxVenue?.updatedAt||null,botCapital:allBotsHaveCapital?botCapital:null,complete:privateComplete,source,sourceAgeMs:spotAuthority.maxAgeMs,spotRequested:Number(priceCoverage.requested)||0,spotResolved:Number(priceCoverage.resolved)||0,spotCoverageComplete:!!priceCoverage.complete,externalVenueCount:Number(spotAuthority.venueCount)||0,externalVenues:Array.isArray(spotAuthority.venues)?spotAuthority.venues:[],excludedStaleHoldings:Number(spotAuthority.excludedStaleHoldings)||0,supersededHoldings:Number(spotAuthority.supersededHoldings)||0,ignoredPrivateHoldings,externalSnapshotAgeMs:spotAuthority.maxAgeMs,ledgerAutoActive:ledgerAuto.active,ledgerAutoRows:ledgerAuto.rowCount,ledgerAutoUsd,ledgerAutoAgeMs:ledgerAuto.ageMs,ledgerAutoAuthorityAt:ledgerAuto.authorityAt,ledgerAutoPriceResolved:Number(priceCoverage.resolved)||0,ledgerAutoPriceRequested:Number(priceCoverage.requested)||0,historySource:historyPoint.source,historyAgeMs:historyPoint.ageMs,historyComparable,historyDeltaUsd,livePriceMeta:d?.livePriceMeta||null,pionexSource:resolvedPionex.source,pionexProvenance:resolvedPionex.source,pionexUpdatedAt:resolvedPionex.updatedAt,pionexTimestampKnown:pionexTime.known,pionexTimestampFuture:pionexTime.future,pionexTimestampMs:pionexTime.timestampMs,pionexAgeMs:pionexTime.ageMs};
 }
 function pick(b,keys){for(const k of keys){const v=num(b?.[k]);if(v!=null)return v}return null}function normalizeLive(b){const nested=b?.bot||b?.position||b?.data||{},x={...nested,...b},investUsd=pick(x,['investmentUsd','investmentUSDT','investmentUsdt','usdtInvestment','investedUsd','investment_usdt']),investAny=investUsd??pick(x,['invest','investment','invested','invested_amount','initialInvestment','initial_investment']);return{id:String(x.id||x.botId||x.bot_id||x.name||x.symbol||'BOT'),symbol:String(x.symbol||x.asset||x.baseAsset||x.base_asset||'').replace(/[-_/]?(USDT|USDC|USD)$/,'').replace(/\.PERP$/,'').toUpperCase(),leverage:pick(x,['leverage','leverageX','leverage_x']),lower:pick(x,['lower','lowerRange','rangeLower','lowerPrice','lower_price','minPrice','min_price']),upper:pick(x,['upper','upperRange','rangeUpper','upperPrice','upper_price','maxPrice','max_price']),be:pick(x,['be','breakEvenPrice','breakevenPrice','break_even_price','avgEntryPrice','averageEntryPrice','breakEven','break_even','entryPrice','entry_price','positionOpenPrice','position_open_price']),liq:pick(x,['liq','pionexLiquidationPrice','liquidationPrice','liqPrice','liquidation_price']),tp:pick(x,['tp','takeProfit','tpPrice','take_profit_price']),sl:pick(x,['sl','stopLoss','stopLossPrice','lossStop','stop_loss_price']),price:pick(x,['price','currentPrice','markPrice','lastPrice','mark_price','last_price']),buffer:pick(x,['buffer','pionexLiqBufferPct','liqBufferPct','liquidationDistancePct']),pnl:pick(x,['pnl','totalProfitUsd','totalProfitUSDT','totalProfitUsdt','total_profit_usdt','pnlUsd','unrealizedPnlUsd','unrealizedPnl','unrealized_profit','totalProfit','total_profit','profit']),invest:investAny,investUsd,profitPct:pick(x,['profitPct','totalProfitPct','pnlPct','total_profit_pct','profit_rate','profitRate']),side:String(x.side||x.direction||x.positionSide||'LONG').toUpperCase()}}
 function relDiff(a,b){a=num(a);b=num(b);if(!(a>0&&b>0))return null;return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-12)}
