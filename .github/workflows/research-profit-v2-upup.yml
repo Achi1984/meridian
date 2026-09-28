@@ -1,0 +1,39 @@
+name: MERIDIAN Paper Bot Profit V2 UPUP Discovery
+
+on:
+  push:
+    branches:
+      - research-profit-agent-v2
+    paths:
+      - "research/PAPERBOT-PROFIT-SPECIAL-AGENT-V2.md"
+      - "research/paperbot-profit-special-agent-v2.js"
+      - "research/run-paperbot-profit-v2-upup.mjs"
+      - "test/paperbot-profit-special-agent-v2.test.js"
+      - ".github/workflows/research-profit-v2-upup.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: V2 module tests
+        run: node --test test/paperbot-profit-special-agent-v2.test.js
+      - name: Run frozen V2 UP-UP discovery
+        run: node research/run-paperbot-profit-v2-upup.mjs
+      - name: Upload untouched V2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperbot-profit-v2-upup
+          path: |
+            research/results/paperbot-profit-v2-upup-summary.json
+            research/results/paperbot-profit-v2-upup-full.json
+          if-no-files-found: error
+          retention-days: 30
