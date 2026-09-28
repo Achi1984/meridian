@@ -416,10 +416,12 @@ const server=http.createServer(async(req,res)=>{
         note:"Token is returned once and is not stored in plaintext. Rotate or revoke to invalidate it."
       },origin||"");
     }
-    const assetWatchShareAuthorized=req.method==="GET"&&u.pathname==="/api/private/asset-watch"
-      ? await authorizedAssetWatchShare(u)
-      : false;
-    if(isProtected(u.pathname)&&!authorizedRead(req)&&!assetWatchShareAuthorized){
+    if(req.method==="GET"&&u.pathname==="/api/private/asset-watch"&&await authorizedAssetWatchShare(u)){
+      const data=await stateGet(PRIVATE_STATE_KEY);
+      if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      return writeJson(res,200,buildAssetWatchApiSnapshot(data),origin||"");
+    }
+    if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
