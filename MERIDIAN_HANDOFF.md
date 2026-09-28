@@ -689,3 +689,7 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - COMMAND contains a local-only Ledger + OKX reconcile action. No personal balances are committed.
 - Expected current total after entering the 28.09.2026 screenshot values is approximately 36.4k–36.5k USD depending on the Pionex Wallet API timestamp.
 - Execution impact remains false.
+
+
+### r63 history note
+Portfolio history capture is also fail-closed now: the backend will not append another canonical history point unless current Ledger + OKX venue authority is complete. Existing pre-r63 history may contain the stale-holdings basis, so COMMAND suppresses HIST Δ comparison until the history point itself reports STRICT_AUTHORITY.
