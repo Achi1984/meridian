@@ -109,6 +109,28 @@ test('normalizer inspector reports the exact four gating stages',()=>{
   assert.equal(quoteAsBase.sidePass,true);
   assert.equal(quoteAsBase.baseClass,'stable_quote');
   assert.equal(quoteAsBase.quoteClass,'asset');
+
+  const inverse=inspectPionexBotOrder({
+    buOrderType:'futures_grid',base:'USD',quote:'BTC',status:'running',
+    buOrderData:{status:'running',trend:'short',cateType:'inverse'}
+  });
+  assert.equal(inverse.symbolPass,true);
+  assert.equal(inverse.symbolSource,'quote_inverse');
+  const normalized=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'inverse-btc',base:'USD',quote:'BTC',status:'running',
+    buOrderData:{status:'running',trend:'short',cateType:'inverse',leverage:5,bottom:'50000',top:'100000'}
+  });
+  assert.equal(normalized.symbol,'BTC');
+  assert.equal(normalized.side,'SHORT');
+});
+
+
+test('inverse quote fallback is not applied without an explicit inverse category',()=>{
+  const x=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'not-inverse',base:'USD',quote:'BTC',status:'running',
+    buOrderData:{status:'running',trend:'long',cateType:'linear'}
+  });
+  assert.equal(x,null);
 });
 
 test('coin-m investment is not mislabeled USD when API gives only coin investment',()=>{
