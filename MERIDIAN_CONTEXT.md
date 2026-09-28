@@ -409,3 +409,18 @@ r65 moves the primary 15m/1h/4h/1D candle transport behind the authenticated MER
 The paper-trading core already uses server-side Binance market access on Northflank, so this change aligns the terminal technical feed with a network path that is already exercised server-side rather than relying primarily on iOS third-party fetch behavior.
 
 No indicator formulas, signal thresholds, bot rules, Profit Lock rules or execution behavior changed.
+
+
+## v10 r66 — inverse Wallet PnL normalization
+
+Live r65 screenshots confirmed that Pionex wallet/detail discovery is structurally complete (28/28 API-native rows, 28/28 safety-ready) while decision readiness remains 0 because bot PnL is missing. The Wallet `TRADING_BOT` rows expose `investmentAmount`, `investmentToken`, and `profit`; the futures-grid detail endpoint exposes range/leverage/liquidation data but no reliable USD-PnL field for these inverse bots.
+
+r66 keeps the existing read-only source hierarchy and adds a narrowly scoped normalization for Pionex `cateType=inverse`:
+- preserve the Wallet API price table (`prices[*].priceInUsd`) inside the private snapshot;
+- accept Wallet `profit` only when the bot is explicitly inverse and `investmentToken` exactly matches the normalized bot asset;
+- convert native-coin profit to USD with the Pionex Wallet USD price from the same account snapshot;
+- prefer any explicit detail USD-PnL field over the Wallet-derived value;
+- derive profit percent only from the resolved USD PnL and existing USD investment;
+- fail closed if category, token, asset, or USD price does not match.
+
+The UI now reports separate PnL and market blocker counts plus aggregate PnL-source coverage. No private bot IDs or PnL values are exposed on public gateway health.

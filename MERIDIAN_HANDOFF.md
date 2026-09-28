@@ -715,3 +715,14 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - Feed timestamps propagate through closed-candle normalization into `assetIntel.updatedAt` and `marketSyncedAt`; stale cache cannot masquerade as a new sample.
 - COMMAND and MARKET show `MERIDIAN_GATEWAY`, `DIRECT_FALLBACK`, or `UNKNOWN` plus market errors.
 - Execution impact remains false.
+
+
+## v10 r66 — PnL blocker remediation
+
+- r65 live screenshots: 28/28 API-native bot identity, 28/28 safety-ready, 0/28 decision-ready.
+- Bot cards show valid capital/BE/TP/liq but blank PnL.
+- Root cause: futures-grid detail normalization intentionally accepts only explicit USD-PnL fields, while the live inverse bot details do not expose one; Wallet bot entries do expose native `profit` + `investmentToken`.
+- r66 preserves Pionex Wallet USD prices and converts inverse native profit only when token == normalized asset.
+- UI adds `PNL USD READY`, PnL source counts, and separate `PNL miss` / `MKT miss` decision blockers.
+- Expected live target after account sync + fresh market feed: 28/28 PnL-normalized and 28/28 decision-ready, unless a row genuinely lacks a valid wallet profit or market dataset.
+- Execution impact remains false.
