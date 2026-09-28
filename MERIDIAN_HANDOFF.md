@@ -622,8 +622,8 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Diagnostic only: no side remap, threshold change, action unlock, PaperBot change or execution change.
 ## v10 r57 — API-native bot identity
 
-- Initial 28.09.2026 BTC spot-check screenshots showed LONG bots, but a later 18:58 follow-up confirms the current inventory can also contain SHORT bots; do not carry forward any global "no shorts" assumption.
-- Current side-validation samples from 28.09.2026 18:58: DOT COIN-M SHORT 4x has creation price 1.155, break-even 1.165 and liquidation 1.854; DOT COIN-M LONG 3x has creation price 1.242, break-even 1.232 and liquidation 0.677. These screenshots are validation samples only, not a canonical bot inventory.
+- Initial 28.09.2026 BTC spot-check screenshots showed LONG bots, but current inventory can contain both LONG and SHORT bots; do not carry forward any global "no shorts" assumption.
+- The DOT SHORT sample from 18:58 was closed immediately afterwards and is historical only. Use the fresher SUI pair from 19:05–19:06 as the current manual side-validation sample: SUI COIN-M SHORT 4x creation 1.0043, break-even 1.0252, liquidation 1.5636; SUI COIN-M LONG 4x creation 1.2463, break-even 1.2218, liquidation 0.6859. These screenshots are validation samples only, not a canonical bot inventory.
 - The 27.09 Asset-Watch snapshot is stale and is no longer suitable as an identity gate.
 - Complete fresh Wallet-detail rows with unique bot IDs can now identify themselves directly.
 - Inverse Coin-M side is economically validated from direct positionOpenPrice/liquidationPrice when clear; original trend remains diagnostic.
