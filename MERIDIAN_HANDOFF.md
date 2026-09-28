@@ -416,3 +416,14 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - LIQ_RISK and PROTECTION_RISK remain ahead of the coverage guard so known liquidation/SL safety is never hidden.
 - Existing DATA_STALE / MARKET_STALE / UNVERIFIED blocking remains unchanged.
 - Pair-status formulas, risk/signal ranks, Profit Lock formulas and thresholds, hedge threshold, Paper-bot parameters, leverage and execution are unchanged.
+
+
+## v10 r38 — Per-asset match completeness guard
+
+- Continues the deep audit after runtime-verified r37.
+- An asset pair can no longer show PROFIT LOCK / momentum RISK REVIEW / WATCH PROFIT / HOLD when another current live row for the same asset is unmatched or ambiguous.
+- Same-asset incompleteness is labelled UNVERIFIED with an asset-scoped row count and ambiguous count when applicable.
+- Unmatched rows for other assets do not invalidate the current pair.
+- LIQ_RISK and explicit SL/protection risk stay ahead of this guard so known safety issues remain visible.
+- r37 global NEXT ACTION coverage guard remains unchanged.
+- No matcher threshold, signal/risk rank, Profit Lock formula, hedge threshold, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
