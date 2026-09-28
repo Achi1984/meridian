@@ -823,6 +823,13 @@ function renderLab(){
   if(note&&note.innerHTML!==nextNote)note.innerHTML=nextNote;
 }
 function activeViewKey(){return String($('.view.active')?.id||'view-command').replace(/^view-/,'')}
+function renderActiveView(active,force=true){
+  if(active==='command')return renderCommand(force);
+  if(active==='bots')return renderBots(force);
+  if(active==='market')return renderMarket(force);
+  if(active==='research')return renderScanner(force);
+  if(active==='more')return renderLab();
+}
 function decorate(forceData=false){
   document.documentElement.dataset.meridianBuild=BUILD;
   const active=activeViewKey();
@@ -831,6 +838,26 @@ function decorate(forceData=false){
   renderMarket(forceData&&active==='market');
   renderScanner(forceData&&active==='research');
   renderLab();renderSystemHeader();decorateA11y();
+}
+function bindV10NavigationAuthority(){
+  $('#nav button[data-v]').forEach(b=>{
+    b.onclick=e=>{
+      e?.preventDefault?.();
+      const v=String(b.dataset.v||'command');
+      const ok=bridge()?.goView?.(v);
+      if(!ok){
+        $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
+        $('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));
+      }
+      queueMicrotask(()=>{
+        try{renderActiveView(v,true);renderSystemHeader();decorateA11y();}
+        catch(err){
+          const host=$('#view-'+v);
+          if(host)host.innerHTML='<section class="v10-live-blocked"><b>V10 VIEW RENDER ERROR</b><small>'+esc(String(err?.message||err).slice(0,180))+'</small></section>';
+        }
+      });
+    };
+  });
 }
 let raf=0,pendingDataRefresh=false;
 const schedule=(forceData=false)=>{
@@ -843,8 +870,6 @@ window.addEventListener('meridian:data',()=>{
   schedule(true);
 });
 window.addEventListener('meridian:view',()=>schedule(true));
-$('#nav')?.addEventListener('click',e=>{
-  if(e.target?.closest?.('button[data-v]'))schedule(true);
-});
 new MutationObserver(()=>schedule(false)).observe($('#app')||document.body,{childList:true,subtree:true});
+bindV10NavigationAuthority();
 decorate();
