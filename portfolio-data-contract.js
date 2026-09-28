@@ -30,6 +30,17 @@ export function pionexEquitySnapshot(data={}){
 }
 export function pionexEquityUsd(data={}){return pionexEquitySnapshot(data).value}
 
+export function sourceTimestampAge(updatedAt,now=Date.now()){
+  let timestampMs=finite(updatedAt);
+  if(timestampMs==null&&updatedAt!==null&&updatedAt!==undefined&&updatedAt!==''){
+    const parsed=Date.parse(String(updatedAt));timestampMs=Number.isFinite(parsed)?parsed:null;
+  }
+  const nowMs=finite(now)??Date.now();
+  if(timestampMs==null)return{known:false,future:false,timestampMs:null,ageMs:null};
+  const future=timestampMs>nowMs+30000,ageMs=Math.max(0,nowMs-timestampMs);
+  return{known:true,future,timestampMs,ageMs};
+}
+
 export function portfolioPriceCoverage(data={}){
   const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings.filter(h=>String(h?.venue||'').toLowerCase()!=='pionex'):[];
   const meta=data?.livePriceMeta||{},requestedRaw=finite(meta.requestedCount),resolvedRaw=finite(meta.resolvedCount);
