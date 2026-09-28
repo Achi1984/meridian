@@ -121,45 +121,132 @@ test('normalizer inspector reports the exact four gating stages',()=>{
     buOrderData:{status:'running',trend:'short',cateType:'inverse',leverage:5,bottom:'50000',top:'100000'}
   });
   assert.equal(normalized.symbol,'BTC');
-  assert.equal(normalized.side,'SHORT');
+  assert.equal(normalized.side,'LONG');
+  assert.equal(normalized.declaredSide,'SHORT');
+  assert.equal(normalized.assetDeclaredSide,'LONG');
 });
 
 
 
-test('inverse Coin-M uses direct liquidation geometry when it contradicts declared trend',()=>{
+test('inverse quote Coin-M converts reciprocal API prices before deriving asset side',()=>{
   const long=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'inverse-long',base:'USD',quote:'BTC',cateType:'inverse',status:'running',
-    buOrderData:{status:'running',trend:'short',leverage:5,bottom:'55000',top:'95000',positionOpenPrice:'83415.6',liquidationPrice:'53453'}
+    buOrderData:{
+      status:'running',trend:'short',leverage:5,
+      bottom:String(1/95000),top:String(1/55000),
+      positionOpenPrice:String(1/83415.6),liquidationPrice:String(1/53453),
+      profitStopType:'price',profitStop:String(1/95000)
+    }
   });
   assert.equal(long.symbol,'BTC');
   assert.equal(long.side,'LONG');
   assert.equal(long.declaredSide,'SHORT');
-  assert.equal(long.sideSource,'economic_inverse');
+  assert.equal(long.assetDeclaredSide,'LONG');
+  assert.equal(long.sideSource,'economic_inverse_asset');
+  assert.ok(Math.abs(long.lower-55000)<1e-6);
+  assert.ok(Math.abs(long.upper-95000)<1e-6);
+  assert.ok(Math.abs(long.positionOpenPrice-83415.6)<1e-6);
+  assert.ok(Math.abs(long.liquidationPrice-53453)<1e-6);
+  assert.ok(Math.abs(long.takeProfit-95000)<1e-6);
 
   const short=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'inverse-short',base:'USD',quote:'BTC',cateType:'inverse',status:'running',
-    buOrderData:{status:'running',trend:'long',leverage:5,bottom:'55000',top:'95000',positionOpenPrice:'83000',liquidationPrice:'96000'}
+    buOrderData:{
+      status:'running',trend:'long',leverage:5,
+      bottom:String(1/96000),top:String(1/55000),
+      positionOpenPrice:String(1/83000),liquidationPrice:String(1/96000)
+    }
   });
   assert.equal(short.side,'SHORT');
   assert.equal(short.declaredSide,'LONG');
-  assert.equal(short.sideSource,'economic_inverse');
+  assert.equal(short.assetDeclaredSide,'SHORT');
+  assert.equal(short.sideSource,'economic_inverse_asset');
+  assert.ok(Math.abs(short.positionOpenPrice-83000)<1e-6);
+  assert.ok(Math.abs(short.liquidationPrice-96000)<1e-6);
 });
 
-test('current SUI screenshot samples validate both inverse Coin-M directions',()=>{
+test('current SUI screenshots validate reciprocal Coin-M long and short normalization',()=>{
   const long=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'sui-long-sample',base:'USD',quote:'SUI',cateType:'inverse',status:'running',
-    buOrderData:{status:'running',trend:'long',leverage:4,bottom:'0.6',top:'1.55',positionOpenPrice:'1.2463',liquidationPrice:'0.6859'}
+    buOrderData:{
+      status:'running',trend:'short',leverage:4,
+      bottom:String(1/1.55),top:String(1/0.6),
+      positionOpenPrice:String(1/1.2463),liquidationPrice:String(1/0.6859),
+      profitStopType:'price',profitStop:String(1/1.55)
+    }
   });
   const short=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'sui-short-sample',base:'USD',quote:'SUI',cateType:'inverse',status:'running',
-    buOrderData:{status:'running',trend:'short',leverage:4,bottom:'0.65',top:'1.85',positionOpenPrice:'1.0043',liquidationPrice:'1.5636'}
+    buOrderData:{
+      status:'running',trend:'long',leverage:4,
+      bottom:String(1/1.85),top:String(1/0.65),
+      positionOpenPrice:String(1/1.0043),liquidationPrice:String(1/1.5636),
+      profitStopType:'price',profitStop:String(1/0.65)
+    }
   });
   assert.equal(long.symbol,'SUI');
   assert.equal(long.side,'LONG');
-  assert.equal(long.sideSource,'economic_inverse');
+  assert.equal(long.declaredSide,'SHORT');
+  assert.equal(long.assetDeclaredSide,'LONG');
+  assert.equal(long.sideSource,'economic_inverse_asset');
+  assert.ok(Math.abs(long.lower-0.6)<1e-9);
+  assert.ok(Math.abs(long.upper-1.55)<1e-9);
+  assert.ok(Math.abs(long.positionOpenPrice-1.2463)<1e-9);
+  assert.ok(Math.abs(long.liquidationPrice-0.6859)<1e-9);
+  assert.ok(Math.abs(long.takeProfit-1.55)<1e-9);
+
   assert.equal(short.symbol,'SUI');
   assert.equal(short.side,'SHORT');
-  assert.equal(short.sideSource,'economic_inverse');
+  assert.equal(short.declaredSide,'LONG');
+  assert.equal(short.assetDeclaredSide,'SHORT');
+  assert.equal(short.sideSource,'economic_inverse_asset');
+  assert.ok(Math.abs(short.lower-0.65)<1e-9);
+  assert.ok(Math.abs(short.upper-1.85)<1e-9);
+  assert.ok(Math.abs(short.positionOpenPrice-1.0043)<1e-9);
+  assert.ok(Math.abs(short.liquidationPrice-1.5636)<1e-9);
+  assert.ok(Math.abs(short.takeProfit-0.65)<1e-9);
+});
+
+test('inverse Coin-M liquidation estimates are selected after reciprocal normalization',()=>{
+  const long=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'estimate-long',base:'USD',quote:'SUI',cateType:'inverse',status:'running',
+    buOrderData:{
+      status:'running',trend:'short',leverage:4,bottom:String(1/1.55),top:String(1/0.6),
+      positionOpenPrice:String(1/1.2463),
+      estimateLiquidationPriceUp:String(1/0.6859),
+      estimateLiquidationPriceDown:String(1/1.8)
+    }
+  });
+  assert.equal(long.side,'LONG');
+  assert.ok(Math.abs(long.liquidationPrice-0.6859)<1e-9);
+
+  const short=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'estimate-short',base:'USD',quote:'SUI',cateType:'inverse',status:'running',
+    buOrderData:{
+      status:'running',trend:'long',leverage:4,bottom:String(1/1.85),top:String(1/0.65),
+      positionOpenPrice:String(1/1.0043),
+      estimateLiquidationPriceUp:String(1/0.7),
+      estimateLiquidationPriceDown:String(1/1.5636)
+    }
+  });
+  assert.equal(short.side,'SHORT');
+  assert.ok(Math.abs(short.liquidationPrice-1.5636)<1e-9);
+});
+
+test('current BTC reciprocal sample renders asset-quoted BE and TP instead of raw inverse values',()=>{
+  const x=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'btc-current-sample',base:'USD',quote:'BTC',cateType:'inverse',status:'running',
+    buOrderData:{
+      status:'running',trend:'short',leverage:5,
+      bottom:String(1/95000),top:String(1/55000),
+      positionOpenPrice:'0.000011999',
+      profitStopType:'price',profitStop:'0.000010526'
+    }
+  });
+  assert.equal(x.side,'LONG');
+  assert.equal(x.sideSource,'trend_inverse_asset');
+  assert.ok(x.positionOpenPrice>83000&&x.positionOpenPrice<84000);
+  assert.ok(x.takeProfit>94900&&x.takeProfit<95100);
 });
 
 test('inverse quote fallback is not applied without an explicit inverse category',()=>{

@@ -42,12 +42,14 @@ test('r57 API-native identity marks identity only and keeps data availability ex
   assert.equal(row._liveInvestUsd,false);
 });
 
-test('r57 inverse Coin-M direction is economically validated from direct position geometry',()=>{
-  assert.match(bot,/function directEconomicSide\(d\)/);
+test('r57 API-native identity survives r58 asset-quoted inverse Coin-M normalization',()=>{
+  assert.match(bot,/function directEconomicSide\(order,d\)/);
+  assert.match(bot,/function assetPrice\(order,v\)/);
   assert.match(bot,/liquidationPrice/);
   assert.match(bot,/positionOpenPrice/);
-  assert.match(bot,/source:'economic_inverse'/);
+  assert.match(bot,/source:'economic_inverse_asset'/);
   assert.match(bot,/declaredSide/);
+  assert.match(bot,/assetDeclaredSide/);
 });
 
 test('r57 UI distinguishes API-native identity from legacy reference match',()=>{
@@ -67,11 +69,12 @@ test('r57 keeps decision readiness fail-closed beyond identity',()=>{
   assert.equal(release.terminalExecutionImpact,false);
 });
 
-test('r57 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r57');
-  assert.match(root,/10\.0-r57-production/);
-  assert.match(root,/\.\/v10\/\?build=r57/);
-  assert.match(v10,/const BUILD='10\.0-r57'/);
-  assert.match(v9,/qs\.set\('build','r57'\)/);
-  assert.match(v9html,/p\.set\('build','r57'\)/);
+test('successor release identity remains canonical after r57',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });

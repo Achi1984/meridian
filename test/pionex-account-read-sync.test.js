@@ -160,7 +160,9 @@ test('wallet inverse cateType survives into Coin-M symbol normalization',()=>{
   assert.equal(risk.symbolPassCount,1);
   assert.equal(risk.allStagePassCount,1);
   assert.equal(risk.bots[0].symbol,'BTC');
-  assert.equal(risk.bots[0].side,'SHORT');
+  assert.equal(risk.bots[0].side,'LONG');
+  assert.equal(risk.bots[0].declaredSide,'SHORT');
+  assert.equal(risk.bots[0].assetDeclaredSide,'LONG');
 });
 
 test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{

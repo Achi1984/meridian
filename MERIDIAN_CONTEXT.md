@@ -277,3 +277,19 @@ A fresh user screenshot pair on 28.09.2026 at 19:05–19:06 confirms that curren
 - LONG 4x: current price 1.1556, creation price 1.2463, break-even 1.2218, liquidation 0.6859, range 0.60–1.55.
 
 Both SUI samples agree with r57 economic-side geometry (LIQ above entry/BE => SHORT; LIQ below entry/BE => LONG). Screenshot inventories are point-in-time validation evidence only. Current Wallet-detail API rows with unique bot IDs remain the live identity source; the 27.09 Asset-Watch screenshots and later manual screenshots must not be treated as canonical inventory.
+
+
+## v10 r58 — inverse Coin-M reciprocal price normalization
+
+Live r57 evidence on 28.09.2026 showed that API-native identity was working (Wallet Detail, 32/32 supported), but quote-inverse Coin-M rows still exposed reciprocal raw prices such as BTC BE 0.000011999 and TP 0.000010526 while the market traded near 83k USD. r58 normalizes quote-inverse price fields into the asset/USD convention before any risk or side interpretation.
+
+r58:
+- detects the existing strict quote-inverse shape only when the normalized symbol source is `quote_inverse`;
+- converts positive raw price fields with `1 / raw` for entry/open, grid bounds, liquidation, TP and SL;
+- reorders reciprocal grid bounds so `lower < upper` in asset/USD terms;
+- translates Pionex pair-direction trend into asset-direction for quote-inverse rows;
+- derives economic LONG/SHORT only after price normalization;
+- selects estimated liquidation candidates only when they lie on the economically correct side of normalized entry;
+- retains the original raw trend as `declaredSide` and exposes translated `assetDeclaredSide` for diagnostics.
+
+Validation fixtures use the current SUI LONG/SHORT pair and the observed BTC reciprocal sample. No trading permission, execution, PaperBot, Profit Lock, leverage, hedge threshold, matcher threshold or decision gate is relaxed.
