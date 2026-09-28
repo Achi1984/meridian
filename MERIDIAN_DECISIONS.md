@@ -622,3 +622,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Diagnostics:** Aggregate per-live-row pass counts for asset, side, exact leverage, structural evidence, strong candidate and final accepted match; aggregate live/reference side distributions; aggregate live field availability for leverage, range, break-even, liquidation and TP.
 
 **Safety:** r55 is diagnostic-only. MATCH_MAX_SCORE, MATCH_MIN_GAP, ambiguity handling, per-asset UNVERIFIED guards, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution logic remain unchanged.
+## D-062 — Validate Pionex trend against economic liquidation geometry before any side remap
+
+**Decision:** A mismatch between Pionex `trend` and the legacy Asset-Watch side must not be corrected by blindly flipping LONG/SHORT. MERIDIAN first validates declared side against economic risk geometry derived from break-even and liquidation price.
+
+**Diagnostic rule:** when both BE and LIQ are positive and separated by at least 0.2%, `LIQ < BE` is classified as economic LONG and `LIQ > BE` as economic SHORT. This classification is diagnostic only in r56.
+
+**Additional cross-checks:** Compare matching potential by asset while ignoring declared side, then repeat against the economic side. Report only aggregate counts.
+
+**Safety:** No normalized bot side is changed. Matcher thresholds, ambiguity handling, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution logic remain unchanged.
