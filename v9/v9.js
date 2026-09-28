@@ -75,7 +75,7 @@ function loadExternalVenueRefs(){
  try{
   const raw=JSON.parse(localStorage.getItem(EXTERNAL_VENUE_REF_KEY)||'[]');
   if(!Array.isArray(raw))return[];
-  return raw.filter(x=>x&&EXTERNAL_VENUE_EXPECTED.includes(String(x.venue||''))&&num(x.valueUsd)>=0&&Date.parse(String(x.updatedAt||''))>0)
+  return raw.filter(x=>{const value=num(x?.valueUsd);return x&&EXTERNAL_VENUE_EXPECTED.includes(String(x.venue||''))&&value!=null&&value>=0&&Date.parse(String(x.updatedAt||''))>0})
     .map(x=>({venue:String(x.venue),valueUsd:num(x.valueUsd),source:'LOCAL_USER_REFERENCE',updatedAt:String(x.updatedAt)}));
  }catch{return[]}
 }
