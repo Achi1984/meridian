@@ -53,17 +53,38 @@ function resolvedSymbol(order){
   if(inverseCoinM(order)&&baseClass==='stable_quote'&&quoteClass==='asset')return{symbol:baseSymbol(order?.quote),source:'quote_inverse',baseClass,quoteClass};
   return{symbol:'',source:'none',baseClass,quoteClass};
 }
-function directEconomicSide(d){
-  const entry=firstNum(d,['positionOpenPrice','openPrice','initPrice']),liq=firstNum(d,['liquidationPrice']);
+function quoteInverseConvention(order){
+  return resolvedSymbol(order).source==='quote_inverse';
+}
+function assetPrice(order,v){
+  const x=n(v);
+  if(!(x>0))return null;
+  return quoteInverseConvention(order)?1/x:x;
+}
+function firstAssetPrice(order,obj,keys){
+  for(const k of keys){
+    const x=assetPrice(order,obj?.[k]);
+    if(x!=null)return x;
+  }
+  return null;
+}
+function assetDeclaredDirection(order,declaredSide){
+  if(!quoteInverseConvention(order))return declaredSide;
+  if(declaredSide==='LONG')return'SHORT';
+  if(declaredSide==='SHORT')return'LONG';
+  return declaredSide;
+}
+function directEconomicSide(order,d){
+  const entry=firstAssetPrice(order,d,['positionOpenPrice','openPrice','initPrice']),liq=firstAssetPrice(order,d,['liquidationPrice']);
   if(!(entry>0&&liq>0))return null;
   const gap=Math.abs(liq-entry)/Math.max(entry,liq,1e-12);
   if(gap<.002)return null;
   return liq<entry?'LONG':'SHORT';
 }
 function resolvedDirection(order){
-  const d=order?.buOrderData||{},declaredSide=direction(d?.trend),economicSide=inverseCoinM(order)?directEconomicSide(d):null;
-  if(economicSide)return{side:economicSide,source:'economic_inverse',declaredSide,economicSide};
-  return{side:declaredSide,source:'trend',declaredSide,economicSide};
+  const d=order?.buOrderData||{},declaredSide=direction(d?.trend),assetDeclaredSide=assetDeclaredDirection(order,declaredSide),economicSide=inverseCoinM(order)?directEconomicSide(order,d):null;
+  if(economicSide)return{side:economicSide,source:'economic_inverse_asset',declaredSide,assetDeclaredSide,economicSide};
+  return{side:assetDeclaredSide,source:quoteInverseConvention(order)?'trend_inverse_asset':'trend',declaredSide,assetDeclaredSide,economicSide};
 }
 export function inspectPionexBotOrder(order){
   const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),resolved=resolvedSymbol(order),resolvedSide=resolvedDirection(order),side=resolvedSide.side;
@@ -77,27 +98,41 @@ export function inspectPionexBotOrder(order){
     symbolSource:resolved.source,
     sideSource:resolvedSide.source,
     declaredSide:resolvedSide.declaredSide,
+    assetDeclaredSide:resolvedSide.assetDeclaredSide,
     economicSide:resolvedSide.economicSide,
     status,
     side
   };
 }
-function liquidationFor(d,side){
-  const direct=firstNum(d,['liquidationPrice']);
+function liquidationFor(order,d,side){
+  const direct=firstAssetPrice(order,d,['liquidationPrice']);
   if(direct!=null)return direct;
-  return side==='SHORT'?firstNum(d,['estimateLiquidationPriceUp','estimateLiquidationPriceDown']):firstNum(d,['estimateLiquidationPriceDown','estimateLiquidationPriceUp']);
+  const entry=firstAssetPrice(order,d,['positionOpenPrice','openPrice','initPrice']);
+  const candidates=['estimateLiquidationPriceUp','estimateLiquidationPriceDown']
+    .map(k=>firstAssetPrice(order,d,[k]))
+    .filter(x=>x>0);
+  if(!(entry>0)||!candidates.length)return null;
+  const valid=candidates.filter(x=>side==='SHORT'?x>entry:side==='LONG'?x<entry:false);
+  if(!valid.length)return null;
+  valid.sort((a,b)=>Math.abs(a-entry)-Math.abs(b-entry));
+  return valid[0];
 }
-function tpFor(d){
+function tpFor(order,d){
   if(String(d?.profitStopType||'').toLowerCase()==='price'){
-    const x=n(d?.profitStop);if(x>0)return x;
+    const x=assetPrice(order,d?.profitStop);if(x>0)return x;
   }
   return null;
 }
-function slFor(d){
+function slFor(order,d){
   if(String(d?.lossStopType||'').toLowerCase()==='price'){
-    const x=n(d?.lossStop);if(x>0)return x;
+    const x=assetPrice(order,d?.lossStop);if(x>0)return x;
   }
-  return firstNum(d,['stopLoss','stopLossPrice','lossStopPrice']);
+  return firstAssetPrice(order,d,['stopLoss','stopLossPrice','lossStopPrice']);
+}
+function rangeFor(order,d){
+  const a=assetPrice(order,d?.bottom),b=assetPrice(order,d?.top);
+  if(a>0&&b>0)return{lower:Math.min(a,b),upper:Math.max(a,b)};
+  return{lower:a,upper:b};
 }
 function reliableUsdInvestment(d){
   const usd=firstNum(d,['usdtInvestment','investmentUsd','investmentUSDT']);
@@ -117,7 +152,7 @@ function optionalPnlPct(d){
 export function normalizePionexBotOrder(order){
   const check=inspectPionexBotOrder(order);
   if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
-  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol;
+  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d);
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),
@@ -125,19 +160,20 @@ export function normalizePionexBotOrder(order){
     symbol,
     side,
     declaredSide:check.declaredSide,
+    assetDeclaredSide:check.assetDeclaredSide,
     sideSource:check.sideSource,
     leverage:n(d.leverage),
-    lower:n(d.bottom),
-    upper:n(d.top),
-    liquidationPrice:liquidationFor(d,side),
-    takeProfit:tpFor(d),
-    stopLoss:slFor(d),
+    lower:range.lower,
+    upper:range.upper,
+    liquidationPrice:liquidationFor(order,d,side),
+    takeProfit:tpFor(order,d),
+    stopLoss:slFor(order,d),
     investmentUsd:reliableUsdInvestment(d),
     pnlUsd:optionalPnl(d),
     totalProfitPct:optionalPnlPct(d),
     grids:n(d.row),
     position:n(d.position),
-    positionOpenPrice:n(d.positionOpenPrice),
+    positionOpenPrice:firstAssetPrice(order,d,['positionOpenPrice','openPrice','initPrice']),
     extraMargin:n(d.extraMargin),
     riskStatus:d.riskStatus||null,
     marginStatus:d.marginStatus||null,
