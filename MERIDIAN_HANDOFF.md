@@ -357,3 +357,16 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Initial v10 shell statuses start as muted, matching the semantic CSS contract before runtime data arrives.
 - Readiness labels and conditions are unchanged.
 - No trading rules, signals, risk thresholds, Profit Lock, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
+
+
+## v10 r33 — Exposure completeness SSOT
+
+- Continues the deep audit after runtime-verified r32.
+- Adds shared exposureIntegrity in the v9 data engine for global and per-asset exposure completeness.
+- Current unmatched supported live rows now count as unknown exposure instead of disappearing from completeness checks.
+- A same-asset unmatched live row makes that asset's hedge percentage unavailable.
+- The existing hedgeLow threshold remains <15%; r33 only blocks that test when its denominator is incomplete.
+- Global SHORT/LONG coverage becomes unavailable when any current live exposure row is unmatched or any matched row lacks USD investment.
+- Active v10 pair cards and COMMAND live overview reuse the shared completeness helper and show PARTIAL rather than COMPLETE on incomplete exposure.
+- Known matched exposure values remain identifiable as known values; no missing quantity is invented.
+- No trading thresholds, Profit Lock percentages, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
