@@ -73,10 +73,13 @@ export function externalVenueBalanceSnapshot(data={},now=Date.now(),maxAgeMs=POR
     if(!prev||rowTs>=prevTs)newest.set(row.key,row);
   }
   const selected=[...newest.values()],current=selected.filter(x=>currentTimestamp(x.timestamp,nowMs,maxAgeMs)),stale=selected.filter(x=>!currentTimestamp(x.timestamp,nowMs,maxAgeMs));
-  const totalUsd=current.reduce((sum,x)=>sum+x.valueUsd,0),ages=current.map(x=>Math.max(0,nowMs-x.timestamp));
+  const totalUsd=current.reduce((sum,x)=>sum+x.valueUsd,0),ages=current.map(x=>Math.max(0,nowMs-x.timestamp)),currentKeys=new Set(current.map(x=>x.key));
+  const expectedVenues=Array.isArray(data?.portfolio?.externalVenueExpectedVenues)?data.portfolio.externalVenueExpectedVenues.map(x=>String(x||'').trim()).filter(Boolean):[],expectedKeys=[...new Set(expectedVenues.map(venueKey).filter(Boolean))];
+  const declaredComplete=data?.portfolio?.externalVenueSnapshotComplete===true,complete=declaredComplete&&(expectedKeys.length?expectedKeys.every(k=>currentKeys.has(k)):current.length>0);
   return{
     rows:current,staleRows:stale,venueCount:current.length,venues:current.map(x=>x.venue),
-    totalUsd:round(totalUsd),complete:data?.portfolio?.externalVenueSnapshotComplete===true&&current.length>0,
+    expectedVenues,missingExpectedVenues:expectedVenues.filter(v=>!currentKeys.has(venueKey(v))),
+    totalUsd:round(totalUsd),complete,
     maxAgeMs:ages.length?Math.max(...ages):null,minAgeMs:ages.length?Math.min(...ages):null
   };
 }
