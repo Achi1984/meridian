@@ -846,8 +846,8 @@ function bindDocumentedEdge(view){
 }
 
 function labOverviewHtml(){
-  const discovery=edgeUi.tsmom?(edgeUi.tsmom.gate?.pass?'PASS':'FAIL'):'NOT RUN',holdout=holdoutUi.combined?(holdoutUi.combined.pass?'PASS':'FAIL'):'NOT RUN',sk=skV2Ui.result?(skV2Ui.result.gate?.pass?'V2 PASS':'V2 FAIL'):'FROZEN';
-  return '<div><span>TSMOM DISCOVERY</span><b class="tone-'+(discovery==='PASS'?'safe':discovery==='FAIL'?'watch':'muted')+'">'+discovery+'</b><small>interner Gate · kein Beweis</small></div><div><span>TSMOM HOLDOUT</span><b class="tone-'+(holdout==='PASS'?'safe':holdout==='FAIL'?'watch':'muted')+'">'+holdout+'</b><small>unabhängige Validierung</small></div><div><span>SK SYSTEM</span><b>'+sk+'</b><small>V1/V2 Research-Benchmark</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only · keine Orders</small></div>';
+  const discovery=edgeUi.tsmom?(edgeUi.tsmom.gate?.pass?'PASS':'FAIL'):'NOT RUN',holdout=holdoutUi.combined?(holdoutUi.combined.pass?'PASS':'FAIL'):'NOT RUN',sk=skV2Ui.result?(skV2Ui.result.gate?.pass?'V2 PASS':'V2 FAIL'):'FROZEN',profit=profitAgentUi.result?(profitAgentUi.result.discoveryLeader||'NO PASS'):'NOT RUN';
+  return '<div><span>PROFIT AGENT</span><b class="tone-'+(profitAgentUi.result?.discoveryLeader?'safe':profitAgentUi.result?'watch':'muted')+'">'+esc(profit)+'</b><small>3 frozen candidates · profit-first gate</small></div><div><span>TSMOM DISCOVERY</span><b class="tone-'+(discovery==='PASS'?'safe':discovery==='FAIL'?'watch':'muted')+'">'+discovery+'</b><small>interner Gate · kein Beweis</small></div><div><span>TSMOM HOLDOUT</span><b class="tone-'+(holdout==='PASS'?'safe':holdout==='FAIL'?'watch':'muted')+'">'+holdout+'</b><small>unabhängige Validierung</small></div><div><span>SK SYSTEM</span><b>'+sk+'</b><small>V1/V2 Research-Benchmark</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only · keine Orders</small></div>';
 }
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
@@ -857,6 +857,13 @@ function renderLab(){
   }
   banner('#view-more','LAB','RESEARCH HUB','Dokumentierte Strategien + interne Hypothesen · keine Orders','paper');
   $('.hero',view)?.remove();
+
+  if(!$('.profit-agent-module',view)){
+    const module=document.createElement('details');module.className='research-module profit-agent-module';module.open=true;
+    module.innerHTML='<summary><span>PROFIT SPECIAL AGENT</span><small>TSMOM · Persistent Trend · Donchian · frozen discovery</small></summary><div class="research-module-body">'+profitAgentPanel()+'</div>';
+    const host=$('.bt-control',view);(host||view.firstElementChild)?.insertAdjacentElement(host?'beforebegin':'afterend',module);
+    bindProfitAgent(view);
+  }
 
   if(!$('.documented-edge-module',view)){
     const module=document.createElement('details');module.className='research-module documented-edge-module';module.open=true;
@@ -885,7 +892,7 @@ function renderLab(){
   }
 
   let overview=$('.lab-overview',view);
-  if(!overview){overview=document.createElement('section');overview.className='lab-overview';$('.documented-edge-module',view)?.insertAdjacentElement('beforebegin',overview);}
+  if(!overview){overview=document.createElement('section');overview.className='lab-overview';$('.profit-agent-module',view)?.insertAdjacentElement('beforebegin',overview);}
   const nextOverview=labOverviewHtml();if(overview&&overview.innerHTML!==nextOverview)overview.innerHTML=nextOverview;
   let note=$('.lab-validation-note',view);
   if(!note){note=document.createElement('section');note.className='lab-validation-note';overview?.insertAdjacentElement('afterend',note);}
