@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "R68_MERGED_AWAITING_DISCOVERY_RUN",
+  "phase": "PAPERBOT_PROFIT_V2_FROZEN_NEXT_CARRY",
   "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
   "r67Merged": true,
   "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
@@ -15,10 +15,14 @@
     "profit candidate engine added",
     "profit lab UI added",
     "r68 cache/build routing updated",
-    "r68 release CI green and merged"
+    "r68 release CI green and merged",
+    "V1 profit discovery frozen: no candidate passes",
+    "V2 UP-UP regime-aware momentum frozen: +7.22% but gate fail",
+    "V2 research PR merged"
   ],
-  "nextAction": "Run LAB > PROFIT SPECIAL AGENT with 1460 days. Persist the untouched discovery result before changing any parameter. Then create an independent holdout branch; do not promote directly.",
+  "nextAction": "Implement and run the separately frozen delta-neutral funding-carry lane with public funding/basis/cost data. Do not modify V1/V2 thresholds or promote any failed directional candidate.",
   "executionImpact": false,
   "r68Merged": true,
-  "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c"
+  "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c",
+  "latestResearchMergeSha": "752d69141426eb4dd070374f4f7c005e5fb85336"
 }
