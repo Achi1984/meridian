@@ -12,7 +12,7 @@ const ACTIVE=new Set([
 ]);
 
 function activeSummary(order={}){
-  const status=String(order?.buOrderData?.status||order?.status||'').toLowerCase();
+  const status=String(order?.buOrderData?.status||order?.status||'').trim().toLowerCase();
   return ACTIVE.has(status);
 }
 
@@ -44,7 +44,7 @@ export async function hydratePionexBotSummaries(
 ){
   if(typeof loadDetail!=='function')throw new Error('pionex_bot_detail_loader_missing');
   const list=Array.isArray(orders)?orders:[];
-  const candidates=list.filter(o=>SUPPORTED.has(String(o?.buOrderType||''))&&activeSummary(o));
+  const candidates=list.filter(o=>SUPPORTED.has(String(o?.buOrderType||'').trim())&&activeSummary(o));
   if(candidates.length>maxRows)throw new Error('pionex_bot_detail_row_limit');
 
   const seen=new Set(),hydrated=[];
