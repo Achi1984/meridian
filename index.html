@@ -12,11 +12,13 @@
   <title>MERIDIAN v10 · Achi</title>
   <script>
     (function(){
+      var target='./v10/?build=r62';
       var p=new URLSearchParams(location.search);
-      p.set('build','r62');
+      p.delete('build');
       p.set('fresh','r62');
+      var q='&'+p.toString();
       var h=location.hash||'';
-      location.replace('./v10/?'+p.toString()+h);
+      location.replace(target+q+h);
     })();
   </script>
   <noscript><meta http-equiv="refresh" content="0;url=./v10/?build=r62&fresh=r62"></noscript>
