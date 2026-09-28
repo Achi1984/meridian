@@ -285,7 +285,7 @@ The following limits are mandatory for interactive repository work:
 - **Log/diff budget:** never emit a complete large CI log, full large diff, or whole large source file when a targeted search/window is sufficient. Return only the failing test, relevant lines, SHA/status, or a concise file list.
 - **Retry budget:** after 2 identical tool failures, stop repeating the same call. Re-read state, switch method, or report the blocker.
 - **Mutation checkpoint:** every commit, PR creation/update, merge, release bump, or deployment state change must be followed by a durable identifier (SHA/PR/run/deploy status) before the next mutation.
-- **Resume command:** after any interruption, prefer `npm run stream:preflight` (or the equivalent GitHub metadata query when operating remotely) before any mutation.
+- **Resume command:** after any interruption, prefer `node scripts/stream-safe-preflight.mjs` (or the equivalent GitHub metadata query when operating remotely) before any mutation.
 - **No blind continuation:** a resumed stream may continue analysis immediately, but must not write/merge/release until the preflight confirms current state.
 
 These are transport-safety limits, not quality shortcuts. Large investigations are split into multiple small verified milestones rather than one oversized streamed response.
