@@ -45,10 +45,18 @@ async function smoke(){
   const pages=await json(`${PAGES_BASE}/version.json?smoke=${nonce}`);
   if(!sameRelease(pages))fail(`GitHub Pages stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${pages?.version}/${pages?.buildId}`);
   if(!EXPECTED_TERMINAL||String(pages?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`GitHub Pages terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${pages?.terminalBuild}`);
-  const [terminalHtml,terminalJs]=await Promise.all([textBody(`${PAGES_BASE}/v10/index.html?smoke=${nonce}`),textBody(`${PAGES_BASE}/v10/v10.js?smoke=${nonce}`)]);
+  const [terminalHtml,terminalJs,manifest]=await Promise.all([
+    textBody(`${PAGES_BASE}/v10/index.html?smoke=${nonce}`),
+    textBody(`${PAGES_BASE}/v10/v10.js?smoke=${nonce}`),
+    json(`${PAGES_BASE}/manifest.webmanifest?smoke=${nonce}`)
+  ]);
   if(!terminalHtml.includes(`content="${EXPECTED_TERMINAL}"`))fail('v10 index terminal build mismatch');
   if(!terminalHtml.includes(`./v10.js?v=${EXPECTED_TERMINAL}`))fail('v10 index points to stale adapter');
   if(!terminalJs.includes(`const BUILD='${EXPECTED_TERMINAL}'`))fail('v10 adapter BUILD mismatch');
+  const terminalRev=EXPECTED_TERMINAL.split('-').at(-1);
+  if(!String(manifest?.start_url||'').includes(`build=${terminalRev}`))fail('PWA manifest points to stale terminal build');
+  if(!terminalHtml.includes(`const LOCAL_BUILD='${EXPECTED_TERMINAL}'`))fail('v10 shell missing stale-build self-heal');
+  if(!terminalHtml.includes("../version.json?boot="))fail('v10 shell missing no-store version probe');
 
   const health=await json(`${GATEWAY}/gateway-health?smoke=${nonce}`);
   if(!health?.ok)fail('Gateway health not ok');
