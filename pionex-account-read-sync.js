@@ -66,6 +66,22 @@ function fieldNames(rows){
   for(const row of Array.isArray(rows)?rows:[])if(row&&typeof row==='object'&&!Array.isArray(row))for(const k of Object.keys(row))set.add(String(k));
   return [...set].sort().slice(0,40);
 }
+function normalizeWalletPrices(prices={}){
+  const out={};
+  for(const [coin,row] of Object.entries(prices&&typeof prices==='object'?prices:{})){
+    const symbol=String(coin||'').trim().toUpperCase();if(!symbol)continue;
+    const priceInUsd=num(row?.priceInUsd),priceInBtc=num(row?.priceInBtc);
+    if(priceInUsd!=null||priceInBtc!=null)out[symbol]={priceInUsd,priceInBtc};
+  }
+  return out;
+}
+function inverseWalletProfitUsd(wallet,row,walletPrices={}){
+  const cate=String(wallet?.cateType||'').trim().toLowerCase(),token=String(wallet?.investmentToken||'').trim().toUpperCase(),symbol=String(row?.symbol||'').trim().toUpperCase(),profit=num(wallet?.profit);
+  if(cate!=='inverse'||profit==null||!token||token!==symbol)return{value:null,token:token||null,source:'NONE'};
+  const px=num(walletPrices?.[token]?.priceInUsd);
+  if(!(px>0))return{value:null,token,source:'NO_WALLET_USD_PRICE'};
+  return{value:profit*px,token,source:'WALLET_PROFIT_X_PIONEX_WALLET_PRICE'};
+}
 function normalizeWalletCategories(rows=[]){
   return (Array.isArray(rows)?rows:[]).map(x=>({
     type:text(x?.type),
@@ -144,10 +160,10 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
   };
 }
 
-export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
+export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletPrices={}){
   const details=Array.isArray(probe?.details)?probe.details:[],expected=Number(probe?.buOrderTypeCounts?.futures_grid)||0,detailSuccess=Number(probe?.successBuOrderTypeCounts?.futures_grid)||0,unsupported=Math.max(0,(Number(probe?.candidateCount)||0)-expected);
-  const bots=[],rejected=[],seen=new Set(),statusCounts={},trendCounts={},rejectReasonCounts={},envelopeFields=new Set(),botDataFields=new Set(),baseClassCounts={},quoteClassCounts={};
-  let detailBasePresentCount=0,walletBaseFallbackCount=0,missingBaseCount=0,typePassCount=0,statusPassCount=0,symbolPassCount=0,sidePassCount=0,allStagePassCount=0;
+  const bots=[],rejected=[],seen=new Set(),statusCounts={},trendCounts={},rejectReasonCounts={},envelopeFields=new Set(),botDataFields=new Set(),baseClassCounts={},quoteClassCounts={},pnlSourceCounts={};
+  let detailBasePresentCount=0,walletBaseFallbackCount=0,missingBaseCount=0,typePassCount=0,statusPassCount=0,symbolPassCount=0,sidePassCount=0,allStagePassCount=0,pnlUsdRows=0,walletProfitRows=0;
   const bump=(obj,key)=>{const k=String(key||'UNKNOWN');obj[k]=(obj[k]||0)+1;};
   const reject=reason=>{const r=String(reason||'unknown').slice(0,80);rejected.push({reason:r});bump(rejectReasonCounts,r);};
   for(const item of details){
@@ -187,7 +203,13 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
         else reject('normalizer_rejected');
         continue;
       }
-      bots.push({...row,source:'PIONEX_WALLET_BOT_DETAIL'});
+      const walletPnl=inverseWalletProfitUsd(wallet,row,walletPrices),detailPnl=num(row?.pnlUsd),resolvedPnl=detailPnl!=null?detailPnl:walletPnl.value;
+      const pnlSource=detailPnl!=null?'BOT_DETAIL_USD':walletPnl.source;
+      if(num(wallet?.profit)!=null)walletProfitRows++;
+      if(resolvedPnl!=null)pnlUsdRows++;
+      bump(pnlSourceCounts,pnlSource);
+      const resolvedInvest=num(row?.investmentUsd),derivedPct=resolvedPnl!=null&&resolvedInvest>0?resolvedPnl/resolvedInvest*100:null;
+      bots.push({...row,pnlUsd:resolvedPnl,totalProfitPct:num(row?.totalProfitPct)??derivedPct,pnlSource,walletProfitNative:num(wallet?.profit),walletProfitToken:walletPnl.token,source:'PIONEX_WALLET_BOT_DETAIL'});
     }catch(e){reject(String(e?.message||e))}
   }
   const ids=new Set(bots.map(x=>String(x?.botOrderId||x?.id||'')));
@@ -214,6 +236,9 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
     symbolPassCount,
     sidePassCount,
     allStagePassCount,
+    pnlUsdRows,
+    walletProfitRows,
+    pnlSourceCounts,
     baseClassCounts,
     quoteClassCounts,
     detailBasePresentCount,
@@ -232,6 +257,7 @@ export function normalizeWalletOverview(data={}){
   return {
     totalInUsdt:num(data?.totalInUsdt),
     totalInBtc:num(data?.totalInBtc),
+    prices:normalizeWalletPrices(data?.prices||{}),
     botAccountTotalInUsdt:num(bot?.totalInUsdt),
     traderAccountTotalInUsdt:num(trader?.totalInUsdt),
     botCategories,
@@ -261,7 +287,7 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
   const walletBotProbe=walletResult.ok?await probeWalletBotDetails(wallet?.botEntries||[],{apiKey,apiSecret,fetchImpl,now}):null;
   const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();
-  const walletBotRisk=walletBotProbe?buildWalletBotRisk(walletBotProbe,at):null;
+  const walletBotRisk=walletBotProbe?buildWalletBotRisk(walletBotProbe,at,wallet?.prices||{}):null;
   return {
     source:'PIONEX_READ_API',
     readOnly:true,
