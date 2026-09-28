@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r30';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r30';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r30';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r30';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r30';
-// MERIDIAN v10 r30 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r31';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r31';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r31';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r31';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r31';
+// MERIDIAN v10 r31 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r30';
+const BUILD='10.0-r31';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -130,7 +130,7 @@ function nextAction(){
 function syncHealth(){
   const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.();
   const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
-  const safetyReady=safetyRows.length,pnlReady=pnlRows.length,decisionReady=decisionRows.length,actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0);
+  const safetyReady=safetyRows.length,pnlReady=pnlRows.length,decisionReady=decisionRows.length,actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
   const status=String(s?.pionexBotSync?.status||'UNKNOWN'),age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
   let detail='Private Bot-Daten werden geprüft.';
   if(status==='DISABLED_MISSING_CREDENTIALS')detail='Pionex Read API fehlt am Backend · letzter Asset-Watch-Snapshot bleibt nur Referenz';
@@ -141,7 +141,7 @@ function syncHealth(){
   else if(status==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(status==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
   else if(status==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
+  return{apiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
 }
 function marketReadiness(m){
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
@@ -151,20 +151,20 @@ function marketReadiness(m){
 function botReadiness(g){
   if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
   if(!g.fresh)return{label:'REF',tone:'reference'};
-  if(g.matched>0&&g.coverageComplete&&g.decisionReady===g.matched)return{label:'READY',tone:'safe'};
+  if(g.decisionComplete)return{label:'READY',tone:'safe'};
   if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
   if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
   return{label:'BLOCKED',tone:'muted'};
 }
 function dataGuardCard(){
-  const g=syncHealth(),completeDecision=g.decisionReady>0&&g.coverageComplete,tone=completeDecision?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionReady>0?(g.coverageComplete?'DECISION READY':'PARTIAL READY'):g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
+  const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
   return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small></section>';
 }
 function liveOverview(){
   const g=syncHealth(),h=H(),rows=g.fresh?(S()?.bots||[]).filter(b=>h.liveMatched?.(b)):[];
   if(!g.safetyReady)return '<section class="v10-live-blocked"><b>LIVE LAYER BLOCKED</b><small>Keine frischen verifizierten Safety-Daten. Asset Watch ist Referenz, nicht Live-Aktion.</small></section>';
   const exposureComplete=rows.length>0&&rows.every(b=>h.liveInvestUsdAvailable?.(b)),long=exposureComplete?exposure(rows,'LONG'):null,short=exposureComplete?exposure(rows,'SHORT'):null,net=long!=null&&short!=null?long-short:null;
-  const decisionRows=rows.filter(b=>h.livePnlAvailable?.(b)&&intelFresh(S()?.assetIntel?.[b.symbol])),plans=decisionRows.map(b=>h.profitLockPlan?.(b)).filter(Boolean),lock=plans.filter(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)).length,watch=plans.filter(p=>['WATCH','HEDGE'].includes(p.code)).length;
+  const decisionRows=rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(S()?.assetIntel?.[b.symbol]))),plans=decisionRows.map(b=>h.profitLockPlan?.(b)).filter(Boolean),lock=plans.filter(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)).length,watch=plans.filter(p=>['WATCH','HEDGE'].includes(p.code)).length;
   return '<section class="v10-live-overview"><div><span>KNOWN LONG USD</span><b>'+(long==null?'—':h.money?.(long))+'</b></div><div><span>KNOWN SHORT USD</span><b>'+(short==null?'—':h.money?.(short))+'</b></div><div><span>KNOWN NET USD</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'/'+g.matched+'</b></div><div><span>PROFIT WATCH / LOCK</span><b>'+(g.decisionReady?watch+' / '+lock:'— / —')+'</b></div><div><span>EXPOSURE</span><b class="tone-'+(exposureComplete?'safe':'watch')+'">'+(exposureComplete?'COMPLETE':'PARTIAL')+'</b></div></section>';
 }
 function snapshotBotLine(x){

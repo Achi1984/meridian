@@ -335,3 +335,13 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Trusted timestamps beyond the existing +5 minute tolerance are displayed as FUTURE TIMESTAMP instead of <1 MIN.
 - DATA TRUTH, stale Profit-Lock/action explanations and v10 DATA GUARD now use the same timestamp label.
 - No trading-rule, matching, PnL, risk, Paper-bot, leverage, execution or Pionex mutation change.
+
+
+## v10 r31 — Decision completeness SSOT
+
+- Continues the deep audit after runtime-verified r30.
+- Adds decisionComplete = matched > 0 + complete match coverage + decisionReady === matched.
+- DATA GUARD shows DECISION READY only when every matched supported live row is decision-ready; otherwise nonzero readiness is PARTIAL READY.
+- Header BOT READY and DATA GUARD now consume the same decisionComplete state.
+- PROFIT WATCH / LOCK counts now use shared decisionReadyBot rows, preventing safety-incomplete rows from entering action summaries.
+- No Profit Lock formula, signal/risk threshold, NEXT ACTION priority, Paper-bot parameter, leverage, execution or Pionex mutation change.

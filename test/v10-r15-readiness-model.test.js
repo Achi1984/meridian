@@ -24,13 +24,14 @@ test('r15 separates safety-ready from decision-ready bot state',()=>{
 test('r15 keeps safety visible while blocking stale-market profit decisions',()=>{
   assert.match(js,/if\(!g\.safetyReady\)return/);
   assert.match(js,/decisionRows=rows\.filter/);
+  assert.match(js,/h\.decisionReadyBot\?h\.decisionReadyBot\(b\)/);
   assert.match(js,/g\.decisionReady\?watch\+' \/ '\+lock:'— \/ —'/);
   assert.match(js,/MARKET_STALE/);
   assert.match(js,/KEINE AKTION · DATEN PRÜFEN/);
 });
 
 test('r15 data guard no longer calls safety-only data actionable',()=>{
-  assert.match(js,/label=g\.decisionReady>0\?\(g\.coverageComplete\?'DECISION READY':'PARTIAL READY'\):g\.safetyReady>0\?'SAFETY ONLY':'BLOCKED'/);
+  assert.match(js,/label=g\.decisionComplete\?'DECISION READY':g\.decisionReady>0\?'PARTIAL READY':g\.safetyReady>0\?'SAFETY ONLY':'BLOCKED'/);
   assert.match(js,/actionable=decisionReady/);
   assert.doesNotMatch(js,/g\.actionable>0\?'ACTIONABLE'/);
 });
