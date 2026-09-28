@@ -726,3 +726,13 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - UI adds `PNL USD READY`, PnL source counts, and separate `PNL miss` / `MKT miss` decision blockers.
 - Expected live target after account sync + fresh market feed: 28/28 PnL-normalized and 28/28 decision-ready, unless a row genuinely lacks a valid wallet profit or market dataset.
 - Execution impact remains false.
+
+
+## v10 r67 — compact BOTS navigation
+
+- r66 live acceptance confirms 28/28 PnL-ready and 28/28 decision-ready.
+- Risk/Profit-Lock audit found no data-readiness blocker remaining: Profit Watch/Lock counts now derive from the same decision-ready rows and existing thresholds.
+- Safety warnings continue to outrank Profit Lock; the SL-vs-liquidation check remains unchanged and is intentionally independent from PnL readiness.
+- r67 changes only presentation: risk-sorted collapsible asset cards, critical asset auto-open, open-state persistence, compact healthy header and collapsed technical diagnostics.
+- Per-bot detail fields remain available after opening an asset.
+- Execution impact remains false.
