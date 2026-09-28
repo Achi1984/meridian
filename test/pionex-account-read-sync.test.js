@@ -144,6 +144,25 @@ test('wallet bot risk promotes only fully hydrated futures_grid rows',()=>{
   assert.deepEqual(risk.quoteClassCounts,{asset:1});
 });
 
+
+test('wallet inverse cateType survives into Coin-M symbol normalization',()=>{
+  const risk=buildWalletBotRisk({
+    candidateCount:1,
+    buOrderTypeCounts:{futures_grid:1},
+    successBuOrderTypeCounts:{futures_grid:1},
+    details:[{
+      wallet:{buOrderId:'inverse-1',buOrderType:'futures_grid',cateType:'inverse',baseList:['USD'],investmentToken:'BTC'},
+      detail:{base:'USD',quote:'BTC',status:'running',buOrderData:{status:'running',trend:'short',leverage:'5',bottom:'50000',top:'100000'}}
+    }]
+  },'2026-09-28T15:00:00.000Z');
+  assert.equal(risk.normalizedRows,1);
+  assert.equal(risk.detailsComplete,true);
+  assert.equal(risk.symbolPassCount,1);
+  assert.equal(risk.allStagePassCount,1);
+  assert.equal(risk.bots[0].symbol,'BTC');
+  assert.equal(risk.bots[0].side,'SHORT');
+});
+
 test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{
   const risk=buildWalletBotRisk({
     candidateCount:1,
