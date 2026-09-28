@@ -533,3 +533,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** The first live r43 request returned `INVALID_SIGNATURE` only after the repeated array filter was introduced. Pionex documents `buOrderTypes` as an array and requires HMAC over the sorted GET query. Separate scalar requests remove duplicate-key serialization ambiguity while preserving the same read scope.
 
 **Safety:** Requests remain GET-only, the zero-bot guard remains fail-closed, and no trading/Paper/execution behavior changes.
+## D-051 — Pionex running-bot discovery is unfiltered; Futures safety allowlist is local
+
+**Decision:** MERIDIAN calls `GET /api/v1/bot/orders?status=running` without `buOrderTypes` and applies its supported Futures allowlist locally.
+
+**Reason:** The first live r44 connection authenticated successfully but Pionex returned zero rows for type-filtered requests. Pionex's official OpenAPI states that omitting `buOrderTypes` returns all bot types, so unfiltered discovery is the least assumption-heavy read path.
+
+**Diagnostics:** Aggregate `listRows`, `typeCounts`, and `statusCounts` are retained for troubleshooting. Bot IDs, balances, prices and PnL are not added to diagnostics.
+
+**Safety:** Only locally supported Futures rows are hydrated/actionable. Unknown bot types remain excluded. `EMPTY_GUARD` remains fail-closed. No trading/Paper/execution behavior changes.

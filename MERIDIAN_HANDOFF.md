@@ -509,3 +509,11 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Keeps all existing privacy-safe diagnostics and `EMPTY_GUARD` behavior.
 - No API credential changes required.
 - No trading, Bot trading, transfer, PaperBot, leverage, signal or execution changes.
+## v10 r45 — Pionex unfiltered bot discovery
+
+- Reads all running bot orders with `GET /api/v1/bot/orders?status=running`.
+- Omits `buOrderTypes` from the signed request.
+- Applies the Futures allowlist locally: `futures_grid` and `future_hedge_grid`.
+- Persists aggregate type/status counts so unsupported or legacy Pionex bot types are visible without exposing private row details.
+- Keeps detail hydration and `EMPTY_GUARD` fail-closed behavior.
+- No Pionex trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.

@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r44';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r44';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r45';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r45';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r44');
+    qs.set('build','r45');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -387,7 +387,7 @@ function dataTruthCard(){
  let diag='';
  if(syncStatus==='DISABLED_MISSING_CREDENTIALS')diag='Pionex Bot API nicht konfiguriert · alter Snapshot bleibt bewusst nicht handlungsrelevant.';
  else if(syncStatus==='ERROR')diag='Pionex Bot API Sync-Fehler · '+String(sync.error||'unbekannt').slice(0,120);
- else if(syncStatus==='EMPTY_GUARD'){const d=sync.diagnostics||{},types=Object.entries(d.typeCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—',states=Object.entries(d.statusCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—';diag='Pionex Futures-Filter: '+String(d.listRows??'—')+' Row(s) · Typen '+types+' · Status '+states+' · alter Snapshot wurde aus Sicherheitsgründen nicht überschrieben.';}
+ else if(syncStatus==='EMPTY_GUARD'){const d=sync.diagnostics||{},types=Object.entries(d.typeCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—',states=Object.entries(d.statusCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—';diag='Pionex Bot-Liste: '+String(d.listRows??'—')+' laufende Row(s) · Typen '+types+' · Status '+states+' · lokale Futures-Allowlist blieb leer · alter Snapshot wurde aus Sicherheitsgründen nicht überschrieben.';}
  else if(coverage.coverageComplete&&matched<state.bots.length)diag='Bot-Feed liefert aktuell '+coverage.supported+' unterstützte Rows · alle sicher gematcht · Referenzkatalog '+state.bots.length+' Rows.';
  else if(coverage.unmatched>0)diag=coverage.unmatched+' Bot-Rows nicht gematcht'+(unmatchedRows.length?' · '+unmatchedRows.slice(0,4).map(x=>x.symbol+' '+x.side+' '+(x.leverage||'—')+'x').join(' / '):'');
  else diag='Keine zusätzlichen Bot-Rows im privaten Feed.';
