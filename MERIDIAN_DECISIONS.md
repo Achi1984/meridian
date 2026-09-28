@@ -542,3 +542,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Diagnostics:** Aggregate `listRows`, `typeCounts`, and `statusCounts` are retained for troubleshooting. Bot IDs, balances, prices and PnL are not added to diagnostics.
 
 **Safety:** Only locally supported Futures rows are hydrated/actionable. Unknown bot types remain excluded. `EMPTY_GUARD` remains fail-closed. No trading/Paper/execution behavior changes.
+## D-052 — Separate live Futures account positions from bot identity
+
+**Decision:** When Pionex Bot API does not enumerate existing bots, MERIDIAN may still use the read-only Futures account position feed as a separate live risk layer.
+
+**Source:** GET /uapi/v1/account/positions under normal Pionex reading permission.
+
+**Allowed use:** Display live account-position fields returned by Pionex such as side, leverage, average price, mark price, liquidation price, size and unrealized PnL.
+
+**Forbidden inference:** An account position must not be assigned to a specific Grid Bot unless an independently verified bot identifier/match exists. Account positions therefore cannot unlock bot-specific Grid/TP/Profit-Lock decisions.
+
+**Safety:** Bot decision readiness remains bound to the existing Bot API matching/freshness guards. The account position layer is informational/risk visibility only. No trading/Paper/execution behavior changes.
