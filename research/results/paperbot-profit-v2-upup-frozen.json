@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-09-28T20:54:26.330Z",
+  "workflowRunId": 36482452784,
+  "artifactId": 10997375443,
+  "artifactSha256": "e43eec118cb0f36f634a62cc7c3f461a331f7526caa53c230f638cb0dcdc6fce",
+  "ruleset": "PAPERBOT-PROFIT-SPECIAL-AGENT-V2-FROZEN",
+  "strategy": "UPUP_RM_MOMENTUM_PROXY_V1",
+  "periods": 263,
+  "totalReturnPct": 7.216268781964508,
+  "pnl": 721.6268781964518,
+  "profitFactor": 1.1288652963856078,
+  "maxDrawdownPct": 43.8126135882738,
+  "positiveWindows": 2,
+  "positiveAssets": 5,
+  "positivePnlConcentrationPct": 29.155123383906833,
+  "gatePass": false,
+  "gateReasons": [
+    "PF_LT_1.15",
+    "DD_GT_25PCT",
+    "POSITIVE_WINDOWS_LT_3"
+  ],
+  "diagnostics": {
+    "activeWeeks": 93,
+    "totalWeeks": 263,
+    "activeWeekSharePct": 35.361216730038024,
+    "totalTurnover": 112.14681944419442,
+    "totalModeledCostReturn": 0.09114369825497157,
+    "longContributionPct": 18.08309755000381,
+    "shortContributionPct": 0.2075052177070491
+  },
+  "benchmarks": {
+    "equalWeightBuyHoldReturnPct": 7.239376127870556,
+    "btcBuyHoldReturnPct": 87.5101084905527
+  },
+  "decision": "V2_DISCOVERY_FAIL",
+  "nextStage": "KEEP_RESEARCH_ONLY",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false
+}
