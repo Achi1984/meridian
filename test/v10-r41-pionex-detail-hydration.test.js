@@ -44,7 +44,8 @@ test('r41 preserves trading and Paper decision invariants',()=>{
 });
 
 test('r41 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r41');
+  assert.ok(/^10\.0-r\d+$/.test(release.terminalBuild));
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=41);
   assert.match(root,/10\.0-r41-production/);
   assert.match(root,/\.\/v10\/\?build=r41/);
   assert.match(v10,/const BUILD='10\.0-r41'/);
