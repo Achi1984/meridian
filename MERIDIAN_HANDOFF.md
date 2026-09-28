@@ -394,3 +394,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Incomplete cards explicitly show PnL-Summe unvollständig.
 - Individual bot PnL logic, Decision Ready and all Profit Lock thresholds remain unchanged.
 - No hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
+
+
+## v10 r36 — Pair PnL USD value integrity
+
+- Continues the deep audit after runtime-verified r35.
+- Tightens shared pnlIntegrity so Pair PnL requires a non-null USD value from botPnlUsd on every matched row.
+- A percent-only PnL row without raw USD PnL or usable USD investment no longer counts as complete for PAIR PNL USD.
+- Existing percent + investUsd derivation and validated raw USD PnL remain accepted.
+- Active pair cards also verify every aggregate value is non-null before reducing the sum, preventing JavaScript null-to-zero coercion.
+- Same-asset unmatched-row scoping from r35 is unchanged.
+- Decision Ready and Profit Lock still use the existing generic live-PnL/percentage contract; their thresholds and behavior are unchanged.
+- No hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation path changed.

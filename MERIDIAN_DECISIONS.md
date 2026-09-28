@@ -411,3 +411,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **UI rule:** The active v10 pair card consumes shared pnlIntegrity(symbol). If incomplete, the aggregate value is withheld and the card states PnL-Summe unvollständig. Individual verified bot-leg PnL remains unchanged and visible where already allowed.
 
 **Isolation:** r35 changes aggregation provenance only. PnL formulas, Decision Ready, Profit Lock thresholds, hedge logic, market signals, Paper-bot parameters, leverage and execution are unchanged.
+
+
+## D-041 — Pair PnL completeness requires a computable USD value
+
+**Decision:** PAIR PNL USD may be aggregated only when every matched row in the asset scope produces a non-null USD PnL through the existing botPnlUsd contract. Generic live PnL presence is insufficient because a row can expose only profitPct without enough USD capital information to convert it.
+
+**Null-integrity rule:** A percent-only row without raw USD PnL and without usable USD investment makes the Pair PnL aggregate incomplete. Null must never enter numeric reduction as implicit zero.
+
+**Derived-value rule:** Existing validated USD derivation remains allowed: profitPct plus usable investUsd may produce PCT_X_USD_INVEST, and a raw valid USD PnL remains valid. The existing discrepancy/correction logic in botPnlUsd is unchanged.
+
+**Scope rule:** Same-asset unmatched rows still invalidate the pair aggregate; unmatched rows for other assets remain out of scope.
+
+**Isolation:** Decision Ready continues to use generic live PnL availability because percentage PnL is sufficient for its existing Profit Lock percentage logic. No Profit Lock threshold, hedge threshold, market signal, Paper-bot parameter, leverage or execution behavior changes.
