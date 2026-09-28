@@ -69,7 +69,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
@@ -168,6 +168,25 @@ function botMatchEvidence(ref,x){
   const strong=score<=MATCH_MAX_SCORE&&((levExact&&structural.length>=1)||structural.length>=2);
   return{score,levExact,structural,strong};
 }
+function matchStageDiagnostics(live,refs,candidates=[],acceptedRows=0){
+  const rows=Array.isArray(live)?live:[],reference=Array.isArray(refs)?refs:[],fieldKeys=['leverage','lower','upper','be','liq','tp'],fields=Object.fromEntries(fieldKeys.map(k=>[k,0])),liveSideCounts={},referenceSideCounts={};
+  let assetPass=0,sidePass=0,leveragePass=0,structurePass=0,strongCandidate=0;
+  const bump=(obj,key)=>{const k=String(key||'UNKNOWN').toUpperCase();obj[k]=(obj[k]||0)+1;};
+  reference.forEach(ref=>bump(referenceSideCounts,ref?.side||'LONG'));
+  rows.forEach((x,li)=>{
+    bump(liveSideCounts,x?.side||'UNKNOWN');
+    for(const k of fieldKeys)if(num(x?.[k])!=null)fields[k]++;
+    const assetRefs=reference.filter(ref=>String(ref?.symbol||'').toUpperCase()===String(x?.symbol||'').toUpperCase());
+    if(assetRefs.length)assetPass++;
+    const sideRefs=assetRefs.filter(ref=>String(ref?.side||'LONG').toUpperCase()===String(x?.side||'').toUpperCase());
+    if(sideRefs.length)sidePass++;
+    const levRefs=sideRefs.filter(ref=>num(x?.leverage)!=null&&num(ref?.leverage)!=null&&num(x.leverage)===num(ref.leverage));
+    if(levRefs.length)leveragePass++;
+    if(sideRefs.some(ref=>['lower','upper','be','liq'].some(k=>{const d=relDiff(x?.[k],ref?.[k]);return d!=null&&d<.03})))structurePass++;
+    if(candidates.some(c=>c.li===li))strongCandidate++;
+  });
+  return{rows:rows.length,assetPass,sidePass,leveragePass,structurePass,strongCandidate,acceptedRows:Number(acceptedRows)||0,fields,liveSideCounts,referenceSideCounts};
+}
 function mergeReference(live){
   const used=new Set,refs=FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'})),candidates=[];
   for(let ri=0;ri<refs.length;ri++)for(let li=0;li<live.length;li++){
@@ -202,6 +221,7 @@ function mergeReference(live){
     return{symbol:x.symbol||'?',side:x.side||'?',leverage:x.leverage,id:x.id||'?',hasPnl:num(x.pnl)!=null||num(x.profitPct)!=null,hasInvestUsd:num(x.investUsd)!=null,reason:ambiguous?'AMBIGUOUS_MATCH':'NO_CONFIDENT_MATCH'};
   }).filter(Boolean);
   state.matchAmbiguous=state.unmatchedLive.filter(x=>x.reason==='AMBIGUOUS_MATCH').length;
+  state.matchDiagnostics=matchStageDiagnostics(live,refs,candidates,used.size);
   return refs;
 }
 
@@ -529,7 +549,7 @@ async function sync(){
  try{
  const [payload,history,tickers]=await Promise.all([getJson('/api/private/dashboard'),getJson('/api/private/portfolio-history?range=1d').catch(e=>({source:'UNAVAILABLE',points:[],error:String(e?.message||e)})),portfolioSpotTickers().catch(e=>({error:String(e?.message||e)}))]),raw=payload?.data||payload,d=Array.isArray(tickers)?buildLivePriceOverlay(raw,tickers,Date.now()):clearStaleLivePrices(raw,Date.now(),tickers?.error||'MARKET_FEED_UNAVAILABLE'),selected=selectPionexRisk(d),feed=selected.risk,live=Array.isArray(feed?.bots)?feed.bots.map(normalizeLive):[];
  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
- if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;}
+ if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;state.matchDiagnostics=null;}
  state.liveRows=live.length;
  state.botApiRows=num(feed?.apiRows)??live.length;
  state.botSupportedRows=num(feed?.supportedRows)??live.length;
