@@ -49,6 +49,7 @@ test('read snapshot normalizes spot, futures balances and active positions witho
   assert.equal(snap.futuresPositionCount,1);
   assert.equal(snap.spotBalances[0].free,0.1);
   assert.equal(snap.futuresPositions[0].side,'LONG');
+  assert.equal(snap.futuresPositions[0].asset,'BTC');
   assert.equal(snap.futuresPositions[0].liquidationPrice,60000);
 });
 

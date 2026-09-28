@@ -199,3 +199,8 @@ r42 extends the already read-only Bot API path with a separate account/futures r
 The UI exposes ACCOUNT API separately from BOT API so normal account reading and Bot API Beta access are not conflated. Missing credentials remain an explicit OFF/not-configured state. Errors preserve the prior snapshot as stale.
 
 The user has not configured Pionex credentials yet. r42 is therefore code-ready but not live-connected until the runtime secret store receives read-only credentials. Trading/transfer permissions are neither required nor implemented.
+## v10 r46 Pionex Account Position Layer
+
+Live r45 proved that authenticated, correctly signed Bot API list calls return zero running bot rows for the user's existing Pionex bots. Rather than weakening Bot API guards, r46 surfaces the already implemented read-only Futures account positions as a separate live layer.
+
+The position layer shows current Pionex Futures account risk data without claiming bot identity. Bot-specific actions remain fail-closed. Gateway health now exposes only aggregate Pionex account/bot status and position/list counts, not private position values.

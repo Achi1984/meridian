@@ -6,6 +6,7 @@ const PRIVATE_STATE_KEY='private_dashboard_v1';
 
 function num(v){const n=Number(v);return Number.isFinite(n)?n:null}
 function text(v){const s=String(v??'').trim();return s||null}
+function baseAsset(v){return String(v||'').toUpperCase().replace(/\.PERP$/,'').replace(/[-_/](USDT|USDC|USD)_?PERP$/,'').replace(/[-_/](USDT|USDC|USD)$/,'')||null}
 
 export function normalizeSpotBalances(data={}){
   return (Array.isArray(data?.balances)?data.balances:[]).map(x=>({
@@ -38,6 +39,7 @@ export function normalizeFuturesPositions(data={}){
   return (Array.isArray(data?.positions)?data.positions:[]).map(x=>({
     positionId:text(x?.positionId),
     symbol:text(x?.symbol),
+    asset:baseAsset(x?.symbol),
     isolatedMode:text(x?.isolatedMode),
     riskState:text(x?.riskState),
     side:text(x?.positionSide),
