@@ -243,10 +243,12 @@ export function runAsymmetricDonchianV2(dataset,config={}){
 export function runUpRegimeDonchianV2(dataset,config={}){
   const cfg={...UP_REGIME_DONCHIAN_V2_CONFIG,...config},series=buildSeries(dataset),master=series.BTC||Object.values(series).sort((a,b)=>b.rows.length-a.rows.length)[0];
   if(!master||!series.BTC)return empty('UP_REGIME_DONCHIAN_V2',cfg,'BTC_REGIME_SOURCE_MISSING');
+  const tradeAssets=Array.isArray(config.tradeAssets)&&config.tradeAssets.length?new Set(config.tradeAssets.map(x=>String(x).toUpperCase())):null;
   const warm=Math.max(cfg.entryDays,cfg.exitDays,cfg.volLookbackDays,cfg.regimeMaDays,cfg.regimeReturnDays*2)+1,periods=[],state=new Map(),prevWeights=new Map();
   for(let i=warm;i+cfg.rebalanceDays<master.rows.length;i+=cfg.rebalanceDays){
     const atTs=master.rows[i].openTime,nextTs=master.rows[i+cfg.rebalanceDays].openTime,btcIdx=series.BTC.by.get(atTs),btcUp=btcIdx!=null&&persistentUp(series.BTC,btcIdx,cfg),candidates=[];
     for(const [symbol,ser] of Object.entries(series)){
+      if(tradeAssets&&!tradeAssets.has(symbol))continue;
       const idx=ser.by.get(atTs),nextIdx=ser.by.get(nextTs);if(idx==null||nextIdx==null)continue;
       const cur=at(ser,idx),future=at(ser,nextIdx),vol=realizedVol(ser,idx,cfg.volLookbackDays,cfg.annualizationDays);if(!(cur?.close>0&&future?.close>0&&vol>0))continue;
       const allowLong=btcUp&&persistentUp(ser,idx,cfg),side=updateDonchianSide(ser,idx,state.get(symbol)||0,cfg,{longOnly:true,allowLong});state.set(symbol,side);if(side<=0)continue;
