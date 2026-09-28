@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-09-28T20:58:04Z",
+  "workflowRunId": 36482867145,
+  "artifactId": 10997935246,
+  "artifactSha256": "3a93a952919e78c515735655980c4741371460f023b22f55b54142aacb20ca37",
+  "ruleset": "PAPERBOT-PROFIT-SPECIAL-AGENT-V2-FROZEN",
+  "decision": "DISCOVERY_LEADER_ONLY",
+  "discoveryLeader": "UP_REGIME_DONCHIAN_V2",
+  "sources": {
+    "BTC": {"bars": 1879},
+    "ETH": {"bars": 1879},
+    "SOL": {"bars": 1879},
+    "XRP": {"bars": 1879},
+    "HBAR": {"bars": 1879},
+    "LINK": {"bars": 1879},
+    "AVAX": {"bars": 1879},
+    "SUI": {"bars": 1244}
+  },
+  "candidates": {
+    "ASYMMETRIC_DONCHIAN_V2": {
+      "periods": 240,
+      "totalReturnPct": -47.71327545119453,
+      "pnl": -4771.327545119452,
+      "profitFactor": 0.9804927038728578,
+      "maxDrawdownPct": 69.10126656488666,
+      "positiveWindows": 2,
+      "positiveAssets": 4,
+      "positivePnlConcentrationPct": 51.49958736173308,
+      "gatePass": false,
+      "gateReasons": [
+        "RETURN_NOT_POSITIVE",
+        "PF_LT_1.15",
+        "DD_GT_25PCT",
+        "POSITIVE_WINDOWS_LT_3",
+        "POSITIVE_PNL_CONCENTRATION_GT_50PCT"
+      ]
+    },
+    "UP_REGIME_DONCHIAN_V2": {
+      "periods": 35,
+      "totalReturnPct": 11.931786751569984,
+      "pnl": 1193.178675156998,
+      "profitFactor": 2.3335687708297663,
+      "maxDrawdownPct": 2.803465872625286,
+      "positiveWindows": 4,
+      "positiveAssets": 6,
+      "positivePnlConcentrationPct": 49.36208356835309,
+      "gatePass": true,
+      "gateReasons": []
+    }
+  },
+  "interpretation": "UP_REGIME_DONCHIAN_V2 is the first candidate to clear the frozen discovery gate. It is a discovery leader only and requires an independently frozen holdout before any paper-shadow consideration. ASYMMETRIC_DONCHIAN_V2 is rejected.",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false
+}
