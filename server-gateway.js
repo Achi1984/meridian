@@ -259,6 +259,12 @@ const server=http.createServer(async(req,res)=>{
         pionexWalletRiskSupportedRows:Number(account?.walletBotRisk?.supportedRows)||0,
         pionexWalletRiskDetailsComplete:account?.walletBotRisk?.detailsComplete===true,
         pionexWalletRiskRejectedCount:Number(account?.walletBotRisk?.rejectedCount)||0,
+        pionexWalletRiskRejectReasonCounts:account?.walletBotRisk?.rejectReasonCounts||{},
+        pionexWalletRiskStatusCounts:account?.walletBotRisk?.statusCounts||{},
+        pionexWalletRiskTrendCounts:account?.walletBotRisk?.trendCounts||{},
+        pionexWalletRiskMissingBaseCount:Number(account?.walletBotRisk?.missingBaseCount)||0,
+        pionexWalletRiskDetailEnvelopeFields:Array.isArray(account?.walletBotRisk?.detailEnvelopeFields)?account.walletBotRisk.detailEnvelopeFields.slice(0,40):[],
+        pionexWalletRiskDetailBotDataFields:Array.isArray(account?.walletBotRisk?.detailBotDataFields)?account.walletBotRisk.detailBotDataFields.slice(0,80):[],
         pionexWalletSuccessBuOrderTypeCounts:account?.walletBotProbe?.successBuOrderTypeCounts||{},
         pionexWalletSuccessCateTypeCounts:account?.walletBotProbe?.successCateTypeCounts||{},
         pionexWalletBotCategories:Array.isArray(account?.wallet?.botCategories)?account.wallet.botCategories.slice(0,12).map(x=>({

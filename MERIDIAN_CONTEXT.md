@@ -221,3 +221,8 @@ r48 live discovery proved 32/35 Wallet bot detail probes succeed. All 32 success
 r49 builds a separate `PIONEX_WALLET_BOT_DETAIL` risk snapshot from the successfully hydrated futures_grid details. The UI selects it only when the complete supported set normalizes successfully and the snapshot is fresh (≤15 min). The classic Bot API remains separately visible and retains precedence whenever it is fresh and complete.
 
 The selected Wallet detail rows still pass through the existing conservative reference matcher. No match means no Bot action. Missing PnL/capital continues to block Decision Ready / exposure completeness as before.
+## v10 r50 Wallet risk normalization diagnostics
+
+r49 deployed correctly but live UI still selected the classic Bot API EMPTY_GUARD instead of WALLET DETAIL, while Wallet discovery remained fresh and 32/35 detail probes succeeded. This isolates the blocker to the Wallet detail -> normalized live-risk step.
+
+r50 adds aggregate diagnostics to the private Wallet risk object and BOTS UI: normalized/supported count, rejected count and reasons, detail status/trend counts, missing-base count, and top-level/buOrderData field names. No guard is relaxed in this release.
