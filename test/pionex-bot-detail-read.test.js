@@ -90,6 +90,16 @@ test('detail hydration fails closed on missing, duplicate, mismatched or incompl
   );
 });
 
+
+test('detail hydration accepts surrounding whitespace on documented type/status enums',async()=>{
+  const result=await hydratePionexBotSummaries(
+    [{buOrderType:' futures_grid ',buOrderId:'trim-1',base:'BTC.PERP',status:' running '}],
+    {delayMs:0,loadDetail:async()=>({status:' running ',trend:' long '}),validateDetail:()=>true}
+  );
+  assert.equal(result.supportedRows,1);
+  assert.equal(result.detailRows,1);
+});
+
 test('unsupported bot types are ignored instead of being hydrated',async()=>{
   let calls=0;
   const result=await hydratePionexBotSummaries(
