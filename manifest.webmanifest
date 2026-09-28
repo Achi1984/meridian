@@ -1,8 +1,10 @@
 {
-  "name": "ACHI MERIDIAN v8.0",
-  "short_name": "MERIDIAN 8.0",
-  "start_url": "./?build=8.0-20260921-R58",
+  "name": "ACHI MERIDIAN v10",
+  "short_name": "MERIDIAN",
+  "start_url": "./v10/?build=r62&fresh=r62",
   "display": "standalone",
   "background_color": "#03070c",
-  "theme_color": "#05080d"
+  "theme_color": "#05080d",
+  "scope": "./",
+  "id": "./"
 }
