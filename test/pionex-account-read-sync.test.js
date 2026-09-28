@@ -58,7 +58,7 @@ test('read snapshot normalizes spot, futures balances and active positions witho
   assert.equal(snap.wallet.botCategoryCount,1);
   assert.equal(snap.wallet.botReportedCount,2);
   assert.equal(snap.wallet.botListCount,2);
-  assert.deepEqual(snap.wallet.botCategories[0].entryFields,['bar','buOrderId','buOrderType','cateType','foo']);
+  assert.deepEqual(snap.wallet.botCategories[0].entryFields,['bar','baseList','buOrderId','buOrderType','cateType','foo']);
   assert.equal(snap.wallet.botEntryCount,2);
   assert.equal(snap.walletBotProbe.candidateCount,2);
   assert.equal(snap.walletBotProbe.successCount,2);
