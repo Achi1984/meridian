@@ -246,3 +246,8 @@ r53 keeps ordinary symbol resolution on `base`, but for explicit inverse/Coin-M 
 r53 deployed successfully but remained at RISK NORMALIZED 0/32 and SYMBOL 0/32. The inverse symbol fallback itself was correct, but the Wallet-origin `cateType=inverse` was dropped while constructing the internal summary used for detail normalization.
 
 r54 preserves Wallet `cateType` in the summary and through mergePionexOrderDetail. This allows the existing strict inverse-only symbol fallback to see the already validated Wallet category without expanding any allowlist or trading rule.
+## v10 r55 Live/reference match-stage diagnostics
+
+r54 completed the read-only Pionex ingestion path: Wallet detail is the active Bot source and 32/32 supported futures-grid rows normalize successfully. Live matching remains 0/32 against the 27.09 Asset-Watch reference snapshot.
+
+r55 instruments the existing conservative matcher without changing it. The Data Guard shows ASSET PASS, SIDE PASS, LEVERAGE PASS, STRUCTURE PASS, STRONG CANDIDATE and ACCEPTED counts, together with live/reference side distributions and aggregate live field availability.
