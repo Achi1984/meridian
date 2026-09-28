@@ -665,3 +665,11 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Pionex portfolio source now prefers a fresh Wallet API total over an untimestamped/older private snapshot; newer fresh private snapshots remain valid.
 - Market technical freshness remains independently fail-closed and is not changed by this patch.
 - Execution impact remains false.
+
+
+## v10 r62 — mobile stale-cache hardening
+
+- Production r61 was verified by runtime smoke before the user still observed r60, proving the issue was a stale mobile/PWA shell rather than deployment state.
+- r62 updates the PWA launch target, links the manifest, adds a no-store version probe/self-reload to the v10 shell, and extends runtime smoke to guard these invariants.
+- Existing clients already stuck on a pre-r62 shell require one cache-busted open. Once r62 is running, later stale builds can self-heal.
+- Execution impact remains false.
