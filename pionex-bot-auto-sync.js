@@ -119,12 +119,13 @@ export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,no
   return j;
 }
 
-export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=20}={}){
+async function fetchRunningBotOrdersForType(type,{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=20}={}){
+  if(!PIONEX_SUPPORTED_BOT_TYPES.includes(type))throw new Error('pionex_bot_type_unsupported');
   const results=[];let pageToken=null,pages=0;
   do{
     const j=await pionexGet('/api/v1/bot/orders',{
       status:'running',
-      buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES,
+      buOrderTypes:type,
       ...(pageToken?{pageToken}:{})
     },{apiKey,apiSecret,fetchImpl,now});
     const data=j?.data||{},rows=Array.isArray(data?.results)?data.results:[];
@@ -134,6 +135,19 @@ export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,no
     if(pageToken)await new Promise(r=>setTimeout(r,125));
   }while(pageToken&&pages<maxPages);
   return {orders:results,pages,truncated:!!pageToken};
+}
+
+export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=20}={}){
+  const results=[];let pages=0,truncated=false;
+  for(let i=0;i<PIONEX_SUPPORTED_BOT_TYPES.length;i++){
+    const type=PIONEX_SUPPORTED_BOT_TYPES[i];
+    const r=await fetchRunningBotOrdersForType(type,{apiKey,apiSecret,fetchImpl,now,maxPages});
+    results.push(...r.orders);
+    pages+=r.pages;
+    truncated=truncated||r.truncated;
+    if(i<PIONEX_SUPPORTED_BOT_TYPES.length-1)await new Promise(resolve=>setTimeout(resolve,125));
+  }
+  return {orders:results,pages,truncated};
 }
 
 export function summarizePionexBotList(orders=[]){

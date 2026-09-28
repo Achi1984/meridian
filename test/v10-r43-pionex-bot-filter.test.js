@@ -10,10 +10,10 @@ const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
-test('r43 bot list requests only supported running futures types',()=>{
+test('r43+ bot list stays restricted to supported running futures types',()=>{
   assert.match(bot,/status:'running'/);
-  assert.match(bot,/buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES/);
   assert.match(bot,/PIONEX_SUPPORTED_BOT_TYPES/);
+  assert.match(bot,/buOrderTypes:type/);
   assert.match(detail,/future_hedge_grid/);
   assert.match(detail,/futures_grid/);
 });
@@ -42,11 +42,13 @@ test('r43 preserves execution-neutral invariants',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
 
-test('r43 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r43');
-  assert.match(root,/10\.0-r43-production/);
-  assert.match(root,/\.\/v10\/\?build=r43/);
-  assert.match(v10,/const BUILD='10\.0-r43'/);
-  assert.match(v9,/qs\.set\('build','r43'\)/);
-  assert.match(v9html,/p\.set\('build','r43'\)/);
+test('r43 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=43);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
+  assert.ok(v9.includes("qs.set('build','"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','"+rev+"')"));
 });

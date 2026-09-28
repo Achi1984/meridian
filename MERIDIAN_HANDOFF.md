@@ -502,3 +502,10 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Adds privacy-safe aggregate list diagnostics for guard troubleshooting.
 - During `EMPTY_GUARD`, UI row counts now show the current filtered API list result instead of the stale preserved snapshot count.
 - No Pionex trading, bot trading, transfer, mutation, PaperBot, leverage, signal or execution behavior changes.
+## v10 r44 — Pionex signed-query compatibility hotfix
+
+- Replaces one repeated-array Bot API request with two scalar signed GET requests.
+- Reads `futures_grid` and `future_hedge_grid` separately, then combines results before existing detail hydration.
+- Keeps all existing privacy-safe diagnostics and `EMPTY_GUARD` behavior.
+- No API credential changes required.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal or execution changes.
