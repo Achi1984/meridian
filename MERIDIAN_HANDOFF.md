@@ -370,3 +370,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Active v10 pair cards and COMMAND live overview reuse the shared completeness helper and show PARTIAL rather than COMPLETE on incomplete exposure.
 - Known matched exposure values remain identifiable as known values; no missing quantity is invented.
 - No trading thresholds, Profit Lock percentages, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
+
+
+## v10 r34 — Portfolio regime basis provenance
+
+- Continues the deep audit after runtime-verified r33.
+- Keeps the existing portfolioRegime/riskV2 scoring formulas exactly unchanged.
+- Adds exposureComplete and COMPLETE/PARTIAL_EXPOSURE provenance to portfolioRegime.
+- When exposure is incomplete, the retained COMMAND portfolio-regime pill is visibly labelled PARTIAL BASIS.
+- The legacy regime strip also discloses PARTIAL BASIS and an incomplete exposure-basis note.
+- Concentration thresholds remain 10/15/25%; avg-risk penalties remain 4/6; regime cutoffs remain +/-2.
+- Active v10 NEXT ACTION remains independent of portfolioRegime.
+- No trading rules, Profit Lock percentages, hedge threshold, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
