@@ -2,9 +2,9 @@
   "schema": 1,
   "project": "MERIDIAN",
   "build": "10.0-r68",
-  "branch": "v10-r68",
+  "branch": "main",
   "issue": 243,
-  "phase": "R68_RELEASE_CI",
+  "phase": "R68_MERGED_AWAITING_DISCOVERY_RUN",
   "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
   "r67Merged": true,
   "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
@@ -14,8 +14,11 @@
     "profit special-agent protocol frozen",
     "profit candidate engine added",
     "profit lab UI added",
-    "r68 cache/build routing updated"
+    "r68 cache/build routing updated",
+    "r68 release CI green and merged"
   ],
-  "nextAction": "Open v10-r68 PR, run CI, fix only verified failures, then merge. After merge run Profit Batch in LAB and freeze the first real discovery result before any parameter change.",
-  "executionImpact": false
+  "nextAction": "Run LAB > PROFIT SPECIAL AGENT with 1460 days. Persist the untouched discovery result before changing any parameter. Then create an independent holdout branch; do not promote directly.",
+  "executionImpact": false,
+  "r68Merged": true,
+  "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c"
 }
