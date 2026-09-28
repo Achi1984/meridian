@@ -570,3 +570,11 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - r51 trims surrounding whitespace for buOrderType, status and trend before the existing allowlist checks.
 - Supported bot types/statuses/directions are otherwise unchanged.
 - No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
+## v10 r52 — exact Pionex normalizer stage diagnostics
+
+- Live r51 evidence: DETAIL PROBE 32/35, RISK NORMALIZED 0/32 after a fresh sync.
+- Adds shared inspectPionexBotOrder() used by the production normalizer and diagnostics.
+- Shows TYPE / STATUS / SYMBOL / SIDE / ALL pass counts.
+- Shows only coarse BASE/QUOTE classes: asset, stable_quote, missing, unresolved.
+- No bot IDs, symbols, prices, balances, investment values or PnL exposed publicly.
+- No source-selection, matching, trading, PaperBot, Profit Lock, hedge or execution changes.
