@@ -729,3 +729,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Privacy:** Current personal venue balances are not hard-coded or committed to GitHub. They remain local to the user device.
 
 **Safety:** If current Ledger/OKX references are missing or stale, COMMAND must display an incomplete portfolio rather than reuse old quantities. No trading, PnL, leverage, Profit Lock, hedge, matcher or execution rules change.
+
+
+## D-071 — Ledger is a confirmed holdings authority, not a fixed USD balance
+
+**Decision:** Ledger valuation should move with the market between confirmations. The browser may use private Ledger quantities already present in the authenticated portfolio and value them with the existing all-ticker public Binance Spot feed.
+
+**Confirmation:** Ledger ownership quantities require a local confirmation timestamp no older than 24h. A fresh r63 Ledger venue-reference timestamp may bootstrap the first r64 confirmation. After expiry, Ledger falls back to fail-closed until reconfirmed.
+
+**Privacy:** The confirmation timestamp is local-only. No wallet quantity or account value is committed to source code or sent to a public per-asset pricing query.
+
+**Canonical composition:** Ledger live-priced holdings + current OKX venue balance + current Pionex Wallet API equity. All other historical holdings are excluded from the production total.
+
+**Completeness:** A required holding venue is complete only when it is present with current authority and every admitted holding is priced from a fresh market overlay. Missing Ledger pricing or missing OKX authority blocks the headline total.
+
+**Safety:** Portfolio valuation/presentation only. No bot matching, PnL interpretation, strategy, leverage, Profit Lock, hedge or execution behavior changes.
