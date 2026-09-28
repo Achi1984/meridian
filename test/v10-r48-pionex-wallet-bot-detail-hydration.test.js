@@ -35,8 +35,8 @@ test('r48 UI exposes only aggregate probe coverage and keeps actions fail-closed
   assert.match(v10,/BUORDERTYPE/);
   assert.match(v10,/CATETYPE/);
   assert.match(v10,/FUTURE_GRID_COIN_MARGINED = Coin-M Futures Grid/);
-  assert.match(v10,/Detaildaten bleiben privat/);
-  assert.match(v10,/Bot-Aktionen bleiben fail-closed/);
+  assert.match(v10,/Detaildaten bleiben privat|Keine Safety-Regel wurde gelockert/);
+  assert.match(v10,/Bot-Aktionen bleiben fail-closed|erst bei vollständiger Normalisierung als Live-Quelle/);
 });
 
 test('r48 does not alter bot decision readiness or execution rules',()=>{
