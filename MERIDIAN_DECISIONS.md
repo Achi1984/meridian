@@ -361,3 +361,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **SSOT rule:** syncHealth exposes decisionComplete; both the header readiness and DATA GUARD use that field.
 
 **Isolation:** No Profit Lock formula, signal threshold, liquidation threshold, NEXT ACTION priority, Paper-bot parameter, leverage or execution behavior changes.
+
+
+## D-037 — v10 header status uses one semantic tone vocabulary
+
+**Decision:** The active v10 system header uses only the semantic status tones safe, watch, danger and muted. Legacy presentation labels mixed and reference are not runtime CSS-state values in v10.
+
+**Mapping:** MARKET READY = safe; MARKET PARTIAL/STALE = watch. BOT READY = safe; BOT PARTIAL/SAFETY = watch; BOT ERROR = danger; BOT REF/BLOCKED = muted.
+
+**SSOT rule:** marketReadiness and botReadiness emit the final semantic tone. The COMMAND source strip and sticky system header consume that tone directly instead of translating legacy class names locally.
+
+**Reason:** r22 added explicit semantic header colors, but the runtime still emitted legacy mixed/reference class names and depended on inherited v9 CSS. The visible state therefore had two vocabularies for the same readiness result.
+
+**Isolation:** Readiness conditions and labels are unchanged. This is presentation/status semantics only; no market signal, bot matching, risk, Profit Lock, Paper-bot, leverage or execution logic changes.
