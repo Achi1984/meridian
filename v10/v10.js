@@ -750,6 +750,58 @@ function bindTsmomHoldout(view){
   const b=$('#holdout-run',view);if(b)b.onclick=()=>runTsmomHoldout(view);
 }
 
+function profitAgentCandidateHtml(name,result){
+  if(!result)return '<article class="profit-agent-candidate empty"><div><span>'+esc(name)+'</span><b>NOT RUN</b></div><small>Keine Discovery-Auswertung.</small></article>';
+  const m=result.summary||{},g=result.profitGate||result.gate||{},assets=result.assets||[],positiveAssets=g.positiveAssets??assets.filter(x=>x?.summary?.pnl>0).length,conc=result.positivePnlConcentrationPct;
+  return '<article class="profit-agent-candidate '+(g.pass?'pass':'fail')+'"><div class="profit-agent-candidate-head"><div><span>'+esc(name)+'</span><b>'+esc(g.label||'PROFIT GATE')+'</b></div><strong class="tone-'+(g.pass?'safe':'watch')+'">'+(g.pass?'PASS':'FAIL')+'</strong></div><div class="profit-agent-metrics"><div><span>NET RETURN</span><b>'+skNum(m.totalReturnPct,2)+'%</b></div><div><span>PF</span><b>'+skNum(m.profitFactor,2)+'</b></div><div><span>MAX DD</span><b>'+skNum(m.maxDrawdownPct,2)+'%</b></div><div><span>WINDOWS</span><b>'+Number(result.stability?.positiveWindows||0)+'/5</b></div><div><span>POS ASSETS</span><b>'+positiveAssets+'/'+assets.length+'</b></div><div><span>CONCENTRATION</span><b>'+skNum(conc,1)+'%</b></div></div><small>'+((g.reasons||[]).join(' · ')||'Frozen Profit Gate erfüllt · nur Discovery, keine Promotion.')+'</small></article>';
+}
+function profitAgentResultHtml(){
+  if(profitAgentUi.running)return '<div class="edge-loading"><b>'+esc(profitAgentUi.progress||'PROFIT BATCH')+'</b><small>'+profitAgentUi.completed+'/'+profitAgentUi.total+' Assets geladen · keine Parameteränderung</small></div>';
+  if(profitAgentUi.error)return '<div class="sk-paper-error"><b>PROFIT AGENT FEHLER</b><small>'+esc(profitAgentUi.error)+'</small></div>';
+  const r=profitAgentUi.result;if(!r)return '<div class="sk-paper-empty"><b>NOCH KEIN PROFIT BATCH</b><small>TSMOM Classic vs Persistent TSMOM vs Donchian Trend · identische Research-only Safety-Grenzen.</small></div>';
+  const leader=r.discoveryLeader||'KEIN PASS',leaderTone=r.discoveryLeader?'safe':'watch';
+  return '<div class="profit-agent-decision"><span>DISCOVERY LEADER</span><b class="tone-'+leaderTone+'">'+esc(leader)+'</b><small>'+esc(r.decision)+' · NEXT '+esc(r.nextStage)+'</small></div><div class="profit-agent-grid">'+
+    profitAgentCandidateHtml('TSMOM CLASSIC',r.candidates?.TSMOM_CLASSIC)+
+    profitAgentCandidateHtml('PERSISTENT TSMOM V1',r.candidates?.PERSISTENT_TSMOM_V1)+
+    profitAgentCandidateHtml('DONCHIAN TREND V1',r.candidates?.DONCHIAN_TREND_V1)+
+    '</div><small class="profit-agent-note">Gewinnrang erst nach Profit/Risk-Gate. Kein Auto-Promotion- oder Live-Pfad.</small>';
+}
+function profitAgentPanel(){
+  return '<section class="profit-agent-shell"><div class="edge-head"><div><span>SPECIAL AGENT · PAPER BOTS</span><b>PROFIT DISCOVERY V1</b><small>Gewinnmaximierung nach Kosten · mit harten Drawdown/Breadth-Gates</small></div><strong>RESEARCH ONLY</strong></div><div class="edge-controls"><label>HISTORY<select id="profit-agent-days"><option value="730" '+(profitAgentUi.days===730?'selected':'')+'>730 TAGE</option><option value="1460" '+(profitAgentUi.days===1460?'selected':'')+'>1460 TAGE</option></select></label><div><span>UNIVERSE</span><b>'+PAPERBOT_PROFIT_AGENT_V1_ASSETS.join(' · ')+'</b></div><button id="profit-agent-run" type="button" '+(profitAgentUi.running?'disabled':'')+'>'+(profitAgentUi.running?'BATCH LÄUFT …':'PROFIT BATCH STARTEN')+'</button></div><details class="edge-rules"><summary>FROZEN PROTOCOL · '+PAPERBOT_PROFIT_AGENT_V1_RULESET+'</summary><small>Classic 30/90/365d TSMOM · Persistent TSMOM nur bei 3/3 Horizont-Alignment · Donchian 55/20 · Vol-Sizing · Kosten · keine Martingale-/Live-Änderung.</small></details><div id="profit-agent-result">'+profitAgentResultHtml()+'</div></section>';
+}
+async function runProfitAgentBatch(view){
+  if(profitAgentUi.running)return;
+  profitAgentUi.days=Number($('#profit-agent-days',view)?.value)||1460;profitAgentUi.running=true;profitAgentUi.error=null;profitAgentUi.result=null;profitAgentUi.completed=0;
+  const out=$('#profit-agent-result',view),btn=$('#profit-agent-run',view),loader=H().marketKlinesHistory;
+  if(typeof loader!=='function'){profitAgentUi.running=false;profitAgentUi.error='Historical daily data bridge fehlt';if(out)out.innerHTML=profitAgentResultHtml();return}
+  if(btn){btn.disabled=true;btn.textContent='BATCH LÄUFT …'}
+  const data={},failures=[],bars=Math.min(9000,profitAgentUi.days+420);
+  try{
+    for(const symbol of PAPERBOT_PROFIT_AGENT_V1_ASSETS){
+      profitAgentUi.progress='LADE '+symbol;if(out)out.innerHTML=profitAgentResultHtml();
+      try{
+        const rows=await loader('1d',bars,symbol);
+        if(Array.isArray(rows)&&rows.length>=500)data[symbol]=rows;
+        else failures.push(symbol+' <500 Bars');
+      }catch(e){failures.push(symbol+' '+String(e?.message||e).slice(0,60))}
+      profitAgentUi.completed++;await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    if(failures.length||Object.keys(data).length!==PAPERBOT_PROFIT_AGENT_V1_ASSETS.length)throw new Error('PROFIT DATA GATE · '+(failures.join(' · ')||('geladen '+Object.keys(data).length+'/'+PAPERBOT_PROFIT_AGENT_V1_ASSETS.length)));
+    profitAgentUi.progress='BERECHNE 3 KANDIDATEN';if(out)out.innerHTML=profitAgentResultHtml();
+    profitAgentUi.result=runPaperBotProfitAgentV1(data);
+  }catch(e){profitAgentUi.error=String(e?.message||e)}
+  finally{
+    profitAgentUi.running=false;profitAgentUi.progress='';
+    if(out)out.innerHTML=profitAgentResultHtml();
+    if(btn){btn.disabled=false;btn.textContent='PROFIT BATCH STARTEN'}
+  }
+}
+function bindProfitAgent(view){
+  const d=$('#profit-agent-days',view),b=$('#profit-agent-run',view);
+  if(d)d.onchange=()=>{profitAgentUi.days=Number(d.value)||1460};
+  if(b)b.onclick=()=>runProfitAgentBatch(view);
+}
+
 function documentedEdgePanel(){
   return '<section class="documented-edge-shell"><div class="edge-head"><div><span>DOCUMENTED EDGE LAB</span><b>PUBLISHED STRATEGY REPLICATIONS</b><small>Evidenz ≠ Garantie · Regeln vor Ergebnis eingefroren</small></div><strong>RESEARCH ONLY</strong></div>'+
     '<div class="edge-controls"><label>HISTORY<select id="edge-days"><option value="730" '+(edgeUi.days===730?'selected':'')+'>730 TAGE</option><option value="1460" '+(edgeUi.days===1460?'selected':'')+'>1460 TAGE</option></select></label><div><span>UNIVERSE</span><b>'+DOCUMENTED_EDGE_ASSETS.join(' · ')+'</b></div><button id="edge-run" type="button" '+(edgeUi.running?'disabled':'')+'>'+(edgeUi.running?'BATCH LÄUFT …':'EDGE BATCH STARTEN')+'</button></div>'+
