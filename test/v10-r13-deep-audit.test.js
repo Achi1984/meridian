@@ -37,7 +37,8 @@ test('r13 aligns technical price sources to liquid perpetual futures and tight c
 
 test('r13 separates market freshness, bot freshness and Asset Watch reference',()=>{
   assert.match(v9,/marketPriceSyncedAt:null/);
-  assert.match(v9,/updatedAt:Date\.now\(\)/);
+  assert.match(v9,/function marketRowsTimestamp\(\.\.\.sets\)/);
+  assert.match(v9,/updatedAt:marketRowsTimestamp\(/);
   assert.match(v10,/function marketHealth\(\)/);
   assert.match(v10,/● MKT /);
   assert.match(v10,/● BOT /);

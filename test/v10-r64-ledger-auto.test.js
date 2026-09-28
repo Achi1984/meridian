@@ -73,8 +73,9 @@ test('r64 separates Ledger confirmation from OKX value refresh and does not stor
   assert.match(v10,/API TREND/);
 });
 
-test('r64 remains portfolio data and presentation only',()=>{
-  assert.equal(release.terminalBuild,'10.0-r64');
+test('r64 remains portfolio data and presentation only in successor releases',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=64);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });

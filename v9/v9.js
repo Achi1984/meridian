@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r64';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r64';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r65';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r65';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r64');
+    qs.set('build','r65');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -69,7 +69,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:null,okx:null}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketTransport:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:null,okx:null}};
 const EXTERNAL_VENUE_REF_KEY='meridian.v10.externalVenueRefs',LEDGER_AUTH_KEY='meridian.v10.ledgerAuthority',EXTERNAL_VENUE_EXPECTED=['Ledger','OKX'],LEDGER_AUTH_MAX_AGE_MS=24*60*60*1000;
 function loadExternalVenueRefs(){
  try{
@@ -313,22 +313,39 @@ function macd(v){if(v.length<35)return null;const series=p=>{const k=2/(p+1),o=[
 function atr(rows,p=14){if(rows.length<p+1)return null;const t=[];for(let i=1;i<rows.length;i++)t.push(Math.max(rows[i].high-rows[i].low,Math.abs(rows[i].high-rows[i-1].close),Math.abs(rows[i].low-rows[i-1].close)));let a=t.slice(0,p).reduce((x,y)=>x+y,0)/p;for(let i=p;i<t.length;i++)a=(a*(p-1)+t[i])/p;return a}
 const MARKET_INTERVAL_MS={'15m':15*60*1000,'1h':60*60*1000,'4h':4*60*60*1000,'1d':24*60*60*1000};
 function closedMarketRows(rows){
- const source=rows?.source||null,now=Date.now(),out=(Array.isArray(rows)?rows:[]).filter(x=>num(x?.closeTime)!=null&&num(x.closeTime)<now-1000);
- if(source)out.source=source;return out
+ const source=rows?.source||null,fetchedAt=num(rows?.fetchedAt),transport=rows?.transport||null,cache=rows?.cache||null,now=Date.now(),out=(Array.isArray(rows)?rows:[]).filter(x=>num(x?.closeTime)!=null&&num(x.closeTime)<now-1000);
+ if(source)out.source=source;if(fetchedAt!=null)out.fetchedAt=fetchedAt;if(transport)out.transport=transport;if(cache)out.cache=cache;return out
+}
+function marketRowsTimestamp(...sets){
+ const ts=sets.map(x=>num(x?.fetchedAt)).filter(x=>x!=null&&x<=Date.now()+30000);
+ return ts.length?Math.min(...ts):Date.now()
+}
+function marketTransportLabel(...sets){
+ const labels=[...new Set(sets.map(x=>String(x?.transport||'')).filter(Boolean))];
+ return labels.join(' + ')||'DIRECT'
 }
 async function marketKlines(interval,limit,symbol='BTC'){
- const barMap={'15m':'15m','1h':'1H','4h':'4H','1d':'1D'},bar=barMap[interval]||interval;
+ const safeSymbol=String(symbol||'BTC').trim().toUpperCase(),safeLimit=Math.max(20,Math.min(300,Math.floor(Number(limit)||160)));
  try{
-  const u='https://www.okx.com/api/v5/market/candles?instId='+symbol+'-USDT-SWAP&bar='+bar+'&limit='+Math.min(limit,300),r=await fetchTimed(u,{cache:'no-store'},7000);
-  if(!r.ok)throw new Error('OKX '+r.status);
-  const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
-  const span=MARKET_INTERVAL_MS[interval]||0,rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]+Math.max(1,span)-1})).reverse();
-  rows.source='OKX USDT-SWAP';return rows
- }catch(okxError){
-  const r=await fetchTimed('https://fapi.binance.com/fapi/v1/klines?symbol='+symbol+'USDT&interval='+interval+'&limit='+Math.min(limit,1500),{cache:'no-store'},7000);
-  if(!r.ok)throw new Error('BINANCE FUTURES '+r.status+' / '+String(okxError?.message||okxError));
-  const rows=(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
-  rows.source='BINANCE USD-M FUTURES';return rows
+  const q=new URLSearchParams({symbol:safeSymbol,interval:String(interval),limit:String(safeLimit)}),j=await getJson('/api/private/market-klines?'+q.toString());
+  if(!j?.ok||!Array.isArray(j.rows)||!j.rows.length)throw new Error(String(j?.error||'GATEWAY_INVALID'));
+  const rows=j.rows.map(x=>({openTime:+x.openTime,high:+x.high,low:+x.low,close:+x.close,closeTime:+x.closeTime})).filter(x=>[x.openTime,x.high,x.low,x.close,x.closeTime].every(Number.isFinite));
+  if(!rows.length)throw new Error('GATEWAY_EMPTY');
+  rows.source=String(j.source||'MERIDIAN MARKET GATEWAY');rows.transport='MERIDIAN_GATEWAY';rows.fetchedAt=num(j.fetchedAt)||Date.now();rows.cache=String(j.cache||'MISS');return rows
+ }catch(gatewayError){
+  const barMap={'15m':'15m','1h':'1H','4h':'4H','1d':'1D'},bar=barMap[interval]||interval;
+  try{
+   const u='https://www.okx.com/api/v5/market/candles?instId='+safeSymbol+'-USDT-SWAP&bar='+bar+'&limit='+safeLimit,r=await fetchTimed(u,{cache:'no-store'},7000);
+   if(!r.ok)throw new Error('OKX '+r.status);
+   const j=await r.json();if(j.code!=='0'||!j.data?.length)throw new Error('OKX data');
+   const span=MARKET_INTERVAL_MS[interval]||0,rows=j.data.map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[0]+Math.max(1,span)-1})).reverse();
+   rows.source='OKX USDT-SWAP';rows.transport='DIRECT_FALLBACK';rows.fetchedAt=Date.now();rows.gatewayError=String(gatewayError?.message||gatewayError);return rows
+  }catch(okxError){
+   const r=await fetchTimed('https://fapi.binance.com/fapi/v1/klines?symbol='+safeSymbol+'USDT&interval='+interval+'&limit='+safeLimit,{cache:'no-store'},7000);
+   if(!r.ok)throw new Error('MARKET GATEWAY '+String(gatewayError?.message||gatewayError)+' / BINANCE FUTURES '+r.status+' / '+String(okxError?.message||okxError));
+   const rows=(await r.json()).map(x=>({openTime:+x[0],high:+x[2],low:+x[3],close:+x[4],closeTime:+x[6]}));
+   rows.source='BINANCE USD-M FUTURES';rows.transport='DIRECT_FALLBACK';rows.fetchedAt=Date.now();rows.gatewayError=String(gatewayError?.message||gatewayError);return rows
+  }
  }
 }
 async function marketKlinesHistory(interval,bars,symbol='BTC'){
@@ -387,7 +404,7 @@ async function syncIntel(){
  try{
   const [m15,h1,h4,d1]=await Promise.all([marketKlines('15m',180),marketKlines('1h',200),marketKlines('4h',240),marketKlines('1d',240)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4),d1c=closedMarketRows(d1);
   if(h1c.length<60||h4c.length<100||d1c.length<210)throw new Error('insufficient closed confirmation bars');
-  const now=Date.now();state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D'};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:now,confirmationBars:'CLOSED_1H_4H'};btcRows=true
+  const now=marketRowsTimestamp(m15,h1,h4,d1),transport=marketTransportLabel(m15,h1,h4,d1);state.intel={...intel(m15,h1c,h4c,d1c),updatedAt:now,confirmationBars:'CLOSED_1H_4H_1D',transport};out.BTC={...profitLockIntel(m15,h1c,h4c),updatedAt:marketRowsTimestamp(m15,h1,h4),confirmationBars:'CLOSED_1H_4H',transport};btcRows=true;state.marketTransport=transport
  }catch(e){state.intel=null;errors.push('BTC '+String(e?.message||e))}
  const universe=trackedMarketSymbols(),assets=universe.filter(symbol=>symbol!=='BTC');
  for(let i=0;i<assets.length;i+=4){
@@ -395,11 +412,11 @@ async function syncIntel(){
   await Promise.all(batch.map(async symbol=>{try{
    const [m15,h1,h4]=await Promise.all([marketKlines('15m',160,symbol),marketKlines('1h',180,symbol),marketKlines('4h',160,symbol)]),h1c=closedMarketRows(h1),h4c=closedMarketRows(h4);
    if(h1c.length<60||h4c.length<100)throw new Error('insufficient closed confirmation bars');
-   out[symbol]={...profitLockIntel(m15,h1c,h4c),updatedAt:Date.now(),confirmationBars:'CLOSED_1H_4H'}
+   out[symbol]={...profitLockIntel(m15,h1c,h4c),updatedAt:marketRowsTimestamp(m15,h1,h4),confirmationBars:'CLOSED_1H_4H',transport:marketTransportLabel(m15,h1,h4)}
   }catch(e){errors.push(symbol+' '+String(e?.message||e))}}));
   if(i+4<assets.length)await new Promise(r=>setTimeout(r,220))
  }
- const allowed=new Set(universe);state.assetIntel=Object.fromEntries(Object.entries(out).filter(([symbol])=>allowed.has(symbol)));if(btcRows)state.marketSyncedAt=Date.now();state.marketError=errors.length?errors.slice(0,6).join(' · '):null;await cross;renderHeaderTruth();return true
+ const allowed=new Set(universe);state.assetIntel=Object.fromEntries(Object.entries(out).filter(([symbol])=>allowed.has(symbol)));if(btcRows)state.marketSyncedAt=num(state.intel?.updatedAt)||Date.now();state.marketError=errors.length?errors.slice(0,6).join(' · '):null;await cross;renderHeaderTruth();return true
  }finally{syncIntelBusy=false}
 }
 

@@ -744,3 +744,18 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Completeness:** A required holding venue is complete only when it is present with current authority and every admitted holding is priced from a fresh market overlay. Missing Ledger pricing or missing OKX authority blocks the headline total.
 
 **Safety:** Portfolio valuation/presentation only. No bot matching, PnL interpretation, strategy, leverage, Profit Lock, hedge or execution behavior changes.
+
+
+## D-072 — Technical candle authority uses server-side gateway transport
+
+**Decision:** Mobile browser third-party candle fetches are no longer the primary authority for 15m/1h/4h/1D technical data. The authenticated MERIDIAN gateway is primary; direct exchange fetches are compatibility fallback only.
+
+**Sources:** Gateway requests OKX USDT-SWAP first and Binance USD-M Futures second. Query inputs are allowlisted and bounded.
+
+**Freshness:** A gateway cache hit carries the timestamp of the original successful upstream fetch. A stale fallback may be served for up to three minutes, but its timestamp is not advanced. Existing terminal freshness rules therefore remain authoritative and fail closed automatically once the source age exceeds the allowed window.
+
+**Resilience:** Successful market snapshots are cached for 45 seconds to reduce repetitive exchange traffic across the minute-level terminal refresh cycle.
+
+**Diagnostics:** Market health surfaces transport and error state so `STALE` can be distinguished from an absent timestamp, gateway failure, or partial symbol coverage.
+
+**Safety:** No market indicator, trading signal, strategy, leverage, PnL, Profit Lock, hedge, matcher or execution thresholds are modified.
