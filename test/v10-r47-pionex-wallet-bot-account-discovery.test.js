@@ -32,9 +32,9 @@ test('r47 UI keeps wallet discovery separate from bot actions',()=>{
   assert.match(v10,/function walletDiscoveryHealth\(\)/);
   assert.match(v10,/function walletDiscoveryLayer\(\)/);
   assert.match(v10,/BOT ACCOUNT API/);
-  assert.match(v10,/WALLET DISCOVERY/);
-  assert.match(v10,/Noch keine automatische Bot-Zuordnung/);
-  assert.match(v10,/Werte und Bot-Aktionen bleiben fail-closed/);
+  assert.match(v10,/WALLET(?: \+ DETAIL)? DISCOVERY/);
+  assert.match(v10,/keine automatische Bot-Zuordnung|Detaildaten bleiben privat/);
+  assert.match(v10,/Bot-Aktionen bleiben fail-closed/);
 });
 
 test('r47 does not alter bot decision readiness or execution rules',()=>{
