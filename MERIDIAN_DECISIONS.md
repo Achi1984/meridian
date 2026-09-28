@@ -297,3 +297,19 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** The privacy-safe all-ticker overlay can succeed while some held assets remain unsupported; separately, Pionex equity is intentionally a private/screenshot snapshot rather than a live account feed. A single transport-level `fresh=true` flag therefore cannot represent whole-portfolio freshness.
 
 **Safety:** Valuation math stays Spot + Pionex. This decision changes provenance and UI semantics only; trading, Paper, risk and execution logic are unchanged.
+
+
+## D-032 — Pionex portfolio equity age requires its own explicit timestamp
+
+**Decision:** The age of Pionex portfolio equity must be derived only from the timestamp attached to that equity source (portfolio.pionexEquityUpdatedAt or the selected Pionex venue-row timestamp). Generic dashboard timestamps such as privateUpdatedAt must not be borrowed to make an older equity snapshot appear newer.
+
+**Display rule:** MERIDIAN shows the Pionex equity source together with one of:
+- a relative age when the explicit source timestamp is known,
+- **NO TIMESTAMP** when the selected equity source has no explicit timestamp,
+- **FUTURE TIMESTAMP** when the explicit source timestamp is more than 30 seconds ahead of the local evaluation time.
+
+**No invented stale threshold:** r27 does not introduce a new age cutoff that invalidates the portfolio value. Age is disclosed as provenance only. Any future rule that blocks valuation because an equity snapshot is too old requires a separate documented decision and evidence.
+
+**Seed rule:** A selected KNOWN_SEED source is shown as **STATIC SEED** rather than being implied to be live.
+
+**Isolation:** Portfolio-equity age does not affect Bot API freshness, Risk Priority, NEXT ACTION, Paper-bot logic, leverage, signals or execution.
