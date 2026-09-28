@@ -585,3 +585,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Diagnostics:** Aggregate status counts, trend counts, reject reasons, missing-base count, and returned field-name sets. No bot IDs, asset amounts, PnL values, prices, or other private row values are exposed publicly.
 
 **Safety:** r50 is diagnostic-only. Wallet detail still requires complete normalization before it can become the active live Bot source. Existing matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots, and execution logic are unchanged.
+## D-057 — Normalize surrounding whitespace on documented Pionex bot enums
+
+**Decision:** MERIDIAN trims leading/trailing whitespace before evaluating documented Pionex bot type, bot status and bot trend enum values.
+
+**Reason:** r50 live diagnostics showed all 32 Wallet futures_grid detail rows had valid semantic values (running; long/short; base present) while the production normalizer rejected all 32. The diagnostic path trimmed enum strings whereas the production normalizer did not.
+
+**Safety:** Trimming does not broaden any allowlist. Supported types remain futures_grid and future_hedge_grid; active statuses remain unchanged; directions remain long, short and no_trend only. No action-readiness, trading, PaperBot, Profit Lock, hedge or execution thresholds change.
