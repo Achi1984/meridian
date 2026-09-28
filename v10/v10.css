@@ -436,3 +436,12 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .v10-account-position-layer>.section-title{align-items:flex-start}
   .v10-account-position-layer>.section-title small{max-width:58%;font-size:7px}
 }
+
+
+/* v10 r47 · Pionex Wallet/Bot Account discovery */
+.v10-wallet-discovery{margin:10px 0 12px}
+.v10-wallet-categories{display:grid;gap:6px;margin-top:8px}
+.v10-wallet-categories>div{background:#070c12;border:1px solid #162b3d;border-radius:9px;padding:7px}
+.v10-wallet-categories span{display:block;font-size:8px;color:var(--cyan);font-weight:800;letter-spacing:.05em}
+.v10-wallet-categories b{display:block;margin-top:2px;font-size:10px;color:var(--text)}
+.v10-wallet-categories small{display:block;margin-top:3px;font-size:7px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}

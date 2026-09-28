@@ -245,6 +245,16 @@ const server=http.createServer(async(req,res)=>{
         pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
         pionexAccountLastSuccessAt:accountSync.lastSuccessAt||null,
         pionexFuturesPositionCount:Array.isArray(account.futuresPositions)?account.futuresPositions.length:0,
+        pionexWalletStatus:String(account.walletStatus||"UNKNOWN"),
+        pionexWalletBotCategoryCount:Number(account?.wallet?.botCategoryCount)||0,
+        pionexWalletBotReportedCount:Number(account?.wallet?.botReportedCount)||0,
+        pionexWalletBotListCount:Number(account?.wallet?.botListCount)||0,
+        pionexWalletBotCategories:Array.isArray(account?.wallet?.botCategories)?account.wallet.botCategories.slice(0,12).map(x=>({
+          type:String(x?.type||""),
+          count:Number.isFinite(Number(x?.count))?Number(x.count):null,
+          listCount:Number(x?.listCount)||0,
+          entryFields:Array.isArray(x?.entryFields)?x.entryFields.slice(0,20):[]
+        })):[],
         pionexBotStatus:String(botSync.status||"UNKNOWN"),
         pionexBotListRows:Number(botSync?.diagnostics?.listRows)||0,
         migration

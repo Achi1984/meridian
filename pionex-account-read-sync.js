@@ -59,25 +59,70 @@ export function normalizeFuturesPositions(data={}){
   })).filter(x=>x.symbol&&['LONG','SHORT'].includes(String(x.side||'').toUpperCase()));
 }
 
+function fieldNames(rows){
+  const set=new Set();
+  for(const row of Array.isArray(rows)?rows:[])if(row&&typeof row==='object'&&!Array.isArray(row))for(const k of Object.keys(row))set.add(String(k));
+  return [...set].sort().slice(0,40);
+}
+function normalizeWalletCategories(rows=[]){
+  return (Array.isArray(rows)?rows:[]).map(x=>({
+    type:text(x?.type),
+    title:text(x?.title),
+    totalInUsdt:num(x?.totalInUsdt),
+    count:Number.isInteger(Number(x?.count))?Number(x.count):null,
+    hasMore:x?.hasMore===true,
+    listCount:Array.isArray(x?.list)?x.list.length:0,
+    entryFields:fieldNames(x?.list),
+    balanceCount:Array.isArray(x?.balances)?x.balances.length:0,
+    positionCount:Array.isArray(x?.positions)?x.positions.length:0,
+    balanceFields:fieldNames(x?.balances),
+    positionFields:fieldNames(x?.positions)
+  })).filter(x=>x.type||x.title||x.count!=null||x.listCount||x.balanceCount||x.positionCount);
+}
+export function normalizeWalletOverview(data={}){
+  const bot=data?.botAccount||{},trader=data?.traderAccount||{};
+  const botCategories=normalizeWalletCategories(bot?.detail);
+  const traderCategories=normalizeWalletCategories(trader?.detail);
+  return {
+    totalInUsdt:num(data?.totalInUsdt),
+    totalInBtc:num(data?.totalInBtc),
+    botAccountTotalInUsdt:num(bot?.totalInUsdt),
+    traderAccountTotalInUsdt:num(trader?.totalInUsdt),
+    botCategories,
+    traderCategories,
+    botCategoryCount:botCategories.length,
+    botReportedCount:botCategories.reduce((n,x)=>n+(Number.isFinite(x.count)?x.count:x.listCount),0),
+    botListCount:botCategories.reduce((n,x)=>n+x.listCount,0),
+    traderCategoryCount:traderCategories.length,
+    source:'PIONEX_WALLET_READ_API'
+  };
+}
+
 export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
-  const [spot,fut,positions]=await Promise.all([
+  const [spot,fut,positions,walletResult]=await Promise.all([
     pionexReadGet('/api/v1/account/balances',{}, {apiKey,apiSecret,fetchImpl,now}),
     pionexReadGet('/uapi/v1/account/balances',{}, {apiKey,apiSecret,fetchImpl,now}),
-    pionexReadGet('/uapi/v1/account/positions',{}, {apiKey,apiSecret,fetchImpl,now})
+    pionexReadGet('/uapi/v1/account/positions',{}, {apiKey,apiSecret,fetchImpl,now}),
+    pionexReadGet('/api/v1/wallet/balancesFull',{}, {apiKey,apiSecret,fetchImpl,now}).then(value=>({ok:true,value}),error=>({ok:false,error:String(error?.message||error)}))
   ]);
   const futures=normalizeFuturesBalances(fut?.data||{});
   const normalizedPositions=normalizeFuturesPositions(positions?.data||{});
+  const wallet=walletResult.ok?normalizeWalletOverview(walletResult.value?.data||{}):null;
+  const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();
   return {
     source:'PIONEX_READ_API',
     readOnly:true,
     updatedAt:at,
     snapshotAt:at,
-    spotBalances:normalizeSpotBalances(spot?.data||{}),
+    spotBalances,
     futuresBalances:futures.balances,
     isolatedBalances:futures.isolates,
     futuresPositions:normalizedPositions,
-    spotBalanceCount:normalizeSpotBalances(spot?.data||{}).length,
+    wallet,
+    walletStatus:walletResult.ok?'OK':'ERROR',
+    walletError:walletResult.ok?null:walletResult.error,
+    spotBalanceCount:spotBalances.length,
     futuresBalanceCount:futures.balances.length,
     futuresPositionCount:normalizedPositions.length
   };
@@ -98,7 +143,8 @@ export function mergePionexAccountState(current,{snapshot=null,status,error=null
     endpoints:[
       'GET /api/v1/account/balances',
       'GET /uapi/v1/account/balances',
-      'GET /uapi/v1/account/positions'
+      'GET /uapi/v1/account/positions',
+      'GET /api/v1/wallet/balancesFull'
     ],
     status:String(status||'UNKNOWN'),
     lastAttemptAt:attemptAt||new Date().toISOString(),
@@ -156,7 +202,11 @@ export async function runPionexAccountReadOnce({env=process.env,fetchImpl=fetch,
       ok:applied,
       spotBalanceCount:snapshot.spotBalanceCount,
       futuresBalanceCount:snapshot.futuresBalanceCount,
-      futuresPositionCount:snapshot.futuresPositionCount
+      futuresPositionCount:snapshot.futuresPositionCount,
+      walletStatus:snapshot.walletStatus,
+      walletBotCategoryCount:snapshot.wallet?.botCategoryCount??0,
+      walletBotReportedCount:snapshot.wallet?.botReportedCount??0,
+      walletBotListCount:snapshot.wallet?.botListCount??0
     };
   }catch(e){
     const msg=String(e?.message||e);

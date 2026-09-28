@@ -526,3 +526,12 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Adds account-position assets to the market-data universe.
 - Gateway health exposes aggregate pionexAccountStatus, pionexFuturesPositionCount, pionexBotStatus and pionexBotListRows only.
 - No API writes, trading permissions, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
+## v10 r47 — Pionex Wallet Bot Account discovery
+
+- Adds GET /api/v1/wallet/balancesFull to the existing read-only account sync.
+- Wallet read is fail-soft; a Wallet permission/API failure does not break the working Futures POSITION API layer.
+- Normalizes Bot Account and Trader Account category structure.
+- BOTS UI shows BOT ACCOUNT API / WALLET DISCOVERY with category count, reported entry count, loaded list count and returned field names.
+- Public gateway health exposes only aggregate/category structure metadata, not balances, position values or bot IDs.
+- No automatic Wallet-to-bot mapping yet.
+- No API writes, trading permissions, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
