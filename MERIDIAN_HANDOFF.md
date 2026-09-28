@@ -482,3 +482,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Until PIONEX_BOT_READ_API_KEY and PIONEX_BOT_READ_API_SECRET exist in the runtime secret store, MERIDIAN must treat Pionex Bot API as OFF / not configured.
 - Do not claim live Pionex bot synchronization from GitHub connectivity alone. GitHub repository access and Pionex exchange credentials are separate concerns.
 - Pionex credentials must never be committed to the repository. When created, use Bot-reading/read-only permissions and inject them only through the deployment/runtime secret store.
+## v10 r42 — Pionex read-only account/futures integration
+
+- Adds a shared GET-only HMAC client for Pionex private reads.
+- Adds read-only Spot trading-account balance ingestion.
+- Adds read-only Futures balance ingestion.
+- Adds read-only current Futures position ingestion including side, size, mark/entry, unrealized PnL, margin, leverage and liquidation when Pionex returns them.
+- Adds ACCOUNT API and FUT POS diagnostics to Data Truth, separate from BOT API/BOT DETAIL.
+- Adds gateway readiness for normal Pionex reading vs Bot reading.
+- Missing credentials stay OFF; read failures preserve the previous snapshot as stale.
+- Adds PIONEX_READONLY_SETUP.md with least-privilege setup.
+- No Pionex write endpoint, trading permission, transfer permission, leverage mutation or margin mutation is introduced.
+- No trading rule, Profit Lock threshold, hedge rule, Paper-bot parameter, leverage or execution behavior changes.

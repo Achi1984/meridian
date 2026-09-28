@@ -192,3 +192,10 @@ The read-only Pionex Bot API path introduced in v9 r20 is now split into list an
 r41 records API list rows, supported futures rows, hydrated detail rows and completeness separately. The active Data Truth surface adds BOT DETAIL coverage. Any missing/duplicate bot ID, detail mismatch, incomplete detail payload, truncated pagination or detail-read failure fails closed and leaves the prior risk snapshot stale rather than partially refreshing it.
 
 This is data-ingestion hardening only. Trading rules, matching thresholds, Profit Lock, hedging, Paper bots, leverage and execution remain unchanged; no Pionex mutation endpoint is introduced.
+## v10 r42 Pionex Read-Only Account Foundation
+
+r42 extends the already read-only Bot API path with a separate account/futures read layer. MERIDIAN can ingest Spot trading-account balances, Futures balances and current Futures positions through Pionex GET-only endpoints once a read-only key is configured.
+
+The UI exposes ACCOUNT API separately from BOT API so normal account reading and Bot API Beta access are not conflated. Missing credentials remain an explicit OFF/not-configured state. Errors preserve the prior snapshot as stale.
+
+The user has not configured Pionex credentials yet. r42 is therefore code-ready but not live-connected until the runtime secret store receives read-only credentials. Trading/transfer permissions are neither required nor implemented.

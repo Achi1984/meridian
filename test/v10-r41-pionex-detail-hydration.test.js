@@ -43,10 +43,12 @@ test('r41 preserves trading and Paper decision invariants',()=>{
   assert.match(v10,/if\(!g\.coverageComplete\)/);
 });
 
-test('r41 release identity is canonical',()=>{
-  assert.equal(release.terminalBuild,'10.0-r41');
-  assert.match(root,/10\.0-r41-production/);
-  assert.match(root,/\.\/v10\/\?build=r41/);
-  assert.match(v10,/const BUILD='10\.0-r41'/);
+test('r41 release identity remains canonical on successors',()=>{
+  const build=String(release.terminalBuild||''),rev=build.split('-').at(-1);
+  assert.ok(/^10\.0-r\d+$/.test(build));
+  assert.ok(Number(build.split('r').at(-1))>=41);
+  assert.ok(root.includes(build+'-production'));
+  assert.ok(root.includes('./v10/?build='+rev));
+  assert.ok(v10.includes("const BUILD='"+build+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });

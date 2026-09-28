@@ -504,3 +504,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Read-only boundary:** The implementation uses only GET /api/v1/bot/orders and GET /api/v1/bot/orders/futuresGrid/order. It introduces no create, adjust, reduce, cancel, transfer or other mutation call.
 
 **Isolation:** Matching thresholds, Decision Ready, Profit Lock, hedge threshold, market signals, portfolio math, Paper-bot parameters, leverage and execution are unchanged. Live trading remains disabled.
+## D-048 — Pionex API integration remains read-only and split by permission domain
+
+**Decision:** MERIDIAN may read Pionex account/futures state through Enable reading and bot state through Bot reading (Beta), but must not request or implement trading, transfer, bot-trading, leverage-update, margin-mode-update or other mutation capabilities.
+
+**Account read scope:** GET /api/v1/account/balances, GET /uapi/v1/account/balances and GET /uapi/v1/account/positions.
+
+**Bot read scope:** GET /api/v1/bot/orders and GET /api/v1/bot/orders/futuresGrid/order.
+
+**Fail-closed rule:** Failed account reads update diagnostics only; the previous account snapshot is not refreshed. Missing credentials keep ACCOUNT API/BOT API visibly OFF rather than implying live connectivity.
+
+**Secrets rule:** Credentials live only in the runtime secret store. No API key or secret may be committed, logged, embedded in frontend assets, issues, PR text, screenshots or chat.
+
+**Execution isolation:** Trading rules, Profit Lock, hedge thresholds, market signals, Paper-bot parameters, leverage and execution remain unchanged. Live trading stays disabled.
