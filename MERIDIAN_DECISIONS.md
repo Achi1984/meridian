@@ -666,3 +666,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Evidence:** r57 live UI showed BTC reciprocal values such as BE 0.000011999 and TP 0.000010526 against a market price near 83,530 USD, and reported an implausible BTC 0 LONG / 5 SHORT distribution. The current SUI screenshots provide simultaneous LONG and SHORT control samples with conventional asset prices.
 
 **Safety:** This is a data-normalization correction. No execution permission, trading logic, PaperBot strategy, leverage, Profit Lock, hedge threshold, matcher acceptance threshold or fail-closed decision gate is loosened.
+
+
+## D-066 — One authoritative COMMAND layer and Wallet equity before screenshots
+
+**Decision:** In v10, legacy v9 COMMAND panels are implementation scaffolding only. If v9 repaints them asynchronously, the v10 observer must treat their presence as a reason to re-run COMMAND decoration, and CSS must suppress them as a final visual guard. The user must see one DATA GUARD and one exposure model.
+
+**Exposure semantics:** Values calculated as confirmed bot investment USD multiplied by leverage are not generic capital figures. They are labeled LONG/SHORT/NET NOTIONAL.
+
+**Pionex equity precedence:** If the canonical portfolio has no higher-priority private Pionex equity snapshot but the fresh read-only account snapshot contains `wallet.totalInUsdt`, that Wallet API total becomes the Pionex equity source. Screenshot fallback remains lower priority.
+
+**Safety:** Wallet equity affects portfolio presentation only. It does not make bot rows decision-ready, does not synthesize PnL, and does not alter trading, leverage, Profit Lock, hedge thresholds or execution.
