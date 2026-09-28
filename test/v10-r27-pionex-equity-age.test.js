@@ -16,7 +16,7 @@ test('r27 portfolio contract exposes explicit source timestamp age without inven
 
 test('r27 Pionex portfolio age derives only from explicit equity timestamp provenance',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
-  assert.match(block,/pionexTime=sourceTimestampAge\(privatePionex\.updatedAt\)/);
+  assert.match(block,/pionexTime=sourceTimestampAge\(resolvedPionex\.updatedAt\)/);
   assert.match(block,/pionexTimestampKnown:pionexTime\.known/);
   assert.match(block,/pionexTimestampFuture:pionexTime\.future/);
   assert.match(block,/pionexAgeMs:pionexTime\.ageMs/);
