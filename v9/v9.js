@@ -168,24 +168,43 @@ function botMatchEvidence(ref,x){
   const strong=score<=MATCH_MAX_SCORE&&((levExact&&structural.length>=1)||structural.length>=2);
   return{score,levExact,structural,strong};
 }
+function economicSide(x){
+  const be=num(x?.be),liq=num(x?.liq);
+  if(!(be>0&&liq>0))return null;
+  const gap=Math.abs(liq-be)/Math.max(be,liq,1e-12);
+  if(gap<.002)return null;
+  return liq<be?'LONG':'SHORT';
+}
 function matchStageDiagnostics(live,refs,candidates=[],acceptedRows=0){
-  const rows=Array.isArray(live)?live:[],reference=Array.isArray(refs)?refs:[],fieldKeys=['leverage','lower','upper','be','liq','tp'],fields=Object.fromEntries(fieldKeys.map(k=>[k,0])),liveSideCounts={},referenceSideCounts={};
-  let assetPass=0,sidePass=0,leveragePass=0,structurePass=0,strongCandidate=0;
+  const rows=Array.isArray(live)?live:[],reference=Array.isArray(refs)?refs:[],fieldKeys=['leverage','lower','upper','be','liq','tp'],fields=Object.fromEntries(fieldKeys.map(k=>[k,0])),liveSideCounts={},referenceSideCounts={},economicSideCounts={};
+  let assetPass=0,sidePass=0,leveragePass=0,structurePass=0,strongCandidate=0,assetLeveragePass=0,assetStructurePass=0,economicKnown=0,economicAgree=0,economicOpposite=0,economicReferenceSidePass=0,economicReferenceLeveragePass=0,economicReferenceStructurePass=0;
   const bump=(obj,key)=>{const k=String(key||'UNKNOWN').toUpperCase();obj[k]=(obj[k]||0)+1;};
+  const structuralHit=(x,ref)=>['lower','upper','be','liq'].some(k=>{const d=relDiff(x?.[k],ref?.[k]);return d!=null&&d<.03});
   reference.forEach(ref=>bump(referenceSideCounts,ref?.side||'LONG'));
   rows.forEach((x,li)=>{
-    bump(liveSideCounts,x?.side||'UNKNOWN');
+    const declared=String(x?.side||'UNKNOWN').toUpperCase(),economic=economicSide(x);
+    bump(liveSideCounts,declared);bump(economicSideCounts,economic||'UNKNOWN');
     for(const k of fieldKeys)if(num(x?.[k])!=null)fields[k]++;
     const assetRefs=reference.filter(ref=>String(ref?.symbol||'').toUpperCase()===String(x?.symbol||'').toUpperCase());
     if(assetRefs.length)assetPass++;
-    const sideRefs=assetRefs.filter(ref=>String(ref?.side||'LONG').toUpperCase()===String(x?.side||'').toUpperCase());
+    if(assetRefs.some(ref=>num(x?.leverage)!=null&&num(ref?.leverage)!=null&&num(x.leverage)===num(ref.leverage)))assetLeveragePass++;
+    if(assetRefs.some(ref=>structuralHit(x,ref)))assetStructurePass++;
+    const sideRefs=assetRefs.filter(ref=>String(ref?.side||'LONG').toUpperCase()===declared);
     if(sideRefs.length)sidePass++;
     const levRefs=sideRefs.filter(ref=>num(x?.leverage)!=null&&num(ref?.leverage)!=null&&num(x.leverage)===num(ref.leverage));
     if(levRefs.length)leveragePass++;
-    if(sideRefs.some(ref=>['lower','upper','be','liq'].some(k=>{const d=relDiff(x?.[k],ref?.[k]);return d!=null&&d<.03})))structurePass++;
+    if(sideRefs.some(ref=>structuralHit(x,ref)))structurePass++;
     if(candidates.some(c=>c.li===li))strongCandidate++;
+    if(economic){
+      economicKnown++;
+      if(economic===declared)economicAgree++;else if(['LONG','SHORT'].includes(declared))economicOpposite++;
+      const econRefs=assetRefs.filter(ref=>String(ref?.side||'LONG').toUpperCase()===economic);
+      if(econRefs.length)economicReferenceSidePass++;
+      if(econRefs.some(ref=>num(x?.leverage)!=null&&num(ref?.leverage)!=null&&num(x.leverage)===num(ref.leverage)))economicReferenceLeveragePass++;
+      if(econRefs.some(ref=>structuralHit(x,ref)))economicReferenceStructurePass++;
+    }
   });
-  return{rows:rows.length,assetPass,sidePass,leveragePass,structurePass,strongCandidate,acceptedRows:Number(acceptedRows)||0,fields,liveSideCounts,referenceSideCounts};
+  return{rows:rows.length,assetPass,sidePass,leveragePass,structurePass,strongCandidate,acceptedRows:Number(acceptedRows)||0,assetLeveragePass,assetStructurePass,economicKnown,economicAgree,economicOpposite,economicReferenceSidePass,economicReferenceLeveragePass,economicReferenceStructurePass,fields,liveSideCounts,referenceSideCounts,economicSideCounts};
 }
 function mergeReference(live){
   const used=new Set,refs=FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'})),candidates=[];
