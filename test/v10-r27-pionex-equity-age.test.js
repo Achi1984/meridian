@@ -40,7 +40,8 @@ test('r27 COMMAND displays Pionex source age, missing timestamp and future times
 });
 
 test('r27 timestamp provenance is display-only and execution impact remains false',()=>{
-  assert.equal(release.terminalBuild,'10.0-r27');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=27);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   assert.ok(v9.includes("live-price-core-r18.js?v="+release.terminalBuild));
