@@ -168,6 +168,7 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
         buOrderId:id,
         base:directBase||walletBase||null,
         quote:detail?.quote||wallet?.investmentToken||null,
+        cateType:wallet?.cateType||detail?.cateType||detail?.buOrderData?.cateType||null,
         status:detail?.status||detail?.buOrderData?.status||'running',
         buOrderData:{}
       };
