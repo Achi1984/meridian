@@ -135,6 +135,7 @@ function syncHealth(){
   const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
   const safetyReady=safetyRows.length,pnlReady=pnlRows.length,decisionReady=decisionRows.length,actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
   const status=String(s?.pionexBotSync?.status||'UNKNOWN'),age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
+  const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=status==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows;
   let detail='Private Bot-Daten werden geprüft.';
   if(status==='DISABLED_MISSING_CREDENTIALS')detail='Pionex Read API fehlt am Backend · letzter Asset-Watch-Snapshot bleibt nur Referenz';
   else if(status==='ERROR')detail='Pionex Bot API Sync-Fehler · '+String(s?.pionexBotSync?.error||'unbekannt').slice(0,110);
@@ -147,7 +148,7 @@ function syncHealth(){
   else if(status==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(status==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
   else if(status==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
+  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
 }
 function marketReadiness(m){
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
