@@ -30,8 +30,8 @@ test('r26+ portfolio model never overstates stale holdings as current',()=>{
 
 test('r26+ COMMAND visibly identifies portfolio provenance and fail-closed stale holdings',()=>{
   const command=v9.slice(v9.indexOf('function command(){'),v9.indexOf('function botGroup'));
-  assert.match(command,/CANONICAL TOTAL · EXTERNAL \+ PIONEX/);
-  assert.match(command,/STALE HOLDINGS AUSGESCHLOSSEN/);
+  assert.match(command,/CANONICAL TOTAL · LEDGER AUTO \+ OKX \+ PIONEX/);
+  assert.match(command,/nicht autorisierte Alt-Holdings ausgeschlossen/);
   assert.match(command,/OKX DCA OLD REF/);
   const strip=v10.slice(v10.indexOf('function commandDataStrip'),v10.indexOf('function renderSystemHeader'));
   assert.match(strip,/CANONICAL_MIXED/);
