@@ -76,9 +76,9 @@ function normalizeWalletPrices(prices={}){
   return out;
 }
 function inverseWalletProfitUsd(wallet,row,walletPrices={}){
-  const cate=String(wallet?.cateType||'').trim().toLowerCase(),token=String(wallet?.investmentToken||'').trim().toUpperCase(),symbol=String(row?.symbol||'').trim().toUpperCase(),profit=num(wallet?.profit);
+  const cate=String(wallet?.cateType||'').trim().toLowerCase(),token=String(wallet?.investmentToken||'').trim().toUpperCase(),symbol=String(row?.symbol||'').trim().toUpperCase(),profit=wallet?.profit==null||wallet?.profit===''?null:num(wallet.profit);
   if(cate!=='inverse'||profit==null||!token||token!==symbol)return{value:null,token:token||null,source:'NONE'};
-  const px=num(walletPrices?.[token]?.priceInUsd);
+  const rawPx=walletPrices?.[token]?.priceInUsd,px=rawPx==null||rawPx===''?null:num(rawPx);
   if(!(px>0))return{value:null,token,source:'NO_WALLET_USD_PRICE'};
   return{value:profit*px,token,source:'WALLET_PROFIT_X_PIONEX_WALLET_PRICE'};
 }
@@ -203,13 +203,13 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
         else reject('normalizer_rejected');
         continue;
       }
-      const walletPnl=inverseWalletProfitUsd(wallet,row,walletPrices),detailPnl=num(row?.pnlUsd),resolvedPnl=detailPnl!=null?detailPnl:walletPnl.value;
-      const pnlSource=detailPnl!=null?'BOT_DETAIL_USD':walletPnl.source;
-      if(num(wallet?.profit)!=null)walletProfitRows++;
+      const walletPnl=inverseWalletProfitUsd(wallet,row,walletPrices),detailPnl=row?.pnlUsd==null||row?.pnlUsd===''?null:num(row.pnlUsd),resolvedPnl=detailPnl!=null?detailPnl:walletPnl.value;
+      const pnlSource=detailPnl!=null?'BOT_DETAIL_USD':walletPnl.source,walletProfit=wallet?.profit==null||wallet?.profit===''?null:num(wallet.profit);
+      if(walletProfit!=null)walletProfitRows++;
       if(resolvedPnl!=null)pnlUsdRows++;
       bump(pnlSourceCounts,pnlSource);
-      const resolvedInvest=num(row?.investmentUsd),derivedPct=resolvedPnl!=null&&resolvedInvest>0?resolvedPnl/resolvedInvest*100:null;
-      bots.push({...row,pnlUsd:resolvedPnl,totalProfitPct:num(row?.totalProfitPct)??derivedPct,pnlSource,walletProfitNative:num(wallet?.profit),walletProfitToken:walletPnl.token,source:'PIONEX_WALLET_BOT_DETAIL'});
+      const resolvedInvest=row?.investmentUsd==null||row?.investmentUsd===''?null:num(row.investmentUsd),detailPct=row?.totalProfitPct==null||row?.totalProfitPct===''?null:num(row.totalProfitPct),derivedPct=resolvedPnl!=null&&resolvedInvest>0?resolvedPnl/resolvedInvest*100:null;
+      bots.push({...row,pnlUsd:resolvedPnl,totalProfitPct:detailPct??derivedPct,pnlSource,walletProfitNative:walletProfit,walletProfitToken:walletPnl.token,source:'PIONEX_WALLET_BOT_DETAIL'});
     }catch(e){reject(String(e?.message||e))}
   }
   const ids=new Set(bots.map(x=>String(x?.botOrderId||x?.id||'')));
