@@ -57,21 +57,23 @@ test('r63 client uses local private venue references instead of hard-coded perso
   assert.match(v9,/EXTERNAL_VENUE_EXPECTED=\['Ledger','OKX'\]/);
   assert.match(v9,/authorityMode:'STRICT_VENUE_SNAPSHOT'/);
   assert.match(v9,/externalVenueSnapshotComplete:true/);
-  assert.match(v9,/externalVenueExpectedVenues:EXTERNAL_VENUE_EXPECTED/);
+  assert.match(v9,/externalVenueExpectedVenues:expectedExternal/);
   assert.doesNotMatch(v9,/798\.62|119\.21|35509\.65/);
-  assert.match(v9,/LEDGER \+ OKX REFERENZ AKTUALISIEREN/);
+  assert.match(v9,/LEDGER ASSETS BESTÄTIGEN/);
+  assert.match(v9,/OKX WERT AKTUALISIEREN/);
 });
 
-test('r63 command labels stale holdings as excluded and keeps legacy OKX DCA outside total',()=>{
-  assert.match(v9,/CANONICAL TOTAL · EXTERNAL \+ PIONEX/);
-  assert.match(v9,/alte Holdings nicht gezählt/);
+test('r63+ command excludes stale holdings and keeps legacy OKX DCA outside total',()=>{
+  assert.match(v9,/CANONICAL TOTAL · LEDGER AUTO \+ OKX \+ PIONEX/);
+  assert.match(v9,/nicht autorisierte Alt-Holdings ausgeschlossen/);
   assert.match(v9,/OKX DCA OLD REF/);
   assert.match(v9,/NICHT IM TOTAL/);
-  assert.match(v10,/External refs \+ Pionex SSOT/);
+  assert.match(v10,/Ledger auto \+ OKX ref \+ Pionex SSOT/);
 });
 
-test('r63 remains portfolio presentation/data authority only',()=>{
-  assert.equal(release.terminalBuild,'10.0-r63');
+test('r63 remains portfolio presentation/data authority only in successor releases',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=63);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
