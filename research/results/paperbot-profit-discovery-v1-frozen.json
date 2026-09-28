@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-09-28T20:45:43Z",
+  "workflowRunId": 36481445167,
+  "artifactId": 10996942843,
+  "artifactSha256": "b4fb36287a8ddc913da851040abd939a7c15911471ac27d539a4b19d87497096",
+  "ruleset": "PAPERBOT-PROFIT-SPECIAL-AGENT-V1-FROZEN",
+  "decision": "NO_CANDIDATE_PASSES",
+  "discoveryLeader": null,
+  "candidates": {
+    "TSMOM_CLASSIC": {
+      "periods": 50,
+      "totalReturnPct": -14.741065629240879,
+      "pnl": -1474.1065629240875,
+      "profitFactor": 0.6338713132495823,
+      "maxDrawdownPct": 16.919303654128647,
+      "positiveWindows": 1,
+      "positiveAssets": 2,
+      "positivePnlConcentrationPct": 64.20956223238991,
+      "gatePass": false,
+      "gateReasons": [
+        "RETURN_NOT_POSITIVE",
+        "PF_LT_1.15",
+        "POSITIVE_WINDOWS_LT_3",
+        "POSITIVE_ASSETS_LT_4",
+        "POSITIVE_PNL_CONCENTRATION_GT_50PCT"
+      ]
+    },
+    "PERSISTENT_TSMOM_V1": {
+      "periods": 31,
+      "totalReturnPct": -18.967826992180637,
+      "pnl": -1896.7826992180635,
+      "profitFactor": 0.5627205786642185,
+      "maxDrawdownPct": 22.101062770213918,
+      "positiveWindows": 1,
+      "positiveAssets": 4,
+      "positivePnlConcentrationPct": 41.87117355547918,
+      "gatePass": false,
+      "gateReasons": [
+        "RETURN_NOT_POSITIVE",
+        "PF_LT_1.15",
+        "POSITIVE_WINDOWS_LT_3"
+      ]
+    },
+    "DONCHIAN_TREND_V1": {
+      "periods": 240,
+      "totalReturnPct": 2.7495760072063335,
+      "pnl": 274.9576007206342,
+      "profitFactor": 1.0489327931848484,
+      "maxDrawdownPct": 11.13742593739555,
+      "positiveWindows": 2,
+      "positiveAssets": 4,
+      "positivePnlConcentrationPct": 41.337007031435775,
+      "gatePass": false,
+      "gateReasons": [
+        "PF_LT_1.15",
+        "POSITIVE_WINDOWS_LT_3"
+      ]
+    }
+  },
+  "interpretation": "No V1 candidate clears the frozen profit/risk/stability gate. Donchian is the only positive-return candidate, but its PF and chronological stability are insufficient. Per protocol, no holdout/promotion is permitted; next stage is a separately frozen research redesign.",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false
+}
