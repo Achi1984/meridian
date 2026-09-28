@@ -35,8 +35,8 @@ export function signPionexGet(path,params,secret){
 function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
 function firstNum(obj,keys){for(const k of keys){const x=n(obj?.[k]);if(x!=null)return x}return null}
 function baseSymbol(v){return String(v||'').toUpperCase().replace(/\.PERP$/,'').replace(/[-_/]?(USDT|USDC|USD)$/,'')}
-function direction(v){const x=String(v||'').toLowerCase();return x==='short'?'SHORT':x==='long'?'LONG':x==='no_trend'?'NEUTRAL':null}
-function activeOrder(o){const status=String(o?.buOrderData?.status||o?.status||'').toLowerCase();return ACTIVE_STATUSES.has(status)}
+function direction(v){const x=String(v||'').trim().toLowerCase();return x==='short'?'SHORT':x==='long'?'LONG':x==='no_trend'?'NEUTRAL':null}
+function activeOrder(o){const status=String(o?.buOrderData?.status||o?.status||'').trim().toLowerCase();return ACTIVE_STATUSES.has(status)}
 function liquidationFor(d,side){
   const direct=firstNum(d,['liquidationPrice']);
   if(direct!=null)return direct;
@@ -70,7 +70,7 @@ function optionalPnlPct(d){
 }
 
 export function normalizePionexBotOrder(order){
-  if(!order||!ACTIVE_TYPES.has(String(order.buOrderType||'')))return null;
+  if(!order||!ACTIVE_TYPES.has(String(order.buOrderType||'').trim()))return null;
   if(!activeOrder(order))return null;
   const d=order.buOrderData||{},side=direction(d.trend),symbol=baseSymbol(order.base);
   if(!symbol||!['LONG','SHORT','NEUTRAL'].includes(side))return null;
