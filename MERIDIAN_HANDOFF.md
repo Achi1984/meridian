@@ -693,3 +693,14 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 
 ### r63 history note
 Portfolio history capture is also fail-closed now: the backend will not append another canonical history point unless current Ledger + OKX venue authority is complete. Existing pre-r63 history may contain the stale-holdings basis, so COMMAND suppresses HIST Δ comparison until the history point itself reports STRICT_AUTHORITY.
+
+
+## v10 r64 — Ledger auto valuation
+
+- r63 live acceptance confirmed the corrected portfolio basis and exposed the remaining manual Ledger drift.
+- r64 reuses the authenticated private Ledger holdings and values them browser-side from the existing Binance Spot all-ticker feed after a local 24h Ledger confirmation.
+- The current r63 Ledger local reference can bootstrap the first confirmation, so an already reconciled device should switch automatically after r64 loads if private Ledger holdings are present.
+- COMMAND now separates LEDGER AUTO, OKX and PIONEX. Ledger confirmation and OKX amount refresh are independent controls.
+- The diagnostic label `TREND` is renamed to `API TREND` so it cannot be confused with economic LONG/SHORT side.
+- History capture remains fail-closed until a server-side authority path is designed for the new local-only external basis.
+- Execution impact remains false.
