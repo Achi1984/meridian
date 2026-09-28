@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {canonicalPionexQuery,signPionexReadGet,pionexReadGet} from '../pionex-read-client.js';
 import {
   normalizeSpotBalances,normalizeFuturesBalances,normalizeFuturesPositions,normalizeWalletOverview,
-  normalizeWalletBotEntries,probeWalletBotDetails,
+  normalizeWalletBotEntries,probeWalletBotDetails,buildWalletBotRisk,
   fetchPionexReadSnapshot,readCredentials,mergePionexAccountState
 } from '../pionex-account-read-sync.js';
 
@@ -62,6 +62,10 @@ test('read snapshot normalizes spot, futures balances and active positions witho
   assert.equal(snap.wallet.botEntryCount,2);
   assert.equal(snap.walletBotProbe.candidateCount,2);
   assert.equal(snap.walletBotProbe.successCount,2);
+  assert.equal(snap.walletBotRisk.supportedRows,1);
+  assert.equal(snap.walletBotRisk.botCount,1);
+  assert.equal(snap.walletBotRisk.detailsComplete,true);
+  assert.equal(snap.walletBotRisk.bots[0].source,'PIONEX_WALLET_BOT_DETAIL');
 });
 
 
@@ -101,6 +105,41 @@ test('wallet bot detail probe is read-only, aggregate-safe, and fail-soft per ca
   assert.deepEqual(result.buOrderTypeCounts,{futures_grid:1,other:1});
   assert.deepEqual(result.successCateTypeCounts,{FUTURE_GRID_COIN_MARGINED:1});
   assert.equal(result.details[0].wallet.buOrderId,'good');
+});
+
+
+test('wallet bot risk promotes only fully hydrated futures_grid rows',()=>{
+  const risk=buildWalletBotRisk({
+    candidateCount:2,
+    buOrderTypeCounts:{futures_grid:1,futures_lite:1},
+    successBuOrderTypeCounts:{futures_grid:1},
+    details:[{
+      wallet:{buOrderId:'grid-1',buOrderType:'futures_grid',baseList:['BTC.PERP'],investmentToken:'BTC'},
+      detail:{base:'BTC.PERP',quote:'BTC',status:'running',buOrderData:{status:'running',trend:'long',leverage:'5',bottom:'55000',top:'95000',liquidationPrice:'57000',positionOpenPrice:'86000'}}
+    }]
+  },'2026-09-28T14:00:00.000Z');
+  assert.equal(risk.apiRows,2);
+  assert.equal(risk.supportedRows,1);
+  assert.equal(risk.unsupportedRows,1);
+  assert.equal(risk.detailRows,1);
+  assert.equal(risk.normalizedRows,1);
+  assert.equal(risk.detailsComplete,true);
+  assert.equal(risk.bots[0].symbol,'BTC');
+  assert.equal(risk.bots[0].side,'LONG');
+  assert.equal(risk.bots[0].leverage,5);
+  assert.equal(risk.bots[0].source,'PIONEX_WALLET_BOT_DETAIL');
+});
+
+test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{
+  const risk=buildWalletBotRisk({
+    candidateCount:1,
+    buOrderTypeCounts:{futures_grid:1},
+    successBuOrderTypeCounts:{futures_grid:1},
+    details:[{wallet:{buOrderId:'grid-1',buOrderType:'futures_grid'},detail:{status:'running',buOrderData:{status:'running'}}}]
+  });
+  assert.equal(risk.botCount,0);
+  assert.equal(risk.detailsComplete,false);
+  assert.equal(risk.rejectedCount,1);
 });
 
 test('wallet overview keeps structural bot-account metadata without inventing entry values',()=>{
