@@ -494,3 +494,11 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Adds PIONEX_READONLY_SETUP.md with least-privilege setup.
 - No Pionex write endpoint, trading permission, transfer permission, leverage mutation or margin mutation is introduced.
 - No trading rule, Profit Lock threshold, hedge rule, Paper-bot parameter, leverage or execution behavior changes.
+## v10 r43 — Pionex Bot API live-read hotfix
+
+- Explicitly filters running Bot API list reads to `futures_grid` and `future_hedge_grid`.
+- Keeps the existing read-only GET detail hydration.
+- Preserves `EMPTY_GUARD` when a previous live bot snapshot exists and the new supported result is zero.
+- Adds privacy-safe aggregate list diagnostics for guard troubleshooting.
+- During `EMPTY_GUARD`, UI row counts now show the current filtered API list result instead of the stale preserved snapshot count.
+- No Pionex trading, bot trading, transfer, mutation, PaperBot, leverage, signal or execution behavior changes.
