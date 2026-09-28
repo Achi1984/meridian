@@ -391,3 +391,21 @@ r64 therefore adds a local Ledger authority layer:
 The strict contract now supports required current holding venues in addition to required external venue balances. A total is complete only if the required Ledger venue exists, every admitted Ledger holding is priced from a fresh market overlay, OKX authority is current, and Pionex equity is valid.
 
 No user asset quantities or current account values are committed to GitHub.
+
+
+## v10 r65 — technical market feed moved behind authenticated gateway
+
+Live r64 acceptance showed a split state: Pionex Wallet API and private bot data were fresh, Ledger pricing was live, but the technical market layer reported `NO TIMESTAMP · 0/15`. The browser technical feed was still fetching dozens of OKX/Binance Futures candle requests directly from mobile Safari. That path is independent from the working same-origin private API and can fail because of third-party CORS/network/rate-limit behavior.
+
+r65 moves the primary 15m/1h/4h/1D candle transport behind the authenticated MERIDIAN gateway:
+- client first requests `/api/private/market-klines` with the existing read token;
+- gateway validates symbol/interval/limit and fetches OKX Futures first, Binance USD-M second;
+- gateway caches successful candle snapshots for 45 seconds;
+- on a short upstream interruption it may reuse a successful snapshot for at most 3 minutes, preserving the original `fetchedAt` timestamp;
+- the client uses that original upstream timestamp for market freshness, so cache fallback never forges freshness;
+- direct browser OKX/Binance calls remain only as compatibility fallback if the gateway endpoint itself is unavailable;
+- COMMAND/MARKET expose the active transport and market error text for live diagnosis.
+
+The paper-trading core already uses server-side Binance market access on Northflank, so this change aligns the terminal technical feed with a network path that is already exercised server-side rather than relying primarily on iOS third-party fetch behavior.
+
+No indicator formulas, signal thresholds, bot rules, Profit Lock rules or execution behavior changed.
