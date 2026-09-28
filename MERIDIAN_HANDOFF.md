@@ -345,3 +345,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Header BOT READY and DATA GUARD now consume the same decisionComplete state.
 - PROFIT WATCH / LOCK counts now use shared decisionReadyBot rows, preventing safety-incomplete rows from entering action summaries.
 - No Profit Lock formula, signal/risk threshold, NEXT ACTION priority, Paper-bot parameter, leverage, execution or Pionex mutation change.
+
+
+## v10 r32 — Header tone semantics
+
+- Continues the deep audit after runtime-verified r31.
+- Normalizes active v10 system-header tones to safe / watch / danger / muted.
+- MARKET STALE now emits watch directly instead of legacy mixed.
+- BOT REF now emits muted directly instead of legacy reference.
+- COMMAND source strip and sticky header consume the readiness tone without local translation.
+- Initial v10 shell statuses start as muted, matching the semantic CSS contract before runtime data arrives.
+- Readiness labels and conditions are unchanged.
+- No trading rules, signals, risk thresholds, Profit Lock, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
