@@ -40,7 +40,7 @@ test('r41 Pionex integration remains GET-only and execution-neutral',()=>{
 test('r41 preserves trading and Paper decision invariants',()=>{
   assert.match(v9,/hedgePct<15/);
   for(const token of ["pnl>=20","pnl>=12","pnl>=10","pnl>=8","pnl>=3"])assert.ok(v9.includes(token),token);
-  assert.match(v9,/if\(!g\.coverageComplete\)/);
+  assert.match(v10,/if\(!g\.coverageComplete\)/);
 });
 
 test('r41 release identity is canonical',()=>{
