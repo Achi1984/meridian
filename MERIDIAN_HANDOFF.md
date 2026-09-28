@@ -605,3 +605,10 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - r54 carries Wallet cateType into the summary and preserves it across detail merge.
 - The inverse quote->asset symbol fallback remains restricted to explicit inverse semantics.
 - No trading, Bot trading, transfer, matching threshold, PaperBot, Profit Lock, hedge-threshold, leverage or execution changes.
+## v10 r55 — live/reference match-stage diagnostics
+
+- Live r54 evidence: BOT SOURCE WALLET DETAIL; RISK NORMALIZED 32/32; NORMALIZER ALL 32/32; SUPPORTED MATCH 0/32.
+- Adds aggregate diagnostics for ASSET / SIDE / LEVERAGE / STRUCTURE / STRONG / ACCEPTED matching stages.
+- Adds aggregate LIVE vs REFERENCE side distributions and field availability for leverage/lower/upper/BE/LIQ/TP.
+- No bot IDs or private numeric position values are exposed by the new diagnostic.
+- No matcher threshold, ambiguity rule, trading, PaperBot, Profit Lock, hedge or execution change.

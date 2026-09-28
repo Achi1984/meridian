@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r54';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r54';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r54';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r54';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r54';
-// MERIDIAN v10 r54 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r55';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r55';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r55';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r55';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r55';
+// MERIDIAN v10 r55 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r54';
+const BUILD='10.0-r55';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -168,6 +168,11 @@ function botReadiness(g){
   if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
   return{label:'BLOCKED',tone:'muted'};
 }
+function matchStageDiagnosticsCard(){
+  const d=S()?.matchDiagnostics;if(!d||!Number(d.rows))return'';
+  const counts=obj=>Object.entries(obj||{}).map(([k,v])=>esc(k)+' '+Number(v||0)).join(' · ')||'—',f=d.fields||{};
+  return '<div class="v10-wallet-categories v10-match-stage-diagnostics"><div><span>MATCH STAGES</span><b>ASSET '+Number(d.assetPass||0)+'/'+Number(d.rows||0)+' · SIDE '+Number(d.sidePass||0)+'/'+Number(d.rows||0)+'</b><small>LEVERAGE '+Number(d.leveragePass||0)+'/'+Number(d.rows||0)+' · STRUCTURE '+Number(d.structurePass||0)+'/'+Number(d.rows||0)+' · STRONG '+Number(d.strongCandidate||0)+' · ACCEPTED '+Number(d.acceptedRows||0)+'</small></div><div><span>SIDE DISTRIBUTION</span><b>LIVE '+counts(d.liveSideCounts)+'</b><small>REFERENCE '+counts(d.referenceSideCounts)+'</small></div><div><span>LIVE MATCH FIELDS</span><b>LEV '+Number(f.leverage||0)+' · LOWER '+Number(f.lower||0)+' · UPPER '+Number(f.upper||0)+'</b><small>BE '+Number(f.be||0)+' · LIQ '+Number(f.liq||0)+' · TP '+Number(f.tp||0)+' · von '+Number(d.rows||0)+'</small></div></div>';
+}
 function unmatchedDiagnostics(open=false){
   const rows=S()?.unmatchedLive||[];if(!rows.length)return'';
   const body=rows.map(x=>{const symbol=esc(String(x?.symbol||'?').toUpperCase()),side=esc(String(x?.side||'?').toUpperCase()),lev=Number(x?.leverage),leverage=Number.isFinite(lev)&&lev>0?lev+'x':'—',reason=x?.reason==='AMBIGUOUS_MATCH'?'AMBIGUOUS MATCH':'NO CONFIDENT MATCH',fields=(x?.hasPnl?'PNL ✓':'PNL —')+' · '+(x?.hasInvestUsd?'USD CAPITAL ✓':'USD CAPITAL —');return '<div class="unmatched-row"><b>'+symbol+' · '+side+' · '+leverage+'</b><span>'+reason+'</span><small>'+fields+'</small></div>'}).join('');
@@ -175,7 +180,7 @@ function unmatchedDiagnostics(open=false){
 }
 function dataGuardCard(){
   const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
-  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+unmatchedDiagnostics()+'</section>';
+  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+matchStageDiagnosticsCard()+unmatchedDiagnostics()+'</section>';
 }
 function accountPositionHealth(){
   const s=S(),sync=s?.pionexAccountSync||{},snap=s?.pionexAccount||{},rows=Array.isArray(snap?.futuresPositions)?snap.futuresPositions:[],status=String(sync.status||'UNKNOWN'),ts=Date.parse(String(snap.updatedAt||snap.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';

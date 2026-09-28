@@ -615,3 +615,10 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Reason:** r53 live diagnostics still showed SYMBOL 0/32 even though BASE=stable_quote and QUOTE=asset. Code inspection showed the Wallet row already carried `cateType=inverse`, but buildWalletBotRisk omitted that field before calling the production normalizer, so the inverse-only symbol fallback could not activate reliably.
 
 **Safety:** r54 does not synthesize or broaden category values. It only preserves the category already returned by the read-only Wallet API. Existing bot-type/status/direction allowlists, matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution rules remain unchanged.
+## D-061 — Diagnose live/reference matching by stage before changing matcher thresholds
+
+**Decision:** When normalized Wallet bots are complete but none can be matched to the Asset-Watch reference snapshot, MERIDIAN must diagnose the existing matcher stage-by-stage before any threshold or acceptance rule is changed.
+
+**Diagnostics:** Aggregate per-live-row pass counts for asset, side, exact leverage, structural evidence, strong candidate and final accepted match; aggregate live/reference side distributions; aggregate live field availability for leverage, range, break-even, liquidation and TP.
+
+**Safety:** r55 is diagnostic-only. MATCH_MAX_SCORE, MATCH_MIN_GAP, ambiguity handling, per-asset UNVERIFIED guards, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution logic remain unchanged.
