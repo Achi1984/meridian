@@ -53,8 +53,20 @@ function resolvedSymbol(order){
   if(inverseCoinM(order)&&baseClass==='stable_quote'&&quoteClass==='asset')return{symbol:baseSymbol(order?.quote),source:'quote_inverse',baseClass,quoteClass};
   return{symbol:'',source:'none',baseClass,quoteClass};
 }
+function directEconomicSide(d){
+  const entry=firstNum(d,['positionOpenPrice','openPrice','initPrice']),liq=firstNum(d,['liquidationPrice']);
+  if(!(entry>0&&liq>0))return null;
+  const gap=Math.abs(liq-entry)/Math.max(entry,liq,1e-12);
+  if(gap<.002)return null;
+  return liq<entry?'LONG':'SHORT';
+}
+function resolvedDirection(order){
+  const d=order?.buOrderData||{},declaredSide=direction(d?.trend),economicSide=inverseCoinM(order)?directEconomicSide(d):null;
+  if(economicSide)return{side:economicSide,source:'economic_inverse',declaredSide,economicSide};
+  return{side:declaredSide,source:'trend',declaredSide,economicSide};
+}
 export function inspectPionexBotOrder(order){
-  const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),side=direction(d?.trend),resolved=resolvedSymbol(order);
+  const d=order?.buOrderData||{},type=String(order?.buOrderType||'').trim(),status=String(d?.status||order?.status||'').trim().toLowerCase(),resolved=resolvedSymbol(order),resolvedSide=resolvedDirection(order),side=resolvedSide.side;
   return {
     typePass:!!order&&ACTIVE_TYPES.has(type),
     statusPass:ACTIVE_STATUSES.has(status),
@@ -63,6 +75,9 @@ export function inspectPionexBotOrder(order){
     baseClass:resolved.baseClass,
     quoteClass:resolved.quoteClass,
     symbolSource:resolved.source,
+    sideSource:resolvedSide.source,
+    declaredSide:resolvedSide.declaredSide,
+    economicSide:resolvedSide.economicSide,
     status,
     side
   };
@@ -109,6 +124,8 @@ export function normalizePionexBotOrder(order){
     botType:String(order.buOrderType||''),
     symbol,
     side,
+    declaredSide:check.declaredSide,
+    sideSource:check.sideSource,
     leverage:n(d.leverage),
     lower:n(d.bottom),
     upper:n(d.top),
@@ -124,7 +141,7 @@ export function normalizePionexBotOrder(order){
     extraMargin:n(d.extraMargin),
     riskStatus:d.riskStatus||null,
     marginStatus:d.marginStatus||null,
-    cateType:d.cateType||null,
+    cateType:d.cateType||order.cateType||null,
     investCurrency:d.investCoin||null,
     quoteInvestment:n(d.quoteInvestment),
     usdtInvestment:n(d.usdtInvestment),

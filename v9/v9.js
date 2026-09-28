@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r56';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r56';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r57';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r57';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r56');
+    qs.set('build','r57');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -69,7 +69,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:776.74,okx:0}};
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
 const money=x=>{x=num(x);if(x==null)return'—';if(x!==0&&Math.abs(x)<.001)return'$'+x.toPrecision(5);return'$'+x.toLocaleString('de-DE',{maximumFractionDigits:2})};
 function botMarketPrice(b){
@@ -205,6 +205,13 @@ function matchStageDiagnostics(live,refs,candidates=[],acceptedRows=0){
     }
   });
   return{rows:rows.length,assetPass,sidePass,leveragePass,structurePass,strongCandidate,acceptedRows:Number(acceptedRows)||0,assetLeveragePass,assetStructurePass,economicKnown,economicAgree,economicOpposite,economicReferenceSidePass,economicReferenceLeveragePass,economicReferenceStructurePass,fields,liveSideCounts,referenceSideCounts,economicSideCounts};
+}
+function apiNativeIdentityEligible(feed,selected,live){
+  const rows=Array.isArray(live)?live:[],ids=rows.map(x=>String(x?.id||'').trim()),supported=num(feed?.supportedRows)??rows.length,normalized=num(feed?.normalizedRows)??rows.length;
+  return selected?.kind==='WALLET_DETAIL'&&feed?.detailsComplete===true&&rows.length>0&&supported===rows.length&&normalized===rows.length&&ids.every(Boolean)&&new Set(ids).size===rows.length;
+}
+function markApiNativeIdentity(live){
+  return (Array.isArray(live)?live:[]).map(x=>({...x,_liveMatched:true,_livePrice:num(x.price)>0,_livePnl:num(x.pnl)!=null||num(x.profitPct)!=null,_livePnlUsd:num(x.pnl)!=null,_liveProfitPct:num(x.profitPct)!=null,_liveInvest:num(x.invest)!=null,_liveInvestUsd:num(x.investUsd)!=null,_liveLiq:num(x.liq)>0||num(x.buffer)>0,_liveBe:num(x.be)>0,_liveTp:num(x.tp)>0,_liveSl:num(x.sl)>0,_matchEvidence:'API_IDENTITY',_source:'LIVE_API_IDENTITY'}));
 }
 function mergeReference(live){
   const used=new Set,refs=FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'})),candidates=[];
@@ -566,9 +573,16 @@ let syncBusy=false;
 async function sync(){
  if(syncBusy)return false;syncBusy=true;
  try{
- const [payload,history,tickers]=await Promise.all([getJson('/api/private/dashboard'),getJson('/api/private/portfolio-history?range=1d').catch(e=>({source:'UNAVAILABLE',points:[],error:String(e?.message||e)})),portfolioSpotTickers().catch(e=>({error:String(e?.message||e)}))]),raw=payload?.data||payload,d=Array.isArray(tickers)?buildLivePriceOverlay(raw,tickers,Date.now()):clearStaleLivePrices(raw,Date.now(),tickers?.error||'MARKET_FEED_UNAVAILABLE'),selected=selectPionexRisk(d),feed=selected.risk,live=Array.isArray(feed?.bots)?feed.bots.map(normalizeLive):[];
- state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
- if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;state.matchDiagnostics=null;}
+ const [payload,history,tickers]=await Promise.all([getJson('/api/private/dashboard'),getJson('/api/private/portfolio-history?range=1d').catch(e=>({source:'UNAVAILABLE',points:[],error:String(e?.message||e)})),portfolioSpotTickers().catch(e=>({error:String(e?.message||e)}))]),raw=payload?.data||payload,d=Array.isArray(tickers)?buildLivePriceOverlay(raw,tickers,Date.now()):clearStaleLivePrices(raw,Date.now(),tickers?.error||'MARKET_FEED_UNAVAILABLE'),selected=selectPionexRisk(d),feed=selected.risk,live=Array.isArray(feed?.bots)?feed.bots.map(normalizeLive):[],apiNative=apiNativeIdentityEligible(feed,selected,live);
+ if(apiNative){
+  state.bots=markApiNativeIdentity(live);
+  state.unmatchedLive=[];state.matchAmbiguous=0;state.matchDiagnostics=matchStageDiagnostics(live,FALLBACK,[],0);
+  state.botIdentityMode='API_NATIVE';state.apiNativeRows=live.length;
+ }else{
+  state.bots=live.length?mergeReference(live):FALLBACK.map(ref=>({...ref,_liveMatched:false,_livePrice:false,_livePnl:false,_liveInvest:false,_source:'REFERENCE'}));
+  state.botIdentityMode=live.length?'REFERENCE_MATCH':'REFERENCE_ONLY';state.apiNativeRows=0;
+  if(!live.length){state.unmatchedLive=[];state.matchAmbiguous=0;state.matchDiagnostics=null;}
+ }
  state.liveRows=live.length;
  state.botApiRows=num(feed?.apiRows)??live.length;
  state.botSupportedRows=num(feed?.supportedRows)??live.length;

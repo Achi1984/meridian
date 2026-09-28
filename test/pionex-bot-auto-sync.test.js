@@ -125,6 +125,26 @@ test('normalizer inspector reports the exact four gating stages',()=>{
 });
 
 
+
+test('inverse Coin-M uses direct liquidation geometry when it contradicts declared trend',()=>{
+  const long=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'inverse-long',base:'USD',quote:'BTC',cateType:'inverse',status:'running',
+    buOrderData:{status:'running',trend:'short',leverage:5,bottom:'55000',top:'95000',positionOpenPrice:'83415.6',liquidationPrice:'53453'}
+  });
+  assert.equal(long.symbol,'BTC');
+  assert.equal(long.side,'LONG');
+  assert.equal(long.declaredSide,'SHORT');
+  assert.equal(long.sideSource,'economic_inverse');
+
+  const short=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'inverse-short',base:'USD',quote:'BTC',cateType:'inverse',status:'running',
+    buOrderData:{status:'running',trend:'long',leverage:5,bottom:'55000',top:'95000',positionOpenPrice:'83000',liquidationPrice:'96000'}
+  });
+  assert.equal(short.side,'SHORT');
+  assert.equal(short.declaredSide,'LONG');
+  assert.equal(short.sideSource,'economic_inverse');
+});
+
 test('inverse quote fallback is not applied without an explicit inverse category',()=>{
   const x=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'not-inverse',base:'USD',quote:'BTC',status:'running',

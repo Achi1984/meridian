@@ -631,3 +631,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Additional cross-checks:** Compare matching potential by asset while ignoring declared side, then repeat against the economic side. Report only aggregate counts.
 
 **Safety:** No normalized bot side is changed. Matcher thresholds, ambiguity handling, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution logic remain unchanged.
+## D-063 — Promote complete Wallet detail rows to API-native bot identity
+
+**Decision:** A fresh Pionex Wallet-detail snapshot may identify live bots directly without matching against the historical Asset-Watch screenshot snapshot when and only when all supported rows are normalized, detailsComplete=true, every row has a non-empty unique bot ID, and supportedRows=normalizedRows=live rows.
+
+**Reason:** The 27.09 Asset-Watch snapshot is historical and can legitimately diverge from the current bot inventory. The private Pionex API already provides stable bot IDs plus current range, leverage, liquidation, position-open and TP/SL fields.
+
+**Side validation:** For explicit inverse/Coin-M rows, when direct positionOpenPrice and direct liquidationPrice are both present and clearly separated, MERIDIAN derives economic side from liquidation geometry. The original Pionex trend is retained as declaredSide for diagnostics.
+
+**Safety:** API-native identity replaces only legacy screenshot identity matching. Freshness, risk availability, PnL availability, capital completeness, market-data freshness, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution remain independently fail-closed.
