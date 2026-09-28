@@ -406,3 +406,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Same-asset unmatched-row scoping from r35 is unchanged.
 - Decision Ready and Profit Lock still use the existing generic live-PnL/percentage contract; their thresholds and behavior are unchanged.
 - No hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
+
+
+## v10 r37 — OKX DCA reference equity provenance
+
+- Continues the deep audit after runtime-verified r36.
+- Adds a complete/partial snapshot contract for OKX Futures DCA reference equity.
+- Exact OKX DCA REF equity requires explicit investUsd and totalPnlUsd on every DCA row.
+- Missing fields no longer enter the reference sum as implicit zero; explicit zero PnL remains valid.
+- The stale manual OKX fallback is no longer used when the DCA snapshot is incomplete.
+- COMMAND labels OKX DCA REF as REFERENCE COMPLETE or REFERENCE PARTIAL and reports missing investment/PnL counts when partial.
+- OKX remains outside the canonical Spot + Pionex portfolio total.
+- No trading rules, Profit Lock thresholds, hedge threshold, market signals, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
