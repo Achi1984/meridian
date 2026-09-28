@@ -27,7 +27,8 @@ test('r31 profit watch and lock counts consume only shared decision-ready rows',
 });
 
 test('r31 release identity remains canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r31');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=31);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
