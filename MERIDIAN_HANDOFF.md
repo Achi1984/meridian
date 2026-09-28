@@ -555,3 +555,11 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - UI distinguishes active BOT SOURCE from the separately reported classic Bot API status.
 - Public gateway health exposes aggregate readiness/counts only; private bot IDs/details stay private.
 - No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
+## v10 r50 — Wallet risk normalization diagnostics
+
+- r49 live evidence: Wallet discovery LIVE, 32/35 detail probes, but BOT SOURCE remains classic EMPTY_GUARD.
+- Adds aggregate diagnostics around buildWalletBotRisk normalization.
+- Shows RISK NORMALIZED n/m, reject reasons, status/trend counts, missing base count and returned detail field names.
+- Public health receives aggregate diagnostics only; no IDs, balances, prices, investments or PnL values.
+- Wallet source selection remains unchanged: it still requires fresh, complete Wallet risk.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.
