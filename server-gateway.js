@@ -6,7 +6,8 @@ import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
-import { marketKlinesSnapshot } from "./market-feed-gateway.js";\nimport { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
+import { marketKlinesSnapshot } from "./market-feed-gateway.js";
+import { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
