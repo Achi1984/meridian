@@ -21,10 +21,11 @@ test('r19 does not invent liquidation prices for OKX DCA bots',()=>{
   assert.match(js,/SAFETY/);
 });
 
-test('r19 derives known OKX bot equity from the new DCA snapshot and removes stale old fallback',()=>{
-  assert.match(js,/function okxKnownBotEquity\(\)/);
+test('r19 derives OKX bot equity from the DCA snapshot without reviving the stale manual fallback',()=>{
+  assert.match(js,/function okxDcaEquitySnapshot\(\)/);
+  assert.match(js,/function okxKnownBotEquity\(\)\{return okxDcaEquitySnapshot\(\)\.value\}/);
   assert.match(js,/num\(x\.investUsd\).*num\(x\.totalPnlUsd\)/);
-  assert.match(js,/okxReference=okxKnownBotEquity\(\)\?\?state\.manual\.okx/);
+  assert.doesNotMatch(js,/okxReference=okxKnownBotEquity\(\)\?\?state\.manual\.okx/);
   assert.match(js,/manual:\{pionex:3126\.12,bitpanda:0,ledger:776\.74,okx:0\}/);
 });
 

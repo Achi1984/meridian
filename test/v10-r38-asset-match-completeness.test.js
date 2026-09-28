@@ -67,7 +67,8 @@ test('r38 keeps trading thresholds, global coverage guard and execution neutral'
   assert.match(v9,/hedgePct<15/);
   const next=v10.slice(v10.indexOf('function nextAction(){'),v10.indexOf('function syncHealth(){'));
   assert.match(next,/if\(!g\.coverageComplete\)/);
-  assert.equal(release.terminalBuild,'10.0-r38');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=38);
   assert.equal(release.terminalExecutionImpact,false);
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
