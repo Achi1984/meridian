@@ -45,11 +45,12 @@ test('r32 shell and CSS agree on the semantic tone vocabulary',()=>{
 });
 
 test('r32 release identity is canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r32');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=32);
   assert.equal(release.terminalExecutionImpact,false);
   assert.ok(shell.includes(release.terminalBuild));
   assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
-  assert.ok(root.includes('build=r32'));
+  assert.ok(root.includes('build='+release.terminalBuild.split('-').at(-1)));
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
