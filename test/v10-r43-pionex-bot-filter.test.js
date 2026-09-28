@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const bot=fs.readFileSync(new URL('../pionex-bot-auto-sync.js',import.meta.url),'utf8');
+const detail=fs.readFileSync(new URL('../pionex-bot-detail-read.js',import.meta.url),'utf8');
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -13,8 +14,8 @@ test('r43 bot list requests only supported running futures types',()=>{
   assert.match(bot,/status:'running'/);
   assert.match(bot,/buOrderTypes:PIONEX_SUPPORTED_BOT_TYPES/);
   assert.match(bot,/PIONEX_SUPPORTED_BOT_TYPES/);
-  assert.match(bot,/future_hedge_grid/);
-  assert.match(bot,/futures_grid/);
+  assert.match(detail,/future_hedge_grid/);
+  assert.match(detail,/futures_grid/);
 });
 
 test('r43 guard diagnostics are aggregate-only and preserve fail-closed behavior',()=>{
