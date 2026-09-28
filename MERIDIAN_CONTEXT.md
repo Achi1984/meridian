@@ -305,3 +305,20 @@ The same screenshots exposed three presentation/data-authority issues:
 - the fresh `/wallet/balancesFull` total was available in `pionexAccount.wallet.totalInUsdt` but the canonical portfolio path still fell back to a screenshot value when no older private Pionex equity snapshot existed.
 
 r59 makes the v10 command layer authoritative after asynchronous v9 repaints, labels live long/short/net values explicitly as NOTIONAL, and uses the fresh Wallet API total as the Pionex equity fallback before any screenshot fallback. Decision readiness remains fail-closed while bot PnL is unavailable.
+
+
+## v10 r60 — deterministic live-view lifecycle + wallet total diagnostics
+
+Live r59 screenshots on 28.09.2026 confirmed the r58/r59 data fixes, but exposed two remaining UI lifecycle problems:
+- COMMAND could keep the pre-sync v9 portfolio hero even after the current state had fresh API data;
+- BOTS could fall back to the legacy v9 bot-group rendering after a tab change because the v10 MutationObserver did not deterministically force decoration for navigation events.
+
+r60 adds a read-only bridge refresh for the currently active v9 view. On a fresh `meridian:data` event, COMMAND first rebuilds its underlying v9 hero from the current state and is then decorated by v10. Navigation clicks explicitly schedule a forced v10 render on the next animation frame, so BOTS cannot remain in the legacy representation after a tab switch.
+
+The private Wallet + Detail diagnostic block now shows:
+- `wallet.totalInUsdt` as WALLET TOTAL,
+- `botAccount.totalInUsdt`,
+- `traderAccount.totalInUsdt`,
+- wallet snapshot age.
+
+Missing wallet values remain unknown (`—`), never coerced to zero. No PnL field is promoted and no decision gate is relaxed.

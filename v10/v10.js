@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r59';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r59';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r59';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r59';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r59';
-// MERIDIAN v10 r59 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r60';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r60';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r60';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r60';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r60';
+// MERIDIAN v10 r60 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r59';
+const BUILD='10.0-r60';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -216,7 +216,10 @@ function walletDiscoveryHealth(){
   return{status,label,tone,wallet,probe:account?.walletBotProbe||null,risk:account?.walletBotRisk||null,fresh,age,error:account?.walletError||null};
 }
 function walletDiscoveryLayer(){
-  const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[],probe=w.probe||{},risk=w.risk||{};
+  const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[],probe=w.probe||{},risk=w.risk||{},h=H();
+  const walletAmount=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+  const walletTotal=walletAmount(w.wallet?.totalInUsdt),botTotal=walletAmount(w.wallet?.botAccountTotalInUsdt),traderTotal=walletAmount(w.wallet?.traderAccountTotalInUsdt);
+  const walletMoney=v=>v==null?'—':(h.money?.(v)||String(v));
   if(w.status==='ERROR')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API ERROR</b><small>'+esc(String(w.error||'Pionex Wallet API nicht verfügbar').slice(0,160))+' · Futures POSITION API bleibt davon unabhängig.</small></section>';
   if(w.status!=='OK')return '<section class="v10-live-blocked v10-wallet-discovery"><b>BOT ACCOUNT API WAIT</b><small>Wallet/Bot-Account-Read noch nicht verfügbar · Positionslayer bleibt separat.</small></section>';
   const cards=rows.map(x=>{
@@ -226,7 +229,7 @@ function walletDiscoveryLayer(){
   const counts=obj=>Object.entries(obj||{}).map(([k,v])=>esc(k)+' '+Number(v||0)).join(' · ')||'—';
   const success=Number(probe.successCount||0),candidates=Number(probe.candidateCount||0),fail=Number(probe.failureCount||0),probeTone=candidates&&success===candidates?'safe':success>0?'watch':'muted',supported=Number(risk.supportedRows||0),normalized=Number(risk.normalizedRows||risk.botCount||0),rejected=Number(risk.rejectedCount||0),riskComplete=risk.detailsComplete===true,riskTone=riskComplete?'safe':normalized>0?'watch':'danger';
   const envFields=Array.isArray(risk.detailEnvelopeFields)&&risk.detailEnvelopeFields.length?risk.detailEnvelopeFields.join(', '):'—',dataFields=Array.isArray(risk.detailBotDataFields)&&risk.detailBotDataFields.length?risk.detailBotDataFields.join(', '):'—';
-  return '<section class="v10-data-guard v10-wallet-discovery"><div class="guard-head"><div><span>BOT ACCOUNT API</span><b>WALLET + DETAIL DISCOVERY</b></div><strong class="tone-'+w.tone+'">'+esc(w.label)+'</strong></div><div class="guard-grid"><div><span>KATEGORIEN</span><b>'+Number(w.wallet?.botCategoryCount||0)+'</b></div><div><span>BOT-EINTRÄGE GELADEN</span><b>'+Number(w.wallet?.botEntryCount||0)+'</b></div><div><span>DETAIL PROBE</span><b class="tone-'+probeTone+'">'+success+'/'+candidates+'</b><small>'+fail+' fehlgeschlagen</small></div><div><span>RISK NORMALIZED</span><b class="tone-'+riskTone+'">'+normalized+'/'+supported+'</b><small>'+rejected+' verworfen · '+(riskComplete?'COMPLETE':'BLOCKED')+'</small></div></div><div class="v10-wallet-categories"><div><span>BUORDERTYPE</span><b>'+counts(w.wallet?.botBuOrderTypeCounts)+'</b><small>Private IDs bleiben verborgen</small></div><div><span>CATETYPE</span><b>'+counts(w.wallet?.botCateTypeCounts)+'</b><small>FUTURE_GRID_COIN_MARGINED = Coin-M Futures Grid</small></div><div><span>DETAIL ERFOLG CATETYPE</span><b>'+counts(probe.successCateTypeCounts)+'</b><small>Nur erfolgreiche read-only Detailreads</small></div><div><span>RISK STATUS</span><b>'+counts(risk.statusCounts)+'</b><small>TREND '+counts(risk.trendCounts)+'</small></div><div><span>NORMALIZER STAGES</span><b>TYPE '+Number(risk.typePassCount||0)+'/'+supported+' · STATUS '+Number(risk.statusPassCount||0)+'/'+supported+'</b><small>SYMBOL '+Number(risk.symbolPassCount||0)+'/'+supported+' · SIDE '+Number(risk.sidePassCount||0)+'/'+supported+' · ALL '+Number(risk.allStagePassCount||0)+'/'+supported+'</small></div><div><span>ASSET CLASS</span><b>BASE '+counts(risk.baseClassCounts)+'</b><small>QUOTE '+counts(risk.quoteClassCounts)+'</small></div><div><span>REJECT REASONS</span><b>'+counts(risk.rejectReasonCounts)+'</b><small>MISSING RAW BASE '+Number(risk.missingBaseCount||0)+'</small></div><div><span>DETAIL FIELDS</span><b>'+esc(envFields)+'</b><small>BOT DATA '+esc(dataFields)+'</small></div></div>'+(cards?'<div class="v10-wallet-categories">'+cards+'</div>':'')+'<small>Read-only Diagnose. Keine Safety-Regel wurde gelockert; Wallet-Bots werden erst bei vollständiger Normalisierung als Live-Quelle gewählt.</small></section>';
+  return '<section class="v10-data-guard v10-wallet-discovery"><div class="guard-head"><div><span>BOT ACCOUNT API</span><b>WALLET + DETAIL DISCOVERY</b></div><strong class="tone-'+w.tone+'">'+esc(w.label)+'</strong></div><div class="guard-grid wallet-total-grid"><div><span>WALLET TOTAL</span><b>'+walletMoney(walletTotal)+'</b><small>totalInUsdt · portfolio candidate</small></div><div><span>BOT ACCOUNT</span><b>'+walletMoney(botTotal)+'</b><small>botAccount.totalInUsdt</small></div><div><span>TRADER ACCOUNT</span><b>'+walletMoney(traderTotal)+'</b><small>traderAccount.totalInUsdt</small></div><div><span>WALLET AGE</span><b>'+esc(w.age)+'</b><small>PIONEX WALLET READ API</small></div></div><div class="guard-grid"><div><span>KATEGORIEN</span><b>'+Number(w.wallet?.botCategoryCount||0)+'</b></div><div><span>BOT-EINTRÄGE GELADEN</span><b>'+Number(w.wallet?.botEntryCount||0)+'</b></div><div><span>DETAIL PROBE</span><b class="tone-'+probeTone+'">'+success+'/'+candidates+'</b><small>'+fail+' fehlgeschlagen</small></div><div><span>RISK NORMALIZED</span><b class="tone-'+riskTone+'">'+normalized+'/'+supported+'</b><small>'+rejected+' verworfen · '+(riskComplete?'COMPLETE':'BLOCKED')+'</small></div></div><div class="v10-wallet-categories"><div><span>BUORDERTYPE</span><b>'+counts(w.wallet?.botBuOrderTypeCounts)+'</b><small>Private IDs bleiben verborgen</small></div><div><span>CATETYPE</span><b>'+counts(w.wallet?.botCateTypeCounts)+'</b><small>FUTURE_GRID_COIN_MARGINED = Coin-M Futures Grid</small></div><div><span>DETAIL ERFOLG CATETYPE</span><b>'+counts(probe.successCateTypeCounts)+'</b><small>Nur erfolgreiche read-only Detailreads</small></div><div><span>RISK STATUS</span><b>'+counts(risk.statusCounts)+'</b><small>TREND '+counts(risk.trendCounts)+'</small></div><div><span>NORMALIZER STAGES</span><b>TYPE '+Number(risk.typePassCount||0)+'/'+supported+' · STATUS '+Number(risk.statusPassCount||0)+'/'+supported+'</b><small>SYMBOL '+Number(risk.symbolPassCount||0)+'/'+supported+' · SIDE '+Number(risk.sidePassCount||0)+'/'+supported+' · ALL '+Number(risk.allStagePassCount||0)+'/'+supported+'</small></div><div><span>ASSET CLASS</span><b>BASE '+counts(risk.baseClassCounts)+'</b><small>QUOTE '+counts(risk.quoteClassCounts)+'</small></div><div><span>REJECT REASONS</span><b>'+counts(risk.rejectReasonCounts)+'</b><small>MISSING RAW BASE '+Number(risk.missingBaseCount||0)+'</small></div><div><span>DETAIL FIELDS</span><b>'+esc(envFields)+'</b><small>BOT DATA '+esc(dataFields)+'</small></div></div>'+(cards?'<div class="v10-wallet-categories">'+cards+'</div>':'')+'<small>Read-only Diagnose. Keine Safety-Regel wurde gelockert; Wallet-Bots werden erst bei vollständiger Normalisierung als Live-Quelle gewählt.</small></section>';
 }
 function liveOverview(){
   const g=syncHealth(),h=H(),rows=g.fresh?(S()?.bots||[]).filter(b=>h.liveMatched?.(b)):[];
@@ -835,6 +838,12 @@ const schedule=(forceData=false)=>{
   if(raf)return;
   raf=requestAnimationFrame(()=>{const force=pendingDataRefresh;pendingDataRefresh=false;raf=0;decorate(force);});
 };
-window.addEventListener('meridian:data',()=>schedule(true));
+window.addEventListener('meridian:data',()=>{
+  if(activeViewKey()==='command')bridge()?.refreshCurrentView?.();
+  schedule(true);
+});
+$('#nav')?.addEventListener('click',e=>{
+  if(e.target?.closest?.('button[data-v]'))schedule(true);
+});
 new MutationObserver(()=>schedule(false)).observe($('#app')||document.body,{childList:true,subtree:true});
 decorate();

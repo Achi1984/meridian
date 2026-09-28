@@ -27,9 +27,10 @@ test('r18 private and market syncs are single-flight',()=>{
   assert.match(v9,/finally\{syncIntelBusy=false\}/);
 });
 
-test('r18 v10 refresh uses data events instead of replacing current DOM every sync',()=>{
+test('r18+ v10 refresh is event-driven and does not call legacy go(current) inside sync',()=>{
   assert.match(v9,/window\.dispatchEvent\(new CustomEvent\('meridian:data'\)\)/);
-  assert.match(v10,/window\.addEventListener\('meridian:data',\(\)=>schedule\(true\)\)/);
+  assert.match(v10,/window\.addEventListener\('meridian:data',[\s\S]*schedule\(true\)/);
+  assert.match(v10,/activeViewKey\(\)==='command'[\s\S]*refreshCurrentView/);
   const syncBlock=v9.slice(v9.indexOf('async function sync(){'),v9.indexOf('window.MERIDIAN_V10_BRIDGE'));
   assert.doesNotMatch(syncBlock,/go\(current\)/);
 });

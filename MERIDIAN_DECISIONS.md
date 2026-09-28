@@ -677,3 +677,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Pionex equity precedence:** If the canonical portfolio has no higher-priority private Pionex equity snapshot but the fresh read-only account snapshot contains `wallet.totalInUsdt`, that Wallet API total becomes the Pionex equity source. Screenshot fallback remains lower priority.
 
 **Safety:** Wallet equity affects portfolio presentation only. It does not make bot rows decision-ready, does not synthesize PnL, and does not alter trading, leverage, Profit Lock, hedge thresholds or execution.
+
+
+## D-067 — Data refresh must rebuild the active source view before v10 decoration
+
+**Decision:** The v10 adapter may not assume that legacy source markup is current. When fresh private data arrives while COMMAND is active, the active v9 view is rebuilt from the current state before v10 decoration. Every navigation click also forces v10 decoration after the legacy tab renderer runs.
+
+**Reason:** r59 live acceptance showed correct state in the v10 safety layer while the underlying COMMAND hero or BOTS layout could still display an older render. The problem was lifecycle ordering, not bot normalization.
+
+**Wallet diagnostics:** Wallet total, Bot Account total and Trader Account total are displayed independently from their existing read-only normalized fields. Missing values remain unknown and are not replaced by zero or inferred sums.
+
+**Safety:** This decision changes rendering and diagnostics only. It does not alter trading rules, PnL interpretation, leverage, Profit Lock, hedge logic, matcher thresholds, decision readiness or execution.

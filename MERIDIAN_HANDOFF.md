@@ -647,3 +647,12 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Wallet Detail currently supplies 28/28 API-native supported bot identities from 31 wallet source rows; Decision Ready remains 0 because PnL is still unavailable, which is intentional fail-closed behavior.
 - r59 removes legacy COMMAND repaint duplicates, relabels leveraged exposure as NOTIONAL, and promotes fresh `pionexAccount.wallet.totalInUsdt` ahead of screenshot equity fallback.
 - Do not infer total-profit figures from wallet `profit` until its unit/semantics are independently validated.
+
+
+## v10 r60 — live acceptance follow-up
+
+- r59 confirmed correct SUI 1 LONG + 1 SHORT, API NATIVE 28/28 and notional labels.
+- Remaining stale-view defects are handled in r60: COMMAND rebuilds from current state on data sync; tab clicks force the v10 renderer after legacy navigation.
+- Wallet diagnostics now expose TOTAL / BOT ACCOUNT / TRADER ACCOUNT plus wallet age to determine why canonical Pionex equity may still be unavailable.
+- Missing totals remain `—`; no wallet profit field is treated as PnL.
+- Execution and decision gates remain unchanged and fail-closed.

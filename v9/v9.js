@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r59';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r59';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge} from '../portfolio-data-contract.js?v=10.0-r60';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r60';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r59');
+    qs.set('build','r60');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -607,6 +607,13 @@ async function sync(){
 }
 window.MERIDIAN_V10_BRIDGE={
   getState:()=>state,
+  refreshCurrentView:()=>{
+    const v=current,host=$('#view-'+v),fn=render[v];
+    if(!host||typeof fn!=='function')return false;
+    host.innerHTML=fn();
+    if(v==='research')bindResearch();
+    return true;
+  },
   helpers:{money,num,botFeedTimeState,botFeedFresh,botFeedCoverage,botFeedAgeMs,botFeedAgeLabel,ageText,liveMatched,livePnlAvailable,liveInvestAvailable,liveInvestUsdAvailable,safetyReadyBot,decisionReadyBot,exposureIntegrity,pnlIntegrity,risk,botMarketPrice,botPnlUsd,profitLockPlan,assetPairRisk,actionForSide,reasonsForSide,signalTone,marketKlines,marketKlinesHistory},
   renderResearch:()=>research(),
   bindResearch:(target='research')=>bindResearch(target)
