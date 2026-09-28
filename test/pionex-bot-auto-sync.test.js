@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   canonicalQuery,signPionexGet,normalizePionexBotOrder,
-  buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail
+  buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail,
+  fetchRunningBotOrders,summarizePionexBotList
 } from '../pionex-bot-auto-sync.js';
 
 test('Pionex GET signing is canonical and deterministic',()=>{
@@ -15,6 +16,33 @@ test('Pionex GET signing is canonical and deterministic',()=>{
     signPionexGet('/api/v1/bot/orders',{timestamp:1700000000000,status:'running'},'test-secret'),
     'a66fc134b331daa12ffc2f2a4cea1984adcc1729b3e53a8184883cff5f4ac6f2'
   );
+});
+
+
+test('running bot list explicitly requests both supported futures bot types',async()=>{
+  const calls=[];
+  const fetchImpl=async(url,options)=>{
+    calls.push({url,options});
+    return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{results:[]}})};
+  };
+  await fetchRunningBotOrders({apiKey:'read-key',apiSecret:'read-secret',fetchImpl,now:()=>1700000000000});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].options.method,'GET');
+  const u=new URL(calls[0].url);
+  assert.equal(u.searchParams.get('status'),'running');
+  assert.deepEqual(u.searchParams.getAll('buOrderTypes').sort(),['future_hedge_grid','futures_grid']);
+});
+
+test('bot list diagnostics expose only privacy-safe aggregate types and statuses',()=>{
+  const d=summarizePionexBotList([
+    {buOrderType:'futures_grid',buOrderId:'secret-1',status:'running',base:'BTC'},
+    {buOrderType:'future_hedge_grid',buOrderId:'secret-2',buOrderData:{status:'paused'},base:'ETH'}
+  ]);
+  assert.equal(d.listRows,2);
+  assert.deepEqual(d.typeCounts,{futures_grid:1,future_hedge_grid:1});
+  assert.deepEqual(d.statusCounts,{running:1,paused:1});
+  assert.equal(JSON.stringify(d).includes('secret-1'),false);
+  assert.equal(JSON.stringify(d).includes('BTC'),false);
 });
 
 test('running futures-grid rows normalize without inventing unsupported values',()=>{
@@ -91,6 +119,7 @@ test('successful sync replaces bot rows and stamps a fresh Pionex source',()=>{
   assert.deepEqual(next.pionexRisk.bots,[{id:'new'}]);
   assert.equal(next.pionexBotSync.readOnly,true);
   assert.equal(next.pionexBotSync.status,'OK');
+  assert.deepEqual(next.pionexBotSync.requestedTypes,['futures_grid','future_hedge_grid']);
 });
 
 test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{
