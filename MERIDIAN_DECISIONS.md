@@ -424,3 +424,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Scope rule:** Same-asset unmatched rows still invalidate the pair aggregate; unmatched rows for other assets remain out of scope.
 
 **Isolation:** Decision Ready continues to use generic live PnL availability because percentage PnL is sufficient for its existing Profit Lock percentage logic. No Profit Lock threshold, hedge threshold, market signal, Paper-bot parameter, leverage or execution behavior changes.
+
+
+## D-042 — Global NEXT ACTION fails closed on incomplete bot coverage, except safety
+
+**Decision:** The global COMMAND NEXT ACTION may emit a momentum/profit/HOLD decision only when the current supported bot coverage is complete. If any supported live bot row is unmatched or ambiguous, the global recommendation becomes **KEINE AKTION · DATEN PRÜFEN** with matched/supported coverage details.
+
+**Safety exception:** Liquidation-risk and explicit stop/protection-risk states remain visible even when global coverage is incomplete. A known urgent safety condition must not be hidden merely because another current row is unverified.
+
+**Reason:** NEXT ACTION is a portfolio-wide priority selector. Selecting a non-safety action from the known subset while another supported current row cannot be evaluated can overstate certainty. Per-asset data may remain visible, but the global decision must disclose that the ranking universe is incomplete.
+
+**Ordering rule:** DATA_STALE / MARKET_STALE / UNVERIFIED still fail closed first; LIQ_RISK and PROTECTION_RISK preserve safety priority; the coverage guard then blocks RISK_REVIEW, PROFIT_LOCK, WATCH_PROFIT and HOLD when coverage is incomplete.
+
+**Isolation:** Pair-status formulas, signal ranks, liquidation thresholds, stop-loss checks, Profit Lock thresholds/percentages, hedge threshold, Paper-bot parameters, leverage and execution are unchanged. r37 changes only eligibility/precedence of the global displayed recommendation.
