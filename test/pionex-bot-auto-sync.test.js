@@ -145,6 +145,23 @@ test('inverse Coin-M uses direct liquidation geometry when it contradicts declar
   assert.equal(short.sideSource,'economic_inverse');
 });
 
+test('current DOT screenshot samples validate both inverse Coin-M directions',()=>{
+  const long=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'dot-long-sample',base:'USD',quote:'DOT',cateType:'inverse',status:'running',
+    buOrderData:{status:'running',trend:'long',leverage:3,bottom:'0.65',top:'1.8',positionOpenPrice:'1.242',liquidationPrice:'0.677'}
+  });
+  const short=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'dot-short-sample',base:'USD',quote:'DOT',cateType:'inverse',status:'running',
+    buOrderData:{status:'running',trend:'short',leverage:4,bottom:'0.75',top:'2',positionOpenPrice:'1.155',liquidationPrice:'1.854'}
+  });
+  assert.equal(long.symbol,'DOT');
+  assert.equal(long.side,'LONG');
+  assert.equal(long.sideSource,'economic_inverse');
+  assert.equal(short.symbol,'DOT');
+  assert.equal(short.side,'SHORT');
+  assert.equal(short.sideSource,'economic_inverse');
+});
+
 test('inverse quote fallback is not applied without an explicit inverse category',()=>{
   const x=normalizePionexBotOrder({
     buOrderType:'futures_grid',buOrderId:'not-inverse',base:'USD',quote:'BTC',status:'running',
