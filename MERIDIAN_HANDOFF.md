@@ -630,3 +630,12 @@ This is infrastructure/process-only. Terminal build, trading logic, PaperBots an
 - Asset Watch remains historical/reference only.
 - No trading, transfer, PaperBot, Profit Lock, hedge-threshold, leverage or execution change.
 - Missing PnL, capital, risk or fresh market data still blocks Decision Ready.
+
+
+## v10 r58 — Coin-M reciprocal convention fix
+
+- r57 live identity path is healthy: Wallet Detail is selected and 32/32 supported futures-grid rows normalize.
+- Remaining defect isolated from live screenshots: quote-inverse Coin-M detail prices were still rendered in reciprocal API units, producing values such as BTC BE 0.000011999 / TP 0.000010526 and an inverted-looking LONG/SHORT distribution.
+- r58 converts quote-inverse entry/range/LIQ/TP/SL into asset/USD before side/risk use, flips pair-direction trend into the asset perspective, and keeps raw trend only as diagnostics.
+- Current SUI LONG 4x and SHORT 4x screenshots plus the BTC reciprocal sample are regression fixtures.
+- Safety remains fail-closed: missing PnL or unverified LIQ still blocks Decision Ready; no execution or trading behavior is enabled.
