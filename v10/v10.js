@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r54';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r54';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r54';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r54';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r54';
-// MERIDIAN v10 r54 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r55';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r55';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r55';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r55';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r55';
+// MERIDIAN v10 r55 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r54';
+const BUILD='10.0-r55';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -171,7 +171,7 @@ function botReadiness(g){
 function matchStageDiagnosticsCard(){
   const d=S()?.matchDiagnostics;if(!d||!Number(d.rows))return'';
   const counts=obj=>Object.entries(obj||{}).map(([k,v])=>esc(k)+' '+Number(v||0)).join(' · ')||'—',f=d.fields||{};
-  return '<div class="v10-match-stage-diagnostics"><div><span>MATCH STAGES</span><b>ASSET '+Number(d.assetPass||0)+'/'+Number(d.rows||0)+' · SIDE '+Number(d.sidePass||0)+'/'+Number(d.rows||0)+'</b><small>LEVERAGE '+Number(d.leveragePass||0)+'/'+Number(d.rows||0)+' · STRUCTURE '+Number(d.structurePass||0)+'/'+Number(d.rows||0)+' · STRONG '+Number(d.strongCandidate||0)+' · ACCEPTED '+Number(d.acceptedRows||0)+'</small></div><div><span>SIDE DISTRIBUTION</span><b>LIVE '+counts(d.liveSideCounts)+'</b><small>REFERENCE '+counts(d.referenceSideCounts)+'</small></div><div><span>LIVE MATCH FIELDS</span><b>LEV '+Number(f.leverage||0)+' · LOWER '+Number(f.lower||0)+' · UPPER '+Number(f.upper||0)+'</b><small>BE '+Number(f.be||0)+' · LIQ '+Number(f.liq||0)+' · TP '+Number(f.tp||0)+' · von '+Number(d.rows||0)+'</small></div></div>';
+  return '<div class="v10-wallet-categories v10-match-stage-diagnostics"><div><span>MATCH STAGES</span><b>ASSET '+Number(d.assetPass||0)+'/'+Number(d.rows||0)+' · SIDE '+Number(d.sidePass||0)+'/'+Number(d.rows||0)+'</b><small>LEVERAGE '+Number(d.leveragePass||0)+'/'+Number(d.rows||0)+' · STRUCTURE '+Number(d.structurePass||0)+'/'+Number(d.rows||0)+' · STRONG '+Number(d.strongCandidate||0)+' · ACCEPTED '+Number(d.acceptedRows||0)+'</small></div><div><span>SIDE DISTRIBUTION</span><b>LIVE '+counts(d.liveSideCounts)+'</b><small>REFERENCE '+counts(d.referenceSideCounts)+'</small></div><div><span>LIVE MATCH FIELDS</span><b>LEV '+Number(f.leverage||0)+' · LOWER '+Number(f.lower||0)+' · UPPER '+Number(f.upper||0)+'</b><small>BE '+Number(f.be||0)+' · LIQ '+Number(f.liq||0)+' · TP '+Number(f.tp||0)+' · von '+Number(d.rows||0)+'</small></div></div>';
 }
 function unmatchedDiagnostics(open=false){
   const rows=S()?.unmatchedLive||[];if(!rows.length)return'';
