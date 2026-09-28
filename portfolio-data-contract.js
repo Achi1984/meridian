@@ -145,13 +145,13 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
 export function latestPortfolioHistorySnapshot(history={},now=Date.now(),maxAgeMs=15*60*1000){
   const points=Array.isArray(history?.points)?history.points:[];
   const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null);
-  if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,source:String(history?.source||'MISSING')};
+  if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,sourceStatus:null,source:String(history?.source||'MISSING')};
   const timestamp=finite(point.timestamp),spotUsd=finite(point.spotUsd),tradingUsd=finite(point.tradingUsd),totalUsd=finite(point.totalUsd);
   const nowMs=finite(now)??Date.now(),future=timestamp!=null&&timestamp>nowMs+30000,ageMs=timestamp==null?null:Math.max(0,nowMs-timestamp);
   const complete=[spotUsd,tradingUsd,totalUsd].every(x=>x!=null&&x>=0);
   const consistent=complete&&Math.abs(totalUsd-(spotUsd+tradingUsd))<=1;
   const fresh=consistent&&!future&&ageMs!=null&&ageMs<=Math.max(0,finite(maxAgeMs)??0);
-  return{found:true,fresh,complete,consistent,ageMs,timestamp,spotUsd,tradingUsd,totalUsd,source:String(history?.source||'POSTGRES_CANONICAL_HISTORY')};
+  return{found:true,fresh,complete,consistent,ageMs,timestamp,spotUsd,tradingUsd,totalUsd,sourceStatus:point?.sourceStatus||null,source:String(history?.source||'POSTGRES_CANONICAL_HISTORY')};
 }
 
 export function alignSeriesToSnapshot(series=[],snapshot={},opts={}){
