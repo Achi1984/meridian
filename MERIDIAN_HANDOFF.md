@@ -313,3 +313,14 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - v9 DATA TRUTH, v9 header/source state and v10 DATA GUARD now consume the same coverage contract.
 - DATA TRUTH BOT MATCH now shows matched / supported live rows.
 - No bot-matching thresholds, trading rules, Paper-bot parameters, risk calculations, leverage, execution or Pionex mutation paths changed.
+
+
+## v10 r29 — Decision readiness SSOT
+
+- Continues the deep audit after runtime-verified r28.
+- Adds shared safetyReadyBot and decisionReadyBot helpers to the v9 data engine.
+- DECISION READY requires: fresh trusted bot snapshot, safe match, usable Liq/safety data, PnL and fresh per-asset market intel.
+- DATA TRUTH ACTIONABLE now uses the same decision-ready helper instead of the older weaker Match + PnL + Bot-Freshness check.
+- v10 syncHealth consumes the same safety/decision helpers instead of re-deriving them independently.
+- SAFETY READY remains intentionally available without PnL or fresh market intel when liquidation data is usable.
+- No signal formula, risk threshold, Profit Lock rule, NEXT ACTION priority, Paper-bot parameter, leverage, execution or Pionex mutation path changed.

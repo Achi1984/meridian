@@ -324,3 +324,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **SSOT rule:** v9 DATA TRUTH, the legacy header source state, and v10 DATA GUARD must consume the same botFeedCoverage helper. BOT MATCH is displayed as matched / supported-live-rows. Extra or ambiguous API rows fail coverage closed.
 
 **Isolation:** This changes bot data-status semantics only. Matching thresholds, PnL handling, liquidation calculations, Profit Lock, NEXT ACTION, Paper bots, leverage and execution are unchanged.
+
+
+## D-034 — ACTIONABLE and DECISION READY share one readiness contract
+
+**Decision:** A bot is decision-ready only when the private bot snapshot is fresh, the bot is safely matched, liquidation/safety data is usable, snapshot PnL is available, and the asset market-intel used for the decision is fresh.
+
+**SSOT rule:** v9 ACTIONABLE and v10 DECISION READY must consume the same shared helpers. ACTIONABLE must not count rows that are missing liquidation data or whose market-intel is stale.
+
+**Safety-ready distinction:** Safety-ready remains a weaker state: fresh matched bot data plus usable liquidation/safety information. It is intentionally allowed without fresh PnL or market-intel so liquidation protection can remain visible even when decision support is blocked.
+
+**Isolation:** This aligns status/count semantics only. It does not change market indicators, risk thresholds, Profit Lock rules, NEXT ACTION ordering, Paper-bot parameters, leverage or execution.

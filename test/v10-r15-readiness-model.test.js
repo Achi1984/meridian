@@ -16,7 +16,8 @@ test('r15 separates safety-ready from decision-ready bot state',()=>{
   assert.match(js,/SAFETY READY/);
   assert.match(js,/DECISION READY/);
   assert.match(js,/SAFETY ONLY/);
-  assert.match(js,/decisionRows=safetyRows\.filter/);
+  assert.match(js,/decisionRows=fresh\?rows\.filter/);
+  assert.match(js,/h\.decisionReadyBot\?h\.decisionReadyBot\(b\)/);
   assert.match(js,/intelFresh\(s\?\.assetIntel\?\.\[b\.symbol\]\)/);
 });
 
