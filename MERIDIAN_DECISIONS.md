@@ -387,3 +387,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **UI rule:** Active v10 pair cards and the COMMAND live overview consume the same exposureIntegrity helper. They show PARTIAL/unknown values instead of COMPLETE when supported live exposure is not fully reconciled.
 
 **Isolation:** No PnL formula, market signal, liquidation threshold, Profit Lock percentage, hedge threshold, Paper-bot parameter, leverage or execution logic is changed. r33 only changes whether incomplete exposure data is eligible to produce an exact exposure/hedge statement.
+
+
+## D-039 — Portfolio regime must disclose partial exposure basis
+
+**Decision:** The legacy portfolioRegime score may remain mathematically unchanged, but the UI must disclose when its bot-risk concentration input is based on incomplete live exposure.
+
+**Rule:** portfolioRegime carries exposureComplete and a COMPLETE/PARTIAL_EXPOSURE basis flag from the canonical exposureModel. When exposure is incomplete, every visible portfolio-regime label retained by the active v10 shell is marked **PARTIAL BASIS**.
+
+**Reason:** assetExposureShare/riskV2 are older scoring components. Changing their concentration thresholds or penalty weights would be a trading-methodology change. r34 instead exposes the provenance limitation so a partial denominator is not presented as fully authoritative.
+
+**Preserved scoring:** concentration thresholds remain 10% / 15% / 25%; average-risk penalties remain at 4 and 6; portfolio regime cutoffs remain +/-2. No score, threshold or signal is changed.
+
+**Isolation:** Active v10 NEXT ACTION does not consume portfolioRegime. r34 is provenance/presentation only and changes no Profit Lock, hedge threshold, Paper-bot, leverage or execution behavior.
