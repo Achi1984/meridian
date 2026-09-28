@@ -121,7 +121,9 @@ test('normalizer inspector reports the exact four gating stages',()=>{
     buOrderData:{status:'running',trend:'short',cateType:'inverse',leverage:5,bottom:'50000',top:'100000'}
   });
   assert.equal(normalized.symbol,'BTC');
-  assert.equal(normalized.side,'SHORT');
+  assert.equal(normalized.side,'LONG');
+  assert.equal(normalized.declaredSide,'SHORT');
+  assert.equal(normalized.assetDeclaredSide,'LONG');
 });
 
 
