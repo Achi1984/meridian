@@ -333,3 +333,16 @@ r61 makes the source renderer emit a dedicated `meridian:view` event after every
 The same screenshots also showed a Pionex private snapshot with no timestamp still outranking a fresh Wallet API account snapshot. r61 changes only portfolio-source precedence: a fresh successful Wallet API `totalInUsdt` is preferred when the private equity snapshot is not fresh, or when Wallet API is at least as new. A fresh newer private snapshot still retains priority.
 
 No bot PnL is inferred; no decision or execution rule changes.
+
+
+## v10 r62 — stale-shell self-heal
+
+At 20:18 local time on 28.09.2026 the user still saw v10 r60 although runtime smoke had already confirmed v10 r61 on GitHub Pages and the gateway deployment was healthy. This isolated the remaining problem to a client-side stale HTML/PWA shell rather than deployment lag.
+
+r62 adds a permanent stale-shell recovery path:
+- root navigation uses a build-specific `build=r62&fresh=r62` URL;
+- the web app manifest launch URL is updated from the obsolete v8 start URL to the current v10 build and is linked from both root and v10 shell;
+- the v10 shell probes `version.json` with `cache:'no-store'` on boot and on BFCache restore; when `terminalBuild` differs from the loaded shell it reloads itself with a fresh cache-busting query;
+- runtime smoke now rejects stale PWA launch URLs and missing self-heal code.
+
+This cannot retroactively modify an already cached r60 document, so one one-time cache-busted navigation is still required for a client currently stuck on r60. After r62 is loaded once, future terminal releases can self-heal without manual cache clearing.
