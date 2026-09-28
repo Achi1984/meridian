@@ -400,3 +400,14 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Preserved scoring:** concentration thresholds remain 10% / 15% / 25%; average-risk penalties remain at 4 and 6; portfolio regime cutoffs remain +/-2. No score, threshold or signal is changed.
 
 **Isolation:** Active v10 NEXT ACTION does not consume portfolioRegime. r34 is provenance/presentation only and changes no Profit Lock, hedge threshold, Paper-bot, leverage or execution behavior.
+
+
+## D-040 — Pair PnL aggregate requires complete current asset rows
+
+**Decision:** An aggregate PAIR PNL USD is authoritative only when the current bot snapshot is fresh, at least one bot for the asset is safely matched, no current supported live row for that asset is unmatched, and every matched row in that asset has live PnL.
+
+**Scope rule:** An unmatched row for another asset does not invalidate the current asset's pair PnL. An unmatched row for the same asset does. Missing PnL on any matched row also makes the aggregate incomplete.
+
+**UI rule:** The active v10 pair card consumes shared pnlIntegrity(symbol). If incomplete, the aggregate value is withheld and the card states PnL-Summe unvollständig. Individual verified bot-leg PnL remains unchanged and visible where already allowed.
+
+**Isolation:** r35 changes aggregation provenance only. PnL formulas, Decision Ready, Profit Lock thresholds, hedge logic, market signals, Paper-bot parameters, leverage and execution are unchanged.

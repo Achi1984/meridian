@@ -382,3 +382,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Concentration thresholds remain 10/15/25%; avg-risk penalties remain 4/6; regime cutoffs remain +/-2.
 - Active v10 NEXT ACTION remains independent of portfolioRegime.
 - No trading rules, Profit Lock percentages, hedge threshold, Paper-bot parameters, leverage, execution or Pionex mutation paths changed.
+
+
+## v10 r35 — Pair PnL completeness
+
+- Continues the deep audit after runtime-verified r34.
+- Adds shared pnlIntegrity(symbol) for asset-level PnL aggregation provenance.
+- PAIR PNL USD is shown only when the bot snapshot is fresh, all current rows for that asset are matched, and every matched row has live PnL.
+- Same-asset unmatched rows now make the aggregate unavailable instead of disappearing from the sum.
+- Unmatched rows from other assets do not invalidate a complete asset pair.
+- Incomplete cards explicitly show PnL-Summe unvollständig.
+- Individual bot PnL logic, Decision Ready and all Profit Lock thresholds remain unchanged.
+- No hedge threshold, market signal, Paper-bot parameter, leverage, execution or Pionex mutation path changed.
