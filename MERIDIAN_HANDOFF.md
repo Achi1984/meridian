@@ -517,3 +517,12 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Persists aggregate type/status counts so unsupported or legacy Pionex bot types are visible without exposing private row details.
 - Keeps detail hydration and `EMPTY_GUARD` fail-closed behavior.
 - No Pionex trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
+## v10 r46 — Pionex read-only account position layer
+
+- Keeps Bot API discovery and EMPTY_GUARD unchanged.
+- Adds a separate POSITION API layer sourced from GET /uapi/v1/account/positions.
+- Shows account-position asset, side, leverage, average price, mark price, liquidation price, size and unrealized PnL when fresh.
+- Explicitly labels positions as not bot-matched; no Grid/TP/Profit-Lock action is derived from them.
+- Adds account-position assets to the market-data universe.
+- Gateway health exposes aggregate pionexAccountStatus, pionexFuturesPositionCount, pionexBotStatus and pionexBotListRows only.
+- No API writes, trading permissions, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
