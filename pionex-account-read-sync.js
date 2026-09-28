@@ -1,6 +1,7 @@
 import pg from 'pg';
 import {pionexReadGet} from './pionex-read-client.js';
-import {PIONEX_FUTURES_GRID_DETAIL_PATH} from './pionex-bot-detail-read.js';
+import {PIONEX_FUTURES_GRID_DETAIL_PATH,mergePionexOrderDetail} from './pionex-bot-detail-read.js';
+import {normalizePionexBotOrder} from './pionex-bot-auto-sync.js';
 
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
@@ -142,6 +143,49 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
     failures
   };
 }
+
+export function buildWalletBotRisk(probe={},iso=new Date().toISOString()){
+  const details=Array.isArray(probe?.details)?probe.details:[],expected=Number(probe?.buOrderTypeCounts?.futures_grid)||0,detailSuccess=Number(probe?.successBuOrderTypeCounts?.futures_grid)||0,unsupported=Math.max(0,(Number(probe?.candidateCount)||0)-expected);
+  const bots=[],rejected=[],seen=new Set();
+  for(const item of details){
+    const wallet=item?.wallet||{},detail=item?.detail||{};
+    if(String(wallet?.buOrderType||'')!=='futures_grid')continue;
+    const id=String(wallet?.buOrderId||'').trim();
+    if(!id||seen.has(id)){rejected.push({reason:id?'duplicate_id':'missing_id'});continue;}
+    seen.add(id);
+    try{
+      const summary={
+        buOrderType:'futures_grid',
+        buOrderId:id,
+        base:detail?.base||wallet?.baseList?.[0]||null,
+        quote:detail?.quote||wallet?.investmentToken||null,
+        status:detail?.status||detail?.buOrderData?.status||'running',
+        buOrderData:{}
+      };
+      const merged=mergePionexOrderDetail(summary,detail),row=normalizePionexBotOrder(merged);
+      if(!row){rejected.push({reason:'normalizer_rejected'});continue;}
+      bots.push({...row,source:'PIONEX_WALLET_BOT_DETAIL'});
+    }catch(e){rejected.push({reason:String(e?.message||e).slice(0,80)})}
+  }
+  const ids=new Set(bots.map(x=>String(x?.botOrderId||x?.id||'')));
+  const unique=ids.size===bots.length,detailsComplete=expected>0&&detailSuccess===expected&&bots.length===expected&&rejected.length===0&&unique;
+  return {
+    source:'PIONEX_WALLET_BOT_DETAIL',
+    syncMode:'WALLET_BOT_DETAIL_FALLBACK',
+    updatedAt:iso,
+    snapshotAt:iso,
+    apiRows:Number(probe?.candidateCount)||0,
+    supportedRows:expected,
+    detailRows:detailSuccess,
+    unsupportedRows:unsupported,
+    normalizedRows:bots.length,
+    detailsComplete,
+    bots,
+    botCount:bots.length,
+    rejectedCount:rejected.length,
+    rejected
+  };
+}
 export function normalizeWalletOverview(data={}){
   const bot=data?.botAccount||{},trader=data?.traderAccount||{};
   const botCategories=normalizeWalletCategories(bot?.detail);
@@ -179,6 +223,7 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
   const walletBotProbe=walletResult.ok?await probeWalletBotDetails(wallet?.botEntries||[],{apiKey,apiSecret,fetchImpl,now}):null;
   const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();
+  const walletBotRisk=walletBotProbe?buildWalletBotRisk(walletBotProbe,at):null;
   return {
     source:'PIONEX_READ_API',
     readOnly:true,
@@ -190,6 +235,7 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
     futuresPositions:normalizedPositions,
     wallet,
     walletBotProbe,
+    walletBotRisk,
     walletStatus:walletResult.ok?'OK':'ERROR',
     walletError:walletResult.ok?null:walletResult.error,
     spotBalanceCount:spotBalances.length,
@@ -279,7 +325,9 @@ export async function runPionexAccountReadOnce({env=process.env,fetchImpl=fetch,
       walletBotListCount:snapshot.wallet?.botListCount??0,
       walletBotCandidateCount:snapshot.walletBotProbe?.candidateCount??0,
       walletBotDetailSuccessCount:snapshot.walletBotProbe?.successCount??0,
-      walletBotDetailFailureCount:snapshot.walletBotProbe?.failureCount??0
+      walletBotDetailFailureCount:snapshot.walletBotProbe?.failureCount??0,
+      walletBotRiskRows:snapshot.walletBotRisk?.botCount??0,
+      walletBotRiskComplete:snapshot.walletBotRisk?.detailsComplete===true
     };
   }catch(e){
     const msg=String(e?.message||e);

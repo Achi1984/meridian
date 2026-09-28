@@ -545,3 +545,13 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 - Recognizes FUTURE_GRID_COIN_MARGINED as the documented Coin-M Futures Grid cateType.
 - Does not promote probe results into bot decision readiness.
 - No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock or execution changes.
+## v10 r49 — validated Wallet live-bot fallback
+
+- Builds `pionexAccount.walletBotRisk` from Wallet `futures_grid` entries whose direct Futures Grid detail reads succeeded.
+- Requires all supported Wallet futures_grid candidates to detail-hydrate, normalize and have unique IDs before marking the Wallet risk snapshot complete.
+- Selects fresh classic Bot API first; otherwise selects fresh complete Wallet detail risk.
+- Enforces the existing 15-minute bot-feed freshness policy.
+- Keeps the 3 observed `futures_lite` entries outside the supported live-bot layer.
+- UI distinguishes active BOT SOURCE from the separately reported classic Bot API status.
+- Public gateway health exposes aggregate readiness/counts only; private bot IDs/details stay private.
+- No trading, Bot trading, transfer, PaperBot, leverage, signal, Profit Lock, hedge-threshold or execution changes.

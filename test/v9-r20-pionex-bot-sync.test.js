@@ -34,10 +34,10 @@ test('r20 frontend accepts normalized Pionex Bot API field aliases',()=>{
   assert.match(js,/replace\(\/\\\.PERP\$\//);
 });
 
-test('r20 uses Pionex section source and raw API row count',()=>{
-  assert.match(js,/state\.botApiRows=num\(d\?\.pionexRisk\?\.apiRows\)\?\?live\.length/);
+test('r20+ uses selected Pionex source and raw source row count',()=>{
+  assert.match(js,/state\.botApiRows=num\(feed\?\.apiRows\)\?\?live\.length/);
   assert.match(js,/state\.pionexBotSync=d\?\.pionexBotSync\|\|null/);
-  assert.match(js,/d\?\.pionexRisk\?\.source/);
+  assert.match(js,/state\.botFeedSource=String\(feed\?\.source/);
 });
 
 test('r20 production version is consistent',()=>{

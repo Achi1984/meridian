@@ -1,11 +1,11 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r48';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r48';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r48';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r48';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r48';
-// MERIDIAN v10 r48 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r49';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r49';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r49';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r49';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r49';
+// MERIDIAN v10 r49 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r48';
+const BUILD='10.0-r49';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -134,21 +134,26 @@ function syncHealth(){
   const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.();
   const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
   const safetyReady=safetyRows.length,pnlReady=pnlRows.length,decisionReady=decisionRows.length,actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
-  const status=String(s?.pionexBotSync?.status||'UNKNOWN'),age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
-  const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=status==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows;
+  const botApiStatus=String(s?.pionexBotSync?.status||'UNKNOWN'),status=String(s?.botFeedStatus||botApiStatus),walletFeed=status==='WALLET_DETAIL_OK',age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
+  const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=walletFeed?apiRows:(botApiStatus==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows);
   let detail='Private Bot-Daten werden geprüft.';
-  if(status==='DISABLED_MISSING_CREDENTIALS')detail='Pionex Read API fehlt am Backend · letzter Asset-Watch-Snapshot bleibt nur Referenz';
-  else if(status==='ERROR')detail='Pionex Bot API Sync-Fehler · '+String(s?.pionexBotSync?.error||'unbekannt').slice(0,110);
-  else if(status==='EMPTY_GUARD'){
+  if(walletFeed&&!fresh)detail='Wallet-Detail-Fallback ist validiert, aber der Bot-Snapshot ist nicht frisch genug.';
+  else if(walletFeed&&fresh&&ambiguous)detail=ambiguous+' Wallet-Detail-Row(s) haben mehrere nahezu gleich gute Referenztreffer · keine automatische Zuordnung.';
+  else if(walletFeed&&fresh&&unmatched)detail=unmatched+' Wallet-Detail-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
+  else if(walletFeed&&fresh&&decisionReady<matched)detail='Wallet-Detail-Botdaten sind frisch; '+(matched-decisionReady)+' gematchte Row(s) bleiben mangels PnL oder Marktfeed nicht decision-ready.';
+  else if(walletFeed&&fresh)detail='Wallet + Futures-Grid-Detail ist der aktive Live-Bot-Feed · '+decisionReady+'/'+matched+' decision-ready.';
+  else if(botApiStatus==='DISABLED_MISSING_CREDENTIALS')detail='Pionex Read API fehlt am Backend · letzter Asset-Watch-Snapshot bleibt nur Referenz';
+  else if(botApiStatus==='ERROR')detail='Pionex Bot API Sync-Fehler · '+String(s?.pionexBotSync?.error||'unbekannt').slice(0,110);
+  else if(botApiStatus==='EMPTY_GUARD'){
     const d=s?.pionexBotSync?.diagnostics||{},types=Object.entries(d.typeCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—',states=Object.entries(d.statusCounts||{}).map(([k,v])=>k+' '+v).join(', ')||'—';
     detail='Pionex Bot-Liste lieferte '+String(d.listRows??'—')+' laufende Row(s) · Typen '+types+' · Status '+states+' · lokale Futures-Allowlist blieb leer · alter Snapshot bleibt blockiert.';
   }
-  else if(status==='OK'&&!fresh)detail='API ist konfiguriert, aber der letzte Bot-Snapshot ist nicht frisch genug.';
-  else if(status==='OK'&&fresh&&ambiguous)detail=ambiguous+' Bot-Row(s) haben mehrere nahezu gleich gute Referenztreffer · keine automatische Zuordnung.';
-  else if(status==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
-  else if(status==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
-  else if(status==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,age,fresh,coverageComplete,detail};
+  else if(botApiStatus==='OK'&&!fresh)detail='API ist konfiguriert, aber der letzte Bot-Snapshot ist nicht frisch genug.';
+  else if(botApiStatus==='OK'&&fresh&&ambiguous)detail=ambiguous+' Bot-Row(s) haben mehrere nahezu gleich gute Referenztreffer · keine automatische Zuordnung.';
+  else if(botApiStatus==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
+  else if(botApiStatus==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
+  else if(botApiStatus==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
+  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,age,fresh,coverageComplete,detail};
 }
 function marketReadiness(m){
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
@@ -169,8 +174,8 @@ function unmatchedDiagnostics(open=false){
   return '<details class="v10-unmatched-details" '+(open?'open':'')+'><summary>UNMATCHED DETAILS · '+rows.length+'</summary><div class="unmatched-list">'+body+'</div><small>Nur Diagnose-Metadaten · keine Bot-ID oder privaten Beträge.</small></details>';
 }
 function dataGuardCard(){
-  const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
-  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+unmatchedDiagnostics()+'</section>';
+  const g=syncHealth(),tone=g.decisionComplete?'safe':(g.decisionReady>0||g.safetyReady>0)?'watch':g.status==='ERROR'?'danger':'muted',source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),label=g.decisionComplete?'DECISION READY':g.decisionReady>0?'PARTIAL READY':g.safetyReady>0?'SAFETY ONLY':'BLOCKED';
+  return '<section class="v10-data-guard"><div class="guard-head"><div><span>DATA GUARD</span><b>LIVE BOT INTEGRITY</b></div><strong class="tone-'+tone+'">'+label+'</strong></div><div class="guard-grid"><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>SNAPSHOT AGE</span><b>'+esc(g.age)+'</b></div><div><span>UNMATCHED</span><b>'+g.unmatched+'</b><small>'+g.ambiguous+' ambiguous</small></div></div><small>'+esc(g.detail)+' · SOURCE '+esc(String(S()?.botFeedSource||'—').replaceAll('_',' '))+'</small>'+unmatchedDiagnostics()+'</section>';
 }
 function accountPositionHealth(){
   const s=S(),sync=s?.pionexAccountSync||{},snap=s?.pionexAccount||{},rows=Array.isArray(snap?.futuresPositions)?snap.futuresPositions:[],status=String(sync.status||'UNKNOWN'),ts=Date.parse(String(snap.updatedAt||snap.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';
@@ -273,9 +278,9 @@ function renderBots(force=false){
   if(!force&&!$('.bot-hero',view)&&!$('.bot-group',view))return;
   const snapshotOpen=force?$('.v10-snapshot-details',view)?.open:null,unmatchedOpen=force?$('.v10-unmatched-details',view)?.open:null;
   const s=S(),g=syncHealth(),ph=accountPositionHealth(),syms=g.fresh?symbols():[],unmatched=g.unmatched;
-  const api=g.status==='OK'?'ON':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' ');
+  const source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' ');
   const liveCards=syms.map(symbol=>pairCard(symbol)).filter(Boolean).join('');
-  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Account-Positionen = echte Futures-Risk-Daten · Bot-Aktionen fail-closed · Asset Watch = Referenz</small></section><section class="bot-tab-head"><div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT API</span><b>'+esc(api)+'</b><small>'+g.apiRows+' API rows</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b></div></section>'+accountPositionLayer(false)+walletDiscoveryLayer()+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+unmatchedDiagnostics(unmatchedOpen??false)+'<div class="v10-pair-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Der aktuelle Asset-Watch-Snapshot folgt als Referenz.</small></section>')+'</div>'+snapshotDetails(snapshotOpen??!g.fresh);
+  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER</b></div><small>Account-Positionen = echte Futures-Risk-Daten · Bot-Aktionen fail-closed · Asset Watch = Referenz</small></section><section class="bot-tab-head"><div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' source rows · Bot API '+esc(g.botApiStatus)+'</small></div><div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'</b></div><div><span>DECISION READY</span><b>'+g.decisionReady+'</b></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b></div></section>'+accountPositionLayer(false)+walletDiscoveryLayer()+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+unmatchedDiagnostics(unmatchedOpen??false)+'<div class="v10-pair-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Der aktuelle Asset-Watch-Snapshot folgt als Referenz.</small></section>')+'</div>'+snapshotDetails(snapshotOpen??!g.fresh);
 }
 function marketUniverse(){
   const s=S(),pref=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];

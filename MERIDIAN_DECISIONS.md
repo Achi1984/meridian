@@ -569,3 +569,12 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Privacy:** Bot IDs, investment amounts, profit and detail payloads remain in private state only. Public health/UI diagnostics expose only aggregate type/category counts and probe success/failure counts.
 
 **Promotion rule:** Successful detail reads are discovery evidence only in r48. They do not enter the actionable Bot Risk layer until a later release explicitly validates normalization/matching and passes release gates.
+## D-055 — Validated Wallet futures_grid details may serve as a live Bot fallback
+
+**Decision:** When the classic Bot list endpoint is unavailable/empty, MERIDIAN may select a Wallet-derived bot risk snapshot as the active live Bot feed only if all supported `futures_grid` Wallet candidates have successful detail reads, all details normalize successfully, IDs are unique, the account sync is OK, and the Wallet-derived snapshot is no older than 15 minutes.
+
+**Scope:** Only `buOrderType=futures_grid` is promoted in r49. `futures_lite` and every other unsupported Wallet bot type remain excluded and UNVERIFIED.
+
+**Precedence:** A fresh, complete classic Bot API snapshot remains preferred. A stale classic snapshot must never override a fresh, complete Wallet-detail fallback.
+
+**Safety:** Promotion changes data provenance only. Existing reference matching, Safety Ready, Decision Ready, Profit Lock, hedge thresholds, PaperBots and execution rules remain unchanged.
