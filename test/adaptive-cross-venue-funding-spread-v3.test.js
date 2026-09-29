@@ -77,7 +77,8 @@ test('synthetic persistent positive differential executes long Binance short Hyp
   assert.equal(r.byAsset.every(x=>x.activeCycles===11),true);
   assert.equal(r.byAsset.every(x=>x.netPnl>0),true);
   assert.equal(r.stressSummary.totalReturnPct>0,true);
-  assert.equal(r.gate.pass,true,r.gate.reasons.join(','));
+  assert.equal(r.gate.pass,false);
+  assert.ok(r.gate.reasons.includes('SHORT_BINANCE_LONG_HYPERLIQUID:CYCLES_LT_4'));
 
   const first=r.periods[0];
   const expected=first.netUsd/160000;
@@ -101,6 +102,23 @@ test('negative trailing differential reverses venue direction',()=>{
   assert.equal(r.binanceLongCycles,0);
   assert.equal(r.hyperliquidLongCycles,88);
   assert.equal(r.cycles.every(x=>x.direction===-1),true);
+  assert.equal(r.gate.pass,false);
+  assert.ok(r.gate.reasons.includes('LONG_BINANCE_SHORT_HYPERLIQUID:CYCLES_LT_4'));
+});
+
+test('mixed synthetic directions satisfy the adaptive-direction gate before real PnL',()=>{
+  const data={};
+  ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3_ASSETS.forEach((a,i)=>{
+    data[a]=i<4
+      ?syntheticAsset({hlRate:.00002,binRate:.00001})
+      :syntheticAsset({hlRate:-.00002,binRate:.00001});
+  });
+  const r=runAdaptiveCrossVenueFundingSpreadV3(data,{stage:'DISCOVERY'});
+  assert.equal(r.dataIntegrityFailure,false,JSON.stringify(r.dataIntegrityErrors.slice(0,2)));
+  assert.equal(r.binanceLongCycles,44);
+  assert.equal(r.hyperliquidLongCycles,44);
+  assert.equal(r.byDirection.every(x=>x.cycles>=4),true);
+  assert.equal(r.byDirection.every(x=>x.netPnl>0),true);
   assert.equal(r.gate.pass,true,r.gate.reasons.join(','));
 });
 
