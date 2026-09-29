@@ -1,0 +1,44 @@
+name: MERIDIAN QH Individual Trade Gap Diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/qh-individual-trades-gap-semantics
+    paths:
+      - "scripts/diagnose-qh-individual-trade-gap.py"
+      - ".github/workflows/qh-individual-trade-gap-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-individual-trade-gap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset: BTCUSDT
+            month: "2025-01"
+          - asset: SOLUSDT
+            month: "2025-07"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare monthly gap with official daily trades and aggTrades
+        run: python3 scripts/diagnose-qh-individual-trade-gap.py
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-trade-gap-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-${{ matrix.asset }}-${{ matrix.month }}-trade-gap-diagnostic.json
+          if-no-files-found: warn
