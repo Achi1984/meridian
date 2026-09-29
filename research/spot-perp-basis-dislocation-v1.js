@@ -87,7 +87,7 @@ export function normalizeBasisKlines(rows){
   out.sort((a,b)=>a.time-b.time);
   for(let i=1;i<out.length;i++){
     if(out[i].time===out[i-1].time)throw new Error('DUPLICATE_KLINE_TIMESTAMP');
-    if(out[i].time<x=>out[i-1].time)throw new Error('NON_MONOTONIC_KLINE');
+    if(out[i].time<out[i-1].time)throw new Error('NON_MONOTONIC_KLINE');
   }
   return out;
 }
