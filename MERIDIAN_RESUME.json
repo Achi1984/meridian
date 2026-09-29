@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SELECTIVE_STATIC_V4_VALIDATION_FAIL_NEXT_SPOT_PERP_CARRY_DATA_FOUNDATION",
+  "phase": "SPOT_PERP_V1_DATA_FOUNDATION_FAIL_NEXT_V2_EXECUTION_PRICE_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "cacbf49777784187e1576098ba2198a5ca918035",
+    "verifiedSha": "bb79e0eb7631de94da5a9aadb27cfa3c03253547",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -551,6 +551,35 @@
       "paperAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "spotPerpFundingHarvestV1DataV1": {
+      "ruleset": "SPOT-PERP-FUNDING-HARVEST-V1-DATA-V1-FROZEN",
+      "interval": "2024-09..2026-08",
+      "universe": [
+        "OP",
+        "INJ",
+        "WLD",
+        "SEI",
+        "TIA",
+        "PENDLE",
+        "RUNE",
+        "ICP"
+      ],
+      "qualifiedAssets": [],
+      "qualifiedCount": 0,
+      "completeMonthsPerAsset": 23,
+      "synchronizedFailedMonth": "2026-06",
+      "failedComponent": "BINANCE_USDM_MARK_PRICE_8H",
+      "synchronizedObservedRows": 87,
+      "expectedRows": 90,
+      "spotJune2026Status": "PASS_90_ROWS_ALL_8",
+      "fundingJune2026Status": "PASS_ALL_8",
+      "unexpectedTransportErrors": 0,
+      "strategyPnlCalculated": false,
+      "fundingThresholdInferred": false,
+      "syntheticBackfillUsed": false,
+      "decision": "FOUNDATION_FAIL_DATA_REDESIGN",
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -564,7 +593,7 @@
     255,
     256
   ],
-  "nextAction": "Build a strategy-neutral Spot-Perp Funding Harvest V1 data foundation on a frozen fresh candidate universe OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP using Binance Vision public Spot 8h klines plus USD-M perpetual 8h mark/funding archives over 2024-09..2026-08. No PnL, no carry threshold, no asset replacement and no synthetic backfill. Require broad joint Spot+Perp coverage before any strategy protocol. Cross-Venue V1-V4 remain immutable and receive no further tuning. Keep executionImpact=false.",
+  "nextAction": "Freeze Spot-Perp Funding Harvest V1 Data Foundation V2 before coverage. Preserve the exact OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP universe, 2024-09..2026-08 interval and >=6/8 breadth gate. Replace Binance USD-M markPriceKlines with public USD-M perpetual trade klines as the execution-price tape while retaining Binance Spot 8h and realized funding archives. No PnL, no funding threshold, no asset replacement, no synthetic backfill. Keep V1 Data Foundation immutable.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -574,7 +603,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_DATA_FOUNDATION",
+    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_DATA_FOUNDATION_V2",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -601,7 +630,7 @@
       "RUNE",
       "ICP"
     ],
-    "nextStage": "SPOT_PERP_DATA_FOUNDATION_BEFORE_STRATEGY",
+    "nextStage": "DATA_FOUNDATION_BEFORE_STRATEGY",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -642,6 +671,8 @@
     "v4HoldoutDataObserved": false,
     "v4PaperAllowed": false,
     "crossVenueFamilyStatus": "CLOSED_AFTER_V1_V4_NO_PROMOTION",
-    "selectiveStaticV4Status": "IMMUTABLE_VALIDATION_FAIL"
+    "selectiveStaticV4Status": "IMMUTABLE_VALIDATION_FAIL",
+    "spotPerpV1DataV1Status": "IMMUTABLE_FOUNDATION_FAIL_SYNCHRONIZED_MARK_GAP",
+    "spotPerpV1DataV2Change": "EXECUTION_PRICE_SOURCE_ONLY_MARK_TO_PERP_TRADE_KLINES"
   }
 }
