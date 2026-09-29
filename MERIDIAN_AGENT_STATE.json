@@ -85,5 +85,11 @@
     "acceptanceCriteria",
     "reviewLoop",
     "reviewVerdict"
-  ]
+  ],
+  "parallelWritePolicy": {
+    "sameBranchConcurrentWritesAllowed": false,
+    "readOnlyParallelismAllowed": true,
+    "separateBranchParallelismAllowed": true,
+    "mergeSerialization": "MAIN_AGENT_ONLY_ONE_AT_A_TIME"
+  }
 }
