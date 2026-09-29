@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DEVELOPMENT_FAIL_PROVENANCE_AUDIT_PENDING_MERGE_HOLDOUT_LOCKED",
+  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V0_PENDING",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "3805e0bbc14b4cf56f6c39662f8fa2ef27f1f927",
+    "verifiedSha": "6de6b20e80602409be618860702716510231f456",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1093,7 +1093,7 @@
     255,
     256
   ],
-  "nextAction": "Merge the Taker Order Flow V1 provenance audit on current main after green provenance/orchestration/release gates. Keep the immutable DEVELOPMENT_FAIL unchanged: no V1 rerun, no retroactive engine mutation, and do not load the 2025-01-11..2026-08-29 temporal holdout. After the provenance audit is canonical, run a fresh external-evidence survey for a separately frozen Order Flow successor or another orthogonal strategy family. Any successor must include entry-time-only selection and a hard validation/holdout authorization gate before its first PnL, and its first validation must use genuinely untouched evidence.",
+  "nextAction": "Run and freeze the strategy-neutral Quarter-Hour Boundary Imbalance V1 DATA_V0 archive-availability audit for BTC/ETH/XRP/SOL/DOGE/ADA across 2025-01..2026-08 using official Binance USD-M monthly aggTrades, 1m klines and fundingRate archives. Do not calculate order imbalance, forward returns, positions or PnL. If and only if all 360 archive/checksum objects are published, advance to a separate full data-quality foundation. No strategy protocol or PnL is authorized yet.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1122,8 +1122,8 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "ORDER_FLOW_V1_FAIL_PROVENANCE_AUDIT_THEN_EXTERNAL_EVIDENCE",
-    "rationale": "Anastasopoulos et al. (2026, Journal of Financial Markets, DOI 10.1016/j.finmar.2026.101047) reports predictive information in lagged cryptocurrency order flow and a stronger weekly relation than daily in its studied setting. MERIDIAN V1 used a distinct public Binance USD-M aggressive-taker quote-flow proxy, so the paper is motivation rather than exact replication.",
+    "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V0",
+    "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
     "v2Status": "IMMUTABLE_DATA_INTEGRITY_FAIL",
@@ -1149,7 +1149,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "MERGE_V1_PROVENANCE_AUDIT_THEN_EXTERNAL_EVIDENCE_BEFORE_SUCCESSOR_PNL",
+    "nextStage": "QH_BOUNDARY_IMBALANCE_V1_DATA_V0_ARCHIVE_AVAILABILITY_NO_SIGNAL_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1371,6 +1371,24 @@
     "orderFlowV1EvidenceUse": "HYPOTHESIS_GENERATION_ONLY_FAILED_GATE",
     "orderFlowV1NoRerun": true,
     "orderFlowV1RetroactiveEngineMutationAuthorized": false,
-    "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY"
+    "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY",
+    "orderFlowV1ProvenanceAuditStatus": "CANONICAL",
+    "orderFlowV1ProvenanceAuditMergeSha": "6de6b20e80602409be618860702716510231f456",
+    "qhImbalanceV1Status": "DATA_V0_PENDING",
+    "qhImbalanceV1Universe": [
+      "BTC",
+      "ETH",
+      "XRP",
+      "SOL",
+      "DOGE",
+      "ADA"
+    ],
+    "qhImbalanceV1DataV0Window": "2025-01..2026-08",
+    "qhImbalanceV1PrimaryEvidence": "KIM_HANSEN_ARXIV_2607_09426_V2_2026_08_24",
+    "qhImbalanceV1CautionEvidence": "PINDZA_FRONTIERS_BLOCKCHAIN_2026_1811716",
+    "qhImbalanceV1RejectedNearby": "15M_MEAN_REVERSION_GROSS_EDGE_BELOW_BENCHMARK_COST",
+    "qhImbalanceV1SignalCalculated": false,
+    "qhImbalanceV1PnlObserved": false,
+    "qhImbalanceV1PaperAuthorized": false
   }
 }
