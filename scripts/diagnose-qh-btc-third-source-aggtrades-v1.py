@@ -219,18 +219,40 @@ def run():
                         "delta":A["declaredUnderlyingTrades"]-K["reportedTrades"]
                       }
                     })
+            tr_total={"rows":sum(x["rows"] for x in tr.values()),
+                      "base":sum(x["base"] for x in tr.values()),
+                      "derivedQuote":sum(x["derivedQuote"] for x in tr.values())}
+            ag_total={"rows":sum(x["rows"] for x in ag.values()),
+                      "declaredUnderlyingTrades":sum(x["declaredUnderlyingTrades"] for x in ag.values()),
+                      "base":sum(x["base"] for x in ag.values()),
+                      "derivedQuote":sum(x["derivedQuote"] for x in ag.values())}
+            kl_total={"reportedTrades":sum(x["reportedTrades"] for x in kl.values()),
+                      "base":sum(x["base"] for x in kl.values()),
+                      "quote":sum(x["quote"] for x in kl.values())}
+            daily_cls=classify(tr_total,ag_total,kl_total)
             results[day]={
               "individualRows":tr_rows,"aggTradeRows":ag_rows,
+              "dailyTotals":{"individualTrades":tr_total,"aggTrades":ag_total,"kline":kl_total,
+                             "classification":daily_cls,
+                             "aggVsIndividualBase":near(ag_total["base"],tr_total["base"]),
+                             "aggVsIndividualQuote":near(ag_total["derivedQuote"],tr_total["derivedQuote"]),
+                             "aggVsKlineBase":near(ag_total["base"],kl_total["base"]),
+                             "aggVsKlineQuote":near(ag_total["derivedQuote"],kl_total["quote"]),
+                             "individualVsKlineBase":near(tr_total["base"],kl_total["base"]),
+                             "individualVsKlineQuote":near(tr_total["derivedQuote"],kl_total["quote"])},
+              "minuteClassificationNote":"Minute-level aggTrades timestamp bucketing can shift volume across adjacent minutes when an aggregate spans a minute boundary; dailyTotals.classification is the primary source-family discriminator.",
               "classificationCounts":dict(sorted(counts.items())),
               "nonReconciledMinuteCount":len(rows),
               "nonReconciledMinutes":rows
             }
             print(json.dumps({"day":day,"individualRows":tr_rows,"aggTradeRows":ag_rows,
+                              "dailyVolumeClassification":daily_cls,
+                              "dailyTotals":results[day]["dailyTotals"],
                               "classificationCounts":results[day]["classificationCounts"],
                               "nonReconciledMinuteCount":len(rows)},sort_keys=True),flush=True)
 
     all_non=[m for d in results.values() for m in d["nonReconciledMinutes"]]
-    kline_div=all(m["classification"]=="AGGTRADES_AND_INDIVIDUAL_ALIGN_KLINE_DIVERGES" for m in all_non) and bool(all_non)
+    kline_div=all(d["dailyTotals"]["classification"]=="AGGTRADES_AND_INDIVIDUAL_ALIGN_KLINE_DIVERGES" for d in results.values())
     result={
       "schema":1,"family":"PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
       "stage":"BTC_THIRD_SOURCE_AGGTRADES_DIAGNOSTIC_V1","asset":ASSET,"days":list(DAYS),
@@ -243,7 +265,9 @@ def run():
     }
     (OUT/"BTCUSDT-2025-01-third-source.json").write_text(json.dumps(result,indent=2)+"\n")
     print(json.dumps({"allObservedDivergenceClassifiedAsKlineOnly":kline_div,
-                      "days":{d:{"classificationCounts":x["classificationCounts"],
+                      "days":{d:{"dailyVolumeClassification":x["dailyTotals"]["classification"],
+                                 "dailyTotals":x["dailyTotals"],
+                                 "classificationCounts":x["classificationCounts"],
                                  "nonReconciledMinuteCount":x["nonReconciledMinuteCount"]} for d,x in results.items()},
                       "decision":result["decision"],
                       "directionalOrderImbalanceCalculated":False,"forwardReturnsCalculated":False,
