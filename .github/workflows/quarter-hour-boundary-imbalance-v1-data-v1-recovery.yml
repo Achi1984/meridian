@@ -1,0 +1,69 @@
+name: MERIDIAN Quarter-Hour Imbalance V1 Data V1 Recovery
+
+on:
+  push:
+    branches:
+      - research/quarter-hour-order-imbalance-v1-data-v1-sharded
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1-DATA-V1-RECOVERY.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: quarter-hour-boundary-imbalance-v1-data-v1-recovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      ORIGINAL_RUN_ID: "36613725640"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Re-run frozen parser invariants
+        run: python3 test/test_quarter_hour_boundary_imbalance_v1_data_v1.py
+
+      - name: Download all 120 original shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Re-validate only SOLUSDT 2025-07 under corrected source semantics
+        env:
+          QH_ASSET: SOLUSDT
+          QH_MONTH: "2025-07"
+          QH_OUTPUT_DIR: research/results/qh-v1-corrected
+        run: python3 scripts/audit-quarter-hour-boundary-imbalance-v1-data-v1-shard.py
+
+      - name: Assemble recovered 120-shard manifest set
+        run: |
+          mkdir -p research/results/qh-v1-recovered
+          cp research/results/qh-v1-original/*.json research/results/qh-v1-recovered/
+          cp research/results/qh-v1-corrected/SOLUSDT-2025-07.json research/results/qh-v1-recovered/SOLUSDT-2025-07.json
+          count="$(find research/results/qh-v1-recovered -maxdepth 1 -name '*.json' | wc -l)"
+          test "$count" -eq 120
+          echo "Recovered manifest count: $count"
+
+      - name: Require recovered 120/120 green shards
+        env:
+          QH_V1_SHARD_RESULTS_DIR: research/results/qh-v1-recovered
+        run: python3 scripts/aggregate-quarter-hour-boundary-imbalance-v1-data-v1.py
+
+      - name: Upload recovered Data V1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarter-hour-boundary-imbalance-v1-data-v1-recovery
+          path: |
+            research/results/qh-v1-corrected/SOLUSDT-2025-07.json
+            research/results/quarter-hour-boundary-imbalance-v1-data-v1-summary.json
+          if-no-files-found: warn
