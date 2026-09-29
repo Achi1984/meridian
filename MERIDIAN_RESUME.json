@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_BASIS_V1_DISCOVERY_FAIL_NEXT_BASIS_VOLATILITY_FOUNDATION",
+  "phase": "SPOT_PERP_BASIS_V1_DISCOVERY_FAIL_NEXT_PERPETUAL_REVERSAL_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -778,7 +778,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a strategy-neutral Spot-Perp Basis-Volatility Regime V1 feature foundation before any new strategy PnL. Preserve the synchronized Spot/Perp 8h data model and public Binance Vision sources. Test only whether lagged absolute/log basis contains out-of-sample information about forward realized volatility, using a preregistered discovery/holdout split and no trading returns. Do not lower the 95th-percentile or 77.5 bps Basis Dislocation V1 thresholds, and do not run its untouched holdout. Only if the feature foundation passes may a separately frozen directional volatility-regime strategy be designed. Keep executionImpact=false.",
+  "nextAction": "Freeze and run a strategy-neutral Perpetual Cross-Sectional Reversal V1 data foundation before any strategy PnL. Motivation is external 2026 evidence of 8-10 week crypto cross-sectional reversal, especially in volatile mid-caps. Freeze a broad midsize/alt Binance USD-M candidate universe and audit public perpetual price plus funding history with objective listing/continuity eligibility, preserving missing/delisted candidates instead of replacing them. Do not calculate reversal ranks, volatility-conditioned returns, portfolio PnL or optimize formation/holding windows in the foundation. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -788,7 +788,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_BASIS_VOLATILITY_REGIME_V1_FEATURE_FOUNDATION",
+    "selected": "PERPETUAL_CROSS_SECTIONAL_REVERSAL_V1_DATA_FOUNDATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -815,7 +815,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "FEATURE_FOUNDATION_BEFORE_DIRECTIONAL_STRATEGY",
+    "nextStage": "DATA_FOUNDATION_BEFORE_REVERSAL_STRATEGY",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -881,6 +881,9 @@
     "spotPerpBasisV1Status": "IMMUTABLE_DISCOVERY_FAIL_ZERO_TRADES",
     "spotPerpBasisV1Diagnosis": "NO_SIGNAL_REGIME_8736_EVALUATIONS_ZERO_QUALIFIED",
     "spotPerpBasisV1Holdout": "UNTOUCHED_UNAUTHORIZED",
-    "basisArbitrageThresholdRescue": false
+    "basisArbitrageThresholdRescue": false,
+    "reversalMotivation": "EXTERNAL_2026_EVIDENCE_8_TO_10_WEEK_CROSS_SECTIONAL_REVERSAL",
+    "reversalStrategyPnlAllowed": false,
+    "basisVolatilityFoundationStatus": "DEFERRED_NOT_IMPLEMENTED"
   }
 }
