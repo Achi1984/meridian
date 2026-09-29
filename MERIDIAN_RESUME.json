@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "FUNDING_V2_DATA_FOUNDATION_PASS_NEXT_RISK_BUDGET_V2",
+  "phase": "FUNDING_CARRY_RISK_BUDGET_V2_FAIL_NEXT_CROSS_VENUE_V2_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "c2601c241d5b52c7e57a2ced1364d1fb9bef0dfe",
+    "verifiedSha": "52707494c4cda3d6837a5ddbbba01f697b33657b",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -334,6 +334,47 @@
       "strategyPnlCalculated": false,
       "executionImpact": false,
       "immutable": true
+    },
+    "crossSectionalFundingCarryRiskBudgetV2": {
+      "ruleset": "CROSS-SECTIONAL-FUNDING-CARRY-RISK-BUDGET-V2-FROZEN",
+      "universe": [
+        "TRX",
+        "ETC",
+        "XLM",
+        "ATOM",
+        "UNI",
+        "AAVE",
+        "FIL",
+        "NEAR"
+      ],
+      "window": "2023-04-03..2026-08-31",
+      "periods": 178,
+      "activeWeeks": 178,
+      "netReturnPct": -9.4489,
+      "priceOnlyReturnPct": -21.9417,
+      "fundingContributionPct": 14.7898,
+      "profitFactor": 1.0075,
+      "sharpe": 0.0187,
+      "maxDrawdownPct": 48.1907,
+      "positiveWindows": "2/5",
+      "stressReturnPct": -33.4966,
+      "meanGrossExposure": 0.7906,
+      "positiveAssets": "5/8",
+      "positiveConcentrationPct": 49.39,
+      "gateReasons": [
+        "RETURN_NOT_POSITIVE",
+        "PRICE_ONLY_NOT_POSITIVE",
+        "PF_LT_1.05",
+        "SHARPE_LT_0.5",
+        "DD_GT_25.0",
+        "POSITIVE_WINDOWS_LT_3",
+        "SHORT_CONTRIBUTION_NOT_POSITIVE",
+        "POSITIVE_CONCENTRATION_GT_35.0",
+        "STRESS_RETURN_NOT_POSITIVE"
+      ],
+      "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -347,7 +388,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Cross-Sectional Funding Carry Risk-Budget V2 before any strategy result. Use only TRX/ETC/XLM/ATOM/UNI/AAVE/FIL/NEAR; preserve the exact FUNDING_CARRY_7D factor direction, 52-of-60 availability rule, 8 bps turnover cost and 32 bps stress; diversify to top-2/bottom-2 and apply an ex-ante 28-day realized portfolio-volatility scalar targeting 10% annualized volatility with gross cap 1.0 and no leverage. Then run the first economic validation on this previously unused universe. Do not retune V1 or reuse LTC/BCH/AVAX/HBAR as independent evidence. Keep executionImpact=false.",
+  "nextAction": "Build a strategy-neutral Cross-Venue Funding Spread V2 data foundation on a frozen previously unused cross-venue candidate universe BNB/ADA/DOT/LTC/BCH/TRX/ETC/XLM. Audit Binance USD-M and Hyperliquid public funding/mark data through 2026-08 with no PnL, no synthetic backfill and no asset substitution based on performance. Preserve Cross-Venue Funding Spread V1 as immutable. Only after the data foundation passes may a separately frozen V2 strategy protocol be written. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -357,7 +398,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "CROSS_SECTIONAL_FUNDING_CARRY_RISK_BUDGET_V2",
+    "selected": "CROSS_VENUE_FUNDING_SPREAD_V2_DATA_FOUNDATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -375,16 +416,19 @@
     },
     "fundingCarryV1Status": "IMMUTABLE_RISK_CONCENTRATION_FAIL",
     "nextUniverse": [
+      "BNB",
+      "ADA",
+      "DOT",
+      "LTC",
+      "BCH",
       "TRX",
       "ETC",
-      "XLM",
-      "ATOM",
-      "UNI",
-      "AAVE",
-      "FIL",
-      "NEAR"
+      "XLM"
     ],
-    "nextStage": "FREEZE_STRATEGY_BEFORE_RESULT",
-    "v2DataFoundation": "FOUNDATION_PASS_8_OF_8"
+    "nextStage": "DATA_FOUNDATION_BEFORE_STRATEGY",
+    "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
+    "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
+    "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
+    "crossVenueV1Status": "AGGREGATE_POSITIVE_HOLDOUT_BUT_ASSET_GATE_FAIL"
   }
 }
