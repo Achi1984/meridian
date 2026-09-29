@@ -110,6 +110,7 @@ A cycle fails closed when:
 
 The V1 research hypothesis passes only if **all** are true:
 - >= 24 completed asset-month cycles
+- >= 8 completed cycles for each of BTC, ETH and SOL
 - aggregate net return > 0
 - Profit Factor >= 1.15
 - max closed-equity drawdown <= 10%
