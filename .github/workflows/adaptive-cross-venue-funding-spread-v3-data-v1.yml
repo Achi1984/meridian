@@ -1,0 +1,34 @@
+name: MERIDIAN Adaptive Cross-Venue Funding Spread V3 Data Foundation
+
+on:
+  push:
+    branches:
+      - research/adaptive-cross-venue-funding-spread-v3-data-v1
+    paths:
+      - "research/ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-DATA-V1-FROZEN.md"
+      - "scripts/audit-adaptive-cross-venue-funding-spread-v3-data-v1.py"
+      - ".github/workflows/adaptive-cross-venue-funding-spread-v3-data-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adaptive-cross-venue-funding-spread-v3-data-v1
+  cancel-in-progress: true
+
+jobs:
+  coverage-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frozen full-history public-data coverage audit
+        run: python3 scripts/audit-adaptive-cross-venue-funding-spread-v3-data-v1.py
+      - name: Upload untouched coverage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-cross-venue-funding-spread-v3-data-v1
+          path: research/results/adaptive-cross-venue-funding-spread-v3-data-v1.json
+          if-no-files-found: error
+          retention-days: 30
