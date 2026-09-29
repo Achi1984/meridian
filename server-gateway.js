@@ -9,6 +9,8 @@ import { readPortfolioHistory } from "./portfolio-history-store.js";
 import { marketKlinesSnapshot } from "./market-feed-gateway.js";
 import { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
 import { createAssetWatchShareToken,verifyAssetWatchShareToken,rotateAssetWatchShareState,revokeAssetWatchShareState,assetWatchShareEnabled } from "./asset-watch-share.js";
+import { verifyGithubActionsOidc } from "./github-actions-oidc.js";
+import { encryptAssetWatchMirror } from "./asset-watch-mirror-crypto.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -420,6 +422,17 @@ const server=http.createServer(async(req,res)=>{
       const data=await stateGet(PRIVATE_STATE_KEY);
       if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
       return writeJson(res,200,buildAssetWatchApiSnapshot(data),origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/asset-watch/github-oidc-mirror"){
+      const verified=await verifyGithubActionsOidc(bearer(req));
+      if(!verified.ok)return writeJson(res,401,{error:"github_oidc_required"},origin||"");
+      const data=await stateGet(PRIVATE_STATE_KEY);
+      if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      const shareState=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
+      if(!assetWatchShareEnabled(shareState))return writeJson(res,503,{error:"asset_watch_share_not_configured"},origin||"");
+      const snapshot=buildAssetWatchApiSnapshot(data);
+      const envelope=encryptAssetWatchMirror(snapshot,shareState.tokenHash);
+      return writeJson(res,200,envelope,origin||"");
     }
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
