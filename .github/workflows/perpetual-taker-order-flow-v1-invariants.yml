@@ -1,0 +1,35 @@
+name: MERIDIAN Perpetual Taker Order Flow V1 Invariants
+
+on:
+  push:
+    branches:
+      - research/perpetual-taker-order-flow-v1-protocol-r2
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN.md"
+      - "research/perpetual-taker-order-flow-v1-protocol.json"
+      - "research/perpetual_taker_order_flow_v1.py"
+      - "test/test_perpetual_taker_order_flow_v1.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-invariants.yml"
+  pull_request:
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN.md"
+      - "research/perpetual-taker-order-flow-v1-protocol.json"
+      - "research/perpetual_taker_order_flow_v1.py"
+      - "test/test_perpetual_taker_order_flow_v1.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-invariants.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-taker-order-flow-v1-invariants-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen Taker Order Flow V1 invariants
+        run: python3 test/test_perpetual_taker_order_flow_v1.py
