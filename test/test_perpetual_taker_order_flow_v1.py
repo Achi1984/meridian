@@ -10,17 +10,23 @@ from perpetual_taker_order_flow_v1 import (
     ASSETS, BASE_COST_BPS, DAY, DEVELOPMENT_END, DEVELOPMENT_EXPECTED_PERIODS,
     DEVELOPMENT_START, FLOW_HOURS, HOLDOUT_END, HOLDOUT_EXPECTED_PERIODS,
     HOLDOUT_START, HOUR, RULESET, SIDE_COUNT, STRESS_COST_BPS, WEEK,
-    AssetData, funding_coverage, select_weights, stage_gate, terminal_close,
-    turnover, weekly_anchors
+    AssetData, development_authorizes_holdout, funding_coverage, run_stage,
+    select_weights, stage_gate, terminal_close, turnover, weekly_anchors
 )
 
 
 class FakeAsset:
-    def __init__(self,signal,holding=.01):
+    def __init__(self,signal,holding=.01,entry=True,raise_on_future=False):
         self.signal=signal
         self.holding=holding
+        self.entry=entry
+        self.raise_on_future=raise_on_future
     def flow_signal(self,t):return self.signal
-    def entry_exit_return(self,t):return self.holding
+    def entry_open_available(self,t):return self.entry
+    def entry_exit_return(self,t):
+        if self.raise_on_future:
+            raise AssertionError('future return must not be read during selection')
+        return self.holding
 
 
 def hourly_rows(start,n,prior_t=None,prior_buy=.60,future_buy=.99):
@@ -98,7 +104,7 @@ class TakerOrderFlowV1Tests(unittest.TestCase):
 
     def test_selection_is_top2_long_bottom2_short(self):
         data={a:FakeAsset(float(i)) for i,a in enumerate(ASSETS)}
-        w,signals,holding,longs,shorts=select_weights(data,0)
+        w,signals,longs,shorts=select_weights(data,0)
         self.assertEqual(longs,[ASSETS[-1],ASSETS[-2]])
         self.assertEqual(set(shorts),set(ASSETS[:2]))
         self.assertEqual(len(longs),2)
@@ -107,6 +113,38 @@ class TakerOrderFlowV1Tests(unittest.TestCase):
         self.assertTrue(all(w[a]<.0 for a in shorts))
         self.assertAlmostEqual(sum(w.values()),0.0)
         self.assertAlmostEqual(sum(abs(x) for x in w.values()),1.0)
+
+    def test_selection_does_not_read_future_return(self):
+        data={a:FakeAsset(float(i),raise_on_future=True) for i,a in enumerate(ASSETS)}
+        w,signals,longs,shorts=select_weights(data,0)
+        self.assertEqual(len(signals),12)
+        self.assertEqual(len(longs),2)
+        self.assertEqual(len(shorts),2)
+        self.assertAlmostEqual(sum(w.values()),0.0)
+        self.assertAlmostEqual(sum(abs(x) for x in w.values()),1.0)
+
+    def test_selection_requires_entry_time_data_but_not_exit_time_data(self):
+        data={a:FakeAsset(float(i)) for i,a in enumerate(ASSETS)}
+        data['BTC']=FakeAsset(99.0,entry=False)
+        with self.assertRaisesRegex(ValueError,'ELIGIBLE_ASSETS_NE_12'):
+            select_weights(data,0)
+
+    def test_holdout_engine_is_locked_without_valid_development_evidence(self):
+        self.assertFalse(development_authorizes_holdout(None))
+        self.assertFalse(development_authorizes_holdout({
+            'ruleset':RULESET,'stage':'DEVELOPMENT',
+            'decision':'DEVELOPMENT_FAIL_RESEARCH_REDESIGN',
+            'dataIntegrityFailure':False,'gate':{'pass':False}
+        }))
+        with self.assertRaisesRegex(PermissionError,'HOLDOUT_NOT_AUTHORIZED'):
+            run_stage({},'TEMPORAL_HOLDOUT')
+
+        good={
+            'ruleset':RULESET,'stage':'DEVELOPMENT',
+            'decision':'DEVELOPMENT_PASS_TEMPORAL_HOLDOUT_REQUIRED',
+            'dataIntegrityFailure':False,'gate':{'pass':True}
+        }
+        self.assertTrue(development_authorizes_holdout(good))
 
     def test_funding_interval_excludes_entry_and_includes_exit(self):
         self.assertTrue(funding_coverage([8*HOUR,16*HOUR,24*HOUR],0,24*HOUR))
@@ -152,6 +190,14 @@ class TakerOrderFlowV1Tests(unittest.TestCase):
         self.assertEqual(p['signal']['direction'],'CONTINUATION_HIGH_LONG_LOW_SHORT')
         self.assertEqual(p['portfolio']['sideCount'],2)
         self.assertTrue(p['stages']['holdout']['authorizedOnlyAfterDevelopmentPass'])
+        self.assertEqual(
+            p['portfolio']['selectionInformationSet'],
+            'PRIOR_168H_FLOW_PLUS_ENTRY_OPEN_ONLY_NO_EXIT_OR_HOLDING_RETURN'
+        )
+        self.assertEqual(
+            p['stages']['holdout']['engineAuthorizationEvidence'],
+            'CANONICAL_DEVELOPMENT_PASS_EVIDENCE_REQUIRED'
+        )
         self.assertFalse(p['holdoutLoaded'])
         self.assertFalse(p['paperAuthorized'])
         self.assertFalse(p['liveAuthorized'])
