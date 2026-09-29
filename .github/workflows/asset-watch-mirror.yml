@@ -47,12 +47,17 @@ jobs:
           MERIDIAN_BASE_URL: https://p01--achi-meridian--ttvk44grdlp7.code.run
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
+          HTTP_CODE="$(curl --silent --show-error \
             --retry 3 --retry-delay 2 --max-time 20 \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             "$MERIDIAN_BASE_URL/api/private/asset-watch/github-oidc-mirror" \
-            -o asset-watch-mirror.json
+            -o asset-watch-mirror.json -w '%{http_code}')"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "MERIDIAN mirror endpoint returned HTTP $HTTP_CODE"
+            cat asset-watch-mirror.json
+            exit 22
+          fi
           node -e '
             const fs=require("fs");
             const x=JSON.parse(fs.readFileSync("asset-watch-mirror.json","utf8"));

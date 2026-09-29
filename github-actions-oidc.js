@@ -20,23 +20,23 @@ function decodePart(part){
 function audOk(aud){
   return Array.isArray(aud)?aud.includes(AUDIENCE):String(aud||'')===AUDIENCE;
 }
-function claimsOk(p,nowSec){
-  if(String(p?.iss||'')!==ISSUER)return false;
-  if(!audOk(p?.aud))return false;
-  if(String(p?.repository||'')!==REPOSITORY)return false;
-  if(String(p?.repository_id||'')!==REPOSITORY_ID)return false;
-  if(String(p?.ref||'')!==REF)return false;
-  if(String(p?.workflow_ref||'')!==WORKFLOW_REF)return false;
-  if(!String(p?.sub||'').startsWith('repo:Achi1984/meridian:'))return false;
-  if(!ALLOWED_EVENTS.has(String(p?.event_name||'')))return false;
-  if(String(p?.runner_environment||'')!=='github-hosted')return false;
+function claimsReason(p,nowSec){
+  if(String(p?.iss||'')!==ISSUER)return 'claim_iss';
+  if(!audOk(p?.aud))return 'claim_aud';
+  if(String(p?.repository||'')!==REPOSITORY)return 'claim_repository';
+  if(String(p?.repository_id||'')!==REPOSITORY_ID)return 'claim_repository_id';
+  if(String(p?.ref||'')!==REF)return 'claim_ref';
+  if(String(p?.workflow_ref||'')!==WORKFLOW_REF)return 'claim_workflow_ref';
+  if(!String(p?.sub||'').startsWith('repo:Achi1984/meridian:'))return 'claim_sub';
+  if(!ALLOWED_EVENTS.has(String(p?.event_name||'')))return 'claim_event_name';
+  if(String(p?.runner_environment||'')!=='github-hosted')return 'claim_runner_environment';
   const exp=Number(p?.exp),nbf=Number(p?.nbf),iat=Number(p?.iat);
-  if(!Number.isFinite(exp)||!Number.isFinite(nbf)||!Number.isFinite(iat))return false;
-  if(exp<nowSec-CLOCK_SKEW_SEC)return false;
-  if(nbf>nowSec+CLOCK_SKEW_SEC)return false;
-  if(iat>nowSec+CLOCK_SKEW_SEC)return false;
-  if(nowSec-iat>MAX_TOKEN_AGE_SEC)return false;
-  return true;
+  if(!Number.isFinite(exp)||!Number.isFinite(nbf)||!Number.isFinite(iat))return 'claim_time_missing';
+  if(exp<nowSec-CLOCK_SKEW_SEC)return 'claim_expired';
+  if(nbf>nowSec+CLOCK_SKEW_SEC)return 'claim_nbf';
+  if(iat>nowSec+CLOCK_SKEW_SEC)return 'claim_iat_future';
+  if(nowSec-iat>MAX_TOKEN_AGE_SEC)return 'claim_iat_stale';
+  return null;
 }
 async function getJwks(fetchFn=fetch,nowMs=Date.now()){
   if(jwksCache.keys.length&&nowMs-jwksCache.at<10*60*1000)return jwksCache.keys;
@@ -57,7 +57,8 @@ export async function verifyGithubActionsOidc(token,{fetchFn=fetch,nowMs=Date.no
     const header=decodePart(parts[0]);
     const payload=decodePart(parts[1]);
     if(header?.alg!=='RS256'||!String(header?.kid||''))return {ok:false,reason:'header'};
-    if(!claimsOk(payload,Math.floor(nowMs/1000)))return {ok:false,reason:'claims'};
+    const claimReason=claimsReason(payload,Math.floor(nowMs/1000));
+    if(claimReason)return {ok:false,reason:claimReason};
     const keys=await getJwks(fetchFn,nowMs);
     const jwk=keys.find(k=>String(k?.kid||'')===String(header.kid));
     if(!jwk)return {ok:false,reason:'kid'};
