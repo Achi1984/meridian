@@ -1,0 +1,56 @@
+name: MERIDIAN Relative-Value Reversal V3 Broad-Market Data V2
+
+on:
+  push:
+    branches:
+      - research/perpetual-relative-value-reversal-v3-data-v2-broad-market
+    paths:
+      - "research/PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-DATA-V2-BROAD-MARKET-FROZEN.md"
+      - "scripts/audit-perpetual-relative-value-reversal-v3-data-v2-broad-market.py"
+      - ".github/workflows/perpetual-relative-value-reversal-v3-data-v2-broad-market.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-relative-value-reversal-v3-data-v2-broad-market
+  cancel-in-progress: true
+
+jobs:
+  benchmark-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify audit syntax
+        run: python3 -m py_compile scripts/audit-perpetual-relative-value-reversal-v3-data-v2-broad-market.py
+      - name: Run frozen broad-market benchmark coverage audit
+        run: python3 scripts/audit-perpetual-relative-value-reversal-v3-data-v2-broad-market.py
+      - name: Assert strategy-neutral invariants
+        run: |
+          python3 - <<'PY'
+          import json
+          p='research/results/perpetual-relative-value-reversal-v3-data-v2-broad-market.json'
+          x=json.load(open(p))
+          forbidden=[
+              'marketFactorReturnCalculated','betaCalculated','residualReturnsCalculated',
+              'reversalRanksCalculated','portfolioWeightsCalculated','strategyPnlCalculated',
+              'syntheticBackfillUsed'
+          ]
+          bad=[k for k in forbidden if x.get(k) is not False]
+          if bad:
+              raise SystemExit('strategy-neutral foundation violated: '+','.join(bad))
+          if x.get('inheritedCandidateUniverseChanged') is not False:
+              raise SystemExit('candidate universe changed')
+          if x.get('inheritedCandidateQualificationChanged') is not False:
+              raise SystemExit('candidate qualification changed')
+          print('strategy-neutral invariants: OK')
+          PY
+      - name: Upload untouched benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-relative-value-reversal-v3-data-v2-broad-market
+          path: research/results/perpetual-relative-value-reversal-v3-data-v2-broad-market.json
+          if-no-files-found: error
+          retention-days: 30

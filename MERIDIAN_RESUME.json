@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_FOUNDATION_PASS_NEXT_BROAD_MARKET_DATA_V2",
+  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_DATA_V2_PASS_NEXT_STRATEGY_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -951,6 +951,27 @@
       "syntheticBackfillUsed": false,
       "decision": "FOUNDATION_PASS",
       "immutable": true
+    },
+    "perpetualRelativeValueReversalV3DataV2": {
+      "ruleset": "PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-DATA-V2-BROAD-MARKET-FROZEN",
+      "interval": "2024-01..2026-08",
+      "benchmarkAssets": [
+        "BTC",
+        "ETH",
+        "BNB",
+        "SOL",
+        "XRP"
+      ],
+      "benchmarkReady": "5_OF_5_32_OF_32_MONTHS",
+      "unexpectedTransportErrors": 0,
+      "marketFactorReturnCalculated": false,
+      "betaCalculated": false,
+      "residualReturnsCalculated": false,
+      "reversalRanksCalculated": false,
+      "portfolioWeightsCalculated": false,
+      "strategyPnlCalculated": false,
+      "decision": "FOUNDATION_PASS_BROAD_MARKET_BENCHMARK",
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -964,7 +985,7 @@
     255,
     256
   ],
-  "nextAction": "Treat PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-DATA-V1 as the canonical strategy-neutral foundation pass (19/20 candidates; EOS remains failed and is not replaced). Before freezing any V3 strategy or calculating beta/residual returns/PnL, add a separately frozen Data V2 benchmark extension using the same 20 candidate universe and the same 2024-01..2026-08 interval, while validating daily price coverage for a fixed broad-market benchmark basket BTC, ETH, BNB, SOL and XRP. Do not calculate market-factor returns or betas in Data V2. Only after the broad benchmark foundation passes may the exact market-factor construction, robust beta estimator, residual formation, sizing, costs and independent asset-transfer split be preregistered.",
+  "nextAction": "Freeze a separately named PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 strategy before first V3 PnL. Use only the 19 Data V1-qualified transfer candidates; EOS remains excluded as a frozen data failure. Build the market factor only from the Data V2-qualified fixed benchmark basket BTC/ETH/BNB/SOL/XRP. Freeze benchmark weighting/return semantics, robust beta estimator and lookback, residual 8-week formation with 1-week skip, hold period, beta-neutral sizing, funding/cost accounting, deterministic development/asset-transfer split and all gates before any PnL. No parameter grid or post-result retuning; executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -974,7 +995,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_BROAD_MARKET_DATA_V2",
+    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_STRATEGY_PREREGISTRATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1001,7 +1022,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "V3_DATA_FOUNDATION_AND_PREREGISTRATION_BEFORE_STRATEGY_PNL",
+    "nextStage": "V3_STRATEGY_PROTOCOL_AND_INVARIANTS_BEFORE_FIRST_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1092,8 +1113,8 @@
     "reversalV2TransferAuthorized": false,
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
-    "reversalV3Stage": "FOUNDATION_V1_PASS_BROAD_MARKET_EXTENSION_BEFORE_STRATEGY",
-    "reversalV3StrategyPnlAllowed": false,
+    "reversalV3Stage": "DATA_V1_AND_BROAD_MARKET_DATA_V2_PASS_BEFORE_STRATEGY",
+    "reversalV3StrategyPnlAllowed": "ONLY_AFTER_PROTOCOL_AND_INVARIANTS_FROZEN",
     "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
     "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
     "reversalV2EvidenceUse": "HYPOTHESIS_GENERATION_ONLY",
@@ -1125,7 +1146,7 @@
     "reversalV3Benchmark": "BTCUSDT_USDM_1D",
     "reversalV3IndependentEvidenceDesign": "DISJOINT_ASSET_TRANSFER_HOLDOUT",
     "reversalV3PaperAuthorized": false,
-    "reversalV3BetaEstimationAllowed": false,
+    "reversalV3BetaEstimationAllowed": "ONLY_AFTER_PROTOCOL_FROZEN",
     "reversalV3DataV1Benchmark": "BTCUSDT_USDM_1D",
     "reversalV3DataV2BenchmarkBasket": [
       "BTC",
@@ -1135,6 +1156,14 @@
       "XRP"
     ],
     "reversalV3DataV2Purpose": "VALIDATE_BROAD_MARKET_BENCHMARK_COVERAGE_ONLY",
-    "reversalV3BroadMarketRationale": "EXTERNAL_2025_EVIDENCE_MARKET_INDEX_SPECIFICATION_MATERIALLY_AFFECTS_CRYPTO_BETA_ESTIMATION"
+    "reversalV3BroadMarketRationale": "EXTERNAL_2025_EVIDENCE_MARKET_INDEX_SPECIFICATION_MATERIALLY_AFFECTS_CRYPTO_BETA_ESTIMATION",
+    "reversalV3DataV2Status": "FOUNDATION_PASS_BROAD_MARKET_BENCHMARK_5_OF_5",
+    "reversalV3BenchmarkBasket": [
+      "BTC",
+      "ETH",
+      "BNB",
+      "SOL",
+      "XRP"
+    ]
   }
 }

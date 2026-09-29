@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-DATA-V2-BROAD-MARKET-FROZEN",
+  "runId": 36605521847,
+  "headSha": "aaece42a11dd46ff7ffc485f9873c44914382993",
+  "artifactId": 11050766443,
+  "artifactZipSha256": "91533286cb87dc2d196424c183024ad9f7aacedd87caa74aaa6a2b06f7b96eea",
+  "foundationJsonSha256": "acf639c41f4952848c9ebf294ee5d71f1c44c9dde91f14597d0f1fe58f62e0cb",
+  "decision": "FOUNDATION_PASS_BROAD_MARKET_BENCHMARK",
+  "benchmarkAssets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP"
+  ],
+  "readyBenchmarkAssets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP"
+  ],
+  "readyBenchmarkCount": 5,
+  "monthsPerBenchmark": 32,
+  "unexpectedTransportErrors": 0,
+  "inheritedDataV1CandidateCount": 20,
+  "inheritedDataV1QualifiedCandidateCount": 19,
+  "inheritedFailedCandidate": "EOS",
+  "inheritedCandidateUniverseChanged": false,
+  "inheritedCandidateQualificationChanged": false,
+  "marketFactorReturnCalculated": false,
+  "betaCalculated": false,
+  "residualReturnsCalculated": false,
+  "reversalRanksCalculated": false,
+  "portfolioWeightsCalculated": false,
+  "strategyPnlCalculated": false,
+  "syntheticBackfillUsed": false,
+  "executionImpact": false,
+  "autoPromotion": false,
+  "nextEligibleStep": "FREEZE_RELATIVE_VALUE_REVERSAL_V3_STRATEGY_PROTOCOL_BEFORE_FIRST_PNL"
+}
