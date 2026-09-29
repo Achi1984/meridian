@@ -1,4 +1,4 @@
-# Quarter-Hour Boundary Imbalance V1 — External Evidence Lock 2026-09-29\n\n> Current-main independent review (2026-09-29): primary arXiv text confirms the six Binance USDT-perpetual contracts, 2021-01-01..2024-10-31 sample, first-10-second peak window, isBuyerMaker direction convention, normalized order imbalance, and 4–12h predictive horizon. Independent cost/leakage and mean-reversion papers were also rechecked. This remains external-evidence prework only; no MERIDIAN signal, return, position or PnL was used to choose the design.\n\n
+# Quarter-Hour Boundary Imbalance V1 — External Evidence Lock 2026-09-29\n\n> Current-main review (2026-09-29): the primary arXiv v2 full text confirms the six Binance USDT-perpetual contracts, 2021-01-01..2024-10-31 sample, first-10-second peak window, `isBuyerMaker` direction convention, normalized order imbalance, and 4–12h predictive horizon. Its appendix Table A.6 also verifies the 4h/8h/12h coefficients recorded below. Independent cost/leakage and mean-reversion papers were rechecked separately. This remains external-evidence prework only; no MERIDIAN signal, return, position or PnL was used to choose the design.\n\n
 
 Status: **EXTERNAL-EVIDENCE PREWORK ONLY**  
 Own-data signal/PnL observed: **false**  
@@ -12,7 +12,7 @@ This document does not authorize a strategy backtest. It locks what the external
 
 ## Primary source
 
-Chan Kim and Peter Reinhard Hansen, *The Quarter-Hour Effect: Periodic Algorithmic Trading and Return Predictability in Cryptocurrency Futures*, arXiv:2607.09426v2, 2026-08-24.
+Chan Kim and Peter Reinhard Hansen, *The Quarter-Hour Effect: Periodic Algorithmic Trading and Return Predictability in Cryptocurrency Futures*, arXiv:2607.09426v2. The arXiv v2 revision is dated 2026-07-16; the manuscript itself is dated 2026-08-24.
 
 Source:
 https://arxiv.org/abs/2607.09426
@@ -21,7 +21,7 @@ Study setting:
 - Binance USDT-margined perpetual futures;
 - BTC, ETH, XRP, SOL, DOGE, ADA;
 - sample: 2021-01-01 through 2024-10-31;
-- trade-level timestamps, price, quantity and `isBuyerMaker`;
+- aggregate-trade records with millisecond timestamps, price, quantity and `isBuyerMaker`;
 - 10-second calendar-time aggregation.
 
 ## Externally defined order-flow variable
