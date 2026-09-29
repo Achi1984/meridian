@@ -83,14 +83,14 @@ Required action: after the active source-consistency diagnostic is resolved, upd
 
 Severity: **HIGH for orchestration continuity, zero execution impact**.
 
-### A2 — No current-runtime performance claim is justified from GitHub alone
+### A2 — Current-runtime comparison requires a fresh deployed snapshot, not new API code
 
-GitHub contains the rules, historical research evidence and lifecycle code, but not a guaranteed fresh runtime ledger snapshot.
+GitHub contains the rules, historical research evidence and lifecycle code, but not a guaranteed fresh runtime ledger snapshot. The current server already exposes read-only runtime surfaces: `/api/paper/overview`, `/api/bot-observer`, `/api/public-status` and `/api/paper`. `paperOverviewStatus()` returns the Baseline ledger plus Challenger V2, Challenger V3, paired Directional V4, Funding Carry V2 and attribution state with a generated timestamp; `botObserverStatus()` also provides observer/lifecycle context.
 
-Therefore:
+Therefore the missing evidence is **not** an export implementation. It is a timestamped capture from the authoritative deployed instance, with freshness/provenance verified before comparison. Until that exists:
 - do not invent current PF, win rate, PnL or drawdown;
 - do not name a currently running bot “best” from repo state alone;
-- a quantitative current-runtime bot comparison requires a timestamped authoritative runtime snapshot with provenance.
+- do not treat a cached UI snapshot as current runtime evidence.
 
 Severity: **HIGH for decision quality, zero execution impact**.
 
@@ -123,7 +123,7 @@ The v10 Lab can execute historical research modules. Observer/R32 components des
 1. Finish the current Quarter-Hour source-consistency gate without exposing strategy PnL.
 2. Refresh `MERIDIAN_RESUME.json` only after that gate is frozen, using the then-current verified `main` SHA and exact next action.
 3. Keep the r68 profit-research outcomes immutable; do not rescue failed candidates by changing frozen gates.
-4. Add a read-only runtime snapshot/export only if a current Paper-bot performance comparison is required.
+4. For a current Paper-bot performance comparison, capture the already-existing `/api/paper/overview` and `/api/bot-observer` responses from the authoritative deployed instance, freeze `generatedAt`/engine/DB freshness plus source URL provenance, then derive comparison metrics offline. Do not add another overlapping runtime API unless a concrete gap is demonstrated.
 5. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
 6. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
 7. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
