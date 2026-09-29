@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "CROSS_VENUE_V2_FAIL_NEXT_ADAPTIVE_V3_DATA_FOUNDATION",
+  "phase": "ADAPTIVE_CROSS_VENUE_V3_FOUNDATION_PASS_NEXT_STRATEGY_DISCOVERY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "e4454e2266f8eddbb0cc3e55b86ee3c85a4fb3c9",
+    "verifiedSha": "703228c935f1993590544810fe2b1e15f174c684",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -444,6 +444,41 @@
       "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
       "promoted": false,
       "immutable": true
+    },
+    "adaptiveCrossVenueFundingSpreadV3DataV1": {
+      "ruleset": "ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-DATA-V1-FROZEN",
+      "interval": "2024-09..2026-08",
+      "candidateUniverse": [
+        "HBAR",
+        "SUI",
+        "NEAR",
+        "FIL",
+        "UNI",
+        "AAVE",
+        "ATOM",
+        "ARB"
+      ],
+      "qualifiedAssets": [
+        "HBAR",
+        "SUI",
+        "NEAR",
+        "FIL",
+        "UNI",
+        "AAVE",
+        "ATOM",
+        "ARB"
+      ],
+      "qualifiedCount": 8,
+      "requiredQualified": 5,
+      "binanceCoreMonthsPerAsset": 24,
+      "hyperliquidCandlesPerAsset": 2191,
+      "hyperliquidFundingObservationsPerAsset": 17520,
+      "unexpectedTransportErrors": 0,
+      "decision": "FOUNDATION_PASS",
+      "strategyPnlCalculated": false,
+      "directionInferred": false,
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -457,7 +492,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze and run a strategy-neutral Adaptive Cross-Venue Funding Spread V3 data foundation on the previously unused candidate universe HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. Use Binance Vision USD-M public funding/8h mark archives and Hyperliquid public meta/8h candles/full funding history over the common 2024-09..2026-08 interval. No PnL, no direction inference, no asset replacement and no synthetic backfill. Require broad full-history qualification before any V3 strategy protocol is written. Keep executionImpact=false.",
+  "nextAction": "Freeze Adaptive Cross-Venue Funding Spread V3 before any PnL. Use the eight qualified assets HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. Use September 2024 only as a pre-trade warmup. Discovery cycles: 2024-10..2025-08. Frozen temporal holdout: 2025-09..2026-08, executable only if discovery passes. At each month start, compute trailing 30-day realized funding spread = Hyperliquid sum minus Binance sum using only timestamps before entry. If spread >= +0.52%, LONG Binance/SHORT Hyperliquid; if <= -0.52%, SHORT Binance/LONG Hyperliquid; otherwise NO TRADE. Preserve V2 notional/cost/basis model, use reserved-capital returns that count flat assets as 0, and require positive stress economics before holdout. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -467,7 +502,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3_DATA_FOUNDATION",
+    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -514,6 +549,22 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-09..2026-08",
     "adaptiveDirectionAllowed": false,
-    "strategyPnlAllowed": false
+    "strategyPnlAllowed": false,
+    "v3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
+    "v3Universe": [
+      "HBAR",
+      "SUI",
+      "NEAR",
+      "FIL",
+      "UNI",
+      "AAVE",
+      "ATOM",
+      "ARB"
+    ],
+    "v3Warmup": "2024-09",
+    "v3Discovery": "2024-10..2025-08",
+    "v3Holdout": "2025-09..2026-08",
+    "v3Signal": "TRAILING_30D_FUNDING_SPREAD_SIGN_WITH_52BPS_COST_FLOOR",
+    "v3NoTrade": true
   }
 }
