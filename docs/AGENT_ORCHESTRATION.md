@@ -133,6 +133,8 @@ Run serially when one result changes the assumptions of the next, for example:
 For any mutable canonical surface:
 - exactly one writer at a time;
 - parallel agents use isolated branches;
+- **two writes must never run concurrently against the same branch/ref, even when they touch different files**;
+- branch writes are serialized; parallelism is limited to read-only work or separate branches/workspaces;
 - no concurrent merge;
 - Main Agent is the only integrator.
 
