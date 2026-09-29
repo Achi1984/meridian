@@ -29,7 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify inherited execution and frozen V1 gates
-        run: python3 -m unittest test/test_self_history_perp_factor_v3.py test/test_cross_sectional_perpetual_factor_v1.py
+        run: |
+          python3 test/test_self_history_perp_factor_v3.py
+          python3 test/test_cross_sectional_perpetual_factor_v1.py
       - name: Collect official unseen Binance Vision archives
         run: python3 scripts/collect-cross-sectional-perpetual-factor-v1.py
       - name: Run first independent temporal validation
