@@ -1,0 +1,53 @@
+name: MERIDIAN Spot-Perp Basis-Volatility Regime V1
+
+on:
+  push:
+    branches:
+      - research/spot-perp-basis-volatility-regime-v1
+    paths:
+      - "research/SPOT-PERP-BASIS-VOLATILITY-REGIME-V1-FROZEN.md"
+      - "research/spot-perp-basis-volatility-regime-v1.js"
+      - "research/run-spot-perp-basis-volatility-regime-v1.mjs"
+      - "test/spot-perp-basis-volatility-regime-v1.test.js"
+      - ".github/workflows/spot-perp-basis-volatility-regime-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spot-perp-basis-volatility-regime-v1
+  cancel-in-progress: true
+
+jobs:
+  feature-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check frozen feature engine and runner
+        run: |
+          node --check research/spot-perp-basis-volatility-regime-v1.js
+          node --check research/run-spot-perp-basis-volatility-regime-v1.mjs
+      - name: Verify frozen feature invariants
+        run: node --test test/spot-perp-basis-volatility-regime-v1.test.js
+      - name: Collect discovery-only synchronized Binance Vision archives
+        env:
+          SPOT_PERP_BASIS_V1_START: "2024-06"
+          SPOT_PERP_BASIS_V1_END: "2025-08"
+        run: python3 scripts/collect-spot-perp-basis-dislocation-v1.py
+      - name: Run first frozen Basis-Volatility feature discovery
+        run: node research/run-spot-perp-basis-volatility-regime-v1.mjs
+      - name: Upload untouched feature evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-perp-basis-volatility-regime-v1
+          path: |
+            research/results/spot-perp-basis-volatility-regime-v1-summary.json
+            research/results/spot-perp-basis-volatility-regime-v1-full.json
+            research/results/spot-perp-basis-volatility-regime-v1.md
+          if-no-files-found: error
+          retention-days: 30
