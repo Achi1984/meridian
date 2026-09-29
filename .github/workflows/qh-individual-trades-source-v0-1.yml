@@ -1,0 +1,35 @@
+name: MERIDIAN QH Individual Trades Source V0.1
+
+on:
+  push:
+    branches:
+      - research/qh-individual-trades-source-v0-1
+    paths:
+      - "scripts/audit-qh-individual-trades-source-v0-1.py"
+      - ".github/workflows/qh-individual-trades-source-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-individual-trades-source-v0-1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check 120 monthly trades archives and checksums
+        run: python3 scripts/audit-qh-individual-trades-source-v0-1.py
+      - name: Upload source-feasibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-individual-trades-source-v0-1
+          path: |
+            research/results/qh-individual-trades-source-v0-1-summary.json
+            research/results/qh-individual-trades-source-v0-1-full.json
+          if-no-files-found: warn

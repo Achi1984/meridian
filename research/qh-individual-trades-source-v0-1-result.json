@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+  "stage": "INDIVIDUAL_TRADES_SOURCE_V0_1_AVAILABILITY",
+  "workflowRun": 36618967045,
+  "artifactId": 11057721043,
+  "artifactZipSha256": "8feaf8e446bd7444fa73b1f8e2f27102518470d638389467f6fb9ef8d6c6ab14",
+  "source": "Binance Vision official public USD-M monthly trades archives",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "DOGEUSDT",
+    "ADAUSDT"
+  ],
+  "window": "2025-01..2026-08",
+  "expectedObjects": 120,
+  "availableObjects": 120,
+  "missingObjects": 0,
+  "publishedBytes": 92920074879,
+  "byAsset": {
+    "BTCUSDT": {
+      "available": 20,
+      "publishedBytes": 17691556174
+    },
+    "ETHUSDT": {
+      "available": 20,
+      "publishedBytes": 33217384723
+    },
+    "XRPUSDT": {
+      "available": 20,
+      "publishedBytes": 13116853172
+    },
+    "SOLUSDT": {
+      "available": 20,
+      "publishedBytes": 12603645841
+    },
+    "DOGEUSDT": {
+      "available": 20,
+      "publishedBytes": 11124296512
+    },
+    "ADAUSDT": {
+      "available": 20,
+      "publishedBytes": 5166338457
+    }
+  },
+  "marketRowsParsed": false,
+  "directionalOrderImbalanceCalculated": false,
+  "forwardReturnsCalculated": false,
+  "signalReturnRelationshipCalculated": false,
+  "positionsCalculated": false,
+  "strategyPnlCalculated": false,
+  "executionImpact": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "decision": "INDIVIDUAL_TRADES_SOURCE_V0_1_PASS_DATA_QUALITY_PROTOCOL_REQUIRED"
+}
