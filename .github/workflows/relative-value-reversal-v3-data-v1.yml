@@ -1,0 +1,51 @@
+name: MERIDIAN Relative-Value Reversal V3 Data Foundation
+
+on:
+  push:
+    branches:
+      - research/relative-value-reversal-v3-data-v1
+    paths:
+      - "research/RELATIVE-VALUE-REVERSAL-V3-DATA-V1-FROZEN.md"
+      - "scripts/audit-relative-value-reversal-v3-data-v1.py"
+      - ".github/workflows/relative-value-reversal-v3-data-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relative-value-reversal-v3-data-v1
+  cancel-in-progress: true
+
+jobs:
+  coverage-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen audit syntax
+        run: python3 -m py_compile scripts/audit-relative-value-reversal-v3-data-v1.py
+      - name: Run frozen strategy-neutral public-data coverage audit
+        run: python3 scripts/audit-relative-value-reversal-v3-data-v1.py
+      - name: Assert no strategy calculations
+        run: |
+          python3 - <<'PY'
+          import json
+          p='research/results/relative-value-reversal-v3-data-v1.json'
+          x=json.load(open(p))
+          forbidden=[
+              'strategyPnlCalculated','reversalRanksCalculated','betaEstimated',
+              'residualReturnsCalculated','portfolioWeightsCalculated','syntheticBackfillUsed'
+          ]
+          bad=[k for k in forbidden if x.get(k) is not False]
+          if bad:
+              raise SystemExit('foundation violated strategy-neutral invariants: '+','.join(bad))
+          print('strategy-neutral invariants: OK')
+          PY
+      - name: Upload untouched foundation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: relative-value-reversal-v3-data-v1
+          path: research/results/relative-value-reversal-v3-data-v1.json
+          if-no-files-found: error
+          retention-days: 30
