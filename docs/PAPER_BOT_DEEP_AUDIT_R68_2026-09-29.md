@@ -94,7 +94,23 @@ Therefore the missing evidence is **not** an export implementation. It is a time
 
 Severity: **HIGH for decision quality, zero execution impact**.
 
-### A3 — Legacy v8 Paper scoring remains in the repository
+### A3 — Fresh runtime snapshot confirms no currently established profitable Paper lineage
+
+Read-only snapshot run `36627547224` captured the public observer at `2026-09-29T20:36:55Z` with 179 ms age, engine RUNNING, marketFresh=true, zero engine errors, paperTrading=true and liveTrading=false.
+
+Observed directional/reference telemetry:
+- Baseline: 30 closed, PnL -853.52, PF 0.63, DD 11.35%, win rate 40.0%.
+- Challenger V2: 23 closed, PnL -29.72, PF 0.98, DD 8.96%, win rate 47.8%; lifecycle SEALED_REFERENCE.
+- Challenger V3: 33 closed, PnL -201.12, PF 0.73, DD 2.44%, win rate 48.5%; lifecycle RETIRED_NO_EDGE. Its R32-style learning phase is already RETIRE at 30 phase trades, expectancy -5.39, PF 0.76.
+- Challenger V4 Exit Shadow: 13 closed, PnL -128.29, PF 0.56, DD 1.46%, win rate 53.8%; lifecycle PAIRED_SHADOW.
+- Funding Carry V1: ACTIVE_PAPER with exposed net PnL -3.74, funding income +30.12, basis PnL -0.77 and estimated costs 33.09.
+- Funding Carry V2: WAITING_ENTRY; current gate reason NET_CARRY_BELOW_HURDLE and cost coverage 0.43.
+
+R42 runtime also remains fail-closed: momentum is SEALED after one losing closed trade and historical walk-forward rejection; pairs is SEALED with no robust pair; squeeze is WAITING_DATA for a complete liquidation feed; carry is WAITING_ENTRY with no cost-covered carry.
+
+The snapshot does not justify a cross-lineage leaderboard because samples, lifecycles and mechanics differ. It does, however, rule out any current claim that an established profitable Paper bot is already demonstrated. No promotion or parameter rescue is supported by this evidence.
+
+### A4 — Legacy v8 Paper scoring remains in the repository
 
 The old `app-v8.0-paper-summary.js` still contains a second heuristic:
 - WATCH+ near trades >= 20, positive PnL, PF >= 1.05 and DD <= 10%;
@@ -108,13 +124,13 @@ Required action:
 
 No trading threshold should be changed as part of that cleanup.
 
-### A4 — Profit research has correctly failed closed so far
+### A5 — Profit research has correctly failed closed so far
 
 Several research lanes show attractive isolated metrics but fail a frozen risk, breadth, stability or transfer gate. The correct response is not threshold relaxation.
 
 The current Quarter-Hour source-quality work is therefore an appropriate independent lane: it must complete data-quality gating before any directional signal, return or PnL is evaluated.
 
-### A5 — Historical research results and runtime Paper bots must remain separate in UI language
+### A6 — Historical research results and runtime Paper bots must remain separate in UI language
 
 The v10 Lab can execute historical research modules. Observer/R32 components describe live Paper research state. Those must not be visually collapsed into one “bot leaderboard” because their sample definitions, costs and lifecycle semantics differ.
 
@@ -123,10 +139,11 @@ The v10 Lab can execute historical research modules. Observer/R32 components des
 1. Finish the current Quarter-Hour source-consistency gate without exposing strategy PnL.
 2. Refresh `MERIDIAN_RESUME.json` only after that gate is frozen, using the then-current verified `main` SHA and exact next action.
 3. Keep the r68 profit-research outcomes immutable; do not rescue failed candidates by changing frozen gates.
-4. For a current Paper-bot performance comparison, capture the already-existing `/api/paper/overview` and `/api/bot-observer` responses from the authoritative deployed instance, freeze `generatedAt`/engine/DB freshness plus source URL provenance, then derive comparison metrics offline. Do not add another overlapping runtime API unless a concrete gap is demonstrated.
-5. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
-6. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
-7. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
+4. Preserve snapshot run `36627547224` as the current runtime evidence baseline; recapture the existing observer later rather than adding a duplicate API.
+5. Do not promote or rescue Baseline/V2/V3/V4 from the captured metrics; V3 remains retired, V2 sealed, and V4 under-sampled/negative.
+6. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
+7. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
+8. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
 
 ## Review conclusion
 
