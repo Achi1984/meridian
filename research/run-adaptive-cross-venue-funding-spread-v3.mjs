@@ -7,8 +7,8 @@ import {
   runAdaptiveCrossVenueFundingSpreadV3
 } from './adaptive-cross-venue-funding-spread-v3.js';
 
-const RAW_START=Date.UTC(2024,8,1);
-const RAW_END=Date.UTC(2026,8,1);
+const RAW_START=Date.parse(process.env.ADAPTIVE_V3_START||'2024-09-01T00:00:00Z');
+const RAW_END=Date.parse(process.env.ADAPTIVE_V3_END||'2025-09-01T00:00:00Z');
 const BINANCE_INPUT=process.env.BINANCE_ADAPTIVE_V3_ARCHIVE_INPUT||'/tmp/meridian-adaptive-cross-venue-v3-binance.json';
 const OUT=path.resolve('research/results');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
