@@ -95,8 +95,6 @@ function bookFeatures(activeFactor='MOM7_SKIP4H'){
 
 test('positive funding charges longs and rewards shorts',()=>{
   const {assets,indexed}=indexedForBook(.001);
-  const r=_test.simulateBook(bookFeatures(),'MOM7_SKIP4H',indexed?undefined:undefined);
-  void r;
   const out=_test.simulateBook(
     bookFeatures(),indexed,assets,'MOM7_SKIP4H','SELF',
     {...SELF_HISTORY_PERPETUAL_FACTOR_V1_CONFIG},0
