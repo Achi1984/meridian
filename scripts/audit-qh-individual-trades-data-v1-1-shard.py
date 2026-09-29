@@ -143,7 +143,7 @@ def audit_trades(zpath):
             base_volume_sum+=qty
             quote_volume_sum+=quote
             if err>max(1e-8,abs(quote)*QUOTE_REL_TOL):
-                raise RuntimeError(f"quoteQty inconsistent with price*qty at trade {trade_id}")
+                raise RuntimeError(f"quoteQty inconsistent with price*qty at trade {trade_id}: price={row[1]} qty={row[2]} quoteQty={row[3]} expected={expected_quote:.17g} absError={err:.17g} relError={err/max(abs(quote),1e-300):.17g} tolerance={max(1e-8,abs(quote)*QUOTE_REL_TOL):.17g}")
             qh=(ts-MONTH_START_MS)//(15*60*1000)
             if not (0<=qh<EXPECTED_QH_BINS): raise RuntimeError("invalid quarter-hour bin")
             qh_counts[qh]=qh_counts.get(qh,0)+1
