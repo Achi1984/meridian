@@ -1,9 +1,9 @@
 name: MERIDIAN Asset Watch Mirror
-# Bootstrap note: subsequent main-branch pushes to this workflow trigger the first mirror run.
+# Refresh target: every 10 minutes so the 15-minute live-data gate normally has a fresh Pionex snapshot.
 
 on:
   schedule:
-    - cron: '50 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
