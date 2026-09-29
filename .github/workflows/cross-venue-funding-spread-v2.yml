@@ -1,0 +1,47 @@
+name: MERIDIAN Cross-Venue Funding Spread V2
+
+on:
+  push:
+    branches:
+      - research/cross-venue-funding-spread-v2
+    paths:
+      - "research/CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN.md"
+      - "research/cross-venue-funding-spread-v2.js"
+      - "research/run-cross-venue-funding-spread-v2.mjs"
+      - "scripts/collect-cross-venue-binance-v2.py"
+      - "test/cross-venue-funding-spread-v2.test.js"
+      - ".github/workflows/cross-venue-funding-spread-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-venue-funding-spread-v2
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen V2 invariants
+        run: node --test test/cross-venue-funding-spread-v2.test.js
+      - name: Collect official Binance Vision archives
+        run: python3 scripts/collect-cross-venue-binance-v2.py
+      - name: Run first independent Cross-Venue V2 validation
+        run: node research/run-cross-venue-funding-spread-v2.mjs
+      - name: Upload untouched V2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-funding-spread-v2
+          path: |
+            research/results/cross-venue-funding-spread-v2-summary.json
+            research/results/cross-venue-funding-spread-v2-full.json
+            research/results/cross-venue-funding-spread-v2.md
+          if-no-files-found: error
+          retention-days: 30
