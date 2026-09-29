@@ -12,10 +12,10 @@ Parent:
 Test whether lagged aggressive taker flow in Binance USD-M perpetual futures predicts the cross-section of next-week returns in the same direction.
 
 External motivation fixed before first PnL:
-- Anastasopoulos et al. (2026), *Order flow and cryptocurrency returns*, Journal of Financial Markets, reports positive out-of-sample predictive power of lagged order flow for cryptocurrency returns, with the weekly relation stronger than the daily relation and weekly high-minus-low order-flow portfolios economically meaningful.
-- MERIDIAN deliberately uses a slower weekly horizon rather than seconds-scale execution because recent microstructure evidence shows very short-horizon order-flow predictability can be fragile after costs.
+- Anastasopoulos et al. (2026), *Order flow and cryptocurrency returns*, Journal of Financial Markets, DOI 10.1016/j.finmar.2026.101047, reports positive predictive information in lagged cryptocurrency order flow and a stronger weekly relation than daily in its studied setting.
+- MERIDIAN fixes a one-week horizon before first PnL because that direction and horizon are consistent with the published evidence.
 
-This is not an exact replication: the paper's primary flow measure is international/world order flow, whereas MERIDIAN V1 uses public Binance USD-M aggressive taker quote flow.
+This is not an exact replication: the paper's primary flow measure is international/world order flow, whereas MERIDIAN V1 uses public Binance USD-M aggressive taker quote flow. The source motivates the hypothesis only; it does not validate this proxy or this exact trading rule.
 
 ## Frozen universe
 
@@ -82,6 +82,14 @@ Final holdout exit:
 
 No holdout signal, ranking, position or PnL may be calculated before a development PASS.
 
+The engine must reject a `TEMPORAL_HOLDOUT` run unless it receives development evidence for this exact ruleset showing:
+- stage = `DEVELOPMENT`;
+- decision = `DEVELOPMENT_PASS_TEMPORAL_HOLDOUT_REQUIRED`;
+- gate.pass = true;
+- dataIntegrityFailure = false.
+
+A future holdout runner must additionally verify that this evidence is the canonical frozen development result before it loads holdout market data.
+
 ## Frozen lagged taker-flow signal
 
 At weekly anchor t, for asset i:
@@ -124,8 +132,9 @@ No sign flip is allowed after results.
 
 ## Cross-sectional ranking
 
-At every anchor:
-- require all **12** assets to have a valid signal and exact entry/exit open;
+At every anchor, the ranking information set is strictly entry-time only:
+- require all **12** assets to have a valid 168-hour signal and an exact entry open at t;
+- **do not inspect the exit open, holding return, holding-week funding, or any other future value before weights are frozen**;
 - sort by FLOW descending;
 - tie-break by symbol ascending;
 - side count = `floor(12/5) = 2`.
@@ -214,14 +223,16 @@ Hourly price/order-flow data used by the strategy must have:
 - finite non-negative taker-buy quote volume;
 - taker-buy quote volume <= quote volume.
 
-Every weekly ranking requires all 12 assets.
+Every weekly ranking requires all 12 assets using only the frozen entry-time information set.
+
+After the week's ranking and weights are frozen, exact exit opens are validated for all 12 assets. Missing future data may fail the stage, but it must never change the ranking, eligible set, or weights.
 
 If any of the 12 lacks:
 - any of the 168 signal hours;
 - exact entry open;
-- exact exit open;
+- exact exit open after selection;
 
-the stage fails closed as a data-integrity failure.
+the stage fails closed as a data-integrity failure. It must never re-rank around a missing future observation.
 
 If any selected position lacks valid funding coverage:
 - the stage fails closed.
