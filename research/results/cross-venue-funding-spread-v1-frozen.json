@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN-RESULT",
+  "workflowRunId": 36526460897,
+  "artifactId": 11014199375,
+  "artifactZipSha256": "31e4f1e5e1b0d07b41467a6eb5faf326be24c6973134f746a71ddcee4d889506",
+  "ruleset": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+  "direction": "LONG_BINANCE_USDM_PERP_SHORT_HYPERLIQUID_PERP",
+  "assets": [
+    "BTC",
+    "ETH",
+    "SOL"
+  ],
+  "cycles": 105,
+  "rejectedCycles": 30,
+  "totalReturnPct": 6.3018118490071995,
+  "totalNetPnl": 3682.428600000001,
+  "profitFactor": 5.611876140076009,
+  "maxDrawdownPct": 0.6612263327430188,
+  "totalFundingPnl": 7073.2188,
+  "totalBasisPnl": -30.79050000000001,
+  "totalCosts": 3360,
+  "stressReturnPct": 2.650060289466105,
+  "positiveWindows": 4,
+  "positivePnlConcentrationPct": 43.850669636880404,
+  "byAsset": [
+    {
+      "asset": "BTC",
+      "cycles": 35,
+      "netPnl": 1118.1544,
+      "stressNetPnl": 418.1544,
+      "fundingPnl": 2247.6689,
+      "basisPnl": -9.5148,
+      "costs": 1120
+    },
+    {
+      "asset": "ETH",
+      "cycles": 35,
+      "netPnl": 949.5046,
+      "stressNetPnl": 249.5046,
+      "fundingPnl": 2090.0482,
+      "basisPnl": -20.5433,
+      "costs": 1120
+    },
+    {
+      "asset": "SOL",
+      "cycles": 35,
+      "netPnl": 1614.7696,
+      "stressNetPnl": 914.7696,
+      "fundingPnl": 2735.5017,
+      "basisPnl": -0.7324,
+      "costs": 1120
+    }
+  ],
+  "gatePass": true,
+  "gateReasons": [],
+  "decision": "DISCOVERY_PASS_HOLDOUT_REQUIRED",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false
+}
