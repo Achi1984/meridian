@@ -89,7 +89,9 @@ Required fields:
 Checks:
 - finite positive price and quantity;
 - first trade ID <= last trade ID;
-- aggregate trade IDs strictly increase within the shard;
+- aggregate trade IDs must never decrease;
+- equal consecutive aggregate trade IDs are permitted only as a source-archive identifier anomaly; they are counted explicitly and do not cause row removal;
+- underlying trade-ID ranges must strictly advance without overlap (`current first_trade_id > previous last_trade_id`);
 - timestamps never decrease;
 - all timestamps are inside the target UTC month;
 - buyer-maker field parses strictly as true/false or 1/0;
@@ -105,11 +107,45 @@ The shard output may contain:
 - total aggregate-trade rows;
 - first/last timestamp;
 - first/last aggregate-trade ID;
+- count of equal consecutive aggregate-trade IDs;
 - timestamp unit;
 - empty/non-empty quarter-hour bin count;
 - min/max trade count per non-empty bin.
 
 It must not contain directional buyer/seller aggregates.
+
+## Source anomaly clarification after first full Data V1 run
+
+The first full run on head `78e8975b061b926733d66734ab409dcf56e11bfe` processed 119/120 shards successfully and failed only `SOLUSDT / 2025-07` because the original parser required the aggregate trade ID itself to be strictly increasing.
+
+An isolated, strategy-neutral source diagnostic then re-read the exact official Binance archive with its published checksum:
+
+- diagnostic workflow: **36617946382**
+- diagnostic artifact: **11055503695**
+- artifact digest: `sha256:af95dd62ab821410ea14a3ea0cec665ead8b28ba60f1e448d34451f8ad5eb73c`
+- official archive SHA-256: `07842c476aab159f008ffc4e95e421e181f75348610c23baeae1dc3799d4e89b`
+- rows: **14,070,960**
+- non-increasing aggregate-ID events: **1**
+- decreases: **0**
+- equal IDs: **1**
+
+The two equal-ID rows are distinct:
+- aggregate ID: `926014272` on both rows;
+- timestamps differ by 203 ms;
+- prices and quantities differ;
+- buyer-maker side differs;
+- underlying trade IDs advance from `2468302188` to `2468302190`;
+- no underlying trade-ID overlap is present.
+
+Binance documents aggregate trade ID, first trade ID and last trade ID as separate fields. For MERIDIAN's data-quality purpose, uniqueness of the aggregate identifier is not required to construct the later trade-level order-flow variable; preserving non-overlapping underlying trade ranges and time ordering is the stronger integrity condition.
+
+Therefore this pre-signal/pre-PnL correction changes only the source-quality invariant:
+
+- **forbidden:** aggregate ID decreases;
+- **allowed and counted:** aggregate ID equality when underlying trade ranges still strictly advance and timestamps do not decrease;
+- **forbidden:** overlapping or non-advancing underlying trade-ID ranges.
+
+No directional imbalance, return, position or PnL was observed before this correction. No row is dropped or deduplicated.
 
 ## 1-minute kline quality rules
 
