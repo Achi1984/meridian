@@ -17,9 +17,11 @@ That is **legacy technical debt**, but it is not sufficient evidence that the ac
 
 Therefore the old #334 severity statement must not be carried forward as an active-v10 UI defect without runtime evidence.
 
-## Canonical research control plane
+## Research control plane and continuity drift
 
-Current `MERIDIAN_RESUME.json` is the durable research index. It explicitly states that only merged `main` plus current-base green CI is canonical and that unmerged research branches are evidence, not authority.
+`MERIDIAN_RESUME.json` is intended to be the durable research index and correctly states that only merged `main` plus current-base green CI is canonical and that unmerged research branches are evidence, not authority. However, the file itself is **not a current repository checkpoint**: its recorded `sourceOfTruth.verifiedSha` predates current main, its phase still describes the earlier source-anomaly stage, and its `nextAction` still asks for the individual-trades source-feasibility/Data V1.1 work that has since been executed and failed at the frozen canary gate.
+
+Therefore the research results inside the file may be used only where independently reconciled to current main, while its top-level resume pointer must be refreshed after the current Data V1.1/source-consistency decision is frozen. A future chat must not treat the stale `verifiedSha` or `nextAction` as current authority.
 
 The current Paper Bot Profit Special Agent V1 is frozen in:
 - `research/PAPERBOT-PROFIT-SPECIAL-AGENT-V1.md`
@@ -73,7 +75,15 @@ These remain valid research/telemetry components, but none authorizes a live pro
 
 ## Critical audit findings
 
-### A1 — No current-runtime performance claim is justified from GitHub alone
+### A1 — Continuity checkpoint is stale and must be refreshed
+
+The durable resume file currently points behind `main` and its next-action text has already been overtaken by #343/#345. This is a process-integrity issue: a fresh chat could repeat completed research if it trusts the resume file without first reconciling GitHub.
+
+Required action: after the active source-consistency diagnostic is resolved, update the resume checkpoint from verified current main with the immutable Data V1.1 FAIL and the next separately versioned step. Do not update it mid-gate in a way that can race the active diagnostic.
+
+Severity: **HIGH for orchestration continuity, zero execution impact**.
+
+### A2 — No current-runtime performance claim is justified from GitHub alone
 
 GitHub contains the rules, historical research evidence and lifecycle code, but not a guaranteed fresh runtime ledger snapshot.
 
@@ -84,7 +94,7 @@ Therefore:
 
 Severity: **HIGH for decision quality, zero execution impact**.
 
-### A2 — Legacy v8 Paper scoring remains in the repository
+### A3 — Legacy v8 Paper scoring remains in the repository
 
 The old `app-v8.0-paper-summary.js` still contains a second heuristic:
 - WATCH+ near trades >= 20, positive PnL, PF >= 1.05 and DD <= 10%;
@@ -98,24 +108,25 @@ Required action:
 
 No trading threshold should be changed as part of that cleanup.
 
-### A3 — Profit research has correctly failed closed so far
+### A4 — Profit research has correctly failed closed so far
 
 Several research lanes show attractive isolated metrics but fail a frozen risk, breadth, stability or transfer gate. The correct response is not threshold relaxation.
 
 The current Quarter-Hour source-quality work is therefore an appropriate independent lane: it must complete data-quality gating before any directional signal, return or PnL is evaluated.
 
-### A4 — Historical research results and runtime Paper bots must remain separate in UI language
+### A5 — Historical research results and runtime Paper bots must remain separate in UI language
 
 The v10 Lab can execute historical research modules. Observer/R32 components describe live Paper research state. Those must not be visually collapsed into one “bot leaderboard” because their sample definitions, costs and lifecycle semantics differ.
 
 ## Safe next package
 
-1. Finish the current Quarter-Hour data-source gate without exposing strategy PnL.
-2. Keep the r68 profit-research outcomes immutable; do not rescue failed candidates by changing frozen gates.
-3. Add a read-only runtime snapshot/export only if a current Paper-bot performance comparison is required.
-4. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
-5. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
-6. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
+1. Finish the current Quarter-Hour source-consistency gate without exposing strategy PnL.
+2. Refresh `MERIDIAN_RESUME.json` only after that gate is frozen, using the then-current verified `main` SHA and exact next action.
+3. Keep the r68 profit-research outcomes immutable; do not rescue failed candidates by changing frozen gates.
+4. Add a read-only runtime snapshot/export only if a current Paper-bot performance comparison is required.
+5. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
+6. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
+7. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
 
 ## Review conclusion
 
