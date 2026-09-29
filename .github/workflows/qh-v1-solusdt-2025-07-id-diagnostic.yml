@@ -1,0 +1,33 @@
+name: MERIDIAN QH V1 SOL 2025-07 ID Diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/qh-v1-sol-2025-07-aggtrade-id
+    paths:
+      - "scripts/diagnose-qh-v1-solusdt-2025-07-aggtrade-id.py"
+      - ".github/workflows/qh-v1-solusdt-2025-07-id-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-v1-sol-2025-07-id-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect official archive ID ordering
+        run: python3 scripts/diagnose-qh-v1-solusdt-2025-07-aggtrade-id.py
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v1-solusdt-2025-07-id-diagnostic
+          path: research/results/qh-v1-solusdt-2025-07-aggtrade-id-diagnostic.json
+          if-no-files-found: warn
