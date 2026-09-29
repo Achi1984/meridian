@@ -1,0 +1,38 @@
+name: MERIDIAN Perpetual Factor Row Continuity V1
+
+on:
+  push:
+    branches:
+      - research/perpetual-factor-row-continuity-v1
+    paths:
+      - "research/PERPETUAL-FACTOR-ROW-CONTINUITY-V1-FROZEN.md"
+      - "scripts/audit-perpetual-factor-row-continuity-v1.py"
+      - ".github/workflows/perpetual-factor-row-continuity-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-factor-row-continuity-v1
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: python3 -m py_compile scripts/audit-perpetual-factor-row-continuity-v1.py
+      - name: Run frozen row-continuity audit
+        run: python3 scripts/audit-perpetual-factor-row-continuity-v1.py
+      - name: Upload untouched audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-factor-row-continuity-v1
+          path: |
+            research/results/perpetual-factor-row-continuity-v1.json
+            research/results/perpetual-factor-row-continuity-v1.md
+          if-no-files-found: error
+          retention-days: 30
