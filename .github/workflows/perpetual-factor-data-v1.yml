@@ -1,0 +1,36 @@
+name: MERIDIAN Perpetual Factor Data V1
+
+on:
+  push:
+    branches:
+      - research/perpetual-factor-data-v1
+    paths:
+      - "research/PERPETUAL-FACTOR-DATA-V1-FROZEN.md"
+      - "scripts/audit-perpetual-factor-data-v1.py"
+      - ".github/workflows/perpetual-factor-data-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-factor-data-v1
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check coverage auditor
+        run: python3 -m py_compile scripts/audit-perpetual-factor-data-v1.py
+      - name: Audit frozen official archive coverage
+        run: python3 scripts/audit-perpetual-factor-data-v1.py
+      - name: Upload untouched coverage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-factor-data-v1
+          path: research/results/perpetual-factor-data-v1-coverage.json
+          if-no-files-found: error
+          retention-days: 30
