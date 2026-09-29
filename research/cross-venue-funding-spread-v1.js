@@ -147,8 +147,9 @@ function cycleForMonth(asset,key,data,cfg){
 }
 export function runCrossVenueFundingSpreadV1(dataset,config={}){
   const cfg={...CROSS_VENUE_FUNDING_SPREAD_V1_CONFIG,...config,gate:{...CROSS_VENUE_FUNDING_SPREAD_V1_CONFIG.gate,...(config.gate||{})}};
+  const assets=Array.isArray(config.assets)&&config.assets.length?[...new Set(config.assets.map(String))]:[...CROSS_VENUE_FUNDING_SPREAD_V1_ASSETS];
   const cycles=[],rejected=[];
-  for(const asset of CROSS_VENUE_FUNDING_SPREAD_V1_ASSETS){
+  for(const asset of assets){
     const data=dataset?.[asset]||{};
     const marks=[...normalizeMarks(data.binanceMarks),...normalizeMarks(data.hyperliquidMarks)];
     const months=[...new Set(marks.map(x=>monthKey(x.time)))].sort();
@@ -166,7 +167,7 @@ export function runCrossVenueFundingSpreadV1(dataset,config={}){
   const summary=summaryFromReturns(periods.map(x=>x.return));
   const stressSummary=summaryFromReturns(periods.map(x=>x.stressReturn));
   const stability=chronologicalWindows(periods,5);
-  const byAsset=CROSS_VENUE_FUNDING_SPREAD_V1_ASSETS.map(asset=>{
+  const byAsset=assets.map(asset=>{
     const xs=cycles.filter(x=>x.asset===asset);
     return{asset,cycles:xs.length,netPnl:sum(xs.map(x=>x.pnl.netUsd)),stressNetPnl:sum(xs.map(x=>x.pnl.stressNetUsd)),fundingPnl:sum(xs.map(x=>x.pnl.fundingUsd)),basisPnl:sum(xs.map(x=>x.pnl.basisUsd)),costs:sum(xs.map(x=>x.pnl.costsUsd))};
   });
@@ -187,6 +188,7 @@ export function runCrossVenueFundingSpreadV1(dataset,config={}){
     researchOnly:true,executionImpact:false,autoPromotion:false,
     direction:'LONG_BINANCE_USDM_PERP_SHORT_HYPERLIQUID_PERP',
     config:cfg,
+    assets,
     cycles,rejected,periods,byAsset,
     summary:{...summary,totalNetPnl:sum(cycles.map(x=>x.pnl.netUsd)),totalFundingPnl:sum(cycles.map(x=>x.pnl.fundingUsd)),totalBasisPnl:sum(cycles.map(x=>x.pnl.basisUsd)),totalCosts:sum(cycles.map(x=>x.pnl.costsUsd))},
     stressSummary,
