@@ -177,7 +177,10 @@ class AssetData:
 
 def _coverage(times,start,end,max_gap,right_inclusive):
     if not times:return False
-    pts=[start]+list(times)+[end]
+    # Events exactly on a boundary satisfy the interval convention but must not
+    # create a zero-length duplicate segment in the continuity check.
+    interior=[x for x in times if start < x < end]
+    pts=[start]+interior+[end]
     return all(0 < pts[i]-pts[i-1] <= max_gap for i in range(1,len(pts)))
 
 def factor_value(data:AssetData,factor,t):
