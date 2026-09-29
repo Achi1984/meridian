@@ -1,0 +1,36 @@
+name: MERIDIAN Perpetual Cross-Sectional Reversal V1 Data Foundation
+
+on:
+  push:
+    branches:
+      - research/perpetual-cross-sectional-reversal-v1-data-v1
+    paths:
+      - "research/PERPETUAL-CROSS-SECTIONAL-REVERSAL-V1-DATA-V1-FROZEN.md"
+      - "scripts/audit-perpetual-cross-sectional-reversal-v1-data-v1.py"
+      - ".github/workflows/perpetual-cross-sectional-reversal-v1-data-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-cross-sectional-reversal-v1-data-v1
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check frozen data audit
+        run: python3 -m py_compile scripts/audit-perpetual-cross-sectional-reversal-v1-data-v1.py
+      - name: Run frozen public-data foundation audit
+        run: python3 scripts/audit-perpetual-cross-sectional-reversal-v1-data-v1.py
+      - name: Upload untouched foundation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-cross-sectional-reversal-v1-data-v1
+          path: research/results/perpetual-cross-sectional-reversal-v1-data-v1.json
+          if-no-files-found: error
+          retention-days: 30
