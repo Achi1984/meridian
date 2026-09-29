@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "ADAPTIVE_CROSS_VENUE_V3_FOUNDATION_PASS_NEXT_STRATEGY_FREEZE",
+  "phase": "ADAPTIVE_CROSS_VENUE_V3_DISCOVERY_FAIL_NEXT_STATIC_COST_GATED_V4_HOLDOUT",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "703228c935f1993590544810fe2b1e15f174c684",
+    "verifiedSha": "e265db44fe05bdce27d1a1b1dbda36a7ba3642e2",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -479,6 +479,48 @@
       "decision": "FOUNDATION_PASS",
       "executionImpact": false,
       "immutable": true
+    },
+    "adaptiveCrossVenueFundingSpreadV3": {
+      "ruleset": "ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-FROZEN",
+      "stage": "DISCOVERY",
+      "rawWindow": "2024-09-01..2025-09-01",
+      "tradeWindow": "2024-10..2025-08",
+      "universe": [
+        "HBAR",
+        "SUI",
+        "NEAR",
+        "FIL",
+        "UNI",
+        "AAVE",
+        "ATOM",
+        "ARB"
+      ],
+      "decisionSlots": 88,
+      "activeCycles": 35,
+      "noTradeCycles": 53,
+      "binanceLongCycles": 34,
+      "hyperliquidLongCycles": 1,
+      "netReturnPct": 1.238612426,
+      "netPnlUsd": 1973.96275948,
+      "profitFactor": 20.00319841,
+      "maxDrawdownPct": 0.06492206,
+      "positiveWindows": "4/5",
+      "fundingPnlUsd": 3113.051113,
+      "basisPnlUsd": -19.08835352,
+      "costsUsd": 1120,
+      "fundingCostRatio": 2.7795099223,
+      "stressReturnPct": 0.7975194225,
+      "positiveAssets": "8/8",
+      "positiveConcentrationPct": 32.07076,
+      "signalSignAgreementPct": 97.142857,
+      "gateReasons": [
+        "SHORT_BINANCE_LONG_HYPERLIQUID:CYCLES_LT_4",
+        "SHORT_BINANCE_LONG_HYPERLIQUID:PNL_NOT_POSITIVE"
+      ],
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -492,7 +534,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Adaptive Cross-Venue Funding Spread V3 before first PnL. Use the eight qualified assets HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. September 2024 is signal warm-up only. Discovery trades are 2024-10 through 2025-08; temporal holdout is 2025-09 through 2026-08 and is allowed only after discovery pass. Direction is determined solely from the previous completed calendar month's realized Hyperliquid-minus-Binance funding differential. Trade long the lower-funding venue and short the higher-funding venue. No trade when the absolute trailing spread is below a threshold derived only from frozen stress round-trip costs, not from strategy outcomes. Preserve V1/V2 notional, basis accounting, base costs and +5bps-per-fill stress. Keep executionImpact=false.",
+  "nextAction": "Freeze a new successor ruleset before any 2025-09..2026-08 PnL: one-direction cost-gated Cross-Venue Funding Spread V4. Reuse the eight V3-qualified assets HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB, same $10k per leg, $160k monthly reserved-capital denominator, same basis accounting, $32 base and $52 stress costs, and unchanged 0.78% previous-month funding-spread threshold. Trade only LONG Binance / SHORT Hyperliquid when prior completed month Hyperliquid-minus-Binance funding spread >=0.0078; otherwise NO TRADE. Never reverse direction. Use 2025-08 as signal warm-up and evaluate only the untouched 2025-09..2026-08 temporal holdout. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -502,7 +544,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3",
+    "selected": "STATIC_COST_GATED_CROSS_VENUE_FUNDING_SPREAD_V4",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -562,6 +604,12 @@
       "ARB"
     ],
     "adaptiveCrossVenueV3Window": "2024-09..2026-08",
-    "strategyPnlObserved": false
+    "strategyPnlObserved": false,
+    "adaptiveCrossVenueV3Status": "IMMUTABLE_DISCOVERY_FAIL",
+    "adaptiveCrossVenueV3Diagnosis": "ECONOMICS_PASS_BUT_REVERSE_DIRECTION_SAMPLE_GATE_FAIL",
+    "v3HoldoutAuthorized": false,
+    "successorHypothesis": "ONE_DIRECTION_LONG_BINANCE_SHORT_HYPERLIQUID_WITH_UNCHANGED_0P78_COST_GATE",
+    "successorWindow": "2025-09..2026-08_UNTOUCHED",
+    "strategyPnlObservedInSuccessor": false
   }
 }
