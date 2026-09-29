@@ -6,6 +6,7 @@ on:
       - diagnostic/qh-data-v1-sol-2025-07
     paths:
       - "scripts/diagnose-qh-solusdt-2025-07-aggtrade-ids.py"
+      - "scripts/diagnose-qh-solusdt-2025-07-16-daily.py"
       - ".github/workflows/qh-solusdt-2025-07-id-diagnostic.yml"
   workflow_dispatch:
 
@@ -22,12 +23,16 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Verify archive and scan identifier ordering
+      - name: Verify monthly archive and scan identifier ordering
         run: python3 scripts/diagnose-qh-solusdt-2025-07-aggtrade-ids.py
+      - name: Compare official daily archive
+        run: python3 scripts/diagnose-qh-solusdt-2025-07-16-daily.py
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qh-solusdt-2025-07-id-diagnostic
-          path: research/results/qh-solusdt-2025-07-aggtrade-id-diagnostic.json
+          path: |
+            research/results/qh-solusdt-2025-07-aggtrade-id-diagnostic.json
+            research/results/qh-solusdt-2025-07-16-daily-id-compare.json
           if-no-files-found: warn
