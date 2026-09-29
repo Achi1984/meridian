@@ -425,7 +425,7 @@ const server=http.createServer(async(req,res)=>{
     }
     if(req.method==="GET"&&u.pathname==="/api/private/asset-watch/github-oidc-mirror"){
       const verified=await verifyGithubActionsOidc(bearer(req));
-      if(!verified.ok)return writeJson(res,401,{error:"github_oidc_required"},origin||"");
+      if(!verified.ok)return writeJson(res,401,{error:"github_oidc_required",reason:String(verified.reason||"unknown")},origin||"");
       const data=await stateGet(PRIVATE_STATE_KEY);
       if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
       const shareState=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
