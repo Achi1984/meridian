@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "ruleset": "PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-HIGH-VOL-FROZEN",
+  "ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
   "status": "FROZEN_BEFORE_FIRST_V2_PNL",
   "executionImpact": false,
   "autoPromotion": false,
@@ -48,17 +48,19 @@
   },
   "volatilityCondition": {
     "sourceWindow": "same completed-close interval t-63d..t-7d",
+    "closeMarks": 57,
     "dailyLogReturns": 56,
     "estimator": "sample_standard_deviation_n_minus_1",
+    "annualization": "sqrt(365)",
     "rank": "ascending_vol_then_symbol",
-    "excluded": "floor(N/3)_lowest_volatility",
-    "all23ExpectedExcluded": 7,
-    "all23ExpectedRetained": 16
+    "retained": "ceil(N/2)_upper_volatility_half",
+    "all23ExpectedRetained": 12
   },
   "portfolio": {
     "rank": "formation_return_ascending_then_symbol",
     "sideCount": "floor(retained_count/5)",
-    "all23ExpectedSideCount": 3,
+    "minimumSideCount": 2,
+    "all23ExpectedSideCount": 2,
     "longGross": 0.5,
     "shortGross": -0.5,
     "equalWeight": true,
@@ -75,12 +77,12 @@
   },
   "gate": {
     "expectedPeriods": 86,
-    "prefilterEligibleEveryWeek": 23,
-    "retainedEveryWeek": 16,
-    "sideCountEveryWeek": 3,
+    "minPrefilterEligibleEveryWeek": 15,
+    "minRetainedEveryWeek": 8,
+    "minSideCountEveryWeek": 2,
     "netReturnPositive": true,
     "priceOnlyReturnPositive": true,
-    "minProfitFactor": 1.05,
+    "minProfitFactor": 1.1,
     "minSharpe": 0.5,
     "maxDrawdownPct": 25,
     "minPositiveWindowsOf5": 3,
@@ -91,8 +93,8 @@
     "maxPositiveConcentrationPct": 25,
     "meanLoserMinusWinnerSpreadPositive": true
   },
-  "passDecision": "INDEPENDENT_VALIDATION_PASS_TRANSFER_REQUIRED",
-  "failDecision": "INDEPENDENT_VALIDATION_FAIL_RESEARCH_REDESIGN",
+  "passDecision": "VALIDATION_PASS_TRANSFER_REQUIRED",
+  "failDecision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
   "transferRequiredBeforePaper": true,
   "paperAuthorized": false,
   "liveAuthorized": false
