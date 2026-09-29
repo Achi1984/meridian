@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SELF_HISTORY_V3_FROZEN_FAIL_NEXT_CROSS_SECTIONAL_FACTOR_V1",
+  "phase": "CROSS_SECTIONAL_V1_TEMPORAL_FAIL_NEXT_FUNDING_ONLY_TRANSFER",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "4c3b6904c1d400ee576c114882514aaa5c62906a",
+    "verifiedSha": "5c92bff1b8acd0fdbcaf29afa35aa6d16517ebb2",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -250,6 +250,29 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "crossSectionalPerpetualFactorV1": {
+      "ruleset": "CROSS-SECTIONAL-PERPETUAL-FACTOR-V1-FROZEN",
+      "stage": "TEMPORAL_VALIDATION",
+      "window": "2025-01-06..2026-08-31",
+      "periods": 86,
+      "activeWeeks": 86,
+      "netReturnPct": -1.9775,
+      "priceOnlyReturnPct": -4.6386,
+      "profitFactor": 0.9778,
+      "sharpe": -0.0624,
+      "maxDrawdownPct": 10.141,
+      "positiveWindows": "2/5",
+      "stressReturnPct": -17.7144,
+      "factorBooks": {
+        "MOMENTUM_12W": -15.8165,
+        "FUNDING_CARRY_7D": 23.9214,
+        "PREMIUM_REVERSION_7D": -15.3698
+      },
+      "decision": "TEMPORAL_VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "transferAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -263,7 +286,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Cross-Sectional Perpetual Factor V1 before any new strategy result. Preserve the exact factor definitions, independent factor-book construction, sparse-input handling, 8 bps turnover cost and 4x stress from the preregistered V3 benchmark. Treat 2023-04..2024-12 as seen development evidence only. The first gating evaluation must be the fresh temporal window 2025-01-06..2026-08-31 on the fixed discovery universe. Only after a temporal pass may the reserved LTC/BCH/AVAX/HBAR transfer universe be evaluated. No parameter tuning from the observed +34% development benchmark. Keep executionImpact=false.",
+  "nextAction": "Freeze a separately named Cross-Sectional Funding Carry V1 before any new result. Preserve the exact FUNDING_CARRY_7D raw factor, sparse-input handling, weekly cross-sectional ranking, 50/50 dollar-neutral construction, 8 bps turnover cost and 32 bps stress from Cross-Sectional Perpetual Factor V1. Treat both the 2023-04..2024-12 +9.47% factor-book development result and the 2025-01..2026-08 +23.92% temporal factor-book result as seen hypothesis-generation evidence only. The first gating evaluation must use only the reserved LTC/BCH/AVAX/HBAR transfer universe with no parameter tuning or asset substitution. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -273,7 +296,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "CROSS_SECTIONAL_PERPETUAL_FACTOR_V1",
+    "selected": "CROSS_SECTIONAL_FUNDING_CARRY_V1",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -282,6 +305,12 @@
     "missingDataPolicy": "NO_INTERPOLATION_FACTOR_LEVEL_FAIL_CLOSED",
     "selfHistoryV3Status": "IMMUTABLE_DISCOVERY_FAIL",
     "xsecDevelopmentEvidence": "SEEN_NOT_VALIDATED",
-    "firstIndependentGate": "TEMPORAL_2025_01_06_TO_2026_08_31"
+    "firstIndependentGate": "TRANSFER_LTC_BCH_AVAX_HBAR",
+    "crossSectionalV1Status": "IMMUTABLE_TEMPORAL_FAIL",
+    "observedFundingBook": {
+      "developmentNetReturnPct": 9.4729,
+      "temporalNetReturnPct": 23.9214,
+      "status": "SEEN_HYPOTHESIS_GENERATION_ONLY"
+    }
   }
 }
