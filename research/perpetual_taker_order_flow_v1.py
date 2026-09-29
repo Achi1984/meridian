@@ -167,10 +167,14 @@ class AssetData:
         if b<0 or b>q+max(1e-8,abs(q)*1e-10):return None
         return (2.0*b-q)/q
 
+    def entry_open_available(self,t):
+        p0=self.open_by_time.get(t)
+        return p0 is not None and p0>0
+
     def entry_exit_return(self,t):
         p0=self.open_by_time.get(t)
         p1=self.open_by_time.get(t+WEEK)
-        if p0 is None or p1 is None or p0<=0:return None
+        if p0 is None or p1 is None or p0<=0 or p1<=0:return None
         return p1/p0-1.0
 
     def funding_sum(self,start,end):
@@ -191,12 +195,13 @@ def prepare_dataset(raw_by_asset):
 
 
 def select_weights(dataset,t):
+    # Ranking is allowed to use only information available at entry time.
+    # Future exit prices / holding returns must never affect eligibility or rank.
     rows=[]
     for a in ASSETS:
         signal=dataset[a].flow_signal(t)
-        holding=dataset[a].entry_exit_return(t)
-        if signal is not None and holding is not None:
-            rows.append((a,signal,holding))
+        if signal is not None and dataset[a].entry_open_available(t):
+            rows.append((a,signal))
     if len(rows)!=REQUIRED_ELIGIBLE:
         raise ValueError(f'ELIGIBLE_ASSETS_NE_{REQUIRED_ELIGIBLE}:{len(rows)}')
 
@@ -206,9 +211,8 @@ def select_weights(dataset,t):
     weights={}
     for a in longs:weights[a]=0.5/SIDE_COUNT
     for a in shorts:weights[a]=-0.5/SIDE_COUNT
-    signals={a:s for a,s,_ in rows}
-    holding={a:h for a,_,h in rows}
-    return weights,signals,holding,longs,shorts
+    signals={a:s for a,s in rows}
+    return weights,signals,longs,shorts
 
 
 def turnover(prev,new):
@@ -224,7 +228,17 @@ def terminal_close(prev,cost_bps):
 
 
 def period_row(dataset,t,prev,cost_bps):
-    weights,signals,holding,longs,shorts=select_weights(dataset,t)
+    weights,signals,longs,shorts=select_weights(dataset,t)
+
+    # Validate future holding data only after the entry-time selection is frozen.
+    # Missing exit data fails the stage; it can never cause re-ranking.
+    holding={}
+    for a in ASSETS:
+        hr=dataset[a].entry_exit_return(t)
+        if hr is None:
+            raise ValueError(f'{a}:HOLDING_RETURN_MISSING')
+        holding[a]=hr
+
     price=funding=long_gross=short_gross=0.0
     attr={a:0.0 for a in ASSETS}
     long_next=[];short_next=[]
@@ -353,9 +367,24 @@ def stage_gate(result,stress,stage):
     return {'pass':not reasons,'reasons':reasons,'decision':decision}
 
 
-def run_stage(raw_by_asset,stage):
+def development_authorizes_holdout(evidence):
+    if not isinstance(evidence,dict):
+        return False
+    return (
+        evidence.get('ruleset')==RULESET
+        and evidence.get('stage')=='DEVELOPMENT'
+        and evidence.get('decision')=='DEVELOPMENT_PASS_TEMPORAL_HOLDOUT_REQUIRED'
+        and evidence.get('dataIntegrityFailure') is False
+        and isinstance(evidence.get('gate'),dict)
+        and evidence['gate'].get('pass') is True
+    )
+
+
+def run_stage(raw_by_asset,stage,development_evidence=None):
     if stage not in ('DEVELOPMENT','TEMPORAL_HOLDOUT'):
         raise ValueError('UNKNOWN_STAGE')
+    if stage=='TEMPORAL_HOLDOUT' and not development_authorizes_holdout(development_evidence):
+        raise PermissionError('HOLDOUT_NOT_AUTHORIZED')
     dataset=prepare_dataset(raw_by_asset)
     start,end=(DEVELOPMENT_START,DEVELOPMENT_END) if stage=='DEVELOPMENT' else (HOLDOUT_START,HOLDOUT_END)
     try:
@@ -365,6 +394,7 @@ def run_stage(raw_by_asset,stage):
         return {
             'ruleset':RULESET,'stage':stage,'researchOnly':True,
             'executionImpact':False,'autoPromotion':False,
+            'holdoutAuthorized':stage=='TEMPORAL_HOLDOUT',
             'dataIntegrityFailure':False,'result':base,'stress':stress,
             'gate':gate,'decision':gate['decision']
         }
@@ -373,6 +403,7 @@ def run_stage(raw_by_asset,stage):
         return {
             'ruleset':RULESET,'stage':stage,'researchOnly':True,
             'executionImpact':False,'autoPromotion':False,
+            'holdoutAuthorized':stage=='TEMPORAL_HOLDOUT',
             'dataIntegrityFailure':True,'error':str(e),
             'gate':{'pass':False,'reasons':['DATA_INTEGRITY_FAILURE'],'decision':decision},
             'decision':decision
