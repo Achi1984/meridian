@@ -1,0 +1,35 @@
+name: MERIDIAN Quarter-Hour Imbalance V1 Data V0
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1-SELECTION.md"
+      - "scripts/audit-quarter-hour-boundary-imbalance-v1-data-v0.py"
+      - ".github/workflows/quarter-hour-boundary-imbalance-v1-data-v0.yml"
+      - "MERIDIAN_RESUME.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quarter-hour-boundary-imbalance-v1-data-v0-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  data-v0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit official archive availability only
+        run: python3 scripts/audit-quarter-hour-boundary-imbalance-v1-data-v0.py
+      - name: Upload V0 audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarter-hour-boundary-imbalance-v1-data-v0
+          path: |
+            research/results/quarter-hour-boundary-imbalance-v1-data-v0-summary.json
+            research/results/quarter-hour-boundary-imbalance-v1-data-v0-full.json
+          if-no-files-found: warn
