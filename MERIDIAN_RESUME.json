@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V2_VALIDATION_FAIL_NEXT_RELATIVE_VALUE_V3_FOUNDATION",
+  "phase": "PERPETUAL_REVERSAL_V2_SEEN_FAIL_NEXT_RELATIVE_VALUE_V3_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -903,7 +903,7 @@
     255,
     256
   ],
-  "nextAction": "Do not rescue Reversal V2 by changing the volatility subset, side gates, horizon, costs or asset list. Build a new strategy-neutral data foundation for a Relative-Value / Beta-Neutral Perpetual Reversal V3 on a separately frozen transfer universe not used by Reversal V1/V2. The V3 hypothesis must isolate the persistent loser-minus-winner spread while neutralizing broad-market beta rather than relying on either absolute long or short leg. Freeze universe, beta-estimation window, residual-return formation, sizing, costs and validation split before any V3 PnL. Keep executionImpact=false and require independent validation before any Paper shadow.",
+  "nextAction": "Treat Reversal V2 as immutable, non-promotable seen evidence. Build a new strategy-neutral data foundation for a separately named Relative-Value / Beta-Neutral Reversal V3 on a fresh validation universe/window not used as the V1/V2 promotion gate. Freeze universe, beta-estimation window, residual-return formation, sizing, costs and validation split before any V3 PnL. Do not reuse the now-seen 2025-01-06..2026-08-31 window as an independent gate. Keep executionImpact=false and require clean independent validation before any Paper shadow.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -940,7 +940,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "V2_VALIDATION_HARNESS_AFTER_CANONICAL_PROTOCOL",
+    "nextStage": "V3_DATA_FOUNDATION_AND_PREREGISTRATION_BEFORE_STRATEGY_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1019,7 +1019,7 @@
     "reversalV2Motivation": "EXTERNAL_2026_HIGH_VOL_REVERSAL_EVIDENCE",
     "reversalV2FirstIndependentWindow": "2025-01-06..2026-08-31",
     "reversalV2StrategyPnlAllowed": "ONLY_AFTER_NEW_PROTOCOL_AND_INVARIANTS_FROZEN",
-    "reversalV2TransferRequiredBeforePaper": true,
+    "reversalV2TransferRequiredBeforePaper": false,
     "reversalV2Status": "IMMUTABLE_VALIDATION_FAIL",
     "reversalV2ChangeFromV1": "UPPER_HALF_CROSS_SECTIONAL_VOLATILITY_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
     "reversalV2Ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
@@ -1032,6 +1032,11 @@
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
     "reversalV3Stage": "DATA_FOUNDATION_BEFORE_STRATEGY",
-    "reversalV3StrategyPnlAllowed": false
+    "reversalV3StrategyPnlAllowed": false,
+    "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
+    "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
+    "reversalV2EvidenceUse": "HYPOTHESIS_GENERATION_ONLY",
+    "reversalV2WindowNowSeen": true,
+    "reversalV3FreshIndependentEvidenceRequired": true
   }
 }
