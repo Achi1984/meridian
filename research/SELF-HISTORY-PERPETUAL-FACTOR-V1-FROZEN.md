@@ -179,9 +179,16 @@ The benchmark differs only in **signal normalization/selection**.
 
 ## Perpetual return accounting
 
+Signals use only completed information strictly before rebalance.
+
+Execution-price proxy:
+- entry = perpetual 4h kline **open** exactly at rebalance timestamp `t`;
+- exit = perpetual 4h kline **open** exactly at `t+1w`;
+- if either exact anchor open is unavailable, the affected factor-book period fails closed.
+
 For an asset held from rebalance `t` to `t+1w`:
 
-`priceReturn = C[t+1w] / C[t] - 1`
+`priceReturn = Open[t+1w] / Open[t] - 1`
 
 Funding over the holding interval uses realized funding events. Funding timestamps must be strictly increasing with no duplicates; a gap greater than 12 hours is a data-gate failure:
 
