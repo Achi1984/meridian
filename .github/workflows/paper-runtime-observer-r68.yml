@@ -1,0 +1,30 @@
+name: MERIDIAN Paper Runtime Observer Snapshot r68
+
+on:
+  pull_request:
+    paths:
+      - "scripts/capture-paper-bot-observer-r68.mjs"
+      - ".github/workflows/paper-runtime-observer-r68.yml"
+      - "docs/PAPER_RUNTIME_OBSERVER_SNAPSHOT_R68.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Capture public read-only Paper observer
+        run: node scripts/capture-paper-bot-observer-r68.mjs
+      - name: Upload observer snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-runtime-observer-r68
+          path: research/results/paper-runtime-observer-r68.json
+          if-no-files-found: error
