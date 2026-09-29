@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V1_DISCOVERY_FAIL_NEXT_HIGH_VOL_REVERSAL_V2",
+  "phase": "PERPETUAL_REVERSAL_V2_HIGH_VOL_FROZEN_NEXT_ENGINE_AND_INDEPENDENT_VALIDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "89b9716d3b8c82ddf1a85b159da203e73bfb2154",
+    "verifiedSha": "1d9c960b0f83422a76508e6fd2dd8bd0ab5bb070",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -870,7 +870,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a new High-Volatility Perpetual Cross-Sectional Reversal V2 before loading any 2025-2026 strategy data. Preserve V1's 8-week formation, 1-week skip, 1-week hold, equal-weight long-losers/short-winners, funding accounting and 8/13 bps turnover costs. The only strategy change should be a pre-trade high-volatility universe condition defined from trailing daily returns available before the weekly anchor; no post-result parameter grid. Use the untouched 2025-01-06..2026-08-31 window as the first independent validation and require an additional transfer validation before any Paper shadow. Keep executionImpact=false.",
+  "nextAction": "Implement the frozen PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-HIGH-VOL engine and invariant tests exactly as preregistered, without loading 2025-2026 strategy PnL until the protocol commit is canonical. Then collect only official Binance Vision USD-M 1d klines and funding for the fixed 23-asset universe, run the untouched 2025-01-06..2026-08-31 independent validation once, and freeze the result. No parameter grid, no post-result retuning, no transfer data unless the independent gate passes, no Paper/live promotion.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -907,7 +907,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "STRATEGY_PREREGISTRATION_BEFORE_FIRST_PNL",
+    "nextStage": "V2_ENGINE_AND_INDEPENDENT_VALIDATION_AFTER_CANONICAL_PROTOCOL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -986,6 +986,11 @@
     "reversalV2Motivation": "EXTERNAL_2026_HIGH_VOL_REVERSAL_EVIDENCE",
     "reversalV2FirstIndependentWindow": "2025-01-06..2026-08-31",
     "reversalV2StrategyPnlAllowed": "ONLY_AFTER_NEW_PROTOCOL_AND_INVARIANTS_FROZEN",
-    "reversalV2TransferRequiredBeforePaper": true
+    "reversalV2TransferRequiredBeforePaper": true,
+    "reversalV2Status": "FROZEN_BEFORE_FIRST_PNL",
+    "reversalV2ChangeFromV1": "EXCLUDE_LOWEST_VOLATILITY_TERCILE_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
+    "reversalV2ExpectedPrefilterEligible": 23,
+    "reversalV2ExpectedRetained": 16,
+    "reversalV2ExpectedSideCount": 3
   }
 }
