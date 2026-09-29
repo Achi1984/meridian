@@ -32,9 +32,9 @@ function buildAsset({entryBasis=.009,signalBasis=.010,fundingRate=.0001,breakSyn
   perp[signalIdx][3]=Math.max(perp[signalIdx][3],perp[signalIdx][5]);
   perp[signalIdx][4]=Math.min(perp[signalIdx][4],perp[signalIdx][5]);
   perp[entryIdx][2]=100*(1+entryBasis);
-  perp[entryIdx][3]=perp[entryIdx][2];
-  perp[entryIdx][4]=perp[entryIdx][2];
-  perp[entryIdx][5]=perp[entryIdx][2];
+  perp[entryIdx][3]=Math.max(perp[entryIdx][2],100.1);
+  perp[entryIdx][4]=Math.min(perp[entryIdx][2],100.1);
+  perp[entryIdx][5]=100.1;
   perp[exitIdx][2]=100.1;
   perp[exitIdx][3]=100.1;
   perp[exitIdx][4]=100.1;
