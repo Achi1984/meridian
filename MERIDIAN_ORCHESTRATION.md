@@ -27,8 +27,8 @@ The durable solution is to make **chat state disposable**: the repository, PR an
 4. **Bound tool output**
    - request workflow/job summaries first;
    - fetch full logs only for a failed job;
-   - emit only the failing test name and a narrow surrounding excerpt;
-   - never dump entire source files when a targeted function slice is enough.
+   - inspect large PRs file-by-file instead of streaming a full diff;
+   - never dump repository-root listings or full source files when metadata or a targeted slice is sufficient.
 
 5. **CI is the verifier**
    - syntax/regression/privacy/paper-only gates must be green before merge;
@@ -43,7 +43,36 @@ The durable solution is to make **chat state disposable**: the repository, PR an
 7. **Research isolation**
    - paper-bot research stays execution-neutral;
    - frozen protocol is committed before result inspection;
-   - discovery, holdout and paper-shadow are distinct stages.
+   - discovery, holdout and paper-shadow are distinct stages;
+   - a redesign gets a unique ruleset/module path and may not overwrite a parallel lane.
+
+## Single-writer merge window
+
+- Exactly one integration PR owns the merge window.
+- Refresh `main` SHA immediately before every write or merge.
+- Never full-merge a branch that is behind/diverged from current `main`.
+- Prior branch CI is supporting evidence only; the actual current-base integration PR must pass its own release gates.
+- Prefer additive files or reviewed targeted patches over branch-wide replacement.
+- If a path already exists on `main`, stop and compare it before writing.
+
+## Durable checkpoint cadence
+
+Update `MERIDIAN_RESUME.json`:
+- after each merged milestone;
+- after a material research decision;
+- after an intentionally abandoned/superseded integration;
+- before switching development lanes.
+
+The checkpoint records verified base SHA, completed work, research state, coordination mode, next action and explicit non-actions.
+
+## Recovery invariant
+
+After any interrupted stream:
+1. read current `main`;
+2. read the durable resume cursor;
+3. inspect only repository objects newer than that checkpoint;
+4. reconcile parallel changes;
+5. continue from Git/CI state, not from chat assumptions.
 
 ## Output discipline
 
