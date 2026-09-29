@@ -210,7 +210,7 @@ function gateStage(result,gate,stage){
   if(!(result.summary.profitFactor>=gate.minProfitFactor))reasons.push('PF_LT_'+gate.minProfitFactor);
   if(!(result.summary.maxDrawdownPct<=gate.maxDrawdownPct))reasons.push('DD_GT_'+gate.maxDrawdownPct);
   if(result.positiveWindows<gate.minPositiveWindows)reasons.push('POSITIVE_WINDOWS_LT_'+gate.minPositiveWindows);
-  if(!(result.totalFundingPnl>0))reasons.push('FUNDING_PNL_NOT_POSITIVE');
+  if(!(result.summary.totalFundingPnl>0))reasons.push('FUNDING_PNL_NOT_POSITIVE');
   if(!(result.fundingCostRatio>=gate.minFundingCostRatio))reasons.push('FUNDING_COST_RATIO_LT_'+gate.minFundingCostRatio);
   if(!(result.stressSummary.totalReturnPct>0))reasons.push('STRESS_RETURN_NOT_POSITIVE');
   if(result.positiveAssets<gate.minPositiveAssets)reasons.push('POSITIVE_ASSETS_LT_'+gate.minPositiveAssets);
