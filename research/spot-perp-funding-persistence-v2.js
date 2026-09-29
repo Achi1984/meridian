@@ -244,21 +244,29 @@ export function runSpotPerpFundingPersistenceV2(dataset,{tradeMonths,config={}}=
       let fundingUsd=0,basisUsd=0;
 
       if(!state.active){
-        if(signal>=cfg.entryFundingThreshold){
-          transition='ENTRY';
-          state.active=true;
-          state.qSpot=cfg.spotNotional/startSpot;
-          state.qPerp=-cfg.perpNotional/startPerp;
-          state.episodeMonths=0;
-          baseCost=baseTransitionCostUsd(cfg);
-          stressCost=stressTransitionCostUsd(cfg);
-        }else{
-          transition='INACTIVE';
-        }
-      }else if(signal>cfg.continuationFundingThreshold){
-        transition='CONTINUE';
+        transition=signal>=cfg.entryFundingThreshold?'ENTRY':'INACTIVE';
       }else{
-        transition='EXIT';
+        transition=signal>cfg.continuationFundingThreshold?'CONTINUE':'EXIT';
+      }
+
+      const willBeActive=transition==='ENTRY'||transition==='CONTINUE';
+      let currentFundingAudit=null;
+      if(willBeActive){
+        currentFundingAudit=auditFundingMonth(d.funding,month,cfg);
+        if(!currentFundingAudit.valid){
+          slots.push({asset,month,priorMonth:prior,valid:false,active:state.active,transition,signalFunding:signal,reasons:currentFundingAudit.reasons.map(x=>'CURRENT_FUNDING_'+x)});
+          continue;
+        }
+      }
+
+      if(transition==='ENTRY'){
+        state.active=true;
+        state.qSpot=cfg.spotNotional/startSpot;
+        state.qPerp=-cfg.perpNotional/startPerp;
+        state.episodeMonths=0;
+        baseCost=baseTransitionCostUsd(cfg);
+        stressCost=stressTransitionCostUsd(cfg);
+      }else if(transition==='EXIT'){
         state.active=false;
         baseCost=baseTransitionCostUsd(cfg);
         stressCost=stressTransitionCostUsd(cfg);
@@ -269,11 +277,6 @@ export function runSpotPerpFundingPersistenceV2(dataset,{tradeMonths,config={}}=
       }
 
       if(state.active){
-        const currentFundingAudit=auditFundingMonth(d.funding,month,cfg);
-        if(!currentFundingAudit.valid){
-          slots.push({asset,month,priorMonth:prior,valid:false,active:true,transition,signalFunding:signal,reasons:currentFundingAudit.reasons.map(x=>'CURRENT_FUNDING_'+x)});
-          continue;
-        }
         activeThisMonth=true;
         currentFunding=currentFundingAudit.sumRate;
         const spotPricePnl=state.qSpot*(endSpot-startSpot);
