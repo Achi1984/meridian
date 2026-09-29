@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+  "stage": "DEVELOPMENT",
+  "workflowRun": 36609900324,
+  "commit": "88e7225eca567c516ea197c27254c82cb4775645",
+  "artifactId": 11053620061,
+  "artifactZipSha256": "b7d77f3cee303467041efed59095e76b12dccacf897a66c570f1d54e762faa16",
+  "evidenceHashes": {
+    "summaryPrehashSha256": "81690e6d5b98c427ce4107e60d6e528e8481a3d8b6179f73e76cb3505f7ceb4b",
+    "fullSha256": "fb04289d9f9f8623360dd3b652320c09e024c4386d722026e72621508be28af1",
+    "markdownSha256": "6c19e3897c1e557b02d5b8708c883922ca55c55d43ab52dfb64bceb9f459b01e"
+  },
+  "rawWindow": "2023-01..2024-12",
+  "developmentWindow": "2023-01-14..2024-12-28",
+  "periods": 102,
+  "eligibleEveryWeek": 12,
+  "sideCountEveryWeek": 2,
+  "holdoutLoaded": false,
+  "postDevelopmentDataLoaded": false,
+  "dataIntegrityFailure": false,
+  "result": {
+    "netReturnPct": 45.14684441005146,
+    "priceOnlyReturnPct": 38.51406679584344,
+    "profitFactor": 1.4350652324313213,
+    "sharpe": 0.8053410597713436,
+    "maxDrawdownPct": 23.9925990676707,
+    "positiveWindows": "3/5",
+    "windowsPct": [
+      -13.083651750742199,
+      37.34865497221922,
+      12.97530838161125,
+      24.028497202795428,
+      -13.228581092935965
+    ],
+    "stressReturnPct": 35.77589467246487,
+    "fundingContribution": 0.04708919249999998,
+    "costContribution": -0.10720000000000007,
+    "turnover": 134,
+    "longContribution": 0.8723032984887042,
+    "shortContribution": -0.3185456019403482,
+    "positiveAssets": "5/12",
+    "positiveConcentrationPct": 42.80459383489449,
+    "meanLongSignal": -0.002782615600462301,
+    "meanShortSignal": -0.03133650735206749,
+    "meanLongNextWeekReturn": 0.018007066833111846,
+    "meanShortNextWeekReturn": 0.008072390283144082,
+    "meanHighMinusLowNextWeek": 0.009934676549967766
+  },
+  "gateReasons": [
+    "POSITIVE_WINDOWS_LT_4",
+    "SHORT_CONTRIBUTION_NOT_POSITIVE",
+    "POSITIVE_ASSETS_LT_8",
+    "POSITIVE_CONCENTRATION_GT_30.0"
+  ],
+  "decision": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+  "holdoutAuthorized": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "immutable": true,
+  "executionImpact": false
+}
