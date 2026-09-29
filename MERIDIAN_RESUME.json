@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_PROTOCOL_ENGINE_INVARIANTS_FROZEN_NO_PNL",
+  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DEVELOPMENT_FAIL_HOLDOUT_LOCKED_NEXT_EXTERNAL_RESEARCH",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "9d52b13a9aa86734a12a6d0e3d1bd7366720b3c3",
+    "verifiedSha": "f896937f9d0c15c4dc5fb58bed2c41a7c846e7bd",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1047,6 +1047,39 @@
       "strategyPnlCalculated": false,
       "decision": "FOUNDATION_PASS_STRATEGY_PREREGISTRATION_ALLOWED",
       "immutable": true
+    },
+    "perpetualTakerOrderFlowV1": {
+      "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+      "stage": "DEVELOPMENT",
+      "workflowRun": 36609900324,
+      "artifactId": 11053620061,
+      "rawWindow": "2023-01..2024-12",
+      "developmentWindow": "2023-01-14..2024-12-28",
+      "periods": 102,
+      "netReturnPct": 45.14684441005146,
+      "priceOnlyReturnPct": 38.51406679584344,
+      "profitFactor": 1.4350652324313213,
+      "sharpe": 0.8053410597713436,
+      "maxDrawdownPct": 23.9925990676707,
+      "positiveWindows": "3/5",
+      "stressReturnPct": 35.77589467246487,
+      "longContribution": "POSITIVE",
+      "shortContribution": "NEGATIVE",
+      "positiveAssets": "5/12",
+      "positiveConcentrationPct": 42.80459383489449,
+      "highMinusLowNextWeekSpreadPct": 0.9934676549967766,
+      "gateReasons": [
+        "POSITIVE_WINDOWS_LT_4",
+        "SHORT_CONTRIBUTION_NOT_POSITIVE",
+        "POSITIVE_ASSETS_LT_8",
+        "POSITIVE_CONCENTRATION_GT_30.0"
+      ],
+      "decision": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+      "holdoutLoaded": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -1060,7 +1093,7 @@
     255,
     256
   ],
-  "nextAction": "Merge PERPETUAL-TAKER-ORDER-FLOW-V1 protocol, engine and invariant tests canonically before any strategy PnL. After green current-base CI and merge, create a separate DEVELOPMENT-only collector/runner that loads only 2023-01..2024-12 data for the frozen 12 assets, runs exactly 102 Saturday anchors from 2023-01-14 through final exit 2024-12-28, and freezes the untouched result. Do not load or calculate the 2025-01-11..2026-08-29 temporal holdout unless DEVELOPMENT passes unchanged. No retuning or Paper/live promotion.",
+  "nextAction": "Freeze the failed PERPETUAL-TAKER-ORDER-FLOW-V1 development result and do not load the 2025-01-11..2026-08-29 temporal holdout. Treat the positive +0.9935% high-flow-minus-low-flow next-week spread, positive long side, negative short side and strong aggregate development return as hypothesis-generation evidence only. Do not remove the short side, drop assets, change the 168h lookback, change costs, relax gates or otherwise rescue V1. Run a fresh external-evidence survey for a separately frozen Order Flow successor or another orthogonal family, then use only genuinely untouched data for its first validation. Keep executionImpact=false and no Paper/live promotion.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1089,7 +1122,7 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_TAKER_ORDER_FLOW_V1_FROZEN",
+    "selected": "ORDER_FLOW_V1_FAIL_NEXT_EXTERNAL_EVIDENCE_FOR_SUCCESSOR",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1116,7 +1149,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "MERGE_ORDER_FLOW_V1_PROTOCOL_THEN_DEVELOPMENT_ONLY",
+    "nextStage": "EXTERNAL_EVIDENCE_BEFORE_ANY_ORDER_FLOW_SUCCESSOR_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1315,7 +1348,7 @@
       "AVAX"
     ],
     "orderFlowV1SignalAllowed": "ONLY_AFTER_PROTOCOL_FROZEN",
-    "orderFlowV1PnlObserved": false,
+    "orderFlowV1PnlObserved": true,
     "orderFlowV1PaperAuthorized": false,
     "orderFlowV1Ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
     "orderFlowV1ProtocolStatus": "FROZEN_BEFORE_FIRST_PNL",
@@ -1325,6 +1358,11 @@
     "orderFlowV1DevelopmentPeriods": 102,
     "orderFlowV1HoldoutWindow": "2025-01-11..2026-08-29",
     "orderFlowV1HoldoutPeriods": 85,
-    "orderFlowV1HoldoutLoaded": false
+    "orderFlowV1HoldoutLoaded": false,
+    "orderFlowV1Status": "IMMUTABLE_DEVELOPMENT_FAIL",
+    "orderFlowV1Economics": "POSITIVE_NET_STRESS_AND_HIGH_MINUS_LOW_SPREAD_BUT_SHORT_SIDE_BREADTH_CONCENTRATION_AND_WINDOW_GATES_FAIL",
+    "orderFlowV1HoldoutAuthorized": false,
+    "orderFlowV1ObservedAsymmetry": "HIGH_FLOW_LONG_POSITIVE_LOW_FLOW_SHORT_NEGATIVE",
+    "orderFlowV1NoRescueRule": "NO_SHORT_REMOVAL_NO_ASSET_REMOVAL_NO_LOOKBACK_OR_COST_OR_GATE_RETUNING"
   }
 }
