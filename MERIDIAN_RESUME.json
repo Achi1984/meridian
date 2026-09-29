@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "ADAPTIVE_CROSS_VENUE_V3_FOUNDATION_PASS_NEXT_STRATEGY_FREEZE",
+  "phase": "ADAPTIVE_CROSS_VENUE_V3_DISCOVERY_FAIL_NEXT_SELECTIVE_STATIC_V4",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "703228c935f1993590544810fe2b1e15f174c684",
+    "verifiedSha": "e265db44fe05bdce27d1a1b1dbda36a7ba3642e2",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -479,6 +479,38 @@
       "decision": "FOUNDATION_PASS",
       "executionImpact": false,
       "immutable": true
+    },
+    "adaptiveCrossVenueFundingSpreadV3": {
+      "ruleset": "ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-FROZEN",
+      "stage": "DISCOVERY",
+      "rawWindow": "2024-09-01..2025-09-01",
+      "tradeWindow": "2024-10..2025-08",
+      "decisionSlots": 88,
+      "activeCycles": 35,
+      "noTradeCycles": 53,
+      "binanceLongCycles": 34,
+      "hyperliquidLongCycles": 1,
+      "netReturnPct": 1.2386,
+      "netPnlUsd": 1973.96,
+      "profitFactor": 20.0032,
+      "maxDrawdownPct": 0.0649,
+      "positiveWindows": "4/5",
+      "fundingPnlUsd": 3113.05,
+      "basisPnlUsd": -19.09,
+      "baseCostsUsd": 1120,
+      "fundingCostRatio": 2.7795,
+      "stressReturnPct": 0.7975,
+      "positiveAssets": "8/8",
+      "positiveConcentrationPct": 32.07,
+      "signalSignAgreementPct": 97.14,
+      "gateReasons": [
+        "SHORT_BINANCE_LONG_HYPERLIQUID:CYCLES_LT_4",
+        "SHORT_BINANCE_LONG_HYPERLIQUID:PNL_NOT_POSITIVE"
+      ],
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -492,7 +524,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Adaptive Cross-Venue Funding Spread V3 before first PnL. Use the eight qualified assets HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. September 2024 is signal warm-up only. Discovery trades are 2024-10 through 2025-08; temporal holdout is 2025-09 through 2026-08 and is allowed only after discovery pass. Direction is determined solely from the previous completed calendar month's realized Hyperliquid-minus-Binance funding differential. Trade long the lower-funding venue and short the higher-funding venue. No trade when the absolute trailing spread is below a threshold derived only from frozen stress round-trip costs, not from strategy outcomes. Preserve V1/V2 notional, basis accounting, base costs and +5bps-per-fill stress. Keep executionImpact=false.",
+  "nextAction": "Freeze a new Selective Static Cross-Venue Funding V4 before reading any 2025-09..2026-08 strategy PnL. Preserve the V3 cost-derived 0.78% prior-month spread threshold and public-data execution model, but trade only the structurally observed LONG_BINANCE/SHORT_HYPERLIQUID direction when the prior completed month's Hyperliquid-minus-Binance realized funding spread is >=0.78%; otherwise NO TRADE. Do not trade the reverse direction. Treat V3 2024-10..2025-08 as hypothesis-generation evidence only. First and only gating evaluation for V4 must use untouched 2025-09..2026-08 data. Keep executionImpact=false and require prospective Paper shadow only after validation pass.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -502,7 +534,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3",
+    "selected": "SELECTIVE_STATIC_CROSS_VENUE_FUNDING_V4",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -562,6 +594,12 @@
       "ARB"
     ],
     "adaptiveCrossVenueV3Window": "2024-09..2026-08",
-    "strategyPnlObserved": false
+    "strategyPnlObserved": false,
+    "adaptiveV3Status": "IMMUTABLE_DISCOVERY_FAIL_DIRECTION_BREADTH",
+    "adaptiveV3Economics": "STRONG_BUT_NOT_PROMOTABLE",
+    "v4HypothesisSource": "V3_DISCOVERY_HYPOTHESIS_GENERATION_ONLY",
+    "v4FirstIndependentWindow": "2025-09..2026-08",
+    "v4HoldoutDataObserved": false,
+    "v4PaperAllowed": false
   }
 }
