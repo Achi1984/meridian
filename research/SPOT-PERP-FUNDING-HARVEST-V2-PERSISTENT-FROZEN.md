@@ -98,10 +98,11 @@ After any exit:
 
 At ENTER:
 
+- state transition occurs at the first valid 8h bar **open** of the month (00:00 UTC when coverage is complete);
 - Spot long notional = $10,000
 - Perp short notional = $10,000
-- Spot quantity fixed from entry price
-- Perp quantity fixed from entry price
+- Spot quantity fixed from that entry open
+- Perp quantity fixed from that entry open
 
 Across consecutive HOLD months:
 
@@ -112,12 +113,14 @@ Across consecutive HOLD months:
 
 At EXIT:
 
-- both legs are closed at the first valid 8h marks of the exit month.
+- both legs are closed at the first valid 8h bar **open** of the exit month;
+- no current-month price or funding PnL is accrued after that exit.
 
 At the final stage end:
 
-- any still-open position is forcibly closed using the final valid 8h marks of the final trade month;
-- exit costs are charged.
+- any still-open position is forcibly closed using the last valid 8h bar **close** of the final trade month;
+- all valid funding events through the final month are included;
+- exit costs are charged at the final close notional.
 
 ## Capital denominator
 
@@ -137,17 +140,24 @@ No leverage credit is taken.
 
 Within every month where the position is held:
 
-- Spot PnL = fixed Spot quantity × (month last mark - month first mark)
-- Perp PnL = fixed short quantity × (month last mark - month first mark)
+- start mark = first valid 8h bar open;
+- end mark = last valid 8h bar close;
+- Spot PnL = fixed Spot quantity × (end mark - start mark);
+- Perp PnL = fixed short quantity × (end mark - start mark).
 
-This preserves fixed quantities across a persistent streak.
+This preserves fixed quantities across a persistent streak. The sub-second transition between consecutive monthly bars is not synthetically reconstructed.
 
 ## Funding PnL while active
 
 For each held month:
 
-- approximate monthly short-perp funding notional = absolute fixed perp quantity × first valid Perp price of the month
-- funding PnL = monthly perp notional × sum(realized funding rates in the current month)
+- approximate monthly short-perp funding notional = absolute fixed perp quantity × first valid Perp bar-open price of the month;
+- funding cash flow uses realized archived events.
+
+Boundary rule:
+- ENTER month: include funding events strictly after the month-start execution timestamp;
+- HOLD month: include all funding events timestamped at or after month start and before month end because the position already existed before the boundary;
+- EXIT month: include no current-month funding because exit occurs at the month-start execution timestamp.
 
 Observed funding cadence is used exactly as archived.
 
