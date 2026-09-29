@@ -1,0 +1,32 @@
+name: MERIDIAN QH BTC Daily Trades Consistency Diagnostic V1
+
+on:
+  pull_request:
+    paths:
+      - "scripts/diagnose-qh-btc-daily-trades-consistency-v1.py"
+      - ".github/workflows/qh-btc-daily-trades-consistency-v1.yml"
+      - "research/PERPETUAL-QH-BTC-DAILY-TRADES-CONSISTENCY-DIAGNOSTIC-V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-btc-daily-trades-consistency-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare monthly vs daily individual trades on the two divergent days
+        run: python3 scripts/diagnose-qh-btc-daily-trades-consistency-v1.py
+      - name: Upload source-consistency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-btc-daily-trades-consistency-v1
+          path: research/results/qh-btc-daily-trades-consistency/*.json
+          if-no-files-found: warn
