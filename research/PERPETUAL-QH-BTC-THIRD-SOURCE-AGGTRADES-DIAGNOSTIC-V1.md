@@ -24,3 +24,10 @@ For aggTrades, declared underlying trade counts from `first_trade_id..last_trade
 - otherwise -> unresolved three-way/partial divergence.
 
 This diagnostic cannot authorize a data protocol or strategy test. No direction, signal, return, position or PnL is calculated.
+
+
+## Reviewer correction loop 1
+
+The first successful run showed many minute-level aggTrades-vs-other-source differences outside the known individual-trades/kline gaps. That exposed an attribution limitation: an aggTrade is timestamped as one aggregate record and can represent an underlying trade-ID range that crosses a minute boundary, so assigning its full quantity to one minute can shift volume between adjacent minutes.
+
+The diagnostic therefore keeps minute-level differences as localization evidence but makes **full UTC-day base/derived-quote totals** the primary third-source discriminator. Daily aggregation removes minute-boundary allocation ambiguity without using any directional information or strategy outcome.
