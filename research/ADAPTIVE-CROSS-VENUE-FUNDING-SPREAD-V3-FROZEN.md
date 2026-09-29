@@ -273,6 +273,8 @@ All must pass:
 - no stage-level data-integrity failure
 - >=32 active asset-month cycles
 - >=6 of 8 assets have at least 2 active cycles
+- >=4 LONG_BINANCE/SHORT_HYPERLIQUID active cycles
+- >=4 SHORT_BINANCE/LONG_HYPERLIQUID active cycles
 - aggregate reserved-capital net return >0
 - Profit Factor >=1.20
 - max drawdown <=8%
@@ -280,6 +282,8 @@ All must pass:
 - total funding PnL >0
 - funding-PnL / base-cost ratio >=1.25
 - aggregate stress return >0
+- LONG_BINANCE/SHORT_HYPERLIQUID aggregate net PnL >0
+- SHORT_BINANCE/LONG_HYPERLIQUID aggregate net PnL >0
 - >=5 of 8 assets have positive net PnL across their active cycles
 - no single positive asset contributes >50% of total positive PnL
 
@@ -297,6 +301,7 @@ With zero rule changes:
 - no stage-level data-integrity failure
 - >=32 active asset-month cycles
 - >=6 of 8 assets have at least 2 active cycles
+- >=4 active cycles in each direction
 - aggregate reserved-capital net return >0
 - Profit Factor >=1.15
 - max drawdown <=8%
@@ -304,6 +309,7 @@ With zero rule changes:
 - total funding PnL >0
 - funding-PnL / base-cost ratio >=1.15
 - aggregate stress return >0
+- both direction buckets have positive aggregate net PnL
 - >=5 of 8 assets have positive net PnL
 - no single positive asset contributes >50% of total positive PnL
 
