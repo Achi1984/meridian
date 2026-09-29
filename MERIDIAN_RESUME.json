@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_BASIS_DATA_FOUNDATION_PASS_NEXT_STRATEGY_PREREGISTRATION",
+  "phase": "SPOT_PERP_BASIS_V1_DISCOVERY_FAIL_NEXT_BASIS_VOLATILITY_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "5b35aa6a3519c5c63328a472d7ffde61f373c9b5",
+    "verifiedSha": "5402ee28c872050cd6f414c5fb9a9bdda0b7611e",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -716,6 +716,55 @@
       "syntheticBackfillUsed": false,
       "decision": "FOUNDATION_PASS",
       "immutable": true
+    },
+    "spotPerpBasisDislocationV1": {
+      "ruleset": "SPOT-PERP-BASIS-DISLOCATION-V1-FROZEN",
+      "stage": "DISCOVERY",
+      "rawWindow": "2024-06..2025-08",
+      "signalWindow": "2024-09..2025-08",
+      "holdoutLoaded": false,
+      "universe": [
+        "APT",
+        "APE",
+        "CRV",
+        "SUSHI",
+        "DYDX",
+        "LDO",
+        "GALA",
+        "IMX"
+      ],
+      "eligibleSignalEvaluations": 8736,
+      "percentileQualifiedSignals": 0,
+      "cancelledByExecutionBasis": 0,
+      "completedTrades": 0,
+      "activeMonths": 0,
+      "netReturnPct": 0,
+      "netPnlUsd": 0,
+      "basisPnlUsd": 0,
+      "fundingPnlUsd": 0,
+      "baseCostsUsd": 0,
+      "stressReturnPct": 0,
+      "positiveWindows": "0/5",
+      "positiveAssets": "0/8",
+      "gateReasons": [
+        "TRADES_LT_32",
+        "ASSETS_WITH_3_TRADES_LT_6",
+        "ACTIVE_MONTHS_LT_8",
+        "RETURN_NOT_POSITIVE",
+        "NET_PNL_NOT_POSITIVE",
+        "PF_LT_1.2",
+        "POSITIVE_WINDOWS_LT_4",
+        "BASIS_PNL_NOT_POSITIVE",
+        "FUNDING_PNL_NOT_POSITIVE",
+        "STRESS_RETURN_NOT_POSITIVE",
+        "GROSS_EDGE_COST_RATIO_LT_1.25",
+        "POSITIVE_ASSETS_LT_6"
+      ],
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "failureClass": "SAMPLE_MARKET_STRUCTURE_NO_SIGNAL_REGIME",
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -729,7 +778,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Spot-Perp Basis Dislocation V1 strategy before first PnL. Use only synchronized Spot and USD-M Perpetual 8h marks plus realized funding from the passed 8-asset foundation. Freeze basis-history lookback, basis-entry/no-trade threshold, funding-confirmation rule, holding/exit rule, costs, discovery/holdout split and gates before any strategy result. Keep market-neutral equal-notional Spot-vs-Perp structure, no leverage multiplier, no synthetic fills, and executionImpact=false.",
+  "nextAction": "Freeze a strategy-neutral Spot-Perp Basis-Volatility Regime V1 feature foundation before any new strategy PnL. Preserve the synchronized Spot/Perp 8h data model and public Binance Vision sources. Test only whether lagged absolute/log basis contains out-of-sample information about forward realized volatility, using a preregistered discovery/holdout split and no trading returns. Do not lower the 95th-percentile or 77.5 bps Basis Dislocation V1 thresholds, and do not run its untouched holdout. Only if the feature foundation passes may a separately frozen directional volatility-regime strategy be designed. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -739,7 +788,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_BASIS_DISLOCATION_V1_STRATEGY",
+    "selected": "SPOT_PERP_BASIS_VOLATILITY_REGIME_V1_FEATURE_FOUNDATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -766,7 +815,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "DATA_FOUNDATION_BEFORE_BASIS_SIGNAL",
+    "nextStage": "FEATURE_FOUNDATION_BEFORE_DIRECTIONAL_STRATEGY",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -786,7 +835,7 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-06..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": "ONLY_AFTER_PROTOCOL_AND_INVARIANTS_FROZEN",
+    "strategyPnlAllowed": false,
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -828,6 +877,10 @@
       "GALA",
       "IMX"
     ],
-    "basisWindow": "2024-06..2026-08"
+    "basisWindow": "2024-06..2026-08",
+    "spotPerpBasisV1Status": "IMMUTABLE_DISCOVERY_FAIL_ZERO_TRADES",
+    "spotPerpBasisV1Diagnosis": "NO_SIGNAL_REGIME_8736_EVALUATIONS_ZERO_QUALIFIED",
+    "spotPerpBasisV1Holdout": "UNTOUCHED_UNAUTHORIZED",
+    "basisArbitrageThresholdRescue": false
   }
 }
