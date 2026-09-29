@@ -1,0 +1,142 @@
+name: MERIDIAN QH Individual Trades Data V1.2
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-INDIVIDUAL-TRADES-DATA-V1-2.md"
+      - "scripts/audit-qh-individual-trades-data-v1-2-shard.py"
+      - "scripts/aggregate-qh-individual-trades-data-v1-2.py"
+      - "test/test_qh_individual_trades_data_v1_2.py"
+      - ".github/workflows/qh-individual-trades-data-v1-2.yml"
+  push:
+    branches:
+      - research/qh-individual-trades-data-v1-2-clean
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-INDIVIDUAL-TRADES-DATA-V1-2-FULL-RUN.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-individual-trades-data-v1-2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify V1.2 parser invariants
+        run: python3 test/test_qh_individual_trades_data_v1_2.py
+
+  canary:
+    if: github.event_name == 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - asset: BTCUSDT
+            month: "2025-01"
+            role: known-fixture
+          - asset: SOLUSDT
+            month: "2025-07"
+            role: known-fixture
+          - asset: ETHUSDT
+            month: "2025-11"
+            role: independent-canary
+          - asset: XRPUSDT
+            month: "2026-02"
+            role: independent-canary
+          - asset: DOGEUSDT
+            month: "2026-05"
+            role: independent-canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v12-canary
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frozen V1.2 canary
+        run: python3 scripts/audit-qh-individual-trades-data-v1-2-shard.py
+      - name: Upload V1.2 canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v12-canary-${{ matrix.role }}-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v12-canary/*.json
+          if-no-files-found: warn
+
+  shard:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        asset: [BTCUSDT, ETHUSDT, XRPUSDT, SOLUSDT, DOGEUSDT, ADAUSDT]
+        month:
+          - "2025-01"
+          - "2025-02"
+          - "2025-03"
+          - "2025-04"
+          - "2025-05"
+          - "2025-06"
+          - "2025-07"
+          - "2025-08"
+          - "2025-09"
+          - "2025-10"
+          - "2025-11"
+          - "2025-12"
+          - "2026-01"
+          - "2026-02"
+          - "2026-03"
+          - "2026-04"
+          - "2026-05"
+          - "2026-06"
+          - "2026-07"
+          - "2026-08"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v12-shard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and discard raw V1.2 shard
+        run: python3 scripts/audit-qh-individual-trades-data-v1-2-shard.py
+      - name: Upload compact V1.2 shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v12-shard-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v12-shard/*.json
+          if-no-files-found: warn
+
+  aggregate:
+    if: github.event_name != 'pull_request' && always()
+    needs: [invariants, shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qh-v12-shard-*
+          path: research/results/qh-v12-shards
+          merge-multiple: true
+      - name: Require 120/120 V1.2 green shards
+        run: python3 scripts/aggregate-qh-individual-trades-data-v1-2.py
+      - name: Upload V1.2 aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-individual-trades-data-v1-2
+          path: research/results/qh-individual-trades-data-v1-2-summary.json
+          if-no-files-found: warn
