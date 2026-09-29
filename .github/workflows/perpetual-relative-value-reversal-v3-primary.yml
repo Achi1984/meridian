@@ -1,0 +1,48 @@
+name: MERIDIAN Relative-Value Reversal V3 Primary Validation
+
+on:
+  push:
+    branches:
+      - research/perpetual-relative-value-reversal-v3-primary
+    paths:
+      - "research/perpetual_relative_value_reversal_v3.py"
+      - "research/PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN.md"
+      - "research/perpetual-relative-value-reversal-v3-protocol.json"
+      - "scripts/collect-perpetual-relative-value-reversal-v3-primary.py"
+      - "research/run-perpetual-relative-value-reversal-v3-primary.py"
+      - "test/test_perpetual_relative_value_reversal_v3.py"
+      - "test/test_perpetual_relative_value_reversal_v3_primary_harness.py"
+      - ".github/workflows/perpetual-relative-value-reversal-v3-primary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-relative-value-reversal-v3-primary
+  cancel-in-progress: true
+
+jobs:
+  primary-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical V3 protocol invariants
+        run: python3 test/test_perpetual_relative_value_reversal_v3.py
+      - name: Verify primary-only transfer exclusion
+        run: python3 test/test_perpetual_relative_value_reversal_v3_primary_harness.py
+      - name: Collect primary-only official Binance Vision data
+        run: python3 scripts/collect-perpetual-relative-value-reversal-v3-primary.py
+      - name: Run first frozen V3 PRIMARY_VALIDATION
+        run: python3 research/run-perpetual-relative-value-reversal-v3-primary.py
+      - name: Upload untouched primary evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-relative-value-reversal-v3-primary
+          path: |
+            research/results/perpetual-relative-value-reversal-v3-primary-summary.json
+            research/results/perpetual-relative-value-reversal-v3-primary-full.json
+            research/results/perpetual-relative-value-reversal-v3-primary.md
+          if-no-files-found: error
+          retention-days: 30
