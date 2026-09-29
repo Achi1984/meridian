@@ -156,7 +156,12 @@ This preserves fixed quantities across a persistent streak without synthetically
 For each held month:
 
 - approximate monthly short-perp funding notional = absolute fixed perp quantity × first valid Perp bar-open price of the month;
-- funding cash flow uses realized archived events.
+- funding cash flow uses realized archived events;
+- ENTER month excludes any funding event timestamped exactly at the entry-month boundary because the position was not held immediately before that settlement;
+- HOLD month includes all valid realized funding events in that calendar month;
+- EXIT month contributes no funding after the first-bar-open exit.
+
+This convention is frozen before V2 PnL and is intentionally conservative at entry boundaries.
 
 Boundary rule:
 - ENTER month: include funding events strictly after the month-start execution timestamp;
