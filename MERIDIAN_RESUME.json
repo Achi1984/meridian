@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_DATA_V2_PASS_NEXT_STRATEGY_PREREGISTRATION",
+  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PROTOCOL_FROZEN_NEXT_ENGINE_INVARIANTS",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "22441748c8b81f2afd33e4ebea31b7ca9c2939ef",
+    "verifiedSha": "0f09cff201f1c97bba012305bff34889664a28c5",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -985,7 +985,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a separately named PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 strategy before first V3 PnL. Use only the 19 Data V1-qualified transfer candidates; EOS remains excluded as a frozen data failure. Build the market factor only from the Data V2-qualified fixed benchmark basket BTC/ETH/BNB/SOL/XRP. Freeze benchmark weighting/return semantics, robust beta estimator and lookback, residual 8-week formation with 1-week skip, hold period, beta-neutral sizing, funding/cost accounting, deterministic development/asset-transfer split and all gates before any PnL. No parameter grid or post-result retuning; executionImpact=false.",
+  "nextAction": "After the PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN protocol is canonical on main, implement the engine and invariant tests exactly as frozen: five-asset equal-weight daily log market factor; 360-day OLS beta with Vasicek-style stage-local shrinkage; 56-day residual formation ending t-7d; fixed SHA-256 10/9 primary-transfer split; fixed 2 longs/2 shorts; exact beta-neutral side sizing with 20-80 gross guard; 8/13 bps turnover costs; transfer strategy data lockout until PRIMARY_VALIDATION passes. No V3 strategy PnL before the protocol merge.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -995,7 +995,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_STRATEGY_PREREGISTRATION",
+    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_ENGINE_INVARIANTS",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1022,7 +1022,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "V3_STRATEGY_PROTOCOL_AND_INVARIANTS_BEFORE_FIRST_PNL",
+    "nextStage": "V3_ENGINE_AND_INVARIANTS_AFTER_PROTOCOL_MERGE",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1164,6 +1164,35 @@
       "BNB",
       "SOL",
       "XRP"
-    ]
+    ],
+    "reversalV3Ruleset": "PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN",
+    "reversalV3ProtocolStatus": "FROZEN_BEFORE_FIRST_PNL",
+    "reversalV3PrimaryAssets": [
+      "RUNE",
+      "ZIL",
+      "SEI",
+      "ARB",
+      "DYDX",
+      "KSM",
+      "WLD",
+      "MANA",
+      "ZEC",
+      "SUI"
+    ],
+    "reversalV3TransferAssets": [
+      "SAND",
+      "ALGO",
+      "SNX",
+      "COMP",
+      "SUSHI",
+      "APE",
+      "1INCH",
+      "IOTA",
+      "CHZ"
+    ],
+    "reversalV3ValidationWindow": "2025-01-06..2026-08-31",
+    "reversalV3BetaRule": "360D_OLS_PLUS_VASICEK_STAGE_LOCAL_SHRINKAGE",
+    "reversalV3BenchmarkRule": "EQUAL_WEIGHT_BTC_ETH_BNB_SOL_XRP_DAILY_LOG_RETURN",
+    "reversalV3TransferLock": "NO_TRANSFER_STRATEGY_DATA_BEFORE_PRIMARY_PASS"
   }
 }
