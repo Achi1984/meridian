@@ -58,7 +58,7 @@ test('negative prior differential stays flat and pays no cost',()=>{
   assert.equal(r.summary.totalCosts,0);
   assert.equal(r.summary.totalNetPnl,0);
   assert.equal(r.gate.pass,false);
-  assert.ok(r.gate.reasons.includes('ACTIVE_CYCLES_LT_24'));
+  assert.ok(r.gate.reasons.includes('ACTIVE_CYCLES_LT_32'));
 });
 
 test('duplicate funding timestamps fail the whole stage closed',()=>{
