@@ -1,0 +1,45 @@
+name: MERIDIAN Relative-Value Reversal V3 Primary
+
+on:
+  push:
+    branches:
+      - research/perpetual-relative-value-reversal-v3-primary-validation
+    paths:
+      - "research/PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN.md"
+      - "research/perpetual-relative-value-reversal-v3-protocol.json"
+      - "research/perpetual_relative_value_reversal_v3.py"
+      - "research/run-perpetual-relative-value-reversal-v3-primary.py"
+      - "scripts/collect-perpetual-relative-value-reversal-v3-primary.py"
+      - "test/test_perpetual_relative_value_reversal_v3.py"
+      - ".github/workflows/perpetual-relative-value-reversal-v3-primary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-relative-value-reversal-v3-primary
+  cancel-in-progress: true
+
+jobs:
+  primary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen V3 invariants
+        run: python3 test/test_perpetual_relative_value_reversal_v3.py
+      - name: Collect PRIMARY_VALIDATION data only
+        run: python3 scripts/collect-perpetual-relative-value-reversal-v3-primary.py
+      - name: Run frozen V3 PRIMARY_VALIDATION
+        run: python3 research/run-perpetual-relative-value-reversal-v3-primary.py
+      - name: Upload untouched V3 primary evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-relative-value-reversal-v3-primary
+          path: |
+            research/results/perpetual-relative-value-reversal-v3-primary-summary.json
+            research/results/perpetual-relative-value-reversal-v3-primary-full.json
+            research/results/perpetual-relative-value-reversal-v3-primary.md
+          if-no-files-found: error
+          retention-days: 30
