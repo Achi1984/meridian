@@ -61,5 +61,29 @@
     "NOT_CHANGED",
     "RISKS_LIMITATIONS",
     "NEXT_ACTION"
+  ],
+  "workPackageRequiredFields": [
+    "id",
+    "title",
+    "status",
+    "baseMainSha",
+    "orchestrationBranch",
+    "executionMode",
+    "riskClass",
+    "tasks",
+    "reviewStatus",
+    "createdAt",
+    "lastCheckpoint"
+  ],
+  "taskRequiredFields": [
+    "id",
+    "role",
+    "status",
+    "dependencies",
+    "allowedFiles",
+    "forbiddenFiles",
+    "acceptanceCriteria",
+    "reviewLoop",
+    "reviewVerdict"
   ]
 }
