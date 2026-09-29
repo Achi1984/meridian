@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "CROSS_VENUE_V2_FAIL_NEXT_ADAPTIVE_V3_DATA_FOUNDATION",
+  "phase": "ADAPTIVE_CROSS_VENUE_V3_FOUNDATION_PASS_NEXT_STRATEGY_FREEZE",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "e4454e2266f8eddbb0cc3e55b86ee3c85a4fb3c9",
+    "verifiedSha": "703228c935f1993590544810fe2b1e15f174c684",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -444,6 +444,41 @@
       "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
       "promoted": false,
       "immutable": true
+    },
+    "adaptiveCrossVenueFundingSpreadV3DataV1": {
+      "ruleset": "ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-DATA-V1-FROZEN",
+      "interval": "2024-09..2026-08",
+      "candidateUniverse": [
+        "HBAR",
+        "SUI",
+        "NEAR",
+        "FIL",
+        "UNI",
+        "AAVE",
+        "ATOM",
+        "ARB"
+      ],
+      "qualifiedAssets": [
+        "HBAR",
+        "SUI",
+        "NEAR",
+        "FIL",
+        "UNI",
+        "AAVE",
+        "ATOM",
+        "ARB"
+      ],
+      "qualifiedCount": 8,
+      "binanceCoreMonthsPerAsset": 24,
+      "hyperliquidMarkCountPerAsset": 2191,
+      "hyperliquidFundingCountPerAsset": 17520,
+      "maxHyperliquidFundingGapHours": 1.2466,
+      "unexpectedTransportErrors": 0,
+      "strategyPnlCalculated": false,
+      "directionInferred": false,
+      "decision": "FOUNDATION_PASS",
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -457,7 +492,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze and run a strategy-neutral Adaptive Cross-Venue Funding Spread V3 data foundation on the previously unused candidate universe HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. Use Binance Vision USD-M public funding/8h mark archives and Hyperliquid public meta/8h candles/full funding history over the common 2024-09..2026-08 interval. No PnL, no direction inference, no asset replacement and no synthetic backfill. Require broad full-history qualification before any V3 strategy protocol is written. Keep executionImpact=false.",
+  "nextAction": "Freeze Adaptive Cross-Venue Funding Spread V3 before first PnL. Use the eight qualified assets HBAR/SUI/NEAR/FIL/UNI/AAVE/ATOM/ARB. September 2024 is signal warm-up only. Discovery trades are 2024-10 through 2025-08; temporal holdout is 2025-09 through 2026-08 and is allowed only after discovery pass. Direction is determined solely from the previous completed calendar month's realized Hyperliquid-minus-Binance funding differential. Trade long the lower-funding venue and short the higher-funding venue. No trade when the absolute trailing spread is below a threshold derived only from frozen stress round-trip costs, not from strategy outcomes. Preserve V1/V2 notional, basis accounting, base costs and +5bps-per-fill stress. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -467,7 +502,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3_DATA_FOUNDATION",
+    "selected": "ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -494,7 +529,7 @@
       "ATOM",
       "ARB"
     ],
-    "nextStage": "FULL_HISTORY_DATA_FOUNDATION_BEFORE_ADAPTIVE_STRATEGY",
+    "nextStage": "FREEZE_STRATEGY_BEFORE_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -513,7 +548,20 @@
     "crossVenueV2Status": "IMMUTABLE_VALIDATION_FAIL",
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-09..2026-08",
-    "adaptiveDirectionAllowed": false,
-    "strategyPnlAllowed": false
+    "adaptiveDirectionAllowed": true,
+    "strategyPnlAllowed": true,
+    "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
+    "adaptiveCrossVenueV3QualifiedAssets": [
+      "HBAR",
+      "SUI",
+      "NEAR",
+      "FIL",
+      "UNI",
+      "AAVE",
+      "ATOM",
+      "ARB"
+    ],
+    "adaptiveCrossVenueV3Window": "2024-09..2026-08",
+    "strategyPnlObserved": false
   }
 }
