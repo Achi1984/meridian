@@ -197,7 +197,7 @@ export function runSelectiveStaticCrossVenueFundingV4(dataset){
     return{asset,activeCycles:xs.length,netPnl:sum(xs.map(x=>x.pnl.netUsd)),stressNetPnl:sum(xs.map(x=>x.pnl.stressNetUsd)),fundingPnl:sum(xs.map(x=>x.pnl.fundingUsd)),basisPnl:sum(xs.map(x=>x.pnl.basisUsd)),costs:sum(xs.map(x=>x.pnl.costsUsd))};
   });
   const positive=byAsset.filter(x=>x.netPnl>0),positiveTotal=sum(positive.map(x=>x.netPnl));
-  const totalFundingPnl=sum(cycles.map(x=>x.pnl.fundingUsd)),totalCosts=sum(cycles.map(x=>x.pnl.costsUsd);
+  const totalFundingPnl=sum(cycles.map(x=>x.pnl.fundingUsd)),totalCosts=sum(cycles.map(x=>x.pnl.costsUsd));
   const activeSpreads=cycles.map(x=>Math.abs(x.signalSpread)).sort((a,b)=>a-b);
   const median=a=>!a.length?0:(a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2);
   const result={
