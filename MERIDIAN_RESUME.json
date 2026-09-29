@@ -4,25 +4,38 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PAPERBOT_PROFIT_V2_FROZEN_NEXT_CARRY",
-  "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
-  "r67Merged": true,
-  "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
-  "completed": [
-    "r67 collapsible asset cards merged",
-    "r67 release and portfolio CI green",
-    "profit special-agent protocol frozen",
-    "profit candidate engine added",
-    "profit lab UI added",
-    "r68 cache/build routing updated",
-    "r68 release CI green and merged",
-    "V1 profit discovery frozen: no candidate passes",
-    "V2 UP-UP regime-aware momentum frozen: +7.22% but gate fail",
-    "V2 research PR merged"
-  ],
-  "nextAction": "Implement and run the separately frozen delta-neutral funding-carry lane with public funding/basis/cost data. Do not modify V1/V2 thresholds or promote any failed directional candidate.",
+  "phase": "R69_RESEARCH_INTEGRATION_PENDING_CI",
+  "lastVerifiedMain": "087a087dc54b79afe3fbb01c1a708beedccfd046",
+  "integrationBranch": "integrate/v10-r69-research-20260929",
   "executionImpact": false,
-  "r68Merged": true,
-  "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c",
-  "latestResearchMergeSha": "752d69141426eb4dd070374f4f7c005e5fb85336"
+  "completed": [
+    "r68 profit-special-agent foundation merged and release-safe",
+    "V1 profit discovery frozen: no candidate passes",
+    "V2 UP-regime Donchian discovery frozen: +11.93%, PF 2.334, discovery gate pass only",
+    "V2 transfer-universe holdout frozen: +5.84%, PF 2.231, holdout fail due sample/stability gates",
+    "V3 adaptive 6h up-trend discovery frozen: +19.40%, PF 1.175, discovery fail due PF/stability gates",
+    "Asset Watch private bridge merged",
+    "GitHub OIDC encrypted Asset Watch mirror merged",
+    "Asset Watch OIDC compatibility fixed",
+    "Asset Watch mirror push run green with encrypted artifact",
+    "main Release Safety, Runtime Smoke, Release Coordinator and Pages deployment green on PR #254"
+  ],
+  "researchStatus": {
+    "validationState": "NO_VALIDATED_PROMOTION",
+    "strongestFamily": "REGIME_AWARE_LONG_TREND",
+    "tuningProhibited": [
+      "V1",
+      "V2",
+      "V3"
+    ],
+    "paperShadowAuthorized": false,
+    "livePromotionAuthorized": false
+  },
+  "nextAction": "Integrate the frozen V2/V3 research evidence on current main after CI, then freeze a new risk-managed cross-sectional momentum hypothesis on a distinct universe before observing results. Keep Funding Carry V3 as the next independent data-foundation lane. Do not tune V2/V3 post hoc or promote failed candidates.",
+  "afterNext": [
+    "FUNDING_CARRY_V3_DATA_FOUNDATION",
+    "DYNAMIC_GRID_ONLY_AFTER_INTRADAY_PATH_SIMULATOR"
+  ],
+  "coordination": "Main Agent owns merges. Refresh main before each merge; no concurrent merge. Failed or stale branches are never merged directly.",
+  "updatedAt": "2026-09-29"
 }
