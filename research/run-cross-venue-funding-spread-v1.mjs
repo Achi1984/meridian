@@ -13,9 +13,15 @@ const BINANCE_ARCHIVE_INPUT=process.env.BINANCE_ARCHIVE_INPUT||'/tmp/meridian-cr
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function json(url,options={}){
-  const r=await fetch(url,{...options,headers:{accept:'application/json','content-type':'application/json','user-agent':'MERIDIAN-research-only',...(options.headers||{})}});
-  if(!r.ok)throw new Error('HTTP '+r.status+' '+url);
-  return await r.json();
+  let last;
+  for(let attempt=0;attempt<6;attempt++){
+    const r=await fetch(url,{...options,headers:{accept:'application/json','content-type':'application/json','user-agent':'MERIDIAN-research-only',...(options.headers||{})}});
+    if(r.ok)return await r.json();
+    last=new Error('HTTP '+r.status+' '+url);
+    if(r.status!==429)throw last;
+    await sleep(10000*(attempt+1));
+  }
+  throw last;
 }
 async function hyperliquidInfo(body){
   return json('https://api.hyperliquid.xyz/info',{method:'POST',body:JSON.stringify(body)});
@@ -30,7 +36,7 @@ async function hyperliquidFunding(coin,start=START,end=END){
     if(!Number.isFinite(last)||last<cursor)break;
     cursor=last+1;
     if(rows.length<500)break;
-    await sleep(80);
+    await sleep(2400);
   }
   return out;
 }
@@ -51,7 +57,7 @@ for(const asset of CROSS_VENUE_FUNDING_SPREAD_V1_ASSETS){
   dataset[asset]={binanceFunding:bf,hyperliquidFunding:hf,binanceMarks:bm,hyperliquidMarks:hm};
   sources[asset]={binanceFunding:bf.length,hyperliquidFunding:hf.length,binanceMarks:bm.length,hyperliquidMarks:hm.length};
   console.log(JSON.stringify(sources[asset]));
-  await sleep(150);
+  await sleep(3000);
 }
 const result=runCrossVenueFundingSpreadV1(dataset);
 const summary={
