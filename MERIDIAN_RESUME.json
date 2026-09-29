@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_BASIS_V1_DISCOVERY_FAIL_NEXT_PERPETUAL_REVERSAL_DATA_FOUNDATION",
+  "phase": "PERPETUAL_REVERSAL_V1_DATA_FOUNDATION_PASS_NEXT_STRATEGY_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "e7187239d61dbf9320dbcdc12876654d89c2106a",
+    "verifiedSha": "335c1b80db69e4363fb2b020a2b87cd88735124a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -806,6 +806,24 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "perpetualCrossSectionalReversalV1DataV1": {
+      "ruleset": "PERPETUAL-CROSS-SECTIONAL-REVERSAL-V1-DATA-V1-FROZEN",
+      "interval": "2022-01..2026-08",
+      "candidateCount": 24,
+      "longHistoryReadyCount": 24,
+      "discovery2024ReadyCount": 23,
+      "nonDiscoveryReadyAssets": [
+        "ARB"
+      ],
+      "unexpectedTransportErrors": 0,
+      "strategyPnlCalculated": false,
+      "reversalRanksCalculated": false,
+      "volatilityConditionedReturnsCalculated": false,
+      "syntheticBackfillUsed": false,
+      "decision": "FOUNDATION_PASS",
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -819,7 +837,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze and run a strategy-neutral Perpetual Cross-Sectional Reversal V1 data foundation before any strategy PnL. Motivation is external 2026 evidence of 8-10 week crypto cross-sectional reversal, especially in volatile mid-caps. Freeze a broad midsize/alt Binance USD-M candidate universe and audit public perpetual price plus funding history with objective listing/continuity eligibility, preserving missing/delisted candidates instead of replacing them. Do not calculate reversal ranks, volatility-conditioned returns, portfolio PnL or optimize formation/holding windows in the foundation. Keep executionImpact=false.",
+  "nextAction": "Freeze Perpetual Cross-Sectional Reversal V1 strategy before first PnL. Use the externally motivated 8-week formation horizon as the primary fixed signal, weekly Monday rebalancing, contrarian long recent losers / short recent winners, an explicit no-mega-cap universe inherited from the foundation, objective eligibility from core-complete history, full funding and transaction-cost accounting, and a frozen discovery/temporal-holdout split. Any volatility conditioning, skip period, weighting method and side-count must be fixed before the first result; no parameter grid or post-result retuning. Keep executionImpact=false and require independent holdout before any Paper shadow.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -829,7 +847,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_CROSS_SECTIONAL_REVERSAL_V1_DATA_FOUNDATION",
+    "selected": "PERPETUAL_CROSS_SECTIONAL_REVERSAL_V1",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -856,7 +874,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "DATA_FOUNDATION_BEFORE_REVERSAL_STRATEGY",
+    "nextStage": "STRATEGY_PREREGISTRATION_BEFORE_FIRST_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -924,9 +942,10 @@
     "spotPerpBasisV1Holdout": "UNTOUCHED_UNAUTHORIZED",
     "basisArbitrageThresholdRescue": false,
     "reversalMotivation": "EXTERNAL_2026_EVIDENCE_8_TO_10_WEEK_CROSS_SECTIONAL_REVERSAL",
-    "reversalStrategyPnlAllowed": false,
+    "reversalStrategyPnlAllowed": "ONLY_AFTER_PROTOCOL_AND_INVARIANTS_FROZEN",
     "basisVolatilityFoundationStatus": "IMMUTABLE_FEATURE_DISCOVERY_FAIL",
     "basisVolatilityHoldout": "UNTOUCHED_UNAUTHORIZED",
-    "basisVolatilityStrategyAllowed": false
+    "basisVolatilityStrategyAllowed": false,
+    "reversalFoundationStatus": "FOUNDATION_PASS_24_OF_24_LONG_HISTORY_23_OF_24_2024_READY"
   }
 }
