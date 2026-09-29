@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+  "status": "FROZEN_BEFORE_FIRST_PNL",
+  "executionImpact": false,
+  "autoPromotion": false,
+  "parent": "PERPETUAL-TAKER-ORDER-FLOW-V1-DATA-FROZEN",
+  "assets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX"
+  ],
+  "calendar": {
+    "anchor": "SATURDAY_00_UTC",
+    "holdingDays": 7
+  },
+  "stages": {
+    "development": {
+      "start": "2023-01-14T00:00:00Z",
+      "endExclusiveEntry": "2024-12-28T00:00:00Z",
+      "finalExit": "2024-12-28T00:00:00Z",
+      "expectedPeriods": 102
+    },
+    "holdout": {
+      "start": "2025-01-11T00:00:00Z",
+      "endExclusiveEntry": "2026-08-29T00:00:00Z",
+      "finalExit": "2026-08-29T00:00:00Z",
+      "expectedPeriods": 85,
+      "authorizedOnlyAfterDevelopmentPass": true
+    }
+  },
+  "signal": {
+    "hours": 168,
+    "interval": "[t-168h,t)",
+    "numerator": "2*sum(takerBuyQuote)-sum(quoteVolume)",
+    "denominator": "sum(quoteVolume)",
+    "direction": "CONTINUATION_HIGH_LONG_LOW_SHORT"
+  },
+  "portfolio": {
+    "requiredEligible": 12,
+    "rank": "FLOW_DESC_THEN_SYMBOL_ASC",
+    "sideCount": 2,
+    "longGross": 0.5,
+    "shortGross": -0.5,
+    "perPositionAbsWeight": 0.25,
+    "grossExposure": 1,
+    "netExposure": 0
+  },
+  "execution": {
+    "entry": "1H_OPEN_AT_T",
+    "exit": "1H_OPEN_AT_T_PLUS_7D"
+  },
+  "funding": {
+    "interval": "(t,t+7d]",
+    "maxGapHours": 12
+  },
+  "costs": {
+    "baseBpsPerTurnover": 8,
+    "stressBpsPerTurnover": 13,
+    "terminalCloseCharged": true
+  },
+  "developmentGate": {
+    "expectedPeriods": 102,
+    "eligibleEveryWeek": 12,
+    "sideCountEveryWeek": 2,
+    "minProfitFactor": 1.15,
+    "minSharpe": 0.75,
+    "maxDrawdownPct": 25,
+    "minPositiveWindowsOf5": 4,
+    "minPositiveAssets": 8,
+    "maxPositiveConcentrationPct": 30,
+    "netPositive": true,
+    "priceOnlyPositive": true,
+    "stressPositive": true,
+    "bothSidesPositive": true,
+    "flowSpreadPositive": true
+  },
+  "holdoutGate": {
+    "expectedPeriods": 85,
+    "eligibleEveryWeek": 12,
+    "sideCountEveryWeek": 2,
+    "minProfitFactor": 1.05,
+    "minSharpe": 0.5,
+    "maxDrawdownPct": 30,
+    "minPositiveWindowsOf5": 3,
+    "minPositiveAssets": 7,
+    "maxPositiveConcentrationPct": 35,
+    "netPositive": true,
+    "priceOnlyPositive": true,
+    "stressPositive": true,
+    "bothSidesPositive": true,
+    "flowSpreadPositive": true
+  },
+  "developmentPassDecision": "DEVELOPMENT_PASS_TEMPORAL_HOLDOUT_REQUIRED",
+  "developmentFailDecision": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+  "holdoutPassDecision": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+  "holdoutFailDecision": "HOLDOUT_FAIL_RESEARCH_REDESIGN",
+  "holdoutLoaded": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
