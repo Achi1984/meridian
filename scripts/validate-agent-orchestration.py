@@ -37,6 +37,12 @@ cap=state.get('runtimeCapabilityPolicy',{})
 req(cap.get('neverClaimUnavailableModelOrAgent') is True,'runtime honesty guard must be enabled')
 req(cap.get('fallbackDisclosureRequired') is True,'fallback disclosure must be required')
 
+pwp=state.get('parallelWritePolicy',{})
+req(pwp.get('sameBranchConcurrentWritesAllowed') is False,'same-branch concurrent writes must be forbidden')
+req(pwp.get('readOnlyParallelismAllowed') is True,'read-only parallelism should remain allowed')
+req(pwp.get('separateBranchParallelismAllowed') is True,'separate-branch parallelism should remain allowed')
+req(pwp.get('mergeSerialization')=='MAIN_AGENT_ONLY_ONE_AT_A_TIME','merge serialization policy mismatch')
+
 expected_lifecycle=['RECONCILE','PLAN','ASSIGN','EXECUTE','REVIEW','INTEGRATE','GATE','MERGE','CHECKPOINT','REPORT']
 req(state.get('lifecycle')==expected_lifecycle,'lifecycle mismatch')
 
