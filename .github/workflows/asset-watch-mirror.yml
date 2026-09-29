@@ -1,4 +1,5 @@
 name: MERIDIAN Asset Watch Mirror
+# Bootstrap note: subsequent main-branch pushes to this workflow trigger the first mirror run.
 
 on:
   schedule:
