@@ -1,0 +1,44 @@
+name: MERIDIAN Perpetual Taker Order Flow V1 Development
+
+on:
+  push:
+    branches:
+      - research/perpetual-taker-order-flow-v1-development
+    paths:
+      - "scripts/collect-perpetual-taker-order-flow-v1-development.py"
+      - "research/run-perpetual-taker-order-flow-v1-development.py"
+      - "test/test_perpetual_taker_order_flow_v1_development_harness.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-development.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-taker-order-flow-v1-development
+  cancel-in-progress: true
+
+jobs:
+  development:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical Taker Order Flow V1 invariants
+        run: python3 test/test_perpetual_taker_order_flow_v1.py
+      - name: Verify development-only holdout exclusion
+        run: python3 test/test_perpetual_taker_order_flow_v1_development_harness.py
+      - name: Collect development-only official Binance Vision data
+        run: python3 scripts/collect-perpetual-taker-order-flow-v1-development.py
+      - name: Run first frozen Taker Order Flow V1 DEVELOPMENT
+        run: python3 research/run-perpetual-taker-order-flow-v1-development.py
+      - name: Upload untouched development evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-taker-order-flow-v1-development
+          path: |
+            research/results/perpetual-taker-order-flow-v1-development-summary.json
+            research/results/perpetual-taker-order-flow-v1-development-full.json
+            research/results/perpetual-taker-order-flow-v1-development.md
+          if-no-files-found: error
+          retention-days: 30
