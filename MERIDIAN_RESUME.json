@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_FOUNDATION_PASS_NEXT_STRATEGY_PREREGISTRATION",
+  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_FOUNDATION_PASS_NEXT_BROAD_MARKET_DATA_V2",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -964,7 +964,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 before any V3 PnL. Use only the 19 qualified transfer assets and BTCUSDT as the frozen market benchmark. Estimate each asset's pre-trade BTC beta from a fixed trailing daily-return window, form an 8-week residual return ending before a 1-week skip, rank residual losers/winners, and construct a beta-neutral long-short portfolio with unchanged public funding accounting and conservative turnover costs. Split the 19 qualified assets into a frozen strategy-development subset and a disjoint asset-transfer holdout before first PnL; the V1/V2 assets and their seen 2024/2025-2026 results may motivate the hypothesis but are not independent promotion evidence. Keep executionImpact=false.",
+  "nextAction": "Treat PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-DATA-V1 as the canonical strategy-neutral foundation pass (19/20 candidates; EOS remains failed and is not replaced). Before freezing any V3 strategy or calculating beta/residual returns/PnL, add a separately frozen Data V2 benchmark extension using the same 20 candidate universe and the same 2024-01..2026-08 interval, while validating daily price coverage for a fixed broad-market benchmark basket BTC, ETH, BNB, SOL and XRP. Do not calculate market-factor returns or betas in Data V2. Only after the broad benchmark foundation passes may the exact market-factor construction, robust beta estimator, residual formation, sizing, costs and independent asset-transfer split be preregistered.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -974,7 +974,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3",
+    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_BROAD_MARKET_DATA_V2",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1092,8 +1092,8 @@
     "reversalV2TransferAuthorized": false,
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
-    "reversalV3Stage": "DATA_FOUNDATION_BEFORE_STRATEGY",
-    "reversalV3StrategyPnlAllowed": "ONLY_AFTER_PROTOCOL_AND_INVARIANTS_FROZEN",
+    "reversalV3Stage": "FOUNDATION_V1_PASS_BROAD_MARKET_EXTENSION_BEFORE_STRATEGY",
+    "reversalV3StrategyPnlAllowed": false,
     "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
     "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
     "reversalV2EvidenceUse": "HYPOTHESIS_GENERATION_ONLY",
@@ -1124,6 +1124,17 @@
     "reversalV3FailedAsset": "EOS",
     "reversalV3Benchmark": "BTCUSDT_USDM_1D",
     "reversalV3IndependentEvidenceDesign": "DISJOINT_ASSET_TRANSFER_HOLDOUT",
-    "reversalV3PaperAuthorized": false
+    "reversalV3PaperAuthorized": false,
+    "reversalV3BetaEstimationAllowed": false,
+    "reversalV3DataV1Benchmark": "BTCUSDT_USDM_1D",
+    "reversalV3DataV2BenchmarkBasket": [
+      "BTC",
+      "ETH",
+      "BNB",
+      "SOL",
+      "XRP"
+    ],
+    "reversalV3DataV2Purpose": "VALIDATE_BROAD_MARKET_BENCHMARK_COVERAGE_ONLY",
+    "reversalV3BroadMarketRationale": "EXTERNAL_2025_EVIDENCE_MARKET_INDEX_SPECIFICATION_MATERIALLY_AFFECTS_CRYPTO_BETA_ESTIMATION"
   }
 }
