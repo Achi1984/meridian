@@ -126,7 +126,7 @@ export function runDynamicGridMonth({
   let grid=newGrid(wallet,bars[0].open,{stepPct,halfLevels,levelMode},cfg);
   if(!grid.ok)return{ruleset:DYNAMIC_GRID_PROXY_V1_RULESET,valid:false,reason:'WALLET:'+grid.reason,researchOnly:true,executionImpact:false,autoPromotion:false};
   let resetPending=false,peak=markEquity(wallet,bars[0].open),maxDD=0,previousClose=bars[0].open;
-  const equityCurve=[],events=[];
+  let eventCount=0;
   const firstTs=bars[0].openTime,lastTs=bars.at(-1).openTime;
 
   for(let bi=0;bi<bars.length;bi++){
@@ -151,7 +151,7 @@ export function runDynamicGridMonth({
             month:monthKey(firstTs),pathMode,dynamicReset,stepPct,halfLevels,levelMode,researchOnly:true,executionImpact:false,autoPromotion:false
           };
         }
-        events.push({openTime:bar.openTime,side:ev.side,price:ev.price,toLevelIndex:ev.toLevelIndex});
+        eventCount++;
         grid.currentIndex=ev.toLevelIndex;
         const boundary=grid.currentIndex===0||grid.currentIndex===grid.levels.length-1;
         if(dynamicReset&&boundary){
@@ -163,7 +163,6 @@ export function runDynamicGridMonth({
     const eq=markEquity(wallet,bar.close);
     peak=Math.max(peak,eq);
     if(peak>0)maxDD=Math.max(maxDD,(peak-eq)/peak*100);
-    equityCurve.push({openTime:bar.openTime,equity:eq});
     previousClose=bar.close;
   }
 
@@ -181,8 +180,7 @@ export function runDynamicGridMonth({
     fills:wallet.fills,rebalances:wallet.rebalances,resets:wallet.resets,costs:wallet.costs,
     insufficientWallet:false,
     buyHoldReturn:finalPrice/bars[0].open-1,
-    eventCount:events.length,
-    equityCurve
+    eventCount
   };
 }
 function returnFinite(x){if(!finite(x))throw new Error('non-finite equity');return x}
