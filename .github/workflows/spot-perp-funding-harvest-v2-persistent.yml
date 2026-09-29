@@ -1,0 +1,51 @@
+name: MERIDIAN Spot-Perp Funding Harvest V2 Persistent Carry
+
+on:
+  push:
+    branches:
+      - research/spot-perp-funding-harvest-v2-persistent
+    paths:
+      - "research/SPOT-PERP-FUNDING-HARVEST-V2-PERSISTENT-FROZEN.md"
+      - "research/spot-perp-funding-harvest-v2-persistent.js"
+      - "research/run-spot-perp-funding-harvest-v2-persistent.mjs"
+      - "test/spot-perp-funding-harvest-v2-persistent.test.js"
+      - ".github/workflows/spot-perp-funding-harvest-v2-persistent.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spot-perp-funding-harvest-v2-persistent
+  cancel-in-progress: true
+
+jobs:
+  development:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SPOT_PERP_V1_START: "2024-09"
+      SPOT_PERP_V1_END: "2025-08"
+      SPOT_PERP_V1_DATA_DIR: "/tmp/meridian-spot-perp-v2"
+      SPOT_PERP_V2_DATA_DIR: "/tmp/meridian-spot-perp-v2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen persistent V2 invariants
+        run: node --test test/spot-perp-funding-harvest-v2-persistent.test.js
+      - name: Collect official development-window Binance Vision archives
+        run: python3 scripts/collect-spot-perp-funding-harvest-v1.py
+      - name: Run first frozen persistent V2 development
+        run: node research/run-spot-perp-funding-harvest-v2-persistent.mjs
+      - name: Upload untouched development evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-perp-funding-harvest-v2-persistent
+          path: |
+            research/results/spot-perp-funding-harvest-v2-persistent-summary.json
+            research/results/spot-perp-funding-harvest-v2-persistent-full.json
+            research/results/spot-perp-funding-harvest-v2-persistent.md
+          if-no-files-found: error
+          retention-days: 30
