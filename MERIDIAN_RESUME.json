@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SELF_HISTORY_V2_DATA_FAIL_ROW_CONTINUITY_CHARACTERIZED_NEXT_V3",
+  "phase": "SELF_HISTORY_V3_FROZEN_FAIL_NEXT_CROSS_SECTIONAL_FACTOR_V1",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "82363d4957b48e2509d8a766b2973fcfd32a350a",
+    "verifiedSha": "4c3b6904c1d400ee576c114882514aaa5c62906a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -222,6 +222,34 @@
       "implication": "Premium gaps are sparse and predominantly synchronized/archive-specific; no interpolation is authorized.",
       "executionImpact": false,
       "immutable": true
+    },
+    "selfHistoryPerpFactorV3": {
+      "ruleset": "SELF-HISTORY-PERP-FACTOR-V3-FROZEN",
+      "discovery": {
+        "window": "2023-04-03..2024-12-30",
+        "periods": 91,
+        "activeWeeks": 2,
+        "netReturnPct": -0.9344,
+        "priceOnlyReturnPct": -0.9687,
+        "profitFactor": 0.1221,
+        "sharpe": -0.6919,
+        "maxDrawdownPct": 1.0629,
+        "positiveWindows": "1/5",
+        "stressReturnPct": -1.2518,
+        "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN"
+      },
+      "matchedCrossSectionalDevelopmentEvidence": {
+        "netReturnPct": 34.0556,
+        "priceOnlyReturnPct": 28.0543,
+        "profitFactor": 1.4621,
+        "sharpe": 0.835,
+        "maxDrawdownPct": 13.0427,
+        "positiveWindows": "5/5",
+        "status": "SEEN_DEVELOPMENT_EVIDENCE_ONLY_NOT_VALIDATED"
+      },
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -235,7 +263,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Self-History Perpetual Factor V3 from current main before any strategy result. Preserve V2 economic definitions and gates, but replace V2's global exact-row continuity assumption with the independently audited sparse-data rule: no interpolation; a factor/asset signal is unavailable when its required input window is incomplete; each factor book uses only currently valid objectively eligible assets and goes flat when its minimum valid breadth is not met; own-history uses the most recent 52 valid weekly observations within a maximum trailing 60-week window. Preserve independent factor books, matched cross-sectional benchmarks, funding, turnover costs, 4x cost stress, temporal holdout and transfer holdout. Keep executionImpact=false.",
+  "nextAction": "Freeze Cross-Sectional Perpetual Factor V1 before any new strategy result. Preserve the exact factor definitions, independent factor-book construction, sparse-input handling, 8 bps turnover cost and 4x stress from the preregistered V3 benchmark. Treat 2023-04..2024-12 as seen development evidence only. The first gating evaluation must be the fresh temporal window 2025-01-06..2026-08-31 on the fixed discovery universe. Only after a temporal pass may the reserved LTC/BCH/AVAX/HBAR transfer universe be evaluated. No parameter tuning from the observed +34% development benchmark. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -245,12 +273,15 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SELF_HISTORY_PERPETUAL_FACTOR_V3",
+    "selected": "CROSS_SECTIONAL_PERPETUAL_FACTOR_V1",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
     "v2Status": "IMMUTABLE_DATA_INTEGRITY_FAIL",
     "rowContinuityStatus": "CHARACTERIZED",
-    "missingDataPolicy": "NO_INTERPOLATION_FACTOR_LEVEL_FAIL_CLOSED"
+    "missingDataPolicy": "NO_INTERPOLATION_FACTOR_LEVEL_FAIL_CLOSED",
+    "selfHistoryV3Status": "IMMUTABLE_DISCOVERY_FAIL",
+    "xsecDevelopmentEvidence": "SEEN_NOT_VALIDATED",
+    "firstIndependentGate": "TEMPORAL_2025_01_06_TO_2026_08_31"
   }
 }
