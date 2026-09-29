@@ -194,8 +194,7 @@ function maxMtmDrawdown(trades,seriesByAsset,cfg,start,end){
   if(!trades.length)return 0;
   const times=[];
   for(let t=start;t<end;t+=cfg.barMs)times.push(t);
-  let peak=capital,equity=capital,maxDD=0;
-  const realized=new Set();
+  let peak=cfg.fixedPortfolioCapital,equity=cfg.fixedPortfolioCapital,maxDD=0;
   for(const t of times){
     let realizedPnl=0,openPnl=0;
     for(const tr of trades){
