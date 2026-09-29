@@ -1,0 +1,44 @@
+name: MERIDIAN Cross-Venue Funding Spread V1
+
+on:
+  push:
+    branches:
+      - research/cross-venue-funding-spread-v1
+    paths:
+      - "research/CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN.md"
+      - "research/cross-venue-funding-spread-v1.js"
+      - "research/run-cross-venue-funding-spread-v1.mjs"
+      - "test/cross-venue-funding-spread-v1.test.js"
+      - ".github/workflows/cross-venue-funding-spread-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-venue-funding-spread-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen invariants
+        run: node --test test/cross-venue-funding-spread-v1.test.js
+      - name: Run first frozen discovery
+        run: node research/run-cross-venue-funding-spread-v1.mjs
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-funding-spread-v1
+          path: |
+            research/results/cross-venue-funding-spread-v1-summary.json
+            research/results/cross-venue-funding-spread-v1-full.json
+            research/results/cross-venue-funding-spread-v1.md
+          if-no-files-found: error
+          retention-days: 30
