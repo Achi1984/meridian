@@ -194,7 +194,7 @@ function maxMtmDrawdown(trades,seriesByAsset,cfg,start,end){
   if(!trades.length)return 0;
   const times=[];
   for(let t=start;t<end;t+=cfg.barMs)times.push(t);
-  let peak=0,equity=0,maxDD=0;
+  let peak=capital,equity=capital,maxDD=0;
   const realized=new Set();
   for(const t of times){
     let realizedPnl=0,openPnl=0;
@@ -214,9 +214,9 @@ function maxMtmDrawdown(trades,seriesByAsset,cfg,start,end){
       const fund=fw.rows.length?cfg.perpNotional*fw.sumRate:0;
       openPnl+=spotMtm+perpMtm+fund-tr.pnl.costsUsd;
     }
-    equity=realizedPnl+openPnl;
+    equity=capital+realizedPnl+openPnl;
     peak=Math.max(peak,equity);
-    if(peak>0)maxDD=Math.max(maxDD,(peak-equity)/cfg.fixedPortfolioCapital*100);
+    if(peak>0)maxDD=Math.max(maxDD,(peak-equity)/peak*100);
   }
   return maxDD;
 }
@@ -278,7 +278,7 @@ export function runSpotPerpBasisDislocationV1(dataset,{stage='DISCOVERY',config=
       const entryIdx=i+1;
       const entryTime=spot[entryIdx].time;
       const exitTime=entryTime+cfg.holdMs;
-      if(entryTime<start||entryTime>=end||exitTime>end)continue;
+      if(entryTime<start||entryTime>=end||exitTime>=end)continue;
       if(signal.time<openUntil)continue;
 
       const expectedEntry=signal.time+cfg.barMs;
