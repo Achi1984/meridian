@@ -112,10 +112,18 @@ Current factor validity:
 - Funding requires finite values and no boundary/inter-event gap >12h in the 7d signal window
 - Premium requires all 42 expected 4h premium rows in the prior 7d window
 
-For each factor/week:
-- use only objectively eligible assets with a valid current raw factor
-- temporal factor book requires >=8 valid assets, otherwise that factor book is FLAT
-- transfer factor book requires >=3 valid assets, otherwise that factor book is FLAT
+For each factor/week, preserve the exact matched-benchmark eligibility implemented in V3:
+- asset must be objectively eligible;
+- current raw factor must be valid;
+- inspect at most the prior 60 weekly anchors for that same asset/factor;
+- require at least 52 valid prior factor observations inside those 60 anchors;
+- the current observation is excluded from that history requirement;
+- only assets meeting both current-input and 52-of-60 history availability enter the Cross-Sectional ranking universe.
+
+Temporal factor book requires >=8 benchmark-eligible assets, otherwise that factor book is FLAT.
+Transfer factor book requires >=3 benchmark-eligible assets, otherwise that factor book is FLAT.
+
+This history filter is retained solely because it was part of the already-observed V3 matched benchmark. Removing it would define a different strategy.
 
 Holding integrity:
 - exact entry price
