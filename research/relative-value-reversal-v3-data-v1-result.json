@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "ruleset": "RELATIVE-VALUE-REVERSAL-V3-DATA-V1-FROZEN",
+  "runId": 36604678672,
+  "headSha": "7ffd3534d820ac45b14db6a4d091b1d7808e09c2",
+  "artifactId": 11050019526,
+  "artifactZipSha256": "f4a0b19c7811c8bf75e47eb6391b58a30691fe919b23c5fb466e6cd9c7aecd44",
+  "foundationJsonSha256": "125b606444b88a1d39c09e720f544052f9ba96ddd85b08a5c3d32df25922fc20",
+  "decision": "FOUNDATION_FAIL_DATA_REDESIGN",
+  "gateReasons": [
+    "V3_MARKET_FACTOR_READY_NE_5"
+  ],
+  "readyCandidateCount": 15,
+  "readyCandidateAssets": [
+    "ALGO",
+    "SAND",
+    "MANA",
+    "AXS",
+    "RUNE",
+    "SUSHI",
+    "DYDX",
+    "APE",
+    "ICP",
+    "THETA",
+    "EGLD",
+    "KAVA",
+    "CHZ",
+    "ZEC",
+    "COMP"
+  ],
+  "failedCandidates": {
+    "MKR": {
+      "lastCoreCompleteMonth": "2025-08",
+      "mandatoryGaps": [
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08"
+      ]
+    }
+  },
+  "readyBenchmarkCount": 3,
+  "readyBenchmarkAssets": [
+    "BTC",
+    "ETH",
+    "BNB"
+  ],
+  "failedBenchmarks": {
+    "SOL": {
+      "completePriceMonths": 54,
+      "gaps": [
+        "2022-02",
+        "2022-04"
+      ]
+    },
+    "XRP": {
+      "completePriceMonths": 54,
+      "gaps": [
+        "2022-02",
+        "2022-04"
+      ]
+    }
+  },
+  "unexpectedTransportErrors": 0,
+  "strategyPnlCalculated": false,
+  "reversalRanksCalculated": false,
+  "betaEstimated": false,
+  "residualReturnsCalculated": false,
+  "portfolioWeightsCalculated": false,
+  "syntheticBackfillUsed": false,
+  "executionImpact": false,
+  "autoPromotion": false,
+  "nextEligibleStep": "RELATIVE-VALUE-REVERSAL-V3-DATA-V2_BENCHMARK_MANDATORY_WINDOW_2023_01_TO_2026_08_ONLY"
+}
