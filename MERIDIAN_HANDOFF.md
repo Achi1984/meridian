@@ -736,3 +736,31 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - r67 changes only presentation: risk-sorted collapsible asset cards, critical asset auto-open, open-state persistence, compact healthy header and collapsed technical diagnostics.
 - Per-bot detail fields remain available after opening an asset.
 - Execution impact remains false.
+
+
+## Agent handoff — secure Pionex Asset Watch bridge (DO NOT MERGE CONCURRENTLY)
+
+- User request: Asset Watch bot values/limits should refresh from the existing read-only Pionex API path instead of relying on stale screenshots.
+- This agent intentionally works on isolated branch `feat/pionex-asset-watch-bridge-agent` and MUST NOT merge while another release/agent merge is in progress.
+- Adds protected `GET /api/private/asset-watch`; existing Bearer read auth remains mandatory. No public bot/portfolio endpoint is introduced.
+- The response is sanitized: raw Pionex bot IDs, credentials, balances and unrelated private dashboard data are not exposed.
+- Overwrite is fail-closed: consumers may replace the Asset Watch bot roster only when `usableForOverwrite === true` (fresh <=15 min, source sync OK, detail hydration complete). Otherwise retain the prior trusted snapshot.
+- Preferred source is the direct Pionex bot detail sync; fresh Wallet bot detail is authenticated fallback.
+- Bot refs are one-way hashed; snapshot fingerprint is stable across row ordering and changes when bot limits/values change.
+- API fields exported for watch updates include side, leverage, range lower/upper, liquidation, TP, SL, grids, position size/open price, margin flags, investment and PnL when available.
+- Important semantic guard: official Pionex Futures Grid detail exposes `positionOpenPrice`, not the UI break-even field. The bridge therefore exports `breakEvenPrice: null` and explicitly marks the screenshot break-even as retained reference until a direct authoritative source exists. Do not silently relabel entry/open price as break-even.
+- Execution impact: false. No Pionex mutation endpoint, no trading action and no credential material added.
+- Runtime smoke additionally asserts anonymous Asset Watch access remains HTTP 401.
+- Main agent: rebase/reconcile after the current merge window, run full test/release gates, then merge only once no parallel agent is merging.
+
+
+### Asset Watch bridge phase 2 — scoped automation link
+
+- Because scheduled ChatGPT/web reads cannot attach MERIDIAN's normal Bearer header, the bridge now supports a separate revocable capability token scoped only to the sanitized Asset Watch endpoint.
+- Full private Bearer auth is required to create/rotate/revoke this token. The server returns the plaintext once and stores only SHA-256.
+- A scoped token can read only `GET /api/private/asset-watch?share=...`; it cannot read `/api/private/dashboard`, market-klines or any other private route, and it cannot mutate anything.
+- BOTS > TECHNISCHE DETAILS contains explicit user controls to create/rotate, copy, and revoke the Asset Watch link. Token creation is never automatic.
+- The UI keeps the plaintext link in memory only; it is not written into markup or localStorage by this feature. Refreshing the page forgets the plaintext, while the server-side hash remains valid until rotate/revoke.
+- Asset Watch overwrite remains fail-closed on `usableForOverwrite === true`.
+- Release Safety run #1429 is green on head `5c9f9c9dfaccde055cf22faee87e83088ece0888`.
+- PR #248 stays draft/unmerged. Current main is one coordination checkpoint beyond this PR base and does not overlap these files; Main Agent still owns final rebase/merge timing.

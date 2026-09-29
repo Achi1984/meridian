@@ -68,6 +68,8 @@ async function smoke(){
 
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
   if(protectedResponse.status!==401)fail(`Anonymous protected API expected 401, got ${protectedResponse.status}`);
+  const assetWatchAnonymous=await request(`${GATEWAY}/api/private/asset-watch?smoke=${nonce}`);
+  if(assetWatchAnonymous.status!==401)fail(`Anonymous asset-watch bridge expected 401, got ${assetWatchAnonymous.status}`);
   const legacyDetailed=await request(`${GATEWAY}/api/assistant?smoke=${nonce}`);
   if(legacyDetailed.status!==401)fail(`Anonymous legacy detailed API expected 401, got ${legacyDetailed.status}`);
   const observer=await json(`${GATEWAY}/api/bot-observer?smoke=${nonce}`);
@@ -97,6 +99,7 @@ async function smoke(){
     privateReadAuthSource:String(health.privateReadAuthSource||'UNKNOWN'),
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,
     anonymousProtectedStatus:protectedResponse.status,
+    anonymousAssetWatchStatus:assetWatchAnonymous.status,
     anonymousLegacyDetailedStatus:legacyDetailed.status,
     botObserver:true,
     ...sha,

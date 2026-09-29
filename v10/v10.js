@@ -17,6 +17,7 @@ const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,ga
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
 const profitAgentUi={days:1460,running:false,result:null,error:null,progress:'',completed:0,total:PAPERBOT_PROFIT_AGENT_V1_ASSETS.length};
+const assetWatchShareUi={busy:false,shareUrl:null,message:'',tone:'muted'};
 const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 const MARKET_FRESH_MS=3*60*1000;
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -295,11 +296,40 @@ function renderCommand(force=false){
   for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
 }
+function assetWatchShareCard(){
+  const h=H(),available=typeof h.manageAssetWatchShare==='function',msg=assetWatchShareUi.message||'Erstellt einen eigenen widerrufbaren Read-only-Link nur für den bereinigten Asset-Watch-Bot-Snapshot.';
+  return '<section class="asset-watch-share-card"><div><span>ASSET WATCH API LINK</span><b class="tone-'+esc(assetWatchShareUi.tone)+'">'+(assetWatchShareUi.busy?'ARBEITET…':assetWatchShareUi.shareUrl?'AKTIV · LINK IM SPEICHER':'BEREIT')+'</b><small>'+esc(msg)+'</small></div><div class="asset-watch-share-actions"><button type="button" data-asset-watch-share="rotate" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>'+(assetWatchShareUi.shareUrl?'NEUEN LINK ERSTELLEN':'LINK ERSTELLEN')+'</button><button type="button" data-asset-watch-share="copy" '+(!assetWatchShareUi.shareUrl||assetWatchShareUi.busy?'disabled':'')+'>LINK KOPIEREN</button><button type="button" data-asset-watch-share="revoke" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>WIDERRUFEN</button></div><small>Der Link enthält einen separaten, auf Asset Watch begrenzten Token. Er erlaubt keine Trades und keinen Zugriff auf das übrige private Dashboard.</small></section>';
+}
+async function assetWatchShareAction(action){
+  const h=H();
+  if(typeof h.manageAssetWatchShare!=='function')return;
+  if(action==='copy'){
+    if(!assetWatchShareUi.shareUrl)return;
+    try{await navigator.clipboard.writeText(assetWatchShareUi.shareUrl);assetWatchShareUi.message='Link in Zwischenablage kopiert.';assetWatchShareUi.tone='safe'}
+    catch{assetWatchShareUi.message='Kopieren fehlgeschlagen. Link neu erstellen und Browser-Zugriff auf die Zwischenablage erlauben.';assetWatchShareUi.tone='watch'}
+    renderBots(true);return;
+  }
+  assetWatchShareUi.busy=true;assetWatchShareUi.message=action==='revoke'?'Asset-Watch-Link wird widerrufen…':'Neuer Asset-Watch-Link wird erstellt…';assetWatchShareUi.tone='muted';renderBots(true);
+  try{
+    const result=await h.manageAssetWatchShare(action);
+    if(action==='revoke'){
+      assetWatchShareUi.shareUrl=null;assetWatchShareUi.message='Asset-Watch-Link widerrufen. Der bisherige Link ist ungültig.';assetWatchShareUi.tone='safe';
+    }else{
+      assetWatchShareUi.shareUrl=result?.shareUrl||null;
+      if(!assetWatchShareUi.shareUrl)throw new Error('share_url_missing');
+      try{await navigator.clipboard.writeText(assetWatchShareUi.shareUrl);assetWatchShareUi.message='Neuer Link erstellt und kopiert. Diesen Link nur für den MERIDIAN Asset Watch verwenden.';assetWatchShareUi.tone='safe'}
+      catch{assetWatchShareUi.message='Link erstellt. Mit „LINK KOPIEREN“ in die Zwischenablage übernehmen.';assetWatchShareUi.tone='watch'}
+    }
+  }catch(e){
+    assetWatchShareUi.message='Asset-Watch-Link fehlgeschlagen: '+String(e?.message||e).slice(0,100);assetWatchShareUi.tone='danger';
+  }finally{assetWatchShareUi.busy=false;renderBots(true)}
+}
 function bindBotOverviewControls(view){
-  const setOpen=open=>$$('.asset-pair-details',view).forEach(x=>{x.open=open});
+  const setOpen=open=>[...view.querySelectorAll('.asset-pair-details')].forEach(x=>{x.open=open});
   const openBtn=$('[data-assets-action="open"]',view),closeBtn=$('[data-assets-action="close"]',view);
   if(openBtn)openBtn.onclick=()=>setOpen(true);
   if(closeBtn)closeBtn.onclick=()=>setOpen(false);
+  [...view.querySelectorAll('[data-asset-watch-share]')].forEach(btn=>{btn.onclick=()=>assetWatchShareAction(btn.dataset.assetWatchShare)});
 }
 function renderBots(force=false){
   const view=$('#view-bots');if(!view)return;
@@ -313,7 +343,7 @@ function renderBots(force=false){
   const source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),healthy=g.matched===g.supported&&g.safetyReady===g.matched&&g.decisionReady===g.matched&&unmatched===0;
   const headCards='<div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' rows · '+esc(g.age)+'</small></div><div><span>DECISION READY</span><b class="tone-'+(g.decisionReady===g.matched&&g.matched?'safe':'watch')+'">'+g.decisionReady+'/'+g.matched+'</b><small>PNL miss '+g.pnlMissing+' · MKT miss '+g.marketMissing+'</small></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b><small>'+(healthy?'DATA COMPLETE':'CHECK DETAILS')+'</small></div>'+(healthy?'':'<div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div>');
   const diagnosticsOpen=diagOpenExisting??(!healthy||!ph.fresh||unmatched>0);
-  const diagnostics='<details class="v10-bot-diagnostics" '+(diagnosticsOpen?'open':'')+'><summary><div><span>TECHNISCHE DETAILS</span><b>'+g.matched+'/'+g.supported+' Bots · PnL '+g.pnlReady+'/'+g.matched+' · Market '+g.marketReady+'/'+g.matched+'</b></div><small>Account API · Wallet Discovery · Normalizer · historische Referenz</small></summary><div class="v10-bot-diagnostics-body">'+accountPositionLayer(false)+walletDiscoveryLayer()+unmatchedDiagnostics(unmatchedOpen??false)+snapshotDetails(snapshotOpen??!g.fresh)+'</div></details>';
+  const diagnostics='<details class="v10-bot-diagnostics" '+(diagnosticsOpen?'open':'')+'><summary><div><span>TECHNISCHE DETAILS</span><b>'+g.matched+'/'+g.supported+' Bots · PnL '+g.pnlReady+'/'+g.matched+' · Market '+g.marketReady+'/'+g.matched+'</b></div><small>Account API · Wallet Discovery · Normalizer · historische Referenz</small></summary><div class="v10-bot-diagnostics-body">'+accountPositionLayer(false)+walletDiscoveryLayer()+assetWatchShareCard()+unmatchedDiagnostics(unmatchedOpen??false)+snapshotDetails(snapshotOpen??!g.fresh)+'</div></details>';
   const assetHead='<section class="asset-overview-head"><div><span>ASSET OVERVIEW</span><b>'+syms.length+' ASSETS · '+g.matched+' BOTS</b><small>Nach Risiko sortiert · wichtigste Kennzahlen direkt sichtbar · Karte antippen für Bot-Details</small></div><div class="asset-toggle-actions"><button type="button" data-assets-action="close">ALLE ZU</button><button type="button" data-assets-action="open">ALLE AUF</button></div></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER · BOT CONTROL CENTER</b></div><small>Risk-first Übersicht · Details nur bei Bedarf öffnen · Asset Watch = Referenz</small></section><section class="bot-tab-head bot-tab-head-compact">'+headCards+'</section>'+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+assetHead+'<div class="v10-pair-stack asset-accordion-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Technische Details öffnen.</small></section>')+'</div>'+diagnostics;
   bindBotOverviewControls(view);
