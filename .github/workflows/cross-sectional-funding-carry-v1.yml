@@ -1,0 +1,48 @@
+name: MERIDIAN Cross-Sectional Funding Carry V1
+
+on:
+  push:
+    branches:
+      - research/cross-sectional-funding-carry-v1
+    paths:
+      - "research/CROSS-SECTIONAL-FUNDING-CARRY-V1-FROZEN.md"
+      - "research/cross_sectional_funding_carry_v1.py"
+      - "research/run-cross-sectional-funding-carry-v1.py"
+      - "research/self_history_perp_factor_v3.py"
+      - "scripts/collect-cross-sectional-funding-carry-v1.py"
+      - "test/test_cross_sectional_funding_carry_v1.py"
+      - "test/test_self_history_perp_factor_v3.py"
+      - ".github/workflows/cross-sectional-funding-carry-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-sectional-funding-carry-v1
+  cancel-in-progress: true
+
+jobs:
+  transfer-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify inherited execution and frozen Funding Carry V1 invariants
+        run: |
+          python3 test/test_self_history_perp_factor_v3.py
+          python3 test/test_cross_sectional_funding_carry_v1.py
+      - name: Collect official transfer-universe archives
+        run: python3 scripts/collect-cross-sectional-funding-carry-v1.py
+      - name: Run first independent Funding Carry transfer validation
+        run: python3 research/run-cross-sectional-funding-carry-v1.py
+      - name: Upload untouched transfer evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-sectional-funding-carry-v1
+          path: |
+            research/results/cross-sectional-funding-carry-v1-summary.json
+            research/results/cross-sectional-funding-carry-v1-full.json
+            research/results/cross-sectional-funding-carry-v1.md
+          if-no-files-found: error
+          retention-days: 30
