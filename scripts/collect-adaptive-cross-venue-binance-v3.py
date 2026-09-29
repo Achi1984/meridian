@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 
 BASE='https://data.binance.vision/data/futures/um/monthly'
 ASSETS=['HBAR','SUI','NEAR','FIL','UNI','AAVE','ATOM','ARB']
-START=datetime(2024,9,1,tzinfo=timezone.utc)
-END=datetime(2026,9,1,tzinfo=timezone.utc)
+START=datetime.fromisoformat(os.environ.get('ADAPTIVE_V3_START','2024-09-01T00:00:00+00:00'))
+END=datetime.fromisoformat(os.environ.get('ADAPTIVE_V3_END','2025-09-01T00:00:00+00:00'))
 OUT=os.environ.get('BINANCE_ADAPTIVE_V3_ARCHIVE_INPUT','/tmp/meridian-adaptive-cross-venue-v3-binance.json')
 UA='ACHI-MERIDIAN-ADAPTIVE-CROSS-VENUE-V3/1'
 
