@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "ADAPTIVE_CROSS_VENUE_V3_DISCOVERY_FAIL_NEXT_SELECTIVE_STATIC_V4",
+  "phase": "SELECTIVE_STATIC_V4_VALIDATION_FAIL_NEXT_SPOT_PERP_CARRY_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "e265db44fe05bdce27d1a1b1dbda36a7ba3642e2",
+    "verifiedSha": "cacbf49777784187e1576098ba2198a5ca918035",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -511,6 +511,46 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "selectiveStaticCrossVenueFundingV4": {
+      "ruleset": "SELECTIVE-STATIC-CROSS-VENUE-FUNDING-V4-FROZEN",
+      "stage": "INDEPENDENT_VALIDATION",
+      "rawWindow": "2025-08-01..2026-09-01",
+      "tradeWindow": "2025-09..2026-08",
+      "decisionSlots": 96,
+      "activeCycles": 5,
+      "noTradeCycles": 90,
+      "dataIntegrityFailure": true,
+      "dataIntegrityErrors": [
+        {
+          "asset": "NEAR",
+          "month": "2026-06",
+          "reason": "CURRENT_BINANCE_MARK_GAP"
+        }
+      ],
+      "netReturnPct": 0.0744428,
+      "netPnlUsd": 119.0878,
+      "profitFactor": 99,
+      "maxDrawdownPct": 0,
+      "positiveWindows": "2/5",
+      "fundingPnlUsd": 264.0557,
+      "basisPnlUsd": 15.0321,
+      "baseCostsUsd": 160,
+      "fundingCostRatio": 1.65035,
+      "stressReturnPct": 0.0119291,
+      "positiveAssets": "3/8",
+      "positiveConcentrationPct": 44.18,
+      "gateReasons": [
+        "DATA_INTEGRITY_FAILURE",
+        "ACTIVE_CYCLES_LT_32",
+        "ACTIVE_ASSET_BREADTH_LT_6",
+        "POSITIVE_WINDOWS_LT_3",
+        "POSITIVE_ASSETS_LT_5"
+      ],
+      "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "paperAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -524,7 +564,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a new Selective Static Cross-Venue Funding V4 before reading any 2025-09..2026-08 strategy PnL. Preserve the V3 cost-derived 0.78% prior-month spread threshold and public-data execution model, but trade only the structurally observed LONG_BINANCE/SHORT_HYPERLIQUID direction when the prior completed month's Hyperliquid-minus-Binance realized funding spread is >=0.78%; otherwise NO TRADE. Do not trade the reverse direction. Treat V3 2024-10..2025-08 as hypothesis-generation evidence only. First and only gating evaluation for V4 must use untouched 2025-09..2026-08 data. Keep executionImpact=false and require prospective Paper shadow only after validation pass.",
+  "nextAction": "Build a strategy-neutral Spot-Perp Funding Harvest V1 data foundation on a frozen fresh candidate universe OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP using Binance Vision public Spot 8h klines plus USD-M perpetual 8h mark/funding archives over 2024-09..2026-08. No PnL, no carry threshold, no asset replacement and no synthetic backfill. Require broad joint Spot+Perp coverage before any strategy protocol. Cross-Venue V1-V4 remain immutable and receive no further tuning. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -534,7 +574,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SELECTIVE_STATIC_CROSS_VENUE_FUNDING_V4",
+    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_DATA_FOUNDATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -552,16 +592,16 @@
     },
     "fundingCarryV1Status": "IMMUTABLE_RISK_CONCENTRATION_FAIL",
     "nextUniverse": [
-      "HBAR",
-      "SUI",
-      "NEAR",
-      "FIL",
-      "UNI",
-      "AAVE",
-      "ATOM",
-      "ARB"
+      "OP",
+      "INJ",
+      "WLD",
+      "SEI",
+      "TIA",
+      "PENDLE",
+      "RUNE",
+      "ICP"
     ],
-    "nextStage": "FREEZE_STRATEGY_BEFORE_PNL",
+    "nextStage": "SPOT_PERP_DATA_FOUNDATION_BEFORE_STRATEGY",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -581,7 +621,7 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-09..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": true,
+    "strategyPnlAllowed": false,
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -600,6 +640,8 @@
     "v4HypothesisSource": "V3_DISCOVERY_HYPOTHESIS_GENERATION_ONLY",
     "v4FirstIndependentWindow": "2025-09..2026-08",
     "v4HoldoutDataObserved": false,
-    "v4PaperAllowed": false
+    "v4PaperAllowed": false,
+    "crossVenueFamilyStatus": "CLOSED_AFTER_V1_V4_NO_PROMOTION",
+    "selectiveStaticV4Status": "IMMUTABLE_VALIDATION_FAIL"
   }
 }
