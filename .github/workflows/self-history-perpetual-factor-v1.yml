@@ -1,0 +1,47 @@
+name: MERIDIAN Self-History Perpetual Factor V1
+
+on:
+  push:
+    branches:
+      - research/self-history-perpetual-factor-v1
+    paths:
+      - "research/SELF-HISTORY-PERPETUAL-FACTOR-V1-FROZEN.md"
+      - "research/self-history-perpetual-factor-v1.js"
+      - "research/run-self-history-perpetual-factor-v1.mjs"
+      - "scripts/collect-self-history-perpetual-factor-v1.py"
+      - "test/self-history-perpetual-factor-v1.test.js"
+      - ".github/workflows/self-history-perpetual-factor-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-history-perpetual-factor-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen multifactor invariants
+        run: node --test test/self-history-perpetual-factor-v1.test.js
+      - name: Materialize audited factor foundation
+        run: python3 scripts/collect-self-history-perpetual-factor-v1.py
+      - name: Run first frozen multifactor discovery
+        run: node research/run-self-history-perpetual-factor-v1.mjs
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-history-perpetual-factor-v1
+          path: |
+            research/results/self-history-perpetual-factor-v1-summary.json
+            research/results/self-history-perpetual-factor-v1-full.json
+            research/results/self-history-perpetual-factor-v1.md
+          if-no-files-found: error
+          retention-days: 30
