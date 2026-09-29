@@ -1,11 +1,14 @@
 """Frozen Cross-Sectional Funding Carry V1 transfer-validation engine. Research only."""
 
 from math import isfinite
+from dataclasses import dataclass
+from bisect import bisect_left, bisect_right
 from self_history_perp_factor_v3 import (
-    AssetData,
     BASE_COST_BPS,
     STRESS_COST_BPS,
     WEEK,
+    FOUR_H,
+    FUND_MAX_GAP,
     HISTORY_MAX_WEEKS,
     weekly_anchors,
     is_eligible,
@@ -17,6 +20,7 @@ from self_history_perp_factor_v3 import (
     _max_dd,
     _sharpe,
     _windows,
+    _coverage,
 )
 
 RULESET='CROSS-SECTIONAL-FUNDING-CARRY-V1-FROZEN'
@@ -34,11 +38,70 @@ GATE={
     'max_positive_concentration_pct':50.0,
 }
 
+@dataclass
+class FundingAssetData:
+    asset:str
+    klines:list
+    funding:list
+
+    def __post_init__(self):
+        self._validate()
+        self.price={int(r[0])+FOUR_H:float(r[5]) for r in self.klines}
+        self.funding_times=[int(r[0]) for r in self.funding]
+        self.funding_values=[float(r[1]) for r in self.funding]
+        self.funding_prefix=[0.0]
+        for x in self.funding_values:
+            self.funding_prefix.append(self.funding_prefix[-1]+x)
+
+    def _validate(self):
+        last=None
+        for row in self.klines:
+            if len(row)<6:
+                raise ValueError(f'{self.asset}: malformed kline')
+            ot=int(row[0]);o,h,l,c=map(float,row[2:6])
+            if not all(isfinite(x) and x>0 for x in (o,h,l,c)):
+                raise ValueError(f'{self.asset}: invalid OHLC')
+            if h<max(o,c,l) or l>min(o,c,h):
+                raise ValueError(f'{self.asset}: inconsistent OHLC')
+            if last is not None and ot<=last:
+                raise ValueError(f'{self.asset}: duplicate/nonmonotonic kline')
+            last=ot
+        last=None
+        for row in self.funding:
+            if len(row)<2:
+                raise ValueError(f'{self.asset}: malformed funding')
+            t=int(row[0]);rate=float(row[1])
+            if not isfinite(rate):
+                raise ValueError(f'{self.asset}: invalid funding')
+            if last is not None and t<=last:
+                raise ValueError(f'{self.asset}: duplicate/nonmonotonic funding')
+            last=t
+
+    def price_at(self,anchor):
+        return self.price.get(anchor)
+
+    def _sum(self,start,end,left_inclusive=True,right_inclusive=False):
+        li=bisect_left(self.funding_times,start) if left_inclusive else bisect_right(self.funding_times,start)
+        ri=bisect_right(self.funding_times,end) if right_inclusive else bisect_left(self.funding_times,end)
+        return self.funding_prefix[ri]-self.funding_prefix[li],self.funding_times[li:ri]
+
+    def funding_factor(self,t):
+        total,rows=self._sum(t-WEEK,t,True,False)
+        if not _coverage(rows,t-WEEK,t,FUND_MAX_GAP,False):
+            return None
+        return -total
+
+    def holding_funding(self,start,end):
+        total,rows=self._sum(start,end,False,True)
+        if not _coverage(rows,start,end,FUND_MAX_GAP,True):
+            raise ValueError(f'{self.asset}: holding funding coverage')
+        return total
+
 def prepare_dataset(raw_by_asset):
     out={}
     for asset in ASSETS:
         raw=raw_by_asset[asset]
-        out[asset]=AssetData(asset,raw.get('klines',[]),[],raw.get('funding',[]))
+        out[asset]=FundingAssetData(asset,raw.get('klines',[]),raw.get('funding',[]))
     return out
 
 def build_funding_panel(dataset,start,end):
