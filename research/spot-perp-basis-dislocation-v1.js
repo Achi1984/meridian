@@ -213,7 +213,7 @@ function maxMtmDrawdown(trades,seriesByAsset,cfg,start,end){
       const fund=fw.rows.length?cfg.perpNotional*fw.sumRate:0;
       openPnl+=spotMtm+perpMtm+fund-tr.pnl.costsUsd;
     }
-    equity=capital+realizedPnl+openPnl;
+    equity=cfg.fixedPortfolioCapital+realizedPnl+openPnl;
     peak=Math.max(peak,equity);
     if(peak>0)maxDD=Math.max(maxDD,(peak-equity)/peak*100);
   }
