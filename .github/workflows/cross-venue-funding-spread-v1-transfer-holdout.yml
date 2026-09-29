@@ -1,0 +1,49 @@
+name: MERIDIAN Cross-Venue Funding Spread V1 Transfer Holdout
+
+on:
+  push:
+    branches:
+      - research/cross-venue-funding-spread-v1
+    paths:
+      - "research/CROSS-VENUE-FUNDING-SPREAD-V1-TRANSFER-HOLDOUT.md"
+      - "research/cross-venue-funding-spread-v1.js"
+      - "research/run-cross-venue-funding-spread-v1-transfer-holdout.mjs"
+      - "scripts/collect-cross-venue-binance-transfer.py"
+      - "test/cross-venue-funding-spread-v1-transfer-holdout.test.js"
+      - ".github/workflows/cross-venue-funding-spread-v1-transfer-holdout.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-venue-funding-spread-v1-transfer-holdout
+  cancel-in-progress: true
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify discovery and holdout invariants
+        run: |
+          node --test test/cross-venue-funding-spread-v1.test.js
+          node --test test/cross-venue-funding-spread-v1-transfer-holdout.test.js
+      - name: Collect fixed transfer-asset Binance Vision archives
+        run: python3 scripts/collect-cross-venue-binance-transfer.py
+      - name: Run first frozen transfer holdout
+        run: node research/run-cross-venue-funding-spread-v1-transfer-holdout.mjs
+      - name: Upload untouched holdout evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-funding-spread-v1-transfer-holdout
+          path: |
+            research/results/cross-venue-funding-spread-v1-transfer-holdout-summary.json
+            research/results/cross-venue-funding-spread-v1-transfer-holdout-full.json
+            research/results/cross-venue-funding-spread-v1-transfer-holdout.md
+          if-no-files-found: error
+          retention-days: 30
