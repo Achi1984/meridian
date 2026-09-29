@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-ORTHOGONALIZED-TAKER-ORDER-FLOW-V2-FROZEN",
+  "status": "FROZEN_BEFORE_FIRST_V2_PNL",
+  "executionImpact": false,
+  "autoPromotion": false,
+  "parents": [
+    "PERPETUAL-TAKER-ORDER-FLOW-V1-DATA-FROZEN",
+    "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN"
+  ],
+  "assets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX"
+  ],
+  "validation": {
+    "start": "2025-01-11T00:00:00Z",
+    "endExclusiveEntry": "2026-08-29T00:00:00Z",
+    "finalExit": "2026-08-29T00:00:00Z",
+    "expectedPeriods": 85
+  },
+  "rawFlow": {
+    "hours": 168,
+    "interval": "[t-168h,t)",
+    "numerator": "2*sum(takerBuyQuote)-sum(quoteVolume)",
+    "denominator": "sum(quoteVolume)"
+  },
+  "lagReturn": "OPEN(t)/OPEN(t-7d)-1",
+  "orthogonalization": {
+    "perAsset": true,
+    "estimatorStart": "2023-01-14T00:00:00Z",
+    "anchors": "SATURDAY_00_UTC_EXPANDING_THROUGH_CURRENT_T",
+    "minimumPairs": 52,
+    "model": "RAW_FLOW=alpha+beta*LAG_RETURN+epsilon",
+    "signal": "LAST_CURRENT_RESIDUAL",
+    "currentPairIncluded": true,
+    "standardizeResidual": false,
+    "winsorize": false
+  },
+  "portfolio": {
+    "requiredEligible": 12,
+    "rank": "ORTHO_FLOW_DESC_THEN_SYMBOL_ASC",
+    "sideCount": 2,
+    "longGross": 0.5,
+    "shortGross": -0.5,
+    "grossExposure": 1,
+    "netExposure": 0
+  },
+  "execution": {
+    "entry": "1H_OPEN_AT_T",
+    "exit": "1H_OPEN_AT_T_PLUS_7D"
+  },
+  "funding": {
+    "interval": "(t,t+7d]",
+    "maxGapHours": 12
+  },
+  "costs": {
+    "baseBpsPerTurnover": 8,
+    "stressBpsPerTurnover": 13,
+    "terminalCloseCharged": true
+  },
+  "gate": {
+    "expectedPeriods": 85,
+    "eligibleEveryWeek": 12,
+    "sideCountEveryWeek": 2,
+    "minProfitFactor": 1.1,
+    "minSharpe": 0.5,
+    "maxDrawdownPct": 25,
+    "minPositiveWindowsOf5": 3,
+    "minPositiveAssets": 7,
+    "maxPositiveConcentrationPct": 35,
+    "netPositive": true,
+    "priceOnlyPositive": true,
+    "stressPositive": true,
+    "bothSidesPositive": true,
+    "highMinusLowSpreadPositive": true
+  },
+  "passDecision": "INDEPENDENT_VALIDATION_PASS_ASSET_TRANSFER_REQUIRED",
+  "failDecision": "INDEPENDENT_VALIDATION_FAIL_RESEARCH_REDESIGN",
+  "transferRequiredBeforePaper": true,
+  "validationDataLoaded": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
