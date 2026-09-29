@@ -53,14 +53,17 @@ No interpolation, nearest-neighbor repair or synthetic fills.
 - used only to seed the 90-day basis history
 
 ### Discovery
-- signal/entry interval: 2024-09-01 00:00 UTC <= entry < 2025-09-01 00:00 UTC
-- any trade must fully exit before 2025-09-01
-- holdout data are not loaded by the first strategy workflow
+- signal/entry stage: 2024-09-01 through 2025-08-31 UTC
+- the first strategy workflow loads no September-2025 holdout bars
+- a candidate entry is eligible only when its exact +24h exit open also lies inside the loaded discovery stage
+- therefore no discovery trade may require any 2025-09 data
 
 ### Temporal holdout
 Authorized only after Discovery PASS:
 - warm-up may use already-seen data through 2025-08-31
-- holdout entries: 2025-09-01 <= entry < 2026-09-01
+- holdout stage: 2025-09-01 through 2026-08-31 UTC
+- a candidate entry is eligible only when its exact +24h exit open lies inside the loaded holdout stage
+- therefore no trade may require any 2026-09 data
 - no parameter changes
 
 ## Basis definition
@@ -141,9 +144,13 @@ No minimum positive funding threshold is optimized.
 
 The funding confirmation only verifies that the short Perpetual leg has recently been on the receiving side of funding.
 
-## Signal and entry timing
+## Signal scan cadence and entry timing
 
-For each asset:
+For each asset, evaluate every completed synchronized 8h bar whose immediately following 8h open is inside the active stage and has an exact +24h exit open inside that same stage.
+
+If the asset already has an open 24h trade, any intermediate 8h signals are ignored and cannot create overlapping exposure.
+
+For each eligible scan:
 
 1. Observe the completed synchronized 8h signal-bar close.
 2. Evaluate the basis extreme using only prior completed bars.
