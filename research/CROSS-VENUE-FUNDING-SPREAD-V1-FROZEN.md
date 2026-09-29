@@ -90,6 +90,15 @@ Binance:
 - public USD-M mark-price 8h klines
 - no synthetic backfill
 
+Frozen monthly coverage requirements:
+- cycle duration >= 25 days;
+- Binance realized funding observations >= 60;
+- Hyperliquid realized funding observations >= 500;
+- maximum Binance funding gap <= 12 hours;
+- maximum Hyperliquid funding gap <= 2 hours;
+- maximum 8h mark gap on either venue <= 16 hours;
+- first/last usable marks must be within 16 hours of the intended monthly boundary.
+
 A cycle fails closed when:
 - either venue has no valid entry/exit mark;
 - funding observations are missing for a material interval;
