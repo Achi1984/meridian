@@ -1,0 +1,44 @@
+name: MERIDIAN QH Trades Quote Semantics Diagnostic V1
+
+on:
+  pull_request:
+    paths:
+      - "scripts/diagnose-qh-individual-trades-quote-semantics-v1.py"
+      - ".github/workflows/qh-individual-trades-quote-semantics-v1.yml"
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-QUOTE-SEMANTICS-DIAGNOSTIC-V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-trades-quote-semantics-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset: BTCUSDT
+            month: "2025-01"
+          - asset: SOLUSDT
+            month: "2025-07"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-quote-semantics
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose quoteQty semantics without authorizing a data gate
+        run: python3 scripts/diagnose-qh-individual-trades-quote-semantics-v1.py
+      - name: Upload compact diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-quote-semantics-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-quote-semantics/*.json
+          if-no-files-found: warn
