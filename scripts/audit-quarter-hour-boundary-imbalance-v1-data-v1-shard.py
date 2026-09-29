@@ -450,4 +450,36 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except SystemExit:
+        raise
+    except Exception as exc:
+        OUT.mkdir(parents=True, exist_ok=True)
+        failure = {
+            "schema": 1,
+            "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+            "stage": "DATA_V1_SHARD_QUALITY",
+            "asset": ASSET,
+            "month": MONTH,
+            "gate": {
+                "pass": False,
+                "reasons": ["SHARD_EXCEPTION"],
+                "decision": "DATA_V1_SHARD_FAIL_DATA_QUALITY",
+            },
+            "error": f"{type(exc).__name__}: {exc}",
+            "directionalOrderImbalanceCalculated": False,
+            "forwardReturnsCalculated": False,
+            "signalReturnRelationshipCalculated": False,
+            "positionsCalculated": False,
+            "strategyPnlCalculated": False,
+            "executionImpact": False,
+            "paperAuthorized": False,
+            "liveAuthorized": False,
+            "rawArchivesRetained": False,
+        }
+        (OUT / f"{ASSET}-{MONTH}.json").write_text(
+            json.dumps(failure, indent=2) + "\n"
+        )
+        print(json.dumps(failure, indent=2))
+        raise
