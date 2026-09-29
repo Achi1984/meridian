@@ -148,7 +148,7 @@ The funding confirmation only verifies that the short Perpetual leg has recently
 
 For each asset, evaluate every completed synchronized 8h bar whose immediately following 8h open is inside the active stage and has an exact +24h exit open inside that same stage.
 
-If the asset already has an open 24h trade, any intermediate 8h signals are ignored and cannot create overlapping exposure.
+If the asset already has an open 24h trade, any intermediate 8h signals are ignored and cannot create overlapping exposure. A signal bar that completed while the prior trade was still open remains discarded; the earliest possible re-entry must be based on a newly completed 8h signal bar after that exit.
 
 For each eligible scan:
 
