@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_V2_VALIDATION_FAIL_NEXT_BASIS_DISLOCATION_DATA_FOUNDATION",
+  "phase": "SPOT_PERP_BASIS_DATA_FOUNDATION_PASS_NEXT_STRATEGY_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "525a780914327f45035b201c4d8781f96d46b7e7",
+    "verifiedSha": "5b35aa6a3519c5c63328a472d7ffde61f373c9b5",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -682,6 +682,40 @@
       "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
       "promoted": false,
       "immutable": true
+    },
+    "spotPerpBasisDislocationV1DataV1": {
+      "ruleset": "SPOT-PERP-BASIS-DISLOCATION-V1-DATA-V1-FROZEN",
+      "interval": "2024-06..2026-08",
+      "universe": [
+        "APT",
+        "APE",
+        "CRV",
+        "SUSHI",
+        "DYDX",
+        "LDO",
+        "GALA",
+        "IMX"
+      ],
+      "qualifiedAssets": [
+        "APT",
+        "APE",
+        "CRV",
+        "SUSHI",
+        "DYDX",
+        "LDO",
+        "GALA",
+        "IMX"
+      ],
+      "qualifiedCount": 8,
+      "requiredMonthsPerAsset": 27,
+      "synchronizedSpotPerpTimestamps": true,
+      "unexpectedTransportErrors": 0,
+      "strategyPnlCalculated": false,
+      "basisThresholdInferred": false,
+      "fundingThresholdInferred": false,
+      "syntheticBackfillUsed": false,
+      "decision": "FOUNDATION_PASS",
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -695,7 +729,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a strategy-neutral Spot-Perp Basis Dislocation V1 data foundation on a previously unused universe APT/APE/CRV/SUSHI/DYDX/LDO/GALA/IMX. Audit Binance Vision public Spot 8h trade klines, USD-M Perpetual 8h trade klines and realized funding from 2024-06 through 2026-08 with exact monthly row continuity, synchronized timestamps, no synthetic backfill and no PnL. Require broad full-history qualification before any basis/funding strategy protocol is written. Keep executionImpact=false.",
+  "nextAction": "Freeze Spot-Perp Basis Dislocation V1 strategy before first PnL. Use only synchronized Spot and USD-M Perpetual 8h marks plus realized funding from the passed 8-asset foundation. Freeze basis-history lookback, basis-entry/no-trade threshold, funding-confirmation rule, holding/exit rule, costs, discovery/holdout split and gates before any strategy result. Keep market-neutral equal-notional Spot-vs-Perp structure, no leverage multiplier, no synthetic fills, and executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -705,7 +739,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_BASIS_DISLOCATION_V1_DATA_FOUNDATION",
+    "selected": "SPOT_PERP_BASIS_DISLOCATION_V1_STRATEGY",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -752,7 +786,7 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-06..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": false,
+    "strategyPnlAllowed": "ONLY_AFTER_PROTOCOL_AND_INVARIANTS_FROZEN",
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -782,6 +816,18 @@
     "v2Hypothesis": "ENTRY_77P5BPS_HOLD_WHILE_PRIOR_MONTH_FUNDING_POSITIVE",
     "spotPerpV2Status": "IMMUTABLE_VALIDATION_FAIL_NO_ENTRY_REGIME",
     "spotPerpFundingFamilyStatus": "CLOSED_AFTER_V1_V2_NO_PROMOTION",
-    "basisThresholdInferred": false
+    "basisThresholdInferred": false,
+    "basisDataFoundationStatus": "FOUNDATION_PASS_8_OF_8",
+    "basisQualifiedAssets": [
+      "APT",
+      "APE",
+      "CRV",
+      "SUSHI",
+      "DYDX",
+      "LDO",
+      "GALA",
+      "IMX"
+    ],
+    "basisWindow": "2024-06..2026-08"
   }
 }
