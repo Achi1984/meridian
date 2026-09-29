@@ -48,11 +48,14 @@ No authenticated API, account data or private venue data.
 ## Time split
 
 ### Discovery
-- 2023-01-01 through 2025-12-31 UTC
+- calendar boundary: 2023-01-01 <= data < 2026-01-01 UTC
+- a weekly period is included only when both its entry anchor and its one-week exit anchor are inside that boundary
+- therefore no discovery holding period consumes a 2026 price or funding event
 
 ### Frozen temporal holdout
 Allowed only if discovery passes:
-- 2026-01-01 through 2026-08-31 UTC
+- calendar boundary: 2026-01-01 <= data <= 2026-08-31 00:00 UTC
+- a weekly period is included only when both entry and exit lie inside the boundary
 - no parameter changes
 
 ## Rebalance
@@ -83,7 +86,13 @@ Using completed 4h closes:
 - denominator = realized standard deviation of the trailing 42 completed 4h log returns
 - annualization is not needed for ranking
 
-`MOM7_SKIP4H = log(C[t-1]/C[t-42]) / sd(r[t-41..t])`
+At a rebalance anchor let `c[-1]` be the close of the latest completed 4h bar and `c[-2]` the prior completed close.
+
+The latest completed 4h return `log(c[-1]/c[-2])` is skipped.
+
+Frozen implementation:
+- numerator = `log(c[-2]/c[-44])`, exactly 42 completed 4h returns ending one bar before the latest close;
+- denominator = sample standard deviation (n-1) of those same 42 log returns.
 
 If volatility is zero/non-finite, signal is missing.
 
@@ -91,7 +100,7 @@ If volatility is zero/non-finite, signal is missing.
 
 Using the latest completed 4h return and trailing 24h volatility:
 
-`REV4H = -log(C[t]/C[t-1]) / sd(last 6 completed 4h returns)`
+`REV4H = -log(c[-1]/c[-2]) / sample_sd(last 6 completed 4h returns)`
 
 ### F3 · Funding crowding
 
@@ -116,7 +125,7 @@ For each asset and factor independently:
 - compute one raw factor observation at each weekly anchor;
 - current observation is never included in its own normalization history;
 - history window = prior **52 valid weekly factor observations**;
-- standardized score = z-score versus those 52 own-history observations;
+- standardized score = z-score versus those 52 own-history observations using sample standard deviation (n-1);
 - require finite standard deviation > 0.
 
 Position rule per factor-book:
@@ -156,6 +165,7 @@ For every factor, on the exact same eligible assets and timestamp:
 - rank the same raw factor values across assets;
 - long top 30%;
 - short bottom 30%;
+- exact side count = max(2, floor(number of eligible assets × 0.30));
 - minimum 2 assets per side;
 - +0.50 long gross / -0.50 short gross;
 - equal weight within each side;
@@ -173,7 +183,7 @@ For an asset held from rebalance `t` to `t+1w`:
 
 `priceReturn = C[t+1w] / C[t] - 1`
 
-Funding over the holding interval uses realized funding events:
+Funding over the holding interval uses realized funding events. Funding timestamps must be strictly increasing with no duplicates; a gap greater than 12 hours is a data-gate failure:
 
 `fundingSum = sum(fundingRate where t < fundingTime <= t+1w)`
 
