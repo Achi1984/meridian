@@ -122,7 +122,8 @@ An asset/day observation is valid only if:
 
 Invalid observation:
 - rejected from all feature metrics;
-- never reconstructed.
+- never reconstructed;
+- recorded as a data-integrity error. Any missing expected daily anchor therefore sets the stage-level data-integrity flag and fails the gate.
 
 ## Per-asset ranks
 
@@ -131,7 +132,10 @@ Within each stage and each asset independently:
 - rank `abs_log_basis` from lowest to highest;
 - rank `fwd_rv24` from lowest to highest;
 - rank `lag_rv24` from lowest to highest;
-- average ranks are used for ties.
+- average ranks are used for ties;
+- normalized rank percentile = `(average_rank - 1) / (n - 1)` for n>1.
+
+Top basis quartile is frozen as the highest `ceil(0.25 × n)` observations per asset, ordered by `abs_log_basis`; ties at the cutoff are broken only by timestamp ascending so the selected count is deterministic.
 
 This prevents high-volatility assets from dominating the pooled relationship solely because of scale.
 
@@ -160,7 +164,7 @@ Report:
 ### Stability
 Split chronological daily anchors into five contiguous windows.
 
-For each window, calculate pooled within-asset Spearman(abs basis, forward RV).
+For each window, recompute ranks independently within each asset using only observations in that window, then calculate pooled within-asset Spearman(abs basis, forward RV).
 
 Report number of positive windows.
 
