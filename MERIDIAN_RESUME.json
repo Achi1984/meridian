@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_V1_DATA_V2_PASS_NEXT_STRATEGY_PREREGISTRATION",
+  "phase": "SPOT_PERP_V1_DISCOVERY_FAIL_NEXT_PERSISTENCE_V2_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "9125885490651906eca3f4de7e2a57b30ed8579e",
+    "verifiedSha": "64807a3bbf1fdf412a3eee0fef2750fc4626454e",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -614,6 +614,38 @@
       "syntheticBackfillUsed": false,
       "decision": "FOUNDATION_PASS",
       "immutable": true
+    },
+    "spotPerpFundingHarvestV1": {
+      "ruleset": "SPOT-PERP-FUNDING-HARVEST-V1-FROZEN",
+      "stage": "DISCOVERY",
+      "rawWindow": "2024-09..2025-08",
+      "tradeWindow": "2024-10..2025-08",
+      "decisionSlots": 88,
+      "validDecisionSlots": 88,
+      "rejectedDecisionSlots": 0,
+      "activeCycles": 24,
+      "noTradeCycles": 64,
+      "netReturnPct": 0.7581261,
+      "netPnlUsd": 1211.3368,
+      "fundingPnlUsd": 2166.7917,
+      "basisPnlUsd": 52.5451,
+      "baseCostsUsd": 1008,
+      "fundingCostRatio": 2.1495949,
+      "profitFactor": 11.2281,
+      "maxDrawdownPct": 0.0740202,
+      "positiveWindows": "3/5",
+      "stressReturnPct": 0.4568732,
+      "positiveAssets": "8/8",
+      "positiveConcentrationPct": 23.4032,
+      "signalSignAgreementPct": 95.8333,
+      "gateReasons": [
+        "ACTIVE_CYCLES_LT_32",
+        "POSITIVE_WINDOWS_LT_4"
+      ],
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -627,7 +659,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Spot-Perp Funding Harvest V1 strategy before first PnL. Use only the Data Foundation V2 qualified universe OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP and public Binance Spot 8h, USD-M perpetual trade 8h and realized funding data. Freeze funding-entry rule, holding cadence, equal-notional spot/perp hedge construction, spot/perp fees and slippage, capital denominator, basis PnL, stress costs, discovery/holdout split and promotion gates before any strategy result. Keep executionImpact=false and require independent holdout before any Paper shadow.",
+  "nextAction": "Freeze a separately named Spot-Perp Funding Persistence V2 before any new PnL. Preserve the V1 universe OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP, LONG Spot / SHORT Binance USD-M Perp direction, V1 77.5 bps initial-entry threshold, public Spot 8h + Perp Trade 8h + realized funding data, and V1 fee/slippage assumptions. Test a stateful carry hypothesis: after an entry is opened, continuation into a following month may occur only when the immediately previous completed month's cumulative realized funding remains strictly positive; exit when that prior-month funding is <=0. Charge transaction costs only for actual entry/exit/rehedge transitions defined in the frozen V2 protocol, not an artificial full monthly roundtrip. Use 2025-08 only as signal/state warm-up and make 2025-09..2026-08 the first independent gating window. Do not reuse the seen V1 discovery window as independent evidence. Keep executionImpact=false and require protocol + invariants before first V2 PnL.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -637,7 +669,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_STRATEGY",
+    "selected": "SPOT_PERP_FUNDING_PERSISTENCE_V2",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -684,7 +716,7 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-09..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": "ONLY_AFTER_STRATEGY_PROTOCOL_AND_INVARIANTS_FROZEN",
+    "strategyPnlAllowed": "ONLY_AFTER_V2_PROTOCOL_AND_INVARIANTS_FROZEN",
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -708,6 +740,13 @@
     "selectiveStaticV4Status": "IMMUTABLE_VALIDATION_FAIL",
     "spotPerpV1DataV1Status": "IMMUTABLE_FOUNDATION_FAIL_SYNCHRONIZED_MARK_GAP",
     "spotPerpV1DataV2Change": "EXECUTION_PRICE_SOURCE_ONLY_MARK_TO_PERP_TRADE_KLINES",
-    "spotPerpV1DataV2Status": "FOUNDATION_PASS_8_OF_8"
+    "spotPerpV1DataV2Status": "FOUNDATION_PASS_8_OF_8",
+    "spotPerpV1Status": "IMMUTABLE_DISCOVERY_FAIL_SAMPLE_BREADTH",
+    "spotPerpV1Economics": "STRONG_BUT_NOT_PROMOTABLE",
+    "v2Hypothesis": "STATEFUL_CARRY_PERSISTENCE_WITH_UNCHANGED_ENTRY_THRESHOLD",
+    "v2EntryThreshold": 0.00775,
+    "v2ContinuationCondition": "PRIOR_COMPLETED_MONTH_FUNDING_GT_0",
+    "v2FirstIndependentWindow": "2025-09..2026-08",
+    "v2SeenDiscoveryReuseAllowed": false
   }
 }
