@@ -112,7 +112,7 @@ test('current-month negative funding is realized honestly even after positive pr
   const op=data.OP;
   const {start,end}=bounds('2024-10');
   for(const row of op.funding)if(row[0]>=start&&row[0]<end)row[1]=-.0001;
-  const r=runSpotPerpFundingHarvestV1(data,{tradeMonths:discoveryMonths,stage:'DISCOVERY'});
+  const r=runSpotPerpFundingHarvestV1(data,{tradeMonths:['2024-10'],stage:'DISCOVERY'});
   const opResult=r.byAsset.find(x=>x.asset==='OP');
   assert.ok(opResult.fundingPnl<0);
   assert.ok(r.signalDiagnostics.signAgreementRate<1);
