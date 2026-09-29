@@ -186,7 +186,7 @@ All must pass:
 
 - exactly 96 decision slots
 - no data-integrity failure
-- >=24 active cycles
+- >=32 active cycles
 - >=6 of 8 assets have at least 2 active cycles
 - aggregate reserved-capital net return >0
 - net PnL >0
