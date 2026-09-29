@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "FUNDING_SPREAD_V1_FROZEN_HOLDOUT_FAIL_NEXT_ADAPTIVE_CHALLENGER",
+  "phase": "ADAPTIVE_TREND_V1_FROZEN_FAIL_NEXT_GRID_SIMULATOR",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "f79506c3dbe5457f8e11b380f43e1dcf9bae2ed2",
+    "verifiedSha": "41c39e6ba46bb2d5021011f26994b681e4445b40",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -84,6 +84,21 @@
       },
       "promoted": false,
       "immutable": true
+    },
+    "adaptiveTrendSharpeProxyV1": {
+      "ruleset": "ADAPTIVE-TREND-SHARPE-PROXY-V1-FROZEN",
+      "exactReplication": false,
+      "periods": 6815,
+      "netReturnPct": -62.9676,
+      "profitFactor": 0.9715,
+      "maxDrawdownPct": 82.4984,
+      "sharpe": -0.3177,
+      "stressReturnPct": -69.1841,
+      "positiveWindows": "1/5",
+      "positiveAssets": "3/12",
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "holdoutAuthorized": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -97,7 +112,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze and test a new uniquely named AdaptiveTrend-style directional challenger from current main using 6h momentum, ATR-based trailing stops, asymmetric long/short allocation and strictly walk-forward monthly selection. Do not retune canonical V1/V2, the failed cross-venue Funding Spread V1 holdout, or the non-canonical r69 V3 result. Keep executionImpact=false. Dynamic Grid remains blocked until a path-aware intraday simulator exists.",
+  "nextAction": "Build a path-aware minute-level grid simulator as a reusable research foundation, then freeze a Dynamic Grid Trading challenger before observing results. Start with BTC/ETH spot geometric grids, explicit fees, no leverage, deterministic one-crossing-per-minute semantics, dynamic reset handling, and a true post-paper holdout. Do not retrofit failed AdaptiveTrend, canonical V1/V2, or Funding Spread V1.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
