@@ -70,3 +70,12 @@ test('rejects stale or tampered tokens',async()=>{
   const tampered=parts[0]+'.'+b64({...JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8')),run_id:'changed'})+'.'+parts[2];
   assert.equal((await verifyGithubActionsOidc(tampered,{fetchFn,nowMs:1700000100*1000})).ok,false);
 });
+
+
+test('accepts immutable subject variants because repository_id/ref/workflow_ref are the trust anchors',async()=>{
+  resetGithubOidcJwksCache();
+  const {privateKey,fetchFn}=fixture();
+  const token=makeToken({privateKey,payload:{sub:'repository_id:1342084551:ref:refs/heads/main'}});
+  const r=await verifyGithubActionsOidc(token,{fetchFn,nowMs:1700000100*1000});
+  assert.equal(r.ok,true);
+});
