@@ -1,104 +1,98 @@
-# Paper Bot Profit Special Agent V2 — Frozen Research Redesign
+# Paper Bot Profit Special Agent V2 — Frozen Redesign
 
 Status: **RESEARCH ONLY**  
 Execution impact: **false**  
-Parent evidence: `PAPERBOT-PROFIT-DISCOVERY-V1-RESULT.md`  
-Issue: #243
+Issue: #243  
+Predecessor: `PAPERBOT-PROFIT-SPECIAL-AGENT-V1-FROZEN`
 
 ## Why V2 exists
 
-V1 produced no candidate that cleared the pre-committed profit/stability gate. Donchian Trend V1 was positive (+2.75%) but did not meet Profit Factor or chronological-stability requirements; both TSMOM variants were negative. V2 therefore does **not** loosen V1 thresholds and does **not** retune V1 parameters.
+The first untouched V1 discovery run produced no passing candidate. Donchian Trend V1 was the only positive-return strategy (+2.75%) but failed the pre-committed Profit Factor and chronological-stability gates. TSMOM Classic and Persistent TSMOM V1 were negative. V1 thresholds are not relaxed and V1 parameters are not retuned.
 
-V2 tests new hypotheses motivated by external evidence published independently of the V1 result.
+V2 is therefore a separately named, separately frozen research redesign.
 
-## Research priorities
+## External evidence used before freezing
 
-### Lane A — UP-UP risk-managed momentum proxy
+The redesign is motivated by evidence available before any V2 result is inspected:
 
-Motivation:
-- 2025 state-transition evidence reports cryptocurrency momentum concentrated in persistent UP→UP market regimes.
-- 2025 risk-managed momentum evidence reports improved return and Sharpe after volatility scaling.
-- 2026 realistic-assumption evidence remains much more supportive of time-series than cross-sectional momentum, so this lane is explicitly a **proxy/challenger**, not presumed edge.
+- Risk-managed cryptocurrency momentum has outperformed plain momentum in recent published work, with improved return and Sharpe after volatility scaling.
+- Recent state-transition evidence reports that crypto momentum profitability is concentrated in persistent UP→UP regimes.
+- Adaptive trend research in crypto combines trend-following, volatility management and an asymmetric long/short capital split that reflects the positive long-run drift of crypto assets.
+- Static Grid is range-dependent. Recent dynamic-grid research starts from the observation that a traditional static grid has near-zero expected value under simple assumptions and only reports improvement after regime-adaptive resets.
+- Martingale/DCA remains excluded as the default profit-maximization route because exposure mechanically increases into adverse moves.
+- Funding Carry remains attractive as a separate diversifier, but only after complete historical funding, basis and fee data are available.
 
-Frozen rules:
-- daily public-price data, evaluated every 7 days;
-- same fixed 8-asset large-cap/liquid universe: BTC, ETH, SOL, XRP, HBAR, LINK, AVAX, SUI;
-- market state = equal-weight universe cumulative return over the prior 28 daily closes;
-- a rebalance is active only when both the current and previous weekly market states are UP;
-- formation return = 14 daily bars ending one daily bar before rebalance (1-bar skip);
-- rank available assets by formation return;
-- long top 25%, short bottom 25%, equal weight within each side; gross raw exposure = 1.0;
-- no position outside UP-UP;
-- volatility scale uses only prior realized strategy returns: trailing 8 weekly observations;
-- warm-up: no position until 8 prior weekly raw strategy returns exist; flat weeks are included as zero returns;
-- target annualized strategy volatility = 10%;
-- max gross leverage = 2x;
-- modeled turnover cost = 8 bps;
-- no martingale, averaging down or pyramiding.
+## Frozen V2 candidates
 
-Because historical market-cap weights are unavailable in the current bridge, this is **not an exact replication** of the cited value-weighted studies.
+### A — ASYMMETRIC DONCHIAN V2
 
-### Lane B — simple delta-neutral funding carry
+Purpose: retain the only V1 family with positive discovery return while changing portfolio construction, not the breakout thresholds.
 
-Motivation:
-- funding is an observable cash-flow mechanism rather than a directional price forecast;
-- 2026 cross-venue evidence finds persistent funding differentials, while also finding that complex timing refinements need not beat a simple baseline.
+Rules:
+- daily bars
+- 55-day breakout entry
+- 20-day opposite-channel exit
+- evaluation every 7 days
+- 60-day realized-vol estimate
+- 10% annualized target vol
+- 2x per-asset research leverage cap
+- 8 bps turnover cost
+- when both sides are active: 70% gross risk budget to LONG, 30% to SHORT
+- when only one side is active: the available side may use 100% of the gross risk budget
+- within each side, allocation is proportional to volatility-scaled absolute position
+- no pyramiding, no averaging down, no martingale
 
-Frozen design target:
-- long spot + short perpetual, equal notional;
-- public funding history only;
-- report funding, basis change and transaction costs separately;
-- compare always-on simple carry with the existing MERIDIAN cost-coverage gate;
-- no yield annualization from a single observation;
-- no borrowing or venue assumptions may be silently omitted;
-- if historical basis/fee coverage is incomplete, fail closed rather than infer profit.
+### B — UP-REGIME DONCHIAN V2
 
-Lane B is not allowed to reuse a headline funding rate as realized PnL.
+Purpose: test the published state-persistence hypothesis without changing the underlying 55/20 breakout family.
 
-### Lane C — adaptive grid, deferred
+Rules:
+- daily bars
+- LONG only
+- same 55-day entry / 20-day exit
+- same 7-day evaluation
+- same 60-day vol estimate, 10% target vol, 2x cap, 8 bps turnover cost
+- a new/continued LONG is allowed only when both the asset and BTC market filter are in a frozen persistent-UP state
+- persistent-UP state requires:
+  - close above the trailing 200-day simple moving average;
+  - current trailing 30-day return > 0;
+  - immediately preceding 30-day return > 0
+- if the regime filter fails, exposure is closed at the next evaluation point
+- no SHORT substitution is allowed
 
-Grid remains a range-regime tool. It may be tested only after a range classifier is frozen independently. OHLC-only grid replay has intrabar-order ambiguity and therefore cannot be promoted as exact execution evidence.
+## Profit gate
 
-### Lane D — market making / XEMM, deferred
+The V1 gate remains unchanged:
 
-Requires order-book depth, maker/taker fee tier, latency, fill probability and adverse-selection telemetry. Daily/4h bars are insufficient.
-
-## V2 profit gate
-
-The same V1 profit gate remains unchanged:
-
-- periods >= 24
+- at least 24 evaluation periods
 - net compounded return > 0
 - Profit Factor >= 1.15
 - max closed-equity drawdown <= 25%
 - at least 3 of 5 chronological windows positive
-- at least 4 positive assets where the strategy has asset-level attribution
-- no single positive asset > 50% of positive PnL
+- at least 4 assets with positive net PnL
+- no single positive asset contributes > 50% of positive candidate PnL
 
-For a market-neutral carry strategy, breadth is evaluated by independently positive carry assets rather than directional asset PnL.
+Among passing V2 candidates, the discovery leader is the candidate with the highest net compounded return. Discovery leader is not promotion.
 
-## Mandatory benchmarks
+## Anti-overfitting rules
 
-Directional V2 must report:
-- equal-weight buy-and-hold return over the same eligible timestamps;
-- BTC buy-and-hold over the same eligible timestamps;
-- active-week share;
-- long and short contribution;
-- turnover and total modeled costs.
+- This file and the V2 implementation must be committed before the first real V2 discovery result is inspected.
+- No threshold may be altered after seeing the V2 discovery result.
+- Costs may be increased for stress tests, never reduced to rescue a candidate.
+- Assets may not be removed after seeing results.
+- If no V2 candidate passes, the decision is `RESEARCH_REDESIGN`; do not relax the gate.
+- Any passing candidate must face a separate immutable holdout before paper-shadow.
+- No live bot, leverage, Pionex or OKX setting may be changed by this research.
 
-A high absolute return caused only by market beta is not sufficient to call the strategy an edge.
+## Deferred tracks
 
-## Promotion policy
+### Funding Carry V3
+Build only when historical funding + executable basis + fees are complete enough for a true net-carry replay.
 
-A V2 discovery pass only authorizes an independent holdout. Holdout parameters and universe are frozen before results. No live bot settings change automatically.
+### Dynamic Grid V1
+Build only with intraday path-aware simulation. Daily OHLC cannot reliably determine the sequence of multiple grid fills inside the same candle, so using it would create false precision.
 
-## Sources frozen with the hypothesis
+### Adaptive 6h Trend
+Potential V3 candidate. Requires an explicitly frozen 6h implementation and enough common-history data across the selected universe.
 
-- Han, Kang & Ryu, *Momentum in the Cryptocurrency Market: A Comprehensive Analysis under Realistic Assumptions*, RAPS accepted, revised 2026: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4675565
-- *Cryptocurrency market risk-managed momentum strategies*, Finance Research Letters 85 (2025): https://www.sciencedirect.com/science/article/pii/S1544612325011377
-- *State transitions and momentum effect in cryptocurrency market*, Finance Research Letters 86 (2025): https://www.sciencedirect.com/science/article/pii/S1544612325016101
-- Grobys et al., *Cryptocurrency momentum has (not) its moments* (2025): https://link.springer.com/article/10.1007/s11408-025-00474-9
-- Lau, *The Funding Carry and a Cross-Venue Spread on Perpetual Futures* (2026): https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6993978
-- Binance Trading Bots guide (updated 2026): https://www.binance.com/de/academy/articles/your-guide-to-binance-trading-bots
-- Pionex Futures Grid guide (reviewed 2026): https://www.pionex.com/blog/futures-grid/
-- Hummingbot Cross-Exchange Market Making documentation: https://hummingbot.org/strategies/v1-strategies/cross-exchange-market-making/
+Research only. No auto-promotion. No execution side effects.
