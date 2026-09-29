@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_V1_DATA_FOUNDATION_FAIL_NEXT_V2_EXECUTION_PRICE_FOUNDATION",
+  "phase": "SPOT_PERP_V1_DATA_V2_PASS_NEXT_STRATEGY_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "bb79e0eb7631de94da5a9aadb27cfa3c03253547",
+    "verifiedSha": "9125885490651906eca3f4de7e2a57b30ed8579e",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -580,6 +580,40 @@
       "syntheticBackfillUsed": false,
       "decision": "FOUNDATION_FAIL_DATA_REDESIGN",
       "immutable": true
+    },
+    "spotPerpFundingHarvestV1DataV2": {
+      "ruleset": "SPOT-PERP-FUNDING-HARVEST-V1-DATA-V2-FROZEN",
+      "interval": "2024-09..2026-08",
+      "universe": [
+        "OP",
+        "INJ",
+        "WLD",
+        "SEI",
+        "TIA",
+        "PENDLE",
+        "RUNE",
+        "ICP"
+      ],
+      "qualifiedAssets": [
+        "OP",
+        "INJ",
+        "WLD",
+        "SEI",
+        "TIA",
+        "PENDLE",
+        "RUNE",
+        "ICP"
+      ],
+      "qualifiedCount": 8,
+      "completeMonthsPerAsset": 24,
+      "spotRowsPerAsset": 2190,
+      "perpTradeRowsPerAsset": 2190,
+      "unexpectedTransportErrors": 0,
+      "strategyPnlCalculated": false,
+      "fundingThresholdInferred": false,
+      "syntheticBackfillUsed": false,
+      "decision": "FOUNDATION_PASS",
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -593,7 +627,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Spot-Perp Funding Harvest V1 Data Foundation V2 before coverage. Preserve the exact OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP universe, 2024-09..2026-08 interval and >=6/8 breadth gate. Replace Binance USD-M markPriceKlines with public USD-M perpetual trade klines as the execution-price tape while retaining Binance Spot 8h and realized funding archives. No PnL, no funding threshold, no asset replacement, no synthetic backfill. Keep V1 Data Foundation immutable.",
+  "nextAction": "Freeze Spot-Perp Funding Harvest V1 strategy before first PnL. Use only the Data Foundation V2 qualified universe OP/INJ/WLD/SEI/TIA/PENDLE/RUNE/ICP and public Binance Spot 8h, USD-M perpetual trade 8h and realized funding data. Freeze funding-entry rule, holding cadence, equal-notional spot/perp hedge construction, spot/perp fees and slippage, capital denominator, basis PnL, stress costs, discovery/holdout split and promotion gates before any strategy result. Keep executionImpact=false and require independent holdout before any Paper shadow.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -603,7 +637,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_DATA_FOUNDATION_V2",
+    "selected": "SPOT_PERP_FUNDING_HARVEST_V1_STRATEGY",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -630,7 +664,7 @@
       "RUNE",
       "ICP"
     ],
-    "nextStage": "DATA_FOUNDATION_BEFORE_STRATEGY",
+    "nextStage": "STRATEGY_PREREGISTRATION_BEFORE_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -650,7 +684,7 @@
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
     "nextWindow": "2024-09..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": false,
+    "strategyPnlAllowed": "ONLY_AFTER_STRATEGY_PROTOCOL_AND_INVARIANTS_FROZEN",
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -673,6 +707,7 @@
     "crossVenueFamilyStatus": "CLOSED_AFTER_V1_V4_NO_PROMOTION",
     "selectiveStaticV4Status": "IMMUTABLE_VALIDATION_FAIL",
     "spotPerpV1DataV1Status": "IMMUTABLE_FOUNDATION_FAIL_SYNCHRONIZED_MARK_GAP",
-    "spotPerpV1DataV2Change": "EXECUTION_PRICE_SOURCE_ONLY_MARK_TO_PERP_TRADE_KLINES"
+    "spotPerpV1DataV2Change": "EXECUTION_PRICE_SOURCE_ONLY_MARK_TO_PERP_TRADE_KLINES",
+    "spotPerpV1DataV2Status": "FOUNDATION_PASS_8_OF_8"
   }
 }
