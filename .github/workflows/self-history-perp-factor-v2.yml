@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify frozen V2 invariants
-        run: python3 -m unittest test/test_self_history_perp_factor_v2.py
+        run: python3 test/test_self_history_perp_factor_v2.py
       - name: Collect official Binance Vision factor archives
         run: python3 scripts/collect-self-history-perp-factor-v2.py
       - name: Run first frozen V2 discovery
