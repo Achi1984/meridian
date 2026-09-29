@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V2_SEEN_FAIL_NEXT_RELATIVE_VALUE_V3_FOUNDATION",
+  "phase": "RELATIVE_VALUE_REVERSAL_V3_DATA_V1_FAIL_NEXT_DATA_V2",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -903,7 +903,7 @@
     255,
     256
   ],
-  "nextAction": "Treat Reversal V2 as immutable, non-promotable seen evidence. Build a new strategy-neutral data foundation for a separately named Relative-Value / Beta-Neutral Reversal V3 on a fresh validation universe/window not used as the V1/V2 promotion gate. Freeze universe, beta-estimation window, residual-return formation, sizing, costs and validation split before any V3 PnL. Do not reuse the now-seen 2025-01-06..2026-08-31 window as an independent gate. Keep executionImpact=false and require clean independent validation before any Paper shadow.",
+  "nextAction": "Freeze RELATIVE-VALUE-REVERSAL-V3-DATA-V1 as immutable foundation-fail evidence. Create a separately named Data V2 with the same 16 trading candidates, same five benchmark assets, unchanged candidate readiness and archive-integrity rules, and only one data-only change: benchmark readiness requires complete daily-price coverage from 2023-01 through 2026-08 instead of 2022-01 through 2026-08. This is justified by the already-fixed one-year beta-history motivation and the earliest later strategy anchor being no earlier than 2024. Do not calculate V3 beta, residual returns, ranks, weights or PnL until Data V2 passes and a separate strategy protocol is frozen.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1031,12 +1031,19 @@
     "reversalV2TransferAuthorized": false,
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
-    "reversalV3Stage": "DATA_FOUNDATION_BEFORE_STRATEGY",
+    "reversalV3Stage": "DATA_V1_IMMUTABLE_FAIL_NEXT_DATA_V2",
     "reversalV3StrategyPnlAllowed": false,
     "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
     "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
     "reversalV2EvidenceUse": "HYPOTHESIS_GENERATION_ONLY",
     "reversalV2WindowNowSeen": true,
-    "reversalV3FreshIndependentEvidenceRequired": true
+    "reversalV3FreshIndependentEvidenceRequired": true,
+    "reversalV3DataV1Status": "IMMUTABLE_FOUNDATION_FAIL_BENCHMARK_OVERCONSTRAINT",
+    "reversalV3DataV1ReadyCandidates": "15_OF_16",
+    "reversalV3DataV1FailedCandidate": "MKR_MISSING_OLD_SYMBOL_CORE_AFTER_2025_08",
+    "reversalV3DataV1BenchmarkReady": "3_OF_5",
+    "reversalV3DataV1BenchmarkFailure": "SOL_XRP_2022_02_AND_2022_04_DAILY_ARCHIVE_GAPS",
+    "reversalV3DataV2Change": "BENCHMARK_MANDATORY_PRICE_WINDOW_ONLY_2023_01_TO_2026_08",
+    "reversalV3BetaEstimationAllowed": false
   }
 }
