@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PRIMARY_FAIL_TRANSFER_LOCKED",
+  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DATA_PASS_NEXT_STRATEGY_PREREGISTRATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "eda7161c7a160a99ed8f30db3bcd521da27c7d9a",
+    "verifiedSha": "541d04586d7ed13ae3105e0ee188603f86ff8922",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1006,6 +1006,47 @@
       "transferLoaded": false,
       "promoted": false,
       "immutable": true
+    },
+    "perpetualTakerOrderFlowV1Data": {
+      "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-DATA-FROZEN",
+      "interval": "2023-01..2026-08",
+      "candidateAssets": [
+        "BTC",
+        "ETH",
+        "BNB",
+        "SOL",
+        "XRP",
+        "ADA",
+        "DOGE",
+        "LINK",
+        "DOT",
+        "LTC",
+        "BCH",
+        "AVAX"
+      ],
+      "qualifiedAssets": [
+        "BTC",
+        "ETH",
+        "BNB",
+        "SOL",
+        "XRP",
+        "ADA",
+        "DOGE",
+        "LINK",
+        "DOT",
+        "LTC",
+        "BCH",
+        "AVAX"
+      ],
+      "qualifiedCount": 12,
+      "requiredMonthsPerAsset": 44,
+      "unexpectedTransportErrors": 0,
+      "takerImbalanceCalculated": false,
+      "orderFlowScoreCalculated": false,
+      "returnPredictabilityCalculated": false,
+      "strategyPnlCalculated": false,
+      "decision": "FOUNDATION_PASS_STRATEGY_PREREGISTRATION_ALLOWED",
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -1019,7 +1060,7 @@
     255,
     256
   ],
-  "nextAction": "Close the current cross-sectional reversal promotion lineage after V1, V2 and V3 failures. Do not load the frozen V3 ASSET_TRANSFER_HOLDOUT. Start a fresh external-research selection for an orthogonal Paper-bot strategy family, then build a strategy-neutral data foundation and preregister the next ruleset before any new PnL. Reuse no failed reversal parameter rescue. Keep executionImpact=false.",
+  "nextAction": "Freeze PERPETUAL-TAKER-ORDER-FLOW-V1 before first strategy PnL. Use the complete 12-asset qualified universe. Define weekly Saturday 00:00 UTC anchors; lagged flow from the immediately preceding completed 168 hourly bars; normalized signed aggressive quote-flow = (2*sum(takerBuyQuote)-sum(quoteVolume))/sum(quoteVolume); rank cross-sectionally; LONG top floor(N/5)=2 and SHORT bottom 2, equal-weight 50/50 dollar-neutral; hold exactly one week; exact Saturday open-to-open execution; realized funding in (t,t+7d]; 8 bps base and 13 bps stress turnover costs. Freeze a 2023-01-14..2024-12-28 development stage and an untouched 2025-01-11..2026-08-29 temporal holdout with no retuning. No PnL before protocol/invariants are canonical.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1029,7 +1070,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "NEXT_ORTHOGONAL_STRATEGY_EXTERNAL_RESEARCH",
+    "selected": "PERPETUAL_TAKER_ORDER_FLOW_V1_STRATEGY_PREREGISTRATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1056,7 +1097,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "EXTERNAL_RESEARCH_THEN_DATA_FOUNDATION_BEFORE_PNL",
+    "nextStage": "ORDER_FLOW_V1_PROTOCOL_AND_INVARIANTS_BEFORE_FIRST_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1237,6 +1278,25 @@
     "reversalV3PrimaryStatus": "IMMUTABLE_FAIL",
     "reversalV3TransferAuthorized": false,
     "reversalV3Economics": "BETA_NEUTRALITY_WORKED_BUT_RESIDUAL_REVERSAL_EDGE_FAILED",
-    "reversalFamilyStatus": "CLOSED_AFTER_V1_V2_V3_NO_PROMOTION"
+    "reversalFamilyStatus": "CLOSED_AFTER_V1_V2_V3_NO_PROMOTION",
+    "orderFlowMotivation": "2026_PEER_REVIEWED_ORDER_FLOW_PREDICTS_CRYPTO_RETURNS_WEEKLY_STRONGER_THAN_DAILY",
+    "orderFlowV1DataStatus": "FOUNDATION_PASS_12_OF_12",
+    "orderFlowV1Universe": [
+      "BTC",
+      "ETH",
+      "BNB",
+      "SOL",
+      "XRP",
+      "ADA",
+      "DOGE",
+      "LINK",
+      "DOT",
+      "LTC",
+      "BCH",
+      "AVAX"
+    ],
+    "orderFlowV1SignalAllowed": "ONLY_AFTER_PROTOCOL_FROZEN",
+    "orderFlowV1PnlObserved": false,
+    "orderFlowV1PaperAuthorized": false
   }
 }
