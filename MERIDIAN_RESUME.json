@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "DYNAMIC_GRID_V1_FROZEN_FAIL_NEXT_REGIME_GATED_GRID_V2",
+  "phase": "REGIME_GRID_V2_FROZEN_FAIL_NEXT_MARKET_CAP_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "069a5475b2edf66d3356d1fa42a74054867a81eb",
+    "verifiedSha": "d1d5a6cc01089a9b417540c48c32f6436fb047d0",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -132,6 +132,32 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "regimeGatedGridV2": {
+      "ruleset": "REGIME-GATED-GRID-V2-FROZEN",
+      "discovery": {
+        "assets": [
+          "BTC",
+          "ETH"
+        ],
+        "window": "2024-01..2025-12",
+        "eligibleByAsset": {
+          "BTC": 9,
+          "ETH": 8
+        },
+        "pairedEligibleMonths": 5,
+        "pairedAssetMonths": 10,
+        "requiredPairedAssetMonths": 16,
+        "bestCandidate": "RG2_GEO_0p015_H5",
+        "paperReturnPct": -16.27,
+        "altReturnPct": -16.24,
+        "paperStressReturnPct": -20.34,
+        "altStressReturnPct": -20.31,
+        "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN"
+      },
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -145,7 +171,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a uniquely named Regime-Gated Grid V2 from current main before results. Use an independently motivated range/low-volatility gate to decide whether a monthly grid cycle is allowed to start, preserve the minute path simulator and self-financing cost model, and use a fresh/disjoint discovery design rather than retuning Dynamic Grid V1 parameters after its failure. Keep executionImpact=false and require independent holdout before any Paper shadow.",
+  "nextAction": "Audit and build a reproducible historical market-cap data foundation to unlock a separately named Cross-Sectional Momentum replication/challenger. Prefer public verifiable sources and fail closed on incomplete asset/date coverage. Do not retune Dynamic Grid V1/V2, AdaptiveTrend, canonical V1/V2, or Funding Spread V1. Keep executionImpact=false and freeze any new momentum ruleset before observing strategy results.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
