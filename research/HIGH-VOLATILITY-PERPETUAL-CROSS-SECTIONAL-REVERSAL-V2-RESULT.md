@@ -7,7 +7,18 @@ Final summary JSON SHA-256: `431de3f881a54dc57ecb6ab1d5e92f615ed8c6ccd49375e36d0
 Full evidence SHA-256: `76ed3a0f8bd43de2862371e424e817febef128b27108f6dd31b45e7c94bea61f`  
 Markdown SHA-256: `77bca4c30c60a2aac49995e6456a4baf3f4f0f4fdba10a54b8b1bbb615c666c5`
 
-This records the first untouched independent validation result of `HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN`.
+This records the first observed validation result of `HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN`. It is economically informative but is not eligible to count as a clean independent promotion gate because the branch contained contradictory preregistration documents at the instant of the run.
+
+## Protocol-integrity audit
+
+At the first observed run, the executed engine/tests and primary frozen protocol used the upper-half volatility rule, but a second duplicate protocol in the same branch described a lower-tercile exclusion. The PR description also referenced that alternate rule.
+
+The upper-half rule was selected as canonical before the PnL output was inspected, but the repository-level preregistration state was still ambiguous at run time. Therefore:
+- the economic result remains frozen evidence;
+- the FAIL decision remains unchanged;
+- the result may be used only for hypothesis generation;
+- it must not be represented as a clean independent validation pass/fail gate for promotion;
+- the 2025-01-06..2026-08-31 window is now seen and cannot be reused as an independent successor gate.
 
 ## Frozen validation scope
 
@@ -68,7 +79,7 @@ All other frozen V2 validation gates passed.
 
 **VALIDATION_FAIL_RESEARCH_REDESIGN**
 
-No transfer validation is authorized.
+No transfer validation is authorized. The observed window is now seen and is not reusable as an independent successor gate.
 
 No Paper shadow and no live promotion are authorized.
 
