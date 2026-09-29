@@ -259,6 +259,8 @@ Cost contribution:
 
 When a factor book moves from active to flat or flat to active, the corresponding weight change is fully charged.
 
+At the final stage exit/rebalance anchor, every factor book is forced to zero weights and the full terminal turnover is charged at the same base/stress rate. No terminal position is left open for free.
+
 ### High-cost stress
 
 Exactly 4× base cost:
