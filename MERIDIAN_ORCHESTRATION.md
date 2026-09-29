@@ -48,3 +48,32 @@ The durable solution is to make **chat state disposable**: the repository, PR an
 ## Output discipline
 
 User-facing progress messages are summaries, not live build logs. Long diagnostic evidence belongs in GitHub commits, PRs, issues and research files. This reduces response-stream size without reducing auditability.
+
+## Single-writer merge window
+
+- Exactly one integration PR owns the merge window.
+- Refresh `main` SHA immediately before every write or merge.
+- Never full-merge a branch that is behind/diverged from current `main`.
+- Prior branch CI is supporting evidence only; the actual current-base integration PR must pass its own release gates.
+- Prefer additive files or reviewed targeted patches over branch-wide replacement.
+- If a path already exists on `main`, stop and compare it before writing.
+
+## Durable checkpoint cadence
+
+Update `MERIDIAN_RESUME.json`:
+- after each merged milestone;
+- after a material research decision;
+- after an intentionally abandoned/superseded integration;
+- before switching development lanes.
+
+The checkpoint records verified base SHA, completed work, research state, coordination mode, next action and explicit non-actions.
+
+## Recovery invariant
+
+After any interrupted stream:
+1. read current `main`;
+2. read the durable resume cursor;
+3. inspect only repository objects newer than that checkpoint;
+4. reconcile parallel changes;
+5. continue from Git/CI state, not from chat assumptions.
+
