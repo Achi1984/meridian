@@ -1,0 +1,47 @@
+name: MERIDIAN Selective Static Cross-Venue Funding V4
+
+on:
+  push:
+    branches:
+      - research/selective-static-cross-venue-funding-v4
+    paths:
+      - "research/SELECTIVE-STATIC-CROSS-VENUE-FUNDING-V4-FROZEN.md"
+      - "research/selective-static-cross-venue-funding-v4.js"
+      - "research/run-selective-static-cross-venue-funding-v4.mjs"
+      - "scripts/collect-selective-static-cross-venue-binance-v4.py"
+      - "test/selective-static-cross-venue-funding-v4.test.js"
+      - ".github/workflows/selective-static-cross-venue-funding-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selective-static-cross-venue-funding-v4
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen Selective Static V4 invariants
+        run: node --test test/selective-static-cross-venue-funding-v4.test.js
+      - name: Collect official Binance Vision V4 holdout archives
+        run: python3 scripts/collect-selective-static-cross-venue-binance-v4.py
+      - name: Run first independent V4 validation
+        run: node research/run-selective-static-cross-venue-funding-v4.mjs
+      - name: Upload untouched V4 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: selective-static-cross-venue-funding-v4
+          path: |
+            research/results/selective-static-cross-venue-funding-v4-summary.json
+            research/results/selective-static-cross-venue-funding-v4-full.json
+            research/results/selective-static-cross-venue-funding-v4.md
+          if-no-files-found: error
+          retention-days: 30
