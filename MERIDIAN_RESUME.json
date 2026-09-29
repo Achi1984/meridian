@@ -1,28 +1,70 @@
 {
-  "schema": 1,
+  "schema": 2,
   "project": "MERIDIAN",
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PAPERBOT_PROFIT_V2_FROZEN_NEXT_CARRY",
-  "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
-  "r67Merged": true,
-  "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
-  "completed": [
-    "r67 collapsible asset cards merged",
-    "r67 release and portfolio CI green",
-    "profit special-agent protocol frozen",
-    "profit candidate engine added",
-    "profit lab UI added",
-    "r68 cache/build routing updated",
-    "r68 release CI green and merged",
-    "V1 profit discovery frozen: no candidate passes",
-    "V2 UP-UP regime-aware momentum frozen: +7.22% but gate fail",
-    "V2 research PR merged"
-  ],
-  "nextAction": "Implement and run the separately frozen delta-neutral funding-carry lane with public funding/basis/cost data. Do not modify V1/V2 thresholds or promote any failed directional candidate.",
+  "phase": "R69_SOURCE_OF_TRUTH_RECOVERED",
   "executionImpact": false,
-  "r68Merged": true,
-  "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c",
-  "latestResearchMergeSha": "752d69141426eb4dd070374f4f7c005e5fb85336"
+  "sourceOfTruth": {
+    "branch": "main",
+    "verifiedSha": "087a087dc54b79afe3fbb01c1a708beedccfd046",
+    "verifiedAt": "2026-09-29",
+    "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
+  },
+  "runtime": {
+    "releaseSafety": "GREEN",
+    "runtimeSmoke": "GREEN",
+    "releaseCoordinator": "GREEN",
+    "pagesDeployment": "GREEN",
+    "northflankDeployment": "GREEN",
+    "assetWatchMirror": {
+      "pushRun": "GREEN",
+      "runId": 36522721085,
+      "encryptedArtifactId": 11012718856,
+      "scheduledRunProof": "PENDING",
+      "note": "Do not present cached/snapshot bot values as current when a fresh authoritative read is unavailable."
+    }
+  },
+  "canonicalResearch": {
+    "V1": {
+      "decision": "NO_CANDIDATE_PASSES",
+      "immutable": true
+    },
+    "V2": {
+      "ruleset": "PAPERBOT-PROFIT-SPECIAL-AGENT-V2-FROZEN",
+      "strategy": "UPUP_RM_MOMENTUM_PROXY_V1",
+      "netReturnPct": 7.22,
+      "profitFactor": 1.129,
+      "maxDrawdownPct": 43.81,
+      "positiveWindows": "2/5",
+      "decision": "V2_DISCOVERY_FAIL",
+      "immutable": true
+    },
+    "fundingCarry": {
+      "v1NewEntriesAllowed": false,
+      "v2NewEntriesAllowed": false,
+      "v2RetirementReason": "REPEATABILITY_SAMPLE_GATE_6_LT_8",
+      "ethHoldoutDecision": "WATCH_NOT_PAPER_CANDIDATE"
+    }
+  },
+  "nonCanonicalResearch": [
+    {
+      "branch": "fix/v10-r69-profit-agent-v2",
+      "status": "REFERENCE_ONLY_NOT_MERGED",
+      "note": "Contains a parallel alternate V2 lineage and V3 evidence. It must not overwrite canonical V2. Reuse ideas only under a new frozen successor ruleset."
+    }
+  ],
+  "closedIntegrationAttempts": [
+    255,
+    256
+  ],
+  "nextAction": "Audit the canonical funding-carry successor/data foundation from current main and the closed research evidence. Freeze any successor as a new ruleset before observing results; never relax prior gates or overwrite V1/V2. After that, evaluate a separately frozen new directional challenger. Dynamic Grid remains blocked until a path-aware intraday simulator exists.",
+  "coordination": {
+    "mergeOwner": "MAIN_AGENT",
+    "refreshMainBeforeMerge": true,
+    "concurrentMerge": false,
+    "frozenResearchGuard": true,
+    "rule": "Subagent output is advisory until independently reviewed, rebased/rebuilt on current main, green in CI, and merged by Main Agent."
+  }
 }
