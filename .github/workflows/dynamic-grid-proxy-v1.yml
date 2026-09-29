@@ -1,0 +1,49 @@
+name: MERIDIAN Dynamic Grid Proxy V1
+
+on:
+  push:
+    branches:
+      - research/dynamic-grid-proxy-v1
+    paths:
+      - "research/DYNAMIC-GRID-PROXY-V1-FROZEN.md"
+      - "research/dynamic-grid-proxy-v1.js"
+      - "research/run-dynamic-grid-proxy-v1.mjs"
+      - "research/grid-path-simulator-v1.js"
+      - "scripts/collect-dynamic-grid-minute.py"
+      - "test/dynamic-grid-proxy-v1.test.js"
+      - "test/grid-path-simulator-v1.test.js"
+      - ".github/workflows/dynamic-grid-proxy-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dynamic-grid-proxy-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify Grid foundation and frozen strategy invariants
+        run: node --test test/grid-path-simulator-v1.test.js test/dynamic-grid-proxy-v1.test.js
+      - name: Collect official Binance Vision minute archives
+        run: python3 scripts/collect-dynamic-grid-minute.py
+      - name: Run first frozen Dynamic Grid discovery
+        run: node research/run-dynamic-grid-proxy-v1.mjs
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-grid-proxy-v1
+          path: |
+            research/results/dynamic-grid-proxy-v1-summary.json
+            research/results/dynamic-grid-proxy-v1-full.json
+            research/results/dynamic-grid-proxy-v1.md
+          if-no-files-found: error
+          retention-days: 30
