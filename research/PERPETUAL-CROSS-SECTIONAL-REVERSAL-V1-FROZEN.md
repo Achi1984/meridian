@@ -186,6 +186,8 @@ Therefore:
 
 Funding is reported separately from price return.
 
+For the reported `price-only` portfolio return, funding is removed but the same modeled transaction costs remain included.
+
 ## Transaction costs
 
 Frozen one-way base cost:
@@ -249,7 +251,7 @@ Portfolio:
 - cumulative funding contribution
 - modeled transaction-cost contribution
 - Profit Factor
-- annualized Sharpe using weekly returns and sample stdev
+- annualized Sharpe = mean weekly net return / sample standard deviation (n-1) × sqrt(52)
 - max drawdown
 - five chronological-window returns
 - turnover
