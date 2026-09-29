@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+  "stage": "DATA_V1_SHARDED_FULL_DATA_QUALITY",
+  "protocolHead": "78e8975b061b926733d66734ab409dcf56e11bfe",
+  "workflowRun": 36613725640,
+  "aggregateArtifact": {
+    "id": 11055862490,
+    "zipSha256": "fbccf3ddf2b2f5057ed050e9802d94a51cc4a17a4ca4e0864923f436ab285787"
+  },
+  "expectedShards": 120,
+  "observedShards": 120,
+  "passedShards": 119,
+  "failedShards": 1,
+  "failedShard": {
+    "asset": "SOLUSDT",
+    "month": "2025-07",
+    "rootCause": "OFFICIAL_AGGTRADES_DUPLICATE_AGGREGATE_TRADE_ID",
+    "error": "RuntimeError: aggTrades aggregate trade id not strictly increasing",
+    "shardArtifact": {
+      "id": 11055671455,
+      "zipSha256": "b0ec38b4b84e10514d51cb9031e116712cf8422a78058e42c3c9265734d2497d"
+    }
+  },
+  "aggregateEvidence": {
+    "aggregateTradeRowsFromPassingManifests": 2889661474,
+    "emptyQuarterHourBinsFromPassingManifests": 0,
+    "kline1mRowsFromPassingManifests": 5208480,
+    "fundingRowsFromPassingManifests": 10851,
+    "decision": "FOUNDATION_DATA_V1_FAIL_DATA_QUALITY"
+  },
+  "sourceDiagnostic": {
+    "workflowRun": 36618234245,
+    "artifactId": 11057041369,
+    "artifactZipSha256": "b55447bb9e953940863b00e59f9c2d740809c437ac4c3eeeb2ff672846b5e874",
+    "officialMonthlyAggTradesSha256": "07842c476aab159f008ffc4e95e421e181f75348610c23baeae1dc3799d4e89b",
+    "monthlyRows": 14070960,
+    "duplicateAggregateIds": 1,
+    "decreasingAggregateIds": 0,
+    "timestampDecreases": 0,
+    "exactAdjacentRowDuplicates": 0,
+    "duplicateAggregateTradeId": 926014272,
+    "duplicateTimestampDeltaMs": 203,
+    "officialDailyArchiveRepeatsSameDuplicate": true,
+    "officialIndividualTradesContainCompleteTargetSequence": true,
+    "individualTradeId2468302189Present": true,
+    "interpretation": "SOURCE_LEVEL_AGGREGATION_METADATA_ANOMALY_NOT_MONTHLY_PACKAGING_OR_RUNNER_ERROR"
+  },
+  "directionalOrderImbalanceCalculated": false,
+  "forwardReturnsCalculated": false,
+  "signalReturnRelationshipCalculated": false,
+  "positionsCalculated": false,
+  "strategyPnlCalculated": false,
+  "executionImpact": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "immutable": true,
+  "decision": "FOUNDATION_DATA_V1_FAIL_SOURCE_ANOMALY_NEW_SOURCE_PROTOCOL_REQUIRED",
+  "nextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
+}

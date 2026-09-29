@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V0_PASS_NEXT_SHARDED_DATA_V1",
+  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "6de6b20e80602409be618860702716510231f456",
+    "verifiedSha": "78e8975b061b926733d66734ab409dcf56e11bfe",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1093,7 +1093,7 @@
     255,
     256
   ],
-  "nextAction": "Build a separate sharded DATA_V1 quality foundation for PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1. Process the six assets over 2025-01..2026-08 in bounded asset/time shards, validate every raw archive against its published checksum, stream-parse aggTrades, validate schema/buyer-maker/timestamp monotonicity and month boundaries, and emit compact quarter-hour coverage/quality metadata before deleting raw shards. Also validate 1m kline and funding continuity. Do not calculate directional order imbalance, forward returns, signal-return relationships, positions or PnL. Only after all shards pass may a strategy protocol be preregistered.",
+  "nextAction": "Keep Quarter-Hour DATA_V1 V1 immutable as FOUNDATION_DATA_V1_FAIL_SOURCE_ANOMALY_NEW_SOURCE_PROTOCOL_REQUIRED. Do not relax the aggTrades ID gate or rerun V1 as a pass. Run a new strategy-neutral source-feasibility audit for official Binance USD-M individual trades archives for the same six assets and 2025-01..2026-08 window. Verify 120/120 monthly archive+checksum availability and corpus size before designing a separately versioned individual-trades Data V1.1 quality protocol. Do not calculate directional imbalance, forward returns, positions or PnL.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1122,7 +1122,7 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_SHARDED_DATA_V1",
+    "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_SOURCE_REDESIGN",
     "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1149,7 +1149,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "QH_BOUNDARY_IMBALANCE_V1_SHARDED_FULL_DATA_QUALITY_NO_SIGNAL_NO_PNL",
+    "nextStage": "QH_BOUNDARY_IMBALANCE_INDIVIDUAL_TRADES_SOURCE_V0_1_NO_SIGNAL_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1374,7 +1374,7 @@
     "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY",
     "orderFlowV1ProvenanceAuditStatus": "CANONICAL",
     "orderFlowV1ProvenanceAuditMergeSha": "6de6b20e80602409be618860702716510231f456",
-    "qhImbalanceV1Status": "DATA_V0_PASS",
+    "qhImbalanceV1Status": "DATA_V1_FAIL_SOURCE_ANOMALY",
     "qhImbalanceV1Universe": [
       "BTC",
       "ETH",
@@ -1395,6 +1395,23 @@
     "qhImbalanceV1DataV0ArtifactId": 11053765060,
     "qhImbalanceV1DataV0Objects": "360_OF_360",
     "qhImbalanceV1AggTradesPublishedBytes": 39135762018,
-    "qhImbalanceV1DataV1Architecture": "SHARDED_STREAM_PARSE_DELETE_RAW_AFTER_QUALITY_MANIFEST"
+    "qhImbalanceV1DataV1Architecture": "SHARDED_STREAM_PARSE_DELETE_RAW_AFTER_QUALITY_MANIFEST",
+    "qhImbalanceV1DataV1Shards": 120,
+    "qhImbalanceV1DataV1Canary": [
+      "BTCUSDT:2025-01",
+      "ADAUSDT:2026-08"
+    ],
+    "qhImbalanceV1DataV1MaxParallel": 6,
+    "qhImbalanceV1DataV1RawRetention": false,
+    "qhImbalanceV1DataV1TimestampPolicy": "USD_M_AGGTRADES_AND_1M_KLINES_EXPECT_MILLISECONDS_FAIL_ON_CHANGE",
+    "qhImbalanceV1DataV1Decision": "FOUNDATION_DATA_V1_FAIL_SOURCE_ANOMALY_NEW_SOURCE_PROTOCOL_REQUIRED",
+    "qhImbalanceV1DataV1WorkflowRun": 36613725640,
+    "qhImbalanceV1DataV1PassedShards": 119,
+    "qhImbalanceV1DataV1FailedShards": 1,
+    "qhImbalanceV1DataV1FailedShard": "SOLUSDT:2025-07",
+    "qhImbalanceV1DataV1RootCause": "OFFICIAL_AGGTRADES_DUPLICATE_AGGREGATE_TRADE_ID",
+    "qhImbalanceV1DataV1DiagnosticRun": 36618234245,
+    "qhImbalanceV1DataV1NoInPlaceRelaxation": true,
+    "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   }
 }

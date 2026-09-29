@@ -1,0 +1,132 @@
+name: MERIDIAN Quarter-Hour Imbalance V1 Data V1
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1-DATA-V1.md"
+      - "scripts/audit-quarter-hour-boundary-imbalance-v1-data-v1-shard.py"
+      - "scripts/aggregate-quarter-hour-boundary-imbalance-v1-data-v1.py"
+      - "test/test_quarter_hour_boundary_imbalance_v1_data_v1.py"
+      - ".github/workflows/quarter-hour-boundary-imbalance-v1-data-v1.yml"
+      - "MERIDIAN_RESUME.json"
+  push:
+    branches:
+      - research/quarter-hour-order-imbalance-v1-data-v1-sharded
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1-DATA-V1-FULL-RUN.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quarter-hour-boundary-imbalance-v1-data-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Data V1 parser invariants
+        run: python3 test/test_quarter_hour_boundary_imbalance_v1_data_v1.py
+
+  canary:
+    if: github.event_name == 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset: BTCUSDT
+            month: "2025-01"
+          - asset: ADAUSDT
+            month: "2026-08"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v1-canary
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stream-validate representative shard
+        run: python3 scripts/audit-quarter-hour-boundary-imbalance-v1-data-v1-shard.py
+      - name: Upload canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v1-canary-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v1-canary/*.json
+          if-no-files-found: warn
+
+  shard:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        asset: [BTCUSDT, ETHUSDT, XRPUSDT, SOLUSDT, DOGEUSDT, ADAUSDT]
+        month:
+          - "2025-01"
+          - "2025-02"
+          - "2025-03"
+          - "2025-04"
+          - "2025-05"
+          - "2025-06"
+          - "2025-07"
+          - "2025-08"
+          - "2025-09"
+          - "2025-10"
+          - "2025-11"
+          - "2025-12"
+          - "2026-01"
+          - "2026-02"
+          - "2026-03"
+          - "2026-04"
+          - "2026-05"
+          - "2026-06"
+          - "2026-07"
+          - "2026-08"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v1-shard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify, stream-parse and discard raw shard
+        run: python3 scripts/audit-quarter-hour-boundary-imbalance-v1-data-v1-shard.py
+      - name: Upload compact shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v1-shard-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v1-shard/*.json
+          if-no-files-found: warn
+
+  aggregate:
+    if: github.event_name != 'pull_request' && always()
+    needs: [invariants, shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: qh-v1-shard-*
+          path: research/results/qh-v1-shards
+          merge-multiple: true
+      - name: Require 120/120 green shards
+        run: python3 scripts/aggregate-quarter-hour-boundary-imbalance-v1-data-v1.py
+      - name: Upload aggregate Data V1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarter-hour-boundary-imbalance-v1-data-v1
+          path: research/results/quarter-hour-boundary-imbalance-v1-data-v1-summary.json
+          if-no-files-found: warn
