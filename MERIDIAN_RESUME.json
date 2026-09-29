@@ -1026,7 +1026,22 @@
     "concurrentMerge": false,
     "frozenResearchGuard": true,
     "rule": "Subagent output is advisory until independently reviewed, rebased/rebuilt on current main, green in CI, and merged by Main Agent.",
-    "singleWriter": true
+    "singleWriter": true,
+    "orchestrationProtocol": "docs/AGENT_ORCHESTRATION.md",
+    "orchestrationVersion": 1,
+    "agentState": "MERIDIAN_AGENT_STATE.json",
+    "maxReviewLoops": 3,
+    "userCommunicationOwner": "MAIN_AGENT",
+    "streamingIsNeverSourceOfTruth": true,
+    "resumeOnInterruption": "RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOMPLETE_STEP",
+    "atomicWorkBursts": true,
+    "checkpointBeforeLongOrIrreversibleStep": true,
+    "requestedModelRouting": {
+      "mainAgent": "GPT-6-Astra",
+      "reviewer": "GPT-6-Sol",
+      "subagentMinimum": "GPT-6-Luna",
+      "fallback": "STRONGEST_AVAILABLE_WITH_EXPLICIT_EXECUTION_MODE"
+    }
   },
   "researchDirection": {
     "selected": "NEXT_ORTHOGONAL_STRATEGY_EXTERNAL_RESEARCH",
