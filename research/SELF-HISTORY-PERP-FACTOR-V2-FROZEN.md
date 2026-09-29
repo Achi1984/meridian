@@ -300,14 +300,14 @@ A discovery/temporal rebalance requires at least 8 objectively eligible assets b
 Report for own-history and matched cross-sectional benchmark:
 
 - completed weekly periods
-- active combined weeks
+- active combined weeks (at least one of the three factor books holds non-zero weights)
 - active weeks by factor book
 - compounded net return
 - compounded price-only return
 - funding contribution
 - modeled cost contribution
 - Profit Factor
-- annualized Sharpe using weekly returns
+- annualized Sharpe = mean weekly return / sample standard deviation (n-1) × sqrt(52)
 - max drawdown
 - 5 chronological-window returns
 - gross long-side contribution before shared costs
