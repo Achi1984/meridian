@@ -191,8 +191,10 @@ def risk_budget_weights(dataset,values,t):
     return_series={}
     for a in selected:
         v=dataset[a].annualized_vol(t)
+        if v is None:
+            return {},{'reason':'VOL_DATA','selectedVols':asset_vols,'riskScale':0.0,'preScalePortfolioVol':None}
         rs=dataset[a].trailing_log_returns(t)
-        if v is None or rs is None:
+        if rs is None:
             return {},{'reason':'VOL_DATA','selectedVols':asset_vols,'riskScale':0.0,'preScalePortfolioVol':None}
         asset_vols[a]=v
         return_series[a]=rs
