@@ -1,0 +1,43 @@
+name: MERIDIAN Self-History Perpetual Factor V3
+
+on:
+  push:
+    branches:
+      - research/self-history-perp-factor-v3
+    paths:
+      - "research/SELF-HISTORY-PERP-FACTOR-V3-FROZEN.md"
+      - "research/self_history_perp_factor_v3.py"
+      - "research/run-self-history-perp-factor-v3.py"
+      - "test/test_self_history_perp_factor_v3.py"
+      - ".github/workflows/self-history-perp-factor-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-history-perp-factor-v3
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen V3 invariants
+        run: python3 test/test_self_history_perp_factor_v3.py
+      - name: Collect official Binance Vision factor archives
+        run: python3 scripts/collect-self-history-perp-factor-v2.py
+      - name: Run first frozen V3 discovery
+        run: python3 research/run-self-history-perp-factor-v3.py
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-history-perp-factor-v3
+          path: |
+            research/results/self-history-perp-factor-v3-summary.json
+            research/results/self-history-perp-factor-v3-full.json
+            research/results/self-history-perp-factor-v3.md
+          if-no-files-found: error
+          retention-days: 30
