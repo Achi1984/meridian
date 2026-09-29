@@ -96,10 +96,13 @@ Disposition:
 
 ## Explicitly retain open in this pass
 
-### Active Data V1
+### Quarter-Hour Data V1 — failed quality gate, diagnosis active
 - **#333** Quarter-Hour Imbalance Data V1
-  - active 120-shard run;
-  - do not touch/merge until aggregate gate is complete.
+  - full run completed with 119/120 shard PASS;
+  - `SOLUSDT / 2025-07` failed because the official aggTrades archive contains one repeated aggregate-trade ID;
+  - aggregate decision: `FOUNDATION_DATA_V1_FAIL_DATA_QUALITY`;
+  - no directional imbalance, forward return, position or PnL was calculated;
+  - do not merge as a PASS; source-provenance diagnosis is being performed on a separate diagnostic branch.
 
 ### Product / UI work
 - **#136** compact asset-pair bot UI
@@ -114,16 +117,30 @@ These need separate current-main review before any decision.
 - **#77/#76/#75/#74** FIB lineage
 - **#35** locked prospective holdout
 - **#36** Meta Allocator design
-- **#40/#39** breakout lineage
+- **#40** Retest / Hold Breakout V2
 - **#42** canonical Paper Activity owner
+
+**#39 Breakout / Expansion V1** is now closed as an explicit broad negative control; #40 remains separately open as its structurally different successor.
 
 No closure decision is made for these without a separate lineage/current-main audit.
 
-### Older Hybrid Alpha lineage
-- #66/#67/#68/#69/#71/#73 remain open for a second pass.
+### Older Hybrid Alpha lineage — second pass completed
+
+The predecessor chain:
+- #66 Hybrid Alpha V1 prototype
+- #67 v7.89-v7.93 programme
+- #68 v7.94 robustness FAIL / NO PROMOTION
+- #69 v7.95 attribution
+- #71 v7.96 weak-alpha attenuation / NO PROMOTION
+- #73 v7.97 precursor
+
+was reconciled against the later v7.98-v7.102 terminal lineage.
+
+Disposition:
+**CLOSED WITHOUT MERGE.**
 
 Reason:
-Their role in the later frozen/failed lineage must be reconciled against current canonical research state before closing them in bulk.
+the later sequence explicitly completed and rejected the microstructure/allocator continuation. Branches, commits and artifacts remain evidence.
 
 ## Safety invariants
 
@@ -135,11 +152,26 @@ Their role in the later frozen/failed lineage must be reconciled against current
 - main is not modified during the active Data V1 full run;
 - PR #333 remains the only current Quarter-Hour Data V1 integration candidate.
 
+## Parallel-work reconciliation
+
+Two duplicate parallel result sets were discovered during this pass.
+
+Canonical:
+- **#334** Paper-bot lifecycle / promotion audit;
+- **#335** Quarter-Hour external-evidence lock;
+- **#336** this hygiene audit.
+
+Closed as duplicate/non-canonical:
+- **#337** duplicate Paper-bot audit;
+- **#338** duplicate Quarter-Hour evidence dossier.
+
+This preserves the single-canonical-PR rule per workstream.
+
 ## Next hygiene pass
 
-After Data V1 is resolved:
-1. audit #66/#67/#68/#69/#71/#73 as one Hybrid Alpha lineage;
-2. audit #74/#75/#76/#77 as one FIB lineage;
-3. audit #39/#40 as one breakout lineage;
-4. reconcile #42/#93/#103 against the current Paper architecture;
-5. rebase or close stale UI PRs #121/#136 only after current product state comparison.
+After the Data V1 source anomaly is dispositioned:
+1. keep #74/#75/#76/#77 intact while the FIB V3 prospective holdout remains active;
+2. keep #35 and its dependency chain until the prospective context holdout is mature or explicitly superseded;
+3. evaluate #40 independently rather than inheriting #39's failure;
+4. reconcile #42/#93/#103 against the current Paper architecture and canonical observer;
+5. rebase or close stale UI PRs #121/#136 only after current product-state comparison.
