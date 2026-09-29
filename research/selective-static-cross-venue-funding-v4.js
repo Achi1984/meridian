@@ -14,7 +14,7 @@ export const SELECTIVE_STATIC_CROSS_VENUE_FUNDING_V4_CONFIG=Object.freeze({
   validationMonths:Object.freeze(['2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08']),
   gate:Object.freeze({
     expectedDecisionSlots:96,
-    minActiveCycles:24,
+    minActiveCycles:32,
     minAssetsWithTwoActiveCycles:6,
     minProfitFactor:1.15,
     maxDrawdownPct:8,
