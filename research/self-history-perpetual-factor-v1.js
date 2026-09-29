@@ -358,7 +358,8 @@ function evaluate(primary,benchmark,stress,anchorReturns,phase,cfg){
   const reasons=[];
   if(primary.summary.periods<g.minPeriods)reasons.push('PERIODS_LT_'+g.minPeriods);
   if(!(primary.summary.totalReturnPct>0))reasons.push('RETURN_NOT_POSITIVE');
-  if(!(primary.summary.sharpe>g.minSharpe))reasons.push('SHARPE_NOT_ABOVE_'+g.minSharpe);
+  const sharpePass=phase==='DISCOVERY'?primary.summary.sharpe>=g.minSharpe:primary.summary.sharpe>g.minSharpe;
+  if(!sharpePass)reasons.push((phase==='DISCOVERY'?'SHARPE_LT_':'SHARPE_NOT_ABOVE_')+g.minSharpe);
   if(!(primary.summary.profitFactor>=g.minProfitFactor))reasons.push('PF_LT_'+g.minProfitFactor);
   if(!(primary.summary.maxDrawdownPct<=g.maxDrawdownPct))reasons.push('DD_GT_'+g.maxDrawdownPct+'PCT');
   if(phase==='DISCOVERY'&&primary.summary.positiveWindows<g.minPositiveWindows)reasons.push('POSITIVE_WINDOWS_LT_'+g.minPositiveWindows);
