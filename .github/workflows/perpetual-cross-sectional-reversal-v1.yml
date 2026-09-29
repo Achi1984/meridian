@@ -1,0 +1,44 @@
+name: MERIDIAN Perpetual Cross-Sectional Reversal V1
+
+on:
+  push:
+    branches:
+      - research/perpetual-cross-sectional-reversal-v1
+    paths:
+      - "research/PERPETUAL-CROSS-SECTIONAL-REVERSAL-V1-FROZEN.md"
+      - "research/perpetual_cross_sectional_reversal_v1.py"
+      - "research/run-perpetual-cross-sectional-reversal-v1.py"
+      - "scripts/collect-perpetual-cross-sectional-reversal-v1.py"
+      - "test/test_perpetual_cross_sectional_reversal_v1.py"
+      - ".github/workflows/perpetual-cross-sectional-reversal-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-cross-sectional-reversal-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen Reversal V1 invariants
+        run: python3 test/test_perpetual_cross_sectional_reversal_v1.py
+      - name: Collect discovery-only official Binance Vision data
+        run: python3 scripts/collect-perpetual-cross-sectional-reversal-v1.py
+      - name: Run first frozen Reversal V1 discovery
+        run: python3 research/run-perpetual-cross-sectional-reversal-v1.py
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-cross-sectional-reversal-v1
+          path: |
+            research/results/perpetual-cross-sectional-reversal-v1-summary.json
+            research/results/perpetual-cross-sectional-reversal-v1-full.json
+            research/results/perpetual-cross-sectional-reversal-v1.md
+          if-no-files-found: error
+          retention-days: 30
