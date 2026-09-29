@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V2_VALIDATION_FAIL_NEXT_RELATIVE_VALUE_V3_FOUNDATION",
+  "phase": "PERPETUAL_REVERSAL_V2_SEEN_FAIL_NEXT_SUCCESSOR_RESEARCH",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -890,6 +890,34 @@
       "transferAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "highVolatilityPerpetualReversalV2": {
+      "ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
+      "stage": "SEEN_VALIDATION_EVIDENCE",
+      "window": "2025-01-06..2026-08-31",
+      "periods": 86,
+      "netReturnPct": 11.3809029365,
+      "priceOnlyReturnPct": 10.6142242386,
+      "profitFactor": 1.152706468,
+      "sharpe": 0.3705863201,
+      "maxDrawdownPct": 20.6269385232,
+      "positiveWindows": "3/5",
+      "stressReturnPct": 7.9297499049,
+      "longContribution": -0.6576035232,
+      "shortContribution": 0.8856537825,
+      "positiveAssets": "15/23",
+      "positiveConcentrationPct": 16.1498045685,
+      "meanLoserMinusWinnerSpreadPct": 0.5142708822,
+      "gateReasons": [
+        "SHARPE_LT_0.5",
+        "LONG_CONTRIBUTION_NOT_POSITIVE"
+      ],
+      "protocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
+      "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "use": "HYPOTHESIS_GENERATION_ONLY",
+      "transferAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -903,7 +931,7 @@
     255,
     256
   ],
-  "nextAction": "Do not rescue Reversal V2 by changing the volatility subset, side gates, horizon, costs or asset list. Build a new strategy-neutral data foundation for a Relative-Value / Beta-Neutral Perpetual Reversal V3 on a separately frozen transfer universe not used by Reversal V1/V2. The V3 hypothesis must isolate the persistent loser-minus-winner spread while neutralizing broad-market beta rather than relying on either absolute long or short leg. Freeze universe, beta-estimation window, residual-return formation, sizing, costs and validation split before any V3 PnL. Keep executionImpact=false and require independent validation before any Paper shadow.",
+  "nextAction": "Freeze V2 as non-promotable seen evidence. Use its long/short asymmetry only for hypothesis generation. Research an externally grounded successor under a new ruleset, with no V2 parameter retuning and no reuse of the now-seen 2025-01-06..2026-08-31 window as an independent gate. Before any successor PnL, freeze a fresh validation universe/window, engine invariants and costs. Keep executionImpact=false; no transfer, Paper or live promotion from V2.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -940,7 +968,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "V2_VALIDATION_HARNESS_AFTER_CANONICAL_PROTOCOL",
+    "nextStage": "SUCCESSOR_EXTERNAL_RESEARCH_AND_FRESH_PREREGISTRATION",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1019,8 +1047,8 @@
     "reversalV2Motivation": "EXTERNAL_2026_HIGH_VOL_REVERSAL_EVIDENCE",
     "reversalV2FirstIndependentWindow": "2025-01-06..2026-08-31",
     "reversalV2StrategyPnlAllowed": "ONLY_AFTER_NEW_PROTOCOL_AND_INVARIANTS_FROZEN",
-    "reversalV2TransferRequiredBeforePaper": true,
-    "reversalV2Status": "IMMUTABLE_VALIDATION_FAIL",
+    "reversalV2TransferRequiredBeforePaper": false,
+    "reversalV2Status": "IMMUTABLE_SEEN_VALIDATION_FAIL",
     "reversalV2ChangeFromV1": "UPPER_HALF_CROSS_SECTIONAL_VOLATILITY_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
     "reversalV2Ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
     "reversalV2MinPrefilterEligible": 15,
@@ -1032,6 +1060,9 @@
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
     "reversalV3Stage": "DATA_FOUNDATION_BEFORE_STRATEGY",
-    "reversalV3StrategyPnlAllowed": false
+    "reversalV3StrategyPnlAllowed": false,
+    "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
+    "reversalV2ObservedAsymmetry": "LONG_LOSER_SIDE_NEGATIVE_SHORT_WINNER_SIDE_POSITIVE",
+    "reversalV2WindowNowSeen": true
   }
 }
