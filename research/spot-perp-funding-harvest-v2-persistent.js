@@ -319,7 +319,7 @@ export function runSpotPerpFundingHarvestV2(dataset,{tradeMonths,stage='DEVELOPM
     dataIntegrityFailure:invalid.length>0,invalid,
     exposureMonths,entryEvents,exitEvents,persistentHoldMonths,
     averageHoldingStreakLength:entryEvents?exposureMonths/entryEvents:0,
-    byAsset,periods,
+    slots,byAsset,periods,
     summary:{...base,totalNetPnl,totalFundingPnl,totalBasisPnl,totalCosts,fundingCostRatio:totalCosts>0?totalFundingPnl/totalCosts:null},
     stressSummary:{...stress,totalStressNetPnl},
     positiveWindows:ws.positiveWindows,windows:ws.windows,
