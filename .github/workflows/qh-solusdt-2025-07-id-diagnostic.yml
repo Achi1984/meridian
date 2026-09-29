@@ -7,6 +7,7 @@ on:
     paths:
       - "scripts/diagnose-qh-solusdt-2025-07-aggtrade-ids.py"
       - "scripts/diagnose-qh-solusdt-2025-07-16-daily.py"
+      - "scripts/diagnose-qh-solusdt-2025-07-16-trades.py"
       - ".github/workflows/qh-solusdt-2025-07-id-diagnostic.yml"
   workflow_dispatch:
 
@@ -27,6 +28,8 @@ jobs:
         run: python3 scripts/diagnose-qh-solusdt-2025-07-aggtrade-ids.py
       - name: Compare official daily archive
         run: python3 scripts/diagnose-qh-solusdt-2025-07-16-daily.py
+      - name: Compare underlying individual trades
+        run: python3 scripts/diagnose-qh-solusdt-2025-07-16-trades.py
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -35,4 +38,5 @@ jobs:
           path: |
             research/results/qh-solusdt-2025-07-aggtrade-id-diagnostic.json
             research/results/qh-solusdt-2025-07-16-daily-id-compare.json
+            research/results/qh-solusdt-2025-07-16-individual-trade-compare.json
           if-no-files-found: warn
