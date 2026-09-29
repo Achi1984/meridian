@@ -104,7 +104,7 @@ function chronologicalWindows(periods,parts=5){
 }
 function mondayAnchors(start,endExclusive,weekMs){
   const out=[];
-  for(let t=start;t<endExclusive;t+=weekMs)out.push(t);
+  for(let t=start;t<=endExclusive;t+=weekMs)out.push(t);
   return out;
 }
 function normalizeBars(rows,barMs){
@@ -211,7 +211,7 @@ function buildFeatures(indexed,assets,start,endExclusive,cfg){
   const anchors=mondayAnchors(start,endExclusive,cfg.weekMs);
   const allAnchors=[];
   const warmStart=start-(cfg.ownHistoryWeeks+cfg.momentumWeeks+2)*cfg.weekMs;
-  for(let t=warmStart;t<endExclusive;t+=cfg.weekMs)allAnchors.push(t);
+  for(let t=warmStart;t<=endExclusive;t+=cfg.weekMs)allAnchors.push(t);
   const rawHistory=Object.fromEntries(assets.map(a=>[a,[]]));
   const featureMap=new Map();
   for(const anchor of allAnchors){
@@ -237,12 +237,26 @@ function simulate(features,indexed,assets,weightFn,cfg,costBps){
   let totalFunding=0,totalPrice=0,totalCosts=0,totalTurnover=0,longGrossContribution=0,shortGrossContribution=0;
   let activeWeeks=0,flatWeeks=0,rejectedWeeks=0,dataIntegrityFailure=false;
 
+  const closePreviousAtCurrentAnchor=()=>{
+    if(!prevWeights.size||!periods.length){prevWeights=new Map();return}
+    const closeTurnover=sum([...prevWeights.values()].map(Math.abs));
+    const closeCost=closeTurnover*costBps/10000;
+    const last=periods.at(-1);
+    last.netReturn-=closeCost;
+    last.priceOnlyReturn-=closeCost;
+    last.costReturn+=closeCost;
+    last.turnover+=closeTurnover;
+    totalCosts+=closeCost;totalTurnover+=closeTurnover;
+    for(const [asset,w] of prevWeights)attribution[asset]-=Math.abs(w)*costBps/10000;
+    prevWeights=new Map();
+  };
+
   for(let pi=0;pi<features.length-1;pi++){
     const feature=features[pi],anchor=feature.anchor,next=features[pi+1].anchor;
     const eligible=Object.values(feature.assets).filter(x=>x.eligible).length;
     if(eligible<cfg.minEligibleAssets){
       rejectedWeeks++;
-      prevWeights=new Map();
+      closePreviousAtCurrentAnchor();
       continue;
     }
     const weights=weightFn(feature,cfg);
@@ -270,7 +284,7 @@ function simulate(features,indexed,assets,weightFn,cfg,costBps){
       if(newW>0)longGross+=gross;else shortGross+=gross;
     }
     if(!valid){
-      dataIntegrityFailure=true;rejectedWeeks++;prevWeights=new Map();continue;
+      dataIntegrityFailure=true;rejectedWeeks++;closePreviousAtCurrentAnchor();continue;
     }
     const net=priceRet+fundingRet-cost;
     periods.push({
