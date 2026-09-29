@@ -138,14 +138,18 @@ No leverage credit is taken.
 
 ## Price PnL while active
 
-Within every month where the position is held:
+Use continuous mark-to-market accounting so a persistent position does not lose the price interval across calendar-month boundaries.
 
-- start mark = first valid 8h bar open;
-- end mark = last valid 8h bar close;
+- ENTER month: start mark = first valid 8h bar open of the entry month; end mark = last valid 8h bar close of that month.
+- HOLD month: start mark = prior month's last valid 8h bar close; end mark = current month's last valid 8h bar close.
+- EXIT month: start mark = prior month's last valid 8h bar close; end mark = first valid 8h bar open of the exit month; after that mark the position is flat for the rest of the month.
+- Final forced close: use the normal ENTER/HOLD start rule and the last valid 8h bar close of the final trade month as end mark.
+
+For every active interval:
 - Spot PnL = fixed Spot quantity × (end mark - start mark);
 - Perp PnL = fixed short quantity × (end mark - start mark).
 
-This preserves fixed quantities across a persistent streak. The sub-second transition between consecutive monthly bars is not synthetically reconstructed.
+This preserves fixed quantities across a persistent streak without synthetically reconstructing any missing tick or sub-second transition.
 
 ## Funding PnL while active
 
