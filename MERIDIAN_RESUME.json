@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PROTOCOL_FROZEN_NO_PNL",
+  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PRIMARY_FAIL_TRANSFER_LOCKED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "0f09cff201f1c97bba012305bff34889664a28c5",
+    "verifiedSha": "eda7161c7a160a99ed8f30db3bcd521da27c7d9a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -972,6 +972,40 @@
       "strategyPnlCalculated": false,
       "decision": "FOUNDATION_PASS_BROAD_MARKET_BENCHMARK",
       "immutable": true
+    },
+    "perpetualRelativeValueReversalV3": {
+      "ruleset": "PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN",
+      "stage": "PRIMARY_VALIDATION",
+      "validationWindow": "2025-01-06..2026-08-31",
+      "periods": 86,
+      "activeWeeks": 86,
+      "netReturnPct": -42.6143,
+      "priceOnlyReturnPct": -39.9291,
+      "profitFactor": 0.845401,
+      "sharpe": -0.373694,
+      "maxDrawdownPct": 70.6637,
+      "positiveWindows": "3/5",
+      "stressReturnPct": -44.054,
+      "positiveAssets": "6/10",
+      "positiveConcentrationPct": 58.0664,
+      "loserMinusWinnerNextWeekSpreadPct": -0.514154,
+      "maxAbsEstimatedBetaExposure": 1.6653345369377348e-16,
+      "realizedMarketBeta": -0.0707511,
+      "gateReasons": [
+        "RETURN_NOT_POSITIVE",
+        "PRICE_ONLY_NOT_POSITIVE",
+        "PF_LT_1.10",
+        "SHARPE_LT_0.50",
+        "DD_GT_25",
+        "STRESS_RETURN_NOT_POSITIVE",
+        "POSITIVE_CONCENTRATION_GT_35",
+        "LOSER_MINUS_WINNER_SPREAD_NOT_POSITIVE"
+      ],
+      "decision": "PRIMARY_VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "transferAuthorized": false,
+      "transferLoaded": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -985,7 +1019,7 @@
     255,
     256
   ],
-  "nextAction": "Merge the frozen PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 protocol, engine and synthetic invariants canonically before any real V3 strategy data are loaded. After green current-base CI and merge, create a separate PRIMARY_VALIDATION runner/collector that loads only the frozen 10 primary assets plus BTC/ETH/BNB/SOL/XRP for 2024-01..2026-08, runs the 2025-01-06..2026-08-31 primary stage exactly once, and freezes the result. Do not load the 9 transfer candidates unless PRIMARY_VALIDATION passes unchanged. No parameter grid, no retuning, no Paper/live promotion.",
+  "nextAction": "Close the current cross-sectional reversal promotion lineage after V1, V2 and V3 failures. Do not load the frozen V3 ASSET_TRANSFER_HOLDOUT. Start a fresh external-research selection for an orthogonal Paper-bot strategy family, then build a strategy-neutral data foundation and preregister the next ruleset before any new PnL. Reuse no failed reversal parameter rescue. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -995,7 +1029,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_FROZEN",
+    "selected": "NEXT_ORTHOGONAL_STRATEGY_EXTERNAL_RESEARCH",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1022,7 +1056,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "MERGE_PROTOCOL_THEN_PRIMARY_VALIDATION_ONLY",
+    "nextStage": "EXTERNAL_RESEARCH_THEN_DATA_FOUNDATION_BEFORE_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1113,7 +1147,7 @@
     "reversalV2TransferAuthorized": false,
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
-    "reversalV3Stage": "PROTOCOL_ENGINE_INVARIANTS_FROZEN_BEFORE_FIRST_PNL",
+    "reversalV3Stage": "IMMUTABLE_PRIMARY_VALIDATION_FAIL",
     "reversalV3StrategyPnlAllowed": "ONLY_AFTER_PROTOCOL_MERGED_CANONICALLY",
     "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
     "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
@@ -1199,6 +1233,10 @@
     "reversalV3Signal": "56D_BETA_RESIDUALIZED_RETURN_1W_SKIP_1W_HOLD",
     "reversalV3SideCount": 2,
     "reversalV3TransferLoaded": false,
-    "reversalV3StrategyPnlObserved": false
+    "reversalV3StrategyPnlObserved": true,
+    "reversalV3PrimaryStatus": "IMMUTABLE_FAIL",
+    "reversalV3TransferAuthorized": false,
+    "reversalV3Economics": "BETA_NEUTRALITY_WORKED_BUT_RESIDUAL_REVERSAL_EDGE_FAILED",
+    "reversalFamilyStatus": "CLOSED_AFTER_V1_V2_V3_NO_PROMOTION"
   }
 }
