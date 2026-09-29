@@ -28,12 +28,57 @@ jobs:
       - name: Re-run frozen parser invariants
         run: python3 test/test_quarter_hour_boundary_imbalance_v1_data_v1.py
 
-      - name: Download all 120 original shard manifests
+      - name: Download original BTCUSDT shard manifests
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: 36613725640
-          pattern: qh-v1-shard-*
+          pattern: qh-v1-shard-BTCUSDT-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Download original ETHUSDT shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-ETHUSDT-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Download original XRPUSDT shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-XRPUSDT-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Download original SOLUSDT shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-SOLUSDT-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Download original DOGEUSDT shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-DOGEUSDT-*
+          path: research/results/qh-v1-original
+          merge-multiple: true
+
+      - name: Download original ADAUSDT shard manifests
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36613725640
+          pattern: qh-v1-shard-ADAUSDT-*
           path: research/results/qh-v1-original
           merge-multiple: true
 
@@ -47,10 +92,13 @@ jobs:
       - name: Assemble recovered 120-shard manifest set
         run: |
           mkdir -p research/results/qh-v1-recovered
+          original_count="$(find research/results/qh-v1-original -maxdepth 1 -name '*.json' | wc -l)"
+          test "$original_count" -eq 120
           cp research/results/qh-v1-original/*.json research/results/qh-v1-recovered/
           cp research/results/qh-v1-corrected/SOLUSDT-2025-07.json research/results/qh-v1-recovered/SOLUSDT-2025-07.json
           count="$(find research/results/qh-v1-recovered -maxdepth 1 -name '*.json' | wc -l)"
           test "$count" -eq 120
+          echo "Original manifest count: $original_count"
           echo "Recovered manifest count: $count"
 
       - name: Require recovered 120/120 green shards
