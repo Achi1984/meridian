@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+  "stage": "DATA_V0_ARCHIVE_AVAILABILITY",
+  "workflowRun": 36611778776,
+  "workflowHeadSha": "434d8b39246a7f5ed6e8ab58ed0921c2b7aabe08",
+  "artifactId": 11053765060,
+  "artifactZipSha256": "c58895b7d9e60fbde28c416116d3dd82cf1b44490451a09aacf801f3848448f9",
+  "generatedAt": "2026-09-29T18:24:18.925446+00:00",
+  "source": "Binance Vision official public USD-M monthly archives",
+  "assets": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "DOGEUSDT",
+    "ADAUSDT"
+  ],
+  "window": "2025-01..2026-08",
+  "months": 20,
+  "dataFamilies": [
+    "aggTrades",
+    "klines1m",
+    "fundingRate"
+  ],
+  "expectedObjects": 360,
+  "availableObjects": 360,
+  "missingObjects": 0,
+  "byFamily": {
+    "aggTrades": {
+      "expected": 120,
+      "available": 120,
+      "missing": 0,
+      "publishedBytes": 39135762018
+    },
+    "klines1m": {
+      "expected": 120,
+      "available": 120,
+      "missing": 0,
+      "publishedBytes": 210752875
+    },
+    "fundingRate": {
+      "expected": 120,
+      "available": 120,
+      "missing": 0,
+      "publishedBytes": 111054
+    }
+  },
+  "signalCalculated": false,
+  "forwardReturnsCalculated": false,
+  "strategyPnlCalculated": false,
+  "positionsCalculated": false,
+  "executionImpact": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "decision": "FOUNDATION_V0_PASS_FULL_DATA_QUALITY_AUDIT_REQUIRED",
+  "nextEngineeringConstraint": "AGGTRADES_CORPUS_REQUIRES_SHARDED_STREAMING_DATA_V1_NOT_MONOLITHIC_CI"
+}
