@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import csv, io, json, os, urllib.error, urllib.request, zipfile
+import csv, io, json, os, time, urllib.error, urllib.request, zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 BASE='https://data.binance.vision/data/futures/um/monthly'
@@ -16,13 +17,20 @@ def months(start,end):
         if m==13: y,m=y+1,1
 
 def fetch_zip(url):
-    req=urllib.request.Request(url,headers={'User-Agent':'ACHI-MERIDIAN-CROSS-VENUE/1'})
-    with urllib.request.urlopen(req,timeout=60) as r:
-        data=r.read()
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
-        names=[n for n in z.namelist() if not n.endswith('/')]
-        if len(names)!=1: raise RuntimeError(f'unexpected archive members: {url}')
-        return z.read(names[0]).decode('utf-8-sig').splitlines()
+    last=None
+    for attempt in range(3):
+        try:
+            req=urllib.request.Request(url,headers={'User-Agent':'ACHI-MERIDIAN-CROSS-VENUE/1'})
+            with urllib.request.urlopen(req,timeout=60) as r:
+                data=r.read()
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                names=[n for n in z.namelist() if not n.endswith('/')]
+                if len(names)!=1: raise RuntimeError(f'unexpected archive members: {url}')
+                return z.read(names[0]).decode('utf-8-sig').splitlines()
+        except Exception as e:
+            last=e
+            if attempt<2: time.sleep(0.5*(attempt+1))
+    raise last
 
 def ts_ms(v):
     x=int(float(v))
@@ -63,23 +71,30 @@ def dedupe(rows,key):
     d={x[key]:x for x in rows}
     return [d[k] for k in sorted(d)]
 
+def fetch_month(symbol,y,m):
+    ym=f'{y:04d}-{m:02d}'
+    mark_url=f'{BASE}/markPriceKlines/{symbol}/8h/{symbol}-8h-{ym}.zip'
+    fund_url=f'{BASE}/fundingRate/{symbol}/{symbol}-fundingRate-{ym}.zip'
+    try:
+        return ym,parse_marks(fetch_zip(mark_url)),parse_funding(fetch_zip(fund_url))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f'official archive missing {symbol} {ym}: HTTP {e.code}') from e
+
 payload={'source':'Binance Vision official public archive','start':START.isoformat(),'end':END.isoformat(),'assets':{}}
+month_list=list(months(START,END))
 for symbol in SYMBOLS:
     marks=[];funding=[]
-    for y,m in months(START,END):
-        ym=f'{y:04d}-{m:02d}'
-        mark_url=f'{BASE}/markPriceKlines/{symbol}/8h/{symbol}-8h-{ym}.zip'
-        fund_url=f'{BASE}/fundingRate/{symbol}/{symbol}-fundingRate-{ym}.zip'
-        print(f'{symbol} {ym}',flush=True)
-        try:
-            marks.extend(parse_marks(fetch_zip(mark_url)))
-            funding.extend(parse_funding(fetch_zip(fund_url)))
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f'official archive missing {symbol} {ym}: HTTP {e.code}') from e
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs={ex.submit(fetch_month,symbol,y,m):(y,m) for y,m in month_list}
+        for fut in as_completed(futs):
+            ym,mm,ff=fut.result()
+            print(f'{symbol} {ym}',flush=True)
+            marks.extend(mm);funding.extend(ff)
+    dm=dedupe(marks,'time');df=dedupe(funding,'fundingTime')
     payload['assets'][symbol[:-4]]={
-      'binanceMarks':dedupe(marks,'time'),
-      'binanceFunding':dedupe(funding,'fundingTime'),
-      'coverage':{'marks':len(dedupe(marks,'time')),'funding':len(dedupe(funding,'fundingTime'))}
+      'binanceMarks':dm,
+      'binanceFunding':df,
+      'coverage':{'marks':len(dm),'funding':len(df)}
     }
 
 with open(OUT,'w') as f:json.dump(payload,f,separators=(',',':'))
