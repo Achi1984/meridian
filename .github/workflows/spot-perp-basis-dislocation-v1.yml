@@ -1,0 +1,54 @@
+name: MERIDIAN Spot-Perp Basis Dislocation V1
+
+on:
+  push:
+    branches:
+      - research/spot-perp-basis-dislocation-v1-strategy
+    paths:
+      - "research/SPOT-PERP-BASIS-DISLOCATION-V1-FROZEN.md"
+      - "research/spot-perp-basis-dislocation-v1.js"
+      - "research/run-spot-perp-basis-dislocation-v1.mjs"
+      - "scripts/collect-spot-perp-basis-dislocation-v1.py"
+      - "test/spot-perp-basis-dislocation-v1.test.js"
+      - ".github/workflows/spot-perp-basis-dislocation-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spot-perp-basis-dislocation-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check frozen engine and runner
+        run: |
+          node --check research/spot-perp-basis-dislocation-v1.js
+          node --check research/run-spot-perp-basis-dislocation-v1.mjs
+      - name: Verify frozen strategy invariants
+        run: node --test test/spot-perp-basis-dislocation-v1.test.js
+      - name: Collect discovery-only official Binance Vision archives
+        env:
+          SPOT_PERP_BASIS_V1_START: "2024-06"
+          SPOT_PERP_BASIS_V1_END: "2025-08"
+        run: python3 scripts/collect-spot-perp-basis-dislocation-v1.py
+      - name: Run first frozen Basis Dislocation discovery
+        run: node research/run-spot-perp-basis-dislocation-v1.mjs
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-perp-basis-dislocation-v1
+          path: |
+            research/results/spot-perp-basis-dislocation-v1-summary.json
+            research/results/spot-perp-basis-dislocation-v1-full.json
+            research/results/spot-perp-basis-dislocation-v1.md
+          if-no-files-found: error
+          retention-days: 30
