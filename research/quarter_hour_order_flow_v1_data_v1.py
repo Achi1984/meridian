@@ -122,12 +122,10 @@ def parse_agg_row(row):
     return rec
 
 
-def validate_agg_csv(text,day):
+def validate_agg_rows(rows,day):
     target=datetime.strptime(day,"%Y-%m-%d").replace(tzinfo=timezone.utc)
     start_ms=int(target.timestamp()*1000)
     end_ms=start_ms+24*60*60*1000
-    reader=csv.reader(io.StringIO(text))
-    rows=iter(reader)
     count=0
     first=None
     last=None
@@ -159,6 +157,10 @@ def validate_agg_csv(text,day):
         "firstTimestamp":first.timestamp,
         "lastTimestamp":last.timestamp,
     }
+
+
+def validate_agg_csv(text,day):
+    return validate_agg_rows(csv.reader(io.StringIO(text)),day)
 
 
 def parse_funding_csv(text):
