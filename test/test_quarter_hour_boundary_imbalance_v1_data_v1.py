@@ -64,16 +64,42 @@ class QuarterHourDataV1ShardTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"invalid boolean"):
                 m.audit_aggtrades(p)
 
-    def test_aggtrades_rejects_nonmonotonic_trade_id(self):
+    def test_aggtrades_allows_equal_aggregate_id_when_underlying_trades_advance(self):
         start=m.MONTH_START_MS
         rows=[
             f"2,100,2,10,10,{start+1},true",
+            f"2,101,1,11,11,{start+2},false",
+            f"3,102,1,12,12,{start+15*60_000+1},true",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"agg.zip"
+            write_zip(p,"agg.csv",rows)
+            r=m.audit_aggtrades(p)
+        self.assertEqual(r["equalAggregateTradeIdEvents"],1)
+        self.assertTrue(r["coveragePass"])
+
+    def test_aggtrades_rejects_decreasing_aggregate_id(self):
+        start=m.MONTH_START_MS
+        rows=[
+            f"3,100,2,10,10,{start+1},true",
             f"2,101,1,11,11,{start+2},false",
         ]
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"agg.zip"
             write_zip(p,"agg.csv",rows)
-            with self.assertRaisesRegex(RuntimeError,"not strictly increasing"):
+            with self.assertRaisesRegex(RuntimeError,"aggregate trade id decreased"):
+                m.audit_aggtrades(p)
+
+    def test_aggtrades_rejects_overlapping_underlying_trade_ranges(self):
+        start=m.MONTH_START_MS
+        rows=[
+            f"2,100,2,10,11,{start+1},true",
+            f"3,101,1,11,12,{start+2},false",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"agg.zip"
+            write_zip(p,"agg.csv",rows)
+            with self.assertRaisesRegex(RuntimeError,"underlying trade id ranges overlap or do not advance"):
                 m.audit_aggtrades(p)
 
     def test_kline_requires_exact_one_minute_coverage(self):
