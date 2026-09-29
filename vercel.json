@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/asset-watch-relay.js": {
+      "maxDuration": 15
+    }
+  }
+}
