@@ -1,0 +1,36 @@
+name: MERIDIAN Funding Carry Risk-Budget V2 Data V1
+
+on:
+  push:
+    branches:
+      - research/funding-carry-risk-budget-v2-data-v1
+    paths:
+      - "research/FUNDING-CARRY-RISK-BUDGET-V2-DATA-V1-FROZEN.md"
+      - "scripts/audit-funding-carry-risk-budget-v2-data-v1.py"
+      - ".github/workflows/funding-carry-risk-budget-v2-data-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: funding-carry-risk-budget-v2-data-v1
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify audit syntax
+        run: python3 -m py_compile scripts/audit-funding-carry-risk-budget-v2-data-v1.py
+      - name: Run first frozen public-data coverage audit
+        run: python3 scripts/audit-funding-carry-risk-budget-v2-data-v1.py
+      - name: Upload untouched coverage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: funding-carry-risk-budget-v2-data-v1
+          path: research/results/funding-carry-risk-budget-v2-data-v1-coverage.json
+          if-no-files-found: error
+          retention-days: 30
