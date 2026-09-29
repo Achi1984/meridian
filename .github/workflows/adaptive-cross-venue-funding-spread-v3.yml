@@ -1,0 +1,47 @@
+name: MERIDIAN Adaptive Cross-Venue Funding Spread V3
+
+on:
+  push:
+    branches:
+      - research/adaptive-cross-venue-funding-spread-v3
+    paths:
+      - "research/ADAPTIVE-CROSS-VENUE-FUNDING-SPREAD-V3-FROZEN.md"
+      - "research/adaptive-cross-venue-funding-spread-v3.js"
+      - "research/run-adaptive-cross-venue-funding-spread-v3.mjs"
+      - "scripts/collect-adaptive-cross-venue-binance-v3.py"
+      - "test/adaptive-cross-venue-funding-spread-v3.test.js"
+      - ".github/workflows/adaptive-cross-venue-funding-spread-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adaptive-cross-venue-funding-spread-v3
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen Adaptive V3 invariants
+        run: node --test test/adaptive-cross-venue-funding-spread-v3.test.js
+      - name: Collect official Binance Vision V3 archives
+        run: python3 scripts/collect-adaptive-cross-venue-binance-v3.py
+      - name: Run first frozen Adaptive V3 discovery
+        run: node research/run-adaptive-cross-venue-funding-spread-v3.mjs
+      - name: Upload untouched Adaptive V3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-cross-venue-funding-spread-v3
+          path: |
+            research/results/adaptive-cross-venue-funding-spread-v3-summary.json
+            research/results/adaptive-cross-venue-funding-spread-v3-full.json
+            research/results/adaptive-cross-venue-funding-spread-v3.md
+          if-no-files-found: error
+          retention-days: 30
