@@ -224,6 +224,13 @@ Invalid required state data => stage data-integrity failure.
 
 ## Development metrics
 
+Frozen counting semantics:
+- an `exposure month` is any asset-month with a position open over a non-zero interval, including ENTER, HOLD and rule-driven EXIT months;
+- a `persistent hold month` is an exposure month that starts and ends active without a new entry or an exit;
+- every ENTER transition counts as one entry event;
+- every rule-driven EXIT and every final forced close counts as one exit event;
+- average holding streak length = total exposure months / entry events.
+
 Report:
 
 - 88 decision slots
