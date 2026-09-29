@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PROTOCOL_FROZEN_NO_PNL",
+  "phase": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_PRIMARY_VALIDATION_RUNNING",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "0f09cff201f1c97bba012305bff34889664a28c5",
+    "verifiedSha": "eda7161c7a160a99ed8f30db3bcd521da27c7d9a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -985,7 +985,7 @@
     255,
     256
   ],
-  "nextAction": "Merge the frozen PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 protocol, engine and synthetic invariants canonically before any real V3 strategy data are loaded. After green current-base CI and merge, create a separate PRIMARY_VALIDATION runner/collector that loads only the frozen 10 primary assets plus BTC/ETH/BNB/SOL/XRP for 2024-01..2026-08, runs the 2025-01-06..2026-08-31 primary stage exactly once, and freezes the result. Do not load the 9 transfer candidates unless PRIMARY_VALIDATION passes unchanged. No parameter grid, no retuning, no Paper/live promotion.",
+  "nextAction": "Run the frozen PERPETUAL-RELATIVE-VALUE-REVERSAL-V3 PRIMARY_VALIDATION exactly once using only the 10 frozen primary candidates plus BTC/ETH/BNB/SOL/XRP benchmark data for 2024-01..2026-08. Freeze the untouched result and gate decision. Do not load or calculate any of the 9 ASSET_TRANSFER_HOLDOUT candidates unless PRIMARY_VALIDATION passes unchanged. No parameter changes, no Paper/live promotion.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1022,7 +1022,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "MERGE_PROTOCOL_THEN_PRIMARY_VALIDATION_ONLY",
+    "nextStage": "V3_PRIMARY_VALIDATION_ONLY_TRANSFER_LOCKED",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1113,7 +1113,7 @@
     "reversalV2TransferAuthorized": false,
     "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
     "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
-    "reversalV3Stage": "PROTOCOL_ENGINE_INVARIANTS_FROZEN_BEFORE_FIRST_PNL",
+    "reversalV3Stage": "PRIMARY_VALIDATION_RUNNING_TRANSFER_UNLOADED",
     "reversalV3StrategyPnlAllowed": "ONLY_AFTER_PROTOCOL_MERGED_CANONICALLY",
     "reversalV2ProtocolIntegrity": "AMBIGUOUS_AT_FIRST_OBSERVED_RUN",
     "reversalV2PromotionGateStatus": "NOT_CLEAN_INDEPENDENT_GATE",
