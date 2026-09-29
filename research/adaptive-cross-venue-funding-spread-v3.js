@@ -17,6 +17,7 @@ export const ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3_CONFIG=Object.freeze({
     expectedDecisionSlots:88,
     minActiveCycles:32,
     minAssetsWithTwoActiveCycles:6,
+    minCyclesPerDirection:4,
     minProfitFactor:1.20,
     maxDrawdownPct:8,
     minPositiveWindows:4,
@@ -28,6 +29,7 @@ export const ADAPTIVE_CROSS_VENUE_FUNDING_SPREAD_V3_CONFIG=Object.freeze({
     expectedDecisionSlots:96,
     minActiveCycles:32,
     minAssetsWithTwoActiveCycles:6,
+    minCyclesPerDirection:4,
     minProfitFactor:1.15,
     maxDrawdownPct:8,
     minPositiveWindows:3,
@@ -200,6 +202,10 @@ function gateStage(result,gate,stage){
   if(result.activeCycles<gate.minActiveCycles)reasons.push('ACTIVE_CYCLES_LT_'+gate.minActiveCycles);
   const breadth=result.byAsset.filter(x=>x.activeCycles>=2).length;
   if(breadth<gate.minAssetsWithTwoActiveCycles)reasons.push('ACTIVE_ASSET_BREADTH_LT_'+gate.minAssetsWithTwoActiveCycles);
+  for(const dir of result.byDirection){
+    if(dir.cycles<gate.minCyclesPerDirection)reasons.push(dir.label+':CYCLES_LT_'+gate.minCyclesPerDirection);
+    if(!(dir.netPnl>0))reasons.push(dir.label+':PNL_NOT_POSITIVE');
+  }
   if(!(result.summary.totalReturnPct>0))reasons.push('RETURN_NOT_POSITIVE');
   if(!(result.summary.profitFactor>=gate.minProfitFactor))reasons.push('PF_LT_'+gate.minProfitFactor);
   if(!(result.summary.maxDrawdownPct<=gate.maxDrawdownPct))reasons.push('DD_GT_'+gate.maxDrawdownPct);
@@ -286,6 +292,13 @@ export function runAdaptiveCrossVenueFundingSpreadV3(dataset,{stage='DISCOVERY'}
       costs:sum(xs.map(x=>x.pnl.costsUsd))
     };
   });
+  const byDirection=[
+    {label:'LONG_BINANCE_SHORT_HYPERLIQUID',direction:1},
+    {label:'SHORT_BINANCE_LONG_HYPERLIQUID',direction:-1}
+  ].map(d=>{
+    const xs=cycles.filter(x=>x.direction===d.direction);
+    return{...d,cycles:xs.length,netPnl:sum(xs.map(x=>x.pnl.netUsd)),stressNetPnl:sum(xs.map(x=>x.pnl.stressNetUsd)),fundingPnl:sum(xs.map(x=>x.pnl.fundingUsd)),basisPnl:sum(xs.map(x=>x.pnl.basisUsd))};
+  });
   const positive=byAsset.filter(x=>x.netPnl>0),positiveTotal=sum(positive.map(x=>x.netPnl));
   const positiveConcentrationPct=positiveTotal>0?Math.max(...positive.map(x=>x.netPnl))/positiveTotal*100:0;
   const totalFundingPnl=sum(cycles.map(x=>x.pnl.fundingUsd));
@@ -312,7 +325,7 @@ export function runAdaptiveCrossVenueFundingSpreadV3(dataset,{stage='DISCOVERY'}
     hyperliquidLongCycles:cycles.filter(x=>x.direction===-1).length,
     dataIntegrityFailure,
     dataIntegrityErrors,
-    slots,cycles,periods,byAsset,
+    slots,cycles,periods,byAsset,byDirection,
     summary:{...summary,totalNetPnl:sum(cycles.map(x=>x.pnl.netUsd)),totalFundingPnl,totalBasisPnl:sum(cycles.map(x=>x.pnl.basisUsd)),totalCosts},
     stressSummary,
     positiveWindows:stability.positiveWindows,
