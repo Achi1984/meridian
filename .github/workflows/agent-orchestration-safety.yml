@@ -1,0 +1,36 @@
+name: MERIDIAN Agent Orchestration Safety
+
+on:
+  pull_request:
+    paths:
+      - "docs/AGENT_ORCHESTRATION.md"
+      - "MERIDIAN_AGENT_STATE.json"
+      - "MERIDIAN_RESUME.json"
+      - "scripts/validate-agent-orchestration.py"
+      - ".github/workflows/agent-orchestration-safety.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/AGENT_ORCHESTRATION.md"
+      - "MERIDIAN_AGENT_STATE.json"
+      - "MERIDIAN_RESUME.json"
+      - "scripts/validate-agent-orchestration.py"
+      - ".github/workflows/agent-orchestration-safety.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-orchestration-safety-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate orchestration contract and durable state
+        run: python3 scripts/validate-agent-orchestration.py

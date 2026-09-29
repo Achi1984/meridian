@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "protocolVersion": 1,
+  "protocolPath": "docs/AGENT_ORCHESTRATION.md",
+  "status": "READY",
+  "sourceOfTruth": "REPOSITORY_NOT_CHAT_STREAM",
+  "mergeOwner": "MAIN_AGENT",
+  "userCommunicationOwner": "MAIN_AGENT",
+  "singleWriter": true,
+  "concurrentMergeAllowed": false,
+  "maxReviewLoops": 3,
+  "requestedModelRouting": {
+    "mainAgent": "GPT-6-Astra",
+    "reviewer": "GPT-6-Sol",
+    "subagentMinimum": "GPT-6-Luna"
+  },
+  "runtimeCapabilityPolicy": {
+    "neverClaimUnavailableModelOrAgent": true,
+    "nativeSubagentMode": "USE_WHEN_RUNTIME_EXPOSES_AGENT_SPAWN",
+    "fallbackMode": "COMPAT_ROLE_ISOLATION",
+    "fallbackDisclosureRequired": true
+  },
+  "streamingGuard": {
+    "maxToolCallGroupsPerVisibleBurst": 3,
+    "checkpointBeforeLongOrIrreversibleStep": true,
+    "streamIsNeverSourceOfTruth": true,
+    "recoveryMode": "RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOMPLETE_DURABLE_STEP",
+    "repeatCompletedWritesAfterInterruption": false
+  },
+  "recoveryChecks": [
+    "LATEST_MAIN_SHA",
+    "MERIDIAN_RESUME",
+    "MERIDIAN_AGENT_STATE",
+    "RELATED_OPEN_PRS",
+    "RELATED_BRANCHES",
+    "BRANCH_VS_MAIN_COMPARE",
+    "CURRENT_CI"
+  ],
+  "lifecycle": [
+    "RECONCILE",
+    "PLAN",
+    "ASSIGN",
+    "EXECUTE",
+    "REVIEW",
+    "INTEGRATE",
+    "GATE",
+    "MERGE",
+    "CHECKPOINT",
+    "REPORT"
+  ],
+  "activeWorkPackage": null,
+  "lastCompletedWorkPackage": null,
+  "resultContract": [
+    "WORK_PACKAGE",
+    "STATUS",
+    "CANONICAL_MAIN_SHA",
+    "PR_MERGE",
+    "WHAT_CHANGED",
+    "REVIEWER_VERDICT",
+    "TESTS_GATES",
+    "NOT_CHANGED",
+    "RISKS_LIMITATIONS",
+    "NEXT_ACTION"
+  ],
+  "workPackageRequiredFields": [
+    "id",
+    "title",
+    "status",
+    "baseMainSha",
+    "orchestrationBranch",
+    "executionMode",
+    "riskClass",
+    "tasks",
+    "reviewStatus",
+    "createdAt",
+    "lastCheckpoint"
+  ],
+  "taskRequiredFields": [
+    "id",
+    "role",
+    "status",
+    "dependencies",
+    "allowedFiles",
+    "forbiddenFiles",
+    "acceptanceCriteria",
+    "reviewLoop",
+    "reviewVerdict"
+  ],
+  "parallelWritePolicy": {
+    "sameBranchConcurrentWritesAllowed": false,
+    "readOnlyParallelismAllowed": true,
+    "separateBranchParallelismAllowed": true,
+    "mergeSerialization": "MAIN_AGENT_ONLY_ONE_AT_A_TIME"
+  }
+}
