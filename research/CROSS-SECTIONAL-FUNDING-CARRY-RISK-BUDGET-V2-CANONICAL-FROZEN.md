@@ -186,7 +186,7 @@ No maker rebates, VIP discounts or fee-token assumptions.
 
 Report:
 - completed weekly periods
-- active weeks
+- active weeks (at least one final post-scale asset weight is non-zero)
 - flat-by-breadth weeks
 - flat-by-risk-data weeks
 - compounded net return
@@ -204,9 +204,9 @@ Report:
 - max positive-PnL concentration
 - turnover
 - 32 bps stress return
-- mean/median final gross exposure
-- mean risk scale
-- mean estimated pre-scale portfolio annualized volatility
+- mean/median final gross exposure across active weeks only
+- mean risk scale across active weeks only
+- mean estimated pre-scale portfolio annualized volatility across active weeks only
 
 ## Frozen validation gate
 
