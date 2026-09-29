@@ -139,7 +139,7 @@ The augmented model's basis coefficient `c` must be estimated only once from dis
 
 For each asset:
 
-- calculate discovery 20th and 80th percentiles of `ABS_LOG_BASIS`;
+- calculate discovery 20th and 80th percentiles of `ABS_LOG_BASIS` using nearest-rank: sorted value at `ceil(p × n) - 1`;
 - freeze those two cutoffs;
 - in holdout, define LOW as basis <= discovery q20;
 - define HIGH as basis >= discovery q80;
@@ -165,6 +165,8 @@ Per asset:
 - holdout HIGH mean forward RV
 - HIGH/LOW forward-RV ratio
 - Pearson correlation between holdout ABS_LOG_BASIS and FWD_RV24
+
+Pooled metrics are observation-weighted across all frozen assets; pooled MSE/MAE are calculated from the concatenated holdout prediction errors, and pooled HIGH/LOW means are calculated from the concatenated frozen-threshold HIGH/LOW observations.
 
 Pooled:
 - total discovery observations
