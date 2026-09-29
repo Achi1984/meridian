@@ -1,0 +1,50 @@
+name: MERIDIAN AdaptiveTrend Sharpe Proxy V1
+
+on:
+  push:
+    branches:
+      - research/adaptive-trend-sharpe-proxy-v1
+    paths:
+      - "research/ADAPTIVE-TREND-SHARPE-PROXY-V1-FROZEN.md"
+      - "research/adaptive-trend-sharpe-proxy-v1.js"
+      - "research/run-adaptive-trend-sharpe-proxy-v1.mjs"
+      - "scripts/collect-adaptive-trend-sharpe-proxy-v1.py"
+      - "test/adaptive-trend-sharpe-proxy-v1.test.js"
+      - ".github/workflows/adaptive-trend-sharpe-proxy-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adaptive-trend-sharpe-proxy-v1
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen engine syntax and invariants
+        run: |
+          node --check research/adaptive-trend-sharpe-proxy-v1.js
+          node --check research/run-adaptive-trend-sharpe-proxy-v1.mjs
+          node --test test/adaptive-trend-sharpe-proxy-v1.test.js
+      - name: Collect official Binance Vision 6h and funding archives
+        run: python3 scripts/collect-adaptive-trend-sharpe-proxy-v1.py
+      - name: Run first frozen discovery
+        run: node research/run-adaptive-trend-sharpe-proxy-v1.mjs
+      - name: Upload untouched discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-trend-sharpe-proxy-v1
+          path: |
+            research/results/adaptive-trend-sharpe-proxy-v1-summary.json
+            research/results/adaptive-trend-sharpe-proxy-v1-full.json
+            research/results/adaptive-trend-sharpe-proxy-v1.md
+          if-no-files-found: error
+          retention-days: 30
