@@ -71,3 +71,9 @@ Recovery PASS requires:
 A PASS authorizes only strategy preregistration.
 
 No Paper/live promotion is authorized.
+
+## Recovery transport retry
+
+Recovery run **36618476603** validated SOLUSDT/2025-07 successfully under the corrected source semantics, but artifact assembly failed because one wildcard artifact-download action returned only 99 of the 120 prior shard artifacts. No data-quality gate failed in that retry.
+
+The retry splits artifact retrieval into six fixed asset patterns of 20 monthly manifests each and requires exactly 120 original manifests before replacement and aggregation.
