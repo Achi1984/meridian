@@ -239,7 +239,7 @@ export function runSpotPerpFundingHarvestV2(dataset,{tradeMonths,stage='DEVELOPM
         baseNet=basisPnl-baseCost;
         stressNet=basisPnl-stressCost;
         state.position=null;
-        transition='EXIT'; L.exitEvents++;
+        transition='EXIT'; exposure=true; L.exitEvents++; L.exposureMonths++;
       }else{
         const currentFunding=auditFunding(d.funding,month,cfg);
         if(!currentFunding.valid){
@@ -279,6 +279,12 @@ export function runSpotPerpFundingHarvestV2(dataset,{tradeMonths,stage='DEVELOPM
     const target=slots.findLast(x=>x.asset===asset&&x.month===finalMonth&&x.valid);
     if(target){
       target.pnl.baseCost+=bc;target.pnl.stressCost+=sc;target.pnl.netUsd-=bc;target.pnl.stressNetUsd-=sc;target.terminalExit=true;
+      if(target.transition==='HOLD'){
+        target.transition='HOLD_FINAL_EXIT';
+        L.persistentHoldMonths=Math.max(0,L.persistentHoldMonths-1);
+      }else if(target.transition==='ENTER'){
+        target.transition='ENTER_FINAL_EXIT';
+      }
     }
     state.position=null;
   }
@@ -286,7 +292,7 @@ export function runSpotPerpFundingHarvestV2(dataset,{tradeMonths,stage='DEVELOPM
   const invalid=slots.filter(x=>!x.valid);
   const periods=tradeMonths.map(month=>{
     const xs=slots.filter(x=>x.month===month&&x.valid);
-    const capital=xs.length*cfg.capitalPerAsset;
+    const capital=cfg.monthlyPortfolioCapital;
     const net=sum(xs.map(x=>x.pnl?.netUsd||0));
     const stress=sum(xs.map(x=>x.pnl?.stressNetUsd||0));
     return{month,decisionSlots:xs.length,exposureMonths:xs.filter(x=>x.exposure).length,netUsd:net,stressNetUsd:stress,return:capital?net/capital:0,stressReturn:capital?stress/capital:0};
