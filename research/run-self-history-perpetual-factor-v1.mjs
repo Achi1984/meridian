@@ -95,7 +95,7 @@ const md=`# Self-History Perpetual Factor V1 — Discovery
 
 Generated: ${summary.generatedAt}
 
-Foundation: `PERPETUAL-FACTOR-DATA-V1`  
+Foundation: PERPETUAL-FACTOR-DATA-V1  
 Data: official Binance Vision USD-M 4h perpetual + 4h premium-index + funding archives.  
 Discovery boundary: 2023-01-01 through 2025-12-31 UTC; no weekly holding crosses into 2026.
 
