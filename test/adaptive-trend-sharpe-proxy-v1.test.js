@@ -79,3 +79,13 @@ test('missing funding fails closed for affected intervals',()=>{
   assert.ok(r.diagnostics.unavailableIntervals.DOGE>0);
   assert.equal(Number.isFinite(r.summary.totalReturnPct),true);
 });
+
+test('selector bar gaps are counted fail-closed before result',()=>{
+  const d=data(),gap=Date.UTC(2022,0,15,12);
+  d.DOGE.bars=d.DOGE.bars.filter(x=>x.openTime!==gap);
+  const r=runAdaptiveTrendSharpeProxyV1(d,cfg);
+  const feb=r.selection.find(x=>x.month==='2022-02');
+  assert.ok(feb);
+  assert.ok((feb.details.DOGE.longUnavailable||0)>0);
+  assert.ok((feb.details.DOGE.shortUnavailable||0)>0);
+});
