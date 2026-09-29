@@ -1,0 +1,34 @@
+name: MERIDIAN Perpetual Taker Order Flow V1 Data Foundation
+
+on:
+  push:
+    branches:
+      - research/perpetual-taker-order-flow-v1-data
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-V1-DATA-FROZEN.md"
+      - "scripts/audit-perpetual-taker-order-flow-v1-data.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-data.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perpetual-taker-order-flow-v1-data
+  cancel-in-progress: true
+
+jobs:
+  data-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frozen strategy-neutral Taker Order Flow data audit
+        run: python3 scripts/audit-perpetual-taker-order-flow-v1-data.py
+      - name: Upload untouched foundation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-taker-order-flow-v1-data
+          path: research/results/perpetual-taker-order-flow-v1-data.json
+          if-no-files-found: error
+          retention-days: 30
