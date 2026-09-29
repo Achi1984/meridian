@@ -126,3 +126,5 @@ test('fixed portfolio denominator does not scale up when only eight synthetic tr
   assert.equal(sep.return,sep.netUsd/160000);
   assert.ok(Math.abs(pnl-r.summary.totalNetPnl)<1e-9);
 });
+
+// CI retrigger after pre-PnL invariant fixes.
