@@ -1082,7 +1082,11 @@
       "reviewer": "GPT-6-Sol",
       "subagentMinimum": "GPT-6-Luna",
       "fallback": "STRONGEST_AVAILABLE_WITH_EXPLICIT_EXECUTION_MODE"
-    }
+    },
+    "orchestrationBootstrapStatus": "COMPLETE",
+    "orchestrationInstallationPr": 324,
+    "orchestrationInstallationMergeSha": "832f46471f12b26016e00c9ba0c06677a32427b4",
+    "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
     "selected": "PERPETUAL_TAKER_ORDER_FLOW_V1_STRATEGY_PREREGISTRATION",
