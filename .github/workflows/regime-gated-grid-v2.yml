@@ -1,0 +1,51 @@
+name: MERIDIAN Regime-Gated Grid V2
+
+on:
+  push:
+    branches:
+      - research/regime-gated-grid-v2
+    paths:
+      - "research/REGIME-GATED-GRID-V2-FROZEN.md"
+      - "research/regime-gated-grid-v2.js"
+      - "research/run-regime-gated-grid-v2.mjs"
+      - "research/dynamic-grid-proxy-v1.js"
+      - "research/grid-path-simulator-v1.js"
+      - "scripts/collect-regime-gated-grid-v2.py"
+      - "test/regime-gated-grid-v2.test.js"
+      - "test/dynamic-grid-proxy-v1.test.js"
+      - "test/grid-path-simulator-v1.test.js"
+      - ".github/workflows/regime-gated-grid-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regime-gated-grid-v2
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen Grid V2 invariants
+        run: node --test test/grid-path-simulator-v1.test.js test/dynamic-grid-proxy-v1.test.js test/regime-gated-grid-v2.test.js
+      - name: Collect official Binance Vision regime and minute data
+        run: python3 scripts/collect-regime-gated-grid-v2.py
+      - name: Run first frozen Regime-Gated Grid V2 discovery
+        run: node research/run-regime-gated-grid-v2.mjs
+      - name: Upload untouched V2 discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: regime-gated-grid-v2
+          path: |
+            research/results/regime-gated-grid-v2-summary.json
+            research/results/regime-gated-grid-v2-full.json
+            research/results/regime-gated-grid-v2.md
+          if-no-files-found: error
+          retention-days: 30
