@@ -1,0 +1,47 @@
+name: MERIDIAN Spot-Perp Funding Persistence V2
+
+on:
+  push:
+    branches:
+      - research/spot-perp-funding-persistence-v2
+    paths:
+      - "research/SPOT-PERP-FUNDING-PERSISTENCE-V2-FROZEN.md"
+      - "research/spot-perp-funding-persistence-v2.js"
+      - "research/run-spot-perp-funding-persistence-v2.mjs"
+      - "scripts/collect-spot-perp-funding-persistence-v2.py"
+      - "test/spot-perp-funding-persistence-v2.test.js"
+      - ".github/workflows/spot-perp-funding-persistence-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spot-perp-funding-persistence-v2
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen V2 state invariants
+        run: node --test test/spot-perp-funding-persistence-v2.test.js
+      - name: Collect independent official Binance Vision archives
+        run: python3 scripts/collect-spot-perp-funding-persistence-v2.py
+      - name: Run first frozen V2 independent validation
+        run: node research/run-spot-perp-funding-persistence-v2.mjs
+      - name: Upload untouched V2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-perp-funding-persistence-v2
+          path: |
+            research/results/spot-perp-funding-persistence-v2-summary.json
+            research/results/spot-perp-funding-persistence-v2-full.json
+            research/results/spot-perp-funding-persistence-v2.md
+          if-no-files-found: error
+          retention-days: 30
