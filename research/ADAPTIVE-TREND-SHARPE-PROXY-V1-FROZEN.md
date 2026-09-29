@@ -72,6 +72,13 @@ No synthetic history or interpolation.
 
 An asset is unavailable until it has all required lookback/ATR/selection history. Missing data fails closed for that asset/bar.
 
+Frozen data-integrity gates:
+- preceding-month selector sample must contain >= 100 completed 6h bars after the 24h buffer;
+- consecutive required 6h bars may not be separated by more than 7 hours;
+- while a position is active, consecutive funding settlements may not be separated by more than 12 hours;
+- an evaluation interval with a missing current/next bar or invalid OHLC is unavailable and must not be synthetically filled;
+- selector or portfolio intervals failing these gates remain flat for that asset and are counted in diagnostics.
+
 ## Frozen signal parameters
 
 Timeframe: 6h
