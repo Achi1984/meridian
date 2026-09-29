@@ -35,6 +35,7 @@ jobs:
           node --check scripts/read-token-auth.mjs
           node --check scripts/start-gateway.mjs
           node --check scripts/runtime-smoke.mjs
+          node --check scripts/frozen-research-guard.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
@@ -49,6 +50,8 @@ jobs:
           node --check research/sk-research-v2.js
           node --check research/documented-edge-v1.js
           node --check research/tsmom-holdout-v1.js
+      - name: Frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
       - name: Research and auth regression tests
         run: node --test test/*.test.js
       - name: Release authority consistency
