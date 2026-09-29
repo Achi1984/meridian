@@ -1,0 +1,44 @@
+name: MERIDIAN Funding Carry Risk-Budget V2
+
+on:
+  push:
+    branches:
+      - research/cross-sectional-funding-carry-risk-budget-v2
+    paths:
+      - "research/CROSS-SECTIONAL-FUNDING-CARRY-RISK-BUDGET-V2-FROZEN.md"
+      - "research/cross_sectional_funding_carry_risk_budget_v2.py"
+      - "research/run-cross-sectional-funding-carry-risk-budget-v2.py"
+      - "scripts/collect-cross-sectional-funding-carry-risk-budget-v2.py"
+      - "test/test_cross_sectional_funding_carry_risk_budget_v2.py"
+      - ".github/workflows/cross-sectional-funding-carry-risk-budget-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-sectional-funding-carry-risk-budget-v2
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify frozen V2 invariants
+        run: python3 test/test_cross_sectional_funding_carry_risk_budget_v2.py
+      - name: Collect official Binance Vision archives
+        run: python3 scripts/collect-cross-sectional-funding-carry-risk-budget-v2.py
+      - name: Run first frozen V2 validation
+        run: python3 research/run-cross-sectional-funding-carry-risk-budget-v2.py
+      - name: Upload untouched V2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-sectional-funding-carry-risk-budget-v2
+          path: |
+            research/results/cross-sectional-funding-carry-risk-budget-v2-summary.json
+            research/results/cross-sectional-funding-carry-risk-budget-v2-full.json
+            research/results/cross-sectional-funding-carry-risk-budget-v2.md
+          if-no-files-found: error
+          retention-days: 30
