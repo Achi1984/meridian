@@ -4,7 +4,7 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V2_HIGH_VOL_FROZEN_NEXT_ENGINE_AND_INDEPENDENT_VALIDATION",
+  "phase": "PERPETUAL_REVERSAL_V2_HIGH_VOL_FROZEN_NEXT_VALIDATION_HARNESS",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -870,7 +870,7 @@
     255,
     256
   ],
-  "nextAction": "Implement the frozen PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-HIGH-VOL engine and invariant tests exactly as preregistered, without loading 2025-2026 strategy PnL until the protocol commit is canonical. Then collect only official Binance Vision USD-M 1d klines and funding for the fixed 23-asset universe, run the untouched 2025-01-06..2026-08-31 independent validation once, and freeze the result. No parameter grid, no post-result retuning, no transfer data unless the independent gate passes, no Paper/live promotion.",
+  "nextAction": "After the frozen HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2 protocol, engine and invariants are merged canonically, add a collector/runner and CI workflow using only official Binance Vision USD-M 1d klines and funding for the fixed 23-asset universe. Then run the untouched 2025-01-06..2026-08-31 independent validation exactly once and freeze the result. No parameter grid, no post-result retuning, no transfer data unless the independent gate passes, and no Paper/live promotion.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -907,7 +907,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "V2_ENGINE_AND_INDEPENDENT_VALIDATION_AFTER_CANONICAL_PROTOCOL",
+    "nextStage": "V2_VALIDATION_HARNESS_AFTER_CANONICAL_PROTOCOL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -988,9 +988,11 @@
     "reversalV2StrategyPnlAllowed": "ONLY_AFTER_NEW_PROTOCOL_AND_INVARIANTS_FROZEN",
     "reversalV2TransferRequiredBeforePaper": true,
     "reversalV2Status": "FROZEN_BEFORE_FIRST_PNL",
-    "reversalV2ChangeFromV1": "EXCLUDE_LOWEST_VOLATILITY_TERCILE_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
-    "reversalV2ExpectedPrefilterEligible": 23,
-    "reversalV2ExpectedRetained": 16,
-    "reversalV2ExpectedSideCount": 3
+    "reversalV2ChangeFromV1": "UPPER_HALF_CROSS_SECTIONAL_VOLATILITY_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
+    "reversalV2Ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
+    "reversalV2MinPrefilterEligible": 15,
+    "reversalV2HighVolRule": "CEIL_N_OVER_2_UPPER_VOLATILITY_HALF",
+    "reversalV2ExpectedAll23Retained": 12,
+    "reversalV2ExpectedAll23SideCount": 2
   }
 }
