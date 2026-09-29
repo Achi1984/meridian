@@ -27,7 +27,6 @@ function claimsReason(p,nowSec){
   if(String(p?.repository_id||'')!==REPOSITORY_ID)return 'claim_repository_id';
   if(String(p?.ref||'')!==REF)return 'claim_ref';
   if(String(p?.workflow_ref||'')!==WORKFLOW_REF)return 'claim_workflow_ref';
-  if(!String(p?.sub||'').startsWith('repo:Achi1984/meridian:'))return 'claim_sub';
   if(!ALLOWED_EVENTS.has(String(p?.event_name||'')))return 'claim_event_name';
   if(String(p?.runner_environment||'')!=='github-hosted')return 'claim_runner_environment';
   const exp=Number(p?.exp),nbf=Number(p?.nbf),iat=Number(p?.iat);
