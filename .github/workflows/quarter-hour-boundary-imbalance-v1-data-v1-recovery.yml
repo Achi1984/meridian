@@ -28,59 +28,13 @@ jobs:
       - name: Re-run frozen parser invariants
         run: python3 test/test_quarter_hour_boundary_imbalance_v1_data_v1.py
 
-      - name: Download original BTCUSDT shard manifests
+      - name: Download frozen original aggregate evidence
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: 36613725640
-          pattern: qh-v1-shard-BTCUSDT-*
-          path: research/results/qh-v1-original/BTCUSDT
-          merge-multiple: true
-
-      - name: Download original ETHUSDT shard manifests
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 36613725640
-          pattern: qh-v1-shard-ETHUSDT-*
-          path: research/results/qh-v1-original/ETHUSDT
-          merge-multiple: true
-
-      - name: Download original XRPUSDT shard manifests
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 36613725640
-          pattern: qh-v1-shard-XRPUSDT-*
-          path: research/results/qh-v1-original/XRPUSDT
-          merge-multiple: true
-
-      - name: Download original SOLUSDT shard manifests
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 36613725640
-          pattern: qh-v1-shard-SOLUSDT-*
-          path: research/results/qh-v1-original/SOLUSDT
-          merge-multiple: true
-
-      - name: Download original DOGEUSDT shard manifests
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 36613725640
-          pattern: qh-v1-shard-DOGEUSDT-*
-          path: research/results/qh-v1-original/DOGEUSDT
-          merge-multiple: true
-
-      - name: Download original ADAUSDT shard manifests
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          run-id: 36613725640
-          pattern: qh-v1-shard-ADAUSDT-*
-          path: research/results/qh-v1-original/ADAUSDT
-          merge-multiple: true
+          name: quarter-hour-boundary-imbalance-v1-data-v1
+          path: research/results/qh-v1-original-summary
 
       - name: Re-validate only SOLUSDT 2025-07 under corrected source semantics
         env:
@@ -89,22 +43,12 @@ jobs:
           QH_OUTPUT_DIR: research/results/qh-v1-corrected
         run: python3 scripts/audit-quarter-hour-boundary-imbalance-v1-data-v1-shard.py
 
-      - name: Assemble recovered 120-shard manifest set
-        run: |
-          mkdir -p research/results/qh-v1-recovered
-          original_count="$(find research/results/qh-v1-original -type f -name '*.json' | wc -l)"
-          echo "Original manifest count: $original_count"
-          test "$original_count" -eq 120
-          find research/results/qh-v1-original -type f -name '*.json' -exec cp {} research/results/qh-v1-recovered/ \;
-          cp research/results/qh-v1-corrected/SOLUSDT-2025-07.json research/results/qh-v1-recovered/SOLUSDT-2025-07.json
-          count="$(find research/results/qh-v1-recovered -maxdepth 1 -name '*.json' | wc -l)"
-          echo "Recovered manifest count: $count"
-          test "$count" -eq 120
-
-      - name: Require recovered 120/120 green shards
+      - name: Recover final Data V1 gate from frozen aggregate plus corrected SOL
         env:
-          QH_V1_SHARD_RESULTS_DIR: research/results/qh-v1-recovered
-        run: python3 scripts/aggregate-quarter-hour-boundary-imbalance-v1-data-v1.py
+          QH_V1_ORIGINAL_SUMMARY: research/results/qh-v1-original-summary/quarter-hour-boundary-imbalance-v1-data-v1-summary.json
+          QH_V1_CORRECTED_SOL: research/results/qh-v1-corrected/SOLUSDT-2025-07.json
+          QH_V1_RECOVERY_OUT: research/results
+        run: python3 scripts/recover-quarter-hour-boundary-imbalance-v1-data-v1.py
 
       - name: Upload recovered Data V1 evidence
         if: always()
@@ -113,5 +57,5 @@ jobs:
           name: quarter-hour-boundary-imbalance-v1-data-v1-recovery
           path: |
             research/results/qh-v1-corrected/SOLUSDT-2025-07.json
-            research/results/quarter-hour-boundary-imbalance-v1-data-v1-summary.json
+            research/results/quarter-hour-boundary-imbalance-v1-data-v1-recovered-summary.json
           if-no-files-found: warn
