@@ -1,0 +1,67 @@
+name: MERIDIAN Asset Watch Mirror
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/asset-watch-mirror.yml'
+      - 'github-actions-oidc.js'
+      - 'asset-watch-mirror-crypto.js'
+      - 'asset-watch-bridge.js'
+      - 'server-gateway.js'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: meridian-asset-watch-mirror
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=meridian-asset-watch")"
+          TOKEN="$(printf '%s' "$RESPONSE" | jq -r '.value')"
+          test -n "$TOKEN"
+          test "$TOKEN" != "null"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch encrypted Asset Watch snapshot
+        shell: bash
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          MERIDIAN_BASE_URL: https://p01--achi-meridian--ttvk44grdlp7.code.run
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --max-time 20 \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            "$MERIDIAN_BASE_URL/api/private/asset-watch/github-oidc-mirror" \
+            -o asset-watch-mirror.json
+          node -e '
+            const fs=require("fs");
+            const x=JSON.parse(fs.readFileSync("asset-watch-mirror.json","utf8"));
+            if(x.schemaVersion!=="MERIDIAN-ASSET-WATCH-MIRROR-V1"||x.alg!=="A256GCM"||!x.iv||!x.tag||!x.ciphertext) process.exit(1);
+          '
+
+      - name: Upload encrypted Asset Watch artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-asset-watch-${{ github.run_id }}
+          path: asset-watch-mirror.json
+          retention-days: 2
+          if-no-files-found: error
