@@ -97,5 +97,14 @@
   "failDecision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
   "transferRequiredBeforePaper": true,
   "paperAuthorized": false,
-  "liveAuthorized": false
+  "liveAuthorized": false,
+  "provenance": {
+    "firstObservedRunId": 36602801293,
+    "firstObservedCommit": "920d5d6667822297641d63517fb913b3e93a4508",
+    "protocolConflictAtFirstObservedRun": true,
+    "executedRule": "ceil(N/2)_upper_volatility_half",
+    "canonicalization": "upper-half selected before inspecting PnL, based on simpler preregistration and engine/test alignment",
+    "cleanIndependentPromotionGate": false,
+    "parameterRetuningAfterObservedPnl": false
+  }
 }

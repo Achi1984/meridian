@@ -20,7 +20,11 @@ V1 produced positive net and stress returns and a positive next-week loser-minus
 
 V1 remains immutable and its temporal holdout was never loaded.
 
-External evidence fixed before V2 PnL:\n- Kiefer & Nowotny (2026), *Reversal in Cryptocurrency Returns*: intermediate-horizon crypto reversal is reported as stronger among higher-volatility assets and outside mega-caps.\n- Zaremba et al. (2021), *Up or down? Short-term reversal, momentum, and liquidity effects in cryptocurrency markets*: crypto reversal/momentum behavior varies with liquidity and the largest, most tradeable coins behave differently.\n\nV2 tests only the predeclared high-volatility conditioning change.
+External evidence fixed before V2 PnL:
+- Kiefer & Nowotny (2026), *Reversal in Cryptocurrency Returns*: intermediate-horizon crypto reversal is reported as stronger among higher-volatility assets and outside mega-caps.
+- Zaremba et al. (2021), *Up or down? Short-term reversal, momentum, and liquidity effects in cryptocurrency markets*: crypto reversal/momentum behavior varies with liquidity and the largest, most tradeable coins behave differently.
+
+V2 tests only the predeclared high-volatility conditioning change.
 
 V2 does **not** claim exact replication of the external paper because MERIDIAN uses Binance USD-M perpetuals, realized funding and explicit retail-style transaction costs.
 
@@ -292,3 +296,14 @@ A PASS does **not** authorize Paper shadow. It authorizes only a separately froz
 ## Safety
 
 Research only. No exchange credentials, live orders, leverage automation, liquidation model, wallet mutation or automatic promotion.
+
+
+## Audit provenance note
+
+This note is non-parametric and was added after the first observed workflow run.
+
+At GitHub Actions run **36602801293** (commit `920d5d6667822297641d63517fb913b3e93a4508`), the executed engine, tests, runner and primary frozen protocol used the **upper-half volatility** rule. However, the branch simultaneously contained a contradictory duplicate protocol describing a lower-tercile exclusion, and the PR description also referenced that alternate rule.
+
+The duplicate was removed and the upper-half rule was selected as canonical before the PnL output was inspected, based on simpler preregistration and direct alignment with the already-written engine/tests. Because repository-level preregistration was nevertheless ambiguous at the instant of the first observed run, the result is retained as seen research evidence but **does not qualify as a clean independent promotion gate**.
+
+No V2 parameter is changed by this note. Any successor requires a new ruleset and fresh independent evidence.
