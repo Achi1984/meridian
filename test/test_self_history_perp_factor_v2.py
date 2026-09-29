@@ -52,8 +52,8 @@ class SelfHistoryV2Tests(unittest.TestCase):
         self.assertEqual(own_history_weights({'A':.9,'B':.1},False),{})
 
     def test_funding_cashflow_sign_rewards_short_when_funding_positive(self):
-        n=60
-        d=AssetData('X',bars(n),premium(n),funding(30,rate=.001))
+        n=100
+        d=AssetData('X',bars(n),premium(n),funding(60,rate=.001))
         t=7*24*60*60*1000
         end=t+7*24*60*60*1000
         long=evaluate_book({'X':d},{'X':.5},{},t,0)
