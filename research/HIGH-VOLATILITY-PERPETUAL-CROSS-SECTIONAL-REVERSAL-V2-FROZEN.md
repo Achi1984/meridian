@@ -20,7 +20,7 @@ V1 produced positive net and stress returns and a positive next-week loser-minus
 
 V1 remains immutable and its temporal holdout was never loaded.
 
-External 2026 evidence reports that intermediate-horizon crypto reversal is materially stronger among higher-volatility assets and outside mega-caps. V2 tests that single change only.
+External evidence fixed before V2 PnL:\n- Kiefer & Nowotny (2026), *Reversal in Cryptocurrency Returns*: intermediate-horizon crypto reversal is reported as stronger among higher-volatility assets and outside mega-caps.\n- Zaremba et al. (2021), *Up or down? Short-term reversal, momentum, and liquidity effects in cryptocurrency markets*: crypto reversal/momentum behavior varies with liquidity and the largest, most tradeable coins behave differently.\n\nV2 tests only the predeclared high-volatility conditioning change.
 
 V2 does **not** claim exact replication of the external paper because MERIDIAN uses Binance USD-M perpetuals, realized funding and explicit retail-style transaction costs.
 
