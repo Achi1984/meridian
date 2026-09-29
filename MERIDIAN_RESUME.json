@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "FUNDING_CARRY_RISK_BUDGET_V2_FAIL_NEXT_CROSS_VENUE_V2_DATA_FOUNDATION",
+  "phase": "CROSS_VENUE_V2_FOUNDATION_PASS_NEXT_STRATEGY_VALIDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "52707494c4cda3d6837a5ddbbba01f697b33657b",
+    "verifiedSha": "f8534ec60db14df07af147ca8c0247ed11e9be95",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -375,6 +375,37 @@
       "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
       "promoted": false,
       "immutable": true
+    },
+    "crossVenueFundingSpreadV2DataV1": {
+      "ruleset": "CROSS-VENUE-FUNDING-SPREAD-V2-DATA-V1-FROZEN",
+      "interval": "2024-09..2026-08",
+      "candidateUniverse": [
+        "BNB",
+        "ADA",
+        "DOT",
+        "LTC",
+        "BCH",
+        "TRX",
+        "ETC",
+        "XLM"
+      ],
+      "qualifiedAssets": [
+        "BNB",
+        "ADA",
+        "DOT",
+        "LTC",
+        "BCH",
+        "TRX",
+        "ETC"
+      ],
+      "failedAssets": {
+        "XLM": "HYPERLIQUID_2024_09_FUNDING_ANCHOR_EMPTY"
+      },
+      "qualifiedCount": 7,
+      "unexpectedTransportErrors": 0,
+      "decision": "FOUNDATION_PASS",
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -388,7 +419,7 @@
     255,
     256
   ],
-  "nextAction": "Build a strategy-neutral Cross-Venue Funding Spread V2 data foundation on a frozen previously unused cross-venue candidate universe BNB/ADA/DOT/LTC/BCH/TRX/ETC/XLM. Audit Binance USD-M and Hyperliquid public funding/mark data through 2026-08 with no PnL, no synthetic backfill and no asset substitution based on performance. Preserve Cross-Venue Funding Spread V1 as immutable. Only after the data foundation passes may a separately frozen V2 strategy protocol be written. Keep executionImpact=false.",
+  "nextAction": "Freeze Cross-Venue Funding Spread V2 on the objectively data-qualified universe BNB/ADA/DOT/LTC/BCH/TRX/ETC before any PnL. Preserve V1 direction LONG Binance USD-M perpetual / SHORT Hyperliquid perpetual, monthly static holding model, funding/basis decomposition, 5 bps fee + 3 bps slippage per fill and +5 bps/fill stress. Use only the frozen 2024-09..2026-08 interval. XLM remains excluded solely by the preregistered data gate and is not replaced. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -398,7 +429,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "CROSS_VENUE_FUNDING_SPREAD_V2_DATA_FOUNDATION",
+    "selected": "CROSS_VENUE_FUNDING_SPREAD_V2",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -425,10 +456,21 @@
       "ETC",
       "XLM"
     ],
-    "nextStage": "DATA_FOUNDATION_BEFORE_STRATEGY",
+    "nextStage": "INDEPENDENT_STRATEGY_VALIDATION",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
-    "crossVenueV1Status": "AGGREGATE_POSITIVE_HOLDOUT_BUT_ASSET_GATE_FAIL"
+    "crossVenueV1Status": "AGGREGATE_POSITIVE_HOLDOUT_BUT_ASSET_GATE_FAIL",
+    "crossVenueV2FoundationStatus": "FOUNDATION_PASS_7_OF_8",
+    "crossVenueV2QualifiedAssets": [
+      "BNB",
+      "ADA",
+      "DOT",
+      "LTC",
+      "BCH",
+      "TRX",
+      "ETC"
+    ],
+    "crossVenueV2Window": "2024-09..2026-08"
   }
 }
