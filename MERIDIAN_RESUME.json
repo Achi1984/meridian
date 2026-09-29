@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "CROSS_SECTIONAL_V1_TEMPORAL_FAIL_NEXT_FUNDING_ONLY_TRANSFER",
+  "phase": "FUNDING_CARRY_V1_RISK_FAIL_NEXT_V2_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "5c92bff1b8acd0fdbcaf29afa35aa6d16517ebb2",
+    "verifiedSha": "c3e3967aad7dcfa84fe4c4f1fe291f193fcd4c98",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -273,6 +273,36 @@
       "transferAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "crossSectionalFundingCarryV1": {
+      "ruleset": "CROSS-SECTIONAL-FUNDING-CARRY-V1-FROZEN",
+      "stage": "TRANSFER_VALIDATION",
+      "universe": [
+        "LTC",
+        "BCH",
+        "AVAX",
+        "HBAR"
+      ],
+      "window": "2023-04-03..2026-08-31",
+      "periods": 178,
+      "activeWeeks": 178,
+      "netReturnPct": 158.2032,
+      "priceOnlyReturnPct": 117.7803,
+      "fundingContributionPct": 16.9481,
+      "profitFactor": 1.4539,
+      "sharpe": 0.858,
+      "maxDrawdownPct": 48.8631,
+      "positiveWindows": "4/5",
+      "stressReturnPct": 76.6383,
+      "positiveAssets": "3/4",
+      "positiveConcentrationPct": 61.3435,
+      "gateReasons": [
+        "DD_GT_25.0",
+        "POSITIVE_CONCENTRATION_GT_50.0"
+      ],
+      "decision": "TRANSFER_VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -286,7 +316,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a separately named Cross-Sectional Funding Carry V1 before any new result. Preserve the exact FUNDING_CARRY_7D raw factor, sparse-input handling, weekly cross-sectional ranking, 50/50 dollar-neutral construction, 8 bps turnover cost and 32 bps stress from Cross-Sectional Perpetual Factor V1. Treat both the 2023-04..2024-12 +9.47% factor-book development result and the 2025-01..2026-08 +23.92% temporal factor-book result as seen hypothesis-generation evidence only. The first gating evaluation must use only the reserved LTC/BCH/AVAX/HBAR transfer universe with no parameter tuning or asset substitution. Keep executionImpact=false.",
+  "nextAction": "Build a strategy-neutral coverage foundation for a new Cross-Sectional Funding Carry Risk-Budget V2 on the previously unused fixed universe TRX/ETC/XLM/ATOM/UNI/AAVE/FIL/NEAR. Freeze the universe before coverage inspection. Audit official Binance Vision USD-M 4h klines and fundingRate through 2026-08 with no synthetic backfill. If the foundation passes, preregister V2 with the exact Funding Carry 7d factor/direction/cost model, top-2/bottom-2 diversification, and an ex-ante volatility risk budget before any strategy result. Do not retune V1, reuse LTC/BCH/AVAX/HBAR as independent validation, or relax the V1 drawdown/concentration gates. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -296,7 +326,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "CROSS_SECTIONAL_FUNDING_CARRY_V1",
+    "selected": "CROSS_SECTIONAL_FUNDING_CARRY_RISK_BUDGET_V2",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -311,6 +341,18 @@
       "developmentNetReturnPct": 9.4729,
       "temporalNetReturnPct": 23.9214,
       "status": "SEEN_HYPOTHESIS_GENERATION_ONLY"
-    }
+    },
+    "fundingCarryV1Status": "IMMUTABLE_RISK_CONCENTRATION_FAIL",
+    "nextUniverse": [
+      "TRX",
+      "ETC",
+      "XLM",
+      "ATOM",
+      "UNI",
+      "AAVE",
+      "FIL",
+      "NEAR"
+    ],
+    "nextStage": "DATA_FOUNDATION_BEFORE_STRATEGY"
   }
 }
