@@ -1,0 +1,124 @@
+# MERIDIAN Paper-Bot Deep Audit — current-main r68 — 2026-09-29
+
+Status: **CURRENT-MAIN ARCHITECTURE / RESEARCH-GOVERNANCE AUDIT**  
+Base: `aec6bd58fd75c0979672e4f88c020cba4208e9fd`  
+Terminal identity: `10.0-r68`  
+Execution impact: **false**  
+Paper-bot parameters changed: **false**  
+Runtime performance snapshot claimed: **false**
+
+## Why the earlier #334 audit is superseded
+
+#334 was prepared from an older repository state. Current `main` now declares the production PWA entry as `./v10/?build=r68&fresh=r68` and the terminal identity as `10.0-r68`.
+
+The legacy file `app-v8.0-paper-summary.js` still exists and still contains the old hard-coded BASELINE / SHADOW / CHALLENGER V2 / REGIME comparison plus UI-owned WATCH/WATCH+ heuristics. It is also still named in the legacy `app-v6.06.js` bootstrap graph.
+
+That is **legacy technical debt**, but it is not sufficient evidence that the active v10 terminal is presenting that comparison. The active production manifest points to v10, whose adapter imports the current research modules directly.
+
+Therefore the old #334 severity statement must not be carried forward as an active-v10 UI defect without runtime evidence.
+
+## Canonical research control plane
+
+Current `MERIDIAN_RESUME.json` is the durable research index. It explicitly states that only merged `main` plus current-base green CI is canonical and that unmerged research branches are evidence, not authority.
+
+The current Paper Bot Profit Special Agent V1 is frozen in:
+- `research/PAPERBOT-PROFIT-SPECIAL-AGENT-V1.md`
+- `research/paperbot-profit-special-agent-v1.js`
+- v10 Lab integration in `v10/v10.js`
+
+Its objective is net research profit **after** hard risk, cost, breadth and concentration gates. It has:
+- research-only status;
+- no auto-promotion;
+- no live order path;
+- no martingale or pyramiding;
+- max research leverage 2x;
+- explicit 8 bps turnover cost in the frozen V1 candidates.
+
+## Current profit-research outcomes
+
+Canonical state already records:
+- **V1:** no candidate passes the frozen profit gate;
+- **V2 UP-UP risk-managed momentum proxy:** +7.22% net return, PF 1.129, max DD 43.81%, 2/5 positive windows -> immutable `V2_DISCOVERY_FAIL`;
+- **Funding Carry V1/V2:** no new entries; V2 retired on the repeatability sample gate;
+- **Cross-Venue Funding Spread V1:** discovery passed, transfer holdout failed the frozen asset-level gate; no promotion;
+- **Adaptive Trend Sharpe Proxy V1:** discovery fail;
+- **Dynamic Grid Proxy V1:** discovery fail;
+- **Regime-Gated Grid V2:** discovery fail;
+- other listed successor research remains fail-closed / not promoted unless separately recorded as canonical.
+
+These outcomes are research evidence, not a ranking of currently running Paper bots.
+
+## R32 lifecycle remains a separate canonical mechanism
+
+`paper-learning-policy.js` still freezes `R32-PAPER-LEARNING-V1` with:
+- first checkpoint: 20 closed trades;
+- retirement decision from 30 closed trades;
+- final checkpoint: 50 closed trades;
+- weak PF: 0.90;
+- promising PF: 1.10 plus positive expectancy;
+- researchOnly=true;
+- livePromotion=false.
+
+The presence of R32 must not be confused with the separate r68 historical Profit Special Agent research gate. They answer different questions and must not silently share thresholds.
+
+## Observer / V4 / funding lineage
+
+The current repository still contains:
+- read-only `bot-observer.js`;
+- paired `CHALLENGER V4 EXIT SHADOW` with independent ledger and no auto-promotion;
+- Funding Carry V2 with `NEW_ENTRIES_ALLOWED=false`;
+- archived Shadow/Regime lifecycle data.
+
+These remain valid research/telemetry components, but none authorizes a live promotion.
+
+## Critical audit findings
+
+### A1 — No current-runtime performance claim is justified from GitHub alone
+
+GitHub contains the rules, historical research evidence and lifecycle code, but not a guaranteed fresh runtime ledger snapshot.
+
+Therefore:
+- do not invent current PF, win rate, PnL or drawdown;
+- do not name a currently running bot “best” from repo state alone;
+- a quantitative current-runtime bot comparison requires a timestamped authoritative runtime snapshot with provenance.
+
+Severity: **HIGH for decision quality, zero execution impact**.
+
+### A2 — Legacy v8 Paper scoring remains in the repository
+
+The old `app-v8.0-paper-summary.js` still contains a second heuristic:
+- WATCH+ near trades >= 20, positive PnL, PF >= 1.05 and DD <= 10%;
+- hard-coded old bot names.
+
+Because production currently starts at v10, this is not treated as an active-terminal defect. It is nevertheless dangerous legacy logic if the legacy bootstrap is ever restored or exposed.
+
+Required action:
+- mark the legacy scorer explicitly deprecated / non-authoritative;
+- keep active v10 research decisions bound to canonical research modules and durable result evidence.
+
+No trading threshold should be changed as part of that cleanup.
+
+### A3 — Profit research has correctly failed closed so far
+
+Several research lanes show attractive isolated metrics but fail a frozen risk, breadth, stability or transfer gate. The correct response is not threshold relaxation.
+
+The current Quarter-Hour source-quality work is therefore an appropriate independent lane: it must complete data-quality gating before any directional signal, return or PnL is evaluated.
+
+### A4 — Historical research results and runtime Paper bots must remain separate in UI language
+
+The v10 Lab can execute historical research modules. Observer/R32 components describe live Paper research state. Those must not be visually collapsed into one “bot leaderboard” because their sample definitions, costs and lifecycle semantics differ.
+
+## Safe next package
+
+1. Finish the current Quarter-Hour data-source gate without exposing strategy PnL.
+2. Keep the r68 profit-research outcomes immutable; do not rescue failed candidates by changing frozen gates.
+3. Add a read-only runtime snapshot/export only if a current Paper-bot performance comparison is required.
+4. Deprecate the legacy v8 WATCH/WATCH+ scorer without changing R32, Paper-bot parameters or execution.
+5. Keep historical research panels explicitly labeled HISTORICAL / DISCOVERY / HOLDOUT and runtime Paper panels explicitly labeled RUNTIME / FORWARD.
+6. Any future profit candidate must enter under a separately frozen protocol before results are viewed.
+
+## Review conclusion
+
+Current-main review does **not** support merging the old #334 audit as authoritative. The active repository has advanced to v10 r68 and its research governance is materially more mature than the earlier document assumed.
+
+No execution, Paper-bot parameter, leverage, risk-threshold or live-order change is authorized by this audit.
