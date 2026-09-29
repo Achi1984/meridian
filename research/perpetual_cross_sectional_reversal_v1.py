@@ -76,8 +76,12 @@ def weekly_anchors(start,end):
 
 def funding_coverage(times,start,end):
     if not times:return False
-    pts=[start]+times+[end]
-    return all(0 < pts[i]-pts[i-1] <= FUND_MAX_GAP for i in range(1,len(pts)))
+    if times[0]-start<0 or times[0]-start>FUND_MAX_GAP:return False
+    for i in range(1,len(times)):
+        gap=times[i]-times[i-1]
+        if gap<=0 or gap>FUND_MAX_GAP:return False
+    tail=end-times[-1]
+    return 0<=tail<=FUND_MAX_GAP
 
 @dataclass
 class AssetData:
