@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "REGIME_GRID_V2_FROZEN_FAIL_NEXT_SELF_HISTORY_FACTOR_FOUNDATION",
+  "phase": "PERPETUAL_FACTOR_DATA_V1_PASS_NEXT_SELF_HISTORY_FACTOR_V1",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "d1d5a6cc01089a9b417540c48c32f6436fb047d0",
+    "verifiedSha": "2dcf23e64ca3933ed381506c9d1cedfbb9aeac8a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -158,6 +158,47 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "perpetualFactorDataV1": {
+      "status": "FOUNDATION_PASS",
+      "source": "Binance Vision USD-M monthly archives",
+      "auditWindow": "2021-01..2026-08",
+      "fixedAssets": [
+        "BTC",
+        "ETH",
+        "BNB",
+        "SOL",
+        "XRP",
+        "ADA",
+        "DOGE",
+        "LINK",
+        "DOT",
+        "LTC",
+        "BCH",
+        "AVAX",
+        "HBAR",
+        "SUI"
+      ],
+      "qualifiedThrough2025_12": 14,
+      "transportErrors": 0,
+      "eligibilityStarts": {
+        "BTC": "2023-01",
+        "ETH": "2023-01",
+        "BNB": "2023-01",
+        "SOL": "2023-01",
+        "XRP": "2023-01",
+        "ADA": "2023-01",
+        "DOGE": "2023-01",
+        "LINK": "2023-01",
+        "DOT": "2023-01",
+        "LTC": "2023-01",
+        "BCH": "2023-01",
+        "AVAX": "2023-01",
+        "HBAR": "2023-03",
+        "SUI": "2025-05"
+      },
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -171,7 +212,7 @@
     255,
     256
   ],
-  "nextAction": "Build a reproducible public perpetual-futures factor data foundation from current main, then freeze a uniquely named Self-History Perpetual Factor V1 before observing results. The foundation should support own-history standardization and a conventional cross-sectional benchmark on the same timestamps; historical market-cap weighting is optional diagnostic infrastructure, not a prerequisite for the first challenger. Preserve factor independence where multiple factor books are tested. Do not retune Dynamic Grid V1/V2, AdaptiveTrend, canonical V1/V2, or Funding Spread V1. Keep executionImpact=false and require an independent holdout before any Paper shadow.",
+  "nextAction": "Freeze Self-History Perpetual Factor V1 before any strategy result. Use only objectively eligible assets from Perpetual Factor Data V1. Compare own-history factor construction against a conventional cross-sectional benchmark on identical timestamps, keep factor books independent before combining returns, model price plus funding and explicit turnover costs, include high-cost stress, and require independent holdout before any Paper shadow. Do not claim exact replication of Dhanya MD (2026).",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
