@@ -40,6 +40,36 @@ req(cap.get('fallbackDisclosureRequired') is True,'fallback disclosure must be r
 expected_lifecycle=['RECONCILE','PLAN','ASSIGN','EXECUTE','REVIEW','INTEGRATE','GATE','MERGE','CHECKPOINT','REPORT']
 req(state.get('lifecycle')==expected_lifecycle,'lifecycle mismatch')
 
+wp_required=state.get('workPackageRequiredFields',[])
+task_required=state.get('taskRequiredFields',[])
+expected_wp={'id','title','status','baseMainSha','orchestrationBranch','executionMode','riskClass','tasks','reviewStatus','createdAt','lastCheckpoint'}
+expected_task={'id','role','status','dependencies','allowedFiles','forbiddenFiles','acceptanceCriteria','reviewLoop','reviewVerdict'}
+req(set(wp_required)==expected_wp,'workPackageRequiredFields mismatch')
+req(set(task_required)==expected_task,'taskRequiredFields mismatch')
+
+active=state.get('activeWorkPackage')
+if active is not None:
+    req(isinstance(active,dict),'activeWorkPackage must be object or null')
+    if isinstance(active,dict):
+        missing=expected_wp-set(active)
+        req(not missing,'activeWorkPackage missing fields: '+','.join(sorted(missing)))
+        tasks=active.get('tasks',[])
+        req(isinstance(tasks,list) and len(tasks)>0,'activeWorkPackage tasks must be non-empty list')
+        if isinstance(tasks,list):
+            ids=[]
+            for i,t in enumerate(tasks):
+                req(isinstance(t,dict),f'task {i} must be object')
+                if not isinstance(t,dict):
+                    continue
+                miss=expected_task-set(t)
+                req(not miss,f'task {i} missing fields: '+','.join(sorted(miss)))
+                ids.append(t.get('id'))
+                loop=t.get('reviewLoop',0)
+                req(isinstance(loop,int) and 0 <= loop <= 3,f'task {i} reviewLoop must be 0..3')
+                verdict=t.get('reviewVerdict')
+                req(verdict in (None,'GREEN','CHANGES_REQUIRED','BLOCKED','COMPAT_GREEN'),f'task {i} invalid reviewVerdict')
+            req(len(ids)==len(set(ids)),'task IDs must be unique')
+
 coord=resume.get('coordination',{})
 req(coord.get('mergeOwner')=='MAIN_AGENT','resume mergeOwner must remain MAIN_AGENT')
 req(coord.get('singleWriter') is True,'resume singleWriter must remain true')
