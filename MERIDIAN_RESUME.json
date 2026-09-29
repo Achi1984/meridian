@@ -1,26 +1,47 @@
 {
-  "schema": 1,
+  "schema": 2,
   "project": "MERIDIAN",
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PAPERBOT_PROFIT_V2_FROZEN_NEXT_CARRY",
-  "lastVerifiedBase": "789144523b220d4516f431b15421c02d2ae0c113",
-  "r67Merged": true,
-  "r67MergeSha": "789144523b220d4516f431b15421c02d2ae0c113",
+  "phase": "STREAM_SAFE_RECONCILIATION_THEN_V4",
+  "lastVerifiedBase": "087a087dc54b79afe3fbb01c1a708beedccfd046",
+  "verifiedAt": "2026-09-29T05:10:34Z",
   "completed": [
-    "r67 collapsible asset cards merged",
-    "r67 release and portfolio CI green",
-    "profit special-agent protocol frozen",
-    "profit candidate engine added",
-    "profit lab UI added",
-    "r68 cache/build routing updated",
-    "r68 release CI green and merged",
-    "V1 profit discovery frozen: no candidate passes",
-    "V2 UP-UP regime-aware momentum frozen: +7.22% but gate fail",
-    "V2 research PR merged"
+    "r68 profit-special-agent framework merged",
+    "V1 discovery frozen: no candidate passes",
+    "main V2 UP-UP risk-managed momentum research merged and frozen",
+    "Asset Watch private bridge merged",
+    "Asset Watch GitHub OIDC encrypted mirror operational",
+    "Asset Watch mirror run 36522721085 produced encrypted artifact 11012718856",
+    "Release Safety, Runtime Smoke, Release Coordinator and Pages deploy green on main 087a087d",
+    "parallel r69 Donchian V2/V3 research branch preserved for evidence",
+    "unsafe full-branch integration PRs #255 and #256 intentionally closed without merge"
   ],
-  "nextAction": "Implement and run the separately frozen delta-neutral funding-carry lane with public funding/basis/cost data. Do not modify V1/V2 thresholds or promote any failed directional candidate.",
+  "researchState": {
+    "validatedPromotion": false,
+    "canonicalMainV2": "UPUP_RM_MOMENTUM_PROXY_V1",
+    "parallelR69Branch": "fix/v10-r69-profit-agent-v2",
+    "parallelEvidence": {
+      "v2Discovery": "+11.93% / PF 2.334 / discovery pass only",
+      "v2TransferHoldout": "+5.84% / PF 2.231 / holdout fail: periods<24 and positive windows<3",
+      "v3Discovery": "+19.40% / PF 1.175 / fail: PF<1.20 and positive windows<4"
+    },
+    "integrationPolicy": "Do not overwrite canonical main V2 files with the parallel r69 lane. Preserve/reconcile under unique names only."
+  },
+  "coordination": {
+    "mode": "SINGLE_WRITER_CHECKPOINTED",
+    "rules": [
+      "Refresh main SHA immediately before every write or merge.",
+      "Only one active integration PR may own a merge window.",
+      "Do not full-merge branches that are behind or diverged from main.",
+      "Prefer additive files or targeted patches; never overwrite canonical files without file-level review.",
+      "Limit tool output to compact metadata; do not stream full repository roots or full PR diffs.",
+      "Persist a resume checkpoint after each merged milestone.",
+      "After interruption, resume from Git/CI state, not from chat assumptions."
+    ]
+  },
+  "nextAction": "Merge the stream-safety checkpoint after CI. Then freeze a uniquely named V4 research hypothesis on a fresh branch from current main; do not retune failed V1/V2/V3 results and do not promote any failed candidate.",
   "executionImpact": false,
   "r68Merged": true,
   "r68MergeSha": "17f3b9f31344a0dc1d0d5d231c0aa3c345185f2c",
