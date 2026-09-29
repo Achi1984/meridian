@@ -86,14 +86,14 @@ function zscore(v,h){
   const sd=sampleSd(h);
   return sd>0?(v-mean(h))/sd:null;
 }
-function normalizePriceBars(rows,barMs,{allowNegative=false}={}){
+function normalizePriceBars(rows,barMs,{allowNegative=false,minTime=-Infinity,maxTime=Infinity}={}){
   const out=(rows||[]).map(x=>({
     openTime:num(x?.openTime??x?.t??(Array.isArray(x)?x[0]:NaN)),
     open:num(x?.open??x?.o??(Array.isArray(x)?x[1]:NaN)),
     high:num(x?.high??x?.h??(Array.isArray(x)?x[2]:NaN)),
     low:num(x?.low??x?.l??(Array.isArray(x)?x[3]:NaN)),
     close:num(x?.close??x?.c??(Array.isArray(x)?x[4]:NaN))
-  })).filter(x=>[x.openTime,x.open,x.high,x.low,x.close].every(finite)).sort((a,b)=>a.openTime-b.openTime);
+  })).filter(x=>[x.openTime,x.open,x.high,x.low,x.close].every(finite)&&x.openTime>=minTime&&x.openTime<=maxTime).sort((a,b)=>a.openTime-b.openTime);
   if(!out.length)throw new Error('NO_BARS');
   const seen=new Set();
   for(let i=0;i<out.length;i++){
@@ -105,11 +105,11 @@ function normalizePriceBars(rows,barMs,{allowNegative=false}={}){
   }
   return out;
 }
-function normalizePremium(rows,barMs){
+function normalizePremium(rows,barMs,{minTime=-Infinity,maxTime=Infinity}={}){
   const out=(rows||[]).map(x=>({
     openTime:num(x?.openTime??x?.t??(Array.isArray(x)?x[0]:NaN)),
     close:num(x?.close??x?.c??(Array.isArray(x)?x[4]:NaN))
-  })).filter(x=>finite(x.openTime)&&finite(x.close)).sort((a,b)=>a.openTime-b.openTime);
+  })).filter(x=>finite(x.openTime)&&finite(x.close)&&x.openTime>=minTime&&x.openTime<=maxTime).sort((a,b)=>a.openTime-b.openTime);
   if(!out.length)throw new Error('NO_PREMIUM');
   const seen=new Set();
   for(let i=0;i<out.length;i++){
@@ -119,11 +119,11 @@ function normalizePremium(rows,barMs){
   }
   return out;
 }
-function normalizeFunding(rows,maxGapMs){
+function normalizeFunding(rows,maxGapMs,{minTime=-Infinity,maxTime=Infinity}={}){
   const out=(rows||[]).map(x=>({
     time:num(x?.fundingTime??x?.time??x?.ts),
     rate:num(x?.fundingRate??x?.rate)
-  })).filter(x=>finite(x.time)&&finite(x.rate)).sort((a,b)=>a.time-b.time);
+  })).filter(x=>finite(x.time)&&finite(x.rate)&&x.time>=minTime&&x.time<=maxTime).sort((a,b)=>a.time-b.time);
   if(!out.length)throw new Error('NO_FUNDING');
   const seen=new Set();
   for(let i=0;i<out.length;i++){
@@ -133,10 +133,10 @@ function normalizeFunding(rows,maxGapMs){
   }
   return out;
 }
-function indexAsset(raw,cfg){
-  const bars=normalizePriceBars(raw?.bars,cfg.barMs);
-  const premium=normalizePremium(raw?.premium,cfg.barMs);
-  const funding=normalizeFunding(raw?.funding,cfg.maxFundingGapMs);
+function indexAsset(raw,cfg,{minTime=-Infinity,maxTime=Infinity}={}){
+  const bars=normalizePriceBars(raw?.bars,cfg.barMs,{minTime,maxTime});
+  const premium=normalizePremium(raw?.premium,cfg.barMs,{minTime,maxTime});
+  const funding=normalizeFunding(raw?.funding,cfg.maxFundingGapMs,{minTime,maxTime});
   return{
     bars,premium,funding,
     barsByOpen:new Map(bars.map(x=>[x.openTime,x])),
@@ -383,8 +383,10 @@ export function runSelfHistoryPerpetualFactorV1(dataset,{
   const cfg={...SELF_HISTORY_PERPETUAL_FACTOR_V1_CONFIG,...config};
   if(!finite(start)||!finite(endInclusive)||endInclusive<=start)throw new Error('invalid window');
   const indexed={},dataErrors=[];
+  const validationMinTime=start-(cfg.ownHistoryWeeks+2)*cfg.weekMs;
+  const validationMaxTime=endInclusive;
   for(const asset of SELF_HISTORY_PERPETUAL_ASSETS){
-    try{indexed[asset]=indexAsset(dataset?.[asset],cfg)}
+    try{indexed[asset]=indexAsset(dataset?.[asset],cfg,{minTime:validationMinTime,maxTime:validationMaxTime})}
     catch(e){dataErrors.push(asset+':'+String(e?.message||e))}
   }
   if(dataErrors.length){
