@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DATA_PASS_NEXT_STRATEGY_PREREGISTRATION",
+  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_PROTOCOL_ENGINE_INVARIANTS_FROZEN_NO_PNL",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "541d04586d7ed13ae3105e0ee188603f86ff8922",
+    "verifiedSha": "9d52b13a9aa86734a12a6d0e3d1bd7366720b3c3",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1060,7 +1060,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze PERPETUAL-TAKER-ORDER-FLOW-V1 before first strategy PnL. Use the complete 12-asset qualified universe. Define weekly Saturday 00:00 UTC anchors; lagged flow from the immediately preceding completed 168 hourly bars; normalized signed aggressive quote-flow = (2*sum(takerBuyQuote)-sum(quoteVolume))/sum(quoteVolume); rank cross-sectionally; LONG top floor(N/5)=2 and SHORT bottom 2, equal-weight 50/50 dollar-neutral; hold exactly one week; exact Saturday open-to-open execution; realized funding in (t,t+7d]; 8 bps base and 13 bps stress turnover costs. Freeze a 2023-01-14..2024-12-28 development stage and an untouched 2025-01-11..2026-08-29 temporal holdout with no retuning. No PnL before protocol/invariants are canonical.",
+  "nextAction": "Merge PERPETUAL-TAKER-ORDER-FLOW-V1 protocol, engine and invariant tests canonically before any strategy PnL. After green current-base CI and merge, create a separate DEVELOPMENT-only collector/runner that loads only 2023-01..2024-12 data for the frozen 12 assets, runs exactly 102 Saturday anchors from 2023-01-14 through final exit 2024-12-28, and freezes the untouched result. Do not load or calculate the 2025-01-11..2026-08-29 temporal holdout unless DEVELOPMENT passes unchanged. No retuning or Paper/live promotion.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1089,7 +1089,7 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_TAKER_ORDER_FLOW_V1_STRATEGY_PREREGISTRATION",
+    "selected": "PERPETUAL_TAKER_ORDER_FLOW_V1_FROZEN",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1116,7 +1116,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "ORDER_FLOW_V1_PROTOCOL_AND_INVARIANTS_BEFORE_FIRST_PNL",
+    "nextStage": "MERGE_ORDER_FLOW_V1_PROTOCOL_THEN_DEVELOPMENT_ONLY",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1316,6 +1316,15 @@
     ],
     "orderFlowV1SignalAllowed": "ONLY_AFTER_PROTOCOL_FROZEN",
     "orderFlowV1PnlObserved": false,
-    "orderFlowV1PaperAuthorized": false
+    "orderFlowV1PaperAuthorized": false,
+    "orderFlowV1Ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+    "orderFlowV1ProtocolStatus": "FROZEN_BEFORE_FIRST_PNL",
+    "orderFlowV1Signal": "168H_NORMALIZED_SIGNED_TAKER_QUOTE_FLOW_CONTINUATION",
+    "orderFlowV1Calendar": "SATURDAY_00_UTC_WEEKLY",
+    "orderFlowV1DevelopmentWindow": "2023-01-14..2024-12-28",
+    "orderFlowV1DevelopmentPeriods": 102,
+    "orderFlowV1HoldoutWindow": "2025-01-11..2026-08-29",
+    "orderFlowV1HoldoutPeriods": 85,
+    "orderFlowV1HoldoutLoaded": false
   }
 }
