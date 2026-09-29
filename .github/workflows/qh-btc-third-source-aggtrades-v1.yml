@@ -1,0 +1,28 @@
+name: MERIDIAN QH BTC Third-Source aggTrades Diagnostic V1
+
+on:
+  pull_request:
+    paths:
+      - "scripts/diagnose-qh-btc-third-source-aggtrades-v1.py"
+      - ".github/workflows/qh-btc-third-source-aggtrades-v1.yml"
+      - "research/PERPETUAL-QH-BTC-THIRD-SOURCE-AGGTRADES-DIAGNOSTIC-V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare individual trades, aggTrades and 1m klines
+        run: python3 scripts/diagnose-qh-btc-third-source-aggtrades-v1.py
+      - name: Upload third-source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-btc-third-source-aggtrades-v1
+          path: research/results/qh-btc-third-source-aggtrades/*.json
+          if-no-files-found: warn
