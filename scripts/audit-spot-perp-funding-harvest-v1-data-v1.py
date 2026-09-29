@@ -74,6 +74,9 @@ def parse_kline(lines):
     out=[]; invalid=0
     for row in csv.reader(lines or []):
         if not row:continue
+        first=str(row[0]).strip().lower()
+        if first in ('open_time','opentime','timestamp','time'):
+            continue
         try:
             ot=ts_ms(row[0])
             o=float(row[1]);h=float(row[2]);l=float(row[3]);c=float(row[4])
