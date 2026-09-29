@@ -77,6 +77,7 @@ agg_bytes=sum(x["downloads"]["aggTrades"]["bytes"] for x in rows if "downloads" 
 kline_bytes=sum(x["downloads"]["klines1m"]["bytes"] for x in rows if "downloads" in x)
 funding_bytes=sum(x["downloads"]["fundingRate"]["bytes"] for x in rows if "downloads" in x)
 agg_rows=sum(x["audits"]["aggTrades"]["rows"] for x in rows if "audits" in x)
+equal_agg_ids=sum(x["audits"]["aggTrades"].get("equalAggregateTradeIdEvents",0) for x in rows if "audits" in x)
 empty_qh=sum(x["audits"]["aggTrades"]["emptyQuarterHourBins"] for x in rows if "audits" in x)
 kline_rows=sum(x["audits"]["klines1m"]["rows"] for x in rows if "audits" in x)
 funding_rows=sum(x["audits"]["fundingRate"]["rows"] for x in rows if "audits" in x)
@@ -93,6 +94,7 @@ summary={
   "duplicateShards":[list(x) for x in duplicates],
   "unexpectedShards":[list(x) for x in unexpected],
   "aggregateTradeRows":agg_rows,
+  "equalAggregateTradeIdEvents":equal_agg_ids,
   "emptyQuarterHourBins":empty_qh,
   "kline1mRows":kline_rows,
   "fundingRows":funding_rows,
