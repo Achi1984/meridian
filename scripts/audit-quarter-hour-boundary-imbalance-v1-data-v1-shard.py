@@ -171,6 +171,8 @@ def audit_aggtrades(zpath: Path) -> dict:
     first_id = last_id = None
     prev_ts = None
     prev_id = None
+    prev_last_trade_id = None
+    equal_aggregate_id_events = 0
     units = set()
     qh_counts = {}
     zf = raw = text = None
@@ -198,8 +200,12 @@ def audit_aggtrades(zpath: Path) -> dict:
                 raise RuntimeError(f"aggTrades timestamp outside month: {ts}")
             if prev_ts is not None and ts < prev_ts:
                 raise RuntimeError("aggTrades timestamp decreased")
-            if prev_id is not None and agg_id <= prev_id:
-                raise RuntimeError("aggTrades aggregate trade id not strictly increasing")
+            if prev_id is not None and agg_id < prev_id:
+                raise RuntimeError("aggTrades aggregate trade id decreased")
+            if prev_id is not None and agg_id == prev_id:
+                equal_aggregate_id_events += 1
+            if prev_last_trade_id is not None and first_trade_id <= prev_last_trade_id:
+                raise RuntimeError("aggTrades underlying trade id ranges overlap or do not advance")
 
             qh = (ts - MONTH_START_MS) // (15 * 60 * 1000)
             qh_counts[qh] = qh_counts.get(qh, 0) + 1
@@ -207,7 +213,7 @@ def audit_aggtrades(zpath: Path) -> dict:
             if first_ts is None:
                 first_ts, first_id = ts, agg_id
             last_ts, last_id = ts, agg_id
-            prev_ts, prev_id = ts, agg_id
+            prev_ts, prev_id, prev_last_trade_id = ts, agg_id, last_trade_id
             row_count += 1
     finally:
         if text:
@@ -232,6 +238,7 @@ def audit_aggtrades(zpath: Path) -> dict:
         "lastTimestampMs": last_ts,
         "firstAggregateTradeId": first_id,
         "lastAggregateTradeId": last_id,
+        "equalAggregateTradeIdEvents": equal_aggregate_id_events,
         "timestampUnitDetected": next(iter(units)),
         "expectedQuarterHourBins": EXPECTED_QH_BINS,
         "nonEmptyQuarterHourBins": len(qh_counts),
