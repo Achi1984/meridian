@@ -411,5 +411,8 @@ export function runSelfHistoryPerpFactorV1(dataset,{
 export const _test=Object.freeze({
   percentileAgainstHistory,
   ownHistoryWeights,
-  crossSectionWeights
+  crossSectionWeights,
+  indexAsset,
+  buildFeatures,
+  simulate
 });
