@@ -236,6 +236,8 @@ export function evaluateDynamicGridPath({dynamicCycles,staticCycles,assets=DYNAM
   if(!(dynamic.maxDrawdownPct<=gate.maxDrawdownPct))reasons.push('DD_GT_'+gate.maxDrawdownPct+'PCT');
   if(dynamic.positiveWindows<gate.minPositiveWindows)reasons.push('POSITIVE_WINDOWS_LT_'+gate.minPositiveWindows);
   for(const a of dynamic.byAsset)if(!(a.returnPct>0))reasons.push(a.asset+'_RETURN_NOT_POSITIVE');
+  if(staticSummary.pairedCycles!==dynamic.pairedCycles)reasons.push('STATIC_COVERAGE_MISMATCH');
+  if(staticSummary.insufficientWallet>0)reasons.push('STATIC_INSUFFICIENT_WALLET');
   if(!(dynamic.totalReturnPct>staticSummary.totalReturnPct))reasons.push('DYNAMIC_NOT_ABOVE_STATIC');
   if(dynamic.insufficientWallet>0)reasons.push('INSUFFICIENT_WALLET');
   return{pass:reasons.length===0,reasons,dynamic,static:staticSummary};
