@@ -35,7 +35,9 @@
       "endExclusiveEntry": "2026-08-29T00:00:00Z",
       "finalExit": "2026-08-29T00:00:00Z",
       "expectedPeriods": 85,
-      "authorizedOnlyAfterDevelopmentPass": true
+      "authorizedOnlyAfterDevelopmentPass": true,
+      "engineAuthorizationEvidence": "CANONICAL_DEVELOPMENT_PASS_EVIDENCE_REQUIRED",
+      "directRunWithoutDevelopmentPassAllowed": false
     }
   },
   "signal": {
@@ -53,7 +55,9 @@
     "shortGross": -0.5,
     "perPositionAbsWeight": 0.25,
     "grossExposure": 1,
-    "netExposure": 0
+    "netExposure": 0,
+    "selectionInformationSet": "PRIOR_168H_FLOW_PLUS_ENTRY_OPEN_ONLY_NO_EXIT_OR_HOLDING_RETURN",
+    "futureExitMayAffectRanking": false
   },
   "execution": {
     "entry": "1H_OPEN_AT_T",
