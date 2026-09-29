@@ -69,7 +69,8 @@ Data collection begins 2021-01-01 UTC to provide factor warm-up.
 
 ### Discovery
 
-- 2022-04-04 00:00 UTC through 2024-12-30 00:00 UTC
+- entry anchors: 2022-04-04 00:00 UTC <= t < 2024-12-30 00:00 UTC
+- final discovery exit/rebalance mark: 2024-12-30 00:00 UTC
 - weekly Monday 00:00 UTC rebalance anchors
 - only completed 8h bars known before the rebalance may enter a signal
 
@@ -77,7 +78,8 @@ Data collection begins 2021-01-01 UTC to provide factor warm-up.
 
 Allowed only after a discovery pass:
 
-- 2025-01-06 00:00 UTC through 2026-08-31 00:00 UTC
+- entry anchors: 2025-01-06 00:00 UTC <= t < 2026-08-31 00:00 UTC
+- final temporal-holdout exit/rebalance mark: 2026-08-31 00:00 UTC
 - exact same rules, universe, costs and signal thresholds
 - no retuning
 
@@ -86,7 +88,7 @@ Allowed only after a discovery pass:
 Allowed only after temporal holdout passes:
 
 - reserved transfer universe above
-- 2022-04-04 through 2026-08-31
+- entry anchors 2022-04-04 <= t < 2026-08-31, final exit 2026-08-31
 - exact same rules and thresholds
 - no asset substitution
 - this stage tests cross-sectional transfer, not temporal independence
@@ -141,6 +143,7 @@ Run on the same timestamps and same eligible discovery universe:
 - rank eligible assets against one another at each rebalance;
 - LONG top quartile;
 - SHORT bottom quartile;
+- exact side count = max(2, floor(number of eligible assets / 4));
 - gross = 1.00, 50/50 long-short;
 - same weekly hold;
 - same funding;
@@ -229,8 +232,8 @@ Report:
 - annualized Sharpe using weekly returns
 - max drawdown
 - 5 chronological-window returns
-- long-side contribution
-- short-side contribution
+- gross long-side contribution = price + funding from positive-weight holdings before shared transaction costs
+- gross short-side contribution = price + funding from negative-weight holdings before shared transaction costs
 - per-asset PnL attribution
 - positive-PnL asset count
 - max positive-PnL concentration
@@ -250,8 +253,8 @@ All must pass:
 - annualized Sharpe >= 0.75
 - max drawdown <= 20%
 - >= 4 of 5 chronological windows positive
-- long-side contribution > 0
-- short-side contribution > 0
+- gross long-side contribution > 0
+- gross short-side contribution > 0
 - >= 7 discovery assets with positive PnL attribution
 - no single positive asset contributes > 35% of total positive PnL
 - 4× cost-stress compounded return > 0
@@ -275,8 +278,8 @@ All must pass with unchanged parameters:
 - annualized Sharpe >= 0.50
 - max drawdown <= 20%
 - >= 3 of 5 chronological windows positive
-- long-side contribution > 0
-- short-side contribution > 0
+- gross long-side contribution > 0
+- gross short-side contribution > 0
 - >= 6 assets with positive PnL attribution
 - 4× cost-stress return > 0
 - own-history return > cross-sectional benchmark return
