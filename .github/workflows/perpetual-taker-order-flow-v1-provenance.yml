@@ -1,0 +1,44 @@
+name: MERIDIAN Taker Order Flow V1 Provenance
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-V1-PROVENANCE-AUDIT.md"
+      - "research/perpetual-taker-order-flow-v1-provenance-audit.json"
+      - "research/perpetual-taker-order-flow-v1-development-result.json"
+      - "research/perpetual_taker_order_flow_v1.py"
+      - "research/run-perpetual-taker-order-flow-v1-development.py"
+      - "scripts/collect-perpetual-taker-order-flow-v1-development.py"
+      - "scripts/validate-perpetual-taker-order-flow-v1-provenance.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-provenance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-V1-PROVENANCE-AUDIT.md"
+      - "research/perpetual-taker-order-flow-v1-provenance-audit.json"
+      - "research/perpetual-taker-order-flow-v1-development-result.json"
+      - "research/perpetual_taker_order_flow_v1.py"
+      - "research/run-perpetual-taker-order-flow-v1-development.py"
+      - "scripts/collect-perpetual-taker-order-flow-v1-development.py"
+      - "scripts/validate-perpetual-taker-order-flow-v1-provenance.py"
+      - ".github/workflows/perpetual-taker-order-flow-v1-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: taker-order-flow-v1-provenance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate immutable V1 provenance and holdout isolation
+        run: python3 scripts/validate-perpetual-taker-order-flow-v1-provenance.py

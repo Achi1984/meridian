@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+  "status": "PROVENANCE_AUDIT_FROZEN_AFTER_DEVELOPMENT_FAIL",
+  "executionImpact": false,
+  "developmentEvidence": {
+    "workflowRun": 36609900324,
+    "runCommit": "88e7225eca567c516ea197c27254c82cb4775645",
+    "engineBlobSha": "580f8885118aa1bfcccd6c77a431d5b7835e8bba",
+    "developmentRunnerBlobSha": "e0a50903b5ba9f2d37af4526144ee8674b8d294a",
+    "developmentCollectorBlobSha": "d149e737dc7638c0b7025cf502235c4baac1508e",
+    "frozenResultPath": "research/perpetual-taker-order-flow-v1-development-result.json",
+    "periods": 102,
+    "eligibleEveryWeek": 12,
+    "sideCountEveryWeek": 2,
+    "dataIntegrityFailure": false,
+    "holdoutLoaded": false,
+    "postDevelopmentDataLoaded": false,
+    "decision": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+    "holdoutAuthorized": false
+  },
+  "findings": [
+    {
+      "id": "OFV1-PROV-001",
+      "issue": "PRE_RANK_FUTURE_EXIT_AVAILABILITY_DEPENDENCY",
+      "description": "The DEVELOPMENT engine called entry_exit_return(t) while building the ranking eligibility rows. The future return value was carried with the row but ranking used only lagged FLOW and symbol tie-break. Exit-price availability therefore could have affected eligibility if an exit observation had been missing.",
+      "observedRunImpact": "NO_OBSERVED_ELIGIBILITY_OR_RANKING_IMPACT",
+      "evidence": "The frozen DEVELOPMENT result reports exactly 12 eligible assets in every one of 102 periods and no data-integrity failure. Therefore no candidate was excluded by missing exit availability in the observed run.",
+      "limitation": "This is a provenance conclusion from the frozen run evidence, not a post-result rerun. V1 must not be rerun or altered to improve its outcome."
+    },
+    {
+      "id": "OFV1-PROV-002",
+      "issue": "NO_ENGINE_LEVEL_HOLDOUT_AUTHORIZATION_GUARD",
+      "description": "The generic V1 engine accepted a TEMPORAL_HOLDOUT stage without independently requiring canonical DEVELOPMENT PASS evidence.",
+      "observedRunImpact": "NO_HOLDOUT_CONTAMINATION_OBSERVED",
+      "evidence": "The first DEVELOPMENT collector was hard-limited to 2023-01..2024-12. The runner required DEVELOPMENT, the exact development range, holdoutLoaded=false and postDevelopmentDataLoaded=false. The frozen result records both flags false.",
+      "limitation": "The engine-level guard was missing, so equivalent guards must be implemented prospectively before first PnL in any successor."
+    }
+  ],
+  "reviewFixPr": {
+    "number": 330,
+    "status": "CLOSED_UNMERGED_AFTER_PNL",
+    "use": "REVIEW_EVIDENCE_AND_PROSPECTIVE_SUCCESSOR_GUARDS_ONLY"
+  },
+  "disposition": {
+    "v1Result": "IMMUTABLE_DEVELOPMENT_FAIL",
+    "evidenceUse": "HYPOTHESIS_GENERATION_ONLY_FAILED_GATE",
+    "rerunAuthorized": false,
+    "temporalHoldoutAuthorized": false,
+    "retroactiveEngineMutationAuthorized": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false,
+    "successorRequirement": "FRESH_EXTERNAL_EVIDENCE_THEN_SEPARATELY_FROZEN_RULESET_BEFORE_FIRST_PNL"
+  }
+}

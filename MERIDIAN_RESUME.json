@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DEVELOPMENT_FAIL_HOLDOUT_LOCKED_NEXT_EXTERNAL_RESEARCH",
+  "phase": "PERPETUAL_TAKER_ORDER_FLOW_V1_DEVELOPMENT_FAIL_PROVENANCE_AUDIT_PENDING_MERGE_HOLDOUT_LOCKED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "f896937f9d0c15c4dc5fb58bed2c41a7c846e7bd",
+    "verifiedSha": "3805e0bbc14b4cf56f6c39662f8fa2ef27f1f927",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1093,7 +1093,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze the failed PERPETUAL-TAKER-ORDER-FLOW-V1 development result and do not load the 2025-01-11..2026-08-29 temporal holdout. Treat the positive +0.9935% high-flow-minus-low-flow next-week spread, positive long side, negative short side and strong aggregate development return as hypothesis-generation evidence only. Do not remove the short side, drop assets, change the 168h lookback, change costs, relax gates or otherwise rescue V1. Run a fresh external-evidence survey for a separately frozen Order Flow successor or another orthogonal family, then use only genuinely untouched data for its first validation. Keep executionImpact=false and no Paper/live promotion.",
+  "nextAction": "Merge the Taker Order Flow V1 provenance audit on current main after green provenance/orchestration/release gates. Keep the immutable DEVELOPMENT_FAIL unchanged: no V1 rerun, no retroactive engine mutation, and do not load the 2025-01-11..2026-08-29 temporal holdout. After the provenance audit is canonical, run a fresh external-evidence survey for a separately frozen Order Flow successor or another orthogonal strategy family. Any successor must include entry-time-only selection and a hard validation/holdout authorization gate before its first PnL, and its first validation must use genuinely untouched evidence.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1122,8 +1122,8 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "ORDER_FLOW_V1_FAIL_NEXT_EXTERNAL_EVIDENCE_FOR_SUCCESSOR",
-    "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
+    "selected": "ORDER_FLOW_V1_FAIL_PROVENANCE_AUDIT_THEN_EXTERNAL_EVIDENCE",
+    "rationale": "Anastasopoulos et al. (2026, Journal of Financial Markets, DOI 10.1016/j.finmar.2026.101047) reports predictive information in lagged cryptocurrency order flow and a stronger weekly relation than daily in its studied setting. MERIDIAN V1 used a distinct public Binance USD-M aggressive-taker quote-flow proxy, so the paper is motivation rather than exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
     "v2Status": "IMMUTABLE_DATA_INTEGRITY_FAIL",
@@ -1149,7 +1149,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "EXTERNAL_EVIDENCE_BEFORE_ANY_ORDER_FLOW_SUCCESSOR_PNL",
+    "nextStage": "MERGE_V1_PROVENANCE_AUDIT_THEN_EXTERNAL_EVIDENCE_BEFORE_SUCCESSOR_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1363,6 +1363,14 @@
     "orderFlowV1Economics": "POSITIVE_NET_STRESS_AND_HIGH_MINUS_LOW_SPREAD_BUT_SHORT_SIDE_BREADTH_CONCENTRATION_AND_WINDOW_GATES_FAIL",
     "orderFlowV1HoldoutAuthorized": false,
     "orderFlowV1ObservedAsymmetry": "HIGH_FLOW_LONG_POSITIVE_LOW_FLOW_SHORT_NEGATIVE",
-    "orderFlowV1NoRescueRule": "NO_SHORT_REMOVAL_NO_ASSET_REMOVAL_NO_LOOKBACK_OR_COST_OR_GATE_RETUNING"
+    "orderFlowV1NoRescueRule": "NO_SHORT_REMOVAL_NO_ASSET_REMOVAL_NO_LOOKBACK_OR_COST_OR_GATE_RETUNING",
+    "orderFlowV1ProtocolProvenance": "FIRST_DEVELOPMENT_RUN_ON_PRE_REVIEW_HARDENED_ENGINE",
+    "orderFlowV1SelectionImplementationFinding": "FUTURE_EXIT_AVAILABILITY_QUERIED_BEFORE_RANKING_BUT_12_OF_12_ELIGIBLE_EVERY_WEEK",
+    "orderFlowV1ObservedOutcomeImpact": "NO_OBSERVED_ELIGIBILITY_OR_RANKING_IMPACT_FROM_FINDING",
+    "orderFlowV1HoldoutIsolation": "DEVELOPMENT_COLLECTOR_RUNNER_HARD_LOCKED_2023_01_TO_2024_12_NO_POST_DEVELOPMENT_DATA",
+    "orderFlowV1EvidenceUse": "HYPOTHESIS_GENERATION_ONLY_FAILED_GATE",
+    "orderFlowV1NoRerun": true,
+    "orderFlowV1RetroactiveEngineMutationAuthorized": false,
+    "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY"
   }
 }
