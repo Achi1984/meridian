@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "SPOT_PERP_V1_DISCOVERY_FAIL_NEXT_PERSISTENT_V2",
+  "phase": "SPOT_PERP_PERSISTENCE_V2_FAIL_NEXT_SHORT_HORIZON_FUNDING_DATA_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "64807a3bbf1fdf412a3eee0fef2750fc4626454e",
+    "verifiedSha": "525a780914327f45035b201c4d8781f96d46b7e7",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -643,6 +643,47 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "spotPerpFundingPersistenceV2": {
+      "ruleset": "SPOT-PERP-FUNDING-PERSISTENCE-V2-FROZEN",
+      "stage": "INDEPENDENT_VALIDATION",
+      "rawWindow": "2025-08..2026-08",
+      "tradeWindow": "2025-09..2026-08",
+      "stateSlots": 96,
+      "validStateSlots": 96,
+      "rejectedStateSlots": 0,
+      "dataIntegrityFailure": false,
+      "activeStateMonths": 0,
+      "inactiveStateMonths": 96,
+      "entryTransitions": 0,
+      "exitTransitions": 0,
+      "continuationMonths": 0,
+      "forcedTerminalExits": 0,
+      "netReturnPct": 0,
+      "netPnlUsd": 0,
+      "profitFactor": 0,
+      "maxDrawdownPct": 0,
+      "positiveWindows": "0/5",
+      "stressReturnPct": 0,
+      "positiveAssets": "0/8",
+      "gateReasons": [
+        "ACTIVE_STATE_MONTHS_LT_32",
+        "ACTIVE_ASSET_BREADTH_LT_6",
+        "ENTRY_TRANSITIONS_LT_6",
+        "CONTINUATION_MONTHS_LT_12",
+        "CONTINUATION_ASSET_BREADTH_LT_4",
+        "RETURN_NOT_POSITIVE",
+        "NET_PNL_NOT_POSITIVE",
+        "PF_LT_1.1",
+        "POSITIVE_WINDOWS_LT_3",
+        "STRESS_RETURN_NOT_POSITIVE",
+        "FUNDING_NOT_ABOVE_COSTS",
+        "FUNDING_COST_RATIO_LT_1.15",
+        "POSITIVE_ASSETS_LT_5"
+      ],
+      "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -656,7 +697,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Spot-Perp Funding Harvest V2 as a genuinely stateful persistent-carry successor before first V2 PnL. Preserve the V1 universe, Data Foundation V2 sources, 77.5 bps entry threshold, conservative fee/slippage assumptions and long-Spot/short-Perp direction. Change only position state: enter after prior-month funding >=77.5 bps; once active, remain active while prior-month cumulative funding stays >0; exit when prior-month funding <=0. Positions persist across qualifying month boundaries instead of forced monthly close/reopen, so costs are charged only on actual entry/exit/rebalance events. Freeze all execution, basis, capital, state-transition, discovery/holdout and promotion gates before any V2 result. Keep executionImpact=false.",
+  "nextAction": "Freeze and run a strategy-neutral Short-Horizon Spot-Perp Funding Data Foundation V1 on a fresh candidate universe APT/ARB/PEPE/ENA/JUP/WIF/TON/TAO. Audit Binance Vision Spot 8h, USD-M Perp Trade 8h and realized fundingRate archives for every month 2025-01..2026-08. Require exact public-data identity, cadence/boundary integrity and complete funding coverage; no strategy PnL, no weekly threshold inference, no synthetic backfill, no asset substitution after coverage results. Foundation PASS requires at least 6/8 fully qualified assets. Only after foundation PASS may a separately frozen short-horizon funding-impulse strategy be written. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -666,7 +707,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SPOT_PERP_FUNDING_HARVEST_V2_PERSISTENT_CARRY",
+    "selected": "SHORT_HORIZON_SPOT_PERP_FUNDING_DATA_V1",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -684,16 +725,16 @@
     },
     "fundingCarryV1Status": "IMMUTABLE_RISK_CONCENTRATION_FAIL",
     "nextUniverse": [
-      "OP",
-      "INJ",
-      "WLD",
-      "SEI",
-      "TIA",
-      "PENDLE",
-      "RUNE",
-      "ICP"
+      "APT",
+      "ARB",
+      "PEPE",
+      "ENA",
+      "JUP",
+      "WIF",
+      "TON",
+      "TAO"
     ],
-    "nextStage": "STATEFUL_STRATEGY_PREREGISTRATION_BEFORE_PNL",
+    "nextStage": "STRATEGY_NEUTRAL_DATA_FOUNDATION",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -711,9 +752,9 @@
     "crossVenueV2Window": "2024-09..2026-08",
     "crossVenueV2Status": "IMMUTABLE_VALIDATION_FAIL",
     "crossVenueV2Diagnosis": "POSITIVE_GROSS_FUNDING_LOW_DD_BUT_FIXED_DIRECTION_AND_COST_EFFICIENCY_FAIL",
-    "nextWindow": "2024-09..2026-08",
+    "nextWindow": "2025-01..2026-08",
     "adaptiveDirectionAllowed": true,
-    "strategyPnlAllowed": "ONLY_AFTER_STRATEGY_PROTOCOL_AND_INVARIANTS_FROZEN",
+    "strategyPnlAllowed": false,
     "adaptiveCrossVenueV3FoundationStatus": "FOUNDATION_PASS_8_OF_8",
     "adaptiveCrossVenueV3QualifiedAssets": [
       "HBAR",
@@ -740,6 +781,10 @@
     "spotPerpV1DataV2Status": "FOUNDATION_PASS_8_OF_8",
     "spotPerpV1Status": "IMMUTABLE_DISCOVERY_FAIL_SAMPLE_STABILITY",
     "spotPerpV1Economics": "STRONG_BUT_NOT_PROMOTABLE",
-    "v2Hypothesis": "ENTRY_77P5BPS_HOLD_WHILE_PRIOR_MONTH_FUNDING_POSITIVE"
+    "v2Hypothesis": "ENTRY_77P5BPS_HOLD_WHILE_PRIOR_MONTH_FUNDING_POSITIVE",
+    "spotPerpFundingFamilyStatus": "V1_STRONG_DISCOVERY_BUT_V2_ZERO_ENTRY_TEMPORAL_INSTABILITY",
+    "spotPerpPersistenceV2Status": "IMMUTABLE_VALIDATION_FAIL_ZERO_ENTRY",
+    "monthlyFundingThresholdFamilyClosed": true,
+    "thresholdInferenceAllowed": false
   }
 }
