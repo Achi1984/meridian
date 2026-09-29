@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_FACTOR_DATA_V1_PASS_NEXT_SELF_HISTORY_FACTOR_V1",
+  "phase": "SELF_HISTORY_V2_DATA_FAIL_ROW_CONTINUITY_CHARACTERIZED_NEXT_V3",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "2dcf23e64ca3933ed381506c9d1cedfbb9aeac8a",
+    "verifiedSha": "82363d4957b48e2509d8a766b2973fcfd32a350a",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -199,6 +199,29 @@
       },
       "executionImpact": false,
       "immutable": true
+    },
+    "selfHistoryPerpFactorV2": {
+      "ruleset": "SELF-HISTORY-PERP-FACTOR-V2-FROZEN",
+      "stage": "DISCOVERY",
+      "decision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "gateReasons": [
+        "DATA_INTEGRITY_FAILURE"
+      ],
+      "observedError": "BTC: PREMIUM_GAP",
+      "economicMetricsEvaluated": false,
+      "promoted": false,
+      "immutable": true
+    },
+    "perpetualFactorRowContinuityV1": {
+      "decision": "ROW_CONTINUITY_CHARACTERIZED",
+      "auditWindow": "2021-01..2026-08",
+      "transportErrors": 0,
+      "fundingGapsOver12h": 0,
+      "synchronizedPremiumGapTimestamps": 48,
+      "longHistoryFactorReadyPctApprox": 99,
+      "implication": "Premium gaps are sparse and predominantly synchronized/archive-specific; no interpolation is authorized.",
+      "executionImpact": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -212,7 +235,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze Self-History Perpetual Factor V1 before any strategy result. Use only objectively eligible assets from Perpetual Factor Data V1. Compare own-history factor construction against a conventional cross-sectional benchmark on identical timestamps, keep factor books independent before combining returns, model price plus funding and explicit turnover costs, include high-cost stress, and require independent holdout before any Paper shadow. Do not claim exact replication of Dhanya MD (2026).",
+  "nextAction": "Freeze Self-History Perpetual Factor V3 from current main before any strategy result. Preserve V2 economic definitions and gates, but replace V2's global exact-row continuity assumption with the independently audited sparse-data rule: no interpolation; a factor/asset signal is unavailable when its required input window is incomplete; each factor book uses only currently valid objectively eligible assets and goes flat when its minimum valid breadth is not met; own-history uses the most recent 52 valid weekly observations within a maximum trailing 60-week window. Preserve independent factor books, matched cross-sectional benchmarks, funding, turnover costs, 4x cost stress, temporal holdout and transfer holdout. Keep executionImpact=false.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -222,9 +245,12 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "SELF_HISTORY_PERPETUAL_FACTOR_V1",
+    "selected": "SELF_HISTORY_PERPETUAL_FACTOR_V3",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
-    "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING"
+    "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
+    "v2Status": "IMMUTABLE_DATA_INTEGRITY_FAIL",
+    "rowContinuityStatus": "CHARACTERIZED",
+    "missingDataPolicy": "NO_INTERPOLATION_FACTOR_LEVEL_FAIL_CLOSED"
   }
 }
