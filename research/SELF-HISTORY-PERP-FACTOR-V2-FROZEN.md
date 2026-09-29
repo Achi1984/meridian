@@ -156,7 +156,8 @@ This is a simple mean-reversion hypothesis, not a claim of an exact basis-arbitr
 
 For each factor and asset independently:
 
-- compute a weekly raw factor observation at every valid Monday anchor;
+- compute a weekly raw factor observation at every valid Monday anchor, including pre-eligibility anchors when the raw official data exist;
+- pre-eligibility observations may seed the historical distribution but can never create a tradable position before the objective 24m/12m eligibility gate passes;
 - current observation is excluded from its own reference history;
 - reference window = previous **52 valid weekly observations** for that same asset and same factor;
 - empirical percentile = fraction of those 52 historical observations <= current observation;
@@ -229,9 +230,10 @@ For weight w_i set at t:
 - price contribution = w_i × (P_i(t+1w) / P_i(t) - 1)
 
 Entry/exit marks:
-- first completed 4h close whose close timestamp equals the weekly anchor;
-- if no exact mark exists, fail the affected weekly book closed;
-- no forward-looking substitution.
+- use the completed 4h bar whose `openTime + 4 hours = weekly anchor t`;
+- its close is known immediately before the anchor (Binance archive closeTime is normally t-1 ms);
+- if that exact preceding 4h bar does not exist, fail the affected weekly book closed;
+- no forward-looking or nearest-neighbor substitution.
 
 ## Funding contribution
 
