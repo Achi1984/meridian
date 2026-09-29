@@ -162,6 +162,26 @@ test('price or premium cadence gaps fail closed',()=>{
   assert.throws(()=>_test.indexAsset(raw2,SELF_HISTORY_PERPETUAL_FACTOR_V1_CONFIG),/PREMIUM_GAP/);
 });
 
+
+test('validation ignores gaps strictly outside the frozen evaluation window',()=>{
+  const anchor=Date.UTC(2025,0,6);
+  const raw=mkRawAsset(anchor);
+  const futureStart=anchor+30*H;
+  raw.bars.push(
+    {openTime:futureStart,open:100,high:101,low:99,close:100},
+    {openTime:futureStart+2*H,open:100,high:101,low:99,close:100}
+  );
+  raw.premium.push(
+    {openTime:futureStart,close:0},
+    {openTime:futureStart+2*H,close:0}
+  );
+  assert.doesNotThrow(()=>_test.indexAsset(
+    raw,
+    SELF_HISTORY_PERPETUAL_FACTOR_V1_CONFIG,
+    {minTime:anchor-60*H,maxTime:anchor}
+  ));
+});
+
 test('discovery anchor generator never crosses into 2026',()=>{
   const start=Date.UTC(2023,0,1);
   const end=Date.UTC(2025,11,31,23,59,59,999);
