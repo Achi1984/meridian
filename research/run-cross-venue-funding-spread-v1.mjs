@@ -9,7 +9,7 @@ import {
 const START=Date.UTC(2023,0,1);
 const END=Date.UTC(2026,8,1);
 const OUT=path.resolve('research/results');
-const DAY=86400000;
+const BINANCE_ARCHIVE_INPUT=process.env.BINANCE_ARCHIVE_INPUT||'/tmp/meridian-cross-venue-binance.json';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 async function json(url,options={}){
@@ -39,54 +39,15 @@ async function hyperliquidMarks(coin,start=START,end=END){
   if(!Array.isArray(rows))throw new Error('Invalid Hyperliquid candles '+coin);
   return rows;
 }
-async function binanceFunding(symbol,start=START,end=END){
-  const out=[];let cursor=start,guard=0;
-  while(cursor<=end&&guard++<100){
-    const u=new URL('https://fapi.binance.com/fapi/v1/fundingRate');
-    u.searchParams.set('symbol',symbol);
-    u.searchParams.set('startTime',String(cursor));
-    u.searchParams.set('endTime',String(end));
-    u.searchParams.set('limit','1000');
-    const rows=await json(u.toString());
-    if(!Array.isArray(rows)||!rows.length)break;
-    out.push(...rows);
-    const last=Math.max(...rows.map(x=>Number(x.fundingTime)).filter(Number.isFinite));
-    if(!Number.isFinite(last)||last<cursor)break;
-    cursor=last+1;
-    if(rows.length<1000)break;
-    await sleep(80);
-  }
-  return out;
-}
-async function binanceMarks(symbol,start=START,end=END){
-  const out=[];let cursor=start,guard=0;
-  while(cursor<end&&guard++<20){
-    const chunkEnd=Math.min(end,cursor+180*DAY);
-    const u=new URL('https://fapi.binance.com/fapi/v1/markPriceKlines');
-    u.searchParams.set('symbol',symbol);
-    u.searchParams.set('interval','8h');
-    u.searchParams.set('startTime',String(cursor));
-    u.searchParams.set('endTime',String(chunkEnd));
-    u.searchParams.set('limit','1500');
-    const rows=await json(u.toString());
-    if(!Array.isArray(rows))throw new Error('Invalid Binance marks '+symbol);
-    out.push(...rows);
-    cursor=chunkEnd+1;
-    await sleep(80);
-  }
-  return out;
-}
-
+const archive=JSON.parse(fs.readFileSync(BINANCE_ARCHIVE_INPUT,'utf8'));
+if(archive?.source!=='Binance Vision official public archive'||!archive?.assets)throw new Error('invalid Binance Vision archive input');
 const dataset={},sources={};
 for(const asset of CROSS_VENUE_FUNDING_SPREAD_V1_ASSETS){
   process.stdout.write('load '+asset+' ... ');
-  const symbol=asset+'USDT';
-  const [bf,hf,bm,hm]=await Promise.all([
-    binanceFunding(symbol),
-    hyperliquidFunding(asset),
-    binanceMarks(symbol),
-    hyperliquidMarks(asset)
-  ]);
+  const ba=archive.assets[asset];
+  if(!ba)throw new Error('missing Binance archive asset '+asset);
+  const [hf,hm]=await Promise.all([hyperliquidFunding(asset),hyperliquidMarks(asset)]);
+  const bf=ba.binanceFunding||[],bm=ba.binanceMarks||[];
   dataset[asset]={binanceFunding:bf,hyperliquidFunding:hf,binanceMarks:bm,hyperliquidMarks:hm};
   sources[asset]={binanceFunding:bf.length,hyperliquidFunding:hf.length,binanceMarks:bm.length,hyperliquidMarks:hm.length};
   console.log(JSON.stringify(sources[asset]));
