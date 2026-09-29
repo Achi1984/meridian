@@ -765,6 +765,47 @@
       "holdoutAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "spotPerpBasisVolatilityRegimeV1": {
+      "ruleset": "SPOT-PERP-BASIS-VOLATILITY-REGIME-V1-FROZEN",
+      "stage": "FEATURE_DISCOVERY",
+      "rawWindow": "2024-06..2025-08",
+      "anchorWindow": "2024-09-01..2025-08-30",
+      "holdoutLoaded": false,
+      "universe": [
+        "APT",
+        "APE",
+        "CRV",
+        "SUSHI",
+        "DYDX",
+        "LDO",
+        "GALA",
+        "IMX"
+      ],
+      "anchors": 364,
+      "observationsPerAsset": 364,
+      "pooledObservations": 2912,
+      "pooledSpearman": -0.0319867663,
+      "pooledPartialSpearman": -0.036956814,
+      "pooledTopQuartileUplift": 0.9862030128,
+      "positiveWindows": "1/5",
+      "positiveSpearmanAssets": "4/8",
+      "positivePartialAssets": "3/8",
+      "positiveUpliftAssets": "5/8",
+      "gateReasons": [
+        "POOLED_SPEARMAN_LT_0.1",
+        "POOLED_PARTIAL_LT_0.05",
+        "POOLED_UPLIFT_LT_1.1",
+        "POSITIVE_SPEARMAN_ASSETS_LT_6",
+        "POSITIVE_PARTIAL_ASSETS_LT_5",
+        "POSITIVE_UPLIFT_ASSETS_LT_6",
+        "POSITIVE_WINDOWS_LT_4"
+      ],
+      "decision": "FEATURE_DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "strategyPnlCalculated": false,
+      "holdoutAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -884,6 +925,8 @@
     "basisArbitrageThresholdRescue": false,
     "reversalMotivation": "EXTERNAL_2026_EVIDENCE_8_TO_10_WEEK_CROSS_SECTIONAL_REVERSAL",
     "reversalStrategyPnlAllowed": false,
-    "basisVolatilityFoundationStatus": "DEFERRED_NOT_IMPLEMENTED"
+    "basisVolatilityFoundationStatus": "IMMUTABLE_FEATURE_DISCOVERY_FAIL",
+    "basisVolatilityHoldout": "UNTOUCHED_UNAUTHORIZED",
+    "basisVolatilityStrategyAllowed": false
   }
 }
