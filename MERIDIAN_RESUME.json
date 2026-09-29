@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "R69_SOURCE_OF_TRUTH_RECOVERED",
+  "phase": "FUNDING_SPREAD_V1_FROZEN_HOLDOUT_FAIL_NEXT_ADAPTIVE_CHALLENGER",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "087a087dc54b79afe3fbb01c1a708beedccfd046",
+    "verifiedSha": "f79506c3dbe5457f8e11b380f43e1dcf9bae2ed2",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -46,6 +46,44 @@
       "v2NewEntriesAllowed": false,
       "v2RetirementReason": "REPEATABILITY_SAMPLE_GATE_6_LT_8",
       "ethHoldoutDecision": "WATCH_NOT_PAPER_CANDIDATE"
+    },
+    "crossVenueFundingSpreadV1": {
+      "ruleset": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "direction": "LONG_BINANCE_USDM_PERP_SHORT_HYPERLIQUID_PERP",
+      "discovery": {
+        "assets": [
+          "BTC",
+          "ETH",
+          "SOL"
+        ],
+        "cycles": 105,
+        "netReturnPct": 6.3018,
+        "profitFactor": 5.6119,
+        "maxDrawdownPct": 0.6612,
+        "stressReturnPct": 2.6501,
+        "positiveWindows": "4/5",
+        "decision": "DISCOVERY_PASS_HOLDOUT_REQUIRED"
+      },
+      "transferHoldout": {
+        "assets": [
+          "DOGE",
+          "XRP",
+          "LINK",
+          "AVAX"
+        ],
+        "cycles": 140,
+        "netReturnPct": 5.5513,
+        "profitFactor": 2.5827,
+        "maxDrawdownPct": 2.4434,
+        "stressReturnPct": 1.9245,
+        "positiveWindows": "4/5",
+        "decision": "HOLDOUT_FAIL_RESEARCH_REDESIGN",
+        "gateReasons": [
+          "XRP_PNL_NOT_POSITIVE"
+        ]
+      },
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -59,12 +97,13 @@
     255,
     256
   ],
-  "nextAction": "Audit the canonical funding-carry successor/data foundation from current main and the closed research evidence. Freeze any successor as a new ruleset before observing results; never relax prior gates or overwrite V1/V2. After that, evaluate a separately frozen new directional challenger. Dynamic Grid remains blocked until a path-aware intraday simulator exists.",
+  "nextAction": "Freeze and test a new uniquely named AdaptiveTrend-style directional challenger from current main using 6h momentum, ATR-based trailing stops, asymmetric long/short allocation and strictly walk-forward monthly selection. Do not retune canonical V1/V2, the failed cross-venue Funding Spread V1 holdout, or the non-canonical r69 V3 result. Keep executionImpact=false. Dynamic Grid remains blocked until a path-aware intraday simulator exists.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
     "concurrentMerge": false,
     "frozenResearchGuard": true,
-    "rule": "Subagent output is advisory until independently reviewed, rebased/rebuilt on current main, green in CI, and merged by Main Agent."
+    "rule": "Subagent output is advisory until independently reviewed, rebased/rebuilt on current main, green in CI, and merged by Main Agent.",
+    "singleWriter": true
   }
 }
