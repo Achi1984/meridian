@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V0_PASS_NEXT_SHARDED_DATA_V1",
+  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_CANARY_PENDING",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "6de6b20e80602409be618860702716510231f456",
+    "verifiedSha": "41b1f6e43b3e2a35e8d8d259c124e347e1bd2455",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1093,7 +1093,7 @@
     255,
     256
   ],
-  "nextAction": "Build a separate sharded DATA_V1 quality foundation for PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1. Process the six assets over 2025-01..2026-08 in bounded asset/time shards, validate every raw archive against its published checksum, stream-parse aggTrades, validate schema/buyer-maker/timestamp monotonicity and month boundaries, and emit compact quarter-hour coverage/quality metadata before deleting raw shards. Also validate 1m kline and funding continuity. Do not calculate directional order imbalance, forward returns, signal-return relationships, positions or PnL. Only after all shards pass may a strategy protocol be preregistered.",
+  "nextAction": "Run the frozen Quarter-Hour Boundary Imbalance V1 DATA_V1 parser invariants plus two real-data canary shards: BTCUSDT/2025-01 and ADAUSDT/2026-08. If both canaries and current-base release/orchestration gates pass unchanged, authorize the full 120 asset-month sharded quality run. The full run must verify official checksums, stream-parse aggTrades/1m klines/funding, emit compact quality manifests and delete raw archives. No directional imbalance, forward returns, signal-return relationship, positions or PnL may be calculated.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1122,7 +1122,7 @@
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_SHARDED_DATA_V1",
+    "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_CANARY",
     "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1149,7 +1149,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "QH_BOUNDARY_IMBALANCE_V1_SHARDED_FULL_DATA_QUALITY_NO_SIGNAL_NO_PNL",
+    "nextStage": "QH_BOUNDARY_IMBALANCE_V1_DATA_V1_CANARY_THEN_120_SHARDS",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1374,7 +1374,7 @@
     "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY",
     "orderFlowV1ProvenanceAuditStatus": "CANONICAL",
     "orderFlowV1ProvenanceAuditMergeSha": "6de6b20e80602409be618860702716510231f456",
-    "qhImbalanceV1Status": "DATA_V0_PASS",
+    "qhImbalanceV1Status": "DATA_V1_CANARY_PENDING",
     "qhImbalanceV1Universe": [
       "BTC",
       "ETH",
@@ -1395,6 +1395,14 @@
     "qhImbalanceV1DataV0ArtifactId": 11053765060,
     "qhImbalanceV1DataV0Objects": "360_OF_360",
     "qhImbalanceV1AggTradesPublishedBytes": 39135762018,
-    "qhImbalanceV1DataV1Architecture": "SHARDED_STREAM_PARSE_DELETE_RAW_AFTER_QUALITY_MANIFEST"
+    "qhImbalanceV1DataV1Architecture": "SHARDED_STREAM_PARSE_DELETE_RAW_AFTER_QUALITY_MANIFEST",
+    "qhImbalanceV1DataV1Shards": 120,
+    "qhImbalanceV1DataV1Canary": [
+      "BTCUSDT:2025-01",
+      "ADAUSDT:2026-08"
+    ],
+    "qhImbalanceV1DataV1MaxParallel": 6,
+    "qhImbalanceV1DataV1RawRetention": false,
+    "qhImbalanceV1DataV1TimestampPolicy": "USD_M_AGGTRADES_AND_1M_KLINES_EXPECT_MILLISECONDS_FAIL_ON_CHANGE"
   }
 }
