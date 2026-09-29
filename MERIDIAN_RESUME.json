@@ -4,11 +4,11 @@
   "build": "10.0-r68",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_REVERSAL_V1_DISCOVERY_FAIL_NEXT_HIGH_VOL_REVERSAL_V2",
+  "phase": "PERPETUAL_REVERSAL_V2_VALIDATION_FAIL_NEXT_RELATIVE_VALUE_V3_FOUNDATION",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "89b9716d3b8c82ddf1a85b159da203e73bfb2154",
+    "verifiedSha": "1d9c960b0f83422a76508e6fd2dd8bd0ab5bb070",
     "verifiedAt": "2026-09-29",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -857,6 +857,39 @@
       "holdoutLoaded": false,
       "promoted": false,
       "immutable": true
+    },
+    "highVolatilityPerpetualCrossSectionalReversalV2": {
+      "ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
+      "stage": "INDEPENDENT_VALIDATION",
+      "rawWindow": "2024-11..2026-08",
+      "validationWindow": "2025-01-06..2026-08-31",
+      "periods": 86,
+      "minEligibleAssets": 23,
+      "highVolSubsetEveryWeek": 12,
+      "sideCountEveryWeek": 2,
+      "netReturnPct": 11.3809,
+      "priceOnlyReturnPct": 10.6142,
+      "profitFactor": 1.152706,
+      "sharpe": 0.370586,
+      "maxDrawdownPct": 20.62694,
+      "positiveWindows": "3/5",
+      "stressReturnPct": 7.92975,
+      "fundingContributionPct": 0.691378,
+      "costContributionPct": -5.04,
+      "turnover": 63,
+      "loserMinusWinnerNextWeekSpreadPct": 0.51427,
+      "positiveAssets": "15/23",
+      "positiveConcentrationPct": 16.1498,
+      "longContribution": "NEGATIVE",
+      "shortContribution": "POSITIVE",
+      "gateReasons": [
+        "SHARPE_LT_0.5",
+        "LONG_CONTRIBUTION_NOT_POSITIVE"
+      ],
+      "decision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "transferAuthorized": false,
+      "promoted": false,
+      "immutable": true
     }
   },
   "nonCanonicalResearch": [
@@ -870,7 +903,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze a new High-Volatility Perpetual Cross-Sectional Reversal V2 before loading any 2025-2026 strategy data. Preserve V1's 8-week formation, 1-week skip, 1-week hold, equal-weight long-losers/short-winners, funding accounting and 8/13 bps turnover costs. The only strategy change should be a pre-trade high-volatility universe condition defined from trailing daily returns available before the weekly anchor; no post-result parameter grid. Use the untouched 2025-01-06..2026-08-31 window as the first independent validation and require an additional transfer validation before any Paper shadow. Keep executionImpact=false.",
+  "nextAction": "Do not rescue Reversal V2 by changing the volatility subset, side gates, horizon, costs or asset list. Build a new strategy-neutral data foundation for a Relative-Value / Beta-Neutral Perpetual Reversal V3 on a separately frozen transfer universe not used by Reversal V1/V2. The V3 hypothesis must isolate the persistent loser-minus-winner spread while neutralizing broad-market beta rather than relying on either absolute long or short leg. Freeze universe, beta-estimation window, residual-return formation, sizing, costs and validation split before any V3 PnL. Keep executionImpact=false and require independent validation before any Paper shadow.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -880,7 +913,7 @@
     "singleWriter": true
   },
   "researchDirection": {
-    "selected": "PERPETUAL_CROSS_SECTIONAL_REVERSAL_V2_HIGH_VOL",
+    "selected": "PERPETUAL_RELATIVE_VALUE_REVERSAL_V3_DATA_FOUNDATION",
     "rationale": "2026 external evidence reports own-history ranking outperforming peer ranking across most tested perpetual-futures factors and surviving held-out universe and high-cost stress; MERIDIAN will treat this as motivation, not as a claimed exact replication.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -907,7 +940,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "STRATEGY_PREREGISTRATION_BEFORE_FIRST_PNL",
+    "nextStage": "V2_VALIDATION_HARNESS_AFTER_CANONICAL_PROTOCOL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -986,6 +1019,19 @@
     "reversalV2Motivation": "EXTERNAL_2026_HIGH_VOL_REVERSAL_EVIDENCE",
     "reversalV2FirstIndependentWindow": "2025-01-06..2026-08-31",
     "reversalV2StrategyPnlAllowed": "ONLY_AFTER_NEW_PROTOCOL_AND_INVARIANTS_FROZEN",
-    "reversalV2TransferRequiredBeforePaper": true
+    "reversalV2TransferRequiredBeforePaper": true,
+    "reversalV2Status": "IMMUTABLE_VALIDATION_FAIL",
+    "reversalV2ChangeFromV1": "UPPER_HALF_CROSS_SECTIONAL_VOLATILITY_USING_56_DAILY_LOG_RETURNS_FROM_FORMATION_WINDOW",
+    "reversalV2Ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
+    "reversalV2MinPrefilterEligible": 15,
+    "reversalV2HighVolRule": "CEIL_N_OVER_2_UPPER_VOLATILITY_HALF",
+    "reversalV2ExpectedAll23Retained": 12,
+    "reversalV2ExpectedAll23SideCount": 2,
+    "reversalV2Economics": "POSITIVE_NET_STRESS_AND_RELATIVE_SPREAD_BUT_SHARPE_AND_LONG_SIDE_FAIL",
+    "reversalV2TransferAuthorized": false,
+    "reversalFamilyObservation": "LOSER_MINUS_WINNER_SPREAD_POSITIVE_IN_V1_AND_V2_WHILE_ABSOLUTE_PROFITABLE_SIDE_FLIPS",
+    "reversalV3Hypothesis": "BETA_NEUTRAL_RELATIVE_VALUE_REVERSAL",
+    "reversalV3Stage": "DATA_FOUNDATION_BEFORE_STRATEGY",
+    "reversalV3StrategyPnlAllowed": false
   }
 }

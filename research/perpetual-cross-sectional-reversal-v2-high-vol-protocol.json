@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "ruleset": "HIGH-VOLATILITY-PERPETUAL-CROSS-SECTIONAL-REVERSAL-V2-FROZEN",
+  "status": "FROZEN_BEFORE_FIRST_V2_PNL",
+  "executionImpact": false,
+  "autoPromotion": false,
+  "parents": [
+    "PERPETUAL-CROSS-SECTIONAL-REVERSAL-V1-FROZEN",
+    "PERPETUAL-CROSS-SECTIONAL-REVERSAL-V1-DATA-V1-FROZEN"
+  ],
+  "assets": [
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX",
+    "HBAR",
+    "TRX",
+    "ETC",
+    "XLM",
+    "ATOM",
+    "UNI",
+    "AAVE",
+    "FIL",
+    "NEAR",
+    "OP",
+    "INJ",
+    "APT",
+    "CRV",
+    "LDO",
+    "GALA",
+    "IMX"
+  ],
+  "window": {
+    "stage": "INDEPENDENT_VALIDATION",
+    "start": "2025-01-06T00:00:00Z",
+    "endExclusiveEntry": "2026-08-31T00:00:00Z",
+    "finalExit": "2026-08-31T00:00:00Z",
+    "expectedPeriods": 86
+  },
+  "signal": {
+    "formationWeeks": 8,
+    "skipWeeks": 1,
+    "holdWeeks": 1,
+    "formation": "CLOSE(t-7d)/CLOSE(t-63d)-1"
+  },
+  "volatilityCondition": {
+    "sourceWindow": "same completed-close interval t-63d..t-7d",
+    "closeMarks": 57,
+    "dailyLogReturns": 56,
+    "estimator": "sample_standard_deviation_n_minus_1",
+    "annualization": "sqrt(365)",
+    "rank": "ascending_vol_then_symbol",
+    "retained": "ceil(N/2)_upper_volatility_half",
+    "all23ExpectedRetained": 12
+  },
+  "portfolio": {
+    "rank": "formation_return_ascending_then_symbol",
+    "sideCount": "floor(retained_count/5)",
+    "minimumSideCount": 2,
+    "all23ExpectedSideCount": 2,
+    "longGross": 0.5,
+    "shortGross": -0.5,
+    "equalWeight": true,
+    "grossExposure": 1,
+    "netExposure": 0
+  },
+  "costs": {
+    "baseBpsPerTurnover": 8,
+    "stressBpsPerTurnover": 13
+  },
+  "funding": {
+    "interval": "(t,t+7d]",
+    "maxGapHours": 12
+  },
+  "gate": {
+    "expectedPeriods": 86,
+    "minPrefilterEligibleEveryWeek": 15,
+    "minRetainedEveryWeek": 8,
+    "minSideCountEveryWeek": 2,
+    "netReturnPositive": true,
+    "priceOnlyReturnPositive": true,
+    "minProfitFactor": 1.1,
+    "minSharpe": 0.5,
+    "maxDrawdownPct": 25,
+    "minPositiveWindowsOf5": 3,
+    "stressReturnPositive": true,
+    "longContributionPositive": true,
+    "shortContributionPositive": true,
+    "minPositiveAssets": 12,
+    "maxPositiveConcentrationPct": 25,
+    "meanLoserMinusWinnerSpreadPositive": true
+  },
+  "passDecision": "VALIDATION_PASS_TRANSFER_REQUIRED",
+  "failDecision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+  "transferRequiredBeforePaper": true,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}

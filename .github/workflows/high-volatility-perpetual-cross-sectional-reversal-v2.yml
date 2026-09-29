@@ -1,0 +1,45 @@
+name: MERIDIAN High-Volatility Perpetual Reversal V2
+
+on:
+  push:
+    branches:
+      - research/perpetual-cross-sectional-reversal-v2-high-vol
+    paths:
+      - "research/high_volatility_perpetual_cross_sectional_reversal_v2.py"
+      - "research/run-high-volatility-perpetual-cross-sectional-reversal-v2.py"
+      - "scripts/collect-high-volatility-perpetual-cross-sectional-reversal-v2.py"
+      - "test/test_high_volatility_perpetual_cross_sectional_reversal_v2.py"
+      - "research/perpetual_cross_sectional_reversal_v1.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: high-volatility-perpetual-cross-sectional-reversal-v2
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify V1 foundation invariants and frozen V2 invariants
+        run: |
+          python3 test/test_perpetual_cross_sectional_reversal_v1.py
+          python3 test/test_high_volatility_perpetual_cross_sectional_reversal_v2.py
+      - name: Collect frozen V2 replay data
+        run: python3 scripts/collect-high-volatility-perpetual-cross-sectional-reversal-v2.py
+      - name: Replay frozen V2 validation
+        run: python3 research/run-high-volatility-perpetual-cross-sectional-reversal-v2.py
+      - name: Upload V2 replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: high-volatility-perpetual-cross-sectional-reversal-v2
+          path: |
+            research/results/high-volatility-perpetual-cross-sectional-reversal-v2-summary.json
+            research/results/high-volatility-perpetual-cross-sectional-reversal-v2-full.json
+            research/results/high-volatility-perpetual-cross-sectional-reversal-v2.md
+          if-no-files-found: error
+          retention-days: 30
