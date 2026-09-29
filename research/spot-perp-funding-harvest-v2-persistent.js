@@ -12,6 +12,7 @@ export const SPOT_PERP_FUNDING_HARVEST_V2_CONFIG=Object.freeze({
   ...SPOT_PERP_FUNDING_HARVEST_V1_CONFIG,
   entryThreshold:0.00775,
   holdThresholdExclusive:0,
+  monthlyPortfolioCapital:160000,
   developmentGate:Object.freeze({
     decisionSlots:88,
     minExposureMonths:32,
