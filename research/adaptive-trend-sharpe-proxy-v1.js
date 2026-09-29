@@ -63,7 +63,8 @@ function standaloneSide(series,side,sampleStart,sampleEnd,cfg,costBps=cfg.costBp
   if(indices.length<cfg.selectorMinBars)return{eligibleData:false,returns:[],sharpe:0,unavailable:0};
   let state={active:false,trail:null},prevW=0,unavailable=0;const rs=[];
   for(const i of indices){const cur=series.rows[i],next=series.rows[i+1];let nextState=updateState(state,series,i,side,cfg);let w=nextState.active?side:0;
-    if(w&&(!contiguous(cur,next,cfg)||!fundingCoverage(series.funding,cur.closeTime,next.closeTime,cfg.maxFundingGapHours*HOUR))){nextState={active:false,trail:null};w=0;unavailable++}
+    if(!contiguous(cur,next,cfg)){nextState={active:false,trail:null};w=0;unavailable++}
+    else if(w&&!fundingCoverage(series.funding,cur.closeTime,next.closeTime,cfg.maxFundingGapHours*HOUR)){nextState={active:false,trail:null};w=0;unavailable++}
     const cost=Math.abs(w-prevW)*costBps/10000;let r=-cost;
     if(w){r+=w*(next.close/cur.close-1)-w*sumFundingBetween(series.funding,cur.closeTime,next.closeTime)}
     rs.push(r);prevW=w;state=nextState;
