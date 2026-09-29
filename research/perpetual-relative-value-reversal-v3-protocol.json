@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-RELATIVE-VALUE-REVERSAL-V3-FROZEN",
+  "status": "FROZEN_BEFORE_FIRST_V3_PNL",
+  "executionImpact": false,
+  "autoPromotion": false,
+  "candidateUniverse": [
+    "SAND",
+    "MANA",
+    "ALGO",
+    "ZEC",
+    "IOTA",
+    "ZIL",
+    "COMP",
+    "SNX",
+    "KSM",
+    "1INCH",
+    "CHZ",
+    "RUNE",
+    "SUSHI",
+    "DYDX",
+    "APE",
+    "ARB",
+    "SUI",
+    "WLD",
+    "SEI"
+  ],
+  "benchmarkAssets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP"
+  ],
+  "split": {
+    "method": "sort_ascending_sha256_hex_of_MERIDIAN-RV-V3|ASSET",
+    "primary": [
+      "RUNE",
+      "ZIL",
+      "SEI",
+      "ARB",
+      "DYDX",
+      "KSM",
+      "WLD",
+      "MANA",
+      "ZEC",
+      "SUI"
+    ],
+    "transfer": [
+      "SAND",
+      "ALGO",
+      "SNX",
+      "COMP",
+      "SUSHI",
+      "APE",
+      "1INCH",
+      "IOTA",
+      "CHZ"
+    ]
+  },
+  "window": {
+    "start": "2025-01-06T00:00:00Z",
+    "endExclusiveEntry": "2026-08-31T00:00:00Z",
+    "finalExit": "2026-08-31T00:00:00Z",
+    "expectedAnchors": 86
+  },
+  "marketFactor": {
+    "dailyReturn": "equal_weight_mean_of_five_daily_log_returns",
+    "benchmarkWeightEach": 0.2
+  },
+  "beta": {
+    "observations": 360,
+    "model": "OLS_with_intercept_then_Vasicek_style_cross_sectional_shrinkage",
+    "end": "t-7d",
+    "priorScope": "current_frozen_stage_universe_only",
+    "clipping": false
+  },
+  "signal": {
+    "formationDailyReturns": 56,
+    "formation": "t-63d_to_t-7d_completed_close_marks",
+    "residual": "sum(asset_log_return - shrunk_beta * market_factor_log_return)",
+    "interceptSubtracted": false,
+    "skipWeeks": 1,
+    "holdWeeks": 1
+  },
+  "selection": {
+    "longCount": 2,
+    "shortCount": 2,
+    "tieBreak": "asset_symbol_ascending"
+  },
+  "sizing": {
+    "betaNeutral": true,
+    "longGross": "B_short/(B_long+B_short)",
+    "shortGross": "B_long/(B_long+B_short)",
+    "requiredMeanLongBetaPositive": true,
+    "requiredMeanShortBetaPositive": true,
+    "minSideGross": 0.2,
+    "maxSideGross": 0.8,
+    "grossExposure": 1,
+    "maxAbsEstimatedBetaExposure": 1e-10,
+    "outsideGuard": "ZERO_EXPOSURE_WEEK"
+  },
+  "costs": {
+    "baseBpsPerTurnover": 8,
+    "stressBpsPerTurnover": 13
+  },
+  "funding": {
+    "interval": "(t,t+7d]",
+    "maxGapHours": 12
+  },
+  "gates": {
+    "common": {
+      "expectedAnchors": 86,
+      "minActiveWeeks": 65,
+      "maxAbsEstimatedBetaExposure": 1e-10,
+      "netReturnPositive": true,
+      "priceOnlyReturnPositive": true,
+      "minProfitFactor": 1.1,
+      "minSharpe": 0.5,
+      "maxDrawdownPct": 25,
+      "minPositiveWindowsOf5": 3,
+      "stressReturnPositive": true,
+      "maxPositiveConcentrationPct": 35,
+      "meanSelectedLoserMinusWinnerSpreadPositive": true,
+      "maxAbsExPostRealizedMarketBeta": 0.2
+    },
+    "primary": {
+      "assetCount": 10,
+      "minPositiveAssets": 5,
+      "passDecision": "PRIMARY_VALIDATION_PASS_TRANSFER_REQUIRED",
+      "failDecision": "PRIMARY_VALIDATION_FAIL_RESEARCH_REDESIGN"
+    },
+    "transfer": {
+      "assetCount": 9,
+      "minPositiveAssets": 5,
+      "passDecision": "TRANSFER_PASS_PAPER_REVIEW_ELIGIBLE",
+      "failDecision": "TRANSFER_FAIL_RESEARCH_REDESIGN"
+    }
+  },
+  "transferLoadedBeforePrimaryPass": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
