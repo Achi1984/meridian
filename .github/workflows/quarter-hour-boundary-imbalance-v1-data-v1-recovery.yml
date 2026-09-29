@@ -34,7 +34,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-BTCUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/BTCUSDT
           merge-multiple: true
 
       - name: Download original ETHUSDT shard manifests
@@ -43,7 +43,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-ETHUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/ETHUSDT
           merge-multiple: true
 
       - name: Download original XRPUSDT shard manifests
@@ -52,7 +52,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-XRPUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/XRPUSDT
           merge-multiple: true
 
       - name: Download original SOLUSDT shard manifests
@@ -61,7 +61,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-SOLUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/SOLUSDT
           merge-multiple: true
 
       - name: Download original DOGEUSDT shard manifests
@@ -70,7 +70,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-DOGEUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/DOGEUSDT
           merge-multiple: true
 
       - name: Download original ADAUSDT shard manifests
@@ -79,7 +79,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: 36613725640
           pattern: qh-v1-shard-ADAUSDT-*
-          path: research/results/qh-v1-original
+          path: research/results/qh-v1-original/ADAUSDT
           merge-multiple: true
 
       - name: Re-validate only SOLUSDT 2025-07 under corrected source semantics
@@ -92,14 +92,14 @@ jobs:
       - name: Assemble recovered 120-shard manifest set
         run: |
           mkdir -p research/results/qh-v1-recovered
-          original_count="$(find research/results/qh-v1-original -maxdepth 1 -name '*.json' | wc -l)"
+          original_count="$(find research/results/qh-v1-original -type f -name '*.json' | wc -l)"
+          echo "Original manifest count: $original_count"
           test "$original_count" -eq 120
-          cp research/results/qh-v1-original/*.json research/results/qh-v1-recovered/
+          find research/results/qh-v1-original -type f -name '*.json' -exec cp {} research/results/qh-v1-recovered/ \;
           cp research/results/qh-v1-corrected/SOLUSDT-2025-07.json research/results/qh-v1-recovered/SOLUSDT-2025-07.json
           count="$(find research/results/qh-v1-recovered -maxdepth 1 -name '*.json' | wc -l)"
-          test "$count" -eq 120
-          echo "Original manifest count: $original_count"
           echo "Recovered manifest count: $count"
+          test "$count" -eq 120
 
       - name: Require recovered 120/120 green shards
         env:
