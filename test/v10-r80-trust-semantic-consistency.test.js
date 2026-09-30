@@ -40,11 +40,11 @@ test('r80 canonicalizes BTC market intelligence across Forecast and Scanner',()=
 
 test('r80 separates true safety danger from technical structure review',()=>{
   const pair=block('function pairStatus(symbol){','function exposure');
-  assert.match(pair,/PROTECTION RISK'.*tone:'danger',rank:160/s);
-  assert.match(pair,/LIQ RISK'.*tone:'danger',rank:150/s);
-  assert.match(pair,/DATA STALE'.*rank:140/s);
-  assert.match(pair,/UNVERIFIED'.*rank:130/s);
-  assert.match(pair,/MARKET STALE'.*rank:120/s);
+  assert.match(pair,/PROTECTION RISK'.*tone:'danger',rank:130/s);
+  assert.match(pair,/LIQ RISK'.*tone:'danger',rank:120/s);
+  assert.match(pair,/DATA STALE'.*rank:100/s);
+  assert.match(pair,/UNVERIFIED'.*rank:90/s);
+  assert.match(pair,/MARKET STALE'.*rank:80/s);
   assert.match(pair,/STRUCTURE REVIEW'.*tone:'watch',rank:70/s);
   const next=block('function nextAction(){','function syncHealth');
   assert.match(next,/STRUCTURE REVIEW/);
