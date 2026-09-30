@@ -9,7 +9,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
 test('r102 release identity is execution-neutral and cache coherent',()=>{
-  assert.ok(Number(String(release.terminalBuild).match(/r(\\d+)$/)?.[1]||0)>=102);
+  assert.ok(Number(String(release.terminalBuild).match(/r(\d+)$/)?.[1]||0)>=102);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/LIVE-HISTORY-INTEGRITY/);
   const rev=String(release.terminalBuild).match(/r\\d+$/)?.[0];
