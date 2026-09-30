@@ -113,19 +113,19 @@ function symbols(){
 }
 function pairStatus(symbol){
   const s=S(),h=H(),rows=matchedRows(symbol);
-  if(!s||!rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:'Kein sicher gematchter privater Bot'};
-  if(!h.botFeedFresh?.())return{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:140,reason:'Privater Bot-Snapshot ist nicht frisch genug'};
+  if(!s||!rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:'Kein sicher gematchter privater Bot'};
+  if(!h.botFeedFresh?.())return{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:100,reason:'Privater Bot-Snapshot ist nicht frisch genug'};
   const risks=rows.map(b=>h.risk?.(b)).filter(x=>x!=null),protection=rows.map(stopLossIssue).filter(Boolean),assetKey=String(symbol||'').trim().toUpperCase(),unmatchedAsset=(s.unmatchedLive||[]).filter(x=>String(x?.symbol||'').trim().toUpperCase()===assetKey),ambiguousAsset=unmatchedAsset.filter(x=>x?.reason==='AMBIGUOUS_MATCH').length;
   const hardProtection=protection.find(x=>x.critical),nearProtection=protection.find(x=>!x.critical);
-  if(hardProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:160,reason:hardProtection.reason};
+  if(hardProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:130,reason:hardProtection.reason};
   const min=risks.length?Math.min(...risks):null;
-  if(min!=null&&min<10)return{code:'LIQ_RISK',label:'LIQ RISK',tone:'danger',rank:150,reason:'Liq-Puffer nur '+min.toFixed(1)+'%'};
-  if(nearProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:145,reason:nearProtection.reason};
-  if(unmatchedAsset.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:unmatchedAsset.length+' aktuelle '+assetKey+' Bot-Row(s) nicht sicher gematcht'+(ambiguousAsset?' · '+ambiguousAsset+' ambiguous':'')};
-  if(rows.some(b=>!h.livePnlAvailable?.(b))||risks.length!==rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:'Mindestens ein Action-Feld (PnL/Liq) fehlt live'};
-  if(!intelFresh(marketIntel(symbol)))return{code:'MARKET_STALE',label:'MARKET STALE',tone:'muted',rank:120,reason:'15m/1h/4h Marktdaten sind nicht frisch · nur Safety-Daten bleiben gültig'};
+  if(min!=null&&min<10)return{code:'LIQ_RISK',label:'LIQ RISK',tone:'danger',rank:120,reason:'Liq-Puffer nur '+min.toFixed(1)+'%'};
+  if(nearProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:115,reason:nearProtection.reason};
+  if(unmatchedAsset.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:unmatchedAsset.length+' aktuelle '+assetKey+' Bot-Row(s) nicht sicher gematcht'+(ambiguousAsset?' · '+ambiguousAsset+' ambiguous':'')};
+  if(rows.some(b=>!h.livePnlAvailable?.(b))||risks.length!==rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:'Mindestens ein Action-Feld (PnL/Liq) fehlt live'};
+  if(!intelFresh(s.assetIntel?.[symbol]))return{code:'MARKET_STALE',label:'MARKET STALE',tone:'muted',rank:80,reason:'15m/1h/4h Marktdaten sind nicht frisch · nur Safety-Daten bleiben gültig'};
   const plans=rows.map(b=>h.profitLockPlan?.(b)).filter(Boolean);
-  const signals=rows.map(b=>{const intel=marketIntel(b.symbol);return intelFresh(intel)?h.actionForSide?.(intel,b.side||'LONG'):'SYNC'});
+  const signals=rows.map(b=>intelFresh(s.assetIntel?.[b.symbol])?h.actionForSide?.(s.assetIntel?.[b.symbol],b.side||'LONG'):'SYNC');
   if(plans.some(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)))return{code:'PROFIT_LOCK',label:'PROFIT LOCK',tone:'watch',rank:60,reason:'Technische Schwäche + ausreichendes Gewinnpolster'};
   if(signals.includes('RISK REVIEW'))return{code:'RISK_REVIEW',label:'STRUCTURE REVIEW',tone:'watch',rank:70,reason:'4h/1h Struktur dreht gegen mindestens eine Seite'};
   if(signals.includes('PROFIT LOCK CANDIDATE')||signals.includes('WATCH PROFIT'))return{code:'WATCH_PROFIT',label:'WATCH PROFIT',tone:'watch',rank:40,reason:'15m/1h Frühwarnung · 4h noch nicht als Exit bestätigt'};
@@ -196,9 +196,9 @@ function pairCard(symbol,compact=false,open=false,assetLink=false){
 }
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
-  if(!h.botFeedFresh?.())return{symbol:'BOT DATA',status:{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:140,reason:'Live-Bot-Layer ist nicht frisch · Asset Watch bleibt nur Referenz'}};
+  if(!h.botFeedFresh?.())return{symbol:'BOT DATA',status:{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:100,reason:'Live-Bot-Layer ist nicht frisch · Asset Watch bleibt nur Referenz'}};
   const candidates=symbols().map(symbol=>({symbol,status:pairStatus(symbol)})),unmatched=s.unmatchedLive||[];
-  if(unmatched.length)candidates.push({symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:unmatched.length+' private Bot-Rows sind nicht sicher gematcht'+(Number(s.matchAmbiguous||0)?' · '+Number(s.matchAmbiguous)+' ambiguous':'')}});
+  if(unmatched.length)candidates.push({symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:unmatched.length+' private Bot-Rows sind nicht sicher gematcht'+(Number(s.matchAmbiguous||0)?' · '+Number(s.matchAmbiguous)+' ambiguous':'')}});
   return candidates.sort((a,b)=>b.status.rank-a.status.rank)[0]||null;
 }
 function nextAction(){
@@ -215,7 +215,7 @@ function nextAction(){
 }
 function syncHealth(){
   const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.(),identityMode=String(s?.botIdentityMode||'REFERENCE_MATCH'),apiNative=identityMode==='API_NATIVE';
-  const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],marketRows=fresh?rows.filter(b=>intelFresh(marketIntel(b.symbol))):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(marketIntel(b.symbol)))):[];
+  const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],marketRows=fresh?rows.filter(b=>intelFresh(s?.assetIntel?.[b.symbol])):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
   const safetyReady=safetyRows.length,pnlReady=pnlRows.length,marketReady=marketRows.length,decisionReady=decisionRows.length,pnlMissing=Math.max(0,matched-pnlReady),marketMissing=Math.max(0,matched-marketReady),safetyMissing=Math.max(0,matched-safetyReady),actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
   const botApiStatus=String(s?.pionexBotSync?.status||'UNKNOWN'),status=String(s?.botFeedStatus||botApiStatus),walletFeed=status==='WALLET_DETAIL_OK',age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
   const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=walletFeed?apiRows:(botApiStatus==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows);
@@ -875,7 +875,7 @@ function renderScanner(force=false){
   if(!force&&$('.v10-scanner-stack',view))return;
   if(!force&&!$('.bt-control',view)&&!$('.hero',view))return;
   const moreOpen=force?!!$('.scanner-more:not(.scanner-stale)',view)?.open:false,staleOpen=force?!!$('.scanner-more.scanner-stale',view)?.open:false;
-  const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(marketIntel(x))).sort((a,b)=>{const A=opportunityContext(a),B=opportunityContext(b),sa=marketSignal(marketIntel(a)),sb=marketSignal(marketIntel(b));return B.score-A.score||sb.rank-sa.rank||sb.score-sa.score}),stale=all.filter(x=>!!marketIntel(x)&&!intelFresh(s.assetIntel[x])),missing=all.filter(x=>!marketIntel(x)),blocked=[...stale,...missing];
+  const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(marketIntel(x))).sort((a,b)=>{const A=opportunityContext(a),B=opportunityContext(b),sa=marketSignal(marketIntel(a)),sb=marketSignal(marketIntel(b));return B.score-A.score||sb.rank-sa.rank||sb.score-sa.score}),stale=all.filter(x=>!!marketIntel(x)&&!intelFresh(marketIntel(x))),missing=all.filter(x=>!marketIntel(x)),blocked=[...stale,...missing];
   const confirmed=fresh.filter(x=>marketSignal(marketIntel(x)).confirmed),top=fresh.slice(0,4),rest=fresh.slice(4),liveLinked=h.botFeedFresh?.()?all.filter(x=>matchedRows(x).length).length:0,refLinked=all.filter(referenceLinked).length,best=top[0]?opportunityContext(top[0]):null;
   const stack=top.length?top.map(scannerCard).join(''):'<section class="v10-live-blocked market-stale"><b>SCANNER BLOCKED</b><small>Keine frischen Multi-Timeframe-Marktdaten · keine bestätigten Setups ausgeben.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section>'+dataStateStripHtml('research')+'<section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Paper Cockpit und Strategie-Lab bleiben sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><div class="scanner-toolbar-actions"><button type="button" data-open-paper>PAPER COCKPIT</button><button type="button" data-open-lab>LAB ÖFFNEN</button></div></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
