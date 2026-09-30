@@ -1,7 +1,7 @@
 # MERIDIAN Chat Handoff
 
 Status: **canonical after merge**  
-Updated: **2026-09-30 22:11 Europe/Vienna**
+Updated: **2026-09-30 23:11 Europe/Vienna**
 
 ## Why this file exists
 
@@ -20,26 +20,49 @@ The full recovery protocol is in `docs/AGENT_ORCHESTRATION.md`.
 
 ## Current durable checkpoint
 
-- Build: **10.0-r102**
-- Canonical main SHA: **9a8a6df5c810c0c2a5a0ef0890305ef82dbef576**
-- Last merged UI PR: **#409 — Live build and history integrity**
+- Build: **10.0-r104**
+- Canonical UI release SHA: **65834f47a1b9850bb52e2e169e96708fd716cbe9**
+- Last merged UI PR: **#415 — Portfolio history component integrity**
+- Prior UI PR: **#413 — Scanner confluence explainability**
 - Execution impact: **false**
-- UI sequence already completed: **r93 through r102**
+- UI sequence already completed: **r93 through r104**
 - Do **not** repeat these releases after a streaming interruption.
 
-### Portfolio checkpoint
+### Live verification and portfolio checkpoint
 
-Last user-verified live composition:
+The user live-verified **r102** from the iPhone dashboard on 2026-09-30 around 22:56 Europe/Vienna:
 
-- Ledger: **$790.08**
+- BUILD: **R102**
+- Strict history shown: **32 points**
+- 1H: **READY** (13 points)
+- 1D: **BUILDING**
+- 1W: **BUILDING**
+- Ledger: **$798.38**
 - OKX: **$116.30**
-- Pionex: **$34,329.97**
-- Gesamtportfolio: **$35,236.35**
-- Portfolio: **READY**
-- Bots: **READY**
-- Market: **READY**
+- Pionex: **$34,456.92**
+- Gesamtportfolio: **$35,371.60**
+- Portfolio / Bots / Market were observed **READY** after refresh.
 
-The 1H / 1D / 1W portfolio chart is deliberately built only from canonical `STRICT_AUTHORITY` history points. It must never synthesize or backfill fake history.
+The same live screenshot exposed a real history-integrity anomaly: the 1D chart included a legacy point around **$1,798.71** before the current ~$35.4k total.
+
+Root cause fixed in **r104**:
+
+- a canonical history point now requires complete **Spot/Venue authority + Pionex Equity authority**;
+- canonical history marks trading provenance as `PIONEX_EQUITY`;
+- incomplete legacy rows remain in PostgreSQL as audit evidence but are excluded from chart/API canonical points;
+- the UI independently requires `STRICT_AUTHORITY + PIONEX_EQUITY`;
+- excluded legacy rows may be surfaced as **BLOCKED**;
+- no synthetic history, interpolation, backfill, or deletion is authorized.
+
+### Exact next durable step
+
+Live-verify **r104** after deployment:
+
+1. confirm **BUILD R104**;
+2. confirm the old ~$1,798.71 incomplete point is no longer charted;
+3. record any **BLOCKED** legacy-point count;
+4. confirm current 1H / 1D / 1W maturity;
+5. then continue only the first incomplete UI milestone after r104.
 
 ## Exact next-chat recovery procedure
 
@@ -65,4 +88,3 @@ The sustainable mitigation is **short atomic work bursts + durable checkpoints**
 ## Ready-to-use prompt for a new chat
 
 > Meridian fortsetzen. Hole dir zuerst den tatsächlichen aktuellen Stand aus `main`, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, offenen relevanten PRs/Branches und CI. Verlasse dich nicht auf den letzten sichtbaren Chattext. Wiederhole keine bereits gemergten Arbeiten. Setze beim ersten unvollständigen dauerhaften Schritt fort und arbeite stream-safe in kurzen atomaren Bursts mit Repository-Checkpoint nach Mutationen.
-
