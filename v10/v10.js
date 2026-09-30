@@ -446,7 +446,7 @@ function commandOverviewHtml(){
   const risk=crit?.status||{label:'SYNC',tone:'muted',reason:'Noch keine bewertbare Bot-Priorität'};
   const portfolioReady=p.complete===true,feedReady=g.decisionComplete&&m.coverageComplete;
   const dataTone=feedReady?'safe':g.fresh||m.fresh?'watch':'danger',dataLabel=feedReady?'READY':g.fresh||m.fresh?'PARTIAL':'STALE';
-  // LIVE DATA covers feed freshness only; portfolio authority remains separate.
+  // DATA FRESHNESS semantic contract: LIVE DATA covers feed freshness only; portfolio authority remains separate.
   const cards='<section class="command-kpi-grid"><div class="command-kpi-primary"><span>GESAMTVERMÖGEN</span><b>'+(portfolioReady?h.money?.(p.total):'—')+'</b><small>'+(portfolioReady?'kanonischer Venue-Total':'Authority unvollständig')+'</small></div>'+deltaHtml(d24,'24H Δ')+deltaHtml(d7,'7T Δ')+'<div><span>RISK STATUS</span><b class="tone-'+esc(risk.tone)+'">'+esc(risk.label)+'</b><small>'+esc(crit?.symbol||'Portfolio')+'</small></div><div><span>LIVE DATA</span><b class="tone-'+dataTone+'">'+dataLabel+'</b><small>MKT '+m.freshAssets+'/'+m.totalAssets+' · BOT '+g.decisionReady+'/'+g.matched+'</small></div></section>';
   return '<section class="command-overview-v2">'+cards+'</section>';
 }
