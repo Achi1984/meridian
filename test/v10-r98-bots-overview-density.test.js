@@ -19,7 +19,7 @@ test('r98 bot asset cards start closed and preserve explicit open state',()=>{
   const start=js.indexOf('function renderBots(force=false)'),end=js.indexOf('function marketUniverse()',start),block=js.slice(start,end);
   assert.match(block,/liveCards=syms\.map\(symbol=>pairCard\(symbol,false,hadAssetAccordion\?openAssets\.has\(symbol\):false,true\)\)/);
   assert.doesNotMatch(block,/symbol===criticalSymbol/);
-  assert.match(block,/openAssets=new Set\(\$\$\('\.asset-pair-details\[open\]'/);
+  assert.match(block,/openAssets=new Set\(\[\.\.\.view\.querySelectorAll\('\.asset-pair-details\[open\]'\)\]\.map/);
 });
 
 test('r98 keeps risk-first ordering and surfaces filter counts without new scoring',()=>{
