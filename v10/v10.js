@@ -453,11 +453,16 @@ function deltaHtml(d,label){
   return '<div><span>'+label+'</span><b class="tone-'+tone+'">'+sign+fmt(d.pct,2)+'%</b><small>'+sign+H().money?.(d.delta)+'</small></div>';
 }
 const PORTFOLIO_CHART_WINDOWS=Object.freeze({ '1h':60*60*1000,'1d':24*60*60*1000,'1w':7*24*60*60*1000 });
+const PORTFOLIO_HISTORY_PIONEX_MAX_AGE_MS=15*60*1000;
+function portfolioHistoryTradingAuthorityFresh(x){
+  const ts=Number(x?.timestamp),s=x?.sourceStatus||{},raw=s?.tradingUpdatedAt??null,updatedAt=raw==null||raw===''?NaN:(Number.isFinite(Number(raw))?Number(raw):Date.parse(String(raw)));
+  return Number.isFinite(ts)&&String(s?.trading||'')==='PIONEX_EQUITY'&&s?.tradingFresh===true&&String(s?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1'&&String(s?.tradingSource||'')!=='MISSING'&&String(s?.tradingSource||'')!=='MISSING_OR_STALE'&&Number.isFinite(updatedAt)&&updatedAt<=ts+30000&&ts-updatedAt<=PORTFOLIO_HISTORY_PIONEX_MAX_AGE_MS;
+}
 function strictPortfolioHistoryPoints(){
   const rows=Array.isArray(S()?.portfolioHistory?.points)?S().portfolioHistory.points:[],now=Date.now()+30000;
   const clean=rows.filter(x=>{
     const ts=Number(x?.timestamp),spot=Number(x?.spotUsd),trading=Number(x?.tradingUsd),total=Number(x?.totalUsd);
-    return Number.isFinite(ts)&&ts<=now&&Number.isFinite(spot)&&spot>=0&&Number.isFinite(trading)&&trading>=0&&Number.isFinite(total)&&total>=0&&Math.abs(total-(spot+trading))<=1&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY';
+    return Number.isFinite(ts)&&ts<=now&&Number.isFinite(spot)&&spot>=0&&Number.isFinite(trading)&&trading>=0&&Number.isFinite(total)&&total>=0&&Math.abs(total-(spot+trading))<=1&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&portfolioHistoryTradingAuthorityFresh(x);
   }).sort((a,b)=>Number(a.timestamp)-Number(b.timestamp));
   const unique=[];for(const x of clean){if(unique.length&&Number(unique.at(-1).timestamp)===Number(x.timestamp))unique[unique.length-1]=x;else unique.push(x)}
   return unique;
@@ -505,7 +510,7 @@ function portfolioHistoryIntegrityHtml(){
     const m=portfolioChartModel(key),ready=m.deltaAvailable,started=m.points>=2||strict.length>0,tone=ready?'safe':started?'watch':'muted',label=ready?'READY':started?'BUILDING':'WAIT',detail=ready?m.points+' PUNKTE · VOLLES FENSTER':started?m.points+' PUNKTE · FENSTER BAUT AUF':'NOCH KEIN FENSTER';
     return '<div class="portfolio-integrity-item portfolio-integrity-range tone-'+tone+'" data-history-range="'+key+'" data-history-ready="'+(ready?'true':'false')+'"><span>'+portfolioChartRangeLabel(key)+'</span><b>'+label+'</b><small>'+esc(detail)+'</small></div>';
   };
-  return '<div class="portfolio-integrity-strip" role="status" aria-label="Build und Portfolio-Historienintegrität" data-build="'+esc(BUILD)+'" data-history-points="'+strict.length+'"><div class="portfolio-integrity-item portfolio-integrity-build"><span>BUILD</span><b>'+esc(rev)+'</b><small>LIVE SHELL ID</small></div><div class="portfolio-integrity-item portfolio-integrity-history" title="'+esc(source)+'"><span>STRICT HISTORY</span><b>'+strict.length+' PUNKTE</b><small>SPOT + PIONEX · '+esc(latestAge)+(excluded?' · '+excluded+' BLOCKED':'')+'</small></div>'+rangeCard('1h')+rangeCard('1d')+rangeCard('1w')+'</div>';
+  return '<div class="portfolio-integrity-strip" role="status" aria-label="Build und Portfolio-Historienintegrität" data-build="'+esc(BUILD)+'" data-history-points="'+strict.length+'"><div class="portfolio-integrity-item portfolio-integrity-build"><span>BUILD</span><b>'+esc(rev)+'</b><small>LIVE SHELL ID</small></div><div class="portfolio-integrity-item portfolio-integrity-history" title="'+esc(source)+'"><span>STRICT HISTORY</span><b>'+strict.length+' PUNKTE</b><small>SPOT + FRESH PIONEX · '+esc(latestAge)+(excluded?' · '+excluded+' BLOCKED':'')+'</small></div>'+rangeCard('1h')+rangeCard('1d')+rangeCard('1w')+'</div>';
 }
 // Legacy Command semantic contract: GESAMTVERMÖGEN is now rendered as the dominant GESAMTPORTFOLIO hero.
 function portfolioChartHeroHtml(){
