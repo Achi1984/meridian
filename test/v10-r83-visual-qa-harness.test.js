@@ -10,11 +10,13 @@ const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',impo
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r83 release identity remains execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r83');
+test('r83 visual-QA contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=83,'expected r83 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/VISUAL-QA-HARNESS/);
-  assert.equal(manifest.start_url,'./v10/?build=r83&fresh=r83');
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r83 visual fixture is localhost-only and disables live refresh only there',()=>{
