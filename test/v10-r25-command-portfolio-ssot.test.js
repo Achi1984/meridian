@@ -7,8 +7,9 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r25 COMMAND total uses the canonical current Spot + Pionex contract',()=>{
-  assert.ok(v9.includes("canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot"));
+  assert.ok(v9.includes("canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,authoritativePionexEquitySnapshot"));
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
+  assert.match(block,/resolvedPionex=authoritativePionexEquitySnapshot\(d,now\)/);
   assert.match(block,/snapshot=canonicalPortfolioSnapshot\(canonicalInput,Date\.now\(\)\)/);
   assert.match(block,/total=privateComplete\?snapshot\.totalUsd:null/);
   assert.doesNotMatch(block,/total=pionex\+ledger\+okx/);
