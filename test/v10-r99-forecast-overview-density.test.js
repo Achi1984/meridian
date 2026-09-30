@@ -58,3 +58,14 @@ test('r99 remains presentation-only',()=>{
   const block=renderBlock();
   assert.doesNotMatch(block,/submitOrder|placeOrder|createOrder|cancelOrder|postJson|method:\s*['"]POST|\/trade\/order/);
 });
+
+
+test('r99 visual QA avoids RAF starvation in the synchronous bot accordion flow',()=>{
+  const start=js.indexOf("}else if(cfg.flow==='bot-toggle'){");
+  const end=js.indexOf("}else if(cfg.flow==='bot-filter-return'){",start);
+  const block=js.slice(start,end);
+  assert.ok(start>=0&&end>start,'bot-toggle QA block missing');
+  assert.match(block,/close\?\.click\(\)/);
+  assert.match(block,/open\?\.click\(\)/);
+  assert.doesNotMatch(block,/await visualQaSettle\(\)/);
+});
