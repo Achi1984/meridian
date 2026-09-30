@@ -5,7 +5,7 @@ import { historySnapshot, appendPortfolioHistory, readPortfolioHistory, normaliz
 function sample(){return{privateRevision:7,livePrices:{BTC:{price:100},SOL:{price:20}},portfolio:{
   holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900},{symbol:'SOL',quantity:3,venue:'Pionex'}],
   manualVenueBalances:[{venue:'Ledger',valueUsd:200,updatedAt:900},{venue:'OKX',valueUsd:0,updatedAt:900}],
-  pionexEquityUsd:50,cumulativeCashflowUsd:25
+  pionexEquityUsd:50,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:900,cumulativeCashflowUsd:25
 }}}
 
 test('history snapshot persists canonical Spot + Pionex basis',()=>{
@@ -19,6 +19,9 @@ test('history snapshot persists canonical Spot + Pionex basis',()=>{
   assert.equal(s.authorityComplete,true);
   assert.equal(s.sourceStatus.spot,'STRICT_AUTHORITY');
   assert.equal(s.sourceStatus.trading,'PIONEX_EQUITY');
+  assert.equal(s.sourceStatus.tradingFresh,true);
+  assert.equal(s.sourceStatus.tradingAuthorityVersion,'PIONEX_FRESH_V1');
+  assert.equal(s.sourceStatus.tradingSource,'PRIVATE_PORTFOLIO_SNAPSHOT');
   assert.equal(s.sourceRevision,7);
 });
 
@@ -41,7 +44,7 @@ test('changed value inserts a canonical history point',async()=>{
 });
 
 test('history reader returns one basis with nullable adjusted value',async()=>{
-  const db={query:async()=>({rows:[{captured_at:'2026-09-04T20:00:00.000Z',spot_usd:'200',trading_usd:'50',total_usd:'250',cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:8,source_status:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}}]})};
+  const db={query:async()=>({rows:[{captured_at:'2026-09-04T20:00:00.000Z',spot_usd:'200',trading_usd:'50',total_usd:'250',cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:8,source_status:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:'2026-09-04T19:59:00.000Z'}}]})};
   const out=await readPortfolioHistory(db,{now:Date.parse('2026-09-04T21:00:00Z'),rangeMs:3600000});
   assert.equal(out.points.length,1);assert.equal(out.points[0].totalUsd,250);assert.equal(out.points[0].cashflowAdjustedTotalUsd,null);
 });
@@ -72,7 +75,7 @@ test('history capture fails closed when Pionex equity is missing even with compl
 test('history reader excludes legacy rows with missing trading authority without deleting audit evidence',async()=>{
   const rows=[
     {captured_at:'2026-09-04T20:00:00.000Z',spot_usd:'1798.71',trading_usd:'0',total_usd:'1798.71',cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:7,source_status:{spot:'STRICT_AUTHORITY',trading:'MISSING'}},
-    {captured_at:'2026-09-04T20:05:00.000Z',spot_usd:'914.68',trading_usd:'34456.92',total_usd:'35371.6',cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:8,source_status:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}}
+    {captured_at:'2026-09-04T20:05:00.000Z',spot_usd:'914.68',trading_usd:'34456.92',total_usd:'35371.6',cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:8,source_status:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:'2026-09-04T20:04:00.000Z'}}
   ];
   const db={query:async()=>({rows})};
   const out=await readPortfolioHistory(db,{now:Date.parse('2026-09-04T21:00:00Z'),rangeMs:3600000});
@@ -83,7 +86,7 @@ test('history reader excludes legacy rows with missing trading authority without
 });
 
 test('canonical history completeness requires both authority components and arithmetic consistency',()=>{
-  const base={timestamp:1,spotUsd:100,tradingUsd:50,totalUsd:150,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}};
+  const base={timestamp:1000,spotUsd:100,tradingUsd:50,totalUsd:150,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:900}};
   assert.equal(canonicalHistoryPointComplete(base),true);
   assert.equal(canonicalHistoryPointComplete({...base,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'MISSING'}}),false);
   assert.equal(canonicalHistoryPointComplete({...base,totalUsd:148}),false);
@@ -92,11 +95,33 @@ test('canonical history completeness requires both authority components and arit
 
 test('history capture fails closed when expected external venue authority is incomplete',async()=>{
   const calls=[];
-  const data={portfolio:{holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900}],manualVenueBalances:[{venue:'Ledger',valueUsd:200,updatedAt:900}],pionexEquityUsd:50}};
+  const data={portfolio:{holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900}],manualVenueBalances:[{venue:'Ledger',valueUsd:200,updatedAt:900}],pionexEquityUsd:50,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:1900}};
   const db={query:async(sql,args)=>{calls.push([sql,args]);return{rows:[]}}};
   const out=await appendPortfolioHistory(db,data,{timestamp:2000});
   assert.equal(out.ok,false);
   assert.equal(out.reason,'PORTFOLIO_AUTHORITY_INCOMPLETE');
   assert.equal(out.snapshot.authorityComplete,false);
   assert.equal(calls.length,0);
+});
+
+
+test('history capture uses fresh wallet API equity instead of stale zero portfolio seed',()=>{
+  const data={privateRevision:9,livePrices:{BTC:{price:100}},livePriceMeta:{fresh:true,requestedCount:1,resolvedCount:1},portfolio:{
+    ledgerAuthorityAt:900,
+    holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900}],
+    manualVenueBalances:[{venue:'OKX',valueUsd:10,updatedAt:900}],
+    pionexEquityUsd:0,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:-2_000_000
+  },pionexAccountSync:{status:'OK'},pionexAccount:{walletStatus:'OK',updatedAt:950,wallet:{totalInUsdt:34402.17}}};
+  const s=historySnapshot(data,{timestamp:1000});
+  assert.equal(s.spotAuthorityComplete,true);
+  assert.equal(s.tradingAuthorityComplete,true);
+  assert.equal(s.tradingUsd,34402.17);
+  assert.equal(s.totalUsd,34612.17);
+  assert.equal(s.sourceStatus.tradingSource,'PIONEX_WALLET_READ_API');
+  assert.equal(s.sourceStatus.tradingFresh,true);
+});
+
+test('r104-style PIONEX_EQUITY label without freshness provenance is rejected',()=>{
+  const legacy={timestamp:1000,spotUsd:1798.71,tradingUsd:0,totalUsd:1798.71,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}};
+  assert.equal(canonicalHistoryPointComplete(legacy),false);
 });
