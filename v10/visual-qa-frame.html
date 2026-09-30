@@ -31,7 +31,7 @@
         return;
       }
     }catch(e){}
-    if(tries<240)setTimeout(pump,20);
+    if(tries<600)setTimeout(pump,20);
   };
   frame.addEventListener('load',()=>setTimeout(pump,0));
 })();
