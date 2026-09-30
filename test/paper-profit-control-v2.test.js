@@ -29,3 +29,11 @@ test('legacy v8 Paper scorer is explicitly non-authoritative',()=>{
   assert.ok(src.includes('LEGACY NON-AUTHORITATIVE'));
   assert.ok(src.includes('WATCH/WATCH+'));
 });
+
+test('Stage A observer workflow is manual/read-only and uploads the frozen snapshot path',()=>{
+  const yml=fs.readFileSync('.github/workflows/paper-profit-observer-stage-a.yml','utf8');
+  assert.ok(yml.includes('workflow_dispatch:'));
+  assert.ok(yml.includes('node scripts/capture-paper-bot-observer-r90.mjs'));
+  assert.ok(yml.includes('research/results/paper-runtime-observer-r90.json'));
+  assert.ok(yml.includes('permissions:\n  contents: read'));
+});
