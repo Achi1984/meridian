@@ -15,13 +15,15 @@ function block(start,end){
   return js.slice(a,b);
 }
 
-test('r82 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r82');
+test('r82 visual interaction contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=82,'expected r82 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/VISUAL-INTERACTION-POLISH/);
-  assert.equal(manifest.start_url,'./v10/?build=r82&fresh=r82');
-  assert.match(html,/10\.0-r82/);
-  assert.match(js,/const BUILD='10\.0-r82'/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.match(html,new RegExp(release.terminalBuild.replaceAll('.','\\.')));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r82 primary navigation starts each top-level surface at the top',()=>{
