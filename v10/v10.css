@@ -1022,3 +1022,34 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #view-research .scanner-toolbar-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important;align-items:stretch!important;gap:6px!important}
   #view-research .scanner-toolbar-actions>button{width:100%!important;min-width:0!important;min-height:44px!important;margin:0!important}
 }
+
+
+/* v10 r90 · Command progressive disclosure */
+button.command-next-decision{width:100%;appearance:none;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+button.command-next-decision:focus-visible,.v10-command-tech-details>summary:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.command-next-action-open{transition:border-color .16s ease,background .16s ease}
+.command-next-action-open:hover{border-color:#356b99;background:linear-gradient(145deg,rgba(10,31,49,.98),rgba(6,14,23,.98))}
+.v10-command-tech-details{margin-top:8px;border:1px solid #1b3044;border-radius:11px;background:#070d14;overflow:hidden}
+.v10-command-tech-details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:8px 9px;touch-action:manipulation}
+.v10-command-tech-details>summary::-webkit-details-marker{display:none}
+.v10-command-tech-details>summary span{font-size:8px;color:var(--cyan);font-weight:900;letter-spacing:.08em}
+.v10-command-tech-details>summary b{font-size:8px;color:#9db0c2;text-align:right;line-height:1.35}
+.v10-command-tech-details[open]>summary{border-bottom:1px solid #172a3c;background:#09131d}
+.v10-command-tech-details-body{padding:8px}
+.v10-command-tech-details-body>.guard-grid{margin-bottom:8px}
+.v10-command-tech-details-body>small{display:block;margin-top:8px;color:#98a9ba;font-size:8px;line-height:1.45}
+#view-command .command-compact .guard-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+#view-command .command-compact .guard-grid>div{min-width:0}
+#view-command .command-compact .guard-grid b{white-space:normal}
+@media(max-width:600px){
+  #view-command .command-compact .guard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view-command .command-source-authority .portfolio-reconcile{display:grid;grid-template-columns:1fr;gap:8px}
+  #view-command .command-source-authority .portfolio-reconcile-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}
+  #view-command .command-source-authority .portfolio-reconcile-actions button{min-width:0;min-height:44px;padding:7px 8px;font-size:8px;line-height:1.25}
+  #view-command .command-source-authority .portfolio-reconcile small{grid-column:1/-1;text-align:left}
+  .v10-command-tech-details>summary{align-items:flex-start;flex-direction:column;gap:3px}
+  .v10-command-tech-details>summary b{text-align:left}
+}
+@media(max-width:360px){
+  #view-command .command-source-authority .portfolio-reconcile-actions{grid-template-columns:1fr}
+}
