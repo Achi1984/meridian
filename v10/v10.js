@@ -736,7 +736,7 @@ function renderBots(force=false){
   const view=$('#view-bots');if(!view)return;
   if(!force&&$('.asset-accordion-stack',view))return;
   if(!force&&!$('.bot-hero',view)&&!$('.bot-group',view))return;
-  const hadAssetAccordion=!!$('.asset-pair-details',view),openAssets=new Set($('.asset-pair-details[open]',view).map(x=>x.dataset.symbol).filter(Boolean));
+  const hadAssetAccordion=!!$('.asset-pair-details',view),openAssets=new Set([...view.querySelectorAll('.asset-pair-details[open]')].map(x=>x.dataset.symbol).filter(Boolean));
   const snapshotOpen=force?$('.v10-snapshot-details',view)?.open:null,unmatchedOpen=force?$('.v10-unmatched-details',view)?.open:null,diagOpenExisting=$('.v10-bot-diagnostics',view)?.open;
   const s=S(),g=syncHealth(),ph=accountPositionHealth(),unmatched=g.unmatched;
   const allSyms=(g.fresh?symbols():[]).slice().sort((a,b)=>pairStatus(b).rank-pairStatus(a).rank||a.localeCompare(b)),syms=allSyms.filter(symbol=>botFilterMatch(symbol));
