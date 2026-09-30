@@ -73,6 +73,13 @@ must(js.includes("contextualBack('more'"),'LAB contextual back missing');
 must(js.includes('delete viewContextUi[v]'),'direct primary navigation must clear stale target context');
 must(css.includes('.context-return-bar{'),'contextual return bar styling missing');
 
+must(js.includes('function commandActionHubHtml()'),'Command Action Hub renderer missing');
+must(js.includes('function bindCommandActionHub(view)'),'Command Action Hub binding missing');
+for(const target of ['depot','bots','market','paper'])must(js.includes("item('"+target+"'"),'Command Action Hub target missing: '+target);
+must(js.includes("openAssetDetail(symbol,'command','command')"),'Command critical asset must drill into Asset Detail');
+must(js.includes("showSecondaryView('paper','research',{returnView:'command',navKey:'command',label:'COMMAND'})"),'Command Paper drill-down must preserve Command return context');
+must(css.includes('.command-action-hub{'),'Command Action Hub styling missing');
+
 const badSelector=/(^|[^$])\$\([^()\n]*\)\.(?:forEach|filter|map|some|every|reduce|find)\s*\(/m;
 must(!badSelector.test(js),'single-element selector used as collection');
 
