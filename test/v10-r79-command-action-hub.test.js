@@ -16,14 +16,16 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r79 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r79');
+test('r79 Command Action Hub contract remains active on successor terminal builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=79,'expected r79 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r79-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-MOBILE-HARDENED-UI-REGRESSION-GATE-DATA-STATE-CONTEXT-NAV-ACTION-HUB');
-  assert.match(root,/10\.0-r79-production/);
-  assert.match(html,/10\.0-r79/);
-  assert.match(v10,/const BUILD='10\.0-r79'/);
-  assert.equal(manifest.start_url,'./v10/?build=r79&fresh=r79');
+  assert.match(String(release.dashboardShell||''),/ACTION-HUB/);
+  assert.match(root,new RegExp(release.terminalBuild.replaceAll('.','\\.')+'-production'));
+  assert.match(html,new RegExp(release.terminalBuild.replaceAll('.','\\.')));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r79 preserves exactly five primary tabs and all secondary surfaces',()=>{

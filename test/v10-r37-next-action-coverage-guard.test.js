@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
+const terminalRevision=Number(String(release.terminalBuild||'').match(/r(\d+)$/)?.[1]||0);
 
 function nextActionRuntime(code,{coverageComplete=true,matched=3,supported=3,unmatched=0,ambiguous=0}={}){
   const a=v10.indexOf('function nextAction(){'),b=v10.indexOf('function syncHealth(){',a);
@@ -42,7 +43,7 @@ test('r37 incomplete coverage never suppresses liquidation or stop-protection sa
 });
 
 test('r37 complete coverage preserves existing decision actions',()=>{
-  assert.equal(nextActionRuntime('RISK_REVIEW').title,'BTC · RISK REVIEW');
+  assert.equal(nextActionRuntime('RISK_REVIEW').title,terminalRevision>=80?'BTC · STRUCTURE REVIEW':'BTC · RISK REVIEW');
   assert.equal(nextActionRuntime('PROFIT_LOCK').title,'BTC · PROFIT LOCK PRÜFEN');
   assert.equal(nextActionRuntime('WATCH_PROFIT').title,'BTC · WATCH PROFIT');
   assert.equal(nextActionRuntime('HOLD').title,'HOLD · RUNNER WEITERLAUFEN');
