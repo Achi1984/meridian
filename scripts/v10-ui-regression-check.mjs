@@ -121,3 +121,16 @@ must(css.includes('.command-next-decision{'),'Command consolidated action stylin
 must(css.includes('.sk-zone.state-below,.sk-zone.state-above'),'FIB inactive-zone styling missing');
 must(css.includes('.command-attention>.section-title{display:flex;flex-direction:column'),'mobile Attention collision guard missing');
 must(css.includes('#view-market .fib-output{padding-bottom:calc(68px + env(safe-area-inset-bottom))}'),'mobile FIB/nav safe-space guard missing');
+
+
+/* r81 permanent mobile-density gates */
+must(String(release.dashboardShell||'').includes('MOBILE-DENSITY-V2'),'dashboardShell must declare mobile density v2');
+must(css.includes('/* v10 r81 · mobile density v2 */'),'r81 mobile-density CSS block missing');
+must(css.includes('.data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))}'),'mobile Data State must use compact two-column layout');
+must(css.includes('.data-state-item:only-child,.data-state-item:last-child:nth-child(odd){grid-column:1/-1}'),'odd Data State span guard missing');
+must(css.includes('.scanner-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:6px}'),'Scanner tool actions must stay side-by-side on phone');
+must(css.includes('.bot-filter-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}'),'Bot mobile filter density guard missing');
+must(css.includes('.asset-toggle-actions button{min-height:44px;padding:0 7px}'),'Asset toggle touch-target guard missing');
+must(css.includes('.depot-asset-card>summary{min-height:58px;padding:8px 9px}'),'Depot mobile card density guard missing');
+must(css.includes('.asset-pair-details>summary{min-height:60px;padding:8px}'),'Bot accordion mobile density guard missing');
+must(css.includes('.command-hub-card{min-height:52px;padding:7px 8px}'),'Command Hub mobile density guard missing');
