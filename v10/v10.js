@@ -210,7 +210,7 @@ function nextAction(){
   const s=c.status,g=syncHealth();
   if(['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(s.code))return{title:'KEINE AKTION · DATEN PRÜFEN',detail:c.symbol+' · '+s.reason};
   if(s.code==='LIQ_RISK')return{title:c.symbol+' · LIQ-PUFFER PRÜFEN',detail:s.reason+' · Safety vor Profit-Lock'};
-  if(s.code==='PROTECTION_RISK')return{title:c.symbol+' · RISK REVIEW',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
+  if(s.code==='PROTECTION_RISK')return{title:c.symbol+' · PROTECTION PRÜFEN',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
   if(!g.coverageComplete)return{title:'KEINE AKTION · DATEN PRÜFEN',detail:'BOT COVERAGE · '+g.matched+'/'+g.supported+' sicher gematcht · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')};
   if(s.code==='RISK_REVIEW')return{title:c.symbol+' · STRUCTURE REVIEW',detail:s.reason+' · MTF-Konflikt prüfen · keine automatische Exit-Freigabe'};
   if(s.code==='PROFIT_LOCK')return{title:c.symbol+' · PROFIT LOCK PRÜFEN',detail:s.reason+' · Teilgewinn/Reload-Reserve statt Komplettausstieg'};
