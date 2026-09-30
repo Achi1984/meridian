@@ -757,7 +757,8 @@ function renderScanner(force=false){
   const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(s?.assetIntel?.[x])).sort((a,b)=>{const A=opportunityContext(a),B=opportunityContext(b),sa=marketSignal(s.assetIntel[a]),sb=marketSignal(s.assetIntel[b]);return B.score-A.score||sb.rank-sa.rank||sb.score-sa.score}),stale=all.filter(x=>!!s?.assetIntel?.[x]&&!intelFresh(s.assetIntel[x])),missing=all.filter(x=>!s?.assetIntel?.[x]),blocked=[...stale,...missing];
   const confirmed=fresh.filter(x=>marketSignal(s.assetIntel[x]).confirmed),top=fresh.slice(0,4),rest=fresh.slice(4),liveLinked=h.botFeedFresh?.()?all.filter(x=>matchedRows(x).length).length:0,refLinked=all.filter(referenceLinked).length,best=top[0]?opportunityContext(top[0]):null;
   const stack=top.length?top.map(scannerCard).join(''):'<section class="v10-live-blocked market-stale"><b>SCANNER BLOCKED</b><small>Keine frischen Multi-Timeframe-Marktdaten · keine bestätigten Setups ausgeben.</small></section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section><section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Strategie-Lab bleibt sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><button type="button" data-open-lab>LAB ÖFFNEN</button></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
+  view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section><section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Paper Cockpit und Strategie-Lab bleiben sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><div class="scanner-toolbar-actions"><button type="button" data-open-paper>PAPER COCKPIT</button><button type="button" data-open-lab>LAB ÖFFNEN</button></div></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
+  $('[data-open-paper]',view)?.addEventListener('click',()=>showSecondaryView('paper','research'));
   $('[data-open-lab]',view)?.addEventListener('click',()=>showSecondaryView('more','research'));
   $$('[data-forecast-asset]',view).forEach(btn=>btn.addEventListener('click',()=>{fibUi.symbol=String(btn.dataset.forecastAsset||'BTC').toUpperCase();fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;showSecondaryView('market','market')}));
   bindAssetDetailLinks(view,'research','research');
@@ -1105,6 +1106,81 @@ function labOverviewHtml(){
   const discovery=edgeUi.tsmom?(edgeUi.tsmom.gate?.pass?'PASS':'FAIL'):'NOT RUN',holdout=holdoutUi.combined?(holdoutUi.combined.pass?'PASS':'FAIL'):'NOT RUN',sk=skV2Ui.result?(skV2Ui.result.gate?.pass?'V2 PASS':'V2 FAIL'):'FROZEN',profit=profitAgentUi.result?(profitAgentUi.result.discoveryLeader||'NO PASS'):'NOT RUN';
   return '<div><span>PROFIT AGENT</span><b class="tone-'+(profitAgentUi.result?.discoveryLeader?'safe':profitAgentUi.result?'watch':'muted')+'">'+esc(profit)+'</b><small>3 frozen candidates · profit-first gate</small></div><div><span>TSMOM DISCOVERY</span><b class="tone-'+(discovery==='PASS'?'safe':discovery==='FAIL'?'watch':'muted')+'">'+discovery+'</b><small>interner Gate · kein Beweis</small></div><div><span>TSMOM HOLDOUT</span><b class="tone-'+(holdout==='PASS'?'safe':holdout==='FAIL'?'watch':'muted')+'">'+holdout+'</b><small>unabhängige Validierung</small></div><div><span>SK SYSTEM</span><b>'+sk+'</b><small>V1/V2 Research-Benchmark</small></div><div><span>EXECUTION</span><b>OFF</b><small>Research only · keine Orders</small></div>';
 }
+function paperOverviewTrusted(d){
+  return !!d&&d.schemaVersion==='8.0-PAPER-OVERVIEW-V1'&&d.researchOnly===true&&d.executionImpact===false&&d?.status?.safety?.paperTrading===true&&d?.status?.safety?.liveTrading===false;
+}
+function paperTradePf(trades){
+  const xs=(Array.isArray(trades)?trades:[]).filter(x=>Number.isFinite(Number(x?.realized))),wins=xs.filter(x=>Number(x.realized)>0),losses=xs.filter(x=>Number(x.realized)<0),gp=wins.reduce((a,x)=>a+Number(x.realized),0),gl=Math.abs(losses.reduce((a,x)=>a+Number(x.realized),0));
+  return gl>0?gp/gl:gp>0?99:null;
+}
+function paperLifecycle(src,baseline=false){
+  if(baseline)return'BASELINE REFERENCE';
+  const raw=typeof src?.lifecycle==='string'?src.lifecycle:String(src?.lifecycle?.status||src?.status||'').toUpperCase();
+  if(raw.includes('STOPPED'))return'STOPPED REVIEW';
+  if(raw.includes('WAITING'))return'WAITING';
+  if(raw.includes('RETIRED'))return'RETIRED';
+  if(raw.includes('ACTIVE_PAPER'))return'PROSPECTIVE PAPER';
+  if(src?.enabled===false)return'INACTIVE';
+  return raw||'PAPER / RESEARCH';
+}
+function paperModelStats(name,src,baseline=false){
+  const a=src?.account||{},start=Number(a.startEquity),equity=Number(a.equity),peak=Number(a.peakEquity),realized=Number(a.realizedPnl),unrealized=Number(a.unrealizedPnl),trades=Array.isArray(src?.trades)?src.trades:[],closedRaw=src?.closedCount??trades.length??src?.closedCycles?.length,openRaw=src?.openCount??src?.openPositions?.length??src?.positions?.length;
+  const pnl=Number.isFinite(start)&&Number.isFinite(equity)?equity-start:Number.isFinite(realized)||Number.isFinite(unrealized)?(Number.isFinite(realized)?realized:0)+(Number.isFinite(unrealized)?unrealized:0):null;
+  const dd=Number.isFinite(Number(a.drawdownPct))?Number(a.drawdownPct):Number.isFinite(peak)&&peak>0&&Number.isFinite(equity)?Math.max(0,(peak-equity)/peak*100):null;
+  const pf=Number.isFinite(Number(src?.profitFactor))?Number(src.profitFactor):baseline?paperTradePf(trades):null;
+  const wr=Number.isFinite(Number(src?.winRate))?Number(src.winRate):trades.length?trades.filter(x=>Number(x?.realized)>0).length/trades.length*100:null;
+  return{name,baseline,src,equity:Number.isFinite(equity)?equity:null,pnl,dd,closed:Number.isFinite(Number(closedRaw))?Number(closedRaw):null,open:Number.isFinite(Number(openRaw))?Number(openRaw):null,pf,wr,phase:paperLifecycle(src,baseline),ruleset:src?.ruleset||null,updatedAt:src?.updatedAt||src?.lastScanAt||null};
+}
+function paperModelCard(m){
+  const h=H(),pnlTone=m.pnl==null?'muted':m.pnl>0?'safe':m.pnl<0?'danger':'muted',ddTone=m.dd==null?'muted':m.dd>=8?'danger':m.dd>=5?'watch':'safe';
+  return '<article class="paper-model-card"><div class="paper-model-head"><div><span>'+esc(m.name)+'</span><b>'+esc(m.phase)+'</b><small>'+esc(m.ruleset||'independent paper ledger')+'</small></div><strong class="tone-'+pnlTone+'">'+(m.pnl==null?'P&L —':h.money?.(m.pnl))+'</strong></div><div class="paper-model-grid"><span>EQUITY <b>'+(m.equity==null?'—':h.money?.(m.equity))+'</b></span><span>MAX DD <b class="tone-'+ddTone+'">'+(m.dd==null?'—':skNum(m.dd,2)+'%')+'</b></span><span>CLOSED <b>'+(m.closed==null?'—':m.closed)+'</b></span><span>OPEN <b>'+(m.open==null?'—':m.open)+'</b></span><span>PF <b>'+(m.pf==null?'—':skNum(m.pf,2))+'</b></span><span>WIN RATE <b>'+(m.wr==null?'—':skNum(m.wr,1)+'%')+'</b></span></div></article>';
+}
+function paperR42Html(rows){
+  const xs=Array.isArray(rows)?rows:[];
+  if(!xs.length)return '<section class="paper-cohort-empty"><b>R42 · NO DATA</b><small>Noch keine Research-Runtime-Zusammenfassung verfügbar.</small></section>';
+  return '<section class="paper-cohort-grid">'+xs.map(x=>'<article><div><span>'+esc(x.id||'R42')+'</span><b>'+esc(x.lifecycle||'UNKNOWN')+'</b></div><strong>'+(x.pnl==null?'P&L —':skMoney(x.pnl))+'</strong><small>CLOSED '+(x.closedTrades??'—')+' · OPEN '+(x.openTrades??'—')+' · PF '+(x.profitFactor==null?'—':skNum(x.profitFactor,2))+'</small></article>').join('')+'</section>';
+}
+function paperCockpitHtml(){
+  const d=paperCockpitUi.data,h=H();
+  if(paperCockpitUi.loading&&!d)return '<section class="paper-cockpit-state"><b>PAPER OVERVIEW WIRD GELADEN …</b><small>Geschützte Read-only Engine-Daten · keine Order-Aktion.</small></section>';
+  if(!d)return '<section class="paper-cockpit-state tone-watch"><b>PAPER OVERVIEW NICHT VERFÜGBAR</b><small>'+esc(paperCockpitUi.error||'Noch kein geschützter Paper-Snapshot geladen.')+'</small></section>';
+  if(!paperOverviewTrusted(d))return '<section class="paper-cockpit-state tone-danger"><b>PAPER SAFETY GUARD BLOCKED</b><small>Schema/Safety-Flags entsprechen nicht dem erwarteten Research-only Paper-Vertrag. Keine Performance-Aussage.</small></section>';
+  const ageMs=Date.now()-Date.parse(String(d.generatedAt||'')),age=Number.isFinite(ageMs)?h.ageText?.(Math.max(0,ageMs))||'—':'—',fresh=Number.isFinite(ageMs)&&ageMs<=2*60*1000;
+  const models=[
+    paperModelStats('BASELINE 6.2',d.baseline,true),
+    paperModelStats('CHALLENGER V2',d.challengerV2),
+    paperModelStats('CHALLENGER V3',d.challengerV3),
+    paperModelStats('DIRECTIONAL V4',d.directionalV4),
+    paperModelStats('FUNDING CARRY V2',d.fundingCarryV2)
+  ];
+  const active=models.filter(x=>!['WAITING','INACTIVE','RETIRED'].includes(x.phase)).length,engine=d?.status?.engine||{},db=d?.status?.db||{};
+  const warning=paperCockpitUi.error?'<section class="paper-refresh-warning"><b>REFRESH FEHLER</b><small>'+esc(paperCockpitUi.error)+' · letzter gültiger Snapshot bleibt sichtbar.</small></section>':'';
+  return '<section class="paper-summary-grid"><div><span>ENGINE</span><b class="tone-'+(engine.running?'safe':'watch')+'">'+(engine.running?'RUNNING':'CHECK')+'</b><small>'+esc(engine.marketFresh===false?'Market stale':'Paper engine')+'</small></div><div><span>SAFETY</span><b class="tone-safe">PAPER ONLY</b><small>liveTrading=false</small></div><div><span>MODELS</span><b>'+active+' / '+models.length+'</b><small>aktive/auswertbare Ledger</small></div><div><span>SNAPSHOT</span><b class="tone-'+(fresh?'safe':'watch')+'">'+esc(age)+'</b><small>'+esc(d.generatedAt||'—')+'</small></div><div><span>DB</span><b class="tone-'+(db.ok?'safe':'watch')+'">'+(db.ok?'READY':'CHECK')+'</b><small>'+esc(db.mode||db.status||'protected state')+'</small></div></section>'+warning+
+    '<section class="paper-safety-note"><b>VALIDATION ONLY</b><small>Equity, P&L, DD und Trades stammen aus unabhängigen Paper-Ledgern. Das Cockpit bewertet keinen Gewinner und autorisiert keine Promotion oder Live-Ausführung.</small></section>'+
+    '<div class="section-title"><h2>PAPER MODELS</h2><small>feste Reihenfolge · keine Performance-Sortierung</small></div><section class="paper-model-stack">'+models.map(paperModelCard).join('')+'</section>'+
+    '<div class="section-title"><h2>R42 RESEARCH COHORTS</h2><small>separate Research-Runtime · keine Vermischung mit Paper-Equity</small></div>'+paperR42Html(d.researchR42);
+}
+async function loadPaperCockpit(force=false){
+  const b=bridge(),now=Date.now();
+  if(paperCockpitUi.loading)return;
+  if(!force&&paperCockpitUi.data&&now-paperCockpitUi.loadedAt<30000)return;
+  if(typeof b?.paperOverview!=='function'){paperCockpitUi.error='Paper overview bridge fehlt';renderPaperCockpit(true);return}
+  paperCockpitUi.loading=true;paperCockpitUi.error=null;renderPaperCockpit(true);
+  try{
+    const d=await b.paperOverview();
+    if(!paperOverviewTrusted(d))throw new Error('PAPER_OVERVIEW_CONTRACT_INVALID');
+    paperCockpitUi.data=d;paperCockpitUi.loadedAt=Date.now();
+  }catch(e){paperCockpitUi.error=String(e?.message||e).slice(0,140)}
+  finally{paperCockpitUi.loading=false;if(activeViewKey()==='paper')renderPaperCockpit(true)}
+}
+function renderPaperCockpit(force=false){
+  const view=$('#view-paper');if(!view)return;
+  view.innerHTML='<section class="v10-mode-banner" data-tone="paper"><div><span>PAPER</span><b>BOT VALIDATION COCKPIT</b></div><small>Echte geschützte Paper-Ledger · Equity + DD + Trades · read-only</small></section><section class="paper-cockpit-toolbar"><button type="button" data-paper-back>← ZUM SCANNER</button><div><span>PAPER OVERVIEW V1</span><small>keine Auto-Promotion · keine Live-Orders</small></div><div class="paper-cockpit-actions"><button type="button" data-paper-lab>LAB</button><button type="button" data-paper-refresh '+(paperCockpitUi.loading?'disabled':'')+'>'+(paperCockpitUi.loading?'SYNC…':'AKTUALISIEREN')+'</button></div></section>'+paperCockpitHtml();
+  $('[data-paper-back]',view)?.addEventListener('click',()=>showSecondaryView('research','research'));
+  $('[data-paper-lab]',view)?.addEventListener('click',()=>showSecondaryView('more','research'));
+  $('[data-paper-refresh]',view)?.addEventListener('click',()=>loadPaperCockpit(true));
+  if(!paperCockpitUi.loading&&(!paperCockpitUi.data||Date.now()-paperCockpitUi.loadedAt>=30000))queueMicrotask(()=>loadPaperCockpit(false));
+}
 function renderLab(){
   const view=$('#view-more'),b=bridge();if(!view||!b)return;
   if(!$('.bt-control',view)&&!$('.bt-result',view)){
@@ -1164,6 +1240,7 @@ function renderActiveView(active,force=true){
   if(active==='market')return renderMarket(force);
   if(active==='research')return renderScanner(force);
   if(active==='asset-detail')return renderAssetDetail(force);
+  if(active==='paper')return renderPaperCockpit(force);
   if(active==='more')return renderLab();
 }
 function decorate(forceData=false){
@@ -1175,6 +1252,7 @@ function decorate(forceData=false){
   renderMarket(forceData&&active==='market');
   renderScanner(forceData&&active==='research');
   if(active==='asset-detail')renderAssetDetail(forceData);
+  if(active==='paper')renderPaperCockpit(forceData);
   renderLab();renderSystemHeader();decorateA11y();
 }
 function bindV10NavigationAuthority(){
