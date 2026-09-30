@@ -40,8 +40,6 @@ jobs:
           node-version: 20
       - name: Verify Chrome
         run: google-chrome --version
-      - name: Install pinned browser driver
-        run: npm install --no-save --ignore-scripts puppeteer-core@24.19.0
       - name: Start deterministic local shell
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/meridian-visual-http.log 2>&1 &
