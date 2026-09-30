@@ -9,12 +9,14 @@ const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',impo
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r84 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r84');
+test('r84 evidence-layout contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=84,'expected r84 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/EVIDENCE-LAYOUT-INVARIANTS/);
-  assert.equal(manifest.start_url,'./v10/?build=r84&fresh=r84');
-  assert.match(js,/const BUILD='10\.0-r84'/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r84 visual QA makes Scanner action layout an explicit pass/fail invariant',()=>{
