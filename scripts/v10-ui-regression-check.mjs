@@ -99,3 +99,25 @@ must(css.includes('transition:none!important')&&css.includes('animation:none!imp
 must(js.includes("setAttribute('role','status')")&&js.includes("setAttribute('aria-live','polite')"),'dynamic status accessibility guard missing');
 
 console.log('V10_UI_REGRESSION_PASS',build,JSON.stringify({primaryTabs:navButtons.length,views:viewIds.length,secondaryViews:3,executionImpact:false}));
+
+
+/* r80 permanent trust / semantic-consistency gates */
+must(js.includes('function marketIntel(symbol)'),'canonical market-intel resolver missing');
+must(js.includes("intelFresh(marketIntel('BTC'))"),'BTC freshness must use canonical market intel');
+must(js.includes("label:'STRUCTURE REVIEW',tone:'watch',rank:70"),'technical structure review must remain non-danger review');
+must(js.includes("label:'LIQ RISK',tone:'danger',rank:150"),'liquidation risk danger priority changed');
+must(js.includes("label:'PROTECTION RISK',tone:'danger',rank:160"),'hard protection danger priority changed');
+must(js.includes("rank:130,reason:unmatched.length+' private Bot-Rows"),'unverified API rows must outrank technical review');
+must(js.includes("OPPORTUNITY '+ctx.score+'/100"),'Forecast opportunity score must be explicitly named');
+must(js.includes("REGIME '+i.score+'/100"),'BTC regime score must be explicitly named');
+must(js.includes("function fibZonePosition(zone,current)"),'FIB zone position classifier missing');
+for(const state of ["return'below'","return'above'","return'inside'"])must(js.includes(state),'FIB zone state missing: '+state);
+must(js.includes('<span>HOLDING <b>'),'Depot holding-value label missing');
+must(js.includes('<span>OPEN FUTURES</span>'),'open-futures count label missing');
+must(js.includes('<span>BOT IDENTITIES</span>'),'bot identity count label missing');
+must(js.includes('function portfolioAuthorityDetail('),'granular portfolio authority detail missing');
+must(js.includes('class="command-next-decision"'),'Command Next Action consolidation missing');
+must(css.includes('.command-next-decision{'),'Command consolidated action styling missing');
+must(css.includes('.sk-zone.state-below,.sk-zone.state-above'),'FIB inactive-zone styling missing');
+must(css.includes('.command-attention>.section-title{display:flex;flex-direction:column'),'mobile Attention collision guard missing');
+must(css.includes('#view-market .fib-output{padding-bottom:calc(68px + env(safe-area-inset-bottom))}'),'mobile FIB/nav safe-space guard missing');
