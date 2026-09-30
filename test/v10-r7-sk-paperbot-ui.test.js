@@ -72,7 +72,7 @@ test('v10 r13 cache key is unique across production entrypoints',()=>{
   const legacy=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
   const engine=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
   for(const txt of [root,shell,legacy,engine,js]){
-    assert.doesNotMatch(txt,/10\.0-r7|10\.0-r8|build=r7|build=r8|build','r7|build','r8/);
+    assert.doesNotMatch(txt,/(?:10\.0-r(?:7|8))(?!\d)|build=r(?:7|8)(?!\d)|build','r(?:7|8)(?!\d)/);
   }
   assert.match(root,/build=r\d+/);
   assert.match(shell,/v10\.js\?v=10\.0-r\d+/);
