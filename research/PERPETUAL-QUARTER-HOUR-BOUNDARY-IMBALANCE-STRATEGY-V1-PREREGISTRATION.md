@@ -140,9 +140,14 @@ Starting equity: **100,000 normalized USD units**.
 At every rebalance:
 - target notional equals target weight times current equity;
 - transaction cost is charged on absolute notional change;
-- mark-to-market uses individual-trades-derived execution/valuation prices under a deterministic no-lookahead convention;
-- funding is added at the recorded funding timestamp;
+- position quantity is updated at the frozen execution-price convention;
+- between rebalances, price PnL is marked from the previous executable reference price to the next executable reference price using the quantity actually held during that interval;
 - equity compounds through time.
+
+Funding valuation is also deterministic:
+- if the official funding archive does not provide a usable mark price, use the last valid individual-trade price with timestamp strictly less than or equal to the funding timestamp;
+- never use a post-funding price to value the funding payment;
+- funding cash flow is `-position_qty * funding_reference_price * funding_rate` for a long quantity and the algebraic opposite for a short quantity.
 
 No borrowing beyond the 1.0x gross cap is allowed.
 
@@ -173,16 +178,16 @@ All blocks are calculated in one run. Results from an earlier block may not be u
 
 Report at minimum:
 - net return;
-- gross return before costs/funding;
+- gross price return before costs/funding;
 - transaction costs;
 - funding PnL;
-- maximum drawdown;
-- profit factor;
+- maximum drawdown on the event/funding-updated equity curve;
+- **daily profit factor**, defined as `sum(positive UTC daily net PnL) / abs(sum(negative UTC daily net PnL))`;
 - turnover;
 - average gross and net exposure;
 - closed cohort-equivalent count;
 - per-asset net return/PnL;
-- each fixed block's net return and PF;
+- each fixed block's net return and daily profit factor;
 - concentration of positive PnL by asset.
 
 Because exposure is continuous and netted, also report:
@@ -196,7 +201,7 @@ Because exposure is continuous and netted, also report:
 Strategy V1 may advance only to a separate Paper-research proposal if **all** of the following hold under the primary 6 bp one-way cost case:
 
 1. full-window net return > 0;
-2. full-window profit factor > 1.00;
+2. full-window **daily profit factor** > 1.00;
 3. maximum drawdown < 15%;
 4. at least 3 of 4 chronological blocks have positive net return;
 5. final block B4 has positive net return;
@@ -242,6 +247,20 @@ Report the primary result again with new cohorts suppressed at 00:00, 08:00 and 
 
 ### Side decomposition
 Report long-contribution and short-contribution attribution without turning either side off.
+
+## PnL attribution conventions
+
+To prevent later metric ambiguity:
+
+- **portfolio net PnL** = price PnL + funding PnL - transaction costs;
+- **gross price PnL** excludes both funding and transaction costs;
+- UTC daily PnL is the change in marked portfolio equity from 00:00 UTC to the next 00:00 UTC, including any funding/cost cash flows in that interval;
+- daily profit factor uses those UTC daily net-PnL observations, not arbitrary trade segmentation;
+- per-asset net contribution includes that asset's price PnL, funding and transaction costs;
+- positive-PnL concentration is calculated only across assets whose full-window net contribution is positive;
+- maximum drawdown is calculated on the complete chronological equity curve after every rebalance and funding event.
+
+If there are no negative UTC days, daily profit factor is reported as `+Infinity` but the remaining gates still apply. If there are no positive UTC days, daily profit factor is zero.
 
 ## Reviewer invariants before implementation
 
