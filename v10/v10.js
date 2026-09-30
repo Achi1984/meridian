@@ -1438,7 +1438,7 @@ function writeLocalVisualQaReport(cfg){
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===390&&viewport.h===844;
   const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,forecastFibInvariant,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
   const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,dataStates,viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
-  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&layout.dataStateInvariant&&!report.bodyOverflow&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
+  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
