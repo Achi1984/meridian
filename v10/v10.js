@@ -247,17 +247,17 @@ function researchSessionReadiness(){
   return{key:'RESEARCH',label:results?'LOADED':'IDLE',tone:results?'safe':'muted',detail:results+' Ergebnis(se) im lokalen Research-Session-State'};
 }
 function dataStateStripHtml(scope){
-  const p=portfolioReadiness(),m=marketStateItem(),b=botStateItem(),paper=paperReadiness(),research=researchSessionReadiness();
+  const sources={portfolio:portfolioReadiness,bots:botStateItem,market:marketStateItem,paper:paperReadiness,research:researchSessionReadiness};
   const map={
-    command:[p,b,m],
-    depot:[p,b],
-    bots:[b,m],
-    market:[m],
-    research:[m,b],
-    asset:[p,b,m],
-    paper:[paper],
-    lab:[research]
-  },items=map[scope]||[];
+    command:['portfolio','bots','market'],
+    depot:['portfolio','bots'],
+    bots:['bots','market'],
+    market:['market'],
+    research:['market','bots'],
+    asset:['portfolio','bots','market'],
+    paper:['paper'],
+    lab:['research']
+  },items=(map[scope]||[]).map(key=>sources[key]());
   const notes={command:'Portfolio, Bots und Markt separat',depot:'Authority + Bot-Verknüpfung',bots:'Private Bots + öffentlicher Marktfeed',market:'Nur öffentlicher Marktfeed ist Forecast-Grundlage',research:'Bot-Status beeinflusst Scanner-Ranking nicht',asset:'Holdings, Bots und Markt bleiben getrennt',paper:'Geschützter Paper Overview · read-only',lab:'Nur lokaler Research-Session-Status'};
   return '<section class="data-state-strip" data-data-scope="'+esc(scope)+'"><div class="data-state-label"><span>DATA STATE</span><small>'+esc(notes[scope]||'Vorhandene Guards')+'</small></div><div class="data-state-items">'+items.map(x=>'<div class="data-state-item tone-'+esc(x.tone)+'"><span>'+esc(x.key)+'</span><b>'+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></div>').join('')+'</div></section>';
 }
