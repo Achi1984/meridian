@@ -21,7 +21,7 @@ test('r84 evidence-layout contract remains active on successor builds',()=>{
 
 test('r84 visual QA makes Scanner action layout an explicit pass/fail invariant',()=>{
   assert.match(js,/const scannerActionsSameRow=/);
-  assert.match(js,/layout=\{scannerActionsSameRow\}/);
+  assert.match(js,/layout=\{scannerActionsSameRow(?:,|\})/);
   assert.match(js,/report\.ok=viewportMatch&&layout\.scannerActionsSameRow/);
 });
 
