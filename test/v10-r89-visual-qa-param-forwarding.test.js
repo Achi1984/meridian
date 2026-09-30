@@ -39,3 +39,10 @@ test('r89 real Asset Detail flow is idempotent and exposes the contextual back s
   assert.match(js,/if\(!force&&\$\('\.asset-detail-topbar',view\)\)return/);
   assert.match(js,/data-asset-back data-context-back="asset-detail"/);
 });
+
+
+test('r89 Bots ERROR evidence requires fail-closed surface instead of live accordions',()=>{
+  const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+  assert.match(js,/botErrorSurfaceInvariant=cfg\.view!=='bots'\|\|cfg\.dataMode!=='error'\|\|!!active\.querySelector\('\.bot-live-blocked'\)/);
+  assert.match(js,/if\(cfg\.view==='bots'&&cfg\.dataMode==='error'\)botAccordionInvariant=botErrorSurfaceInvariant/);
+});
