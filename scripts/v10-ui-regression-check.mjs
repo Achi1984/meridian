@@ -413,3 +413,17 @@ must(css.includes('grid-template-columns:repeat(2,auto)'),'mobile status row mis
 must(css.includes('nav button.active::before'),'mobile active-nav cue missing');
 must(css.includes('padding-bottom:calc(5px + env(safe-area-inset-bottom))'),'mobile nav safe-area padding missing');
 must(css.includes('@media(max-width:350px)'),'narrow mobile shell fallback missing');
+
+
+/* r102 permanent live-history integrity gates */
+must(String(release.dashboardShell||'').includes('LIVE-HISTORY-INTEGRITY'),'dashboardShell must declare live/history integrity');
+must(js.includes('function portfolioHistoryIntegrityHtml()'),'portfolio history integrity renderer missing');
+must(js.includes('class="portfolio-integrity-strip"'),'portfolio integrity strip missing');
+must(js.includes('data-history-points='),'strict history point telemetry missing');
+for(const key of ['1h','1d','1w'])must(js.includes('data-history-range="'+key+'"'),'history integrity range missing: '+key);
+must(js.includes('data-history-ready='),'history readiness telemetry missing');
+must(js.includes('STRICT_AUTHORITY · '),'strict authority provenance missing from integrity strip');
+must(js.includes('portfolioHistoryIntegrityHtml()+chart'),'integrity strip must stay adjacent to portfolio chart');
+must(css.includes('/* v10 r102 · live + history integrity */'),'r102 history-integrity CSS block missing');
+must(css.includes('.portfolio-integrity-strip{'),'portfolio integrity layout missing');
+must(css.includes('.portfolio-integrity-range.tone-safe'),'history READY tone missing');
