@@ -18,7 +18,7 @@ function block(start,end){
 test('r76 release identity is execution-neutral and cache coherent',()=>{
   assert.equal(release.terminalBuild,'10.0-r76');
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r76-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-DATA-STATE');
+  assert.equal(release.dashboardShell,'10.0-r76-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-MOBILE-HARDENED-DATA-STATE');
   assert.match(root,/10\.0-r76-production/);
   assert.match(html,/10\.0-r76/);
   assert.match(v10,/const BUILD='10\.0-r76'/);
