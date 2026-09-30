@@ -5,7 +5,7 @@
 (function(){
   const local=['127.0.0.1','localhost'].includes(location.hostname);
   if(!local){document.body.textContent='LOCAL VISUAL QA ONLY';return}
-  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'r83';
+  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current';
   const frame=document.createElement('iframe');
   frame.id='qa-frame';
   frame.width='390';frame.height='844';

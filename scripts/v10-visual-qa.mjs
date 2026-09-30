@@ -12,6 +12,7 @@ const chrome=candidates.find(x=>fs.existsSync(x));
 if(!chrome)throw new Error('No Chrome/Chromium binary found for visual QA');
 
 const base=String(process.env.MERIDIAN_VISUAL_QA_BASE||'http://127.0.0.1:4173/v10/visual-qa-frame.html').replace(/\?$/,'');
+const release=JSON.parse(fs.readFileSync(path.join(ROOT,'version.json'),'utf8')),revision='r'+String(release.terminalBuild||'10.0-r0').split('-r').pop();
 const viewport={width:390,height:844};
 const cases=[
   ['command-top','command',0],['command-deep','command',900],
@@ -45,7 +46,7 @@ function runChrome(name,kind,url,extra=[]){
 const summaries=[];
 for(let i=0;i<cases.length;i++){
   const [name,view,scroll]=cases[i],png=path.join(OUT,name+'.png'),url=new URL(base);
-  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build','r83');
+  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build',revision);
 
   // Chrome does not reliably emit --dump-dom when screenshot capture is requested in the same process.
   // Keep layout evaluation and evidence capture as separate deterministic invocations.
