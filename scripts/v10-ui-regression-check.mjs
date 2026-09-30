@@ -148,3 +148,17 @@ must(css.includes('.forecast-focus-head{display:grid;grid-template-columns:1fr;g
 must(css.includes('.market-regime{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}'),'Market regime narrow-screen stack missing');
 must(css.includes('.scanner-summary{grid-template-columns:repeat(2,minmax(0,1fr))}'),'Scanner summary 2x2 phone layout missing');
 must(css.includes('html{scroll-padding-top:72px;scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))}'),'mobile scroll safe-area padding missing');
+
+
+/* r83 permanent visual-QA gates */
+must(String(release.dashboardShell||'').includes('VISUAL-QA-HARNESS'),'dashboardShell must declare visual QA harness');
+must(v9.includes("const LOCAL_VISUAL_QA=['127.0.0.1','localhost'].includes(location.hostname)"),'visual QA network freeze must remain localhost-only');
+must(js.includes('function localVisualQaConfig()'),'local visual QA config missing');
+must(js.includes("if(!['127.0.0.1','localhost'].includes(location.hostname))return null"),'visual QA fixture must remain localhost-only');
+must(js.includes("allowed=['command','depot','bots','market','research']"),'visual QA top-level view coverage missing');
+must(js.includes("fibUi.mode='MANUAL'"),'visual QA deterministic FIB fixture missing');
+must(js.includes('function writeLocalVisualQaReport(cfg)'),'visual QA layout report missing');
+must(js.includes('bodyOverflow:root.scrollWidth>innerWidth+2'),'visual QA body overflow gate missing');
+must(js.includes('shortButtons'),'visual QA touch-target gate missing');
+must(fs.existsSync('scripts/v10-visual-qa.mjs'),'visual QA runner missing');
+must(fs.existsSync('.github/workflows/v10-visual-qa.yml'),'visual QA workflow missing');
