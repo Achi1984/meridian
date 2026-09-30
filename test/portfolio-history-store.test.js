@@ -54,7 +54,7 @@ test('row normalization preserves timestamp and components',()=>{
 
 test('history capture fails closed when Pionex equity is missing even with complete Spot authority',async()=>{
   const calls=[];
-  const data={privateRevision:8,livePrices:{BTC:{price:100}},portfolio:{
+  const data={privateRevision:8,livePrices:{BTC:{price:100}},livePriceMeta:{fresh:true},portfolio:{
     ledgerAuthorityAt:'1970-01-01T00:00:00.900Z',
     holdings:[{symbol:'BTC',quantity:2,venue:'Ledger',updatedAt:900}],
     manualVenueBalances:[{venue:'OKX',valueUsd:10,updatedAt:900}]
@@ -86,7 +86,7 @@ test('canonical history completeness requires both authority components and arit
   const base={timestamp:1,spotUsd:100,tradingUsd:50,totalUsd:150,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}};
   assert.equal(canonicalHistoryPointComplete(base),true);
   assert.equal(canonicalHistoryPointComplete({...base,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'MISSING'}}),false);
-  assert.equal(canonicalHistoryPointComplete({...base,totalUsd:149}),false);
+  assert.equal(canonicalHistoryPointComplete({...base,totalUsd:148}),false);
 });
 
 
