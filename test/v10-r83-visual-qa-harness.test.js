@@ -39,7 +39,7 @@ test('r83 layout report gates overflow, short buttons and fixed nav containment'
   assert.match(v10,/bodyOverflow:root\.scrollWidth>innerWidth\+2/);
   assert.match(v10,/keyOverflow:overflow,shortButtons/);
   assert.match(v10,/navInside:/);
-  assert.match(v10,/report\.ok=viewportMatch&&!report\.bodyOverflow/);
+  assert.match(v10,/report\.ok=viewportMatch&&(?:layout\.scannerActionsSameRow&&)?!report\.bodyOverflow/);
   assert.match(qa,/if\(failed\.length\)/);
 });
 
