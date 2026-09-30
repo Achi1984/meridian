@@ -427,3 +427,13 @@ must(js.includes('portfolioHistoryIntegrityHtml()+chart'),'integrity strip must 
 must(css.includes('/* v10 r102 · live + history integrity */'),'r102 history-integrity CSS block missing');
 must(css.includes('.portfolio-integrity-strip{'),'portfolio integrity layout missing');
 must(css.includes('.portfolio-integrity-range.tone-safe'),'history READY tone missing');
+
+
+/* r103 Scanner confluence explainability gates */
+must(js.includes('function scannerConfluenceHtml(symbol){'),'r103 Scanner confluence renderer missing');
+must(js.includes('WHY NOW?'),'r103 Why Now label missing');
+must(js.includes('kein zusätzlicher Score'),'r103 no-new-score disclosure missing');
+must(js.includes('BULL/BEAR CONFLICT'),'r103 conflict warning missing');
+must(js.includes('FIB WEITER ENTFERNT'),'r103 FIB counter-signal missing');
+must(js.includes('scannerConfluenceHtml(symbol)'),'r103 confluence must be composed into Scanner leader');
+must(css.includes('/* v10 r103 · Scanner confluence explainability */'),'r103 Scanner confluence CSS missing');
