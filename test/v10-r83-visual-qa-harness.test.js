@@ -37,8 +37,17 @@ test('r83 layout report gates overflow, short buttons and fixed nav containment'
   assert.match(v10,/bodyOverflow:root\.scrollWidth>innerWidth\+2/);
   assert.match(v10,/keyOverflow:overflow,shortButtons/);
   assert.match(v10,/navInside:/);
-  assert.match(v10,/report\.ok=!report\.bodyOverflow/);
+  assert.match(v10,/report\.ok=viewportMatch&&!report\.bodyOverflow/);
   assert.match(qa,/if\(failed\.length\)/);
+});
+
+test('r83 forces the app into a same-origin 390x844 CSS viewport',()=>{
+  const frame=fs.readFileSync(new URL('../v10/visual-qa-frame.html',import.meta.url),'utf8');
+  assert.match(frame,/width:390px;height:844px/);
+  assert.match(frame,/frame\.width='390';frame\.height='844'/);
+  assert.match(frame,/LOCAL VISUAL QA ONLY/);
+  assert.match(v10,/viewportMatch=viewport\.w===390&&viewport\.h===844/);
+  assert.match(qa,/visual-qa-frame\.html/);
 });
 
 test('r83 captures ten phone screenshots and uploads evidence',()=>{
