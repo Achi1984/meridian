@@ -14,6 +14,7 @@ const css=read('v10/v10.css');
 const qa=read('scripts/v10-visual-qa.mjs');
 const qaFrame=read('v10/visual-qa-frame.html');
 const gateway=read('server-gateway.js');
+const contract=read('portfolio-data-contract.js');
 const historyStore=read('portfolio-history-store.js');
 const authorityUpdate=read('portfolio-authority-update.js');
 
