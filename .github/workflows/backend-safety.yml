@@ -31,6 +31,7 @@ jobs:
         run: |
           node --check server.js
           node --check server-gateway.js
+          node --check portfolio-authority-update.js
           node --check cloud-backtest.js
           node --check scripts/read-token-auth.mjs
           node --check scripts/start-gateway.mjs
