@@ -1,7 +1,7 @@
 # MERIDIAN Chat Handoff
 
 Status: **canonical after merge**  
-Updated: **2026-09-30 21:56 Europe/Vienna**
+Updated: **2026-09-30 22:11 Europe/Vienna**
 
 ## Why this file exists
 
@@ -20,11 +20,11 @@ The full recovery protocol is in `docs/AGENT_ORCHESTRATION.md`.
 
 ## Current durable checkpoint
 
-- Build: **10.0-r101**
-- Canonical main SHA: **c0f001fa8a3b10a4683fd2fcdeaa5e239528addb**
-- Last merged UI PR: **#407 — Mobile shell density**
+- Build: **10.0-r102**
+- Canonical main SHA: **9a8a6df5c810c0c2a5a0ef0890305ef82dbef576**
+- Last merged UI PR: **#409 — Live build and history integrity**
 - Execution impact: **false**
-- UI sequence already completed: **r93 through r101**
+- UI sequence already completed: **r93 through r102**
 - Do **not** repeat these releases after a streaming interruption.
 
 ### Portfolio checkpoint
