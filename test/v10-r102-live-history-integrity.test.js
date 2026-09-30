@@ -12,7 +12,7 @@ test('r102 release identity is execution-neutral and cache coherent',()=>{
   assert.ok(Number(String(release.terminalBuild).match(/r(\d+)$/)?.[1]||0)>=102);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/LIVE-HISTORY-INTEGRITY/);
-  const rev=String(release.terminalBuild).match(/r\\d+$/)?.[0];
+  const rev=String(release.terminalBuild).match(/r\d+$/)?.[0];
   assert.equal(manifest.start_url,`./v10/?build=${rev}&fresh=${rev}`);
   assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
   assert.ok(html.includes('v10 '+rev+' · SMART TRADING TERMINAL'));
