@@ -38,8 +38,9 @@ test('r102 derives range readiness from existing canonical chart coverage only',
 test('r102 keeps the integrity surface compact on mobile',()=>{
   assert.match(css,/\/\* v10 r102 · live \+ history integrity \*\//);
   assert.match(css,/\.portfolio-integrity-strip\{[\s\S]*grid-template-columns:1fr 1\.35fr repeat\(3,minmax\(0,\.8fr\)\)/);
-  assert.match(css,/@media\(max-width:600px\)\{[\s\S]*\.portfolio-integrity-strip\{grid-template-columns:repeat\(2,minmax\(0,1fr\))/);
-  assert.match(css,/\.portfolio-integrity-strip>\.portfolio-integrity-range:last-child\{grid-column:1\/-1\}/);
+  assert.ok(css.includes('@media(max-width:600px){'));
+  assert.ok(css.includes('.portfolio-integrity-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}'));
+  assert.ok(css.includes('.portfolio-integrity-strip>.portfolio-integrity-range:last-child{grid-column:1/-1}'));
 });
 
 test('r102 remains presentation-only',()=>{
