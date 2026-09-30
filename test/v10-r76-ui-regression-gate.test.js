@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
-const pkg=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8'));
 const workflow=fs.readFileSync(new URL('../.github/workflows/backend-safety.yml',import.meta.url),'utf8');
 const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',import.meta.url),'utf8');
 
@@ -14,10 +13,9 @@ test('r76 release declares the permanent UI regression gate and remains executio
   assert.match(release.dashboardShell,/UI-REGRESSION-GATE$/);
 });
 
-test('r76 exposes and enforces one canonical UI regression command in Release Safety',()=>{
-  assert.equal(pkg.scripts['ui:regression'],'node scripts/v10-ui-regression-check.mjs');
+test('r76 enforces one canonical UI regression command in Release Safety',()=>{
   assert.match(workflow,/node --check scripts\/v10-ui-regression-check\.mjs/);
-  assert.match(workflow,/- name: V10 UI regression gate\n\s+run: npm run ui:regression/);
+  assert.match(workflow,/- name: V10 UI regression gate\n\s+run: node scripts\/v10-ui-regression-check\.mjs/);
 });
 
 test('r76 gate freezes five primary tabs and three secondary surfaces',()=>{
