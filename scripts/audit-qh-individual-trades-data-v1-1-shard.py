@@ -128,7 +128,11 @@ def audit_trades(zpath):
                 raise RuntimeError("trade timestamp decreased")
             if prev_id is not None:
                 if trade_id<=prev_id: raise RuntimeError("trade id not strictly increasing")
-                step=trade_id-prev_id\n                max_id_step=max(max_id_step,step)\n                if step>1:\n                    id_gap_events+=1\n                    missing_id_count+=step-1
+                step=trade_id-prev_id
+                max_id_step=max(max_id_step,step)
+                if step>1:
+                    id_gap_events+=1
+                    missing_id_count+=step-1
             expected_quote=price*qty
             err=abs(quote-expected_quote)
             max_quote_err=max(max_quote_err,err)
