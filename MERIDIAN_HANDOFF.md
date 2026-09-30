@@ -582,13 +582,15 @@ Important: until read-only Pionex credentials are configured in the runtime, r20
 
 A repeated ChatGPT UI streaming interruption was traced to orchestration pressure rather than lost repository state: long sequences of serial GitHub calls, repeated workflow polling, and unnecessarily large source/log payloads increased the chance of the response stream disconnecting while GitHub mutations had already completed.
 
-Durable mitigation:
-- `node scripts/stream-safe-preflight.mjs` returns a compact resume checkpoint with main SHA, terminal build, current branch/head, PR state/distance and gate summaries.
-- Interactive work is limited to at most 3 consecutive tool calls before a user-visible checkpoint.
-- Same-status workflow polling is limited to 2 consecutive polls.
-- Tool output is normally capped below 8 KB and large logs/diffs/files must be reduced to relevant windows.
-- Every mutation is checkpointed by a durable SHA/PR/run/deploy identifier.
-- After interruption, repo state is authoritative and no write is replayed before preflight.
+Durable mitigation — STREAM-SAFE-V3:
+- `node scripts/stream-safe-preflight.mjs` returns a compact resume checkpoint plus a deterministic `resumeToken`.
+- Each interactive chat turn has a hard budget of **2 bundled tool phases or 120 seconds**, whichever comes first.
+- Independent reads are parallelized inside one phase; serial one-by-one GitHub reads are prohibited when they can be batched.
+- Same-status workflow polling is limited to **1 repeat**. If a gate is still running, end the chat turn with its run ID instead of continuing to poll.
+- Tool output is capped below 8 KB per relevant payload; large logs/diffs/files are reduced to the smallest useful window.
+- Every mutation is checkpointed by a durable SHA/PR/run/deploy identifier before the next phase.
+- After interruption, repo state is authoritative: run preflight, compare the resume token, and never replay an already durable write.
+- Long-running development is intentionally split into short resumable turns; the user may answer simply `Go` / `Fortsetzen`, with no need to restate context.
 
 This is infrastructure/process-only. Terminal build, trading logic, PaperBots and execution behavior are unchanged.
 ## v10 r53 — inverse Coin-M symbol resolution
