@@ -18,9 +18,9 @@ test('stream-safe checkpoint keeps only compact resume state',()=>{
     ]
   });
   assert.deepEqual(out,{
-    protocol:'STREAM-SAFE-V3',
+    protocol:'STREAM-SAFE-V4',
     resumeToken:'1234567890ab:chore/stream-safe-execution-v2:fedcba098765:pr-224',
-    streamBudget:{toolBatches:2,sameStatusPolls:1,maxPayloadBytes:8192,maxTurnSeconds:120},
+    streamBudget:{toolBatches:2,sameStatusPolls:1,maxPayloadBytes:6144,maxTurnSeconds:90,checkpointAfterMutation:true},
     mainSha:'1234567890ab',
     terminalBuild:'10.0-r52',
     branch:'chore/stream-safe-execution-v2',
