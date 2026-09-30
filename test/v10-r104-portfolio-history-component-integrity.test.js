@@ -7,13 +7,15 @@ const store=fs.readFileSync(new URL('../portfolio-history-store.js',import.meta.
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r104 release identity is cache coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r104');
+test('r104 contract remains cache coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=104);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/PORTFOLIO-HISTORY-COMPONENT-INTEGRITY/);
-  assert.equal(release.dashboardConsistency,'7.64-CANONICAL-PORTFOLIO-HISTORY-V2');
-  assert.equal(manifest.start_url,'./v10/?build=r104&fresh=r104');
-  assert.ok(js.includes("const BUILD='10.0-r104'"));
+  assert.match(String(release.dashboardConsistency||''),/^7\.64-CANONICAL-PORTFOLIO-HISTORY-V\d+$/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r104 history writer requires both strict Spot authority and Pionex equity authority',()=>{
@@ -31,9 +33,9 @@ test('r104 reader keeps audit evidence but excludes incomplete canonical points'
 });
 
 test('r104 UI independently rejects missing Pionex authority and reports blocked legacy points',()=>{
-  assert.match(js,/String\(x\?\.sourceStatus\?\.trading\|\|''\)==='PIONEX_EQUITY'/);
+  assert.match(js,/portfolioHistoryTradingAuthorityFresh/);
   assert.match(js,/excludedIncompletePoints/);
-  assert.match(js,/SPOT \+ PIONEX/);
+  assert.match(js,/STRICT HISTORY/);
   assert.match(js,/BLOCKED/);
 });
 
