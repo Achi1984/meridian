@@ -16,14 +16,17 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r77 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r77');
+test('r77 unified Data State contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=77);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r77-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-MOBILE-HARDENED-UI-REGRESSION-GATE-DATA-STATE');
-  assert.match(root,/10\.0-r77-production/);
-  assert.match(html,/10\.0-r77/);
-  assert.match(v10,/const BUILD='10\.0-r77'/);
-  assert.equal(manifest.start_url,'./v10/?build=r77&fresh=r77');
+  assert.match(String(release.dashboardShell||''),/DATA-STATE/);
+  assert.match(String(release.dashboardShell||''),/UI-REGRESSION-GATE/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r77 keeps exactly five primary tabs and all secondary surfaces',()=>{
