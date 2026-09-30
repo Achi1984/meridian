@@ -130,8 +130,8 @@ function bindPortfolioRefEditor(){
   }finally{ledgerBtn.disabled=false}
  };
  if(okxBtn)okxBtn.onclick=async()=>{
-  const serverRows=Array.isArray(state?.portfolio?.externalVenues)?state.portfolio.externalVenues:[],refs=loadExternalVenueRefs(),current=refs.find(x=>String(x.venue).toLowerCase()==='okx')||serverRows.find(x=>String(x?.venue||'').toLowerCase()==='okx');
-  const raw=prompt('OKX Gesamtwert in USD',current?.valueUsd??'');if(raw===null)return;
+  const refs=loadExternalVenueRefs(),current=refs.find(x=>String(x.venue).toLowerCase()==='okx'),serverValue=num(state?.portfolio?.okxVenueUsd);
+  const raw=prompt('OKX Gesamtwert in USD',current?.valueUsd??(serverValue??''));if(raw===null)return;
   const value=parseMoneyInput(raw);if(value==null){alert('Ungültiger OKX-Wert. Bitte nur den USD-Gesamtwert eingeben.');return}
   okxBtn.disabled=true;
   try{
