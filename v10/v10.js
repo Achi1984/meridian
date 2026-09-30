@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r101';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r101';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r101';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r101';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r101';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r101';
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r102';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r102';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r102';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r102';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r102';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r102';
 // MERIDIAN v10 r101 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r101';
+const BUILD='10.0-r102';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -499,6 +499,14 @@ function portfolioChartModel(range=portfolioChartUi.range){
   return{...series,geometry,delta:deltaAvailable?delta:null,pct,deltaAvailable,startCovered,endCovered,points:rows.length,first,last};
 }
 function portfolioChartRangeLabel(range){return range==='1h'?'1H':range==='1w'?'1W':'1D'}
+function portfolioHistoryIntegrityHtml(){
+  const s=S(),h=H(),strict=strictPortfolioHistoryPoints(),latest=strict.at(-1),latestAge=Number.isFinite(Number(latest?.timestamp))?(h.ageText?.(Math.max(0,Date.now()-Number(latest.timestamp)))||'—'):'—',rev=(BUILD.split('-').at(-1)||BUILD).toUpperCase(),source=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
+  const rangeCard=key=>{
+    const m=portfolioChartModel(key),ready=m.deltaAvailable,started=m.points>=2||strict.length>0,tone=ready?'safe':started?'watch':'muted',label=ready?'READY':started?'BUILDING':'WAIT',detail=ready?m.points+' PUNKTE · VOLLES FENSTER':started?m.points+' PUNKTE · FENSTER BAUT AUF':'NOCH KEIN FENSTER';
+    return '<div class="portfolio-integrity-item portfolio-integrity-range tone-'+tone+'" data-history-range="'+key+'" data-history-ready="'+(ready?'true':'false')+'"><span>'+portfolioChartRangeLabel(key)+'</span><b>'+label+'</b><small>'+esc(detail)+'</small></div>';
+  };
+  return '<div class="portfolio-integrity-strip" role="status" aria-label="Build und Portfolio-Historienintegrität" data-build="'+esc(BUILD)+'" data-history-points="'+strict.length+'"><div class="portfolio-integrity-item portfolio-integrity-build"><span>BUILD</span><b>'+esc(rev)+'</b><small>LIVE SHELL ID</small></div><div class="portfolio-integrity-item portfolio-integrity-history" title="'+esc(source)+'"><span>STRICT HISTORY</span><b>'+strict.length+' PUNKTE</b><small>STRICT_AUTHORITY · '+esc(latestAge)+'</small></div>'+rangeCard('1h')+rangeCard('1d')+rangeCard('1w')+'</div>';
+}
 // Legacy Command semantic contract: GESAMTVERMÖGEN is now rendered as the dominant GESAMTPORTFOLIO hero.
 function portfolioChartHeroHtml(){
   const s=S(),p=s?.portfolio||{},h=H(),range=PORTFOLIO_CHART_WINDOWS[portfolioChartUi.range]?portfolioChartUi.range:'1d',m=portfolioChartModel(range),strictHistory=strictPortfolioHistoryPoints(),storedPoints=strictHistory.length,total=Number(p.total),ready=p.complete===true&&Number.isFinite(total)&&total>=0,totalText=ready?(h.money?.(total)||String(total)):'—',tone=!m.deltaAvailable?'muted':m.delta>0?'safe':m.delta<0?'danger':'muted',sign=m.delta!=null&&m.delta>0?'+':'',rangeLabel=portfolioChartRangeLabel(range),historySource=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
@@ -515,7 +523,7 @@ function portfolioChartHeroHtml(){
     const g=m.geometry,minLabel=h.money?.(g.rawMin)||fmt(g.rawMin,2),maxLabel=h.money?.(g.rawMax)||fmt(g.rawMax,2),startLabel=portfolioChartTimeLabel(m.first?.timestamp,range),endLabel=portfolioChartTimeLabel(m.last?.timestamp,range);
     chart='<div class="portfolio-chart-plot"><svg viewBox="0 0 '+g.width+' '+g.height+'" preserveAspectRatio="none" role="img" aria-label="Gesamtportfolio Verlauf '+rangeLabel+'"><line class="portfolio-chart-grid" x1="16" y1="18" x2="984" y2="18"></line><line class="portfolio-chart-grid" x1="16" y1="130" x2="984" y2="130"></line><line class="portfolio-chart-grid" x1="16" y1="242" x2="984" y2="242"></line><path class="portfolio-chart-area" d="'+g.area+'"></path><path class="portfolio-chart-line" d="'+g.line+'"></path></svg><div class="portfolio-chart-axis"><span>'+esc(startLabel)+'</span><span>'+esc(minLabel)+' – '+esc(maxLabel)+'</span><span>'+esc(endLabel)+'</span></div></div>';
   }
-  return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+chart+'</section>';
+  return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+portfolioHistoryIntegrityHtml()+chart+'</section>';
 }
 function bindCommandPortfolioHero(view){
   view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
