@@ -1124,11 +1124,11 @@ function paperLifecycle(src,baseline=false){
   return raw||'PAPER / RESEARCH';
 }
 function paperModelStats(name,src,baseline=false){
-  const a=src?.account||{},start=Number(a.startEquity),equity=Number(a.equity),peak=Number(a.peakEquity),realized=Number(a.realizedPnl),unrealized=Number(a.unrealizedPnl),trades=Array.isArray(src?.trades)?src.trades:[],closedRaw=src?.closedCount??trades.length??src?.closedCycles?.length,openRaw=src?.openCount??src?.openPositions?.length??src?.positions?.length;
+  const a=src?.account||{},start=Number(a.startEquity),equity=Number(a.equity),peak=Number(a.peakEquity),realized=Number(a.realizedPnl),unrealized=Number(a.unrealizedPnl),tradesPresent=Array.isArray(src?.trades),trades=tradesPresent?src.trades:[],closedRaw=src?.closedCount??(tradesPresent?trades.length:null)??(Array.isArray(src?.closedCycles)?src.closedCycles.length:null),openRaw=src?.openCount??(Array.isArray(src?.openPositions)?src.openPositions.length:null)??(Array.isArray(src?.positions)?src.positions.length:null);
   const pnl=Number.isFinite(start)&&Number.isFinite(equity)?equity-start:Number.isFinite(realized)||Number.isFinite(unrealized)?(Number.isFinite(realized)?realized:0)+(Number.isFinite(unrealized)?unrealized:0):null;
   const dd=Number.isFinite(Number(a.drawdownPct))?Number(a.drawdownPct):Number.isFinite(peak)&&peak>0&&Number.isFinite(equity)?Math.max(0,(peak-equity)/peak*100):null;
-  const pf=Number.isFinite(Number(src?.profitFactor))?Number(src.profitFactor):baseline?paperTradePf(trades):null;
-  const wr=Number.isFinite(Number(src?.winRate))?Number(src.winRate):trades.length?trades.filter(x=>Number(x?.realized)>0).length/trades.length*100:null;
+  const pf=Number.isFinite(Number(src?.profitFactor))?Number(src.profitFactor):baseline&&tradesPresent?paperTradePf(trades):null;
+  const wr=Number.isFinite(Number(src?.winRate))?Number(src.winRate):tradesPresent&&trades.length?trades.filter(x=>Number(x?.realized)>0).length/trades.length*100:null;
   return{name,baseline,src,equity:Number.isFinite(equity)?equity:null,pnl,dd,closed:Number.isFinite(Number(closedRaw))?Number(closedRaw):null,open:Number.isFinite(Number(openRaw))?Number(openRaw):null,pf,wr,phase:paperLifecycle(src,baseline),ruleset:src?.ruleset||null,updatedAt:src?.updatedAt||src?.lastScanAt||null};
 }
 function paperModelCard(m){
