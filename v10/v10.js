@@ -371,7 +371,7 @@ function assetDetailButton(symbol,label='ASSET DETAIL'){
   return '<button type="button" class="asset-detail-open" data-asset-detail="'+esc(symbol)+'">'+esc(label)+'</button>';
 }
 function bindAssetDetailLinks(view,returnView='depot',navKey=returnView){
-  $('[data-asset-detail]',view).forEach(btn=>btn.addEventListener('click',e=>{
+  $$('[data-asset-detail]',view).forEach(btn=>btn.addEventListener('click',e=>{
     e?.preventDefault?.();e?.stopPropagation?.();
     openAssetDetail(btn.dataset.assetDetail,returnView,navKey);
   }));
@@ -758,7 +758,7 @@ function renderScanner(force=false){
   const stack=top.length?top.map(scannerCard).join(''):'<section class="v10-live-blocked market-stale"><b>SCANNER BLOCKED</b><small>Keine frischen Multi-Timeframe-Marktdaten · keine bestätigten Setups ausgeben.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section><section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Strategie-Lab bleibt sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><button type="button" data-open-lab>LAB ÖFFNEN</button></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
   $('[data-open-lab]',view)?.addEventListener('click',()=>showSecondaryView('more','research'));
-  $('[data-forecast-asset]',view).forEach(btn=>btn.addEventListener('click',()=>{fibUi.symbol=String(btn.dataset.forecastAsset||'BTC').toUpperCase();fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;showSecondaryView('market','market')}));
+  $$('[data-forecast-asset]',view).forEach(btn=>btn.addEventListener('click',()=>{fibUi.symbol=String(btn.dataset.forecastAsset||'BTC').toUpperCase();fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;showSecondaryView('market','market')}));
   bindAssetDetailLinks(view,'research','research');
 }
 function skNum(v,d=2){
