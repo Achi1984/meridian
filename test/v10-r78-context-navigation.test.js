@@ -16,14 +16,17 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r78 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r78');
+test('r78 context-navigation contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=78);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r78-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-MOBILE-HARDENED-UI-REGRESSION-GATE-DATA-STATE-CONTEXT-NAV');
-  assert.match(root,/10\.0-r78-production/);
-  assert.match(html,/10\.0-r78/);
-  assert.match(v10,/const BUILD='10\.0-r78'/);
-  assert.equal(manifest.start_url,'./v10/?build=r78&fresh=r78');
+  assert.match(String(release.dashboardShell||''),/CONTEXT-NAV/);
+  assert.match(String(release.dashboardShell||''),/UI-REGRESSION-GATE/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r78 keeps exactly five primary tabs and existing secondary surfaces',()=>{
