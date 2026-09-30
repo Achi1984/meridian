@@ -1026,5 +1026,5 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* v10 r85 · bottom-nav occlusion clearance */
 @media(max-width:430px){
-  #view-depot,#view-bots{padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+  #view-depot,#view-bots{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
