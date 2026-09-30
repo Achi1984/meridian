@@ -267,3 +267,12 @@ must(js.includes('command-next-decision command-next-action-open'),'Next Action 
 must(!js.includes('class="command-hub-card command-hub-critical'),'duplicate Command critical-asset card must stay removed');
 must(css.includes('.v10-command-tech-details>summary'),'Command technical disclosure styling missing');
 must(css.includes('min-height:44px'),'touch target floor missing');
+
+
+/* r91 permanent Command top-fold clarity gates */
+must(String(release.dashboardShell||'').includes('COMMAND-TOP-FOLD-CLARITY'),'dashboardShell must declare Command top-fold clarity');
+must(js.includes("feedReady=g.decisionComplete&&m.coverageComplete"),'Live Data readiness must remain independent from portfolio authority');
+must(js.includes("<span>LIVE DATA</span>"),'Command LIVE DATA KPI missing');
+must(js.includes('function commandDataDisclosure()'),'Command source disclosure renderer missing');
+must(js.includes('source.innerHTML=commandDataDisclosure()'),'Command source details must be collapsed by default');
+must(css.includes('.command-source-details>summary'),'Command source disclosure styling missing');

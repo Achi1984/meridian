@@ -1053,3 +1053,19 @@ button.command-next-decision:focus-visible,.v10-command-tech-details>summary:foc
 @media(max-width:360px){
   #view-command .command-source-authority .portfolio-reconcile-actions{grid-template-columns:1fr}
 }
+
+
+/* v10 r91 · Command top-fold clarity */
+.command-source-details{margin:8px 0 10px;border:1px solid #1b3044;border-radius:12px;background:#071019;overflow:hidden}
+.command-source-details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 10px;touch-action:manipulation}
+.command-source-details>summary::-webkit-details-marker{display:none}
+.command-source-details>summary>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.command-source-details>summary span{font-size:8px;color:var(--cyan);font-weight:900;letter-spacing:.09em}
+.command-source-details>summary b{font-size:9px;color:#d5e2ee;line-height:1.3}
+.command-source-details>summary small{font-size:7px;color:var(--muted);text-align:right;line-height:1.35}
+.command-source-details[open]>summary{border-bottom:1px solid #172a3c;background:#09131d}
+.command-source-details>.command-source-strip{margin:8px}
+@media(max-width:520px){
+  .command-source-details>summary{align-items:flex-start;flex-direction:column;gap:3px}
+  .command-source-details>summary small{text-align:left}
+}
