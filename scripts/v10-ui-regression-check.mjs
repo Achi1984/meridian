@@ -251,3 +251,6 @@ must(qa.includes("if(dataMode)url.searchParams.set('qaData',dataMode)"),'visual 
 
 must(js.includes("if(!force&&$('.asset-detail-topbar',view))return"),'Asset Detail must be idempotent under mutation-only decorate passes');
 must(js.includes('data-asset-back data-context-back="asset-detail"'),'Asset Detail contextual-back QA selector must exist in rendered markup');
+
+must(js.includes("botErrorSurfaceInvariant=cfg.view!=='bots'||cfg.dataMode!=='error'||!!active.querySelector('.bot-live-blocked')"),'Bots ERROR visual QA must require visible fail-closed surface');
+must(js.includes("if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvariant=botErrorSurfaceInvariant"),'Bots ERROR state must replace accordion requirement with error-surface requirement');
