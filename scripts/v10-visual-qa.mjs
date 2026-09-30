@@ -24,25 +24,47 @@ const cases=[
 function decodeText(s){
   return String(s||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 }
+function runChrome(name,kind,url,extra=[]){
+  const profile=path.join('/tmp','meridian-visual-qa-'+process.pid+'-'+name+'-'+kind);
+  const args=[
+    '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--hide-scrollbars',
+    '--run-all-compositor-stages-before-draw','--force-device-scale-factor=1',
+    '--window-size='+viewport.width+','+viewport.height,'--virtual-time-budget=2600',
+    '--user-data-dir='+profile,...extra,url.toString()
+  ];
+  const p=spawnSync(chrome,args,{cwd:ROOT,encoding:'utf8',timeout:45000,maxBuffer:30*1024*1024});
+  fs.rmSync(profile,{recursive:true,force:true});
+  if(p.error)throw p.error;
+  if(p.status!==0){
+    fs.writeFileSync(path.join(OUT,name+'-'+kind+'.stderr.txt'),String(p.stderr||''));
+    throw new Error(name+' '+kind+' chrome exit '+p.status+'\n'+String(p.stderr||'').slice(-4000));
+  }
+  return p;
+}
 
 const summaries=[];
 for(let i=0;i<cases.length;i++){
   const [name,view,scroll]=cases[i],png=path.join(OUT,name+'.png'),url=new URL(base);
   url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build','r83');
-  const profile=path.join('/tmp','meridian-visual-qa-'+process.pid+'-'+i);
-  const args=[
-    '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--hide-scrollbars',
-    '--run-all-compositor-stages-before-draw','--force-device-scale-factor=1',
-    '--window-size='+viewport.width+','+viewport.height,'--virtual-time-budget=2600',
-    '--user-data-dir='+profile,'--screenshot='+png,'--dump-dom',url.toString()
-  ];
-  const p=spawnSync(chrome,args,{cwd:ROOT,encoding:'utf8',timeout:45000,maxBuffer:30*1024*1024});
-  fs.rmSync(profile,{recursive:true,force:true});
-  if(p.error)throw p.error;
-  if(p.status!==0)throw new Error(name+' chrome exit '+p.status+'\n'+String(p.stderr||'').slice(-4000));
-  const m=String(p.stdout||'').match(/<pre id="visual-qa-report"[^>]*>([\s\S]*?)<\/pre>/);
-  if(!m)throw new Error(name+' visual QA report missing');
+
+  // Chrome does not reliably emit --dump-dom when screenshot capture is requested in the same process.
+  // Keep layout evaluation and evidence capture as separate deterministic invocations.
+  const domRun=runChrome(name,'dom',url,['--dump-dom']);
+  const dom=String(domRun.stdout||'');
+  const m=dom.match(/<pre id="visual-qa-report"[^>]*>([\s\S]*?)<\/pre>/);
+  if(!m){
+    fs.writeFileSync(path.join(OUT,name+'.html'),dom);
+    fs.writeFileSync(path.join(OUT,name+'-dom.stderr.txt'),String(domRun.stderr||''));
+    throw new Error(name+' visual QA report missing');
+  }
   const report=JSON.parse(decodeText(m[1]));
+
+  const shotRun=runChrome(name,'shot',url,['--screenshot='+png]);
+  if(!fs.existsSync(png)||fs.statSync(png).size<1000){
+    fs.writeFileSync(path.join(OUT,name+'-shot.stderr.txt'),String(shotRun.stderr||''));
+    throw new Error(name+' screenshot missing or empty');
+  }
+
   summaries.push({name,url:url.toString(),screenshot:path.relative(ROOT,png),...report});
   console.log('[visual-qa]',name,JSON.stringify(report));
 }
