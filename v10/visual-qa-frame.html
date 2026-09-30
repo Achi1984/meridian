@@ -6,10 +6,19 @@
   const local=['127.0.0.1','localhost'].includes(location.hostname);
   if(!local){document.body.textContent='LOCAL VISUAL QA ONLY';return}
   const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current';
+  const inner=new URL('./',location.href);
+  inner.searchParams.set('visualQa','1');
+  inner.searchParams.set('qaView',view);
+  inner.searchParams.set('qaScroll',scroll);
+  inner.searchParams.set('build',build);
+  for(const key of ['qaFlow','qaData']){
+    const value=q.get(key);
+    if(value)inner.searchParams.set(key,value);
+  }
   const frame=document.createElement('iframe');
   frame.id='qa-frame';
   frame.width='390';frame.height='844';
-  frame.src='./?visualQa=1&qaView='+encodeURIComponent(view)+'&qaScroll='+encodeURIComponent(scroll)+'&build='+encodeURIComponent(build);
+  frame.src=inner.pathname+inner.search;
   document.body.appendChild(frame);
   let tries=0;
   const pump=()=>{
