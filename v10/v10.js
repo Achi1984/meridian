@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r70';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r70';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r70';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r70';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r70';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r70';
-// MERIDIAN v10 r70 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r71';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r71';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r71';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r71';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r71';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r71';
+// MERIDIAN v10 r71 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r70';
+const BUILD='10.0-r71';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -18,6 +18,7 @@ const skV2Ui={days:730,running:false,result:null,error:null,progress:'',complete
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
 const profitAgentUi={days:1460,running:false,result:null,error:null,progress:'',completed:0,total:PAPERBOT_PROFIT_AGENT_V1_ASSETS.length};
 const assetWatchShareUi={busy:false,shareUrl:null,message:'',tone:'muted'};
+const botViewUi={filter:'ALL'};
 const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 const MARKET_FRESH_MS=3*60*1000;
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -100,11 +101,46 @@ function marketPrice(symbol){
   const i=s?.assetIntel?.[symbol]??(symbol==='BTC'?s?.intel:null),p=Number(i?.price),fresh=intelFresh(i);
   return{value:p>0?p:null,source:p>0?(i?.source||'MARKET FEED')+(fresh?'':' · STALE'):'UNVERIFIED',verified:false,spread:null,stale:!fresh};
 }
+function botTypeLabel(b){
+  const raw=String(b?.botType||'').trim().toLowerCase();
+  if(raw.includes('grid'))return'GRID';
+  if(raw.includes('dca'))return'DCA';
+  if(raw.includes('lite'))return'LITE';
+  return raw?raw.replaceAll('_',' ').toUpperCase().slice(0,18):'BOT';
+}
+function botTypeSummary(rows){
+  const types=[...new Set((rows||[]).map(botTypeLabel).filter(Boolean))];
+  return types.length?types.join(' + '):'BOT';
+}
+function botRangeState(b,mp=marketPrice(b?.symbol)){
+  const lower=Number(b?.lower),upper=Number(b?.upper),price=Number(mp?.value),available=lower>0&&upper>lower;
+  if(!available)return{available:false,positionFresh:false,inRange:null,positionPct:null,label:'—'};
+  const positionFresh=Number.isFinite(price)&&price>0&&!mp?.stale;
+  if(!positionFresh)return{available:true,positionFresh:false,inRange:null,positionPct:null,label:'MKT STALE'};
+  const raw=(price-lower)/(upper-lower)*100,positionPct=Math.max(0,Math.min(100,raw)),inRange=price>=lower&&price<=upper;
+  return{available:true,positionFresh:true,inRange,positionPct,label:inRange?'IN RANGE':price<lower?'BELOW RANGE':'ABOVE RANGE'};
+}
+function botRangeSummary(rows,mp){
+  const states=(rows||[]).map(b=>botRangeState(b,mp)).filter(x=>x.available),positionFresh=states.length>0&&states.every(x=>x.positionFresh),inRange=positionFresh?states.filter(x=>x.inRange).length:null;
+  return{known:states.length,positionFresh,inRange,label:states.length?(positionFresh?inRange+'/'+states.length:'MKT STALE'):'—'};
+}
+function botFilterMatch(symbol,filter=botViewUi.filter){
+  const st=pairStatus(symbol),rows=matchedRows(symbol),key=String(filter||'ALL').toUpperCase();
+  if(key==='RISK')return['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','MARKET_STALE'].includes(st.code);
+  if(key==='PROFIT')return['PROFIT_LOCK','WATCH_PROFIT'].includes(st.code);
+  if(key==='HEDGE')return rows.some(b=>String(b?.side||'').toUpperCase()==='SHORT');
+  return true;
+}
+function botFilterBar(allSyms){
+  const defs=[['ALL','ALLE'],['RISK','RISIKO'],['PROFIT','PROFIT'],['HEDGE','HEDGE']];
+  return '<section class="bot-filter-bar"><div><span>ANSICHT</span><small>Nur Darstellung · Risk-Ranking bleibt unverändert</small></div><div class="bot-filter-actions">'+defs.map(([key,label])=>'<button type="button" data-bot-filter="'+key+'" class="'+(botViewUi.filter===key?'active':'')+'">'+label+' <b>'+allSyms.filter(s=>botFilterMatch(s,key)).length+'</b></button>').join('')+'</div></section>';
+}
 function legRow(b){
   const h=H(),fresh=h.botFeedFresh?.(),verified=fresh&&h.liveMatched?.(b),pnl=verified&&h.livePnlAvailable?.(b)?h.botPnlUsd?.(b)?.value:null,r=verified?h.risk?.(b):null,sl=Number(b.sl)>0?h.money?.(b.sl):'—';
   if(!fresh)return '<div class="pair-leg pair-leg-stale '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>STALE</span></div><small>Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten</small></div>';
   if(!verified)return '<div class="pair-leg pair-leg-stale"><div class="leg-head"><strong>'+(b.side||'BOT')+' · '+(b.leverage||'—')+'x</strong><span>UNVERIFIED</span></div><small>Nicht handlungsrelevant</small></div>';
-  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>PRIVATE</span></div><div class="leg-grid"><span>CAPITAL USD <b>'+(h.liveInvestUsdAvailable?.(b)?h.money(b.investUsd):'—')+'</b></span><span>PNL USD <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>SL <b>'+sl+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
+  const mp=marketPrice(b.symbol),range=botRangeState(b,mp),type=botTypeLabel(b),grids=Number(b.grids),rangeText=range.available?h.money?.(b.lower)+' — '+h.money?.(b.upper):'—',rangeTone=!range.positionFresh?'muted':range.inRange?'safe':'watch',marker=range.positionFresh?'<i style="--range-pos:'+range.positionPct.toFixed(1)+'%"></i>':'';
+  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>'+esc(type)+(grids>0?' · '+Math.round(grids)+' GRIDS':'')+'</span></div><div class="leg-range"><div><span>RANGE</span><b>'+rangeText+'</b><small class="tone-'+rangeTone+'">'+esc(range.label)+(range.positionFresh?' · '+range.positionPct.toFixed(0)+'%':'')+'</small></div><div class="leg-range-track">'+marker+'</div></div><div class="leg-grid"><span>CAPITAL USD <b>'+(h.liveInvestUsdAvailable?.(b)?h.money(b.investUsd):'—')+'</b></span><span>PNL USD <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>SL <b>'+sl+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
 }
 function pairCard(symbol,compact=false,open=false){
   const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
@@ -112,10 +148,11 @@ function pairCard(symbol,compact=false,open=false){
   const exposureState=h.exposureIntegrity?.(symbol),exposureComplete=exposureState?!!exposureState.complete:(fresh&&rows.length>0&&rows.every(b=>h.liveInvestUsdAvailable?.(b))),longUsd=exposureComplete?exposure(rows,'LONG'):null,shortUsd=exposureComplete?exposure(rows,'SHORT'):null;
   const pnlState=h.pnlIntegrity?.(symbol),pnlVals=fresh?rows.map(b=>h.botPnlUsd?.(b)?.value):[],pnlComplete=(pnlState?!!pnlState.complete:(fresh&&rows.length>0))&&pnlVals.length===rows.length&&pnlVals.every(x=>x!=null),pnl=pnlComplete?pnlVals.reduce((a,b)=>a+b,0):null;
   const risks=fresh?rows.map(b=>h.risk?.(b)).filter(x=>x!=null):[],minRisk=risks.length?Math.min(...risks):null,riskTone=minRisk==null?'muted':minRisk<10?'danger':minRisk<18?'watch':'safe';
-  const hedge=longUsd>0&&shortUsd!=null?shortUsd/longUsd*100:null,net=longUsd!=null&&shortUsd!=null?longUsd-shortUsd:null,pnlTone=pnl==null?'muted':pnl>0?'safe':pnl<0?'danger':'muted';
+  const hedge=longUsd>0&&shortUsd!=null?shortUsd/longUsd*100:null,net=longUsd!=null&&shortUsd!=null?longUsd-shortUsd:null,pnlTone=pnl==null?'muted':pnl>0?'safe':pnl<0?'danger':'muted',range=botRangeSummary(rows,mp),rangeTone=!range.positionFresh?'muted':range.inRange===range.known?'safe':'watch',types=botTypeSummary(rows);
   const reason=esc(st.reason)+(exposureComplete?'':' · Exposure-Einheit unvollständig')+(pnlComplete?'':' · PnL-Summe unvollständig');
-  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+longs.length+' LONG · '+shorts.length+' SHORT</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+reason+'</div></article>';
-  return '<details class="asset-pair asset-pair-details pair-tone-'+st.tone+'" data-symbol="'+esc(symbol)+'" '+(open?'open':'')+'><summary class="asset-pair-summary"><div class="asset-pair-identity"><span class="asset-symbol">'+symbol+'</span><small>'+longs.length+' LONG · '+shorts.length+' SHORT</small></div><div class="asset-glance"><span>PNL <b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></span><span>MIN LIQ <b class="tone-'+riskTone+'">'+(minRisk==null?'—':minRisk.toFixed(1)+'%')+'</b></span><span>HEDGE <b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></span></div><div class="asset-pair-status-wrap"><b class="pair-status tone-'+st.tone+'">'+st.label+'</b><i class="asset-chevron" aria-hidden="true"></i></div></summary><div class="asset-pair-body"><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>LONG NOTIONAL</span><b>'+(longUsd==null?'—':h.money?.(longUsd))+'</b></div><div><span>SHORT NOTIONAL</span><b>'+(shortUsd==null?'—':h.money?.(shortUsd))+'</b></div><div><span>NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div></div><div class="pair-reason">'+reason+'</div><div class="pair-legs">'+rows.map(legRow).join('')+'</div></div></details>';
+  const identityMeta=longs.length+' LONG · '+shorts.length+' SHORT · '+types;
+  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+reason+'</div></article>';
+  return '<details class="asset-pair asset-pair-details pair-tone-'+st.tone+'" data-symbol="'+esc(symbol)+'" '+(open?'open':'')+'><summary class="asset-pair-summary"><div class="asset-pair-identity"><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><div class="asset-glance"><span>PNL <b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></span><span>MIN LIQ <b class="tone-'+riskTone+'">'+(minRisk==null?'—':minRisk.toFixed(1)+'%')+'</b></span><span>HEDGE <b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></span><span>RANGE <b class="tone-'+rangeTone+'">'+esc(range.label)+'</b></span></div><div class="asset-pair-status-wrap"><b class="pair-status tone-'+st.tone+'">'+st.label+'</b><i class="asset-chevron" aria-hidden="true"></i></div></summary><div class="asset-pair-body"><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>LONG NOTIONAL</span><b>'+(longUsd==null?'—':h.money?.(longUsd))+'</b></div><div><span>SHORT NOTIONAL</span><b>'+(shortUsd==null?'—':h.money?.(shortUsd))+'</b></div><div><span>NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div></div><div class="pair-reason">'+reason+'</div><div class="pair-legs">'+rows.map(legRow).join('')+'</div></div></details>';
 }
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
@@ -417,6 +454,7 @@ function bindBotOverviewControls(view){
   const openBtn=$('[data-assets-action="open"]',view),closeBtn=$('[data-assets-action="close"]',view);
   if(openBtn)openBtn.onclick=()=>setOpen(true);
   if(closeBtn)closeBtn.onclick=()=>setOpen(false);
+  [...view.querySelectorAll('[data-bot-filter]')].forEach(btn=>{btn.onclick=()=>{botViewUi.filter=String(btn.dataset.botFilter||'ALL').toUpperCase();renderBots(true)}});
   [...view.querySelectorAll('[data-asset-watch-share]')].forEach(btn=>{btn.onclick=()=>assetWatchShareAction(btn.dataset.assetWatchShare)});
 }
 function renderBots(force=false){
@@ -426,14 +464,15 @@ function renderBots(force=false){
   const hadAssetAccordion=!!$('.asset-pair-details',view),openAssets=new Set($$('.asset-pair-details[open]',view).map(x=>x.dataset.symbol).filter(Boolean));
   const snapshotOpen=force?$('.v10-snapshot-details',view)?.open:null,unmatchedOpen=force?$('.v10-unmatched-details',view)?.open:null,diagOpenExisting=$('.v10-bot-diagnostics',view)?.open;
   const s=S(),g=syncHealth(),ph=accountPositionHealth(),unmatched=g.unmatched,criticalSymbol=criticalPair()?.symbol;
-  const syms=(g.fresh?symbols():[]).slice().sort((a,b)=>pairStatus(b).rank-pairStatus(a).rank||a.localeCompare(b));
+  const allSyms=(g.fresh?symbols():[]).slice().sort((a,b)=>pairStatus(b).rank-pairStatus(a).rank||a.localeCompare(b)),syms=allSyms.filter(symbol=>botFilterMatch(symbol));
   const liveCards=syms.map(symbol=>pairCard(symbol,false,hadAssetAccordion?openAssets.has(symbol):symbol===criticalSymbol)).filter(Boolean).join('');
   const source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),healthy=g.matched===g.supported&&g.safetyReady===g.matched&&g.decisionReady===g.matched&&unmatched===0;
   const headCards='<div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' rows · '+esc(g.age)+'</small></div><div><span>DECISION READY</span><b class="tone-'+(g.decisionReady===g.matched&&g.matched?'safe':'watch')+'">'+g.decisionReady+'/'+g.matched+'</b><small>PNL miss '+g.pnlMissing+' · MKT miss '+g.marketMissing+'</small></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b><small>'+(healthy?'DATA COMPLETE':'CHECK DETAILS')+'</small></div>'+(healthy?'':'<div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div>');
   const diagnosticsOpen=diagOpenExisting??(!healthy||!ph.fresh||unmatched>0);
   const diagnostics='<details class="v10-bot-diagnostics" '+(diagnosticsOpen?'open':'')+'><summary><div><span>TECHNISCHE DETAILS</span><b>'+g.matched+'/'+g.supported+' Bots · PnL '+g.pnlReady+'/'+g.matched+' · Market '+g.marketReady+'/'+g.matched+'</b></div><small>Account API · Wallet Discovery · Normalizer · historische Referenz</small></summary><div class="v10-bot-diagnostics-body">'+accountPositionLayer(false)+walletDiscoveryLayer()+assetWatchShareCard()+unmatchedDiagnostics(unmatchedOpen??false)+snapshotDetails(snapshotOpen??!g.fresh)+'</div></details>';
-  const assetHead='<section class="asset-overview-head"><div><span>ASSET OVERVIEW</span><b>'+syms.length+' ASSETS · '+g.matched+' BOTS</b><small>Nach Risiko sortiert · wichtigste Kennzahlen direkt sichtbar · Karte antippen für Bot-Details</small></div><div class="asset-toggle-actions"><button type="button" data-assets-action="close">ALLE ZU</button><button type="button" data-assets-action="open">ALLE AUF</button></div></section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>POSITION LAYER · BOT CONTROL CENTER</b></div><small>Risk-first Übersicht · Details nur bei Bedarf öffnen · Asset Watch = Referenz</small></section><section class="bot-tab-head bot-tab-head-compact">'+headCards+'</section>'+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+assetHead+'<div class="v10-pair-stack asset-accordion-stack">'+(liveCards||'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Technische Details öffnen.</small></section>')+'</div>'+diagnostics;
+  const assetHead='<section class="asset-overview-head"><div><span>ASSET OVERVIEW</span><b>'+syms.length+' / '+allSyms.length+' ASSETS · '+g.matched+' BOTS</b><small>Risk-first · Range + Hedge + PnL direkt sichtbar · Karte antippen für Bot-Details</small></div><div class="asset-toggle-actions"><button type="button" data-assets-action="close">ALLE ZU</button><button type="button" data-assets-action="open">ALLE AUF</button></div></section>';
+  const emptyFilter=allSyms.length&&botViewUi.filter!=='ALL'?'<section class="v10-live-blocked bot-live-blocked"><b>KEIN ASSET IM FILTER '+esc(botViewUi.filter)+'</b><small>Filter ändern; die zugrunde liegenden Live-Bots bleiben unverändert.</small></section>':'<section class="v10-live-blocked bot-live-blocked"><b>KEINE FRISCHEN LIVE-AKTIONSKARTEN</b><small>'+esc(g.detail)+' · Technische Details öffnen.</small></section>';
+  view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>LIVE</span><b>BOT CONTROL CENTER 2.0</b></div><small>Risk-first Übersicht · Range/Typ sichtbar · Asset Watch = Referenz</small></section><section class="bot-tab-head bot-tab-head-compact">'+headCards+'</section>'+(unmatched?'<section class="v10-unverified-note">'+unmatched+' unterstützte private Bot-Row(s) sind UNVERIFIED und aus Actions ausgeschlossen.'+(g.ambiguous?' · '+g.ambiguous+' davon AMBIGUOUS MATCH':'')+'</section>':'')+botFilterBar(allSyms)+assetHead+'<div class="v10-pair-stack asset-accordion-stack">'+(liveCards||emptyFilter)+'</div>'+diagnostics;
   bindBotOverviewControls(view);
 }
 function marketUniverse(){
