@@ -25,7 +25,7 @@ test('r91 collapses verbose source provenance while retaining the source strip',
   assert.match(js,/function commandDataDisclosure\(\)/);
   assert.match(js,/class="command-source-details"/);
   assert.match(js,/DATA SOURCES/);
-  assert.match(js,/\+commandDataStrip\(\)\+<\/details>/);
+  assert.ok(js.includes("+commandDataStrip()+'</details>'"));
   assert.match(js,/source\.innerHTML=commandDataDisclosure\(\)/);
   assert.match(js,/\.command-source-details,\.command-source-strip/);
 });
