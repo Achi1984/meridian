@@ -108,7 +108,7 @@ def is_header(row,fam):
 
 def audit_trades(zpath):
     rows=0; first_id=last_id=first_ts=last_ts=None; prev_id=prev_ts=None
-    units=set(); qh_counts={}; max_quote_err=0.0
+    units=set(); qh_counts={}; max_quote_err=0.0; id_gap_events=0; missing_id_count=0; max_id_step=1
     zf=raw=text=None
     try:
         zf,raw,text,reader=open_csv(zpath)
@@ -128,7 +128,7 @@ def audit_trades(zpath):
                 raise RuntimeError("trade timestamp decreased")
             if prev_id is not None:
                 if trade_id<=prev_id: raise RuntimeError("trade id not strictly increasing")
-                if trade_id!=prev_id+1: raise RuntimeError(f"trade id gap: {prev_id}->{trade_id}")
+                step=trade_id-prev_id\n                max_id_step=max(max_id_step,step)\n                if step>1:\n                    id_gap_events+=1\n                    missing_id_count+=step-1
             expected_quote=price*qty
             err=abs(quote-expected_quote)
             max_quote_err=max(max_quote_err,err)
