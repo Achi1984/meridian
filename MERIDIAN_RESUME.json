@@ -1423,7 +1423,7 @@
     "terminalBuild": "10.0-r105",
     "canonicalMainSha": "1f1ce0b3450dfcdf62146290a144949deeaf682d",
     "lastMergedPr": 417,
-    "status": "PIONEX_HISTORY_SOURCE_ALIGNMENT_COMPLETE",
+    "status": "R105_LIVE_ACCEPTED",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1440,16 +1440,16 @@
       "r105 Pionex history source alignment + freshness"
     ],
     "portfolioCheckpoint": {
-      "lastObservedTotalUsd": 35312.88,
-      "lastObservedLedgerUsd": 794.41,
+      "lastObservedTotalUsd": 35275.04,
+      "lastObservedLedgerUsd": 796.7,
       "lastObservedOkxUsd": 116.3,
-      "lastObservedPionexUsd": 34402.17,
+      "lastObservedPionexUsd": 34362.04,
       "portfolioReady": true,
-      "botReady": true,
-      "marketReady": true,
-      "historyStatus": "R104_LIVE_VERIFIED_WITH_SOURCE_DIVERGENCE; 38 accepted points + 1452 blocked; r105 requires timestamped fresh Pionex authority and rejects all pre-r105 history without PIONEX_FRESH_V1 provenance"
+      "botReady": false,
+      "marketReady": false,
+      "historyStatus": "R105_LIVE_PASS; 2 strict points; 1489 blocked; legacy USD 1798.71 artifact absent; fresh PIONEX_FRESH_V1 history rebuilding"
     },
-    "nextAction": "Live-verify r105 after deployment: confirm BUILD R105, SPOT + FRESH PIONEX, that the old ~USD 1798.71 flat-line is gone, record STRICT HISTORY/BLOCKED and 1H/1D/1W maturity. Then continue only the first incomplete milestone. Do not repeat r93-r105 work.",
+    "nextAction": "Investigate MKT STALE root cause as the next isolated r106 lane. Preserve BOT SAFETY and all fail-closed readiness guards until market freshness is proven healthy. Do not reopen r93-r105 portfolio/history work.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1478,13 +1478,27 @@
         "anomaly": "The USD 1798.71 flat-line persisted. Root cause: server history used stale portfolio.pionexEquityUsd while live portfolio preferred fresh pionexAccount.wallet.totalInUsdt. r105 aligns both paths on one freshness-gated resolver."
       },
       "r105": {
-        "status": "PENDING_LIVE_SCREEN_VERIFY",
-        "expected": "BUILD R105; SPOT + FRESH PIONEX; pre-r105 rows blocked; no USD ~1798.71 flat-line; canonical points rebuild only from fresh PIONEX_FRESH_V1 provenance"
+        "status": "PASS",
+        "observedBuild": "R105",
+        "observedAt": "2026-09-30T23:37:00+02:00",
+        "strictHistoryPoints": 2,
+        "blockedLegacyPoints": 1489,
+        "oneHour": "BUILDING",
+        "oneDay": "BUILDING",
+        "oneWeek": "BUILDING",
+        "observedTotalUsd": 35275.04,
+        "observedLedgerUsd": 796.7,
+        "observedOkxUsd": 116.3,
+        "observedPionexUsd": 34362.04,
+        "chartStartUsd": 35181.56,
+        "chartEndUsd": 35275.04,
+        "historyArtifactResolved": true,
+        "note": "SPOT + FRESH PIONEX live; old ~USD 1798.71 flat-line absent. Header still shows MKT STALE and BOT SAFETY, to investigate separately without weakening fail-closed guards."
       }
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-09-30T23:31:05+02:00",
+    "updatedAt": "2026-09-30T23:37:00+02:00",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
