@@ -331,17 +331,17 @@ function depotAssetCard(row,open=false){
 }
 function renderDepot(force=false){
   const view=$('#view-depot');if(!view)return;
-  const openAssets=new Set($('.depot-asset-card[open]',view).map(x=>x.dataset.symbol).filter(Boolean)),had=!!$('.depot-asset-card',view),s=S(),h=H(),p=s?.portfolio||{},rows=depotAssetRows();
+  const openAssets=new Set($$('.depot-asset-card[open]',view).map(x=>x.dataset.symbol).filter(Boolean)),had=!!$('.depot-asset-card',view),s=S(),h=H(),p=s?.portfolio||{},rows=depotAssetRows();
   const venue='<section class="depot-venue-grid"><div class="depot-total"><span>GESAMT</span><b>'+(p.complete?h.money?.(p.total):'—')+'</b><small>'+(p.complete?'CANONICAL VENUE TOTAL':'Authority unvollständig')+'</small></div><div><span>LEDGER</span><b>'+(p.ledgerAutoUsd!=null?h.money?.(p.ledgerAutoUsd):'—')+'</b><small>'+(p.ledgerAutoActive?'AUTO · '+(p.ledgerAutoRows||0)+' Assets':'Bestätigung fehlt')+'</small></div><div><span>OKX</span><b>'+(p.okxVenueUsd!=null?h.money?.(p.okxVenueUsd):'—')+'</b><small>Venue Reference</small></div><div><span>PIONEX</span><b>'+(p.pionex!=null?h.money?.(p.pionex):'—')+'</b><small>'+esc(p.pionexSource||'PIONEX')+'</small></div></section>';
   const note='<section class="depot-integrity-note"><b>ACCOUNTING GUARD</b><small>Asset-Karten zeigen verfügbare Detailquellen. Der Gesamtwert wird ausschließlich aus dem kanonischen Venue-SSOT gebildet; Bot-Exposure und Detail-Balances werden nicht doppelt addiert.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="live"><div><span>DEPOT</span><b>PORTFOLIO + VENUE HOLDINGS</b></div><small>Kanonischer Gesamtwert oben · Asset-Details progressiv aufklappen</small></section>'+venue+note+'<section class="depot-assets-head"><div><span>ASSETS</span><b>'+rows.length+' DETAILZEILEN</b><small>Ledger + Pionex Read API + Bot-Verknüpfung</small></div><div class="asset-toggle-actions"><button type="button" data-depot-action="close">ALLE ZU</button><button type="button" data-depot-action="open">ALLE AUF</button></div></section><div class="depot-asset-stack">'+(rows.length?rows.map((row,i)=>depotAssetCard(row,had?openAssets.has(row.symbol):i===0)).join(''):'<section class="v10-live-blocked"><b>DEPOT DETAILS NICHT VERFÜGBAR</b><small>Der kanonische Venue-Total bleibt maßgeblich; Detailquellen sind derzeit leer.</small></section>')+'</div>';
-  const setOpen=open=>$('.depot-asset-card',view).forEach(x=>{x.open=open});
+  const setOpen=open=>$$('.depot-asset-card',view).forEach(x=>{x.open=open});
   $('[data-depot-action="open"]',view)?.addEventListener('click',()=>setOpen(true));
   $('[data-depot-action="close"]',view)?.addEventListener('click',()=>setOpen(false));
 }
 function showSecondaryView(v,navKey='research'){
-  $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
-  $('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===navKey));
+  $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
+  $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===navKey));
   renderActiveView(v,true);decorateA11y();
 }
 let feedRefreshBusy=false;
