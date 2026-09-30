@@ -9,13 +9,15 @@ const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',impo
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r81 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r81');
+test('r81 mobile-density contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=81,'expected r81 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/MOBILE-DENSITY-V2/);
-  assert.equal(manifest.start_url,'./v10/?build=r81&fresh=r81');
-  assert.match(html,/10\.0-r81/);
-  assert.match(js,/const BUILD='10\.0-r81'/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.match(html,new RegExp(release.terminalBuild.replaceAll('.','\\.')));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r81 compacts Data State without hiding source semantics',()=>{
