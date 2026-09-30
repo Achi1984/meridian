@@ -70,7 +70,7 @@ Before full 120-shard execution:
 
 1. **SOLUSDT / 2025-07**
    - mandatory because this is the exact month that invalidated aggTrades V1;
-   - individual-trades source must show clean trade-ID continuity and quarter-hour coverage.
+   - individual-trades source must show strictly increasing IDs, measured gap metadata and quarter-hour coverage.
 
 2. **BTCUSDT / 2025-01**
    - high-volume beginning-of-window stress canary.
@@ -83,7 +83,7 @@ PASS requires:
 - exactly 120 unique expected shards;
 - 120/120 shard PASS;
 - no missing/duplicate/unexpected shard;
-- continuous individual trade IDs in every month;
+- strictly increasing individual trade IDs in every month;\n- ID-gap metrics retained for every shard and the aggregate result;
 - zero empty quarter-hour bins;
 - complete 1m kline coverage;
 - complete funding coverage;
