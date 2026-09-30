@@ -52,7 +52,7 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
 });
 
 test('v10 scanner requires aligned 1h and 4h confirmation',()=>{
-  assert.match(js,/MARKET SIGNALS/);
+  assert.match(js,/OPPORTUNITY SCANNER/);
   assert.match(js,/CONFIRMED braucht geschlossene 1h \+ 4h Alignment/);
   assert.match(js,/bear1&&bear4/);
   assert.match(js,/bull1&&bull4/);
