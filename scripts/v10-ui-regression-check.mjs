@@ -289,7 +289,8 @@ must(js.includes("hubNode.insertAdjacentElement('afterend',attentionNode)"),'Com
 must(js.includes('command-position-details'),'Command Account Futures disclosure missing');
 must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
 
-must(qa.includes("virtualBudget=name.startsWith('flow-')?5200:2600"),'interaction visual QA flow budget must cover iframe settle window');
+must(qa.includes("virtualBudget=name.startsWith('flow-')?8000:2600"),'interaction visual QA flow budget must cover iframe settle window');
+must(qaFrame.includes('if(tries<600)setTimeout(pump,20);'),'visual QA iframe pump must outlive interaction flow budget');
 
 
 /* r93 permanent dominant portfolio-chart gates */
