@@ -1391,17 +1391,29 @@ function applyLocalVisualQaFixture(){
   window.MERIDIAN_VISUAL_QA=true;
   return cfg;
 }
+function visualQaVisible(el){
+  if(!el||el.hidden||el.closest?.('[hidden]'))return false;
+  for(let node=el.parentElement;node;node=node.parentElement){
+    if(node.tagName==='DETAILS'&&!node.open){
+      const summary=[...node.children].find(x=>x.tagName==='SUMMARY');
+      if(!summary?.contains(el))return false;
+    }
+    if(node===document.body)break;
+  }
+  const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)return false;
+  const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
+}
 function writeLocalVisualQaReport(cfg){
   const active=$('#view-'+cfg.view),keys=['.v10-mode-banner','.data-state-strip','.section-title','.command-action-grid','.depot-venue-grid','.bot-filter-bar','.forecast-focus-head','.market-regime','.scanner-summary','.fib-map-shell'];
   const overflow=keys.flatMap(sel=>[...active.querySelectorAll(sel)].filter(el=>el.scrollWidth>el.clientWidth+2).map(el=>sel+':'+Math.ceil(el.scrollWidth-el.clientWidth)));
-  const shortButtons=[...active.querySelectorAll('button')].filter(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<42}).map(b=>(b.textContent||b.getAttribute('aria-label')||'button').trim().slice(0,40));
+  const shortButtons=[...active.querySelectorAll('button')].filter(b=>visualQaVisible(b)&&b.getBoundingClientRect().height<42).map(b=>(b.textContent||b.getAttribute('aria-label')||'button').trim().slice(0,40));
   const nav=$('#nav')?.getBoundingClientRect(),root=document.documentElement,main=$('main'),mainRect=main?.getBoundingClientRect(),scannerButtons=[...active.querySelectorAll('.scanner-toolbar-actions button')].map(x=>x.getBoundingClientRect());
   const scannerActionsSameRow=cfg.view!=='research'||scannerButtons.length<2||Math.max(...scannerButtons.map(x=>x.top))-Math.min(...scannerButtons.map(x=>x.top))<=4;
   const commandHubCards=active.querySelectorAll('.command-hub-card').length,commandHubInvariant=cfg.view!=='command'||(commandHubCards>=4&&!!active.querySelector('.command-next-decision'));
   const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect()),botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
   const forecastFibInvariant=cfg.view!=='market'||(!!active.querySelector('.fib-map-shell')&&!!active.querySelector('.fib-output'));
   const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top+1;
-  const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')]:[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
+  const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')].filter(visualQaVisible):[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===390&&viewport.h===844;
   const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,forecastFibInvariant,nearBottom,bottomClearance,commandHubCards,botSummaryCount:botSummaries.length};
   const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
