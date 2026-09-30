@@ -401,3 +401,15 @@ must(js.includes("Quality ist Markt-Kontext, keine Renditeprognose"),'Scanner co
 must(css.includes('#view-research .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Scanner compact data state missing');
 must(css.includes('.scanner-leader-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))'),'Scanner leader metric grid missing');
 must(css.includes('#view-research .scan-drill-actions{grid-template-columns:repeat(2,minmax(0,1fr))'),'Scanner mobile dual-action layout missing');
+
+
+/* r101 permanent mobile shell-density gates */
+must(String(release.dashboardShell||'').includes('MOBILE-SHELL-DENSITY'),'dashboardShell must declare mobile shell density');
+must(css.includes('/* v10 r101 · global mobile shell density */'),'r101 mobile shell density styles missing');
+must(css.includes('grid-template-columns:44px auto'),'mobile topbar action layout missing');
+must(css.includes('.feed-refresh span{display:none}'),'mobile refresh label suppression missing');
+must(css.includes('min-height:44px'),'44px touch invariant missing');
+must(css.includes('grid-template-columns:repeat(2,auto)'),'mobile status row missing');
+must(css.includes('nav button.active::before'),'mobile active-nav cue missing');
+must(css.includes('padding-bottom:calc(5px + env(safe-area-inset-bottom))'),'mobile nav safe-area padding missing');
+must(css.includes('@media(max-width:350px)'),'narrow mobile shell fallback missing');

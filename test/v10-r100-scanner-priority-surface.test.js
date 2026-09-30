@@ -13,12 +13,14 @@ function block(startToken,endToken){
   return js.slice(start,end);
 }
 
-test('r100 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r100');
+test('r100 Scanner priority-surface contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=100,'expected r100 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/SCANNER-PRIORITY-SURFACE/);
-  assert.equal(manifest.start_url,'./v10/?build=r100&fresh=r100');
-  assert.ok(js.includes("const BUILD='10.0-r100'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r100 promotes the existing top Opportunity Quality result without adding a new score',()=>{
