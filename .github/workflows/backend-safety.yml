@@ -60,7 +60,7 @@ jobs:
           node scripts/release-sync.mjs --check
           node scripts/release-check.mjs
       - name: V10 UI regression gate
-        run: npm run ui:regression
+        run: node scripts/v10-ui-regression-check.mjs
       - name: Public privacy regression
         run: node scripts/privacy-check.mjs
       - name: High-confidence secret scan
