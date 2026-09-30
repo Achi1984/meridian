@@ -1,7 +1,7 @@
 {
   "name": "ACHI MERIDIAN v10",
   "short_name": "MERIDIAN",
-  "start_url": "./v10/?build=r89&fresh=r89",
+  "start_url": "./v10/?build=r90&fresh=r90",
   "scope": "./",
   "id": "./",
   "display": "standalone",
