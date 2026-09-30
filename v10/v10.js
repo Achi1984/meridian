@@ -1,25 +1,55 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r77';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r77';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r77';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r77';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r77';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r77';
-// MERIDIAN v10 r77 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r78';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r78';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r78';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r78';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r78';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r78';
+// MERIDIAN v10 r78 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r77';
+const BUILD='10.0-r78';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
 const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
-const fibUi={symbol:'BTC',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
+const UI_CONTEXT_KEY='meridian.v10.context.v1';
+const BOT_FILTERS=['ALL','RISK','PROFIT','HEDGE'];
+function readUiContext(){
+  try{
+    if(typeof sessionStorage==='undefined')return{fibSymbol:'BTC',botFilter:'ALL'};
+    const raw=JSON.parse(sessionStorage.getItem(UI_CONTEXT_KEY)||'{}')||{},fibSymbol=String(raw.fibSymbol||'').trim().toUpperCase(),botFilter=String(raw.botFilter||'').trim().toUpperCase();
+    return{fibSymbol:/^[A-Z0-9]{2,16}$/.test(fibSymbol)?fibSymbol:'BTC',botFilter:BOT_FILTERS.includes(botFilter)?botFilter:'ALL'};
+  }catch{return{fibSymbol:'BTC',botFilter:'ALL'}}
+}
+const savedUiContext=readUiContext();
+const fibUi={symbol:savedUiContext.fibSymbol,window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
 const profitAgentUi={days:1460,running:false,result:null,error:null,progress:'',completed:0,total:PAPERBOT_PROFIT_AGENT_V1_ASSETS.length};
 const assetWatchShareUi={busy:false,shareUrl:null,message:'',tone:'muted'};
-const botViewUi={filter:'ALL'};
-const assetDetailUi={symbol:'BTC',returnView:'depot',navKey:'depot'};
+const botViewUi={filter:savedUiContext.botFilter};
+const assetDetailUi={symbol:savedUiContext.fibSymbol,returnView:'depot',navKey:'depot'};
+const VIEW_LABELS=Object.freeze({command:'COMMAND',depot:'DEPOT',bots:'BOTS',market:'FORECAST',research:'SCANNER','asset-detail':'ASSET DETAIL',paper:'PAPER',more:'LAB'});
+const viewContextUi={};
+function persistUiContext(){
+  try{
+    if(typeof sessionStorage!=='undefined')sessionStorage.setItem(UI_CONTEXT_KEY,JSON.stringify({fibSymbol:String(fibUi.symbol||'BTC').toUpperCase(),botFilter:BOT_FILTERS.includes(botViewUi.filter)?botViewUi.filter:'ALL'}));
+  }catch{}
+}
+function activeNavKey(){return String($('#nav button.active')?.dataset.v||'research')}
+function contextReturnLabel(target,fallback='ZURÜCK'){return viewContextUi[target]?.label||fallback}
+function contextualBack(target,fallbackView='research',fallbackNav='research'){
+  const ctx=viewContextUi[target];delete viewContextUi[target];
+  showSecondaryView(ctx?.returnView||fallbackView,ctx?.navKey||fallbackNav,false);
+}
+function contextBarHtml(target){
+  const ctx=viewContextUi[target];if(!ctx)return'';
+  return '<section class="context-return-bar"><button type="button" data-context-back="'+esc(target)+'">← '+esc(ctx.label||'ZURÜCK')+'</button><small>Kontext-Rücksprung · Auswahl bleibt in dieser Browser-Session erhalten</small></section>';
+}
+function bindContextBack(view,target,fallbackView='research',fallbackNav='research'){
+  $('[data-context-back="'+target+'"]',view)?.addEventListener('click',()=>contextualBack(target,fallbackView,fallbackNav));
+}
 const paperCockpitUi={loading:false,data:null,error:null,loadedAt:0};
 const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 const MARKET_FRESH_MS=3*60*1000;
