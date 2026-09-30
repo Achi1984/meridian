@@ -26,7 +26,7 @@ test('r100 promotes the existing top Opportunity Quality result without adding a
   assert.match(leader,/opportunityContext\(symbol\)/);
   assert.match(leader,/marketSignal\(i\)/);
   assert.match(leader,/marketPrice\(symbol\)/);
-  assert.match(leader,/TOP MARKET CONTEXT/);
+  assert.match(leader,/TOP MARKET CONTEXTS · PRIORITY 1/);
   assert.match(leader,/Quality ist Markt-Kontext, keine Renditeprognose/);
   assert.doesNotMatch(leader,/score\s*[+*\/-]=|Math\.round\(.*score|newScore|weighted/i);
 });
@@ -34,7 +34,7 @@ test('r100 promotes the existing top Opportunity Quality result without adding a
 test('r100 keeps the existing ranking and shows one leader plus two next contexts before the remainder',()=>{
   const render=block('function renderScanner(force=false){','function skNum(');
   assert.match(render,/return B\.score-A\.score\|\|sb\.rank-sa\.rank\|\|sb\.score-sa\.score/);
-  assert.match(render,/top=fresh\.slice\(0,3\),leader=top\[0\]\|\|null,next=top\.slice\(1\),rest=fresh\.slice\(3\)/);
+  assert.match(render,/top=fresh\\.slice\\(0,4\\),leader=top\\[0\\]\\|\\|null,next=top\\.slice\\(1,3\\),rest=\\[\\.\\.\\.top\\.slice\\(3\\),\\.\\.\\.fresh\\.slice\\(4\\)\\]/);
   assert.match(render,/leaderHtml=leader\?scannerLeaderCard\(leader\)/);
   assert.match(render,/NÄCHSTE KONTEXTE/);
   assert.match(render,/WEITERE '\+rest\.length\+' FRISCHE MÄRKTE/);
