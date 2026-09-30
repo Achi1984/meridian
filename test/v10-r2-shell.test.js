@@ -13,9 +13,12 @@ test('v10 r13 loads validated v9 engine plus isolated v10 presentation adapter',
   assert.match(html,/window\.MERIDIAN_V10=true/);
 });
 
-test('v10 exposes Command Bots Market Scanner Lab only',()=>{
-  for(const label of ['COMMAND','BOTS','MARKET','SCANNER','LAB'])assert.match(html,new RegExp('>'+label+'<'));
+test('v10 r69 exposes five decision-first primary tabs and keeps Lab secondary',()=>{
+  for(const label of ['COMMAND','DEPOT','BOTS','FORECAST','SCANNER'])assert.match(html,new RegExp('>'+label+'<'));
   assert.equal((html.match(/<button data-v=/g)||[]).length,5);
+  assert.doesNotMatch(html,/data-v="more"/);
+  assert.match(js,/data-open-lab/);
+  assert.match(js,/LAB ÖFFNEN/);
 });
 
 test('v10 makes Data Guard and asset-pair risk explicit without changing trading logic',()=>{
