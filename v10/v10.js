@@ -13,12 +13,13 @@ const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
 const S=()=>bridge()?.getState?.()||null;
 const H=()=>bridge()?.helpers||{};
 const UI_CONTEXT_KEY='meridian.v10.context.v1';
+const UI_CONTEXT_ASSETS=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ','DOGE','NEAR'];
 const BOT_FILTERS=['ALL','RISK','PROFIT','HEDGE'];
 function readUiContext(){
   try{
     if(typeof sessionStorage==='undefined')return{fibSymbol:'BTC',botFilter:'ALL'};
     const raw=JSON.parse(sessionStorage.getItem(UI_CONTEXT_KEY)||'{}')||{},fibSymbol=String(raw.fibSymbol||'').trim().toUpperCase(),botFilter=String(raw.botFilter||'').trim().toUpperCase();
-    return{fibSymbol:/^[A-Z0-9]{2,16}$/.test(fibSymbol)?fibSymbol:'BTC',botFilter:BOT_FILTERS.includes(botFilter)?botFilter:'ALL'};
+    return{fibSymbol:UI_CONTEXT_ASSETS.includes(fibSymbol)?fibSymbol:'BTC',botFilter:BOT_FILTERS.includes(botFilter)?botFilter:'ALL'};
   }catch{return{fibSymbol:'BTC',botFilter:'ALL'}}
 }
 const savedUiContext=readUiContext();
