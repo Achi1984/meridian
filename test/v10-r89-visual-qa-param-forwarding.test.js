@@ -33,3 +33,9 @@ test('r89 permanent regression gate protects parameter forwarding',()=>{
   assert.match(gate,/r89 permanent visual-QA parameter forwarding gates/);
   assert.match(gate,/visual QA frame must forward flow and data-mode parameters/);
 });
+
+test('r89 real Asset Detail flow is idempotent and exposes the contextual back selector',()=>{
+  const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+  assert.match(js,/if\(!force&&\$\('\.asset-detail-topbar',view\)\)return/);
+  assert.match(js,/data-asset-back data-context-back="asset-detail"/);
+});
