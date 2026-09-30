@@ -1591,9 +1591,11 @@ async function runLocalInteractionQa(cfg){
       const details=[...$('#view-bots')?.querySelectorAll('.asset-pair-details')||[]],close=$('#view-bots [data-assets-action="close"]'),open=$('#view-bots [data-assets-action="open"]');
       checks.botCardsPresent=details.length>0;
       checks.controlsPresent=!!close&&!!open;
-      close?.click();await visualQaSettle();
+      // The accordion controls mutate the native details.open state synchronously. Do not wait for RAF here:
+      // headless virtual-time can starve nested-frame RAF after opening every bot card at once.
+      close?.click();
       checks.allClosed=details.length>0&&details.every(x=>!x.open);
-      open?.click();await visualQaSettle();
+      open?.click();
       checks.allOpened=details.length>0&&details.every(x=>x.open);
     }else if(cfg.flow==='bot-filter-return'){
       const risk=$('#view-bots [data-bot-filter="RISK"]');
