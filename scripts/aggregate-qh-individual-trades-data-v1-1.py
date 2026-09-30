@@ -24,7 +24,7 @@ for x in rows:
     if x.get("gate",{}).get("pass") is not True:errors.append(f"{key}:SHARD_GATE_FAIL")
     audits=x.get("audits",{})
     if audits.get("trades",{}).get("coveragePass") is not True:errors.append(f"{key}:TRADES_COVERAGE")
-    if audits.get("trades",{}).get("tradeIdsContiguous") is not True:errors.append(f"{key}:TRADE_ID_CONTINUITY")
+    if audits.get("trades",{}).get("tradeIdsStrictlyIncreasing") is not True:errors.append(f"{key}:TRADE_ID_MONOTONICITY")
     if audits.get("trades",{}).get("timestampUnitDetected")!="MILLISECOND":errors.append(f"{key}:TRADES_TIMESTAMP_UNIT")
     if audits.get("klines1m",{}).get("coveragePass") is not True:errors.append(f"{key}:KLINE_COVERAGE")
     if audits.get("fundingRate",{}).get("coveragePass") is not True:errors.append(f"{key}:FUNDING_COVERAGE")
@@ -44,7 +44,7 @@ summary={
  "missingShards":[list(x) for x in missing],"duplicateShards":[list(x) for x in duplicates],
  "unexpectedShards":[list(x) for x in unexpected],
  "tradeRows":sum(x.get("audits",{}).get("trades",{}).get("rows",0) for x in rows),
- "emptyQuarterHourBins":sum(x.get("audits",{}).get("trades",{}).get("emptyQuarterHourBins",0) for x in rows),
+ "emptyQuarterHourBins":sum(x.get("audits",{}).get("trades",{}).get("emptyQuarterHourBins",0) for x in rows),\n "tradeIdGapEvents":sum(x.get("audits",{}).get("trades",{}).get("tradeIdGapEvents",0) for x in rows),\n "missingTradeIdCount":sum(x.get("audits",{}).get("trades",{}).get("missingTradeIdCount",0) for x in rows),
  "kline1mRows":sum(x.get("audits",{}).get("klines1m",{}).get("rows",0) for x in rows),
  "fundingRows":sum(x.get("audits",{}).get("fundingRate",{}).get("rows",0) for x in rows),
  "downloadedBytes":{
