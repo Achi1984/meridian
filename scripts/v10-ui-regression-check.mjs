@@ -420,7 +420,7 @@ must(String(release.dashboardShell||'').includes('LIVE-HISTORY-INTEGRITY'),'dash
 must(js.includes('function portfolioHistoryIntegrityHtml()'),'portfolio history integrity renderer missing');
 must(js.includes('class="portfolio-integrity-strip"'),'portfolio integrity strip missing');
 must(js.includes('data-history-points='),'strict history point telemetry missing');
-for(const key of ['1h','1d','1w'])must(js.includes('data-history-range="'+key+'"'),'history integrity range missing: '+key);
+for(const key of ['1h','1d','1w'])must(js.includes("rangeCard('"+key+"')"),'history integrity range missing: '+key);
 must(js.includes('data-history-ready='),'history readiness telemetry missing');
 must(js.includes('STRICT_AUTHORITY · '),'strict authority provenance missing from integrity strip');
 must(js.includes('portfolioHistoryIntegrityHtml()+chart'),'integrity strip must stay adjacent to portfolio chart');
