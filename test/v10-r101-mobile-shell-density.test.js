@@ -9,7 +9,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
 test('r101 contract remains execution-neutral and cache coherent on successor builds',()=>{
-  const m=String(release.terminalBuild||'').match(/^10\\.0-r(\\d+)$/);
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
   assert.ok(m);
   assert.ok(Number(m[1])>=101);
   assert.equal(release.terminalExecutionImpact,false);
