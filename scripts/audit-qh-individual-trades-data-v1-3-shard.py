@@ -29,7 +29,7 @@ from pathlib import Path
 BASE="https://data.binance.vision/data/futures/um/monthly"
 ASSETS=("BTCUSDT","ETHUSDT","XRPUSDT","SOLUSDT","DOGEUSDT","ADAUSDT")
 MONTHS=tuple(f"{y:04d}-{m:02d}" for y,ms in ((2025,range(1,13)),(2026,range(1,9))) for m in ms)
-UA="MERIDIAN-QH-INDIVIDUAL-TRADES-DATA-V1-2/1"
+UA="MERIDIAN-QH-INDIVIDUAL-TRADES-DATA-V1-3/1"
 CHUNK=8*1024*1024
 FUND_MAX_GAP_MS=12*60*60*1000
 QUOTE_REL_TOL=1e-8
