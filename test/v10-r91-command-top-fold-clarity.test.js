@@ -7,12 +7,14 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r91 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r91');
+test('r91 top-fold clarity remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=91,'expected r91 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/COMMAND-TOP-FOLD-CLARITY/);
-  assert.equal(manifest.start_url,'./v10/?build=r91&fresh=r91');
-  assert.ok(js.includes("const BUILD='10.0-r91'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r91 LIVE DATA freshness is independent from incomplete portfolio authority',()=>{
