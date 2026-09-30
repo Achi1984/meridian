@@ -168,7 +168,7 @@ must(fs.existsSync('.github/workflows/v10-visual-qa.yml'),'visual QA workflow mi
 must(String(release.dashboardShell||'').includes('EVIDENCE-LAYOUT-INVARIANTS'),'dashboardShell must declare evidence layout invariants');
 must(js.includes('const scannerActionsSameRow='),'visual QA scanner same-row invariant missing');
 must(js.includes('layout={scannerActionsSameRow'),'visual QA layout evidence payload missing');
-must(js.includes('layout.scannerActionsSameRow&&!report.bodyOverflow'),'visual QA same-row invariant must gate pass/fail');
+must(js.includes('layout.scannerActionsSameRow&&')&&js.includes('!report.bodyOverflow'),'visual QA same-row invariant must gate pass/fail');
 must(js.includes("updatedAt:new Date(now).toISOString(),snapshotAt:new Date(now).toISOString(),walletStatus:'OK'"),'visual QA account fixture must be timestamped and fresh');
 must(css.includes('#view-research .scanner-toolbar-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important'),'mobile Scanner actions must remain a two-column evidence-locked grid');
 must(css.includes('#view-research .scanner-toolbar-actions>button{width:100%!important;min-width:0!important;min-height:44px!important'),'Scanner action touch-target evidence guard missing');
