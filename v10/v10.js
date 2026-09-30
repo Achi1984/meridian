@@ -309,6 +309,8 @@ function renderSystemHeader(){
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
+  $$('.v10-shell button').forEach(b=>{if(!b.getAttribute('type'))b.type='button'});
+  $$('.v10-live-blocked,.paper-cockpit-state,.paper-refresh-warning,.v10-unverified-note').forEach(el=>{el.setAttribute('role','status');el.setAttribute('aria-live','polite')});
   $$('#nav button').forEach(b=>{b.type='button';const label=$('span',b)?.textContent||'MERIDIAN';b.setAttribute('aria-label',label);if(b.classList.contains('active'))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 
