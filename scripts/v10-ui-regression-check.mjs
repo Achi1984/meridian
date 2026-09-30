@@ -367,3 +367,16 @@ must(js.includes("<small>RISIKO '+riskCount+' · PROFIT '+profitCount+' · HEDGE
 must(css.includes('#view-bots .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Bots compact data-state row missing');
 must(css.includes('#view-bots .asset-pair-details>summary{min-height:60px'),'Bots compact asset summary missing');
 must(css.includes('#view-bots .bot-filter-actions{width:100%;grid-template-columns:repeat(4,minmax(0,1fr))'),'Bots four-filter mobile row missing');
+
+
+/* r99 permanent Forecast overview-density gates */
+must(String(release.dashboardShell||'').includes('FORECAST-OVERVIEW-DENSITY'),'dashboardShell must declare Forecast overview density');
+must(js.includes('function renderMarket(force=false)'),'Forecast renderer missing');
+must(js.includes('const techOpen=!mh.fresh||!mh.coverageComplete||!mh.priceFresh'),'Forecast fail-visible tech disclosure guard missing');
+must(js.includes('class="market-tech-details"'),'Forecast market-tech disclosure missing');
+must(js.includes('const tapeOpen=mh.staleAssets>0||mh.missingAssets>0'),'Forecast Asset Tape degraded-coverage guard missing');
+must(js.includes('class="market-tape-details"'),'Forecast Asset Tape disclosure missing');
+must(js.includes("forecastContextHtml(fibUi.symbol)+technical+fibMapHtml()+tape"),'Forecast primary surface ordering missing');
+must(css.includes('#view-market .data-state-items{grid-template-columns:1fr'),'Forecast compact data state missing');
+must(css.includes('.market-tech-details>summary,.market-tape-details>summary'),'Forecast disclosure touch surface missing');
+must(css.includes('#view-market .forecast-focus-head b{font-size:18px'),'Forecast dominant focus typography missing');
