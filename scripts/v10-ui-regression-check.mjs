@@ -12,6 +12,7 @@ const js=read('v10/v10.js');
 const v9=read('v9/v9.js');
 const css=read('v10/v10.css');
 const qa=read('scripts/v10-visual-qa.mjs');
+const qaFrame=read('v10/visual-qa-frame.html');
 
 const build=String(release.terminalBuild||'');
 const rev=build.split('-').at(-1)||'';
@@ -237,3 +238,19 @@ must(js.includes("checks.marketRecovered=after.MARKET==='READY'"),'Market recove
 must(qa.includes("['data-command-stale','command',0,null,'stale']"),'stale Command evidence case missing');
 must(qa.includes("['data-bots-error','bots',0,null,'error']"),'error Bots evidence case missing');
 must(qa.includes("['flow-stale-recovery','command',0,'stale-recovery','stale']"),'stale recovery evidence case missing');
+
+
+/* r89 permanent visual-QA parameter forwarding gates */
+must(String(release.dashboardShell||'').includes('VISUAL-QA-PARAM-FORWARDING'),'dashboardShell must declare visual QA parameter forwarding');
+must(qaFrame.includes("const inner=new URL('./',location.href)"),'visual QA frame must build inner dashboard URL explicitly');
+must(qaFrame.includes("for(const key of ['qaFlow','qaData'])"),'visual QA frame must forward flow and data-mode parameters');
+must(qaFrame.includes("if(value)inner.searchParams.set(key,value)"),'visual QA frame parameter forwarding assignment missing');
+must(qaFrame.includes("frame.src=inner.pathname+inner.search"),'visual QA frame must use forwarded inner URL');
+must(qa.includes("if(flow)url.searchParams.set('qaFlow',flow)"),'visual QA runner must emit qaFlow');
+must(qa.includes("if(dataMode)url.searchParams.set('qaData',dataMode)"),'visual QA runner must emit qaData');
+
+must(js.includes("if(!force&&$('.asset-detail-topbar',view))return"),'Asset Detail must be idempotent under mutation-only decorate passes');
+must(js.includes('data-asset-back data-context-back="asset-detail"'),'Asset Detail contextual-back QA selector must exist in rendered markup');
+
+must(js.includes("botErrorSurfaceInvariant=cfg.view!=='bots'||cfg.dataMode!=='error'||!!active.querySelector('.bot-live-blocked')"),'Bots ERROR visual QA must require visible fail-closed surface');
+must(js.includes("if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvariant=botErrorSurfaceInvariant"),'Bots ERROR state must replace accordion requirement with error-surface requirement');

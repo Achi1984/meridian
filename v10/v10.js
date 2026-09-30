@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r88';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r88';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r88';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r88';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r88';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r88';
-// MERIDIAN v10 r88 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r89';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r89';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r89';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r89';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r89';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r89';
+// MERIDIAN v10 r89 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r88';
+const BUILD='10.0-r89';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -517,6 +517,7 @@ function assetDetailMarketHtml(symbol){
 }
 function renderAssetDetail(force=false){
   const view=$('#view-asset-detail');if(!view)return;
+  if(!force&&$('.asset-detail-topbar',view))return;
   const symbol=String(assetDetailUi.symbol||'BTC').trim().toUpperCase();
   if(force&&fibUi.mode==='MANUAL'){
     const lo=fibParse($('#fib-low',view)?.value),hi=fibParse($('#fib-high',view)?.value),dir=$('#fib-direction',view)?.value;
@@ -524,7 +525,7 @@ function renderAssetDetail(force=false){
   }
   fibUi.symbol=symbol;
   const h=H(),row=depotAssetRows().find(x=>x.symbol===symbol),rows=matchedRows(symbol),mp=marketPrice(symbol),ctx=opportunityContext(symbol),st=rows.length?pairStatus(symbol):{label:'NO LIVE BOT',tone:'muted',reason:'Kein sicher gematchter privater Bot'},known=row?.valueKnown?Number(row.valueUsd):null;
-  view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back>← '+esc(contextReturnLabel('asset-detail','ZURÜCK'))+'</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+dataStateStripHtml('asset')+
+  view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back data-context-back="asset-detail">← '+esc(contextReturnLabel('asset-detail','ZURÜCK'))+'</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+dataStateStripHtml('asset')+
     '<section class="asset-detail-hero"><div><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN HOLDING DETAIL</span><b>'+(known==null?'—':h.money?.(known))+'</b><small>nicht mit Bot-Exposure addieren</small></div><div><span>LIVE BOTS</span><b>'+rows.length+'</b><small>'+esc(st.reason)+'</small></div><div><span>OPPORTUNITY QUALITY</span><b class="tone-'+esc(ctx.tone)+'">'+(ctx.available?ctx.score+'/100':'—')+'</b><small>'+(ctx.available?esc(ctx.label):'NO FRESH CONTEXT')+'</small></div></section>'+
     '<section class="asset-detail-accounting-guard"><b>READ-ONLY DETAIL</b><small>Holdings, Bot-Exposure und Markt-Kontext bleiben getrennte Ebenen. Keine Orders, keine automatische Promotion, keine Doppelzählung.</small></section>'+
     assetDetailHoldingHtml(symbol)+assetDetailBotHtml(symbol)+assetDetailMarketHtml(symbol);
@@ -1430,15 +1431,16 @@ function writeLocalVisualQaReport(cfg){
   const nav=$('#nav')?.getBoundingClientRect(),root=document.documentElement,main=$('main'),mainRect=main?.getBoundingClientRect(),scannerButtons=[...active.querySelectorAll('.scanner-toolbar-actions button')].map(x=>x.getBoundingClientRect());
   const scannerActionsSameRow=cfg.view!=='research'||scannerButtons.length<2||Math.max(...scannerButtons.map(x=>x.top))-Math.min(...scannerButtons.map(x=>x.top))<=4;
   const commandHubCards=active.querySelectorAll('.command-hub-card').length,commandHubInvariant=cfg.view!=='command'||(commandHubCards>=4&&!!active.querySelector('.command-next-decision'));
-  const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect()),botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
+  const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect());let botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
+  const botErrorSurfaceInvariant=cfg.view!=='bots'||cfg.dataMode!=='error'||!!active.querySelector('.bot-live-blocked');if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvariant=botErrorSurfaceInvariant;
   const forecastFibInvariant=cfg.view!=='market'||(!!active.querySelector('.fib-map-shell')&&!!active.querySelector('.fib-output'));
   const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top+1;
   const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')].filter(visualQaVisible):[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
   const dataStates=Object.fromEntries([...active.querySelectorAll('.data-state-item')].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()])),dataStateInvariant=cfg.dataMode==='stale'?dataStates.BOTS==='REF'&&dataStates.MARKET==='STALE':cfg.dataMode==='error'?dataStates.BOTS==='ERROR'&&dataStates.MARKET==='STALE':true;
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===390&&viewport.h===844;
-  const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,forecastFibInvariant,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
+  const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,botErrorSurfaceInvariant,forecastFibInvariant,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
   const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,dataStates,viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
-  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
+  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&layout.botErrorSurfaceInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
