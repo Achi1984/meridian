@@ -54,8 +54,9 @@ test('r21 stale SCANNER diagnostics are visible but actions and ranking are bloc
 
 test('r21 market coverage separates stale and missing technical feeds',()=>{
   assert.ok(v10.includes("mh.staleAssets+' stale · '+mh.missingAssets+' missing"));
-  assert.ok(v10.includes("stale=all.filter(x=>!!s?.assetIntel?.[x]&&!intelFresh(s.assetIntel[x]))"));
-  assert.ok(v10.includes("missing=all.filter(x=>!s?.assetIntel?.[x])"));
+  const successorCanonical=v10.includes("stale=all.filter(x=>!!marketIntel(x)&&!intelFresh(marketIntel(x)))")&&v10.includes("missing=all.filter(x=>!marketIntel(x))");
+  const legacyAssetIntel=v10.includes("stale=all.filter(x=>!!s?.assetIntel?.[x]&&!intelFresh(s.assetIntel[x]))")&&v10.includes("missing=all.filter(x=>!s?.assetIntel?.[x])");
+  assert.ok(successorCanonical||legacyAssetIntel);
   assert.ok(v10.includes("stale.length+' / '+missing.length"));
 });
 
