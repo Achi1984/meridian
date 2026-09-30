@@ -1,0 +1,57 @@
+name: MERIDIAN Visual QA
+
+on:
+  pull_request:
+    paths:
+      - 'v10/**'
+      - 'v9/v9.js'
+      - 'v9/index.html'
+      - 'index.html'
+      - 'version.json'
+      - 'manifest.webmanifest'
+      - 'scripts/v10-visual-qa.mjs'
+      - 'test/v10-r83-visual-qa-harness.test.js'
+      - '.github/workflows/v10-visual-qa.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'v10/**'
+      - 'v9/v9.js'
+      - 'v9/index.html'
+      - 'index.html'
+      - 'version.json'
+      - 'manifest.webmanifest'
+      - 'scripts/v10-visual-qa.mjs'
+      - 'test/v10-r83-visual-qa-harness.test.js'
+      - '.github/workflows/v10-visual-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify Chrome
+        run: google-chrome --version
+      - name: Start deterministic local shell
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/meridian-visual-http.log 2>&1 &
+          echo $! > /tmp/meridian-visual-http.pid
+          sleep 1
+      - name: Run mobile visual QA
+        run: node scripts/v10-visual-qa.mjs
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-v10-visual-qa-${{ github.sha }}
+          path: artifacts/visual-qa/
+          if-no-files-found: warn
+          retention-days: 14
