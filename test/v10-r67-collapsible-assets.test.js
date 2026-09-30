@@ -17,11 +17,11 @@ test('r67 renders live assets as collapsible risk-first cards',()=>{
   assert.match(v10,/pairStatus\(b\)\.rank-pairStatus\(a\)\.rank/);
 });
 
-test('r67 opens the critical asset by default and preserves manual open state',()=>{
+test('r67 manual-open-state contract remains while r98 successor defaults assets closed',()=>{
   assert.match(v10,/hadAssetAccordion=!!\$\('\.asset-pair-details',view\)/);
   assert.match(v10,/openAssets=new Set/);
-  assert.match(v10,/criticalSymbol=criticalPair\(\)\?\.symbol/);
-  assert.match(v10,/hadAssetAccordion\?openAssets\.has\(symbol\):symbol===criticalSymbol/);
+  assert.match(v10,/hadAssetAccordion\?openAssets\.has\(symbol\):false/);
+  assert.doesNotMatch(v10,/hadAssetAccordion\?openAssets\.has\(symbol\):symbol===criticalSymbol/);
 });
 
 test('r67 hides low-value diagnostics behind one technical details disclosure',()=>{
