@@ -24,7 +24,7 @@ test('r102 exposes deployed build and strict-history integrity beside the portfo
   assert.match(js,/data-history-points="/);
   assert.match(js,/STRICT HISTORY/);
   assert.match(js,/STRICT_AUTHORITY · /);
-  for(const key of ['1h','1d','1w'])assert.match(js,new RegExp('data-history-range="'+key+'"'));
+  for(const key of ['1h','1d','1w'])assert.ok(js.includes("rangeCard('"+key+"')"));
 });
 
 test('r102 derives range readiness from existing canonical chart coverage only',()=>{
