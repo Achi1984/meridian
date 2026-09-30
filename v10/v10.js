@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r69';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r69';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r69';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r69';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r69';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r69';
-// MERIDIAN v10 r69 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r70';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r70';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r70';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r70';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r70';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r70';
+// MERIDIAN v10 r70 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r69';
+const BUILD='10.0-r70';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -273,14 +273,19 @@ function decorateA11y(){
   $$('#nav button').forEach(b=>{b.type='button';const label=$('span',b)?.textContent||'MERIDIAN';b.setAttribute('aria-label',label);if(b.classList.contains('active'))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 
+function selectHistoryAnchor(points,target,toleranceMs=15*60*1000){
+  const xs=(Array.isArray(points)?points:[]).filter(x=>Number.isFinite(Number(x?.timestamp))&&Number.isFinite(Number(x?.totalUsd))&&Number(x.totalUsd)>=0&&String(x?.sourceStatus?.spot||'').startsWith('STRICT_'));
+  if(!xs.length||!Number.isFinite(Number(target)))return null;
+  const nearest=[...xs].sort((a,b)=>Math.abs(Number(a.timestamp)-Number(target))-Math.abs(Number(b.timestamp)-Number(target)))[0]||null;
+  return nearest&&Math.abs(Number(nearest.timestamp)-Number(target))<=Math.max(0,Number(toleranceMs)||0)?nearest:null;
+}
 function historyDelta(windowMs){
   const s=S(),current=Number(s?.portfolio?.total),points=Array.isArray(s?.portfolioHistory?.points)?s.portfolioHistory.points:[];
   if(!(current>=0))return{available:false,delta:null,pct:null,ageMs:null};
-  const target=Date.now()-windowMs,valid=points.filter(x=>Number.isFinite(Number(x?.timestamp))&&Number.isFinite(Number(x?.totalUsd))&&Number(x.totalUsd)>=0&&String(x?.sourceStatus?.spot||'').startsWith('STRICT_'));
-  const prior=valid.filter(x=>Number(x.timestamp)<=target).sort((a,b)=>Number(b.timestamp)-Number(a.timestamp))[0];
+  const target=Date.now()-windowMs,prior=selectHistoryAnchor(points,target);
   if(!prior||!(Number(prior.totalUsd)>0))return{available:false,delta:null,pct:null,ageMs:null};
   const delta=current-Number(prior.totalUsd);
-  return{available:true,delta,pct:delta/Number(prior.totalUsd)*100,ageMs:Date.now()-Number(prior.timestamp)};
+  return{available:true,delta,pct:delta/Number(prior.totalUsd)*100,ageMs:Date.now()-Number(prior.timestamp),anchorOffsetMs:Number(prior.timestamp)-target};
 }
 function deltaHtml(d,label){
   if(!d.available)return '<div><span>'+label+'</span><b>—</b><small>noch keine volle Vergleichsperiode</small></div>';
