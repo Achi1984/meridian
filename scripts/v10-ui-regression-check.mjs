@@ -197,7 +197,7 @@ must(js.includes(".filter(visualQaVisible):[]"),'nav occlusion scan must ignore 
 
 /* r86 permanent interaction-QA gates */
 must(String(release.dashboardShell||'').includes('INTERACTION-QA'),'dashboardShell must declare interaction QA');
-must(js.includes("flows=['primary-reset','asset-return','bot-toggle']"),'interaction QA flow allowlist missing');
+must(js.includes("flows=['primary-reset','asset-return','bot-toggle'"),'interaction QA core flow allowlist missing');
 must(js.includes('async function runLocalInteractionQa(cfg)'),'interaction QA runner missing');
 must(js.includes("$('#nav button[data-v=\"bots\"]')?.click()"),'primary navigation interaction probe missing');
 must(js.includes("$('#view-depot [data-asset-detail]')"),'Asset Detail drill-down interaction probe missing');
@@ -207,3 +207,17 @@ must(js.includes("$('#view-bots [data-assets-action=\"open\"]')"),'Bot open-all 
 must(qa.includes("['flow-primary-reset','command',900,'primary-reset']"),'primary reset browser evidence case missing');
 must(qa.includes("['flow-asset-return','depot',700,'asset-return']"),'asset return browser evidence case missing');
 must(qa.includes("['flow-bot-toggle','bots',0,'bot-toggle']"),'bot toggle browser evidence case missing');
+
+
+/* r87 permanent state-continuity gates */
+must(String(release.dashboardShell||'').includes('STATE-CONTINUITY-QA'),'dashboardShell must declare state continuity QA');
+must(js.includes("'bot-filter-return','scanner-forecast-return'"),'state-continuity QA flow allowlist missing');
+must(js.includes("cfg.flow==='bot-filter-return'"),'Bot filter continuity interaction flow missing');
+must(js.includes("checks.filterRetained=botViewUi.filter==='RISK'"),'Bot filter return-state check missing');
+must(js.includes("checks.sessionFilterRetained=String(saved.botFilter||'').toUpperCase()==='RISK'"),'Bot filter session continuity check missing');
+must(js.includes("cfg.flow==='scanner-forecast-return'"),'Scanner to Forecast continuity flow missing');
+must(js.includes("checks.assetSelected=!!target&&fibUi.symbol===target"),'Forecast selected-asset continuity check missing');
+must(js.includes("checks.sessionAssetRetained=String(saved.fibSymbol||'').toUpperCase()===target"),'Forecast asset session continuity check missing');
+must(js.includes("checks.scannerRestored=activeViewKey()==='research'"),'Scanner contextual return check missing');
+must(qa.includes("['flow-bot-filter-return','bots',0,'bot-filter-return']"),'Bot filter continuity evidence case missing');
+must(qa.includes("['flow-scanner-forecast-return','research',520,'scanner-forecast-return']"),'Scanner Forecast continuity evidence case missing');

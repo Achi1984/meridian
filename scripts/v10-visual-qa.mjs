@@ -22,7 +22,9 @@ const cases=[
   ['scanner-top','research',0],['scanner-bottom','research',6000],
   ['flow-primary-reset','command',900,'primary-reset'],
   ['flow-asset-return','depot',700,'asset-return'],
-  ['flow-bot-toggle','bots',0,'bot-toggle']
+  ['flow-bot-toggle','bots',0,'bot-toggle'],
+  ['flow-bot-filter-return','bots',0,'bot-filter-return'],
+  ['flow-scanner-forecast-return','research',520,'scanner-forecast-return']
 ];
 
 function decodeText(s){
