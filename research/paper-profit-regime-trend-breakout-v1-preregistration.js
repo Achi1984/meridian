@@ -1,0 +1,43 @@
+import {PAPER_PROFIT_CONTROL_V2_STAGE_B} from './paperbot-profit-control-v2-stage-b.js';
+
+export const REGIME_TREND_BREAKOUT_V1=Object.freeze({
+  ruleset:'PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1',
+  researchOnly:true,
+  executionImpact:false,
+  autoPromotion:false,
+  universe:Object.freeze(['BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI']),
+  timeframe:'1d',
+  regime:Object.freeze({
+    adxPeriod:14,
+    minAdx:25,
+    smaPeriod:200,
+    longCloseAboveSma:true,
+    shortCloseBelowSma:true
+  }),
+  breakout:Object.freeze({
+    entryChannelDays:55,
+    exitChannelDays:20,
+    excludeCurrentBarFromChannels:true
+  }),
+  sizing:Object.freeze({
+    realizedVolDays:60,
+    targetVolAnnual:0.10,
+    maxLeverage:2,
+    equalWeightActiveNormalizedPositions:true,
+    pyramiding:false,
+    averagingDown:false,
+    martingale:false
+  }),
+  costs:Object.freeze({
+    baselineBps:8,
+    stressBps:16
+  }),
+  split:Object.freeze({
+    method:'CHRONOLOGICAL_COMMON_TIMESTAMPS',
+    discoveryFraction:0.70,
+    holdoutFraction:0.30,
+    holdoutBlockedUntilDiscoveryPass:true,
+    insufficientSampleDecision:'INSUFFICIENT_SPLIT_SAMPLE'
+  }),
+  gate:PAPER_PROFIT_CONTROL_V2_STAGE_B.gate
+});
