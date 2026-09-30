@@ -50,7 +50,7 @@ test('r69 Depot uses canonical venue total and keeps detail rows non-additive',(
   assert.match(v10,/ledgerAssets/);
   assert.match(v10,/pionexDetailAssets/);
   assert.match(v10,/Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert/);
-  assert.match(v10,/new Set\(\$\$\('\.depot-asset-card\[open\]'/);
+  assert.match(v10,/new Set\(\[\.\.\.view\.querySelectorAll\('\.depot-asset-card\[open\]'\)\]\.map/);
   assert.match(css,/\.depot-venue-grid/);
   assert.match(css,/\.depot-asset-card/);
 });
