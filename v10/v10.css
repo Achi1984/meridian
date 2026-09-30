@@ -1267,3 +1267,43 @@ button.command-next-decision:focus-visible,.v10-command-tech-details>summary:foc
   #view-bots .bot-filter-actions{grid-template-columns:repeat(4,minmax(0,1fr))}
   #view-bots .bot-filter-actions button{font-size:6.5px}
 }
+
+
+/* v10 r99 · Forecast overview density */
+#view-market .data-state-strip{display:block;padding:5px 6px;margin-bottom:7px;border-radius:11px}
+#view-market .data-state-label{display:none}
+#view-market .data-state-items{grid-template-columns:1fr;gap:4px}
+#view-market .data-state-item{padding:6px 8px;border-left-width:2px;border-radius:8px}
+#view-market .data-state-item>small{font-size:6.5px;line-height:1.25}
+
+#view-market .forecast-focus{margin-bottom:8px;padding:12px 13px;border-color:#2c628e}
+#view-market .forecast-focus-head b{font-size:18px}
+#view-market .forecast-focus-head>strong{font-size:11px;padding:6px 9px}
+#view-market .forecast-focus-grid{margin-top:9px}
+
+.market-tech-details,.market-tape-details{margin:0 0 9px;border:1px solid #1c3348;border-radius:13px;background:linear-gradient(145deg,rgba(8,18,29,.98),rgba(6,11,18,.98));overflow:hidden}
+.market-tech-details>summary,.market-tape-details>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:8px 10px;cursor:pointer;touch-action:manipulation}
+.market-tech-details>summary::-webkit-details-marker,.market-tape-details>summary::-webkit-details-marker{display:none}
+.market-tech-details>summary>div,.market-tape-details>summary>div{display:flex;align-items:baseline;gap:7px;min-width:0}
+.market-tech-details>summary span,.market-tape-details>summary span{font-size:7px;color:var(--cyan);font-weight:900;letter-spacing:.09em}
+.market-tech-details>summary b,.market-tape-details>summary b{font-size:9px}
+.market-tech-details>summary small,.market-tape-details>summary small{font-size:7px;color:#8093a6;text-align:right;line-height:1.3}
+.market-tech-details[open]>summary,.market-tape-details[open]>summary{border-bottom:1px solid #182d40;background:#09131d}
+.market-tech-body{padding:7px}
+.market-tech-body .market-health{margin:0 0 7px}
+.market-tech-body .market-regime{margin-bottom:6px}
+.market-tech-body .market-kpis{margin-bottom:0}
+.market-tape-details .market-list{padding:7px}
+
+#view-market .fib-map-shell{margin:9px 0 10px;border-color:#285174}
+#view-market .fib-head{margin-bottom:7px}
+#view-market .fib-head>strong{font-size:22px}
+
+@media(max-width:520px){
+  #view-market .forecast-focus-head{gap:6px}
+  #view-market .forecast-focus-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  #view-market .forecast-focus-grid>span{padding:6px}
+  .market-tech-details>summary,.market-tape-details>summary{align-items:flex-start;flex-direction:column;gap:2px}
+  .market-tech-details>summary small,.market-tape-details>summary small{text-align:left}
+  .market-tech-body .market-health{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
