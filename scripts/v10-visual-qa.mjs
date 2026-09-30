@@ -15,11 +15,11 @@ const base=String(process.env.MERIDIAN_VISUAL_QA_BASE||'http://127.0.0.1:4173/v1
 const release=JSON.parse(fs.readFileSync(path.join(ROOT,'version.json'),'utf8')),revision='r'+String(release.terminalBuild||'10.0-r0').split('-r').pop();
 const viewport={width:390,height:844};
 const cases=[
-  ['command-top','command',0],['command-deep','command',900],
-  ['depot-top','depot',0],['depot-deep','depot',900],
-  ['bots-top','bots',0],['bots-deep','bots',900],
-  ['forecast-top','market',0],['forecast-fib','market',1050],
-  ['scanner-top','research',0],['scanner-deep','research',850]
+  ['command-top','command',0],['command-bottom','command',6000],
+  ['depot-top','depot',0],['depot-bottom','depot',6000],
+  ['bots-top','bots',0],['bots-bottom','bots',6000],
+  ['forecast-top','market',0],['forecast-fib','market',1050],['forecast-bottom','market',6000],
+  ['scanner-top','research',0],['scanner-bottom','research',6000]
 ];
 
 function decodeText(s){
