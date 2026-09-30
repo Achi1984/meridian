@@ -821,3 +821,39 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .paper-summary-grid{grid-template-columns:1fr 1fr}
   .paper-model-head{flex-direction:column}.paper-model-head>strong{align-self:flex-start}
 }
+
+
+/* v10 r75 · iPhone-first visual + interaction hardening */
+html,body{max-width:100%;overflow-x:hidden}
+.v10-shell,.view,.v10-mode-banner,.command-overview-v2,.depot-asset-card,.asset-pair,.scan-card,.forecast-focus,.asset-detail-section,.paper-model-card{min-width:0}
+button,summary,select,input{-webkit-tap-highlight-color:transparent}
+button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.v10-live-blocked,.fib-loading,.fib-error,.paper-cockpit-state,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{overflow-wrap:anywhere}
+
+@media(max-width:600px){
+  .app-shell{padding:calc(7px + env(safe-area-inset-top)) calc(9px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(9px + env(safe-area-inset-left))}
+  .v10-topbar{top:env(safe-area-inset-top);margin:0 -2px 6px;padding:8px 4px}
+  nav{padding-left:calc(7px + env(safe-area-inset-left));padding-right:calc(7px + env(safe-area-inset-right))}
+  nav button{min-height:48px;padding:4px 2px}
+  nav button span{font-size:9px}
+  .feed-refresh,.scanner-toolbar button,.lab-backbar button,.paper-cockpit-toolbar button,.asset-detail-topbar>button,.asset-detail-open,.asset-toggle-actions button,.bot-filter-actions button,.scan-forecast-open,.asset-watch-share-actions button,.fib-controls button,.fib-manual button,.sk-paper-controls button,.sk-v2-controls button{min-height:44px}
+  select,input{min-height:44px}
+  details>summary{scroll-margin-top:72px}
+  .v10-mode-banner{margin-bottom:7px;padding:7px 8px}
+  .command-overview-v2{gap:7px;margin-bottom:8px}
+  .command-kpi-grid,.depot-venue-grid{gap:6px}
+  .asset-accordion-stack,.depot-asset-stack,.v10-scanner-stack{gap:6px}
+  .asset-pair-details>summary{min-height:66px}
+  .depot-asset-card>summary{min-height:62px}
+  .section-title{gap:8px}
+  .section-title small{overflow-wrap:anywhere}
+  .scanner-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .scanner-toolbar-actions button{width:100%}
+  .v10-live-blocked,.fib-loading,.fib-error,.paper-cockpit-state,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{min-height:58px;padding:10px}
+}
+@media(max-width:390px){
+  .app-shell{padding-left:calc(7px + env(safe-area-inset-left));padding-right:calc(7px + env(safe-area-inset-right))}
+  .system-actions{min-width:0}
+  .system-status{min-width:0}
+  .system-status .live{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
