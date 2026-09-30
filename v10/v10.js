@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r81';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r81';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r81';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r81';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r81';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r81';
-// MERIDIAN v10 r81 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r82';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r82';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r82';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r82';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r82';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r82';
+// MERIDIAN v10 r82 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r81';
+const BUILD='10.0-r82';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -40,9 +40,13 @@ function persistUiContext(){
 }
 function activeNavKey(){return String($('#nav button.active')?.dataset.v||'research')}
 function contextReturnLabel(target,fallback='ZURÜCK'){return viewContextUi[target]?.label||fallback}
+function restoreViewport(y=0){
+  const top=Math.max(0,Number(y)||0);
+  requestAnimationFrame(()=>{try{window.scrollTo({top,behavior:'auto'})}catch{window.scrollTo(0,top)}});
+}
 function contextualBack(target,fallbackView='research',fallbackNav='research'){
   const ctx=viewContextUi[target];delete viewContextUi[target];
-  showSecondaryView(ctx?.returnView||fallbackView,ctx?.navKey||fallbackNav,false);
+  showSecondaryView(ctx?.returnView||fallbackView,ctx?.navKey||fallbackNav,false,ctx?.scrollY||0);
 }
 function contextBarHtml(target){
   const ctx=viewContextUi[target];if(!ctx)return'';
@@ -544,15 +548,15 @@ function renderDepot(force=false){
   $('[data-depot-action="close"]',view)?.addEventListener('click',()=>setOpen(false));
   bindAssetDetailLinks(view,'depot','depot');
 }
-function showSecondaryView(v,navKey='research',context=null){
+function showSecondaryView(v,navKey='research',context=null,scrollY=0){
   const from=activeViewKey();
   if(context!==false&&['asset-detail','paper','more','market'].includes(v)&&from!==v){
     const meta=context&&typeof context==='object'?context:{},returnView=meta.returnView||from,returnNav=meta.navKey||activeNavKey();
-    viewContextUi[v]={returnView,navKey:returnNav,label:meta.label||VIEW_LABELS[returnView]||String(returnView||'ZURÜCK').toUpperCase()};
+    viewContextUi[v]={returnView,navKey:returnNav,label:meta.label||VIEW_LABELS[returnView]||String(returnView||'ZURÜCK').toUpperCase(),scrollY:Math.max(0,Number(window.scrollY)||0)};
   }
   $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
   $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===navKey));
-  renderActiveView(v,true);decorateA11y();
+  renderActiveView(v,true);decorateA11y();restoreViewport(scrollY);
 }
 let feedRefreshBusy=false;
 async function refreshFeeds(){
@@ -1394,7 +1398,7 @@ function bindV10NavigationAuthority(){
         $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===v));
       }
       queueMicrotask(()=>{
-        try{renderActiveView(v,true);renderSystemHeader();decorateA11y();}
+        try{renderActiveView(v,true);renderSystemHeader();decorateA11y();restoreViewport(0);}
         catch(err){
           const host=$('#view-'+v);
           if(host)host.innerHTML='<section class="v10-live-blocked"><b>V10 VIEW RENDER ERROR</b><small>'+esc(String(err?.message||err).slice(0,180))+'</small></section>';
