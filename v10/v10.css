@@ -702,3 +702,57 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
   .forecast-focus-grid,.scan-context-grid{grid-template-columns:1fr 1fr}
   .forecast-focus-grid>span,.scan-context-grid>span{padding:6px}
 }
+
+
+/* v10 r73 · secondary unified Asset Detail */
+.asset-detail-topbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin:0 0 9px;padding:9px 10px;border:1px solid #24405a;border-radius:14px;background:linear-gradient(145deg,rgba(8,25,39,.98),rgba(6,11,18,.98))}
+.asset-detail-topbar>button,.asset-detail-open{min-height:36px;border:1px solid #285277;background:#081827;color:#8fc9f5;border-radius:9px;padding:0 10px;font:inherit;font-size:8px;font-weight:900;letter-spacing:.05em;touch-action:manipulation}
+.asset-detail-topbar>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.asset-detail-topbar span{font-size:7px;color:var(--cyan);font-weight:900;letter-spacing:.09em}
+.asset-detail-topbar b{font-size:22px;letter-spacing:-.035em}
+.asset-detail-topbar small{font-size:7px;color:var(--muted)}
+.asset-detail-topbar>strong{font-size:8px;border:1px solid currentColor;border-radius:999px;padding:5px 7px;white-space:nowrap}
+
+.asset-detail-hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:8px}
+.asset-detail-hero>div{min-width:0;padding:9px;border:1px solid #1a2a3b;border-radius:12px;background:#071019}
+.asset-detail-hero span,.asset-detail-holding-summary span,.asset-detail-source span,.asset-detail-fib-head span{display:block;font-size:7px;color:var(--muted);font-weight:900;letter-spacing:.07em}
+.asset-detail-hero b{display:block;margin-top:3px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asset-detail-hero small{display:block;margin-top:3px;font-size:7px;color:var(--muted);line-height:1.35}
+
+.asset-detail-accounting-guard{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:11px;padding:8px 10px;border:1px dashed #2a4055;border-radius:11px;background:#071019}
+.asset-detail-accounting-guard b{font-size:8px;color:var(--cyan);letter-spacing:.08em}
+.asset-detail-accounting-guard small{font-size:8px;color:var(--muted);line-height:1.4;text-align:right}
+
+.asset-detail-section{margin:0 0 12px}
+.asset-detail-section>.section-title{margin:0 2px 7px}
+.asset-detail-holding-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:6px}
+.asset-detail-holding-summary>div,.asset-detail-source{padding:8px;border:1px solid #172838;border-radius:10px;background:#070d14}
+.asset-detail-holding-summary b,.asset-detail-source b{display:block;margin-top:2px;font-size:11px}
+.asset-detail-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.asset-detail-source small{display:block;margin-top:2px;font-size:7px;color:var(--muted);line-height:1.35}
+.asset-detail-section>.asset-pair{margin:0}
+.asset-detail-fib-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 2px 6px}
+.asset-detail-fib-head span{color:var(--cyan)}
+.asset-detail-fib-head small{font-size:7px;color:var(--muted)}
+.pair-detail-action,.depot-asset-action{display:flex;justify-content:flex-end;margin-top:7px}
+.scan-drill-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+.scan-drill-actions .scan-forecast-open,.scan-drill-actions .asset-detail-open{width:100%;margin-top:0}
+#view-asset-detail .fib-controls select:disabled{opacity:.75;cursor:not-allowed}
+#view-asset-detail .market-row{margin-bottom:8px}
+
+@media(max-width:760px){
+  .asset-detail-hero{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .asset-detail-sources{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+  .asset-detail-topbar{grid-template-columns:auto 1fr}
+  .asset-detail-topbar>strong{grid-column:2;justify-self:start}
+  .asset-detail-accounting-guard{flex-direction:column;align-items:flex-start;gap:4px}
+  .asset-detail-accounting-guard small{text-align:left}
+  .asset-detail-holding-summary{grid-template-columns:1fr}
+  .scan-drill-actions{grid-template-columns:1fr}
+}
+@media(max-width:390px){
+  .asset-detail-hero{grid-template-columns:1fr 1fr}
+  .asset-detail-topbar b{font-size:19px}
+}
