@@ -455,7 +455,7 @@ const server=http.createServer(async(req,res)=>{
       return data?writeJson(res,200,{private:true,data},origin||""):writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/portfolio-history"){
-      return writeJson(res,200,await readPortfolioHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get('range')),limit:1800}),origin||"");
+      return writeJson(res,200,await readPortfolioHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get('range')),limit:2200}),origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/activity-summary"){
       return writeJson(res,200,await activitySummary(),origin||"");
