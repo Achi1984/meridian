@@ -279,16 +279,16 @@ This protocol reduces transport/output pressure, while the existing GitHub check
 
 The following limits are mandatory for interactive repository work:
 
-- **Tool-call budget:** after at most 3 consecutive repository/tool calls, emit a short user-visible checkpoint before continuing.
+- **Tool-call budget:** after at most 2 consecutive repository/tool-call groups, emit a short user-visible checkpoint before any third group.
 - **Polling budget:** do not poll the same workflow/status more than 2 consecutive times without a checkpoint or a state-changing event.
-- **Output budget:** a single tool result surfaced back into the orchestration context should normally stay below 8 KB. Filter, slice, or summarize inside the tool call before returning text.
+- **Output budget:** a single tool result surfaced back into the orchestration context should normally stay below 6 KB. Filter, slice, or summarize inside the tool call before returning text.
 - **Log/diff budget:** never emit a complete large CI log, full large diff, or whole large source file when a targeted search/window is sufficient. Return only the failing test, relevant lines, SHA/status, or a concise file list.
 - **Retry budget:** after 2 identical tool failures, stop repeating the same call. Re-read state, switch method, or report the blocker.
 - **Mutation checkpoint:** every commit, PR creation/update, merge, release bump, or deployment state change must be followed by a durable identifier (SHA/PR/run/deploy status) before the next mutation.
 - **Resume command:** after any interruption, prefer `node scripts/stream-safe-preflight.mjs` (or the equivalent GitHub metadata query when operating remotely) before any mutation.
 - **No blind continuation:** a resumed stream may continue analysis immediately, but must not write/merge/release until the preflight confirms current state.
 
-These are transport-safety limits, not quality shortcuts. Large investigations are split into multiple small verified milestones rather than one oversized streamed response.
+These are transport-safety limits, not quality shortcuts. Large investigations are split into multiple small verified milestones rather than one oversized streamed response. A visible burst should also end or checkpoint by 90 seconds, whichever comes first. Every durable mutation is followed by a concise user-visible checkpoint before further mutation.
 
 ## 15. Documentation and Continuity
 
