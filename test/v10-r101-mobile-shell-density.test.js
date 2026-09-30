@@ -8,13 +8,16 @@ const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r101 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r101');
+test('r101 contract remains execution-neutral and cache coherent on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m);
+  assert.ok(Number(m[1])>=101);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/MOBILE-SHELL-DENSITY/);
-  assert.equal(manifest.start_url,'./v10/?build=r101&fresh=r101');
-  assert.ok(js.includes("const BUILD='10.0-r101'"));
-  assert.match(html,/v10 r101 · SMART TRADING TERMINAL/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
+  assert.match(html,new RegExp('v10 r'+m[1]+' · SMART TRADING TERMINAL'));
 });
 
 test('r101 compacts the sticky mobile header while retaining explicit live status',()=>{
