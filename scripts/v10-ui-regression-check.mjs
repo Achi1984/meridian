@@ -285,3 +285,5 @@ must(js.includes("attentionWrap.innerHTML=commandAttentionHtml()"),'Command Atte
 must(js.includes("hubNode.insertAdjacentElement('afterend',attentionNode)"),'Command Attention ordering must follow Next/Open');
 must(js.includes('command-position-details'),'Command Account Futures disclosure missing');
 must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
+
+must(qa.includes("virtualBudget=name.startsWith('flow-')?5200:2600"),'interaction visual QA flow budget must cover iframe settle window');
