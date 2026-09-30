@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r79';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r79';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r79';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r79';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r79';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r79';
-// MERIDIAN v10 r79 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r80';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r80';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r80';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r80';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r80';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r80';
+// MERIDIAN v10 r80 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r79';
+const BUILD='10.0-r80';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -58,11 +58,18 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function fmt(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toFixed(d):'—'}
 function freshTs(ts,maxAge=MARKET_FRESH_MS){const n=Number(ts);return Number.isFinite(n)&&n<=Date.now()+30000&&Date.now()-n<=maxAge}
 function intelFresh(i){return !!i&&freshTs(i.updatedAt)}
+function marketIntel(symbol){
+  const s=S(),key=String(symbol||'').trim().toUpperCase(),asset=s?.assetIntel?.[key]||null,btc=key==='BTC'?(s?.intel||null):null;
+  if(!btc)return asset;
+  if(!asset)return btc;
+  const btcTs=Number(btc.updatedAt)||0,assetTs=Number(asset.updatedAt)||0,primary=btcTs>=assetTs?btc:asset,secondary=primary===btc?asset:btc;
+  return {...primary,near:primary?.near??(intelFresh(secondary)?secondary?.near:null),longReasons:primary?.longReasons??secondary?.longReasons,shortReasons:primary?.shortReasons??secondary?.shortReasons};
+}
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(s?.assetIntel?.[symbol])).length,knownAssets=universe.filter(symbol=>!!s?.assetIntel?.[symbol]).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(s?.intel),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(marketIntel(symbol))).length,knownAssets=universe.filter(symbol=>!!marketIntel(symbol)).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(marketIntel('BTC')),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -106,21 +113,21 @@ function symbols(){
 }
 function pairStatus(symbol){
   const s=S(),h=H(),rows=matchedRows(symbol);
-  if(!s||!rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:'Kein sicher gematchter privater Bot'};
-  if(!h.botFeedFresh?.())return{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:100,reason:'Privater Bot-Snapshot ist nicht frisch genug'};
+  if(!s||!rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:'Kein sicher gematchter privater Bot'};
+  if(!h.botFeedFresh?.())return{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:140,reason:'Privater Bot-Snapshot ist nicht frisch genug'};
   const risks=rows.map(b=>h.risk?.(b)).filter(x=>x!=null),protection=rows.map(stopLossIssue).filter(Boolean),assetKey=String(symbol||'').trim().toUpperCase(),unmatchedAsset=(s.unmatchedLive||[]).filter(x=>String(x?.symbol||'').trim().toUpperCase()===assetKey),ambiguousAsset=unmatchedAsset.filter(x=>x?.reason==='AMBIGUOUS_MATCH').length;
   const hardProtection=protection.find(x=>x.critical),nearProtection=protection.find(x=>!x.critical);
-  if(hardProtection)return{code:'PROTECTION_RISK',label:'RISK REVIEW',tone:'danger',rank:130,reason:hardProtection.reason};
+  if(hardProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:160,reason:hardProtection.reason};
   const min=risks.length?Math.min(...risks):null;
-  if(min!=null&&min<10)return{code:'LIQ_RISK',label:'LIQ RISK',tone:'danger',rank:120,reason:'Liq-Puffer nur '+min.toFixed(1)+'%'};
-  if(nearProtection)return{code:'PROTECTION_RISK',label:'RISK REVIEW',tone:'danger',rank:115,reason:nearProtection.reason};
-  if(unmatchedAsset.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:unmatchedAsset.length+' aktuelle '+assetKey+' Bot-Row(s) nicht sicher gematcht'+(ambiguousAsset?' · '+ambiguousAsset+' ambiguous':'')};
-  if(rows.some(b=>!h.livePnlAvailable?.(b))||risks.length!==rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:'Mindestens ein Action-Feld (PnL/Liq) fehlt live'};
-  if(!intelFresh(s.assetIntel?.[symbol]))return{code:'MARKET_STALE',label:'MARKET STALE',tone:'muted',rank:80,reason:'15m/1h/4h Marktdaten sind nicht frisch · nur Safety-Daten bleiben gültig'};
+  if(min!=null&&min<10)return{code:'LIQ_RISK',label:'LIQ RISK',tone:'danger',rank:150,reason:'Liq-Puffer nur '+min.toFixed(1)+'%'};
+  if(nearProtection)return{code:'PROTECTION_RISK',label:'PROTECTION RISK',tone:'danger',rank:145,reason:nearProtection.reason};
+  if(unmatchedAsset.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:unmatchedAsset.length+' aktuelle '+assetKey+' Bot-Row(s) nicht sicher gematcht'+(ambiguousAsset?' · '+ambiguousAsset+' ambiguous':'')};
+  if(rows.some(b=>!h.livePnlAvailable?.(b))||risks.length!==rows.length)return{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:'Mindestens ein Action-Feld (PnL/Liq) fehlt live'};
+  if(!intelFresh(marketIntel(symbol)))return{code:'MARKET_STALE',label:'MARKET STALE',tone:'muted',rank:120,reason:'15m/1h/4h Marktdaten sind nicht frisch · nur Safety-Daten bleiben gültig'};
   const plans=rows.map(b=>h.profitLockPlan?.(b)).filter(Boolean);
-  const signals=rows.map(b=>intelFresh(s.assetIntel?.[b.symbol])?h.actionForSide?.(s.assetIntel?.[b.symbol],b.side||'LONG'):'SYNC');
+  const signals=rows.map(b=>{const intel=marketIntel(b.symbol);return intelFresh(intel)?h.actionForSide?.(intel,b.side||'LONG'):'SYNC'});
   if(plans.some(p=>['LOCK20','LOCK25','LOCK50'].includes(p.code)))return{code:'PROFIT_LOCK',label:'PROFIT LOCK',tone:'watch',rank:60,reason:'Technische Schwäche + ausreichendes Gewinnpolster'};
-  if(signals.includes('RISK REVIEW'))return{code:'RISK_REVIEW',label:'RISK REVIEW',tone:'danger',rank:100,reason:'4h/1h Struktur dreht gegen mindestens eine Seite'};
+  if(signals.includes('RISK REVIEW'))return{code:'RISK_REVIEW',label:'STRUCTURE REVIEW',tone:'watch',rank:70,reason:'4h/1h Struktur dreht gegen mindestens eine Seite'};
   if(signals.includes('PROFIT LOCK CANDIDATE')||signals.includes('WATCH PROFIT'))return{code:'WATCH_PROFIT',label:'WATCH PROFIT',tone:'watch',rank:40,reason:'15m/1h Frühwarnung · 4h noch nicht als Exit bestätigt'};
   return{code:'HOLD',label:'HOLD',tone:'safe',rank:10,reason:'Kein bestätigtes Exit-/Safety-Signal'};
 }
@@ -131,7 +138,7 @@ function exposure(rows,side){
 function marketPrice(symbol){
   const s=S(),c=s?.priceChecks?.[symbol],crossFresh=freshTs(c?.updatedAt),vals=c?.verified&&crossFresh?[Number(c.okx),Number(c.binance)].filter(x=>x>0):[];
   if(vals.length===2)return{value:(vals[0]+vals[1])/2,source:'OKX SWAP + BINANCE USD-M',verified:true,spread:Number(c.spreadPct)||0,stale:false};
-  const i=s?.assetIntel?.[symbol]??(symbol==='BTC'?s?.intel:null),p=Number(i?.price),fresh=intelFresh(i);
+  const i=marketIntel(symbol),p=Number(i?.price),fresh=intelFresh(i);
   return{value:p>0?p:null,source:p>0?(i?.source||'MARKET FEED')+(fresh?'':' · STALE'):'UNVERIFIED',verified:false,spread:null,stale:!fresh};
 }
 function botTypeLabel(b){
@@ -189,9 +196,9 @@ function pairCard(symbol,compact=false,open=false,assetLink=false){
 }
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
-  if(!h.botFeedFresh?.())return{symbol:'BOT DATA',status:{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:100,reason:'Live-Bot-Layer ist nicht frisch · Asset Watch bleibt nur Referenz'}};
+  if(!h.botFeedFresh?.())return{symbol:'BOT DATA',status:{code:'DATA_STALE',label:'DATA STALE',tone:'muted',rank:140,reason:'Live-Bot-Layer ist nicht frisch · Asset Watch bleibt nur Referenz'}};
   const candidates=symbols().map(symbol=>({symbol,status:pairStatus(symbol)})),unmatched=s.unmatchedLive||[];
-  if(unmatched.length)candidates.push({symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:90,reason:unmatched.length+' private Bot-Rows sind nicht sicher gematcht'+(Number(s.matchAmbiguous||0)?' · '+Number(s.matchAmbiguous)+' ambiguous':'')}});
+  if(unmatched.length)candidates.push({symbol:'API',status:{code:'UNVERIFIED',label:'UNVERIFIED',tone:'muted',rank:130,reason:unmatched.length+' private Bot-Rows sind nicht sicher gematcht'+(Number(s.matchAmbiguous||0)?' · '+Number(s.matchAmbiguous)+' ambiguous':'')}});
   return candidates.sort((a,b)=>b.status.rank-a.status.rank)[0]||null;
 }
 function nextAction(){
@@ -201,14 +208,14 @@ function nextAction(){
   if(s.code==='LIQ_RISK')return{title:c.symbol+' · LIQ-PUFFER PRÜFEN',detail:s.reason+' · Safety vor Profit-Lock'};
   if(s.code==='PROTECTION_RISK')return{title:c.symbol+' · RISK REVIEW',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
   if(!g.coverageComplete)return{title:'KEINE AKTION · DATEN PRÜFEN',detail:'BOT COVERAGE · '+g.matched+'/'+g.supported+' sicher gematcht · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')};
-  if(s.code==='RISK_REVIEW')return{title:c.symbol+' · RISK REVIEW',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
+  if(s.code==='RISK_REVIEW')return{title:c.symbol+' · STRUCTURE REVIEW',detail:s.reason+' · MTF-Konflikt prüfen · keine automatische Exit-Freigabe'};
   if(s.code==='PROFIT_LOCK')return{title:c.symbol+' · PROFIT LOCK PRÜFEN',detail:s.reason+' · Teilgewinn/Reload-Reserve statt Komplettausstieg'};
   if(s.code==='WATCH_PROFIT')return{title:c.symbol+' · WATCH PROFIT',detail:s.reason};
   return{title:'HOLD · RUNNER WEITERLAUFEN',detail:'Kein 4h-bestätigtes Exit-Signal'};
 }
 function syncHealth(){
   const s=S(),h=H(),rows=(s?.bots||[]).filter(h.liveMatched||(()=>false)),shared=h.botFeedCoverage?.(),supported=Number(shared?.supported??s?.liveRows??0),matched=Number(shared?.matched??rows.length),apiRows=Number(s?.botApiRows??supported),fresh=shared?!!shared.fresh:!!h.botFeedFresh?.(),identityMode=String(s?.botIdentityMode||'REFERENCE_MATCH'),apiNative=identityMode==='API_NATIVE';
-  const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],marketRows=fresh?rows.filter(b=>intelFresh(s?.assetIntel?.[b.symbol])):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(s?.assetIntel?.[b.symbol]))):[];
+  const safetyRows=fresh?rows.filter(b=>h.safetyReadyBot?h.safetyReadyBot(b):h.risk?.(b)!=null):[],pnlRows=fresh?rows.filter(b=>h.livePnlAvailable?.(b)):[],marketRows=fresh?rows.filter(b=>intelFresh(marketIntel(b.symbol))):[],decisionRows=fresh?rows.filter(b=>h.decisionReadyBot?h.decisionReadyBot(b):(h.risk?.(b)!=null&&h.livePnlAvailable?.(b)&&intelFresh(marketIntel(b.symbol)))):[];
   const safetyReady=safetyRows.length,pnlReady=pnlRows.length,marketReady=marketRows.length,decisionReady=decisionRows.length,pnlMissing=Math.max(0,matched-pnlReady),marketMissing=Math.max(0,matched-marketReady),safetyMissing=Math.max(0,matched-safetyReady),actionable=decisionReady,unmatched=Number(shared?.unmatched??Math.max(0,supported-matched)),ambiguous=Number(shared?.ambiguous??s?.matchAmbiguous??(s?.unmatchedLive||[]).filter(x=>x?.reason==='AMBIGUOUS_MATCH').length),coverageComplete=shared?!!shared.coverageComplete:(fresh&&supported>0&&unmatched===0&&ambiguous===0),decisionComplete=matched>0&&coverageComplete&&decisionReady===matched;
   const botApiStatus=String(s?.pionexBotSync?.status||'UNKNOWN'),status=String(s?.botFeedStatus||botApiStatus),walletFeed=status==='WALLET_DETAIL_OK',age=h.botFeedAgeLabel?.()||(h.ageText?.(h.botFeedAgeMs?.())||'—');
   const guardRows=Number(s?.pionexBotSync?.diagnostics?.listRows),shownApiRows=walletFeed?apiRows:(botApiStatus==='EMPTY_GUARD'&&Number.isFinite(guardRows)?guardRows:apiRows);
@@ -246,11 +253,15 @@ function botReadiness(g){
   if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
   return{label:'BLOCKED',tone:'muted'};
 }
+function portfolioAuthorityDetail(p=S()?.portfolio||{}){
+  const ledger=p.ledgerAutoActive?'Ledger aktuell':p.ledgerAutoUsd!=null?'Ledger vorhanden':'Ledger unbestätigt',okx=p.okxVenueUsd!=null?'OKX vorhanden':'OKX fehlt',pionex=p.pionex!=null?'Pionex vorhanden':'Pionex fehlt';
+  return ledger+' · '+okx+' · '+pionex;
+}
 function portfolioReadiness(){
   const p=S()?.portfolio||{};
   if(p.complete===true)return{key:'PORTFOLIO',label:'READY',tone:'safe',detail:'Kanonischer Venue-SSOT vollständig'};
   const known=[p.ledgerAutoUsd,p.okxVenueUsd,p.pionex].filter(v=>v!=null&&Number.isFinite(Number(v))).length;
-  return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:known?'Venue-Daten vorhanden · Authority noch unvollständig':'Keine vollständige kanonische Portfolio-Authority'};
+  return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:portfolioAuthorityDetail(p)};
 }
 function marketStateItem(){
   const m=marketHealth(),r=marketReadiness(m);
@@ -417,7 +428,7 @@ function commandOverviewHtml(){
   const dataTone=dataReady?'safe':g.fresh&&m.fresh?'watch':'danger',dataLabel=dataReady?'READY':g.fresh||m.fresh?'PARTIAL':'STALE';
   const cards='<section class="command-kpi-grid"><div class="command-kpi-primary"><span>GESAMTVERMÖGEN</span><b>'+(portfolioReady?h.money?.(p.total):'—')+'</b><small>'+(portfolioReady?'kanonischer Venue-Total':'Authority unvollständig')+'</small></div>'+deltaHtml(d24,'24H Δ')+deltaHtml(d7,'7T Δ')+'<div><span>RISK STATUS</span><b class="tone-'+esc(risk.tone)+'">'+esc(risk.label)+'</b><small>'+esc(crit?.symbol||'Portfolio')+'</small></div><div><span>DATA FRESHNESS</span><b class="tone-'+dataTone+'">'+dataLabel+'</b><small>MKT '+m.freshAssets+'/'+m.totalAssets+' · BOT '+g.decisionReady+'/'+g.matched+'</small></div></section>';
   const items=[];
-  if(!portfolioReady)items.push({tone:'danger',title:'PORTFOLIO AUTHORITY',detail:'Ledger/OKX/Pionex Quellen sind noch nicht vollständig aktuell.'});
+  if(!portfolioReady)items.push({tone:'danger',title:'PORTFOLIO AUTHORITY',detail:portfolioAuthorityDetail(p)});
   if(crit&&['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'].includes(crit.status.code))items.push({tone:crit.status.tone,title:(crit.symbol||'BOT')+' · '+crit.status.label,detail:crit.status.reason});
   if(!g.decisionComplete)items.push({tone:'watch',title:'BOT COVERAGE',detail:g.decisionReady+'/'+g.matched+' decision-ready · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')});
   if(!m.coverageComplete)items.push({tone:'watch',title:'MARKET COVERAGE',detail:m.freshAssets+'/'+m.totalAssets+' frisch · '+m.staleAssets+' stale · '+m.missingAssets+' missing'});
@@ -426,9 +437,9 @@ function commandOverviewHtml(){
   return '<section class="command-overview-v2">'+cards+attention+'</section>';
 }
 function commandActionHubHtml(){
-  const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=paperReadiness(),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null;
+  const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=paperReadiness(),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null,next=nextAction();
   const item=(target,kicker,label,detail,tone='muted')=>'<button type="button" class="command-hub-card tone-'+esc(tone)+'" data-command-go="'+esc(target)+'"><span>'+esc(kicker)+'</span><b>'+esc(label)+'</b><small>'+esc(detail)+'</small></button>';
-  return '<section class="command-action-hub"><div class="section-title"><h2>OPEN NEXT</h2><small>Navigation zu vorhandenen Read-only Ansichten · keine Trading-Aktion</small></div><div class="command-action-grid">'+
+  return '<section class="command-action-hub"><div class="section-title"><h2>NEXT / OPEN</h2><small>Priorität + Navigation · read-only · keine Trading-Aktion</small></div><div class="command-next-decision"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></div><div class="command-action-grid">'+
     (asset?'<button type="button" class="command-hub-card command-hub-critical tone-'+esc(crit.status.tone)+'" data-command-asset="'+esc(asset)+'"><span>CRITICAL ASSET</span><b>'+esc(asset)+' · '+esc(crit.status.label)+'</b><small>'+esc(crit.status.reason)+'</small></button>':'')+
     item('depot','DEPOT',p.label,p.detail,p.tone)+
     item('bots','BOT CONTROL',b.label,b.detail,b.tone)+
@@ -520,7 +531,7 @@ function renderAssetDetail(force=false){
 function depotAssetCard(row,open=false){
   const h=H(),p=S()?.portfolio||{},share=row.valueKnown&&Number(p.total)>0?row.valueUsd/Number(p.total)*100:null,venues=[...new Set(row.sources.map(x=>x.venue).filter(Boolean))],mp=marketPrice(row.symbol);
   const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>HOLDING DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
-  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>DETAIL <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
+  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>HOLDING <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
 }
 function renderDepot(force=false){
   const view=$('#view-depot');if(!view)return;
@@ -568,10 +579,9 @@ function renderCommand(force=false){
   const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
   wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Safety/Data Guard überstimmt Trading-Signal</small></div>'+criticalHtml;
   sourceNode.insertAdjacentElement('afterend',wrap);
-  const action=$('.command-action',view);
-  if(action){action.innerHTML='<span>NEXT ACTION</span><b>'+esc(a.title)+'</b><small>'+esc(a.detail)+'</small>';wrap.insertAdjacentElement('afterend',action);}
+  const action=$('.command-action',view);if(action)action.remove(); // NEXT ACTION is consolidated in the r80 Command Action Hub.
   const live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;
-  (action||wrap).insertAdjacentElement('afterend',liveNode);
+  wrap.insertAdjacentElement('afterend',liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard();liveNode.insertAdjacentElement('afterend',guard.firstElementChild);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);guard.firstElementChild.insertAdjacentElement('afterend',account.firstElementChild);
   const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();account.firstElementChild.insertAdjacentElement('afterend',wallet.firstElementChild);
@@ -626,7 +636,7 @@ function renderBots(force=false){
   const allSyms=(g.fresh?symbols():[]).slice().sort((a,b)=>pairStatus(b).rank-pairStatus(a).rank||a.localeCompare(b)),syms=allSyms.filter(symbol=>botFilterMatch(symbol));
   const liveCards=syms.map(symbol=>pairCard(symbol,false,hadAssetAccordion?openAssets.has(symbol):symbol===criticalSymbol,true)).filter(Boolean).join('');
   const source=g.walletFeed?'WALLET DETAIL':g.status==='BOT_API_OK'||g.status==='OK'?'BOT API':g.status==='DISABLED_MISSING_CREDENTIALS'?'OFF':g.status.replaceAll('_',' '),healthy=g.matched===g.supported&&g.safetyReady===g.matched&&g.decisionReady===g.matched&&unmatched===0;
-  const headCards='<div><span>POSITION API</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' positions · '+esc(ph.age)+'</small></div><div><span>BOT SOURCE</span><b>'+esc(source)+'</b><small>'+g.apiRows+' rows · '+esc(g.age)+'</small></div><div><span>DECISION READY</span><b class="tone-'+(g.decisionReady===g.matched&&g.matched?'safe':'watch')+'">'+g.decisionReady+'/'+g.matched+'</b><small>PNL miss '+g.pnlMissing+' · MKT miss '+g.marketMissing+'</small></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b><small>'+(healthy?'DATA COMPLETE':'CHECK DETAILS')+'</small></div>'+(healthy?'':'<div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div>');
+  const headCards='<div><span>OPEN FUTURES</span><b class="tone-'+ph.tone+'">'+esc(ph.label)+'</b><small>'+ph.rows.length+' account position'+(ph.rows.length===1?'':'s')+' · '+esc(ph.age)+'</small></div><div><span>BOT IDENTITIES</span><b>'+g.matched+'/'+g.supported+'</b><small>'+esc(source)+' · '+g.apiRows+' wallet rows · '+esc(g.age)+'</small></div><div><span>DECISION READY</span><b class="tone-'+(g.decisionReady===g.matched&&g.matched?'safe':'watch')+'">'+g.decisionReady+'/'+g.matched+'</b><small>PNL miss '+g.pnlMissing+' · MKT miss '+g.marketMissing+'</small></div><div><span>BOT AGE</span><b>'+esc(g.age)+'</b><small>'+(healthy?'DATA COMPLETE':'CHECK DETAILS')+'</small></div>'+(healthy?'':'<div><span>SUPPORTED MATCH</span><b>'+g.matched+'/'+g.supported+'</b></div><div><span>SAFETY READY</span><b>'+g.safetyReady+'/'+g.matched+'</b></div>');
   const diagnosticsOpen=diagOpenExisting??(!healthy||!ph.fresh||unmatched>0);
   const diagnostics='<details class="v10-bot-diagnostics" '+(diagnosticsOpen?'open':'')+'><summary><div><span>TECHNISCHE DETAILS</span><b>'+g.matched+'/'+g.supported+' Bots · PnL '+g.pnlReady+'/'+g.matched+' · Market '+g.marketReady+'/'+g.matched+'</b></div><small>Account API · Wallet Discovery · Normalizer · historische Referenz</small></summary><div class="v10-bot-diagnostics-body">'+accountPositionLayer(false)+walletDiscoveryLayer()+assetWatchShareCard()+unmatchedDiagnostics(unmatchedOpen??false)+snapshotDetails(snapshotOpen??!g.fresh)+'</div></details>';
   const assetHead='<section class="asset-overview-head"><div><span>ASSET OVERVIEW</span><b>'+syms.length+' / '+allSyms.length+' ASSETS · '+g.matched+' BOTS</b><small>Risk-first · Range + Hedge + PnL direkt sichtbar · Karte antippen für Bot-Details</small></div><div class="asset-toggle-actions"><button type="button" data-assets-action="close">ALLE ZU</button><button type="button" data-assets-action="open">ALLE AUF</button></div></section>';
@@ -657,7 +667,7 @@ function marketSignal(i){
   return{label:'NEUTRAL',tone:'muted',score:peak,rank:1,confirmed:false};
 }
 function opportunityContext(symbol){
-  const i=S()?.assetIntel?.[symbol],sig=marketSignal(i);
+  const i=marketIntel(symbol),sig=marketSignal(i);
   if(!i||!intelFresh(i))return{available:false,score:0,label:'NO FRESH CONTEXT',tone:'muted',signal:sig.label,momentum:'—',fib:'—',reasons:['Frische technische Marktdaten fehlen']};
   let score=25;const reasons=['Fresh market feed'];
   if(sig.confirmed){score+=25;reasons.push('1h + 4h bestätigt')}
@@ -686,12 +696,12 @@ function opportunityContext(symbol){
   return{available:true,score,label,tone,signal:sig.label,momentum,fib,fibDistance,reasons};
 }
 function forecastContextHtml(symbol){
-  const h=H(),ctx=opportunityContext(symbol),i=S()?.assetIntel?.[symbol],m=marketPrice(symbol);
+  const h=H(),ctx=opportunityContext(symbol),i=marketIntel(symbol),m=marketPrice(symbol);
   if(!ctx.available)return '<section class="forecast-focus forecast-focus-blocked"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>NO FRESH CONTEXT</b><small>FIB-/SK-Map kann separat laden; Opportunity Quality bleibt ohne frische Multi-Timeframe-Daten blockiert.</small></div></section>';
-  return '<section class="forecast-focus"><div class="forecast-focus-head"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>'+esc(ctx.signal)+'</b><small>'+h.money?.(m.value)+' · '+esc(m.source)+'</small></div><strong class="tone-'+ctx.tone+'">'+ctx.score+'/100 · '+esc(ctx.label)+'</strong></div><div class="forecast-focus-grid"><span>MOMENTUM <b>'+esc(ctx.momentum)+'</b></span><span>NEAREST FIB <b>'+esc(ctx.fib)+'</b></span><span>RSI 1h / 4h <b>'+fmt(i?.rsi1h)+' · '+fmt(i?.rsi4)+'</b></span><span>MACD 1h / 4h <b>'+fmt(i?.macd1h?.hist,2)+' · '+fmt(i?.macd4?.hist,2)+'</b></span></div><small class="forecast-context-note">'+esc(ctx.reasons.slice(0,3).join(' · '))+' · Opportunity Quality ist Markt-Kontext, keine Renditeprognose oder Order-Freigabe.</small></section>';
+  return '<section class="forecast-focus"><div class="forecast-focus-head"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>'+esc(ctx.signal)+'</b><small>'+h.money?.(m.value)+' · '+esc(m.source)+'</small></div><strong class="tone-'+ctx.tone+'">OPPORTUNITY '+ctx.score+'/100 · '+esc(ctx.label)+'</strong></div><div class="forecast-focus-grid"><span>MOMENTUM <b>'+esc(ctx.momentum)+'</b></span><span>NEAREST FIB <b>'+esc(ctx.fib)+'</b></span><span>RSI 1h / 4h <b>'+fmt(i?.rsi1h)+' · '+fmt(i?.rsi4)+'</b></span><span>MACD 1h / 4h <b>'+fmt(i?.macd1h?.hist,2)+' · '+fmt(i?.macd4?.hist,2)+'</b></span></div><small class="forecast-context-note">'+esc(ctx.reasons.slice(0,3).join(' · '))+' · Opportunity Quality ist Markt-Kontext, keine Renditeprognose oder Order-Freigabe.</small></section>';
 }
 function marketRow(symbol){
-  const s=S(),h=H(),i=s?.assetIntel?.[symbol],m=marketPrice(symbol);
+  const s=S(),h=H(),i=marketIntel(symbol),m=marketPrice(symbol);
   if(!i)return '<article class="market-row market-row-missing"><div class="market-symbol"><strong>'+esc(symbol)+'</strong><span class="tone-muted">NO TECH DATA</span><small>keine 15m/1h/4h Historie geladen</small></div><div><span>PRICE</span><b>'+h.money?.(m.value)+'</b><small>'+esc(m.source)+'</small></div><div><span>RSI 1h / 4h</span><b>— · —</b></div><div><span>TREND 1h</span><b>—</b></div><div><span>MACD 4h</span><b>—</b></div></article>';
   const fresh=intelFresh(i),sig=marketSignal(i),macd4=Number(i.macd4?.hist),trend=Number(i.ema20)>Number(i.ema50)?'EMA20 > 50':'EMA20 ≤ 50',age=i.updatedAt?h.ageText?.(Date.now()-i.updatedAt):'—';
   return '<article class="market-row '+(fresh?'':'market-row-stale')+'"><div class="market-symbol"><strong>'+esc(symbol)+'</strong><span class="tone-'+sig.tone+'">'+sig.label+'</span><small>'+esc(age)+(fresh?'':' · REFERENCE ONLY')+'</small></div><div><span>PRICE</span><b>'+h.money?.(m.value)+'</b><small>'+esc(m.source)+'</small></div><div><span>RSI 1h / 4h</span><b>'+fmt(i.rsi1h)+' · '+fmt(i.rsi4)+'</b></div><div><span>TREND 1h</span><b>'+trend+'</b></div><div><span>MACD 4h</span><b class="'+(fresh?(macd4>0?'tone-safe':macd4<0?'tone-danger':''):'tone-muted')+'">'+fmt(macd4,2)+'</b></div></article>';
@@ -737,22 +747,28 @@ function fibLevelRow(level,next,current,levels){
   const label=(sk?'SK ':'')+level.label+(gate?' · GATE':'')+(up?' · NEXT ↑':down?' · NEXT ↓':'');
   return '<div class="fib-level '+(level.kind==='extension'?'fib-extension':'fib-retracement')+' '+(sk?'fib-sk-core ':'')+(up?'fib-next-up ':'')+(down?'fib-next-down':'')+'" style="top:'+top.toFixed(2)+'%"><span>'+label+'</span><i></i><b>'+fibFmt(level.price)+'</b></div>';
 }
+function fibZonePosition(zone,current){
+  const c=Number(current);if(!(c>0)||!zone)return'unknown';
+  if(c<zone.low)return'below';
+  if(c>zone.high)return'above';
+  return'inside';
+}
 function fibZoneState(zone,current){
-  const c=Number(current);if(!(c>0)||!zone)return'—';
-  if(c>=zone.low&&c<=zone.high)return'IN ZONE';
-  const edge=c<zone.low?zone.low:zone.high,d=Math.abs((edge-c)/c*100);
-  return d.toFixed(2)+'% entfernt';
+  const c=Number(current),position=fibZonePosition(zone,current);if(!(c>0)||position==='unknown')return'—';
+  if(position==='inside')return'INSIDE';
+  const edge=position==='below'?zone.low:zone.high,d=Math.abs((edge-c)/c*100);
+  return position.toUpperCase()+' · '+d.toFixed(2)+'% entfernt';
 }
 function fibZoneBand(zone,levels,current,kind,label,active=false){
   const y1=fibPlotPosition(zone.high,levels,current),y2=fibPlotPosition(zone.low,levels,current),top=Math.min(y1,y2),height=Math.max(2,Math.abs(y2-y1));
   return '<div class="fib-zone fib-zone-'+kind+' '+(active?'active':'')+'" style="top:'+top.toFixed(2)+'%;height:'+height.toFixed(2)+'%"><span>'+label+'</span></div>';
 }
 function fibSkCards(low,high,direction,current,doubleAdvantage){
-  const zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction),targetSide=direction==='UP'?'BULLISH TARGET / SHORT WATCH':'BEARISH TARGET / LONG WATCH';
+  const zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction),targetSide=direction==='UP'?'BULLISH TARGET / SHORT WATCH':'BEARISH TARGET / LONG WATCH',longPosition=fibZonePosition(zones.long,current),shortPosition=fibZonePosition(zones.short,current);
   const da=doubleAdvantage?.candidate
     ?'<div class="sk-double '+doubleAdvantage.side.toLowerCase()+'"><span>DOPPELTER VORTEIL · '+doubleAdvantage.side+'</span><b>'+fibFmt(doubleAdvantage.overlap.low)+' – '+fibFmt(doubleAdvantage.overlap.high)+'</b><small>Gegen-Ziel ∩ GKL · '+doubleAdvantage.overlap.overlapPct.toFixed(0)+'% Überlappung · Bestätigung über Struktur nötig</small></div>'
     :'<div class="sk-double muted"><span>DOPPELTER VORTEIL</span><b>—</b><small>Keine bestätigte Gegen-Ziel ∩ GKL Überlappung</small></div>';
-  return '<div class="sk-zone-grid"><div class="sk-zone bull"><span>LONG TRENDWENDE · BULLISH</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear"><span>SHORT TRENDWENDE · BEARISH</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
+  return '<div class="sk-zone-grid"><div class="sk-zone bull state-'+longPosition+'"><span>LONG TRENDWENDE · BULLISH</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear state-'+shortPosition+'"><span>SHORT TRENDWENDE · BEARISH</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
 }
 function fibResultHtml(model){
   const {symbol,low,high,direction,current,levels,source,bars,doubleAdvantage=null}=model,next=adjacentFibLevels(levels,current),currentTop=fibPlotPosition(current,levels,current),zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction);
@@ -840,14 +856,15 @@ function renderMarket(force=false){
     const lo=fibParse($('#fib-low',view)?.value),hi=fibParse($('#fib-high',view)?.value),dir=$('#fib-direction',view)?.value;
     if(lo)fibUi.manualLow=lo;if(hi)fibUi.manualHigh=hi;if(dir)fibUi.direction=dir;
   }
-  const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),mh=marketHealth(),verified=syms.filter(symbol=>{const x=s?.priceChecks?.[symbol];return x?.verified&&freshTs(x.updatedAt)}).length;
+  const s=S(),h=H(),i=marketIntel('BTC'),syms=marketUniverse(),mh=marketHealth(),verified=syms.filter(symbol=>{const x=s?.priceChecks?.[symbol];return x?.verified&&freshTs(x.updatedAt)}).length;
+  const btcCtx=opportunityContext('BTC'),btcTone=i?.score>=70&&btcCtx.available&&btcCtx.score>=60?'safe':i?.score>=55?'watch':'muted';
   const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+' · '+esc(mh.transport)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
-  const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
+  const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+' · OPPORTUNITY '+(btcCtx.available?btcCtx.score+'/100 · '+esc(btcCtx.label):'BLOCKED')+'</small></div><strong class="tone-'+btcTone+'">REGIME '+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+contextBarHtml('market')+dataStateStripHtml('market')+'<div class="v10-market-board">'+health+forecastContextHtml(fibUi.symbol)+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · '+mh.freshAssets+' frisch · 15m/1h/4h</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
   bindContextBack(view,'market','research','research');bindFibMap(view);
 }
 function scannerCard(symbol){
-  const s=S(),h=H(),i=s?.assetIntel?.[symbol],ctx=opportunityContext(symbol),liveLinked=!!h.botFeedFresh?.()&&matchedRows(symbol).length>0,refLinked=referenceLinked(symbol),link=liveLinked?'LIVE BOT · FRESH':refLinked?'REF BOT · ASSET WATCH':'MARKET ONLY';
+  const s=S(),h=H(),i=marketIntel(symbol),ctx=opportunityContext(symbol),liveLinked=!!h.botFeedFresh?.()&&matchedRows(symbol).length>0,refLinked=referenceLinked(symbol),link=liveLinked?'LIVE BOT · FRESH':refLinked?'REF BOT · ASSET WATCH':'MARKET ONLY';
   const open='<div class="scan-drill-actions"><button type="button" class="scan-forecast-open" data-forecast-asset="'+esc(symbol)+'">IM FORECAST ÖFFNEN</button>'+assetDetailButton(symbol,'ASSET DETAIL')+'</div>';
   if(!i)return '<article class="scan-card compact-scan scan-missing"><div class="scan-head"><div><strong>'+esc(symbol)+'</strong><small>'+link+' · NO TECH DATA</small></div><b class="tone-muted">NO DATA</b></div><div class="scan-grid compact"><span>OPPORTUNITY QUALITY <b>—</b></span><span>MOMENTUM <b>—</b></span><span>NEAREST FIB <b>—</b></span><span>MTF STATUS <b>BLOCKED</b></span></div><small>Kein technischer Datensatz geladen · keine Ranking-/Setup-Aussage.</small>'+open+'</article>';
   const fresh=intelFresh(i),sig=marketSignal(i),bearReasons=i.longReasons||[],bullReasons=i.shortReasons||[],reasonSet=!fresh?[]:sig.label.startsWith('BEAR')?bearReasons:sig.label.startsWith('BULL')?bullReasons:[bearReasons[0],bullReasons[0],...bearReasons.slice(1),...bullReasons.slice(1)].filter(Boolean),reasons=[...new Set(reasonSet)],age=i.updatedAt?h.ageText?.(Date.now()-i.updatedAt):'—';
@@ -858,8 +875,8 @@ function renderScanner(force=false){
   if(!force&&$('.v10-scanner-stack',view))return;
   if(!force&&!$('.bt-control',view)&&!$('.hero',view))return;
   const moreOpen=force?!!$('.scanner-more:not(.scanner-stale)',view)?.open:false,staleOpen=force?!!$('.scanner-more.scanner-stale',view)?.open:false;
-  const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(s?.assetIntel?.[x])).sort((a,b)=>{const A=opportunityContext(a),B=opportunityContext(b),sa=marketSignal(s.assetIntel[a]),sb=marketSignal(s.assetIntel[b]);return B.score-A.score||sb.rank-sa.rank||sb.score-sa.score}),stale=all.filter(x=>!!s?.assetIntel?.[x]&&!intelFresh(s.assetIntel[x])),missing=all.filter(x=>!s?.assetIntel?.[x]),blocked=[...stale,...missing];
-  const confirmed=fresh.filter(x=>marketSignal(s.assetIntel[x]).confirmed),top=fresh.slice(0,4),rest=fresh.slice(4),liveLinked=h.botFeedFresh?.()?all.filter(x=>matchedRows(x).length).length:0,refLinked=all.filter(referenceLinked).length,best=top[0]?opportunityContext(top[0]):null;
+  const s=S(),h=H(),all=marketUniverse(),fresh=all.filter(x=>intelFresh(marketIntel(x))).sort((a,b)=>{const A=opportunityContext(a),B=opportunityContext(b),sa=marketSignal(marketIntel(a)),sb=marketSignal(marketIntel(b));return B.score-A.score||sb.rank-sa.rank||sb.score-sa.score}),stale=all.filter(x=>!!marketIntel(x)&&!intelFresh(s.assetIntel[x])),missing=all.filter(x=>!marketIntel(x)),blocked=[...stale,...missing];
+  const confirmed=fresh.filter(x=>marketSignal(marketIntel(x)).confirmed),top=fresh.slice(0,4),rest=fresh.slice(4),liveLinked=h.botFeedFresh?.()?all.filter(x=>matchedRows(x).length).length:0,refLinked=all.filter(referenceLinked).length,best=top[0]?opportunityContext(top[0]):null;
   const stack=top.length?top.map(scannerCard).join(''):'<section class="v10-live-blocked market-stale"><b>SCANNER BLOCKED</b><small>Keine frischen Multi-Timeframe-Marktdaten · keine bestätigten Setups ausgeben.</small></section>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section>'+dataStateStripHtml('research')+'<section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Paper Cockpit und Strategie-Lab bleiben sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><div class="scanner-toolbar-actions"><button type="button" data-open-paper>PAPER COCKPIT</button><button type="button" data-open-lab>LAB ÖFFNEN</button></div></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
   $('[data-open-paper]',view)?.addEventListener('click',()=>showSecondaryView('paper','research'));
