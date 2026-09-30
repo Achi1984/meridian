@@ -587,8 +587,8 @@ function renderCommand(force=false){
   const live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;
   wrap.insertAdjacentElement('afterend',liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard();const guardNode=guard.firstElementChild;if(guardNode)liveNode.insertAdjacentElement('afterend',guardNode);
-  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)(guardNode||liveNode).insertAdjacentElement('afterend',accountNode);
-  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode).insertAdjacentElement('afterend',walletNode);
+  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)(guardNode||liveNode||wrap).insertAdjacentElement('afterend',accountNode);
+  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode||wrap).insertAdjacentElement('afterend',walletNode);
   for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
   bindCommandActionHub(view);
