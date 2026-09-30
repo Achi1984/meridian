@@ -1403,8 +1403,8 @@ function writeLocalVisualQaReport(cfg){
   return report;
 }
 function renderLocalVisualQa(cfg){
-  $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
-  $('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
+  $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
+  $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
   renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
   requestAnimationFrame(()=>requestAnimationFrame(()=>{window.scrollTo(0,cfg.scroll);requestAnimationFrame(()=>writeLocalVisualQaReport(cfg))}));
 }
