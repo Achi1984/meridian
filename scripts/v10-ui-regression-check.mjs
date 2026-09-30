@@ -197,7 +197,7 @@ must(js.includes(".filter(visualQaVisible):[]"),'nav occlusion scan must ignore 
 
 /* r86 permanent interaction-QA gates */
 must(String(release.dashboardShell||'').includes('INTERACTION-QA'),'dashboardShell must declare interaction QA');
-must(js.includes("flows=['primary-reset','asset-return','bot-toggle']"),'interaction QA flow allowlist missing');
+must(js.includes("flows=['primary-reset','asset-return','bot-toggle'"),'interaction QA core flow allowlist missing');
 must(js.includes('async function runLocalInteractionQa(cfg)'),'interaction QA runner missing');
 must(js.includes("$('#nav button[data-v=\"bots\"]')?.click()"),'primary navigation interaction probe missing');
 must(js.includes("$('#view-depot [data-asset-detail]')"),'Asset Detail drill-down interaction probe missing');
