@@ -143,7 +143,7 @@ For any mutable canonical surface:
 ### 6.1 Atomic work bursts
 
 A visible interaction burst should normally contain no more than:
-- 2–3 tool-call groups; or
+- 2 tool-call groups; or
 - one durable repository transition.
 
 Before a longer sequence, commit/checkpoint the current durable state.
@@ -190,8 +190,11 @@ Do not ask the user to restate information already known.
 
 ### 6.5 Chat updates
 
+Hard runtime budget: **2 tool-call groups / 90 seconds / 6 KB per surfaced payload**. After any repository mutation, emit a compact visible checkpoint before the next mutation. Repeated status polling is limited to one unchanged poll per burst.
+
+
 For long work:
-- send a concise status update roughly every 15 seconds or after 2–3 tool-call groups;
+- send a concise status update after at most 2 tool-call groups and never allow a visible work burst to exceed 90 seconds without a checkpoint;
 - report meaningful findings, not low-level API chatter;
 - immediately surface a discovered blocker or contradiction;
 - keep final user-facing result compact and stateful.
