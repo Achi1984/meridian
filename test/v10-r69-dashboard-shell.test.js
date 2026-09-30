@@ -10,13 +10,14 @@ const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
-test('r69 release identity is canonical and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r69');
+test('r69 dashboard contract remains present on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=69);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r69-COMMAND-DEPOT-SHELL');
-  assert.match(root,/10\.0-r69-production/);
-  assert.match(html,/10\.0-r69/);
-  assert.match(v10,/const BUILD='10\.0-r69'/);
+  assert.match(String(release.dashboardShell||''),/^10\.0-r\d+-COMMAND-DEPOT/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r69 exposes exactly five primary decision tabs plus a secondary Lab',()=>{
