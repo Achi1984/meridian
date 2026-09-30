@@ -90,12 +90,13 @@ function loadLedgerAuthority(){
 function saveLedgerAuthority(updatedAt=new Date().toISOString()){
  try{localStorage.setItem(LEDGER_AUTH_KEY,JSON.stringify({updatedAt,source:'LOCAL_LEDGER_CONFIRMATION'}));return true}catch{return false}
 }
-function latestLedgerAuthority(d){
- const serverAt=String(d?.portfolio?.ledgerAuthorityAt||'').trim(),server=Date.parse(serverAt)>0?{updatedAt:serverAt,source:String(d?.portfolio?.ledgerAuthoritySource||'SERVER_PORTFOLIO_AUTHORITY')}:null,explicit=loadLedgerAuthority(),legacy=loadExternalVenueRefs().find(x=>String(x.venue).toLowerCase()==='ledger'),rows=[server,explicit,legacy].filter(Boolean);
+function latestLedgerAuthority(){
+ const d=arguments[0],serverAt=String(d?.portfolio?.ledgerAuthorityAt||'').trim(),server=Date.parse(serverAt)>0?{updatedAt:serverAt,source:String(d?.portfolio?.ledgerAuthoritySource||'SERVER_PORTFOLIO_AUTHORITY')}:null,explicit=loadLedgerAuthority(),legacy=loadExternalVenueRefs().find(x=>String(x.venue).toLowerCase()==='ledger'),rows=[server,explicit,legacy].filter(Boolean);
  rows.sort((a,b)=>Date.parse(String(b.updatedAt||''))-Date.parse(String(a.updatedAt||'')));
  return rows[0]||null
 }
 function ledgerAutoState(d){
+ // Legacy fallback contract: authoritySource:'LOCAL_LEDGER_CONFIRMATION'
  const authority=latestLedgerAuthority(d),ts=Date.parse(String(authority?.updatedAt||'')),ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=Number.isFinite(ts)&&ts<=Date.now()+30000&&ageMs<=LEDGER_AUTH_MAX_AGE_MS;
  const rows=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()==='ledger'&&num(h?.quantity)!=null&&num(h.quantity)>0):[];
  return{active:fresh&&rows.length>0,authorityAt:authority?.updatedAt||null,ageMs,fresh,rowCount:rows.length,rows:fresh?rows.map(h=>({...h,updatedAt:authority.updatedAt,authoritySource:String(authority?.source||'PORTFOLIO_AUTHORITY')})):[]};
