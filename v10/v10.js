@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r103';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r103';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r103';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r103';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r103';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r103';
-// MERIDIAN v10 r103 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r104';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r104';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r104';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r104';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r104';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r104';
+// MERIDIAN v10 r104 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r103';
+const BUILD='10.0-r104';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -457,7 +457,7 @@ function strictPortfolioHistoryPoints(){
   const rows=Array.isArray(S()?.portfolioHistory?.points)?S().portfolioHistory.points:[],now=Date.now()+30000;
   const clean=rows.filter(x=>{
     const ts=Number(x?.timestamp),spot=Number(x?.spotUsd),trading=Number(x?.tradingUsd),total=Number(x?.totalUsd);
-    return Number.isFinite(ts)&&ts<=now&&Number.isFinite(spot)&&spot>=0&&Number.isFinite(trading)&&trading>=0&&Number.isFinite(total)&&total>=0&&Math.abs(total-(spot+trading))<=1&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY';
+    return Number.isFinite(ts)&&ts<=now&&Number.isFinite(spot)&&spot>=0&&Number.isFinite(trading)&&trading>=0&&Number.isFinite(total)&&total>=0&&Math.abs(total-(spot+trading))<=1&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY';
   }).sort((a,b)=>Number(a.timestamp)-Number(b.timestamp));
   const unique=[];for(const x of clean){if(unique.length&&Number(unique.at(-1).timestamp)===Number(x.timestamp))unique[unique.length-1]=x;else unique.push(x)}
   return unique;
@@ -500,12 +500,12 @@ function portfolioChartModel(range=portfolioChartUi.range){
 }
 function portfolioChartRangeLabel(range){return range==='1h'?'1H':range==='1w'?'1W':'1D'}
 function portfolioHistoryIntegrityHtml(){
-  const s=S(),h=H(),strict=strictPortfolioHistoryPoints(),latest=strict.at(-1),latestAge=Number.isFinite(Number(latest?.timestamp))?(h.ageText?.(Math.max(0,Date.now()-Number(latest.timestamp)))||'—'):'—',rev=(BUILD.split('-').at(-1)||BUILD).toUpperCase(),source=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
+  const s=S(),h=H(),strict=strictPortfolioHistoryPoints(),latest=strict.at(-1),latestAge=Number.isFinite(Number(latest?.timestamp))?(h.ageText?.(Math.max(0,Date.now()-Number(latest.timestamp)))||'—'):'—',rev=(BUILD.split('-').at(-1)||BUILD).toUpperCase(),source=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' '),excluded=Math.max(0,Number(s?.portfolioHistory?.excludedIncompletePoints)||0);
   const rangeCard=key=>{
     const m=portfolioChartModel(key),ready=m.deltaAvailable,started=m.points>=2||strict.length>0,tone=ready?'safe':started?'watch':'muted',label=ready?'READY':started?'BUILDING':'WAIT',detail=ready?m.points+' PUNKTE · VOLLES FENSTER':started?m.points+' PUNKTE · FENSTER BAUT AUF':'NOCH KEIN FENSTER';
     return '<div class="portfolio-integrity-item portfolio-integrity-range tone-'+tone+'" data-history-range="'+key+'" data-history-ready="'+(ready?'true':'false')+'"><span>'+portfolioChartRangeLabel(key)+'</span><b>'+label+'</b><small>'+esc(detail)+'</small></div>';
   };
-  return '<div class="portfolio-integrity-strip" role="status" aria-label="Build und Portfolio-Historienintegrität" data-build="'+esc(BUILD)+'" data-history-points="'+strict.length+'"><div class="portfolio-integrity-item portfolio-integrity-build"><span>BUILD</span><b>'+esc(rev)+'</b><small>LIVE SHELL ID</small></div><div class="portfolio-integrity-item portfolio-integrity-history" title="'+esc(source)+'"><span>STRICT HISTORY</span><b>'+strict.length+' PUNKTE</b><small>STRICT_AUTHORITY · '+esc(latestAge)+'</small></div>'+rangeCard('1h')+rangeCard('1d')+rangeCard('1w')+'</div>';
+  return '<div class="portfolio-integrity-strip" role="status" aria-label="Build und Portfolio-Historienintegrität" data-build="'+esc(BUILD)+'" data-history-points="'+strict.length+'"><div class="portfolio-integrity-item portfolio-integrity-build"><span>BUILD</span><b>'+esc(rev)+'</b><small>LIVE SHELL ID</small></div><div class="portfolio-integrity-item portfolio-integrity-history" title="'+esc(source)+'"><span>STRICT HISTORY</span><b>'+strict.length+' PUNKTE</b><small>SPOT + PIONEX · '+esc(latestAge)+(excluded?' · '+excluded+' BLOCKED':'')+'</small></div>'+rangeCard('1h')+rangeCard('1d')+rangeCard('1w')+'</div>';
 }
 // Legacy Command semantic contract: GESAMTVERMÖGEN is now rendered as the dominant GESAMTPORTFOLIO hero.
 function portfolioChartHeroHtml(){
