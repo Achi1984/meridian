@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r98';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r98';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r98';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r98';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r98';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r98';
-// MERIDIAN v10 r98 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r99';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r99';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r99';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r99';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r99';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r99';
+// MERIDIAN v10 r99 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r98';
+const BUILD='10.0-r99';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -967,7 +967,11 @@ function renderMarket(force=false){
   const btcCtx=opportunityContext('BTC'),btcTone=i?.score>=70&&btcCtx.available&&btcCtx.score>=60?'safe':i?.score>=55?'watch':'muted';
   const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+' · '+esc(mh.transport)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
   const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+' · OPPORTUNITY '+(btcCtx.available?btcCtx.score+'/100 · '+esc(btcCtx.label):'BLOCKED')+'</small></div><strong class="tone-'+btcTone+'">REGIME '+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+contextBarHtml('market')+dataStateStripHtml('market')+'<div class="v10-market-board">'+health+forecastContextHtml(fibUi.symbol)+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · '+mh.freshAssets+' frisch · 15m/1h/4h</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  const techOpen=!mh.fresh||!mh.coverageComplete||!mh.priceFresh;
+  const technical='<details class="market-tech-details" '+(techOpen?'open':'')+'><summary><div><span>MARKT TECHNIK</span><b>'+(mh.fresh&&mh.coverageComplete?'READY':'REVIEW')+'</b></div><small>BTC '+esc(mh.ageText)+' · '+mh.freshAssets+'/'+mh.totalAssets+' frisch · '+verified+'/'+syms.length+' Preise</small></summary><div class="market-tech-body">'+health+btc+'</div></details>';
+  const tapeOpen=mh.staleAssets>0||mh.missingAssets>0;
+  const tape='<details class="market-tape-details" '+(tapeOpen?'open':'')+'><summary><div><span>ASSET TAPE</span><b>'+syms.length+' MÄRKTE</b></div><small>'+mh.freshAssets+' frisch · '+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></summary><div class="market-list">'+syms.map(marketRow).join('')+'</div></details>';
+  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+contextBarHtml('market')+dataStateStripHtml('market')+'<div class="v10-market-board">'+forecastContextHtml(fibUi.symbol)+technical+fibMapHtml()+tape+'</div>';
   bindContextBack(view,'market','research','research');bindFibMap(view);
 }
 function scannerCard(symbol){
@@ -1587,9 +1591,11 @@ async function runLocalInteractionQa(cfg){
       const details=[...$('#view-bots')?.querySelectorAll('.asset-pair-details')||[]],close=$('#view-bots [data-assets-action="close"]'),open=$('#view-bots [data-assets-action="open"]');
       checks.botCardsPresent=details.length>0;
       checks.controlsPresent=!!close&&!!open;
-      close?.click();await visualQaSettle();
+      // The accordion controls mutate the native details.open state synchronously. Do not wait for RAF here:
+      // headless virtual-time can starve nested-frame RAF after opening every bot card at once.
+      close?.click();
       checks.allClosed=details.length>0&&details.every(x=>!x.open);
-      open?.click();await visualQaSettle();
+      open?.click();
       checks.allOpened=details.length>0&&details.every(x=>x.open);
     }else if(cfg.flow==='bot-filter-return'){
       const risk=$('#view-bots [data-bot-filter="RISK"]');
