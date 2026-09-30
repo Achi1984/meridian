@@ -1,14 +1,14 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r102",
+  "build": "10.0-r104",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "9a8a6df5c810c0c2a5a0ef0890305ef82dbef576",
+    "verifiedSha": "65834f47a1b9850bb52e2e169e96708fd716cbe9",
     "verifiedAt": "2026-09-30",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1420,10 +1420,10 @@
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r102",
-    "canonicalMainSha": "9a8a6df5c810c0c2a5a0ef0890305ef82dbef576",
-    "lastMergedPr": 409,
-    "status": "LIVE_HISTORY_INTEGRITY_COMPLETE",
+    "terminalBuild": "10.0-r104",
+    "canonicalMainSha": "65834f47a1b9850bb52e2e169e96708fd716cbe9",
+    "lastMergedPr": 415,
+    "status": "PORTFOLIO_HISTORY_COMPONENT_INTEGRITY_COMPLETE",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1434,29 +1434,47 @@
       "r99 FORECAST overview density",
       "r100 SCANNER priority surface",
       "r101 global mobile shell density",
-      "r102 live build + strict history integrity"
+      "r102 live build + strict history integrity",
+      "r103 SCANNER confluence explainability",
+      "r104 portfolio history component integrity"
     ],
     "portfolioCheckpoint": {
-      "lastObservedTotalUsd": 35236.35,
-      "lastObservedLedgerUsd": 790.08,
+      "lastObservedTotalUsd": 35371.6,
+      "lastObservedLedgerUsd": 798.38,
       "lastObservedOkxUsd": 116.3,
-      "lastObservedPionexUsd": 34329.97,
+      "lastObservedPionexUsd": 34456.92,
       "portfolioReady": true,
       "botReady": true,
       "marketReady": true,
-      "historyStatus": "CANONICAL_HISTORY_BOOTSTRAPPING; chart populates only from strict-authority points"
+      "historyStatus": "R102_LIVE_VERIFIED_32_RAW_POINTS; r104 requires STRICT_AUTHORITY + PIONEX_EQUITY and excludes incomplete legacy rows from chart reads"
     },
-    "nextAction": "Verify live r102 BUILD/STRICT HISTORY indicator and canonical portfolio-history progression, then continue only the first incomplete UI milestone. Do not repeat r93-r102 work.",
-    "executionImpact": false
+    "nextAction": "Verify live r104 BUILD/history component-integrity behavior: confirm the incomplete ~USD 1798.71 legacy point is no longer charted, note any BLOCKED count, and confirm 1H/1D/1W maturity. Then continue only the first incomplete UI milestone. Do not repeat r93-r104 work.",
+    "executionImpact": false,
+    "liveVerification": {
+      "r102": {
+        "status": "PASS_WITH_HISTORY_ANOMALY_FOUND",
+        "observedBuild": "R102",
+        "observedAt": "2026-09-30T22:56:00+02:00",
+        "strictHistoryPoints": 32,
+        "oneHour": "READY",
+        "oneDay": "BUILDING",
+        "oneWeek": "BUILDING",
+        "anomaly": "Legacy incomplete portfolio-history point around USD 1798.71 was visible against current total around USD 35371.6; root cause fixed in r104 without deleting audit evidence."
+      },
+      "r104": {
+        "status": "PENDING_LIVE_SCREEN_VERIFY",
+        "expected": "BUILD R104; incomplete legacy rows excluded; optional BLOCKED count visible; no USD ~1798.71 chart artifact"
+      }
+    }
   },
   "chatHandoff": {
-    "updatedAt": "2026-09-30T22:11:36+02:00",
+    "updatedAt": "2026-09-30T23:11:31+02:00",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "9a8a6df5c810c0c2a5a0ef0890305ef82dbef576",
-    "currentBuild": "10.0-r102"
+    "currentMainSha": "65834f47a1b9850bb52e2e169e96708fd716cbe9",
+    "currentBuild": "10.0-r104"
   }
 }
