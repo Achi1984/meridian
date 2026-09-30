@@ -13,12 +13,16 @@ export function compactWorkflowRuns(runs=[]){
 }
 
 export function compactCheckpoint(input={}){
+  const mainSha=shortSha(input.mainSha),headSha=shortSha(input.headSha),prNumber=Number.isInteger(Number(input.prNumber))?Number(input.prNumber):null;
   return {
-    mainSha:shortSha(input.mainSha),
+    protocol:'STREAM-SAFE-V3',
+    resumeToken:[mainSha,input.branch||'main',headSha,prNumber==null?'no-pr':'pr-'+prNumber].filter(Boolean).join(':'),
+    streamBudget:{toolBatches:2,sameStatusPolls:1,maxPayloadBytes:8192,maxTurnSeconds:120},
+    mainSha,
     terminalBuild:input.terminalBuild||null,
     branch:input.branch||null,
-    headSha:shortSha(input.headSha),
-    prNumber:Number.isInteger(Number(input.prNumber))?Number(input.prNumber):null,
+    headSha,
+    prNumber,
     prState:input.prState||null,
     aheadBy:Number.isFinite(Number(input.aheadBy))?Number(input.aheadBy):null,
     behindBy:Number.isFinite(Number(input.behindBy))?Number(input.behindBy):null,
