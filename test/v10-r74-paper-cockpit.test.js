@@ -18,14 +18,16 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r74 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r74');
+test('r74 Paper Cockpit contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=74);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r74-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT');
-  assert.match(root,/10\.0-r74-production/);
-  assert.match(html,/10\.0-r74/);
-  assert.match(v10,/const BUILD='10\.0-r74'/);
-  assert.equal(manifest.start_url,'./v10/?build=r74&fresh=r74');
+  assert.match(String(release.dashboardShell||''),/PAPER-COCKPIT/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r74 uses the existing protected GET-only Paper Overview bridge',()=>{
