@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r85';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r85';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r85';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r85';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r85';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r85';
-// MERIDIAN v10 r85 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r86';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r86';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r86';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r86';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r86';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r86';
+// MERIDIAN v10 r86 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r85';
+const BUILD='10.0-r86';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -1366,8 +1366,8 @@ function renderLab(){
 function localVisualQaConfig(){
   if(!['127.0.0.1','localhost'].includes(location.hostname))return null;
   const q=new URLSearchParams(location.search);if(q.get('visualQa')!=='1')return null;
-  const allowed=['command','depot','bots','market','research'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0));
-  return{view,scroll};
+  const allowed=['command','depot','bots','market','research'],flows=['primary-reset','asset-return','bot-toggle'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0)),flow=flows.includes(q.get('qaFlow'))?q.get('qaFlow'):null;
+  return{view,scroll,flow};
 }
 function applyLocalVisualQaFixture(){
   const cfg=localVisualQaConfig(),s=S();if(!cfg||!s)return null;
@@ -1427,12 +1427,57 @@ function writeLocalVisualQaError(cfg,error){
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}
   pre.textContent=JSON.stringify(report);document.documentElement.dataset.visualQaReady='fail';return report;
 }
+function writeLocalInteractionQaReport(cfg,checks){
+  const finalView=activeViewKey(),report={build:BUILD,flow:cfg.flow,view:cfg.view,finalView,scroll:cfg.scroll,actualScroll:Math.round(scrollY),checks,ok:Object.values(checks).every(Boolean)};
+  let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}
+  pre.textContent=JSON.stringify(report);document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';return report;
+}
+function visualQaSettle(){
+  return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(resolve,0))));
+}
+async function runLocalInteractionQa(cfg){
+  try{
+    const checks={};
+    if(cfg.flow==='primary-reset'){
+      window.scrollTo(0,cfg.scroll);await visualQaSettle();
+      checks.startedScrolled=scrollY>100;
+      $('#nav button[data-v="bots"]')?.click();await visualQaSettle();
+      checks.botsActive=activeViewKey()==='bots';
+      checks.botsNavActive=$('#nav button[data-v="bots"]')?.classList.contains('active')===true;
+      checks.scrollReset=scrollY<=2;
+    }else if(cfg.flow==='asset-return'){
+      window.scrollTo(0,cfg.scroll);await visualQaSettle();
+      const origin=Math.round(scrollY),open=$('#view-depot [data-asset-detail]');
+      checks.startedScrolled=origin>100;
+      checks.assetTrigger=!!open;
+      open?.click();await visualQaSettle();
+      checks.assetOpened=activeViewKey()==='asset-detail';
+      const back=$('#view-asset-detail [data-context-back="asset-detail"]');
+      checks.backControl=!!back;
+      back?.click();await visualQaSettle();
+      checks.depotRestored=activeViewKey()==='depot';
+      checks.depotNavActive=$('#nav button[data-v="depot"]')?.classList.contains('active')===true;
+      checks.scrollRestored=Math.abs(Math.round(scrollY)-origin)<=8;
+    }else if(cfg.flow==='bot-toggle'){
+      const details=[...$('#view-bots')?.querySelectorAll('.asset-pair-details')||[]],close=$('#view-bots [data-assets-action="close"]'),open=$('#view-bots [data-assets-action="open"]');
+      checks.botCardsPresent=details.length>0;
+      checks.controlsPresent=!!close&&!!open;
+      close?.click();await visualQaSettle();
+      checks.allClosed=details.length>0&&details.every(x=>!x.open);
+      open?.click();await visualQaSettle();
+      checks.allOpened=details.length>0&&details.every(x=>x.open);
+    }else checks.knownFlow=false;
+    writeLocalInteractionQaReport(cfg,checks);
+  }catch(error){writeLocalVisualQaError(cfg,error)}
+}
 function renderLocalVisualQa(cfg){
   try{
     $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
     $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
     renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
-    window.scrollTo(0,cfg.scroll);writeLocalVisualQaReport(cfg);
+    window.scrollTo(0,cfg.scroll);
+    if(cfg.flow){void runLocalInteractionQa(cfg);return}
+    writeLocalVisualQaReport(cfg);
   }catch(error){writeLocalVisualQaError(cfg,error)}
 }
 function activeViewKey(){return String($('.view.active')?.id||'view-command').replace(/^view-/,'')}

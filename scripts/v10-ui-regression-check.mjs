@@ -193,3 +193,17 @@ must(qa.includes("['scanner-bottom','research',6000]"),'Scanner bottom evidence 
 must(js.includes('function visualQaVisible(el)'),'visibility-aware visual QA helper missing');
 must(js.includes("node.tagName==='DETAILS'&&!node.open"),'closed-details visibility exclusion missing');
 must(js.includes(".filter(visualQaVisible):[]"),'nav occlusion scan must ignore hidden details content');
+
+
+/* r86 permanent interaction-QA gates */
+must(String(release.dashboardShell||'').includes('INTERACTION-QA'),'dashboardShell must declare interaction QA');
+must(js.includes("flows=['primary-reset','asset-return','bot-toggle']"),'interaction QA flow allowlist missing');
+must(js.includes('async function runLocalInteractionQa(cfg)'),'interaction QA runner missing');
+must(js.includes("$('#nav button[data-v=\"bots\"]')?.click()"),'primary navigation interaction probe missing');
+must(js.includes("$('#view-depot [data-asset-detail]')"),'Asset Detail drill-down interaction probe missing');
+must(js.includes("$('#view-asset-detail [data-context-back=\"asset-detail\"]')"),'contextual back interaction probe missing');
+must(js.includes("$('#view-bots [data-assets-action=\"close\"]')"),'Bot close-all interaction probe missing');
+must(js.includes("$('#view-bots [data-assets-action=\"open\"]')"),'Bot open-all interaction probe missing');
+must(qa.includes("['flow-primary-reset','command',900,'primary-reset']"),'primary reset browser evidence case missing');
+must(qa.includes("['flow-asset-return','depot',700,'asset-return']"),'asset return browser evidence case missing');
+must(qa.includes("['flow-bot-toggle','bots',0,'bot-toggle']"),'bot toggle browser evidence case missing');

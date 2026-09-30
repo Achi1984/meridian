@@ -8,12 +8,14 @@ const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',impo
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r85 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r85');
+test('r85 visual-occlusion contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=85,'expected r85 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/VISUAL-QA-OCCLUSION/);
-  assert.equal(manifest.start_url,'./v10/?build=r85&fresh=r85');
-  assert.match(js,/const BUILD='10\.0-r85'/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r85 gates bottom navigation occlusion at actual page bottom',()=>{
