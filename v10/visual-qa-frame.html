@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MERIDIAN Visual QA Frame</title>
+<style>html,body{margin:0;padding:0;width:390px;height:844px;overflow:hidden;background:#05070b}iframe{display:block;width:390px;height:844px;border:0;margin:0;padding:0}</style></head>
+<body><script>
+(function(){
+  const local=['127.0.0.1','localhost'].includes(location.hostname);
+  if(!local){document.body.textContent='LOCAL VISUAL QA ONLY';return}
+  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'r83';
+  const frame=document.createElement('iframe');
+  frame.id='qa-frame';
+  frame.width='390';frame.height='844';
+  frame.src='./?visualQa=1&qaView='+encodeURIComponent(view)+'&qaScroll='+encodeURIComponent(scroll)+'&build='+encodeURIComponent(build);
+  document.body.appendChild(frame);
+  let tries=0;
+  const pump=()=>{
+    tries++;
+    try{
+      const inner=frame.contentDocument?.getElementById('visual-qa-report');
+      if(inner&&inner.textContent){
+        const out=document.createElement('pre');out.id='visual-qa-report';out.hidden=true;out.textContent=inner.textContent;document.body.appendChild(out);
+        document.documentElement.dataset.visualQaReady=frame.contentDocument?.documentElement?.dataset?.visualQaReady||'ready';
+        return;
+      }
+    }catch(e){}
+    if(tries<240)setTimeout(pump,20);
+  };
+  frame.addEventListener('load',()=>setTimeout(pump,0));
+})();
+</script></body></html>
