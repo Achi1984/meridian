@@ -7,10 +7,11 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 const workflow=fs.readFileSync(new URL('../.github/workflows/backend-safety.yml',import.meta.url),'utf8');
 const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',import.meta.url),'utf8');
 
-test('r76 release declares the permanent UI regression gate and remains execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r76');
+test('r76 permanent UI regression gate remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=76);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.match(release.dashboardShell,/UI-REGRESSION-GATE$/);
+  assert.match(String(release.dashboardShell||''),/UI-REGRESSION-GATE/);
 });
 
 test('r76 enforces one canonical UI regression command in Release Safety',()=>{
@@ -42,5 +43,5 @@ test('r76 gate freezes selector and read-only boundaries',()=>{
 test('r76 UI regression script passes against the current checked-out release',()=>{
   const run=spawnSync(process.execPath,['scripts/v10-ui-regression-check.mjs'],{encoding:'utf8'});
   assert.equal(run.status,0,run.stderr||run.stdout);
-  assert.match(run.stdout,/V10_UI_REGRESSION_PASS 10\.0-r76/);
+  assert.match(run.stdout,/V10_UI_REGRESSION_PASS 10\.0-r\d+/);
 });

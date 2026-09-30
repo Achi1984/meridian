@@ -49,6 +49,13 @@ must(js.includes("if(active==='more')return renderLab()"),'LAB secondary rendere
 must(js.includes("showSecondaryView('paper','research')"),'Scanner to Paper Cockpit bridge missing');
 must(js.includes("showSecondaryView('more','research')"),'secondary LAB bridge missing');
 
+must(js.includes('function dataStateStripHtml(scope)'),'unified Data State renderer missing');
+for(const scope of ['command','depot','bots','market','research','asset','paper','lab']){
+  must(js.includes("dataStateStripHtml('"+scope+"')"),'Data State scope missing: '+scope);
+}
+must(css.includes('.data-state-strip{'),'Data State strip styling missing');
+must(css.includes('.data-state-item.tone-danger'),'Data State danger tone missing');
+
 const badSelector=/(^|[^$])\$\([^()\n]*\)\.(?:forEach|filter|map|some|every|reduce|find)\s*\(/m;
 must(!badSelector.test(js),'single-element selector used as collection');
 
