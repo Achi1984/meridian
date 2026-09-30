@@ -712,8 +712,11 @@ function refreshFibMap(view){
   old.outerHTML=fibMapHtml();refreshForecastFocus(view);bindFibMap(view);
 }
 function bindFibMap(view){
-  const asset=$('#fib-asset',view),win=$('#fib-window',view);
-  if(asset)asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;refreshFibMap(view)};
+  const asset=$('#fib-asset',view),win=$('#fib-window',view),assetLocked=view?.id==='view-asset-detail';
+  if(asset){
+    if(assetLocked){asset.value=assetDetailUi.symbol;asset.disabled=true;asset.title='Asset ist im Asset Detail fixiert';}
+    else asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;refreshFibMap(view)};
+  }
   if(win)win.onchange=()=>{fibUi.window=Number(win.value)||90;if(fibUi.mode==='AUTO')updateFibMap(view)};
   $$('[data-fib-mode]',view).forEach(btn=>btn.onclick=()=>{
     const next=btn.dataset.fibMode;
