@@ -19,7 +19,7 @@ test('r86 interaction-QA contract remains active on successor builds',()=>{
 });
 
 test('r86 exposes only localhost visual interaction flows',()=>{
-  assert.match(js,/flows=\['primary-reset','asset-return','bot-toggle'(?:,'bot-filter-return','scanner-forecast-return')?\]/);
+  assert.match(js,/flows=\['primary-reset','asset-return','bot-toggle'(?:,'bot-filter-return','scanner-forecast-return'(?:,'stale-recovery')?)?\]/);
   assert.match(js,/flow=flows\.includes\(q\.get\('qaFlow'\)\)\?q\.get\('qaFlow'\):null/);
   assert.match(js,/if\(!\['127\.0\.0\.1','localhost'\]\.includes\(location\.hostname\)\)return null/);
 });
