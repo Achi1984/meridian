@@ -12,12 +12,12 @@ test('r61 legacy renderer emits a deterministic view lifecycle event',()=>{
   assert.match(v10,/window\.addEventListener\('meridian:view',\(\)=>schedule\(true\)\)/);
 });
 
-test('r61 prefers fresh Wallet API equity when an older private snapshot has no usable freshness',()=>{
+test('r61 delegates fresh Wallet-vs-private precedence to the canonical authority resolver',()=>{
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
-  assert.match(block,/walletFresh=String\(d\?\.pionexAccountSync\?\.status\|\|'UNKNOWN'\)==='OK'/);
-  assert.match(block,/privateFresh=privatePionex\.found&&Number\.isFinite\(privateTs\)/);
-  assert.match(block,/walletPionex&&\(!privateFresh\|\|walletTs>=privateTs\)\?walletPionex/);
-  assert.match(block,/source:'PIONEX_WALLET_READ_API'/);
+  assert.match(v9,/authoritativePionexEquitySnapshot/);
+  assert.match(block,/resolvedPionex=authoritativePionexEquitySnapshot\(d,now\)/);
+  assert.match(block,/pionexSource:resolvedPionex\.source/);
+  assert.match(block,/pionexUpdatedAt:resolvedPionex\.updatedAt/);
 });
 
 test('r61 changes lifecycle and portfolio source precedence only in successor releases',()=>{
