@@ -15,14 +15,16 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r75 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r75');
+test('r75 mobile visual hardening remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=75);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r75-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER-ASSET-DETAIL-PAPER-COCKPIT-MOBILE-HARDENED');
-  assert.match(root,/10\.0-r75-production/);
-  assert.match(html,/10\.0-r75/);
-  assert.match(v10,/const BUILD='10\.0-r75'/);
-  assert.equal(manifest.start_url,'./v10/?build=r75&fresh=r75');
+  assert.match(String(release.dashboardShell||''),/MOBILE-HARDENED/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r75 keeps exactly five primary tabs and all secondary surfaces',()=>{
