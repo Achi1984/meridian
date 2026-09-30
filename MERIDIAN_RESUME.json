@@ -1,15 +1,15 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r68",
+  "build": "10.0-r99",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "78e8975b061b926733d66734ab409dcf56e11bfe",
-    "verifiedAt": "2026-09-29",
+    "verifiedSha": "2d36fff70bd006976a2cc75a6d8feb6012728f9f",
+    "verifiedAt": "2026-09-30",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
   "runtime": {
@@ -1119,7 +1119,12 @@
     "orchestrationBootstrapStatus": "COMPLETE",
     "orchestrationInstallationPr": 324,
     "orchestrationInstallationMergeSha": "832f46471f12b26016e00c9ba0c06677a32427b4",
-    "orchestrationBootstrapRecoveredAfterStreamingInterruption": true
+    "orchestrationBootstrapRecoveredAfterStreamingInterruption": true,
+    "streamSafeProtocol": "STREAM-SAFE-V4",
+    "maxToolCallGroupsPerVisibleBurst": 2,
+    "maxSameStatusPollsPerVisibleBurst": 1,
+    "maxVisibleBurstSeconds": 90,
+    "userVisibleCheckpointRequired": true
   },
   "researchDirection": {
     "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_SOURCE_REDESIGN",
@@ -1413,5 +1418,13 @@
     "qhImbalanceV1DataV1DiagnosticRun": 36618234245,
     "qhImbalanceV1DataV1NoInPlaceRelaxation": true,
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
+  },
+  "activeUiLane": {
+    "terminalBuild": "10.0-r99",
+    "canonicalMainSha": "2d36fff70bd006976a2cc75a6d8feb6012728f9f",
+    "lastMergedPr": 403,
+    "status": "FORECAST_OVERVIEW_DENSITY_COMPLETE",
+    "nextAction": "Continue UI evolution with Scanner overview-density only after stream-safe v4 process hardening is merged.",
+    "executionImpact": false
   }
 }
