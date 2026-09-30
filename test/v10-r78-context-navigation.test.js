@@ -54,13 +54,16 @@ test('r78 rejects unknown persisted assets and Bot filters',()=>{
 });
 
 test('r78 contextual secondary navigation captures origin but Back does not create a new context',()=>{
-  const nav=block("function showSecondaryView(v,navKey='research',context=null){","let feedRefreshBusy=false");
+  const signature=v10.includes("function showSecondaryView(v,navKey='research',context=null,scrollY=0){")
+    ?"function showSecondaryView(v,navKey='research',context=null,scrollY=0){"
+    :"function showSecondaryView(v,navKey='research',context=null){";
+  const nav=block(signature,"let feedRefreshBusy=false");
   assert.match(nav,/const from=activeViewKey\(\)/);
   assert.match(nav,/\['asset-detail','paper','more','market'\]\.includes\(v\)/);
   assert.match(nav,/viewContextUi\[v\]=\{returnView,navKey:returnNav,label:/);
   const back=block('function contextualBack(target','function contextBarHtml(target)');
   assert.match(back,/delete viewContextUi\[target\]/);
-  assert.match(back,/showSecondaryView\(ctx\?\.returnView\|\|fallbackView,ctx\?\.navKey\|\|fallbackNav,false\)/);
+  assert.match(back,/showSecondaryView\(ctx\?\.returnView\|\|fallbackView,ctx\?\.navKey\|\|fallbackNav,false(?:,ctx\?\.scrollY\|\|0)?\)/);
 });
 
 test('r78 Scanner to Forecast keeps selected asset and exposes a contextual return bar',()=>{

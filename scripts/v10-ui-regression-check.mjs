@@ -134,3 +134,17 @@ must(css.includes('.asset-toggle-actions button{min-height:44px;padding:0 7px}')
 must(css.includes('.depot-asset-card>summary{min-height:58px;padding:8px 9px}'),'Depot mobile card density guard missing');
 must(css.includes('.asset-pair-details>summary{min-height:60px;padding:8px}'),'Bot accordion mobile density guard missing');
 must(css.includes('.command-hub-card{min-height:52px;padding:7px 8px}'),'Command Hub mobile density guard missing');
+
+
+/* r82 permanent visual-interaction gates */
+must(String(release.dashboardShell||'').includes('VISUAL-INTERACTION-POLISH'),'dashboardShell must declare visual interaction polish');
+must(js.includes('function restoreViewport(y=0)'),'viewport restore helper missing');
+must(js.includes("scrollY:Math.max(0,Number(window.scrollY)||0)"),'secondary drill-down scroll capture missing');
+must(js.includes("false,ctx?.scrollY||0"),'contextual back scroll restore missing');
+must(js.includes("decorateA11y();restoreViewport(0)"),'primary tab navigation must reset viewport');
+must(css.includes('/* v10 r82 · visual + interaction polish */'),'r82 visual CSS block missing');
+must(css.includes('.section-title{display:flex;flex-direction:column;align-items:flex-start;gap:2px}'),'global mobile section-title collision guard missing');
+must(css.includes('.forecast-focus-head{display:grid;grid-template-columns:1fr;gap:6px}'),'Forecast focus narrow-screen stack missing');
+must(css.includes('.market-regime{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}'),'Market regime narrow-screen stack missing');
+must(css.includes('.scanner-summary{grid-template-columns:repeat(2,minmax(0,1fr))}'),'Scanner summary 2x2 phone layout missing');
+must(css.includes('html{scroll-padding-top:72px;scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))}'),'mobile scroll safe-area padding missing');
