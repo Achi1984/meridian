@@ -501,7 +501,7 @@ function portfolioChartHeroHtml(){
   return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div><div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div>'+chart+'</section>';
 }
 function bindCommandPortfolioHero(view){
-  $('[data-portfolio-range]',view).forEach(btn=>btn.addEventListener('click',()=>{
+  view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
     const next=String(btn.dataset.portfolioRange||'').toLowerCase();if(!PORTFOLIO_CHART_WINDOWS[next]||next===portfolioChartUi.range)return;
     portfolioChartUi.range=next;const current=$('.command-portfolio-hero',view);if(!current)return;
     const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();current.replaceWith(box.firstElementChild);bindCommandPortfolioHero(view);
