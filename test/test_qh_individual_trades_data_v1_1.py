@@ -31,7 +31,7 @@ class DataV11Tests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"t.zip";write_zip(p,"t.csv",rows);r=m.audit_trades(p)
-        self.assertEqual(r["rows"],2);self.assertTrue(r["tradeIdsContiguous"])
+        self.assertEqual(r["rows"],2);self.assertTrue(r["tradeIdsStrictlyIncreasing"]);self.assertEqual(r["tradeIdGapEvents"],0)
         self.assertEqual(r["emptyQuarterHourBins"],0);self.assertTrue(r["coveragePass"])
         self.assertNotIn("buy", "".join(r.keys()).lower())
         self.assertNotIn("sell", "".join(r.keys()).lower())
