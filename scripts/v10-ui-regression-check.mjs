@@ -259,7 +259,8 @@ must(js.includes("if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvar
 /* r90 permanent Command progressive-disclosure gates */
 must(String(release.dashboardShell||'').includes('COMMAND-PROGRESSIVE-DISCLOSURE'),'dashboardShell must declare Command progressive disclosure');
 must(js.includes('function dataGuardCard(compact=false)'),'Data Guard compact/full contract missing');
-must(js.includes('function walletDiscoveryLayer(){return walletDiscoveryLayerMode(false)}'),'Wallet discovery full contract missing');\nmust(js.includes('function walletDiscoveryLayerCompact(){return walletDiscoveryLayerMode(true)}'),'Wallet discovery compact contract missing');
+must(js.includes('function walletDiscoveryLayer(){return walletDiscoveryLayerMode(false)}'),'Wallet discovery full contract missing');
+must(js.includes('function walletDiscoveryLayerCompact(){return walletDiscoveryLayerMode(true)}'),'Wallet discovery compact contract missing');
 must(js.includes('guard.innerHTML=dataGuardCard(true)'),'Command must use compact Data Guard');
 must(js.includes('wallet.innerHTML=walletDiscoveryLayerCompact()'),'Command must use compact Wallet discovery');
 must(js.includes('command-next-decision command-next-action-open'),'Next Action critical-asset drilldown missing');
