@@ -190,4 +190,6 @@ must(qa.includes("['bots-bottom','bots',6000]"),'Bots bottom evidence capture mi
 must(qa.includes("['forecast-fib','market',1050]"),'Forecast FIB evidence capture missing');
 must(qa.includes("['forecast-bottom','market',6000]"),'Forecast bottom evidence capture missing');
 must(qa.includes("['scanner-bottom','research',6000]"),'Scanner bottom evidence capture missing');
-must(css.includes('#view-depot,#view-bots{padding-bottom:calc(96px + env(safe-area-inset-bottom))}'),'Depot/Bots bottom-nav clearance guard missing');
+must(js.includes('function visualQaVisible(el)'),'visibility-aware visual QA helper missing');
+must(js.includes("node.tagName==='DETAILS'&&!node.open"),'closed-details visibility exclusion missing');
+must(js.includes(".filter(visualQaVisible):[]"),'nav occlusion scan must ignore hidden details content');
