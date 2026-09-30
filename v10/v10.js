@@ -210,7 +210,7 @@ function nextAction(){
   const s=c.status,g=syncHealth();
   if(['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(s.code))return{title:'KEINE AKTION · DATEN PRÜFEN',detail:c.symbol+' · '+s.reason};
   if(s.code==='LIQ_RISK')return{title:c.symbol+' · LIQ-PUFFER PRÜFEN',detail:s.reason+' · Safety vor Profit-Lock'};
-  if(s.code==='PROTECTION_RISK')return{title:c.symbol+' · PROTECTION PRÜFEN',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
+  if(s.code==='PROTECTION_RISK')return{title:c.symbol+' · RISK REVIEW',detail:s.reason+' · Safety zuerst, nicht reflexartig komplett schließen'};
   if(!g.coverageComplete)return{title:'KEINE AKTION · DATEN PRÜFEN',detail:'BOT COVERAGE · '+g.matched+'/'+g.supported+' sicher gematcht · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')};
   if(s.code==='RISK_REVIEW')return{title:c.symbol+' · STRUCTURE REVIEW',detail:s.reason+' · MTF-Konflikt prüfen · keine automatische Exit-Freigabe'};
   if(s.code==='PROFIT_LOCK')return{title:c.symbol+' · PROFIT LOCK PRÜFEN',detail:s.reason+' · Teilgewinn/Reload-Reserve statt Komplettausstieg'};
@@ -1402,11 +1402,18 @@ function writeLocalVisualQaReport(cfg){
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
 }
+function writeLocalVisualQaError(cfg,error){
+  const report={build:BUILD,view:cfg?.view||'unknown',scroll:cfg?.scroll||0,ok:false,error:String(error?.stack||error?.message||error||'VISUAL_QA_ERROR').slice(0,1800)};
+  let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}
+  pre.textContent=JSON.stringify(report);document.documentElement.dataset.visualQaReady='fail';return report;
+}
 function renderLocalVisualQa(cfg){
-  $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
-  $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
-  renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
-  window.scrollTo(0,cfg.scroll);writeLocalVisualQaReport(cfg);
+  try{
+    $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
+    $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
+    renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
+    window.scrollTo(0,cfg.scroll);writeLocalVisualQaReport(cfg);
+  }catch(error){writeLocalVisualQaError(cfg,error)}
 }
 function activeViewKey(){return String($('.view.active')?.id||'view-command').replace(/^view-/,'')}
 function renderActiveView(active,force=true){
