@@ -355,3 +355,15 @@ must(js.includes("rows.map(row=>depotAssetCard(row,had?openAssets.has(row.symbol
 must(css.includes('#view-depot .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Depot compact two-column data state missing');
 must(css.includes('.depot-accounting-details>summary'),'Depot accounting disclosure styling missing');
 must(css.includes('#view-depot .depot-asset-card>summary{min-height:58px'),'Depot compact asset summary target missing');
+
+
+/* r98 permanent Bots overview-density gates */
+must(String(release.dashboardShell||'').includes('BOTS-OVERVIEW-DENSITY'),'dashboardShell must declare Bots overview density');
+must(js.includes("liveCards=syms.map(symbol=>pairCard(symbol,false,hadAssetAccordion?openAssets.has(symbol):false,true))"),'Bots asset cards must default closed while preserving explicit open state');
+must(js.includes("const riskCount=allSyms.filter(symbol=>botFilterMatch(symbol,'RISK')).length"),'Bots risk-count summary missing');
+must(js.includes("profitCount=allSyms.filter(symbol=>botFilterMatch(symbol,'PROFIT')).length"),'Bots profit-count summary missing');
+must(js.includes("hedgeCount=allSyms.filter(symbol=>botFilterMatch(symbol,'HEDGE')).length"),'Bots hedge-count summary missing');
+must(js.includes("'RISIKO '+riskCount+' · PROFIT '+profitCount+' · HEDGE '+hedgeCount"),'Bots filter-count summary missing');
+must(css.includes('#view-bots .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Bots compact data-state row missing');
+must(css.includes('#view-bots .asset-pair-details>summary{min-height:60px'),'Bots compact asset summary missing');
+must(css.includes('#view-bots .bot-filter-actions{width:100%;grid-template-columns:repeat(4,minmax(0,1fr))'),'Bots four-filter mobile row missing');
