@@ -21,7 +21,7 @@ const botRangeState=new Function(extract('botRangeState','botRangeSummary')+';re
 test('r71 release identity is execution-neutral and cache coherent',()=>{
   assert.equal(release.terminalBuild,'10.0-r71');
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r71-BOT-CONTROL-2');
+  assert.equal(release.dashboardShell,'10.0-r71-COMMAND-DEPOT-BOT-CONTROL-2');
   assert.match(root,/10\.0-r71-production/);
   assert.match(html,/10\.0-r71/);
   assert.match(v10,/const BUILD='10\.0-r71'/);
