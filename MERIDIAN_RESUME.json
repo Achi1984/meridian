@@ -1,14 +1,14 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r99",
+  "build": "10.0-r100",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "2d36fff70bd006976a2cc75a6d8feb6012728f9f",
+    "verifiedSha": "575c51abda11662c20babd81653bdd6b712697b5",
     "verifiedAt": "2026-09-30",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1420,11 +1420,41 @@
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r99",
-    "canonicalMainSha": "2d36fff70bd006976a2cc75a6d8feb6012728f9f",
-    "lastMergedPr": 403,
-    "status": "FORECAST_OVERVIEW_DENSITY_COMPLETE",
-    "nextAction": "Continue UI evolution with Scanner overview-density only after stream-safe v4 process hardening is merged.",
+    "terminalBuild": "10.0-r100",
+    "canonicalMainSha": "575c51abda11662c20babd81653bdd6b712697b5",
+    "lastMergedPr": 404,
+    "status": "SCANNER_PRIORITY_SURFACE_COMPLETE",
+    "completedSequence": [
+      "r93 COMMAND total-portfolio chart 1H/1D/1W",
+      "r94 server-side Ledger/OKX portfolio authority + canonical history",
+      "r95 history bootstrap UX",
+      "r96 COMMAND portfolio hero cleanup",
+      "r97 DEPOT overview density",
+      "r98 BOTS overview density",
+      "r99 FORECAST overview density",
+      "r100 SCANNER priority surface"
+    ],
+    "portfolioCheckpoint": {
+      "lastObservedTotalUsd": 35236.35,
+      "lastObservedLedgerUsd": 790.08,
+      "lastObservedOkxUsd": 116.3,
+      "lastObservedPionexUsd": 34329.97,
+      "portfolioReady": true,
+      "botReady": true,
+      "marketReady": true,
+      "historyStatus": "CANONICAL_HISTORY_BOOTSTRAPPING; chart populates only from strict-authority points"
+    },
+    "nextAction": "NEXT CHAT: reconcile latest main/CI first, verify live r100 UI and portfolio-history progression, then continue with the first incomplete UI milestone only. Do not repeat r93-r100 work.",
     "executionImpact": false
+  },
+  "chatHandoff": {
+    "updatedAt": "2026-09-30T21:49:00+02:00",
+    "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
+    "sourceOfTruth": "REPOSITORY_NOT_CHAT",
+    "protocol": "docs/AGENT_ORCHESTRATION.md",
+    "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
+    "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
+    "currentMainSha": "575c51abda11662c20babd81653bdd6b712697b5",
+    "currentBuild": "10.0-r100"
   }
 }
