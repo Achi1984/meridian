@@ -24,7 +24,10 @@ const cases=[
   ['flow-asset-return','depot',700,'asset-return'],
   ['flow-bot-toggle','bots',0,'bot-toggle'],
   ['flow-bot-filter-return','bots',0,'bot-filter-return'],
-  ['flow-scanner-forecast-return','research',520,'scanner-forecast-return']
+  ['flow-scanner-forecast-return','research',520,'scanner-forecast-return'],
+  ['data-command-stale','command',0,null,'stale'],
+  ['data-bots-error','bots',0,null,'error'],
+  ['flow-stale-recovery','command',0,'stale-recovery','stale']
 ];
 
 function decodeText(s){
@@ -50,8 +53,8 @@ function runChrome(name,kind,url,extra=[]){
 
 const summaries=[];
 for(let i=0;i<cases.length;i++){
-  const [name,view,scroll,flow]=cases[i],png=path.join(OUT,name+'.png'),url=new URL(base);
-  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build',revision);if(flow)url.searchParams.set('qaFlow',flow);
+  const [name,view,scroll,flow,dataMode]=cases[i],png=path.join(OUT,name+'.png'),url=new URL(base);
+  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build',revision);if(flow)url.searchParams.set('qaFlow',flow);if(dataMode)url.searchParams.set('qaData',dataMode);
 
   // Chrome does not reliably emit --dump-dom when screenshot capture is requested in the same process.
   // Keep layout evaluation and evidence capture as separate deterministic invocations.
