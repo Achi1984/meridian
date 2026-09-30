@@ -380,3 +380,11 @@ must(js.includes("forecastContextHtml(fibUi.symbol)+technical+fibMapHtml()+tape"
 must(css.includes('#view-market .data-state-items{grid-template-columns:1fr'),'Forecast compact data state missing');
 must(css.includes('.market-tech-details>summary,.market-tape-details>summary'),'Forecast disclosure touch surface missing');
 must(css.includes('#view-market .forecast-focus-head b{font-size:18px'),'Forecast dominant focus typography missing');
+
+
+/* r99 QA determinism guard */
+{
+  const a=js.indexOf("}else if(cfg.flow==='bot-toggle'){"),b=js.indexOf("}else if(cfg.flow==='bot-filter-return'){",a),block=js.slice(a,b);
+  must(a>=0&&b>a,'bot-toggle visual QA block missing');
+  must(!block.includes('await visualQaSettle()'),'bot-toggle visual QA must not depend on RAF after synchronous details mutation');
+}
