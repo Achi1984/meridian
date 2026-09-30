@@ -1,4 +1,4 @@
-/* MERIDIAN v8.0 R1 — customer-first PAPER summary. Presentation only. */
+// LEGACY NON-AUTHORITATIVE: v8 Paper WATCH/WATCH+ presentation heuristic only.\n// Production v10 research/runtime decisions must use canonical research modules and lifecycle-aware forward evidence.\n/* MERIDIAN v8.0 R1 — customer-first PAPER summary. Presentation only. */
 (function(){
   'use strict';
   const VERSION='8.0';
