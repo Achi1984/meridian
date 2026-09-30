@@ -14,12 +14,14 @@ function renderBlock(){
   return js.slice(start,end);
 }
 
-test('r99 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r99');
+test('r99 Forecast overview-density contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=99,'expected r99 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/FORECAST-OVERVIEW-DENSITY/);
-  assert.equal(manifest.start_url,'./v10/?build=r99&fresh=r99');
-  assert.ok(js.includes("const BUILD='10.0-r99'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r99 makes selected Forecast focus and Fib map the primary visible surfaces',()=>{
