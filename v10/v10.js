@@ -586,9 +586,9 @@ function renderCommand(force=false){
   const action=$('.command-action',view);if(action)action.remove(); // NEXT ACTION is consolidated in the r80 Command Action Hub.
   const live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;
   wrap.insertAdjacentElement('afterend',liveNode);
-  const guard=document.createElement('div');guard.innerHTML=dataGuardCard();liveNode.insertAdjacentElement('afterend',guard.firstElementChild);
-  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);guard.firstElementChild.insertAdjacentElement('afterend',account.firstElementChild);
-  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();account.firstElementChild.insertAdjacentElement('afterend',wallet.firstElementChild);
+  const guard=document.createElement('div');guard.innerHTML=dataGuardCard();const guardNode=guard.firstElementChild;if(guardNode)liveNode.insertAdjacentElement('afterend',guardNode);
+  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)(guardNode||liveNode).insertAdjacentElement('afterend',accountNode);
+  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer();const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode).insertAdjacentElement('afterend',walletNode);
   for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
   bindCommandActionHub(view);
@@ -1396,8 +1396,9 @@ function writeLocalVisualQaReport(cfg){
   const overflow=keys.flatMap(sel=>[...active.querySelectorAll(sel)].filter(el=>el.scrollWidth>el.clientWidth+2).map(el=>sel+':'+Math.ceil(el.scrollWidth-el.clientWidth)));
   const shortButtons=[...active.querySelectorAll('button')].filter(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<42}).map(b=>(b.textContent||b.getAttribute('aria-label')||'button').trim().slice(0,40));
   const nav=$('#nav')?.getBoundingClientRect(),root=document.documentElement;
-  const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,viewport:{w:innerWidth,h:innerHeight},documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
-  report.ok=!report.bodyOverflow&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&report.navInside;
+  const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===390&&viewport.h===844;
+  const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,viewport,viewportMatch,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
+  report.ok=viewportMatch&&!report.bodyOverflow&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&report.navInside;
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
