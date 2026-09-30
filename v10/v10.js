@@ -1466,4 +1466,11 @@ window.addEventListener('meridian:view',()=>schedule(true));
 new MutationObserver(()=>schedule(false)).observe($('#app')||document.body,{childList:true,subtree:true});
 bindV10NavigationAuthority();bindRefreshControl();
 const visualQa=applyLocalVisualQaFixture();
-if(visualQa)renderLocalVisualQa(visualQa);else decorate();
+if(visualQa){
+  try{renderLocalVisualQa(visualQa)}
+  catch(err){
+    let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}
+    pre.textContent=JSON.stringify({build:BUILD,view:visualQa.view,scroll:visualQa.scroll,ok:false,error:String(err?.stack||err?.message||err)});
+    document.documentElement.dataset.visualQaReady='error';
+  }
+}else decorate();
