@@ -422,7 +422,7 @@ must(js.includes('class="portfolio-integrity-strip"'),'portfolio integrity strip
 must(js.includes('data-history-points='),'strict history point telemetry missing');
 for(const key of ['1h','1d','1w'])must(js.includes("rangeCard('"+key+"')"),'history integrity range missing: '+key);
 must(js.includes('data-history-ready='),'history readiness telemetry missing');
-must(js.includes('STRICT_AUTHORITY · '),'strict authority provenance missing from integrity strip');
+must(js.includes('STRICT HISTORY'),'strict history integrity label missing');
 must(js.includes('portfolioHistoryIntegrityHtml()+chart'),'integrity strip must stay adjacent to portfolio chart');
 must(css.includes('/* v10 r102 · live + history integrity */'),'r102 history-integrity CSS block missing');
 must(css.includes('.portfolio-integrity-strip{'),'portfolio integrity layout missing');
