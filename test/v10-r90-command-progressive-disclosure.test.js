@@ -23,7 +23,9 @@ test('r90 Next Action owns the critical-asset drilldown without a duplicate crit
 
 test('r90 Command uses compact Data Guard and wallet discovery',()=>{
   assert.match(js,/function dataGuardCard\(compact=false\)/);
-  assert.match(js,/function walletDiscoveryLayer\(\)/);\n  assert.match(js,/function walletDiscoveryLayerCompact\(\)/);\n  assert.match(js,/function walletDiscoveryLayerMode\(compact=false\)/);
+  assert.match(js,/function walletDiscoveryLayer\(\)/);
+  assert.match(js,/function walletDiscoveryLayerCompact\(\)/);
+  assert.match(js,/function walletDiscoveryLayerMode\(compact=false\)/);
   assert.match(js,/guard\.innerHTML=dataGuardCard\(true\)/);
   assert.match(js,/wallet\.innerHTML=walletDiscoveryLayerCompact\(\)/);
   assert.match(js,/v10-command-tech-details/);
