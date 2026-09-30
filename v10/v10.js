@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r87';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r87';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r87';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r87';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r87';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r87';
-// MERIDIAN v10 r87 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r88';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r88';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r88';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r88';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r88';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r88';
+// MERIDIAN v10 r88 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r87';
+const BUILD='10.0-r88';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -1366,8 +1366,27 @@ function renderLab(){
 function localVisualQaConfig(){
   if(!['127.0.0.1','localhost'].includes(location.hostname))return null;
   const q=new URLSearchParams(location.search);if(q.get('visualQa')!=='1')return null;
-  const allowed=['command','depot','bots','market','research'],flows=['primary-reset','asset-return','bot-toggle','bot-filter-return','scanner-forecast-return'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0)),flow=flows.includes(q.get('qaFlow'))?q.get('qaFlow'):null;
-  return{view,scroll,flow};
+  const allowed=['command','depot','bots','market','research'],flows=['primary-reset','asset-return','bot-toggle','bot-filter-return','scanner-forecast-return','stale-recovery'],dataModes=['fresh','stale','error'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0)),flow=flows.includes(q.get('qaFlow'))?q.get('qaFlow'):null,dataMode=dataModes.includes(q.get('qaData'))?q.get('qaData'):'fresh';
+  return{view,scroll,flow,dataMode};
+}
+function setLocalVisualQaDataMode(mode,s=S(),now=Date.now()){
+  if(!s)return;
+  const staleAt=now-20*60*1000,setTimes=ts=>{
+    s.botFeedUpdatedAt=ts;s.syncedAt=ts;s.marketSyncedAt=ts;s.marketPriceSyncedAt=ts;
+    Object.values(s.assetIntel||{}).forEach(x=>{if(x)x.updatedAt=ts});
+    Object.values(s.priceChecks||{}).forEach(x=>{if(x)x.updatedAt=ts});
+    if(s.pionexAccount){s.pionexAccount.updatedAt=new Date(ts).toISOString();s.pionexAccount.snapshotAt=new Date(ts).toISOString()}
+  };
+  if(mode==='stale'){
+    setTimes(staleAt);s.botFeedTimestampTrusted=true;s.botFeedStatus='WALLET_DETAIL_OK';s.source='STALE';s.marketError=null;s.marketPriceError=null;
+    s.pionexBotSync={status:'OK',diagnostics:{listRows:Number(s.bots?.length||0)}};s.pionexAccountSync={status:'OK'};return;
+  }
+  if(mode==='error'){
+    setTimes(staleAt);s.botFeedTimestampTrusted=true;s.botFeedStatus='ERROR';s.source='ERROR';s.error='VISUAL_QA_FORCED_ERROR';s.marketError='VISUAL_QA_FORCED_ERROR';s.marketPriceError='VISUAL_QA_FORCED_ERROR';
+    s.pionexBotSync={status:'ERROR',error:'VISUAL_QA_FORCED_ERROR',diagnostics:{listRows:Number(s.bots?.length||0)}};s.pionexAccountSync={status:'ERROR'};return;
+  }
+  setTimes(now);s.botFeedTimestampTrusted=true;s.botFeedStatus='WALLET_DETAIL_OK';s.source='FRESH';s.error=null;s.marketError=null;s.marketPriceError=null;
+  s.pionexBotSync={status:'OK',diagnostics:{listRows:Number(s.bots?.length||0)}};s.pionexAccountSync={status:'OK'};
 }
 function applyLocalVisualQaFixture(){
   const cfg=localVisualQaConfig(),s=S();if(!cfg||!s)return null;
@@ -1387,6 +1406,7 @@ function applyLocalVisualQaFixture(){
   s.portfolio={complete:false,total:null,ledgerAutoUsd:null,ledgerAutoActive:false,ledgerAutoRows:0,ledgerAssets:[],okxVenueUsd:null,pionex:34705.93,pionexSource:'VISUAL_QA_FIXTURE'};
   s.pionexAccount={updatedAt:new Date(now).toISOString(),snapshotAt:new Date(now).toISOString(),walletStatus:'OK',spotBalances:[{coin:'USDT',free:33.01,frozen:0,debts:0},{coin:'BTC',free:.0000011,frozen:0,debts:0},{coin:'SOL',free:.00074,frozen:0,debts:0},{coin:'LINK',free:.0043,frozen:0,debts:0},{coin:'AVAX',free:.0024,frozen:0,debts:0}],futuresBalances:[],futuresPositions:[{asset:'SUI',symbol:'SUI_USDT_PERP',side:'LONG',leverage:3,markPrice:1.15,avgPrice:1.12,liquidationPrice:.66,unrealizedPnl:12.34,netSize:7689,positionAmt:1}],wallet:{prices:Object.fromEntries(universe.map(x=>[x,{priceInUsd:prices[x]||1}]))}};
   s.pionexBotSync={status:'OK',diagnostics:{listRows:s.bots.length}};s.pionexAccountSync={status:'OK'};
+  setLocalVisualQaDataMode(cfg.dataMode,s,now);
   fibUi.symbol='BTC';fibUi.mode='MANUAL';fibUi.manualLow=74896.6;fibUi.manualHigh=87374.3;fibUi.direction='UP';
   window.MERIDIAN_VISUAL_QA=true;
   return cfg;
@@ -1414,10 +1434,11 @@ function writeLocalVisualQaReport(cfg){
   const forecastFibInvariant=cfg.view!=='market'||(!!active.querySelector('.fib-map-shell')&&!!active.querySelector('.fib-output'));
   const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top+1;
   const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')].filter(visualQaVisible):[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
+  const dataStates=Object.fromEntries([...active.querySelectorAll('.data-state-item')].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()])),dataStateInvariant=cfg.dataMode==='stale'?dataStates.BOTS==='REF'&&dataStates.MARKET==='STALE':cfg.dataMode==='error'?dataStates.BOTS==='ERROR'&&dataStates.MARKET==='STALE':true;
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===390&&viewport.h===844;
-  const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,forecastFibInvariant,nearBottom,bottomClearance,commandHubCards,botSummaryCount:botSummaries.length};
-  const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
-  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&!report.bodyOverflow&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
+  const layout={scannerActionsSameRow,commandHubInvariant,botAccordionInvariant,forecastFibInvariant,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
+  const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,dataStates,viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
+  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!navOcclusions.length&&report.navInside;
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
@@ -1428,7 +1449,7 @@ function writeLocalVisualQaError(cfg,error){
   pre.textContent=JSON.stringify(report);document.documentElement.dataset.visualQaReady='fail';return report;
 }
 function writeLocalInteractionQaReport(cfg,checks){
-  const finalView=activeViewKey(),report={build:BUILD,flow:cfg.flow,view:cfg.view,finalView,scroll:cfg.scroll,actualScroll:Math.round(scrollY),checks,ok:Object.values(checks).every(Boolean)};
+  const finalView=activeViewKey(),report={build:BUILD,flow:cfg.flow,view:cfg.view,finalView,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,checks,ok:Object.values(checks).every(Boolean)};
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}
   pre.textContent=JSON.stringify(report);document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';return report;
 }
@@ -1494,6 +1515,18 @@ async function runLocalInteractionQa(cfg){
       checks.scannerRestored=activeViewKey()==='research';
       checks.scannerNavActive=$('#nav button[data-v="research"]')?.classList.contains('active')===true;
       checks.scrollRestored=Math.abs(Math.round(scrollY)-origin)<=8;
+    }else if(cfg.flow==='stale-recovery'){
+      const labels=()=>Object.fromEntries([...$('#view-command')?.querySelectorAll('.data-state-item')||[]].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()]));
+      const before=labels();
+      checks.startsStale=before.BOTS==='REF'&&before.MARKET==='STALE';
+      checks.headersStale=String($('#data-status')?.textContent||'').includes('BOT REF')&&String($('#market-status')?.textContent||'').includes('MKT STALE');
+      checks.failClosedBefore=!!$('#view-command .blocked-critical');
+      setLocalVisualQaDataMode('fresh',S(),Date.now());
+      renderActiveView('command',true);renderSystemHeader();decorateA11y();await visualQaSettle();
+      const after=labels();
+      checks.botRecovered=after.BOTS==='READY';
+      checks.marketRecovered=after.MARKET==='READY';
+      checks.headersRecovered=String($('#data-status')?.textContent||'').includes('BOT READY')&&String($('#market-status')?.textContent||'').includes('MKT READY');
     }else checks.knownFlow=false;
     writeLocalInteractionQaReport(cfg,checks);
   }catch(error){writeLocalVisualQaError(cfg,error)}
