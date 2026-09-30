@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r82';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r82';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r82';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r82';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r82';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r82';
-// MERIDIAN v10 r82 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r83';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r83';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r83';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r83';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r83';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r83';
+// MERIDIAN v10 r83 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r82';
+const BUILD='10.0-r83';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -1363,6 +1363,51 @@ function renderLab(){
   const nextNote='<b>VALIDATION LADDER</b><small>Discovery PASS ≠ bestätigtes Edge. Deep-Audit r20 korrigiert Accounting/Lookahead; frühere TSMOM/SK-Ergebnisse müssen neu gerechnet werden. Holdout muss unabhängig bestehen; danach höchstens Paper-Shadow/Forward-Test, nie Auto-Promotion.</small>';
   if(note&&note.innerHTML!==nextNote)note.innerHTML=nextNote;
 }
+function localVisualQaConfig(){
+  if(!['127.0.0.1','localhost'].includes(location.hostname))return null;
+  const q=new URLSearchParams(location.search);if(q.get('visualQa')!=='1')return null;
+  const allowed=['command','depot','bots','market','research'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0));
+  return{view,scroll};
+}
+function applyLocalVisualQaFixture(){
+  const cfg=localVisualQaConfig(),s=S();if(!cfg||!s)return null;
+  const now=Date.now(),prices={BTC:83747.5,ETH:2689.1,SOL:122.05,XRP:1.5243,HBAR:.09397,PEPE:.0000043853,DOT:1.242,ADA:.414,SUI:1.15,AVAX:16.8,LINK:13.9,XLM:.291,TRX:.337,WIF:.76,INJ:7.82};
+  const refs=Array.isArray(s.referenceBots)?s.referenceBots:[];
+  s.bots=refs.map((b,i)=>({...b,_liveMatched:true,_livePrice:true,_livePnl:true,_liveInvest:true,_liveInvestUsd:true,_apiNativeIdentity:true,price:prices[b.symbol]||Number(b.price)||1,pnlUsd:Number(((i%5)-2)*25.33).toFixed(2),investUsd:Number((180+i*37.5).toFixed(2)),gridCount:Number(b.gridCount||180+(i%7)*31)}));
+  s.liveRows=s.bots.length;s.botApiRows=s.bots.length;s.botSupportedRows=s.bots.length;s.botDetailRows=s.bots.length;s.botDetailsComplete=true;s.unmatchedLive=[];s.matchAmbiguous=0;s.botIdentityMode='API_NATIVE';s.apiNativeRows=s.bots.length;
+  s.botFeedUpdatedAt=now;s.botFeedTimestampTrusted=true;s.botFeedSource='VISUAL_QA_FIXTURE';s.botFeedStatus='WALLET_DETAIL_OK';s.source='FRESH';s.error=null;s.syncedAt=now;
+  const universe=['BTC','ETH','SOL','XRP','HBAR','PEPE','LINK','AVAX','SUI','ADA','DOT','XLM','TRX','WIF','INJ'];
+  s.assetIntel={};s.priceChecks={};
+  universe.forEach((symbol,i)=>{
+    const price=prices[symbol]||1,bull=i%3!==1,bullish=bull?7:4,bearish=bull?3:7,ema50=price*.94,ema20=price*(bull?0.98:1.02);
+    s.assetIntel[symbol]={symbol,price,source:'VISUAL_QA',updatedAt:now,rsi15:54+(i%8),rsi1h:bull?58+(i%5):44-(i%3),rsi4:bull?55+(i%4):46-(i%3),rsi1d:52+(i%7),ema20,ema50,atr:price*.012,macd1h:{hist:bull?31.2+i:-22.4-i},macd4:{hist:bull?18.1+i:-28.9-i},bullish,bearish,score:bull?80:58,status:bull?'RE-ENTRY READY':'WATCH',near:{f:.382,price:price*.986},longReasons:['Momentum bestätigt','EMA-Struktur positiv'],shortReasons:['MTF Gegenprüfung aktiv']};
+    s.priceChecks[symbol]={okx:price,binance:price*1.0003,verified:true,updatedAt:now};
+  });
+  s.intel=s.assetIntel.BTC;s.marketSyncedAt=now;s.marketPriceSyncedAt=now;s.marketTransport='VISUAL_QA';s.marketError=null;s.marketPriceError=null;
+  s.portfolio={complete:false,total:null,ledgerAutoUsd:null,ledgerAutoActive:false,ledgerAutoRows:0,ledgerAssets:[],okxVenueUsd:null,pionex:34705.93,pionexSource:'VISUAL_QA_FIXTURE'};
+  s.pionexAccount={spotBalances:[{coin:'USDT',free:33.01,frozen:0,debts:0},{coin:'BTC',free:.0000011,frozen:0,debts:0},{coin:'SOL',free:.00074,frozen:0,debts:0},{coin:'LINK',free:.0043,frozen:0,debts:0},{coin:'AVAX',free:.0024,frozen:0,debts:0}],futuresBalances:[],futuresPositions:[{asset:'SUI',symbol:'SUI_USDT_PERP',positionAmt:1}],wallet:{prices:Object.fromEntries(universe.map(x=>[x,{priceInUsd:prices[x]||1}]))}};
+  s.pionexBotSync={status:'OK',diagnostics:{listRows:s.bots.length}};s.pionexAccountSync={status:'OK'};
+  fibUi.symbol='BTC';fibUi.mode='MANUAL';fibUi.manualLow=74896.6;fibUi.manualHigh=87374.3;fibUi.direction='UP';
+  window.MERIDIAN_VISUAL_QA=true;
+  return cfg;
+}
+function writeLocalVisualQaReport(cfg){
+  const active=$('#view-'+cfg.view),keys=['.v10-mode-banner','.data-state-strip','.section-title','.command-action-grid','.depot-venue-grid','.bot-filter-bar','.forecast-focus-head','.market-regime','.scanner-summary','.fib-map-shell'];
+  const overflow=keys.flatMap(sel=>[...active.querySelectorAll(sel)].filter(el=>el.scrollWidth>el.clientWidth+2).map(el=>sel+':'+Math.ceil(el.scrollWidth-el.clientWidth)));
+  const shortButtons=[...active.querySelectorAll('button')].filter(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<42}).map(b=>(b.textContent||b.getAttribute('aria-label')||'button').trim().slice(0,40));
+  const nav=$('#nav')?.getBoundingClientRect(),root=document.documentElement;
+  const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,viewport:{w:innerWidth,h:innerHeight},documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
+  report.ok=!report.bodyOverflow&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&report.navInside;
+  let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
+  document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
+  return report;
+}
+function renderLocalVisualQa(cfg){
+  $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
+  $('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
+  renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{window.scrollTo(0,cfg.scroll);requestAnimationFrame(()=>writeLocalVisualQaReport(cfg))}));
+}
 function activeViewKey(){return String($('.view.active')?.id||'view-command').replace(/^view-/,'')}
 function renderActiveView(active,force=true){
   if(active==='command')return renderCommand(force);
@@ -1420,4 +1465,5 @@ window.addEventListener('meridian:data',()=>{
 window.addEventListener('meridian:view',()=>schedule(true));
 new MutationObserver(()=>schedule(false)).observe($('#app')||document.body,{childList:true,subtree:true});
 bindV10NavigationAuthority();bindRefreshControl();
-decorate();
+const visualQa=applyLocalVisualQaFixture();
+if(visualQa)renderLocalVisualQa(visualQa);else decorate();
