@@ -276,3 +276,12 @@ must(js.includes("<span>LIVE DATA</span>"),'Command LIVE DATA KPI missing');
 must(js.includes('function commandDataDisclosure()'),'Command source disclosure renderer missing');
 must(js.includes('source.innerHTML=commandDataDisclosure()'),'Command source details must be collapsed by default');
 must(css.includes('.command-source-details>summary'),'Command source disclosure styling missing');
+
+
+/* r92 permanent Command decision-flow gates */
+must(String(release.dashboardShell||'').includes('COMMAND-DECISION-FLOW'),'dashboardShell must declare Command decision flow');
+must(js.includes('function commandAttentionHtml()'),'Command Attention standalone renderer missing');
+must(js.includes("attentionWrap.innerHTML=commandAttentionHtml()"),'Command Attention must render after Next/Open');
+must(js.includes("hubNode.insertAdjacentElement('afterend',attentionNode)"),'Command Attention ordering must follow Next/Open');
+must(js.includes('command-position-details'),'Command Account Futures disclosure missing');
+must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
