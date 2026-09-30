@@ -15,13 +15,15 @@ function block(start,end){
   return js.slice(a,b);
 }
 
-test('r80 release identity remains execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r80');
+test('r80 trust semantic contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=80,'expected r80 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
-  assert.match(release.dashboardShell,/TRUST-SEMANTIC-CONSISTENCY/);
-  assert.equal(manifest.start_url,'./v10/?build=r80&fresh=r80');
-  assert.match(html,/10\.0-r80/);
-  assert.match(js,/const BUILD='10\.0-r80'/);
+  assert.match(String(release.dashboardShell||''),/TRUST-SEMANTIC-CONSISTENCY/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.match(html,new RegExp(release.terminalBuild.replaceAll('.','\\.')));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r80 canonicalizes BTC market intelligence across Forecast and Scanner',()=>{

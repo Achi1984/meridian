@@ -962,3 +962,35 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .market-regime{align-items:flex-start}.market-regime>strong{max-width:48%;font-size:9px}
   #view-market .fib-output{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
 }
+
+
+/* v10 r81 · mobile density v2 */
+@media(max-width:430px){
+  .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .data-state-item{padding:6px 7px}
+  .data-state-item:only-child,.data-state-item:last-child:nth-child(odd){grid-column:1/-1}
+  .data-state-item>small{font-size:6.5px;line-height:1.25}
+  .scanner-toolbar{gap:7px;padding:7px 8px}
+  .scanner-toolbar>div:first-child{width:100%}
+  .scanner-toolbar small{max-width:none}
+  .scanner-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:6px}
+  .scanner-toolbar-actions button{width:auto;min-height:44px;padding:0 7px}
+  .bot-filter-bar{flex-direction:column;align-items:stretch;gap:6px;padding:7px 8px}
+  .bot-filter-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+  .bot-filter-actions button{min-width:0;min-height:44px;padding:0 4px}
+  .depot-assets-head,.asset-overview-head{margin-top:8px;gap:7px}
+  .depot-assets-head .asset-toggle-actions,.asset-overview-head .asset-toggle-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .asset-toggle-actions button{min-height:44px;padding:0 7px}
+  .depot-asset-card>summary{min-height:58px;padding:8px 9px}
+  .depot-asset-id>b{font-size:18px}
+  .depot-asset-stack,.asset-accordion-stack{gap:6px}
+  .asset-pair-details>summary{min-height:60px;padding:8px}
+  .asset-glance>span,.depot-asset-glance span{padding:5px}
+  .command-action-grid{gap:5px}
+  .command-hub-card{min-height:52px;padding:7px 8px}
+}
+@media(max-width:390px){
+  .scanner-toolbar-actions{grid-template-columns:1fr 1fr}
+  .scanner-toolbar button{width:auto}
+  .bot-filter-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
