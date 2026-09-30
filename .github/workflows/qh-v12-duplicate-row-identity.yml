@@ -1,0 +1,50 @@
+name: MERIDIAN QH V1.2 Duplicate Row Identity
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-DATA-V1-2-DUPLICATE-ROW-IDENTITY-DIAGNOSTIC.md"
+      - "scripts/diagnose-qh-v12-duplicate-row-identity.py"
+      - "test/test_qh_v12_duplicate_row_identity.py"
+      - ".github/workflows/qh-v12-duplicate-row-identity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-v12-duplicate-row-identity-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify diagnostic invariants
+        run: python3 test/test_qh_v12_duplicate_row_identity.py
+
+  diagnostic:
+    needs: invariants
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        asset: [ETHUSDT, XRPUSDT, ADAUSDT]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_OUTPUT_DIR: research/results/qh-v12-aug-duplicate-row-identity
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect duplicate trade-ID row identity
+        run: python3 scripts/diagnose-qh-v12-duplicate-row-identity.py
+      - name: Upload compact row-identity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v12-duplicate-row-identity-${{ matrix.asset }}
+          path: research/results/qh-v12-aug-duplicate-row-identity/*.json
+          if-no-files-found: error
