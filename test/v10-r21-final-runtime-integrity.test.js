@@ -45,7 +45,9 @@ test('r21 stale SCANNER diagnostics are visible but actions and ranking are bloc
   assert.match(block,/fresh=intelFresh\(i\)/);
   assert.match(block,/scan-stale/);
   assert.match(block,/REFERENCE ONLY/);
-  assert.match(block,/RAW PRESSURE <b>'\+\(fresh\?sig\.score\+'\/9':'—'\)/);
+  assert.match(block,/OPPORTUNITY QUALITY/);
+  assert.match(block,/ctx\.available\?ctx\.score\+'\/100':'—'/);
+  assert.match(v10,/if\(!i\|\|!intelFresh\(i\)\)return\{available:false,score:0/);
   assert.match(block,/LONG VIEW <b>'\+\(fresh\?esc\(i\.longAction\):'BLOCKED'\)/);
   assert.match(block,/SHORT VIEW <b>'\+\(fresh\?esc\(i\.shortAction\):'BLOCKED'\)/);
 });
