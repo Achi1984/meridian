@@ -356,7 +356,9 @@ function walletDiscoveryHealth(){
   const label=status==='OK'?(fresh?'LIVE':'STALE'):status==='ERROR'?'ERROR':'WAIT',tone=label==='LIVE'?'safe':label==='ERROR'?'danger':'watch';
   return{status,label,tone,wallet,probe:account?.walletBotProbe||null,risk:account?.walletBotRisk||null,fresh,age,error:account?.walletError||null};
 }
-function walletDiscoveryLayer(compact=false){
+function walletDiscoveryLayer(){return walletDiscoveryLayerMode(false)}
+function walletDiscoveryLayerCompact(){return walletDiscoveryLayerMode(true)}
+function walletDiscoveryLayerMode(compact=false){
   const w=walletDiscoveryHealth(),rows=Array.isArray(w.wallet?.botCategories)?w.wallet.botCategories:[],probe=w.probe||{},risk=w.risk||{},h=H();
   const walletAmount=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
   const walletTotal=walletAmount(w.wallet?.totalInUsdt),botTotal=walletAmount(w.wallet?.botAccountTotalInUsdt),traderTotal=walletAmount(w.wallet?.traderAccountTotalInUsdt);
@@ -452,7 +454,7 @@ function commandOverviewHtml(){
 function commandActionHubHtml(){
   const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=paperReadiness(),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null,next=nextAction();
   const item=(target,kicker,label,detail,tone='muted')=>'<button type="button" class="command-hub-card tone-'+esc(tone)+'" data-command-go="'+esc(target)+'"><span>'+esc(kicker)+'</span><b>'+esc(label)+'</b><small>'+esc(detail)+'</small></button>';
-  const nextHtml=asset?'<button type="button" class="command-next-decision command-next-action-open" data-command-asset="'+esc(asset)+'"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></button>':'<div class="command-next-decision"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></div>';
+  const nextHtml=asset?'<button type="button" class="command-next-decision command-next-action-open" data-command-asset="'+esc(asset)+'" aria-label="CRITICAL ASSET '+esc(asset)+' · '+esc(crit.status.label)+'"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></button>':'<div class="command-next-decision"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></div>';
   return '<section class="command-action-hub"><div class="section-title"><h2>NEXT / OPEN</h2><small>Priorität + Navigation · read-only · keine Trading-Aktion</small></div>'+nextHtml+'<div class="command-action-grid">'+
     item('depot','DEPOT',p.label,p.detail,p.tone)+
     item('bots','BOT CONTROL',b.label,b.detail,b.tone)+
@@ -598,7 +600,7 @@ function renderCommand(force=false){
   wrap.insertAdjacentElement('afterend',liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true);const guardNode=guard.firstElementChild;if(guardNode)liveNode.insertAdjacentElement('afterend',guardNode);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)(guardNode||liveNode||wrap).insertAdjacentElement('afterend',accountNode);
-  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayer(true);const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode||wrap).insertAdjacentElement('afterend',walletNode);
+  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayerCompact();const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode||wrap).insertAdjacentElement('afterend',walletNode);
   for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
   bindCommandActionHub(view);
