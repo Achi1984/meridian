@@ -393,8 +393,8 @@ must(css.includes('#view-market .forecast-focus-head b{font-size:18px'),'Forecas
 /* r100 permanent Scanner priority-surface gates */
 must(String(release.dashboardShell||'').includes('SCANNER-PRIORITY-SURFACE'),'dashboardShell must declare Scanner priority surface');
 must(js.includes('function scannerLeaderCard(symbol)'),'Scanner leader renderer missing');
-must(js.includes('TOP MARKET CONTEXT'),'Scanner top-context label missing');
-must(js.includes("top=fresh.slice(0,3),leader=top[0]||null,next=top.slice(1),rest=fresh.slice(3)"),'Scanner leader/next/remainder partition missing');
+must(js.includes('TOP MARKET CONTEXTS · PRIORITY 1'),'Scanner top-context label missing');
+must(js.includes("top=fresh.slice(0,4),leader=top[0]||null,next=top.slice(1,3),rest=[...top.slice(3),...fresh.slice(4)]"),'Scanner leader/next/remainder partition missing');
 must(js.includes("leaderHtml=leader?scannerLeaderCard(leader)"),'Scanner leader composition missing');
 must(js.includes('NÄCHSTE KONTEXTE'),'Scanner next-context surface missing');
 must(js.includes("Quality ist Markt-Kontext, keine Renditeprognose"),'Scanner context disclaimer missing');
