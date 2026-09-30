@@ -48,5 +48,6 @@ test('r92 decision-flow adapter remains presentation-only',()=>{
 test('r92 interaction QA gives asynchronous flows the full iframe settle window',()=>{
   const qa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
   assert.match(qa,/virtualBudget=name\.startsWith\('flow-'\)\?5200:2600/);
-  assert.match(qa,/--virtual-time-budget='\+virtualBudget/);
+  assert.match(qa,/effectiveVirtualBudget=name\.startsWith\('flow-'\)\?8000:virtualBudget/);
+  assert.match(qa,/--virtual-time-budget='\+effectiveVirtualBudget/);
 });
