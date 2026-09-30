@@ -267,3 +267,14 @@ must(js.includes('command-next-decision command-next-action-open'),'Next Action 
 must(!js.includes('class="command-hub-card command-hub-critical'),'duplicate Command critical-asset card must stay removed');
 must(css.includes('.v10-command-tech-details>summary'),'Command technical disclosure styling missing');
 must(css.includes('min-height:44px'),'touch target floor missing');
+
+
+/* r91 permanent Command above-fold priority gates */
+must(String(release.dashboardShell||'').includes('COMMAND-ABOVE-FOLD-PRIORITY'),'dashboardShell must declare Command above-fold priority');
+must(js.includes('function commandAttentionHtml()'),'Command Attention standalone renderer missing');
+must(js.includes('function commandDataDetails()'),'Command Data Sources disclosure missing');
+must(js.includes("source.innerHTML=commandDataDetails()"),'Command must render collapsed Data Sources disclosure');
+must(js.includes("attentionWrap.innerHTML=commandAttentionHtml()"),'Command must place standalone Attention after Next/Open');
+must(js.includes('command-position-details'),'Command Account Futures disclosure missing');
+must(css.includes('.command-source-details>summary'),'Command Data Sources disclosure styling missing');
+must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
