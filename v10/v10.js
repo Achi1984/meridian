@@ -367,6 +367,57 @@ function depotAssetRows(){
   for(const symbol of symbols()){const x=map.get(symbol)||{symbol,sources:[],valueUsd:0,valueKnown:false,botCount:0};x.botCount=matchedRows(symbol).length;map.set(symbol,x)}
   return [...map.values()].sort((a,b)=>(b.valueKnown?b.valueUsd:-1)-(a.valueKnown?a.valueUsd:-1)||b.botCount-a.botCount||a.symbol.localeCompare(b.symbol));
 }
+function assetDetailButton(symbol,label='ASSET DETAIL'){
+  return '<button type="button" class="asset-detail-open" data-asset-detail="'+esc(symbol)+'">'+esc(label)+'</button>';
+}
+function bindAssetDetailLinks(view,returnView='depot',navKey=returnView){
+  $('[data-asset-detail]',view).forEach(btn=>btn.addEventListener('click',e=>{
+    e?.preventDefault?.();e?.stopPropagation?.();
+    openAssetDetail(btn.dataset.assetDetail,returnView,navKey);
+  }));
+}
+function openAssetDetail(symbol,returnView='depot',navKey=returnView){
+  const key=String(symbol||'').trim().toUpperCase();if(!key)return;
+  assetDetailUi.symbol=key;assetDetailUi.returnView=returnView;assetDetailUi.navKey=navKey;
+  fibUi.symbol=key;fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;
+  showSecondaryView('asset-detail',navKey);
+}
+function closeAssetDetail(){
+  showSecondaryView(assetDetailUi.returnView||'depot',assetDetailUi.navKey||'depot');
+}
+function assetDetailHoldingHtml(symbol){
+  const h=H(),p=S()?.portfolio||{},row=depotAssetRows().find(x=>x.symbol===symbol),known=row?.valueKnown?Number(row.valueUsd):null,share=known!=null&&Number(p.total)>0?known/Number(p.total)*100:null;
+  const sources=row?.sources||[];
+  const sourceRows=sources.length?sources.map(x=>'<div class="asset-detail-source"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+symbol:x.source||'Detail')+'</small></div>').join(''):'<div class="asset-detail-source"><span>DETAIL SOURCE</span><b>—</b><small>Kein autoritativer Asset-Bestand aus den verfügbaren Detailquellen.</small></div>';
+  return '<section class="asset-detail-section"><div class="section-title"><h2>DEPOT + VENUES</h2><small>Detailwerte sind nicht der Portfolio-Total und werden nicht mit Bot-Exposure addiert</small></div><div class="asset-detail-holding-summary"><div><span>KNOWN DETAIL VALUE</span><b>'+(known==null?'—':h.money?.(known))+'</b></div><div><span>PORTFOLIO-ANTEIL</span><b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></div><div><span>DETAILQUELLEN</span><b>'+sources.length+'</b></div></div><div class="asset-detail-sources">'+sourceRows+'</div></section>';
+}
+function assetDetailBotHtml(symbol){
+  const h=H(),rows=matchedRows(symbol);
+  if(!h.botFeedFresh?.())return '<section class="asset-detail-section"><div class="section-title"><h2>LIVE BOTS + RISK</h2><small>private Bot-Daten</small></div><section class="v10-live-blocked"><b>BOT DATA STALE</b><small>Keine Bot-Risk-Ableitung aus einem veralteten privaten Snapshot.</small></section></section>';
+  if(!rows.length)return '<section class="asset-detail-section"><div class="section-title"><h2>LIVE BOTS + RISK</h2><small>private Bot-Daten</small></div><section class="v10-live-blocked"><b>KEIN LIVE BOT</b><small>Für '+esc(symbol)+' ist aktuell kein sicher gematchter privater Bot vorhanden.</small></section></section>';
+  return '<section class="asset-detail-section"><div class="section-title"><h2>LIVE BOTS + RISK</h2><small>'+rows.length+' sicher gematchte Bot-Row(s) · bestehende Safety-Regeln unverändert</small></div>'+pairCard(symbol,false,true,false)+'</section>';
+}
+function assetDetailMarketHtml(symbol){
+  const i=S()?.assetIntel?.[symbol],fresh=intelFresh(i);
+  return '<section class="asset-detail-section"><div class="section-title"><h2>MARKT + OPPORTUNITY</h2><small>Kontext statt Renditeversprechen · geschlossene höhere Timeframes</small></div>'+forecastContextHtml(symbol)+(i?marketRow(symbol):'<section class="v10-live-blocked market-stale"><b>NO TECH DATA</b><small>Keine technische Historie für '+esc(symbol)+' geladen.</small></section>')+'<div class="asset-detail-fib-head"><span>FIB / SK MAP</span><small>'+(fresh?'frischer Markt-Kontext':'Markt-Kontext stale/fehlend · FIB kann separat laden')+'</small></div>'+fibMapHtml()+'</section>';
+}
+function renderAssetDetail(force=false){
+  const view=$('#view-asset-detail');if(!view)return;
+  const symbol=String(assetDetailUi.symbol||'BTC').trim().toUpperCase();
+  if(force&&fibUi.mode==='MANUAL'){
+    const lo=fibParse($('#fib-low',view)?.value),hi=fibParse($('#fib-high',view)?.value),dir=$('#fib-direction',view)?.value;
+    if(lo)fibUi.manualLow=lo;if(hi)fibUi.manualHigh=hi;if(dir)fibUi.direction=dir;
+  }
+  fibUi.symbol=symbol;
+  const h=H(),row=depotAssetRows().find(x=>x.symbol===symbol),rows=matchedRows(symbol),mp=marketPrice(symbol),ctx=opportunityContext(symbol),st=rows.length?pairStatus(symbol):{label:'NO LIVE BOT',tone:'muted',reason:'Kein sicher gematchter privater Bot'},known=row?.valueKnown?Number(row.valueUsd):null;
+  view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back>← ZURÜCK</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+
+    '<section class="asset-detail-hero"><div><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN HOLDING DETAIL</span><b>'+(known==null?'—':h.money?.(known))+'</b><small>nicht mit Bot-Exposure addieren</small></div><div><span>LIVE BOTS</span><b>'+rows.length+'</b><small>'+esc(st.reason)+'</small></div><div><span>OPPORTUNITY QUALITY</span><b class="tone-'+esc(ctx.tone)+'">'+(ctx.available?ctx.score+'/100':'—')+'</b><small>'+(ctx.available?esc(ctx.label):'NO FRESH CONTEXT')+'</small></div></section>'+
+    '<section class="asset-detail-accounting-guard"><b>READ-ONLY DETAIL</b><small>Holdings, Bot-Exposure und Markt-Kontext bleiben getrennte Ebenen. Keine Orders, keine automatische Promotion, keine Doppelzählung.</small></section>'+
+    assetDetailHoldingHtml(symbol)+assetDetailBotHtml(symbol)+assetDetailMarketHtml(symbol);
+  $('[data-asset-back]',view)?.addEventListener('click',closeAssetDetail);
+  bindFibMap(view);
+  const selector=$('#fib-asset',view);if(selector){selector.value=symbol;selector.disabled=true;selector.title='Asset ist im Asset Detail fixiert';}
+}
 function depotAssetCard(row,open=false){
   const h=H(),p=S()?.portfolio||{},share=row.valueKnown&&Number(p.total)>0?row.valueUsd/Number(p.total)*100:null,venues=[...new Set(row.sources.map(x=>x.venue).filter(Boolean))],mp=marketPrice(row.symbol);
   const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>HOLDING DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
