@@ -8,6 +8,7 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
+const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',import.meta.url),'utf8');
 
 function block(start,end){
   const a=v10.indexOf(start),b=v10.indexOf(end,a);
@@ -78,6 +79,16 @@ test('r77 renders the unified strip in all primary and secondary UI surfaces',()
   assert.match(css,/\.data-state-item\.tone-safe/);
   assert.match(css,/\.data-state-item\.tone-watch/);
   assert.match(css,/\.data-state-item\.tone-danger/);
+});
+
+test('r77 extends the permanent UI regression gate with all Data State scopes',()=>{
+  assert.match(gate,/unified Data State renderer missing/);
+  for(const scope of ['command','depot','bots','market','research','asset','paper','lab'])assert.ok(gate.includes("'"+scope+"'"),scope);
+  assert.match(gate,/Data State strip styling missing/);
+  assert.match(gate,/Data State danger tone missing/);
+  const a11y=block('function decorateA11y(){','function selectHistoryAnchor');
+  assert.match(a11y,/\.data-state-strip/);
+  assert.match(a11y,/setAttribute\('aria-live','polite'\)/);
 });
 
 test('r77 escapes source detail text at the rendering boundary',()=>{
