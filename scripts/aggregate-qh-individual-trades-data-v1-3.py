@@ -3,7 +3,7 @@ import json, os
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-IN=Path(os.environ.get("QH_V12_SHARDS_DIR",ROOT/"research"/"results"/"qh-v13-shards"))
+IN=Path(os.environ.get("QH_V13_SHARDS_DIR",ROOT/"research"/"results"/"qh-v13-shards"))
 OUT=ROOT/"research"/"results"
 ASSETS=("BTCUSDT","ETHUSDT","XRPUSDT","SOLUSDT","DOGEUSDT","ADAUSDT")
 MONTHS=tuple(f"{y:04d}-{m:02d}" for y,ms in ((2025,range(1,13)),(2026,range(1,9))) for m in ms)
