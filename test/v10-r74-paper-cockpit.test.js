@@ -9,6 +9,8 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
+const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
+const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 
 function block(start,end){
   const a=v10.indexOf(start),b=v10.indexOf(end,a);
@@ -30,6 +32,15 @@ test('r74 uses the existing protected GET-only Paper Overview bridge',()=>{
   assert.match(v9,/paperOverview:\(\)=>getJson\('\/api\/paper\/overview'\)/);
   const bridge=v9.slice(v9.indexOf('window.MERIDIAN_V10_BRIDGE='),v9.indexOf('document.querySelectorAll',v9.indexOf('window.MERIDIAN_V10_BRIDGE=')));
   assert.doesNotMatch(bridge,/paperOverview:[^\n]*postJson/);
+});
+
+test('r74 has one canonical protected Paper Overview SSOT and no duplicate analytics poller',()=>{
+  assert.match(server,/u\.pathname==="\/api\/paper\/overview"[\s\S]*paperOverviewStatus\(\)/);
+  assert.match(server,/schemaVersion:'8\.0-PAPER-OVERVIEW-V1'/);
+  assert.match(server,/researchOnly:true/);
+  assert.match(server,/executionImpact:false/);
+  assert.match(gateway,/PROTECTED_PREFIXES[\s\S]*"\/api\/paper"/);
+  assert.doesNotMatch(v9,/syncPaperTelemetry|\/api\/research-analytics|\/api\/activity-summary/);
 });
 
 test('r74 adds Paper Cockpit as secondary view without creating a sixth primary tab',()=>{
