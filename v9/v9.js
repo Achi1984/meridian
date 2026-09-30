@@ -69,7 +69,7 @@ const OKX_DCA_BOTS=[
 {id:'OKX-XRP-FUTURES-DCA-3X',venue:'OKX',type:'FUTURES_DCA',symbol:'XRP',side:'LONG',leverage:3,quote:'USDC',investUsd:65.32,totalPnlUsd:-.014,totalPnlPct:-.03,variablePnlUsd:-.0048,variablePnlPct:-.01,price:1.5291,tp:1.5924,avgCost:1.5296,liq:null,safetyExecuted:0,safetyMax:9,snapshotAt:'2026-09-25T06:22:00+02:00',note:'User screenshot 25.09.2026 06:22 · old OKX position closed, Futures DCA started'}
 ];
 const HEDGE=HEDGES[0];
-const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketTransport:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,paperAnalytics:null,paperActivity:null,paperTelemetryUpdatedAt:null,paperTelemetryError:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:null,okx:null}};
+const state={bots:FALLBACK,referenceBots:FALLBACK,referenceSnapshotAt:ASSET_WATCH_SNAPSHOT_AT,hedge:HEDGE,hedges:HEDGES,okxDcaBots:OKX_DCA_BOTS,manualPositions:MANUAL_POSITIONS,pionexManual:PIONEX_MANUAL,source:'REFERENCE',market:null,intel:null,assetIntel:{},priceChecks:{},portfolio:null,portfolioHistory:null,portfolioHistoryError:null,error:null,syncedAt:null,marketSyncedAt:null,marketPriceSyncedAt:null,marketTransport:null,marketError:null,marketPriceError:null,liveRows:0,botApiRows:0,botSupportedRows:0,botDetailRows:0,botDetailsComplete:false,unmatchedLive:[],matchAmbiguous:0,matchDiagnostics:null,botIdentityMode:'REFERENCE_MATCH',apiNativeRows:0,botFeedUpdatedAt:null,botFeedTimestampTrusted:false,botFeedSource:'PRIVATE SNAPSHOT',botFeedStatus:'UNKNOWN',pionexBotSync:null,pionexAccountSync:null,pionexAccount:null,backtest:{symbol:'BTC',running:false,result:null,error:null},manual:{pionex:3126.12,bitpanda:0,ledger:null,okx:null}};
 const EXTERNAL_VENUE_REF_KEY='meridian.v10.externalVenueRefs',LEDGER_AUTH_KEY='meridian.v10.ledgerAuthority',EXTERNAL_VENUE_EXPECTED=['Ledger','OKX'],LEDGER_AUTH_MAX_AGE_MS=24*60*60*1000;
 function loadExternalVenueRefs(){
  try{
@@ -187,18 +187,6 @@ async function fetchTimed(url,options={},timeoutMs=FETCH_TIMEOUT_MS){
 async function getJson(path){const r=await fetchTimed(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function postJson(path,body={}){const r=await fetchTimed(API_BASE+path,{method:'POST',cache:'no-store',headers:{accept:'application/json','content-type':'application/json',...(token()?{authorization:'Bearer '+token()}:{})},body:JSON.stringify(body)},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function manageAssetWatchShare(action='rotate'){const j=await postJson('/api/private/asset-watch-share',{action});return{...j,shareUrl:j?.sharePath?API_BASE+j.sharePath:null}}
-async function syncPaperTelemetry(){
- const results=await Promise.allSettled([getJson('/api/research-analytics'),getJson('/api/activity-summary')]);
- const analytics=results[0],activity=results[1],errors=[];
- if(analytics.status==='fulfilled'&&analytics.value&&typeof analytics.value==='object')state.paperAnalytics=analytics.value;
- else errors.push('RESEARCH '+String(analytics.reason?.message||analytics.reason||'UNAVAILABLE'));
- if(activity.status==='fulfilled'&&activity.value&&typeof activity.value==='object')state.paperActivity=activity.value;
- else errors.push('ACTIVITY '+String(activity.reason?.message||activity.reason||'UNAVAILABLE'));
- const success=analytics.status==='fulfilled'||activity.status==='fulfilled';
- if(success)state.paperTelemetryUpdatedAt=Date.now();
- state.paperTelemetryError=errors.length?errors.join(' · '):null;
- return success;
-}
 const PORTFOLIO_TICKER_CACHE_MS=25000;
 let portfolioTickerCache={at:0,rows:null};
 async function portfolioSpotTickers(){
@@ -713,10 +701,10 @@ window.MERIDIAN_V10_BRIDGE={
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 async function refreshNow(){
  await sync();
- const [marketChanged,paperChanged]=await Promise.all([syncIntel(),syncPaperTelemetry()]);
- if(marketChanged||paperChanged)notifyData();
+ const changed=await syncIntel();
+ if(changed)notifyData();
 }
 go('command');void refreshNow();
-setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);setInterval(()=>syncPaperTelemetry().then(changed=>{if(changed)notifyData()}),120000);
+setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshNow()});
 window.addEventListener('online',()=>{void refreshNow()});
