@@ -36,9 +36,6 @@ OUT = Path(os.environ.get(
     "QH_OUTPUT_DIR",
     "research/results/qh-v12-aug-duplicate-row-identity",
 ))
-if ASSET not in TARGETS:
-    raise SystemExit(f"invalid QH_ASSET {ASSET!r}")
-
 
 def checksum(url: str) -> str:
     req = urllib.request.Request(
@@ -204,6 +201,8 @@ def scan(zpath: Path) -> dict:
 
 
 def run():
+    if ASSET not in TARGETS:
+        raise SystemExit(f"invalid QH_ASSET {ASSET!r}")
     OUT.mkdir(parents=True, exist_ok=True)
     url = f"{BASE}/{ASSET}/{ASSET}-trades-{DATE}.zip"
     with tempfile.TemporaryDirectory(prefix=f"meridian-qh-v12-row-id-{ASSET}-") as td:
