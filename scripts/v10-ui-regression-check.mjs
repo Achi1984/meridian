@@ -56,6 +56,23 @@ for(const scope of ['command','depot','bots','market','research','asset','paper'
 must(css.includes('.data-state-strip{'),'Data State strip styling missing');
 must(css.includes('.data-state-item.tone-danger'),'Data State danger tone missing');
 
+const contextStart=js.indexOf("const UI_CONTEXT_KEY='meridian.v10.context.v1'");
+const contextEnd=js.indexOf('const MARKET_FRESH_MS',contextStart);
+must(contextStart>=0&&contextEnd>contextStart,'UI session context block missing');
+const contextBlock=js.slice(contextStart,contextEnd);
+must(contextBlock.includes('sessionStorage.getItem(UI_CONTEXT_KEY)'),'UI session context read missing');
+must(contextBlock.includes('sessionStorage.setItem(UI_CONTEXT_KEY'),'UI session context write missing');
+must(!contextBlock.includes('localStorage'),'UI context must remain session-only');
+must(contextBlock.includes("JSON.stringify({fibSymbol:String(fibUi.symbol||'BTC').toUpperCase(),botFilter:"),'UI context payload must stay limited to asset + bot filter');
+must(js.includes('function contextualBack(target'),'contextual back helper missing');
+must(js.includes('function contextBarHtml(target)'),'contextual return bar helper missing');
+must(js.includes("contextBarHtml('market')"),'Scanner-to-Forecast return context missing');
+must(js.includes("contextualBack('asset-detail'"),'Asset Detail contextual back missing');
+must(js.includes("contextualBack('paper'"),'Paper contextual back missing');
+must(js.includes("contextualBack('more'"),'LAB contextual back missing');
+must(js.includes('delete viewContextUi[v]'),'direct primary navigation must clear stale target context');
+must(css.includes('.context-return-bar{'),'contextual return bar styling missing');
+
 const badSelector=/(^|[^$])\$\([^()\n]*\)\.(?:forEach|filter|map|some|every|reduce|find)\s*\(/m;
 must(!badSelector.test(js),'single-element selector used as collection');
 

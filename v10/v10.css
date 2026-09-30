@@ -921,3 +921,11 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .data-state-items{grid-template-columns:1fr}
   .data-state-item{padding:7px 8px}
 }
+
+
+/* v10 r78 · contextual navigation */
+.context-return-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 9px;padding:7px 9px;border:1px solid #24405a;border-radius:11px;background:#07111b}
+.context-return-bar button{min-height:36px;border:1px solid #285277;background:#081827;color:#8fc9f5;border-radius:9px;padding:0 10px;font:inherit;font-size:8px;font-weight:900;letter-spacing:.05em;touch-action:manipulation}
+.context-return-bar small{font-size:7px;color:var(--muted);line-height:1.35;text-align:right}
+@media(max-width:760px){.context-return-bar button{min-height:44px}}
+@media(max-width:520px){.context-return-bar{align-items:flex-start;flex-direction:column}.context-return-bar small{text-align:left}}

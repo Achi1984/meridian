@@ -71,8 +71,8 @@ test('r73 remembers the originating primary view for deterministic Back navigati
   const close=block('function closeAssetDetail(){','function assetDetailHoldingHtml(symbol){');
   assert.match(open,/assetDetailUi\.returnView=returnView/);
   assert.match(open,/assetDetailUi\.navKey=navKey/);
-  assert.match(open,/showSecondaryView\('asset-detail',navKey\)/);
-  assert.match(close,/showSecondaryView\(assetDetailUi\.returnView\|\|'depot',assetDetailUi\.navKey\|\|'depot'\)/);
+  assert.match(open,/showSecondaryView\('asset-detail',navKey(?:,\{returnView,navKey,label:[^}]+\})?\)/);
+  assert.match(close,/(?:showSecondaryView\(assetDetailUi\.returnView\|\|'depot',assetDetailUi\.navKey\|\|'depot'\)|contextualBack\('asset-detail',assetDetailUi\.returnView\|\|'depot',assetDetailUi\.navKey\|\|'depot'\))/);
 });
 
 test('r73 fixes the Fib selector to the selected Asset Detail identity across rerenders',()=>{
