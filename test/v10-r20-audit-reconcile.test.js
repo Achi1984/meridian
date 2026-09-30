@@ -42,7 +42,9 @@ test('r20 refresh is sequential and preserves r18 single-flight runtime hardenin
   assert.match(v9,/async function refreshNow\(\)/);
   assert.match(v9,/await sync\(\)/);
   assert.match(v9,/const changed=await syncIntel\(\)/);
-  assert.match(v9,/go\('command'\);void refreshNow\(\)/);
+  const legacyStartup=/go\('command'\);void refreshNow\(\)/.test(v9);
+  const qaAwareStartup=/go\('command'\);[\s\S]*if\(LOCAL_VISUAL_QA\)[\s\S]*else\{[\s\S]*void refreshNow\(\)/.test(v9);
+  assert.ok(legacyStartup||qaAwareStartup,'production startup must still invoke refreshNow outside localhost-only visual QA');
   assert.match(v9,/fetchTimed/);
 });
 

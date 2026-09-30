@@ -1,15 +1,16 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r82';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r82';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r83';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r83';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r82');
+    qs.set('build','r83');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
 const API_BASE=(window.MERIDIAN_V9_CONFIG?.apiBase||'https://p01--achi-meridian--ttvk44grdlp7.code.run').replace(/\/$/,'');
+const LOCAL_VISUAL_QA=['127.0.0.1','localhost'].includes(location.hostname)&&new URLSearchParams(location.search).get('visualQa')==='1';
 const TOKEN_KEY='meridian.v8.readToken';
 const ASSET_WATCH_SNAPSHOT_AT='2026-09-27T19:50:00+02:00';
 const FALLBACK=[
@@ -704,7 +705,12 @@ async function refreshNow(){
  const changed=await syncIntel();
  if(changed)notifyData();
 }
-go('command');void refreshNow();
-setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshNow()});
-window.addEventListener('online',()=>{void refreshNow()});
+go('command');
+if(LOCAL_VISUAL_QA){
+  queueMicrotask(()=>window.dispatchEvent(new CustomEvent('meridian:data',{detail:{visualQa:true}})));
+}else{
+  void refreshNow();
+  setInterval(sync,30000);setInterval(()=>syncIntel().then(changed=>{if(changed)notifyData()}),60000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshNow()});
+  window.addEventListener('online',()=>{void refreshNow()});
+}
