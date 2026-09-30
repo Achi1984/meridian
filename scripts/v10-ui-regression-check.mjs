@@ -388,3 +388,16 @@ must(css.includes('#view-market .forecast-focus-head b{font-size:18px'),'Forecas
   must(a>=0&&b>a,'bot-toggle visual QA block missing');
   must(!block.includes('await visualQaSettle()'),'bot-toggle visual QA must not depend on RAF after synchronous details mutation');
 }
+
+
+/* r100 permanent Scanner priority-surface gates */
+must(String(release.dashboardShell||'').includes('SCANNER-PRIORITY-SURFACE'),'dashboardShell must declare Scanner priority surface');
+must(js.includes('function scannerLeaderCard(symbol)'),'Scanner leader renderer missing');
+must(js.includes('TOP MARKET CONTEXT'),'Scanner top-context label missing');
+must(js.includes("top=fresh.slice(0,3),leader=top[0]||null,next=top.slice(1),rest=fresh.slice(3)"),'Scanner leader/next/remainder partition missing');
+must(js.includes("leaderHtml=leader?scannerLeaderCard(leader)"),'Scanner leader composition missing');
+must(js.includes('NÄCHSTE KONTEXTE'),'Scanner next-context surface missing');
+must(js.includes("Quality ist Markt-Kontext, keine Renditeprognose"),'Scanner context disclaimer missing');
+must(css.includes('#view-research .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Scanner compact data state missing');
+must(css.includes('.scanner-leader-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))'),'Scanner leader metric grid missing');
+must(css.includes('#view-research .scan-drill-actions{grid-template-columns:repeat(2,minmax(0,1fr))'),'Scanner mobile dual-action layout missing');
