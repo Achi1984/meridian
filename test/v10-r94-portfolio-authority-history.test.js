@@ -58,7 +58,9 @@ test('r94 canonical history accepts fresh Ledger holdings plus current OKX autho
   const data={
     privateRevision:9,
     livePrices:{BTC:{price:50000}},
+    livePriceMeta:{fresh:true},
     portfolio:{
+      ledgerAuthorityAt:'2026-09-30T18:30:00Z',
       holdings:[{venue:'Ledger',symbol:'BTC',quantity:.01,updatedAt:'2026-09-30T18:30:00Z'}],
       manualVenueBalances:[{venue:'OKX',valueUsd:130,updatedAt:'2026-09-30T18:31:00Z'}],
       pionexEquityUsd:34500,
