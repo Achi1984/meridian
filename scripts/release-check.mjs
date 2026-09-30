@@ -57,12 +57,14 @@ if(v10Cutover){
   must(v10.includes('content="'+terminalBuild+'"'),'v10 meta build must match terminalBuild');
   must(v10js.includes("const BUILD='"+terminalBuild+"'"),'v10 runtime BUILD must match terminalBuild');
   must(!/(^|[^$])\$\([^()\n]*\)\.(?:forEach|filter|map|some|every|reduce|find)\s*\(/m.test(v10js),'v10 single-element selector used as collection');
-  for(const key of ['command','bots','market','research','more']){
+  for(const key of ['command','depot','bots','market','research','more']){
     must(v10.includes(`id="view-${key}"`),`v10 production target missing view-${key}`);
   }
-  for(const label of ['COMMAND','BOTS','MARKET','SCANNER','LAB']){
+  for(const label of ['COMMAND','DEPOT','BOTS','FORECAST','SCANNER']){
     must(v10.includes('>'+label+'<'),`v10 production target missing nav label ${label}`);
   }
+  must((v10.match(/<button data-v=/g)||[]).length===5,'v10 production target must expose exactly five primary nav items');
+  must(!v10.includes('data-v="more"'),'v10 LAB must remain a secondary surface, not a primary nav item');
   must(v10.includes('../v9/v9.js?v='+terminalBuild),'v10 must load validated v9 engine at terminalBuild');
   must(v10.includes('./v10.js?v='+terminalBuild),'v10 presentation adapter missing or stale');
   for(const modulePath of ['./fib-core.js','../research/sk-paperbot-v1.js','../research/sk-research-v2.js','../research/documented-edge-v1.js','../research/tsmom-holdout-v1.js'])must(v10js.includes(modulePath+'?v='+terminalBuild),'v10 module cache tag mismatch: '+modulePath);
