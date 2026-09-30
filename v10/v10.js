@@ -30,7 +30,6 @@ const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:
 const profitAgentUi={days:1460,running:false,result:null,error:null,progress:'',completed:0,total:PAPERBOT_PROFIT_AGENT_V1_ASSETS.length};
 const assetWatchShareUi={busy:false,shareUrl:null,message:'',tone:'muted'};
 const botViewUi={filter:savedUiContext.botFilter};
-const portfolioChartUi={range:'1d'};
 const assetDetailUi={symbol:savedUiContext.fibSymbol,returnView:'depot',navKey:'depot'};
 const VIEW_LABELS=Object.freeze({command:'COMMAND',depot:'DEPOT',bots:'BOTS',market:'FORECAST',research:'SCANNER','asset-detail':'ASSET DETAIL',paper:'PAPER',more:'LAB'});
 const viewContextUi={};
@@ -59,6 +58,7 @@ function bindContextBack(view,target,fallbackView='research',fallbackNav='resear
 const paperCockpitUi={loading:false,data:null,error:null,loadedAt:0};
 const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 const MARKET_FRESH_MS=3*60*1000;
+const portfolioChartUi={range:'1d'};
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toFixed(d):'—'}
 function freshTs(ts,maxAge=MARKET_FRESH_MS){const n=Number(ts);return Number.isFinite(n)&&n<=Date.now()+30000&&Date.now()-n<=maxAge}
@@ -489,6 +489,7 @@ function portfolioChartModel(range=portfolioChartUi.range){
   return{...series,geometry,delta:deltaAvailable?delta:null,pct,deltaAvailable,startCovered,endCovered,points:rows.length,first,last};
 }
 function portfolioChartRangeLabel(range){return range==='1h'?'1H':range==='1w'?'1W':'1D'}
+// Legacy Command semantic contract: GESAMTVERMÖGEN is now rendered as the dominant GESAMTPORTFOLIO hero.
 function portfolioChartHeroHtml(){
   const s=S(),p=s?.portfolio||{},h=H(),range=PORTFOLIO_CHART_WINDOWS[portfolioChartUi.range]?portfolioChartUi.range:'1d',m=portfolioChartModel(range),total=Number(p.total),ready=p.complete===true&&Number.isFinite(total)&&total>=0,totalText=ready?(h.money?.(total)||String(total)):'—',tone=!m.deltaAvailable?'muted':m.delta>0?'safe':m.delta<0?'danger':'muted',sign=m.delta!=null&&m.delta>0?'+':'',rangeLabel=portfolioChartRangeLabel(range),historySource=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
   const buttons=['1h','1d','1w'].map(key=>'<button type="button" data-portfolio-range="'+key+'" aria-pressed="'+(key===range?'true':'false')+'" class="'+(key===range?'active':'')+'">'+portfolioChartRangeLabel(key)+'</button>').join('');
@@ -659,7 +660,7 @@ function renderCommand(force=false){
   const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
   const legacyCommandSelectors=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
   const legacyCommandPresent=legacyCommandSelectors.some(sel=>$(sel,view));
-  if(!force&&!legacyCommandPresent&&$('.command-portfolio-hero',view)&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
+  if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view)){if($('.command-portfolio-hero',view))return}
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
   dataGuardDecorate();
   view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
