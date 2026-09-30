@@ -35,10 +35,11 @@ function decodeText(s){
 }
 function runChrome(name,kind,url,extra=[]){
   const profile=path.join('/tmp','meridian-visual-qa-'+process.pid+'-'+name+'-'+kind);
+  const virtualBudget=name.startsWith('flow-')?5200:2600;
   const args=[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--hide-scrollbars',
     '--run-all-compositor-stages-before-draw','--force-device-scale-factor=1',
-    '--window-size='+viewport.width+','+viewport.height,'--virtual-time-budget=2600',
+    '--window-size='+viewport.width+','+viewport.height,'--virtual-time-budget='+virtualBudget,
     '--user-data-dir='+profile,...extra,url.toString()
   ];
   const p=spawnSync(chrome,args,{cwd:ROOT,encoding:'utf8',timeout:45000,maxBuffer:30*1024*1024});
