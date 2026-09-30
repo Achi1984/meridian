@@ -1,90 +1,78 @@
 # MERIDIAN Chat Handoff
 
 Status: **canonical after merge**  
-Updated: **2026-09-30 23:11 Europe/Vienna**
-
-## Why this file exists
-
-ChatGPT streaming may be interrupted or a new chat may start with little visible context. The chat transcript is therefore **not** the project source of truth.
-
-Canonical continuation state is:
-
-1. merged `main`
-2. green current-base CI / release gates
-3. `MERIDIAN_RESUME.json`
-4. `MERIDIAN_AGENT_STATE.json`
-5. related PR / branch evidence
-6. chat transcript last
-
-The full recovery protocol is in `docs/AGENT_ORCHESTRATION.md`.
+Updated: **2026-09-30 23:31 Europe/Vienna**
 
 ## Current durable checkpoint
 
-- Build: **10.0-r104**
-- Canonical UI release SHA: **65834f47a1b9850bb52e2e169e96708fd716cbe9**
-- Last merged UI PR: **#415 — Portfolio history component integrity**
-- Prior UI PR: **#413 — Scanner confluence explainability**
+- Build: **10.0-r105**
+- Canonical r105 release SHA: **1f1ce0b3450dfcdf62146290a144949deeaf682d**
+- Last merged release PR: **#417 — Pionex history source alignment**
+- Previous UI/data-integrity releases: **#415 r104**, **#413 r103**
 - Execution impact: **false**
-- UI sequence already completed: **r93 through r104**
-- Do **not** repeat these releases after a streaming interruption.
+- Completed terminal sequence: **r93 through r105**
 
-### Live verification and portfolio checkpoint
+Repository state remains the source of truth. Use merged `main`, current CI, `MERIDIAN_RESUME.json`, and `MERIDIAN_AGENT_STATE.json` before chat history.
 
-The user live-verified **r102** from the iPhone dashboard on 2026-09-30 around 22:56 Europe/Vienna:
+## Live evidence
 
-- BUILD: **R102**
-- Strict history shown: **32 points**
-- 1H: **READY** (13 points)
-- 1D: **BUILDING**
-- 1W: **BUILDING**
-- Ledger: **$798.38**
-- OKX: **$116.30**
-- Pionex: **$34,456.92**
-- Gesamtportfolio: **$35,371.60**
-- Portfolio / Bots / Market were observed **READY** after refresh.
+### r102
 
-The same live screenshot exposed a real history-integrity anomaly: the 1D chart included a legacy point around **$1,798.71** before the current ~$35.4k total.
+- BUILD **R102**
+- STRICT HISTORY **32 points**
+- 1H **READY**
+- 1D / 1W **BUILDING**
+- Portfolio about **$35,371.60**
+- A history artifact around **$1,798.71** was visible.
 
-Root cause fixed in **r104**:
+### r104
 
-- a canonical history point now requires complete **Spot/Venue authority + Pionex Equity authority**;
-- canonical history marks trading provenance as `PIONEX_EQUITY`;
-- incomplete legacy rows remain in PostgreSQL as audit evidence but are excluded from chart/API canonical points;
-- the UI independently requires `STRICT_AUTHORITY + PIONEX_EQUITY`;
-- excluded legacy rows may be surfaced as **BLOCKED**;
-- no synthetic history, interpolation, backfill, or deletion is authorized.
+Live-verified around 23:16 Europe/Vienna:
 
-### Exact next durable step
+- BUILD **R104**
+- Gesamtportfolio **$35,312.88**
+- Ledger **$794.41**
+- OKX **$116.30**
+- Pionex **$34,402.17**
+- STRICT HISTORY **38 points**
+- **1452 BLOCKED**
+- 1H **READY** with 15 points
+- 1D / 1W **BUILDING**
 
-Live-verify **r104** after deployment:
+The old **$1,798.71 flat-line still remained**, so r104 did not fully solve the live history problem.
 
-1. confirm **BUILD R104**;
-2. confirm the old ~$1,798.71 incomplete point is no longer charted;
-3. record any **BLOCKED** legacy-point count;
-4. confirm current 1H / 1D / 1W maturity;
-5. then continue only the first incomplete UI milestone after r104.
+## r105 fix
 
-## Exact next-chat recovery procedure
+Root cause #2 was different Pionex authority paths for live portfolio and server history.
 
-When the user says **"Meridian fortsetzen"**, **"Fortsetzen"**, or similar:
+r105 now:
 
-1. fetch latest `main` SHA;
-2. read `MERIDIAN_RESUME.json`;
-3. read `MERIDIAN_AGENT_STATE.json`;
-4. inspect relevant open PRs and branches;
-5. inspect current CI / release gates;
-6. compare reality with this checkpoint;
-7. find the **first incomplete durable step**;
-8. continue from there only.
+- uses one shared fresh Pionex-equity resolver for live portfolio and history;
+- prefers the fresh read-only Pionex Wallet API value;
+- requires source timestamp age <= 15 minutes;
+- allows only a fresh timestamped private-equity fallback;
+- persists `tradingFresh`, `PIONEX_FRESH_V1`, source and timestamp provenance;
+- rejects all older rows without this provenance from canonical chart reads;
+- retains old PostgreSQL rows as audit evidence;
+- does not backfill, interpolate, or fabricate history.
 
-Never ask the user to restate information already available in repository state.
+Exact-head r105 gates before merge:
 
-## Streaming-interruption rule
+- Release Safety: **GREEN**
+- Portfolio Contract: **GREEN**
+- Mobile Visual QA: **GREEN**
 
-If the app shows **"Streaming unterbrochen"**, do not assume the repository operation failed. Before retrying any write, PR, merge, or release action, inspect the repository to see whether it already completed.
+## Next durable step
 
-The sustainable mitigation is **short atomic work bursts + durable checkpoints**, not relying on one long streamed answer.
+Live-verify r105 after deployment.
 
-## Ready-to-use prompt for a new chat
+Expected:
 
-> Meridian fortsetzen. Hole dir zuerst den tatsächlichen aktuellen Stand aus `main`, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, offenen relevanten PRs/Branches und CI. Verlasse dich nicht auf den letzten sichtbaren Chattext. Wiederhole keine bereits gemergten Arbeiten. Setze beim ersten unvollständigen dauerhaften Schritt fort und arbeite stream-safe in kurzen atomaren Bursts mit Repository-Checkpoint nach Mutationen.
+1. **BUILD R105**
+2. **SPOT + FRESH PIONEX**
+3. old **$1,798.71** flat-line is absent
+4. pre-r105 rows are blocked
+5. STRICT HISTORY may restart at 0, 1, or a few points and rebuild naturally
+6. 1H / 1D / 1W become READY only with enough genuinely fresh history
+
+Do not relax provenance or synthesize old history to make the chart look fuller.
