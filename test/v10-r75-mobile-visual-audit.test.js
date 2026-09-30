@@ -35,10 +35,11 @@ test('r75 keeps exactly five primary tabs and all secondary surfaces',()=>{
 test('r75 protects iPhone safe areas and dynamic viewport without horizontal page overflow',()=>{
   assert.match(css,/body\{min-height:100dvh\}/);
   assert.match(css,/html,body\{max-width:100%;overflow-x:hidden\}/);
-  assert.match(css,/padding-right:max\(8px,env\(safe-area-inset-right\)\)/);
-  assert.match(css,/padding-left:max\(8px,env\(safe-area-inset-left\)\)/);
+  assert.match(css,/padding-right:calc\(8px \+ env\(safe-area-inset-right\)\)/);
+  assert.match(css,/padding-left:calc\(8px \+ env\(safe-area-inset-left\)\)/);
   assert.match(css,/padding-bottom:calc\(84px \+ env\(safe-area-inset-bottom\)\)/);
-  assert.match(css,/nav\{padding-left:max\(8px,env\(safe-area-inset-left\)\);padding-right:max\(8px,env\(safe-area-inset-right\)\)\}/);
+  assert.match(css,/nav\{padding-left:calc\(8px \+ env\(safe-area-inset-left\)\);padding-right:calc\(8px \+ env\(safe-area-inset-right\)\)\}/);
+  assert.match(css,/\.v10-topbar\{top:env\(safe-area-inset-top\)\}/);
 });
 
 test('r75 standardizes mobile touch targets to at least 44px',()=>{
