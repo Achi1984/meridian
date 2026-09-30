@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r102';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r102';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r102';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r102';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r102';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r102';
-// MERIDIAN v10 r102 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r103';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r103';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r103';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r103';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r103';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r103';
+// MERIDIAN v10 r103 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r102';
+const BUILD='10.0-r103';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -981,6 +981,17 @@ function renderMarket(force=false){
   const tape='<details class="market-tape-details" '+(tapeOpen?'open':'')+'><summary><div><span>ASSET TAPE</span><b>'+syms.length+' MÄRKTE</b></div><small>'+mh.freshAssets+' frisch · '+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></summary><div class="market-list">'+syms.map(marketRow).join('')+'</div></details>';
   view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+contextBarHtml('market')+dataStateStripHtml('market')+'<div class="v10-market-board">'+forecastContextHtml(fibUi.symbol)+technical+fibMapHtml()+tape+'</div>';
   bindContextBack(view,'market','research','research');bindFibMap(view);
+}
+function scannerConfluenceHtml(symbol){
+  const i=marketIntel(symbol),ctx=opportunityContext(symbol),sig=marketSignal(i);
+  if(!i||!ctx.available)return '<div class="scanner-confluence scanner-confluence-blocked"><span>WHY NOW?</span><b>FRESH CONTEXT REQUIRED</b></div>';
+  const p=Number(i.price),e20=Number(i.ema20),e50=Number(i.ema50),trend=p>e20&&e20>e50?'BULL TREND':p<e20&&e20<e50?'BEAR TREND':'MIXED TREND',trendTone=trend==='MIXED TREND'?'watch':'safe';
+  const mtf=sig.confirmed?'MTF CONFIRMED':sig.rank>=3?'MTF WATCH':'MTF WEAK',mtfTone=sig.confirmed?'safe':sig.rank>=3?'watch':'muted';
+  const fib=Number.isFinite(ctx.fibDistance)?ctx.fibDistance<=1?'FIB ≤1%':ctx.fibDistance<=2.5?'FIB ≤2.5%':'FIB '+fmt(ctx.fibDistance,1)+'%':'FIB —',fibTone=Number.isFinite(ctx.fibDistance)&&ctx.fibDistance<=1?'safe':Number.isFinite(ctx.fibDistance)&&ctx.fibDistance<=2.5?'watch':'muted';
+  const momentum=ctx.momentum||'MIXED',momTone=/ALIGNED/.test(momentum)?'safe':momentum==='MIXED'?'watch':'muted';
+  const warning=sig.label==='CONFLICT'?'BULL/BEAR CONFLICT':trend==='MIXED TREND'?'TREND NICHT GESTAPELT':!sig.confirmed?'MTF NOCH NICHT BESTÄTIGT':Number.isFinite(ctx.fibDistance)&&ctx.fibDistance>2.5?'FIB WEITER ENTFERNT':'KEIN HARTES GEGENSIGNAL',warningTone=warning==='KEIN HARTES GEGENSIGNAL'?'safe':'watch';
+  const chip=(label,tone)=>'<span class="scanner-confluence-chip tone-'+tone+'">'+esc(label)+'</span>';
+  return '<div class="scanner-confluence"><div><span>WHY NOW?</span><small>Bestehende Quality-Faktoren · kein zusätzlicher Score</small></div><div class="scanner-confluence-chips">'+chip(trend,trendTone)+chip(momentum,momTone)+chip(mtf,mtfTone)+chip(fib,fibTone)+chip(warning,warningTone)+'</div></div>';
 }
 function scannerLeaderCard(symbol){
   const h=H(),i=marketIntel(symbol),ctx=opportunityContext(symbol),m=marketPrice(symbol);
