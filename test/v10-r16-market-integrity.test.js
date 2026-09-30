@@ -42,15 +42,16 @@ test('r16 MARKET and SCANNER keep missing assets visible and blocked',()=>{
   assert.match(v10,/NO TECH DATA/);
   assert.match(v10,/keine 15m\/1h\/4h Historie geladen/);
   assert.match(v10,/NO DATA/);
-  assert.match(v10,/LONG VIEW <b>BLOCKED/);
+  assert.match(v10,/MTF STATUS <b>BLOCKED/);
   assert.match(v10,/const s=S\(\),h=H\(\),all=marketUniverse\(\)/);
   assert.doesNotMatch(v10,/marketUniverse\(\)\.filter\(x=>s\?\.assetIntel/);
   assert.match(v10,/STALE \/ NO DATA/);
 });
 
 test('r16 UI states closed-candle confirmation explicitly',()=>{
-  assert.match(v10,/geschlossenen 1h \+ 4h Kerzen/);
-  assert.match(v10,/1h\/4h\/1D bestätigt nur auf geschlossenen Kerzen/);
+  assert.match(v10,/1h\/4h\/1D nur auf geschlossenen Kerzen/);
+  assert.match(v10,/bear1&&bear4/);
+  assert.match(v10,/bull1&&bull4/);
 });
 
 test('r16+ release identity remains canonical',()=>{

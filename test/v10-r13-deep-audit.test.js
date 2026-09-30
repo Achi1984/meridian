@@ -57,7 +57,7 @@ test('r13 suppresses stale bot action cards but keeps the 34-bot screenshot rost
 test('r13 distinguishes live bot links from reference bot links in scanner',()=>{
   assert.match(v10,/LIVE BOT · FRESH/);
   assert.match(v10,/REF BOT · ASSET WATCH/);
-  assert.match(v10,/Bot-Referenz beeinflusst Ranking nicht/);
+  assert.match(v10,/Bot-Verknüpfung beeinflusst Ranking nicht/);
   assert.match(v10,/if\(!intelFresh\(i\)\)return\{label:'DATA STALE'/);
 });
 
