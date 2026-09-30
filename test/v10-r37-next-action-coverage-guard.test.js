@@ -38,7 +38,7 @@ test('r37 incomplete coverage never suppresses liquidation or stop-protection sa
   assert.equal(liq.title,'BTC · LIQ-PUFFER PRÜFEN');
   assert.match(liq.detail,/Safety vor Profit-Lock/);
   const sl=nextActionRuntime('PROTECTION_RISK',partial);
-  assert.equal(sl.title,'BTC · RISK REVIEW');
+  assert.equal(sl.title,terminalRevision>=83?'BTC · PROTECTION PRÜFEN':'BTC · RISK REVIEW');
   assert.match(sl.detail,/Safety zuerst/);
 });
 
