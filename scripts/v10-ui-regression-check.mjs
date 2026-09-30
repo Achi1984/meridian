@@ -248,3 +248,6 @@ must(qaFrame.includes("if(value)inner.searchParams.set(key,value)"),'visual QA f
 must(qaFrame.includes("frame.src=inner.pathname+inner.search"),'visual QA frame must use forwarded inner URL');
 must(qa.includes("if(flow)url.searchParams.set('qaFlow',flow)"),'visual QA runner must emit qaFlow');
 must(qa.includes("if(dataMode)url.searchParams.set('qaData',dataMode)"),'visual QA runner must emit qaData');
+
+must(js.includes("if(!force&&$('.asset-detail-topbar',view))return"),'Asset Detail must be idempotent under mutation-only decorate passes');
+must(js.includes('data-asset-back data-context-back="asset-detail"'),'Asset Detail contextual-back QA selector must exist in rendered markup');
