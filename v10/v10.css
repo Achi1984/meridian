@@ -857,3 +857,75 @@ button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visi
   .system-status{min-width:0}
   .system-status .live{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+
+/* v10 r75 · mobile / visual deep-audit hardening */
+html,body{max-width:100%;overflow-x:hidden}
+body{min-height:100dvh}
+.v10-shell,main,.view,.view.active{min-width:0;max-width:100%}
+.v10-shell button,.v10-shell summary,.v10-shell input,.v10-shell select{font-family:inherit}
+.v10-shell button,.v10-shell summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.v10-shell button:focus-visible,.v10-shell summary:focus-visible,.v10-shell input:focus-visible,.v10-shell select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.v10-shell :where(.command-kpi-grid,.depot-venue-grid,.depot-asset-glance,.pair-summary,.leg-grid,.forecast-focus-grid,.scan-context-grid,.asset-detail-hero,.asset-detail-holding-summary,.paper-summary-grid,.paper-model-grid,.paper-cohort-grid)>*{min-width:0}
+.v10-shell :where(.v10-live-blocked,.paper-cockpit-state,.paper-refresh-warning,.v10-unverified-note){overflow-wrap:anywhere}
+nav{padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
+nav button{min-width:0}
+nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v10-topbar>div:first-child,.system-actions,.system-status{min-width:0}
+
+@media(max-width:760px){
+  .v10-shell button,.v10-shell summary,.v10-shell input,.v10-shell select{min-height:44px}
+  .feed-refresh,.scanner-toolbar-actions button,.scanner-toolbar button,.lab-backbar button,.asset-detail-open,.asset-detail-topbar>button,.paper-cockpit-toolbar button,.scan-forecast-open,.asset-toggle-actions button,.bot-filter-actions button{min-height:44px}
+  .depot-asset-card>summary,.asset-pair-summary,.v10-bot-diagnostics>summary,.scanner-more>summary,.research-module>summary,.sk-rules>summary,.v10-snapshot-details>summary,.v10-unmatched-details>summary{min-height:44px}
+  .command-kpi-grid b,.depot-venue-grid b,.depot-asset-glance b,.pair-summary b,.leg-grid b,.forecast-focus-grid b,.scan-context-grid b,.asset-detail-hero b,.paper-summary-grid b,.paper-model-grid b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .section-title{gap:8px}.section-title>*{min-width:0}.section-title small{overflow-wrap:anywhere}
+  .v10-live-blocked,.paper-safety-note,.paper-refresh-warning,.paper-cockpit-state{min-height:44px}
+}
+
+@media(max-width:600px){
+  .app-shell{padding-top:calc(6px + env(safe-area-inset-top));padding-right:max(8px,env(safe-area-inset-right));padding-bottom:calc(84px + env(safe-area-inset-bottom));padding-left:max(8px,env(safe-area-inset-left))}
+  .v10-topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;margin:0 -1px 7px;padding:7px 2px 8px}
+  .v10-topbar .brand{font-size:18px;white-space:nowrap}
+  .v10-topbar>div:first-child>small{font-size:7px;letter-spacing:.06em}
+  .system-actions{gap:5px}
+  .system-status{max-width:none;gap:3px}
+  .system-status .live{font-size:7px;line-height:1.15;padding:4px 5px;white-space:nowrap}
+  .v10-mode-banner{display:grid;grid-template-columns:1fr;gap:3px;padding:7px 9px}
+  .v10-mode-banner>div{min-width:0}.v10-mode-banner small{max-width:none;text-align:left;font-size:7px;line-height:1.35}
+  .command-kpi-grid,.depot-venue-grid,.asset-detail-hero,.paper-summary-grid{gap:5px}
+  .command-kpi-grid>div,.depot-venue-grid>div,.asset-detail-hero>div,.paper-summary-grid>div{padding:7px}
+  .attention-row,.depot-integrity-note,.asset-detail-accounting-guard,.paper-safety-note,.paper-refresh-warning{padding:7px 8px}
+  .v10-live-blocked{display:grid;grid-template-columns:1fr;gap:3px;padding:8px 9px}
+  .v10-live-blocked small{max-width:none;text-align:left}
+  .snapshot-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px}
+  .snapshot-row span{max-width:none;overflow-wrap:anywhere}
+  .scanner-toolbar,.paper-cockpit-toolbar,.asset-detail-topbar{scroll-margin-top:72px}
+  nav{padding-top:5px}
+  nav button{padding:4px 2px;font-size:16px}
+  nav button span{font-size:7px;margin-top:2px;letter-spacing:.01em}
+}
+
+@media(max-width:430px){
+  .v10-topbar{grid-template-columns:minmax(0,1fr) auto}
+  .system-actions{align-items:flex-end}
+  .system-status{display:grid;grid-template-columns:1fr}
+  .feed-refresh{min-width:44px;padding:0 8px}
+  .command-kpi-grid,.depot-venue-grid,.asset-detail-hero,.paper-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .command-kpi-grid .command-kpi-primary,.depot-venue-grid .depot-total,.paper-summary-grid>div:first-child{grid-column:1/-1}
+  .asset-pair-summary{gap:6px}
+  .asset-glance{gap:4px}
+  .asset-glance span,.depot-asset-glance span{padding:5px}
+  .scanner-toolbar-actions,.paper-cockpit-actions{width:100%}
+  .scanner-toolbar-actions button,.paper-cockpit-actions button{flex:1 1 0;min-width:0}
+}
+
+@media(max-width:390px){
+  .v10-topbar>div:first-child>small{display:none}
+  .v10-topbar .brand{font-size:17px}
+  .system-status .live{font-size:6.5px}
+  .command-kpi-grid b,.depot-venue-grid b,.asset-detail-hero b,.paper-summary-grid b{font-size:11px}
+  .command-kpi-grid .command-kpi-primary b,.depot-venue-grid .depot-total b{font-size:18px}
+  .pair-summary,.scan-context-grid,.forecast-focus-grid,.paper-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .leg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  nav button span{font-size:6.5px}
+}
