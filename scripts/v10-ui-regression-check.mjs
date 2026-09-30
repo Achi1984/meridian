@@ -11,6 +11,7 @@ const html=read('v10/index.html');
 const js=read('v10/v10.js');
 const v9=read('v9/v9.js');
 const css=read('v10/v10.css');
+const qa=read('scripts/v10-visual-qa.mjs');
 
 const build=String(release.terminalBuild||'');
 const rev=build.split('-').at(-1)||'';
