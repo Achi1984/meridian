@@ -823,52 +823,17 @@ nav{width:min(1040px,100%);background:rgba(5,8,12,.9);border-color:#182431;backd
 }
 
 
-/* v10 r75 · iPhone-first visual + interaction hardening */
-html,body{max-width:100%;overflow-x:hidden}
-.v10-shell,.view,.v10-mode-banner,.command-overview-v2,.depot-asset-card,.asset-pair,.scan-card,.forecast-focus,.asset-detail-section,.paper-model-card{min-width:0}
-button,summary,select,input{-webkit-tap-highlight-color:transparent}
-button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-.v10-live-blocked,.fib-loading,.fib-error,.paper-cockpit-state,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{overflow-wrap:anywhere}
-
-@media(max-width:600px){
-  .app-shell{padding:calc(7px + env(safe-area-inset-top)) calc(9px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) calc(9px + env(safe-area-inset-left))}
-  .v10-topbar{top:env(safe-area-inset-top);margin:0 -2px 6px;padding:8px 4px}
-  nav{padding-left:calc(7px + env(safe-area-inset-left));padding-right:calc(7px + env(safe-area-inset-right))}
-  nav button{min-height:48px;padding:4px 2px}
-  nav button span{font-size:9px}
-  .feed-refresh,.scanner-toolbar button,.lab-backbar button,.paper-cockpit-toolbar button,.asset-detail-topbar>button,.asset-detail-open,.asset-toggle-actions button,.bot-filter-actions button,.scan-forecast-open,.asset-watch-share-actions button,.fib-controls button,.fib-manual button,.sk-paper-controls button,.sk-v2-controls button{min-height:44px}
-  select,input{min-height:44px}
-  details>summary{scroll-margin-top:72px}
-  .v10-mode-banner{margin-bottom:7px;padding:7px 8px}
-  .command-overview-v2{gap:7px;margin-bottom:8px}
-  .command-kpi-grid,.depot-venue-grid{gap:6px}
-  .asset-accordion-stack,.depot-asset-stack,.v10-scanner-stack{gap:6px}
-  .asset-pair-details>summary{min-height:66px}
-  .depot-asset-card>summary{min-height:62px}
-  .section-title{gap:8px}
-  .section-title small{overflow-wrap:anywhere}
-  .scanner-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
-  .scanner-toolbar-actions button{width:100%}
-  .v10-live-blocked,.fib-loading,.fib-error,.paper-cockpit-state,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{min-height:58px;padding:10px}
-}
-@media(max-width:390px){
-  .app-shell{padding-left:calc(7px + env(safe-area-inset-left));padding-right:calc(7px + env(safe-area-inset-right))}
-  .system-actions{min-width:0}
-  .system-status{min-width:0}
-  .system-status .live{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-}
-
-
 /* v10 r75 · mobile / visual deep-audit hardening */
 html,body{max-width:100%;overflow-x:hidden}
 body{min-height:100dvh}
+.v10-topbar{top:env(safe-area-inset-top)}
 .v10-shell,main,.view,.view.active{min-width:0;max-width:100%}
 .v10-shell button,.v10-shell summary,.v10-shell input,.v10-shell select{font-family:inherit}
 .v10-shell button,.v10-shell summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .v10-shell button:focus-visible,.v10-shell summary:focus-visible,.v10-shell input:focus-visible,.v10-shell select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .v10-shell :where(.command-kpi-grid,.depot-venue-grid,.depot-asset-glance,.pair-summary,.leg-grid,.forecast-focus-grid,.scan-context-grid,.asset-detail-hero,.asset-detail-holding-summary,.paper-summary-grid,.paper-model-grid,.paper-cohort-grid)>*{min-width:0}
-.v10-shell :where(.v10-live-blocked,.paper-cockpit-state,.paper-refresh-warning,.v10-unverified-note){overflow-wrap:anywhere}
-nav{padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
+.v10-shell :where(.v10-live-blocked,.paper-cockpit-state,.paper-refresh-warning,.v10-unverified-note,.fib-loading,.fib-error,.sk-paper-empty,.sk-paper-error,.sk-v2-loading){overflow-wrap:anywhere}
+nav{padding-left:calc(8px + env(safe-area-inset-left));padding-right:calc(8px + env(safe-area-inset-right))}
 nav button{min-width:0}
 nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v10-topbar>div:first-child,.system-actions,.system-status{min-width:0}
@@ -879,11 +844,11 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .depot-asset-card>summary,.asset-pair-summary,.v10-bot-diagnostics>summary,.scanner-more>summary,.research-module>summary,.sk-rules>summary,.v10-snapshot-details>summary,.v10-unmatched-details>summary{min-height:44px}
   .command-kpi-grid b,.depot-venue-grid b,.depot-asset-glance b,.pair-summary b,.leg-grid b,.forecast-focus-grid b,.scan-context-grid b,.asset-detail-hero b,.paper-summary-grid b,.paper-model-grid b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
   .section-title{gap:8px}.section-title>*{min-width:0}.section-title small{overflow-wrap:anywhere}
-  .v10-live-blocked,.paper-safety-note,.paper-refresh-warning,.paper-cockpit-state{min-height:44px}
+  .v10-live-blocked,.paper-safety-note,.paper-refresh-warning,.paper-cockpit-state,.fib-loading,.fib-error,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{min-height:44px}
 }
 
 @media(max-width:600px){
-  .app-shell{padding-top:calc(6px + env(safe-area-inset-top));padding-right:max(8px,env(safe-area-inset-right));padding-bottom:calc(84px + env(safe-area-inset-bottom));padding-left:max(8px,env(safe-area-inset-left))}
+  .app-shell{padding-top:calc(6px + env(safe-area-inset-top));padding-right:calc(8px + env(safe-area-inset-right));padding-bottom:calc(84px + env(safe-area-inset-bottom));padding-left:calc(8px + env(safe-area-inset-left))}
   .v10-topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;margin:0 -1px 7px;padding:7px 2px 8px}
   .v10-topbar .brand{font-size:18px;white-space:nowrap}
   .v10-topbar>div:first-child>small{font-size:7px;letter-spacing:.06em}
@@ -895,14 +860,15 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .command-kpi-grid,.depot-venue-grid,.asset-detail-hero,.paper-summary-grid{gap:5px}
   .command-kpi-grid>div,.depot-venue-grid>div,.asset-detail-hero>div,.paper-summary-grid>div{padding:7px}
   .attention-row,.depot-integrity-note,.asset-detail-accounting-guard,.paper-safety-note,.paper-refresh-warning{padding:7px 8px}
-  .v10-live-blocked{display:grid;grid-template-columns:1fr;gap:3px;padding:8px 9px}
+  .v10-live-blocked,.fib-loading,.fib-error,.paper-cockpit-state,.sk-paper-empty,.sk-paper-error,.sk-v2-loading{min-height:58px;padding:10px}
+  .v10-live-blocked{display:grid;grid-template-columns:1fr;gap:3px}
   .v10-live-blocked small{max-width:none;text-align:left}
   .snapshot-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px}
   .snapshot-row span{max-width:none;overflow-wrap:anywhere}
   .scanner-toolbar,.paper-cockpit-toolbar,.asset-detail-topbar{scroll-margin-top:72px}
   nav{padding-top:5px}
-  nav button{padding:4px 2px;font-size:16px}
-  nav button span{font-size:7px;margin-top:2px;letter-spacing:.01em}
+  nav button{min-height:48px;padding:4px 2px;font-size:16px}
+  nav button span{font-size:8px;margin-top:2px;letter-spacing:.01em}
 }
 
 @media(max-width:430px){
@@ -922,10 +888,10 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:390px){
   .v10-topbar>div:first-child>small{display:none}
   .v10-topbar .brand{font-size:17px}
-  .system-status .live{font-size:6.5px}
+  .system-status .live{font-size:7px}
   .command-kpi-grid b,.depot-venue-grid b,.asset-detail-hero b,.paper-summary-grid b{font-size:11px}
   .command-kpi-grid .command-kpi-primary b,.depot-venue-grid .depot-total b{font-size:18px}
   .pair-summary,.scan-context-grid,.forecast-focus-grid,.paper-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .leg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  nav button span{font-size:6.5px}
+  nav button span{font-size:8px}
 }
