@@ -105,9 +105,9 @@ console.log('V10_UI_REGRESSION_PASS',build,JSON.stringify({primaryTabs:navButton
 must(js.includes('function marketIntel(symbol)'),'canonical market-intel resolver missing');
 must(js.includes("intelFresh(marketIntel('BTC'))"),'BTC freshness must use canonical market intel');
 must(js.includes("label:'STRUCTURE REVIEW',tone:'watch',rank:70"),'technical structure review must remain non-danger review');
-must(js.includes("label:'LIQ RISK',tone:'danger',rank:150"),'liquidation risk danger priority changed');
-must(js.includes("label:'PROTECTION RISK',tone:'danger',rank:160"),'hard protection danger priority changed');
-must(js.includes("rank:130,reason:unmatched.length+' private Bot-Rows"),'unverified API rows must outrank technical review');
+must(js.includes("label:'LIQ RISK',tone:'danger',rank:120"),'liquidation risk danger priority changed');
+must(js.includes("label:'PROTECTION RISK',tone:'danger',rank:130"),'hard protection danger priority changed');
+must(js.includes("rank:90,reason:unmatched.length+' private Bot-Rows"),'unverified API rows must outrank technical review');
 must(js.includes("OPPORTUNITY '+ctx.score+'/100"),'Forecast opportunity score must be explicitly named');
 must(js.includes("REGIME '+i.score+'/100"),'BTC regime score must be explicitly named');
 must(js.includes("function fibZonePosition(zone,current)"),'FIB zone position classifier missing');
