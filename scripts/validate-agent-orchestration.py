@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 state=json.loads((ROOT/'MERIDIAN_AGENT_STATE.json').read_text())
 resume=json.loads((ROOT/'MERIDIAN_RESUME.json').read_text())
+version=json.loads((ROOT/'version.json').read_text())
 
 errors=[]
 
@@ -27,6 +28,13 @@ req(1 <= int(sg.get('maxToolCallGroupsPerVisibleBurst',0)) <= 3,'visible burst t
 req(sg.get('checkpointBeforeLongOrIrreversibleStep') is True,'checkpoint-before-risk must be enabled')
 req(sg.get('streamIsNeverSourceOfTruth') is True,'streamIsNeverSourceOfTruth must be true')
 req(sg.get('repeatCompletedWritesAfterInterruption') is False,'completed writes must not be repeated after interruption')
+req(sg.get('maxToolCallGroupsPerVisibleBurst')==2,'visible burst tool-call group cap must be exactly 2')
+req(sg.get('maxSameStatusPollsPerVisibleBurst')==1,'same-status poll cap must be exactly 1')
+req(sg.get('maxVisibleBurstSeconds')==90,'visible burst time budget must be 90 seconds')
+req(sg.get('maxPayloadBytes')==6144,'stream payload budget must be 6144 bytes')
+req(sg.get('checkpointAfterEveryMutation') is True,'checkpoint-after-mutation must be enabled')
+req(sg.get('userVisibleCheckpointRequired') is True,'user-visible checkpoint must be required')
+req(sg.get('longOperationSplitRequired') is True,'long operations must be split into bounded bursts')
 
 routing=state.get('requestedModelRouting',{})
 req(routing.get('mainAgent')=='GPT-6-Astra','requested main model routing changed')
@@ -85,6 +93,8 @@ req(coord.get('agentState')=='MERIDIAN_AGENT_STATE.json','resume agentState miss
 req(coord.get('maxReviewLoops')==3,'resume maxReviewLoops must be 3')
 req(coord.get('streamingIsNeverSourceOfTruth') is True,'resume streaming source-of-truth guard missing')
 req(coord.get('resumeOnInterruption')=='RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOMPLETE_STEP','resume interruption policy mismatch')
+req(resume.get('build')==version.get('terminalBuild'),'MERIDIAN_RESUME build must match version.json terminalBuild')
+req(coord.get('streamSafeProtocol')=='STREAM-SAFE-V4','resume stream-safe protocol must be V4')
 
 if errors:
     for e in errors:

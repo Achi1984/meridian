@@ -21,11 +21,17 @@
     "fallbackDisclosureRequired": true
   },
   "streamingGuard": {
-    "maxToolCallGroupsPerVisibleBurst": 3,
+    "maxToolCallGroupsPerVisibleBurst": 2,
     "checkpointBeforeLongOrIrreversibleStep": true,
     "streamIsNeverSourceOfTruth": true,
     "recoveryMode": "RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOMPLETE_DURABLE_STEP",
-    "repeatCompletedWritesAfterInterruption": false
+    "repeatCompletedWritesAfterInterruption": false,
+    "maxSameStatusPollsPerVisibleBurst": 1,
+    "maxVisibleBurstSeconds": 90,
+    "maxPayloadBytes": 6144,
+    "checkpointAfterEveryMutation": true,
+    "userVisibleCheckpointRequired": true,
+    "longOperationSplitRequired": true
   },
   "recoveryChecks": [
     "LATEST_MAIN_SHA",
