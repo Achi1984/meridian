@@ -18,13 +18,14 @@ function extract(name,nextName){
 const botTypeLabel=new Function(extract('botTypeLabel','botTypeSummary')+';return botTypeLabel')();
 const botRangeState=new Function(extract('botRangeState','botRangeSummary')+';return botRangeState')();
 
-test('r71 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r71');
+test('r71 bot-control contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=71);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r71-COMMAND-DEPOT-BOT-CONTROL-2');
-  assert.match(root,/10\.0-r71-production/);
-  assert.match(html,/10\.0-r71/);
-  assert.match(v10,/const BUILD='10\.0-r71'/);
+  assert.match(String(release.dashboardShell||''),/BOT-CONTROL/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r71 preserves live bot type and grid metadata without changing matching inputs',()=>{
