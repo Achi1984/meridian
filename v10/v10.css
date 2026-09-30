@@ -929,3 +929,20 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .context-return-bar small{font-size:7px;color:var(--muted);line-height:1.35;text-align:right}
 @media(max-width:760px){.context-return-bar button{min-height:44px}}
 @media(max-width:520px){.context-return-bar{align-items:flex-start;flex-direction:column}.context-return-bar small{text-align:left}}
+
+
+/* v10 r79 · Command Action Hub */
+.command-action-hub{margin:0 0 10px}
+.command-action-hub>.section-title{margin:0 2px 6px}
+.command-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.command-hub-card{min-height:72px;border:1px solid #1d3147;border-left:3px solid currentColor;border-radius:12px;background:linear-gradient(145deg,rgba(8,18,29,.98),rgba(6,11,18,.98));padding:8px 9px;text-align:left;color:#8194a8;font:inherit;touch-action:manipulation}
+.command-hub-card>span{display:block;font-size:7px;color:var(--muted);font-weight:900;letter-spacing:.08em}
+.command-hub-card>b{display:block;margin-top:3px;font-size:10px;color:currentColor}
+.command-hub-card>small{display:block;margin-top:3px;font-size:7px;color:#8999aa;line-height:1.3}
+.command-hub-card.tone-safe{color:var(--green)}
+.command-hub-card.tone-watch{color:var(--amber)}
+.command-hub-card.tone-danger{color:var(--red)}
+.command-hub-card.tone-muted{color:#8194a8}
+.command-hub-critical{grid-column:span 2}
+@media(max-width:760px){.command-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.command-hub-card{min-height:64px}}
+@media(max-width:430px){.command-action-grid{grid-template-columns:1fr 1fr}.command-hub-critical{grid-column:1/-1}.command-hub-card{min-height:48px;padding:8px}}
