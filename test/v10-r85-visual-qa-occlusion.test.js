@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
-const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const qa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
 const gate=fs.readFileSync(new URL('../scripts/v10-ui-regression-check.mjs',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
@@ -43,8 +42,10 @@ test('r85 visual evidence includes bottom states plus dedicated Forecast FIB sta
   assert.equal((qa.match(/\['(?:command|depot|bots|forecast|scanner)-/g)||[]).length,11);
 });
 
-test('r85 reserves extra mobile clearance for Depot and Bots',()=>{
-  assert.match(css,/#view-depot,#view-bots\{padding-bottom:calc\(96px \+ env\(safe-area-inset-bottom\)\)\}/);
+test('r85 occlusion audit ignores content hidden inside closed details',()=>{
+  assert.match(js,/function visualQaVisible\(el\)/);
+  assert.match(js,/node\.tagName==='DETAILS'&&!node\.open/);
+  assert.match(js,/\.filter\(visualQaVisible\):\[\]/);
 });
 
 test('r85 visual report records actual scroll and document height for evidence review',()=>{
