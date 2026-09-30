@@ -13,6 +13,9 @@ const v9=read('v9/v9.js');
 const css=read('v10/v10.css');
 const qa=read('scripts/v10-visual-qa.mjs');
 const qaFrame=read('v10/visual-qa-frame.html');
+const gateway=read('server-gateway.js');
+const historyStore=read('portfolio-history-store.js');
+const authorityUpdate=read('portfolio-authority-update.js');
 
 const build=String(release.terminalBuild||'');
 const rev=build.split('-').at(-1)||'';
@@ -301,3 +304,16 @@ must(js.includes("bindCommandPortfolioHero(view)"),'portfolio chart controls mus
 must(css.includes('.command-portfolio-hero'),'dominant portfolio hero styling missing');
 must(css.includes('.portfolio-range-switch button'),'portfolio range controls styling missing');
 must(css.includes('.portfolio-chart-line'),'portfolio chart line styling missing');
+
+
+/* r94 permanent portfolio-authority/history gates */
+must(String(release.dashboardShell||'').includes('PORTFOLIO-AUTHORITY-SERVER-HISTORY'),'dashboardShell must declare server portfolio authority history');
+must(gateway.includes('u.pathname==="/api/private/portfolio-authority"'),'portfolio authority endpoint missing');
+must(gateway.includes('reconcilePortfolioAuthority(current,body)'),'portfolio authority endpoint must use limited reconciler');
+must(gateway.includes('capturePortfolioHistoryOnce({db:pool(),data:merged.data,dedupeMs:0})'),'portfolio authority update must attempt immediate history capture');
+must(authorityUpdate.includes("action==='confirm_ledger'"),'Ledger confirmation action missing');
+must(authorityUpdate.includes("action==='set_okx'"),'OKX authority action missing');
+must(historyStore.includes("externalVenueExpectedVenues:hasLedgerHoldings?['OKX']:['Ledger','OKX']"),'history must use Ledger holdings as required venue authority');
+must(historyStore.includes("requiredHoldingVenues:hasLedgerHoldings?['Ledger']:[]"),'history Ledger required-holding contract missing');
+must(v9.includes("postJson('/api/private/portfolio-authority',{action:'confirm_ledger'})"),'client Ledger authority server sync missing');
+must(v9.includes("postJson('/api/private/portfolio-authority',{action:'set_okx',valueUsd:value})"),'client OKX authority server sync missing');
