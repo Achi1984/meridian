@@ -22,7 +22,7 @@ test('r104 history writer requires both strict Spot authority and Pionex equity 
   assert.match(store,/spotAuthorityComplete=base\?\.spotAuthority\?\.complete===true/);
   assert.match(store,/tradingAuthorityComplete=tradingAuthority\?\.found===true/);
   assert.match(store,/authorityComplete=spotAuthorityComplete&&tradingAuthorityComplete/);
-  assert.match(store,/sourceStatus:\{\.\.\.base\.sourceStatus,trading:tradingAuthorityComplete\?'PIONEX_EQUITY':'MISSING'\}/);
+  assert.match(store,/sourceStatus:\{\.\.\.base\.sourceStatus,trading:tradingAuthorityComplete\?'PIONEX_EQUITY':'MISSING'/);
 });
 
 test('r104 reader keeps audit evidence but excludes incomplete canonical points',()=>{
