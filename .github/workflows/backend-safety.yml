@@ -36,6 +36,7 @@ jobs:
           node --check scripts/start-gateway.mjs
           node --check scripts/runtime-smoke.mjs
           node --check scripts/frozen-research-guard.mjs
+          node --check scripts/v10-ui-regression-check.mjs
       - name: Frontend module syntax
         run: |
           node --check app-v6.06.js
@@ -58,6 +59,8 @@ jobs:
         run: |
           node scripts/release-sync.mjs --check
           node scripts/release-check.mjs
+      - name: V10 UI regression gate
+        run: node scripts/v10-ui-regression-check.mjs
       - name: Public privacy regression
         run: node scripts/privacy-check.mjs
       - name: High-confidence secret scan
