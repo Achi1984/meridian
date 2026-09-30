@@ -11,7 +11,7 @@ const candidates=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/goog
 const chrome=candidates.find(x=>fs.existsSync(x));
 if(!chrome)throw new Error('No Chrome/Chromium binary found for visual QA');
 
-const base=String(process.env.MERIDIAN_VISUAL_QA_BASE||'http://127.0.0.1:4173/v10/').replace(/\?$/,'');
+const base=String(process.env.MERIDIAN_VISUAL_QA_BASE||'http://127.0.0.1:4173/v10/visual-qa-frame.html').replace(/\?$/,'');
 const viewport={width:390,height:844};
 const cases=[
   ['command-top','command',0],['command-deep','command',900],
