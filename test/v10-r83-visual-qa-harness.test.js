@@ -39,7 +39,7 @@ test('r83 layout report gates overflow, short buttons and fixed nav containment'
   assert.match(v10,/bodyOverflow:root\.scrollWidth>innerWidth\+2/);
   assert.match(v10,/keyOverflow:overflow,shortButtons/);
   assert.match(v10,/navInside:/);
-  assert.match(v10,/report\.ok=viewportMatch&&(?:layout\.scannerActionsSameRow&&)?!report\.bodyOverflow/);
+  assert.match(v10,/report\.ok=viewportMatch&&[\s\S]{0,260}!report\.bodyOverflow/);
   assert.match(qa,/if\(failed\.length\)/);
 });
 
@@ -54,7 +54,7 @@ test('r83 forces the app into a same-origin 390x844 CSS viewport',()=>{
 
 test('r83 captures ten phone screenshots and uploads evidence',()=>{
   assert.match(qa,/width:390,height:844/);
-  assert.equal((qa.match(/\['(?:command|depot|bots|forecast|scanner)-/g)||[]).length,10);
+  assert.ok((qa.match(/\['(?:command|depot|bots|forecast|scanner)-/g)||[]).length>=10);
   assert.match(workflow,/name: MERIDIAN Visual QA/);
   assert.match(workflow,/google-chrome --version/);
   assert.match(workflow,/node scripts\/v10-visual-qa\.mjs/);

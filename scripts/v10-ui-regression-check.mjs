@@ -11,6 +11,7 @@ const html=read('v10/index.html');
 const js=read('v10/v10.js');
 const v9=read('v9/v9.js');
 const css=read('v10/v10.css');
+const qa=read('scripts/v10-visual-qa.mjs');
 
 const build=String(release.terminalBuild||'');
 const rev=build.split('-').at(-1)||'';
@@ -167,8 +168,28 @@ must(fs.existsSync('.github/workflows/v10-visual-qa.yml'),'visual QA workflow mi
 /* r84 permanent evidence-layout gates */
 must(String(release.dashboardShell||'').includes('EVIDENCE-LAYOUT-INVARIANTS'),'dashboardShell must declare evidence layout invariants');
 must(js.includes('const scannerActionsSameRow='),'visual QA scanner same-row invariant missing');
-must(js.includes('layout={scannerActionsSameRow}'),'visual QA layout evidence payload missing');
-must(js.includes('layout.scannerActionsSameRow&&!report.bodyOverflow'),'visual QA same-row invariant must gate pass/fail');
+must(js.includes('layout={scannerActionsSameRow'),'visual QA layout evidence payload missing');
+must(js.includes('layout.scannerActionsSameRow&&')&&js.includes('!report.bodyOverflow'),'visual QA same-row invariant must gate pass/fail');
 must(js.includes("updatedAt:new Date(now).toISOString(),snapshotAt:new Date(now).toISOString(),walletStatus:'OK'"),'visual QA account fixture must be timestamped and fresh');
 must(css.includes('#view-research .scanner-toolbar-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important'),'mobile Scanner actions must remain a two-column evidence-locked grid');
 must(css.includes('#view-research .scanner-toolbar-actions>button{width:100%!important;min-width:0!important;min-height:44px!important'),'Scanner action touch-target evidence guard missing');
+
+
+/* r85 permanent occlusion gates */
+must(String(release.dashboardShell||'').includes('VISUAL-QA-OCCLUSION'),'dashboardShell must declare visual QA occlusion');
+must(js.includes('const commandHubCards='),'Command Hub visual invariant missing');
+must(js.includes('const botSummaries='),'Bot accordion visual invariant missing');
+must(js.includes('const forecastFibInvariant='),'Forecast/FIB visual invariant missing');
+must(js.includes('const nearBottom=scrollY+innerHeight>=root.scrollHeight-4'),'bottom-state detector missing');
+must(js.includes('const navCandidates=nearBottom?'),'bottom-nav occlusion candidate scan missing');
+must(js.includes('navOcclusions'),'bottom-nav occlusion evidence missing');
+must(js.includes('layout.bottomClearance&&!report.bodyOverflow'),'bottom clearance must gate visual QA pass/fail');
+must(js.includes('layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant'),'view structural invariants must gate visual QA');
+must(qa.includes("['command-bottom','command',6000]"),'Command bottom evidence capture missing');
+must(qa.includes("['bots-bottom','bots',6000]"),'Bots bottom evidence capture missing');
+must(qa.includes("['forecast-fib','market',1050]"),'Forecast FIB evidence capture missing');
+must(qa.includes("['forecast-bottom','market',6000]"),'Forecast bottom evidence capture missing');
+must(qa.includes("['scanner-bottom','research',6000]"),'Scanner bottom evidence capture missing');
+must(js.includes('function visualQaVisible(el)'),'visibility-aware visual QA helper missing');
+must(js.includes("node.tagName==='DETAILS'&&!node.open"),'closed-details visibility exclusion missing');
+must(js.includes(".filter(visualQaVisible):[]"),'nav occlusion scan must ignore hidden details content');
