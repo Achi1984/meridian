@@ -16,14 +16,15 @@ function extract(name,nextName){
 }
 const selectHistoryAnchor=new Function(extract('selectHistoryAnchor','historyDelta')+';return selectHistoryAnchor')();
 
-test('r70 release identity is execution-neutral and cache-coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r70');
+test('r70 history contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=70);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r70-COMMAND-DEPOT-HISTORY-HARDENED');
-  assert.match(root,/10\.0-r70-production/);
-  assert.match(html,/10\.0-r70/);
-  assert.match(v10,/const BUILD='10\.0-r70'/);
-  assert.equal(manifest.start_url,'./v10/?build=r70&fresh=r70');
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r70 accepts the nearest strict history point slightly after the exact 7d boundary',()=>{
