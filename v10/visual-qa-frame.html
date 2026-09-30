@@ -21,6 +21,7 @@
   frame.src=inner.pathname+inner.search;
   document.body.appendChild(frame);
   let tries=0;
+  const maxTries=480;
   const pump=()=>{
     tries++;
     try{
@@ -31,7 +32,7 @@
         return;
       }
     }catch(e){}
-    if(tries<240)setTimeout(pump,20);
+    if(tries<maxTries)setTimeout(pump,20);
   };
   frame.addEventListener('load',()=>setTimeout(pump,0));
 })();
