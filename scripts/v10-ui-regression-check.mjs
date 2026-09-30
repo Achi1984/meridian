@@ -317,3 +317,11 @@ must(historyStore.includes("externalVenueExpectedVenues:hasLedgerHoldings?['OKX'
 must(historyStore.includes("requiredHoldingVenues:hasLedgerHoldings?['Ledger']:[]"),'history Ledger required-holding contract missing');
 must(v9.includes("postJson('/api/private/portfolio-authority',{action:'confirm_ledger'})"),'client Ledger authority server sync missing');
 must(v9.includes("postJson('/api/private/portfolio-authority',{action:'set_okx',valueUsd:value})"),'client OKX authority server sync missing');
+
+
+/* r95 permanent portfolio-history bootstrap UX gates */
+must(String(release.dashboardShell||'').includes('PORTFOLIO-HISTORY-BOOTSTRAP-UX'),'dashboardShell must declare portfolio history bootstrap UX');
+must(js.includes("storedPoints===0?(ready?'STARTPUNKT WIRD GESPEICHERT'"),'zero-point portfolio history state missing');
+must(js.includes("storedPoints===1?'1. MESSPUNKT GESPEICHERT · KURVE STARTET MIT DEM NÄCHSTEN'"),'one-point portfolio history bootstrap state missing');
+must(js.includes('portfolio-history-progress'),'portfolio history bootstrap progress missing');
+must(css.includes('.portfolio-history-progress'),'portfolio history progress styling missing');
