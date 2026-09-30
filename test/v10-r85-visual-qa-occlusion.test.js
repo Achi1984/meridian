@@ -44,7 +44,7 @@ test('r85 visual evidence includes bottom states plus dedicated Forecast FIB sta
 });
 
 test('r85 reserves extra mobile clearance for Depot and Bots',()=>{
-  assert.match(css,/#view-depot,#view-bots\{padding-bottom:calc\(48px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(css,/#view-depot,#view-bots\{padding-bottom:calc\(96px \+ env\(safe-area-inset-bottom\)\)\}/);
 });
 
 test('r85 visual report records actual scroll and document height for evidence review',()=>{
