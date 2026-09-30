@@ -221,3 +221,19 @@ must(js.includes("checks.sessionAssetRetained=String(saved.fibSymbol||'').toUppe
 must(js.includes("checks.scannerRestored=activeViewKey()==='research'"),'Scanner contextual return check missing');
 must(qa.includes("['flow-bot-filter-return','bots',0,'bot-filter-return']"),'Bot filter continuity evidence case missing');
 must(qa.includes("['flow-scanner-forecast-return','research',520,'scanner-forecast-return']"),'Scanner Forecast continuity evidence case missing');
+
+
+/* r88 permanent data-resilience QA gates */
+must(String(release.dashboardShell||'').includes('DATA-RESILIENCE-QA'),'dashboardShell must declare data resilience QA');
+must(js.includes("dataModes=['fresh','stale','error']"),'visual QA data-mode allowlist missing');
+must(js.includes("flows=['primary-reset','asset-return','bot-toggle','bot-filter-return','scanner-forecast-return','stale-recovery']"),'stale recovery QA flow missing');
+must(js.includes('function setLocalVisualQaDataMode(mode,s=S(),now=Date.now())'),'QA data-state mutator missing');
+must(js.includes("mode==='stale'")&&js.includes("mode==='error'"),'stale/error QA fixtures missing');
+must(js.includes("dataStateInvariant=cfg.dataMode==='stale'"),'data-state resilience invariant missing');
+must(js.includes("cfg.flow==='stale-recovery'"),'stale recovery interaction flow missing');
+must(js.includes("checks.failClosedBefore=!!$('#view-command .blocked-critical')"),'fail-closed stale guard check missing');
+must(js.includes("checks.botRecovered=after.BOTS==='READY'"),'Bot recovery check missing');
+must(js.includes("checks.marketRecovered=after.MARKET==='READY'"),'Market recovery check missing');
+must(qa.includes("['data-command-stale','command',0,null,'stale']"),'stale Command evidence case missing');
+must(qa.includes("['data-bots-error','bots',0,null,'error']"),'error Bots evidence case missing');
+must(qa.includes("['flow-stale-recovery','command',0,'stale-recovery','stale']"),'stale recovery evidence case missing');
