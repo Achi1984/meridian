@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r91';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r91';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r91';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r91';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r91';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r91';
-// MERIDIAN v10 r91 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r92';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r92';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r92';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r92';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r92';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r92';
+// MERIDIAN v10 r92 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r91';
+const BUILD='10.0-r92';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -349,7 +349,8 @@ function accountPositionLayer(compact=false){
     const asset=esc(String(x?.asset||x?.symbol||'?').toUpperCase()),side=esc(String(x?.side||'?').toUpperCase()),lev=Number(x?.leverage),mark=Number(x?.markPrice),liq=Number(x?.liquidationPrice);
     return '<div><span>'+asset+' '+side+'</span><b>'+(Number.isFinite(lev)?lev+'x':'—')+'</b><small>MARK '+(h.money?.(mark)||'—')+' · LIQ '+(h.money?.(liq)||'—')+'</small></div>';
   }).join(''):cards;
-  return '<section class="v10-account-position-layer"><div class="section-title"><h2>PIONEX ACCOUNT POSITIONS</h2><small>READ-ONLY · '+esc(p.age)+' · '+p.rows.length+' POSITION(S) · NICHT BOT-GEMATCHT</small></div><div class="'+(compact?'v10-live-overview':'v10-pair-stack')+'">'+body+'</div>'+(compact&&p.rows.length>shown?'<small>+'+(p.rows.length-shown)+' weitere Position(en) im BOTS-Tab.</small>':'')+'</section>';
+  if(compact)return '<details class="v10-account-position-layer command-position-details"><summary><span>ACCOUNT FUTURES</span><b>'+p.rows.length+' POSITION(S) · '+esc(p.age)+'</b></summary><div class="command-position-details-body"><div class="v10-live-overview">'+body+'</div>'+(p.rows.length>shown?'<small>+'+(p.rows.length-shown)+' weitere Position(en) im BOTS-Tab.</small>':'')+'</div></details>';
+  return '<section class="v10-account-position-layer"><div class="section-title"><h2>PIONEX ACCOUNT POSITIONS</h2><small>READ-ONLY · '+esc(p.age)+' · '+p.rows.length+' POSITION(S) · NICHT BOT-GEMATCHT</small></div><div class="v10-pair-stack">'+body+'</div></section>';
 }
 function walletDiscoveryHealth(){
   const s=S(),account=s?.pionexAccount||{},sync=s?.pionexAccountSync||{},wallet=account?.wallet||{},status=String(account?.walletStatus||'UNKNOWN'),ts=Date.parse(String(account.updatedAt||account.snapshotAt||'')),future=Number.isFinite(ts)&&ts>Date.now()+5*60*1000,ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=String(sync.status||'UNKNOWN')==='OK'&&status==='OK'&&!future&&ageMs!=null&&ageMs<=15*60*1000,h=H(),age=future?'FUTURE TIMESTAMP':ageMs!=null?(h.ageText?.(ageMs)||'—'):'NO TIMESTAMP';
@@ -445,16 +446,18 @@ function commandOverviewHtml(){
   const risk=crit?.status||{label:'SYNC',tone:'muted',reason:'Noch keine bewertbare Bot-Priorität'};
   const portfolioReady=p.complete===true,feedReady=g.decisionComplete&&m.coverageComplete;
   const dataTone=feedReady?'safe':g.fresh||m.fresh?'watch':'danger',dataLabel=feedReady?'READY':g.fresh||m.fresh?'PARTIAL':'STALE';
-  // DATA FRESHNESS semantic contract: LIVE DATA covers feed freshness only; portfolio authority remains separate.
+  // LIVE DATA covers feed freshness only; portfolio authority remains separate.
   const cards='<section class="command-kpi-grid"><div class="command-kpi-primary"><span>GESAMTVERMÖGEN</span><b>'+(portfolioReady?h.money?.(p.total):'—')+'</b><small>'+(portfolioReady?'kanonischer Venue-Total':'Authority unvollständig')+'</small></div>'+deltaHtml(d24,'24H Δ')+deltaHtml(d7,'7T Δ')+'<div><span>RISK STATUS</span><b class="tone-'+esc(risk.tone)+'">'+esc(risk.label)+'</b><small>'+esc(crit?.symbol||'Portfolio')+'</small></div><div><span>LIVE DATA</span><b class="tone-'+dataTone+'">'+dataLabel+'</b><small>MKT '+m.freshAssets+'/'+m.totalAssets+' · BOT '+g.decisionReady+'/'+g.matched+'</small></div></section>';
-  const items=[];
+  return '<section class="command-overview-v2">'+cards+'</section>';
+}
+function commandAttentionHtml(){
+  const s=S(),p=s?.portfolio||{},g=syncHealth(),m=marketHealth(),crit=criticalPair(),portfolioReady=p.complete===true,items=[];
   if(!portfolioReady)items.push({tone:'danger',title:'PORTFOLIO AUTHORITY',detail:portfolioAuthorityDetail(p)});
   if(crit&&['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'].includes(crit.status.code))items.push({tone:crit.status.tone,title:(crit.symbol||'BOT')+' · '+crit.status.label,detail:crit.status.reason});
   if(!g.decisionComplete)items.push({tone:'watch',title:'BOT COVERAGE',detail:g.decisionReady+'/'+g.matched+' decision-ready · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')});
   if(!m.coverageComplete)items.push({tone:'watch',title:'MARKET COVERAGE',detail:m.freshAssets+'/'+m.totalAssets+' frisch · '+m.staleAssets+' stale · '+m.missingAssets+' missing'});
   const shown=items.slice(0,3);
-  const attention='<section class="command-attention"><div class="section-title"><h2>ATTENTION</h2><small>maximal drei Punkte · Safety und Datenqualität zuerst</small></div>'+(shown.length?shown.map(x=>'<article class="attention-row tone-'+x.tone+'"><b>'+esc(x.title)+'</b><small>'+esc(x.detail)+'</small></article>').join(''):'<article class="attention-row tone-safe"><b>KEIN KRITISCHER PUNKT</b><small>Portfolio-, Bot- und Marktquellen sind aktuell ohne priorisierten Blocker.</small></article>')+'</section>';
-  return '<section class="command-overview-v2">'+cards+attention+'</section>';
+  return '<section class="command-attention"><div class="section-title"><h2>ATTENTION</h2><small>maximal drei Punkte · Safety und Datenqualität zuerst</small></div>'+(shown.length?shown.map(x=>'<article class="attention-row tone-'+x.tone+'"><b>'+esc(x.title)+'</b><small>'+esc(x.detail)+'</small></article>').join(''):'<article class="attention-row tone-safe"><b>KEIN KRITISCHER PUNKT</b><small>Portfolio-, Bot- und Marktquellen sind aktuell ohne priorisierten Blocker.</small></article>')+'</section>';
 }
 function commandActionHubHtml(){
   const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=paperReadiness(),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null,next=nextAction();
@@ -593,8 +596,8 @@ function renderCommand(force=false){
   if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
   dataGuardDecorate();
-  view.querySelectorAll('.data-state-strip,.command-overview-v2,.command-action-hub,.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
-  const hero=$('.portfolio-hero',view),stateBox=document.createElement('div');stateBox.innerHTML=dataStateStripHtml('command');const stateNode=stateBox.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',stateNode);const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;stateNode.insertAdjacentElement('afterend',overviewNode);const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);if(hero)hero.classList.add('command-source-authority');const c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;
+  view.querySelectorAll('.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
+  const hero=$('.portfolio-hero',view),stateBox=document.createElement('div');stateBox.innerHTML=dataStateStripHtml('command');const stateNode=stateBox.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',stateNode);const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;stateNode.insertAdjacentElement('afterend',overviewNode);const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);if(hero)hero.classList.add('command-source-authority');const c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;
   (hero||overviewNode).insertAdjacentElement('afterend',sourceNode);
   const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
   const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
