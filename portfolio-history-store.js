@@ -7,7 +7,8 @@ export const PORTFOLIO_HISTORY_VERSION='7.64-CANONICAL-PORTFOLIO-HISTORY-V1';
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
 
 export function historySnapshot(data={},opts={}){
-  const strictData={...data,portfolio:{...(data?.portfolio||{}),authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:['Ledger','OKX']}};
+  const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],hasLedgerHoldings=holdings.some(h=>String(h?.venue||'').trim().toLowerCase()==='ledger'&&Number(h?.quantity)>0);
+  const strictData={...data,portfolio:{...(data?.portfolio||{}),authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:hasLedgerHoldings?['OKX']:['Ledger','OKX'],requiredHoldingVenues:hasLedgerHoldings?['Ledger']:[]}};
   const base=canonicalPortfolioSnapshot(strictData,opts.timestamp??Date.now());
   const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),authorityComplete=base?.spotAuthority?.complete===true;
   return{
