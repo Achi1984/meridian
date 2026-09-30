@@ -8,13 +8,16 @@ const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r102 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r102');
+test('r102 contract remains execution-neutral and cache coherent on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m);
+  assert.ok(Number(m[1])>=102);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/LIVE-HISTORY-INTEGRITY/);
-  assert.equal(manifest.start_url,'./v10/?build=r102&fresh=r102');
-  assert.ok(js.includes("const BUILD='10.0-r102'"));
-  assert.match(html,/v10 r102 · SMART TRADING TERMINAL/);
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
+  assert.match(html,new RegExp('v10 r'+m[1]+' · SMART TRADING TERMINAL'));
 });
 
 test('r102 exposes deployed build and strict-history integrity beside the portfolio chart',()=>{
