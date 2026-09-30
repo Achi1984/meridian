@@ -201,12 +201,13 @@ Because exposure is continuous and netted, also report:
 Strategy V1 may advance only to a separate Paper-research proposal if **all** of the following hold under the primary 6 bp one-way cost case:
 
 1. full-window net return > 0;
-2. full-window **daily profit factor** > 1.00;
-3. maximum drawdown < 15%;
-4. at least 3 of 4 chronological blocks have positive net return;
-5. final block B4 has positive net return;
-6. at least 4 of 6 assets have positive net contribution;
-7. no single asset contributes more than 40% of total positive asset PnL.
+2. maximum drawdown < 15%;
+3. at least 3 of 4 chronological blocks have positive net return;
+4. final block B4 has positive net return;
+5. at least 4 of 6 assets have positive net contribution;
+6. no single asset contributes more than 40% of total positive asset PnL.
+
+Daily profit factor remains a required reported metric, but it is **not a separate gate** because a threshold of 1.00 is algebraically redundant with positive total net PnL for the same daily PnL series.
 
 Failure of any primary gate freezes **STRATEGY V1 FAIL**.
 
