@@ -7,7 +7,7 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r67 renders live assets as collapsible risk-first cards',()=>{
-  assert.match(v10,/function pairCard\(symbol,compact=false,open=false\)/);
+  assert.match(v10,/function pairCard\(symbol,compact=false,open=false(?:,assetLink=false)?\)/);
   assert.match(v10,/<details class="asset-pair asset-pair-details pair-tone-/);
   assert.match(v10,/data-symbol="/);
   assert.match(v10,/asset-glance/);

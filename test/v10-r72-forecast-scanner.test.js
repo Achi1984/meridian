@@ -15,14 +15,16 @@ function block(start,end){
   return v10.slice(a,b);
 }
 
-test('r72 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r72');
+test('r72 Forecast/Scanner contract remains active on successor terminal builds',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=72);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(release.dashboardShell,'10.0-r72-COMMAND-DEPOT-BOT-CONTROL-FORECAST-SCANNER');
-  assert.match(root,/10\.0-r72-production/);
-  assert.match(html,/10\.0-r72/);
-  assert.match(v10,/const BUILD='10\.0-r72'/);
-  assert.equal(manifest.start_url,'./v10/?build=r72&fresh=r72');
+  assert.match(String(release.dashboardShell||''),/FORECAST-SCANNER/);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(html.includes(release.terminalBuild));
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
+  const rev=release.terminalBuild.split('-').at(-1);
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
 });
 
 test('r72 Opportunity Quality is market-context only and excludes bot linkage from scoring',()=>{
