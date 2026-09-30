@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot, portfolioPriceCoverage, sourceTimestampAge } from '../portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, alignSeriesToSnapshot, portfolioConsistency, oneDayPerformance, pionexEquitySnapshot, authoritativePionexEquitySnapshot, holdingUsd, latestPortfolioHistorySnapshot, portfolioPriceCoverage, sourceTimestampAge } from '../portfolio-data-contract.js';
 
 test('canonical snapshot sums live spot holdings plus Pionex equity once',()=>{
   const data={livePrices:{SOL:{price:100},BTC:{price:50000}},portfolio:{holdings:[{symbol:'SOL',quantity:2,venue:'Bitpanda'},{symbol:'BTC',quantity:.01,venue:'OKX'},{symbol:'USDT',quantity:999,price:1,venue:'Pionex'}],pionexEquityUsd:900}};
@@ -56,18 +56,20 @@ test('missing holding quantity never coerces to zero over a stored USD value',()
 });
 
 
-test('latest canonical history point must be fresh and internally consistent',()=>{
-  const now=2_000_000;
+test('latest canonical history point must be fresh, internally consistent, and provenance-complete',()=>{
+  const now=2_000_000,authority={spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1'};
   const fresh=latestPortfolioHistorySnapshot({source:'POSTGRES_CANONICAL_HISTORY',points:[
-    {timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120},
-    {timestamp:1_950_000,spotUsd:110,tradingUsd:25,totalUsd:135}
+    {timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120,sourceStatus:{...authority,tradingUpdatedAt:950_000,tradingSource:'PIONEX_WALLET_READ_API'}},
+    {timestamp:1_950_000,spotUsd:110,tradingUsd:25,totalUsd:135,sourceStatus:{...authority,tradingUpdatedAt:1_900_000,tradingSource:'PIONEX_WALLET_READ_API'}}
   ]},now,100_000);
   assert.equal(fresh.found,true);
   assert.equal(fresh.fresh,true);
   assert.equal(fresh.totalUsd,135);
-  const stale=latestPortfolioHistorySnapshot({points:[{timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120}]},now,100_000);
+  const stale=latestPortfolioHistorySnapshot({points:[{timestamp:1_000_000,spotUsd:100,tradingUsd:20,totalUsd:120,sourceStatus:{...authority,tradingUpdatedAt:950_000,tradingSource:'PIONEX_WALLET_READ_API'}}]},now,100_000);
   assert.equal(stale.fresh,false);
-  const inconsistent=latestPortfolioHistorySnapshot({points:[{timestamp:1_950_000,spotUsd:100,tradingUsd:20,totalUsd:999}]},now,100_000);
+  const incompleteLegacy=latestPortfolioHistorySnapshot({points:[{timestamp:1_950_000,spotUsd:100,tradingUsd:20,totalUsd:120,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY'}}]},now,100_000);
+  assert.equal(incompleteLegacy.found,false);
+  const inconsistent=latestPortfolioHistorySnapshot({points:[{timestamp:1_950_000,spotUsd:100,tradingUsd:20,totalUsd:999,sourceStatus:{...authority,tradingUpdatedAt:1_900_000,tradingSource:'PIONEX_WALLET_READ_API'}}]},now,100_000);
   assert.equal(inconsistent.consistent,false);
   assert.equal(inconsistent.fresh,false);
 });
@@ -117,4 +119,36 @@ test('Pionex equity snapshot never borrows generic privateUpdatedAt as its own t
   assert.equal(direct.updatedAt,null);
   const venue=pionexEquitySnapshot({privateUpdatedAt:'2026-09-27T21:00:00Z',portfolio:{manualVenueBalances:[{venue:'Pionex',valueUsd:1234,updatedAt:'2026-09-20T00:00:00Z'}]}});
   assert.equal(venue.updatedAt,'2026-09-20T00:00:00Z');
+});
+
+
+test('authoritative Pionex equity prefers fresh wallet API over stale or zero portfolio seed',()=>{
+  const now=Date.parse('2026-09-30T21:00:00Z');
+  const d={
+    portfolio:{pionexEquityUsd:0,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:'2026-09-30T20:20:00Z'},
+    pionexAccountSync:{status:'OK'},
+    pionexAccount:{walletStatus:'OK',updatedAt:'2026-09-30T20:59:00Z',wallet:{totalInUsdt:34402.17}}
+  };
+  const out=authoritativePionexEquitySnapshot(d,now);
+  assert.equal(out.found,true);
+  assert.equal(out.fresh,true);
+  assert.equal(out.value,34402.17);
+  assert.equal(out.source,'PIONEX_WALLET_READ_API');
+});
+
+test('authoritative Pionex equity fails closed on untimed or stale private values',()=>{
+  const now=Date.parse('2026-09-30T21:00:00Z');
+  const untimed=authoritativePionexEquitySnapshot({portfolio:{pionexEquityUsd:34402.17,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT'}},now);
+  assert.equal(untimed.found,false);
+  const stale=authoritativePionexEquitySnapshot({portfolio:{pionexEquityUsd:34402.17,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:'2026-09-30T20:30:00Z'}},now);
+  assert.equal(stale.found,false);
+});
+
+test('authoritative Pionex equity accepts a fresh timestamped private authority when wallet read is unavailable',()=>{
+  const now=Date.parse('2026-09-30T21:00:00Z');
+  const out=authoritativePionexEquitySnapshot({portfolio:{pionexEquityUsd:1234.5,pionexEquitySource:'PRIVATE_PORTFOLIO_SNAPSHOT',pionexEquityUpdatedAt:'2026-09-30T20:58:00Z'}},now);
+  assert.equal(out.found,true);
+  assert.equal(out.fresh,true);
+  assert.equal(out.value,1234.5);
+  assert.equal(out.source,'PRIVATE_PORTFOLIO_SNAPSHOT');
 });

@@ -3,6 +3,7 @@
 
 export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V2';
 export const PORTFOLIO_AUTHORITY_MAX_AGE_MS=24*60*60*1000;
+export const PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS=15*60*1000;
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
 const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
@@ -40,6 +41,35 @@ export function sourceTimestampAge(updatedAt,now=Date.now()){
   if(timestampMs==null)return{known:false,future:false,timestampMs:null,ageMs:null};
   const future=timestampMs>nowMs+30000,ageMs=Math.max(0,nowMs-timestampMs);
   return{known:true,future,timestampMs,ageMs};
+}
+
+export function authoritativePionexEquitySnapshot(data={},now=Date.now(),maxAgeMs=PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS){
+  const nowMs=finite(now)??Date.now(),maxAge=Math.max(0,finite(maxAgeMs)??PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS);
+  const privateSnapshot=pionexEquitySnapshot(data),privateAge=sourceTimestampAge(privateSnapshot.updatedAt,nowMs);
+  const privateFresh=privateSnapshot.found===true&&privateAge.known&&!privateAge.future&&privateAge.ageMs<=maxAge;
+
+  const walletRaw=data?.pionexAccount?.wallet?.totalInUsdt,walletValue=finite(walletRaw),walletUpdatedAt=data?.pionexAccount?.updatedAt||data?.pionexAccount?.snapshotAt||null,walletAge=sourceTimestampAge(walletUpdatedAt,nowMs);
+  const walletStatus=String(data?.pionexAccount?.walletStatus||'UNKNOWN')==='OK',syncStatus=String(data?.pionexAccountSync?.status||'UNKNOWN')==='OK';
+  const walletFound=walletStatus&&syncStatus&&walletValue!=null&&walletValue>=0;
+  const walletFresh=walletFound&&walletAge.known&&!walletAge.future&&walletAge.ageMs<=maxAge;
+  const walletSnapshot={found:walletFound,value:walletValue??0,source:'PIONEX_WALLET_READ_API',updatedAt:walletUpdatedAt,fresh:walletFresh,ageMs:walletAge.ageMs,timestampMs:walletAge.timestampMs};
+
+  if(walletFresh&&(!privateFresh||Number(walletAge.timestampMs)>=Number(privateAge.timestampMs))){
+    return walletSnapshot;
+  }
+  if(privateFresh){
+    return{...privateSnapshot,fresh:true,ageMs:privateAge.ageMs,timestampMs:privateAge.timestampMs};
+  }
+  return{
+    found:false,
+    value:0,
+    source:'MISSING_OR_STALE',
+    updatedAt:null,
+    fresh:false,
+    ageMs:null,
+    timestampMs:null,
+    reason:walletFound?'WALLET_STALE_OR_UNTIMED':privateSnapshot.found?'PRIVATE_STALE_OR_UNTIMED':'PIONEX_EQUITY_MISSING'
+  };
 }
 
 function venueKey(v){return String(v||'').trim().toLowerCase()}
@@ -154,7 +184,7 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
 
 export function latestPortfolioHistorySnapshot(history={},now=Date.now(),maxAgeMs=15*60*1000){
   const points=Array.isArray(history?.points)?history.points:[];
-  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null);
+  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'&&x?.sourceStatus?.tradingFresh===true&&String(x?.sourceStatus?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1');
   if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,sourceStatus:null,source:String(history?.source||'MISSING')};
   const timestamp=finite(point.timestamp),spotUsd=finite(point.spotUsd),tradingUsd=finite(point.tradingUsd),totalUsd=finite(point.totalUsd);
   const nowMs=finite(now)??Date.now(),future=timestamp!=null&&timestamp>nowMs+30000,ageMs=timestamp==null?null:Math.max(0,nowMs-timestamp);

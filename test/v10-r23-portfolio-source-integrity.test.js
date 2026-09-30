@@ -8,12 +8,10 @@ const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r23 COMMAND consumes canonical private Pionex equity snapshot',()=>{
-  assert.match(v9,/import \{[^}]*pionexEquitySnapshot[^}]*\} from '\.\.\/portfolio-data-contract\.js\?v=10\.0-r\d+'/);
+  assert.match(v9,/import \{[^}]*authoritativePionexEquitySnapshot[^}]*\} from '\.\.\/portfolio-data-contract\.js\?v=10\.0-r\d+'/);
   assert.ok(v9.includes("portfolio-data-contract.js?v="+release.terminalBuild));
   const block=v9.slice(v9.indexOf('function portfolioModel'),v9.indexOf('function pick'));
-  assert.match(block,/privatePionex=pionexEquitySnapshot\(d\)/);
-  assert.match(block,/walletEquity=num\(d\?\.pionexAccount\?\.wallet\?\.totalInUsdt\)/);
-  assert.match(block,/resolvedPionex=walletPionex&&\(!privateFresh\|\|walletTs>=privateTs\)\?walletPionex:privatePionex\.found\?privatePionex:/);
+  assert.match(block,/resolvedPionex=authoritativePionexEquitySnapshot\(d,now\)/);
   assert.match(block,/strictPortfolio=.*authorityMode:'STRICT_VENUE_SNAPSHOT'/s);
   assert.match(block,/canonicalInput=resolvedPionex\.found\?.*pionexEquityUsd:resolvedPionex\.value.*:.*pionexEquityUsd:state\.manual\.pionex/s);
   assert.match(block,/pionex=resolvedPionex\.found\?snapshot\.tradingUsd:null/);

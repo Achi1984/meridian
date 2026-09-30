@@ -14,6 +14,7 @@ const css=read('v10/v10.css');
 const qa=read('scripts/v10-visual-qa.mjs');
 const qaFrame=read('v10/visual-qa-frame.html');
 const gateway=read('server-gateway.js');
+const contract=read('portfolio-data-contract.js');
 const historyStore=read('portfolio-history-store.js');
 const authorityUpdate=read('portfolio-authority-update.js');
 
@@ -441,13 +442,28 @@ must(css.includes('/* v10 r103 · Scanner confluence explainability */'),'r103 S
 
 /* r104 permanent portfolio-history component-integrity gates */
 must(String(release.dashboardShell||'').includes('PORTFOLIO-HISTORY-COMPONENT-INTEGRITY'),'dashboardShell must declare portfolio history component integrity');
-must(String(release.dashboardConsistency||'').includes('CANONICAL-PORTFOLIO-HISTORY-V2'),'dashboard consistency must declare history V2');
-must(historyStore.includes('pionexEquitySnapshot'),'history writer must inspect Pionex equity authority');
+must(String(release.dashboardConsistency||'').includes('CANONICAL-PORTFOLIO-HISTORY-V'),'dashboard consistency must declare canonical history version');
+must(historyStore.includes('tradingAuthority'),'history writer must inspect Pionex equity authority');
 must(historyStore.includes('spotAuthorityComplete=base?.spotAuthority?.complete===true'),'history Spot authority component missing');
 must(historyStore.includes('tradingAuthorityComplete=tradingAuthority?.found===true'),'history Pionex authority component missing');
 must(historyStore.includes('authorityComplete=spotAuthorityComplete&&tradingAuthorityComplete'),'history completeness must require both components');
 must(historyStore.includes('canonicalHistoryPointComplete'),'canonical history point completeness filter missing');
 must(historyStore.includes("spotStatus==='STRICT_AUTHORITY'&&tradingStatus==='PIONEX_EQUITY'"),'history read filter must require Spot + Pionex authority');
 must(historyStore.includes('excludedIncompletePoints'),'history API must expose excluded incomplete count');
-must(js.includes("String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'"),'UI history guard must require Pionex equity authority');
+must(js.includes('portfolioHistoryTradingAuthorityFresh'),'UI history guard must require Pionex equity authority');
 must(js.includes('excludedIncompletePoints'),'UI must expose blocked legacy point count');
+
+
+/* r105 permanent Pionex history source-alignment gates */
+must(String(release.dashboardShell||'').includes('PIONEX-HISTORY-SOURCE-ALIGNMENT'),'dashboardShell must declare Pionex history source alignment');
+must(String(release.dashboardConsistency||'').includes('CANONICAL-PORTFOLIO-HISTORY-V3'),'dashboard consistency must declare history V3');
+must(contract.includes('export function authoritativePionexEquitySnapshot'),'authoritative Pionex equity resolver missing');
+must(contract.includes("source:'PIONEX_WALLET_READ_API'"),'fresh wallet API source path missing');
+must(contract.includes('PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS=15*60*1000'),'Pionex freshness window missing');
+must(historyStore.includes('authoritativePionexEquitySnapshot(strictData,timestamp)'),'history writer must use authoritative Pionex resolver');
+must(historyStore.includes("tradingAuthorityVersion:tradingAuthorityComplete?'PIONEX_FRESH_V1':'MISSING'"),'history provenance version missing');
+must(historyStore.includes('tradingUpdatedAt:tradingAuthority?.updatedAt||null'),'history Pionex timestamp provenance missing');
+must(historyStore.includes("authorityVersion==='PIONEX_FRESH_V1'"),'history reader must reject pre-r105 provenance');
+must(js.includes('function portfolioHistoryTradingAuthorityFresh(x){'),'client history freshness guard missing');
+must(js.includes('SPOT + FRESH PIONEX'),'history integrity UI must disclose fresh Pionex requirement');
+must(v9.includes('authoritativePionexEquitySnapshot(d,now)'),'live portfolio must share authoritative Pionex resolver');
