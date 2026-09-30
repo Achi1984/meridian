@@ -1,28 +1,35 @@
 // MERIDIAN v7.64 — Canonical Portfolio History
 // Private PostgreSQL persistence for one portfolio valuation basis.
 
-import { canonicalPortfolioSnapshot } from './portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, pionexEquitySnapshot } from './portfolio-data-contract.js';
 
-export const PORTFOLIO_HISTORY_VERSION='7.64-CANONICAL-PORTFOLIO-HISTORY-V1';
+export const PORTFOLIO_HISTORY_VERSION='7.64-CANONICAL-PORTFOLIO-HISTORY-V2';
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
 
 export function historySnapshot(data={},opts={}){
   const holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],ledgerAuthorityAt=String(data?.portfolio?.ledgerAuthorityAt||'').trim(),hasLedgerHoldings=!!ledgerAuthorityAt&&holdings.some(h=>String(h?.venue||'').trim().toLowerCase()==='ledger'&&Number(h?.quantity)>0);
   const strictData={...data,portfolio:{...(data?.portfolio||{}),authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:hasLedgerHoldings?['OKX']:['Ledger','OKX'],requiredHoldingVenues:hasLedgerHoldings?['Ledger']:[]}};
-  const base=canonicalPortfolioSnapshot(strictData,opts.timestamp??Date.now());
-  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),authorityComplete=base?.spotAuthority?.complete===true;
+  const base=canonicalPortfolioSnapshot(strictData,opts.timestamp??Date.now()),tradingAuthority=pionexEquitySnapshot(strictData);
+  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),spotAuthorityComplete=base?.spotAuthority?.complete===true,tradingAuthorityComplete=tradingAuthority?.found===true,authorityComplete=spotAuthorityComplete&&tradingAuthorityComplete;
   return{
     version:PORTFOLIO_HISTORY_VERSION,
     timestamp:base.timestamp,
     spotUsd:base.spotUsd,
     tradingUsd:base.tradingUsd,
     totalUsd:base.totalUsd,
+    spotAuthorityComplete,
+    tradingAuthorityComplete,
     authorityComplete,
     cashflowAdjustedTotalUsd:authorityComplete&&cumulative!=null?Math.round((base.totalUsd-cumulative)*100)/100:null,
     cumulativeCashflowUsd:cumulative,
     sourceRevision:Number.isInteger(data?.privateRevision)?data.privateRevision:null,
-    sourceStatus:base.sourceStatus
+    sourceStatus:{...base.sourceStatus,trading:tradingAuthorityComplete?'PIONEX_EQUITY':'MISSING'}
   };
+}
+
+export function canonicalHistoryPointComplete(point={}){
+  const timestamp=num(point?.timestamp),spotUsd=num(point?.spotUsd),tradingUsd=num(point?.tradingUsd),totalUsd=num(point?.totalUsd),spotStatus=String(point?.sourceStatus?.spot||''),tradingStatus=String(point?.sourceStatus?.trading||'');
+  return timestamp!=null&&spotUsd!=null&&spotUsd>=0&&tradingUsd!=null&&tradingUsd>=0&&totalUsd!=null&&totalUsd>=0&&Math.abs(totalUsd-(spotUsd+tradingUsd))<=1&&spotStatus==='STRICT_AUTHORITY'&&tradingStatus==='PIONEX_EQUITY';
 }
 
 export async function ensurePortfolioHistorySchema(db){
@@ -45,7 +52,7 @@ export async function ensurePortfolioHistorySchema(db){
 export async function appendPortfolioHistory(db,data={},opts={}){
   if(!db)return{ok:false,reason:'NO_DATABASE'};
   const s=historySnapshot(data,opts);
-  if(s.authorityComplete!==true)return{ok:false,reason:'PORTFOLIO_AUTHORITY_INCOMPLETE',snapshot:s};
+  if(s.authorityComplete!==true)return{ok:false,reason:'PORTFOLIO_AUTHORITY_INCOMPLETE',incompleteComponents:{spot:s.spotAuthorityComplete!==true,trading:s.tradingAuthorityComplete!==true},snapshot:s};
   if(!(s.totalUsd>=0))return{ok:false,reason:'INVALID_TOTAL'};
   const dedupeMs=Math.max(0,Number(opts.dedupeMs??5*60*1000)||0);
   const latest=await db.query(`SELECT captured_at,spot_usd,trading_usd,total_usd,cashflow_adjusted_total_usd
@@ -86,5 +93,6 @@ export async function readPortfolioHistory(db,opts={}){
     FROM meridian_portfolio_history
     WHERE captured_at>=to_timestamp($1/1000.0) AND captured_at<=to_timestamp($2/1000.0)
     ORDER BY captured_at ASC LIMIT $3`,[now-rangeMs,now,limit]);
-  return{version:PORTFOLIO_HISTORY_VERSION,source:'POSTGRES_CANONICAL_HISTORY',generatedAt:new Date(now).toISOString(),rangeMs,points:normalizeHistoryRows(r.rows||[])};
+  const normalized=normalizeHistoryRows(r.rows||[]),points=normalized.filter(canonicalHistoryPointComplete),excludedIncompletePoints=normalized.length-points.length;
+  return{version:PORTFOLIO_HISTORY_VERSION,source:'POSTGRES_CANONICAL_HISTORY',generatedAt:new Date(now).toISOString(),rangeMs,rawPointCount:normalized.length,excludedIncompletePoints,points};
 }
