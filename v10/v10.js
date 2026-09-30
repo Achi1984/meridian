@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r95';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r95';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r95';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r95';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r95';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r95';
-// MERIDIAN v10 r95 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r96';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r96';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r96';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r96';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r96';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r96';
+// MERIDIAN v10 r96 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r95';
+const BUILD='10.0-r96';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -410,6 +410,16 @@ function commandDataDisclosure(){
   const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),p=portfolioReadiness();
   return '<details class="command-source-details"><summary><div><span>DATA SOURCES</span><b>MKT '+esc(mr.label)+' · BOT '+esc(br.label)+' · PORTFOLIO '+esc(p.label)+'</b></div><small>Provenance, Asset Watch und Historie</small></summary>'+commandDataStrip()+'</details>';
 }
+function commandSystemDiagnostics(){
+  const g=syncHealth(),w=walletDiscoveryHealth(),ph=accountPositionHealth(),ready=g.decisionComplete&&w.status==='OK'&&ph.status==='OK'&&ph.fresh,details=document.createElement('details');
+  details.className='command-system-diagnostics';
+  details.innerHTML='<summary><div><span>SYSTEM STATUS</span><b class="tone-'+(ready?'safe':'watch')+'">'+(ready?'READY':'CHECK')+'</b></div><small>BOT '+g.decisionReady+'/'+g.matched+' · WALLET '+esc(w.label)+' · FUTURES '+esc(ph.label)+'</small></summary><div class="command-system-diagnostics-body"></div>';
+  const body=$('.command-system-diagnostics-body',details),live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;if(liveNode)body.append(liveNode);
+  const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true);const guardNode=guard.firstElementChild;if(guardNode)body.append(guardNode);
+  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)body.append(accountNode);
+  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayerCompact();const walletNode=wallet.firstElementChild;if(walletNode)body.append(walletNode);
+  return details;
+}
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
@@ -492,15 +502,20 @@ function portfolioChartRangeLabel(range){return range==='1h'?'1H':range==='1w'?'
 // Legacy Command semantic contract: GESAMTVERMÖGEN is now rendered as the dominant GESAMTPORTFOLIO hero.
 function portfolioChartHeroHtml(){
   const s=S(),p=s?.portfolio||{},h=H(),range=PORTFOLIO_CHART_WINDOWS[portfolioChartUi.range]?portfolioChartUi.range:'1d',m=portfolioChartModel(range),strictHistory=strictPortfolioHistoryPoints(),storedPoints=strictHistory.length,total=Number(p.total),ready=p.complete===true&&Number.isFinite(total)&&total>=0,totalText=ready?(h.money?.(total)||String(total)):'—',tone=!m.deltaAvailable?'muted':m.delta>0?'safe':m.delta<0?'danger':'muted',sign=m.delta!=null&&m.delta>0?'+':'',rangeLabel=portfolioChartRangeLabel(range),historySource=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
+  const ageLabel=ms=>Number.isFinite(Number(ms))?(h.ageText?.(Math.max(0,Number(ms)))||'—'):'—',okxTs=Date.parse(String(p.okxVenueUpdatedAt||'')),okxAge=Number.isFinite(okxTs)?Math.max(0,Date.now()-okxTs):null;
+  const sourceMoney=v=>Number.isFinite(Number(v))?(h.money?.(Number(v))||String(v)):'—',sourceCard=(label,value,detail,toneName='safe')=>'<div class="portfolio-venue-card tone-'+toneName+'"><span>'+esc(label)+'</span><b>'+sourceMoney(value)+'</b><small>'+esc(detail)+'</small></div>';
+  const ledgerDetail=p.ledgerAutoUsd!=null?'AUTHORITY · '+ageLabel(p.ledgerAutoAgeMs):'AUTHORITY FEHLT',okxDetail=p.okxVenueUsd!=null?(String(p.okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY').includes('SERVER')?'SERVER AUTH':'AUTHORITY')+' · '+ageLabel(okxAge):'AUTHORITY FEHLT',pionexDetail=p.pionex!=null?String(p.pionexSource||'PIONEX').replaceAll('_',' ')+' · '+ageLabel(p.pionexAgeMs):'FEHLT';
+  const venueStrip='<div class="portfolio-venue-strip">'+sourceCard('LEDGER',p.ledgerAutoUsd,ledgerDetail,p.ledgerAutoUsd!=null?'safe':'danger')+sourceCard('OKX',p.okxVenueUsd,okxDetail,p.okxVenueUsd!=null?'safe':'danger')+sourceCard('PIONEX',p.pionex,pionexDetail,p.pionex!=null?'safe':'danger')+'</div>';
   const buttons=['1h','1d','1w'].map(key=>'<button type="button" data-portfolio-range="'+key+'" aria-pressed="'+(key===range?'true':'false')+'" class="'+(key===range?'active':'')+'">'+portfolioChartRangeLabel(key)+'</button>').join('');
   const bootstrap=storedPoints===0?(ready?'STARTPUNKT WIRD GESPEICHERT':'HISTORIE WARTET AUF PORTFOLIO AUTHORITY'):storedPoints===1?'1. MESSPUNKT GESPEICHERT · KURVE STARTET MIT DEM NÄCHSTEN':'';
   const change=m.deltaAvailable?'<b class="tone-'+tone+'">'+sign+fmt(m.pct,2)+'%</b><small>'+sign+(h.money?.(m.delta)||fmt(m.delta,2))+' · '+m.points+' PUNKTE</small>':'<b class="tone-muted">—</b><small>'+(m.points>=2?'TEILVERLAUF · ZEITFENSTER NICHT VOLL':bootstrap)+'</small>';
+  const historyAge=Number.isFinite(Number(p.historyAgeMs))?ageLabel(p.historyAgeMs):'—',historyBadge='<div class="portfolio-history-status"><span>HISTORY</span><b>'+storedPoints+' PUNKTE</b><small>'+esc(storedPoints?historyAge:'START')+'</small></div>';
   let chart='<div class="portfolio-chart-empty portfolio-chart-bootstrap"><b>'+esc(bootstrap||'VERLAUF NOCH NICHT VERFÜGBAR')+'</b><small>'+(ready?'Kanonische History läuft automatisch weiter. Spätestens mit dem nächsten Messpunkt wird die Kurve sichtbar.':'Es werden ausschließlich vollständige STRICT_AUTHORITY-Punkte gezeichnet.')+'</small>'+(storedPoints===1?'<div class="portfolio-history-progress"><span class="done"></span><span></span><em>1 / 2</em></div>':'')+'</div>';
   if(m.geometry){
     const g=m.geometry,minLabel=h.money?.(g.rawMin)||fmt(g.rawMin,2),maxLabel=h.money?.(g.rawMax)||fmt(g.rawMax,2),startLabel=portfolioChartTimeLabel(m.first?.timestamp,range),endLabel=portfolioChartTimeLabel(m.last?.timestamp,range);
     chart='<div class="portfolio-chart-plot"><svg viewBox="0 0 '+g.width+' '+g.height+'" preserveAspectRatio="none" role="img" aria-label="Gesamtportfolio Verlauf '+rangeLabel+'"><line class="portfolio-chart-grid" x1="16" y1="18" x2="984" y2="18"></line><line class="portfolio-chart-grid" x1="16" y1="130" x2="984" y2="130"></line><line class="portfolio-chart-grid" x1="16" y1="242" x2="984" y2="242"></line><path class="portfolio-chart-area" d="'+g.area+'"></path><path class="portfolio-chart-line" d="'+g.line+'"></path></svg><div class="portfolio-chart-axis"><span>'+esc(startLabel)+'</span><span>'+esc(minLabel)+' – '+esc(maxLabel)+'</span><span>'+esc(endLabel)+'</span></div></div>';
   }
-  return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div><div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div>'+chart+'</section>';
+  return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+chart+'</section>';
 }
 function bindCommandPortfolioHero(view){
   view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -664,7 +679,7 @@ function renderCommand(force=false){
   if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
   banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
   dataGuardDecorate();
-  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
+  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
   const hero=$('.portfolio-hero',view),portfolioBox=document.createElement('div');portfolioBox.innerHTML=portfolioChartHeroHtml();const portfolioNode=portfolioBox.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',portfolioNode);const stateBox=document.createElement('div');stateBox.innerHTML=dataStateStripHtml('command');const stateNode=stateBox.firstElementChild;portfolioNode.insertAdjacentElement('afterend',stateNode);const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;stateNode.insertAdjacentElement('afterend',overviewNode);const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);if(hero)hero.classList.add('command-source-authority');const c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;
   (hero||overviewNode).insertAdjacentElement('afterend',sourceNode);
   const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
@@ -672,11 +687,7 @@ function renderCommand(force=false){
   wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Safety/Data Guard überstimmt Trading-Signal</small></div>'+criticalHtml;
   sourceNode.insertAdjacentElement('afterend',wrap);
   const action=$('.command-action',view);if(action)action.remove(); // NEXT ACTION is consolidated in the r80 Command Action Hub.
-  const live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;
-  wrap.insertAdjacentElement('afterend',liveNode);
-  const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true);const guardNode=guard.firstElementChild;if(guardNode)liveNode.insertAdjacentElement('afterend',guardNode);
-  const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)(guardNode||liveNode||wrap).insertAdjacentElement('afterend',accountNode);
-  const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayerCompact();const walletNode=wallet.firstElementChild;if(walletNode)(accountNode||guardNode||liveNode||wrap).insertAdjacentElement('afterend',walletNode);
+  const systemDiagnostics=commandSystemDiagnostics();wrap.insertAdjacentElement('afterend',systemDiagnostics);
   for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
   bindCommandActionHub(view);

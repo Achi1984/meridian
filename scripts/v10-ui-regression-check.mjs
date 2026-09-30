@@ -325,3 +325,21 @@ must(js.includes("storedPoints===0?(ready?'STARTPUNKT WIRD GESPEICHERT'"),'zero-
 must(js.includes("storedPoints===1?'1. MESSPUNKT GESPEICHERT · KURVE STARTET MIT DEM NÄCHSTEN'"),'one-point portfolio history bootstrap state missing');
 must(js.includes('portfolio-history-progress'),'portfolio history bootstrap progress missing');
 must(css.includes('.portfolio-history-progress'),'portfolio history progress styling missing');
+
+
+/* r96 permanent Command portfolio-hero cleanup gates */
+must(String(release.dashboardShell||'').includes('COMMAND-PORTFOLIO-HERO-CLEANUP'),'dashboardShell must declare Command portfolio hero cleanup');
+must(js.includes('class="portfolio-venue-strip"'),'portfolio venue split missing from dominant hero');
+must(js.includes("sourceCard('LEDGER'"),'Ledger venue card missing');
+must(js.includes("sourceCard('OKX'"),'OKX venue card missing');
+must(js.includes("sourceCard('PIONEX'"),'Pionex venue card missing');
+must(js.includes("okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY'"),'OKX server authority provenance missing in hero');
+must(v9.includes('okxVenueSource:okxVenue?.source||null'),'portfolio model must expose OKX authority source');
+must(!v9.includes("'LOCAL REF · '+okxAge"),'stale LOCAL REF label must remain removed');
+must(js.includes('function commandSystemDiagnostics()'),'collapsed Command system diagnostics missing');
+must(js.includes("details.className='command-system-diagnostics'"),'Command system diagnostics disclosure missing');
+must(js.includes("const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true)"),'compact Data Guard must remain inside Command diagnostics');
+must(js.includes("const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayerCompact()"),'compact wallet diagnostics must remain inside Command diagnostics');
+must(css.includes('#view-command .data-state-items{grid-template-columns:repeat(3,minmax(0,1fr))'),'Command data-state compact row missing');
+must(css.includes('#view-command .command-source-authority>.source-grid'),'duplicate authority source grid cleanup missing');
+must(css.includes('.command-system-diagnostics>summary'),'Command system diagnostics touch surface missing');
