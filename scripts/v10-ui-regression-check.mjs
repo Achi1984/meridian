@@ -254,3 +254,15 @@ must(js.includes('data-asset-back data-context-back="asset-detail"'),'Asset Deta
 
 must(js.includes("botErrorSurfaceInvariant=cfg.view!=='bots'||cfg.dataMode!=='error'||!!active.querySelector('.bot-live-blocked')"),'Bots ERROR visual QA must require visible fail-closed surface');
 must(js.includes("if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvariant=botErrorSurfaceInvariant"),'Bots ERROR state must replace accordion requirement with error-surface requirement');
+
+
+/* r90 permanent Command progressive-disclosure gates */
+must(String(release.dashboardShell||'').includes('COMMAND-PROGRESSIVE-DISCLOSURE'),'dashboardShell must declare Command progressive disclosure');
+must(js.includes('function dataGuardCard(compact=false)'),'Data Guard compact/full contract missing');
+must(js.includes('function walletDiscoveryLayer(compact=false)'),'Wallet discovery compact/full contract missing');
+must(js.includes('guard.innerHTML=dataGuardCard(true)'),'Command must use compact Data Guard');
+must(js.includes('wallet.innerHTML=walletDiscoveryLayer(true)'),'Command must use compact Wallet discovery');
+must(js.includes('command-next-decision command-next-action-open'),'Next Action critical-asset drilldown missing');
+must(!js.includes('class="command-hub-card command-hub-critical'),'duplicate Command critical-asset card must stay removed');
+must(css.includes('.v10-command-tech-details>summary'),'Command technical disclosure styling missing');
+must(css.includes('min-height:44px'),'touch target floor missing');
