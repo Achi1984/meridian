@@ -51,9 +51,10 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
   assert.match(js,/\.data-truth/);
 });
 
-test('v10 scanner requires aligned 1h and 4h confirmation',()=>{
+test('v10 scanner preserves aligned 1h and 4h confirmation inside successor ranking',()=>{
   assert.match(js,/OPPORTUNITY SCANNER/);
-  assert.match(js,/CONFIRMED braucht geschlossene 1h \+ 4h Alignment/);
+  assert.match(js,/BEAR CONFIRMED/);
+  assert.match(js,/BULL CONFIRMED/);
   assert.match(js,/bear1&&bear4/);
   assert.match(js,/bull1&&bull4/);
 });
@@ -100,23 +101,23 @@ test('v10 r13 bots suppress stale action cards and expose Asset Watch reference 
   assert.match(js,/function marketPrice/);
 });
 
-test('v10 r13 market is a multi-asset public-data board independent from bot freshness',()=>{
+test('v10 market remains a multi-asset public-data Forecast board independent from bot freshness',()=>{
   assert.match(js,/function btcRegimeLabel/);
   assert.doesNotMatch(js,/BTC REGIME<\/span><b>'\+String\(s\.market/);
   assert.match(js,/function marketUniverse/);
-  assert.match(js,/REGIME \+ FIB MAP \+ ASSET TAPE/);
-  assert.match(js,/Öffentliche Futures-Marktdaten · 1h\/4h\/1D bestätigt nur auf geschlossenen Kerzen/);
+  assert.match(js,/REGIME \+ OPPORTUNITY CONTEXT \+ FIB MAP/);
+  assert.match(js,/Kontext statt Renditeversprechen/);
   assert.match(js,/ASSET TAPE/);
   assert.match(js,/market-list/);
 });
 
-test('v10 r13 scanner ranks confirmed setups before raw pressure',()=>{
-  assert.match(js,/B\.rank-A\.rank\|\|B\.score-A\.score/);
+test('v10 scanner ranks Opportunity Quality first while preserving confirmation as tie-break evidence',()=>{
+  assert.match(js,/B\.score-A\.score\|\|sb\.rank-sa\.rank\|\|sb\.score-sa\.score/);
   assert.match(js,/BEAR CONFIRMED/);
   assert.match(js,/BULL CONFIRMED/);
   assert.match(js,/const confirmed=/);
   assert.match(js,/slice\(0,4\)/);
-  assert.match(js,/TOP SETUPS/);
+  assert.match(js,/TOP MARKET CONTEXTS/);
 });
 
 test('v10 r13 lab prioritizes documented edges while retaining SK and paired Profit Lock research',()=>{
