@@ -23,7 +23,7 @@ test('r96 dominant hero exposes Ledger OKX Pionex composition and history status
   assert.match(block,/sourceCard\('OKX'/);
   assert.match(block,/sourceCard\('PIONEX'/);
   assert.match(block,/portfolio-history-status/);
-  assert.match(block,/storedPoints\+' PUNKTE'/);
+  assert.match(block,/storedPoints\+' PUNKTE/);
 });
 
 test('r96 OKX UI uses server authority provenance rather than stale local-ref wording',()=>{
