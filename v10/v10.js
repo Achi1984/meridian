@@ -458,11 +458,11 @@ function bindAssetDetailLinks(view,returnView='depot',navKey=returnView){
 function openAssetDetail(symbol,returnView='depot',navKey=returnView){
   const key=String(symbol||'').trim().toUpperCase();if(!key)return;
   assetDetailUi.symbol=key;assetDetailUi.returnView=returnView;assetDetailUi.navKey=navKey;
-  fibUi.symbol=key;fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;
-  showSecondaryView('asset-detail',navKey);
+  fibUi.symbol=key;fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;persistUiContext();
+  showSecondaryView('asset-detail',navKey,{returnView,navKey,label:VIEW_LABELS[returnView]||String(returnView).toUpperCase()});
 }
 function closeAssetDetail(){
-  showSecondaryView(assetDetailUi.returnView||'depot',assetDetailUi.navKey||'depot');
+  contextualBack('asset-detail',assetDetailUi.returnView||'depot',assetDetailUi.navKey||'depot');
 }
 function assetDetailHoldingHtml(symbol){
   const h=H(),p=S()?.portfolio||{},row=depotAssetRows().find(x=>x.symbol===symbol),known=row?.valueKnown?Number(row.valueUsd):null,share=known!=null&&Number(p.total)>0?known/Number(p.total)*100:null;
@@ -489,7 +489,7 @@ function renderAssetDetail(force=false){
   }
   fibUi.symbol=symbol;
   const h=H(),row=depotAssetRows().find(x=>x.symbol===symbol),rows=matchedRows(symbol),mp=marketPrice(symbol),ctx=opportunityContext(symbol),st=rows.length?pairStatus(symbol):{label:'NO LIVE BOT',tone:'muted',reason:'Kein sicher gematchter privater Bot'},known=row?.valueKnown?Number(row.valueUsd):null;
-  view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back>← ZURÜCK</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+dataStateStripHtml('asset')+
+  view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back>← '+esc(contextReturnLabel('asset-detail','ZURÜCK'))+'</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+dataStateStripHtml('asset')+
     '<section class="asset-detail-hero"><div><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN HOLDING DETAIL</span><b>'+(known==null?'—':h.money?.(known))+'</b><small>nicht mit Bot-Exposure addieren</small></div><div><span>LIVE BOTS</span><b>'+rows.length+'</b><small>'+esc(st.reason)+'</small></div><div><span>OPPORTUNITY QUALITY</span><b class="tone-'+esc(ctx.tone)+'">'+(ctx.available?ctx.score+'/100':'—')+'</b><small>'+(ctx.available?esc(ctx.label):'NO FRESH CONTEXT')+'</small></div></section>'+
     '<section class="asset-detail-accounting-guard"><b>READ-ONLY DETAIL</b><small>Holdings, Bot-Exposure und Markt-Kontext bleiben getrennte Ebenen. Keine Orders, keine automatische Promotion, keine Doppelzählung.</small></section>'+
     assetDetailHoldingHtml(symbol)+assetDetailBotHtml(symbol)+assetDetailMarketHtml(symbol);
@@ -513,7 +513,12 @@ function renderDepot(force=false){
   $('[data-depot-action="close"]',view)?.addEventListener('click',()=>setOpen(false));
   bindAssetDetailLinks(view,'depot','depot');
 }
-function showSecondaryView(v,navKey='research'){
+function showSecondaryView(v,navKey='research',context=null){
+  const from=activeViewKey();
+  if(context!==false&&['asset-detail','paper','more','market'].includes(v)&&from!==v){
+    const meta=context&&typeof context==='object'?context:{},returnView=meta.returnView||from,returnNav=meta.navKey||activeNavKey();
+    viewContextUi[v]={returnView,navKey:returnNav,label:meta.label||VIEW_LABELS[returnView]||String(returnView||'ZURÜCK').toUpperCase()};
+  }
   $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
   $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===navKey));
   renderActiveView(v,true);decorateA11y();
@@ -586,7 +591,7 @@ function bindBotOverviewControls(view){
   const openBtn=$('[data-assets-action="open"]',view),closeBtn=$('[data-assets-action="close"]',view);
   if(openBtn)openBtn.onclick=()=>setOpen(true);
   if(closeBtn)closeBtn.onclick=()=>setOpen(false);
-  [...view.querySelectorAll('[data-bot-filter]')].forEach(btn=>{btn.onclick=()=>{botViewUi.filter=String(btn.dataset.botFilter||'ALL').toUpperCase();renderBots(true)}});
+  [...view.querySelectorAll('[data-bot-filter]')].forEach(btn=>{btn.onclick=()=>{botViewUi.filter=String(btn.dataset.botFilter||'ALL').toUpperCase();persistUiContext();renderBots(true)}});
   [...view.querySelectorAll('[data-asset-watch-share]')].forEach(btn=>{btn.onclick=()=>assetWatchShareAction(btn.dataset.assetWatchShare)});
   bindAssetDetailLinks(view,'bots','bots');
 }
@@ -794,7 +799,7 @@ function bindFibMap(view){
   const asset=$('#fib-asset',view),win=$('#fib-window',view),assetLocked=view?.id==='view-asset-detail';
   if(asset){
     if(assetLocked){asset.value=assetDetailUi.symbol;asset.disabled=true;asset.title='Asset ist im Asset Detail fixiert';}
-    else asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;refreshFibMap(view)};
+    else asset.onchange=()=>{fibUi.symbol=asset.value;fibUi.manualHigh=null;fibUi.manualLow=null;persistUiContext();refreshFibMap(view)};
   }
   if(win)win.onchange=()=>{fibUi.window=Number(win.value)||90;if(fibUi.mode==='AUTO')updateFibMap(view)};
   $$('[data-fib-mode]',view).forEach(btn=>btn.onclick=()=>{
@@ -817,8 +822,8 @@ function renderMarket(force=false){
   const s=S(),h=H(),i=s?.intel,syms=marketUniverse(),mh=marketHealth(),verified=syms.filter(symbol=>{const x=s?.priceChecks?.[symbol];return x?.verified&&freshTs(x.updatedAt)}).length;
   const health='<section class="market-health"><div><span>BTC TECH FEED</span><b class="tone-'+(mh.fresh?'safe':'watch')+'">'+(mh.fresh?'FRESH':'STALE')+'</b><small>'+esc(mh.ageText)+' · '+esc(mh.transport)+'</small></div><div><span>TECH COVERAGE</span><b class="tone-'+(mh.coverageComplete?'safe':'watch')+'">'+mh.freshAssets+'/'+mh.totalAssets+'</b><small>'+mh.staleAssets+' stale · '+mh.missingAssets+' missing</small></div><div><span>2-SOURCE PRICE</span><b>'+verified+'/'+syms.length+'</b><small>'+(mh.priceFresh?'fresh':'stale')+'</small></div><div><span>SOURCE</span><b>FUTURES</b><small>OKX / Binance USD-M</small></div></section>';
   const btc=mh.fresh&&i?'<section class="market-regime"><div><span>BTC REGIME</span><b>'+btcRegimeLabel(i)+'</b><small>'+h.money?.(i.price)+' · '+esc(i.source||'MARKET FEED')+' · '+esc(mh.ageText)+'</small></div><strong class="'+(i.score>=70?'tone-safe':i.score>=55?'tone-watch':'tone-muted')+'">'+i.score+'/100 · '+esc(i.status)+'</strong></section><section class="market-kpis"><div><span>RSI 15m / 1h</span><b>'+fmt(i.rsi15)+' · '+fmt(i.rsi1h)+'</b></div><div><span>RSI 4h / 1D</span><b>'+fmt(i.rsi4)+' · '+fmt(i.rsi1d)+'</b></div><div><span>MACD 1h / 4h</span><b>'+fmt(i.macd1h?.hist,2)+' · '+fmt(i.macd4?.hist,2)+'</b></div><div><span>EMA20 / EMA50 1D</span><b>'+h.money?.(i.ema20)+' / '+h.money?.(i.ema50)+'</b></div><div><span>NEAREST FIB</span><b>'+fmt(i.near?.f,3)+' · '+h.money?.(i.near?.price)+'</b></div><div><span>ATR 4h</span><b>'+h.money?.(i.atr)+'</b></div></section>':'<section class="v10-live-blocked market-stale"><b>BTC REGIME BLOCKED</b><small>Technische Marktdaten sind nicht frisch genug. Keine Regime-/Setup-Aussage aus altem Feed.</small></section>';
-  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+dataStateStripHtml('market')+'<div class="v10-market-board">'+health+forecastContextHtml(fibUi.symbol)+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · '+mh.freshAssets+' frisch · 15m/1h/4h</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
-  bindFibMap(view);
+  view.innerHTML='<section class="v10-mode-banner" data-tone="market"><div><span>FORECAST</span><b>REGIME + OPPORTUNITY CONTEXT + FIB MAP</b></div><small>Öffentliche Futures-Marktdaten · Kontext statt Renditeversprechen · 1h/4h/1D nur auf geschlossenen Kerzen</small></section>'+contextBarHtml('market')+dataStateStripHtml('market')+'<div class="v10-market-board">'+health+forecastContextHtml(fibUi.symbol)+btc+fibMapHtml()+'<div class="section-title"><h2>ASSET TAPE</h2><small>'+syms.length+' Märkte · '+mh.freshAssets+' frisch · 15m/1h/4h</small></div><div class="market-list">'+syms.map(marketRow).join('')+'</div></div>';
+  bindContextBack(view,'market','research','research');bindFibMap(view);
 }
 function scannerCard(symbol){
   const s=S(),h=H(),i=s?.assetIntel?.[symbol],ctx=opportunityContext(symbol),liveLinked=!!h.botFeedFresh?.()&&matchedRows(symbol).length>0,refLinked=referenceLinked(symbol),link=liveLinked?'LIVE BOT · FRESH':refLinked?'REF BOT · ASSET WATCH':'MARKET ONLY';
@@ -838,7 +843,7 @@ function renderScanner(force=false){
   view.innerHTML='<section class="v10-mode-banner" data-tone="research"><div><span>SCANNER</span><b>OPPORTUNITY SCANNER · FORECAST BRIDGE</b></div><small>Quality = Daten + MTF + Momentum + Trend + FIB-Kontext · Bot-Verknüpfung beeinflusst Ranking nicht</small></section>'+dataStateStripHtml('research')+'<section class="scanner-toolbar"><div><span>RESEARCH TOOLS</span><small>Paper Cockpit und Strategie-Lab bleiben sekundär. Jede Marktkarte kann direkt im Forecast/FIB-Kontext geöffnet werden.</small></div><div class="scanner-toolbar-actions"><button type="button" data-open-paper>PAPER COCKPIT</button><button type="button" data-open-lab>LAB ÖFFNEN</button></div></section><section class="scanner-summary"><div><span>FRESH MARKETS</span><b>'+fresh.length+'/'+all.length+'</b></div><div><span>CONFIRMED</span><b>'+confirmed.length+'</b></div><div><span>TOP QUALITY</span><b>'+(best?best.score+'/100':'—')+'</b><small>'+(top[0]?esc(top[0]):'—')+'</small></div><div><span>STALE / MISSING</span><b class="'+(blocked.length?'tone-watch':'tone-safe')+'">'+stale.length+' / '+missing.length+'</b></div></section><div class="section-title"><h2>TOP MARKET CONTEXTS</h2><small>Opportunity Quality ist ein transparenter Kontext-Score, keine erwartete Rendite</small></div><div class="v10-scanner-stack">'+stack+'</div>'+(rest.length?'<details class="scanner-more" '+(moreOpen?'open':'')+'><summary>WEITERE '+rest.length+' FRISCHE MÄRKTE</summary><div class="v10-scanner-stack">'+rest.map(scannerCard).join('')+'</div></details>':'')+(blocked.length?'<details class="scanner-more scanner-stale" '+(staleOpen?'open':'')+'><summary>STALE / NO DATA · '+stale.length+' / '+missing.length+'</summary><div class="v10-scanner-stack">'+blocked.map(scannerCard).join('')+'</div></details>':'');
   $('[data-open-paper]',view)?.addEventListener('click',()=>showSecondaryView('paper','research'));
   $('[data-open-lab]',view)?.addEventListener('click',()=>showSecondaryView('more','research'));
-  $$('[data-forecast-asset]',view).forEach(btn=>btn.addEventListener('click',()=>{fibUi.symbol=String(btn.dataset.forecastAsset||'BTC').toUpperCase();fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;showSecondaryView('market','market')}));
+  $$('[data-forecast-asset]',view).forEach(btn=>btn.addEventListener('click',()=>{fibUi.symbol=String(btn.dataset.forecastAsset||'BTC').toUpperCase();fibUi.mode='AUTO';fibUi.manualHigh=null;fibUi.manualLow=null;persistUiContext();showSecondaryView('market','market')}));
   bindAssetDetailLinks(view,'research','research');
 }
 function skNum(v,d=2){
@@ -1254,8 +1259,8 @@ async function loadPaperCockpit(force=false){
 }
 function renderPaperCockpit(force=false){
   const view=$('#view-paper');if(!view)return;
-  view.innerHTML='<section class="v10-mode-banner" data-tone="paper"><div><span>PAPER</span><b>BOT VALIDATION COCKPIT</b></div><small>Echte geschützte Paper-Ledger · Equity + DD + Trades · read-only</small></section>'+dataStateStripHtml('paper')+'<section class="paper-cockpit-toolbar"><button type="button" data-paper-back>← ZUM SCANNER</button><div><span>PAPER OVERVIEW V1</span><small>keine Auto-Promotion · keine Live-Orders</small></div><div class="paper-cockpit-actions"><button type="button" data-paper-lab>LAB</button><button type="button" data-paper-refresh '+(paperCockpitUi.loading?'disabled':'')+'>'+(paperCockpitUi.loading?'SYNC…':'AKTUALISIEREN')+'</button></div></section>'+paperCockpitHtml();
-  $('[data-paper-back]',view)?.addEventListener('click',()=>showSecondaryView('research','research'));
+  view.innerHTML='<section class="v10-mode-banner" data-tone="paper"><div><span>PAPER</span><b>BOT VALIDATION COCKPIT</b></div><small>Echte geschützte Paper-Ledger · Equity + DD + Trades · read-only</small></section>'+dataStateStripHtml('paper')+'<section class="paper-cockpit-toolbar"><button type="button" data-paper-back>← '+esc(contextReturnLabel('paper','SCANNER'))+'</button><div><span>PAPER OVERVIEW V1</span><small>keine Auto-Promotion · keine Live-Orders</small></div><div class="paper-cockpit-actions"><button type="button" data-paper-lab>LAB</button><button type="button" data-paper-refresh '+(paperCockpitUi.loading?'disabled':'')+'>'+(paperCockpitUi.loading?'SYNC…':'AKTUALISIEREN')+'</button></div></section>'+paperCockpitHtml();
+  $('[data-paper-back]',view)?.addEventListener('click',()=>contextualBack('paper','research','research'));
   $('[data-paper-lab]',view)?.addEventListener('click',()=>showSecondaryView('more','research'));
   $('[data-paper-refresh]',view)?.addEventListener('click',()=>loadPaperCockpit(true));
   if(!paperCockpitUi.loading&&(!paperCockpitUi.data||Date.now()-paperCockpitUi.loadedAt>=30000))queueMicrotask(()=>loadPaperCockpit(false));
@@ -1271,7 +1276,8 @@ function renderLab(){
   const dataStateHtml=dataStateStripHtml('lab');
   if(!dataState){const box=document.createElement('div');box.innerHTML=dataStateHtml;dataState=box.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',dataState)}
   else if(dataState.outerHTML!==dataStateHtml)dataState.outerHTML=dataStateHtml;
-  if(!$('.lab-backbar',view)){const back=document.createElement('section');back.className='lab-backbar';back.innerHTML='<button type="button" data-lab-back>← ZUM SCANNER</button><small>LAB ist Research-only und kein Haupttab.</small>';$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',back);$('[data-lab-back]',back)?.addEventListener('click',()=>showSecondaryView('research','research'))}
+  let back=$('.lab-backbar',view);if(!back){back=document.createElement('section');back.className='lab-backbar';$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',back)}
+  back.innerHTML='<button type="button" data-lab-back>← '+esc(contextReturnLabel('more','SCANNER'))+'</button><small>LAB ist Research-only und kein Haupttab · Rücksprung folgt dem Aufrufkontext.</small>';$('[data-lab-back]',back)?.addEventListener('click',()=>contextualBack('more','research','research'));
   $('.hero',view)?.remove();
 
   if(!$('.profit-agent-module',view)){
@@ -1343,6 +1349,7 @@ function bindV10NavigationAuthority(){
     b.onclick=e=>{
       e?.preventDefault?.();
       const v=String(b.dataset.v||'command');
+      delete viewContextUi[v];
       const ok=bridge()?.goView?.(v);
       if(!ok){
         $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
