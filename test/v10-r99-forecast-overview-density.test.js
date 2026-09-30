@@ -24,11 +24,7 @@ test('r99 release identity is execution-neutral and cache coherent',()=>{
 
 test('r99 makes selected Forecast focus and Fib map the primary visible surfaces',()=>{
   const block=renderBlock();
-  const focus=block.indexOf('forecastContextHtml(fibUi.symbol)');
-  const tech=block.indexOf("class=\"market-tech-details\"");
-  const fib=block.indexOf('fibMapHtml()');
-  const tape=block.indexOf("class=\"market-tape-details\"");
-  assert.ok(focus>=0&&tech>focus&&fib>tech&&tape>fib);
+  assert.match(block,/forecastContextHtml\(fibUi\.symbol\)\+technical\+fibMapHtml\(\)\+tape/);
   assert.match(block,/REGIME \+ OPPORTUNITY CONTEXT \+ FIB MAP/);
 });
 
