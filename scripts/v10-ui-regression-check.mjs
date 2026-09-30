@@ -363,7 +363,7 @@ must(js.includes("liveCards=syms.map(symbol=>pairCard(symbol,false,hadAssetAccor
 must(js.includes("const riskCount=allSyms.filter(symbol=>botFilterMatch(symbol,'RISK')).length"),'Bots risk-count summary missing');
 must(js.includes("profitCount=allSyms.filter(symbol=>botFilterMatch(symbol,'PROFIT')).length"),'Bots profit-count summary missing');
 must(js.includes("hedgeCount=allSyms.filter(symbol=>botFilterMatch(symbol,'HEDGE')).length"),'Bots hedge-count summary missing');
-must(js.includes("'RISIKO '+riskCount+' · PROFIT '+profitCount+' · HEDGE '+hedgeCount"),'Bots filter-count summary missing');
+must(js.includes("<small>RISIKO '+riskCount+' · PROFIT '+profitCount+' · HEDGE '+hedgeCount"),'Bots filter-count summary missing');
 must(css.includes('#view-bots .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Bots compact data-state row missing');
 must(css.includes('#view-bots .asset-pair-details>summary{min-height:60px'),'Bots compact asset summary missing');
 must(css.includes('#view-bots .bot-filter-actions{width:100%;grid-template-columns:repeat(4,minmax(0,1fr))'),'Bots four-filter mobile row missing');
