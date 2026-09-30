@@ -223,11 +223,11 @@ function portfolioReadiness(){
 }
 function marketStateItem(){
   const m=marketHealth(),r=marketReadiness(m);
-  return{key:'MARKET',label:r.label,tone:r.tone,detail:esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'};
+  return{key:'MARKET',label:r.label,tone:r.tone,detail:String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'};
 }
 function botStateItem(){
   const g=syncHealth(),r=botReadiness(g);
-  return{key:'BOTS',label:r.label,tone:r.tone,detail:esc(g.age)+' · '+g.decisionReady+'/'+g.matched+' decision-ready'};
+  return{key:'BOTS',label:r.label,tone:r.tone,detail:String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready'};
 }
 function paperReadiness(){
   const d=paperCockpitUi.data;
@@ -259,7 +259,7 @@ function dataStateStripHtml(scope){
     lab:[research]
   },items=map[scope]||[];
   const notes={command:'Portfolio, Bots und Markt separat',depot:'Authority + Bot-Verknüpfung',bots:'Private Bots + öffentlicher Marktfeed',market:'Nur öffentlicher Marktfeed ist Forecast-Grundlage',research:'Bot-Status beeinflusst Scanner-Ranking nicht',asset:'Holdings, Bots und Markt bleiben getrennt',paper:'Geschützter Paper Overview · read-only',lab:'Nur lokaler Research-Session-Status'};
-  return '<section class="data-state-strip" data-data-scope="'+esc(scope)+'"><div class="data-state-label"><span>DATA STATE</span><small>'+esc(notes[scope]||'Vorhandene Guards')+'</small></div><div class="data-state-items">'+items.map(x=>'<div class="data-state-item tone-'+esc(x.tone)+'"><span>'+esc(x.key)+'</span><b>'+esc(x.label)+'</b><small>'+x.detail+'</small></div>').join('')+'</div></section>';
+  return '<section class="data-state-strip" data-data-scope="'+esc(scope)+'"><div class="data-state-label"><span>DATA STATE</span><small>'+esc(notes[scope]||'Vorhandene Guards')+'</small></div><div class="data-state-items">'+items.map(x=>'<div class="data-state-item tone-'+esc(x.tone)+'"><span>'+esc(x.key)+'</span><b>'+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></div>').join('')+'</div></section>';
 }
 function matchStageDiagnosticsCard(){
   const s=S(),d=s?.matchDiagnostics;
