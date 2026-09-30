@@ -27,8 +27,10 @@ async function publicPrices(){
   return out;
 }
 export function mergeRuntimePrices(data={},prices={}){
-  const next={...data,livePrices:{...(data.livePrices||{})}};
-  for(const h of data?.portfolio?.holdings||[]){const s=sym(h?.symbol),p=Number(prices[s]);if(p>0)next.livePrices[h.symbol]={price:p,source:'BINANCE_PUBLIC_HISTORY_CAPTURE'};}
+  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],requested=holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').length;
+  for(const h of holdings){const s=sym(h?.symbol),p=Number(prices[s]);if(p>0)next.livePrices[h.symbol]={price:p,source:'BINANCE_PUBLIC_HISTORY_CAPTURE'};}
+  const resolved=holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex'&&Number(next.livePrices?.[h?.symbol]?.price)>0).length;
+  next.livePriceMeta={...(data.livePriceMeta||{}),fresh:true,requestedCount:requested,resolvedCount:resolved,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',updatedAt:Date.now()};
   return next;
 }
 export async function capturePortfolioHistoryOnce(opts={}){

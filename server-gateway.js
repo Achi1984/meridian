@@ -11,6 +11,8 @@ import { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
 import { createAssetWatchShareToken,verifyAssetWatchShareToken,rotateAssetWatchShareState,revokeAssetWatchShareState,assetWatchShareEnabled } from "./asset-watch-share.js";
 import { verifyGithubActionsOidc } from "./github-actions-oidc.js";
 import { encryptAssetWatchMirror } from "./asset-watch-mirror-crypto.js";
+import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfolio-authority-update.js";
+import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -388,6 +390,24 @@ const server=http.createServer(async(req,res)=>{
       if(body.dryRun)return writeJson(res,200,receipt,origin||"");
       await stateSet(PRIVATE_STATE_KEY,merged.data);
       return writeJson(res,200,receipt,origin||"");
+    }
+    if(req.method==="POST"&&u.pathname==="/api/private/portfolio-authority"){
+      if(!authorizedRead(req))return writeJson(res,401,{error:"read_token_required"},origin||"");
+      let body;
+      try{body=await readJsonBody(req,8192);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      const merged=reconcilePortfolioAuthority(current,body);
+      if(!merged.ok)return writeJson(res,400,{error:merged.error,currentRevision:merged.currentRevision},origin||"");
+      await stateSet(PRIVATE_STATE_KEY,merged.data);
+      let history=null;
+      try{history=await capturePortfolioHistoryOnce({db:pool(),data:merged.data,dedupeMs:0})}
+      catch(e){history={ok:false,reason:String(e?.message||e)}}
+      return writeJson(res,200,portfolioAuthorityReceipt(merged,history),origin||"");
     }
     if(req.method==="POST"&&u.pathname==="/api/private/asset-watch-share"){
       if(!authorizedRead(req))return writeJson(res,401,{error:"read_token_required"},origin||"");

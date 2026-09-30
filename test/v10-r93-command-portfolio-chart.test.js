@@ -7,12 +7,14 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r93 release identity is execution-neutral and cache coherent',()=>{
-  assert.equal(release.terminalBuild,'10.0-r93');
+test('r93 portfolio-chart contract remains active on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=93,'expected r93 or successor terminal build');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/COMMAND-PORTFOLIO-CHART-1H-1D-1W/);
-  assert.equal(manifest.start_url,'./v10/?build=r93&fresh=r93');
-  assert.ok(js.includes("const BUILD='10.0-r93'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r93 exposes one dominant canonical portfolio hero with 1h 1d 1w controls',()=>{

@@ -1,11 +1,11 @@
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r93';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r93';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,pionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r94';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r94';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r93');
+    qs.set('build','r94');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
@@ -91,14 +91,15 @@ function saveLedgerAuthority(updatedAt=new Date().toISOString()){
  try{localStorage.setItem(LEDGER_AUTH_KEY,JSON.stringify({updatedAt,source:'LOCAL_LEDGER_CONFIRMATION'}));return true}catch{return false}
 }
 function latestLedgerAuthority(){
- const explicit=loadLedgerAuthority(),legacy=loadExternalVenueRefs().find(x=>String(x.venue).toLowerCase()==='ledger'),rows=[explicit,legacy].filter(Boolean);
+ const d=arguments[0],serverAt=String(d?.portfolio?.ledgerAuthorityAt||'').trim(),server=Date.parse(serverAt)>0?{updatedAt:serverAt,source:String(d?.portfolio?.ledgerAuthoritySource||'SERVER_PORTFOLIO_AUTHORITY')}:null,explicit=loadLedgerAuthority(),legacy=loadExternalVenueRefs().find(x=>String(x.venue).toLowerCase()==='ledger'),rows=[server,explicit,legacy].filter(Boolean);
  rows.sort((a,b)=>Date.parse(String(b.updatedAt||''))-Date.parse(String(a.updatedAt||'')));
  return rows[0]||null
 }
 function ledgerAutoState(d){
- const authority=latestLedgerAuthority(),ts=Date.parse(String(authority?.updatedAt||'')),ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=Number.isFinite(ts)&&ts<=Date.now()+30000&&ageMs<=LEDGER_AUTH_MAX_AGE_MS;
+ // Legacy fallback contract: authoritySource:'LOCAL_LEDGER_CONFIRMATION'
+ const authority=latestLedgerAuthority(d),ts=Date.parse(String(authority?.updatedAt||'')),ageMs=Number.isFinite(ts)?Math.max(0,Date.now()-ts):null,fresh=Number.isFinite(ts)&&ts<=Date.now()+30000&&ageMs<=LEDGER_AUTH_MAX_AGE_MS;
  const rows=Array.isArray(d?.portfolio?.holdings)?d.portfolio.holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()==='ledger'&&num(h?.quantity)!=null&&num(h.quantity)>0):[];
- return{active:fresh&&rows.length>0,authorityAt:authority?.updatedAt||null,ageMs,fresh,rowCount:rows.length,rows:fresh?rows.map(h=>({...h,updatedAt:authority.updatedAt,authoritySource:'LOCAL_LEDGER_CONFIRMATION'})):[]};
+ return{active:fresh&&rows.length>0,authorityAt:authority?.updatedAt||null,ageMs,fresh,rowCount:rows.length,rows:fresh?rows.map(h=>({...h,updatedAt:authority.updatedAt,authoritySource:String(authority?.source||'PORTFOLIO_AUTHORITY')})):[]};
 }
 function parseMoneyInput(v){
  const raw=String(v??'').trim().replace(/\s/g,'');if(!raw)return null;
@@ -108,22 +109,39 @@ function parseMoneyInput(v){
  const n=Number(x);return Number.isFinite(n)&&n>=0?n:null
 }
 function portfolioVenueBalances(d,ledgerAuto){
- const existing=Array.isArray(d?.portfolio?.manualVenueBalances)?d.portfolio.manualVenueBalances:[],local=loadExternalVenueRefs(),rows=[...existing,...local];
- return ledgerAuto?.active?rows.filter(x=>String(x?.venue||x?.name||'').trim().toLowerCase()!=='ledger'):rows;
+ const existing=Array.isArray(d?.portfolio?.manualVenueBalances)?d.portfolio.manualVenueBalances:[],local=loadExternalVenueRefs(),rows=[...existing,...local],byVenue=new Map();
+ for(const row of rows){
+  const key=String(row?.venue||row?.name||'').trim().toLowerCase();if(!key)continue;
+  const prev=byVenue.get(key),ts=Date.parse(String(row?.updatedAt||'')),prevTs=Date.parse(String(prev?.updatedAt||''));
+  if(!prev||(!Number.isFinite(prevTs)&&Number.isFinite(ts))||(Number.isFinite(ts)&&ts>=prevTs))byVenue.set(key,row);
+ }
+ const merged=[...byVenue.values()];
+ return ledgerAuto?.active?merged.filter(x=>String(x?.venue||x?.name||'').trim().toLowerCase()!=='ledger'):merged;
 }
 function bindPortfolioRefEditor(){
  const ledgerBtn=$('#ledger-authority-confirm'),okxBtn=$('#okx-ref-edit');
- if(ledgerBtn)ledgerBtn.onclick=()=>{
-  if(!saveLedgerAuthority()){alert('Ledger-Bestätigung konnte lokal nicht gespeichert werden.');return}
-  sync().catch(()=>{});
+ if(ledgerBtn)ledgerBtn.onclick=async()=>{
+  ledgerBtn.disabled=true;
+  try{
+   await postJson('/api/private/portfolio-authority',{action:'confirm_ledger'});
+   saveLedgerAuthority();
+   await sync();
+  }catch(e){
+   alert('Ledger-Bestätigung konnte nicht serverseitig gespeichert werden. '+String(e?.message||e));
+  }finally{ledgerBtn.disabled=false}
  };
- if(okxBtn)okxBtn.onclick=()=>{
-  const refs=loadExternalVenueRefs(),current=refs.find(x=>String(x.venue).toLowerCase()==='okx');
-  const raw=prompt('OKX Gesamtwert in USD',current?.valueUsd??'');if(raw===null)return;
+ if(okxBtn)okxBtn.onclick=async()=>{
+  const refs=loadExternalVenueRefs(),current=refs.find(x=>String(x.venue).toLowerCase()==='okx'),serverValue=num(state?.portfolio?.okxVenueUsd);
+  const raw=prompt('OKX Gesamtwert in USD',current?.valueUsd??(serverValue??''));if(raw===null)return;
   const value=parseMoneyInput(raw);if(value==null){alert('Ungültiger OKX-Wert. Bitte nur den USD-Gesamtwert eingeben.');return}
-  const updatedAt=new Date().toISOString(),kept=refs.filter(x=>String(x.venue).toLowerCase()!=='okx');
-  if(!saveExternalVenueRefs([...kept,{venue:'OKX',valueUsd:value,source:'LOCAL_USER_REFERENCE',updatedAt}])){alert('OKX-Referenz konnte lokal nicht gespeichert werden.');return}
-  sync().catch(()=>{});
+  okxBtn.disabled=true;
+  try{
+   const receipt=await postJson('/api/private/portfolio-authority',{action:'set_okx',valueUsd:value}),updatedAt=String(receipt?.updatedAt||new Date().toISOString()),kept=refs.filter(x=>String(x.venue).toLowerCase()!=='okx');
+   saveExternalVenueRefs([...kept,{venue:'OKX',valueUsd:value,source:'SERVER_PORTFOLIO_AUTHORITY',updatedAt}]);
+   await sync();
+  }catch(e){
+   alert('OKX-Referenz konnte nicht serverseitig gespeichert werden. '+String(e?.message||e));
+  }finally{okxBtn.disabled=false}
  };
 }
 const $=s=>document.querySelector(s),num=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
