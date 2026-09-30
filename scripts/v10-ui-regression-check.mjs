@@ -287,3 +287,17 @@ must(js.includes('command-position-details'),'Command Account Futures disclosure
 must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
 
 must(qa.includes("virtualBudget=name.startsWith('flow-')?5200:2600"),'interaction visual QA flow budget must cover iframe settle window');
+
+
+/* r93 permanent dominant portfolio-chart gates */
+must(String(release.dashboardShell||'').includes('COMMAND-PORTFOLIO-CHART-1H-1D-1W'),'dashboardShell must declare Command portfolio chart');
+must(js.includes("const portfolioChartUi={range:'1d'}"),'portfolio chart default range missing');
+must(js.includes("PORTFOLIO_CHART_WINDOWS=Object.freeze({ '1h':60*60*1000,'1d':24*60*60*1000,'1w':7*24*60*60*1000 })"),'portfolio chart windows missing');
+must(js.includes("String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'"),'portfolio chart must use strict authority history only');
+must(js.includes('function portfolioChartHeroHtml()'),'portfolio chart hero renderer missing');
+must(js.includes('function bindCommandPortfolioHero(view)'),'portfolio chart range binding missing');
+must(js.includes("portfolioBox.innerHTML=portfolioChartHeroHtml()"),'portfolio chart must render into Command top fold');
+must(js.includes("bindCommandPortfolioHero(view)"),'portfolio chart controls must be bound');
+must(css.includes('.command-portfolio-hero'),'dominant portfolio hero styling missing');
+must(css.includes('.portfolio-range-switch button'),'portfolio range controls styling missing');
+must(css.includes('.portfolio-chart-line'),'portfolio chart line styling missing');
