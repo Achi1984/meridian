@@ -59,12 +59,19 @@ class DataV11Tests(unittest.TestCase):
             p=Path(td)/"t.zip";write_zip(p,"t.csv",rows)
             with self.assertRaisesRegex(RuntimeError,"not strictly increasing"):m.audit_trades(p)
 
-    def test_quote_consistency_fails_closed(self):
+    def test_quote_qty_is_validated_as_source_field(self):
         s=m.MONTH_START_MS
-        rows=[f"10,100,2,199,{s+1},true"]
+        rows=[f"10,100,2,199,{s+1},true",f"11,100,1,100,{s+15*60_000+1},false"]
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"t.zip";write_zip(p,"t.csv",rows);r=m.audit_trades(p)
+        self.assertTrue(r["coveragePass"])
+
+    def test_quote_qty_must_be_nonnegative(self):
+        s=m.MONTH_START_MS
+        rows=[f"10,100,2,-1,{s+1},true"]
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"t.zip";write_zip(p,"t.csv",rows)
-            with self.assertRaisesRegex(RuntimeError,"quoteQty inconsistent"):m.audit_trades(p)
+            with self.assertRaisesRegex(ValueError,"expected nonnegative"):m.audit_trades(p)
 
     def test_timestamp_must_not_decrease(self):
         s=m.MONTH_START_MS
