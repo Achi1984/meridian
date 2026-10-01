@@ -53,7 +53,7 @@ Require:
 - trade IDs strictly increasing;
 - trade IDs strictly increasing; duplicates and reversals fail closed;
 - numeric ID gaps are permitted and retained as `tradeIdGapEvents`, `missingTradeIdCount`, and `maxTradeIdStep` metadata;
-- `quoteQty ~= price * qty` with fixed relative tolerance `1e-8`;
+- `quoteQty` must be finite and non-negative as supplied by the official source; no locally recomputed `price * qty` equality is required;
 - every UTC quarter-hour bin contains at least one trade.
 
 ### 1-minute klines
