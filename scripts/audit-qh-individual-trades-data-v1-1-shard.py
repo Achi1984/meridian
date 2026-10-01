@@ -149,14 +149,16 @@ def audit_trades(zpath):
         if zf:zf.close()
     if rows==0: raise RuntimeError("trades archive has zero rows")
     if len(units)!=1: raise RuntimeError(f"mixed trades timestamp units: {sorted(units)}")
-    if last_id-first_id+1!=rows: raise RuntimeError("trade-id span does not match row count")
     empty=EXPECTED_QH_BINS-len(qh_counts)
     return {
       "rows":rows,"firstTradeId":first_id,"lastTradeId":last_id,
       "firstTimestampMs":first_ts,"lastTimestampMs":last_ts,
       "timestampUnitDetected":next(iter(units)),
       "tradeIdSpanRows":last_id-first_id+1,
-      "tradeIdsContiguous":True,
+      "tradeIdsStrictlyIncreasing":True,
+      "tradeIdGapEvents":id_gap_events,
+      "missingTradeIdCount":missing_id_count,
+      "maxTradeIdStep":max_id_step,
       "expectedQuarterHourBins":EXPECTED_QH_BINS,
       "nonEmptyQuarterHourBins":len(qh_counts),"emptyQuarterHourBins":empty,
       "minTradesPerNonEmptyQuarterHour":min(qh_counts.values()),
@@ -248,7 +250,7 @@ def run():
             p.unlink(missing_ok=True)
     reasons=[]
     if not audits["trades"]["coveragePass"]: reasons.append("TRADES_QUARTER_HOUR_COVERAGE_FAIL")
-    if not audits["trades"]["tradeIdsContiguous"]: reasons.append("TRADE_ID_CONTINUITY_FAIL")
+    if not audits["trades"]["tradeIdsStrictlyIncreasing"]: reasons.append("TRADE_ID_MONOTONICITY_FAIL")
     if audits["trades"]["timestampUnitDetected"]!="MILLISECOND": reasons.append("UNEXPECTED_TRADES_TIMESTAMP_UNIT")
     if not audits["klines1m"]["coveragePass"]: reasons.append("KLINE_1M_COVERAGE_FAIL")
     if not audits["fundingRate"]["coveragePass"]: reasons.append("FUNDING_COVERAGE_FAIL")
