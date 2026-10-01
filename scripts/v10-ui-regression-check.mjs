@@ -16,6 +16,7 @@ const qaFrame=read('v10/visual-qa-frame.html');
 const gateway=read('server-gateway.js');
 const contract=read('portfolio-data-contract.js');
 const historyStore=read('portfolio-history-store.js');
+const marketFeed=read('market-feed-gateway.js');
 const authorityUpdate=read('portfolio-authority-update.js');
 
 const build=String(release.terminalBuild||'');
@@ -467,3 +468,15 @@ must(historyStore.includes("authorityVersion==='PIONEX_FRESH_V1'"),'history read
 must(js.includes('function portfolioHistoryTradingAuthorityFresh(x){'),'client history freshness guard missing');
 must(js.includes('SPOT + FRESH PIONEX'),'history integrity UI must disclose fresh Pionex requirement');
 must(v9.includes('authoritativePionexEquitySnapshot(d,now)'),'live portfolio must share authoritative Pionex resolver');
+
+
+/* r106 permanent market freshness lifecycle gates */
+must(String(release.dashboardShell||'').includes('MARKET-FRESHNESS-LIFECYCLE'),'dashboardShell must declare market freshness lifecycle');
+must(marketFeed.includes("const MARKET_STALE_FALLBACK_MS=90*1000;"),'gateway stale fallback reserve must remain below decision freshness boundary');
+must(v9.includes("marketSyncStatus:'IDLE'"),'market sync lifecycle state missing');
+must(v9.includes("state.marketSyncStatus='RUNNING';state.marketSyncStartedAt=Date.now();notifyData()"),'market sync start lifecycle missing');
+must(v9.includes("state.marketSyncStatus=btcRows?(errors.length?'PARTIAL':'OK'):'ERROR'"),'market sync completion lifecycle missing');
+must(v9.includes("gatewayCache==='STALE_FALLBACK'&&gatewayAge!=null&&gatewayAge>90*1000"),'client stale-fallback reserve guard missing');
+must(js.includes("if(m.syncing)return{label:'SYNCING',tone:'watch'}"),'UI must distinguish SYNCING from STALE');
+must(js.includes('Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed'),'header sync lifecycle disclosure missing');
+must(js.includes("if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'}"),'BOT SAFETY fail-closed state must remain intact');
