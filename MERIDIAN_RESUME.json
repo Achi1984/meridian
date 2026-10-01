@@ -1,14 +1,14 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r106",
+  "build": "10.0-r107",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
+    "verifiedSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
     "verifiedAt": "2026-10-01",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -27,10 +27,9 @@
     },
     "marketFeedCore": {
       "status": "PASS",
-      "checkedAt": "2026-10-01T05:38:49.256Z",
-      "deploymentSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
-      "terminalBuild": "10.0-r106",
-      "firstAttempt": "WARMUP_NOT_READY",
+      "checkedAt": "2026-10-01T05:52:13.312Z",
+      "deploymentSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+      "terminalBuild": "10.0-r107",
       "passingAttempt": 2,
       "freshnessLimitMs": 90000,
       "oldestAgeMs": 0,
@@ -60,7 +59,7 @@
           "rowCount": 240
         }
       },
-      "conclusion": "SERVER_GATEWAY_CORE_FEED_HEALTHY_AFTER_DEPLOY_WARMUP"
+      "conclusion": "R107_DEPLOYMENT_RUNTIME_MARKET_CORE_PASS"
     }
   },
   "canonicalResearch": {
@@ -1457,10 +1456,10 @@
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r106",
-    "canonicalMainSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
-    "lastMergedPr": 419,
-    "status": "R106_RUNTIME_AND_MARKET_CORE_PASS_UI_LIVE_VERIFY_PENDING",
+    "terminalBuild": "10.0-r107",
+    "canonicalMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+    "lastMergedPr": 425,
+    "status": "R107_RUNTIME_PASS_UI_SPOTCHECK_PENDING",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1475,7 +1474,8 @@
       "r103 SCANNER confluence explainability",
       "r104 portfolio history component integrity",
       "r105 Pionex history source alignment + freshness",
-      "r106 market freshness lifecycle"
+      "r106 market freshness lifecycle",
+      "r107 market coverage diagnostics"
     ],
     "portfolioCheckpoint": {
       "lastObservedTotalUsd": 35275.04,
@@ -1487,7 +1487,7 @@
       "marketReady": false,
       "historyStatus": "R105_LIVE_PASS; 2 strict points; 1489 blocked; old USD 1798.71 artifact absent; canonical history rebuilding from fresh PIONEX_FRESH_V1 only"
     },
-    "nextAction": "Live UI spotcheck only: confirm BUILD R106, press refresh, observe MKT SYNCING, then record settled MKT/BOT state. Server/Northflank/runtime/BTC 15m+1h+4h+1d core feed are already live PASS; do not repeat upstream diagnosis unless new smoke evidence turns red. If settled MKT is STALE, isolate client 15-asset coverage without weakening fail-closed guards.",
+    "nextAction": "Live UI spotcheck only: confirm BUILD R107, press refresh, observe MKT SYNCING, then record settled MKT/BOT state. If PARTIAL/STALE, expand DATA SOURCES and capture exact STALE/MISSING symbols and SYNC status. Server/runtime/BTC core feed are already PASS; do not repeat upstream diagnosis unless runtime smoke turns red.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1554,9 +1554,28 @@
           }
         },
         "remaining": "Confirm in the deployed client that manual refresh visibly enters MKT SYNCING and then settles to READY/PARTIAL according to 15-asset coverage. If it settles STALE, investigate client coverage/lifecycle; server/gateway BTC core feed is already proven healthy."
+      },
+      "r107": {
+        "status": "PARTIAL_PASS_UI_SPOTCHECK_PENDING",
+        "deployment": "PASS",
+        "runtimeSmoke": "PASS",
+        "marketFeedCore": "PASS",
+        "checkedAt": "2026-10-01T05:52:13.312Z",
+        "marketCoreEvidence": {
+          "passingAttempt": 2,
+          "oldestAgeMs": 0,
+          "rowCounts": {
+            "15m": 180,
+            "1h": 200,
+            "4h": 240,
+            "1d": 240
+          },
+          "source": "OKX USDT-SWAP"
+        },
+        "remaining": "Confirm BUILD R107 in client, press refresh, observe MKT SYNCING, then record settled MKT/BOT state. If PARTIAL/STALE, expand DATA SOURCES and capture exact STALE/MISSING symbols plus SYNC status."
       }
     },
-    "terminalReleaseSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "terminalReleaseSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
     "lastMergedOpsPr": 423,
     "observability": {
       "runtimeSmokeCommitStatusPr": 422,
@@ -1566,13 +1585,13 @@
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-10-01T05:38:49.256Z",
+    "updatedAt": "2026-10-01T05:52:13.312Z",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
-    "currentBuild": "10.0-r106"
+    "currentMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+    "currentBuild": "10.0-r107"
   }
 }
