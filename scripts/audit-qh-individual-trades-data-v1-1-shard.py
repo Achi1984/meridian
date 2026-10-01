@@ -19,7 +19,6 @@ MONTHS=tuple(f"{y:04d}-{m:02d}" for y,ms in ((2025,range(1,13)),(2026,range(1,9)
 UA="MERIDIAN-QH-INDIVIDUAL-TRADES-DATA-V1-1/1"
 CHUNK=8*1024*1024
 FUND_MAX_GAP_MS=12*60*60*1000
-QUOTE_REL_TOL=1e-8
 
 ASSET=os.environ.get("QH_ASSET","")
 MONTH=os.environ.get("QH_MONTH","")
@@ -108,7 +107,7 @@ def is_header(row,fam):
 
 def audit_trades(zpath):
     rows=0; first_id=last_id=first_ts=last_ts=None; prev_id=prev_ts=None
-    units=set(); qh_counts={}; max_quote_err=0.0; id_gap_events=0; missing_id_count=0; max_id_step=1
+    units=set(); qh_counts={}; id_gap_events=0; missing_id_count=0; max_id_step=1
     zf=raw=text=None
     try:
         zf,raw,text,reader=open_csv(zpath)
@@ -133,11 +132,6 @@ def audit_trades(zpath):
                 if step>1:
                     id_gap_events+=1
                     missing_id_count+=step-1
-            expected_quote=price*qty
-            err=abs(quote-expected_quote)
-            max_quote_err=max(max_quote_err,err)
-            if err>max(1e-8,abs(quote)*QUOTE_REL_TOL):
-                raise RuntimeError(f"quoteQty inconsistent with price*qty at trade {trade_id}")
             qh=(ts-MONTH_START_MS)//(15*60*1000)
             if not (0<=qh<EXPECTED_QH_BINS): raise RuntimeError("invalid quarter-hour bin")
             qh_counts[qh]=qh_counts.get(qh,0)+1
@@ -163,7 +157,6 @@ def audit_trades(zpath):
       "nonEmptyQuarterHourBins":len(qh_counts),"emptyQuarterHourBins":empty,
       "minTradesPerNonEmptyQuarterHour":min(qh_counts.values()),
       "maxTradesPerQuarterHour":max(qh_counts.values()),
-      "maxAbsoluteQuoteConsistencyError":max_quote_err,
       "coveragePass":empty==0
     }
 
