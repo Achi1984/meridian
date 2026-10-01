@@ -8,13 +8,13 @@
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "verifiedSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
     "verifiedAt": "2026-10-01",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
   "runtime": {
     "releaseSafety": "GREEN",
-    "runtimeSmoke": "GREEN",
+    "runtimeSmoke": "GREEN_MARKET_CORE",
     "releaseCoordinator": "GREEN",
     "pagesDeployment": "GREEN",
     "northflankDeployment": "GREEN",
@@ -24,6 +24,43 @@
       "encryptedArtifactId": 11012718856,
       "scheduledRunProof": "PENDING",
       "note": "Do not present cached/snapshot bot values as current when a fresh authoritative read is unavailable."
+    },
+    "marketFeedCore": {
+      "status": "PASS",
+      "checkedAt": "2026-10-01T05:38:49.256Z",
+      "deploymentSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
+      "terminalBuild": "10.0-r106",
+      "firstAttempt": "WARMUP_NOT_READY",
+      "passingAttempt": 2,
+      "freshnessLimitMs": 90000,
+      "oldestAgeMs": 0,
+      "intervals": {
+        "15m": {
+          "source": "OKX USDT-SWAP",
+          "cache": "MISS",
+          "ageMs": 0,
+          "rowCount": 180
+        },
+        "1h": {
+          "source": "OKX USDT-SWAP",
+          "cache": "MISS",
+          "ageMs": 0,
+          "rowCount": 200
+        },
+        "4h": {
+          "source": "OKX USDT-SWAP",
+          "cache": "MISS",
+          "ageMs": 0,
+          "rowCount": 240
+        },
+        "1d": {
+          "source": "OKX USDT-SWAP",
+          "cache": "MISS",
+          "ageMs": 0,
+          "rowCount": 240
+        }
+      },
+      "conclusion": "SERVER_GATEWAY_CORE_FEED_HEALTHY_AFTER_DEPLOY_WARMUP"
     }
   },
   "canonicalResearch": {
@@ -1421,9 +1458,9 @@
   },
   "activeUiLane": {
     "terminalBuild": "10.0-r106",
-    "canonicalMainSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "canonicalMainSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
     "lastMergedPr": 419,
-    "status": "R106_MERGED_PENDING_LIVE_VERIFY",
+    "status": "R106_RUNTIME_AND_MARKET_CORE_PASS_UI_LIVE_VERIFY_PENDING",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1450,7 +1487,7 @@
       "marketReady": false,
       "historyStatus": "R105_LIVE_PASS; 2 strict points; 1489 blocked; old USD 1798.71 artifact absent; canonical history rebuilding from fresh PIONEX_FRESH_V1 only"
     },
-    "nextAction": "Live-verify r106 after deployment. Confirm BUILD R106, press refresh, observe MKT SYNCING during market refresh, then record the settled MKT/BOT states. If MKT remains STALE after refresh completion, inspect transport/error diagnostics without weakening fail-closed guards. Do not repeat r93-r106 work.",
+    "nextAction": "Live UI spotcheck only: confirm BUILD R106, press refresh, observe MKT SYNCING, then record settled MKT/BOT state. Server/Northflank/runtime/BTC 15m+1h+4h+1d core feed are already live PASS; do not repeat upstream diagnosis unless new smoke evidence turns red. If settled MKT is STALE, isolate client 15-asset coverage without weakening fail-closed guards.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1497,19 +1534,45 @@
         "note": "SPOT + FRESH PIONEX live; old ~USD 1798.71 flat-line absent."
       },
       "r106": {
-        "status": "PENDING_LIVE_SCREEN_VERIFY",
-        "expected": "BUILD R106; manual refresh shows MKT SYNCING while technical refresh is in progress; after completion market settles to READY or PARTIAL only if freshness/coverage qualifies; stale market data remains blocked and BOT SAFETY is not relaxed."
+        "status": "PARTIAL_PASS_UI_SPOTCHECK_PENDING",
+        "deployment": "PASS",
+        "runtimeSmoke": "PASS",
+        "marketFeedCore": "PASS",
+        "checkedAt": "2026-10-01T05:38:49.256Z",
+        "marketCoreEvidence": {
+          "firstAttempt": "WARMUP_NOT_READY",
+          "passingAttempt": 2,
+          "oldestAgeMs": 0,
+          "sources": [
+            "OKX USDT-SWAP"
+          ],
+          "rowCounts": {
+            "15m": 180,
+            "1h": 200,
+            "4h": 240,
+            "1d": 240
+          }
+        },
+        "remaining": "Confirm in the deployed client that manual refresh visibly enters MKT SYNCING and then settles to READY/PARTIAL according to 15-asset coverage. If it settles STALE, investigate client coverage/lifecycle; server/gateway BTC core feed is already proven healthy."
       }
+    },
+    "terminalReleaseSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "lastMergedOpsPr": 423,
+    "observability": {
+      "runtimeSmokeCommitStatusPr": 422,
+      "marketFeedCoreSmokePr": 423,
+      "runtimeCommitStatus": "meridian/runtime-smoke",
+      "marketFeedCoreStatus": "PASS"
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-10-01T06:32:00+02:00",
+    "updatedAt": "2026-10-01T05:38:49.256Z",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "currentMainSha": "aebd79d1f822563e595f0ac860aee5a4572b4dd7",
     "currentBuild": "10.0-r106"
   }
 }

@@ -1,22 +1,23 @@
 # MERIDIAN Chat Handoff
 
 Status: **canonical after merge**  
-Updated: **2026-10-01 06:32 Europe/Vienna**
+Updated: **2026-10-01 05:38 UTC**
 
 ## Current durable checkpoint
 
 - Build: **10.0-r106**
-- Canonical r106 release SHA: **77f7154e0a71021a427957dbf9b321d5a5fb308a**
-- Last merged release PR: **#419 — market freshness lifecycle**
-- Previous release: **#417 r105 Pionex history source alignment**
+- Current canonical `main`: **aebd79d1f822563e595f0ac860aee5a4572b4dd7**
+- r106 terminal release SHA: **77f7154e0a71021a427957dbf9b321d5a5fb308a**
+- Last terminal release PR: **#419 — market freshness lifecycle**
+- Runtime observability PRs: **#422 commit-status bridge**, **#423 market-feed core smoke**
 - Execution impact: **false**
 - Completed terminal sequence: **r93 through r106**
 
-Repository state is the source of truth. Reconcile merged `main`, current CI, `MERIDIAN_RESUME.json`, and `MERIDIAN_AGENT_STATE.json` before using chat history.
+Repository state is the source of truth. Reconcile merged `main`, current CI/statuses, `MERIDIAN_RESUME.json`, and `MERIDIAN_AGENT_STATE.json` before using chat history.
 
 ## r105 live acceptance
 
-Live-verified on iPhone at 23:37 Europe/Vienna:
+Live-verified on iPhone:
 
 - BUILD **R105**
 - Gesamtportfolio **$35,275.04**
@@ -27,23 +28,20 @@ Live-verified on iPhone at 23:37 Europe/Vienna:
 - **1489 BLOCKED**
 - **SPOT + FRESH PIONEX**
 - 1H / 1D / 1W **BUILDING**
-- chart range shown: **$35,181.56 → $35,275.04**
+- chart range **$35,181.56 → $35,275.04**
+- previous ~$1,798.71 history artifact absent
 
-The previous ~$1,798.71 history artifact was absent. r105 is therefore **live PASS**. Do not reopen r93-r105 portfolio/history work unless new evidence contradicts this.
+r105 is **live PASS**. Do not reopen r93-r105 portfolio/history work unless new evidence contradicts this.
 
-## r106 root cause and fix
+## r106 release
 
-After r105 passed, the header still showed **MKT STALE** and **BOT SAFETY**.
+r106 adds:
 
-r106 addresses the market-freshness lifecycle without weakening safety:
-
-- explicit market sync states: IDLE / RUNNING / OK / PARTIAL / ERROR;
-- header shows **MKT SYNCING** while technical refresh is actually running instead of evaluating the old timestamp as a settled stale state;
-- gateway stale fallback reserve reduced from the 3-minute decision boundary to **90 seconds**;
-- client independently rejects over-age gateway stale fallbacks;
-- stale technical data remains fail-closed;
-- BOT SAFETY and decision-ready guards are unchanged;
-- no trading, signal threshold, sizing, risk, order, or execution behavior changed.
+- explicit market sync lifecycle: IDLE / RUNNING / OK / PARTIAL / ERROR;
+- **MKT SYNCING** while the technical refresh is actually running;
+- gateway stale fallback reserve reduced to **90 seconds**;
+- client rejection of over-age stale gateway fallbacks;
+- unchanged BOT SAFETY and decision-ready fail-closed guards.
 
 Exact-head r106 gates before merge:
 
@@ -51,17 +49,45 @@ Exact-head r106 gates before merge:
 - Portfolio Contract: **GREEN**
 - Mobile Visual QA: **GREEN**
 
-## Next durable step
+## r106 deployment/runtime live evidence
 
-Live-verify r106 after deployment.
+The r106 deployment is live. Two observability improvements were then merged without changing the terminal build:
 
-Expected flow:
+### #422 runtime smoke commit status
+
+The existing public Runtime Smoke now publishes `meridian/runtime-smoke` as a normal commit status.
+
+### #423 market-feed core smoke
+
+`/gateway-health` exposes only non-sensitive BTC technical-feed health metadata and the Runtime Smoke fails closed when that core feed is stale, unavailable, or undersized.
+
+Live smoke on current main **aebd79d1…**:
+
+- Northflank status: **SUCCESS**
+- `meridian/runtime-smoke`: **SUCCESS**
+- terminalBuild: **10.0-r106**
+- deployment SHA matched current main
+- first smoke attempt immediately after deploy: **marketFeedCore not ready**
+- second attempt about 24 seconds later: **PASS**
+- oldest core-feed age: **0 ms**
+- 15m: **OKX USDT-SWAP**, MISS, age 0 ms, **180 rows**
+- 1h: **OKX USDT-SWAP**, MISS, age 0 ms, **200 rows**
+- 4h: **OKX USDT-SWAP**, MISS, age 0 ms, **240 rows**
+- 1d: **OKX USDT-SWAP**, MISS, age 0 ms, **240 rows**
+
+Conclusion: **server/gateway BTC core market feed is healthy after normal deployment warm-up**.
+
+If the client settles on `MKT STALE` after refresh, do **not** repeat server/upstream diagnosis unless the runtime smoke turns red. The remaining fault domain is client lifecycle or 15-asset coverage.
+
+## Exact next durable step
+
+Only the interactive r106 client spotcheck remains:
 
 1. confirm **BUILD R106**;
-2. press the refresh control;
-3. while technical refresh is running, header should show **MKT SYNCING**;
-4. after completion, market should settle to **READY** or **PARTIAL** only when freshness and coverage qualify;
-5. if market remains **STALE**, inspect transport/error diagnostics and upstream availability;
-6. do not weaken freshness thresholds or BOT SAFETY to force READY.
+2. press refresh;
+3. observe **MKT SYNCING** while the refresh is running;
+4. record the settled **MKT** and **BOT** states;
+5. if the settled state is **READY** or **PARTIAL**, r106 live verification passes;
+6. if the settled state remains **STALE**, isolate stale/missing symbols and client coverage without weakening any fail-closed guard.
 
 Do not repeat r93-r106 work.
