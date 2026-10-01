@@ -1459,7 +1459,7 @@
     "terminalBuild": "10.0-r107",
     "canonicalMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
     "lastMergedPr": 425,
-    "status": "R107_CLIENT_SYNCING_PASS_SETTLED_STATE_PENDING",
+    "status": "R107_LIVE_ACCEPTED",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1478,16 +1478,16 @@
       "r107 market coverage diagnostics"
     ],
     "portfolioCheckpoint": {
-      "lastObservedTotalUsd": 35275.04,
-      "lastObservedLedgerUsd": 796.7,
+      "lastObservedTotalUsd": 34848.5,
+      "lastObservedLedgerUsd": 805.32,
       "lastObservedOkxUsd": 116.3,
-      "lastObservedPionexUsd": 34362.04,
+      "lastObservedPionexUsd": 33926.88,
       "portfolioReady": true,
-      "botReady": false,
-      "marketReady": false,
-      "historyStatus": "R105_LIVE_PASS; 2 strict points; 1489 blocked; old USD 1798.71 artifact absent; canonical history rebuilding from fresh PIONEX_FRESH_V1 only"
+      "botReady": true,
+      "marketReady": true,
+      "historyStatus": "R107_LIVE_PASS; 135 strict points; 1357 blocked; 1H READY; 1D/1W BUILDING; SPOT + FRESH PIONEX"
     },
-    "nextAction": "Wait for the current client refresh to finish and capture the settled MKT/BOT state. If MKT is PARTIAL/STALE, expand DATA SOURCES and capture exact STALE/MISSING symbols and SYNC status. BUILD R107 and MKT SYNCING during refresh are already live PASS.",
+    "nextAction": "r107 live acceptance is complete. Reconcile main/PRs/CI and continue only the first incomplete milestone after r107. Do not repeat r93-r107 work.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1556,7 +1556,7 @@
         "remaining": "Confirm in the deployed client that manual refresh visibly enters MKT SYNCING and then settles to READY/PARTIAL according to 15-asset coverage. If it settles STALE, investigate client coverage/lifecycle; server/gateway BTC core feed is already proven healthy."
       },
       "r107": {
-        "status": "PARTIAL_PASS_SETTLED_STATE_PENDING",
+        "status": "PASS",
         "deployment": "PASS",
         "runtimeSmoke": "PASS",
         "marketFeedCore": "PASS",
@@ -1572,7 +1572,7 @@
           },
           "source": "OKX USDT-SWAP"
         },
-        "remaining": "After the same refresh completes, record settled MKT and BOT states. If MKT is PARTIAL/STALE, expand DATA SOURCES and capture exact STALE/MISSING symbols plus SYNC status.",
+        "remaining": null,
         "clientBuildObserved": "R107",
         "clientObservedAt": "2026-10-01T10:30:00+02:00",
         "clientRefreshLifecycle": {
@@ -1581,16 +1581,28 @@
           "verdict": "PASS"
         },
         "clientPortfolioSnapshot": {
-          "totalUsd": 35012.78,
-          "ledgerUsd": 807.63,
+          "totalUsd": 34848.5,
+          "ledgerUsd": 805.32,
           "okxUsd": 116.3,
-          "pionexUsd": 34088.85,
-          "strictHistoryPoints": 134,
-          "historyBlocked": 1358,
+          "pionexUsd": 33926.88,
+          "strictHistoryPoints": 135,
+          "historyBlocked": 1357,
           "oneHour": "READY",
+          "oneHourPoints": 12,
           "oneDay": "BUILDING",
           "oneWeek": "BUILDING"
-        }
+        },
+        "clientSettledObservedAt": "2026-10-01T10:35:00+02:00",
+        "settledMarket": "READY",
+        "settledBot": "READY",
+        "liveData": "READY",
+        "marketCoverage": "15/15",
+        "botCoverage": "24/24",
+        "botDecisionReady": "24/24",
+        "portfolioReady": true,
+        "forecastReady": true,
+        "depotReady": true,
+        "verdict": "FULL_LIVE_PASS"
       }
     },
     "terminalReleaseSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
@@ -1603,7 +1615,7 @@
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-10-01T05:52:13.312Z",
+    "updatedAt": "2026-10-01T10:35:00+02:00",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
