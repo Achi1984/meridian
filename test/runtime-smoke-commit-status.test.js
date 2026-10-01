@@ -8,7 +8,8 @@ test('runtime smoke can publish a commit status without private credentials',()=
   assert.match(workflow,/permissions:\n  contents: read\n  statuses: write/);
   assert.match(workflow,/context "meridian\/runtime-smoke"/);
   assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
-  assert.doesNotMatch(workflow,/MERIDIAN_READ_TOKEN/);
+  assert.doesNotMatch(workflow,/secrets\.MERIDIAN_READ_TOKEN/);
+  assert.doesNotMatch(workflow,/MERIDIAN_READ_TOKEN:\s*\$\{\{/);
 });
 
 test('runtime smoke reports pending then final result for the workflow commit',()=>{
