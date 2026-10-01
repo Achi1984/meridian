@@ -53,7 +53,10 @@ test('r108 production boot primes Paper Overview but visual QA remains network-i
   assert.doesNotMatch(visualBlock,/primePaperCockpit/);
 });
 
-test('r108 does not add promotion, ranking, order, or execution behavior',()=>{
-  const prefetch=v10.slice(v10.indexOf('async function loadPaperCockpit(force=false){'),v10.indexOf('function renderLab(){'));
+test('r108 prefetch path does not add promotion, ranking, order, or execution behavior',()=>{
+  const start=v10.indexOf('async function loadPaperCockpit(force=false){');
+  const end=v10.indexOf('function renderPaperCockpit(force=false){',start);
+  assert.ok(start>=0&&end>start);
+  const prefetch=v10.slice(start,end);
   assert.doesNotMatch(prefetch,/(?:submitOrder|placeOrder|createOrder|cancelOrder|postJson|promot|models\.sort\()/i);
 });
