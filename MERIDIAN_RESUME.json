@@ -1,15 +1,15 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r105",
+  "build": "10.0-r106",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "1f1ce0b3450dfcdf62146290a144949deeaf682d",
-    "verifiedAt": "2026-09-30",
+    "verifiedSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "verifiedAt": "2026-10-01",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
   "runtime": {
@@ -1420,10 +1420,10 @@
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r105",
-    "canonicalMainSha": "1f1ce0b3450dfcdf62146290a144949deeaf682d",
-    "lastMergedPr": 417,
-    "status": "PIONEX_HISTORY_SOURCE_ALIGNMENT_COMPLETE",
+    "terminalBuild": "10.0-r106",
+    "canonicalMainSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "lastMergedPr": 419,
+    "status": "R106_MERGED_PENDING_LIVE_VERIFY",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1437,19 +1437,20 @@
       "r102 live build + strict history integrity",
       "r103 SCANNER confluence explainability",
       "r104 portfolio history component integrity",
-      "r105 Pionex history source alignment + freshness"
+      "r105 Pionex history source alignment + freshness",
+      "r106 market freshness lifecycle"
     ],
     "portfolioCheckpoint": {
-      "lastObservedTotalUsd": 35312.88,
-      "lastObservedLedgerUsd": 794.41,
+      "lastObservedTotalUsd": 35275.04,
+      "lastObservedLedgerUsd": 796.7,
       "lastObservedOkxUsd": 116.3,
-      "lastObservedPionexUsd": 34402.17,
+      "lastObservedPionexUsd": 34362.04,
       "portfolioReady": true,
-      "botReady": true,
-      "marketReady": true,
-      "historyStatus": "R104_LIVE_VERIFIED_WITH_SOURCE_DIVERGENCE; 38 accepted points + 1452 blocked; r105 requires timestamped fresh Pionex authority and rejects all pre-r105 history without PIONEX_FRESH_V1 provenance"
+      "botReady": false,
+      "marketReady": false,
+      "historyStatus": "R105_LIVE_PASS; 2 strict points; 1489 blocked; old USD 1798.71 artifact absent; canonical history rebuilding from fresh PIONEX_FRESH_V1 only"
     },
-    "nextAction": "Live-verify r105 after deployment: confirm BUILD R105, SPOT + FRESH PIONEX, that the old ~USD 1798.71 flat-line is gone, record STRICT HISTORY/BLOCKED and 1H/1D/1W maturity. Then continue only the first incomplete milestone. Do not repeat r93-r105 work.",
+    "nextAction": "Live-verify r106 after deployment. Confirm BUILD R106, press refresh, observe MKT SYNCING during market refresh, then record the settled MKT/BOT states. If MKT remains STALE after refresh completion, inspect transport/error diagnostics without weakening fail-closed guards. Do not repeat r93-r106 work.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1478,19 +1479,37 @@
         "anomaly": "The USD 1798.71 flat-line persisted. Root cause: server history used stale portfolio.pionexEquityUsd while live portfolio preferred fresh pionexAccount.wallet.totalInUsdt. r105 aligns both paths on one freshness-gated resolver."
       },
       "r105": {
+        "status": "PASS",
+        "observedBuild": "R105",
+        "observedAt": "2026-09-30T23:37:00+02:00",
+        "strictHistoryPoints": 2,
+        "blockedLegacyPoints": 1489,
+        "oneHour": "BUILDING",
+        "oneDay": "BUILDING",
+        "oneWeek": "BUILDING",
+        "observedTotalUsd": 35275.04,
+        "observedLedgerUsd": 796.7,
+        "observedOkxUsd": 116.3,
+        "observedPionexUsd": 34362.04,
+        "chartStartUsd": 35181.56,
+        "chartEndUsd": 35275.04,
+        "historyArtifactResolved": true,
+        "note": "SPOT + FRESH PIONEX live; old ~USD 1798.71 flat-line absent."
+      },
+      "r106": {
         "status": "PENDING_LIVE_SCREEN_VERIFY",
-        "expected": "BUILD R105; SPOT + FRESH PIONEX; pre-r105 rows blocked; no USD ~1798.71 flat-line; canonical points rebuild only from fresh PIONEX_FRESH_V1 provenance"
+        "expected": "BUILD R106; manual refresh shows MKT SYNCING while technical refresh is in progress; after completion market settles to READY or PARTIAL only if freshness/coverage qualifies; stale market data remains blocked and BOT SAFETY is not relaxed."
       }
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-09-30T23:31:05+02:00",
+    "updatedAt": "2026-10-01T06:32:00+02:00",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "1f1ce0b3450dfcdf62146290a144949deeaf682d",
-    "currentBuild": "10.0-r105"
+    "currentMainSha": "77f7154e0a71021a427957dbf9b321d5a5fb308a",
+    "currentBuild": "10.0-r106"
   }
 }
