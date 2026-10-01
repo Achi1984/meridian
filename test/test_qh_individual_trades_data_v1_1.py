@@ -36,16 +36,25 @@ class DataV11Tests(unittest.TestCase):
         self.assertNotIn("buy", "".join(r.keys()).lower())
         self.assertNotIn("sell", "".join(r.keys()).lower())
 
-    def test_trade_gap_fails_closed(self):
+    def test_trade_gap_is_allowed_and_measured(self):
         s=m.MONTH_START_MS
-        rows=[f"10,100,1,100,{s+1},true",f"12,100,1,100,{s+2},false"]
+        rows=[f"10,100,1,100,{s+1},true",f"12,100,1,100,{s+15*60_000+1},false"]
         with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/"t.zip";write_zip(p,"t.csv",rows)
-            with self.assertRaisesRegex(RuntimeError,"trade id gap"):m.audit_trades(p)
+            p=Path(td)/"t.zip";write_zip(p,"t.csv",rows);r=m.audit_trades(p)
+        self.assertTrue(r["tradeIdsStrictlyIncreasing"])
+        self.assertEqual(r["tradeIdGapEvents"],1);self.assertEqual(r["missingTradeIdCount"],1);self.assertEqual(r["maxTradeIdStep"],2)
+        self.assertTrue(r["coveragePass"])
 
     def test_trade_duplicate_fails_closed(self):
         s=m.MONTH_START_MS
         rows=[f"10,100,1,100,{s+1},true",f"10,100,1,100,{s+2},false"]
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"t.zip";write_zip(p,"t.csv",rows)
+            with self.assertRaisesRegex(RuntimeError,"not strictly increasing"):m.audit_trades(p)
+
+    def test_trade_reversal_fails_closed(self):
+        s=m.MONTH_START_MS
+        rows=[f"11,100,1,100,{s+1},true",f"10,100,1,100,{s+2},false"]
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"t.zip";write_zip(p,"t.csv",rows)
             with self.assertRaisesRegex(RuntimeError,"not strictly increasing"):m.audit_trades(p)
