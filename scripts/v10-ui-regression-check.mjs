@@ -495,3 +495,16 @@ must(js.includes("SYNC '+esc(m.syncStatus)"),'market sync-status disclosure miss
 must(js.includes("if(m.syncing)return{label:'SYNCING',tone:'watch'}"),'market SYNCING readiness invariant changed');
 must(js.includes("if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'}"),'market READY coverage invariant changed');
 must(js.includes("if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'}"),'BOT SAFETY fail-closed invariant changed');
+
+
+/* r108 permanent Paper readiness prefetch gates */
+must(String(release.dashboardShell||'').includes('PAPER-READINESS-PREFETCH'),'dashboardShell must declare Paper readiness prefetch');
+must(js.includes("paperCockpitUi={loading:false,data:null,error:null,loadedAt:0,prefetchStarted:false}"),'Paper prefetch lifecycle state missing');
+must(js.includes('function primePaperCockpit(){'),'Paper prefetch helper missing');
+must(js.includes('if(paperCockpitUi.prefetchStarted)return'),'Paper prefetch one-shot guard missing');
+must(js.includes('queueMicrotask(()=>loadPaperCockpit(false))'),'Paper prefetch microtask missing');
+must(js.includes("if(!paperOverviewTrusted(d))throw new Error('PAPER_OVERVIEW_CONTRACT_INVALID')"),'Paper Overview trust guard missing');
+must(js.includes("schedule(true)"),'Paper readiness lifecycle must schedule UI refresh');
+must(v9.includes("paperOverview:()=>getJson('/api/paper/overview')"),'Paper Overview bridge must remain GET-only');
+must(!/setInterval\([^\n]*loadPaperCockpit/.test(js),'Paper readiness must not introduce a polling loop');
+must(js.includes("d.researchOnly===true")&&js.includes("d.executionImpact===false"),'Paper research-only execution-neutral guard missing');
