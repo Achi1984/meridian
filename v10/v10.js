@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r107';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r107';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r107';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r107';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r107';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r107';
-// MERIDIAN v10 r107 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r108';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r108';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r108';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r108';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r108';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r108';
+// MERIDIAN v10 r108 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r107';
+const BUILD='10.0-r108';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -55,7 +55,7 @@ function contextBarHtml(target){
 function bindContextBack(view,target,fallbackView='research',fallbackNav='research'){
   $('[data-context-back="'+target+'"]',view)?.addEventListener('click',()=>contextualBack(target,fallbackView,fallbackNav));
 }
-const paperCockpitUi={loading:false,data:null,error:null,loadedAt:0};
+const paperCockpitUi={loading:false,data:null,error:null,loadedAt:0,prefetchStarted:false};
 const holdoutUi={running:false,legacy:null,transfer:null,combined:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length+TSMOM_TRANSFER_ASSETS.length};
 const MARKET_FRESH_MS=3*60*1000;
 const portfolioChartUi={range:'1d'};
@@ -1441,14 +1441,19 @@ async function loadPaperCockpit(force=false){
   const b=bridge(),now=Date.now();
   if(paperCockpitUi.loading)return;
   if(!force&&paperCockpitUi.data&&now-paperCockpitUi.loadedAt<30000)return;
-  if(typeof b?.paperOverview!=='function'){paperCockpitUi.error='Paper overview bridge fehlt';renderPaperCockpit(true);return}
-  paperCockpitUi.loading=true;paperCockpitUi.error=null;renderPaperCockpit(true);
+  if(typeof b?.paperOverview!=='function'){paperCockpitUi.error='Paper overview bridge fehlt';schedule(true);if(activeViewKey()==='paper')renderPaperCockpit(true);return}
+  paperCockpitUi.loading=true;paperCockpitUi.error=null;if(activeViewKey()==='paper')renderPaperCockpit(true);schedule(true);
   try{
     const d=await b.paperOverview();
     if(!paperOverviewTrusted(d))throw new Error('PAPER_OVERVIEW_CONTRACT_INVALID');
     paperCockpitUi.data=d;paperCockpitUi.loadedAt=Date.now();
   }catch(e){paperCockpitUi.error=String(e?.message||e).slice(0,140)}
-  finally{paperCockpitUi.loading=false;if(activeViewKey()==='paper')renderPaperCockpit(true)}
+  finally{paperCockpitUi.loading=false;if(activeViewKey()==='paper')renderPaperCockpit(true);schedule(true)}
+}
+function primePaperCockpit(){
+  if(paperCockpitUi.prefetchStarted)return;
+  paperCockpitUi.prefetchStarted=true;
+  queueMicrotask(()=>loadPaperCockpit(false));
 }
 function renderPaperCockpit(force=false){
   const view=$('#view-paper');if(!view)return;
@@ -1760,4 +1765,7 @@ if(visualQa){
     pre.textContent=JSON.stringify({build:BUILD,view:visualQa.view,scroll:visualQa.scroll,ok:false,error:String(err?.stack||err?.message||err)});
     document.documentElement.dataset.visualQaReady='error';
   }
-}else decorate();
+}else{
+  decorate();
+  primePaperCockpit();
+}
