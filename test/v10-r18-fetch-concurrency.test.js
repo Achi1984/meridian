@@ -24,7 +24,9 @@ test('r18 private and market syncs are single-flight',()=>{
   assert.match(v9,/finally\{syncBusy=false;notifyData\(\)\}/);
   assert.match(v9,/let syncIntelBusy=false/);
   assert.match(v9,/if\(syncIntelBusy\)return false;syncIntelBusy=true/);
-  assert.match(v9,/finally\{syncIntelBusy=false\}/);
+  const intelBlock=v9.slice(v9.indexOf('async function syncIntel(){'),v9.indexOf('\nfunction risk(',v9.indexOf('async function syncIntel(){')));
+  assert.match(intelBlock,/finally\{/);
+  assert.match(intelBlock,/syncIntelBusy=false/);
 });
 
 test('r18+ v10 refresh is event-driven and does not call legacy go(current) inside sync',()=>{
