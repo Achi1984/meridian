@@ -210,6 +210,35 @@ function portfolioHistoryRangeMs(raw){
   return ({'1d':86400000,'1w':7*86400000,'1m':30*86400000,'6m':183*86400000,'1y':366*86400000})[key]||86400000;
 }
 
+function marketFeedCoreReceipt(snapshot,minRows){
+  const ageRaw=Number(snapshot?.ageMs),fetchedRaw=Number(snapshot?.fetchedAt),rowCount=Array.isArray(snapshot?.rows)?snapshot.rows.length:0;
+  const ageMs=Number.isFinite(ageRaw)?Math.max(0,ageRaw):null,fetchedAt=Number.isFinite(fetchedRaw)?fetchedRaw:null;
+  return{
+    ok:snapshot?.ok===true,
+    status:Number(snapshot?.status)||null,
+    cache:String(snapshot?.cache||'NONE'),
+    ageMs,
+    source:String(snapshot?.source||''),
+    transport:String(snapshot?.transport||''),
+    fetchedAt,
+    rowCount,
+    minimumRows:minRows,
+    sufficientRows:rowCount>=minRows,
+    error:snapshot?.ok===true?null:String(snapshot?.error||'market_feed_unavailable')
+  };
+}
+function marketFeedCoreSummary(probes={}){
+  const intervals=Object.fromEntries(Object.entries(probes).map(([key,{snapshot,minRows}])=>[key,marketFeedCoreReceipt(snapshot,minRows)]));
+  const rows=Object.values(intervals),ages=rows.map(x=>x.ageMs).filter(Number.isFinite);
+  const ready=rows.length===4&&rows.every(x=>x.ok&&x.sufficientRows&&Number.isFinite(x.ageMs)&&x.ageMs<=90*1000);
+  return{
+    ready,
+    freshnessLimitMs:90*1000,
+    oldestAgeMs:ages.length?Math.max(...ages):null,
+    intervals
+  };
+}
+
 function proxy(req,res,origin){
   const headers={...req.headers,host:`127.0.0.1:${INTERNAL_PORT}`};
   delete headers.origin;
@@ -251,12 +280,26 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
-      const current=await stateGet(PRIVATE_STATE_KEY),account=current?.pionexAccount||{},accountSync=current?.pionexAccountSync||{},botSync=current?.pionexBotSync||{};
+      const [current,shareState,m15,h1,h4,d1]=await Promise.all([
+        stateGet(PRIVATE_STATE_KEY),
+        stateGet(ASSET_WATCH_SHARE_STATE_KEY),
+        marketKlinesSnapshot({symbol:'BTC',interval:'15m',limit:180}),
+        marketKlinesSnapshot({symbol:'BTC',interval:'1h',limit:200}),
+        marketKlinesSnapshot({symbol:'BTC',interval:'4h',limit:240}),
+        marketKlinesSnapshot({symbol:'BTC',interval:'1d',limit:240})
+      ]);
+      const account=current?.pionexAccount||{},accountSync=current?.pionexAccountSync||{},botSync=current?.pionexBotSync||{},marketFeedCore=marketFeedCoreSummary({
+        '15m':{snapshot:m15,minRows:20},
+        '1h':{snapshot:h1,minRows:61},
+        '4h':{snapshot:h4,minRows:101},
+        '1d':{snapshot:d1,minRows:211}
+      });
       return writeJson(res,200,{
         ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
         privateData:!!current,privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),
         pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,
-        assetWatchShareConfigured:assetWatchShareEnabled(await stateGet(ASSET_WATCH_SHARE_STATE_KEY)),
+        assetWatchShareConfigured:assetWatchShareEnabled(shareState),
+        marketFeedCore,
         pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
         pionexAccountLastSuccessAt:accountSync.lastSuccessAt||null,
         pionexFuturesPositionCount:Array.isArray(account.futuresPositions)?account.futuresPositions.length:0,
