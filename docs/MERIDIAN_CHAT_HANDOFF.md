@@ -67,16 +67,57 @@ Post-merge runtime smoke on current main **f0290bee…**:
 
 Conclusion: **deployment/runtime/server core market feed are live PASS**.
 
+## r107 live client evidence
+
+The complete r107 client lifecycle is live **PASS**.
+
+### During refresh — 10:30 Europe/Vienna
+
+- BUILD **R107**
+- **MKT SYNCING**
+- **BOT SAFETY**
+- Gesamtportfolio **$35,012.78**
+- Ledger **$807.63**
+- OKX **$116.30**
+- Pionex **$34,088.85**
+- STRICT HISTORY **134 points**
+- **1358 BLOCKED**
+- 1H **READY**
+- 1D / 1W **BUILDING**
+
+This proves the explicit refresh lifecycle and fail-closed BOT SAFETY state.
+
+### Settled after refresh — 10:35 Europe/Vienna
+
+- **MKT READY**
+- **BOT READY**
+- PORTFOLIO **READY**
+- MARKET **READY**
+- BOTS **READY**
+- LIVE DATA **READY**
+- **MKT 15/15**
+- **BOT 24/24**
+- BOT CONTROL **24/24 decision-ready**
+- FORECAST **READY**
+- DEPOT **READY**
+- Gesamtportfolio **$34,848.50**
+- Ledger **$805.32**
+- OKX **$116.30**
+- Pionex **$33,926.88**
+- STRICT HISTORY **135 points**
+- **1357 BLOCKED**
+- 1H **READY** with **12 points**
+- 1D / 1W **BUILDING**
+
+Verdict: r107 is **FULL LIVE PASS**. The observed transition **MKT SYNCING → MKT READY** and **BOT SAFETY → BOT READY** matches the intended lifecycle. No remaining r107 acceptance item exists.
+
 ## Exact next durable step
 
-Only the interactive client spotcheck remains:
+r107 acceptance is complete. On continuation:
 
-1. confirm **BUILD R107**;
-2. press refresh;
-3. observe **MKT SYNCING** while refresh runs;
-4. record settled **MKT** and **BOT** states;
-5. if MKT is **PARTIAL** or **STALE**, expand **DATA SOURCES** and record the exact STALE/MISSING symbols and SYNC status;
-6. do not repeat server/upstream diagnosis unless `meridian/runtime-smoke` turns red;
-7. do not weaken any freshness or BOT SAFETY guard to force READY.
+1. reconcile current `main`, PRs, branches and CI;
+2. identify the first incomplete milestone after r107;
+3. continue that milestone only;
+4. do not repeat r93-r107 work unless new evidence contradicts the stored live passes.
 
 Do not repeat r93-r107 work.

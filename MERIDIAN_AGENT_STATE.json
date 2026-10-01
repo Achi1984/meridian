@@ -124,11 +124,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-01T05:52:13.312Z",
-    "canonicalMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+    "at": "2026-10-01T10:35:00+02:00",
+    "canonicalMainSha": "25259e1f84cbbbf11aac3dace40d8cd42f56819d",
     "build": "10.0-r107",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "r107 deployment/runtime/BTC core market feed PASS; only client refresh spotcheck remains. If MKT PARTIAL/STALE, DATA SOURCES now exposes exact stale/missing symbols."
+    "note": "r107 full live PASS: BUILD R107, refresh lifecycle MKT SYNCING -> MKT READY, BOT SAFETY -> BOT READY, MKT 15/15, BOT 24/24. Continue only the first incomplete milestone after r107."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
