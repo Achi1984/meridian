@@ -65,6 +65,15 @@ async function smoke(){
   if(health.privateData!==true)fail('Private dashboard store is not ready');
   if(health.privateReadConfigured!==true)fail('Gateway private read auth is not configured');
   if(String(health.privateReadAuthSource||'')!=='ENV')fail(`Gateway private read auth must come from ENV, got ${health.privateReadAuthSource||'UNKNOWN'}`);
+  const marketFeedCore=health?.marketFeedCore||{},marketIntervals=marketFeedCore?.intervals||{},marketFreshnessLimit=Number(marketFeedCore?.freshnessLimitMs);
+  if(marketFeedCore.ready!==true)fail('Gateway marketFeedCore not ready');
+  if(!Number.isFinite(marketFreshnessLimit)||marketFreshnessLimit!==90*1000)fail(`Gateway market freshness limit mismatch: ${marketFeedCore?.freshnessLimitMs}`);
+  for(const key of ['15m','1h','4h','1d']){
+    const item=marketIntervals?.[key]||{},age=Number(item?.ageMs),rows=Number(item?.rowCount),minimum=Number(item?.minimumRows);
+    if(item.ok!==true)fail(`Gateway market ${key} not ok: ${item?.error||'unknown'}`);
+    if(item.sufficientRows!==true||!Number.isFinite(rows)||!Number.isFinite(minimum)||rows<minimum)fail(`Gateway market ${key} insufficient rows: ${rows}/${minimum}`);
+    if(!Number.isFinite(age)||age>marketFreshnessLimit)fail(`Gateway market ${key} stale: ${item?.ageMs}`);
+  }
 
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
   if(protectedResponse.status!==401)fail(`Anonymous protected API expected 401, got ${protectedResponse.status}`);
@@ -98,6 +107,9 @@ async function smoke(){
     privateReadConfigured:health.privateReadConfigured===true,
     privateReadAuthSource:String(health.privateReadAuthSource||'UNKNOWN'),
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,
+    marketFeedCore:true,
+    marketFeedCoreOldestAgeMs:Number(marketFeedCore.oldestAgeMs),
+    marketFeedCoreIntervals:Object.fromEntries(['15m','1h','4h','1d'].map(key=>[key,{cache:String(marketIntervals?.[key]?.cache||'NONE'),ageMs:Number(marketIntervals?.[key]?.ageMs),source:String(marketIntervals?.[key]?.source||''),rowCount:Number(marketIntervals?.[key]?.rowCount)}])),
     anonymousProtectedStatus:protectedResponse.status,
     anonymousAssetWatchStatus:assetWatchAnonymous.status,
     anonymousLegacyDetailedStatus:legacyDetailed.status,
