@@ -9,13 +9,15 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r105 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r105');
+test('r105 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=105);
   assert.equal(release.terminalExecutionImpact,false);
   assert.equal(release.dashboardConsistency,'7.64-CANONICAL-PORTFOLIO-HISTORY-V3');
   assert.match(String(release.dashboardShell||''),/PIONEX-HISTORY-SOURCE-ALIGNMENT/);
-  assert.equal(manifest.start_url,'./v10/?build=r105&fresh=r105');
-  assert.ok(v10.includes("const BUILD='10.0-r105'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r105 centralizes fresh Pionex authority and prefers the read-only wallet source',()=>{
