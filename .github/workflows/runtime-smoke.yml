@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: meridian-runtime-smoke
@@ -25,9 +26,38 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Publish runtime smoke pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          payload=$(jq -nc --arg state "pending" --arg context "meridian/runtime-smoke" --arg description "Runtime smoke in progress" --arg target_url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')
+          curl -fsS -X POST             -H "Authorization: Bearer ${GH_TOKEN}"             -H "Accept: application/vnd.github+json"             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"             -d "$payload"
+
       - name: Verify GitHub Pages and Northflank runtime
+        id: runtime_smoke
+        continue-on-error: true
         env:
           MERIDIAN_SMOKE_RETRIES: ${{ github.event_name == 'push' && '30' || '3' }}
           MERIDIAN_SMOKE_DELAY_MS: ${{ github.event_name == 'push' && '20000' || '10000' }}
           GITHUB_SHA: ${{ github.sha }}
         run: node scripts/runtime-smoke.mjs
+
+      - name: Publish runtime smoke result
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SMOKE_OUTCOME: ${{ steps.runtime_smoke.outcome }}
+        run: |
+          if [ "$SMOKE_OUTCOME" = "success" ]; then
+            state="success"
+            description="Runtime smoke passed"
+          else
+            state="failure"
+            description="Runtime smoke failed"
+          fi
+          payload=$(jq -nc --arg state "$state" --arg context "meridian/runtime-smoke" --arg description "$description" --arg target_url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')
+          curl -fsS -X POST             -H "Authorization: Bearer ${GH_TOKEN}"             -H "Accept: application/vnd.github+json"             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"             -d "$payload"
+
+      - name: Preserve runtime smoke failure semantics
+        if: ${{ steps.runtime_smoke.outcome != 'success' }}
+        run: exit 1
