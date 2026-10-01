@@ -67,16 +67,35 @@ Post-merge runtime smoke on current main **f0290bee…**:
 
 Conclusion: **deployment/runtime/server core market feed are live PASS**.
 
+## r107 live client evidence
+
+Live screenshot at **2026-10-01 10:30 Europe/Vienna** confirms:
+
+- BUILD **R107**
+- while refresh is running: **MKT SYNCING**
+- during that same refresh: **BOT SAFETY**
+- Gesamtportfolio **$35,012.78**
+- Ledger **$807.63**
+- OKX **$116.30**
+- Pionex **$34,088.85**
+- STRICT HISTORY **134 points**
+- **1358 BLOCKED**
+- 1H **READY**
+- 1D **BUILDING**
+- 1W **BUILDING**
+
+Verdict: the r106/r107 client refresh lifecycle transition into **MKT SYNCING** is live **PASS** and BOT SAFETY remains fail-closed.
+
+Remaining evidence is only the settled state after this refresh completes.
+
 ## Exact next durable step
 
 Only the interactive client spotcheck remains:
 
-1. confirm **BUILD R107**;
-2. press refresh;
-3. observe **MKT SYNCING** while refresh runs;
-4. record settled **MKT** and **BOT** states;
-5. if MKT is **PARTIAL** or **STALE**, expand **DATA SOURCES** and record the exact STALE/MISSING symbols and SYNC status;
-6. do not repeat server/upstream diagnosis unless `meridian/runtime-smoke` turns red;
-7. do not weaken any freshness or BOT SAFETY guard to force READY.
+1. wait for the already-started refresh to complete;
+2. record settled **MKT** and **BOT** states;
+3. if MKT is **PARTIAL** or **STALE**, expand **DATA SOURCES** and record the exact STALE/MISSING symbols and SYNC status;
+4. do not repeat server/upstream diagnosis unless `meridian/runtime-smoke` turns red;
+5. do not weaken any freshness or BOT SAFETY guard to force READY.
 
 Do not repeat r93-r107 work.
