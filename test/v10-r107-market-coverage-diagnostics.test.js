@@ -6,12 +6,14 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r107 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r107');
+test('r107 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=107);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/MARKET-COVERAGE-DIAGNOSTICS/);
-  assert.equal(manifest.start_url,'./v10/?build=r107&fresh=r107');
-  assert.ok(v10.includes("const BUILD='10.0-r107'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r107 market health exposes concrete fresh, stale, and missing symbol sets',()=>{
