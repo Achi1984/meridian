@@ -49,8 +49,10 @@ test('r20 refresh is sequential and preserves r18 single-flight runtime hardenin
 });
 
 test('r20 readiness distinguishes market stale missing and bot READY PARTIAL SAFETY REF',()=>{
-  assert.match(v10,/staleAssets=Math\.max\(0,knownAssets-freshAssets\)/);
-  assert.match(v10,/missingAssets=Math\.max\(0,totalAssets-knownAssets\)/);
+  assert.match(v10,/staleSymbols=rows\.filter\(x=>!!x\.intel&&!intelFresh\(x\.intel\)\)\.map\(x=>x\.symbol\)/);
+  assert.match(v10,/missingSymbols=rows\.filter\(x=>!x\.intel\)\.map\(x=>x\.symbol\)/);
+  assert.match(v10,/staleAssets=staleSymbols\.length/);
+  assert.match(v10,/missingAssets=missingSymbols\.length/);
   assert.match(v10,/function marketReadiness\(m\)/);
   assert.match(v10,/function botReadiness\(g\)/);
   for(const token of ["label:'READY'","label:'PARTIAL'","label:'SAFETY'","label:'REF'"])assert.ok(v10.includes(token),token);
