@@ -1,0 +1,130 @@
+name: MERIDIAN QH Individual Trades Data V1.1
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-INDIVIDUAL-TRADES-DATA-V1-1.md"
+      - "scripts/audit-qh-individual-trades-data-v1-1-shard.py"
+      - "scripts/aggregate-qh-individual-trades-data-v1-1.py"
+      - "test/test_qh_individual_trades_data_v1_1.py"
+      - ".github/workflows/qh-individual-trades-data-v1-1.yml"
+  push:
+    branches:
+      - research/qh-individual-trades-data-v1-1
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-INDIVIDUAL-TRADES-DATA-V1-1-FULL-RUN.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qh-individual-trades-data-v1-1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify parser invariants
+        run: python3 test/test_qh_individual_trades_data_v1_1.py
+
+  canary:
+    if: github.event_name == 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset: SOLUSDT
+            month: "2025-07"
+          - asset: BTCUSDT
+            month: "2025-01"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v11-canary
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate individual-trades canary
+        run: python3 scripts/audit-qh-individual-trades-data-v1-1-shard.py
+      - name: Upload canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v11-canary-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v11-canary/*.json
+          if-no-files-found: warn
+
+  shard:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        asset: [BTCUSDT, ETHUSDT, XRPUSDT, SOLUSDT, DOGEUSDT, ADAUSDT]
+        month:
+          - "2025-01"
+          - "2025-02"
+          - "2025-03"
+          - "2025-04"
+          - "2025-05"
+          - "2025-06"
+          - "2025-07"
+          - "2025-08"
+          - "2025-09"
+          - "2025-10"
+          - "2025-11"
+          - "2025-12"
+          - "2026-01"
+          - "2026-02"
+          - "2026-03"
+          - "2026-04"
+          - "2026-05"
+          - "2026-06"
+          - "2026-07"
+          - "2026-08"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QH_ASSET: ${{ matrix.asset }}
+      QH_MONTH: ${{ matrix.month }}
+      QH_OUTPUT_DIR: research/results/qh-v11-shard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and discard raw shard
+        run: python3 scripts/audit-qh-individual-trades-data-v1-1-shard.py
+      - name: Upload compact shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-v11-shard-${{ matrix.asset }}-${{ matrix.month }}
+          path: research/results/qh-v11-shard/*.json
+          if-no-files-found: warn
+
+  aggregate:
+    if: github.event_name != 'pull_request' && always()
+    needs: [invariants, shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qh-v11-shard-*
+          path: research/results/qh-v11-shards
+          merge-multiple: true
+      - name: Require 120/120 green shards
+        run: python3 scripts/aggregate-qh-individual-trades-data-v1-1.py
+      - name: Upload aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-individual-trades-data-v1-1
+          path: research/results/qh-individual-trades-data-v1-1-summary.json
+          if-no-files-found: warn
