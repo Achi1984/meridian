@@ -15,12 +15,14 @@ function okxRows(count=30,start=1700000000000,step=15*60*1000){
   }).reverse();
 }
 
-test('r106 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r106');
+test('r106 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=106);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/MARKET-FRESHNESS-LIFECYCLE/);
-  assert.equal(manifest.start_url,'./v10/?build=r106&fresh=r106');
-  assert.ok(v10.includes("const BUILD='10.0-r106'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r106 reserves freshness margin below the 3 minute decision boundary',async()=>{

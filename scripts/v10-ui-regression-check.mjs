@@ -480,3 +480,18 @@ must(v9.includes("gatewayCache==='STALE_FALLBACK'&&gatewayAge!=null&&gatewayAge>
 must(js.includes("if(m.syncing)return{label:'SYNCING',tone:'watch'}"),'UI must distinguish SYNCING from STALE');
 must(js.includes('Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed'),'header sync lifecycle disclosure missing');
 must(js.includes("if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'}"),'BOT SAFETY fail-closed state must remain intact');
+
+
+/* r107 permanent market coverage diagnostics gates */
+must(String(release.dashboardShell||'').includes('MARKET-COVERAGE-DIAGNOSTICS'),'dashboardShell must declare market coverage diagnostics');
+must(js.includes('function compactMarketSymbols(rows=[],limit=6){'),'market coverage compact-symbol helper missing');
+must(js.includes('function marketCoverageIssueText(m){'),'market coverage issue formatter missing');
+must(js.includes('freshSymbols=rows.filter(x=>intelFresh(x.intel)).map(x=>x.symbol)'),'fresh market symbol telemetry missing');
+must(js.includes('staleSymbols=rows.filter(x=>!!x.intel&&!intelFresh(x.intel)).map(x=>x.symbol)'),'stale market symbol telemetry missing');
+must(js.includes('missingSymbols=rows.filter(x=>!x.intel).map(x=>x.symbol)'),'missing market symbol telemetry missing');
+must(js.includes("parts.push('STALE '+compactMarketSymbols(m.staleSymbols))"),'stale-symbol disclosure missing');
+must(js.includes("parts.push('MISSING '+compactMarketSymbols(m.missingSymbols))"),'missing-symbol disclosure missing');
+must(js.includes("SYNC '+esc(m.syncStatus)"),'market sync-status disclosure missing');
+must(js.includes("if(m.syncing)return{label:'SYNCING',tone:'watch'}"),'market SYNCING readiness invariant changed');
+must(js.includes("if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'}"),'market READY coverage invariant changed');
+must(js.includes("if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'}"),'BOT SAFETY fail-closed invariant changed');
