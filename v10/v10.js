@@ -72,9 +72,19 @@ function marketIntel(symbol){
 }
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
+function compactMarketSymbols(rows=[],limit=6){
+  const xs=(Array.isArray(rows)?rows:[]).map(x=>String(x||'').trim().toUpperCase()).filter(Boolean),shown=xs.slice(0,Math.max(1,limit));
+  return shown.join(', ')+(xs.length>shown.length?' +'+(xs.length-shown.length):'');
+}
+function marketCoverageIssueText(m){
+  const parts=[];
+  if(m?.staleSymbols?.length)parts.push('STALE '+compactMarketSymbols(m.staleSymbols));
+  if(m?.missingSymbols?.length)parts.push('MISSING '+compactMarketSymbols(m.missingSymbols));
+  return parts.join(' · ');
+}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(marketIntel(symbol))).length,knownAssets=universe.filter(symbol=>!!marketIntel(symbol)).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets),syncStatus=String(s?.marketSyncStatus||'IDLE'),syncing=syncStatus==='RUNNING';
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(marketIntel('BTC')),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),syncStatus,syncing,syncStartedAt:s?.marketSyncStartedAt||null,syncCompletedAt:s?.marketSyncCompletedAt||null,priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),rows=universe.map(symbol=>({symbol,intel:marketIntel(symbol)})),freshSymbols=rows.filter(x=>intelFresh(x.intel)).map(x=>x.symbol),knownSymbols=rows.filter(x=>!!x.intel).map(x=>x.symbol),staleSymbols=rows.filter(x=>!!x.intel&&!intelFresh(x.intel)).map(x=>x.symbol),missingSymbols=rows.filter(x=>!x.intel).map(x=>x.symbol),freshAssets=freshSymbols.length,knownAssets=knownSymbols.length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=staleSymbols.length,missingAssets=missingSymbols.length,syncStatus=String(s?.marketSyncStatus||'IDLE'),syncing=syncStatus==='RUNNING';
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(marketIntel('BTC')),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,freshSymbols,knownSymbols,staleSymbols,missingSymbols,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),syncStatus,syncing,syncStartedAt:s?.marketSyncStartedAt||null,syncCompletedAt:s?.marketSyncCompletedAt||null,priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -270,7 +280,7 @@ function portfolioReadiness(){
   return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:portfolioAuthorityDetail(p)};
 }
 function marketStateItem(){
-  const m=marketHealth(),r=marketReadiness(m),detail=m.syncing?'Refresh läuft · letzter vollständiger Stand '+String(m.ageText||'—'):String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch';
+  const m=marketHealth(),r=marketReadiness(m),coverage=marketCoverageIssueText(m),detail=m.syncing?'Refresh läuft · letzter vollständiger Stand '+String(m.ageText||'—'):String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'+(coverage?' · '+coverage:'');
   return{key:'MARKET',label:r.label,tone:r.tone,detail};
 }
 function botStateItem(){
@@ -404,8 +414,8 @@ function snapshotDetails(openByDefault=false){
   return '<details class="v10-snapshot-details asset-watch-reference" '+(openByDefault?'open':'')+'><summary>ASSET WATCH SNAPSHOT · '+refs.length+' PIONEX BOTS</summary><div class="snapshot-meta"><b>27.09.2026 · ca. 19:47–19:52</b><span>'+stamp+'</span></div><div class="snapshot-assets">'+groups+'</div>'+(p||o?'<div class="snapshot-list">'+p+o+'</div>':'')+'<small>Autoritativer letzter Screenshot-Stand. Nur Referenz, solange BOT API nicht frisch ist · keine Risk-/Next-Action-Ableitung.</small></details>';
 }
 function commandDataStrip(){
-  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',ps=s?.portfolio?.source||'INCOMPLETE',portfolioLabel=ps==='CANONICAL_MIXED'?'CANONICAL MIXED':ps==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':ps==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',histDelta=Number(s?.portfolio?.historyDeltaUsd),histText=Number.isFinite(histDelta)?' · HIST Δ '+(h.money?.(histDelta)||histDelta.toFixed(2)):' · HIST Δ —',pionexAge=s?.portfolio?.pionexTimestampFuture?'FUTURE TS':s?.portfolio?.pionexTimestampKnown?(h.ageText?.(s.portfolio.pionexAgeMs)||'—'):'NO TIMESTAMP';
-  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+mr.tone+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing · '+esc(m.transport)+(m.error?' · '+esc(String(m.error).slice(0,90)):'')+'</small></div><div><span>BOT LAYER</span><b class="tone-'+br.tone+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>'+portfolioLabel+'</b><small>Ledger auto + OKX ref + Pionex SSOT · PIONEX '+pionexAge+histText+' · stale Holdings fail-closed</small></div></section>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),coverage=marketCoverageIssueText(m),s=S(),h=H(),refTs=Date.parse(String(s?.referenceSnapshotAt||'')),refAge=Number.isFinite(refTs)?h.ageText?.(Date.now()-refTs):'—',ps=s?.portfolio?.source||'INCOMPLETE',portfolioLabel=ps==='CANONICAL_MIXED'?'CANONICAL MIXED':ps==='CANONICAL_PARTIAL'?'CANONICAL PARTIAL':ps==='PRIVATE_CANONICAL_SNAPSHOT'?'PRIVATE SNAPSHOT':'INCOMPLETE',histDelta=Number(s?.portfolio?.historyDeltaUsd),histText=Number.isFinite(histDelta)?' · HIST Δ '+(h.money?.(histDelta)||histDelta.toFixed(2)):' · HIST Δ —',pionexAge=s?.portfolio?.pionexTimestampFuture?'FUTURE TS':s?.portfolio?.pionexTimestampKnown?(h.ageText?.(s.portfolio.pionexAgeMs)||'—'):'NO TIMESTAMP';
+  return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+mr.tone+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' fresh · SYNC '+esc(m.syncStatus)+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing · '+esc(m.transport)+(coverage?' · '+esc(coverage):'')+(m.error?' · '+esc(String(m.error).slice(0,90)):'')+'</small></div><div><span>BOT LAYER</span><b class="tone-'+br.tone+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>'+portfolioLabel+'</b><small>Ledger auto + OKX ref + Pionex SSOT · PIONEX '+pionexAge+histText+' · stale Holdings fail-closed</small></div></section>';
 }
 function commandDataDisclosure(){
   const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),p=portfolioReadiness();
@@ -424,7 +434,8 @@ function commandSystemDiagnostics(){
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='SYNCING'?'Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed':mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
+  const marketCoverage=marketCoverageIssueText(m);
+  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='SYNCING'?'Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed':mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets+(marketCoverage?' · '+marketCoverage:''));
   set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
