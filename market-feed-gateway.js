@@ -6,7 +6,7 @@ const MARKET_INTERVAL_MS={
 };
 const MARKET_ALLOWED_INTERVALS=new Set(Object.keys(MARKET_INTERVAL_MS));
 const MARKET_CACHE_TTL_MS=45*1000;
-const MARKET_STALE_FALLBACK_MS=3*60*1000;
+const MARKET_STALE_FALLBACK_MS=90*1000;
 const candleCache=new Map();
 
 function finite(v){const n=Number(v);return Number.isFinite(n)?n:null}

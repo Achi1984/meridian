@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r105';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r105';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r105';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r105';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r105';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r105';
-// MERIDIAN v10 r105 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r106';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r106';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r106';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r106';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r106';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r106';
+// MERIDIAN v10 r106 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r105';
+const BUILD='10.0-r106';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -73,8 +73,8 @@ function marketIntel(symbol){
 function referenceRows(symbol){return (S()?.referenceBots||[]).filter(b=>b.symbol===symbol)}
 function referenceLinked(symbol){return referenceRows(symbol).length>0}
 function marketHealth(){
-  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(marketIntel(symbol))).length,knownAssets=universe.filter(symbol=>!!marketIntel(symbol)).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets);
-  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(marketIntel('BTC')),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
+  const s=S(),h=H(),universe=marketUniverse(),freshAssets=universe.filter(symbol=>intelFresh(marketIntel(symbol))).length,knownAssets=universe.filter(symbol=>!!marketIntel(symbol)).length,age=s?.marketSyncedAt?Date.now()-s.marketSyncedAt:null,totalAssets=universe.length,staleAssets=Math.max(0,knownAssets-freshAssets),missingAssets=Math.max(0,totalAssets-knownAssets),syncStatus=String(s?.marketSyncStatus||'IDLE'),syncing=syncStatus==='RUNNING';
+  return{fresh:freshTs(s?.marketSyncedAt)&&intelFresh(marketIntel('BTC')),freshAssets,knownAssets,staleAssets,missingAssets,totalAssets,coverageComplete:totalAssets>0&&freshAssets===totalAssets,age,ageText:h.ageText?.(age)||'—',transport:String(s?.marketTransport||s?.intel?.transport||'UNKNOWN'),syncStatus,syncing,syncStartedAt:s?.marketSyncStartedAt||null,syncCompletedAt:s?.marketSyncCompletedAt||null,priceAge:s?.marketPriceSyncedAt?Date.now()-s.marketPriceSyncedAt:null,priceFresh:freshTs(s?.marketPriceSyncedAt),error:s?.marketError||null,priceError:s?.marketPriceError||null};
 }
 function stopLossIssue(b){
   const sl=Number(b?.sl),liq=Number(b?.liq);if(!(sl>0&&liq>0))return null;
@@ -246,6 +246,7 @@ function syncHealth(){
   return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,marketReady,pnlMissing,marketMissing,safetyMissing,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail};
 }
 function marketReadiness(m){
+  if(m.syncing)return{label:'SYNCING',tone:'watch'};
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
   if(m.fresh)return{label:'PARTIAL',tone:'watch'};
   return{label:'STALE',tone:'watch'};
@@ -269,8 +270,8 @@ function portfolioReadiness(){
   return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:portfolioAuthorityDetail(p)};
 }
 function marketStateItem(){
-  const m=marketHealth(),r=marketReadiness(m);
-  return{key:'MARKET',label:r.label,tone:r.tone,detail:String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'};
+  const m=marketHealth(),r=marketReadiness(m),detail=m.syncing?'Refresh läuft · letzter vollständiger Stand '+String(m.ageText||'—'):String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch';
+  return{key:'MARKET',label:r.label,tone:r.tone,detail};
 }
 function botStateItem(){
   const g=syncHealth(),r=botReadiness(g);
@@ -423,7 +424,7 @@ function commandSystemDiagnostics(){
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
+  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='SYNCING'?'Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed':mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets);
   set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
