@@ -44,7 +44,9 @@ summary={
  "missingShards":[list(x) for x in missing],"duplicateShards":[list(x) for x in duplicates],
  "unexpectedShards":[list(x) for x in unexpected],
  "tradeRows":sum(x.get("audits",{}).get("trades",{}).get("rows",0) for x in rows),
- "emptyQuarterHourBins":sum(x.get("audits",{}).get("trades",{}).get("emptyQuarterHourBins",0) for x in rows),\n "tradeIdGapEvents":sum(x.get("audits",{}).get("trades",{}).get("tradeIdGapEvents",0) for x in rows),\n "missingTradeIdCount":sum(x.get("audits",{}).get("trades",{}).get("missingTradeIdCount",0) for x in rows),
+ "emptyQuarterHourBins":sum(x.get("audits",{}).get("trades",{}).get("emptyQuarterHourBins",0) for x in rows),
+ "tradeIdGapEvents":sum(x.get("audits",{}).get("trades",{}).get("tradeIdGapEvents",0) for x in rows),
+ "missingTradeIdCount":sum(x.get("audits",{}).get("trades",{}).get("missingTradeIdCount",0) for x in rows),
  "kline1mRows":sum(x.get("audits",{}).get("klines1m",{}).get("rows",0) for x in rows),
  "fundingRows":sum(x.get("audits",{}).get("fundingRate",{}).get("rows",0) for x in rows),
  "downloadedBytes":{
