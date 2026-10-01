@@ -76,14 +76,28 @@ Post-merge smoke on **6dbc5780ca73410833eda72e99f4b298515970cb**:
 
 Conclusion: deployment/runtime/server market core are live PASS.
 
+## r108 full live client acceptance
+
+Live COMMAND screenshot at **2026-10-01 10:53 Europe/Vienna** confirms:
+
+- **PAPER COCKPIT READY**
+- **<1 MIN · protected Paper Overview**
+- PAPER view was not required to be opened first
+- **DEPOT READY**
+- **BOT CONTROL READY**
+- **FORECAST READY**
+- **LIVE DATA READY**
+- **MKT 15/15**
+- **BOT 24/24**
+- DATA SOURCES: **MKT READY · BOT READY · PORTFOLIO READY**
+
+Verdict: r108 background Paper Overview prefetch is **FULL LIVE PASS**.
+
 ## Exact next durable step
 
-Only the interactive r108 Paper-readiness spotcheck remains:
+r108 acceptance is complete. On continuation:
 
-1. confirm **BUILD R108**;
-2. stay on COMMAND — do **not** open PAPER first;
-3. after normal startup, observe PAPER COCKPIT;
-4. expected: it leaves **NOT LOADED** and settles to **READY**, **STALE**, or **ERROR** according to the protected Paper Overview;
-5. if it remains **NOT LOADED**, isolate only the client prefetch lifecycle; deployment/runtime are already PASS.
-
-Do not repeat r93-r108 work.
+1. reconcile current `main`, PRs, branches and CI;
+2. identify the first incomplete milestone after r108;
+3. continue that milestone only;
+4. do not repeat r93-r108 work unless new evidence contradicts the stored live passes.
