@@ -1,14 +1,14 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r107",
+  "build": "10.0-r108",
   "branch": "main",
   "issue": 243,
   "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_V1_FAIL_SOURCE_ANOMALY",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+    "verifiedSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
     "verifiedAt": "2026-10-01",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -27,10 +27,10 @@
     },
     "marketFeedCore": {
       "status": "PASS",
-      "checkedAt": "2026-10-01T05:52:13.312Z",
-      "deploymentSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
-      "terminalBuild": "10.0-r107",
-      "passingAttempt": 2,
+      "checkedAt": "2026-10-01T08:46:28.236Z",
+      "deploymentSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
+      "terminalBuild": "10.0-r108",
+      "passingAttempt": 3,
       "freshnessLimitMs": 90000,
       "oldestAgeMs": 0,
       "intervals": {
@@ -59,7 +59,7 @@
           "rowCount": 240
         }
       },
-      "conclusion": "R107_DEPLOYMENT_RUNTIME_MARKET_CORE_PASS"
+      "conclusion": "R108_DEPLOYMENT_RUNTIME_MARKET_CORE_PASS"
     }
   },
   "canonicalResearch": {
@@ -1456,10 +1456,10 @@
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r107",
-    "canonicalMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
-    "lastMergedPr": 425,
-    "status": "R107_LIVE_ACCEPTED",
+    "terminalBuild": "10.0-r108",
+    "canonicalMainSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
+    "lastMergedPr": 428,
+    "status": "R108_RUNTIME_PASS_PAPER_UI_SPOTCHECK_PENDING",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1475,7 +1475,8 @@
       "r104 portfolio history component integrity",
       "r105 Pionex history source alignment + freshness",
       "r106 market freshness lifecycle",
-      "r107 market coverage diagnostics"
+      "r107 market coverage diagnostics",
+      "r108 Paper readiness prefetch"
     ],
     "portfolioCheckpoint": {
       "lastObservedTotalUsd": 34848.5,
@@ -1487,7 +1488,7 @@
       "marketReady": true,
       "historyStatus": "R107_LIVE_PASS; 135 strict points; 1357 blocked; 1H READY; 1D/1W BUILDING; SPOT + FRESH PIONEX"
     },
-    "nextAction": "r107 live acceptance is complete. Reconcile main/PRs/CI and continue only the first incomplete milestone after r107. Do not repeat r93-r107 work.",
+    "nextAction": "Live UI spotcheck only: confirm BUILD R108 and observe PAPER COCKPIT in COMMAND after normal startup. It must leave NOT LOADED without opening the PAPER view, settling to READY/STALE/ERROR according to the protected Paper Overview. If it stays NOT LOADED, inspect client prefetch lifecycle only; deployment/runtime are already PASS.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1603,9 +1604,18 @@
         "forecastReady": true,
         "depotReady": true,
         "verdict": "FULL_LIVE_PASS"
+      },
+      "r108": {
+        "status": "PARTIAL_PASS_UI_SPOTCHECK_PENDING",
+        "deployment": "PASS",
+        "runtimeSmoke": "PASS",
+        "marketFeedCore": "PASS",
+        "checkedAt": "2026-10-01T08:46:28.236Z",
+        "terminalBuild": "R108",
+        "remaining": "Confirm in live COMMAND that PAPER COCKPIT no longer remains NOT LOADED after normal startup. Expected lifecycle: LOADING then READY/STALE/ERROR from the protected read-only Paper Overview. No PAPER view should need to be opened."
       }
     },
-    "terminalReleaseSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
+    "terminalReleaseSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
     "lastMergedOpsPr": 423,
     "observability": {
       "runtimeSmokeCommitStatusPr": 422,
@@ -1615,13 +1625,13 @@
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-10-01T10:35:00+02:00",
+    "updatedAt": "2026-10-01T08:46:28.236Z",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "f0290bee35803b8e45cbff0a7508f5a974b08d94",
-    "currentBuild": "10.0-r107"
+    "currentMainSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
+    "currentBuild": "10.0-r108"
   }
 }
