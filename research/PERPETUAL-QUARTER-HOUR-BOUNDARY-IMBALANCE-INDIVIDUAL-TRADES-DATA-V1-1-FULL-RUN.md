@@ -22,3 +22,7 @@ Run the already-frozen Data V1.1 workflow over exactly the preregistered 120 ass
 The aggregate gate must fail closed unless exactly 120/120 expected unique shards PASS all frozen hard gates.
 
 This authorization changes no parser, workflow, test, threshold, source semantic, or gate logic. It authorizes only strategy-neutral data-quality execution. It does not authorize directional imbalance, forward returns, signal-return analysis, positions, PnL, Paper execution, or live execution.
+
+## Launch record
+
+Full 120-shard execution launched from the current-main r108 authorization branch after the trigger-only branch-name correction. No frozen data-quality semantics changed.
