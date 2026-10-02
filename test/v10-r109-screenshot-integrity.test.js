@@ -6,12 +6,14 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r109 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r109');
+test('r109 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=109);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/SCREENSHOT-INTEGRITY-NULL-AUTHORITY-HISTORY-PRICE-PRECISION/);
-  assert.equal(manifest.start_url,'./v10/?build=r109&fresh=r109');
-  assert.ok(v10.includes("const BUILD='10.0-r109'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 test('r109 never coerces missing portfolio authority to zero or a fake -100 percent delta',()=>{
   assert.match(v10,/function knownNumber\(v\)/);
