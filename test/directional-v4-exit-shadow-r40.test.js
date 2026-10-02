@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recordDirectionalV3Close,directionalV4Status} from '../directional-v4-exit-shadow.js';
 
 const parent={id:'p1',symbol:'BTCUSDT',side:'LONG',entry:100,sl:90,tp1:114,tp2:122,qty:10,feeOpen:.5,riskPct:.5,plannedRiskBudgetUsd:100,openedAt:'2026-09-13T00:00:00Z'};
@@ -22,3 +23,20 @@ test('V4 records a matched comparison only when both twins are closed',()=>{
   assert.equal(s.pairs.length,1);assert.equal(directionalV4Status(s).closedCount,1);
 });
 
+
+test('V4 ignores stale or future quotes when runtime freshness is enforced',()=>{
+  let s=pairDirectionalV4Position(newDirectionalV4State(0,{feeBps:5,slippageBps:3}),parent,1);
+  s=cycleDirectionalV4(s,{BTCUSDT:{price:110,ts:1000}},1000,{maxQuoteAgeMs:100});
+  const marked=s.positions[0].unrealized;
+  s=cycleDirectionalV4(s,{BTCUSDT:{price:130,ts:1000}},1201,{maxQuoteAgeMs:100});
+  assert.equal(s.positions.length,1);assert.equal(s.positions[0].unrealized,marked);
+  s=cycleDirectionalV4(s,{BTCUSDT:{price:130,ts:1300}},1200,{maxQuoteAgeMs:100});
+  assert.equal(s.positions.length,1);assert.equal(s.positions[0].unrealized,marked);
+  s=cycleDirectionalV4(s,{BTCUSDT:{price:122,ts:1200}},1200,{maxQuoteAgeMs:100});
+  assert.equal(s.positions.length,0);assert.equal(s.trades[0].exitReason,'TP2');
+});
+
+test('server passes the engine stale-quote budget into V4 runtime',()=>{
+  const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
+  assert.match(server,/cycleDirectionalV4\(s,m\?\.quotes\|\|\{\},Date\.now\(\),\{maxQuoteAgeMs:config\.marketStaleMs\}\)/);
+});
