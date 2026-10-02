@@ -27,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Checkout strict-live validator
+        uses: actions/checkout@v4
+
       - name: Request GitHub OIDC token
         id: oidc
         shell: bash
@@ -57,32 +60,21 @@ jobs:
             echo "MERIDIAN mirror endpoint returned HTTP $HTTP_CODE"
             exit 22
           fi
-          node -e '
-            const fs=require("fs");
-            const x=JSON.parse(fs.readFileSync("asset-watch-mirror.json","utf8"));
-            const r=x.receipt||{};
-            const required =
-              x.schemaVersion==="MERIDIAN-ASSET-WATCH-MIRROR-V1" &&
-              x.alg==="A256GCM" && !!x.iv && !!x.tag && !!x.ciphertext &&
-              r.schemaVersion==="MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1" &&
-              r.bridgeSchemaVersion==="MERIDIAN-ASSET-WATCH-BRIDGE-V1" &&
-              r.readOnly===true && r.executionImpact===false &&
-              r.detailsComplete===true && r.sourceStatusOk===true &&
-              r.fresh===true && r.usableForOverwrite===true &&
-              !!r.sourceSnapshotAt;
-            if(!required){
-              console.error("Asset Watch strict-live receipt validation failed");
-              process.exit(1);
-            }
-            const sourceAt=Date.parse(r.sourceSnapshotAt);
-            const generatedAt=Date.parse(x.generatedAt);
-            const limit=Number(r.freshnessLimitMs);
-            if(!Number.isFinite(sourceAt)||!Number.isFinite(generatedAt)||!Number.isFinite(limit)||limit<=0||generatedAt-sourceAt>limit){
-              console.error("Asset Watch source snapshot is stale");
-              process.exit(1);
-            }
-            console.log("Asset Watch strict-live receipt valid");
-          '
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {validateAssetWatchMirrorEnvelope} from './asset-watch-mirror-crypto.js';
+          const envelope=JSON.parse(fs.readFileSync('asset-watch-mirror.json','utf8'));
+          const validation=validateAssetWatchMirrorEnvelope(envelope);
+          if(!validation.ok){
+            console.error('Asset Watch strict-live validation failed:',validation.reason);
+            process.exit(1);
+          }
+          console.log('Asset Watch strict-live receipt valid',JSON.stringify({
+            ageMs:validation.ageMs,
+            reportedAgeMs:validation.reportedAgeMs,
+            limitMs:validation.limitMs
+          }));
+          NODE
 
       - name: Upload encrypted Asset Watch artifact
         uses: actions/upload-artifact@v4
