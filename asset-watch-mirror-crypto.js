@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 const AAD='MERIDIAN-ASSET-WATCH-MIRROR-V1';
+const RECEIPT_SCHEMA='MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1';
 const HASH_RE=/^[a-f0-9]{64}$/;
 
 function keyFromHash(tokenHash){
@@ -10,6 +11,22 @@ function keyFromHash(tokenHash){
 }
 export function assetWatchMirrorKeyHashFromShareToken(shareToken){
   return crypto.createHash('sha256').update(String(shareToken||'')).digest('hex');
+}
+export function assetWatchMirrorPublicReceipt(snapshot){
+  return {
+    schemaVersion:RECEIPT_SCHEMA,
+    bridgeSchemaVersion:String(snapshot?.schemaVersion||''),
+    readOnly:snapshot?.readOnly===true,
+    executionImpact:snapshot?.executionImpact===true,
+    detailsComplete:snapshot?.detailsComplete===true,
+    sourceStatusOk:snapshot?.sourceStatusOk===true,
+    fresh:snapshot?.fresh===true,
+    usableForOverwrite:snapshot?.usableForOverwrite===true,
+    source:String(snapshot?.source||'UNAVAILABLE'),
+    sourceSnapshotAt:snapshot?.sourceSnapshotAt||null,
+    sourceAgeMs:Number.isFinite(Number(snapshot?.sourceAgeMs))?Number(snapshot.sourceAgeMs):null,
+    freshnessLimitMs:Number.isFinite(Number(snapshot?.freshnessLimitMs))?Number(snapshot.freshnessLimitMs):null
+  };
 }
 export function encryptAssetWatchMirror(snapshot,tokenHash,{iv=crypto.randomBytes(12),now=new Date().toISOString()}={}){
   const key=keyFromHash(tokenHash);
@@ -22,6 +39,7 @@ export function encryptAssetWatchMirror(snapshot,tokenHash,{iv=crypto.randomByte
     schemaVersion:AAD,
     alg:'A256GCM',
     generatedAt:now,
+    receipt:assetWatchMirrorPublicReceipt(snapshot),
     iv:Buffer.from(iv).toString('base64url'),
     tag:tag.toString('base64url'),
     ciphertext:ciphertext.toString('base64url')
