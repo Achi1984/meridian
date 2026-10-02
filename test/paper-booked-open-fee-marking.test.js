@@ -22,13 +22,22 @@ test('booked opening fee is not deducted twice from open SHORT equity',()=>{
 test('server routes booked-fee ledgers to the cash-aware marker while preserving V3 compensation',()=>{
   const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
   assert.match(server,/function markPositionBookedOpenFee\(p,price\)/);
-  for(const name of ['cycleUnlocked','shadowV1Cycle','challengerV2Cycle','regimeV1Cycle']){
-    const sync='function '+name+'('; const async='async function '+name+'('; const start=server.indexOf(sync)>=0?server.indexOf(sync):server.indexOf(async);
-    assert.ok(start>=0,name+' missing');
-    const tail=server.slice(start,start+7000);
-    assert.match(tail,/markPositionBookedOpenFee\(p,q\.price\)/,name+' must use booked-fee marker');
+  const routes=[
+    ['async function cycleUnlocked()','function cycle()'],
+    ['async function shadowV1Cycle(m)','async function shadowV1Status()'],
+    ['async function challengerV2Cycle(m)','async function challengerV2Status()'],
+    ['async function regimeV1Cycle(m)','async function regimeV1Status()'],
+  ];
+  for(const [startMarker,endMarker] of routes){
+    const start=server.indexOf(startMarker),end=server.indexOf(endMarker,start+startMarker.length);
+    assert.ok(start>=0&&end>start,startMarker+' definition missing');
+    const body=server.slice(start,end);
+    assert.match(body,/markPositionBookedOpenFee\(p,q\.price\)/,startMarker+' must use booked-fee marker');
   }
-  const v3=server.slice(server.indexOf('async function challengerV3CycleUnlocked'),server.indexOf('async function challengerV3Status'));
+  const v3Start=server.indexOf('async function challengerV3CycleUnlocked');
+  const v3End=server.indexOf('async function challengerV3Status',v3Start);
+  assert.ok(v3Start>=0&&v3End>v3Start,'V3 cycle definition missing');
+  const v3=server.slice(v3Start,v3End);
   assert.match(v3,/markPosition\(p,q\.price\)/);
   assert.match(v3,/marked\.unrealized\+=p\.feeOpen/);
   assert.doesNotMatch(v3,/markPositionBookedOpenFee\(p,q\.price\)/);
