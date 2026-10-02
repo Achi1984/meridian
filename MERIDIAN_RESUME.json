@@ -4,11 +4,11 @@
   "build": "10.0-r108",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
+  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_STRATEGY_V1_PREREGISTRATION_CANONICAL_IMPLEMENTATION_REQUIRED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "da1dd62bcdd24d0c0d60d78fd700261e761f9102",
+    "verifiedSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
     "verifiedAt": "2026-10-02",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1129,7 +1129,7 @@
     255,
     256
   ],
-  "nextAction": "Freeze the validated Data V1.3 120/120 PASS on current-main lineage. Restore the already-frozen docs-only Quarter-Hour Strategy V1 preregistration from PR #354 onto the validated V1.3 dependency without changing strategy rules, thresholds, costs, gates or accounting definitions. Run exact-head review and Release Safety before any first V1.3 directional signal, forward-return relationship, position or strategy PnL calculation. Paper/live remain unauthorized.",
+  "nextAction": "The frozen Quarter-Hour Strategy V1 preregistration is canonical on Data V1.3 via merged PR #435. Next create a separate deterministic research implementation matching the frozen document exactly. Before any historical Strategy V1 evidence run, require unit tests for signal direction, 12h cohort expiry, net target accounting, turnover costs, no-lookahead execution pricing, funding sign/valuation, fixed blocks and primary gates, plus exact-head Release Safety and independent implementation review. Do not change preregistered strategy rules. Paper/live remain unauthorized.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1190,7 +1190,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "QH_BOUNDARY_IMBALANCE_STRATEGY_V1_PREREGISTRATION_REBIND_TO_DATA_V1_3_NO_PNL",
+    "nextStage": "QH_BOUNDARY_IMBALANCE_STRATEGY_V1_IMPLEMENTATION_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1512,12 +1512,26 @@
         "observedShards": 120,
         "gateReasons": []
       },
-      "strategyPreregistrationRequired": true,
+      "strategyPreregistrationRequired": false,
       "directionalSignalCalculated": false,
       "forwardReturnsCalculated": false,
       "positionsCalculated": false,
       "strategyPnlCalculated": false,
       "executionImpact": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "strategyPreregistrationCanonical": true
+    },
+    "qhImbalanceV1StrategyV1Preregistration": {
+      "sourcePr": 354,
+      "restoredPr": 435,
+      "mergeSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
+      "document": "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V1-PREREGISTRATION.md",
+      "dependency": "INDIVIDUAL_TRADES_DATA_V1_3_120_OF_120_PASS",
+      "status": "FROZEN_CANONICAL_BEFORE_FIRST_STRATEGY_PNL",
+      "ownDirectionalSignalInspected": false,
+      "ownForwardReturnsInspected": false,
+      "ownStrategyPnlInspected": false,
       "paperAuthorized": false,
       "liveAuthorized": false
     }
