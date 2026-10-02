@@ -119,7 +119,7 @@ must(js.includes("OPPORTUNITY '+ctx.score+'/100"),'Forecast opportunity score mu
 must(js.includes("REGIME '+i.score+'/100"),'BTC regime score must be explicitly named');
 must(js.includes("function fibZonePosition(zone,current)"),'FIB zone position classifier missing');
 for(const state of ["return'below'","return'above'","return'inside'"])must(js.includes(state),'FIB zone state missing: '+state);
-must(js.includes('<span>HOLDING <b>'),'Depot holding-value label missing');
+must(js.includes('<span>WALLET <b>'),'Depot wallet-value label missing');
 must(js.includes('<span>OPEN FUTURES</span>'),'open-futures count label missing');
 must(js.includes('<span>BOT IDENTITIES</span>'),'bot identity count label missing');
 must(js.includes('function portfolioAuthorityDetail('),'granular portfolio authority detail missing');
@@ -508,3 +508,20 @@ must(js.includes("schedule(true)"),'Paper readiness lifecycle must schedule UI r
 must(v9.includes("paperOverview:()=>getJson('/api/paper/overview')"),'Paper Overview bridge must remain GET-only');
 must(!/setInterval\([^\n]*loadPaperCockpit/.test(js),'Paper readiness must not introduce a polling loop');
 must(js.includes("d.researchOnly===true")&&js.includes("d.executionImpact===false"),'Paper research-only execution-neutral guard missing');
+
+
+/* r109 permanent screenshot-integrity gates */
+must(String(release.dashboardShell||'').includes('SCREENSHOT-INTEGRITY-NULL-AUTHORITY-HISTORY-PRICE-PRECISION'),'dashboardShell must declare r109 screenshot integrity');
+must(js.includes('function knownNumber(v){'),'known-number null guard missing');
+must(js.includes("p.complete!==true||current==null||current<0"),'history delta must fail closed on incomplete portfolio authority');
+must(js.includes('points=strictPortfolioHistoryPoints()'),'history delta must use strict validated history only');
+must(js.includes('const sourceMoney=v=>knownNumber(v)?'),'venue source cards must not coerce null authority to zero');
+must(js.includes('historyStale=!m.currentIncluded'),'stale chart date-label guard missing');
+must(js.includes('<span>WALLET <b>'),'Depot compact asset value must be labelled as wallet detail, not total holding');
+must(js.includes("portfolioReady=S()?.portfolio?.complete===true"),'system readiness must include portfolio authority');
+must(js.includes('function precisePrice(v){'),'sub-dollar price precision helper missing');
+
+must(js.includes("deltaAvailable=series.currentIncluded&&delta!=null&&startCovered&&endCovered"),'chart delta must require current canonical total');
+must(js.includes('AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE'),'missing current total must be explicit beside history chart');
+must(js.includes("venue:'Pionex Wallet',source:'READ API BALANCE'"),'Pionex balance residue provenance must be wallet-specific');
+must(js.includes('<span>WALLET DETAIL</span>'),'missing asset-detail fallback must use wallet wording');

@@ -73,7 +73,7 @@ test('r80 exposes FIB zone position instead of ambiguous equal emphasis',()=>{
 });
 
 test('r80 clarifies holdings, account positions and bot identity counts',()=>{
-  assert.match(js,/<span>HOLDING <b>/);
+  assert.match(js,/<span>WALLET <b>/);
   const bots=block('function renderBots(force=false){','function marketUniverse');
   assert.match(bots,/<span>OPEN FUTURES<\/span>/);
   assert.match(bots,/<span>BOT IDENTITIES<\/span>/);
