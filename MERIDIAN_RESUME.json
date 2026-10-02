@@ -4,7 +4,7 @@
   "build": "10.0-r108",
   "branch": "main",
   "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_INDIVIDUAL_TRADES_DATA_V1_1_CANARIES_PASS_FULL_RUN_AUTHORIZED",
+  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -1129,7 +1129,7 @@
     255,
     256
   ],
-  "nextAction": "Keep failed aggTrades Data V1 immutable. Individual-trades Data V1.1 is merged on main via PR #431. Parser invariants plus mandatory BTCUSDT/2025-01 and SOLUSDT/2025-07 canaries passed in workflow run 36839785637. Next execute exactly one strategy-neutral Data V1.1 full run across all 120 asset-month shards and require the aggregate 120/120 fail-closed gate. If any shard fails, freeze the result and diagnose the source/invariant failure. Do not calculate directional imbalance, forward returns, positions or PnL until the 120/120 data-quality gate passes.",
+  "nextAction": "Freeze the validated Data V1.3 120/120 PASS on current-main lineage. Restore the already-frozen docs-only Quarter-Hour Strategy V1 preregistration from PR #354 onto the validated V1.3 dependency without changing strategy rules, thresholds, costs, gates or accounting definitions. Run exact-head review and Release Safety before any first V1.3 directional signal, forward-return relationship, position or strategy PnL calculation. Paper/live remain unauthorized.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1190,7 +1190,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "QH_BOUNDARY_IMBALANCE_INDIVIDUAL_TRADES_DATA_V1_1_FULL_RUN_120_SHARDS",
+    "nextStage": "QH_BOUNDARY_IMBALANCE_STRATEGY_V1_PREREGISTRATION_REBIND_TO_DATA_V1_3_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1415,7 +1415,7 @@
     "orderFlowV1ReviewFixPr330": "CLOSED_UNMERGED_REUSE_PROSPECTIVELY_ONLY",
     "orderFlowV1ProvenanceAuditStatus": "CANONICAL",
     "orderFlowV1ProvenanceAuditMergeSha": "6de6b20e80602409be618860702716510231f456",
-    "qhImbalanceV1Status": "DATA_V1_1_CANARIES_PASS_FULL_RUN_AUTHORIZED",
+    "qhImbalanceV1Status": "DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
     "qhImbalanceV1Universe": [
       "BTC",
       "ETH",
@@ -1454,18 +1454,73 @@
     "qhImbalanceV1DataV1DiagnosticRun": 36618234245,
     "qhImbalanceV1DataV1NoInPlaceRelaxation": true,
     "qhImbalanceV1NextCandidateDataSource": "BINANCE_USD_M_INDIVIDUAL_TRADES",
-    "qhImbalanceV1DataV11ProtocolMergedPr": 431,
-    "qhImbalanceV1DataV11MergeSha": "546ce0b3528d513adfe9858ad8248846f2290b6f",
-    "qhImbalanceV1DataV11CanaryWorkflowRun": 36839785637,
-    "qhImbalanceV1DataV11Canaries": {
-      "BTCUSDT:2025-01": "PASS",
-      "SOLUSDT:2025-07": "PASS",
-      "parserInvariants": "PASS"
-    },
-    "qhImbalanceV1DataV11FullRunAuthorized": true,
+    "qhImbalanceV1DataV11FullRunAuthorized": false,
     "qhImbalanceV1DataV11SignalCalculated": false,
     "qhImbalanceV1DataV11PnlObserved": false,
-    "qhImbalanceV1DataV11PaperAuthorized": false
+    "qhImbalanceV1DataV11PaperAuthorized": false,
+    "qhImbalanceV1DataV11CanonicalDecision": "IMMUTABLE_FAIL_PREDECLARED_QUOTEQTY_GATE",
+    "qhImbalanceV1DataV11FrozenFailRun": 36621993141,
+    "qhImbalanceV1DataV11FrozenFailReasons": [
+      "SOLUSDT_2025_07_QUOTEQTY_MISMATCH",
+      "BTCUSDT_2025_01_QUOTEQTY_MISMATCH_AND_CROSS_SOURCE_RECONCILIATION"
+    ],
+    "qhImbalanceV1DataV11LatePort": {
+      "mergedPr": 431,
+      "mergeSha": "546ce0b3528d513adfe9858ad8248846f2290b6f",
+      "workflowRun": 36839785637,
+      "status": "NON_CANONICAL_LATE_PORT_DO_NOT_REVIVE_FROZEN_V1_1"
+    },
+    "qhImbalanceV1DataV12Decision": "IMMUTABLE_FAIL_TRADE_ID_ORDER",
+    "qhImbalanceV1DataV12CanaryRun": 36629831568,
+    "qhImbalanceV1DataV12FullRun": 36664484586,
+    "qhImbalanceV1DataV12FailedShards": [
+      "ETHUSDT:2025-08",
+      "XRPUSDT:2025-08",
+      "ADAUSDT:2025-08"
+    ],
+    "qhImbalanceV1DataV12FailureReason": "OFFICIAL_SOURCE_REPEATED_NON_INCREASING_TRADE_IDS",
+    "qhImbalanceV1DataV13Decision": "INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
+    "qhImbalanceV1DataV13ProtocolPr": 358,
+    "qhImbalanceV1DataV13ProtocolHead": "6c61574f0029d535c99d20420742ca02503f5e99",
+    "qhImbalanceV1DataV13AuthorizationHead": "65d783103b8d8311b17277c01ee6b4071526642e",
+    "qhImbalanceV1DataV13CanaryRun": 36687150944,
+    "qhImbalanceV1DataV13CanaryReleaseSafety": 36687150858,
+    "qhImbalanceV1DataV13FullRun": 36690368732,
+    "qhImbalanceV1DataV13AggregateArtifactId": 11090766829,
+    "qhImbalanceV1DataV13AggregateDigest": "sha256:49211d4059f8cecc38133f8bea9ac5b4ce9bf23a041c242440cb25b335dbb344",
+    "qhImbalanceV1DataV13ExpectedShards": 120,
+    "qhImbalanceV1DataV13ObservedShards": 120,
+    "qhImbalanceV1DataV13TradeRows": 10534731145,
+    "qhImbalanceV1DataV13GateReasons": [],
+    "qhImbalanceV1DataV13SignalCalculated": false,
+    "qhImbalanceV1DataV13ForwardReturnsCalculated": false,
+    "qhImbalanceV1DataV13PositionsCalculated": false,
+    "qhImbalanceV1DataV13PnlObserved": false,
+    "qhImbalanceV1DataV13PaperAuthorized": false,
+    "qhImbalanceV1CurrentGate": {
+      "dataVersion": "V1.3",
+      "status": "PASS",
+      "decision": "INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
+      "protocolHead": "6c61574f0029d535c99d20420742ca02503f5e99",
+      "authorizationHead": "65d783103b8d8311b17277c01ee6b4071526642e",
+      "canaryRun": 36687150944,
+      "fullRun": {
+        "runId": 36690368732,
+        "artifactId": 11090766829,
+        "digest": "sha256:49211d4059f8cecc38133f8bea9ac5b4ce9bf23a041c242440cb25b335dbb344",
+        "expectedShards": 120,
+        "observedShards": 120,
+        "gateReasons": []
+      },
+      "strategyPreregistrationRequired": true,
+      "directionalSignalCalculated": false,
+      "forwardReturnsCalculated": false,
+      "positionsCalculated": false,
+      "strategyPnlCalculated": false,
+      "executionImpact": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false
+    }
   },
   "activeUiLane": {
     "terminalBuild": "10.0-r108",
