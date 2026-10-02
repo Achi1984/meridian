@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r109';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r109';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r109';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r109';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r109';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r109';
-// MERIDIAN v10 r109 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r110';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r110';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r110';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r110';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r110';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r110';
+// MERIDIAN v10 r110 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r109';
+const BUILD='10.0-r110';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -675,7 +675,8 @@ function renderAssetDetail(force=false){
 function depotAssetCard(row,open=false){
   const h=H(),p=S()?.portfolio||{},share=row.valueKnown&&Number(p.total)>0?row.valueUsd/Number(p.total)*100:null,venues=[...new Set(row.sources.map(x=>x.venue).filter(Boolean))],mp=marketPrice(row.symbol);
   const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>WALLET DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
-  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>WALLET <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
+  const shareText=share==null?'—':share.toFixed(1)+'%',shareNote=share==null?'nur bei vollständiger Portfolio Authority':'vom kanonischen Gesamtportfolio';
+  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>WALLET <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div class="depot-share-row"><span>ANTEIL</span><b>'+shareText+'</b><small>'+shareNote+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
 }
 // Legacy r69 semantic contract: CANONICAL VENUE TOTAL
 function renderDepot(force=false){
