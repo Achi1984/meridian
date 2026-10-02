@@ -104,3 +104,10 @@ test('gateway startup enables only the new value-authority sync, not the retired
   assert.doesNotMatch(start,/startExchangeAutoSync/);
   assert.match(backend,/node --check okx-portfolio-authority-sync\.js/);
 });
+
+test('health exposes only a boolean OKX authority configuration diagnostic',()=>{
+  const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
+  assert.match(gateway,/const OKX_PORTFOLIO_AUTHORITY_CONFIGURED=!!\(/);
+  assert.match(gateway,/okxPortfolioAuthorityConfigured:OKX_PORTFOLIO_AUTHORITY_CONFIGURED/);
+  assert.doesNotMatch(gateway,/okxPortfolioAuthorityConfigured:[^\n]*OKX_READ_API_SECRET/);
+});
