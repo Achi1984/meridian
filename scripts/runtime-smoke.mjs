@@ -10,7 +10,7 @@ const RETRIES=Math.max(1,Number(process.env.MERIDIAN_SMOKE_RETRIES||1));
 const DELAY_MS=Math.max(0,Number(process.env.MERIDIAN_SMOKE_DELAY_MS||5000));
 const TIMEOUT_MS=Math.max(1000,Number(process.env.MERIDIAN_SMOKE_TIMEOUT_MS||10000));
 const EXPECTED_SHA=String(process.env.GITHUB_SHA||'').trim().toLowerCase();
-const REQUIRE_SHA=process.env.MERIDIAN_SMOKE_REQUIRE_SHA==='1';
+const REQUIRE_SHA=!!EXPECTED_SHA&&process.env.MERIDIAN_SMOKE_REQUIRE_SHA!=='0';
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const fail=msg=>{throw new Error(msg)};
@@ -117,6 +117,7 @@ async function smoke(){
     privateReadConfigured:health.privateReadConfigured===true,
     privateReadAuthSource:String(health.privateReadAuthSource||'UNKNOWN'),
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,
+    okxPortfolioAuthorityConfigured:health.okxPortfolioAuthorityConfigured===true,
     assetWatchLiveMirror:true,
     assetWatchLiveSource:String(receipt.source||'UNAVAILABLE'),
     assetWatchLiveAgeMs:liveGeneratedAt-liveSourceAt,
