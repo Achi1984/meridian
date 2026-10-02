@@ -37,6 +37,7 @@ jobs:
           node --check scripts/start-gateway.mjs
           node --check scripts/runtime-smoke.mjs
           node --check scripts/frozen-research-guard.mjs
+          node --check scripts/continuity-audit.mjs
           node --check scripts/v10-ui-regression-check.mjs
       - name: Frontend module syntax
         run: |
@@ -60,6 +61,8 @@ jobs:
         run: |
           node scripts/release-sync.mjs --check
           node scripts/release-check.mjs
+      - name: Meridian continuity audit
+        run: node scripts/continuity-audit.mjs
       - name: V10 UI regression gate
         run: node scripts/v10-ui-regression-check.mjs
       - name: Public privacy regression
