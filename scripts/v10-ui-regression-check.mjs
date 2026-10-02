@@ -508,3 +508,14 @@ must(js.includes("schedule(true)"),'Paper readiness lifecycle must schedule UI r
 must(v9.includes("paperOverview:()=>getJson('/api/paper/overview')"),'Paper Overview bridge must remain GET-only');
 must(!/setInterval\([^\n]*loadPaperCockpit/.test(js),'Paper readiness must not introduce a polling loop');
 must(js.includes("d.researchOnly===true")&&js.includes("d.executionImpact===false"),'Paper research-only execution-neutral guard missing');
+
+
+/* r109 permanent screenshot data-truth gates */
+must(String(release.dashboardShell||'').includes('SCREENSHOT-DATA-TRUTH'),'dashboardShell must declare r109 screenshot data-truth');
+must(js.includes("if(p.complete!==true||p.total==null)return{available:false,delta:null,pct:null,ageMs:null,reason:'PORTFOLIO_AUTHORITY_INCOMPLETE'}"),'24h/7d delta must fail closed on incomplete authority');
+must(js.includes("sourceMoney=v=>v!=null&&Number.isFinite(Number(v))"),'missing venue authority must not coerce null to zero');
+must(js.includes("deltaAvailable=series.currentIncluded&&delta!=null&&startCovered&&endCovered"),'chart delta must require current canonical total');
+must(js.includes('AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE'),'history-only chart state must be explicit');
+must(js.includes('function marketMoney(v){'),'dynamic market-price precision helper missing');
+must(js.includes("venue:'Pionex Wallet',source:'READ API BALANCE'"),'Pionex wallet detail provenance must be explicit');
+must(js.includes('<span>WALLET <b>'),'Depot closed cards must label wallet detail, not generic holding');
