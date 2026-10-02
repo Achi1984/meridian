@@ -31,3 +31,17 @@ test('runtime smoke status links back to the exact Actions run and still fails t
   assert.match(workflow,/if: \$\{\{ steps\.runtime_smoke\.outcome != 'success' \}\}/);
   assert.match(workflow,/run: exit 1/);
 });
+
+
+test('runtime smoke requires the exact deployed workflow SHA by default',()=>{
+  const smoke=fs.readFileSync(new URL('../scripts/runtime-smoke.mjs',import.meta.url),'utf8');
+  assert.match(workflow,/MERIDIAN_SMOKE_REQUIRE_SHA: '1'/);
+  assert.match(smoke,/const REQUIRE_SHA=!!EXPECTED_SHA&&process\.env\.MERIDIAN_SMOKE_REQUIRE_SHA!=='0'/);
+  assert.match(smoke,/if\(REQUIRE_SHA&&sha\.shaMatch!==true\)fail\(/);
+  assert.match(smoke,/Deployment SHA mismatch/);
+});
+
+test('runtime smoke surfaces the safe OKX authority configuration boolean',()=>{
+  const smoke=fs.readFileSync(new URL('../scripts/runtime-smoke.mjs',import.meta.url),'utf8');
+  assert.match(smoke,/okxPortfolioAuthorityConfigured:health\.okxPortfolioAuthorityConfigured===true/);
+});
