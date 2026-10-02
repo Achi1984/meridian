@@ -124,11 +124,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-02T08:00:00Z",
-    "canonicalMainSha": "d0a1c9051a1d58ae956af0b5403a2b7bc61b5bea",
+    "at": "2026-10-02T11:05:10Z",
+    "canonicalMainSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
     "build": "10.0-r108",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Research reconciliation: Data V1.1 is immutable FAIL (run 36621993141), Data V1.2 is immutable FAIL (full run 36664484586; ETH/XRP/ADA 2025-08 trade-ID-order failures), and Data V1.3 completed 120/120 PASS in run 36690368732 with aggregate artifact 11090766829. No signal/forward-return/position/PnL was calculated. Next durable step is strategy preregistration rebound to V1.3 with rules unchanged."
+    "note": "Data V1.3 remains canonical 120/120 PASS. Frozen Quarter-Hour Strategy V1 preregistration from #354 was rebound to Data V1.3 without strategy-rule changes and merged via PR #435. Next durable gate is deterministic Strategy V1 implementation plus exact-head tests/review before any historical signal/return/PnL run. Paper/live remain unauthorized."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
@@ -141,13 +141,15 @@
   "researchCheckpoint": {
     "family": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1",
     "dataVersion": "V1.3",
-    "status": "PASS",
-    "decision": "INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
-    "fullRun": 36690368732,
-    "aggregateArtifactId": 11090766829,
-    "aggregateDigest": "sha256:49211d4059f8cecc38133f8bea9ac5b4ce9bf23a041c242440cb25b335dbb344",
-    "expectedShards": 120,
-    "observedShards": 120,
-    "next": "RESTORE_FROZEN_STRATEGY_V1_PREREGISTRATION_ON_V1_3_DEPENDENCY_NO_PNL"
+    "dataStatus": "PASS_120_OF_120",
+    "strategyVersion": "V1",
+    "strategyPreregistration": "FROZEN_CANONICAL",
+    "preregistrationPr": 435,
+    "preregistrationMergeSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
+    "signalObserved": false,
+    "pnlObserved": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false,
+    "next": "IMPLEMENT_STRATEGY_V1_DETERMINISTIC_ENGINE_AND_TESTS_NO_PNL"
   }
 }
