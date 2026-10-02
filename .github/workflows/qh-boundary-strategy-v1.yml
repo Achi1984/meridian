@@ -8,6 +8,7 @@ on:
       - "scripts/extract-qh-boundary-strategy-v1-shard.py"
       - "scripts/aggregate-qh-boundary-strategy-v1.py"
       - "scripts/build-qh-v13-source-lock.py"
+      - "scripts/download-github-run-artifacts.sh"
       - "test/test_qh_boundary_strategy_v1.py"
       - ".github/workflows/qh-boundary-strategy-v1.yml"
   push:
@@ -52,29 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download all exact Data V1.3 shard evidence with pagination
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "$QH_V13_EVIDENCE_DIR"
-          mkdir -p "$QH_V13_EVIDENCE_DIR"
-          gh api --method GET --paginate \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${GITHUB_REPOSITORY}/actions/runs/36690368732/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.name | startswith("qh-v13-shard-")) | "\(.id) \(.name)"' \
-            > /tmp/qh-v13-artifacts.txt
-          count="$(wc -l < /tmp/qh-v13-artifacts.txt | tr -d ' ')"
-          test "$count" = "120"
-          while read -r artifact_id artifact_name; do
-            dest="$QH_V13_EVIDENCE_DIR/$artifact_name"
-            mkdir -p "$dest"
-            curl -L --fail --silent --show-error \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
-              -o /tmp/qh-v13-artifact.zip
-            unzip -oq /tmp/qh-v13-artifact.zip -d "$dest"
-          done < /tmp/qh-v13-artifacts.txt
+        run: bash scripts/download-github-run-artifacts.sh 36690368732 qh-v13-shard- 120 "$QH_V13_EVIDENCE_DIR"
       - name: Build exact Data V1.3 source checksum lock
         run: python3 scripts/build-qh-v13-source-lock.py
       - name: Upload exact source lock
@@ -149,29 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download all Strategy V1 shard artifacts with pagination
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "$QH_STRATEGY_SHARDS_DIR"
-          mkdir -p "$QH_STRATEGY_SHARDS_DIR"
-          gh api --method GET --paginate \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.name | startswith("qh-strategy-v1-shard-")) | "\(.id) \(.name)"' \
-            > /tmp/qh-strategy-v1-artifacts.txt
-          count="$(wc -l < /tmp/qh-strategy-v1-artifacts.txt | tr -d ' ')"
-          test "$count" = "120"
-          while read -r artifact_id artifact_name; do
-            dest="$QH_STRATEGY_SHARDS_DIR/$artifact_name"
-            mkdir -p "$dest"
-            curl -L --fail --silent --show-error \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
-              -o /tmp/qh-strategy-v1-artifact.zip
-            unzip -oq /tmp/qh-strategy-v1-artifact.zip -d "$dest"
-          done < /tmp/qh-strategy-v1-artifacts.txt
+        run: bash scripts/download-github-run-artifacts.sh "$GITHUB_RUN_ID" qh-strategy-v1-shard- 120 "$QH_STRATEGY_SHARDS_DIR"
       - name: Require 120 compact source shards and run frozen Strategy V1
         run: python3 scripts/aggregate-qh-boundary-strategy-v1.py
       - name: Upload Strategy V1 result
