@@ -40,6 +40,7 @@ jobs:
           MERIDIAN_SMOKE_RETRIES: ${{ github.event_name == 'push' && '30' || '3' }}
           MERIDIAN_SMOKE_DELAY_MS: ${{ github.event_name == 'push' && '20000' || '10000' }}
           GITHUB_SHA: ${{ github.sha }}
+          MERIDIAN_SMOKE_REQUIRE_SHA: '1'
         run: node scripts/runtime-smoke.mjs
 
       - name: Publish runtime smoke result
