@@ -52,7 +52,7 @@ export function parseOkxAssetValuation(body={},opts={}){
 export async function fetchOkxPortfolioAuthoritySnapshot({env=process.env,fetchImpl=fetch,now=Date.now,maxAgeMs=DEFAULT_MAX_SOURCE_AGE_MS}={}){
   const creds=readOkxPortfolioAuthorityCredentials(env);
   if(!creds.ok)throw new Error('okx_credentials_missing');
-  const path=okxPortfolioAuthorityPath(),base=okxPortfolioAuthorityBaseUrl(env),nowMs=Number(now()),headers=okxPortfolioAuthorityHeaders(path,{...creds,now:()=>nowMs});
+  const path=okxPortfolioAuthorityPath(),base=okxPortfolioAuthorityBaseUrl(env),nowMs=Number(now()),headers=okxPortfolioAuthorityHeaders(path,{...creds,now:nowMs});
   const response=await fetchImpl(base+path,{method:'GET',headers:{accept:'application/json',...headers},signal:AbortSignal.timeout(12000)});
   const text=await response.text();
   let body={};try{body=text?JSON.parse(text):{}}catch{throw new Error('okx_asset_valuation_invalid_json')}
