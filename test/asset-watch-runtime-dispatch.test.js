@@ -13,7 +13,7 @@ test('runtime mirror dispatch uses secret only in Authorization header and never
   let seen;
   const env={MERIDIAN_GITHUB_ASSET_WATCH_TOKEN:'super-secret'};
   const r=await dispatchAssetWatchMirror({
-    env,now:1000000,minimumIntervalMs:0,
+    env,now:()=>1000000,minimumIntervalMs:0,
     fetchImpl:async(url,options)=>{seen={url,options};return {status:204}}
   });
   assert.equal(r.ok,true);
@@ -27,7 +27,7 @@ test('runtime mirror dispatch uses secret only in Authorization header and never
 test('runtime mirror dispatch reports GitHub rejection without exposing response body',async()=>{
   const r=await dispatchAssetWatchMirror({
     env:{MERIDIAN_GITHUB_ASSET_WATCH_TOKEN:'secret'},
-    now:2000000,minimumIntervalMs:0,
+    now:()=>2000000,minimumIntervalMs:0,
     fetchImpl:async()=>({status:403,text:async()=> 'sensitive upstream body'})
   });
   assert.equal(r.ok,false);
