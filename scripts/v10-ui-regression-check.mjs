@@ -119,7 +119,7 @@ must(js.includes("OPPORTUNITY '+ctx.score+'/100"),'Forecast opportunity score mu
 must(js.includes("REGIME '+i.score+'/100"),'BTC regime score must be explicitly named');
 must(js.includes("function fibZonePosition(zone,current)"),'FIB zone position classifier missing');
 for(const state of ["return'below'","return'above'","return'inside'"])must(js.includes(state),'FIB zone state missing: '+state);
-must(js.includes('<span>HOLDING <b>'),'Depot holding-value label missing');
+must(js.includes('<span>WALLET <b>'),'Depot wallet-value label missing');
 must(js.includes('<span>OPEN FUTURES</span>'),'open-futures count label missing');
 must(js.includes('<span>BOT IDENTITIES</span>'),'bot identity count label missing');
 must(js.includes('function portfolioAuthorityDetail('),'granular portfolio authority detail missing');
