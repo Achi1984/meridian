@@ -37,6 +37,11 @@ const PIONEX_READ_CONFIGURED=!!(
   String(process.env.PIONEX_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
 );
+const OKX_PORTFOLIO_AUTHORITY_CONFIGURED=!!(
+  String(process.env.OKX_READ_API_KEY||'').trim() &&
+  String(process.env.OKX_READ_API_SECRET||'').trim() &&
+  String(process.env.OKX_READ_API_PASSPHRASE||'').trim()
+);
 const PUBLIC_PATHS = new Set(["/","/health","/api/bot-observer"]);
 const PROTECTED_PREFIXES = [
   "/api/status","/api/paper","/api/events","/api/signals","/api/evidence",
@@ -297,7 +302,7 @@ const server=http.createServer(async(req,res)=>{
       return writeJson(res,200,{
         ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
         privateData:!!current,privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),
-        pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,
+        pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,okxPortfolioAuthorityConfigured:OKX_PORTFOLIO_AUTHORITY_CONFIGURED,
         assetWatchShareConfigured:assetWatchShareEnabled(shareState),
         marketFeedCore,
         pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
