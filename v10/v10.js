@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r108';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r108';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r108';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r108';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r108';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r108';
-// MERIDIAN v10 r108 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r109';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r109';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r109';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r109';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r109';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r109';
+// MERIDIAN v10 r109 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r108';
+const BUILD='10.0-r109';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -61,6 +61,12 @@ const MARKET_FRESH_MS=3*60*1000;
 const portfolioChartUi={range:'1d'};
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toFixed(d):'—'}
+function knownNumber(v){return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))}
+function precisePrice(v){
+  if(!knownNumber(v)||Number(v)<=0)return'—';
+  const n=Number(v),a=Math.abs(n),digits=a>=1000?2:a>=1?2:a>=.1?4:a>=.01?5:a>=.001?6:8;
+  return'$'+n.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+}
 function freshTs(ts,maxAge=MARKET_FRESH_MS){const n=Number(ts);return Number.isFinite(n)&&n<=Date.now()+30000&&Date.now()-n<=maxAge}
 function intelFresh(i){return !!i&&freshTs(i.updatedAt)}
 function marketIntel(symbol){
@@ -191,11 +197,11 @@ function botFilterBar(allSyms){
   return '<section class="bot-filter-bar"><div><span>ANSICHT</span><small>Nur Darstellung · Risk-Ranking bleibt unverändert</small></div><div class="bot-filter-actions">'+defs.map(([key,label])=>'<button type="button" data-bot-filter="'+key+'" class="'+(botViewUi.filter===key?'active':'')+'">'+label+' <b>'+allSyms.filter(s=>botFilterMatch(s,key)).length+'</b></button>').join('')+'</div></section>';
 }
 function legRow(b){
-  const h=H(),fresh=h.botFeedFresh?.(),verified=fresh&&h.liveMatched?.(b),pnl=verified&&h.livePnlAvailable?.(b)?h.botPnlUsd?.(b)?.value:null,r=verified?h.risk?.(b):null,sl=Number(b.sl)>0?h.money?.(b.sl):'—';
+  const h=H(),fresh=h.botFeedFresh?.(),verified=fresh&&h.liveMatched?.(b),pnl=verified&&h.livePnlAvailable?.(b)?h.botPnlUsd?.(b)?.value:null,r=verified?h.risk?.(b):null,sl=Number(b.sl)>0?precisePrice(b.sl):'—';
   if(!fresh)return '<div class="pair-leg pair-leg-stale '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>STALE</span></div><small>Bot-Felder ausgeblendet · frischen privaten Snapshot abwarten</small></div>';
   if(!verified)return '<div class="pair-leg pair-leg-stale"><div class="leg-head"><strong>'+(b.side||'BOT')+' · '+(b.leverage||'—')+'x</strong><span>UNVERIFIED</span></div><small>Nicht handlungsrelevant</small></div>';
-  const mp=marketPrice(b.symbol),range=botRangeState(b,mp),type=botTypeLabel(b),grids=Number(b.grids),rangeText=range.available?h.money?.(b.lower)+' — '+h.money?.(b.upper):'—',rangeTone=!range.positionFresh?'muted':range.inRange?'safe':'watch',marker=range.positionFresh?'<i style="--range-pos:'+range.positionPct.toFixed(1)+'%"></i>':'';
-  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>'+esc(type)+(grids>0?' · '+Math.round(grids)+' GRIDS':'')+'</span></div><div class="leg-range"><div><span>RANGE</span><b>'+rangeText+'</b><small class="tone-'+rangeTone+'">'+esc(range.label)+(range.positionFresh?' · '+range.positionPct.toFixed(0)+'%':'')+'</small></div><div class="leg-range-track">'+marker+'</div></div><div class="leg-grid"><span>CAPITAL USD <b>'+(h.liveInvestUsdAvailable?.(b)?h.money(b.investUsd):'—')+'</b></span><span>PNL USD <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?h.money(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?h.money(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?h.money(b.liq):'—')+'</b></span><span>SL <b>'+sl+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
+  const mp=marketPrice(b.symbol),range=botRangeState(b,mp),type=botTypeLabel(b),grids=Number(b.grids),rangeText=range.available?precisePrice(b.lower)+' — '+precisePrice(b.upper):'—',rangeTone=!range.positionFresh?'muted':range.inRange?'safe':'watch',marker=range.positionFresh?'<i style="--range-pos:'+range.positionPct.toFixed(1)+'%"></i>':'';
+  return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>'+esc(type)+(grids>0?' · '+Math.round(grids)+' GRIDS':'')+'</span></div><div class="leg-range"><div><span>RANGE</span><b>'+rangeText+'</b><small class="tone-'+rangeTone+'">'+esc(range.label)+(range.positionFresh?' · '+range.positionPct.toFixed(0)+'%':'')+'</small></div><div class="leg-range-track">'+marker+'</div></div><div class="leg-grid"><span>CAPITAL USD <b>'+(h.liveInvestUsdAvailable?.(b)?h.money(b.investUsd):'—')+'</b></span><span>PNL USD <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?precisePrice(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?precisePrice(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?precisePrice(b.liq):'—')+'</b></span><span>SL <b>'+sl+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
 }
 function pairCard(symbol,compact=false,open=false,assetLink=false){
   const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
@@ -206,8 +212,8 @@ function pairCard(symbol,compact=false,open=false,assetLink=false){
   const hedge=longUsd>0&&shortUsd!=null?shortUsd/longUsd*100:null,net=longUsd!=null&&shortUsd!=null?longUsd-shortUsd:null,pnlTone=pnl==null?'muted':pnl>0?'safe':pnl<0?'danger':'muted',range=botRangeSummary(rows,mp),rangeTone=!range.positionFresh?'muted':range.inRange===range.known?'safe':'watch',types=botTypeSummary(rows);
   const reason=esc(st.reason)+(exposureComplete?'':' · Exposure-Einheit unvollständig')+(pnlComplete?'':' · PnL-Summe unvollständig');
   const identityMeta=longs.length+' LONG · '+shorts.length+' SHORT · '+types;
-  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+reason+'</div></article>';
-  return '<details class="asset-pair asset-pair-details pair-tone-'+st.tone+'" data-symbol="'+esc(symbol)+'" '+(open?'open':'')+'><summary class="asset-pair-summary"><div class="asset-pair-identity"><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><div class="asset-glance"><span>PNL <b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></span><span>MIN LIQ <b class="tone-'+riskTone+'">'+(minRisk==null?'—':minRisk.toFixed(1)+'%')+'</b></span><span>HEDGE <b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></span><span>RANGE <b class="tone-'+rangeTone+'">'+esc(range.label)+'</b></span></div><div class="asset-pair-status-wrap"><b class="pair-status tone-'+st.tone+'">'+st.label+'</b><i class="asset-chevron" aria-hidden="true"></i></div></summary><div class="asset-pair-body"><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>LONG NOTIONAL</span><b>'+(longUsd==null?'—':h.money?.(longUsd))+'</b></div><div><span>SHORT NOTIONAL</span><b>'+(shortUsd==null?'—':h.money?.(shortUsd))+'</b></div><div><span>NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div></div><div class="pair-reason">'+reason+'</div><div class="pair-legs">'+rows.map(legRow).join('')+'</div>'+(assetLink?'<div class="pair-detail-action">'+assetDetailButton(symbol,'ASSET DETAIL')+'</div>':'')+'</div></details>';
+  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+reason+'</div></article>';
+  return '<details class="asset-pair asset-pair-details pair-tone-'+st.tone+'" data-symbol="'+esc(symbol)+'" '+(open?'open':'')+'><summary class="asset-pair-summary"><div class="asset-pair-identity"><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><div class="asset-glance"><span>PNL <b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></span><span>MIN LIQ <b class="tone-'+riskTone+'">'+(minRisk==null?'—':minRisk.toFixed(1)+'%')+'</b></span><span>HEDGE <b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></span><span>RANGE <b class="tone-'+rangeTone+'">'+esc(range.label)+'</b></span></div><div class="asset-pair-status-wrap"><b class="pair-status tone-'+st.tone+'">'+st.label+'</b><i class="asset-chevron" aria-hidden="true"></i></div></summary><div class="asset-pair-body"><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>LONG NOTIONAL</span><b>'+(longUsd==null?'—':h.money?.(longUsd))+'</b></div><div><span>SHORT NOTIONAL</span><b>'+(shortUsd==null?'—':h.money?.(shortUsd))+'</b></div><div><span>NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div></div><div class="pair-reason">'+reason+'</div><div class="pair-legs">'+rows.map(legRow).join('')+'</div>'+(assetLink?'<div class="pair-detail-action">'+assetDetailButton(symbol,'ASSET DETAIL')+'</div>':'')+'</div></details>';
 }
 function criticalPair(){
   const s=S(),h=H();if(!s)return null;
@@ -422,9 +428,9 @@ function commandDataDisclosure(){
   return '<details class="command-source-details"><summary><div><span>DATA SOURCES</span><b>MKT '+esc(mr.label)+' · BOT '+esc(br.label)+' · PORTFOLIO '+esc(p.label)+'</b></div><small>Provenance, Asset Watch und Historie</small></summary>'+commandDataStrip()+'</details>';
 }
 function commandSystemDiagnostics(){
-  const g=syncHealth(),w=walletDiscoveryHealth(),ph=accountPositionHealth(),ready=g.decisionComplete&&w.status==='OK'&&ph.status==='OK'&&ph.fresh,details=document.createElement('details');
+  const g=syncHealth(),w=walletDiscoveryHealth(),ph=accountPositionHealth(),portfolioReady=S()?.portfolio?.complete===true,ready=g.decisionComplete&&w.status==='OK'&&ph.status==='OK'&&ph.fresh&&portfolioReady,details=document.createElement('details');
   details.className='command-system-diagnostics';
-  details.innerHTML='<summary><div><span>SYSTEM STATUS</span><b class="tone-'+(ready?'safe':'watch')+'">'+(ready?'READY':'CHECK')+'</b></div><small>BOT '+g.decisionReady+'/'+g.matched+' · WALLET '+esc(w.label)+' · FUTURES '+esc(ph.label)+'</small></summary><div class="command-system-diagnostics-body"></div>';
+  details.innerHTML='<summary><div><span>SYSTEM STATUS</span><b class="tone-'+(ready?'safe':'watch')+'">'+(ready?'READY':'CHECK')+'</b></div><small>BOT '+g.decisionReady+'/'+g.matched+' · WALLET '+esc(w.label)+' · FUTURES '+esc(ph.label)+' · PORTFOLIO '+(portfolioReady?'READY':'PARTIAL')+'</small></summary><div class="command-system-diagnostics-body"></div>';
   const body=$('.command-system-diagnostics-body',details),live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;if(liveNode)body.append(liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true);const guardNode=guard.firstElementChild;if(guardNode)body.append(guardNode);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)body.append(accountNode);
@@ -452,15 +458,18 @@ function selectHistoryAnchor(points,target,toleranceMs=15*60*1000){
   return nearest&&Math.abs(Number(nearest.timestamp)-Number(target))<=Math.max(0,Number(toleranceMs)||0)?nearest:null;
 }
 function historyDelta(windowMs){
-  const s=S(),current=Number(s?.portfolio?.total),points=Array.isArray(s?.portfolioHistory?.points)?s.portfolioHistory.points:[];
-  if(!(current>=0))return{available:false,delta:null,pct:null,ageMs:null};
+  const s=S(),p=s?.portfolio||{},raw=p.total,current=knownNumber(raw)?Number(raw):null,points=strictPortfolioHistoryPoints();
+  if(p.complete!==true||current==null||current<0)return{available:false,delta:null,pct:null,ageMs:null,reason:'PORTFOLIO_AUTHORITY_INCOMPLETE'};
   const target=Date.now()-windowMs,prior=selectHistoryAnchor(points,target);
-  if(!prior||!(Number(prior.totalUsd)>0))return{available:false,delta:null,pct:null,ageMs:null};
+  if(!prior||!(Number(prior.totalUsd)>0))return{available:false,delta:null,pct:null,ageMs:null,reason:'FULL_WINDOW_UNAVAILABLE'};
   const delta=current-Number(prior.totalUsd);
   return{available:true,delta,pct:delta/Number(prior.totalUsd)*100,ageMs:Date.now()-Number(prior.timestamp),anchorOffsetMs:Number(prior.timestamp)-target};
 }
 function deltaHtml(d,label){
-  if(!d.available)return '<div><span>'+label+'</span><b>—</b><small>noch keine volle Vergleichsperiode</small></div>';
+  if(!d.available){
+    const detail=d.reason==='PORTFOLIO_AUTHORITY_INCOMPLETE'?'Portfolio Authority unvollständig':'noch keine volle Vergleichsperiode';
+    return '<div><span>'+label+'</span><b>—</b><small>'+esc(detail)+'</small></div>';
+  }
   const tone=d.delta>0?'safe':d.delta<0?'danger':'muted',sign=d.delta>0?'+':'';
   return '<div><span>'+label+'</span><b class="tone-'+tone+'">'+sign+fmt(d.pct,2)+'%</b><small>'+sign+H().money?.(d.delta)+'</small></div>';
 }
@@ -507,9 +516,12 @@ function portfolioChartGeometry(rows){
   const line=coords.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' '),first=coords[0],last=coords.at(-1),baseY=height-padY,area=line+' L '+last.x.toFixed(1)+' '+baseY+' L '+first.x.toFixed(1)+' '+baseY+' Z';
   return{width,height,line,area,rawMin,rawMax};
 }
-function portfolioChartTimeLabel(ts,range){
+function portfolioChartTimeLabel(ts,range,withDate=false){
   const d=new Date(Number(ts));if(!Number.isFinite(d.getTime()))return'—';
-  try{return new Intl.DateTimeFormat('de-DE',range==='1w'?{day:'2-digit',month:'2-digit'}:{hour:'2-digit',minute:'2-digit'}).format(d)}catch{return'—'}
+  try{
+    const opts=range==='1w'?{day:'2-digit',month:'2-digit'}:withDate?{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}:{hour:'2-digit',minute:'2-digit'};
+    return new Intl.DateTimeFormat('de-DE',opts).format(d);
+  }catch{return'—'}
 }
 function portfolioChartModel(range=portfolioChartUi.range){
   const series=portfolioChartSeries(range),rows=series.rows,geometry=portfolioChartGeometry(rows),first=rows[0],last=rows.at(-1),firstVal=Number(first?.totalUsd),lastVal=Number(last?.totalUsd),delta=Number.isFinite(firstVal)&&firstVal>0&&Number.isFinite(lastVal)?lastVal-firstVal:null,startCovered=Number.isFinite(Number(first?.timestamp))&&Math.abs(Number(first.timestamp)-series.start)<=15*60*1000,endCovered=series.currentIncluded||(Number.isFinite(Number(last?.timestamp))&&series.now-Number(last.timestamp)<=15*60*1000),deltaAvailable=delta!=null&&startCovered&&endCovered,pct=deltaAvailable?delta/firstVal*100:null;
@@ -528,7 +540,7 @@ function portfolioHistoryIntegrityHtml(){
 function portfolioChartHeroHtml(){
   const s=S(),p=s?.portfolio||{},h=H(),range=PORTFOLIO_CHART_WINDOWS[portfolioChartUi.range]?portfolioChartUi.range:'1d',m=portfolioChartModel(range),strictHistory=strictPortfolioHistoryPoints(),storedPoints=strictHistory.length,total=Number(p.total),ready=p.complete===true&&Number.isFinite(total)&&total>=0,totalText=ready?(h.money?.(total)||String(total)):'—',tone=!m.deltaAvailable?'muted':m.delta>0?'safe':m.delta<0?'danger':'muted',sign=m.delta!=null&&m.delta>0?'+':'',rangeLabel=portfolioChartRangeLabel(range),historySource=String(s?.portfolioHistory?.source||'STRICT HISTORY').replaceAll('_',' ');
   const ageLabel=ms=>Number.isFinite(Number(ms))?(h.ageText?.(Math.max(0,Number(ms)))||'—'):'—',okxTs=Date.parse(String(p.okxVenueUpdatedAt||'')),okxAge=Number.isFinite(okxTs)?Math.max(0,Date.now()-okxTs):null;
-  const sourceMoney=v=>Number.isFinite(Number(v))?(h.money?.(Number(v))||String(v)):'—',sourceCard=(label,value,detail,toneName='safe')=>'<div class="portfolio-venue-card tone-'+toneName+'"><span>'+esc(label)+'</span><b>'+sourceMoney(value)+'</b><small>'+esc(detail)+'</small></div>';
+  const sourceMoney=v=>knownNumber(v)?(h.money?.(Number(v))||String(v)):'—',sourceCard=(label,value,detail,toneName='safe')=>'<div class="portfolio-venue-card tone-'+toneName+'"><span>'+esc(label)+'</span><b>'+sourceMoney(value)+'</b><small>'+esc(detail)+'</small></div>';
   const ledgerDetail=p.ledgerAutoUsd!=null?'AUTHORITY · '+ageLabel(p.ledgerAutoAgeMs):'AUTHORITY FEHLT',okxDetail=p.okxVenueUsd!=null?(String(p.okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY').includes('SERVER')?'SERVER AUTH':'AUTHORITY')+' · '+ageLabel(okxAge):'AUTHORITY FEHLT',pionexDetail=p.pionex!=null?String(p.pionexSource||'PIONEX').replaceAll('_',' ')+' · '+ageLabel(p.pionexAgeMs):'FEHLT';
   const venueStrip='<div class="portfolio-venue-strip">'+sourceCard('LEDGER',p.ledgerAutoUsd,ledgerDetail,p.ledgerAutoUsd!=null?'safe':'danger')+sourceCard('OKX',p.okxVenueUsd,okxDetail,p.okxVenueUsd!=null?'safe':'danger')+sourceCard('PIONEX',p.pionex,pionexDetail,p.pionex!=null?'safe':'danger')+'</div>';
   const buttons=['1h','1d','1w'].map(key=>'<button type="button" data-portfolio-range="'+key+'" aria-pressed="'+(key===range?'true':'false')+'" class="'+(key===range?'active':'')+'">'+portfolioChartRangeLabel(key)+'</button>').join('');
@@ -537,7 +549,7 @@ function portfolioChartHeroHtml(){
   const historyAge=Number.isFinite(Number(p.historyAgeMs))?ageLabel(p.historyAgeMs):'—',historyBadge='<div class="portfolio-history-status"><span>HISTORY</span><b>'+storedPoints+' PUNKTE</b><small>'+esc(storedPoints?historyAge:'START')+'</small></div>';
   let chart='<div class="portfolio-chart-empty portfolio-chart-bootstrap"><b>'+esc(bootstrap||'VERLAUF NOCH NICHT VERFÜGBAR')+'</b><small>'+(ready?'Kanonische History läuft automatisch weiter. Spätestens mit dem nächsten Messpunkt wird die Kurve sichtbar.':'Es werden ausschließlich vollständige STRICT_AUTHORITY-Punkte gezeichnet.')+'</small>'+(storedPoints===1?'<div class="portfolio-history-progress"><span class="done"></span><span></span><em>1 / 2</em></div>':'')+'</div>';
   if(m.geometry){
-    const g=m.geometry,minLabel=h.money?.(g.rawMin)||fmt(g.rawMin,2),maxLabel=h.money?.(g.rawMax)||fmt(g.rawMax,2),startLabel=portfolioChartTimeLabel(m.first?.timestamp,range),endLabel=portfolioChartTimeLabel(m.last?.timestamp,range);
+    const g=m.geometry,minLabel=h.money?.(g.rawMin)||fmt(g.rawMin,2),maxLabel=h.money?.(g.rawMax)||fmt(g.rawMax,2),historyStale=!m.currentIncluded&&knownNumber(m.last?.timestamp)&&Date.now()-Number(m.last.timestamp)>60*60*1000,startLabel=portfolioChartTimeLabel(m.first?.timestamp,range,historyStale),endLabel=portfolioChartTimeLabel(m.last?.timestamp,range,historyStale);
     chart='<div class="portfolio-chart-plot"><svg viewBox="0 0 '+g.width+' '+g.height+'" preserveAspectRatio="none" role="img" aria-label="Gesamtportfolio Verlauf '+rangeLabel+'"><line class="portfolio-chart-grid" x1="16" y1="18" x2="984" y2="18"></line><line class="portfolio-chart-grid" x1="16" y1="130" x2="984" y2="130"></line><line class="portfolio-chart-grid" x1="16" y1="242" x2="984" y2="242"></line><path class="portfolio-chart-area" d="'+g.area+'"></path><path class="portfolio-chart-line" d="'+g.line+'"></path></svg><div class="portfolio-chart-axis"><span>'+esc(startLabel)+'</span><span>'+esc(minLabel)+' – '+esc(maxLabel)+'</span><span>'+esc(endLabel)+'</span></div></div>';
   }
   return '<section class="command-portfolio-hero"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small></div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+portfolioHistoryIntegrityHtml()+chart+'</section>';
@@ -653,7 +665,7 @@ function renderAssetDetail(force=false){
   fibUi.symbol=symbol;
   const h=H(),row=depotAssetRows().find(x=>x.symbol===symbol),rows=matchedRows(symbol),mp=marketPrice(symbol),ctx=opportunityContext(symbol),st=rows.length?pairStatus(symbol):{label:'NO LIVE BOT',tone:'muted',reason:'Kein sicher gematchter privater Bot'},known=row?.valueKnown?Number(row.valueUsd):null;
   view.innerHTML='<section class="asset-detail-topbar"><button type="button" data-asset-back data-context-back="asset-detail">← '+esc(contextReturnLabel('asset-detail','ZURÜCK'))+'</button><div><span>ASSET DETAIL</span><b>'+esc(symbol)+'</b><small>Depot · Bots · Risk · Forecast · FIB/SK</small></div><strong class="tone-'+esc(st.tone)+'">'+esc(st.label)+'</strong></section>'+dataStateStripHtml('asset')+
-    '<section class="asset-detail-hero"><div><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN HOLDING DETAIL</span><b>'+(known==null?'—':h.money?.(known))+'</b><small>nicht mit Bot-Exposure addieren</small></div><div><span>LIVE BOTS</span><b>'+rows.length+'</b><small>'+esc(st.reason)+'</small></div><div><span>OPPORTUNITY QUALITY</span><b class="tone-'+esc(ctx.tone)+'">'+(ctx.available?ctx.score+'/100':'—')+'</b><small>'+(ctx.available?esc(ctx.label):'NO FRESH CONTEXT')+'</small></div></section>'+
+    '<section class="asset-detail-hero"><div><span>MARKET</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN HOLDING DETAIL</span><b>'+(known==null?'—':h.money?.(known))+'</b><small>nicht mit Bot-Exposure addieren</small></div><div><span>LIVE BOTS</span><b>'+rows.length+'</b><small>'+esc(st.reason)+'</small></div><div><span>OPPORTUNITY QUALITY</span><b class="tone-'+esc(ctx.tone)+'">'+(ctx.available?ctx.score+'/100':'—')+'</b><small>'+(ctx.available?esc(ctx.label):'NO FRESH CONTEXT')+'</small></div></section>'+
     '<section class="asset-detail-accounting-guard"><b>READ-ONLY DETAIL</b><small>Holdings, Bot-Exposure und Markt-Kontext bleiben getrennte Ebenen. Keine Orders, keine automatische Promotion, keine Doppelzählung.</small></section>'+
     assetDetailHoldingHtml(symbol)+assetDetailBotHtml(symbol)+assetDetailMarketHtml(symbol);
   $('[data-asset-back]',view)?.addEventListener('click',closeAssetDetail);
@@ -663,7 +675,7 @@ function renderAssetDetail(force=false){
 function depotAssetCard(row,open=false){
   const h=H(),p=S()?.portfolio||{},share=row.valueKnown&&Number(p.total)>0?row.valueUsd/Number(p.total)*100:null,venues=[...new Set(row.sources.map(x=>x.venue).filter(Boolean))],mp=marketPrice(row.symbol);
   const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>HOLDING DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
-  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>HOLDING <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+h.money?.(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
+  return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>WALLET <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
 }
 // Legacy r69 semantic contract: CANONICAL VENUE TOTAL
 function renderDepot(force=false){

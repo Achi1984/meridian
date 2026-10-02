@@ -508,3 +508,15 @@ must(js.includes("schedule(true)"),'Paper readiness lifecycle must schedule UI r
 must(v9.includes("paperOverview:()=>getJson('/api/paper/overview')"),'Paper Overview bridge must remain GET-only');
 must(!/setInterval\([^\n]*loadPaperCockpit/.test(js),'Paper readiness must not introduce a polling loop');
 must(js.includes("d.researchOnly===true")&&js.includes("d.executionImpact===false"),'Paper research-only execution-neutral guard missing');
+
+
+/* r109 permanent screenshot-integrity gates */
+must(String(release.dashboardShell||'').includes('SCREENSHOT-INTEGRITY-NULL-AUTHORITY-HISTORY-PRICE-PRECISION'),'dashboardShell must declare r109 screenshot integrity');
+must(js.includes('function knownNumber(v){'),'known-number null guard missing');
+must(js.includes("p.complete!==true||current==null||current<0"),'history delta must fail closed on incomplete portfolio authority');
+must(js.includes('points=strictPortfolioHistoryPoints()'),'history delta must use strict validated history only');
+must(js.includes('const sourceMoney=v=>knownNumber(v)?'),'venue source cards must not coerce null authority to zero');
+must(js.includes('historyStale=!m.currentIncluded'),'stale chart date-label guard missing');
+must(js.includes('<span>WALLET <b>'),'Depot compact asset value must be labelled as wallet detail, not total holding');
+must(js.includes("portfolioReady=S()?.portfolio?.complete===true"),'system readiness must include portfolio authority');
+must(js.includes('function precisePrice(v){'),'sub-dollar price precision helper missing');
