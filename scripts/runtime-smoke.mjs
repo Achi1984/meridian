@@ -75,6 +75,16 @@ async function smoke(){
     if(!Number.isFinite(age)||age>marketFreshnessLimit)fail(`Gateway market ${key} stale: ${item?.ageMs}`);
   }
 
+  const liveMirror=await json(`${GATEWAY}/api/asset-watch/live-mirror?smoke=${nonce}`);
+  const receipt=liveMirror?.receipt||{};
+  if(liveMirror?.schemaVersion!=='MERIDIAN-ASSET-WATCH-MIRROR-V1'||liveMirror?.alg!=='A256GCM')fail('Asset Watch live mirror envelope invalid');
+  if(!liveMirror?.iv||!liveMirror?.tag||!liveMirror?.ciphertext)fail('Asset Watch live mirror ciphertext missing');
+  if(receipt?.schemaVersion!=='MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1'||receipt?.bridgeSchemaVersion!=='MERIDIAN-ASSET-WATCH-BRIDGE-V1')fail('Asset Watch live receipt schema invalid');
+  if(receipt?.readOnly!==true||receipt?.executionImpact!==false||receipt?.detailsComplete!==true||receipt?.sourceStatusOk!==true||receipt?.fresh!==true||receipt?.usableForOverwrite!==true)fail('Asset Watch live receipt strict gate failed');
+  const liveSourceAt=Date.parse(receipt?.sourceSnapshotAt||''),liveGeneratedAt=Date.parse(liveMirror?.generatedAt||''),liveLimit=Number(receipt?.freshnessLimitMs);
+  if(!Number.isFinite(liveSourceAt)||!Number.isFinite(liveGeneratedAt)||!Number.isFinite(liveLimit)||liveLimit<=0||liveLimit>15*60*1000)fail('Asset Watch live freshness fields invalid');
+  if(liveGeneratedAt-liveSourceAt<0||liveGeneratedAt-liveSourceAt>liveLimit)fail('Asset Watch live source stale');
+
   const protectedResponse=await request(`${GATEWAY}/api/status?smoke=${nonce}`);
   if(protectedResponse.status!==401)fail(`Anonymous protected API expected 401, got ${protectedResponse.status}`);
   const assetWatchAnonymous=await request(`${GATEWAY}/api/private/asset-watch?smoke=${nonce}`);
@@ -107,6 +117,9 @@ async function smoke(){
     privateReadConfigured:health.privateReadConfigured===true,
     privateReadAuthSource:String(health.privateReadAuthSource||'UNKNOWN'),
     pionexBotReadConfigured:health.pionexBotReadConfigured===true,
+    assetWatchLiveMirror:true,
+    assetWatchLiveSource:String(receipt.source||'UNAVAILABLE'),
+    assetWatchLiveAgeMs:liveGeneratedAt-liveSourceAt,
     marketFeedCore:true,
     marketFeedCoreOldestAgeMs:Number(marketFeedCore.oldestAgeMs),
     marketFeedCoreIntervals:Object.fromEntries(['15m','1h','4h','1d'].map(key=>[key,{cache:String(marketIntervals?.[key]?.cache||'NONE'),ageMs:Number(marketIntervals?.[key]?.ageMs),source:String(marketIntervals?.[key]?.source||''),rowCount:Number(marketIntervals?.[key]?.rowCount)}])),
