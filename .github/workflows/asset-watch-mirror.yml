@@ -40,7 +40,7 @@ jobs:
           test "$TOKEN" != "null"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch encrypted Asset Watch snapshot
+      - name: Fetch and validate encrypted Asset Watch snapshot
         shell: bash
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
@@ -55,13 +55,33 @@ jobs:
             -o asset-watch-mirror.json -w '%{http_code}')"
           if [ "$HTTP_CODE" != "200" ]; then
             echo "MERIDIAN mirror endpoint returned HTTP $HTTP_CODE"
-            cat asset-watch-mirror.json
             exit 22
           fi
           node -e '
             const fs=require("fs");
             const x=JSON.parse(fs.readFileSync("asset-watch-mirror.json","utf8"));
-            if(x.schemaVersion!=="MERIDIAN-ASSET-WATCH-MIRROR-V1"||x.alg!=="A256GCM"||!x.iv||!x.tag||!x.ciphertext) process.exit(1);
+            const r=x.receipt||{};
+            const required =
+              x.schemaVersion==="MERIDIAN-ASSET-WATCH-MIRROR-V1" &&
+              x.alg==="A256GCM" && !!x.iv && !!x.tag && !!x.ciphertext &&
+              r.schemaVersion==="MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1" &&
+              r.bridgeSchemaVersion==="MERIDIAN-ASSET-WATCH-BRIDGE-V1" &&
+              r.readOnly===true && r.executionImpact===false &&
+              r.detailsComplete===true && r.sourceStatusOk===true &&
+              r.fresh===true && r.usableForOverwrite===true &&
+              !!r.sourceSnapshotAt;
+            if(!required){
+              console.error("Asset Watch strict-live receipt validation failed");
+              process.exit(1);
+            }
+            const sourceAt=Date.parse(r.sourceSnapshotAt);
+            const generatedAt=Date.parse(x.generatedAt);
+            const limit=Number(r.freshnessLimitMs);
+            if(!Number.isFinite(sourceAt)||!Number.isFinite(generatedAt)||!Number.isFinite(limit)||limit<=0||generatedAt-sourceAt>limit){
+              console.error("Asset Watch source snapshot is stale");
+              process.exit(1);
+            }
+            console.log("Asset Watch strict-live receipt valid");
           '
 
       - name: Upload encrypted Asset Watch artifact
