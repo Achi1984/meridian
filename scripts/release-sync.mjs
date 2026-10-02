@@ -43,7 +43,7 @@ apply('manifest.webmanifest',()=>JSON.stringify({
 apply('package.json',src=>{
   const p=JSON.parse(src);
   p.version=version+'.0';
-  p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs','runtime:smoke':'node scripts/runtime-smoke.mjs','stream:preflight':'node scripts/stream-safe-preflight.mjs'};
+  p.scripts={...(p.scripts||{}),start:'node scripts/start-gateway.mjs','start:core':'node server.js',test:'node --test test/*.test.js','release:check':'node scripts/release-sync.mjs --check && node scripts/release-check.mjs && node scripts/continuity-audit.mjs','runtime:smoke':'node scripts/runtime-smoke.mjs','stream:preflight':'node scripts/stream-safe-preflight.mjs','continuity:check':'node scripts/continuity-audit.mjs'};
   return JSON.stringify(p)+'\n';
 });
 
