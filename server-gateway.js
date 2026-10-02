@@ -486,6 +486,15 @@ const server=http.createServer(async(req,res)=>{
       if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
       return writeJson(res,200,buildAssetWatchApiSnapshot(data),origin||"");
     }
+    if(req.method==="GET"&&u.pathname==="/api/asset-watch/live-mirror"){
+      const data=await stateGet(PRIVATE_STATE_KEY);
+      if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      const shareState=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
+      if(!assetWatchShareEnabled(shareState))return writeJson(res,503,{error:"asset_watch_share_not_configured"},origin||"");
+      const snapshot=buildAssetWatchApiSnapshot(data);
+      const envelope=encryptAssetWatchMirror(snapshot,shareState.tokenHash);
+      return writeJson(res,200,envelope,origin||"");
+    }
     if(req.method==="GET"&&u.pathname==="/api/private/asset-watch/github-oidc-mirror"){
       const verified=await verifyGithubActionsOidc(bearer(req));
       if(!verified.ok)return writeJson(res,401,{error:"github_oidc_required",reason:String(verified.reason||"unknown")},origin||"");
