@@ -49,6 +49,29 @@ export function reconcilePortfolioAuthority(current={},body={},opts={}){
   };
 }
 
+
+export function upsertOkxPortfolioAuthority(current={},valueUsd,opts={}){
+  const value=num(valueUsd),now=String(opts.now||new Date().toISOString()),source=clean(opts.source)||'OKX_PORTFOLIO_AUTHORITY',privateUpdateSource=clean(opts.privateUpdateSource)||'portfolio_authority_okx_sync',next=clone(current||{});
+  next.portfolio=next.portfolio&&typeof next.portfolio==='object'&&!Array.isArray(next.portfolio)?next.portfolio:{};
+  const currentRevision=Number.isInteger(next.privateRevision)?next.privateRevision:0;
+  if(value==null||value<0)return{ok:false,error:'invalid_okx_value',currentRevision};
+  const sourceTs=Date.parse(now);
+  if(!Number.isFinite(sourceTs))return{ok:false,error:'invalid_okx_timestamp',currentRevision};
+  const rows=Array.isArray(next.portfolio.manualVenueBalances)?next.portfolio.manualVenueBalances:[],existing=rows.filter(x=>clean(x?.venue||x?.name).toLowerCase()==='okx').sort((a,b)=>Date.parse(String(b?.updatedAt||''))-Date.parse(String(a?.updatedAt||'')))[0]||null,existingTs=Date.parse(String(existing?.updatedAt||''));
+  if(Number.isFinite(existingTs)&&existingTs>sourceTs){
+    return{ok:true,changed:false,reason:'existing_okx_authority_newer',data:next,currentRevision,nextRevision:currentRevision,updatedAt:existing.updatedAt||null,okxValueUsd:num(existing?.valueUsd??existing?.value),source:String(existing?.source||'UNKNOWN')};
+  }
+  const kept=rows.filter(x=>clean(x?.venue||x?.name).toLowerCase()!=='okx');
+  next.portfolio.manualVenueBalances=[...kept,{venue:'OKX',valueUsd:value,value,updatedAt:now,source}];
+  next.portfolio.okxAuthorityAt=now;
+  next.portfolio.okxAuthoritySource=source;
+  next.privateUpdateSource=privateUpdateSource;
+  next.privateStorageVersion=String(next.privateStorageVersion||'1');
+  next.privateRevision=currentRevision+1;
+  next.privateUpdatedAt=now;
+  return{ok:true,changed:true,data:next,currentRevision,nextRevision:next.privateRevision,updatedAt:now,okxValueUsd:value,source};
+}
+
 export function portfolioAuthorityReceipt(result={},history=null){
   return{
     ok:true,
