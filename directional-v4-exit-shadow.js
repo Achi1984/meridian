@@ -59,12 +59,14 @@ function closeQuantity(out,p,qty,triggerPrice,reason,now,costs){
   }else{p.feeClose=round(Number(p.feeClose||0)+fee,8);}
 }
 
-export function cycleDirectionalV4(state,quotes,now=Date.now()){
+export function cycleDirectionalV4(state,quotes,now=Date.now(),options={}){
   const out=copy(state),costs=out.frozenPolicy,open=[];let unrealized=0;
+  const maxQuoteAgeMs=Number(options?.maxQuoteAgeMs),enforceFreshness=Number.isFinite(maxQuoteAgeMs)&&maxQuoteAgeMs>=0;
   if(costs.feeBps==null||costs.slippageBps==null)throw new Error('V4 costs not frozen');
   for(const p of out.positions){
-    if(p.status!=='OPEN')continue;const q=quotes?.[p.symbol],price=Number(q?.price);
-    if(!(price>0)){open.push(p);unrealized+=Number(p.unrealized||0);continue;}
+    if(p.status!=='OPEN')continue;const q=quotes?.[p.symbol],price=Number(q?.price),quoteTs=Number(q?.ts),quoteAgeMs=Number(now)-quoteTs;
+    const usableQuote=price>0&&(!enforceFreshness||(Number.isFinite(quoteTs)&&quoteAgeMs>=0&&quoteAgeMs<=maxQuoteAgeMs));
+    if(!usableQuote){open.push(p);unrealized+=Number(p.unrealized||0);continue;}
     if(crossesStop(p,price))closeQuantity(out,p,p.remainingQty,price,p.tp1Filled?'PROTECTED_STOP':'SL',now,costs);
     else if(crossesTarget(p,price,p.tp2))closeQuantity(out,p,p.remainingQty,p.tp2,'TP2',now,costs);
     else if(!p.tp1Filled&&crossesTarget(p,price,p.tp1)){
