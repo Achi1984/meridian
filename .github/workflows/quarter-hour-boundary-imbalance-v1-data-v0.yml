@@ -6,7 +6,6 @@ on:
       - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1-SELECTION.md"
       - "scripts/audit-quarter-hour-boundary-imbalance-v1-data-v0.py"
       - ".github/workflows/quarter-hour-boundary-imbalance-v1-data-v0.yml"
-      - "MERIDIAN_RESUME.json"
   workflow_dispatch:
 
 permissions:

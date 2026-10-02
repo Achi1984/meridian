@@ -8,7 +8,6 @@ on:
       - "scripts/aggregate-quarter-hour-boundary-imbalance-v1-data-v1.py"
       - "test/test_quarter_hour_boundary_imbalance_v1_data_v1.py"
       - ".github/workflows/quarter-hour-boundary-imbalance-v1-data-v1.yml"
-      - "MERIDIAN_RESUME.json"
   push:
     branches:
       - research/quarter-hour-order-imbalance-v1-data-v1-sharded
