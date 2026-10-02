@@ -3,6 +3,7 @@ import { seedKnownPortfolioOnce } from '../private-known-portfolio-seed.js';
 import { startPortfolioHistoryCapture } from '../portfolio-history-runtime.js';
 import { startPionexBotAutoSync } from '../pionex-bot-auto-sync.js';
 import { startPionexAccountReadSync } from '../pionex-account-read-sync.js';
+import { startOkxAccountReadSync } from '../okx-account-read-sync.js';
 
 // Portfolio quantities are seeded from private runtime env; no exchange API is required.
 const auth=applyReadTokenSecret(process.env);
@@ -11,4 +12,5 @@ await import('../server-gateway.js');
 await seedKnownPortfolioOnce();
 startPortfolioHistoryCapture();
 startPionexAccountReadSync();
+startOkxAccountReadSync();
 startPionexBotAutoSync();
