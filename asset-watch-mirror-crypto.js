@@ -28,6 +28,51 @@ export function assetWatchMirrorPublicReceipt(snapshot){
     freshnessLimitMs:Number.isFinite(Number(snapshot?.freshnessLimitMs))?Number(snapshot.freshnessLimitMs):null
   };
 }
+
+export const ASSET_WATCH_MAX_FRESHNESS_MS=15*60*1000;
+export const ASSET_WATCH_MAX_CLOCK_SKEW_MS=60*1000;
+
+export function validateAssetWatchMirrorEnvelope(envelope,{
+  nowMs=Date.now(),
+  maxFreshnessMs=ASSET_WATCH_MAX_FRESHNESS_MS,
+  maxClockSkewMs=ASSET_WATCH_MAX_CLOCK_SKEW_MS
+}={}){
+  const x=envelope||{},r=x.receipt||{};
+  const shapeOk=
+    x.schemaVersion===AAD &&
+    x.alg==='A256GCM' &&
+    !!x.generatedAt && !!x.iv && !!x.tag && !!x.ciphertext &&
+    r.schemaVersion===RECEIPT_SCHEMA &&
+    r.bridgeSchemaVersion==='MERIDIAN-ASSET-WATCH-BRIDGE-V1' &&
+    r.readOnly===true && r.executionImpact===false &&
+    r.detailsComplete===true && r.sourceStatusOk===true &&
+    r.fresh===true && r.usableForOverwrite===true &&
+    !!r.sourceSnapshotAt;
+  if(!shapeOk)return{ok:false,reason:'receipt_invalid'};
+
+  const sourceAt=Date.parse(r.sourceSnapshotAt);
+  const generatedAt=Date.parse(x.generatedAt);
+  const limitMs=Number(r.freshnessLimitMs);
+  const reportedAgeMs=Number(r.sourceAgeMs);
+  const policyMax=Number(maxFreshnessMs);
+  const skewMax=Number(maxClockSkewMs);
+  const now=Number(nowMs);
+  if(![sourceAt,generatedAt,limitMs,reportedAgeMs,policyMax,skewMax,now].every(Number.isFinite))
+    return{ok:false,reason:'freshness_fields_invalid'};
+  if(limitMs<=0||policyMax<=0||skewMax<0)return{ok:false,reason:'freshness_policy_invalid'};
+  if(limitMs>policyMax)return{ok:false,reason:'freshness_limit_exceeds_policy',limitMs,policyMax};
+
+  const ageMs=generatedAt-sourceAt;
+  if(ageMs<0)return{ok:false,reason:'source_timestamp_in_future',ageMs,limitMs};
+  if(generatedAt>now+skewMax)return{ok:false,reason:'envelope_timestamp_in_future',generatedAt,now,skewMax};
+  if(now-generatedAt>policyMax)return{ok:false,reason:'envelope_stale',generatedAt,now,policyMax};
+  if(ageMs>limitMs||ageMs>policyMax)return{ok:false,reason:'source_snapshot_stale',ageMs,limitMs,policyMax};
+  if(reportedAgeMs<0)return{ok:false,reason:'reported_source_age_negative',reportedAgeMs};
+  if(reportedAgeMs>limitMs||reportedAgeMs>policyMax)
+    return{ok:false,reason:'reported_source_age_stale',reportedAgeMs,limitMs,policyMax};
+
+  return{ok:true,ageMs,reportedAgeMs,limitMs,policyMax};
+}
 export function encryptAssetWatchMirror(snapshot,tokenHash,{iv=crypto.randomBytes(12),now=new Date().toISOString()}={}){
   const key=keyFromHash(tokenHash);
   const cipher=crypto.createCipheriv('aes-256-gcm',key,iv);
