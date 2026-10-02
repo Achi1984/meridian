@@ -7,12 +7,14 @@ const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r108 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r108');
+test('r108 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=108);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/PAPER-READINESS-PREFETCH/);
-  assert.equal(manifest.start_url,'./v10/?build=r108&fresh=r108');
-  assert.ok(v10.includes("const BUILD='10.0-r108'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(v10.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r108 prefetch is one-shot and uses the existing GET-only Paper Overview bridge',()=>{
