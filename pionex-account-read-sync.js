@@ -1,3 +1,4 @@
+import {dispatchAssetWatchMirror} from './asset-watch-runtime-dispatch.js';
 import pg from 'pg';
 import {pionexReadGet} from './pionex-read-client.js';
 import {PIONEX_FUTURES_GRID_DETAIL_PATH,mergePionexOrderDetail} from './pionex-bot-detail-read.js';
@@ -378,8 +379,13 @@ export async function runPionexAccountReadOnce({env=process.env,fetchImpl=fetch,
     const applied=await updatePrivateState(env,current=>mergePionexAccountState(current,{
       snapshot,status:'OK',attemptAt:at,successAt:at,configured:true
     }));
+    const strictLiveReady=applied&&snapshot?.walletBotRisk?.detailsComplete===true;
+    const mirrorDispatch=strictLiveReady
+      ? await dispatchAssetWatchMirror({env,fetchImpl,now})
+      : {ok:false,reason:'strict_live_not_ready',configured:!!String(env.MERIDIAN_GITHUB_ASSET_WATCH_TOKEN||'').trim(),dispatched:false};
     return {
       ok:applied,
+      mirrorDispatch:{ok:mirrorDispatch.ok,configured:mirrorDispatch.configured===true,dispatched:mirrorDispatch.dispatched===true,reason:mirrorDispatch.reason||null},
       spotBalanceCount:snapshot.spotBalanceCount,
       futuresBalanceCount:snapshot.futuresBalanceCount,
       futuresPositionCount:snapshot.futuresPositionCount,
