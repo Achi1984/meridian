@@ -520,3 +520,8 @@ must(js.includes('historyStale=!m.currentIncluded'),'stale chart date-label guar
 must(js.includes('<span>WALLET <b>'),'Depot compact asset value must be labelled as wallet detail, not total holding');
 must(js.includes("portfolioReady=S()?.portfolio?.complete===true"),'system readiness must include portfolio authority');
 must(js.includes('function precisePrice(v){'),'sub-dollar price precision helper missing');
+
+must(js.includes("deltaAvailable=series.currentIncluded&&delta!=null&&startCovered&&endCovered"),'chart delta must require current canonical total');
+must(js.includes('AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE'),'missing current total must be explicit beside history chart');
+must(js.includes("venue:'Pionex Wallet',source:'READ API BALANCE'"),'Pionex balance residue provenance must be wallet-specific');
+must(js.includes('<span>WALLET DETAIL</span>'),'missing asset-detail fallback must use wallet wording');
