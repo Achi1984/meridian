@@ -8,7 +8,9 @@ on:
       - "scripts/extract-qh-boundary-strategy-v1-shard.py"
       - "scripts/aggregate-qh-boundary-strategy-v1.py"
       - "scripts/build-qh-v13-source-lock.py"
+      - "scripts/download-github-run-artifacts.sh"
       - "test/test_qh_boundary_strategy_v1.py"
+      - "test/qh-strategy-v1-artifact-pagination.test.js"
       - ".github/workflows/qh-boundary-strategy-v1.yml"
   push:
     branches:
@@ -37,6 +39,7 @@ jobs:
             scripts/extract-qh-boundary-strategy-v1-shard.py \
             scripts/aggregate-qh-boundary-strategy-v1.py \
             scripts/build-qh-v13-source-lock.py
+          bash -n scripts/download-github-run-artifacts.sh
       - name: Run Strategy V1 synthetic invariants
         run: python3 test/test_qh_boundary_strategy_v1.py
 
@@ -51,15 +54,8 @@ jobs:
       QH_V13_SOURCE_LOCK_OUTPUT: research/results/qh-v13-source-lock.json
     steps:
       - uses: actions/checkout@v4
-      - name: Download exact Data V1.3 shard evidence
-        uses: actions/download-artifact@v4
-        with:
-          pattern: qh-v13-shard-*
-          path: research/results/qh-v13-source-evidence
-          merge-multiple: true
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: 36690368732
+      - name: Download all exact Data V1.3 shard evidence with pagination
+        run: bash scripts/download-github-run-artifacts.sh 36690368732 qh-v13-shard- 120 "$QH_V13_EVIDENCE_DIR"
       - name: Build exact Data V1.3 source checksum lock
         run: python3 scripts/build-qh-v13-source-lock.py
       - name: Upload exact source lock
@@ -128,15 +124,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      GH_TOKEN: ${{ github.token }}
       QH_STRATEGY_SHARDS_DIR: research/results/qh-strategy-v1-shards
       QH_STRATEGY_RESULT_DIR: research/results
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: qh-strategy-v1-shard-*
-          path: research/results/qh-strategy-v1-shards
-          merge-multiple: true
+      - name: Download all Strategy V1 shard artifacts with pagination
+        run: bash scripts/download-github-run-artifacts.sh "$GITHUB_RUN_ID" qh-strategy-v1-shard- 120 "$QH_STRATEGY_SHARDS_DIR"
       - name: Require 120 compact source shards and run frozen Strategy V1
         run: python3 scripts/aggregate-qh-boundary-strategy-v1.py
       - name: Upload Strategy V1 result
