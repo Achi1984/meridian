@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+  "stage": "INDIVIDUAL_TRADES_DATA_V1_3_FULL_DATA_QUALITY_RESULT",
+  "protocolVersion": "V1.3",
+  "frozenProtocolHead": "6c61574f0029d535c99d20420742ca02503f5e99",
+  "authorizationHead": "65d783103b8d8311b17277c01ee6b4071526642e",
+  "canaryWorkflowRun": 36687150944,
+  "canaryReleaseSafetyRun": 36687150858,
+  "fullRun": 36690368732,
+  "aggregateArtifact": {
+    "id": 11090766829,
+    "name": "qh-individual-trades-data-v1-3",
+    "digest": "sha256:49211d4059f8cecc38133f8bea9ac5b4ce9bf23a041c242440cb25b335dbb344"
+  },
+  "aggregate": {
+    "expectedShards": 120,
+    "observedShards": 120,
+    "missingShards": [],
+    "duplicateShards": [],
+    "unexpectedShards": [],
+    "tradeRows": 10534731145,
+    "tradeIdNonIncreasingEvents": 5,
+    "duplicateAdjacentTradeIdEvents": 5,
+    "decreasingTradeIdEvents": 0,
+    "sourceRowTimestampDecreaseEvents": 2,
+    "tradeIdGapEvents": 14828846,
+    "missingTradeIdCount": 19638008,
+    "emptyQuarterHourBins": 0,
+    "emptyFirst10SecondWindows": 35,
+    "rawQuoteQtyMismatchRows": 1299,
+    "klineDiagnosticMismatchMinutes": 1433,
+    "kline1mRows": 5253120,
+    "fundingRows": 10944,
+    "downloadedBytes": {
+      "trades": 92920074879,
+      "klines1m": 210752875,
+      "fundingRate": 111054
+    },
+    "gateReasons": []
+  },
+  "decision": "INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED",
+  "directionalOrderImbalanceCalculated": false,
+  "forwardReturnsCalculated": false,
+  "signalReturnRelationshipCalculated": false,
+  "positionsCalculated": false,
+  "strategyPnlCalculated": false,
+  "executionImpact": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
