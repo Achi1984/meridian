@@ -19,13 +19,45 @@ check(handoff.includes(`Build: **${resume.build}**`),'handoff build differs from
 check(handoff.includes(`Verified main checkpoint: **${resume.sourceOfTruth.verifiedSha}**`),'handoff verified checkpoint differs from resume');
 check(state?.lastCheckpoint?.build===resume.build,'agent-state checkpoint build differs from resume');
 
-const v11Workflow=path.join(root,'.github/workflows/qh-individual-trades-data-v1-1.yml');
-if(fs.existsSync(v11Workflow)){
-  check(!/source-feasibility audit/i.test(String(resume?.nextAction||'')),'resume nextAction is stale: V1.1 exists but still requests source feasibility');
-  check(!/SOURCE_V0_1/.test(String(resume?.researchDirection?.nextStage||'')),'resume nextStage is stale: V1.1 exists but points to source V0.1');
-  check(/V1_1|V1\.1/.test(String(resume?.phase||'')),'resume phase must identify Data V1.1 after V1.1 workflow merge');
-  check(resume?.researchDirection?.qhImbalanceV1DataV11CanaryWorkflowRun>0,'V1.1 canary workflow evidence missing');
-  check(resume?.researchDirection?.qhImbalanceV1DataV11FullRunAuthorized===true,'V1.1 full-run authorization missing after canary pass');
+const gate=resume?.researchDirection?.qhImbalanceV1CurrentGate||null;
+if(gate){
+  check(/^V\d+(?:\.\d+)?$/.test(String(gate.dataVersion||'')),'current research gate dataVersion invalid');
+  check(['PASS','FAIL','ACTIVE','CANARY_PASS'].includes(String(gate.status||'')),'current research gate status invalid');
+  check(typeof gate.decision==='string'&&gate.decision.length>0,'current research gate decision missing');
+  check(gate.executionImpact===false,'data-quality gate must remain executionImpact=false');
+  check(gate.paperAuthorized===false,'data-quality gate must not authorize Paper');
+  check(gate.liveAuthorized===false,'data-quality gate must not authorize live execution');
+  check(gate.directionalSignalCalculated===false,'data-quality gate must not calculate directional signals');
+  check(gate.forwardReturnsCalculated===false,'data-quality gate must not calculate forward returns');
+  check(gate.positionsCalculated===false,'data-quality gate must not calculate positions');
+  check(gate.strategyPnlCalculated===false,'data-quality gate must not calculate strategy PnL');
+  check(handoff.includes(`Research gate: **${gate.dataVersion} ${gate.status}**`),'handoff current research gate differs from resume');
+  check(handoff.includes(`Full-run decision: **${gate.decision}**`),'handoff research decision differs from resume');
+
+  const full=gate.fullRun||null;
+  if(full){
+    check(Number(full.runId)>0,'full-run id missing');
+    check(Number(full.artifactId)>0,'aggregate artifact id missing');
+    check(/^sha256:[a-f0-9]{64}$/.test(String(full.digest||'')),'aggregate artifact digest invalid');
+    check(Number(full.expectedShards)>0,'expectedShards must be positive');
+    check(Number(full.observedShards)>=0,'observedShards invalid');
+    check(Array.isArray(full.gateReasons),'full-run gateReasons must be an array');
+  }
+
+  if(gate.status==='PASS'){
+    check(full!=null,'PASS requires full-run evidence');
+    check(Number(full?.observedShards)===Number(full?.expectedShards),'PASS requires observedShards == expectedShards');
+    check((full?.gateReasons||[]).length===0,'PASS requires zero hard gate reasons');
+    check(/PASS/.test(String(gate.decision)),'PASS gate decision must contain PASS');
+    if(gate.strategyPreregistrationRequired===true){
+      check(/STRATEGY.*PREREGISTRATION/i.test(String(resume?.researchDirection?.nextStage||'')),'PASS requiring preregistration must point nextStage to strategy preregistration');
+      check(!/full\s*run|source-feasibility/i.test(String(resume?.nextAction||'')),'PASS state must not ask to repeat data full run/source feasibility');
+    }
+  }
+
+  if(gate.status==='FAIL'){
+    check(!/STRATEGY.*PREREGISTRATION/i.test(String(resume?.researchDirection?.nextStage||'')),'FAIL data gate must not advance to strategy preregistration');
+  }
 }
 
 if(failures.length){
@@ -38,5 +70,6 @@ console.log(JSON.stringify({
   build:resume.build,
   phase:resume.phase,
   verifiedSha:resume.sourceOfTruth.verifiedSha,
+  currentResearchGate:gate?{dataVersion:gate.dataVersion,status:gate.status,decision:gate.decision}:null,
   nextStage:resume.researchDirection?.nextStage||null
 },null,2));
