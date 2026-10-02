@@ -524,7 +524,7 @@ function portfolioChartTimeLabel(ts,range,withDate=false){
   }catch{return'—'}
 }
 function portfolioChartModel(range=portfolioChartUi.range){
-  const series=portfolioChartSeries(range),rows=series.rows,geometry=portfolioChartGeometry(rows),first=rows[0],last=rows.at(-1),firstVal=Number(first?.totalUsd),lastVal=Number(last?.totalUsd),delta=Number.isFinite(firstVal)&&firstVal>0&&Number.isFinite(lastVal)?lastVal-firstVal:null,startCovered=Number.isFinite(Number(first?.timestamp))&&Math.abs(Number(first.timestamp)-series.start)<=15*60*1000,endCovered=series.currentIncluded||(Number.isFinite(Number(last?.timestamp))&&series.now-Number(last.timestamp)<=15*60*1000),deltaAvailable=delta!=null&&startCovered&&endCovered,pct=deltaAvailable?delta/firstVal*100:null;
+  const series=portfolioChartSeries(range),rows=series.rows,geometry=portfolioChartGeometry(rows),first=rows[0],last=rows.at(-1),firstVal=Number(first?.totalUsd),lastVal=Number(last?.totalUsd),delta=Number.isFinite(firstVal)&&firstVal>0&&Number.isFinite(lastVal)?lastVal-firstVal:null,startCovered=Number.isFinite(Number(first?.timestamp))&&Math.abs(Number(first.timestamp)-series.start)<=15*60*1000,endCovered=series.currentIncluded||(Number.isFinite(Number(last?.timestamp))&&series.now-Number(last.timestamp)<=15*60*1000),deltaAvailable=series.currentIncluded&&delta!=null&&startCovered&&endCovered,pct=deltaAvailable?delta/firstVal*100:null;
   return{...series,geometry,delta:deltaAvailable?delta:null,pct,deltaAvailable,startCovered,endCovered,points:rows.length,first,last};
 }
 function portfolioChartRangeLabel(range){return range==='1h'?'1H':range==='1w'?'1W':'1D'}
@@ -545,7 +545,7 @@ function portfolioChartHeroHtml(){
   const venueStrip='<div class="portfolio-venue-strip">'+sourceCard('LEDGER',p.ledgerAutoUsd,ledgerDetail,p.ledgerAutoUsd!=null?'safe':'danger')+sourceCard('OKX',p.okxVenueUsd,okxDetail,p.okxVenueUsd!=null?'safe':'danger')+sourceCard('PIONEX',p.pionex,pionexDetail,p.pionex!=null?'safe':'danger')+'</div>';
   const buttons=['1h','1d','1w'].map(key=>'<button type="button" data-portfolio-range="'+key+'" aria-pressed="'+(key===range?'true':'false')+'" class="'+(key===range?'active':'')+'">'+portfolioChartRangeLabel(key)+'</button>').join('');
   const bootstrap=storedPoints===0?(ready?'STARTPUNKT WIRD GESPEICHERT':'HISTORIE WARTET AUF PORTFOLIO AUTHORITY'):storedPoints===1?'1. MESSPUNKT GESPEICHERT · KURVE STARTET MIT DEM NÄCHSTEN':'';
-  const change=m.deltaAvailable?'<b class="tone-'+tone+'">'+sign+fmt(m.pct,2)+'%</b><small>'+sign+(h.money?.(m.delta)||fmt(m.delta,2))+' · '+m.points+' PUNKTE</small>':'<b class="tone-muted">—</b><small>'+(m.points>=2?'TEILVERLAUF · ZEITFENSTER NICHT VOLL':bootstrap)+'</small>';
+  const change=!ready?'<b class="tone-muted">—</b><small>AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE</small>':m.deltaAvailable?'<b class="tone-'+tone+'">'+sign+fmt(m.pct,2)+'%</b><small>'+sign+(h.money?.(m.delta)||fmt(m.delta,2))+' · '+m.points+' PUNKTE</small>':'<b class="tone-muted">—</b><small>'+(m.points>=2?'TEILVERLAUF · ZEITFENSTER NICHT VOLL':bootstrap)+'</small>';
   const historyAge=Number.isFinite(Number(p.historyAgeMs))?ageLabel(p.historyAgeMs):'—',historyBadge='<div class="portfolio-history-status"><span>HISTORY</span><b>'+storedPoints+' PUNKTE</b><small>'+esc(storedPoints?historyAge:'START')+'</small></div>';
   let chart='<div class="portfolio-chart-empty portfolio-chart-bootstrap"><b>'+esc(bootstrap||'VERLAUF NOCH NICHT VERFÜGBAR')+'</b><small>'+(ready?'Kanonische History läuft automatisch weiter. Spätestens mit dem nächsten Messpunkt wird die Kurve sichtbar.':'Es werden ausschließlich vollständige STRICT_AUTHORITY-Punkte gezeichnet.')+'</small>'+(storedPoints===1?'<div class="portfolio-history-progress"><span class="done"></span><span></span><em>1 / 2</em></div>':'')+'</div>';
   if(m.geometry){
@@ -604,7 +604,7 @@ function pionexDetailAssets(){
     const symbol=String(row?.coin||'').trim().toUpperCase();if(!symbol)continue;
     const qty=Math.max(0,(Number(row?.free)||0)+(Number(row?.frozen)||0)-(Number(row?.debts)||0));if(!(qty>0))continue;
     const price=['USDT','USDC','USD'].includes(symbol)?1:Number(prices?.[symbol]?.priceInUsd);
-    const value=Number.isFinite(price)&&price>0?qty*price:null,prev=map.get(symbol)||{symbol,quantity:0,valueUsd:0,valueKnown:true,venue:'Pionex',source:'READ API BALANCE'};
+    const value=Number.isFinite(price)&&price>0?qty*price:null,prev=map.get(symbol)||{symbol,quantity:0,valueUsd:0,valueKnown:true,venue:'Pionex Wallet',source:'READ API BALANCE'};
     prev.quantity+=qty;if(value==null)prev.valueKnown=false;else prev.valueUsd+=value;map.set(symbol,prev);
   }
   return [...map.values()].map(x=>({...x,valueUsd:x.valueKnown?x.valueUsd:null}));
@@ -674,7 +674,7 @@ function renderAssetDetail(force=false){
 }
 function depotAssetCard(row,open=false){
   const h=H(),p=S()?.portfolio||{},share=row.valueKnown&&Number(p.total)>0?row.valueUsd/Number(p.total)*100:null,venues=[...new Set(row.sources.map(x=>x.venue).filter(Boolean))],mp=marketPrice(row.symbol);
-  const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>HOLDING DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
+  const sourceRows=row.sources.length?row.sources.map(x=>'<div class="depot-source-row"><span>'+esc(x.venue||'SOURCE')+'</span><b>'+(Number.isFinite(Number(x.valueUsd))?h.money?.(Number(x.valueUsd)):'—')+'</b><small>'+esc(x.quantity!=null?Number(x.quantity).toLocaleString('de-DE',{maximumFractionDigits:8})+' '+row.symbol: x.source||'Detail')+'</small></div>').join(''):'<div class="depot-source-row"><span>WALLET DETAIL</span><b>—</b><small>Kein autoritativer Asset-Bestand verfügbar · Bot-Verknüpfung separat</small></div>';
   return '<details class="depot-asset-card" data-symbol="'+esc(row.symbol)+'" '+(open?'open':'')+'><summary><div class="depot-asset-id"><b>'+esc(row.symbol)+'</b><small>'+esc(venues.join(' + ')||'BOT LINK')+'</small></div><div class="depot-asset-glance"><span>WALLET <b>'+(row.valueKnown?h.money?.(row.valueUsd):'—')+'</b></span><span>ANTEIL <b>'+(share==null?'—':share.toFixed(1)+'%')+'</b></span><span>BOTS <b>'+row.botCount+'</b></span></div><i class="asset-chevron" aria-hidden="true"></i></summary><div class="depot-asset-body"><div class="depot-market-row"><span>MARKET</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div>'+sourceRows+(row.botCount?'<div class="depot-bot-note"><b>'+row.botCount+' LIVE BOT'+(row.botCount===1?'':'S')+'</b><small>Bot-Exposure wird im BOTS-Tab bewertet und nicht zum Depotwert addiert.</small></div>':'')+'<div class="depot-asset-action">'+assetDetailButton(row.symbol)+'</div></div></details>';
 }
 // Legacy r69 semantic contract: CANONICAL VENUE TOTAL
