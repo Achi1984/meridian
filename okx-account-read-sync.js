@@ -40,7 +40,21 @@ export function readOkxCredentials(env={}){
 
 export function mergeOkxAccountState(current,{snapshot=null,status,error=null,attemptAt,successAt=null,configured=false,apiBase=null}={}){
   const base=current==null?{}:JSON.parse(JSON.stringify(current));
-  if(snapshot)base.okxAccount=snapshot;
+  if(snapshot){
+    base.okxAccount=snapshot;
+    base.portfolio=base.portfolio&&typeof base.portfolio==='object'&&!Array.isArray(base.portfolio)?base.portfolio:{};
+    const rows=Array.isArray(base.portfolio.manualVenueBalances)?base.portfolio.manualVenueBalances:[];
+    const kept=rows.filter(x=>String(x?.venue||x?.name||'').trim().toLowerCase()!=='okx');
+    base.portfolio.manualVenueBalances=[...kept,{
+      venue:'OKX',
+      valueUsd:snapshot.totalEqUsd,
+      value:snapshot.totalEqUsd,
+      updatedAt:snapshot.snapshotAt,
+      source:'OKX_ACCOUNT_READ_API'
+    }];
+    base.portfolio.okxAuthorityAt=snapshot.snapshotAt;
+    base.portfolio.okxAuthoritySource='OKX_ACCOUNT_READ_API';
+  }
   base.okxAccountSync={
     configured:!!configured,
     readOnly:true,
