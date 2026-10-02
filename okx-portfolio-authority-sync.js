@@ -27,7 +27,7 @@ export function okxPortfolioAuthorityPath(){return'/api/v5/asset/asset-valuation
 
 export function okxPortfolioAuthorityHeaders(path,{apiKey,apiSecret,passphrase,now=Date.now}={}){
   if(!(apiKey&&apiSecret&&passphrase))throw new Error('okx_credentials_missing');
-  const timestamp=new Date(now()).toISOString(),prehash=timestamp+'GET'+path,sign=crypto.createHmac('sha256',apiSecret).update(prehash).digest('base64');
+  const rawNow=typeof now==='function'?Number(now()):Number(now),nowMs=Number.isFinite(rawNow)?rawNow:Date.now(),timestamp=new Date(nowMs).toISOString(),prehash=timestamp+'GET'+path,sign=crypto.createHmac('sha256',apiSecret).update(prehash).digest('base64');
   return{'OK-ACCESS-KEY':apiKey,'OK-ACCESS-SIGN':sign,'OK-ACCESS-TIMESTAMP':timestamp,'OK-ACCESS-PASSPHRASE':passphrase};
 }
 
