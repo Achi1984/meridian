@@ -23,7 +23,7 @@ test('server routes booked-fee ledgers to the cash-aware marker while preserving
   const server=fs.readFileSync(new URL('../server.js',import.meta.url),'utf8');
   assert.match(server,/function markPositionBookedOpenFee\(p,price\)/);
   for(const name of ['cycleUnlocked','shadowV1Cycle','challengerV2Cycle','regimeV1Cycle']){
-    const start=server.indexOf(name);
+    const sync='function '+name+'('; const async='async function '+name+'('; const start=server.indexOf(sync)>=0?server.indexOf(sync):server.indexOf(async);
     assert.ok(start>=0,name+' missing');
     const tail=server.slice(start,start+7000);
     assert.match(tail,/markPositionBookedOpenFee\(p,q\.price\)/,name+' must use booked-fee marker');
