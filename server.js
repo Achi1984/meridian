@@ -12,7 +12,8 @@ import {newDirectionalV4State,pairDirectionalV4Position,cycleDirectionalV4,recor
 import {buildBotObserver} from "./bot-observer.js";
 import {createSerialQueue,createSingleFlight} from "./state-serial.js";
 import {createResearchRuntime} from "./research/r42-runtime.js";
-import {ALPHA_LAB_R43_KEY,newAlphaLabState,observeAlphaScan,alphaAttributionSummary} from "./research/alpha-attribution-r43.js";\nimport {markPaperPosition} from "./paper-position-accounting.js";
+import {ALPHA_LAB_R43_KEY,newAlphaLabState,observeAlphaScan,alphaAttributionSummary} from "./research/alpha-attribution-r43.js";
+import {markPaperPosition} from "./paper-position-accounting.js";
 
 const { Pool } = pg;
 const num=(k,f)=>Number.isFinite(Number(process.env[k]))?Number(process.env[k]):f;
