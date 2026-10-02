@@ -45,3 +45,17 @@ test('r109 preserves sub-dollar structural price precision without touching noti
 test('r109 presentation hardening remains read-only',()=>{
   assert.doesNotMatch(v10,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds)/i);
 });
+
+
+test('r109 current canonical total is required before chart delta is shown',()=>{
+  const start=v10.indexOf('function portfolioChartModel(');
+  const end=v10.indexOf('function portfolioChartRangeLabel',start);
+  const block=v10.slice(start,end);
+  assert.match(block,/deltaAvailable=series\.currentIncluded&&/);
+  assert.match(v10,/AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE/);
+});
+
+test('r109 Pionex residue provenance is explicitly wallet detail',()=>{
+  assert.match(v10,/venue:'Pionex Wallet',source:'READ API BALANCE'/);
+  assert.match(v10,/<span>WALLET DETAIL<\/span>/);
+});
