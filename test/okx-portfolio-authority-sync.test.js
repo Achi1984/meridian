@@ -19,10 +19,14 @@ test('OKX authority credentials are read-only and complete only with key secret 
   assert.equal(readOkxPortfolioAuthorityCredentials({OKX_READ_API_KEY:'k',OKX_READ_API_SECRET:'s',OKX_READ_API_PASSPHRASE:'p'}).ok,true);
 });
 
-test('OKX authority base URL is HTTPS-only and configurable for regional API domains',()=>{
-  assert.equal(okxPortfolioAuthorityBaseUrl({}),'https://www.okx.com');
+test('OKX authority base URL is restricted to documented production REST hosts',()=>{
+  assert.equal(okxPortfolioAuthorityBaseUrl({}),'https://openapi.okx.com');
   assert.equal(okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'https://eea.okx.com/'}),'https://eea.okx.com');
-  assert.throws(()=>okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'http://example.com'}),/invalid_okx_api_base_url/);
+  assert.equal(okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'https://us.okx.com'}),'https://us.okx.com');
+  assert.throws(()=>okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'https://www.okx.com'}),/invalid_okx_api_base_url/);
+  assert.throws(()=>okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'http://eea.okx.com'}),/invalid_okx_api_base_url/);
+  assert.throws(()=>okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'https://evil.example'}),/invalid_okx_api_base_url/);
+  assert.throws(()=>okxPortfolioAuthorityBaseUrl({OKX_READ_API_BASE_URL:'https://eea.okx.com/api'}),/invalid_okx_api_base_url/);
 });
 
 test('OKX asset valuation parser accepts fresh finite USD authority and rejects unsafe timestamps',()=>{

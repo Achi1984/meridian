@@ -4,7 +4,8 @@ import {upsertOkxPortfolioAuthority} from './portfolio-authority-update.js';
 
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
-const DEFAULT_BASE_URL='https://www.okx.com';
+const DEFAULT_BASE_URL='https://openapi.okx.com';
+const ALLOWED_API_HOSTS=new Set(['openapi.okx.com','eea.okx.com','us.okx.com']);
 const DEFAULT_INTERVAL_MIN=10;
 const DEFAULT_MAX_SOURCE_AGE_MS=5*60*1000;
 let pool=null,running=false,poolUrl='';
@@ -18,9 +19,10 @@ export function readOkxPortfolioAuthorityCredentials(env={}){
 }
 
 export function okxPortfolioAuthorityBaseUrl(env={}){
-  const raw=clean(env.OKX_READ_API_BASE_URL||env.OKX_API_BASE_URL||DEFAULT_BASE_URL).replace(/\/+$/,'');
-  if(!/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(raw))throw new Error('invalid_okx_api_base_url');
-  return raw;
+  const raw=clean(env.OKX_READ_API_BASE_URL||env.OKX_API_BASE_URL||DEFAULT_BASE_URL);
+  let url;try{url=new URL(raw)}catch{throw new Error('invalid_okx_api_base_url')}
+  if(url.protocol!=='https:'||url.username||url.password||url.port||url.pathname!=='/'||url.search||url.hash||!ALLOWED_API_HOSTS.has(url.hostname))throw new Error('invalid_okx_api_base_url');
+  return url.origin;
 }
 
 export function okxPortfolioAuthorityPath(){return'/api/v5/asset/asset-valuation?ccy=USD'}
