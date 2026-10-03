@@ -1,0 +1,90 @@
+name: MERIDIAN Taker Flow Relative Strength V2
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-PREREGISTRATION.md"
+      - "research/perpetual-taker-order-flow-relative-strength-v2-protocol.json"
+      - "research/perpetual_taker_order_flow_relative_strength_v2.py"
+      - "scripts/collect-perpetual-taker-order-flow-relative-strength-v2-validation.py"
+      - "research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py"
+      - "test/test_perpetual_taker_order_flow_relative_strength_v2.py"
+      - ".github/workflows/perpetual-taker-order-flow-relative-strength-v2.yml"
+  push:
+    branches:
+      - research/taker-order-flow-relative-strength-v2-validation-run
+    paths:
+      - "research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: taker-flow-relative-strength-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile feature-validation implementation
+        run: |
+          python3 -m py_compile research/perpetual_taker_order_flow_relative_strength_v2.py
+          python3 -m py_compile scripts/collect-perpetual-taker-order-flow-relative-strength-v2-validation.py
+          python3 -m py_compile research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py
+      - name: Run frozen V2 feature invariants only
+        run: python3 test/test_perpetual_taker_order_flow_relative_strength_v2.py
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect first authorized independent public validation source
+        run: python3 scripts/collect-perpetual-taker-order-flow-relative-strength-v2-validation.py
+      - name: Upload exact validation source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: taker-flow-relative-strength-v2-validation-source
+          path: /tmp/meridian-taker-flow-rs-v2-validation
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants, source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: taker-flow-relative-strength-v2-validation-source
+          path: /tmp/meridian-taker-flow-rs-v2-validation
+      - name: Run first frozen independent feature-validation gate
+        run: python3 research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py
+      - name: Upload untouched V2 feature result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taker-flow-relative-strength-v2-validation-result
+          path: |
+            research/results/perpetual-taker-order-flow-relative-strength-v2-result.json
+            research/results/perpetual-taker-order-flow-relative-strength-v2-result.md
+          if-no-files-found: error
+          retention-days: 30
