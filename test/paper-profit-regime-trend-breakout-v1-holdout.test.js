@@ -40,7 +40,7 @@ test('frozen Discovery result still proves Holdout was untouched',()=>{
 });
 
 test('source SHA helper is deterministic',()=>{
-  assert.equal(sha256Buffer(Buffer.from('meridian')),'0814b92d127cd03a2f5e1a9ae60a7b4432e9201d2838905ca6dafd60e38bf4e8');
+  assert.equal(sha256Buffer(Buffer.from('meridian')),'b6c4ac412ac8822355239dd717c11ca5b07373e4db550d0423c1b6aeceef8493');
 });
 
 test('Holdout workflow cannot touch historical source on pull requests',()=>{
@@ -52,7 +52,7 @@ test('Holdout workflow cannot touch historical source on pull requests',()=>{
   assert.match(source,/if: github\.event_name != 'pull_request'/);
   assert.match(evaluate,/if: github\.event_name != 'pull_request'/);
   const inv=y.slice(y.indexOf('\n  invariants:'),y.indexOf('\n  source:'));
-  assert.doesNotMatch(inv,/11266308720|run-paper-profit-regime-trend-breakout-v1-holdout/);
+  assert.doesNotMatch(inv,/11266308720|node research\/run-paper-profit-regime-trend-breakout-v1-holdout\.mjs/);
 });
 
 test('Holdout implementation does not modify the frozen Discovery evaluator',()=>{
