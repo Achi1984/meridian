@@ -33,6 +33,10 @@ class ProspectiveV2Tests(unittest.TestCase):
             git_blob_sha(ROOT/"research"/"LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-REVIEW-PREREGISTRATION.md"),
             p.PROSPECTIVE_PREREGISTRATION_BLOB
         )
+        self.assertEqual(
+            git_blob_sha(ROOT/"research"/"LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-AUTHORIZATION.md"),
+            p.PROSPECTIVE_START_AUTHORIZATION_BLOB
+        )
         summary=p.verify_frozen_lineage()
         self.assertEqual(summary["decision"],"HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY")
 
