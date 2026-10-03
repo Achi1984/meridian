@@ -3,6 +3,10 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/results/regime-trend-breakout-v1-result.json':'c3a5b72d27f825e2df951794fb782af429cfafc8',
+  'research/results/regime-trend-breakout-v1-result.md':'3d2e9bc3a9e95752ecb8875f0cb514d0de21d360',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-RUN-AUTHORIZATION.md':'7ecb7aadf0075f3a834001453ab2c32b2f1783f5',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-DISCOVERY-EVIDENCE.md':'75cfb173c5d0e8681c00bafb634d11b0ba3490fb',
   'research/PAPERBOT-PROFIT-CONTROL-V2-STAGE-B.md':'6f3df6f877c67ef7f65408331ed1f1c6be25be4a',
   'research/paperbot-profit-control-v2-stage-b.js':'7b3217ae4a84577b711820ac630c38b1f09593cd',
   'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-PREREGISTRATION.md':'31f8e924939c2a713c4831db760f93661c2fe8c1',
