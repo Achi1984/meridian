@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "MERIDIAN-LOWVOL-RANK-WEIGHTED-V2-DEVELOPMENT-FROZEN-SUMMARY-1",
+  "canonicalWorkflowRun": 37132394717,
+  "canonicalAuthorizationCommit": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
+  "correctedImplementationMerge": "257fcd3fba441e3ccb4103ba8c1382185d22c9a0",
+  "decision": "DEVELOPMENT_PASS_HOLDOUT_REQUIRED",
+  "holdoutEvaluated": false,
+  "dataIntegrityFailure": false,
+  "source": {
+    "sourceDigestSha256": "c632e7a00c30625fc3efb7a58c400e9c9b481bb0c603aa95bf68e0be44ba6220",
+    "manifestSha256": "770e7d452422793debc08c80f19f168c6da6ef487db6c9c2b2ce3726a05a8662",
+    "artifactId": 11277247641,
+    "artifactZipDigest": "sha256:b62f7b3eadacc7c55a1d61006d645caea385dbd73c33854522c30624499e5556"
+  },
+  "resultArtifact": {
+    "artifactId": 11277656738,
+    "artifactZipDigest": "sha256:e076f9424b4373621bec7502d9835945a00a1211716ba299057b7adcd7b22314",
+    "exactJsonSha256": "c72046db7aeb0e28a87e3e8e2c181b9d67f8ed9b8eae275c3b7f4037793a16bb",
+    "exactMarkdownSha256": "e0a2c60b690ddd0c3b5cf141e21208bf2f255de0f1952f1853f1df14fcbeec62",
+    "runnerPrehashSha256": "2362f76bac08deb9ff4271fba5d1d1545a455e03bf2271b924ffcc8f09d626b1"
+  },
+  "metrics": {
+    "periods": 48,
+    "returnPct": 31.278378608220002,
+    "profitFactor": 1.8084340977865965,
+    "sharpe": 1.7021122324934954,
+    "maxDrawdownPct": 7.34331287885676,
+    "positiveBlocks": 4,
+    "blocksPct": [
+      2.6529369458066387,
+      8.820344844164762,
+      13.90456337459225,
+      3.1740796508226365
+    ],
+    "stressReturnPct": 29.474124116472254,
+    "turnover": 13.88888888888889,
+    "costContribution": -0.01388888888888889,
+    "priceContribution": 0.3060148106642601,
+    "fundingContribution": -0.0039810859722222225,
+    "meanRankIc": 0.21503496503496503,
+    "rankIcNeweyWestT": 4.33746345012385,
+    "maxGrossDeviation": 0,
+    "maxAbsNetExposure": 0,
+    "assetAttribution": {
+      "BTC": -0.025291846074655212,
+      "ETH": -0.050031193997515246,
+      "BNB": 0.07540600411730101,
+      "SOL": 0.0024240149893197086,
+      "XRP": 0.005919837362373284,
+      "ADA": 0.0007213207554212197,
+      "DOGE": 0.03263189140699893,
+      "LINK": 0.04403825903727244,
+      "DOT": 0.09445628660009725,
+      "LTC": 0.09946276350947855,
+      "BCH": 0.010856898355604968,
+      "AVAX": -0.002449400258547899
+    }
+  },
+  "gate": {
+    "pass": true,
+    "reasons": [],
+    "baseCostBps": 10,
+    "stressCostBps": 20,
+    "minProfitFactor": 1.15,
+    "minSharpe": 0.75,
+    "maxDrawdownPct": 20,
+    "minPositiveBlocks": 3,
+    "rankIcNeweyWestLag": 4,
+    "rankIcTMin": 1.645
+  },
+  "laterDuplicateVerification": {
+    "workflowRun": 37132982310,
+    "canonical": false,
+    "sameDecision": true,
+    "sameSummaryMetrics": true,
+    "sameSourceDigest": true
+  }
+}
