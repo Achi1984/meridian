@@ -96,6 +96,27 @@ class LowVolRankWeightedV2Tests(unittest.TestCase):
         f=v2.FundingSeries("BTC",rows)
         self.assertAlmostEqual(f.sum_for_hold(start,start+v2.WEEK),21*0.0001,12)
 
+    def test_funding_coverage_accepts_subsecond_official_timestamp_jitter(self):
+        start=v2.DEVELOPMENT_START
+        rows=[]
+        for i in range(1,22):
+            jitter=16 if i%3==0 else (1 if i%2==0 else 0)
+            rows.append([start+i*8*v2.HOUR+jitter,8,0.0001])
+        f=v2.FundingSeries("BTC",rows)
+        self.assertAlmostEqual(f.sum_for_hold(start,start+v2.WEEK),20*0.0001,12)
+        self.assertEqual(v2.FUNDING_TIME_TOLERANCE_MS,1000)
+
+    def test_funding_tolerance_does_not_hide_a_missing_interval(self):
+        start=v2.DEVELOPMENT_START
+        rows=[
+            [start+8*v2.HOUR+16,8,0.0001],
+            [start+16*v2.HOUR+1,8,0.0001],
+            [start+32*v2.HOUR+16,8,0.0001],
+        ]
+        f=v2.FundingSeries("BTC",rows)
+        with self.assertRaisesRegex(ValueError,"FUNDING_INTERNAL_GAP"):
+            f.sum_for_hold(start,start+40*v2.HOUR)
+
     def test_development_gate_passes_only_when_all_frozen_conditions_pass(self):
         base={
           "periods":48,
