@@ -5,9 +5,16 @@ on:
     paths:
       - "research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md"
       - "research/cross_sectional_low_volatility_v1.py"
+      - "scripts/collect-cross-sectional-low-volatility-v1-discovery.py"
+      - "research/run-cross-sectional-low-volatility-v1-discovery.py"
       - "test/test_cross_sectional_low_volatility_v1.py"
       - "scripts/frozen-research-guard.mjs"
       - ".github/workflows/cross-sectional-low-volatility-v1.yml"
+  push:
+    branches:
+      - research/cross-sectional-low-volatility-v1-discovery-run
+    paths:
+      - "research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-DISCOVERY-RUN-AUTHORIZATION.md"
 
 permissions:
   contents: read
@@ -27,11 +34,57 @@ jobs:
           python-version: "3.12"
       - name: Verify frozen research lineage
         run: node scripts/frozen-research-guard.mjs
-      - name: Compile frozen low-volatility feature engine
-        run: python3 -m py_compile research/cross_sectional_low_volatility_v1.py
+      - name: Compile frozen low-volatility validation implementation
+        run: |
+          python3 -m py_compile research/cross_sectional_low_volatility_v1.py
+          python3 -m py_compile scripts/collect-cross-sectional-low-volatility-v1-discovery.py
+          python3 -m py_compile research/run-cross-sectional-low-volatility-v1-discovery.py
       - name: Run frozen low-volatility V1 invariants only
         run: python3 test/test_cross_sectional_low_volatility_v1.py
-      - name: Confirm no historical V1 evaluation is wired on PR
-        run: |
-          test ! -e research/results/cross-sectional-low-volatility-v1-discovery-result.json
-          test ! -e research/results/cross-sectional-low-volatility-v1-holdout-result.json
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect first authorized public discovery source
+        run: python3 scripts/collect-cross-sectional-low-volatility-v1-discovery.py
+      - name: Upload exact discovery source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-sectional-low-volatility-v1-discovery-source
+          path: /tmp/meridian-lowvol-v1-discovery
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants, source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: cross-sectional-low-volatility-v1-discovery-source
+          path: /tmp/meridian-lowvol-v1-discovery
+      - name: Run first frozen discovery gate
+        run: python3 research/run-cross-sectional-low-volatility-v1-discovery.py
+      - name: Upload untouched discovery result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-sectional-low-volatility-v1-discovery-result
+          path: |
+            research/results/cross-sectional-low-volatility-v1-discovery-result.json
+            research/results/cross-sectional-low-volatility-v1-discovery-result.md
+          if-no-files-found: error
+          retention-days: 30
