@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "MERIDIAN-CROSS-SECTIONAL-LOW-VOLATILITY-V1-DISCOVERY-RESULT-1",
+  "generatedAt": "2026-10-03T14:33:12.771730+00:00",
+  "ruleset": "CROSS-SECTIONAL-LOW-VOLATILITY-V1-FROZEN",
+  "stage": "DISCOVERY",
+  "source": "Binance Vision official public USD-M monthly archives",
+  "sourceRange": "2025-01..2026-01 retained through 2026-01-03T00:00:00Z only",
+  "sourceDigestSha256": "6a562441822e70f7086e179beee785ff268c2c2986d5815325d1fce8302829d1",
+  "sourceReceipt": {
+    "manifestSha256": "fdf17a414f9abd0e4a9df016a88cd35c1dfefb54000ca52f737ea11965f491bf",
+    "files": {
+      "BTC": "31f4a232255f6264b218475b90b8c25099bb4534b5c1a79ded4935edc5253563",
+      "ETH": "7dde96ac03969555c2797aef417cb4a96a5deb9c1cb85e970d7018b65fdd7d04",
+      "BNB": "18410411654b727465731d83fffc90e1a90fe03aa9ceadc464c173a677d42c96",
+      "SOL": "7db16a2319086ef59f3dd114c54a7eb6d06e062cdab1bbc696fa6487b20fc95c",
+      "XRP": "ee552b8579333e14f6b0607d92a7d507848ec301bfedec1e5f72f6be2e50ec61",
+      "ADA": "ddeac540ab73761db2b0d1bf72f270722badde70e2c6bb351ac2b1b4619769b5",
+      "DOGE": "c4fe98ae0cdc1157718042f730e28b889681c477e5138a5b89316397a0bfe211",
+      "LINK": "bd9bce9b620de3adf74e6b1bd29463b13876f373e520eb34b2a923ee642e0076",
+      "DOT": "dec7b45354c3dc068717faa677d42a6acd5be444aaaaa4a5ae92d97bf7a98bdf",
+      "LTC": "8fd19acd689b7f8045bd067294d79fa8577eb7f93e1b03a573157aa979c1da90",
+      "BCH": "fd558c12fb97e46565240522784283e62c96c3e581828274c86e243c1e476f42",
+      "AVAX": "62c4d1dadf2b86db455c37aa76e90391aca280fe6f767648bac4f19436a3cdc4"
+    }
+  },
+  "assets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX"
+  ],
+  "expectedWeeks": 48,
+  "fundingLoaded": false,
+  "strategyPnlCalculated": false,
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false,
+  "holdoutEvaluated": false,
+  "dataIntegrityFailure": false,
+  "error": null,
+  "metrics": {
+    "weeks": 48,
+    "meanRankIc": 0.21503496503496503,
+    "medianRankIc": 0.28671328671328666,
+    "positiveIcWeeks": 35,
+    "rankIcNeweyWestT": 4.33746345012385,
+    "meanLow2MinusHigh2": 0.010254321508339144,
+    "medianLow2MinusHigh2": 0.027324997538783452,
+    "positiveSpreadWeeks": 32,
+    "spreadNeweyWestT": 0.9582644174378768,
+    "blocks": [
+      {
+        "i": 1,
+        "from": 1738368000000,
+        "to": 1745020800000,
+        "weeks": 12,
+        "meanRankIc": 0.12645687645687645,
+        "meanSpread": -7.248761193995774e-05
+      },
+      {
+        "i": 2,
+        "from": 1745625600000,
+        "to": 1752278400000,
+        "weeks": 12,
+        "meanRankIc": 0.2517482517482518,
+        "meanSpread": 0.009425782217133466
+      },
+      {
+        "i": 3,
+        "from": 1752883200000,
+        "to": 1759536000000,
+        "weeks": 12,
+        "meanRankIc": 0.289044289044289,
+        "meanSpread": 0.02944607526129035
+      },
+      {
+        "i": 4,
+        "from": 1760140800000,
+        "to": 1766793600000,
+        "weeks": 12,
+        "meanRankIc": 0.1928904428904429,
+        "meanSpread": 0.0022179161668727195
+      }
+    ],
+    "positiveIcBlocks": 4,
+    "positiveSpreadBlocks": 3
+  },
+  "gate": {
+    "pass": false,
+    "reasons": [
+      "SPREAD_NW_T_LT_1_645"
+    ],
+    "stage": "DISCOVERY",
+    "expectedWeeks": 48,
+    "requiredAssets": 12,
+    "neweyWestLag": 4,
+    "oneSidedTMin": 1.645,
+    "researchOnly": true,
+    "executionImpact": false,
+    "autoPromotion": false,
+    "strategyPnlCalculated": false
+  },
+  "decision": "DISCOVERY_FAIL_RESEARCH_STOP",
+  "artifactHashes": {
+    "resultPrehashSha256": "1902e3585b18f8fe16c54d2e4a4268fc11ac1102dee7d4230c6fa043a8f57a3a",
+    "markdownSha256": "b03a7c333da2ccc152ae968571c8cae8e1c062980a89291bfc274ffebe2fe0f7"
+  }
+}
