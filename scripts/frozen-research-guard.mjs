@@ -3,11 +3,12 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-FUNDING-TIMESTAMP-CORRECTION.md':'ad5694309438c80aac0717700b7772fd94bc8f89',
   '.github/workflows/low-volatility-rank-weighted-v2.yml':'52bc76b5572b74cf4e7808e4f707e15bddda6769',
-  'test/test_low_volatility_rank_weighted_v2.py':'cfafe79f467831bfa700c25e1cf5a3aad72b18d7',
+  'test/test_low_volatility_rank_weighted_v2.py':'8a5c044e76555ad11eaff0da9be2ef763a16329c',
   'research/run-low-volatility-rank-weighted-v2-development.py':'e8f076258612407dd3676af94a7442c785ab53ba',
   'scripts/collect-low-volatility-rank-weighted-v2-development.py':'c084d8ec4a72a666818b9e8a9f5ca143788a0c9d',
-  'research/low_volatility_rank_weighted_v2.py':'833db87c79578be0530fca8ad9b7cb4a79f76b35',
+  'research/low_volatility_rank_weighted_v2.py':'87302fdc0c1880a35e1bfd663be8191d5f6be429',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-IMPLEMENTATION.md':'90e070996c399d6d678a10b25e6b52cd0aac6335',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PREREGISTRATION.md':'b8c644a5a15c321a1a52514dd05eb088288cd8f4',
   'research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md':'7c72162b7cf2f3dd5b22ef2aecc30936de52f4c8',
