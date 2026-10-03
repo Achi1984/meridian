@@ -117,6 +117,24 @@ def fetch_funding(symbol,start_ms,end_ms,interval_hours):
     for a,b in zip(rows,rows[1:]):
         if b[0]<=a[0]:
             raise RuntimeError(f"{symbol}:nonmonotonic funding")
+
+    # Each canonical weekly snapshot validates the newest completed week
+    # against Binance's currently published interval. Older canonical weeks
+    # remain preserved in the append-only evidence ledger and are not
+    # retroactively reclassified when Binance later changes an interval.
+    latest_start=max(int(start_ms),int(end_ms)-WEEK)
+    recent=[x for x in rows if latest_start<x[0]<=int(end_ms)]
+    if int(end_ms)>int(start_ms):
+        allowed=int(interval_hours)*HOUR+1000
+        if not recent:
+            raise RuntimeError(f"{symbol}:missing latest-week funding")
+        if recent[0][0]-latest_start>allowed:
+            raise RuntimeError(f"{symbol}:latest-week funding head gap")
+        for a,b in zip(recent,recent[1:]):
+            if b[0]-a[0]>allowed:
+                raise RuntimeError(f"{symbol}:latest-week funding internal gap")
+        if int(end_ms)-recent[-1][0]>allowed:
+            raise RuntimeError(f"{symbol}:latest-week funding tail gap")
     return rows,[receipt]
 
 
