@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-RESULT.md':'7bc0ef10fec1c89d0daa6023372ac03f8243c53e',
+  'research/quarter-hour-boundary-imbalance-strategy-v2-result-summary.json':'a3fd70940357f2fe5d2d48fe11f5b2dc68856969',
   '.github/workflows/qh-boundary-strategy-v2.yml':'da9eb28f506104bc04f3308a2703a4cbd97ed62d',
   'research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-IMPLEMENTATION.md':'b179a35b0d71e7bff8eec259bef5fb375a3737ba',
   'research/qh_boundary_strategy_v2_core.py':'074c64575404d0cebfdf53ac83531a698ffdc766',
