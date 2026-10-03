@@ -3,6 +3,9 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V1-RESULT.md':'b33649ff9813acfbaffbf3f2edfa5c456cb30739',
+  'research/quarter-hour-boundary-imbalance-strategy-v1-result-summary.json':'0d85a4d5d728c52c813e3a7a69d416efcbbd53e9',
+  'research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-PREREGISTRATION.md':'2170f11622207ed61add031ff79d6e296c00299d',
   '.github/workflows/research-profit-discovery-v1.yml':'33209e0efbf7e1011561cf0f9103b15788f6168d',
   '.github/workflows/research-profit-v2-upup.yml':'2673da0f4f9839fdec151cfa15b431ce40924039',
   'research/PAPERBOT-PROFIT-DISCOVERY-V1-RESULT.md':'bf0f891a8ad440774ac0bca716c2d394e6e9cd66',
