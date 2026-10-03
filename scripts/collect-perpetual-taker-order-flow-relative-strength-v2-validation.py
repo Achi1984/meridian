@@ -22,6 +22,8 @@ START="2025-01"
 END="2026-08"
 OUT=Path(os.environ.get("TAKER_FLOW_RS_V2_VALIDATION_DATA_DIR","/tmp/meridian-taker-flow-rs-v2-validation"))
 UA="ACHI-MERIDIAN-TAKER-FLOW-RS-V2-VALIDATION/1"
+SOURCE_START_MS=1735948800000  # 2025-01-04T00:00:00Z
+SOURCE_END_MS=1787961600000    # 2026-08-29T00:00:00Z inclusive
 
 
 def month_range(a,b):
@@ -114,11 +116,15 @@ manifest={
   "strategyPnlCalculated":False,
   "privateData":False,
   "syntheticBackfill":False,
+  "requiredHourlyStart":"2025-01-04T00:00:00Z",
+  "requiredHourlyEndInclusive":"2026-08-29T00:00:00Z",
+  "rowsAfterValidationEndpointRetained":False,
   "files":{}
 }
 
 for asset,d in data.items():
     d["hourly"].sort(key=lambda x:x[0])
+    d["hourly"]=[r for r in d["hourly"] if SOURCE_START_MS<=int(r[0])<=SOURCE_END_MS]
     d["sources"].sort(key=lambda x:x["month"])
     p=OUT/(asset+".json")
     p.write_text(json.dumps(d,separators=(",",":"))+"\n")
