@@ -127,6 +127,9 @@ class TakerFlowRelativeStrengthV2Tests(unittest.TestCase):
         self.assertIn('SOURCE_START_MS<=int(r[0])<=SOURCE_END_MS',collector)
         self.assertIn('"rowsAfterValidationEndpointRetained":False',collector)
         self.assertIn('feature validation forbids funding data',runner)
+        self.assertIn('post-validation source rows are forbidden',runner)
+        self.assertIn('len(hourly)!=14449',runner)
+        self.assertIn('int(hourly[-1][0])!=1787961600000',runner)
         self.assertIn('"strategyPnlCalculated":False',runner)
 
 
