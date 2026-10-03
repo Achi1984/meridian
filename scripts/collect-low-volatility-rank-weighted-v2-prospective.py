@@ -54,8 +54,9 @@ def get_json(path,params=None):
 def saturday_cutoff(now_ms):
     day=24*HOUR
     midnight=(int(now_ms)//day)*day
-    weekday=(int(now_ms)//day+3)%7
-    return midnight-weekday*day
+    weekday=(int(now_ms)//day+3)%7  # Monday=0; Saturday=5
+    days_since_saturday=(weekday-5)%7
+    return midnight-days_since_saturday*day
 
 
 def fetch_klines(symbol,start_ms,end_ms):
