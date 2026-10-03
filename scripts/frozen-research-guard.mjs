@@ -3,6 +3,10 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-RUN-AUTHORIZATION.md':'3d79c17d43a2c242a25b0b05a6127b6cb514d759',
+  'research/results/perpetual-taker-order-flow-relative-strength-v2-result.json':'6494dbfb5760671eadbde7b77ff619acd1f5073d',
+  'research/results/perpetual-taker-order-flow-relative-strength-v2-result.md':'3cec79c16274cdb51a6d55bdf657c5374769adaf',
+  'research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-EVIDENCE.md':'a6775c5240e1d422b5dd4fc222e34fb79b967786',
   '.github/workflows/perpetual-taker-order-flow-relative-strength-v2.yml':'5efd8fdfc7efcb61010b4390bfe81c20155effb3',
   'test/test_perpetual_taker_order_flow_relative_strength_v2.py':'272c4db92e2cfb7e9c20dad20b5912c5dca7d09b',
   'research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py':'6f51d4e7a97d563d2aa1612edad1ddb6e0d76b02',
