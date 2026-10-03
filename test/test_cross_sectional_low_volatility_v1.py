@@ -40,27 +40,27 @@ class CrossSectionalLowVolatilityV1Tests(unittest.TestCase):
         self.assertEqual(v1.HOLDOUT_EXPECTED_WEEKS,34)
         self.assertEqual(v1.REQUIRED_ASSETS,12)
 
-    def test_lowvol_signal_uses_exactly_672_hourly_log_returns(self):
+    def test_lowvol_signal_uses_672_returns_and_ends_strictly_before_anchor(self):
         t=v1.DISCOVERY_START
-        first=t-v1.FORMATION_ROWS*v1.HOUR
+        first=t-(v1.FORMATION_RETURNS+2)*v1.HOUR
         rows=[]
         for i in range(v1.FORMATION_ROWS):
             ts=first+i*v1.HOUR
             px=100.0*math.exp(0.001*i)
-            rows.append([ts,px,px,px,px,1.0])
+            rows.append([ts,px,px,px,px])
         series=v1.HourlySeries(rows)
-        expected=-math.sqrt(v1.FORMATION_HOURS*(0.001**2))
+        expected=-math.sqrt(v1.FORMATION_RETURNS*(0.001**2))
         self.assertAlmostEqual(series.lowvol_signal(t),expected,12)
+        self.assertEqual(max(series.by_ts),t-2*v1.HOUR)
+        self.assertNotIn(t-v1.HOUR,series.by_ts)
 
-    def test_missing_formation_hour_fails_closed(self):
+    def test_using_t_minus_1h_as_last_bar_cannot_rescue_missing_strict_window(self):
         t=v1.DISCOVERY_START
-        first=t-v1.FORMATION_ROWS*v1.HOUR
+        wrong_first=t-v1.FORMATION_ROWS*v1.HOUR
         rows=[]
         for i in range(v1.FORMATION_ROWS):
-            if i==123:
-                continue
-            ts=first+i*v1.HOUR
-            rows.append([ts,100,100,100,100,1])
+            ts=wrong_first+i*v1.HOUR
+            rows.append([ts,100,100,100,100])
         series=v1.HourlySeries(rows)
         with self.assertRaisesRegex(ValueError,"MISSING_FORMATION_HOUR"):
             series.lowvol_signal(t)
@@ -88,54 +88,53 @@ class CrossSectionalLowVolatilityV1Tests(unittest.TestCase):
             rows.append({
                 "t":v1.DISCOVERY_START+i*v1.WEEK,
                 "assetCount":12,
-                "rankIc":0.20 + (0.01 if i%2 else -0.01),
-                "low2MinusHigh2":0.01 + (0.001 if i%2 else -0.001),
+                "rankIc":0.20+(0.01 if i%2 else -0.01),
+                "low2MinusHigh2":0.01+(0.001 if i%2 else -0.001),
             })
-        metrics,gate=v1.summarize_feature_rows(rows,stage="DISCOVERY")
+        metrics,gate=v1.summarize_discovery_rows(rows)
         self.assertTrue(gate["pass"])
         self.assertEqual(gate["reasons"],[])
         self.assertEqual(metrics["positiveIcBlocks"],4)
         self.assertEqual(metrics["positiveSpreadBlocks"],4)
 
-    def test_discovery_negative_feature_fails(self):
+    def test_wrong_sample_size_and_negative_feature_fail(self):
         rows=[{
             "t":v1.DISCOVERY_START+i*v1.WEEK,
             "assetCount":12,
             "rankIc":-0.10,
             "low2MinusHigh2":-0.005,
-        } for i in range(48)]
-        _,gate=v1.summarize_feature_rows(rows,stage="DISCOVERY")
+        } for i in range(47)]
+        _,gate=v1.summarize_discovery_rows(rows)
         self.assertFalse(gate["pass"])
+        self.assertIn("WEEKS_NE_48",gate["reasons"])
         self.assertIn("MEAN_RANK_IC_NOT_POSITIVE",gate["reasons"])
         self.assertIn("MEAN_LOW2_MINUS_HIGH2_NOT_POSITIVE",gate["reasons"])
 
-    def test_wrong_discovery_sample_size_fails_even_if_positive(self):
-        rows=[{
-            "t":v1.DISCOVERY_START+i*v1.WEEK,
-            "assetCount":12,
-            "rankIc":0.20,
-            "low2MinusHigh2":0.01,
-        } for i in range(47)]
-        _,gate=v1.summarize_feature_rows(rows,stage="DISCOVERY")
-        self.assertFalse(gate["pass"])
-        self.assertIn("WEEKS_NE_48",gate["reasons"])
-
-    def test_holdout_is_sealed_without_discovery_authorization(self):
-        result=v1.run_feature_validation({},stage="HOLDOUT",discovery_authorized=False)
-        self.assertEqual(result["error"],"HOLDOUT_NOT_AUTHORIZED")
-        self.assertEqual(result["decision"],v1.HOLDOUT_FAIL)
-        self.assertFalse(result["gate"]["pass"])
-
-    def test_engine_contains_no_strategy_pnl_or_execution_path(self):
+    def test_engine_contains_no_holdout_evaluator_strategy_pnl_or_execution_path(self):
         body=(ROOT/"research"/"cross_sectional_low_volatility_v1.py").read_text()
         banned=[
+            "run_holdout","HOLDOUT_PASS_STRATEGY_DESIGN_ALLOWED",
             "submitOrder","placeOrder","createOrder","cancelOrder","transferFunds",
-            "funding_sum(","turnover(","terminal_close(","run_method("
+            "funding_sum(","turnover(","terminal_close(","profitFactor","maxDrawdown",
         ]
         for token in banned:
             self.assertNotIn(token,body)
-        self.assertIn('"strategyPnlCalculated": False',body)
-        self.assertIn('"executionImpact": False',body)
+        self.assertIn('"strategyPnlCalculated":False',body.replace(" ",""))
+        self.assertIn('"holdoutEvaluated":False',body.replace(" ",""))
+
+    def test_collector_and_runner_are_discovery_only(self):
+        collector=(ROOT/"scripts"/"collect-cross-sectional-low-volatility-v1-discovery.py").read_text()
+        runner=(ROOT/"research"/"run-cross-sectional-low-volatility-v1-discovery.py").read_text()
+        self.assertIn('START="2025-01"',collector)
+        self.assertIn('END="2026-01"',collector)
+        self.assertIn('SOURCE_START_MS=1735941600000',collector)
+        self.assertIn('SOURCE_END_MS=1767398400000',collector)
+        self.assertIn('"holdoutRowsRetained":False',collector)
+        self.assertNotIn("2026-08",collector)
+        self.assertIn('manifest.get("holdoutRowsRetained") is not False',runner)
+        self.assertIn('len(hourly)!=8739',runner)
+        self.assertIn('run_discovery',runner)
+        self.assertIn('"holdoutEvaluated":False',runner)
 
 
 if __name__=="__main__":
