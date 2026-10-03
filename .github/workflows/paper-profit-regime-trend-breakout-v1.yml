@@ -1,0 +1,91 @@
+name: MERIDIAN Regime Trend Breakout V1
+
+on:
+  pull_request:
+    paths:
+      - "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-PREREGISTRATION.md"
+      - "research/paper-profit-regime-trend-breakout-v1-preregistration.js"
+      - "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-IMPLEMENTATION.md"
+      - "research/paper-profit-regime-trend-breakout-v1-evaluator.js"
+      - "scripts/collect-paper-profit-regime-trend-breakout-v1.mjs"
+      - "research/run-paper-profit-regime-trend-breakout-v1.mjs"
+      - "test/paper-profit-regime-trend-breakout-v1.test.js"
+      - ".github/workflows/paper-profit-regime-trend-breakout-v1.yml"
+  push:
+    branches:
+      - research/regime-trend-breakout-v1-run
+    paths:
+      - "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regime-trend-breakout-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile deterministic implementation
+        run: |
+          node --check research/paper-profit-regime-trend-breakout-v1-evaluator.js
+          node --check scripts/collect-paper-profit-regime-trend-breakout-v1.mjs
+          node --check research/run-paper-profit-regime-trend-breakout-v1.mjs
+      - name: Run synthetic invariants only
+        run: node --test test/paper-profit-regime-trend-breakout-v1.test.js
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Collect exact frozen public source package
+        run: node scripts/collect-paper-profit-regime-trend-breakout-v1.mjs
+      - name: Upload exact source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-source
+          path: research/results/regime-trend-breakout-v1-source.json
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants, source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-source
+          path: research/results
+      - name: Run frozen Discovery gate
+        run: node research/run-paper-profit-regime-trend-breakout-v1.mjs
+      - name: Upload untouched result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-result
+          path: |
+            research/results/regime-trend-breakout-v1-result.json
+            research/results/regime-trend-breakout-v1-result.md
+          if-no-files-found: error
+          retention-days: 30
