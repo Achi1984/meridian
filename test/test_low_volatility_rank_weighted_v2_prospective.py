@@ -149,7 +149,9 @@ class ProspectiveV2Tests(unittest.TestCase):
 
     def test_collector_is_public_market_data_only_and_start_bounded(self):
         body=(ROOT/"scripts"/"collect-low-volatility-rank-weighted-v2-prospective.py").read_text()
-        self.assertIn('BASE="https://fapi.binance.com"',body)
+        self.assertIn('"https://fapi.binance.com"',body)
+        self.assertIn('"https://fapi1.binance.com"',body)
+        self.assertIn('"https://fapi4.binance.com"',body)
         self.assertIn('"/fapi/v1/klines"',body)
         self.assertIn('"/fapi/v1/fundingRate"',body)
         self.assertIn('"/fapi/v1/fundingInfo"',body)
