@@ -82,9 +82,10 @@ def saturday_cutoff(now_ms):
     """Most recent Saturday 00:00 UTC not later than now_ms."""
     now=int(now_ms)
     day=24*HOUR
-    week_index=(now//day+3)%7  # 1970-01-01 was Thursday; Saturday => 0 after +3 mod 7.
     midnight=(now//day)*day
-    return midnight-week_index*day
+    weekday=(now//day+3)%7  # Monday=0; Saturday=5
+    days_since_saturday=(weekday-5)%7
+    return midnight-days_since_saturday*day
 
 
 def completed_anchors(cutoff_ms):
