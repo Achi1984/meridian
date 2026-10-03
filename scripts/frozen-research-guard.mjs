@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PREREGISTRATION.md':'b8c644a5a15c321a1a52514dd05eb088288cd8f4',
   'research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md':'7c72162b7cf2f3dd5b22ef2aecc30936de52f4c8',
   'research/cross_sectional_low_volatility_v1.py':'d161b6b4553d5a18fc7064570f4a4e956178d0c9',
   'scripts/collect-cross-sectional-low-volatility-v1-discovery.py':'c6d76e0feb0b779b96c6abe6d8a611bfe808fd3a',
