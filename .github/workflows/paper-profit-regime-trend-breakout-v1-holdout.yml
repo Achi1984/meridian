@@ -1,0 +1,95 @@
+name: MERIDIAN Regime Trend Breakout V1 Holdout
+
+on:
+  pull_request:
+    paths:
+      - "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-IMPLEMENTATION.md"
+      - "research/paper-profit-regime-trend-breakout-v1-holdout.js"
+      - "research/run-paper-profit-regime-trend-breakout-v1-holdout.mjs"
+      - "test/paper-profit-regime-trend-breakout-v1-holdout.test.js"
+      - ".github/workflows/paper-profit-regime-trend-breakout-v1-holdout.yml"
+  push:
+    branches:
+      - research/regime-trend-breakout-v1-holdout-run
+    paths:
+      - "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: regime-trend-breakout-v1-holdout-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile Holdout implementation
+        run: |
+          node --check research/paper-profit-regime-trend-breakout-v1-holdout.js
+          node --check research/run-paper-profit-regime-trend-breakout-v1-holdout.mjs
+      - name: Run Holdout synthetic invariants only
+        run: node --test test/paper-profit-regime-trend-breakout-v1-holdout.test.js
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact frozen Discovery source artifact
+        run: |
+          mkdir -p research/results
+          curl -fL --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/11266308720/zip" \
+            -o /tmp/regime-trend-breakout-v1-source.zip
+          unzip -q /tmp/regime-trend-breakout-v1-source.zip -d research/results
+          test "$(sha256sum research/results/regime-trend-breakout-v1-source.json | awk '{print $1}')" = "08fb30cd3c9028920637c71d86035a723be2fdc63ee25607b842dc79211cc69b"
+      - name: Upload exact Holdout source handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-holdout-source
+          path: research/results/regime-trend-breakout-v1-source.json
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants, source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-holdout-source
+          path: research/results
+      - name: Run frozen Holdout gate
+        run: node research/run-paper-profit-regime-trend-breakout-v1-holdout.mjs
+      - name: Upload untouched Holdout result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regime-trend-breakout-v1-holdout-result
+          path: |
+            research/results/regime-trend-breakout-v1-holdout-result.json
+            research/results/regime-trend-breakout-v1-holdout-result.md
+          if-no-files-found: error
+          retention-days: 30
