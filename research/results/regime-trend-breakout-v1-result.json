@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "MERIDIAN-REGIME-TREND-BREAKOUT-V1-RESULT-1",
+  "generatedAt": "2026-10-03T06:15:59.518Z",
+  "sourceSha256": "08fb30cd3c9028920637c71d86035a723be2fdc63ee25607b842dc79211cc69b",
+  "sourceContract": {
+    "source": "Binance Spot public 1d klines",
+    "primary": "https://api.binance.com/api/v3/klines",
+    "fallback": "https://data-api.binance.vision/api/v3/klines",
+    "sourceStartUtc": "2021-08-08T00:00:00.000Z",
+    "sourceEndUtc": "2026-09-30T23:59:59.999Z",
+    "closedBarsOnly": true,
+    "privateData": false,
+    "syntheticHistory": false
+  },
+  "sources": {
+    "BTC": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "ETH": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "SOL": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "XRP": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "HBAR": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "LINK": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "AVAX": {"bars": 1880, "first": "2021-08-08T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"},
+    "SUI": {"bars": 1247, "first": "2023-05-03T00:00:00.000Z", "last": "2026-09-30T00:00:00.000Z"}
+  },
+  "result": {
+    "ruleset": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+    "split": {
+      "ok": true,
+      "method": "CHRONOLOGICAL_COMMON_TIMESTAMPS",
+      "totalTimestamps": 1247,
+      "discoveryCount": 872,
+      "holdoutCount": 375,
+      "discoveryFrom": 1683072000000,
+      "discoveryTo": 1758326400000,
+      "holdoutFrom": 1758412800000,
+      "holdoutTo": 1790726400000,
+      "splitTimestamp": 1758412800000
+    },
+    "discovery": {
+      "periods": 872,
+      "totalReturnPct": 22.874182504930584,
+      "pnl": 2287.4182504930577,
+      "profitFactor": 1.1685418889573382,
+      "maxDrawdownPct": 6.819614707589719,
+      "positiveWindows": 4,
+      "positiveAssets": 6,
+      "positivePnlConcentrationPct": 21.16468126498267,
+      "stress16BpsReturnPct": 21.572867185048672,
+      "turnoverNotional": 147101.2731497212,
+      "maxGrossExposure": 0.2667614810612474,
+      "gate": {
+        "pass": true,
+        "label": "STAGE_B_GATE_PASS",
+        "reasons": [],
+        "researchOnly": true,
+        "executionImpact": false,
+        "autoPromotion": false
+      }
+    },
+    "holdout": null,
+    "decision": "REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED",
+    "researchOnly": true,
+    "executionImpact": false,
+    "autoPromotion": false
+  }
+}
