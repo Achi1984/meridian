@@ -122,6 +122,10 @@ class TakerFlowRelativeStrengthV2Tests(unittest.TestCase):
         self.assertNotIn('/fundingRate/',collector)
         self.assertIn('"fundingLoaded":False',collector)
         self.assertIn('"strategyPnlCalculated":False',collector)
+        self.assertIn('SOURCE_START_MS=1735948800000',collector)
+        self.assertIn('SOURCE_END_MS=1787961600000',collector)
+        self.assertIn('SOURCE_START_MS<=int(r[0])<=SOURCE_END_MS',collector)
+        self.assertIn('"rowsAfterValidationEndpointRetained":False',collector)
         self.assertIn('feature validation forbids funding data',runner)
         self.assertIn('"strategyPnlCalculated":False',runner)
 
