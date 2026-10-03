@@ -138,5 +138,20 @@ class CrossSectionalLowVolatilityV1Tests(unittest.TestCase):
         self.assertIn('"executionImpact": False',body)
 
 
+    def test_collector_and_runner_are_discovery_only_and_holdout_sealed(self):
+        collector=(ROOT/"scripts"/"collect-cross-sectional-low-volatility-v1-discovery.py").read_text()
+        runner=(ROOT/"research"/"run-cross-sectional-low-volatility-v1-discovery.py").read_text()
+        self.assertIn('START="2025-01"',collector)
+        self.assertIn('END="2026-01"',collector)
+        self.assertIn('SOURCE_END_MS=1767398400000',collector)
+        self.assertIn('"holdoutRowsRetained":False',collector)
+        self.assertNotIn('/fundingRate/',collector)
+        self.assertIn('"fundingLoaded":False',collector)
+        self.assertIn('"strategyPnlCalculated":False',collector)
+        self.assertIn('untouched holdout rows are forbidden during discovery',runner)
+        self.assertIn('holdoutEvaluated":False',runner)
+        self.assertIn('"strategyPnlCalculated":False',runner)
+
+
 if __name__=="__main__":
     unittest.main()
