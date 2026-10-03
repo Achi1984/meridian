@@ -54,7 +54,7 @@ class TakerFlowRelativeStrengthV2Tests(unittest.TestCase):
         self.assertAlmostEqual(row["rankIc"],1.0,12)
         self.assertGreater(row["top2MinusBottom2"],0)
         self.assertEqual(row["top2"],["AVAX","BCH"])
-        self.assertEqual(row["bottom2"],["BTC","ETH"])
+        self.assertEqual(row["bottom2"],["ETH","BTC"])
 
     def test_missing_signal_or_outcome_fails_closed(self):
         dataset={a:StubAsset(i,i/100.0) for i,a in enumerate(v2.ASSETS)}
