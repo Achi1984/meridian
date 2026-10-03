@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"research"))
 
 from cross_sectional_low_volatility_v1 import (
-    ASSETS,HOUR,RULESET,DISCOVERY_EXPECTED_WEEKS,run_feature_validation,
+    ASSETS,HOUR,RULESET,DISCOVERY_EXPECTED_WEEKS,run_discovery,
 )
 
 DATA=Path(os.environ.get("LOWVOL_V1_DISCOVERY_DATA_DIR","/tmp/meridian-lowvol-v1-discovery"))
@@ -78,7 +78,7 @@ for asset in ASSETS:
 source_receipt={"manifestSha256":file_sha256(manifest_path),"files":file_hashes}
 source_digest=sha256_bytes(json.dumps(source_receipt,sort_keys=True,separators=(",",":")).encode())
 
-result=run_feature_validation(raw,stage="DISCOVERY")
+result=run_discovery(raw)
 summary={
   "schemaVersion":"MERIDIAN-LOWVOL-V1-DISCOVERY-RESULT-1",
   "generatedAt":datetime.now(timezone.utc).isoformat(),
