@@ -50,6 +50,12 @@ if manifest.get("privateData") is not False:
     raise RuntimeError("feature validation source must be public")
 if manifest.get("syntheticBackfill") is not False:
     raise RuntimeError("feature validation forbids synthetic backfill")
+if manifest.get("requiredHourlyStart")!="2025-01-04T00:00:00Z":
+    raise RuntimeError("unexpected source warmup boundary")
+if manifest.get("requiredHourlyEndInclusive")!="2026-08-29T00:00:00Z":
+    raise RuntimeError("unexpected source terminal boundary")
+if manifest.get("rowsAfterValidationEndpointRetained") is not False:
+    raise RuntimeError("post-validation source rows are forbidden")
 
 raw={}
 file_hashes={}
@@ -63,6 +69,11 @@ for asset in ASSETS:
         raise RuntimeError(f"source file hash mismatch {asset}")
     file_hashes[asset]=observed
     raw[asset]=json.loads(p.read_text())
+    hourly=raw[asset].get("hourly",[])
+    if len(hourly)!=14449:
+        raise RuntimeError(f"unexpected hourly row count {asset}:{len(hourly)}")
+    if int(hourly[0][0])!=1735948800000 or int(hourly[-1][0])!=1787961600000:
+        raise RuntimeError(f"unexpected hourly source bounds {asset}")
 
 source_receipt={
   "manifestSha256":file_sha256(manifest_path),
