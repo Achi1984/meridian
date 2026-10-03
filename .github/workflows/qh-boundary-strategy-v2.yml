@@ -31,6 +31,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
       - name: Compile deterministic Strategy V2 implementation
         run: |
           python3 -m py_compile             research/qh_boundary_strategy_v2_core.py             scripts/aggregate-qh-boundary-strategy-v2.py
