@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
   '.github/workflows/perpetual-taker-order-flow-relative-strength-v2.yml':'5efd8fdfc7efcb61010b4390bfe81c20155effb3',
-  'test/test_perpetual_taker_order_flow_relative_strength_v2.py':'2014cb161272ec555e08e695d9cf91c4defeca51',
+  'test/test_perpetual_taker_order_flow_relative_strength_v2.py':'272c4db92e2cfb7e9c20dad20b5912c5dca7d09b',
   'research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py':'6f51d4e7a97d563d2aa1612edad1ddb6e0d76b02',
   'scripts/collect-perpetual-taker-order-flow-relative-strength-v2-validation.py':'fa72fa88d3bccc0fb8c7fe50e38b16feb7ee2b7c',
   'research/perpetual_taker_order_flow_relative_strength_v2.py':'c7411e57723462a03037ae0fdc8fa590c7239ac4',
