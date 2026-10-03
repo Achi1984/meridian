@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V1",
+  "stage": "STRATEGY_V1_RESULT_LOCK",
+  "decision": "STRATEGY_V1_FAIL",
+  "evidence": {
+    "strategyRun": 37029699996,
+    "aggregateJob": 110951917303,
+    "resultArtifactId": 11241728193,
+    "resultJsonSha256": "3b0a14d70067afb2bd429accdfa3079de4d16da9b58c7828b5f27a4c0d2cb9a7",
+    "artifactZipSha256": "171d73d9cd4172c0e9e4032ca106f3b95fad45b72280a9313c57b453c710fee8",
+    "dataV13Run": 36690368732,
+    "dataV13AggregateArtifactId": 11090766829,
+    "dataV13AggregateDigest": "sha256:49211d4059f8cecc38133f8bea9ac5b4ce9bf23a041c242440cb25b335dbb344",
+    "sourceShards": {
+      "expected": 120,
+      "observed": 120
+    }
+  },
+  "primary": {
+    "startingEquity": 100000,
+    "endingEquity": 65253.701089349925,
+    "netReturn": -0.34746298910650075,
+    "grossPriceReturn": 0.02533191143219894,
+    "grossPricePnl": 2533.191143219894,
+    "fundingPnl": -204.79927357759925,
+    "transactionCosts": 37074.69078029566,
+    "maxDrawdown": 0.35290278228287547,
+    "dailyProfitFactor": 0.41796039522905154,
+    "turnoverOnStartingEquity": 617.9115130049245,
+    "rebalanceCount": 350202,
+    "averageGrossExposure": 0.07506066906825032,
+    "positiveAssetCount": 0
+  },
+  "sideAttribution": {
+    "longPriceFundingPnl": -423.2535216294944,
+    "shortPriceFundingPnl": 2751.645391271862,
+    "transactionCosts": 37074.69078029689
+  },
+  "blocks": {
+    "B1": {
+      "netReturn": -0.07807103753422617,
+      "netPnl": -7807.10375342262,
+      "dailyProfitFactor": 0.5237033210161552
+    },
+    "B2": {
+      "netReturn": -0.07705480755516914,
+      "netPnl": -7103.905878233694,
+      "dailyProfitFactor": 0.46998985589379455
+    },
+    "B3": {
+      "netReturn": -0.10040537898051805,
+      "netPnl": -8543.392325003195,
+      "dailyProfitFactor": 0.4698160385164804
+    },
+    "B4": {
+      "netReturn": -0.14751856726753954,
+      "netPnl": -11291.896953990567,
+      "dailyProfitFactor": 0.18108585501984456
+    }
+  },
+  "robustness": {
+    "horizon4h": {
+      "netReturn": -0.7017929764055939,
+      "maxDrawdown": 0.7037090395980163,
+      "dailyProfitFactor": 0.24298942009438998,
+      "turnoverOnStartingEquity": 1300.0877498057341
+    },
+    "horizon8h": {
+      "netReturn": -0.4349597771396754,
+      "maxDrawdown": 0.4387198955298482,
+      "dailyProfitFactor": 0.4020210604173644,
+      "turnoverOnStartingEquity": 870.0339568981499
+    },
+    "cost3bp": {
+      "netReturn": -0.18462075137606093,
+      "maxDrawdown": 0.19392859042669983,
+      "dailyProfitFactor": 0.6459664841306957,
+      "turnoverOnStartingEquity": 687.1942917697301
+    },
+    "cost10bp": {
+      "netReturn": -0.5151600471591198,
+      "maxDrawdown": 0.5173698469355839,
+      "dailyProfitFactor": 0.25085628480473765,
+      "turnoverOnStartingEquity": 539.6774857344082
+    },
+    "suppressFundingCoincidentNewCohorts": {
+      "netReturn": -0.34213975584513945,
+      "maxDrawdown": 0.34684304700012963,
+      "dailyProfitFactor": 0.4138537704470975,
+      "turnoverOnStartingEquity": 610.4873291587388
+    }
+  },
+  "executionImpact": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
