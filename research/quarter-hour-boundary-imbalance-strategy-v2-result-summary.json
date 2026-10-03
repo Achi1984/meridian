@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "family": "PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-V2",
+  "stage": "STRATEGY_V2_DEVELOPMENT_RESULT_LOCK",
+  "decision": "STRATEGY_V2_DEV_FAIL",
+  "familyStatus": "PAUSED_AFTER_V2_DEVELOPMENT_FAIL",
+  "evidence": {
+    "developmentRun": 37101396355,
+    "aggregateJob": 111141623200,
+    "resultArtifactId": 11266935745,
+    "sourceArtifactId": 11266741213,
+    "resultJsonSha256": "7bfd0687fc00bed0d15a55241729e5c525a69c922691ad76c9767b795454e74c",
+    "resultArtifactZipSha256": "3d56a999365d255e78c36ee1db0e6ae0f8e771adee4e41c7866350ad32514a99",
+    "sourceArtifactZipSha256": "f12b16f13828585c33c1ef3b700c72060bdad37909cf70034688b971c07cb3fe",
+    "implementationPr": 459,
+    "implementationHead": "6b1abb80120c1d7a267cc6bb930ea512c7962c8d",
+    "implementationMerge": "07ffa7a2e3f60dac31006cc1ef122fc06ae643e8",
+    "runAuthorizationCommit": "a6436bc7a9ed88ced825ced09565c3ab6604fa1e",
+    "sourceShards": {
+      "expected": 120,
+      "observed": 120
+    }
+  },
+  "negativeControl": {
+    "v1Decision": "STRATEGY_V1_FAIL",
+    "v1Run": 37029699996,
+    "v1TurnoverOnStartingEquity": 617.9115130049245,
+    "v1RebalanceCount": 350202
+  },
+  "primary": {
+    "startingEquity": 100000,
+    "endingEquity": 91882.36682733281,
+    "netReturn": -0.08117633172667194,
+    "grossPricePnl": -479.2449871244437,
+    "fundingPnl": -128.6098820726328,
+    "preCostPriceFundingPnl": -607.8548691970765,
+    "transactionCosts": 7509.778303471185,
+    "maxDrawdown": 0.0877021471473623,
+    "dailyProfitFactor": 0.8402324088599246,
+    "turnoverOnStartingEquity": 125.1629717245204,
+    "turnoverReductionVsV1": 0.7974419166979935,
+    "rebalanceCount": 7290,
+    "rebalanceCountReductionVsV1": 0.9791834426987853,
+    "averageGrossExposure": 0.07642351648568843,
+    "averageNetExposure": 0.0011227367348558034,
+    "positiveAssetCount": 1
+  },
+  "developmentGate": {
+    "pass": false,
+    "gates": {
+      "fullWindowNetReturnPositive": false,
+      "maxDrawdownBelow15Pct": true,
+      "atLeast3Of4BlocksPositive": false,
+      "finalBlockB4Positive": false,
+      "atLeast4Of6AssetsPositive": false,
+      "singleAssetPositivePnlConcentrationAtMost40Pct": false,
+      "turnoverAtLeast90PctBelowV1": false
+    },
+    "positivePnlConcentration": 1,
+    "maxAllowedTurnoverOnStartingEquity": 61.79115130049245
+  },
+  "blocks": {
+    "B1": {
+      "netReturn": -0.040349275991733324,
+      "netPnl": -4034.9275991733302,
+      "dailyProfitFactor": 0.7545980191475783
+    },
+    "B2": {
+      "netReturn": -0.00719371752231035,
+      "netPnl": -690.3456228596042,
+      "dailyProfitFactor": 0.939879801853447
+    },
+    "B3": {
+      "netReturn": 0.011959515364285078,
+      "netPnl": 1139.4395587291656,
+      "dailyProfitFactor": 1.100969019191719
+    },
+    "B4": {
+      "netReturn": -0.04700346102187447,
+      "netPnl": -4531.799509363424,
+      "dailyProfitFactor": 0.6092972101940861
+    }
+  },
+  "robustness": {
+    "cost3bp": {
+      "netReturn": -0.04427856310916589,
+      "preCostPriceFundingPnl": -598.5224916091297,
+      "maxDrawdown": 0.061741989666023595,
+      "dailyProfitFactor": 0.9107707815035958,
+      "turnoverOnStartingEquity": 127.64446064353447
+    },
+    "cost10bp": {
+      "netReturn": -0.1281694666011418,
+      "preCostPriceFundingPnl": -621.5927456769522,
+      "maxDrawdown": 0.13378285267136408,
+      "dailyProfitFactor": 0.7554350727090575,
+      "turnoverOnStartingEquity": 121.95353914436531
+    }
+  },
+  "holdoutRequired": false,
+  "holdoutAuthorized": false,
+  "v3Authorized": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "executionImpact": false
+}
