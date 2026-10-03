@@ -150,6 +150,17 @@ def build_sample_hold_rebalance_events(shards_by_asset):
         rows=[]
         for shard in shards_by_asset.get(asset,[]):rows.extend(shard.get("boundaries",[]))
         rows.sort(key=lambda x:x["boundaryMs"])
+        if not rows:
+            diagnostics[asset]={
+                "positiveOiEvents":0,"negativeOiEvents":0,"zeroOiEvents":0,
+                "missingSignalEvents":0,"rightCensoredSignalEvents":0,
+                "oiDistribution":distribution([]),
+                "sampledAbsoluteTargetWeightDistribution":distribution([]),
+                "scheduledSampleCount":0,"warmupSampleCount":0,
+                "skippedExecutionReferences":0,"executableSampleCount":0,
+                "terminalTargetWeight":0.0
+            }
+            continue
         cohorts=deque()
         targets=[];all_oi=[]
         pos=neg=zero=missing=right_censored=0
