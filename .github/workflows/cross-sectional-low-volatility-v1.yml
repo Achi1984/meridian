@@ -1,0 +1,37 @@
+name: MERIDIAN Cross-Sectional Low-Volatility V1
+
+on:
+  pull_request:
+    paths:
+      - "research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md"
+      - "research/cross_sectional_low_volatility_v1.py"
+      - "test/test_cross_sectional_low_volatility_v1.py"
+      - "scripts/frozen-research-guard.mjs"
+      - ".github/workflows/cross-sectional-low-volatility-v1.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-sectional-low-volatility-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile frozen low-volatility feature engine
+        run: python3 -m py_compile research/cross_sectional_low_volatility_v1.py
+      - name: Run frozen low-volatility V1 invariants only
+        run: python3 test/test_cross_sectional_low_volatility_v1.py
+      - name: Confirm no historical V1 evaluation is wired on PR
+        run: |
+          test ! -e research/results/cross-sectional-low-volatility-v1-discovery-result.json
+          test ! -e research/results/cross-sectional-low-volatility-v1-holdout-result.json
