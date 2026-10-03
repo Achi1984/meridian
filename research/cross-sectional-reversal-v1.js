@@ -1,0 +1,88 @@
+'use strict';
+
+const ASSETS = Object.freeze(['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','DOTUSDT','HBARUSDT','SUIUSDT','NEARUSDT','INJUSDT']);
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const FORMATION_WEEKS = 8;
+const NW_LAG = 4;
+const BLOCKS = 5;
+
+function mean(xs) { return xs.reduce((a,b)=>a+b,0)/xs.length; }
+
+function ranks(values) {
+  const indexed=values.map((v,i)=>({v,i})).sort((a,b)=>a.v-b.v);
+  const out=Array(values.length);
+  for(let i=0;i<indexed.length;){
+    let j=i+1; while(j<indexed.length && indexed[j].v===indexed[i].v) j++;
+    const r=(i+j-1)/2+1;
+    for(let k=i;k<j;k++) out[indexed[k].i]=r;
+    i=j;
+  }
+  return out;
+}
+
+function pearson(a,b){
+  if(a.length!==b.length || a.length<2) return NaN;
+  const ma=mean(a), mb=mean(b);
+  let n=0,da=0,db=0;
+  for(let i=0;i<a.length;i++){ const x=a[i]-ma,y=b[i]-mb; n+=x*y; da+=x*x; db+=y*y; }
+  return da>0&&db>0?n/Math.sqrt(da*db):NaN;
+}
+function spearman(a,b){ return pearson(ranks(a),ranks(b)); }
+
+function neweyWestT(xs,lag=NW_LAG){
+  const n=xs.length; if(n<2) return NaN;
+  const m=mean(xs), u=xs.map(x=>x-m);
+  let lrv=u.reduce((s,x)=>s+x*x,0)/n;
+  for(let k=1;k<=Math.min(lag,n-1);k++){
+    let g=0; for(let t=k;t<n;t++) g+=u[t]*u[t-k]; g/=n;
+    lrv += 2*(1-k/(lag+1))*g;
+  }
+  return lrv>0 ? m/Math.sqrt(lrv/n) : (m>0?Infinity:m<0?-Infinity:0);
+}
+
+function chronologicalBlocks(rows,count=BLOCKS){
+  const n=rows.length, out=[]; let start=0;
+  for(let b=0;b<count;b++){
+    const size=Math.floor(n/count)+(b<n%count?1:0);
+    out.push(rows.slice(start,start+size)); start+=size;
+  }
+  return out;
+}
+
+function validateAnchor(openByAsset, anchorMs){
+  const formationMs=anchorMs-FORMATION_WEEKS*WEEK_MS, outcomeMs=anchorMs+WEEK_MS;
+  const rows=[];
+  for(const asset of ASSETS){
+    const series=openByAsset[asset];
+    if(!series) throw new Error('MISSING_ASSET:'+asset);
+    const a=series.get(formationMs), b=series.get(anchorMs), c=series.get(outcomeMs);
+    if(![a,b,c].every(Number.isFinite) || a<=0 || b<=0 || c<=0) throw new Error('INCOMPLETE_ANCHOR:'+asset);
+    rows.push({asset,formation:b/a-1,reversal:-(b/a-1),outcome:c/b-1});
+  }
+  const ic=spearman(rows.map(r=>r.reversal),rows.map(r=>r.outcome));
+  if(!Number.isFinite(ic)) throw new Error('INVALID_RANK_IC');
+  const sorted=[...rows].sort((x,y)=>x.formation-y.formation || x.asset.localeCompare(y.asset));
+  const spread=mean(sorted.slice(0,3).map(r=>r.outcome))-mean(sorted.slice(-3).map(r=>r.outcome));
+  return {anchorMs,ic,spread};
+}
+
+function summarize(weeks){
+  if(!weeks.length) throw new Error('NO_ELIGIBLE_WEEKS');
+  const ics=weeks.map(x=>x.ic), spreads=weeks.map(x=>x.spread);
+  const blocks=chronologicalBlocks(weeks).map(b=>({
+    meanIc:b.length?mean(b.map(x=>x.ic)):null,
+    meanSpread:b.length?mean(b.map(x=>x.spread)):null
+  }));
+  const metrics={
+    weeks:weeks.length, meanIc:mean(ics), medianIc:[...ics].sort((a,b)=>a-b)[Math.floor(ics.length/2)],
+    positiveIcWeeks:ics.filter(x=>x>0).length, icNwT:neweyWestT(ics),
+    meanSpread:mean(spreads), medianSpread:[...spreads].sort((a,b)=>a-b)[Math.floor(spreads.length/2)],
+    positiveSpreadWeeks:spreads.filter(x=>x>0).length, spreadNwT:neweyWestT(spreads),
+    positiveIcBlocks:blocks.filter(x=>x.meanIc>0).length,
+    positiveSpreadBlocks:blocks.filter(x=>x.meanSpread>0).length, blocks
+  };
+  const pass=metrics.meanIc>0 && metrics.icNwT>=1.645 && metrics.meanSpread>0 && metrics.spreadNwT>=1.645 && metrics.positiveIcBlocks>=3 && metrics.positiveSpreadBlocks>=3;
+  return {metrics,decision:pass?'REVERSAL_V1_FEATURE_PASS_STRATEGY_DESIGN_ALLOWED':'REVERSAL_V1_FEATURE_FAIL_RESEARCH_STOP'};
+}
+
+module.exports={ASSETS,WEEK_MS,FORMATION_WEEKS,NW_LAG,BLOCKS,ranks,spearman,neweyWestT,chronologicalBlocks,validateAnchor,summarize};
