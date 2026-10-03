@@ -3,6 +3,16 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/PAPERBOT-PROFIT-CONTROL-V2-STAGE-B.md':'6f3df6f877c67ef7f65408331ed1f1c6be25be4a',
+  'research/paperbot-profit-control-v2-stage-b.js':'7b3217ae4a84577b711820ac630c38b1f09593cd',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-PREREGISTRATION.md':'31f8e924939c2a713c4831db760f93661c2fe8c1',
+  'research/paper-profit-regime-trend-breakout-v1-preregistration.js':'804e94486a8d4ab88c8a593586f43a08fb56ea20',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-IMPLEMENTATION.md':'24a129607ee5b0625fe9cd14925d31c3e446bba0',
+  'research/paper-profit-regime-trend-breakout-v1-evaluator.js':'1947cb7e85929c1cd49966e8b5fc96fd340eca2b',
+  'scripts/collect-paper-profit-regime-trend-breakout-v1.mjs':'82a93703e46746ccdf6e21bcf0702d0506b15839',
+  'research/run-paper-profit-regime-trend-breakout-v1.mjs':'a2d995393c2882b1fb2451403e6ac81af9e7f3b6',
+  '.github/workflows/paper-profit-regime-trend-breakout-v1.yml':'5158e7777631a658d68fab8e9342ba27a2ff538f',
+  'test/paper-profit-regime-trend-breakout-v1.test.js':'e14a92e95added82a045d147ea40851214a0090c',
   'research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-RESULT.md':'7bc0ef10fec1c89d0daa6023372ac03f8243c53e',
   'research/quarter-hour-boundary-imbalance-strategy-v2-result-summary.json':'a3fd70940357f2fe5d2d48fe11f5b2dc68856969',
   '.github/workflows/qh-boundary-strategy-v2.yml':'da9eb28f506104bc04f3308a2703a4cbd97ed62d',
