@@ -3,6 +3,15 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  '.github/workflows/paper-profit-regime-trend-breakout-v1-holdout.yml':'4e6a502db972d4d2c0cd4a0b56e914d946432acc',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-IMPLEMENTATION.md':'9570eaef974870eb4a3a44aeee125407a24eb91d',
+  'research/paper-profit-regime-trend-breakout-v1-holdout.js':'7e0abb50d64a2a27be47590172058c59c4c9dc55',
+  'research/run-paper-profit-regime-trend-breakout-v1-holdout.mjs':'f3e709237758a607321fd7a16de4a9dcbd2782fc',
+  'test/paper-profit-regime-trend-breakout-v1-holdout.test.js':'34cf1bf89387e8ea193333ab9c05702ae5156a37',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-RUN-AUTHORIZATION.md':'03d683f8f32534b3831692a09a2d0d68cab039b3',
+  'research/results/regime-trend-breakout-v1-holdout-result.json':'f68452cae0bad17448a336113a9a264c3c999213',
+  'research/results/regime-trend-breakout-v1-holdout-result.md':'00dfd074c34b3d9412f1ef945851e4911c8bc32f',
+  'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-EVIDENCE.md':'40654266f711348d9577a424962327e23cf45a2d',
   'research/results/regime-trend-breakout-v1-result.json':'c3a5b72d27f825e2df951794fb782af429cfafc8',
   'research/results/regime-trend-breakout-v1-result.md':'3d2e9bc3a9e95752ecb8875f0cb514d0de21d360',
   'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-RUN-AUTHORIZATION.md':'7ecb7aadf0075f3a834001453ab2c32b2f1783f5',
