@@ -1,0 +1,91 @@
+name: MERIDIAN Low-Volatility Rank-Weighted V2
+
+on:
+  pull_request:
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PREREGISTRATION.md"
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-IMPLEMENTATION.md"
+      - "research/low_volatility_rank_weighted_v2.py"
+      - "scripts/collect-low-volatility-rank-weighted-v2-development.py"
+      - "research/run-low-volatility-rank-weighted-v2-development.py"
+      - "test/test_low_volatility_rank_weighted_v2.py"
+      - "scripts/frozen-research-guard.mjs"
+      - ".github/workflows/low-volatility-rank-weighted-v2.yml"
+  push:
+    branches:
+      - research/low-volatility-rank-weighted-v2-development-run
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-DEVELOPMENT-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lowvol-rank-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile frozen V2 implementation
+        run: |
+          python3 -m py_compile research/low_volatility_rank_weighted_v2.py
+          python3 -m py_compile scripts/collect-low-volatility-rank-weighted-v2-development.py
+          python3 -m py_compile research/run-low-volatility-rank-weighted-v2-development.py
+      - name: Run V2 synthetic and structural invariants only
+        run: python3 test/test_low_volatility_rank_weighted_v2.py
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect first authorized V2 Development source
+        run: python3 scripts/collect-low-volatility-rank-weighted-v2-development.py
+      - name: Upload exact V2 Development source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-rank-v2-development-source
+          path: /tmp/meridian-lowvol-rank-v2-development
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants,source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: lowvol-rank-v2-development-source
+          path: /tmp/meridian-lowvol-rank-v2-development
+      - name: Run first frozen V2 Development gate
+        run: python3 research/run-low-volatility-rank-weighted-v2-development.py
+      - name: Upload untouched V2 Development result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-rank-v2-development-result
+          path: |
+            research/results/low-volatility-rank-weighted-v2-development-result.json
+            research/results/low-volatility-rank-weighted-v2-development-result.md
+          if-no-files-found: error
+          retention-days: 30
