@@ -525,3 +525,11 @@ must(js.includes("deltaAvailable=series.currentIncluded&&delta!=null&&startCover
 must(js.includes('AKTUELLER TOTAL FEHLT · NUR VALIDIERTE HISTORIE'),'missing current total must be explicit beside history chart');
 must(js.includes("venue:'Pionex Wallet',source:'READ API BALANCE'"),'Pionex balance residue provenance must be wallet-specific');
 must(js.includes('<span>WALLET DETAIL</span>'),'missing asset-detail fallback must use wallet wording');
+
+
+/* r111 permanent portfolio partial / paused-history gates */
+must(String(release.dashboardShell||'').includes('PORTFOLIO-PARTIAL-KNOWN-VALUE-HISTORY-PAUSED-SEMANTICS'),'r111 dashboardShell marker missing');
+must(js.includes("label='PAUSED'"),'paused portfolio history state missing');
+must(js.includes('BEKANNTER TEILWERT'),'known partial portfolio disclosure missing');
+must(js.includes('NICHT GESAMTPORTFOLIO'),'partial portfolio disclaimer missing');
+must(js.includes('VERLAUF PAUSIERT · PORTFOLIO AUTHORITY FEHLT'),'paused history explanation missing');

@@ -30,7 +30,11 @@ test('r102 exposes deployed build and strict-history integrity beside the portfo
 
 test('r102 derives range readiness from existing canonical chart coverage only',()=>{
   assert.match(js,/ready=m\.deltaAvailable/);
-  assert.match(js,/label=ready\?'READY':started\?'BUILDING':'WAIT'/);
+  assert.match(js,/if\(ready\)\{tone='safe';label='READY'/);
+  assert.match(js,/historyPaused=!portfolioComplete/);
+  assert.match(js,/label='PAUSED'/);
+  assert.match(js,/label='BUILDING'/);
+  assert.match(js,/label='WAIT'/);
   assert.match(js,/strictPortfolioHistoryPoints\(\)/);
   assert.match(js,/String\(x\?\.sourceStatus\?\.spot\|\|''\)==='STRICT_AUTHORITY'/);
   assert.doesNotMatch(js,/syntheticPortfolioHistory|interpolatePortfolioHistory|backfillFakeHistory/);
