@@ -13,6 +13,7 @@ import { verifyGithubActionsOidc } from "./github-actions-oidc.js";
 import { encryptAssetWatchMirror } from "./asset-watch-mirror-crypto.js";
 import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfolio-authority-update.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
+import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -513,6 +514,10 @@ const server=http.createServer(async(req,res)=>{
     }
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/paper-execution-audit-v2"){
+      if(!pool())return writeJson(res,503,{error:"paper_audit_database_unavailable"},origin||"");
+      return writeJson(res,200,await buildPaperExecutionAuditExport(stateGet),origin||"");
     }
     if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
       const snapshot=await marketKlinesSnapshot({
