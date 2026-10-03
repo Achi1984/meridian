@@ -7,12 +7,14 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r110 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r110');
+test('r110 contract remains coherent and execution neutral on successor builds',()=>{
+  const m=String(release.terminalBuild||'').match(/^10\\.0-r(\\d+)$/);
+  assert.ok(m&&Number(m[1])>=110);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/DEPOT-COMPACT-COLLAPSED-ASSET-ROWS/);
-  assert.equal(manifest.start_url,'./v10/?build=r110&fresh=r110');
-  assert.ok(js.includes("const BUILD='10.0-r110'"));
+  const rev='r'+m[1];
+  assert.equal(manifest.start_url,'./v10/?build='+rev+'&fresh='+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r110 collapsed Depot row contains only wallet and bot glance metrics',()=>{
