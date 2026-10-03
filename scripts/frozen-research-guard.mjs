@@ -3,6 +3,13 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  '.github/workflows/low-volatility-rank-weighted-v2-prospective.yml':'2c82aeb72a67e61d47acbe5c197cc3982dfda722',
+  'test/test_low_volatility_rank_weighted_v2_prospective.py':'ed94bdfc5334dc9d10d2e24467773a36ba1deb7f',
+  'research/run-low-volatility-rank-weighted-v2-prospective.py':'0287e968a22c5c2be197fb10e5ef35b0189d0bc0',
+  'scripts/collect-low-volatility-rank-weighted-v2-prospective.py':'bb0a1aaae606a6f78182f706d09870b8ce28dd3c',
+  'research/low_volatility_rank_weighted_v2_prospective.py':'3bc3777d2c6cec08eca0bf25ef963543d9e39fae',
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-SHADOW-IMPLEMENTATION.md':'d156db5409c94bc6cfface2a65e5fb6bef9a6f40',
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-REVIEW-PREREGISTRATION.md':'738965343f5fc28835f15bbbcdc0a12d8cf3cfbe',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-HOLDOUT-EVIDENCE.md':'f3e6c329fe57b3a5d6a4ee03dde693c33d4aa85b',
   'research/results/low-volatility-rank-weighted-v2-holdout-frozen-summary.json':'4e59899559fefe5c8f6697f9f4fc320fc9ed8516',
   'research/results/low-volatility-rank-weighted-v2-holdout-result.md':'08756eb06c30414a5c1e2ec52916e694829f7447',

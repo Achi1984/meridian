@@ -1,0 +1,107 @@
+name: MERIDIAN Low-Volatility V2 Prospective Shadow
+
+on:
+  pull_request:
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-REVIEW-PREREGISTRATION.md"
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-SHADOW-IMPLEMENTATION.md"
+      - "research/low_volatility_rank_weighted_v2_prospective.py"
+      - "scripts/collect-low-volatility-rank-weighted-v2-prospective.py"
+      - "research/run-low-volatility-rank-weighted-v2-prospective.py"
+      - "test/test_low_volatility_rank_weighted_v2_prospective.py"
+      - "scripts/frozen-research-guard.mjs"
+      - ".github/workflows/low-volatility-rank-weighted-v2-prospective.yml"
+  push:
+    branches:
+      - research/low-volatility-rank-weighted-v2-prospective-start
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-AUTHORIZATION.md"
+  workflow_dispatch:
+  schedule:
+    - cron: "15 1 * * 6"
+
+permissions:
+  contents: write
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile prospective shadow implementation
+        run: |
+          python3 -m py_compile research/low_volatility_rank_weighted_v2_prospective.py
+          python3 -m py_compile scripts/collect-low-volatility-rank-weighted-v2-prospective.py
+          python3 -m py_compile research/run-low-volatility-rank-weighted-v2-prospective.py
+      - name: Run prospective synthetic and lineage invariants
+        run: python3 test/test_low_volatility_rank_weighted_v2_prospective.py
+
+  snapshot:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: lowvol-v2-prospective-shadow-ledger
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect public prospective source
+        run: python3 scripts/collect-low-volatility-rank-weighted-v2-prospective.py
+      - name: Build immutable prospective snapshot
+        run: python3 research/run-low-volatility-rank-weighted-v2-prospective.py
+      - name: Upload exact prospective source
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-v2-prospective-source-${{ github.run_id }}
+          path: /tmp/meridian-lowvol-v2-prospective
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload prospective snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-v2-prospective-snapshot-${{ github.run_id }}
+          path: /tmp/meridian-lowvol-v2-prospective-output
+          if-no-files-found: error
+          retention-days: 90
+      - name: Persist first canonical snapshot for cutoff
+        env:
+          EVIDENCE_BRANCH: research/low-volatility-rank-weighted-v2-prospective-evidence
+        run: |
+          set -euo pipefail
+          SNAPSHOT_ID="$(cat /tmp/meridian-lowvol-v2-prospective-output/snapshot-id.txt)"
+          cp /tmp/meridian-lowvol-v2-prospective-output/snapshot.json /tmp/prospective-snapshot.json
+          cp /tmp/meridian-lowvol-v2-prospective-output/snapshot.md /tmp/prospective-snapshot.md
+
+          git fetch origin "${EVIDENCE_BRANCH}:refs/remotes/origin/${EVIDENCE_BRANCH}"
+          git checkout -B "${EVIDENCE_BRANCH}" "refs/remotes/origin/${EVIDENCE_BRANCH}"
+
+          DIR="research/prospective/low-volatility-rank-weighted-v2/snapshots"
+          mkdir -p "${DIR}"
+          JSON_PATH="${DIR}/${SNAPSHOT_ID}.json"
+          MD_PATH="${DIR}/${SNAPSHOT_ID}.md"
+
+          if [ -e "${JSON_PATH}" ] || [ -e "${MD_PATH}" ]; then
+            echo "Canonical snapshot ${SNAPSHOT_ID} already exists; immutable first snapshot preserved."
+            exit 0
+          fi
+
+          cp /tmp/prospective-snapshot.json "${JSON_PATH}"
+          cp /tmp/prospective-snapshot.md "${MD_PATH}"
+          cp /tmp/prospective-snapshot.json "research/prospective/low-volatility-rank-weighted-v2/LATEST.json"
+          cp /tmp/prospective-snapshot.md "research/prospective/low-volatility-rank-weighted-v2/LATEST.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/prospective/low-volatility-rank-weighted-v2
+          git commit -m "Prospective V2 shadow snapshot ${SNAPSHOT_ID}"
+          git push origin "HEAD:${EVIDENCE_BRANCH}"
