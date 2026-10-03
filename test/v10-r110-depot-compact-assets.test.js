@@ -8,7 +8,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
 test('r110 contract remains coherent and execution neutral on successor builds',()=>{
-  const m=String(release.terminalBuild||'').match(/^10\\.0-r(\\d+)$/);
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
   assert.ok(m&&Number(m[1])>=110);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/DEPOT-COMPACT-COLLAPSED-ASSET-ROWS/);
