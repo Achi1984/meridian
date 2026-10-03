@@ -515,7 +515,11 @@ const server=http.createServer(async(req,res)=>{
     if(isProtected(u.pathname)&&!authorizedRead(req)){
       return writeJson(res,401,{error:"read_token_required"},origin||"");
     }
-    if(req.method==="GET"&&u.pathname==="/api/private/paper-execution-audit-v2"){\n      if(!pool())return writeJson(res,503,{error:"paper_audit_database_unavailable"},origin||"");\n      return writeJson(res,200,await buildPaperExecutionAuditExport(stateGet),origin||"");\n    }\n    if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
+    if(req.method==="GET"&&u.pathname==="/api/private/paper-execution-audit-v2"){
+      if(!pool())return writeJson(res,503,{error:"paper_audit_database_unavailable"},origin||"");
+      return writeJson(res,200,await buildPaperExecutionAuditExport(stateGet),origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/market-klines"){
       const snapshot=await marketKlinesSnapshot({
         symbol:u.searchParams.get("symbol"),
         interval:u.searchParams.get("interval"),
