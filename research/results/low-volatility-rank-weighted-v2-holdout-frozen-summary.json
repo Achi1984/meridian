@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "MERIDIAN-LOWVOL-RANK-WEIGHTED-V2-HOLDOUT-FROZEN-SUMMARY-1",
+  "canonicalWorkflowRun": 37133809945,
+  "canonicalAuthorizationCommit": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
+  "holdoutImplementationMerge": "76e7161ab00886932412a027b9e93b1061ecce4a",
+  "developmentCanonicalWorkflowRun": 37132394717,
+  "developmentDecision": "DEVELOPMENT_PASS_HOLDOUT_REQUIRED",
+  "decision": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+  "dataIntegrityFailure": false,
+  "source": {
+    "sourceDigestSha256": "cba10d070b2956d4ba293888f26dcd65c93875096aee22b5a7b7e457bbe5b76e",
+    "manifestSha256": "ed2ed862e62578dd0695a5d852e1e661ef2ee01dcc6d37f1e0e35b87168aa230",
+    "artifactId": 11278085201,
+    "artifactZipDigest": "sha256:8f9ed3953268ba985034ecd6db09a4a3e5900c835061ce6930b710320de50426"
+  },
+  "resultArtifact": {
+    "artifactId": 11277199985,
+    "artifactZipDigest": "sha256:7c96e9456d80f3eb61047f6c7f108dddddbf704409f6526643f5fa3f8e1106af",
+    "exactJsonSha256": "c88ab6074e3fc0777f3a69693d6e549a9b704f7a668b384a44d0e0db02a01dd0",
+    "exactMarkdownSha256": "24cdf3b1d54a943fa17645bcb77237b3082ba73e72dc196554ed13b767f24e7a",
+    "runnerPrehashSha256": "93afdabd1208e56ada008499b8e27d20793ca2c50c141a44d6aabfc2609fdbc3"
+  },
+  "metrics": {
+    "periods": 34,
+    "returnPct": 15.018404444613488,
+    "profitFactor": 1.8468826191815935,
+    "sharpe": 1.7417272868691995,
+    "maxDrawdownPct": 5.4217225237862205,
+    "positiveBlocks": 4,
+    "blocksPct": [
+      3.8288056003964677,
+      5.809746859521403,
+      4.2669481341118365,
+      0.41004071060384284
+    ],
+    "stressReturnPct": 13.858855936243897,
+    "turnover": 10.222222222222223,
+    "costContribution": -0.010222222222222223,
+    "priceContribution": 0.1698104463411907,
+    "fundingContribution": -0.014189324861111111,
+    "meanRankIc": 0.18798848210612917,
+    "rankIcNeweyWestT": 4.658517995569365,
+    "maxGrossDeviation": 0,
+    "maxAbsNetExposure": 0,
+    "assetAttribution": {
+      "BTC": -0.028876337287496733,
+      "ETH": -0.0368382908502762,
+      "BNB": -0.023874045465944245,
+      "SOL": -0.006381183875368828,
+      "XRP": 0.05600950310444943,
+      "ADA": 0.007824768887420388,
+      "DOGE": 0.06414521846002462,
+      "LINK": 0.00009556359253500596,
+      "DOT": 0.1272927419568544,
+      "LTC": -0.030006383082031057,
+      "BCH": 0.00642310807485178,
+      "AVAX": 0.009584235742838763
+    }
+  },
+  "gate": {
+    "pass": true,
+    "reasons": [],
+    "expectedPeriods": 34,
+    "requiredAssets": 12,
+    "baseCostBps": 10,
+    "stressCostBps": 20,
+    "minProfitFactor": 1.15,
+    "minSharpe": 0.75,
+    "maxDrawdownPct": 20,
+    "minPositiveBlocks": 3,
+    "rankIcNeweyWestLag": 4,
+    "rankIcTMin": 1.645
+  },
+  "nextAuthorization": "PROSPECTIVE_PAPER_REVIEW_ONLY"
+}
