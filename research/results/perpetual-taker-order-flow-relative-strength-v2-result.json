@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "MERIDIAN-TAKER-FLOW-RS-V2-RESULT-1",
+  "generatedAt": "2026-10-03T10:05:30.632268+00:00",
+  "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
+  "stage": "INDEPENDENT_FEATURE_VALIDATION",
+  "source": "Binance Vision official public USD-M monthly archives",
+  "sourceRange": "2025-01..2026-08",
+  "sourceDigestSha256": "ddcefc2fd1f1f0c8c6c66fcb6ec185701f0ccb4b8ae8f11ed31289a2a5a9d1a2",
+  "sourceReceipt": {
+    "manifestSha256": "d4ebf92c9ad634de721d96a139c6d3996cd907111c92797bdc21c04b722d0c5e",
+    "files": {
+      "BTC": "905812ea2689e2f382e2904ebaae6b6df364045495f70fc658a35cfc7563b664",
+      "ETH": "af73bea6d2d28a4e459a878555227dcaf7ecc46271aa6ec2f79d36689087add0",
+      "BNB": "bfeae92be1cb18d8c55a87b5487015f5687dda247acf96cb032fbdab24ae758b",
+      "SOL": "99d389fd234ecefa60fab3b5f447a81c3bb34be3d7bd1107b4e687a45ba0a8fc",
+      "XRP": "79d4bbab11d2beb738bb4ac6115f7dd63254742f3f12d2d326193ec3c7f94c81",
+      "ADA": "996fc74514e1543ded3c0769d65810a9e67816646b579dc940bb72dd11cadb36",
+      "DOGE": "210a933c21ced28ef26438e0bbc609d0dd473eceece1f1c6dd4d80f10666feef",
+      "LINK": "f2f82719edc3013bf0df85d0c40faa9908eb9891d3677b7f7b4c48215f562613",
+      "DOT": "bb2c00975539389fb8b4d997b6c25497895ac3884826618eabd41e51f0cca71e",
+      "LTC": "ad797ffd5fc10d54a87f662ad683f29f2d9692560656647626cc27404cb9f126",
+      "BCH": "a257b187efa1e141303f36a4c4858cef632d47f63325d5e0c955d73fb5ea7e1d",
+      "AVAX": "da199ff6b09965268d4fceab653bc5b5755e2371783eae5d85b7a149118b1c74"
+    }
+  },
+  "assets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX"
+  ],
+  "expectedWeeks": 85,
+  "fundingLoaded": false,
+  "strategyPnlCalculated": false,
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false,
+  "dataIntegrityFailure": false,
+  "error": null,
+  "metrics": {
+    "weeks": 85,
+    "meanRankIc": 0.03389551624845742,
+    "medianRankIc": 0.06993006993006994,
+    "positiveIcWeeks": 50,
+    "rankIcNeweyWestT": 1.0051084902912502,
+    "meanTop2MinusBottom2": 0.009980852245506485,
+    "medianTop2MinusBottom2": 0.009961742203262236,
+    "positiveSpreadWeeks": 52,
+    "spreadNeweyWestT": 1.8675905019594172,
+    "positiveIcBlocks": 3,
+    "positiveSpreadBlocks": 4,
+    "blocks": [
+      {
+        "i": 1,
+        "from": 1736553600000,
+        "to": 1746230400000,
+        "weeks": 17,
+        "meanRankIc": -0.009872480460715751,
+        "meanSpread": 0.017723321932884284
+      },
+      {
+        "i": 2,
+        "from": 1746835200000,
+        "to": 1756512000000,
+        "weeks": 17,
+        "meanRankIc": 0.06211435623200329,
+        "meanSpread": -0.0014651952182956243
+      },
+      {
+        "i": 3,
+        "from": 1757116800000,
+        "to": 1766793600000,
+        "weeks": 17,
+        "meanRankIc": 0.09831345125462772,
+        "meanSpread": 0.026356748196986628
+      },
+      {
+        "i": 4,
+        "from": 1767398400000,
+        "to": 1777075200000,
+        "weeks": 17,
+        "meanRankIc": -0.0008227067050596467,
+        "meanSpread": 0.0033313269639336555
+      },
+      {
+        "i": 5,
+        "from": 1777680000000,
+        "to": 1787356800000,
+        "weeks": 17,
+        "meanRankIc": 0.019744960921431513,
+        "meanSpread": 0.003958059352023487
+      }
+    ]
+  },
+  "gate": {
+    "pass": false,
+    "reasons": [
+      "RANK_IC_NW_T_LT_1_645"
+    ],
+    "expectedWeeks": 85,
+    "requiredAssets": 12,
+    "neweyWestLag": 4,
+    "oneSidedTMin": 1.645,
+    "minPositiveBlocks": 3,
+    "researchOnly": true,
+    "executionImpact": false,
+    "autoPromotion": false,
+    "strategyPnlCalculated": false
+  },
+  "decision": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
+  "artifactHashes": {
+    "resultPrehashSha256": "947ba9bf72e39e00a3b645e5e2a55c9cb3ca050e50be83c587557c9fc9737b62",
+    "markdownSha256": "471ad636736a914d582e617d78860c2310f1bc03709b0c667a6eb4cc451cc5b1"
+  }
+}
