@@ -3,6 +3,12 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  '.github/workflows/cross-sectional-low-volatility-v1.yml':'55cc4b45be521f7f13a88235359a6dabe2a2562e',
+  'test/test_cross_sectional_low_volatility_v1.py':'4fc47634d400424fa3dea0369b9c9ecdaeed31ca',
+  'research/run-cross-sectional-low-volatility-v1-discovery.py':'0d1acee9e8ea947fab4c0764ce24f45a5747b5f1',
+  'scripts/collect-cross-sectional-low-volatility-v1-discovery.py':'ff36e15ad2700f13cafaa0c19fd7cfeba735e41d',
+  'research/cross_sectional_low_volatility_v1.py':'d945e00c6ffde125b8e913bc3a2a76bb6d7ce40b',
+  'research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-IMPLEMENTATION.md':'b1d916f7ed7ed19d71d458757a5d13f6c7460e68',
   'research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md':'7c72162b7cf2f3dd5b22ef2aecc30936de52f4c8',
   'research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-RUN-AUTHORIZATION.md':'3d79c17d43a2c242a25b0b05a6127b6cb514d759',
   'research/results/perpetual-taker-order-flow-relative-strength-v2-result.json':'6494dbfb5760671eadbde7b77ff619acd1f5073d',
