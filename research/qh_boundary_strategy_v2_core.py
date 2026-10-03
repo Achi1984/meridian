@@ -165,7 +165,7 @@ def build_sample_hold_rebalance_events(shards_by_asset):
         targets=[];all_oi=[]
         pos=neg=zero=missing=right_censored=0
         scheduled=warmup=skipped=executable=0
-        terminal_target=None
+        terminal_target=None;saw_final_flatten=False
         for row in rows:
             t=int(row["boundaryMs"])
             while cohorts and cohorts[0][0]<=t:cohorts.popleft()
@@ -187,6 +187,7 @@ def build_sample_hold_rebalance_events(shards_by_asset):
             if t<FIRST_V2_SAMPLE_MS:
                 warmup+=1
                 continue
+            if t==FINAL_V2_FLATTEN_BOUNDARY_MS:saw_final_flatten=True
             target=0.0 if t==FINAL_V2_FLATTEN_BOUNDARY_MS else sum(x[1] for x in cohorts)
             if t>FINAL_V2_FLATTEN_BOUNDARY_MS:
                 continue
@@ -203,8 +204,9 @@ def build_sample_hold_rebalance_events(shards_by_asset):
                 "type":"rebalance","ts":int(xt),"boundaryMs":t,"asset":asset,
                 "price":float(px),"targetWeight":target
             })
-        if terminal_target is None or abs(terminal_target)>1e-12:
-            raise RuntimeError(f"{asset} terminal sampled target not flat")
+        if rows[-1]["boundaryMs"]>=FINAL_V2_FLATTEN_BOUNDARY_MS:
+            if not saw_final_flatten or terminal_target is None or abs(terminal_target)>1e-12:
+                raise RuntimeError(f"{asset} terminal sampled target not flat")
         diagnostics[asset]={
             "positiveOiEvents":pos,"negativeOiEvents":neg,"zeroOiEvents":zero,
             "missingSignalEvents":missing,"rightCensoredSignalEvents":right_censored,
