@@ -1,0 +1,83 @@
+name: MERIDIAN Quarter-Hour Strategy V2
+
+on:
+  pull_request:
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-PREREGISTRATION.md"
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-IMPLEMENTATION.md"
+      - "research/qh_boundary_strategy_v2_core.py"
+      - "research/quarter-hour-boundary-imbalance-strategy-v1-result-summary.json"
+      - "scripts/aggregate-qh-boundary-strategy-v2.py"
+      - "scripts/download-github-run-artifacts.sh"
+      - "test/test_qh_boundary_strategy_v2.py"
+      - ".github/workflows/qh-boundary-strategy-v2.yml"
+  push:
+    branches:
+      - research/qh-boundary-strategy-v2-run
+    paths:
+      - "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: qh-boundary-strategy-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile deterministic Strategy V2 implementation
+        run: |
+          python3 -m py_compile             research/qh_boundary_strategy_v2_core.py             scripts/aggregate-qh-boundary-strategy-v2.py
+          bash -n scripts/download-github-run-artifacts.sh
+      - name: Run Strategy V2 synthetic invariants
+        run: python3 test/test_qh_boundary_strategy_v2.py
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QH_STRATEGY_V2_SOURCE_DIR: research/results/qh-strategy-v2-source
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen Strategy V1 compact source shards
+        run: bash scripts/download-github-run-artifacts.sh 37029699996 qh-strategy-v1-shard- 120 "$QH_STRATEGY_V2_SOURCE_DIR"
+      - name: Upload exact V2 source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-strategy-v2-source
+          path: research/results/qh-strategy-v2-source
+          if-no-files-found: error
+
+  aggregate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants, source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QH_STRATEGY_V2_SOURCE_DIR: research/results/qh-strategy-v2-source
+      QH_STRATEGY_V2_RESULT_DIR: research/results
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen V2 source package
+        uses: actions/download-artifact@v4
+        with:
+          name: qh-strategy-v2-source
+          path: research/results/qh-strategy-v2-source
+      - name: Require 120 frozen source shards and run Strategy V2 development evidence
+        run: python3 scripts/aggregate-qh-boundary-strategy-v2.py
+      - name: Upload Strategy V2 development result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qh-boundary-imbalance-strategy-v2-development-result
+          path: research/results/quarter-hour-boundary-imbalance-strategy-v2-development-result.json
+          if-no-files-found: error
