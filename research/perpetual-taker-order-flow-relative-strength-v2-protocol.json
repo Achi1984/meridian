@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "ruleset": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
+  "status": "PREREGISTERED_BEFORE_FIRST_V2_VALIDATION_RESULT",
+  "researchOnly": true,
+  "executionImpact": false,
+  "autoPromotion": false,
+  "strategyPnlCalculated": false,
+  "parentV1EngineBlob": "580f8885118aa1bfcccd6c77a431d5b7835e8bba",
+  "assets": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "AVAX"
+  ],
+  "source": {
+    "provider": "Binance Vision public USD-M monthly archives",
+    "data": "1h perpetual klines",
+    "startMonth": "2025-01",
+    "endMonth": "2026-08",
+    "privateData": false,
+    "fundingLoaded": false,
+    "syntheticBackfill": false,
+    "requiredHourlyStart": "2025-01-04T00:00:00Z",
+    "requiredHourlyEndInclusive": "2026-08-29T00:00:00Z",
+    "rowsAfterValidationEndpointRetained": false
+  },
+  "calendar": {
+    "anchor": "SATURDAY_00_UTC",
+    "start": "2025-01-11T00:00:00Z",
+    "endExclusive": "2026-08-29T00:00:00Z",
+    "finalOutcomeEndpoint": "2026-08-29T00:00:00Z",
+    "expectedWeeks": 85
+  },
+  "feature": {
+    "hours": 168,
+    "interval": "[t-168h,t)",
+    "formula": "(2*sum(takerBuyQuote)-sum(quoteVolume))/sum(quoteVolume)",
+    "direction": "HIGHER_FLOW_PREDICTS_HIGHER_NEXT_WEEK_RETURN"
+  },
+  "outcome": {
+    "formula": "OPEN(t+7d)/OPEN(t)-1",
+    "holdingDays": 7
+  },
+  "weekly": {
+    "rankIc": "SPEARMAN_FLOW_VS_NEXT_WEEK_RETURN_12_ASSETS",
+    "spread": "MEAN_TOP2_FLOW_RETURN_MINUS_MEAN_BOTTOM2_FLOW_RETURN",
+    "tieBreak": "SYMBOL_ASC"
+  },
+  "inference": {
+    "neweyWestLag": 4,
+    "oneSidedTThreshold": 1.645,
+    "chronologicalBlocks": 5,
+    "minPositiveIcBlocks": 3,
+    "minPositiveSpreadBlocks": 3
+  },
+  "gate": {
+    "expectedWeeks": 85,
+    "requiredAssetsEveryWeek": 12,
+    "meanIcPositive": true,
+    "nwIcTMin": 1.645,
+    "meanSpreadPositive": true,
+    "nwSpreadTMin": 1.645,
+    "minPositiveIcBlocks": 3,
+    "minPositiveSpreadBlocks": 3
+  },
+  "passDecision": "FEATURE_VALIDATION_PASS_STRATEGY_DESIGN_ALLOWED",
+  "failDecision": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
+  "paperAuthorized": false,
+  "liveAuthorized": false
+}
