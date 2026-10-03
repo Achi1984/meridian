@@ -45,6 +45,7 @@ GROSS_TARGET=v2.GROSS_TARGET
 PROSPECTIVE_BLOCKS=3
 MIN_POSITIVE_BLOCKS=2
 CANONICAL_SNAPSHOT_MAX_LAG_MS=12*HOUR
+MAX_PROSPECTIVE_FUNDING_GAP_MS=8*HOUR+1000
 
 WAITING="PROSPECTIVE_WAITING_FOR_START"
 COLLECTING="PROSPECTIVE_COLLECTING"
@@ -121,6 +122,53 @@ def _summarize(weeks):
         "weekly":weeks,
     }
 
+
+
+class ProspectiveFundingSeries:
+    """Public REST funding coverage with a frozen maximum eight-hour gap.
+
+    Exact funding rates/timestamps are used for accounting. The eight-hour cap
+    is a prospective source-completeness rule; each canonical weekly collector
+    additionally checks the current official funding interval for the newest
+    completed week.
+    """
+    def __init__(self,asset,rows):
+        self.asset=asset
+        self.rows=[]
+        last=None
+        for row in rows:
+            if len(row)<3:
+                raise ValueError(f"{asset}:MALFORMED_PROSPECTIVE_FUNDING")
+            t=int(row[0]);rate=float(row[2])
+            if last is not None and t<=last:
+                raise ValueError(f"{asset}:NONMONOTONIC_PROSPECTIVE_FUNDING")
+            self.rows.append((t,rate))
+            last=t
+
+    def sum_for_hold(self,start,end):
+        selected=[x for x in self.rows if start<x[0]<=end]
+        if not selected:
+            raise ValueError(f"{self.asset}:MISSING_PROSPECTIVE_FUNDING")
+        if selected[0][0]-start>MAX_PROSPECTIVE_FUNDING_GAP_MS:
+            raise ValueError(f"{self.asset}:PROSPECTIVE_FUNDING_HEAD_GAP")
+        for prev,curr in zip(selected,selected[1:]):
+            gap=curr[0]-prev[0]
+            if gap<=0 or gap>MAX_PROSPECTIVE_FUNDING_GAP_MS:
+                raise ValueError(f"{self.asset}:PROSPECTIVE_FUNDING_INTERNAL_GAP")
+        if end-selected[-1][0]>MAX_PROSPECTIVE_FUNDING_GAP_MS:
+            raise ValueError(f"{self.asset}:PROSPECTIVE_FUNDING_TAIL_GAP")
+        return sum(x[1] for x in selected)
+
+
+def prepare_prospective_dataset(raw_by_asset):
+    if set(raw_by_asset)!=set(ASSETS):
+        raise ValueError("PROSPECTIVE_ASSET_UNIVERSE_MISMATCH")
+    price=v2.parent.prepare_dataset(raw_by_asset)
+    funding={}
+    for asset in ASSETS:
+        payload=raw_by_asset[asset]
+        funding[asset]=ProspectiveFundingSeries(asset,payload.get("funding",[]))
+    return price,funding
 
 def run_method(price,funding,anchors,cost_bps,terminal_close=False):
     prev={}
@@ -224,7 +272,7 @@ def evaluate(raw_by_asset,cutoff_ms,collected_at_ms):
                 "monitoring":None,"gateSample":None,"gate":None,
             }
 
-        price,funding=v2.prepare_dataset(raw_by_asset)
+        price,funding=prepare_prospective_dataset(raw_by_asset)
         monitoring_base=run_method(price,funding,anchors,BASE_COST_BPS,terminal_close=False)
         monitoring_stress=run_method(price,funding,anchors,STRESS_COST_BPS,terminal_close=False)
 
