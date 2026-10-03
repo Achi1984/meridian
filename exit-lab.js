@@ -58,7 +58,7 @@ export function simulateExitModel(trade,candles,modelId='B_PROTECTED',opts={}){
   const bePrice=priceAtR(entry,initialRisk,side,beR);
   const spec=modelId==='D_ADAPTIVE'?{...model,...adaptiveSpec(trade.regimeType||trade.regime||trade.challengerRegime)}:model;
   let remaining=1,realizedR=0,tp1Hit=false,tp1At=null,stop=sl0,peakFavorable=entry,maxOpenR=0,runnerExit=null,runnerReason=null;
-  let tp1ThenBe=false,runnerTp2AfterBe=false,beArmed=false,beArmedAt=null;
+  let tp1ThenBe=false,runnerTp2AfterBe=false,beArmed=false,beArmedAt=null,ambiguousBars=0,gapStops=0;
 
   const rows=Array.isArray(candles)?candles:[];
   for(let i=0;i<rows.length&&remaining>1e-9;i++){
@@ -69,8 +69,11 @@ export function simulateExitModel(trade,candles,modelId='B_PROTECTED',opts={}){
 
     // Conservative same-candle ordering: the stop active at candle open is checked before targets.
     if(hitStop(side,stop,c)){
-      const r=rAtPrice(entry,initialRisk,side,stop)-costsR;
-      realizedR+=remaining*r;runnerExit=stop;runnerReason=tp1Hit&&beArmed?'BE_OR_TRAIL':'SL';
+      if((!tp1Hit&&hit(side,tp1,c))||(tp1Hit&&tp2>0&&hit(side,tp2,c)))ambiguousBars++;
+      const open=Number(c.open),fill=Number.isFinite(open)&&open>0?(side==='LONG'?Math.min(stop,open):Math.max(stop,open)):stop;
+      if(fill!==stop)gapStops++;
+      const r=rAtPrice(entry,initialRisk,side,fill)-costsR;
+      realizedR+=remaining*r;runnerExit=fill;runnerReason=tp1Hit&&beArmed?'BE_OR_TRAIL':'SL';
       if(tp1Hit&&beArmed&&Math.abs(r-extraProtectR)<=Math.max(.15,costsR+.05))tp1ThenBe=true;
       remaining=0;break;
     }
@@ -110,7 +113,7 @@ export function simulateExitModel(trade,candles,modelId='B_PROTECTED',opts={}){
     realizedR+=remaining*(rAtPrice(entry,initialRisk,side,px)-costsR);runnerExit=px;runnerReason='END_OF_SAMPLE';remaining=0;
   }
   const givebackR=Math.max(0,maxOpenR-realizedR);
-  return{modelId,label:model.label,realizedR:round(realizedR,4),maxOpenR:round(maxOpenR,4),givebackR:round(givebackR,4),tp1Hit,tp1At,beAfterTp1:!!spec.beAfterTp1,beArmed,beArmedAt,bePrice:round(bePrice,8),beExtraR:round(extraProtectR,3),confirmTp1Close:!!opts.confirmTp1Close,costBufferR:round(costsR,4),runnerReason,runnerExit:round(runnerExit,8),tp1ThenBe,runnerTp2Touched:runnerTp2AfterBe,remaining:0,researchOnly:true,executionImpact:false};
+  return{modelId,label:model.label,auditVersion:'R29-CAUSAL-BARS-GAP-FILLS',ambiguousBars,gapStops,realizedR:round(realizedR,4),maxOpenR:round(maxOpenR,4),givebackR:round(givebackR,4),tp1Hit,tp1At,beAfterTp1:!!spec.beAfterTp1,beArmed,beArmedAt,bePrice:round(bePrice,8),beExtraR:round(extraProtectR,3),confirmTp1Close:!!opts.confirmTp1Close,costBufferR:round(costsR,4),runnerReason,runnerExit:round(runnerExit,8),tp1ThenBe,runnerTp2Touched:runnerTp2AfterBe,remaining:0,researchOnly:true,executionImpact:false};
 }
 
 function probeResult(trade,candles,p,opts){
