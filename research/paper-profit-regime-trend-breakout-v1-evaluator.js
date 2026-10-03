@@ -210,7 +210,7 @@ function view(backtestResult,{start=null,end=null}={}){
   const concentration=positiveTotal>0?Math.max(...pos.map(x=>x.pnl/positiveTotal*100)):0;
   return{
     periods:xs,
-    summary:{periods:xs.length,totalReturnPct:(eq-1)*100,pnl:eq*10000-10000,profitFactor,maxDrawdownPct:maxDD},
+    summary:{periods:xs.length,totalReturnPct:(eq/10000-1)*100,pnl:eq-10000,profitFactor,maxDrawdownPct:maxDD},
     stability:{windows,positiveWindows:windows.filter(x=>x.positive).length},
     assets,
     positiveAssets:assets.filter(x=>x.pnl>0).length,
