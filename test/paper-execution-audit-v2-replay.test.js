@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {initialRisk,fillAtStop,stopReplay,percentile,auditDecision} from '../paper-execution-audit-v2-replay.js';
+const L={side:'LONG',entry:100,sl:90,qty:2,openedAt:'2026-01-01T00:00:00Z',closedAt:'2026-01-01T01:00:00Z'};
+test('risk validates stop side',()=>{assert.equal(initialRisk(L),20);assert.equal(initialRisk({...L,sl:101}),null)});
+test('long gap-through uses worse open',()=>assert.deepEqual(fillAtStop(L,{open:88,high:92,low:85}),{touched:true,price:88,gap:true}));
+test('short gap-through uses worse open',()=>assert.deepEqual(fillAtStop({...L,side:'SHORT',sl:110},{open:112,high:115,low:108}),{touched:true,price:112,gap:true}));
+test('missing candles is inconclusive evidence',()=>{const r=stopReplay(L,[]);assert.equal(r.reason,'MISSING_CANDLES');assert.equal(auditDecision([r]).decision,'PAPER_EXECUTION_V2_INCONCLUSIVE')});
+test('p90 is interpolated deterministically',()=>assert.equal(percentile([1,2,3,4,5],.9),4.6));
+test('coverage gate fails closed',()=>{const rows=Array.from({length:20},(_,i)=>({eligible:true,replayed:i<18,stopTouched:i<18,netR:-1}));assert.equal(auditDecision(rows).decision,'PAPER_EXECUTION_V2_INCONCLUSIVE')});
+test('p90 overrun fails',()=>{const rows=Array.from({length:20},()=>({eligible:true,replayed:true,stopTouched:true,netR:-1.3}));assert.equal(auditDecision(rows).decision,'PAPER_EXECUTION_V2_FAIL')});
+test('bounded stops pass execution gate',()=>{const rows=Array.from({length:20},()=>({eligible:true,replayed:true,stopTouched:true,netR:-1.1}));assert.equal(auditDecision(rows).decision,'PAPER_EXECUTION_V2_PASS')});
