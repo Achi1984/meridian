@@ -16,7 +16,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 
 ASSETS=["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","LINK","DOT","LTC","BCH","AVAX"]
-BASE="https://fapi.binance.com"
+BASES=["https://fapi.binance.com","https://fapi1.binance.com","https://fapi2.binance.com","https://fapi3.binance.com","https://fapi4.binance.com"]
 UA="ACHI-MERIDIAN-LOWVOL-V2-PROSPECTIVE-SHADOW/1"
 HOUR=60*60*1000
 WEEK=7*24*HOUR
@@ -35,20 +35,21 @@ def canonical_json_bytes(obj):
 
 def get_json(path,params=None):
     query=urllib.parse.urlencode(params or {})
-    url=BASE+path+("?" + query if query else "")
-    last=None
-    for attempt in range(5):
-        try:
-            req=urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"application/json"})
-            with urllib.request.urlopen(req,timeout=45) as resp:
-                raw=resp.read()
-            data=json.loads(raw.decode())
-            return data,{"url":url,"sha256":sha256(raw),"bytes":len(raw)}
-        except Exception as exc:
-            last=exc
-            if attempt<4:
-                time.sleep(0.8*(attempt+1))
-    raise RuntimeError(f"public Binance request failed: {url}: {last}")
+    errors=[]
+    for base in BASES:
+        url=base+path+("?" + query if query else "")
+        for attempt in range(2):
+            try:
+                req=urllib.request.Request(url,headers={"User-Agent":UA,"Accept":"application/json"})
+                with urllib.request.urlopen(req,timeout=30) as resp:
+                    raw=resp.read()
+                data=json.loads(raw.decode())
+                return data,{"url":url,"base":base,"sha256":sha256(raw),"bytes":len(raw)}
+            except Exception as exc:
+                errors.append(f"{base}:{type(exc).__name__}:{exc}")
+                if attempt<1:
+                    time.sleep(0.5)
+    raise RuntimeError("all official Binance USD-M public endpoints failed: "+" | ".join(errors[-10:]))
 
 
 def saturday_cutoff(now_ms):
