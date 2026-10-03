@@ -62,8 +62,13 @@ Binance Vision public USD-M monthly archives only:
 
 No private API. No credentials. No funding data. No synthetic backfill. No interpolation. No nearest-neighbor fill.
 
-Raw validation source months:
+Raw archive months fetched:
 - 2025-01 through 2026-08 inclusive.
+
+Stored source rows are then trimmed before evaluation to exactly:
+- first required FLOW hour: `2025-01-04T00:00:00Z`;
+- final required outcome open: `2026-08-29T00:00:00Z`;
+- no later hourly row is retained in the V2 source package.
 
 Historical validation collection/evaluation is blocked on pull requests. It requires a later documentation-only authorization commit after this exact implementation passes CI and review.
 
@@ -189,3 +194,11 @@ This V2 stage is feature research only:
 - no leverage or liquidation logic;
 - no Paper-bot mutation;
 - no automatic promotion.
+
+
+## External sources frozen with the hypothesis
+
+- Anastasopoulos, Gradojevic, Liu, Maynard & Tsiakas, *Order Flow and Cryptocurrency Returns*, SSRN 5020002: https://ssrn.com/abstract=5020002
+- Vafin, *Order-Flow Imbalance and Short-Horizon Return Predictability in Cryptocurrency Markets*, SSRN 6938742: https://ssrn.com/abstract=6938742
+
+These sources motivate testing lagged order flow as a predictive feature. They do not determine MERIDIAN V2's validation outcome and do not authorize a specific portfolio construction.
