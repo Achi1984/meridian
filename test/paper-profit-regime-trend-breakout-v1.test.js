@@ -135,3 +135,12 @@ test('implementation path contains no Paper/live/order mutation',()=>{
   const body=paths.map(p=>fs.readFileSync(p,'utf8')).join('\n');
   assert.doesNotMatch(body,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|liveTrading\s*=\s*true|paperTrading\s*=\s*true)/i);
 });
+
+
+test('Discovery pass still requires a separately authorized Holdout run',()=>{
+  const body=fs.readFileSync('research/paper-profit-regime-trend-breakout-v1-evaluator.js','utf8');
+  assert.match(body,/decision:'REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED'/);
+  assert.match(body,/holdout:null/);
+  assert.doesNotMatch(body,/fullBaseline=backtest\(dataset/);
+  assert.doesNotMatch(body,/fullStress=backtest\(dataset/);
+});
