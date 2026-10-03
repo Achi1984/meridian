@@ -3,6 +3,14 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  '.github/workflows/perpetual-taker-order-flow-relative-strength-v2.yml':'5efd8fdfc7efcb61010b4390bfe81c20155effb3',
+  'test/test_perpetual_taker_order_flow_relative_strength_v2.py':'2014cb161272ec555e08e695d9cf91c4defeca51',
+  'research/run-perpetual-taker-order-flow-relative-strength-v2-validation.py':'6f51d4e7a97d563d2aa1612edad1ddb6e0d76b02',
+  'scripts/collect-perpetual-taker-order-flow-relative-strength-v2-validation.py':'fa72fa88d3bccc0fb8c7fe50e38b16feb7ee2b7c',
+  'research/perpetual_taker_order_flow_relative_strength_v2.py':'c7411e57723462a03037ae0fdc8fa590c7239ac4',
+  'research/perpetual-taker-order-flow-relative-strength-v2-protocol.json':'4b2aaf182098c6beecadd56d69b3b51c1dd7c5d8',
+  'research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-PREREGISTRATION.md':'a352a3bfa8be3d22f32d4e647f4660a100a7c7ed',
+  'research/perpetual_taker_order_flow_v1.py':'580f8885118aa1bfcccd6c77a431d5b7835e8bba',
   '.github/workflows/paper-profit-regime-trend-breakout-v1-holdout.yml':'4e6a502db972d4d2c0cd4a0b56e914d946432acc',
   'research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-IMPLEMENTATION.md':'9570eaef974870eb4a3a44aeee125407a24eb91d',
   'research/paper-profit-regime-trend-breakout-v1-holdout.js':'7e0abb50d64a2a27be47590172058c59c4c9dc55',
