@@ -3,6 +3,12 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  '.github/workflows/low-volatility-rank-weighted-v2-holdout.yml':'a481844c1209609448eadc66b1690aceae1ed52f',
+  'test/test_low_volatility_rank_weighted_v2_holdout.py':'899f6d4161d4a4572971a00886d768ffad770ff2',
+  'research/run-low-volatility-rank-weighted-v2-holdout.py':'4ce41e23a5a6db4bf0a26f2218b4e372deebecb1',
+  'scripts/collect-low-volatility-rank-weighted-v2-holdout.py':'3569c714b000c67184d7144b1da3b92a9c321c6d',
+  'research/low_volatility_rank_weighted_v2_holdout.py':'0d07a763b4ed0bb2c4f4c6970de8d50b1823d55c',
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-HOLDOUT-IMPLEMENTATION.md':'23e6f6bc8cc095f5dca437bd411501a2d0b825f6',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-DEVELOPMENT-EVIDENCE.md':'e9babe1566c8667a21eb6cae8388ca6dfb77385e',
   'research/results/low-volatility-rank-weighted-v2-development-frozen-summary.json':'5b3ada9fd32abe4747fbc854bb5f5388e15e6763',
   'research/results/low-volatility-rank-weighted-v2-development-result.md':'031b1487e487e1ab00cddd5e19b94a2533e3694e',

@@ -1,0 +1,90 @@
+name: MERIDIAN Low-Volatility Rank-Weighted V2 Holdout
+
+on:
+  pull_request:
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-HOLDOUT-IMPLEMENTATION.md"
+      - "research/low_volatility_rank_weighted_v2_holdout.py"
+      - "scripts/collect-low-volatility-rank-weighted-v2-holdout.py"
+      - "research/run-low-volatility-rank-weighted-v2-holdout.py"
+      - "test/test_low_volatility_rank_weighted_v2_holdout.py"
+      - "scripts/frozen-research-guard.mjs"
+      - ".github/workflows/low-volatility-rank-weighted-v2-holdout.yml"
+  push:
+    branches:
+      - research/low-volatility-rank-weighted-v2-holdout-run
+    paths:
+      - "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-HOLDOUT-RUN-AUTHORIZATION.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lowvol-rank-v2-holdout-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Compile isolated Holdout implementation
+        run: |
+          python3 -m py_compile research/low_volatility_rank_weighted_v2_holdout.py
+          python3 -m py_compile scripts/collect-low-volatility-rank-weighted-v2-holdout.py
+          python3 -m py_compile research/run-low-volatility-rank-weighted-v2-holdout.py
+      - name: Run Holdout synthetic and lineage invariants only
+        run: python3 test/test_low_volatility_rank_weighted_v2_holdout.py
+
+  source:
+    if: github.event_name != 'pull_request'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect first authorized untouched Holdout source
+        run: python3 scripts/collect-low-volatility-rank-weighted-v2-holdout.py
+      - name: Upload exact untouched Holdout source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-rank-v2-holdout-source
+          path: /tmp/meridian-lowvol-rank-v2-holdout
+          if-no-files-found: error
+          retention-days: 30
+
+  evaluate:
+    if: github.event_name != 'pull_request'
+    needs: [invariants,source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: lowvol-rank-v2-holdout-source
+          path: /tmp/meridian-lowvol-rank-v2-holdout
+      - name: Run first untouched Holdout gate
+        run: python3 research/run-low-volatility-rank-weighted-v2-holdout.py
+      - name: Upload untouched Holdout result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowvol-rank-v2-holdout-result
+          path: |
+            research/results/low-volatility-rank-weighted-v2-holdout-result.json
+            research/results/low-volatility-rank-weighted-v2-holdout-result.md
+          if-no-files-found: error
+          retention-days: 30
