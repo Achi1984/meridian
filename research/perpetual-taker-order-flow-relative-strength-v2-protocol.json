@@ -28,7 +28,10 @@
     "endMonth": "2026-08",
     "privateData": false,
     "fundingLoaded": false,
-    "syntheticBackfill": false
+    "syntheticBackfill": false,
+    "requiredHourlyStart": "2025-01-04T00:00:00Z",
+    "requiredHourlyEndInclusive": "2026-08-29T00:00:00Z",
+    "rowsAfterValidationEndpointRetained": false
   },
   "calendar": {
     "anchor": "SATURDAY_00_UTC",
