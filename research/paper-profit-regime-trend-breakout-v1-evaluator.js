@@ -263,17 +263,14 @@ export function runRegimeTrendBreakoutV1Discovery(dataset={}){
   const discoveryGate=gateView(d,ds,{holdoutUntouched:true}),discovery=concise(d,ds,discoveryGate);
   if(!discoveryGate.pass)return{ruleset:REGIME_TREND_BREAKOUT_V1.ruleset,split,discovery,holdout:null,decision:'REGIME_TREND_BREAKOUT_V1_DISCOVERY_FAIL',researchOnly:true,executionImpact:false,autoPromotion:false};
 
-  // Holdout path is unreachable until the frozen Discovery gate passes.
-  const fullBaseline=backtest(dataset,REGIME_TREND_BREAKOUT_V1.costs.baselineBps);
-  const fullStress=backtest(dataset,REGIME_TREND_BREAKOUT_V1.costs.stressBps);
-  const h=view(fullBaseline,{start:split.holdoutFrom,end:split.holdoutTo}),hs=view(fullStress,{start:split.holdoutFrom,end:split.holdoutTo});
-  if(h.summary.periods<REGIME_TREND_BREAKOUT_V1.gate.minEvaluationPeriods){
-    return{ruleset:REGIME_TREND_BREAKOUT_V1.ruleset,split,discovery,holdout:concise(h,hs,{pass:false,label:'STAGE_B_GATE_FAIL',reasons:['INSUFFICIENT_SPLIT_SAMPLE'],researchOnly:true,executionImpact:false,autoPromotion:false}),decision:'INSUFFICIENT_SPLIT_SAMPLE',researchOnly:true,executionImpact:false,autoPromotion:false};
-  }
-  const holdoutGate=gateView(h,hs,{holdoutUntouched:true});
   return{
-    ruleset:REGIME_TREND_BREAKOUT_V1.ruleset,split,discovery,holdout:concise(h,hs,holdoutGate),
-    decision:holdoutGate.pass?'REGIME_TREND_BREAKOUT_V1_HOLDOUT_PASS_PAPER_SHADOW_REQUIRED':'REGIME_TREND_BREAKOUT_V1_HOLDOUT_FAIL',
-    researchOnly:true,executionImpact:false,autoPromotion:false
+    ruleset:REGIME_TREND_BREAKOUT_V1.ruleset,
+    split,
+    discovery,
+    holdout:null,
+    decision:'REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED',
+    researchOnly:true,
+    executionImpact:false,
+    autoPromotion:false
   };
 }
