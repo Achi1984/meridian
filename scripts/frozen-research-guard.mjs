@@ -3,6 +3,10 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-DEVELOPMENT-EVIDENCE.md':'e9babe1566c8667a21eb6cae8388ca6dfb77385e',
+  'research/results/low-volatility-rank-weighted-v2-development-frozen-summary.json':'5b3ada9fd32abe4747fbc854bb5f5388e15e6763',
+  'research/results/low-volatility-rank-weighted-v2-development-result.md':'031b1487e487e1ab00cddd5e19b94a2533e3694e',
+  'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-DEVELOPMENT-RUN-AUTHORIZATION.md':'dd719ebe10f818a2a261df4a1fea6a4d3cf491fd',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-FUNDING-TIMESTAMP-CORRECTION.md':'ad5694309438c80aac0717700b7772fd94bc8f89',
   '.github/workflows/low-volatility-rank-weighted-v2.yml':'52bc76b5572b74cf4e7808e4f707e15bddda6769',
   'test/test_low_volatility_rank_weighted_v2.py':'8a5c044e76555ad11eaff0da9be2ef763a16329c',
