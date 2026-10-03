@@ -43,6 +43,11 @@ MIN_PROFIT_FACTOR=1.15
 MIN_SHARPE=0.75
 MAX_DRAWDOWN_PCT=20.0
 
+# Binance Vision funding settlement timestamps can differ from their nominal
+# interval grid by a few milliseconds. This tolerance is coverage-validation
+# metadata only: it does not change which rows are included in (t, t+7d].
+FUNDING_TIME_TOLERANCE_MS=1000
+
 PASS_DECISION="DEVELOPMENT_PASS_HOLDOUT_REQUIRED"
 FAIL_DECISION="DEVELOPMENT_FAIL_RESEARCH_STOP"
 
@@ -82,18 +87,18 @@ class FundingSeries:
             raise ValueError(f"{self.asset}:MISSING_FUNDING_COVERAGE")
 
         first_t,first_int,_=selected[0]
-        if first_t-start>first_int*HOUR:
+        if first_t-start>first_int*HOUR+FUNDING_TIME_TOLERANCE_MS:
             raise ValueError(f"{self.asset}:FUNDING_HEAD_GAP")
 
         for prev,curr in zip(selected,selected[1:]):
             gap=curr[0]-prev[0]
             allowed=max(prev[1],curr[1])*HOUR
-            if gap<=0 or gap>allowed:
+            if gap<=0 or gap>allowed+FUNDING_TIME_TOLERANCE_MS:
                 raise ValueError(f"{self.asset}:FUNDING_INTERNAL_GAP")
 
         last_t,last_int,_=selected[-1]
         tail=end-last_t
-        if tail<0 or tail>last_int*HOUR:
+        if tail<0 or tail>last_int*HOUR+FUNDING_TIME_TOLERANCE_MS:
             raise ValueError(f"{self.asset}:FUNDING_TAIL_GAP")
 
         return sum(x[2] for x in selected)
