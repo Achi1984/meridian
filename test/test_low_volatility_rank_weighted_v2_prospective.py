@@ -149,16 +149,16 @@ class ProspectiveV2Tests(unittest.TestCase):
 
     def test_collector_is_public_market_data_only_and_start_bounded(self):
         body=(ROOT/"scripts"/"collect-low-volatility-rank-weighted-v2-prospective.py").read_text()
-        self.assertIn('"https://fapi.binance.com"',body)
-        self.assertIn('"https://fapi1.binance.com"',body)
-        self.assertIn('"https://fapi4.binance.com"',body)
-        self.assertIn('"/fapi/v1/klines"',body)
-        self.assertIn('"/fapi/v1/fundingRate"',body)
-        self.assertIn('"/fapi/v1/fundingInfo"',body)
+        self.assertIn('BASE="https://data.binance.vision/data/futures/um"',body)
+        self.assertIn('/daily/klines/',body)
+        self.assertIn('/daily/fundingRate/',body)
+        self.assertIn('/monthly/klines/',body)
+        self.assertIn('/monthly/fundingRate/',body)
         self.assertIn("PROSPECTIVE_START=1791590400000",body)
         self.assertIn("WARMUP_START=1789167600000",body)
         self.assertIn('"credentialsUsed":False',body)
         self.assertIn('"ordersPlaced":False',body)
+        self.assertEqual(p.CANONICAL_SNAPSHOT_MAX_LAG_MS,36*p.HOUR)
 
 
 if __name__=="__main__":
