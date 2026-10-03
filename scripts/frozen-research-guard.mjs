@@ -4,6 +4,11 @@ import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
   'research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-PREREGISTRATION.md':'7c72162b7cf2f3dd5b22ef2aecc30936de52f4c8',
+  'research/cross_sectional_low_volatility_v1.py':'d161b6b4553d5a18fc7064570f4a4e956178d0c9',
+  'scripts/collect-cross-sectional-low-volatility-v1-discovery.py':'c6d76e0feb0b779b96c6abe6d8a611bfe808fd3a',
+  'research/run-cross-sectional-low-volatility-v1-discovery.py':'c2c787ad3bfb10b001af90c7af68b279be84515a',
+  'test/test_cross_sectional_low_volatility_v1.py':'e168fa68825c19d6ceee22370b1129132c3529eb',
+  '.github/workflows/cross-sectional-low-volatility-v1.yml':'43c72ee5dbfaf5e8002fc87f2cb95ca3e672a92f',
   'research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-RUN-AUTHORIZATION.md':'3d79c17d43a2c242a25b0b05a6127b6cb514d759',
   'research/results/perpetual-taker-order-flow-relative-strength-v2-result.json':'6494dbfb5760671eadbde7b77ff619acd1f5073d',
   'research/results/perpetual-taker-order-flow-relative-strength-v2-result.md':'3cec79c16274cdb51a6d55bdf657c5374769adaf',
