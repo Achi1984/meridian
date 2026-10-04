@@ -37,7 +37,7 @@ Before any authorized Discovery result is inspected, the following defects/bound
 2. Initial-stop ATR14 is taken from the completed trigger bar. The not-yet-completed entry bar can never provide ATR for its own entry.
 3. A setup is invalidated if its Daily regime no longer matches its side before trigger; a scheduled next-open entry is cancelled if the regime no longer matches at entry.
 4. Aggregate open risk is remaining downside-to-stop risk only; partial exits reduce it and break-even/profit-locked stops do not consume loss-risk budget.
-5. Authoritative funding coverage fails closed on any internal gap greater than eight hours.
+5. Authoritative funding coverage fails closed on an internal cadence gap beyond the scheduled eight hours plus a fixed 60-second exchange timestamp-jitter allowance. This tolerance only absorbs millisecond/second timestamp skew; a missing 8h funding record still creates a roughly 16h gap and fails closed.
 6. A funding timestamp at a 4h bar open applies only to a position already open before that timestamp and still present after open-time exits. A new entry at the same timestamp is excluded by the strict-after-entry rule.
 7. Baseline and stress ending cash must reconcile to initial equity plus their respective closed-trade net PnL; trade IDs must be unique and all entry/final-exit times must remain inside Discovery.
 
