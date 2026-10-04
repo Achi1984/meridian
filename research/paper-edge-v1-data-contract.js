@@ -15,13 +15,13 @@ export function validateSource({barsBySymbol={},fundingBySymbol={},provenance={}
  for(const s of EDGE_V1_SOURCE.symbols){
   const raw=barsBySymbol[s]||[],rawFunding=fundingBySymbol[s]||[],bars=canonicalBars(raw),funding=canonicalFunding(rawFunding);
   if(!bars.length)return{ok:false,reason:'MISSING_BARS',symbol:s};
-  if(raw.some((x,i)=>i>0&&Number(x.openTime)<=Number(raw[i-1].openTime)))return{ok:false,reason:'UNORDERED_BARS',symbol:s};
   if(new Set(bars.map(x=>x.openTime)).size!==bars.length)return{ok:false,reason:'DUPLICATE_BARS',symbol:s};
+  if(raw.some((x,i)=>i>0&&Number(x.openTime)<Number(raw[i-1].openTime)))return{ok:false,reason:'UNORDERED_BARS',symbol:s};
   for(const b of bars){if(![b.openTime,b.closeTime,b.open,b.high,b.low,b.close,b.volume].every(finite)||b.openTime<start||b.closeTime>end||b.closeTime<=b.openTime)return{ok:false,reason:'INVALID_BAR',symbol:s};if(!(b.high>=Math.max(b.open,b.close,b.low)&&b.low<=Math.min(b.open,b.close,b.high)))return{ok:false,reason:'INVALID_OHLC',symbol:s};}
   for(let i=1;i<bars.length;i++)if(bars[i].openTime-bars[i-1].openTime!==step)return{ok:false,reason:'BAR_CADENCE_GAP',symbol:s,after:bars[i-1].openTime,before:bars[i].openTime};
   if(!funding.length)return{ok:false,reason:'MISSING_FUNDING',symbol:s};
-  if(rawFunding.some((x,i)=>i>0&&Number(x.time)<=Number(rawFunding[i-1].time)))return{ok:false,reason:'UNORDERED_FUNDING',symbol:s};
   if(new Set(funding.map(x=>x.time)).size!==funding.length)return{ok:false,reason:'DUPLICATE_FUNDING',symbol:s};
+  if(rawFunding.some((x,i)=>i>0&&Number(x.time)<Number(rawFunding[i-1].time)))return{ok:false,reason:'UNORDERED_FUNDING',symbol:s};
   if(funding.some(x=>!finite(x.time)||!finite(x.rate)||(x.markPrice!=null&&!finite(x.markPrice))||x.time<start||x.time>end))return{ok:false,reason:'INVALID_FUNDING',symbol:s};
   if(provenance?.fundingComplete?.[s]!==true)return{ok:false,reason:'FUNDING_COVERAGE_NOT_CERTIFIED',symbol:s};
  }
