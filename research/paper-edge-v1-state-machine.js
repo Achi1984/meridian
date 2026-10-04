@@ -10,7 +10,7 @@ export function exitEvents(p,bar){const long=p.side==='LONG',stop=long?bar.low<=
 export function applyEvent(p,event){const n={...p,remaining:Math.max(0,p.remaining-event.fraction)};if(event.type==='TP1'){n.tp1Done=true;n.stop=n.entry}if(event.type==='TP2')n.tp2Done=true;return n}
 export function atrTrail(p,bar,atr14){if(!(p.tp2Done&&atr14>0))return p;const candidate=p.side==='LONG'?bar.close-2*atr14:bar.close+2*atr14;return{...p,stop:p.side==='LONG'?Math.max(p.stop,candidate):Math.min(p.stop,candidate)}}
 export function oppositeRegimeExit(p,previousRegime,currentRegime){return p?.remaining>0&&['LONG','SHORT'].includes(currentRegime)&&currentRegime!==p.side&&currentRegime!==previousRegime}
-export function aggregateRisk(openPositions=[]){return openPositions.reduce((a,p)=>a+Math.abs((p.entry-p.stop)*p.qty),0)}
+export function aggregateRisk(openPositions=[]){return openPositions.reduce((a,p)=>{if(!p||!(p.remaining>0))return a;const downside=p.side==='LONG'?Math.max(0,p.entry-p.stop):Math.max(0,p.stop-p.entry);return a+downside*p.qty*p.remaining},0)}
 export function canOpen(openPositions,equity,symbol){const same=symbol!=null&&openPositions.some(p=>p.symbol===symbol&&p.remaining>0);return !same&&aggregateRisk(openPositions)+equity*.005<=equity*.015+1e-9}
 export function nextBarEntry(triggerIndex,bars=[]){const b=bars[triggerIndex+1];return b?{index:triggerIndex+1,open:b.open}:null}
 export function fundingCashflow({side,qty,entryPrice,rate}){const signed=qty*entryPrice*rate;return side==='LONG'?-signed:signed}
