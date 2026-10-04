@@ -1,0 +1,23 @@
+name: MERIDIAN Paper Edge V1 Source Collection
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Collect validated frozen source
+        run: node scripts/collect-paper-edge-v1-source.mjs
+      - name: Upload source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-edge-v1-source
+          path: research/data/paper-edge-v1-source.json
+          if-no-files-found: error
+          retention-days: 30
