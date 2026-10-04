@@ -24,6 +24,14 @@ async function archiveCsv(rel,name,{missingOk=false}={}){
 function parseKlineCsv(csv){
  return String(csv||'').trim().split(/\r?\n/).filter(Boolean).filter(x=>/^\d/.test(x)).map(line=>{const r=line.split(',');return{openTime:+r[0],open:+r[1],high:+r[2],low:+r[3],close:+r[4],volume:+r[5],closeTime:+r[6]};});
 }
+export function klineMonthCoverageOk(rows,year,month){
+ const step=EDGE_V1_SOURCE.intervalMs,monthStart=Date.UTC(year,month-1,1),monthEnd=Date.UTC(year,month,1)-1;
+ const from=Math.max(start,monthStart),to=Math.min(end,monthEnd),first=Math.ceil(from/step)*step,last=Math.floor((to-(step-1))/step)*step;
+ if(first>last)return true;
+ const times=(rows||[]).filter(x=>Number(x.openTime)>=from&&Number(x.closeTime)<=to).map(x=>Number(x.openTime)).sort((a,b)=>a-b);
+ const expected=Math.floor((last-first)/step)+1;if(times.length!==expected)return false;
+ return times.every((t,i)=>t===first+i*step);
+}
 export function parseFundingCsv(csv){
  const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!lines.length)return[];
  const first=lines[0].split(',').map(x=>x.trim().toLowerCase());let timeIndex=0,rateIndex=2,data=lines;
@@ -34,11 +42,7 @@ export function parseFundingCsv(csv){
  }
  return data.map(line=>{const r=line.split(','),time=Number(r[timeIndex]),rate=Number(r[rateIndex]);if(!Number.isFinite(time)||!Number.isFinite(rate))throw new Error('FUNDING_ARCHIVE_ROW');return{time,rate,markPrice:null,rateType:null};});
 }
-async function monthlyOrDaily({symbol,year,month,kind,interval,parse}){
- const ym=`${year}-${String(month).padStart(2,'0')}`;
- const stem=kind==='klines'?`${symbol}-${interval}-${ym}`:`${symbol}-fundingRate-${ym}`;
- const monthlyRel=kind==='klines'?`data/futures/um/monthly/klines/${symbol}/${interval}/${stem}.zip`:`data/futures/um/monthly/fundingRate/${symbol}/${stem}.zip`;
- const monthly=await archiveCsv(monthlyRel,`${stem}.zip`,{missingOk:true});if(monthly!=null)return parse(monthly);
+async function dailyArchive({symbol,year,month,kind,interval,parse}){
  const monthStart=Date.UTC(year,month-1,1),monthEnd=Date.UTC(year,month,1)-1,from=Math.max(start,monthStart),to=Math.min(end,monthEnd),out=[];
  for(let d=Date.UTC(year,month-1,new Date(from).getUTCDate());d<=to;d+=DAY){
   const ds=stampDay(d),dayStem=kind==='klines'?`${symbol}-${interval}-${ds}`:`${symbol}-fundingRate-${ds}`;
@@ -46,6 +50,17 @@ async function monthlyOrDaily({symbol,year,month,kind,interval,parse}){
   const csv=await archiveCsv(rel,`${dayStem}.zip`);out.push(...parse(csv));
  }
  return out;
+}
+async function monthlyOrDaily({symbol,year,month,kind,interval,parse}){
+ const ym=`${year}-${String(month).padStart(2,'0')}`;
+ const stem=kind==='klines'?`${symbol}-${interval}-${ym}`:`${symbol}-fundingRate-${ym}`;
+ const monthlyRel=kind==='klines'?`data/futures/um/monthly/klines/${symbol}/${interval}/${stem}.zip`:`data/futures/um/monthly/fundingRate/${symbol}/${stem}.zip`;
+ const monthly=await archiveCsv(monthlyRel,`${stem}.zip`,{missingOk:true});
+ if(monthly!=null){
+  const parsed=parse(monthly);
+  if(kind!=='klines'||klineMonthCoverageOk(parsed,year,month))return parsed;
+ }
+ return dailyArchive({symbol,year,month,kind,interval,parse});
 }
 export async function bars(symbol){
  const out=[],sd=new Date(start),ed=new Date(end);
@@ -60,7 +75,7 @@ export async function funding(symbol){
 export async function collect(){
  const barsBySymbol={},fundingBySymbol={},barComplete={},fundComplete={};
  for(const symbol of EDGE_V1_SOURCE.symbols){const b=await bars(symbol),f=await funding(symbol);barsBySymbol[symbol]=b.rows;fundingBySymbol[symbol]=f.rows;barComplete[symbol]=b.complete;fundComplete[symbol]=f.complete;}
- const provenance={provider:'Binance USD-M Futures',archive:ARCHIVE,klines:'official monthly archive with daily fallback; SHA256 CHECKSUM verified',funding:'official fundingRate monthly archive with daily fallback; SHA256 CHECKSUM verified',barComplete,fundingComplete:fundComplete,paginationComplete:EDGE_V1_SOURCE.symbols.every(s=>barComplete[s]&&fundComplete[s])};
+ const provenance={provider:'Binance USD-M Futures',archive:ARCHIVE,klines:'official monthly archive; incomplete/missing month rebuilt from checksum-verified daily archives',funding:'official fundingRate monthly archive with checksum-verified daily fallback',barComplete,fundingComplete:fundComplete,paginationComplete:EDGE_V1_SOURCE.symbols.every(s=>barComplete[s]&&fundComplete[s])};
  const validation=validateSource({barsBySymbol,fundingBySymbol,provenance});if(!validation.ok)throw new Error(JSON.stringify(validation));
  return{schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',researchOnly:true,executionImpact:false,collectedAt:new Date().toISOString(),provenance,receipt:validation.receipt,barsBySymbol,fundingBySymbol};
 }
