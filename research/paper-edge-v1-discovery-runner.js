@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {validateSource,EDGE_V1_SOURCE} from './paper-edge-v1-data-contract.js';
+import {validateSource,EDGE_V1_SOURCE,EDGE_V1_FUNDING_TIMESTAMP_JITTER_MS} from './paper-edge-v1-data-contract.js';
 import {commonTimes,frozenSplit,prepareSymbol,eligibleSetup,openCandidate,gate} from './paper-edge-v1-discovery-engine.js';
 import {dailyContextForTrigger,conservativeFill} from './paper-edge-v1-foundation.js';
 import {triggerFromPullback,exitEvents,applyEvent,atrTrail,fundingCashflow} from './paper-edge-v1-state-machine.js';
@@ -23,7 +23,11 @@ function opposite(side){return side==='LONG'?'SHORT':'LONG'}
 
 export function fundingEventsForBar(events=[],openedAt,bar={}){
  const from=Number(bar.openTime),to=Number(bar.closeTime),entry=Number(openedAt);
- return (events||[]).filter(x=>finite(x?.time)&&Number(x.time)>entry&&Number(x.time)>=from&&Number(x.time)<=to);
+ return (events||[]).filter(x=>{
+  const time=Number(x?.time);if(!finite(time)||time<=entry||time<from||time>to)return false;
+  if(entry===from&&time<=from+EDGE_V1_FUNDING_TIMESTAMP_JITTER_MS)return false;
+  return true;
+ });
 }
 
 export function profitFactorFromPnls(pnls=[]){
@@ -222,7 +226,7 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
    const events=exitEvents(st.position,bar);
    for(const e of events){
     if(!st.position)break;
-    const price=e.type==='STOP'?conservativeFill({side:st.position.side,stop:st.position.stop},bar):e.type==='TP1'?st.position.tp1:st.position.tp2;
+    const price=e.type==='STOP'?conservativeFill({side:st.position.side,stop:st.position.stop},bar):e.type==='BREAKEVEN_STOP'?st.position.stop:e.type==='TP1'?st.position.tp1:st.position.tp2;
     executeFill(s,e,price,bar.closeTime,t,e.type);
    }
    if(st.position)st.position=atrTrail(st.position,bar,bar.atr14);
