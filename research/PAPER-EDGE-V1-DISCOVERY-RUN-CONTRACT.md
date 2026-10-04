@@ -38,7 +38,7 @@ Before any authorized Discovery result is inspected, the following defects/bound
 3. A setup is invalidated if its Daily regime no longer matches its side before trigger; a scheduled next-open entry is cancelled if the regime no longer matches at entry.
 4. Aggregate open risk is remaining downside-to-stop risk only; partial exits reduce it and break-even/profit-locked stops do not consume loss-risk budget.
 5. Authoritative funding coverage fails closed on any internal gap greater than eight hours plus a 1-second timestamp-jitter allowance. The locked source was audited pre-result: the maximum observed excess over eight hours is only 47 ms across BTC/ETH/SOL.
-6. A funding timestamp at a 4h bar open applies only to a position already open before that timestamp and still present after open-time exits. A new entry at the same timestamp is excluded by the strict-after-entry rule.
+6. A funding event on a 4h bar-open boundary, including the audited <=1-second exchange timestamp jitter, applies only to a position already open before that boundary and still present after open-time exits. A new entry at that bar open is excluded from that boundary funding event.
 7. Baseline and stress ending cash must reconcile to initial equity plus their respective closed-trade net PnL; trade IDs must be unique and all entry/final-exit times must remain inside Discovery.
 
 These are implementation correctness fixes, not threshold tuning.
@@ -52,7 +52,7 @@ These are implementation correctness fixes, not threshold tuning.
 - New entries execute at the next completed 4h bar open after a valid trigger.
 - Gap-through target fills already reachable at the open are processed at the frozen target price before funding.
 - Funding is then booked for qualifying authoritative timestamps before non-gap intrabar high/low exits in that bar.
-- Intrabar ambiguity remains STOP-first.
+- Intrabar ambiguity remains STOP-first. When TP1 activates the break-even stop inside a bar and that bar also spans the new entry-price stop, the remaining position is conservatively stopped at entry before any TP2 fill.
 - TP1/TP2 and the 2 ATR trail remain exactly preregistered; trailing changes apply only after completed-bar processing.
 - Any residual position is force-closed at the final Discovery bar close with normal costs so Validation prices cannot complete a Discovery trade.
 
