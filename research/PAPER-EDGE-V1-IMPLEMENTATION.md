@@ -40,6 +40,10 @@ This document resolves implementation ambiguities in the already-frozen preregis
 - After TP2, the remainder uses the frozen 2 ATR trailing rule.
 - Opposite completed daily regime closes the remainder at the next 4h open.
 
+## Accounting lock
+
+The exact normalized-equity, fill-order, funding-order, split-boundary, five-window, Profit-Factor, expectancy and drawdown conventions are frozen in `PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md` before the first dataset PnL inspection. Those conventions clarify implementation only; they do not alter any preregistered threshold, cost assumption, universe, timeframe, entry, exit or split.
+
 ## Isolation
 
-The 60/20/20 common-time split is fixed. Holdout remains inaccessible until Discovery and Validation both pass their frozen gates. This contract may not be modified to rescue a result.
+The 60/20/20 common-time split is fixed. Holdout remains inaccessible until Discovery and Validation both pass their frozen gates. Discovery positions are closed at the Discovery boundary rather than consuming Validation prices. This contract may not be modified to rescue a result.
