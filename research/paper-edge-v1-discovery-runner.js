@@ -19,6 +19,11 @@ function netPricePnl(p,price,fraction){return sideSign(p.side)*(Number(price)-p.
 function unrealized(p,price){return sideSign(p.side)*(Number(price)-p.entry)*p.qty*p.remaining}
 function opposite(side){return side==='LONG'?'SHORT':'LONG'}
 
+export function fundingEventsForBar(events=[],openedAt,bar={}){
+ const from=Number(bar.openTime),to=Number(bar.closeTime),entry=Number(openedAt);
+ return (events||[]).filter(x=>finite(x?.time)&&Number(x.time)>entry&&Number(x.time)>=from&&Number(x.time)<=to);
+}
+
 export function profitFactorFromPnls(pnls=[]){
  const pos=pnls.filter(x=>x>0).reduce((a,b)=>a+b,0),neg=-pnls.filter(x=>x<0).reduce((a,b)=>a+b,0);
  return neg>0?pos/neg:pos>0?Number.MAX_SAFE_INTEGER:0;
@@ -177,7 +182,7 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
 
  function applyFunding(s,bar){
   const st=states[s],p=st.position;if(!p)return;
-  const events=discoveryFunding[s].filter(x=>Number(x.time)>Number(p.openedAt)&&Number(x.time)>Number(bar.openTime)&&Number(x.time)<=Number(bar.closeTime));
+  const events=fundingEventsForBar(discoveryFunding[s],p.openedAt,bar);
   for(const e of events){
    const current=st.position;if(!current)break;
    const cf=fundingCashflow({side:current.side,qty:current.qty*current.remaining,entryPrice:current.entry,rate:Number(e.rate)});
@@ -254,8 +259,14 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
 
  if(openPositions().length)throw new Error('EDGE_V1_DISCOVERY_POSITION_LEAK');
  const allFinite=trades.every(t=>[t.entryPrice,t.initialStop,t.initialRiskCash,t.netPnl,t.stressNetPnl,t.r,t.exitPrice].every(finite));
+ const baselineNet=trades.reduce((a,t)=>a+Number(t.netPnl),0),stressNet=trades.reduce((a,t)=>a+Number(t.stressNetPnl),0);
+ const baselineExpected=initialEquity+baselineNet,stressExpected=initialEquity+stressNet;
+ const baseDelta=Math.abs(baselineExpected-cash),stressDelta=Math.abs(stressExpected-stressCash);
+ const uniqueIds=new Set(trades.map(t=>t.id)).size===trades.length;
+ const timesValid=trades.every(t=>Number(t.entryTime)>=split.discovery.from&&Number(t.exitTime)>=Number(t.entryTime)&&Number(t.exitBucketTime)<=discoveryTo);
+ const reconciliation={endingCash:round(cash,8),expectedEndingCash:round(baselineExpected,8),delta:round(baseDelta,10),baseOk:baseDelta<=1e-6,stressEndingCash:round(stressCash,8),stressExpectedEndingCash:round(stressExpected,8),stressDelta:round(stressDelta,10),stressOk:stressDelta<=1e-6,uniqueTradeIds:uniqueIds,timesWithinDiscovery:timesValid};
  const summary=summarize(trades,stressTrades,equityCurve,discoveryTimes);
- summary.integrityOk=allFinite&&equityCurve.length===discoveryTimes.length&&discoveryTimes.at(-1)===discoveryTo;
+ summary.integrityOk=allFinite&&equityCurve.length===discoveryTimes.length&&discoveryTimes.at(-1)===discoveryTo&&reconciliation.baseOk&&reconciliation.stressOk&&uniqueIds&&timesValid;
  const verdict=gate(summary);
  const core={
   schema:'PAPER-EDGE-V1-DISCOVERY-RESULT-1',
@@ -265,6 +276,7 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
   sourceDigest:validation.receipt.digest,
   split:{total:split.total,discovery:split.discovery},
   isolation:{maxBarOpenTime:discoveryTimes.at(-1),maxFundingTime:Math.max(...EDGE_V1_SOURCE.symbols.flatMap(s=>discoveryFunding[s].map(x=>Number(x.time)))),validationValuesRead:false,holdoutValuesRead:false},
+  reconciliation,
   summary,
   decision:verdict
  };
