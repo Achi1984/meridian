@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {pullbackCandidate,triggerFromPullback,initialStop,newPosition,exitEvents,applyEvent,atrTrail,canOpen} from '../research/paper-edge-v1-state-machine.js';
+test('pullback requires aligned EMA and does not trigger same bar',()=>{const p={warm:true,ema20:105,ema50:100,low:104,close:106,high:108};assert.equal(pullbackCandidate(p,'LONG'),true);assert.equal(triggerFromPullback(p,{close:109},'LONG',0),false);assert.equal(triggerFromPullback(p,{close:109},'LONG',1),true)});
+test('trigger expires after three completed bars',()=>assert.equal(triggerFromPullback({high:100},{close:101},'LONG',4),false));
+test('stop uses farther swing or 1.5 ATR',()=>{assert.equal(initialStop({side:'LONG',entry:100,pullback:{low:97},atr14:4}),94);assert.equal(initialStop({side:'SHORT',entry:100,pullback:{high:103},atr14:4}),106)});
+test('position risks exactly half percent',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(p.qty,10);assert.equal(p.tp1,105);assert.equal(p.tp2,110)});
+test('same bar stop wins before targets',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(exitEvents(p,{low:94,high:111})[0].type,'STOP')});
+test('TP1 moves stop to break even',()=>{let p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});p=applyEvent(p,{type:'TP1',fraction:.33});assert.equal(p.stop,100);assert.equal(p.remaining,.67)});
+test('ATR trail only tightens after TP2',()=>{let p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(atrTrail(p,{close:120},5).stop,95);p={...p,tp2Done:true};assert.equal(atrTrail(p,{close:120},5).stop,110)});
+test('aggregate risk cap blocks fourth half-percent slot',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(canOpen([p,p],10000),true);assert.equal(canOpen([p,p,p],10000),false)});
