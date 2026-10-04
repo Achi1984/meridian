@@ -4,3 +4,6 @@ const pack=()=>({provenance:{paginationComplete:true,fundingComplete:Object.from
 test('complete frozen source shape validates deterministically',()=>{const x=pack();assert.equal(validateSource(x).ok,true);assert.equal(sourceReceipt(x).digest,sourceReceipt(x).digest)});
 test('missing funding fails closed',()=>{const x=pack();x.fundingBySymbol.ETHUSDT=[];assert.deepEqual(validateSource(x),{ok:false,reason:'MISSING_FUNDING',symbol:'ETHUSDT'})});
 test('duplicate bars fail closed',()=>{const x=pack();x.barsBySymbol.BTCUSDT.push({...bar});assert.equal(validateSource(x).reason,'DUPLICATE_BARS')});
+
+test('unordered bars fail closed',()=>{const x=pack();x.barsBySymbol.BTCUSDT=[{...bar,openTime:t+14400000,closeTime:t+28799999},{...bar}];assert.equal(validateSource(x).reason,'UNORDERED_BARS')});
+test('nonfinite funding mark fails closed',()=>{const x=pack();x.fundingBySymbol.SOLUSDT[0].markPrice=NaN;assert.equal(validateSource(x).reason,'INVALID_FUNDING')});
