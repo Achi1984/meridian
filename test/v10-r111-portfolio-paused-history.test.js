@@ -12,7 +12,7 @@ test('r111 release identity is coherent and execution neutral',()=>{
   assert.ok(Number(release.terminalBuild.split('r').at(-1))>=111);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/PORTFOLIO-PARTIAL-KNOWN-VALUE-HISTORY-PAUSED-SEMANTICS/);
-  assert.equal(manifest.start_url,'./v10/?build=r111&fresh=r111');
+  assert.equal(manifest.start_url,'./v10/?build='+release.terminalBuild.split('-').at(-1)+'&fresh='+release.terminalBuild.split('-').at(-1));
   assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
