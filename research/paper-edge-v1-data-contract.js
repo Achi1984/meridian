@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 export const EDGE_V1_SOURCE=Object.freeze({symbols:['BTCUSDT','ETHUSDT','SOLUSDT'],interval:'4h',intervalMs:14400000,start:'2021-01-01T00:00:00.000Z',end:'2026-09-30T23:59:59.999Z',market:'USD-M-PERPETUAL'});
-export const EDGE_V1_FUNDING_MAX_GAP_MS=8*60*60*1000+1000;
+export const EDGE_V1_FUNDING_TIMESTAMP_JITTER_MS=1000;
+export const EDGE_V1_FUNDING_MAX_GAP_MS=8*60*60*1000+EDGE_V1_FUNDING_TIMESTAMP_JITTER_MS;
 const finite=x=>Number.isFinite(Number(x));
 const canonicalBars=a=>(a||[]).map(x=>({openTime:+x.openTime,closeTime:+x.closeTime,open:+x.open,high:+x.high,low:+x.low,close:+x.close,volume:+x.volume})).sort((a,b)=>a.openTime-b.openTime);
 const canonicalFunding=a=>(a||[]).map(x=>({time:+x.time,rate:+x.rate,markPrice:x.markPrice==null?null:+x.markPrice,rateType:x.rateType??null})).sort((a,b)=>a.time-b.time);
