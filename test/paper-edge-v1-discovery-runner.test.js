@@ -43,9 +43,9 @@ test('profit factor uses closed-trade net PnL',()=>{
  assert.equal(profitFactorFromPnls([5]),Number.MAX_SAFE_INTEGER);
 });
 
-test('funding at bar open is included only for a position already open',()=>{
+test('funding at the bar-open boundary is included only for a position already open',()=>{
  const bar={openTime:START+STEP,closeTime:START+2*STEP-1};
- const events=[{time:bar.openTime,rate:.0001},{time:bar.openTime+1,rate:.0002},{time:bar.closeTime,rate:.0003}];
- assert.equal(fundingEventsForBar(events,START,bar).length,3);
- assert.equal(fundingEventsForBar(events,bar.openTime,bar).length,2);
+ const events=[{time:bar.openTime,rate:.0001},{time:bar.openTime+47,rate:.0002},{time:bar.openTime+1001,rate:.00025},{time:bar.closeTime,rate:.0003}];
+ assert.equal(fundingEventsForBar(events,START,bar).length,4);
+ assert.deepEqual(fundingEventsForBar(events,bar.openTime,bar).map(x=>x.rate),[.00025,.0003]);
 });
