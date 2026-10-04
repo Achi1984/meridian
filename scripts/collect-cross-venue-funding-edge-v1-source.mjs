@@ -11,7 +11,7 @@ import {
 
 const execFileAsync=promisify(execFile);
 const BINANCE_ARCHIVE='https://data.binance.vision';
-const BYBIT_API='https://api.bybit.com';
+const BYBIT_APIS=Object.freeze(['https://api.bybit.com','https://api.bytick.com']);
 const START=Date.parse(CONTRACT.start),END=Date.parse(CONTRACT.end);
 const HOUR=60*60*1000,DAY=24*HOUR;
 
@@ -147,19 +147,33 @@ async function collectBinance(){
   return{funding:f,marks:m,receipts};
 }
 
-async function bybitPage(endpoint,params){
-  const u=new URL(BYBIT_API+endpoint);
+async function resolveBybitApi(){
+  const errors=[];
+  for(const base of BYBIT_APIS){
+    try{
+      const u=new URL(base+'/v5/market/funding/history');
+      for(const [k,v] of Object.entries({category:'linear',symbol:'BTCUSDT',endTime:END,limit:1}))u.searchParams.set(k,String(v));
+      const r=await fetchRetry(u.toString(),{},2),json=JSON.parse(await r.text());
+      if(Number(json?.retCode)===0&&Array.isArray(json?.result?.list))return base;
+      errors.push(base+' API '+json?.retCode+' '+json?.retMsg);
+    }catch(e){errors.push(base+' '+String(e?.message||e))}
+  }
+  throw new Error('BYBIT_OFFICIAL_ENDPOINTS_UNAVAILABLE '+errors.join(' | '));
+}
+
+async function bybitPage(base,endpoint,params){
+  const u=new URL(base+endpoint);
   for(const [k,v] of Object.entries(params))if(v!=null)u.searchParams.set(k,String(v));
   const r=await fetchRetry(u.toString());
-  const raw=await r.text(),json=JSON.parse(raw);
+  const json=JSON.parse(await r.text());
   if(Number(json?.retCode)!==0)throw new Error('BYBIT_API '+json?.retCode+' '+json?.retMsg);
   return{json,receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(json?.result??null))}};
 }
 
-async function collectBybitFunding(){
+async function collectBybitFunding(base){
   const out=[],receipts=[];let cursor=END,guard=0;
   while(cursor>=START&&guard++<200){
-    const page=await bybitPage('/v5/market/funding/history',{category:'linear',symbol:'BTCUSDT',startTime:START,endTime:cursor,limit:200});
+    const page=await bybitPage(base,'/v5/market/funding/history',{category:'linear',symbol:'BTCUSDT',startTime:START,endTime:cursor,limit:200});
     receipts.push(page.receipt);
     const rows=Array.isArray(page.json?.result?.list)?page.json.result.list:[];
     if(!rows.length)break;
@@ -175,10 +189,10 @@ async function collectBybitFunding(){
   return{rows:out.filter(x=>x.fundingRateTimestamp>=START&&x.fundingRateTimestamp<=END).sort((a,b)=>a.fundingRateTimestamp-b.fundingRateTimestamp),receipts};
 }
 
-async function collectBybitMarks(){
+async function collectBybitMarks(base){
   const out=[],receipts=[];let cursor=END,guard=0;
   while(cursor>=START&&guard++<200){
-    const page=await bybitPage('/v5/market/mark-price-kline',{category:'linear',symbol:'BTCUSDT',interval:'60',start:START,end:cursor,limit:1000});
+    const page=await bybitPage(base,'/v5/market/mark-price-kline',{category:'linear',symbol:'BTCUSDT',interval:'60',start:START,end:cursor,limit:1000});
     receipts.push(page.receipt);
     const rows=Array.isArray(page.json?.result?.list)?page.json.result.list:[];
     if(!rows.length)break;
@@ -195,11 +209,12 @@ async function collectBybitMarks(){
 }
 
 export async function collectCrossVenueFundingEdgeV1Source(){
-  const [binance,bybitFunding,bybitMarks]=await Promise.all([collectBinance(),collectBybitFunding(),collectBybitMarks()]);
+  const bybitBase=await resolveBybitApi();
+  const [binance,bybitFunding,bybitMarks]=await Promise.all([collectBinance(),collectBybitFunding(bybitBase),collectBybitMarks(bybitBase)]);
   const provenance={
     collectedAt:new Date().toISOString(),
     binance:{provider:'Binance Vision',archive:BINANCE_ARCHIVE,receipts:binance.receipts},
-    bybit:{provider:'Bybit V5 public market API',baseUrl:BYBIT_API,fundingPageReceipts:bybitFunding.receipts,markPageReceipts:bybitMarks.receipts},
+    bybit:{provider:'Bybit V5 public market API',baseUrl:bybitBase,fundingPageReceipts:bybitFunding.receipts,markPageReceipts:bybitMarks.receipts},
     binanceChecksumsVerified:true,
     bybitPagesHashed:true,
     strategyPnlCalculated:false
