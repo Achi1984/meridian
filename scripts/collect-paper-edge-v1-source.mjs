@@ -16,7 +16,7 @@ export async function bars(symbol){
   for(const r of rows){const [openTime,o,h,l,c,v,closeTime]=r;if(closeTime>end)continue;out.push({openTime,closeTime,open:+o,high:+h,low:+l,close:+c,volume:+v});}
   const next=Number(rows.at(-1)[6])+1;if(next<=cursor)throw new Error('NON_ADVANCING_KLINES');cursor=next;
  }
- return out;
+ return{rows:out,complete:out.length>0&&Number(out[0].openTime)===start&&Number(out.at(-1).closeTime)>=end-(EDGE_V1_SOURCE.intervalMs-1)};
 }
 export async function funding(symbol){
  const out=[]; let cursor=start;
