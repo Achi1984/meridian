@@ -4,6 +4,6 @@ test('trigger expires after three completed bars',()=>assert.equal(triggerFromPu
 test('stop uses farther swing or 1.5 ATR',()=>{assert.equal(initialStop({side:'LONG',entry:100,pullback:{low:97},atr14:4}),94);assert.equal(initialStop({side:'SHORT',entry:100,pullback:{high:103},atr14:4}),106)});
 test('position risks exactly half percent',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(p.qty,10);assert.equal(p.tp1,105);assert.equal(p.tp2,110)});
 test('same bar stop wins before targets',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(exitEvents(p,{low:94,high:111})[0].type,'STOP')});
-test('TP1 moves stop to break even',()=>{let p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});p=applyEvent(p,{type:'TP1',fraction:.33});assert.equal(p.stop,100);assert.equal(p.remaining,.67)});
+test('TP1 moves stop to break even',()=>{let p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});p=applyEvent(p,{type:'TP1',fraction:.33});assert.equal(p.stop,100);assert.ok(Math.abs(p.remaining-.67)<1e-12)});
 test('ATR trail only tightens after TP2',()=>{let p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(atrTrail(p,{close:120},5).stop,95);p={...p,tp2Done:true};assert.equal(atrTrail(p,{close:120},5).stop,110)});
 test('aggregate risk cap blocks fourth half-percent slot',()=>{const p=newPosition({side:'LONG',entry:100,stop:95,equity:10000});assert.equal(canOpen([p,p],10000),true);assert.equal(canOpen([p,p,p],10000),false)});
