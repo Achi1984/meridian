@@ -70,15 +70,35 @@ export function splitCommonTimes(times=[]){
   };
 }
 
+function stableSourceProvenance(provenance={}){
+  const cleanReceipt=x=>({endpoint:x?.endpoint??null,params:x?.params??{},sha256:x?.sha256??null});
+  return{
+    binance:{
+      provider:provenance?.binance?.provider??null,
+      archive:provenance?.binance?.archive??null,
+      receipts:[...(provenance?.binance?.receipts||[])].map(x=>({kind:x?.kind??null,scope:x?.scope??null,rel:x?.rel??null,sha256:x?.sha256??null})).sort((a,b)=>String(a.rel).localeCompare(String(b.rel)))
+    },
+    bybit:{
+      provider:provenance?.bybit?.provider??null,
+      baseUrl:provenance?.bybit?.baseUrl??null,
+      fundingPageReceipts:(provenance?.bybit?.fundingPageReceipts||[]).map(cleanReceipt),
+      markPageReceipts:(provenance?.bybit?.markPageReceipts||[]).map(cleanReceipt)
+    },
+    binanceChecksumsVerified:provenance?.binanceChecksumsVerified===true,
+    bybitPagesHashed:provenance?.bybitPagesHashed===true,
+    strategyPnlCalculated:provenance?.strategyPnlCalculated===true
+  };
+}
+
 export function sourceReceipt({binanceFunding=[],bybitFunding=[],binanceMarks=[],bybitMarks=[],provenance={}}={},contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
   const bf=normalizeFunding(binanceFunding,'BINANCE',contract),yf=normalizeFunding(bybitFunding,'BYBIT',contract);
   const bm=normalizeMarks(binanceMarks,'BINANCE'),ym=normalizeMarks(bybitMarks,'BYBIT');
-  const common=commonFundingTimes(bf,yf),split=splitCommonTimes(common);
+  const common=commonFundingTimes(bf,yf),split=splitCommonTimes(common),stableProvenance=stableSourceProvenance(provenance);
   const symbols={
     binance:{funding:bf.length,marks:bm.length,firstFunding:bf[0]?.rawTime??null,lastFunding:bf.at(-1)?.rawTime??null,firstMark:bm[0]?.openTime??null,lastMark:bm.at(-1)?.openTime??null,digest:hash({funding:bf,marks:bm})},
     bybit:{funding:yf.length,marks:ym.length,firstFunding:yf[0]?.rawTime??null,lastFunding:yf.at(-1)?.rawTime??null,firstMark:ym[0]?.openTime??null,lastMark:ym.at(-1)?.openTime??null,digest:hash({funding:yf,marks:ym})}
   };
-  const core={schema:contract.schema,contract,provenance,symbols,commonFundingDecisions:common.length,split};
+  const core={schema:contract.schema,contract,provenance:stableProvenance,symbols,commonFundingDecisions:common.length,split};
   return{...core,digest:hash(core)};
 }
 
