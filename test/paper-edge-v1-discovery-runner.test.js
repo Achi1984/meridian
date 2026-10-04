@@ -18,10 +18,10 @@ test('discovery runner is locked to normalized initial equity',()=>{
  assert.equal(EDGE_V1_INITIAL_EQUITY,100000);
 });
 
-test('Discovery requires the immutable validated source receipt',()=>{
+test('final Discovery decision closes the runner while preserving source lock evidence',()=>{
  assert.equal(EDGE_V1_DISCOVERY_SOURCE_LOCK.runId,37231163461);
  assert.equal(EDGE_V1_DISCOVERY_SOURCE_LOCK.receiptDigest,'d05b6c2916900ffac602c11166376e33a2f606e70967d0ecc988a1201df8ad08');
- assert.throws(()=>runEdgeV1Discovery(syntheticSource()),/SOURCE_DIGEST_MISMATCH/);
+ assert.throws(()=>runEdgeV1Discovery(syntheticSource()),/STAGE_LOCK_VIOLATION/);
 });
 
 test('Discovery split boundaries are frozen independently of result values',()=>{

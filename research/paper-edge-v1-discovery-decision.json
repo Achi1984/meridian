@@ -1,0 +1,78 @@
+{
+  "schema": "PAPER-EDGE-V1-DISCOVERY-DECISION-1",
+  "ruleset": "PAPER-EDGE-V1",
+  "final": true,
+  "decision": "EDGE_V1_DISCOVERY_FAIL",
+  "validationPermitted": false,
+  "holdoutPermitted": false,
+  "paperShadowPermitted": false,
+  "livePermitted": false,
+  "evidence": {
+    "workflowRunId": 37233479311,
+    "authorizationCommit": "a5db40d73f30b99d397004d4903b60ea5fc31fd3",
+    "baseMain": "e0ba3a210a08ce5c0d9573181524604e14b3fe8d",
+    "sourceRunId": 37231163461,
+    "sourceArtifactId": 11313901895,
+    "sourceReceipt": "d05b6c2916900ffac602c11166376e33a2f606e70967d0ecc988a1201df8ad08",
+    "discoveryArtifactId": 11314304791,
+    "discoveryArtifactZipDigest": "sha256:48c8d01aed0e10e84965dcd21334da99055c919524bd877e2a3927f7d5c967e7",
+    "resultDigest": "e04e812ab59b5b084dcdd8f15fa7aa58c55df15e22f028c2f6cf2266b06f1abd"
+  },
+  "summary": {
+    "closedTrades": 164,
+    "netPnl": 4351.71571356,
+    "profitFactor": 1.10428106,
+    "stressProfitFactor": 1.01367242,
+    "expectancyR": 0.05602976,
+    "maxDrawdownPct": 9.19462501,
+    "positiveWindows": 3,
+    "positivePnlConcentrationPct": 98.83724421,
+    "integrityOk": true
+  },
+  "failedGates": [
+    "PF_LT_1_20",
+    "STRESS_PF_LT_1_05",
+    "POSITIVE_WINDOWS_LT_4",
+    "NEGATIVE_ASSET",
+    "CONCENTRATION_GT_50"
+  ],
+  "byAsset": {
+    "BTCUSDT": {
+      "closedTrades": 61,
+      "netPnl": 83.85415672,
+      "profitFactor": 1.00520169
+    },
+    "ETHUSDT": {
+      "closedTrades": 48,
+      "netPnl": -2859.95824494,
+      "profitFactor": 0.78456844
+    },
+    "SOLUSDT": {
+      "closedTrades": 55,
+      "netPnl": 7127.81980178,
+      "profitFactor": 1.57787218
+    }
+  },
+  "bySide": {
+    "LONG": {
+      "closedTrades": 91,
+      "netPnl": 5639.88591624,
+      "profitFactor": 1.25050298
+    },
+    "SHORT": {
+      "closedTrades": 73,
+      "netPnl": -1288.17020268,
+      "profitFactor": 0.93296505
+    }
+  },
+  "reconciliation": {
+    "endingCash": 104351.71571355,
+    "expectedEndingCash": 104351.71571356,
+    "delta": 8.8e-9,
+    "stressEndingCash": 100594.91418587,
+    "stressExpectedEndingCash": 100594.91418594,
+    "stressDelta": 6.61e-8,
+    "uniqueTradeIds": true,
+    "timesWithinDiscovery": true
+  }
+}
