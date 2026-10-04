@@ -20,11 +20,12 @@ async function archiveMonth(symbol,year,month){
  const rel=`data/futures/um/monthly/klines/${symbol}/4h/${name}`;
  const [zr,cr]=await Promise.all([fetch(`${ARCHIVE}/${rel}`),fetch(`${ARCHIVE}/${rel}.CHECKSUM`)]);
  if(zr.status===404)return[]; if(!zr.ok||!cr.ok)throw new Error(`ARCHIVE_HTTP ${zr.status}/${cr.status} ${rel}`);
- const bytes=Buffer.from(await zr.arrayBuffer()), expected=(await cr.text()).trim().split(/\\s+/)[0].toLowerCase();
- const actual=crypto.createHash('sha256').update(bytes).digest('hex'); if(actual!==expected)throw new Error(`ARCHIVE_CHECKSUM ${rel}`);
+ const bytes=Buffer.from(await zr.arrayBuffer()), checksumText=(await cr.text()).trim();
+ const match=checksumText.match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/); if(!match||path.basename(match[2].trim())!==name)throw new Error(`ARCHIVE_CHECKSUM_FORMAT ${rel}`);
+ const expected=match[1].toLowerCase(),actual=crypto.createHash('sha256').update(bytes).digest('hex'); if(actual!==expected)throw new Error(`ARCHIVE_CHECKSUM ${rel}`);
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'edge-v1-')); const zip=path.join(dir,name);
  try{await fs.writeFile(zip,bytes);const {stdout}=await execFileAsync('unzip',['-p',zip],{maxBuffer:32*1024*1024});
-  return stdout.trim().split(/\\r?\\n/).filter(Boolean).filter(x=>/^\\d/.test(x)).map(line=>{const r=line.split(',');return{openTime:+r[0],open:+r[1],high:+r[2],low:+r[3],close:+r[4],volume:+r[5],closeTime:+r[6]};});
+  return stdout.trim().split(/\r?\n/).filter(Boolean).filter(x=>/^\d/.test(x)).map(line=>{const r=line.split(',');return{openTime:+r[0],open:+r[1],high:+r[2],low:+r[3],close:+r[4],volume:+r[5],closeTime:+r[6]};});
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 }
 export async function bars(symbol){
