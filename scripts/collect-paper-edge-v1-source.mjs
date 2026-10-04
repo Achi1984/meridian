@@ -8,7 +8,7 @@ async function get(path,params){
  const r=await fetch(u,{headers:{'user-agent':'MERIDIAN-PAPER-EDGE-V1-RESEARCH'}});
  if(!r.ok)throw new Error(`HTTP ${r.status} ${u.pathname}`); return r.json();
 }
-async function bars(symbol){
+export async function bars(symbol){
  const out=[]; let cursor=start;
  while(cursor<=end){
   const rows=await get('/fapi/v1/klines',{symbol,interval:'4h',startTime:cursor,endTime:end,limit:1500});
@@ -16,9 +16,9 @@ async function bars(symbol){
   for(const r of rows){const [openTime,o,h,l,c,v,closeTime]=r;if(closeTime>end)continue;out.push({openTime,closeTime,open:+o,high:+h,low:+l,close:+c,volume:+v});}
   const next=Number(rows.at(-1)[6])+1;if(next<=cursor)throw new Error('NON_ADVANCING_KLINES');cursor=next;
  }
- return out;
+ return{rows:out,complete:out.length>0&&Number(out[0].openTime)===start&&Number(out.at(-1).closeTime)>=end-(EDGE_V1_SOURCE.intervalMs-1)};
 }
-async function funding(symbol){
+export async function funding(symbol){
  const out=[]; let cursor=start;
  while(cursor<=end){
   const rows=await get('/fapi/v1/fundingRate',{symbol,startTime:cursor,endTime:end,limit:1000});
@@ -26,12 +26,13 @@ async function funding(symbol){
   for(const r of rows)if(Number(r.fundingTime)<=end)out.push({time:Number(r.fundingTime),rate:Number(r.fundingRate),markPrice:r.markPrice==null?null:Number(r.markPrice),rateType:r.rateType??null});
   const next=Number(rows.at(-1).fundingTime)+1;if(next<=cursor)throw new Error('NON_ADVANCING_FUNDING');cursor=next;
  }
- return out;
+ return{rows:out,complete:out.length>0&&Number(out[0].time)>=start&&Number(out.at(-1).time)>=end-(8*60*60*1000)};
 }
 export async function collect(){
  const barsBySymbol={},fundingBySymbol={};
- for(const symbol of EDGE_V1_SOURCE.symbols){barsBySymbol[symbol]=await bars(symbol);fundingBySymbol[symbol]=await funding(symbol);}
- const provenance={provider:'Binance USD-M Futures',base:BASE,klines:'/fapi/v1/klines',funding:'/fapi/v1/fundingRate',paginationComplete:true,fundingComplete:Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>[s,true]))};
+ const barComplete={},fundComplete={};
+ for(const symbol of EDGE_V1_SOURCE.symbols){const b=await bars(symbol),f=await funding(symbol);barsBySymbol[symbol]=b.rows;fundingBySymbol[symbol]=f.rows;barComplete[symbol]=b.complete;fundComplete[symbol]=f.complete;}
+ const provenance={provider:'Binance USD-M Futures',base:BASE,klines:'/fapi/v1/klines',funding:'/fapi/v1/fundingRate',barComplete,fundingComplete:fundComplete,paginationComplete:EDGE_V1_SOURCE.symbols.every(s=>barComplete[s]&&fundComplete[s])};
  const validation=validateSource({barsBySymbol,fundingBySymbol,provenance});if(!validation.ok)throw new Error(JSON.stringify(validation));
  return{schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',researchOnly:true,executionImpact:false,collectedAt:new Date().toISOString(),provenance,receipt:validation.receipt,barsBySymbol,fundingBySymbol};
 }
