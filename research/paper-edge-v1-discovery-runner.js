@@ -1,12 +1,14 @@
 import crypto from 'node:crypto';
 import {validateSource,EDGE_V1_SOURCE} from './paper-edge-v1-data-contract.js';
-import {commonTimes,frozenSplit,prepareSymbol,eligibleSetup,gate} from './paper-edge-v1-discovery-engine.js';
+import {commonTimes,frozenSplit,prepareSymbol,eligibleSetup,openCandidate,gate} from './paper-edge-v1-discovery-engine.js';
 import {dailyContextForTrigger,conservativeFill} from './paper-edge-v1-foundation.js';
-import {triggerFromPullback,initialStop,newPosition,exitEvents,applyEvent,atrTrail,canOpen,fundingCashflow} from './paper-edge-v1-state-machine.js';
+import {triggerFromPullback,exitEvents,applyEvent,atrTrail,fundingCashflow} from './paper-edge-v1-state-machine.js';
 import {EDGE_V1_STAGE_LOCK} from './edge-v1-stage-lock.js';
 
 export const EDGE_V1_DISCOVERY_RUNNER='PAPER-EDGE-V1-DISCOVERY-RUNNER-1';
 export const EDGE_V1_INITIAL_EQUITY=100000;
+export const EDGE_V1_DISCOVERY_SOURCE_LOCK=Object.freeze({runId:37231163461,artifactId:11313901895,sourceHeadSha:'000e6864a0aabdb5053a5988a5ccc46cee2b9e0b',artifactZipDigest:'sha256:8113b45cf2cebc957416e2ef69a3bd1fc510a41441591fbec0d7b47c49cca91d',receiptDigest:'d05b6c2916900ffac602c11166376e33a2f606e70967d0ecc988a1201df8ad08',artifactName:'paper-edge-v1-source'});
+export const EDGE_V1_DISCOVERY_SPLIT_LOCK=Object.freeze({total:12594,discovery:{from:1609459200000,to:1718251200000,count:7556},validation:{from:1718265600000,count:2519},holdout:{from:1754539200000,count:2519}});
 const BASE_BPS=8;
 const STRESS_BPS=16;
 const finite=x=>Number.isFinite(Number(x));
@@ -106,10 +108,12 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
  const barsBySymbol=sourcePackage.barsBySymbol||{},fundingBySymbol=sourcePackage.fundingBySymbol||{},provenance=sourcePackage.provenance||{};
  const validation=validateSource({barsBySymbol,fundingBySymbol,provenance});
  if(!validation.ok)throw new Error('EDGE_V1_SOURCE_INVALID '+JSON.stringify(validation));
- if(sourcePackage?.receipt?.digest&&sourcePackage.receipt.digest!==validation.receipt.digest)throw new Error('EDGE_V1_SOURCE_RECEIPT_MISMATCH');
+ if(validation.receipt.digest!==EDGE_V1_DISCOVERY_SOURCE_LOCK.receiptDigest)throw new Error('EDGE_V1_SOURCE_DIGEST_MISMATCH '+validation.receipt.digest);
+ if(sourcePackage?.receipt?.digest!==EDGE_V1_DISCOVERY_SOURCE_LOCK.receiptDigest)throw new Error('EDGE_V1_SOURCE_RECEIPT_MISMATCH');
 
  const split=frozenSplit(barsBySymbol);
  if(!split.ok)throw new Error('EDGE_V1_SPLIT_INVALID '+split.reason);
+ if(split.total!==EDGE_V1_DISCOVERY_SPLIT_LOCK.total||split.discovery.count!==EDGE_V1_DISCOVERY_SPLIT_LOCK.discovery.count||split.validation.count!==EDGE_V1_DISCOVERY_SPLIT_LOCK.validation.count||split.holdout.count!==EDGE_V1_DISCOVERY_SPLIT_LOCK.holdout.count||split.discovery.from!==EDGE_V1_DISCOVERY_SPLIT_LOCK.discovery.from||split.discovery.to!==EDGE_V1_DISCOVERY_SPLIT_LOCK.discovery.to||split.validation.from!==EDGE_V1_DISCOVERY_SPLIT_LOCK.validation.from||split.holdout.from!==EDGE_V1_DISCOVERY_SPLIT_LOCK.holdout.from)throw new Error('EDGE_V1_SPLIT_LOCK_MISMATCH');
  const discoveryTo=split.discovery.to;
  const discoveryBars={};
  for(const s of EDGE_V1_SOURCE.symbols)discoveryBars[s]=(barsBySymbol[s]||[]).filter(x=>Number(x.openTime)<=discoveryTo);
@@ -158,17 +162,16 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
   finalizeIfClosed(s,p,time,bucket,price,reason||event.type);
  }
 
- function openPosition(s,pending,t){
+ function openPosition(s,pending,t,entryEquity){
   const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];
   if(!bar||!pending||pending.entryTime!==t)return;
   st.pendingEntry=null;
   if(st.position)return;
-  const prices=openPricesAt(t),eq=equityAt(prices);
+  const eq=Number(entryEquity);
   if(!(eq>0))throw new Error('EDGE_V1_NONPOSITIVE_EQUITY');
-  const existing=openPositions();
-  if(!canOpen(existing,eq,s))return;
-  const stop=initialStop({side:pending.side,entry:bar.open,pullback:pending.pullback,atr14:bar.atr14});
-  let p=newPosition({symbol:s,side:pending.side,entry:bar.open,stop,equity:eq});
+  const existing=openPositions(),trigger={...pending,entry:bar.open,entryIndex:i};
+  let p=openCandidate({symbol:s,prepared:st.prepared,trigger,equity:eq,openPositions:existing});
+  if(!p)return;
   const entryNotional=Math.abs(p.entry*p.qty),bc=fillCost(entryNotional,BASE_BPS),sc=fillCost(entryNotional,STRESS_BPS);
   cash-=bc;stressCash-=sc;
   const currentDaily=dailyContextForTrigger(st.prepared.daily,t)?.regime??'FLAT';
@@ -177,7 +180,6 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
     pricePnl:0,funding:0,baseCosts:bc,stressCosts:sc,exitTime:null,exitBucketTime:null,exitPrice:null,exitReason:null
   }};
   st.position=p;
-  if(currentDaily===opposite(p.side))executeFill(s,{type:'REGIME',fraction:p.remaining},bar.open,t,t,'OPPOSITE_DAILY_REGIME');
  }
 
  function applyFunding(s,bar){
@@ -200,8 +202,9 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
    if(st.position)st.position.lastDailyRegime=regime;
   }
 
-  // 3: entries scheduled by the prior completed trigger bar.
-  for(const s of EDGE_V1_SOURCE.symbols){const st=states[s];if(st.pendingEntry?.entryTime===t)openPosition(s,st.pendingEntry,t)}
+  // 3: entries scheduled by the prior completed trigger bar use one pre-entry marked-equity snapshot.
+  const entryEquity=equityAt(openPricesAt(t));
+  for(const s of EDGE_V1_SOURCE.symbols){const st=states[s];if(st.pendingEntry?.entryTime===t)openPosition(s,st.pendingEntry,t,entryEquity)}
 
   // 4: target gaps at the open, after stop priority.
   for(const s of EDGE_V1_SOURCE.symbols){
@@ -238,13 +241,17 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
     const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];
     if(st.position||st.pendingEntry)continue;
     if(st.setup){
-     const barsSince=i-st.setup.index;
-     if(barsSince>=1&&barsSince<=3&&triggerFromPullback(st.setup.pullback,bar,st.setup.side,barsSince)){
-      const next=st.prepared.four[i+1];
-      if(next&&next.openTime<=discoveryTo)st.pendingEntry={side:st.setup.side,pullback:st.setup.pullback,triggerIndex:i,entryTime:next.openTime,entryIndex:i+1};
-      st.setup=null;continue;
+     const currentDaily=dailyContextForTrigger(st.prepared.daily,bar.openTime)?.regime??'FLAT';
+     if(currentDaily!==st.setup.side)st.setup=null;
+     else{
+      const barsSince=i-st.setup.index;
+      if(barsSince>=1&&barsSince<=3&&triggerFromPullback(st.setup.pullback,bar,st.setup.side,barsSince)){
+       const next=st.prepared.four[i+1];
+       if(next&&next.openTime<=discoveryTo)st.pendingEntry={side:st.setup.side,pullback:st.setup.pullback,triggerIndex:i,entryTime:next.openTime,entryIndex:i+1,entry:next.open};
+       st.setup=null;continue;
+      }
+      if(barsSince>=3){st.setup=null;continue}
      }
-     if(barsSince>=3){st.setup=null;continue}
     }
     if(!st.setup){
      const setup=eligibleSetup(st.prepared,i);
@@ -273,6 +280,7 @@ export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_
   researchOnly:true,executionImpact:false,autoPromotion:false,
   ruleset:'PAPER-EDGE-V1',runner:EDGE_V1_DISCOVERY_RUNNER,accounting:'PAPER-EDGE-V1-DISCOVERY-ACCOUNTING-1',
   authorizedStage:'DISCOVERY',
+  sourceLock:EDGE_V1_DISCOVERY_SOURCE_LOCK,
   sourceDigest:validation.receipt.digest,
   split:{total:split.total,discovery:split.discovery},
   isolation:{maxBarOpenTime:discoveryTimes.at(-1),maxFundingTime:Math.max(...EDGE_V1_SOURCE.symbols.flatMap(s=>discoveryFunding[s].map(x=>Number(x.time)))),validationValuesRead:false,holdoutValuesRead:false},
