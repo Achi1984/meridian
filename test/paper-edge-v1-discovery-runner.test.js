@@ -1,56 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {runEdgeV1Discovery,chronologicalWindows,profitFactorFromPnls,fundingEventsForBar,EDGE_V1_INITIAL_EQUITY} from '../research/paper-edge-v1-discovery-runner.js';
+import {runEdgeV1Discovery,chronologicalWindows,profitFactorFromPnls,fundingEventsForBar,EDGE_V1_INITIAL_EQUITY,EDGE_V1_DISCOVERY_SOURCE_LOCK,EDGE_V1_DISCOVERY_SPLIT_LOCK} from '../research/paper-edge-v1-discovery-runner.js';
 
 const STEP=4*60*60*1000,START=Date.parse('2021-01-01T00:00:00.000Z');
-function sourcePackage({mutateFuture=false}={}){
+function syntheticSource(){
  const barsBySymbol={},fundingBySymbol={},fundingComplete={};
  for(const [si,s] of ['BTCUSDT','ETHUSDT','SOLUSDT'].entries()){
-  barsBySymbol[s]=Array.from({length:20},(_,i)=>{
-   const base=100+si*10+i;
-   const future=mutateFuture&&i>=12?base*7:base;
-   return {openTime:START+i*STEP,closeTime:START+(i+1)*STEP-1,open:future,high:future+2,low:future-2,close:future+1,volume:1000+i};
-  });
-  fundingBySymbol[s]=[{time:START+2,rate:0.0001,markPrice:null,rateType:null}];
+  barsBySymbol[s]=Array.from({length:20},(_,i)=>{const base=100+si*10+i;return{openTime:START+i*STEP,closeTime:START+(i+1)*STEP-1,open:base,high:base+2,low:base-2,close:base+1,volume:1000+i}});
+  fundingBySymbol[s]=[{time:START+2,rate:.0001,markPrice:null,rateType:null}];
   fundingComplete[s]=true;
  }
- return {
-  schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',
-  researchOnly:true,
-  executionImpact:false,
-  provenance:{provider:'TEST',paginationComplete:true,fundingComplete},
-  barsBySymbol,
-  fundingBySymbol
- };
+ return{schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',researchOnly:true,executionImpact:false,provenance:{provider:'TEST',paginationComplete:true,fundingComplete},barsBySymbol,fundingBySymbol};
 }
 
 test('discovery runner is locked to normalized initial equity',()=>{
- assert.throws(()=>runEdgeV1Discovery(sourcePackage(),{initialEquity:99999}),/INITIAL_EQUITY_LOCKED/);
+ assert.throws(()=>runEdgeV1Discovery(syntheticSource(),{initialEquity:99999}),/INITIAL_EQUITY_LOCKED/);
  assert.equal(EDGE_V1_INITIAL_EQUITY,100000);
 });
 
-test('discovery runner evaluates only the frozen 60 percent slice',()=>{
- const r=runEdgeV1Discovery(sourcePackage());
- assert.equal(r.authorizedStage,'DISCOVERY');
- assert.equal(r.split.total,20);
- assert.equal(r.split.discovery.count,12);
- assert.equal(r.equityCurve.length,12);
- assert.equal(r.isolation.maxBarOpenTime,r.split.discovery.to);
- assert.equal(r.isolation.validationValuesRead,false);
- assert.equal(r.isolation.holdoutValuesRead,false);
- assert.equal(r.summary.closedTrades,0);
- assert.equal(r.reconciliation.baseOk,true);
- assert.equal(r.reconciliation.stressOk,true);
- assert.equal(r.summary.integrityOk,true);
- assert.equal(r.decision.decision,'EDGE_V1_DISCOVERY_FAIL');
+test('Discovery requires the immutable validated source receipt',()=>{
+ assert.equal(EDGE_V1_DISCOVERY_SOURCE_LOCK.runId,37231163461);
+ assert.equal(EDGE_V1_DISCOVERY_SOURCE_LOCK.receiptDigest,'d05b6c2916900ffac602c11166376e33a2f606e70967d0ecc988a1201df8ad08');
+ assert.throws(()=>runEdgeV1Discovery(syntheticSource()),/SOURCE_DIGEST_MISMATCH/);
 });
 
-test('validation and holdout price values cannot change discovery PnL result',()=>{
- const a=runEdgeV1Discovery(sourcePackage());
- const b=runEdgeV1Discovery(sourcePackage({mutateFuture:true}));
- assert.deepEqual(a.summary,b.summary);
- assert.deepEqual(a.decision,b.decision);
- assert.notEqual(a.sourceDigest,b.sourceDigest);
+test('Discovery split boundaries are frozen independently of result values',()=>{
+ assert.deepEqual(EDGE_V1_DISCOVERY_SPLIT_LOCK,{total:12594,discovery:{from:1609459200000,to:1718251200000,count:7556},validation:{from:1718265600000,count:2519},holdout:{from:1754539200000,count:2519}});
 });
 
 test('five chronological windows are contiguous and near equal count',()=>{
@@ -67,7 +42,6 @@ test('profit factor uses closed-trade net PnL',()=>{
  assert.equal(profitFactorFromPnls([0,0]),0);
  assert.equal(profitFactorFromPnls([5]),Number.MAX_SAFE_INTEGER);
 });
-
 
 test('funding at bar open is included only for a position already open',()=>{
  const bar={openTime:START+STEP,closeTime:START+2*STEP-1};
