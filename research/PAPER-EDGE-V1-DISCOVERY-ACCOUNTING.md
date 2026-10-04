@@ -24,7 +24,7 @@ For each completed 4h bar, the deterministic order is:
 3. Execute any entry that was triggered by the prior completed bar. Entry is exactly this bar open.
 4. Apply target gaps already reachable at the bar open at the frozen target price; STOP always has priority over targets.
 5. Apply authoritative funding events with timestamps strictly after entry and within the bar to the quantity still open after open-time events.
-6. Evaluate the remaining intrabar high/low path with the frozen STOP-first convention, then TP1 and TP2.
+6. Evaluate the remaining intrabar high/low path with the frozen STOP-first convention, then TP1 and TP2. If TP1 activates the break-even stop and that same bar also spans the new entry-price stop, the remaining quantity is conservatively closed at entry before TP2; the bar path is not guessed in favor of the target.
 7. At bar close, update the 2 ATR trail only after TP2.
 8. Only after the bar is completed may it become a new pullback/trigger observation.
 
@@ -37,7 +37,7 @@ A pullback candidate owns its next three completed 4h trigger bars. Overlapping 
 - Stress cost per fill side is 8 bps fee + 8 bps adverse slippage.
 - Target fills use the frozen target price. Gap-through stop fills use the worse bar open.
 - Opposite-regime exit uses the next 4h open.
-- Funding uses the frozen entry-price notional convention and the quantity remaining at the funding event. A funding timestamp exactly at a 4h bar open applies only to a position that survived the open-time exit checks and was already open before that timestamp; a new entry at that same timestamp is excluded by the strict-after-entry rule.
+- Funding uses the frozen entry-price notional convention and the quantity remaining at the funding event. A funding event on the bar-open boundary, including the locked source's audited <=1-second exchange timestamp jitter, applies only to a position that survived the open-time exit checks and was already open before that boundary. A new entry at that bar open is excluded from the boundary funding event.
 
 ## Discovery isolation
 
