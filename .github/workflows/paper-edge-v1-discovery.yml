@@ -1,0 +1,41 @@
+name: MERIDIAN Paper Edge V1 Discovery
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "research/PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md"
+      - "research/paper-edge-v1-discovery-runner.js"
+      - "scripts/run-paper-edge-v1-discovery.mjs"
+      - "test/paper-edge-v1-discovery-runner.test.js"
+      - ".github/workflows/paper-edge-v1-discovery.yml"
+permissions:
+  contents: read
+concurrency:
+  group: paper-edge-v1-discovery
+  cancel-in-progress: false
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify frozen Discovery invariants
+        run: node --test test/paper-edge-v1-discovery-engine.test.js test/paper-edge-v1-state-machine.test.js test/edge-v1-stage-lock.test.js test/paper-edge-v1-discovery-runner.test.js
+      - name: Collect validated frozen source
+        run: node scripts/collect-paper-edge-v1-source.mjs
+      - name: Run Discovery-only evidence
+        run: node scripts/run-paper-edge-v1-discovery.mjs
+      - name: Upload immutable Discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-edge-v1-discovery-evidence
+          path: |
+            research/data/paper-edge-v1-source.json
+            research/data/paper-edge-v1-discovery.json
+          if-no-files-found: error
+          retention-days: 90
