@@ -7,3 +7,4 @@ test('funding fails closed when absent',()=>assert.equal(fundingCoverage([],0,10
 test('cost is charged exactly as declared',()=>assert.equal(executionCost(10000,{feeBps:5,slippageBps:3}),8));
 test('gap stop uses worse open both sides',()=>{assert.equal(conservativeFill({side:'LONG',stop:95},{open:90}),90);assert.equal(conservativeFill({side:'SHORT',stop:105},{open:110}),110)});
 test('same bar ambiguity is stop first',()=>assert.equal(sameBarDecision({stopTouched:true,targetTouched:true}),'STOP'));
+test('daily context preserves derived regime fields',()=>{const d=[{...h(0),regime:'LONG',ema50:101,ema200:99}];const x=dailyContextForTrigger(d,86400000);assert.equal(x.regime,'LONG');assert.equal(x.ema50,101);assert.equal(x.ema200,99)});
