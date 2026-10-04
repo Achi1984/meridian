@@ -5,10 +5,22 @@ on:
     branches:
       - main
     paths:
+      - "research/PAPER-EDGE-V1-PREREGISTRATION.md"
+      - "research/PAPER-EDGE-V1-IMPLEMENTATION.md"
       - "research/PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md"
+      - "research/paper-edge-v1-data-contract.js"
+      - "research/paper-edge-v1-foundation.js"
+      - "research/paper-edge-v1-state-machine.js"
+      - "research/paper-edge-v1-discovery-engine.js"
       - "research/paper-edge-v1-discovery-runner.js"
+      - "research/edge-v1-stage-lock.js"
+      - "scripts/collect-paper-edge-v1-source.mjs"
       - "scripts/run-paper-edge-v1-discovery.mjs"
+      - "test/paper-edge-v1-discovery-engine.test.js"
+      - "test/paper-edge-v1-state-machine.test.js"
+      - "test/edge-v1-stage-lock.test.js"
       - "test/paper-edge-v1-discovery-runner.test.js"
+      - ".github/workflows/paper-edge-v1-source.yml"
       - ".github/workflows/paper-edge-v1-discovery.yml"
 permissions:
   contents: read
