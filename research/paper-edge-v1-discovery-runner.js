@@ -1,0 +1,272 @@
+import crypto from 'node:crypto';
+import {validateSource,EDGE_V1_SOURCE} from './paper-edge-v1-data-contract.js';
+import {commonTimes,frozenSplit,prepareSymbol,eligibleSetup,gate} from './paper-edge-v1-discovery-engine.js';
+import {dailyContextForTrigger,conservativeFill} from './paper-edge-v1-foundation.js';
+import {triggerFromPullback,initialStop,newPosition,exitEvents,applyEvent,atrTrail,canOpen,fundingCashflow} from './paper-edge-v1-state-machine.js';
+import {EDGE_V1_STAGE_LOCK} from './edge-v1-stage-lock.js';
+
+export const EDGE_V1_DISCOVERY_RUNNER='PAPER-EDGE-V1-DISCOVERY-RUNNER-1';
+export const EDGE_V1_INITIAL_EQUITY=100000;
+const BASE_BPS=8;
+const STRESS_BPS=16;
+const finite=x=>Number.isFinite(Number(x));
+const sideSign=side=>side==='LONG'?1:-1;
+const round=(x,n=10)=>Number(Number(x).toFixed(n));
+const hash=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
+
+function fillCost(notional,bps){return Math.abs(Number(notional))*Number(bps)/10000}
+function netPricePnl(p,price,fraction){return sideSign(p.side)*(Number(price)-p.entry)*p.qty*Number(fraction)}
+function unrealized(p,price){return sideSign(p.side)*(Number(price)-p.entry)*p.qty*p.remaining}
+function opposite(side){return side==='LONG'?'SHORT':'LONG'}
+
+export function profitFactorFromPnls(pnls=[]){
+ const pos=pnls.filter(x=>x>0).reduce((a,b)=>a+b,0),neg=-pnls.filter(x=>x<0).reduce((a,b)=>a+b,0);
+ return neg>0?pos/neg:pos>0?Number.MAX_SAFE_INTEGER:0;
+}
+
+export function chronologicalWindows(times=[],count=5){
+ const xs=[...new Set(times.map(Number).filter(Number.isFinite))].sort((a,b)=>a-b);
+ if(!xs.length||count<1)return[];
+ const out=[];
+ for(let i=0;i<count;i++){
+  const fromIndex=Math.floor(i*xs.length/count),toIndex=Math.floor((i+1)*xs.length/count)-1;
+  if(toIndex<fromIndex)out.push({index:i,from:null,to:null,count:0});
+  else out.push({index:i,from:xs[fromIndex],to:xs[toIndex],count:toIndex-fromIndex+1});
+ }
+ return out;
+}
+
+function windowForTime(windows,t){
+ return windows.find(w=>w.count>0&&t>=w.from&&t<=w.to)?.index??null;
+}
+
+function groupStats(trades=[]){
+ const pnls=trades.map(t=>t.netPnl);
+ return {
+  closedTrades:trades.length,
+  netPnl:round(pnls.reduce((a,b)=>a+b,0),8),
+  profitFactor:round(profitFactorFromPnls(pnls),8)
+ };
+}
+
+function summarize(trades,stressTrades,equityCurve,discoveryTimes){
+ const byAsset={},bySide={};
+ for(const s of EDGE_V1_SOURCE.symbols)byAsset[s]=groupStats(trades.filter(t=>t.symbol===s));
+ for(const side of ['LONG','SHORT'])bySide[side]=groupStats(trades.filter(t=>t.side===side));
+ const pnls=trades.map(t=>t.netPnl),stressPnls=stressTrades.map(t=>t.netPnl);
+ const positiveAssets=Object.values(byAsset).map(x=>x.netPnl).filter(x=>x>0),positiveTotal=positiveAssets.reduce((a,b)=>a+b,0);
+ const concentration=positiveTotal>0?Math.max(...positiveAssets)/positiveTotal*100:100;
+ const windows=chronologicalWindows(discoveryTimes,5).map(w=>{
+  const net=trades.filter(t=>windowForTime([w],t.exitBucketTime)===w.index).reduce((a,t)=>a+t.netPnl,0);
+  return {...w,netPnl:round(net,8),positive:net>0};
+ });
+ let peak=EDGE_V1_INITIAL_EQUITY,maxDd=0;
+ for(const p of equityCurve){peak=Math.max(peak,p.equity);if(peak>0)maxDd=Math.max(maxDd,(peak-p.equity)/peak*100)}
+ const expectancyR=trades.length?trades.reduce((a,t)=>a+t.r,0)/trades.length:0;
+ return {
+  closedTrades:trades.length,
+  netPnl:round(pnls.reduce((a,b)=>a+b,0),8),
+  profitFactor:round(profitFactorFromPnls(pnls),8),
+  stressProfitFactor:round(profitFactorFromPnls(stressPnls),8),
+  expectancyR:round(expectancyR,8),
+  maxDrawdownPct:round(maxDd,8),
+  positiveWindows:windows.filter(x=>x.positive).length,
+  windows,
+  byAsset,
+  bySide,
+  positivePnlConcentrationPct:round(concentration,8),
+  integrityOk:true
+ };
+}
+
+function targetGapEvents(p,open){
+ const long=p.side==='LONG',out=[];
+ if(!p.tp1Done&&(long?open>=p.tp1:open<=p.tp1))out.push({type:'TP1',fraction:Math.min(.33,p.remaining)});
+ const after=Math.max(0,p.remaining-(out[0]?.fraction??0));
+ if(!p.tp2Done&&(long?open>=p.tp2:open<=p.tp2))out.push({type:'TP2',fraction:Math.min(.33,after)});
+ return out;
+}
+
+function gapStopTouched(p,open){return p.side==='LONG'?open<=p.stop:open>=p.stop}
+
+function stageLockOk(){
+ return EDGE_V1_STAGE_LOCK?.stage==='DISCOVERY'&&EDGE_V1_STAGE_LOCK.validation===false&&EDGE_V1_STAGE_LOCK.holdout===false&&EDGE_V1_STAGE_LOCK.live===false;
+}
+
+export function runEdgeV1Discovery(sourcePackage,{initialEquity=EDGE_V1_INITIAL_EQUITY}={}){
+ if(initialEquity!==EDGE_V1_INITIAL_EQUITY)throw new Error('EDGE_V1_INITIAL_EQUITY_LOCKED');
+ if(!stageLockOk())throw new Error('EDGE_V1_STAGE_LOCK_VIOLATION');
+ if(sourcePackage?.schema!=='PAPER-EDGE-V1-SOURCE-PACKAGE-1'||sourcePackage?.researchOnly!==true||sourcePackage?.executionImpact!==false)throw new Error('EDGE_V1_SOURCE_PACKAGE_REJECTED');
+
+ const barsBySymbol=sourcePackage.barsBySymbol||{},fundingBySymbol=sourcePackage.fundingBySymbol||{},provenance=sourcePackage.provenance||{};
+ const validation=validateSource({barsBySymbol,fundingBySymbol,provenance});
+ if(!validation.ok)throw new Error('EDGE_V1_SOURCE_INVALID '+JSON.stringify(validation));
+ if(sourcePackage?.receipt?.digest&&sourcePackage.receipt.digest!==validation.receipt.digest)throw new Error('EDGE_V1_SOURCE_RECEIPT_MISMATCH');
+
+ const split=frozenSplit(barsBySymbol);
+ if(!split.ok)throw new Error('EDGE_V1_SPLIT_INVALID '+split.reason);
+ const discoveryTo=split.discovery.to;
+ const discoveryBars={};
+ for(const s of EDGE_V1_SOURCE.symbols)discoveryBars[s]=(barsBySymbol[s]||[]).filter(x=>Number(x.openTime)<=discoveryTo);
+ const discoveryTimes=commonTimes(discoveryBars);
+ if(discoveryTimes.length!==split.discovery.count||discoveryTimes.at(-1)!==discoveryTo)throw new Error('EDGE_V1_DISCOVERY_BOUNDARY_MISMATCH');
+ const finalClose=Math.min(...EDGE_V1_SOURCE.symbols.map(s=>Number(discoveryBars[s].at(-1)?.closeTime)));
+ const discoveryFunding={};
+ for(const s of EDGE_V1_SOURCE.symbols)discoveryFunding[s]=(fundingBySymbol[s]||[]).filter(x=>Number(x.time)<=finalClose);
+
+ const states={},indexByTime={};
+ for(const s of EDGE_V1_SOURCE.symbols){
+  const prepared=prepareSymbol(discoveryBars[s]);
+  states[s]={prepared,position:null,setup:null,pendingEntry:null};
+  indexByTime[s]=new Map(prepared.four.map((b,i)=>[Number(b.openTime),i]));
+ }
+ let cash=initialEquity,stressCash=initialEquity,tradeSeq=0;
+ const trades=[],stressTrades=[],equityCurve=[];
+
+ const openPositions=()=>EDGE_V1_SOURCE.symbols.map(s=>states[s].position).filter(Boolean);
+ const openPricesAt=t=>Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>{
+  const i=indexByTime[s].get(t);return[s,states[s].prepared.four[i]?.open];
+ }));
+ const equityAt=(prices,cashValue=cash)=>cashValue+EDGE_V1_SOURCE.symbols.reduce((sum,s)=>{
+  const p=states[s].position,px=prices[s];return sum+(p&&finite(px)?unrealized(p,px):0);
+ },0);
+
+ function finalizeIfClosed(s,p,exitTime,exitBucketTime,exitPrice,reason){
+  if(p.remaining>1e-12){states[s].position=p;return}
+  p.trade.exitTime=Number(exitTime);p.trade.exitBucketTime=Number(exitBucketTime);p.trade.exitPrice=Number(exitPrice);p.trade.exitReason=reason;
+  p.trade.netPnl=p.trade.pricePnl+p.trade.funding-p.trade.baseCosts;
+  p.trade.stressNetPnl=p.trade.pricePnl+p.trade.funding-p.trade.stressCosts;
+  p.trade.r=p.trade.initialRiskCash>0?p.trade.netPnl/p.trade.initialRiskCash:0;
+  const clean={...p.trade,netPnl:round(p.trade.netPnl,8),stressNetPnl:round(p.trade.stressNetPnl,8),r:round(p.trade.r,10),pricePnl:round(p.trade.pricePnl,8),funding:round(p.trade.funding,8),baseCosts:round(p.trade.baseCosts,8),stressCosts:round(p.trade.stressCosts,8)};
+  trades.push(clean);stressTrades.push({...clean,netPnl:clean.stressNetPnl});
+  states[s].position=null;
+ }
+
+ function executeFill(s,event,price,time,bucket,reason){
+  let p=states[s].position;if(!p||!(event.fraction>0))return;
+  const fraction=Math.min(event.fraction,p.remaining),qty=p.qty*fraction,gross=netPricePnl(p,price,fraction),notional=Math.abs(Number(price)*qty);
+  const bc=fillCost(notional,BASE_BPS),sc=fillCost(notional,STRESS_BPS);
+  cash+=gross-bc;stressCash+=gross-sc;
+  p.trade.pricePnl+=gross;p.trade.baseCosts+=bc;p.trade.stressCosts+=sc;
+  p=applyEvent(p,{type:event.type,fraction});
+  states[s].position=p;
+  finalizeIfClosed(s,p,time,bucket,price,reason||event.type);
+ }
+
+ function openPosition(s,pending,t){
+  const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];
+  if(!bar||!pending||pending.entryTime!==t)return;
+  st.pendingEntry=null;
+  if(st.position)return;
+  const prices=openPricesAt(t),eq=equityAt(prices);
+  if(!(eq>0))throw new Error('EDGE_V1_NONPOSITIVE_EQUITY');
+  const existing=openPositions();
+  if(!canOpen(existing,eq,s))return;
+  const stop=initialStop({side:pending.side,entry:bar.open,pullback:pending.pullback,atr14:bar.atr14});
+  let p=newPosition({symbol:s,side:pending.side,entry:bar.open,stop,equity:eq});
+  const entryNotional=Math.abs(p.entry*p.qty),bc=fillCost(entryNotional,BASE_BPS),sc=fillCost(entryNotional,STRESS_BPS);
+  cash-=bc;stressCash-=sc;
+  const currentDaily=dailyContextForTrigger(st.prepared.daily,t)?.regime??'FLAT';
+  p={...p,openedAt:t,lastDailyRegime:currentDaily,trade:{
+    id:++tradeSeq,symbol:s,side:p.side,entryTime:t,entryPrice:p.entry,initialStop:p.stop,initialRiskCash:p.qty*p.initialRisk,
+    pricePnl:0,funding:0,baseCosts:bc,stressCosts:sc,exitTime:null,exitBucketTime:null,exitPrice:null,exitReason:null
+  }};
+  st.position=p;
+  if(currentDaily===opposite(p.side))executeFill(s,{type:'REGIME',fraction:p.remaining},bar.open,t,t,'OPPOSITE_DAILY_REGIME');
+ }
+
+ function applyFunding(s,bar){
+  const st=states[s],p=st.position;if(!p)return;
+  const events=discoveryFunding[s].filter(x=>Number(x.time)>Number(p.openedAt)&&Number(x.time)>Number(bar.openTime)&&Number(x.time)<=Number(bar.closeTime));
+  for(const e of events){
+   const current=st.position;if(!current)break;
+   const cf=fundingCashflow({side:current.side,qty:current.qty*current.remaining,entryPrice:current.entry,rate:Number(e.rate)});
+   cash+=cf;stressCash+=cf;current.trade.funding+=cf;
+  }
+ }
+
+ for(const t of discoveryTimes){
+  // 1-2: existing open-time regime exits and gap stops.
+  for(const s of EDGE_V1_SOURCE.symbols){
+   const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i],p=st.position;if(!p)continue;
+   const regime=dailyContextForTrigger(st.prepared.daily,t)?.regime??'FLAT';
+   if(regime===opposite(p.side)){executeFill(s,{type:'REGIME',fraction:p.remaining},bar.open,t,t,'OPPOSITE_DAILY_REGIME');continue}
+   if(gapStopTouched(p,bar.open)){executeFill(s,{type:'STOP',fraction:p.remaining},bar.open,t,t,'GAP_STOP');continue}
+   if(st.position)st.position.lastDailyRegime=regime;
+  }
+
+  // 3: entries scheduled by the prior completed trigger bar.
+  for(const s of EDGE_V1_SOURCE.symbols){const st=states[s];if(st.pendingEntry?.entryTime===t)openPosition(s,st.pendingEntry,t)}
+
+  // 4: target gaps at the open, after stop priority.
+  for(const s of EDGE_V1_SOURCE.symbols){
+   const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];if(!st.position)continue;
+   if(gapStopTouched(st.position,bar.open)){executeFill(s,{type:'STOP',fraction:st.position.remaining},bar.open,t,t,'GAP_STOP');continue}
+   for(const e of targetGapEvents(st.position,bar.open)){if(!st.position)break;executeFill(s,e,e.type==='TP1'?st.position.tp1:st.position.tp2,t,t,e.type+'_GAP')}
+  }
+
+  // 5: authoritative funding after open-time events.
+  for(const s of EDGE_V1_SOURCE.symbols){const st=states[s],i=indexByTime[s].get(t);applyFunding(s,st.prepared.four[i])}
+
+  // 6-7: intrabar stop/targets then close-time ATR trail.
+  for(const s of EDGE_V1_SOURCE.symbols){
+   const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];if(!st.position)continue;
+   const events=exitEvents(st.position,bar);
+   for(const e of events){
+    if(!st.position)break;
+    const price=e.type==='STOP'?conservativeFill({side:st.position.side,stop:st.position.stop},bar):e.type==='TP1'?st.position.tp1:st.position.tp2;
+    executeFill(s,e,price,bar.closeTime,t,e.type);
+   }
+   if(st.position)st.position=atrTrail(st.position,bar,bar.atr14);
+  }
+
+  // Discovery split is fail-closed: no position may consume the next split.
+  if(t===discoveryTo){
+   for(const s of EDGE_V1_SOURCE.symbols){
+    const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];
+    if(st.position)executeFill(s,{type:'BOUNDARY',fraction:st.position.remaining},bar.close,bar.closeTime,t,'DISCOVERY_BOUNDARY');
+    st.setup=null;st.pendingEntry=null;
+   }
+  }else{
+   // 8: completed-bar setup/trigger state update.
+   for(const s of EDGE_V1_SOURCE.symbols){
+    const st=states[s],i=indexByTime[s].get(t),bar=st.prepared.four[i];
+    if(st.position||st.pendingEntry)continue;
+    if(st.setup){
+     const barsSince=i-st.setup.index;
+     if(barsSince>=1&&barsSince<=3&&triggerFromPullback(st.setup.pullback,bar,st.setup.side,barsSince)){
+      const next=st.prepared.four[i+1];
+      if(next&&next.openTime<=discoveryTo)st.pendingEntry={side:st.setup.side,pullback:st.setup.pullback,triggerIndex:i,entryTime:next.openTime,entryIndex:i+1};
+      st.setup=null;continue;
+     }
+     if(barsSince>=3){st.setup=null;continue}
+    }
+    if(!st.setup){
+     const setup=eligibleSetup(st.prepared,i);
+     if(setup)st.setup=setup;
+    }
+   }
+  }
+
+  const closes=Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>{const i=indexByTime[s].get(t);return[s,states[s].prepared.four[i].close]}));
+  equityCurve.push({time:t,equity:round(equityAt(closes),8)});
+ }
+
+ if(openPositions().length)throw new Error('EDGE_V1_DISCOVERY_POSITION_LEAK');
+ const allFinite=trades.every(t=>[t.entryPrice,t.initialStop,t.initialRiskCash,t.netPnl,t.stressNetPnl,t.r,t.exitPrice].every(finite));
+ const summary=summarize(trades,stressTrades,equityCurve,discoveryTimes);
+ summary.integrityOk=allFinite&&equityCurve.length===discoveryTimes.length&&discoveryTimes.at(-1)===discoveryTo;
+ const verdict=gate(summary);
+ const core={
+  schema:'PAPER-EDGE-V1-DISCOVERY-RESULT-1',
+  researchOnly:true,executionImpact:false,autoPromotion:false,
+  ruleset:'PAPER-EDGE-V1',runner:EDGE_V1_DISCOVERY_RUNNER,accounting:'PAPER-EDGE-V1-DISCOVERY-ACCOUNTING-1',
+  authorizedStage:'DISCOVERY',
+  sourceDigest:validation.receipt.digest,
+  split:{total:split.total,discovery:split.discovery},
+  isolation:{maxBarOpenTime:discoveryTimes.at(-1),maxFundingTime:Math.max(...EDGE_V1_SOURCE.symbols.flatMap(s=>discoveryFunding[s].map(x=>Number(x.time)))),validationValuesRead:false,holdoutValuesRead:false},
+  summary,
+  decision:verdict
+ };
+ return {...core,digest:hash(core),trades,equityCurve};
+}
