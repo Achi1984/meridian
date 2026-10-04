@@ -153,7 +153,7 @@ async function bybitPage(endpoint,params){
   const r=await fetchRetry(u.toString());
   const raw=await r.text(),json=JSON.parse(raw);
   if(Number(json?.retCode)!==0)throw new Error('BYBIT_API '+json?.retCode+' '+json?.retMsg);
-  return{json,receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(raw),responseTime:json?.time??null}};
+  return{json,receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(json?.result??null))}};
 }
 
 async function collectBybitFunding(){
