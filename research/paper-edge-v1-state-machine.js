@@ -42,4 +42,4 @@ export function atrTrail(p,bar,atr14){
  return{...p,stop:p.side==='LONG'?Math.max(p.stop,candidate):Math.min(p.stop,candidate)};
 }
 export function aggregateRisk(openPositions=[]){return openPositions.reduce((a,p)=>a+Math.abs((p.entry-p.stop)*p.qty),0)}
-export function canOpen(openPositions,equity){return aggregateRisk(openPositions)+equity*.005<=equity*.015+1e-9}
+export function canOpen(openPositions,equity){return aggregateRisk(openPositions)+equity*.005<equity*.015-1e-9}
