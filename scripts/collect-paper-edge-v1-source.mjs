@@ -31,7 +31,8 @@ async function funding(symbol){
 export async function collect(){
  const barsBySymbol={},fundingBySymbol={};
  for(const symbol of EDGE_V1_SOURCE.symbols){barsBySymbol[symbol]=await bars(symbol);fundingBySymbol[symbol]=await funding(symbol);}
- const validation=validateSource({barsBySymbol,fundingBySymbol});if(!validation.ok)throw new Error(JSON.stringify(validation));
- return{schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',researchOnly:true,executionImpact:false,collectedAt:new Date().toISOString(),provenance:{provider:'Binance USD-M Futures',base:BASE,klines:'/fapi/v1/klines',funding:'/fapi/v1/fundingRate'},receipt:validation.receipt,barsBySymbol,fundingBySymbol};
+ const provenance={provider:'Binance USD-M Futures',base:BASE,klines:'/fapi/v1/klines',funding:'/fapi/v1/fundingRate',paginationComplete:true,fundingComplete:Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>[s,true]))};
+ const validation=validateSource({barsBySymbol,fundingBySymbol,provenance});if(!validation.ok)throw new Error(JSON.stringify(validation));
+ return{schema:'PAPER-EDGE-V1-SOURCE-PACKAGE-1',researchOnly:true,executionImpact:false,collectedAt:new Date().toISOString(),provenance,receipt:validation.receipt,barsBySymbol,fundingBySymbol};
 }
 if(import.meta.url===`file://${process.argv[1]}`){const out=await collect();await fs.mkdir('research/data',{recursive:true});await fs.writeFile('research/data/paper-edge-v1-source.json',JSON.stringify(out));console.log(JSON.stringify(out.receipt,null,2));}
