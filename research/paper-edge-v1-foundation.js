@@ -23,7 +23,9 @@ export function aggregateDaily(rows=[]){
  return [...days.values()].sort((a,b)=>a.openTime-b.openTime);
 }
 export function dailyContextForTrigger(daily=[],triggerOpenTime){
- const xs=orderedBars(daily).filter(r=>r.closeTime<triggerOpenTime);
+ const xs=(daily||[]).filter(r=>r&&finite(r.openTime)&&finite(r.closeTime)&&Number(r.closeTime)<Number(triggerOpenTime))
+  .map(r=>({...r,openTime:Number(r.openTime),closeTime:Number(r.closeTime)}))
+  .sort((a,b)=>a.openTime-b.openTime);
  return xs.length?xs.at(-1):null;
 }
 export function splitEdgeV1(timestamps=[]){
