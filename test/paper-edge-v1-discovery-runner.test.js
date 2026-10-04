@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {runEdgeV1Discovery,chronologicalWindows,profitFactorFromPnls,EDGE_V1_INITIAL_EQUITY} from '../research/paper-edge-v1-discovery-runner.js';
+import {runEdgeV1Discovery,chronologicalWindows,profitFactorFromPnls,fundingEventsForBar,EDGE_V1_INITIAL_EQUITY} from '../research/paper-edge-v1-discovery-runner.js';
 
 const STEP=4*60*60*1000,START=Date.parse('2021-01-01T00:00:00.000Z');
 function sourcePackage({mutateFuture=false}={}){
@@ -39,6 +39,9 @@ test('discovery runner evaluates only the frozen 60 percent slice',()=>{
  assert.equal(r.isolation.validationValuesRead,false);
  assert.equal(r.isolation.holdoutValuesRead,false);
  assert.equal(r.summary.closedTrades,0);
+ assert.equal(r.reconciliation.baseOk,true);
+ assert.equal(r.reconciliation.stressOk,true);
+ assert.equal(r.summary.integrityOk,true);
  assert.equal(r.decision.decision,'EDGE_V1_DISCOVERY_FAIL');
 });
 
@@ -63,4 +66,12 @@ test('profit factor uses closed-trade net PnL',()=>{
  assert.equal(profitFactorFromPnls([10,-5,5]),3);
  assert.equal(profitFactorFromPnls([0,0]),0);
  assert.equal(profitFactorFromPnls([5]),Number.MAX_SAFE_INTEGER);
+});
+
+
+test('funding at bar open is included only for a position already open',()=>{
+ const bar={openTime:START+STEP,closeTime:START+2*STEP-1};
+ const events=[{time:bar.openTime,rate:.0001},{time:bar.openTime+1,rate:.0002},{time:bar.closeTime,rate:.0003}];
+ assert.equal(fundingEventsForBar(events,START,bar).length,3);
+ assert.equal(fundingEventsForBar(events,bar.openTime,bar).length,2);
 });
