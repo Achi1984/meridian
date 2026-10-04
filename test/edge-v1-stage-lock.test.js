@@ -1,0 +1,1 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import {EDGE_V1_STAGE_LOCK as x} from '../research/edge-v1-stage-lock.js'; test('only discovery is authorized',()=>{assert.equal(x.stage,'DISCOVERY');assert.equal(x.validation,false);assert.equal(x.holdout,false);assert.equal(x.live,false)});
