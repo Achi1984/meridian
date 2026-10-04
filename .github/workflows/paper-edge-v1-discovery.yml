@@ -1,53 +1,95 @@
 name: MERIDIAN Paper Edge V1 Discovery
+
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+  pull_request:
     paths:
       - "research/PAPER-EDGE-V1-PREREGISTRATION.md"
       - "research/PAPER-EDGE-V1-IMPLEMENTATION.md"
       - "research/PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md"
+      - "research/PAPER-EDGE-V1-DISCOVERY-RUN-CONTRACT.md"
       - "research/paper-edge-v1-data-contract.js"
       - "research/paper-edge-v1-foundation.js"
       - "research/paper-edge-v1-state-machine.js"
       - "research/paper-edge-v1-discovery-engine.js"
       - "research/paper-edge-v1-discovery-runner.js"
       - "research/edge-v1-stage-lock.js"
-      - "scripts/collect-paper-edge-v1-source.mjs"
       - "scripts/run-paper-edge-v1-discovery.mjs"
+      - "test/paper-edge-v1-data-contract.test.js"
       - "test/paper-edge-v1-discovery-engine.test.js"
       - "test/paper-edge-v1-state-machine.test.js"
       - "test/edge-v1-stage-lock.test.js"
       - "test/paper-edge-v1-discovery-runner.test.js"
-      - ".github/workflows/paper-edge-v1-source.yml"
       - ".github/workflows/paper-edge-v1-discovery.yml"
+  push:
+    branches:
+      - research/paper-edge-v1-discovery-run
+    paths:
+      - "research/PAPER-EDGE-V1-DISCOVERY-RUN-AUTHORIZATION.md"
+
 permissions:
   contents: read
+  actions: read
+
 concurrency:
-  group: paper-edge-v1-discovery
+  group: paper-edge-v1-discovery-${{ github.ref }}
   cancel-in-progress: false
+
 jobs:
-  discovery:
+  invariants:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verify frozen Discovery syntax
+        run: |
+          node --check research/paper-edge-v1-foundation.js
+          node --check research/paper-edge-v1-state-machine.js
+          node --check research/paper-edge-v1-discovery-engine.js
+          node --check research/paper-edge-v1-discovery-runner.js
+          node --check scripts/run-paper-edge-v1-discovery.mjs
       - name: Verify frozen Discovery invariants
-        run: node --test test/paper-edge-v1-discovery-engine.test.js test/paper-edge-v1-state-machine.test.js test/edge-v1-stage-lock.test.js test/paper-edge-v1-discovery-runner.test.js
-      - name: Collect validated frozen source
-        run: node scripts/collect-paper-edge-v1-source.mjs
-      - name: Run Discovery-only evidence
-        run: node scripts/run-paper-edge-v1-discovery.mjs
+        run: |
+          node --test \
+            test/paper-edge-v1-data-contract.test.js \
+            test/paper-edge-v1-discovery-engine.test.js \
+            test/paper-edge-v1-state-machine.test.js \
+            test/edge-v1-stage-lock.test.js \
+            test/paper-edge-v1-discovery-runner.test.js
+
+  discovery:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/research/paper-edge-v1-discovery-run'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Require explicit Discovery-only authorization
+        run: |
+          grep -F 'DISCOVERY_ONLY=true' research/PAPER-EDGE-V1-DISCOVERY-RUN-AUTHORIZATION.md
+          grep -F 'SOURCE_RECEIPT=d05b6c2916900ffac602c11166376e33a2f606e70967d0ecc988a1201df8ad08' research/PAPER-EDGE-V1-DISCOVERY-RUN-AUTHORIZATION.md
+          grep -F 'SOURCE_RUN=37231163461' research/PAPER-EDGE-V1-DISCOVERY-RUN-AUTHORIZATION.md
+      - name: Download immutable validated source
+        uses: actions/download-artifact@v4
+        with:
+          name: paper-edge-v1-source
+          path: research/data/locked
+          github-token: ${{ github.token }}
+          repository: Achi1984/meridian
+          run-id: 37231163461
+      - name: Run frozen Discovery only
+        run: node scripts/run-paper-edge-v1-discovery.mjs research/data/locked/paper-edge-v1-source.json research/data/paper-edge-v1-discovery.json
       - name: Upload immutable Discovery evidence
         uses: actions/upload-artifact@v4
         with:
           name: paper-edge-v1-discovery-evidence
           path: |
-            research/data/paper-edge-v1-source.json
+            research/data/locked/paper-edge-v1-source.json
             research/data/paper-edge-v1-discovery.json
           if-no-files-found: error
           retention-days: 90

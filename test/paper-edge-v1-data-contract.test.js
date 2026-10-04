@@ -15,3 +15,16 @@ test('monthly kline coverage detects an incomplete authoritative month',()=>{
  assert.equal(klineMonthCoverageOk(rows,2022,2),true);
  assert.equal(klineMonthCoverageOk(rows.slice(0,-6),2022,2),false);
 });
+
+
+test('internal funding gap greater than eight hours fails closed',()=>{
+ const x=pack();
+ x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+8*60*60*1000+1,rate:.0001}];
+ assert.equal(validateSource(x).reason,'FUNDING_CADENCE_GAP');
+});
+
+test('funding intervals of eight hours or less remain valid',()=>{
+ const x=pack();
+ x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+8*60*60*1000,rate:.0001}];
+ assert.equal(validateSource(x).ok,true);
+});

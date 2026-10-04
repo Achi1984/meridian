@@ -37,7 +37,7 @@ A pullback candidate owns its next three completed 4h trigger bars. Overlapping 
 - Stress cost per fill side is 8 bps fee + 8 bps adverse slippage.
 - Target fills use the frozen target price. Gap-through stop fills use the worse bar open.
 - Opposite-regime exit uses the next 4h open.
-- Funding uses the frozen entry-price notional convention and the quantity remaining at the funding event.
+- Funding uses the frozen entry-price notional convention and the quantity remaining at the funding event. A funding timestamp exactly at a 4h bar open applies only to a position that survived the open-time exit checks and was already open before that timestamp; a new entry at that same timestamp is excluded by the strict-after-entry rule.
 
 ## Discovery isolation
 
@@ -56,5 +56,6 @@ A pullback candidate owns its next three completed 4h trigger bars. Overlapping 
 - The five chronological windows are five contiguous, near-equal-count slices of Discovery common timestamps. A trade belongs to the window containing its final exit timestamp. A window is positive only when its summed closed-trade net PnL is greater than zero.
 - Positive-PnL concentration is the largest positive per-asset net PnL divided by the sum of all positive per-asset net PnL.
 - Side and asset Profit Factors use the same closed-trade net PnL convention.
+- Integrity is fail-closed unless baseline and stress ending cash reconcile to initial equity plus the sum of their respective closed-trade net PnL, trade IDs are unique, and every entry/final exit remains inside the authorized Discovery interval.
 
 No statistic in this document changes any preregistered pass/fail threshold. Any later change to these conventions requires a new ruleset rather than rescuing V1 after result inspection.
