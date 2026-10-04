@@ -8,7 +8,8 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
 test('r111 release identity is coherent and execution neutral',()=>{
-  assert.match(release.terminalBuild,/^10\.0-r\d+$/);\n  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=111);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('r').at(-1))>=111);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/PORTFOLIO-PARTIAL-KNOWN-VALUE-HISTORY-PAUSED-SEMANTICS/);
   assert.equal(manifest.start_url,'./v10/?build=r111&fresh=r111');
