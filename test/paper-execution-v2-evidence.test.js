@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {ledgerEvidenceStatus,immutableMarketReceipt,runPaperExecutionV2Evidence} from '../research/paper-execution-v2-evidence.js';
+const trade={id:'t1',symbol:'BTCUSDT',side:'LONG',entry:100,qty:1,sl:90,tp1:110,openedAt:'2026-01-01T00:00:00Z',closedAt:'2026-01-01T01:00:00Z',exit:90};
+const exp={schemaVersion:'X',digest:'abc',ledgers:[{name:'BASELINE',available:true,closedCount:1,digest:'d',trades:[trade]}]};
+test('fails closed on missing ledger fields',()=>assert.equal(ledgerEvidenceStatus({...exp,ledgers:[{...exp.ledgers[0],trades:[{...trade,qty:null}]}]}).ready,false));
+test('market receipt is deterministic and provenance-bearing',()=>{const m={BTCUSDT:[{openTime:'2026-01-01T00:00:00Z',open:100,high:101,low:89,close:90}]};const a=immutableMarketReceipt(m,{source:'TEST',cutoff:'x'}),b=immutableMarketReceipt(m,{source:'TEST',cutoff:'x'});assert.equal(a.digest,b.digest);assert.equal(a.symbols.BTCUSDT.rows,1)});
+test('complete evidence can produce preregistered verdict',()=>{const m={BTCUSDT:[{openTime:'2026-01-01T00:00:00Z',open:100,high:101,low:89,close:90}]};const r=runPaperExecutionV2Evidence(exp,m,{costs:{feeBps:0,slippageBps:0},market:{source:'TEST',cutoff:'2026-01-02'}});assert.equal(r.summary.coveragePct,100);assert.equal(r.decision,'PASS');assert.equal(r.executionImpact,false)});
+test('missing market coverage stays inconclusive',()=>assert.equal(runPaperExecutionV2Evidence(exp,{}).decision,'PAPER_EXECUTION_V2_INCONCLUSIVE'));
