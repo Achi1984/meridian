@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {validateSource,sourceReceipt,EDGE_V1_SOURCE} from '../research/paper-edge-v1-data-contract.js';import {parseFundingCsv,klineMonthCoverageOk} from '../scripts/collect-paper-edge-v1-source.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {validateSource,sourceReceipt,EDGE_V1_SOURCE,EDGE_V1_FUNDING_MAX_GAP_MS} from '../research/paper-edge-v1-data-contract.js';import {parseFundingCsv,klineMonthCoverageOk} from '../scripts/collect-paper-edge-v1-source.mjs';
 const t=Date.parse(EDGE_V1_SOURCE.start), bar={openTime:t,closeTime:t+14399999,open:1,high:2,low:.5,close:1.5,volume:1},fund={time:t+1000,rate:.0001};
 const pack=()=>({provenance:{paginationComplete:true,fundingComplete:Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>[s,true]))},barsBySymbol:Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>[s,[{...bar}]])),fundingBySymbol:Object.fromEntries(EDGE_V1_SOURCE.symbols.map(s=>[s,[{...fund}]]))});
 test('complete frozen source shape validates deterministically',()=>{const x=pack();assert.equal(validateSource(x).ok,true);assert.equal(sourceReceipt(x).digest,sourceReceipt(x).digest)});
@@ -17,14 +17,15 @@ test('monthly kline coverage detects an incomplete authoritative month',()=>{
 });
 
 
-test('internal funding gap greater than eight hours fails closed',()=>{
+test('funding cadence allows only one second of timestamp jitter',()=>{
  const x=pack();
- x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+8*60*60*1000+1,rate:.0001}];
- assert.equal(validateSource(x).reason,'FUNDING_CADENCE_GAP');
+ x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+8*60*60*1000+47,rate:.0001}];
+ assert.equal(validateSource(x).ok,true);
+ assert.equal(EDGE_V1_FUNDING_MAX_GAP_MS,8*60*60*1000+1000);
 });
 
-test('funding intervals of eight hours or less remain valid',()=>{
+test('funding gap beyond eight hours plus jitter tolerance fails closed',()=>{
  const x=pack();
- x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+8*60*60*1000,rate:.0001}];
- assert.equal(validateSource(x).ok,true);
+ x.fundingBySymbol.BTCUSDT=[{time:t+1000,rate:.0001},{time:t+1000+EDGE_V1_FUNDING_MAX_GAP_MS+1,rate:.0001}];
+ assert.equal(validateSource(x).reason,'FUNDING_CADENCE_GAP');
 });
