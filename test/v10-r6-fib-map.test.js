@@ -114,8 +114,8 @@ test('r6 Market integrates graphical SK Fib zones without execution',()=>{
   assert.match(js,/SWING-FENSTER/);
   assert.match(js,/30 × 4h/);
   assert.match(js,/180 × 4h/);
-  assert.match(js,/LONG TRENDWENDE/);
-  assert.match(js,/SHORT TRENDWENDE/);
+  assert.match(js,/POTENZIELLE LONG-REAKTIONSZONE|LONG TRENDWENDE/);
+  assert.match(js,/POTENZIELLE SHORT-REAKTIONSZONE|SHORT TRENDWENDE/);
   assert.match(js,/DOPPELTER VORTEIL/);
   assert.match(js,/Gegen-Ziel ∩ GKL/);
   assert.match(js,/1\.618 \/ 1\.809 \/ 2\.000/);

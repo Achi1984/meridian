@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r111';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r111';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r111';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r111';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r111';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r111';
-// MERIDIAN v10 r111 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r112';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r112';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r112';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r112';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r112';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r112';
+// MERIDIAN v10 r112 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r111';
+const BUILD='10.0-r112';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -919,7 +919,7 @@ function fibSkCards(low,high,direction,current,doubleAdvantage){
   const da=doubleAdvantage?.candidate
     ?'<div class="sk-double '+doubleAdvantage.side.toLowerCase()+'"><span>DOPPELTER VORTEIL · '+doubleAdvantage.side+'</span><b>'+fibFmt(doubleAdvantage.overlap.low)+' – '+fibFmt(doubleAdvantage.overlap.high)+'</b><small>Gegen-Ziel ∩ GKL · '+doubleAdvantage.overlap.overlapPct.toFixed(0)+'% Überlappung · Bestätigung über Struktur nötig</small></div>'
     :'<div class="sk-double muted"><span>DOPPELTER VORTEIL</span><b>—</b><small>Keine bestätigte Gegen-Ziel ∩ GKL Überlappung</small></div>';
-  return '<div class="sk-zone-grid"><div class="sk-zone bull state-'+longPosition+'"><span>LONG TRENDWENDE · BULLISH</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear state-'+shortPosition+'"><span>SHORT TRENDWENDE · BEARISH</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
+  return '<div class="fib-context-guard"><b>LEVEL MAP · KEIN RICHTUNGSSIGNAL</b><small>LONG/SHORT-Zonen markieren nur mögliche Reaktionsbereiche. Die aktuelle FORECAST-/Momentum-Richtung bleibt davon getrennt.</small></div><div class="sk-zone-grid"><div class="sk-zone bull state-'+longPosition+'"><span>POTENZIELLE LONG-REAKTIONSZONE · LEVEL ONLY</span><b>'+fibFmt(zones.long.low)+' – '+fibFmt(zones.long.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.long,current)+'</small></div><div class="sk-zone bear state-'+shortPosition+'"><span>POTENZIELLE SHORT-REAKTIONSZONE · LEVEL ONLY</span><b>'+fibFmt(zones.short.low)+' – '+fibFmt(zones.short.high)+'</b><small>GKL 0.500 / 0.559 / 0.618 / 0.667 · '+fibZoneState(zones.short,current)+'</small></div><div class="sk-zone target"><span>'+targetSide+'</span><b>'+fibFmt(target.low)+' – '+fibFmt(target.high)+'</b><small>SK Zielbereich 1.618 / 1.809 / 2.000 · Reaktion beobachten, nicht automatisch handeln</small></div></div><div class="sk-double-grid">'+da+'</div>';
 }
 function fibResultHtml(model){
   const {symbol,low,high,direction,current,levels,source,bars,doubleAdvantage=null}=model,next=adjacentFibLevels(levels,current),currentTop=fibPlotPosition(current,levels,current),zones=skLongShortZones(low,high),target=skTargetZone(low,high,direction);
@@ -929,8 +929,8 @@ function fibResultHtml(model){
   fibSkCards(low,high,direction,current,doubleAdvantage)+
   '<div class="fib-meta"><span>'+direction+' SWING</span><span>'+source+(bars?' · '+bars+' Bars':'')+'</span></div>'+
   '<div class="fib-ladder">'+
-    fibZoneBand(zones.long,levels,current,'long','LONG TRENDWENDE',direction==='UP')+
-    fibZoneBand(zones.short,levels,current,'short','SHORT TRENDWENDE',direction==='DOWN')+
+    fibZoneBand(zones.long,levels,current,'long','LONG ZONE',direction==='UP')+
+    fibZoneBand(zones.short,levels,current,'short','SHORT ZONE',direction==='DOWN')+
     fibZoneBand(target,levels,current,'target','1.618–2.000 TARGET',true)+doubleBand+
     levels.map(x=>fibLevelRow(x,next,current,levels)).join('')+
     '<div class="fib-current" style="top:'+currentTop.toFixed(2)+'%"><span>CURRENT · '+symbol+'</span><i></i><b>'+fibFmt(current)+'</b></div></div>'+
