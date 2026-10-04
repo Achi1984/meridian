@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CROSS_VENUE_FUNDING_EDGE_V1_SOURCE as BASE,
   canonicalFundingTime,normalizeFunding,normalizeMarks,commonFundingTimes,
-  splitCommonTimes,validateCrossVenueSource
+  splitCommonTimes,sourceReceipt,validateCrossVenueSource
 } from '../research/cross-venue-funding-edge-v1-data-contract.js';
 
 const H=60*60*1000;
@@ -75,4 +75,20 @@ test('normalizers expose mark and funding semantics deterministically',()=>{
   const p=pack();
   assert.equal(normalizeMarks(p.bybitMarks,'BYBIT')[0].open,100);
   assert.equal(normalizeFunding(p.bybitFunding,'BYBIT',contract)[0].rate,.0001);
+});
+
+
+test('source receipt ignores collection time and Binance receipt completion order',()=>{
+  const p=pack();
+  p.provenance.collectedAt='2026-10-04T20:00:00Z';
+  p.provenance.binance={provider:'Binance Vision',archive:'https://data.binance.vision',receipts:[
+    {kind:'funding',scope:'monthly',rel:'z',sha256:'2'},
+    {kind:'marks',scope:'monthly',rel:'a',sha256:'1'}
+  ]};
+  p.provenance.bybit={provider:'Bybit',baseUrl:'https://api.bybit.com',fundingPageReceipts:[{endpoint:'/f',params:{a:'1'},sha256:'f'}],markPageReceipts:[{endpoint:'/m',params:{a:'1'},sha256:'m'}]};
+  const a=sourceReceipt(p,contract);
+  p.provenance.collectedAt='2026-10-04T21:00:00Z';
+  p.provenance.binance.receipts.reverse();
+  const b=sourceReceipt(p,contract);
+  assert.equal(a.digest,b.digest);
 });
