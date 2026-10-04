@@ -1,0 +1,80 @@
+name: MERIDIAN Cross-Venue Funding Edge V1 Source Audit
+
+on:
+  pull_request:
+    paths:
+      - "research/CROSS-VENUE-FUNDING-EDGE-V1-PREREGISTRATION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V1-IMPLEMENTATION.md"
+      - "research/cross-venue-funding-edge-v1.js"
+      - "research/cross-venue-funding-edge-v1-data-contract.js"
+      - "research/cross-venue-funding-edge-v1-stage-lock.js"
+      - "scripts/collect-cross-venue-funding-edge-v1-source.mjs"
+      - "test/cross-venue-funding-edge-v1.test.js"
+      - "test/cross-venue-funding-edge-v1-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v1-stage-lock.test.js"
+      - ".github/workflows/cross-venue-funding-edge-v1-source.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/CROSS-VENUE-FUNDING-EDGE-V1-IMPLEMENTATION.md"
+      - "research/cross-venue-funding-edge-v1.js"
+      - "research/cross-venue-funding-edge-v1-data-contract.js"
+      - "research/cross-venue-funding-edge-v1-stage-lock.js"
+      - "scripts/collect-cross-venue-funding-edge-v1-source.mjs"
+      - "test/cross-venue-funding-edge-v1.test.js"
+      - "test/cross-venue-funding-edge-v1-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v1-stage-lock.test.js"
+      - ".github/workflows/cross-venue-funding-edge-v1-source.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-venue-funding-edge-v1-source-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify source-only syntax
+        run: |
+          node --check research/cross-venue-funding-edge-v1.js
+          node --check research/cross-venue-funding-edge-v1-data-contract.js
+          node --check research/cross-venue-funding-edge-v1-stage-lock.js
+          node --check scripts/collect-cross-venue-funding-edge-v1-source.mjs
+      - name: Verify frozen pre-result invariants
+        run: |
+          node --test \
+            test/cross-venue-funding-edge-v1.test.js \
+            test/cross-venue-funding-edge-v1-data-contract.test.js \
+            test/cross-venue-funding-edge-v1-stage-lock.test.js
+      - name: Assert collector cannot calculate strategy PnL
+        run: |
+          ! grep -E "profitFactor|expectancy|netPnl|runCrossVenue" scripts/collect-cross-venue-funding-edge-v1-source.mjs
+
+  source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Collect and validate frozen public source
+        run: node scripts/collect-cross-venue-funding-edge-v1-source.mjs
+      - name: Upload immutable source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-funding-edge-v1-source
+          path: research/data/cross-venue-funding-edge-v1-source.json
+          if-no-files-found: error
+          retention-days: 90
