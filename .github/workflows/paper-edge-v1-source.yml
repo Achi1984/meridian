@@ -1,6 +1,13 @@
 name: MERIDIAN Paper Edge V1 Source Collection
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/collect-paper-edge-v1-source.mjs"
+      - "research/paper-edge-v1-data-contract.js"
+      - ".github/workflows/paper-edge-v1-source.yml"
 permissions:
   contents: read
 jobs:
