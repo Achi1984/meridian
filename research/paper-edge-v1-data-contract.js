@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 export const EDGE_V1_SOURCE=Object.freeze({symbols:['BTCUSDT','ETHUSDT','SOLUSDT'],interval:'4h',intervalMs:14400000,start:'2021-01-01T00:00:00.000Z',end:'2026-09-30T23:59:59.999Z',market:'USD-M-PERPETUAL'});
+export const EDGE_V1_FUNDING_MAX_GAP_MS=8*60*60*1000+1000;
 const finite=x=>Number.isFinite(Number(x));
 const canonicalBars=a=>(a||[]).map(x=>({openTime:+x.openTime,closeTime:+x.closeTime,open:+x.open,high:+x.high,low:+x.low,close:+x.close,volume:+x.volume})).sort((a,b)=>a.openTime-b.openTime);
 const canonicalFunding=a=>(a||[]).map(x=>({time:+x.time,rate:+x.rate,markPrice:x.markPrice==null?null:+x.markPrice,rateType:x.rateType??null})).sort((a,b)=>a.time-b.time);
@@ -23,7 +24,7 @@ export function validateSource({barsBySymbol={},fundingBySymbol={},provenance={}
   if(new Set(funding.map(x=>x.time)).size!==funding.length)return{ok:false,reason:'DUPLICATE_FUNDING',symbol:s};
   if(rawFunding.some((x,i)=>i>0&&Number(x.time)<Number(rawFunding[i-1].time)))return{ok:false,reason:'UNORDERED_FUNDING',symbol:s};
   if(funding.some(x=>!finite(x.time)||!finite(x.rate)||(x.markPrice!=null&&!finite(x.markPrice))||x.time<start||x.time>end))return{ok:false,reason:'INVALID_FUNDING',symbol:s};
-  for(let i=1;i<funding.length;i++)if(funding[i].time-funding[i-1].time>8*60*60*1000)return{ok:false,reason:'FUNDING_CADENCE_GAP',symbol:s,after:funding[i-1].time,before:funding[i].time};
+  for(let i=1;i<funding.length;i++)if(funding[i].time-funding[i-1].time>EDGE_V1_FUNDING_MAX_GAP_MS)return{ok:false,reason:'FUNDING_CADENCE_GAP',symbol:s,after:funding[i-1].time,before:funding[i].time};
   if(provenance?.fundingComplete?.[s]!==true)return{ok:false,reason:'FUNDING_COVERAGE_NOT_CERTIFIED',symbol:s};
  }
  const starts=EDGE_V1_SOURCE.symbols.map(x=>canonicalBars(barsBySymbol[x])[0].openTime),ends=EDGE_V1_SOURCE.symbols.map(x=>canonicalBars(barsBySymbol[x]).at(-1).closeTime);const commonStart=Math.max(...starts),commonEnd=Math.min(...ends);if(!(commonStart<commonEnd))return{ok:false,reason:'NO_COMMON_TIME_OVERLAP'};
