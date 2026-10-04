@@ -18,7 +18,7 @@ test('frozen cross-venue costs are exact and conservative',()=>{
 });
 
 test('funding spread direction is Bybit minus Binance',()=>{
-  assert.equal(fundingSpread(.0001,.0003),.00019999999999999998);
+  assert.ok(Math.abs(fundingSpread(.0001,.0003)-.0002)<1e-15);
   assert.deepEqual(directionLegs(1),{binance:'LONG',bybit:'SHORT'});
   assert.deepEqual(directionLegs(-1),{binance:'SHORT',bybit:'LONG'});
 });
