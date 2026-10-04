@@ -23,6 +23,7 @@ export function validateSource({barsBySymbol={},fundingBySymbol={},provenance={}
   if(new Set(funding.map(x=>x.time)).size!==funding.length)return{ok:false,reason:'DUPLICATE_FUNDING',symbol:s};
   if(rawFunding.some((x,i)=>i>0&&Number(x.time)<Number(rawFunding[i-1].time)))return{ok:false,reason:'UNORDERED_FUNDING',symbol:s};
   if(funding.some(x=>!finite(x.time)||!finite(x.rate)||(x.markPrice!=null&&!finite(x.markPrice))||x.time<start||x.time>end))return{ok:false,reason:'INVALID_FUNDING',symbol:s};
+  for(let i=1;i<funding.length;i++)if(funding[i].time-funding[i-1].time>8*60*60*1000)return{ok:false,reason:'FUNDING_CADENCE_GAP',symbol:s,after:funding[i-1].time,before:funding[i].time};
   if(provenance?.fundingComplete?.[s]!==true)return{ok:false,reason:'FUNDING_COVERAGE_NOT_CERTIFIED',symbol:s};
  }
  const starts=EDGE_V1_SOURCE.symbols.map(x=>canonicalBars(barsBySymbol[x])[0].openTime),ends=EDGE_V1_SOURCE.symbols.map(x=>canonicalBars(barsBySymbol[x]).at(-1).closeTime);const commonStart=Math.max(...starts),commonEnd=Math.min(...ends);if(!(commonStart<commonEnd))return{ok:false,reason:'NO_COMMON_TIME_OVERLAP'};
