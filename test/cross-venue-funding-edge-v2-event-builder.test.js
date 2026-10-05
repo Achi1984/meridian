@@ -166,6 +166,12 @@ function offgridNearSplitPackage(){
     d.okxFunding.push({fundingTime:splitStart-12*H,fundingRate:.00012});
   }));
 }
+function explainedFundingGapPackage(){
+  return cachedFixture('explained-funding-gap',()=>rebuild(BASE,d=>{
+    const missing=BASE.receipt.split.discovery.times[50];
+    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==missing);
+  }));
+}
 function permutedPackage(){
   return cachedFixture('permuted',()=>({
     ...BASE,
