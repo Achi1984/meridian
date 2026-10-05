@@ -153,7 +153,7 @@
     "strategyPnlObserved": false,
     "paperAuthorized": false,
     "liveAuthorized": false,
-    "next": "IMPLEMENT_V2_RUNNER_EPISODE_STATE_MACHINE_AND_INDEPENDENT_LEDGER_NO_PNL",
+    "next": "CROSS_MODEL_REVIEW_V2_RUNNER_IMPLEMENTATION_NO_PNL",
     "sourceAuditEvaluated": true,
     "sourceAuditOutcome": "VALID_WITH_INTEGRITY_EPISODES",
     "canonicalSourceRun": {
@@ -163,6 +163,8 @@
       "sourceJobId": 111700620728,
       "artifactId": 11336541442,
       "receiptDigest": "822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5"
-    }
+    },
+    "runnerImplementationCandidate": true,
+    "runnerImplementationStatus": "SYNTHETIC_ONLY_AWAITING_CROSS_MODEL_REVIEW"
   }
 }
