@@ -1,16 +1,17 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r113",
+  "build": "10.0-r115",
   "branch": "main",
   "issue": 541,
-  "phase": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_FROZEN_NO_PNL",
+  "phase": "CROSS_VENUE_FUNDING_EDGE_V2_STRATEGY_DRIVER_FROZEN_NO_PNL",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
+    "verifiedSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "verifiedAt": "2026-10-05",
-    "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
+    "rule": "verifiedSha is the last non-continuity product/research checkpoint. Continuity-only merges may advance live main; always reconcile Issue #539, live main, PRs and CI before mutation.",
+    "checkpointKind": "LAST_NON_CONTINUITY_CANONICAL_CHECKPOINT"
   },
   "runtime": {
     "releaseSafety": "GREEN",
@@ -60,6 +61,16 @@
         }
       },
       "conclusion": "R108_DEPLOYMENT_RUNTIME_MARKET_CORE_PASS"
+    },
+    "currentCheckpointSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
+    "terminalBuild": "10.0-r115",
+    "postMergeVerification": {
+      "releaseSafetyRunId": 37357195842,
+      "visualQaRunId": 37357195857,
+      "runtimeSmokeRunId": 37357195901,
+      "releaseCoordinatorRunId": 37357195943,
+      "pagesRunId": 37357192838,
+      "status": "GREEN"
     }
   },
   "canonicalResearch": {
@@ -1134,7 +1145,7 @@
     },
     "crossVenueFundingEdgeV2": {
       "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
-      "status": "SOURCE_AUDIT_RUNNER_IMPLEMENTATION_FROZEN_REVIEWED_NO_PNL",
+      "status": "SOURCE_AUDIT_STRATEGY_DRIVER_FROZEN_REVIEWED_NO_PNL",
       "stage": "SOURCE_AUDIT",
       "predecessor": "CROSS-VENUE-FUNDING-EDGE-V1",
       "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
@@ -1144,7 +1155,7 @@
       "holdoutAuthorized": false,
       "strategyPnlAuthorized": false,
       "executionImpact": false,
-      "nextRequiredGate": "PREIMPLEMENTATION_REVIEW_V2_EVENT_BUILDER_NO_PNL",
+      "nextRequiredGate": "USER_AND_CROSS_MODEL_AUTHORIZATION_BEFORE_CANONICAL_V2_EXECUTION_OR_DISCOVERY",
       "requiredImplementationGuards": [
         "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
         "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
@@ -1184,6 +1195,40 @@
         "classification": "DIAGNOSTIC_DETERMINISM_CONFIRMED_RECEIPT_IDENTICAL",
         "packageDifference": "provenance.collectedAt only",
         "canonicalReplacement": false
+      },
+      "canonicalExecutionAuthorized": false,
+      "sourceCollectionSeal": {
+        "status": "FROZEN_REVIEWED",
+        "mergeSha": "9d0cddfc005af41b8795f6353530075367ddaec6",
+        "reviewedHeadSha": "0414236c5c27ef824c807e7e14bfd23b351bb9d4",
+        "review": "CV2-SOURCE-SEAL-IMPL-R1_GREEN_LIGHT"
+      },
+      "exitFillRunnerFix": {
+        "status": "FROZEN_REVIEWED",
+        "mergeSha": "86c433050be8dab1f970b4af08545b9341fea2b6",
+        "reviewedHeadSha": "105372756d12ebbcd042b61a0fc6c7d3e6779cba",
+        "review": "CV2-RUNNER-EXIT-FILL-PR0-IMPL-R2_GREEN_LIGHT"
+      },
+      "eventBuilder": {
+        "status": "FROZEN_REVIEWED_SYNTHETIC_ONLY_NO_PNL",
+        "mergeSha": "ac962ec561c9e31715641986afd9f722ef9c5b38",
+        "reviewedHeadSha": "4fe7364be7bacb51c42ffc2456e51ea9f073fbfe",
+        "review": "CV2-EVENT-BUILDER-PR1-IMPL-R2_GREEN_LIGHT"
+      },
+      "structuralRunnerAdapter": {
+        "status": "FROZEN_REVIEWED_SYNTHETIC_ONLY_NO_PNL",
+        "mergeSha": "3360fb555b56a1abf72924ece6554ecbcfdd72a3",
+        "reviewedHeadSha": "437e4b89e2cd5f610f48e7fa568c5daad21c772b",
+        "review": "CV2-RUNNER-ADAPTER-IMPL-R3_GREEN_LIGHT"
+      },
+      "strategyDriver": {
+        "status": "FROZEN_REVIEWED_SYNTHETIC_ONLY_NO_PNL",
+        "mergeSha": "886544fe9220ce96204f7007b2488a1a97126b02",
+        "reviewedHeadSha": "70a2f943c6af6f8b60ac1ccaad5a1e5ddf3d4e4a",
+        "review": "CV2-STRATEGY-DRIVER-PR2-IMPL-R3_GREEN_LIGHT",
+        "strategySignalsCalculatedInSyntheticTests": true,
+        "strategyPnlCalculated": false,
+        "canonicalSourceExecutionAuthorized": false
       }
     }
   },
@@ -1198,7 +1243,7 @@
     255,
     256
   ],
-  "nextAction": "Obtain a pre-implementation cross-model design review for the CROSS-VENUE-FUNDING-EDGE-V2 canonical Source-to-Runner event builder. Freeze causal event construction, split-stream completeness, strict runner inputs, and builder-level G16-G18 causality before any builder implementation. Keep V2 at SOURCE_AUDIT; do not execute the canonical runner, calculate strategy PnL, or authorize Discovery.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2, do not run canonical Source→Events→Strategy→Runner, calculate strategy PnL, or advance Discovery/Validation/Holdout/Paper/Live without explicit user authorization and a separate exact-head Claude cross-model review. Synthetic implementation through PR #549 is complete and must not be repeated. Use MERIDIAN_LIVE_CHECKPOINT.json as the compact bootstrap before expanding large continuity files.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1228,18 +1273,22 @@
     "orchestrationInstallationPr": 324,
     "orchestrationInstallationMergeSha": "832f46471f12b26016e00c9ba0c06677a32427b4",
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true,
-    "streamSafeProtocol": "STREAM-SAFE-V4",
-    "maxToolCallGroupsPerVisibleBurst": 2,
+    "streamSafeProtocol": "STREAM-SAFE-V5",
+    "maxToolCallGroupsPerVisibleBurst": 1,
     "maxSameStatusPollsPerVisibleBurst": 1,
     "maxVisibleBurstSeconds": 90,
     "userVisibleCheckpointRequired": true,
     "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md",
     "leadLease": "MERIDIAN_LEAD_LEASE.json",
     "crossModelLead": "CHATGPT",
-    "crossModelReviewSubAgent": "CLAUDE"
+    "crossModelReviewSubAgent": "CLAUDE",
+    "compactBootstrap": "MERIDIAN_LIVE_CHECKPOINT.json",
+    "maxPayloadBytes": 4096,
+    "expandLargeContinuityFilesOnlyOnMismatch": true,
+    "oneMutationPerBurst": true
   },
   "researchDirection": {
-    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_FROZEN_NO_PNL",
+    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_STRATEGY_DRIVER_FROZEN_NO_PNL",
     "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1266,7 +1315,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_EVENT_BUILDER_PREIMPLEMENTATION_REVIEW_NO_PNL",
+    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_CANONICAL_EXECUTION_OR_DISCOVERY_REQUIRES_USER_AND_CROSS_MODEL_AUTHORIZATION",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",
@@ -1615,10 +1664,10 @@
     "qhImbalanceV1PausedReason": "CURRENT_ACTIVE_RESEARCH_LANE_IS_CROSS_VENUE_FUNDING_EDGE_V2"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r108",
-    "canonicalMainSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
-    "lastMergedPr": 428,
-    "status": "R108_LIVE_ACCEPTED",
+    "terminalBuild": "10.0-r115",
+    "canonicalMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
+    "lastMergedPr": 552,
+    "status": "R115_POST_MERGE_GREEN",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1635,7 +1684,10 @@
       "r105 Pionex history source alignment + freshness",
       "r106 market freshness lifecycle",
       "r107 market coverage diagnostics",
-      "r108 Paper readiness prefetch"
+      "r108 Paper readiness prefetch",
+      "r113 liquidation-distance command risk",
+      "r114 FIB map mobile clarity",
+      "r115 nearest FIB AUTO sync"
     ],
     "portfolioCheckpoint": {
       "lastObservedTotalUsd": 34848.5,
@@ -1647,7 +1699,7 @@
       "marketReady": true,
       "historyStatus": "R107_LIVE_PASS; 135 strict points; 1357 blocked; 1H READY; 1D/1W BUILDING; SPOT + FRESH PIONEX"
     },
-    "nextAction": "r108 live acceptance is complete. Reconcile main/PRs/CI and continue only the first incomplete milestone after r108. Do not repeat r93-r108 work.",
+    "nextAction": "r115 post-merge gates are green. Continue only from new user-observed UI/runtime evidence; do not repeat r113-r115 work.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1786,7 +1838,7 @@
         "verdict": "FULL_LIVE_PASS"
       }
     },
-    "terminalReleaseSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
+    "terminalReleaseSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "lastMergedOpsPr": 423,
     "observability": {
       "runtimeSmokeCommitStatusPr": 422,
@@ -1796,13 +1848,14 @@
     }
   },
   "chatHandoff": {
-    "updatedAt": "2026-10-01T10:53:00+02:00",
+    "updatedAt": "2026-10-05T20:48:00+02:00",
     "reason": "Durable continuation across ChatGPT streaming interruptions and new chats",
     "sourceOfTruth": "REPOSITORY_NOT_CHAT",
     "protocol": "docs/AGENT_ORCHESTRATION.md",
-    "quickResume": "User only needs to say: 'Meridian fortsetzen'. The agent must read MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step.",
+    "quickResume": "User only needs to say: 'Meridian fortsetzen'. Read Issue #539 first, then MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step without repeating merged work.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "ea4ad2fdbb69562350cfb80e7d9ec9ff8170979e",
-    "currentBuild": "10.0-r108"
+    "currentMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
+    "currentBuild": "10.0-r115",
+    "currentMainSemantics": "LAST_NON_CONTINUITY_CANONICAL_CHECKPOINT; reconcile live GitHub main before every mutation"
   }
 }
