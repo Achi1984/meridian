@@ -22,6 +22,18 @@ import {
 
 const HOUR=60*60*1000;
 const CANONICAL_RECEIPT_DIGEST='822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5';
+const CANONICAL_DATA_DIGESTS=Object.freeze({
+  binanceFunding:'442c4a68ef728ec42ccd0bedeb8a6c786e9ac9de573565d18aaaf9eb942ffef1',
+  okxFunding:'f35f14e28c8d3093a7ceaceeb488f2b930f27530fed876936b3f5c8cfeeb2c9f',
+  binanceMarks:'0a5679947c8bcd5562ef9aecded5eb36706fc33515e7821aeff6deaeb86e57a7',
+  okxMarks:'ef7beb1a849710831c950cc561b90b7b80d3b0feb927bf7c966354cbde2c284b'
+});
+const SOURCE_DIGEST_KEYS=Object.freeze(Object.keys(CANONICAL_DATA_DIGESTS));
+const CANONICAL_SOURCE_PINS=Object.freeze({
+  receiptDigest:CANONICAL_RECEIPT_DIGEST,
+  integrityDigest:'0e0a7e1dc0b8ab616114d99ba7d475185b027caacdd1544d4ce06c8b2d9d4b07',
+  dataDigests:CANONICAL_DATA_DIGESTS
+});
 const DRIVER_SCHEMA='CROSS-VENUE-FUNDING-EDGE-V2-STRATEGY-DRIVER-1';
 const ALLOWED_FINAL=new Set([
   V2_RUNNER_STATES.FLAT_ELIGIBLE,
@@ -93,9 +105,26 @@ function activateDecision(structuralDecision,slot,signal){
   });
 }
 
+export function crossVenueV2ReceiptMatchesForbiddenPins(receipt,pins){
+  if(!receipt||typeof receipt!=='object'||!pins||typeof pins!=='object')return false;
+  if(typeof pins.receiptDigest==='string'&&receipt.digest===pins.receiptDigest)return true;
+  if(typeof pins.integrityDigest==='string'&&receipt.integrityDigest===pins.integrityDigest)return true;
+  const actual=receipt.dataDigests;
+  const expected=pins.dataDigests;
+  if(!actual||typeof actual!=='object'||!expected||typeof expected!=='object')return false;
+  return SOURCE_DIGEST_KEYS.some(key=>
+    typeof expected[key]==='string'&&actual[key]===expected[key]
+  );
+}
+
 export function assertCrossVenueV2SyntheticSourceAllowed(validatedSource){
-  if(validatedSource?.expectedReceiptDigest===CANONICAL_RECEIPT_DIGEST)
-    fail('CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER');
+  if(
+    validatedSource?.expectedReceiptDigest===CANONICAL_RECEIPT_DIGEST||
+    crossVenueV2ReceiptMatchesForbiddenPins(
+      validatedSource?.validation?.receipt,
+      CANONICAL_SOURCE_PINS
+    )
+  )fail('CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER');
   return true;
 }
 
@@ -170,6 +199,14 @@ function internalRun({validatedSource,split}={}){
     return false;
   }
 
+  function completeTerminalPrefix(limit,evidenceBoundary){
+    const prefixTerminal=appendTerminalPrefixSlotsThrough(limit,evidenceBoundary);
+    if(prefixTerminal)return;
+    const afterPrefix=stateBefore(events,evidenceBoundary,recoveryInputs);
+    if(afterPrefix.status!==V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
+      fail('CROSS_VENUE_V2_DRIVER_TERMINAL_PREFIX_DIVERGENCE');
+  }
+
   slotLoop:
   for(const slot of slots){
     const signal=strategy.entryAt({
@@ -211,6 +248,7 @@ function internalRun({validatedSource,split}={}){
 
       const atHour=stateBefore(events,hour+1,recoveryInputs);
       if(atHour.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE){
+        completeTerminalPrefix(hour,hour+1);
         terminal=true;
         break;
       }
@@ -232,6 +270,7 @@ function internalRun({validatedSource,split}={}){
 
       const beforeExitFill=stateBefore(events,exitFillAt,recoveryInputs);
       if(beforeExitFill.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE){
+        completeTerminalPrefix(exitFillAt,exitFillAt+1);
         terminal=true;
         break;
       }
@@ -247,22 +286,8 @@ function internalRun({validatedSource,split}={}){
           recoveryInputs
         );
         if(preliminaryExitEvidence.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE){
-          const prefixTerminal=appendTerminalPrefixSlotsThrough(
-            exitFillAt,
-            evidenceBoundary
-          );
-          if(prefixTerminal){
-            terminal=true;
-          }else{
-            const afterExitEvidence=stateBefore(
-              events,
-              evidenceBoundary,
-              recoveryInputs
-            );
-            if(afterExitEvidence.status!==V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
-              fail('CROSS_VENUE_V2_DRIVER_TERMINAL_PREFIX_DIVERGENCE');
-            terminal=true;
-          }
+          completeTerminalPrefix(exitFillAt,evidenceBoundary);
+          terminal=true;
         }
       }
       break;
@@ -334,4 +359,5 @@ export function executeCrossVenueV2StrategyDriver({
 }
 
 export const CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST=CANONICAL_RECEIPT_DIGEST;
+export const CROSS_VENUE_V2_CANONICAL_SOURCE_PINS=CANONICAL_SOURCE_PINS;
 export const CROSS_VENUE_V2_STRATEGY_DRIVER_SCHEMA=DRIVER_SCHEMA;
