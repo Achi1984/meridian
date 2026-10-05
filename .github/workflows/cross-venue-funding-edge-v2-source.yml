@@ -1,0 +1,98 @@
+name: MERIDIAN Cross-Venue Funding Edge V2 Source Audit
+
+on:
+  pull_request:
+    paths:
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json"
+      - "research/cross-venue-funding-edge-v2.js"
+      - "research/cross-venue-funding-edge-v2-data-contract.js"
+      - "research/cross-venue-funding-edge-v2-stage-lock.js"
+      - "scripts/collect-cross-venue-funding-edge-v2-source.mjs"
+      - "test/cross-venue-funding-edge-v2.test.js"
+      - "test/cross-venue-funding-edge-v2-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v2-collector.test.js"
+      - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
+      - ".github/workflows/cross-venue-funding-edge-v2-source.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json"
+      - "research/cross-venue-funding-edge-v2.js"
+      - "research/cross-venue-funding-edge-v2-data-contract.js"
+      - "research/cross-venue-funding-edge-v2-stage-lock.js"
+      - "scripts/collect-cross-venue-funding-edge-v2-source.mjs"
+      - "test/cross-venue-funding-edge-v2.test.js"
+      - "test/cross-venue-funding-edge-v2-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v2-collector.test.js"
+      - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
+      - ".github/workflows/cross-venue-funding-edge-v2-source.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-venue-funding-edge-v2-source-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      source_audit: ${{ steps.stage.outputs.source_audit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify V2 source-only syntax
+        run: |
+          node --check research/cross-venue-funding-edge-v2.js
+          node --check research/cross-venue-funding-edge-v2-data-contract.js
+          node --check research/cross-venue-funding-edge-v2-stage-lock.js
+          node --check scripts/collect-cross-venue-funding-edge-v2-source.mjs
+      - name: Verify V2 pre-source behavior
+        run: |
+          node --test \
+            test/cross-venue-funding-edge-v2.test.js \
+            test/cross-venue-funding-edge-v2-data-contract.test.js \
+            test/cross-venue-funding-edge-v2-collector.test.js \
+            test/cross-venue-funding-edge-v2-preregistration.test.js \
+            test/cross-venue-funding-edge-v2-stage-lock.test.js
+      - name: Assert V2 does not reuse coercive V1 primitives
+        run: |
+          ! grep -E "from ['\"].*cross-venue-funding-edge-v1\.js" \
+            research/cross-venue-funding-edge-v2.js \
+            research/cross-venue-funding-edge-v2-data-contract.js \
+            scripts/collect-cross-venue-funding-edge-v2-source.mjs
+      - name: Assert collector is source-only
+        run: |
+          ! grep -E "profitFactor|expectancy|netPnl|runCrossVenue|discoveryResult|holdoutResult" \
+            scripts/collect-cross-venue-funding-edge-v2-source.mjs
+      - name: Read V2 source-audit lock
+        id: stage
+        run: |
+          node --input-type=module -e "import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK as x} from './research/cross-venue-funding-edge-v2-stage-lock.js'; console.log('source_audit='+(x.sourceAudit===true?'true':'false'))" >> "$GITHUB_OUTPUT"
+
+  source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.invariants.outputs.source_audit == 'true'
+    needs: invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Collect and validate frozen V2 public source
+        run: node scripts/collect-cross-venue-funding-edge-v2-source.mjs
+      - name: Upload immutable V2 source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-venue-funding-edge-v2-source
+          path: research/data/cross-venue-funding-edge-v2-source.json
+          if-no-files-found: error
+          retention-days: 90
