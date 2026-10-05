@@ -62,5 +62,5 @@ test('source evaluation decision records finality and remaining runner prerequis
   assert.match(decision,/deterministic episode state machine/);
   assert.match(decision,/independent cash\/equity ledger construction/);
   assert.match(decision,/generic causality tests across event types/);
-  assert.match(decision,/strategy PnL calculated: \*\*false\*\*/);
+  assert.match(decision,/Strategy PnL calculated: \*\*false\*\*/);
 });
