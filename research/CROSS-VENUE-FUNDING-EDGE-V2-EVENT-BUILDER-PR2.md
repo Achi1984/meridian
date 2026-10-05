@@ -14,6 +14,8 @@ PR2 bridges the already source-bound Event Builder PR1 output to the frozen runn
 - runner ordering is delegated to the frozen `sortRunnerEvents` / `runnerEventKey` implementation.
 - unknown builder event kinds fail closed.
 - builder output must remain research-only with execution impact, strategy PnL and strategy signals all disabled.
+- the caller-provided builder output is read exactly once into a single immutable JSON snapshot; key checks, digest verification, event adaptation, lineage fields and the returned stream all derive only from that snapshot.
+- the returned `stream` is detached from caller ownership and deeply frozen, so later caller mutation cannot alter adapted evidence.
 - the adapter carries both PR1 stream and package-bound digests for lineage.
 
 ## Explicit non-goals
