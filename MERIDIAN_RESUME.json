@@ -8,8 +8,8 @@
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
-    "verifiedAt": "2026-10-02",
+    "verifiedSha": "a52c56010b9a547061c82d37840f5335465b3754",
+    "verifiedAt": "2026-10-05",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
   "runtime": {
