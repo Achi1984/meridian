@@ -10,6 +10,7 @@ import {
 
 const H=60*60*1000;
 const START=Date.parse('2026-01-01T00:00:00.000Z');
+const healthy=Object.freeze({activeDegradation:false});
 const contract={
   ...PROD,
   rawStart:new Date(START).toISOString(),
@@ -168,12 +169,12 @@ test('entry readiness at t uses only completed data available by t',()=>{
   const t=START+16*H;
   const b=normalizeFunding(funding(),'BINANCE',contract),o=normalizeFunding(funding(),'OKX',contract);
   const bm=normalizeMarks(marks(),'BINANCE'),om=normalizeMarks(marks(),'OKX');
-  const ready=entryInputsReady({decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
+  const ready=entryInputsReady({...healthy,decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
   assert.equal(ready.ready,true);
   assert.equal(ready.entryOpenTime,t+H);
   assert.equal(ready.lastClosedMarkTime,t-H);
 
-  const noFutureMarks=entryInputsReady({
+  const noFutureMarks=entryInputsReady({...healthy,
     decisionTime:t,
     binanceFunding:b,
     okxFunding:o,
@@ -183,7 +184,7 @@ test('entry readiness at t uses only completed data available by t',()=>{
   assert.deepEqual(noFutureMarks,ready);
 
   const futureMutated=om.map(x=>x.openTime>=t?{...x,confirmed:false}:x);
-  assert.deepEqual(entryInputsReady({
+  assert.deepEqual(entryInputsReady({...healthy,
     decisionTime:t,
     binanceFunding:b,
     okxFunding:o,
@@ -191,22 +192,22 @@ test('entry readiness at t uses only completed data available by t',()=>{
     okxMarks:futureMutated
   },contract),ready);
 
-  const stale=entryInputsReady({decisionTime:t,binanceFunding:b.slice(1),okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
+  const stale=entryInputsReady({...healthy,decisionTime:t,binanceFunding:b.slice(1),okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
   assert.equal(stale.reason,'FUNDING_INPUTS_INCOMPLETE_OR_STALE');
 
-  const lastClosedMissing=entryInputsReady({
+  const lastClosedMissing=entryInputsReady({...healthy,
     decisionTime:t,binanceFunding:b,okxFunding:o,
     binanceMarks:bm.filter(x=>x.openTime!==t-H),okxMarks:om
   },contract);
   assert.equal(lastClosedMissing.reason,'MARK_INPUTS_INCOMPLETE_OR_STALE');
 
-  const lastClosedUnconfirmed=entryInputsReady({
+  const lastClosedUnconfirmed=entryInputsReady({...healthy,
     decisionTime:t,binanceFunding:b,okxFunding:o,
     binanceMarks:bm,okxMarks:om.map(x=>x.openTime===t-H?{...x,confirmed:false}:x)
   },contract);
   assert.equal(lastClosedUnconfirmed.reason,'MARK_INPUTS_INCOMPLETE_OR_STALE');
 
-  assert.equal(entryInputsReady({decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om,activeDegradation:true},contract).reason,'DATA_DEGRADED');
+  assert.equal(entryInputsReady({...healthy,decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om,activeDegradation:true},contract).reason,'DATA_DEGRADED');
 });
 
 test('an invalid entry candle after an active ENTRY becomes terminal INCONCLUSIVE at its causal detection time',()=>{
@@ -336,4 +337,27 @@ test('future integrity events cannot alter a recovery decision at an earlier tim
       kind
     );
   }
+});
+
+
+test('entry readiness and entry-fill activation flags are strict booleans',()=>{
+  const t=START+16*H;
+  const b=normalizeFunding(funding(),'BINANCE',contract),o=normalizeFunding(funding(),'OKX',contract);
+  const bm=normalizeMarks(marks(),'BINANCE'),om=normalizeMarks(marks(),'OKX');
+  for(const bad of ['true',1,undefined,null]){
+    assert.throws(()=>entryInputsReady({decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om,activeDegradation:bad},contract),/INVALID_DEGRADATION_FLAG/);
+    assert.throws(()=>entryFillIntegrityOutcome({decisionTime:t,entryActive:bad,asOfTime:t+2*H,binanceMarks:bm,okxMarks:om},contract),/INVALID_ENTRY_ACTIVE_FLAG/);
+  }
+  assert.equal(entryFillIntegrityOutcome({decisionTime:t,entryActive:false,asOfTime:t+2*H,binanceMarks:bm,okxMarks:om},contract).status,'NOT_APPLICABLE');
+});
+
+test('recovery reset at candidate T is causal and a one-venue settlement never becomes common',()=>{
+  const common=[START+8*H,START+16*H,START+24*H,START+32*H];
+  const m=normalizeMarks(marks(),'BINANCE');
+  const exact=[{kind:'OFF_GRID_FUNDING',venue:'OKX',detectionTime:START+24*H}];
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:exact,binanceMarks:m,okxMarks:m},contract),null);
+
+  const b=normalizeFunding(funding(),'BINANCE',contract);
+  const onlyOne=normalizeFunding(funding().filter(x=>x.fundingTime!==START+16*H),'OKX',contract);
+  assert.equal(commonFundingTimes(b,onlyOne,contract).includes(START+16*H),false);
 });
