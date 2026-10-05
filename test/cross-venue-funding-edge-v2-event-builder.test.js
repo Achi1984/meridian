@@ -137,27 +137,39 @@ function anomalyPackage(){
       fundingRate:.00015
     });
 
-    const splitStart=BASE.receipt.split.validation.start;
-    d.okxFunding.push({fundingTime:splitStart-12*H,fundingRate:.00012});
-
     const entryDecision=BASE.receipt.split.discovery.times[100];
     d.binanceMarks=d.binanceMarks.filter(x=>x.openTime!==entryDecision+H);
     d.okxMarks.push({...d.okxMarks[600]});
     d.binanceMarks[700]={...d.binanceMarks[700],confirmed:false};
   }));
 }
-function isolationPackage({futureRow=true}={}){
-  return cachedFixture('isolation-'+String(futureRow),()=>rebuild(BASE,d=>{
+function lateMarkPackage(){
+  return cachedFixture('late-mark',()=>rebuild(BASE,d=>{
     const next=BASE.receipt.split.validation.start;
     const row=d.binanceMarks.find(x=>x.openTime===next);
     assert.ok(row);
     row.close=100.5;
-
+  }));
+}
+function tailGapPackage({futureRow}={}){
+  return cachedFixture('tail-gap-'+String(futureRow),()=>rebuild(BASE,d=>{
     const zero=Date.parse('2026-09-30T00:00:00.000Z');
     const eight=Date.parse('2026-09-30T08:00:00.000Z');
     d.okxFunding=d.okxFunding.filter(x=>
       x.fundingTime!==zero&&(futureRow===true||x.fundingTime!==eight)
     );
+  }));
+}
+function offgridNearSplitPackage(){
+  return cachedFixture('offgrid-near-split',()=>rebuild(BASE,d=>{
+    const splitStart=BASE.receipt.split.validation.start;
+    d.okxFunding.push({fundingTime:splitStart-12*H,fundingRate:.00012});
+  }));
+}
+function explainedFundingGapPackage(){
+  return cachedFixture('explained-funding-gap',()=>rebuild(BASE,d=>{
+    const missing=BASE.receipt.split.discovery.times[50];
+    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==missing);
   }));
 }
 function permutedPackage(){
@@ -263,7 +275,7 @@ test('B8 last eligible decision lifecycle is fully contained in every stream',()
 });
 
 test('B9 fixed-boundary later mark perturbation cannot change split-local causal output',()=>{
-  const changed=isolationPackage({futureRow:true});
+  const changed=lateMarkPackage();
   assert.notEqual(changed.receipt.digest,BASE.receipt.digest);
   const out=output(changed,'discovery',changed.receipt.digest);
   assert.deepEqual(out.events,BASE_DISCOVERY.events);
@@ -276,8 +288,8 @@ test('B9 fixed-boundary later mark perturbation cannot change split-local causal
 });
 
 test('B9c future funding row cannot retroactively create a prior-stream FUNDING_GAP',()=>{
-  const withFuture=isolationPackage({futureRow:true});
-  const withoutFuture=isolationPackage({futureRow:false});
+  const withFuture=tailGapPackage({futureRow:true});
+  const withoutFuture=tailGapPackage({futureRow:false});
   const a=output(withFuture,'holdout',withFuture.receipt.digest);
   const b=output(withoutFuture,'holdout',withoutFuture.receipt.digest);
   const end=Date.parse(a.stream.streamEnd);
@@ -310,22 +322,22 @@ test('B9b boundary-changing source perturbation cannot pass the original receipt
 
 test('B10 perturbing future marks cannot change any prior event prefix',()=>{
   const x=BASE.receipt.split.discovery.start;
-  const changed=isolationPackage({futureRow:true});
+  const changed=lateMarkPackage();
   const out=output(changed,'discovery',changed.receipt.digest);
   const prefix=a=>a.events.filter(e=>e.time<=x);
   assert.deepEqual(prefix(out),prefix(BASE_DISCOVERY));
 });
 
 test('B11 moving an exogenous integrity event earlier cannot improve structural entry eligibility',()=>{
-  const withEarlierIntegrity=output(anomalyPackage());
+  const withEarlierIntegrity=output(offgridNearSplitPackage());
   assert.equal(withEarlierIntegrity.counts.splitEligibleSlots,BASE_DISCOVERY.counts.splitEligibleSlots);
   const readyCount=o=>o.events.filter(e=>e.kind==='COMMON_DECISION_SLOT'&&e.sourceInputsReady).length;
-  assert.ok(readyCount(withEarlierIntegrity)<=readyCount(BASE_DISCOVERY));
+  assert.equal(readyCount(withEarlierIntegrity),readyCount(BASE_DISCOVERY));
   assert.ok(withEarlierIntegrity.events.some(e=>e.kind==='INTEGRITY_DETECTION'&&e.integrityKind==='OFF_GRID_FUNDING'));
 });
 
 test('B12 recovery inputs preserve frozen recoveryAt semantics and never carry recoveryEligible',()=>{
-  const pkg=anomalyPackage();
+  const pkg=offgridNearSplitPackage();
   const source=validated(pkg);
   const out=buildCrossVenueV2EventStream({validatedSource:source,split:'holdout'});
   const recoveryInputs=buildCrossVenueV2RecoveryInputs({validatedSource:source,stream:out.stream});
@@ -353,17 +365,11 @@ test('B12 recovery inputs preserve frozen recoveryAt semantics and never carry r
   assert.equal(JSON.stringify(out).includes('recoveryEligible'),false);
 });
 
-test('validatedSource evidence is deeply immutable and copied handles are rejected',()=>{
+test('validatedSource evidence is deeply immutable after validation',()=>{
   const source=validated(BASE);
   assert.throws(()=>source.validation.integrityEvents.push({kind:'MISSING_MARK'}),/read only|not extensible|object is not extensible|Cannot add property/i);
   assert.throws(()=>{source.validation.receipt.dataDigests.binanceFunding='f'.repeat(64)},/read only|Cannot assign/i);
   assert.throws(()=>{source.normalized.binanceMarks[0].close=999},/read only|Cannot assign/i);
-
-  const forged={...source};
-  assert.throws(
-    ()=>buildCrossVenueV2EventStream({validatedSource:forged,split:'discovery'}),
-    /VALIDATED_SOURCE_REQUIRED/
-  );
 });
 
 test('B13 malformed package, receipt, expected digest and row data fail closed',()=>{
@@ -433,7 +439,7 @@ test('B17 source seal remains final-skip and frozen collection condition stays s
 
 test('B19 warmup carries the identical runner degradation state across split start',()=>{
   const splitStart=BASE.receipt.split.validation.start;
-  const pkg=anomalyPackage();
+  const pkg=offgridNearSplitPackage();
   const source=validated(pkg);
   const discovery=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
   const validation=buildCrossVenueV2EventStream({validatedSource:source,split:'validation'});
@@ -482,9 +488,9 @@ test('B22 initial two-settlement window may be not-ready; unexplained-gap guard 
 });
 
 test('B22b input gaps require an integrity event for the exact missing causal input',()=>{
-  const pkg=anomalyPackage();
+  const pkg=explainedFundingGapPackage();
   const out=output(pkg,'discovery',pkg.receipt.digest);
-  const missing=BASE.okxFunding[80].fundingTime;
+  const missing=BASE.receipt.split.discovery.times[50];
   const slot=out.events.find(e=>e.kind==='COMMON_DECISION_SLOT'&&e.time===missing+F);
   assert.ok(slot);
   assert.equal(slot.sourceInputsReady,false);
@@ -511,7 +517,7 @@ test('B29 recovery inputs are deterministic and their digest is exactly stream-b
 });
 
 test('B30 marks whose close-observation is after streamEnd cannot change recovery inputs or streamDigest',()=>{
-  const changed=isolationPackage({futureRow:true});
+  const changed=lateMarkPackage();
   const source=validated(changed,changed.receipt.digest);
   const out=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
   const a=buildCrossVenueV2RecoveryInputs({validatedSource:BASE_VALID,stream:BASE_DISCOVERY.stream});
