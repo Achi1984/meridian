@@ -6,7 +6,7 @@ import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runT
 import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r114';
 // MERIDIAN v10 r113 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r114';
+const BUILD='10.0-r115';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -24,6 +24,7 @@ function readUiContext(){
 }
 const savedUiContext=readUiContext();
 const fibUi={symbol:savedUiContext.fibSymbol,window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
+const fibAutoContext=new Map();
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
@@ -843,6 +844,20 @@ function marketSignal(i){
 
   return{label:'NEUTRAL',tone:'muted',score:peak,rank:1,confirmed:false};
 }
+function fibNearestContext(levels,currentInput){
+  const current=Number(currentInput);if(!(current>0))return null;
+  const next=adjacentFibLevels(levels,current),rows=[next.above,next.below].filter(x=>x&&Number.isFinite(Number(x.price))&&Number.isFinite(Number(x.ratio)));
+  if(!rows.length)return null;
+  rows.sort((a,b)=>Math.abs(Number(a.price)-current)-Math.abs(Number(b.price)-current)||Number(a.price)-Number(b.price));
+  const level=rows[0];
+  return{f:Number(level.ratio),price:Number(level.price)};
+}
+function fibAutoNear(symbol){
+  const key=String(symbol||'').trim().toUpperCase(),ctx=fibAutoContext.get(key);
+  if(!ctx||ctx.mode!=='AUTO'||!freshTs(ctx.loadedAt))return null;
+  const f=Number(ctx.near?.f),price=Number(ctx.near?.price);
+  return Number.isFinite(f)&&price>0?{f,price}:null;
+}
 function opportunityContext(symbol){
   const i=marketIntel(symbol),sig=marketSignal(i);
   if(!i||!intelFresh(i))return{available:false,score:0,label:'NO FRESH CONTEXT',tone:'muted',signal:sig.label,momentum:'—',fib:'—',reasons:['Frische technische Marktdaten fehlen']};
@@ -860,7 +875,7 @@ function opportunityContext(symbol){
   const p=Number(i.price),e20=Number(i.ema20),e50=Number(i.ema50),bullTrend=p>e20&&e20>e50,bearTrend=p<e20&&e20<e50,dir=sig.label.startsWith('BULL')?1:sig.label.startsWith('BEAR')?-1:0;
   if((dir===1&&bullTrend)||(dir===-1&&bearTrend)){score+=15;reasons.push('Trendstruktur bestätigt Richtung')}
   else if(bullTrend||bearTrend){score+=8;reasons.push('Trendstruktur vorhanden')}
-  const nearPrice=Number(i.near?.price),nearRatio=Number(i.near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null;
+  const near=fibAutoNear(symbol)||i.near,nearPrice=Number(near?.price),nearRatio=Number(near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null;
   if(fibDistance!=null){
     if(fibDistance<=1){score+=15;reasons.push('Nahe relevantem FIB-Level')}
     else if(fibDistance<=2.5){score+=10;reasons.push('FIB-Kontext in Reichweite')}
@@ -1050,6 +1065,7 @@ async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
   fibUi.symbol=$('#fib-asset',view)?.value||fibUi.symbol;
   fibUi.window=Number($('#fib-window',view)?.value)||fibUi.window||90;
+  fibAutoContext.delete(String(fibUi.symbol||'').trim().toUpperCase());
   out.setAttribute('aria-busy','true');out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
   try{
     const fetchRows=H().marketKlines;
@@ -1076,6 +1092,8 @@ async function updateFibMap(view){
     if(!(current>0))current=marketPrice(fibUi.symbol).value;
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
+    const autoNear=fibUi.mode==='AUTO'?fibNearestContext(levels,current):null;
+    if(autoNear)fibAutoContext.set(String(fibUi.symbol||'').trim().toUpperCase(),{mode:'AUTO',near:autoNear,loadedAt:Date.now(),source});
     let doubleAdvantage=null;
     if(fibUi.mode==='AUTO'&&swingRows.length){
       const parent=detectSwing(swingRows,fibUi.window),child=detectOpposingChildSwing(swingRows,parent,fibUi.window);
@@ -1084,7 +1102,7 @@ async function updateFibMap(view){
     out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
   }catch(e){
     out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+esc(e?.message||e)+'</small></div>';
-  }finally{out.setAttribute('aria-busy','false')}
+  }finally{out.setAttribute('aria-busy','false');refreshForecastFocus(view)}
 }
 function refreshForecastFocus(view){
   const old=$('.forecast-focus',view);if(old)old.outerHTML=forecastContextHtml(fibUi.symbol);
