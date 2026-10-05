@@ -165,11 +165,14 @@ async function okxJson(endpoint,params){
   };
 }
 
-function parseOkxFundingCsv(csv){
-  const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  return lines.map(line=>{
-    const r=line.split(',');
-    if(r.length<3||r[0]!=='BTC-USDT-SWAP')throw new Error('OKX_FUNDING_ARCHIVE_SCHEMA');
+export function parseOkxFundingCsv(csv){
+  const lines=String(csv||'').replace(/^\uFEFF/,'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!lines.length)return[];
+  const header=lines[0].split(',').map(x=>x.trim().toLowerCase());
+  if(header.join(',')!=='instrument_name,funding_rate,funding_time')throw new Error('OKX_FUNDING_ARCHIVE_SCHEMA');
+  return lines.slice(1).map(line=>{
+    const r=line.split(',').map(x=>x.trim());
+    if(r.length!==3||r[0]!=='BTC-USDT-SWAP')throw new Error('OKX_FUNDING_ARCHIVE_SCHEMA');
     const fundingRate=Number(r[1]),fundingTime=Number(r[2]);
     if(!Number.isFinite(fundingRate)||!Number.isFinite(fundingTime))throw new Error('OKX_FUNDING_ARCHIVE_ROW');
     return{fundingTime,fundingRate};

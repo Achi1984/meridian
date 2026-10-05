@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {parseOkxFundingCsv} from '../scripts/collect-cross-venue-funding-edge-v1-source.mjs';
 import {
   CROSS_VENUE_FUNDING_EDGE_V1_SOURCE as BASE,
   canonicalFundingTime,normalizeFunding,normalizeMarks,commonFundingTimes,
@@ -115,4 +116,16 @@ test('source receipt ignores collection time and receipt completion order',()=>{
   p.provenance.okx.markPageReceipts.reverse();
   const b=sourceReceipt(p,contract);
   assert.equal(a.digest,b.digest);
+});
+
+
+test('OKX funding archive parser accepts only the verified official header schema',()=>{
+  const csv='instrument_name,funding_rate,funding_time\nBTC-USDT-SWAP,-0.0001360076771935,1646064000000\nBTC-USDT-SWAP,0.000084197161794,1646121600000\n';
+  assert.deepEqual(parseOkxFundingCsv(csv),[
+    {fundingTime:1646064000000,fundingRate:-0.0001360076771935},
+    {fundingTime:1646121600000,fundingRate:0.000084197161794}
+  ]);
+  assert.deepEqual(parseOkxFundingCsv('\uFEFF'+csv),parseOkxFundingCsv(csv));
+  assert.throws(()=>parseOkxFundingCsv('symbol,rate,time\nBTC-USDT-SWAP,0.1,1\n'),/OKX_FUNDING_ARCHIVE_SCHEMA/);
+  assert.throws(()=>parseOkxFundingCsv('instrument_name,funding_rate,funding_time\nETH-USDT-SWAP,0.1,1\n'),/OKX_FUNDING_ARCHIVE_SCHEMA/);
 });
