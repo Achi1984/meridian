@@ -53,4 +53,16 @@ The collector independently checks the same stage lock before network access.
 
 The resulting run is source-evidence only. A successful source audit does not unlock any later stage. A failed or inconclusive source audit also does not permit rule rescue inside V2.
 
+## Canonical source evidence lineage
+
+The canonical V2 source evidence is fixed before any source result is known:
+
+1. **Canonical run.** The canonical source workflow lineage is the first V2 source workflow run triggered by the merge commit of this authorization PR. Its `head_sha` must equal that merge commit. A later workflow run created by another commit can never replace this canonical lineage.
+2. **Transport/infrastructure aborts and retry limit.** A failure is retryable only when execution aborts before `validateCrossVenueV2Source` produces a result because of transport or infrastructure failure, including exhausted HTTP retry handling, provider/network unavailability, GitHub runner failure or timeout. Such an abort is not a source result. Only a GitHub re-run of the same canonical workflow run on the same merge commit and unchanged repository tree is allowed. At most **two retries after the initial attempt** are allowed, for **three total attempts**. Every attempt and its classification must be recorded in `MERIDIAN_HANDOFF.md`.
+3. **Final source-semantic result.** Any completed `validateCrossVenueV2Source` result is final for V2. An `ok:false` result is `CROSS_VENUE_V2_SOURCE_FAIL` and cannot be retried, rescued or replaced. A deterministic schema/parser/integrity failure after the relevant source object has been fully downloaded is also a final source-semantic result, not a transport retry. A successful `ok:true` result is final source evidence but still authorizes no later stage by itself.
+4. **Later runs are diagnostic only.** A source run produced by any different commit is diagnostic and cannot replace the canonical source evidence. It may only confirm determinism when its canonical source-receipt digest is exactly identical to the canonical receipt digest. Any digest difference is `CROSS_VENUE_V2_SOURCE_DETERMINISM_FAILURE`, not an alternative evidence choice, and blocks further research progression.
+5. **Durable persistence before transition.** Before any later research-stage transition, a separate reviewed source-evaluation PR must persist the canonical `runId`, `runAttempt`, merge `commitSha`, `artifactId` and `receiptDigest` in repository continuity/evidence state. This must occur before artifact retention expires. Until that evaluation PR is merged, V2 remains at `SOURCE_AUDIT`.
+
+These rules prevent both "retry until green" evidence selection and accidental termination from pure transport failure.
+
 Any subsequent stage transition requires a separate reviewed PR under `RESEARCH_STAGE_TRANSITION` / `SPLIT_OR_STAGE_LOCK`.
