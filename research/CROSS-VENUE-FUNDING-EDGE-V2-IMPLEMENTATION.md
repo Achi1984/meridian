@@ -112,25 +112,33 @@ Any successor attempt requires a new, independently preregistered ruleset.
 
 Flat runs remain entry-blocked until Recovery.
 
-Recovery requires all of:
+Recovery at common settlement timestamp `T` requires all of:
 
 1. three consecutive common on-grid scheduled settlements after the latest integrity event;
-2. no new integrity event before the third settlement;
-3. complete, unique, confirmed hourly marks for both venues from the first required hour after degradation detection through the third recovery settlement.
+2. no new integrity event with `detectionTime <= T` before the third settlement;
+3. complete, unique, confirmed hourly marks for both venues from the first required hourly candle after the latest degradation reset through the last candle that has closed by `T`, i.e. through `openTime = T - 1h`.
 
-A funding-only recovery cannot reopen entries while mark integrity is still unresolved.
+The candle with `openTime = T` closes only at `T + 1h` and cannot affect a Recovery decision at `T`.
+
+A funding-only recovery cannot reopen entries while mark integrity is still unresolved. An integrity event whose `detectionTime > T` cannot retroactively block Recovery at `T`.
 
 ## Entry source completeness / freshness
 
-A V2 entry can be eligible only when:
+A V2 entry decision at common funding timestamp `t` may use only information available by `t`.
+
+Entry can be eligible only when:
 
 - integrity state is `HEALTHY`;
-- both venues have exactly one authoritative on-grid funding record at the decision timestamp;
+- both venues have exactly one authoritative on-grid funding record at each of `t-16h`, `t-8h` and `t`;
 - the decision timestamp is within the frozen decision window;
-- the required entry mark row on each venue is unique, confirmed and exactly at the first hourly timestamp strictly after the decision;
+- the last fully closed hourly mark before the decision, `openTime = t-1h`, is unique and confirmed on both venues;
 - the latest three common spreads are formed only from completed eligible common funding timestamps.
 
-Stale, missing, duplicate or unconfirmed inputs block entry.
+The entry execution reference remains the mark OPEN at `t+1h`. The decision at `t` must not inspect whether that future candle will later be complete, unique or confirmed.
+
+If an ENTRY decision is active and the `t+1h` entry candle on either venue is later found missing, duplicated, unconfirmed or otherwise invalid at its causal detection time `t+2h`, the entry is treated as already open/in execution for fail-closed research classification and the affected stage becomes terminal `INCONCLUSIVE`. The anomaly must never be converted retrospectively into “no entry”.
+
+Missing, duplicate or unconfirmed information already observable by `t` blocks the entry as freshness/integrity failure. Information with a later detection timestamp cannot influence the decision at `t`.
 
 ## Split
 
