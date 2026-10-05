@@ -14,7 +14,7 @@ The exact source boundaries were derived before V2 source collection or strategy
 Probe run: `37280311203`  
 Probe HEAD: `80e7afddc7849197b608875bf6d6abec4f1b9bce`
 
-The probe emitted no rates, prices, signals, positions or PnL.
+The probe emitted no rates, prices, signals, positions or PnL. The final V2 source contract embeds the probe run/head and the four provider evidence SHA-256 values, so every later source receipt is cryptographically bound to the pre-result coverage decision.
 
 Frozen boundaries:
 
@@ -135,6 +135,8 @@ Stale, missing, duplicate or unconfirmed inputs block entry.
 ## Split
 
 The 60/20/20 chronological split is still computed from all valid common canonical decision timestamps inside the frozen V2 decision window, independent of strategy PnL or entry eligibility.
+
+For `N` sorted common timestamps the frozen rounding rule is identical to V1: Discovery is indices `[0, floor(0.60N))`, Validation is `[floor(0.60N), floor(0.80N))`, and Holdout is the remainder `[floor(0.80N), N)`.
 
 A timestamp made ambiguous by duplicate funding is not a valid common decision timestamp because no venue value is selected.
 
