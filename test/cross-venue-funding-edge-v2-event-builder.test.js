@@ -353,11 +353,17 @@ test('B12 recovery inputs preserve frozen recoveryAt semantics and never carry r
   assert.equal(JSON.stringify(out).includes('recoveryEligible'),false);
 });
 
-test('validatedSource evidence is deeply immutable after validation',()=>{
+test('validatedSource evidence is deeply immutable and copied handles are rejected',()=>{
   const source=validated(BASE);
   assert.throws(()=>source.validation.integrityEvents.push({kind:'MISSING_MARK'}),/read only|not extensible|object is not extensible|Cannot add property/i);
   assert.throws(()=>{source.validation.receipt.dataDigests.binanceFunding='f'.repeat(64)},/read only|Cannot assign/i);
   assert.throws(()=>{source.normalized.binanceMarks[0].close=999},/read only|Cannot assign/i);
+
+  const forged={...source};
+  assert.throws(
+    ()=>buildCrossVenueV2EventStream({validatedSource:forged,split:'discovery'}),
+    /VALIDATED_SOURCE_REQUIRED/
+  );
 });
 
 test('B13 malformed package, receipt, expected digest and row data fail closed',()=>{
