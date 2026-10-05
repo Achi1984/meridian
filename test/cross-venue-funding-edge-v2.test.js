@@ -5,7 +5,7 @@ import {
   strictNum,costBreakdown,fundingSpread,conservativeProjection,entryDecision,
   remainingFundingIntervals,exitDecision,fundingCashflow,basisPnl,directionLegs,
   positionOpenAtDetection,degradationOutcome,assertV2StageAdvanceAllowed,
-  reconcileCycleAccounting
+  reconcileCycleAccounting,tradePathDigest,scenarioPathIdentity
 } from '../research/cross-venue-funding-edge-v2.js';
 
 const BAD=[null,'','  ',false,true,[],NaN];
@@ -121,6 +121,8 @@ test('open-position degradation is terminal INCONCLUSIVE and cannot advance',()=
   const flat=degradationOutcome({positionOpenAtDetection:false});
   assert.equal(flat.status,'DATA_DEGRADED');
   assert.equal(flat.terminal,false);
+  assert.throws(()=>assertV2StageAdvanceAllowed(flat),/STAGE_ADVANCE_BLOCKED/);
+  assert.equal(assertV2StageAdvanceAllowed({status:'PASS',terminal:false,mayAdvance:true}),true);
 });
 
 test('cycle accounting reconciles funding plus basis minus costs to equity delta',()=>{
@@ -135,14 +137,13 @@ test('cycle accounting reconciles funding plus basis minus costs to equity delta
   assert.equal(r.expectedDelta,16);
   assert.equal(r.actualDelta,16);
   assert.equal(r.ok,true);
-  const bad=reconcileCycleAccounting({
+  assert.throws(()=>reconcileCycleAccounting({
     fundingCashflows:[10,-2,5],
     basisPnlUsd:7,
     costsUsd:4,
     openingEquity:20000,
     closingEquity:20015
-  });
-  assert.equal(bad.ok,false);
+  }),/ACCOUNTING_RECONCILIATION/);
 });
 
 const H=60*60*1000;
@@ -155,4 +156,22 @@ test('frozen V2 config remains BTC-only and leverage-neutral',()=>{
   assert.equal(cfg.reservedCapital,20000);
   assert.equal(cfg.maxHoldingHours,24);
   assert.equal(cfg.fundingIntervalMs,8*H);
+});
+
+
+test('baseline and stress scenarios preserve an identical trade path identity',()=>{
+  const path=[
+    {venue:'BINANCE',side:'LONG',time:1760000000000,qty:.1,mark:100000},
+    {venue:'OKX',side:'SHORT',time:1760000000000,qty:.1,mark:100010},
+    {venue:'BINANCE',side:'LONG',time:1760086400000,qty:.1,mark:100500},
+    {venue:'OKX',side:'SHORT',time:1760086400000,qty:.1,mark:100490}
+  ];
+  const digest=tradePathDigest(path);
+  const base=scenarioPathIdentity(path,'baseline');
+  const stress=scenarioPathIdentity(path,'stress');
+  assert.match(digest,/^[a-f0-9]{64}$/);
+  assert.equal(base.tradePathDigest,digest);
+  assert.equal(stress.tradePathDigest,digest);
+  assert.equal(base.slippageBpsPerFill,3);
+  assert.equal(stress.slippageBpsPerFill,6);
 });
