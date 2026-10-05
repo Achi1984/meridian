@@ -43,7 +43,13 @@ function splitLines(csv){
 export function parseBinanceMarkCsv(csv){
   const lines=splitLines(csv);
   if(!lines.length)return[];
-  const data=/^\d/.test(lines[0])?lines:lines.slice(1);
+  let data=lines;
+  if(!/^\d/.test(lines[0])){
+    const header=lines[0].split(',').map(x=>x.trim().toLowerCase());
+    if(header.length<5||header[0]!=='open_time'||header[1]!=='open'||header[2]!=='high'||header[3]!=='low'||header[4]!=='close')
+      throw new Error('BINANCE_MARK_ARCHIVE_SCHEMA');
+    data=lines.slice(1);
+  }
   return data.map(line=>{
     const r=line.split(',').map(x=>x.trim());
     if(r.length<5)throw new Error('BINANCE_MARK_ARCHIVE_SCHEMA');
@@ -64,8 +70,8 @@ export function parseBinanceFundingCsv(csv){
   const first=lines[0].split(',').map(x=>x.trim()),lower=first.map(x=>x.toLowerCase());
   let ti=0,ri=2,data=lines;
   if(!/^\d/.test(lines[0])){
-    ti=lower.indexOf('calc_time');if(ti<0)ti=lower.indexOf('fundingtime');
-    ri=lower.indexOf('last_funding_rate');if(ri<0)ri=lower.indexOf('fundingrate');
+    ti=lower.indexOf('calc_time');
+    ri=lower.indexOf('last_funding_rate');
     if(ti<0||ri<0)throw new Error('BINANCE_FUNDING_ARCHIVE_SCHEMA');
     data=lines.slice(1);
   }
@@ -97,14 +103,14 @@ export function parseOkxFundingCsv(csv){
 export function parseOkxMarkRows(rows=[]){
   if(!Array.isArray(rows))throw new Error('OKX_MARK_PAGE_SCHEMA');
   return rows.map(row=>{
-    if(!Array.isArray(row)||row.length<6||String(row[5])!=='1')throw new Error('OKX_MARK_PAGE_ROW');
+    if(!Array.isArray(row)||row.length<6||!['0','1'].includes(String(row[5])))throw new Error('OKX_MARK_PAGE_ROW');
     return{
       openTime:strictCsvNumber(row[0],'OKX_MARK_PAGE_ROW',{positive:true,integer:true}),
       open:strictCsvNumber(row[1],'OKX_MARK_PAGE_ROW',{positive:true}),
       high:strictCsvNumber(row[2],'OKX_MARK_PAGE_ROW',{positive:true}),
       low:strictCsvNumber(row[3],'OKX_MARK_PAGE_ROW',{positive:true}),
       close:strictCsvNumber(row[4],'OKX_MARK_PAGE_ROW',{positive:true}),
-      confirmed:true
+      confirmed:String(row[5])==='1'
     };
   });
 }
