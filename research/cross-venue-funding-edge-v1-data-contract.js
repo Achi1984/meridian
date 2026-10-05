@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 export const CROSS_VENUE_FUNDING_EDGE_V1_SOURCE=Object.freeze({
   schema:'CROSS-VENUE-FUNDING-EDGE-V1-SOURCE-1',
   symbol:'BTCUSDT',
-  start:'2021-01-01T00:00:00.000Z',
+  start:'2022-03-01T00:00:00.000Z',
   end:'2026-09-30T23:59:59.999Z',
   markInterval:'1h',
   markIntervalMs:60*60*1000,
@@ -12,7 +12,7 @@ export const CROSS_VENUE_FUNDING_EDGE_V1_SOURCE=Object.freeze({
   minCommonFundingDecisions:100,
   venues:Object.freeze({
     binance:Object.freeze({market:'USD-M-PERPETUAL',source:'BINANCE_VISION'}),
-    bybit:Object.freeze({market:'LINEAR-USDT-PERPETUAL',source:'BYBIT_V5_PUBLIC'})
+    okx:Object.freeze({market:'USDT-SWAP',source:'OKX_PUBLIC_HISTORY'})
   })
 });
 
@@ -40,7 +40,7 @@ export function normalizeMarks(rows=[],venue){
     if(Array.isArray(x))return{venue,openTime:Number(x[0]),open:Number(x[1]),high:Number(x[2]),low:Number(x[3]),close:Number(x[4])};
     return{
       venue,
-      openTime:Number(x?.openTime??x?.startTime??x?.time??x?.t),
+      openTime:Number(x?.openTime??x?.startTime??x?.time??x?.t??x?.ts),
       open:Number(x?.open??x?.openPrice??x?.o),
       high:Number(x?.high??x?.highPrice??x?.h),
       low:Number(x?.low??x?.lowPrice??x?.l),
@@ -53,9 +53,9 @@ function duplicate(values=[]){return new Set(values).size!==values.length}
 function exactCadence(rows,step){for(let i=1;i<rows.length;i++)if(rows[i].openTime-rows[i-1].openTime!==step)return{ok:false,after:rows[i-1].openTime,before:rows[i].openTime};return{ok:true}}
 function fundingGap(rows,maxGap){for(let i=1;i<rows.length;i++)if(rows[i].rawTime-rows[i-1].rawTime>maxGap)return{ok:false,after:rows[i-1].rawTime,before:rows[i].rawTime,gapMs:rows[i].rawTime-rows[i-1].rawTime};return{ok:true}}
 
-export function commonFundingTimes(binanceFunding=[],bybitFunding=[]){
+export function commonFundingTimes(binanceFunding=[],okxFunding=[]){
   const b=new Set(binanceFunding.map(x=>x.time).filter(Number.isFinite));
-  return [...new Set(bybitFunding.map(x=>x.time).filter(t=>Number.isFinite(t)&&b.has(t)))].sort((a,b)=>a-b);
+  return [...new Set(okxFunding.map(x=>x.time).filter(t=>Number.isFinite(t)&&b.has(t)))].sort((a,b)=>a-b);
 }
 
 export function splitCommonTimes(times=[]){
@@ -71,42 +71,46 @@ export function splitCommonTimes(times=[]){
 }
 
 function stableSourceProvenance(provenance={}){
-  const cleanReceipt=x=>({endpoint:x?.endpoint??null,params:x?.params??{},sha256:x?.sha256??null});
+  const cleanQueryReceipt=x=>({endpoint:x?.endpoint??null,params:x?.params??{},sha256:x?.sha256??null});
+  const cleanArchiveReceipt=x=>({filename:x?.filename??null,url:x?.url??null,dateTs:x?.dateTs??null,sha256:x?.sha256??null});
+  const sortJson=(a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b));
   return{
     binance:{
       provider:provenance?.binance?.provider??null,
       archive:provenance?.binance?.archive??null,
       receipts:[...(provenance?.binance?.receipts||[])].map(x=>({kind:x?.kind??null,scope:x?.scope??null,rel:x?.rel??null,sha256:x?.sha256??null})).sort((a,b)=>String(a.rel).localeCompare(String(b.rel)))
     },
-    bybit:{
-      provider:provenance?.bybit?.provider??null,
-      baseUrl:provenance?.bybit?.baseUrl??null,
-      fundingPageReceipts:(provenance?.bybit?.fundingPageReceipts||[]).map(cleanReceipt),
-      markPageReceipts:(provenance?.bybit?.markPageReceipts||[]).map(cleanReceipt)
+    okx:{
+      provider:provenance?.okx?.provider??null,
+      baseUrl:provenance?.okx?.baseUrl??null,
+      fundingQueryReceipts:[...(provenance?.okx?.fundingQueryReceipts||[])].map(cleanQueryReceipt).sort(sortJson),
+      fundingArchiveReceipts:[...(provenance?.okx?.fundingArchiveReceipts||[])].map(cleanArchiveReceipt).sort((a,b)=>String(a.filename).localeCompare(String(b.filename))),
+      markPageReceipts:[...(provenance?.okx?.markPageReceipts||[])].map(cleanQueryReceipt).sort(sortJson)
     },
     binanceChecksumsVerified:provenance?.binanceChecksumsVerified===true,
-    bybitPagesHashed:provenance?.bybitPagesHashed===true,
+    okxFundingArchivesHashed:provenance?.okxFundingArchivesHashed===true,
+    okxMarkPagesHashed:provenance?.okxMarkPagesHashed===true,
     strategyPnlCalculated:provenance?.strategyPnlCalculated===true
   };
 }
 
-export function sourceReceipt({binanceFunding=[],bybitFunding=[],binanceMarks=[],bybitMarks=[],provenance={}}={},contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
-  const bf=normalizeFunding(binanceFunding,'BINANCE',contract),yf=normalizeFunding(bybitFunding,'BYBIT',contract);
-  const bm=normalizeMarks(binanceMarks,'BINANCE'),ym=normalizeMarks(bybitMarks,'BYBIT');
-  const common=commonFundingTimes(bf,yf),split=splitCommonTimes(common),stableProvenance=stableSourceProvenance(provenance);
+export function sourceReceipt({binanceFunding=[],okxFunding=[],binanceMarks=[],okxMarks=[],provenance={}}={},contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
+  const bf=normalizeFunding(binanceFunding,'BINANCE',contract),of=normalizeFunding(okxFunding,'OKX',contract);
+  const bm=normalizeMarks(binanceMarks,'BINANCE'),om=normalizeMarks(okxMarks,'OKX');
+  const common=commonFundingTimes(bf,of),split=splitCommonTimes(common),stableProvenance=stableSourceProvenance(provenance);
   const symbols={
     binance:{funding:bf.length,marks:bm.length,firstFunding:bf[0]?.rawTime??null,lastFunding:bf.at(-1)?.rawTime??null,firstMark:bm[0]?.openTime??null,lastMark:bm.at(-1)?.openTime??null,digest:hash({funding:bf,marks:bm})},
-    bybit:{funding:yf.length,marks:ym.length,firstFunding:yf[0]?.rawTime??null,lastFunding:yf.at(-1)?.rawTime??null,firstMark:ym[0]?.openTime??null,lastMark:ym.at(-1)?.openTime??null,digest:hash({funding:yf,marks:ym})}
+    okx:{funding:of.length,marks:om.length,firstFunding:of[0]?.rawTime??null,lastFunding:of.at(-1)?.rawTime??null,firstMark:om[0]?.openTime??null,lastMark:om.at(-1)?.openTime??null,digest:hash({funding:of,marks:om})}
   };
   const core={schema:contract.schema,contract,provenance:stableProvenance,symbols,commonFundingDecisions:common.length,split};
   return{...core,digest:hash(core)};
 }
 
-export function validateCrossVenueSource({binanceFunding=[],bybitFunding=[],binanceMarks=[],bybitMarks=[],provenance={}}={},contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
+export function validateCrossVenueSource({binanceFunding=[],okxFunding=[],binanceMarks=[],okxMarks=[],provenance={}}={},contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
   const start=Date.parse(contract.start),end=Date.parse(contract.end),step=contract.markIntervalMs,maxFundingGap=contract.nominalFundingIntervalMs+contract.timestampToleranceMs;
   const rawSets=[
     ['BINANCE',binanceFunding,binanceMarks],
-    ['BYBIT',bybitFunding,bybitMarks]
+    ['OKX',okxFunding,okxMarks]
   ];
   const normalized={};
   for(const [venue,rawFunding,rawMarks] of rawSets){
@@ -119,7 +123,7 @@ export function validateCrossVenueSource({binanceFunding=[],bybitFunding=[],bina
     if(duplicate(funding.map(x=>x.rawTime))||duplicate(funding.map(x=>x.time)))return{ok:false,reason:venue+'_DUPLICATE_FUNDING'};
     if(duplicate(marks.map(x=>x.openTime)))return{ok:false,reason:venue+'_DUPLICATE_MARK'};
     if((rawFunding||[]).some((x,i)=>i>0&&Number(x?.fundingTime??x?.fundingRateTimestamp??x?.time??x?.ts)<Number(rawFunding[i-1]?.fundingTime??rawFunding[i-1]?.fundingRateTimestamp??rawFunding[i-1]?.time??rawFunding[i-1]?.ts)))return{ok:false,reason:venue+'_UNORDERED_FUNDING'};
-    if((rawMarks||[]).some((x,i)=>i>0&&Number(x?.openTime??x?.startTime??x?.time??x?.t)<Number(rawMarks[i-1]?.openTime??rawMarks[i-1]?.startTime??rawMarks[i-1]?.time??rawMarks[i-1]?.t)))return{ok:false,reason:venue+'_UNORDERED_MARK'};
+    if((rawMarks||[]).some((x,i)=>i>0&&Number(x?.openTime??x?.startTime??x?.time??x?.t??x?.ts)<Number(rawMarks[i-1]?.openTime??rawMarks[i-1]?.startTime??rawMarks[i-1]?.time??rawMarks[i-1]?.t??rawMarks[i-1]?.ts)))return{ok:false,reason:venue+'_UNORDERED_MARK'};
     const cadence=exactCadence(marks,step);if(!cadence.ok)return{ok:false,reason:venue+'_MARK_CADENCE_GAP',...cadence};
     const fgap=fundingGap(funding,maxFundingGap);if(!fgap.ok)return{ok:false,reason:venue+'_FUNDING_CADENCE_GAP',...fgap};
     if(marks[0].openTime!==start)return{ok:false,reason:venue+'_MARK_START_MISMATCH',actual:marks[0].openTime,expected:start};
@@ -129,17 +133,18 @@ export function validateCrossVenueSource({binanceFunding=[],bybitFunding=[],bina
     if(funding.some(x=>x.rawTime<start||x.rawTime>end))return{ok:false,reason:venue+'_FUNDING_OUT_OF_RANGE'};
     if(marks.some(x=>x.openTime<start||x.openTime>end))return{ok:false,reason:venue+'_MARK_OUT_OF_RANGE'};
   }
-  const common=commonFundingTimes(normalized.BINANCE.funding,normalized.BYBIT.funding);
+  const common=commonFundingTimes(normalized.BINANCE.funding,normalized.OKX.funding);
   if(common.length<contract.minCommonFundingDecisions)return{ok:false,reason:'COMMON_FUNDING_DECISIONS_LT_'+contract.minCommonFundingDecisions,count:common.length};
   const split=splitCommonTimes(common);if(!split.ok)return{ok:false,reason:split.reason};
   if(provenance?.binanceChecksumsVerified!==true)return{ok:false,reason:'BINANCE_CHECKSUMS_NOT_VERIFIED'};
-  if(provenance?.bybitPagesHashed!==true)return{ok:false,reason:'BYBIT_PAGE_RECEIPTS_NOT_VERIFIED'};
+  if(provenance?.okxFundingArchivesHashed!==true)return{ok:false,reason:'OKX_FUNDING_ARCHIVES_NOT_HASHED'};
+  if(provenance?.okxMarkPagesHashed!==true)return{ok:false,reason:'OKX_MARK_PAGE_RECEIPTS_NOT_VERIFIED'};
   return{
     ok:true,
     commonFundingDecisions:common.length,
     commonStart:common[0],
     commonEnd:common.at(-1),
     split,
-    receipt:sourceReceipt({binanceFunding,bybitFunding,binanceMarks,bybitMarks,provenance},contract)
+    receipt:sourceReceipt({binanceFunding,okxFunding,binanceMarks,okxMarks,provenance},contract)
   };
 }

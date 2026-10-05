@@ -7,7 +7,7 @@ import {
 } from '../research/cross-venue-funding-edge-v1-data-contract.js';
 
 const H=60*60*1000;
-const START=Date.parse('2021-01-01T00:00:00.000Z');
+const START=Date.parse('2022-03-01T00:00:00.000Z');
 const END=START+48*H-1;
 const contract={...BASE,start:new Date(START).toISOString(),end:new Date(END).toISOString(),minCommonFundingDecisions:5};
 
@@ -20,12 +20,17 @@ function funding(jitter=0){
 function pack(){
   return{
     binanceFunding:funding(2),
-    bybitFunding:funding(47).map(x=>({fundingRateTimestamp:x.fundingTime,fundingRate:x.fundingRate})),
+    okxFunding:funding(47),
     binanceMarks:marks(),
-    bybitMarks:marks().map(x=>({startTime:x.openTime,openPrice:x.open,highPrice:x.high,lowPrice:x.low,closePrice:x.close})),
-    provenance:{binanceChecksumsVerified:true,bybitPagesHashed:true}
+    okxMarks:marks().map(x=>[String(x.openTime),String(x.open),String(x.high),String(x.low),String(x.close),'1']),
+    provenance:{binanceChecksumsVerified:true,okxFundingArchivesHashed:true,okxMarkPagesHashed:true}
   };
 }
+
+test('production source starts at objectively proven OKX funding archive coverage',()=>{
+  assert.equal(BASE.start,'2022-03-01T00:00:00.000Z');
+  assert.equal(BASE.venues.okx.source,'OKX_PUBLIC_HISTORY');
+});
 
 test('funding timestamps canonicalize only inside one-second tolerance',()=>{
   assert.equal(canonicalFundingTime(START+999,contract),START);
@@ -35,9 +40,9 @@ test('funding timestamps canonicalize only inside one-second tolerance',()=>{
 test('normalized common funding decisions preserve six shared settlements',()=>{
   const p=pack();
   const b=normalizeFunding(p.binanceFunding,'BINANCE',contract);
-  const y=normalizeFunding(p.bybitFunding,'BYBIT',contract);
-  assert.equal(commonFundingTimes(b,y).length,6);
-  const split=splitCommonTimes(commonFundingTimes(b,y));
+  const o=normalizeFunding(p.okxFunding,'OKX',contract);
+  assert.equal(commonFundingTimes(b,o).length,6);
+  const split=splitCommonTimes(commonFundingTimes(b,o));
   assert.equal(split.discovery.count,3);
   assert.equal(split.validation.count,1);
   assert.equal(split.holdout.count,2);
@@ -51,9 +56,9 @@ test('valid source requires complete marks, funding and provenance receipts',()=
   assert.match(r.receipt.digest,/^[a-f0-9]{64}$/);
 });
 
-test('source fails closed on mark cadence gap',()=>{
-  const p=pack();p.bybitMarks.splice(10,1);
-  assert.equal(validateCrossVenueSource(p,contract).reason,'BYBIT_MARK_CADENCE_GAP');
+test('source fails closed on OKX mark cadence gap',()=>{
+  const p=pack();p.okxMarks.splice(10,1);
+  assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_MARK_CADENCE_GAP');
 });
 
 test('source fails closed on funding cadence gap beyond eight hours plus jitter',()=>{
@@ -62,33 +67,52 @@ test('source fails closed on funding cadence gap beyond eight hours plus jitter'
 });
 
 test('source fails closed on provider receipt failures',()=>{
-  const p=pack();p.provenance.bybitPagesHashed=false;
-  assert.equal(validateCrossVenueSource(p,contract).reason,'BYBIT_PAGE_RECEIPTS_NOT_VERIFIED');
+  const p=pack();p.provenance.okxFundingArchivesHashed=false;
+  assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_FUNDING_ARCHIVES_NOT_HASHED');
+  p.provenance.okxFundingArchivesHashed=true;p.provenance.okxMarkPagesHashed=false;
+  assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_MARK_PAGE_RECEIPTS_NOT_VERIFIED');
 });
 
-test('source rejects canonical funding collisions created by timestamp jitter',()=>{
-  const p=pack();p.bybitFunding[1].fundingRateTimestamp=p.bybitFunding[0].fundingRateTimestamp+1;
-  assert.equal(validateCrossVenueSource(p,contract).reason,'BYBIT_DUPLICATE_FUNDING');
+test('source rejects canonical OKX funding collisions created by timestamp jitter',()=>{
+  const p=pack();p.okxFunding[1].fundingTime=p.okxFunding[0].fundingTime+1;
+  assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_DUPLICATE_FUNDING');
 });
 
-test('normalizers expose mark and funding semantics deterministically',()=>{
+test('normalizers expose OKX mark and funding semantics deterministically',()=>{
   const p=pack();
-  assert.equal(normalizeMarks(p.bybitMarks,'BYBIT')[0].open,100);
-  assert.equal(normalizeFunding(p.bybitFunding,'BYBIT',contract)[0].rate,.0001);
+  assert.equal(normalizeMarks(p.okxMarks,'OKX')[0].open,100);
+  assert.equal(normalizeFunding(p.okxFunding,'OKX',contract)[0].rate,.0001);
 });
 
-
-test('source receipt ignores collection time and Binance receipt completion order',()=>{
+test('source receipt ignores collection time and receipt completion order',()=>{
   const p=pack();
-  p.provenance.collectedAt='2026-10-04T20:00:00Z';
+  p.provenance.collectedAt='2026-10-05T05:00:00Z';
   p.provenance.binance={provider:'Binance Vision',archive:'https://data.binance.vision',receipts:[
     {kind:'funding',scope:'monthly',rel:'z',sha256:'2'},
     {kind:'marks',scope:'monthly',rel:'a',sha256:'1'}
   ]};
-  p.provenance.bybit={provider:'Bybit',baseUrl:'https://api.bybit.com',fundingPageReceipts:[{endpoint:'/f',params:{a:'1'},sha256:'f'}],markPageReceipts:[{endpoint:'/m',params:{a:'1'},sha256:'m'}]};
+  p.provenance.okx={
+    provider:'OKX public historical market data',
+    baseUrl:'https://www.okx.com',
+    fundingQueryReceipts:[
+      {endpoint:'/history',params:{begin:'2'},sha256:'q2'},
+      {endpoint:'/history',params:{begin:'1'},sha256:'q1'}
+    ],
+    fundingArchiveReceipts:[
+      {filename:'z.zip',url:'https://static.okx.com/z',dateTs:2,sha256:'z'},
+      {filename:'a.zip',url:'https://static.okx.com/a',dateTs:1,sha256:'a'}
+    ],
+    markPageReceipts:[
+      {endpoint:'/mark',params:{after:'2'},sha256:'m2'},
+      {endpoint:'/mark',params:{after:'1'},sha256:'m1'}
+    ]
+  };
   const a=sourceReceipt(p,contract);
-  p.provenance.collectedAt='2026-10-04T21:00:00Z';
+  p.provenance.collectedAt='2026-10-05T06:00:00Z';
   p.provenance.binance.receipts.reverse();
+  p.provenance.okx.fundingQueryReceipts.reverse();
+  p.provenance.okx.fundingArchiveReceipts.reverse();
+  p.provenance.okx.markPageReceipts.reverse();
   const b=sourceReceipt(p,contract);
   assert.equal(a.digest,b.digest);
 });
