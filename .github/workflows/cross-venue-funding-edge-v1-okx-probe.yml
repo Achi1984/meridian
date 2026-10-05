@@ -19,21 +19,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Probe OKX funding archive schemas across years
+      - name: Scan every OKX monthly funding archive first row
         shell: bash
         run: |
           node <<'NODE'
           const fs=await import('node:fs');
-          const crypto=await import('node:crypto');
           const base='https://www.okx.com';
-          const months=['2022-03','2022-04','2023-01','2024-01','2025-01','2026-01','2026-09'];
+          const start=new Date('2022-03-01T00:00:00Z'),end=new Date('2026-09-01T00:00:00Z');
+          const months=[];
+          for(let y=start.getUTCFullYear(),m=start.getUTCMonth()+1;y<end.getUTCFullYear()||(y===end.getUTCFullYear()&&m<=end.getUTCMonth()+1);){
+            months.push(y+'-'+String(m).padStart(2,'0'));
+            if(++m===13){m=1;y++}
+          }
           async function getJson(path){
-            const r=await fetch(base+path,{headers:{accept:'application/json','user-agent':'MERIDIAN-source-probe/1.0'},signal:AbortSignal.timeout(20000)});
-            const text=await r.text();
-            if(!r.ok)throw new Error('HTTP '+r.status+' '+path+' '+text.slice(0,200));
-            const j=JSON.parse(text);
-            if(String(j.code)!=='0')throw new Error('OKX '+j.code+' '+j.msg);
-            return j;
+            for(let attempt=0;attempt<5;attempt++){
+              const r=await fetch(base+path,{headers:{accept:'application/json','user-agent':'MERIDIAN-source-probe/1.0'},signal:AbortSignal.timeout(20000)});
+              const text=await r.text();
+              if(r.ok){
+                const j=JSON.parse(text);
+                if(String(j.code)==='0')return j;
+                if(String(j.code)!=='50011')throw new Error('OKX '+j.code+' '+j.msg);
+              } else if(r.status!==429) throw new Error('HTTP '+r.status+' '+path);
+              await new Promise(r=>setTimeout(r,800*(attempt+1)));
+            }
+            throw new Error('RATE_LIMIT '+path);
           }
           for(const ym of months){
             const ts=Date.parse(ym+'-01T00:00:00+08:00');
@@ -43,15 +52,22 @@ jobs:
             const name='BTC-USDT-SWAP-fundingrates-'+ym+'.zip';
             const file=groups.find(x=>x.filename===name);
             if(!file?.url)throw new Error('MISSING '+ym);
-            const r=await fetch(file.url,{signal:AbortSignal.timeout(20000)});
-            if(!r.ok)throw new Error('ZIP HTTP '+r.status+' '+ym);
-            const bytes=Buffer.from(await r.arrayBuffer());
-            fs.writeFileSync('/tmp/okx-'+ym+'.zip',bytes);
-            console.log(JSON.stringify({month:ym,filename:name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')}));
+            const rr=await fetch(file.url,{signal:AbortSignal.timeout(20000)});
+            if(!rr.ok)throw new Error('ZIP_HTTP_'+rr.status+' '+ym);
+            fs.writeFileSync('/tmp/okx-'+ym+'.zip',Buffer.from(await rr.arrayBuffer()));
             await new Promise(r=>setTimeout(r,500));
           }
+          console.log(JSON.stringify({downloaded:months.length}));
           NODE
+
+          bad=0
           for f in /tmp/okx-*.zip; do
-            echo "=== $(basename "$f") ==="
-            unzip -p "$f" | head -n 4
+            ym="$(basename "$f" .zip | sed 's/^okx-//')"
+            first="$(unzip -p "$f" | head -n 1 | tr -d '\r')"
+            case "$first" in
+              BTC-USDT-SWAP,*) ;;
+              *) echo "ANOMALY $ym :: $first"; bad=1 ;;
+            esac
           done
+          echo "scan_bad=$bad"
+          exit "$bad"
