@@ -137,19 +137,21 @@ test('mark completeness requires unique confirmed hourly rows',()=>{
   assert.ok(markIntegrityEvents(normalizeMarks(dup,'BINANCE'),'BINANCE',contract).some(x=>x.kind==='DUPLICATE_MARK'));
 });
 
-test('Recovery requires three consecutive common settlements and complete marks on both venues',()=>{
+test('Recovery requires three consecutive common settlements and complete marks from degradation through recovery',()=>{
   const common=[START+8*H,START+16*H,START+24*H,START+32*H];
   const bm=normalizeMarks(marks(),'BINANCE'),om=normalizeMarks(marks(),'OKX');
   assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:om},contract),START+24*H);
-  const gap=normalizeMarks(marks().filter(x=>x.openTime!==START+12*H),'OKX');
-  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:gap},contract),null);
+  const gapBeforeFirstSettlement=normalizeMarks(marks().filter(x=>x.openTime!==START+4*H),'OKX');
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:gapBeforeFirstSettlement},contract),null);
 });
 
-test('new integrity event inside a recovery sequence resets recovery',()=>{
-  const common=[START+8*H,START+16*H,START+24*H,START+32*H,START+40*H];
+test('new integrity event before or inside a recovery sequence resets the episode clock',()=>{
+  const common=[START+8*H,START+16*H,START+24*H,START+32*H,START+40*H,START+48*H];
   const m=normalizeMarks(marks(),'BINANCE');
-  const events=[{kind:'OFF_GRID_FUNDING',venue:'OKX',detectionTime:START+18*H}];
-  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:events,binanceMarks:m,okxMarks:m},contract),START+40*H);
+  const events=[{kind:'OFF_GRID_FUNDING',venue:'OKX',detectionTime:START+10*H}];
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:events,binanceMarks:m,okxMarks:m},contract),START+32*H);
+  const later=[{kind:'OFF_GRID_FUNDING',venue:'OKX',detectionTime:START+18*H}];
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:later,binanceMarks:m,okxMarks:m},contract),START+40*H);
 });
 
 test('entry requires three fresh common funding inputs and the next confirmed mark on both venues',()=>{
@@ -197,4 +199,24 @@ test('combined integrity ledger is deterministic across venues',()=>{
   assert.ok(e.some(x=>x.kind==='MISSING_SCHEDULED_FUNDING'));
   assert.ok(e.some(x=>x.kind==='MISSING_MARK'));
   assert.deepEqual(e,[...e].sort((a,b)=>a.detectionTime-b.detectionTime||String(a.venue).localeCompare(String(b.venue))||String(a.kind).localeCompare(String(b.kind))||Number(a.scheduledTime??a.rawTime??0)-Number(b.scheduledTime??b.rawTime??0)));
+});
+
+
+test('normalized mark confirmation is type-strict and does not accept provider string aliases',()=>{
+  const row={openTime:START,open:100,high:101,low:99,close:100,confirmed:'1'};
+  const n=normalizeMarks([row],'OKX')[0];
+  assert.equal(n.confirmed,false);
+  assert.ok(markIntegrityEvents([n],'OKX',{...contract,markCoverageEnd:new Date(START).toISOString()}).some(x=>x.kind==='UNCONFIRMED_MARK'));
+});
+
+test('source validation refuses any package that claims strategy PnL was calculated',()=>{
+  const p=pack();
+  p.provenance.strategyPnlCalculated=true;
+  assert.equal(validateCrossVenueV2Source(p,contract).reason,'SOURCE_COLLECTOR_MUST_NOT_CALCULATE_PNL');
+});
+
+test('mark validation rejects impossible OHLC relationships',()=>{
+  const p=pack();
+  p.okxMarks[5]={...p.okxMarks[5],high:98};
+  assert.equal(validateCrossVenueV2Source(p,contract).reason,'OKX_INVALID_MARK');
 });
