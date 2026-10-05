@@ -26,7 +26,7 @@ check(state?.lastCompletedWorkPackage?.build===resume?.build,'last completed wor
 check(state?.lastCompletedWorkPackage?.canonicalMainSha===resume?.sourceOfTruth?.verifiedSha,'last completed work package checkpoint must match resume verified checkpoint');
 check(/^[a-f0-9]{40}$/.test(String(resume?.sourceOfTruth?.verifiedSha||'')),'resume verifiedSha invalid');
 check(handoff.includes(`Build: **${resume.build}**`),'handoff build differs from resume');
-check(handoff.includes(`Verified main checkpoint: **${resume.sourceOfTruth.verifiedSha}**`),'handoff verified checkpoint differs from resume');
+check(handoff.includes(`Verified substantive checkpoint: **${resume.sourceOfTruth.verifiedSha}**`),'handoff verified checkpoint differs from resume');
 check(state?.lastCheckpoint?.build===resume.build,'agent-state checkpoint build differs from resume');
 check(state?.lastCheckpoint?.canonicalMainSha===resume?.sourceOfTruth?.verifiedSha,'agent-state checkpoint main differs from resume verified main');
 const activeLane=resume?.researchDirection?.activeLane||null;
