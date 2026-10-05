@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 export const CROSS_VENUE_FUNDING_EDGE_V2='CROSS-VENUE-FUNDING-EDGE-V2';
 
 export const CROSS_VENUE_FUNDING_EDGE_V2_CONFIG=Object.freeze({
@@ -237,8 +239,9 @@ export function reconcileCycleAccounting({fundingCashflows=[],basisPnlUsd,costsU
   const expectedDelta=fundingUsd+basis-costs;
   const actualDelta=close-open;
   const reconciliationError=actualDelta-expectedDelta;
+  if(Math.abs(reconciliationError)>tol)throw new Error('CROSS_VENUE_V2_ACCOUNTING_RECONCILIATION');
   return{
-    ok:Math.abs(reconciliationError)<=tol,
+    ok:true,
     fundingUsd,
     basisPnlUsd:basis,
     costsUsd:costs,
@@ -246,4 +249,32 @@ export function reconcileCycleAccounting({fundingCashflows=[],basisPnlUsd,costsU
     actualDelta,
     reconciliationError
   };
+}
+
+function canonicalTradePath(path=[]){
+  if(!Array.isArray(path))throw new Error('CROSS_VENUE_V2_INVALID_TRADE_PATH');
+  return path.map((x,i)=>{
+    if(!x||typeof x!=='object')throw new Error('CROSS_VENUE_V2_INVALID_TRADE_PATH');
+    if(!['BINANCE','OKX'].includes(x.venue)||!['LONG','SHORT'].includes(x.side))
+      throw new Error('CROSS_VENUE_V2_INVALID_TRADE_PATH');
+    const time=finiteNumber(x.time),qty=finiteNumber(x.qty),mark=finiteNumber(x.mark);
+    if(time===null||!Number.isSafeInteger(time)||time<=0||qty===null||qty<=0||mark===null||mark<=0)
+      throw new Error('CROSS_VENUE_V2_INVALID_TRADE_PATH');
+    return{index:i,venue:x.venue,side:x.side,time,qty,mark};
+  });
+}
+
+export function tradePathDigest(path=[]){
+  const canonical=canonicalTradePath(path);
+  return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+export function scenarioPathIdentity(path=[],scenario='baseline',cfg=CROSS_VENUE_FUNDING_EDGE_V2_CONFIG){
+  if(!['baseline','stress'].includes(scenario))throw new Error('CROSS_VENUE_V2_INVALID_COST_SCENARIO');
+  const costs=costBreakdown(scenario,cfg);
+  return Object.freeze({
+    scenario,
+    tradePathDigest:tradePathDigest(path),
+    slippageBpsPerFill:costs.slippageBpsPerFill
+  });
 }
