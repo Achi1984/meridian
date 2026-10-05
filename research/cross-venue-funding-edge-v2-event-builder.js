@@ -5,6 +5,7 @@ import {
   normalizeFunding,
   normalizeMarks,
   usableFundingMap,
+  confirmedUniqueMarkSet,
   commonFundingTimes,
   entryInputsReady,
   validateCrossVenueV2Source
@@ -48,6 +49,17 @@ function deepFreezeCopy(x){
   if(isObj(x))return Object.freeze(Object.fromEntries(Object.entries(x).map(([k,v])=>[k,deepFreezeCopy(v)])));
   return x;
 }
+function snapshotJsonData(x){
+  let text;
+  try{text=JSON.stringify(x)}
+  catch{fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SNAPSHOT')}
+  if(typeof text!=='string')fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SNAPSHOT');
+  let parsed;
+  try{parsed=JSON.parse(text)}
+  catch{fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SNAPSHOT')}
+  if(!isObj(parsed))fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SNAPSHOT');
+  return deepFreezeCopy(parsed);
+}
 function canonicalJson(x){return JSON.stringify(canonicalize(x))}
 function digest(x){return sha256(canonicalJson(x))}
 function compareBuilderEvents(a,b){
@@ -90,33 +102,34 @@ function compareRecoveryMarks(a,b){
     Number(a.confirmed)-Number(b.confirmed);
 }
 
-export function validateCrossVenueV2BuilderSource({packageData,expectedReceiptDigest}={}){
+export function validateCrossVenueV2BuilderSource({pkg,expectedReceiptDigest}={}){
   requireExpectedReceipt(expectedReceiptDigest);
-  exactTopLevelKeys(packageData);
-  if(packageData.schema!==PACKAGE_SCHEMA)fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SCHEMA');
-  if(packageData.researchOnly!==true)fail('CROSS_VENUE_V2_BUILDER_RESEARCH_ONLY');
-  if(packageData.executionImpact!==false)fail('CROSS_VENUE_V2_BUILDER_EXECUTION_IMPACT');
-  if(packageData.stage!=='SOURCE_AUDIT')fail('CROSS_VENUE_V2_BUILDER_SOURCE_STAGE');
+  const pkg=snapshotJsonData(pkg);
+  exactTopLevelKeys(pkg);
+  if(pkg.schema!==PACKAGE_SCHEMA)fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SCHEMA');
+  if(pkg.researchOnly!==true)fail('CROSS_VENUE_V2_BUILDER_RESEARCH_ONLY');
+  if(pkg.executionImpact!==false)fail('CROSS_VENUE_V2_BUILDER_EXECUTION_IMPACT');
+  if(pkg.stage!=='SOURCE_AUDIT')fail('CROSS_VENUE_V2_BUILDER_SOURCE_STAGE');
   if(packageData?.provenance?.strategyPnlCalculated!==false)fail('CROSS_VENUE_V2_BUILDER_SOURCE_PNL_FLAG');
-  if(!isDeepStrictEqual(packageData.contract,CROSS_VENUE_FUNDING_EDGE_V2_SOURCE))
+  if(!isDeepStrictEqual(pkg.contract,CROSS_VENUE_FUNDING_EDGE_V2_SOURCE))
     fail('CROSS_VENUE_V2_BUILDER_CONTRACT_MISMATCH');
 
-  const validation=validateCrossVenueV2Source(packageData,CROSS_VENUE_FUNDING_EDGE_V2_SOURCE);
+  const validation=validateCrossVenueV2Source(pkg,CROSS_VENUE_FUNDING_EDGE_V2_SOURCE);
   if(validation.ok!==true)fail('CROSS_VENUE_V2_BUILDER_SOURCE_INVALID:'+String(validation.reason||'UNKNOWN'));
-  if(!isObj(packageData.receipt)||packageData.receipt.digest!==expectedReceiptDigest)
+  if(!isObj(pkg.receipt)||pkg.receipt.digest!==expectedReceiptDigest)
     fail('CROSS_VENUE_V2_BUILDER_RECEIPT_MISMATCH');
   if(validation.receipt.digest!==expectedReceiptDigest)
     fail('CROSS_VENUE_V2_BUILDER_RECOMPUTED_RECEIPT_MISMATCH');
-  if(!isDeepStrictEqual(validation.receipt,packageData.receipt))
+  if(!isDeepStrictEqual(validation.receipt,pkg.receipt))
     fail('CROSS_VENUE_V2_BUILDER_RECEIPT_CONTENT_MISMATCH');
-  if(!Array.isArray(packageData.integrityEvents)||!isDeepStrictEqual(validation.integrityEvents,packageData.integrityEvents))
+  if(!Array.isArray(pkg.integrityEvents)||!isDeepStrictEqual(validation.integrityEvents,pkg.integrityEvents))
     fail('CROSS_VENUE_V2_BUILDER_INTEGRITY_EVENTS_MISMATCH');
 
   const normalized=Object.freeze({
-    binanceFunding:freezeRows(normalizeFunding(packageData.binanceFunding,'BINANCE',CROSS_VENUE_FUNDING_EDGE_V2_SOURCE)),
-    okxFunding:freezeRows(normalizeFunding(packageData.okxFunding,'OKX',CROSS_VENUE_FUNDING_EDGE_V2_SOURCE)),
-    binanceMarks:freezeRows(normalizeMarks(packageData.binanceMarks,'BINANCE')),
-    okxMarks:freezeRows(normalizeMarks(packageData.okxMarks,'OKX'))
+    binanceFunding:freezeRows(normalizeFunding(pkg.binanceFunding,'BINANCE',CROSS_VENUE_FUNDING_EDGE_V2_SOURCE)),
+    okxFunding:freezeRows(normalizeFunding(pkg.okxFunding,'OKX',CROSS_VENUE_FUNDING_EDGE_V2_SOURCE)),
+    binanceMarks:freezeRows(normalizeMarks(pkg.binanceMarks,'BINANCE')),
+    okxMarks:freezeRows(normalizeMarks(pkg.okxMarks,'OKX'))
   });
   const common=Object.freeze(commonFundingTimes(
     normalized.binanceFunding,
@@ -221,25 +234,58 @@ function integrityEvent(event,bounds){
   });
 }
 
-function readinessGapExplained(readiness,t,integrityEvents,contract){
+function uniqueDeepIntegrityEvents(events){
+  const seen=new Set(),out=[];
+  for(const event of events){
+    const key=canonicalJson(event);
+    if(seen.has(key))continue;
+    seen.add(key);
+    out.push(event);
+  }
+  return out;
+}
+
+function readinessGapExplained(readiness,t,integrityEvents,contract,indexes){
   if(readiness.reason==='FUNDING_INPUTS_INCOMPLETE_OR_STALE'){
-    const required=new Set([
+    const required=[
       t-2*contract.fundingIntervalMs,
       t-contract.fundingIntervalMs,
       t
-    ]);
-    return integrityEvents.some(event=>
-      event.time<=t&&
-      ['MISSING_SCHEDULED_FUNDING','DUPLICATE_CANONICAL_FUNDING'].includes(event.integrityKind)&&
-      required.has(event.subjectTime)
+    ];
+    const missing=[];
+    for(const [venue,index] of [
+      ['BINANCE',indexes.binanceFunding],
+      ['OKX',indexes.okxFunding]
+    ]){
+      const usable=usableFundingMap(rowsForTimes(index,required));
+      for(const time of required)if(!usable.has(time))missing.push({venue,time});
+    }
+    return missing.length>0&&missing.every(({venue,time})=>
+      integrityEvents.some(event=>
+        event.time<=t&&
+        event.venue===venue&&
+        ['MISSING_SCHEDULED_FUNDING','DUPLICATE_CANONICAL_FUNDING'].includes(event.integrityKind)&&
+        event.subjectTime===time
+      )
     );
   }
   if(readiness.reason==='MARK_INPUTS_INCOMPLETE_OR_STALE'){
     const requiredMark=t-contract.markIntervalMs;
-    return integrityEvents.some(event=>
-      event.time<=t&&
-      ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK'].includes(event.integrityKind)&&
-      event.subjectTime===requiredMark
+    const missing=[];
+    for(const [venue,index] of [
+      ['BINANCE',indexes.binanceMarks],
+      ['OKX',indexes.okxMarks]
+    ]){
+      const usable=confirmedUniqueMarkSet(index.get(requiredMark)||[]);
+      if(!usable.has(requiredMark))missing.push({venue,time:requiredMark});
+    }
+    return missing.length>0&&missing.every(({venue,time})=>
+      integrityEvents.some(event=>
+        event.time<=t&&
+        event.venue===venue&&
+        ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK'].includes(event.integrityKind)&&
+        event.subjectTime===time
+      )
     );
   }
   return true;
@@ -292,7 +338,7 @@ function slotEvent(time,bounds,validatedSource,integrityEvents,indexes){
     t>=initialWindowEnd&&
     readiness.ready===false&&
     ['FUNDING_INPUTS_INCOMPLETE_OR_STALE','MARK_INPUTS_INCOMPLETE_OR_STALE'].includes(readiness.reason)&&
-    !readinessGapExplained(readiness,t,integrityEvents,contract)
+    !readinessGapExplained(readiness,t,integrityEvents,contract,indexes)
   )fail('CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP');
 
   const segment=segmentFor(t,bounds);
@@ -351,7 +397,9 @@ function streamShape(bounds,recoveryInputsDigest){
 
 function causalIntegrityEvents(validatedSource,bounds){
   const {validation}=requireValidated(validatedSource);
-  return validation.integrityEvents.filter(event=>event.detectionTime<=bounds.streamEnd);
+  return uniqueDeepIntegrityEvents(
+    validation.integrityEvents.filter(event=>event.detectionTime<=bounds.streamEnd)
+  );
 }
 
 function eventCore(validatedSource,bounds){
