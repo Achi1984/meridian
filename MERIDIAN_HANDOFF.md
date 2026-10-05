@@ -800,3 +800,16 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - After reviewed merge, the frozen main-only V2 Source Gate may run the source collector automatically. The resulting run is source evidence only and cannot authorize a later stage.
 - Any later transition requires a separate exact-head cross-model review.
 
+## SSOT UPDATE — 2026-10-05 · Cross-Venue Funding Edge V2 canonical source audit result
+
+- Canonical main/source commit: `63f93aa41b6e054b229309b6fd6fbc2447a92181`.
+- Canonical V2 Source Gate run: `37290831222`, attempt `1`; source job `111700620728`.
+- Attempt classification fixed pre-result: `FINAL_SOURCE_SEMANTIC_RESULT / SUCCESSFUL VALIDATOR RESULT`; no retry was used.
+- Artifact: `11336541442` (`cross-venue-funding-edge-v2-source`), ZIP SHA-256 `97bf9772ed10e741d5a2a0de64ccde7e4dec703178f1b662796b0ce7f3258a32`, source package SHA-256 `a2bb7802a6c6b4298466d16e0225ef616fe36ae2d85ac4af9d020127be4ce91b`.
+- Canonical source receipt digest: `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`.
+- Validator state: `VALID_WITH_INTEGRITY_EPISODES`; 5,019 common funding decision timestamps; strategy PnL calculated = false.
+- Exactly three source-integrity events are preserved, all on OKX 2022-12-18: `FUNDING_GAP`, `MISSING_SCHEDULED_FUNDING` at 16:00 UTC, and authoritative `OFF_GRID_FUNDING` at 18:54 UTC.
+- These events are expected under the frozen V2 semantics and do not invalidate the source contract. Their economic consequence depends on future causal position state and has not been evaluated.
+- V2 remains at `SOURCE_AUDIT`; Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
+- Before any Discovery authorization, implement and review: strict boolean `entryActive`, deterministic degradation episode state machine, pending-entry/open-position wiring, independent cash/equity ledger, and generic causality tests.
+
