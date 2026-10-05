@@ -89,9 +89,13 @@ test('guard rejects byte changes to frozen V2 implementation source accounting o
     'research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md',
     'research/cross-venue-funding-edge-v2.js',
     'research/cross-venue-funding-edge-v2-data-contract.js',
+    'research/cross-venue-funding-edge-v2-ledger.js',
+    'research/cross-venue-funding-edge-v2-runner.js',
     'scripts/collect-cross-venue-funding-edge-v2-source.mjs',
     'test/cross-venue-funding-edge-v2.test.js',
     'test/cross-venue-funding-edge-v2-data-contract.test.js',
+    'test/cross-venue-funding-edge-v2-ledger.test.js',
+    'test/cross-venue-funding-edge-v2-runner.test.js',
     'test/cross-venue-funding-edge-v2-collector.test.js',
     '.github/workflows/cross-venue-funding-edge-v2-source.yml'
   ];
