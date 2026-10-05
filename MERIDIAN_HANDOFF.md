@@ -813,3 +813,9 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - V2 remains at `SOURCE_AUDIT`; Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
 - Before any Discovery authorization, implement and review: strict boolean `entryActive`, deterministic degradation episode state machine, pending-entry/open-position wiring, independent cash/equity ledger, and generic causality tests.
 
+## COORDINATION CHECKPOINT — 2026-10-05 · PR #542 current-base refresh
+
+- While PR #542 awaited the independent Claude SOURCE_RECEIPT / DATA_CONTRACT review, canonical `main` advanced from `63f93aa41b6e054b229309b6fd6fbc2447a92181` to `d4a628fee5cf527e0218b99635d80b9cd91bd0ad` via the unrelated r113 COMMAND liquidation-distance UI change.
+- The main advance touches only UI/version/tests and does not overlap the ten PR #542 source-evaluation/continuity files.
+- This checkpoint intentionally changes no source evidence, receipt, data contract, stage lock, accounting or strategy logic. Its commit exists to force current-base PR CI and therefore invalidates the prior exact-head review request.
+- A new exact-head Claude request is required before merge. V2 remains `SOURCE_AUDIT`; no Source Audit rerun and no strategy PnL.
