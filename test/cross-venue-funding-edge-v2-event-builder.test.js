@@ -155,11 +155,9 @@ function lateMarkPackage(){
 function tailGapPackage({futureRow}={}){
   return cachedFixture('tail-gap-'+String(futureRow),()=>rebuild(BASE,d=>{
     const zero=Date.parse('2026-09-30T00:00:00.000Z');
-    const eight=Date.parse('2026-09-30T08:00:00.000Z');
-    const future=d.okxFunding.find(x=>x.fundingTime===eight);
-    assert.ok(future);
-    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==zero&&x.fundingTime!==eight);
-    if(futureRow===true)d.okxFunding.push({...future},{...future});
+    const six=Date.parse('2026-09-30T06:00:00.000Z');
+    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==zero);
+    if(futureRow===true)d.okxFunding.push({fundingTime:six,fundingRate:.00012});
   }));
 }
 function offgridNearSplitPackage(){
@@ -289,7 +287,7 @@ test('B9 fixed-boundary later mark perturbation cannot change split-local causal
   assert.notEqual(out.packageBoundDigest,BASE_DISCOVERY.packageBoundDigest);
 });
 
-test('B9c future funding row cannot retroactively create a prior-stream FUNDING_GAP',()=>{
+test('B9c future funding row may change gap detail but not the prior split-local gap event or digest',()=>{
   const withFuture=tailGapPackage({futureRow:true});
   const withoutFuture=tailGapPackage({futureRow:false});
   const a=output(withFuture,'holdout',withFuture.receipt.digest);
@@ -305,9 +303,26 @@ test('B9c future funding row cannot retroactively create a prior-stream FUNDING_
   assert.notEqual(a.packageBoundDigest,b.packageBoundDigest);
 
   const retro=e=>e.kind==='FUNDING_GAP'&&e.venue==='OKX'&&e.detectionTime<=end;
-  assert.equal(withFuture.integrityEvents.some(retro),true);
-  assert.equal(withoutFuture.integrityEvents.some(retro),false);
-  assert.equal(a.events.some(e=>e.kind==='INTEGRITY_DETECTION'&&e.integrityKind==='FUNDING_GAP'&&e.venue==='OKX'),false);
+  const globalA=withFuture.integrityEvents.find(retro);
+  const globalB=withoutFuture.integrityEvents.find(retro);
+  assert.ok(globalA);
+  assert.ok(globalB);
+  assert.equal(globalA.detectionTime,globalB.detectionTime);
+  assert.equal(globalA.after,globalB.after);
+  assert.notEqual(globalA.before,globalB.before);
+  assert.notEqual(globalA.gapMs,globalB.gapMs);
+
+  const streamGap=a.events.find(e=>
+    e.kind==='INTEGRITY_DETECTION'&&
+    e.integrityKind==='FUNDING_GAP'&&
+    e.venue==='OKX'&&
+    e.time===globalA.detectionTime
+  );
+  assert.ok(streamGap);
+  assert.deepEqual(Object.keys(streamGap).sort(),[
+    'integrityKind','kind','segment','stableId','subjectTime','time','venue'
+  ]);
+  assert.equal(streamGap.subjectTime,globalA.after);
 });
 
 test('B9b boundary-changing source perturbation cannot pass the original receipt binding',()=>{
