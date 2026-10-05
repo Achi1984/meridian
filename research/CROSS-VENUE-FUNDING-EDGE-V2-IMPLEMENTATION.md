@@ -466,7 +466,7 @@ It returns only semantically normalized mark rows required by frozen `recoveryAt
 - no t+1h entry candle is inspected at decision t;
 - mark anomalies become observable only at their frozen detection timestamp;
 - initial history before three funding observations may be not-ready without error;
-- after the initial window, an incomplete/stale source input without any causally observable integrity event fails closed as `CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP`;
+- after the initial window, an incomplete/stale source input must be explained by an integrity event for the exact missing causal input: funding gaps map to one of the three required settlement times and mark gaps to the exact `t−1h` mark; an unrelated historical integrity event cannot explain it. Otherwise the builder fails closed as `CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP`;
 - input permutations canonicalize to identical output/digests;
 - `provenance.collectedAt` alone cannot change any builder digest;
 - duplicate event keys/stable IDs are hard errors.
