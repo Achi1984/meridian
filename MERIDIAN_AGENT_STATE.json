@@ -38,7 +38,8 @@
     "userVisibleCheckpointRequired": true,
     "streamIsNeverSourceOfTruth": true,
     "recoveryMode": "READ_539_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI",
-    "repeatCompletedWritesAfterInterruption": false
+    "repeatCompletedWritesAfterInterruption": false,
+    "longOperationSplitRequired": true
   },
   "recoveryChecks": [
     "LATEST_MAIN_SHA",
