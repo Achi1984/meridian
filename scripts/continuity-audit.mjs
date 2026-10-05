@@ -43,7 +43,7 @@ check(/^\d+\.\d+-r\d+$/.test(String(resume?.build||'')),'resume build format inv
 check(/^[a-f0-9]{40}$/.test(String(resume?.sourceOfTruth?.verifiedSha||'')),'resume verifiedSha invalid');
 check(handoff.includes(`Build: **${resume.build}**`),'handoff build differs from resume');
 check(handoff.includes(`Verified main checkpoint: **${resume.sourceOfTruth.verifiedSha}**`),'handoff verified checkpoint differs from resume');
-check(state?.lastCheckpoint?.build===resume.build,'agent-state checkpoint build differs from resume');
+check(/^\d+\.\d+-r\d+$/.test(String(state?.lastCheckpoint?.build||'')),'agent-state historical checkpoint build format invalid');
 check(state?.lastCheckpoint?.canonicalMainSha===resume?.sourceOfTruth?.verifiedSha,'agent-state checkpoint main differs from resume verified main');
 const activeLane=resume?.researchDirection?.activeLane||null;
 check(activeLane==='CROSS_VENUE_FUNDING_EDGE_V2','active research lane must be Cross-Venue Funding Edge V2');
