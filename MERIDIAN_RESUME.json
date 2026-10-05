@@ -1232,7 +1232,7 @@
     255,
     256
   ],
-  "nextAction": "Read Issue #539, then MERIDIAN_LIVE_CHECKPOINT.json, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. V2 canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read Issue #539, then MERIDIAN_LIVE_CHECKPOINT.json, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
