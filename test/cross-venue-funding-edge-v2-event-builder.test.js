@@ -8,6 +8,7 @@ import {
   normalizeMarks,
   commonFundingTimes,
   recoveryAt,
+  entryInputsReady,
   validateCrossVenueV2Source
 } from '../research/cross-venue-funding-edge-v2-data-contract.js';
 import {
@@ -494,6 +495,42 @@ test('B22 initial two-settlement window may be not-ready; unexplained-gap guard 
   assert.ok(early.every(e=>e.sourceInputsReady===false));
   const module=fs.readFileSync(new URL('../research/cross-venue-funding-edge-v2-event-builder.js',import.meta.url),'utf8');
   assert.match(module,/CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP/);
+});
+
+test('readiness indexing is semantically identical to full frozen entryInputsReady on representative slots',()=>{
+  const check=(pkg,split,times)=>{
+    const out=output(pkg,split,pkg.receipt.digest);
+    const bf=normalizeFunding(pkg.binanceFunding,'BINANCE',CONTRACT);
+    const of=normalizeFunding(pkg.okxFunding,'OKX',CONTRACT);
+    const bm=normalizeMarks(pkg.binanceMarks,'BINANCE');
+    const om=normalizeMarks(pkg.okxMarks,'OKX');
+    for(const t of times){
+      const slot=out.events.find(e=>e.kind==='COMMON_DECISION_SLOT'&&e.time===t);
+      assert.ok(slot,'missing slot '+new Date(t).toISOString());
+      const direct=entryInputsReady({
+        decisionTime:t,
+        binanceFunding:bf,
+        okxFunding:of,
+        binanceMarks:bm,
+        okxMarks:om,
+        activeDegradation:false
+      },CONTRACT);
+      assert.equal(slot.sourceInputsReady,direct.ready,t);
+      assert.equal(slot.sourceReason,direct.reason,t);
+    }
+  };
+
+  check(BASE,'discovery',[
+    BASE.receipt.split.discovery.times[0],
+    BASE.receipt.split.discovery.times[2],
+    BASE.receipt.split.discovery.times[100],
+    BASE.receipt.split.discovery.times.at(-1)
+  ]);
+
+  const anomaly=anomalyPackage();
+  const missing=BASE.receipt.split.discovery.times[80];
+  const duplicated=BASE.receipt.split.discovery.times[90];
+  check(anomaly,'discovery',[missing+F,duplicated+F]);
 });
 
 test('B22b input gaps require an integrity event for the exact missing causal input',()=>{
