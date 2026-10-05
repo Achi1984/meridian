@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "project": "MERIDIAN",
+  "protocol": "STREAM-SAFE-V5",
+  "mailboxIssue": 539,
+  "lead": "CHATGPT",
+  "reviewer": "CLAUDE",
+  "terminalBuild": "10.0-r115",
+  "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
+  "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
+  "lastContinuityMerge": {
+    "pr": 553,
+    "mergeSha": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f"
+  },
+  "activeResearch": {
+    "lane": "CROSS_VENUE_FUNDING_EDGE_V2",
+    "stage": "SOURCE_AUDIT",
+    "syntheticPipeline": "FROZEN_REVIEWED_COMPLETE_NO_CANONICAL_RUN_NO_PNL",
+    "canonicalExecutionAuthorized": false,
+    "strategyPnlAuthorized": false,
+    "discoveryAuthorized": false,
+    "validationAuthorized": false,
+    "holdoutAuthorized": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false,
+    "nextGate": "EXPLICIT_USER_AUTHORIZATION_PLUS_EXACT_HEAD_CLAUDE_REVIEW_BEFORE_CANONICAL_EXECUTION_PNL_OR_DISCOVERY"
+  },
+  "secondaryResearch": {
+    "fundingCarryCandidateA": "COST_PREFILTER_PASS_SCOPED_DATA_DESIGN_NOT_AUTHORIZED"
+  },
+  "bootstrapOrder": [
+    "READ_LATEST_ISSUE_539_COMMENT",
+    "READ_THIS_FILE",
+    "FETCH_LIVE_MAIN_AND_CURRENT_CI",
+    "INSPECT_ONLY_RELATED_OPEN_PRS_BRANCHES",
+    "EXPAND_LARGE_CONTINUITY_FILES_ONLY_ON_MISMATCH_OR_DETAIL_NEED"
+  ],
+  "streamSafety": {
+    "maxMutationsPerVisibleBurst": 1,
+    "maxSameStatusPollsPerVisibleBurst": 1,
+    "maxPayloadBytes": 4096,
+    "noBulkContinuityDump": true,
+    "checkpointAfterEveryMutation": true,
+    "repeatCompletedWritesAfterInterruption": false
+  }
+}
