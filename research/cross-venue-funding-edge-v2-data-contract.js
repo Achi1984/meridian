@@ -23,6 +23,14 @@ export const CROSS_VENUE_FUNDING_EDGE_V2_SOURCE=Object.freeze({
   venues:Object.freeze({
     binance:Object.freeze({market:'USD-M-PERPETUAL',source:'BINANCE_VISION'}),
     okx:Object.freeze({market:'USDT-SWAP',source:'OKX_PUBLIC_HISTORY'})
+  }),
+  coverageEvidence:Object.freeze({
+    workflowRunId:37280311203,
+    probeHeadSha:'80e7afddc7849197b608875bf6d6abec4f1b9bce',
+    binanceFundingSha256:'913cd31b8f924a06717a2fac17f3df6132c24ccded209eb3e4ae7d83e1b247f2',
+    okxFundingSha256:'ce5a600e578678a73294a316592afea9cc2a7f0702bf15d56eb0c9ee68fa5a65',
+    binanceMarkSha256:'3ebf19fd6e1d4ca842691a5d3ef0d80aaacafb00143b5628556a0e9fd92c4a4e',
+    okxMarkPageSha256:'7d957103d496ebd83034713bd98921c2f84fdd8e452c3bde8d03528426a3e519'
   })
 });
 
@@ -194,12 +202,12 @@ export function commonFundingTimes(binanceFunding=[],okxFunding=[],contract=CROS
 
 export function splitCommonTimes(times=[]){
   const xs=[...new Set((times||[]).filter(Number.isFinite))].sort((a,b)=>a-b);
-  const n=xs.length,d=Math.floor(n*.60),v=Math.floor(n*.20);
+  const n=xs.length,d=Math.floor(n*.60),h=Math.floor(n*.80);
   const pack=a=>Object.freeze({count:a.length,start:a[0]??null,end:a.at(-1)??null,times:Object.freeze(a)});
   return Object.freeze({
     discovery:pack(xs.slice(0,d)),
-    validation:pack(xs.slice(d,d+v)),
-    holdout:pack(xs.slice(d+v))
+    validation:pack(xs.slice(d,h)),
+    holdout:pack(xs.slice(h))
   });
 }
 
@@ -263,8 +271,8 @@ export function sourceReceipt(packageData,normalized,events,common,contract=CROS
   const provenance=stable(packageData?.provenance||{});
   const split=splitCommonTimes(common);
   const compactEvents=sortEvents(events).map(x=>stable(x));
-  const fundingRows=x=>x.map(r=>[r.venue,r.rawTime,r.time,r.rate,r.sourceOrdinal]);
-  const markRows=x=>x.map(r=>[r.venue,r.openTime,r.open,r.high,r.low,r.close,r.confirmed,r.sourceOrdinal]);
+  const fundingRows=x=>x.map(r=>[r.venue,r.rawTime,r.time,r.rate]).sort((a,b)=>a[1]-b[1]||a[3]-b[3]);
+  const markRows=x=>x.map(r=>[r.venue,r.openTime,r.open,r.high,r.low,r.close,r.confirmed]).sort((a,b)=>a[1]-b[1]||a[2]-b[2]);
   const receipt={
     schema:contract.schema,
     ruleset:'CROSS-VENUE-FUNDING-EDGE-V2',
@@ -300,9 +308,11 @@ export function validateCrossVenueV2Source(packageData={},contract=CROSS_VENUE_F
     okxMarks:normalizeMarks(packageData.okxMarks,'OKX')
   };
 
+  const rawStart=timeOf(contract.rawStart),fundingEnd=timeOf(contract.fundingCoverageEnd),markEnd=timeOf(contract.markCoverageEnd);
   for(const [venue,rows] of [['BINANCE',normalized.binanceFunding],['OKX',normalized.okxFunding]]){
     if(!rows.length||rows.some(x=>x.rawTime===null||!finite(x.rate)))return{ok:false,reason:venue+'_INVALID_FUNDING'};
-    const map=usableFundingMap(rows),end=timeOf(contract.fundingCoverageEnd);
+    if(rows.some(x=>x.rawTime<rawStart||x.rawTime>fundingEnd))return{ok:false,reason:venue+'_FUNDING_OUT_OF_RANGE'};
+    const map=usableFundingMap(rows),end=fundingEnd;
     if(![...map.keys()].some(t=>t===end))return{ok:false,reason:venue+'_FUNDING_END_INCOMPLETE'};
   }
   for(const [venue,rows] of [['BINANCE',normalized.binanceMarks],['OKX',normalized.okxMarks]]){
@@ -313,7 +323,8 @@ export function validateCrossVenueV2Source(packageData={},contract=CROSS_VENUE_F
       x.high<Math.max(x.open,x.close,x.low)||
       x.low>Math.min(x.open,x.close,x.high)
     ))return{ok:false,reason:venue+'_INVALID_MARK'};
-    const set=confirmedUniqueMarkSet(rows),end=timeOf(contract.markCoverageEnd);
+    if(rows.some(x=>x.openTime<rawStart||x.openTime>markEnd))return{ok:false,reason:venue+'_MARK_OUT_OF_RANGE'};
+    const set=confirmedUniqueMarkSet(rows),end=markEnd;
     if(!set.has(end))return{ok:false,reason:venue+'_MARK_END_INCOMPLETE'};
   }
 
