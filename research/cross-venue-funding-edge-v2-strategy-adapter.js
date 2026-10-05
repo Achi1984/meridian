@@ -8,6 +8,7 @@ import {
   directionLegs
 } from './cross-venue-funding-edge-v2.js';
 import {
+  CROSS_VENUE_FUNDING_EDGE_V2_SOURCE,
   usableFundingMap,
   confirmedUniqueMarkSet,
   commonFundingTimes
@@ -67,6 +68,14 @@ export function createCrossVenueV2StrategyAdapter({normalized,cfg=CROSS_VENUE_FU
   const bMarks=markMap(source.binanceMarks);
   const oMarks=markMap(source.okxMarks);
   const common=Object.freeze(commonFundingTimes(source.binanceFunding,source.okxFunding));
+  const exitCommonStart=Date.parse(CROSS_VENUE_FUNDING_EDGE_V2_SOURCE.rawStart);
+  if(!Number.isSafeInteger(exitCommonStart)||exitCommonStart<=0)
+    fail('CROSS_VENUE_V2_ADAPTER_INVALID_CONFIG');
+  const exitCommon=Object.freeze(
+    [...bFunding.keys()]
+      .filter(time=>oFunding.has(time)&&time>=exitCommonStart)
+      .sort((a,b)=>a-b)
+  );
   const fundingStep=finite(cfg?.fundingIntervalMs,'CROSS_VENUE_V2_ADAPTER_INVALID_CONFIG');
   const maxHolding=finite(cfg?.maxHoldingHours,'CROSS_VENUE_V2_ADAPTER_INVALID_CONFIG');
   if(!Number.isSafeInteger(fundingStep)||fundingStep<=0||!Number.isFinite(maxHolding)||maxHolding<=0)
@@ -142,7 +151,7 @@ export function createCrossVenueV2StrategyAdapter({normalized,cfg=CROSS_VENUE_FU
       okxMark:oCurrent.close
     });
 
-    const commonAtHour=common.filter(time=>time<=h);
+    const commonAtHour=exitCommon.filter(time=>time<=h);
     const lastThree=commonAtHour.slice(-3);
     if(lastThree.length!==3)fail('CROSS_VENUE_V2_ADAPTER_INTEGRITY_DIVERGENCE');
     const spreads=spreadsForTimes(lastThree);
