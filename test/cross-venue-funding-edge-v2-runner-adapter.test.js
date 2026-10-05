@@ -72,3 +72,14 @@ test('PR2 adapter cannot create strategy signal, fill, exit decision or PnL fiel
   for(const forbidden of ['"fundingRate"','"price"','"spread"','"direction"','"basis"','"equity"'])
     assert.equal(text.toLowerCase().includes(forbidden.toLowerCase()),false,forbidden);
 });
+
+
+test('PR2 adapter fails closed on malformed structural booleans and lineage digests',()=>{
+  for(const field of ['sourceInputsReady','splitEligible']){
+    const event={time:T,kind:'COMMON_DECISION_SLOT',venue:'',stableId:'cd',sourceInputsReady:true,splitEligible:true};
+    event[field]=undefined;
+    assert.throws(()=>adaptCrossVenueV2BuilderForRunner({builderOutput:builder([event])}),/INVALID_/);
+  }
+  assert.throws(()=>adaptCrossVenueV2BuilderForRunner({builderOutput:{...builder([]),streamDigest:'bad'}}),/STREAM_DIGEST/);
+  assert.throws(()=>adaptCrossVenueV2BuilderForRunner({builderOutput:{...builder([]),packageBoundDigest:'bad'}}),/PACKAGE_DIGEST/);
+});
