@@ -475,3 +475,73 @@ It returns only semantically normalized mark rows required by frozen `recoveryAt
 
 No canonical Source→Events execution is authorized by this contract.
 
+## Strategy Adapter + Causal Driver PR2 contract — synthetic only, no canonical execution
+
+PR2 is the reviewed Layer-B/Driver bridge between the frozen PR1 structural event builder and the frozen runner. It remains synthetic-only.
+
+### Ownership boundary
+
+- The Strategy Adapter is stateless. It computes entry/exit decisions only from causal source inputs and the frozen strategy primitives.
+- The Runner remains the sole owner of degradation, recovery and position state.
+- The Driver queries runner state through `runnerStateBeforeTime`; it does not mirror runner transitions.
+- PR2 does not calculate canonical strategy PnL, equity, PF, drawdown, expectancy or any stage result.
+
+### Entry adapter
+
+- `COMMON_DECISION_SLOT` is converted to runner `COMMON_DECISION`.
+- WARMUP slots never calculate a strategy signal: `entryActive=false`.
+- For SPLIT slots with `sourceInputsReady=true`, the adapter uses exactly the three completed common funding settlements at `t-16h`, `t-8h`, `t`.
+- `entryDecision(...).inconclusive===true` while sourceInputsReady is true is `CROSS_VENUE_V2_ADAPTER_INTEGRITY_DIVERGENCE`.
+- The t+1h entry candle is never inspected at decision time.
+- `activeDegradation` remains hard-coded false only inside the frozen PR1 builder; the runner state is the only degradation authority.
+
+### Quantity / basis adapter
+
+- `v2LegQuantity(mark) = notionalPerLeg / mark`; this is the single pure quantity rule for fixed-notional legs and is intended for the same ledger-compatible fill records later.
+- Exit basis checks use entry OPEN at `entryFill` and CLOSE of the candle with `openTime=h-1h`.
+- The candle opening at `h` is not read for the basis check.
+- Held direction is recomputed deterministically from the original entry decision time, not stored as mutable driver state.
+
+### Exit adapter
+
+- Exit checks run hourly for `h = entryFill+1h ... entryFill+24h`.
+- Funding/spread inputs are the last three completed common settlements with timestamp `<= h`.
+- `remainingHours = (entryFill + 24h - h)`.
+- The frozen `exitDecision` primitive is authoritative.
+- Adapter-inconclusive output without prior runner integrity terminality is a fail-closed `CROSS_VENUE_V2_ADAPTER_INTEGRITY_DIVERGENCE`.
+
+### Causal Driver
+
+- The reviewed structural runner adapter (`cross-venue-funding-edge-v2-runner-adapter.js`) is the sole owner of PR1→runner structural mapping and lineage verification.
+- Strategy activation starts from that adapter's `COMMON_DECISION` events, which arrive with `entryActive:false`; PR2 changes only `entryActive` when the stateless strategy signal is active.
+- Structural `FUNDING_SETTLEMENT` and `INTEGRITY_DETECTION` events pass through from the reviewed adapter unchanged.
+- Candidate ENTRY_FILL stable id: `EF|<entryDecisionISO>`.
+- Candidate EXIT_DECISION stable id: `XD|<entryDecisionISO>|<hourISO>`.
+- Candidate EXIT_FILL stable id: `XF|<entryDecisionISO>`.
+- ENTRY_FILL is emitted when runner state immediately before the fill timestamp is the matching `ENTRY_PENDING`; the fill candle is not inspected.
+- EXIT_DECISION is emitted only while the runner reports `POSITION_OPEN`.
+- EXIT_FILL is emitted when runner state immediately before the fill timestamp is the matching `EXIT_PENDING`.
+- Same-timestamp integrity remains governed solely by frozen runner phase ordering.
+- Before finalization, the driver requires runner state in `FLAT_ELIGIBLE`, `DEGRADED_FLAT` or `TERMINAL_INCONCLUSIVE`; otherwise it throws `CROSS_VENUE_V2_STREAM_BOUNDARY_VIOLATION`.
+- Slots are processed causally in time order. No later strategy signal is calculated after a terminal runner outcome is observed.
+- If the runner becomes `TERMINAL_INCONCLUSIVE`, the serialized driver event stream is trimmed to the exact event prefix actually consumed by the runner trace.
+
+### Authorization
+
+- `executeCrossVenueV2StrategyDriver` calls `assertV2RunnerExecutionAuthorized` first and therefore remains locked while discovery=false.
+- `runCrossVenueV2StrategyDriverSynthetic` requires literal `syntheticOnly:true` and exists only for synthetic regression evidence.
+- No PR2 module reads files, network, Actions, artifacts or `research/data`.
+- No canonical package is read or executed in this PR.
+- First canonical Source→Events→Adapter→Runner execution requires a separate reviewed execution/stage authorization.
+
+### PR2 output
+
+The driver output is research-only and includes:
+- source receipt/stream/recovery-input digests;
+- runner-valid event stream;
+- event counts;
+- runner outcome/state/traceDigest;
+- `strategySignalsCalculated:true`;
+- `strategyPnlCalculated:false`.
+
+It does not serialize direction, rates, prices, basis PnL, equity, PF, DD, expectancy or stage/gate decisions.
