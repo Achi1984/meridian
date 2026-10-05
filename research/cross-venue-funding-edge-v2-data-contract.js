@@ -39,7 +39,7 @@ function sortEvents(events){
     a.detectionTime-b.detectionTime||
     String(a.venue).localeCompare(String(b.venue))||
     String(a.kind).localeCompare(String(b.kind))||
-    Number(a.scheduledTime??a.rawTime??0)-Number(b.scheduledTime??b.rawTime??0)
+    (a.scheduledTime??a.rawTime??0)-(b.scheduledTime??b.rawTime??0)
   );
 }
 function stable(value){
