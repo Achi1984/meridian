@@ -858,3 +858,13 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - Canonical source lineage remains run `37290831222`, attempt 1, commit `63f93aa41b6e054b229309b6fd6fbc2447a92181`, artifact `11336541442`; later run cannot replace it.
 - Next gate: pre-implementation cross-model design review for the canonical Source→Runner event builder. Builder must prove causal construction, complete split streams through required fill horizons, strict runner inputs, and builder-level G16–G18 invariance before implementation.
 
+## r115 continuity checkpoint — 2026-10-05
+
+- Verified pre-checkpoint main: `c009326529e162f84bb985d0aca2de6cf5065c18`; build `10.0-r115`.
+- V2 source seal (#545), runner boundary fix (#546), Event Builder (#547), Runner Adapter (#548), and synthetic Strategy/Driver (#549) are merged, reviewed, and frozen.
+- Claude mailbox automation (#550) is merged; ChatGPT remains Lead and Merge-Owner; Issue #539 is read before each Meridian step.
+- UI r114/r115 (#551/#552) is merged and post-merge gates are green.
+- V2 stays `SOURCE_AUDIT`; canonical strategy execution, strategy PnL, Discovery, Validation, Holdout, Paper, and Live remain locked.
+- Next Research action requires explicit user authorization and separate exact-head Claude review. No completed work above should be repeated.
+- Funding-Carry Candidate A remains secondary and data-design is not authorized.
+
