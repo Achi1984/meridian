@@ -102,15 +102,15 @@ function compareRecoveryMarks(a,b){
     Number(a.confirmed)-Number(b.confirmed);
 }
 
-export function validateCrossVenueV2BuilderSource({pkg,expectedReceiptDigest}={}){
+export function validateCrossVenueV2BuilderSource({packageData,expectedReceiptDigest}={}){
   requireExpectedReceipt(expectedReceiptDigest);
-  const pkg=snapshotJsonData(pkg);
+  const pkg=snapshotJsonData(packageData);
   exactTopLevelKeys(pkg);
   if(pkg.schema!==PACKAGE_SCHEMA)fail('CROSS_VENUE_V2_BUILDER_PACKAGE_SCHEMA');
   if(pkg.researchOnly!==true)fail('CROSS_VENUE_V2_BUILDER_RESEARCH_ONLY');
   if(pkg.executionImpact!==false)fail('CROSS_VENUE_V2_BUILDER_EXECUTION_IMPACT');
   if(pkg.stage!=='SOURCE_AUDIT')fail('CROSS_VENUE_V2_BUILDER_SOURCE_STAGE');
-  if(packageData?.provenance?.strategyPnlCalculated!==false)fail('CROSS_VENUE_V2_BUILDER_SOURCE_PNL_FLAG');
+  if(pkg?.provenance?.strategyPnlCalculated!==false)fail('CROSS_VENUE_V2_BUILDER_SOURCE_PNL_FLAG');
   if(!isDeepStrictEqual(pkg.contract,CROSS_VENUE_FUNDING_EDGE_V2_SOURCE))
     fail('CROSS_VENUE_V2_BUILDER_CONTRACT_MISMATCH');
 
@@ -150,7 +150,6 @@ export function validateCrossVenueV2BuilderSource({pkg,expectedReceiptDigest}={}
   VALIDATED_SOURCES.add(handle);
   return handle;
 }
-
 function requireValidated(validatedSource){
   if(!isObj(validatedSource)||!VALIDATED_SOURCES.has(validatedSource)||validatedSource.validatedKind!==VALIDATED_KIND)
     fail('CROSS_VENUE_V2_BUILDER_VALIDATED_SOURCE_REQUIRED');
