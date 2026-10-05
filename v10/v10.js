@@ -943,7 +943,8 @@ function fibDisplayLayout(levels,next,current,ladderPx=430,minGapPx=22,clusterGa
     if(!side.length)return;
     const available=sign<0?Math.max(0,currentPx-edge):Math.max(0,height-edge-currentPx);
     const sideGap=Math.min(gap,Math.max(12,available/(side.length+1)));
-    let cursor=currentPx+sign*sideGap;
+    const adjacentGap=available>=18?Math.min(gap,available):available;
+    let cursor=currentPx+sign*adjacentGap;
     for(const row of side){
       const proposed=sign<0?Math.min(row.anchorPx,cursor):Math.max(row.anchorPx,cursor);
       row.displayPx=Math.max(edge,Math.min(height-edge,proposed));
