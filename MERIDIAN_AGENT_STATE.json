@@ -128,10 +128,10 @@
   },
   "lastCheckpoint": {
     "at": "2026-10-05T09:42:00Z",
-    "canonicalMainSha": "63f93aa41b6e054b229309b6fd6fbc2447a92181",
-    "build": "10.0-r112",
+    "canonicalMainSha": "d4a628fee5cf527e0218b99635d80b9cd91bd0ad",
+    "build": "10.0-r113",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "PR #537 merged and canonical V2 Source Gate run 37290831222 attempt 1 completed successfully. Source validator state is VALID_WITH_INTEGRITY_EPISODES; canonical receipt/artifact identity is persisted by the current evaluation PR. V2 remains SOURCE_AUDIT; strategy PnL and later stages remain unauthorized."
+    "note": "PR #537 canonical V2 source lineage remains commit 63f93aa41b6e054b229309b6fd6fbc2447a92181. Current canonical main advanced independently to d4a628fee5cf527e0218b99635d80b9cd91bd0ad (r113 UI). PR #542 persists the canonical source receipt while V2 remains SOURCE_AUDIT; no strategy PnL or later stage is authorized."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
