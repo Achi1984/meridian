@@ -86,7 +86,7 @@ export function normalizeMarks(rows=[],venue){
     const high=Object.hasOwn(obj,'high')?strictNum(obj.high):NaN;
     const low=Object.hasOwn(obj,'low')?strictNum(obj.low):NaN;
     const close=Object.hasOwn(obj,'close')?strictNum(obj.close):NaN;
-    const confirmed=obj.confirmed===true||obj.confirmed==='1';
+    const confirmed=obj.confirmed===true;
     return{venue,sourceOrdinal,openTime,open,high,low,close,confirmed};
   }).sort((a,b)=>(a.openTime??Infinity)-(b.openTime??Infinity)||a.sourceOrdinal-b.sourceOrdinal);
 }
@@ -224,13 +224,24 @@ export function recoveryAt({episodeStart,commonTimes=[],integrityEvents=[],binan
   const xs=[...new Set(commonTimes.filter(Number.isFinite))].filter(t=>t>start).sort((a,b)=>a-b);
   const events=sortEvents(integrityEvents.filter(x=>Number.isFinite(x?.detectionTime)&&x.detectionTime>start));
   const need=contract.recoveryCommonSettlements;
-  for(let i=0;i+need-1<xs.length;i++){
-    const seq=xs.slice(i,i+need);
-    if(seq.some((t,j)=>j>0&&t-seq[j-1]!==contract.fundingIntervalMs))continue;
-    const first=seq[0],last=seq.at(-1);
-    if(events.some(e=>e.detectionTime>=first&&e.detectionTime<=last))continue;
-    if(!marksCompleteBetween(binanceMarks,first,last,contract)||!marksCompleteBetween(okxMarks,first,last,contract))continue;
-    return last;
+  let resetAt=start,streak=[],eventIndex=0;
+  for(const time of xs){
+    let reset=false;
+    while(eventIndex<events.length&&events[eventIndex].detectionTime<=time){
+      resetAt=Math.max(resetAt,events[eventIndex].detectionTime);
+      eventIndex++;
+      reset=true;
+    }
+    if(reset)streak=[];
+    if(time<=resetAt)continue;
+    if(streak.length&&time-streak.at(-1)!==contract.fundingIntervalMs)streak=[];
+    streak.push(time);
+    if(streak.length>need)streak=streak.slice(-need);
+    if(streak.length!==need)continue;
+    const markFrom=Math.ceil(resetAt/contract.markIntervalMs)*contract.markIntervalMs;
+    if(!marksCompleteBetween(binanceMarks,markFrom,time,contract))continue;
+    if(!marksCompleteBetween(okxMarks,markFrom,time,contract))continue;
+    return time;
   }
   return null;
 }
@@ -280,6 +291,7 @@ export function validateCrossVenueV2Source(packageData={},contract=CROSS_VENUE_F
   if(p.okxFundingArchivesHashed!==true)return{ok:false,reason:'OKX_FUNDING_ARCHIVES_NOT_HASHED'};
   if(p.okxMarkPagesHashed!==true)return{ok:false,reason:'OKX_MARK_PAGE_RECEIPTS_NOT_VERIFIED'};
   if(p.deterministicParsing!==true)return{ok:false,reason:'DETERMINISTIC_PARSING_NOT_VERIFIED'};
+  if(p.strategyPnlCalculated===true)return{ok:false,reason:'SOURCE_COLLECTOR_MUST_NOT_CALCULATE_PNL'};
 
   const normalized={
     binanceFunding:normalizeFunding(packageData.binanceFunding,'BINANCE',contract),
@@ -294,8 +306,13 @@ export function validateCrossVenueV2Source(packageData={},contract=CROSS_VENUE_F
     if(![...map.keys()].some(t=>t===end))return{ok:false,reason:venue+'_FUNDING_END_INCOMPLETE'};
   }
   for(const [venue,rows] of [['BINANCE',normalized.binanceMarks],['OKX',normalized.okxMarks]]){
-    if(!rows.length||rows.some(x=>x.openTime===null||![x.open,x.high,x.low,x.close].every(Number.isFinite)))
-      return{ok:false,reason:venue+'_INVALID_MARK'};
+    if(!rows.length||rows.some(x=>
+      x.openTime===null||
+      ![x.open,x.high,x.low,x.close].every(Number.isFinite)||
+      x.open<=0||x.high<=0||x.low<=0||x.close<=0||
+      x.high<Math.max(x.open,x.close,x.low)||
+      x.low>Math.min(x.open,x.close,x.high)
+    ))return{ok:false,reason:venue+'_INVALID_MARK'};
     const set=confirmedUniqueMarkSet(rows),end=timeOf(contract.markCoverageEnd);
     if(!set.has(end))return{ok:false,reason:venue+'_MARK_END_INCOMPLETE'};
   }
