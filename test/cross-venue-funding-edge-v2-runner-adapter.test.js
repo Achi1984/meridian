@@ -87,3 +87,69 @@ test('PR2 degradation and recovery decisions never create pending entry',()=>{
  const out=adaptCrossVenueV2BuilderForRunner({builderOutput:builder(events)});
  assert.ok(out.events.filter(e=>e.kind==='COMMON_DECISION').every(e=>e.entryActive===false));
 });
+
+test('PR2 snapshots changing events getter exactly once and never loses verified integrity events',()=>{
+ const sourceEvents=[
+  {time:T,kind:'INTEGRITY_DETECTION',venue:'BINANCE',stableId:'i1',integrityKind:'MISSING_MARK'},
+  {time:T+1,kind:'INTEGRITY_DETECTION',venue:'OKX',stableId:'i2',integrityKind:'OFF_GRID_FUNDING'},
+  {time:T+2,kind:'COMMON_DECISION_SLOT',venue:'',stableId:'cd',sourceInputsReady:true,splitEligible:true}
+ ];
+ const original=builder(sourceEvents);
+ for(const switchAfter of [1,2,3,4]){
+  let reads=0;
+  const input={...original};
+  Object.defineProperty(input,'events',{
+   enumerable:true,configurable:true,
+   get(){
+    reads++;
+    return reads<=switchAfter
+      ? original.events
+      : original.events.filter(e=>e.kind!=='INTEGRITY_DETECTION');
+   }
+  });
+  const out=adaptCrossVenueV2BuilderForRunner({builderOutput:input});
+  assert.equal(reads,1,'events getter must be read exactly once');
+  assert.equal(out.events.filter(e=>e.kind==='INTEGRITY_DETECTION').length,2);
+  assert.equal(out.sourceStreamDigest,original.streamDigest);
+ }
+});
+
+test('PR2 snapshots changing stream and sourceBinding getters exactly once',()=>{
+ const original=builder([
+  {time:T,kind:'INTEGRITY_DETECTION',venue:'OKX',stableId:'i1',integrityKind:'MISSING_MARK'},
+  {time:T+1,kind:'COMMON_DECISION_SLOT',venue:'',stableId:'cd',sourceInputsReady:true,splitEligible:true}
+ ]);
+ for(const field of ['stream','sourceBinding']){
+  let reads=0;
+  const input={...original};
+  Object.defineProperty(input,field,{
+   enumerable:true,configurable:true,
+   get(){
+    reads++;
+    if(reads===1)return original[field];
+    if(field==='stream')return {...original.stream,split:'holdout'};
+    return {...original.sourceBinding,receiptDigest:'e'.repeat(64)};
+   }
+  });
+  const out=adaptCrossVenueV2BuilderForRunner({builderOutput:input});
+  assert.equal(reads,1,field+' getter must be read exactly once');
+  assert.equal(out.stream.split,original.stream.split);
+  assert.equal(out.sourceReceiptDigest,original.sourceBinding.receiptDigest);
+  assert.equal(out.events.filter(e=>e.kind==='INTEGRITY_DETECTION').length,1);
+ }
+});
+
+test('PR2 output stream is detached and deeply frozen after adaptation',()=>{
+ const input=builder([
+  {time:T,kind:'COMMON_DECISION_SLOT',venue:'',stableId:'cd',sourceInputsReady:true,splitEligible:true}
+ ]);
+ const out=adaptCrossVenueV2BuilderForRunner({builderOutput:input});
+ assert.notEqual(out.stream,input.stream);
+ assert.equal(Object.isFrozen(out.stream),true);
+ assert.equal(out.stream.split,'discovery');
+ input.stream.split='holdout';
+ input.stream.recoveryInputsDigest='e'.repeat(64);
+ assert.equal(out.stream.split,'discovery');
+ assert.equal(out.stream.recoveryInputsDigest,'d'.repeat(64));
+});
+
