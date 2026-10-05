@@ -263,7 +263,7 @@ test('B8 last eligible decision lifecycle is fully contained in every stream',()
 });
 
 test('B9 fixed-boundary later mark perturbation cannot change split-local causal output',()=>{
-  const changed=lateMarkPackage();
+  const changed=isolationPackage({futureRow:true});
   assert.notEqual(changed.receipt.digest,BASE.receipt.digest);
   const out=output(changed,'discovery',changed.receipt.digest);
   assert.deepEqual(out.events,BASE_DISCOVERY.events);
@@ -276,8 +276,8 @@ test('B9 fixed-boundary later mark perturbation cannot change split-local causal
 });
 
 test('B9c future funding row cannot retroactively create a prior-stream FUNDING_GAP',()=>{
-  const withFuture=tailGapPackage({futureRow:true});
-  const withoutFuture=tailGapPackage({futureRow:false});
+  const withFuture=isolationPackage({futureRow:true});
+  const withoutFuture=isolationPackage({futureRow:false});
   const a=output(withFuture,'holdout',withFuture.receipt.digest);
   const b=output(withoutFuture,'holdout',withoutFuture.receipt.digest);
   const end=Date.parse(a.stream.streamEnd);
@@ -310,14 +310,14 @@ test('B9b boundary-changing source perturbation cannot pass the original receipt
 
 test('B10 perturbing future marks cannot change any prior event prefix',()=>{
   const x=BASE.receipt.split.discovery.start;
-  const changed=lateMarkPackage();
+  const changed=isolationPackage({futureRow:true});
   const out=output(changed,'discovery',changed.receipt.digest);
   const prefix=a=>a.events.filter(e=>e.time<=x);
   assert.deepEqual(prefix(out),prefix(BASE_DISCOVERY));
 });
 
 test('B11 moving an exogenous integrity event earlier cannot improve structural entry eligibility',()=>{
-  const withEarlierIntegrity=output(offgridNearSplitPackage());
+  const withEarlierIntegrity=output(anomalyPackage());
   assert.equal(withEarlierIntegrity.counts.splitEligibleSlots,BASE_DISCOVERY.counts.splitEligibleSlots);
   const readyCount=o=>o.events.filter(e=>e.kind==='COMMON_DECISION_SLOT'&&e.sourceInputsReady).length;
   assert.equal(readyCount(withEarlierIntegrity),readyCount(BASE_DISCOVERY));
@@ -325,7 +325,7 @@ test('B11 moving an exogenous integrity event earlier cannot improve structural 
 });
 
 test('B12 recovery inputs preserve frozen recoveryAt semantics and never carry recoveryEligible',()=>{
-  const pkg=offgridNearSplitPackage();
+  const pkg=anomalyPackage();
   const source=validated(pkg);
   const out=buildCrossVenueV2EventStream({validatedSource:source,split:'holdout'});
   const recoveryInputs=buildCrossVenueV2RecoveryInputs({validatedSource:source,stream:out.stream});
@@ -427,7 +427,7 @@ test('B17 source seal remains final-skip and frozen collection condition stays s
 
 test('B19 warmup carries the identical runner degradation state across split start',()=>{
   const splitStart=BASE.receipt.split.validation.start;
-  const pkg=offgridNearSplitPackage();
+  const pkg=anomalyPackage();
   const source=validated(pkg);
   const discovery=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
   const validation=buildCrossVenueV2EventStream({validatedSource:source,split:'validation'});
@@ -476,7 +476,7 @@ test('B22 initial two-settlement window may be not-ready; unexplained-gap guard 
 });
 
 test('B22b input gaps require an integrity event for the exact missing causal input',()=>{
-  const pkg=explainedFundingGapPackage();
+  const pkg=anomalyPackage();
   const out=output(pkg,'discovery',pkg.receipt.digest);
   const missing=BASE.receipt.split.discovery.times[50];
   const slot=out.events.find(e=>e.kind==='COMMON_DECISION_SLOT'&&e.time===missing+F);
@@ -505,7 +505,7 @@ test('B29 recovery inputs are deterministic and their digest is exactly stream-b
 });
 
 test('B30 marks whose close-observation is after streamEnd cannot change recovery inputs or streamDigest',()=>{
-  const changed=lateMarkPackage();
+  const changed=isolationPackage({futureRow:true});
   const source=validated(changed,changed.receipt.digest);
   const out=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
   const a=buildCrossVenueV2RecoveryInputs({validatedSource:BASE_VALID,stream:BASE_DISCOVERY.stream});
