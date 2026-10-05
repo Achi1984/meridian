@@ -8,6 +8,8 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
+const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
 
 function loadFibLayoutHarness(){
   const a=js.indexOf('function fibLayoutHeightPx()');
@@ -27,6 +29,10 @@ test('r114 release identity is coherent and execution neutral',()=>{
   assert.equal(manifest.start_url,'./v10/?build=r114&fresh=r114');
   assert.match(html,/meridian-build" content="10\.0-r114"/);
   assert.ok(js.includes("const BUILD='10.0-r114'"));
+  assert.ok(v9.includes("qs.set('build','r114')"));
+  assert.ok(v9html.includes("p.set('build','r114')"));
+  assert.match(v9,/portfolio-data-contract\.js\?v=10\.0-r114/);
+  assert.match(v9,/live-price-core-r18\.js\?v=10\.0-r114/);
 });
 
 test('r114 keeps exact FIB anchors while deconflicting display labels around CURRENT',()=>{
