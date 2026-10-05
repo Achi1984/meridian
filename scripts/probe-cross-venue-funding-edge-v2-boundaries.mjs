@@ -40,7 +40,7 @@ async function unzipText(bytes,name){
   }finally{await fs.rm(dir,{recursive:true,force:true})}
 }
 function strictTs(x,label){
-  if(!(typeof x==='string'||typeof x==='number')||String(x).trim()===''||!(/^-?\\d+$/.test(String(x).trim())))
+  if(!(typeof x==='string'||typeof x==='number')||String(x).trim()===''||!(/^-?\d+$/.test(String(x).trim())))
     throw new Error(label+'_INVALID_TIMESTAMP');
   const n=Number(String(x).trim());
   if(!Number.isSafeInteger(n)||n<=0)throw new Error(label+'_INVALID_TIMESTAMP');
@@ -49,18 +49,18 @@ function strictTs(x,label){
 async function binanceZip(rel,name){
   const pair=await Promise.all([fetchRetry(BINANCE+'/'+rel),fetchRetry(BINANCE+'/'+rel+'.CHECKSUM')]);
   const bytes=Buffer.from(await pair[0].arrayBuffer()),checksumText=(await pair[1].text()).trim();
-  const match=checksumText.match(/^([a-fA-F0-9]{64})\\s+\\*?(.+)$/);
+  const match=checksumText.match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/);
   if(!match||path.basename(match[2].trim())!==name)throw new Error('BINANCE_CHECKSUM_FORMAT '+rel);
   const expected=match[1].toLowerCase(),actual=sha256(bytes);
   if(expected!==actual)throw new Error('BINANCE_CHECKSUM_MISMATCH '+rel);
   return{csv:await unzipText(bytes,name),sha256:expected,rel};
 }
 function latestBinanceFundingTs(csv){
-  const lines=String(csv||'').trim().split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(!lines.length)throw new Error('BINANCE_FUNDING_EMPTY');
   const first=lines[0].split(',').map(x=>x.trim()),lower=first.map(x=>x.toLowerCase());
   let ti=0,data=lines;
-  if(!/^\\d/.test(lines[0])){
+  if(!/^\d/.test(lines[0])){
     ti=lower.indexOf('calc_time');if(ti<0)ti=lower.indexOf('fundingtime');
     if(ti<0)throw new Error('BINANCE_FUNDING_SCHEMA');
     data=lines.slice(1);
@@ -68,7 +68,7 @@ function latestBinanceFundingTs(csv){
   return Math.max(...data.map(line=>strictTs(line.split(',')[ti],'BINANCE_FUNDING')));
 }
 function latestBinanceMarkTs(csv){
-  const lines=String(csv||'').trim().split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).filter(x=>/^\\d/.test(x));
+  const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean).filter(x=>/^\d/.test(x));
   if(!lines.length)throw new Error('BINANCE_MARK_EMPTY');
   return Math.max(...lines.map(line=>strictTs(line.split(',')[0],'BINANCE_MARK')));
 }
@@ -120,7 +120,7 @@ async function latestOkxFundingArchive(){
     if(!file||!file.url)continue;
     const response=await fetchRetry(file.url),bytes=Buffer.from(await response.arrayBuffer());
     const digest=sha256(bytes),csv=await unzipText(bytes,filename);
-    const lines=String(csv||'').replace(/^\\uFEFF/,'').trim().split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+    const lines=String(csv||'').replace(/^\uFEFF/,'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     const header=(lines[0]||'').split(',').map(x=>x.trim().toLowerCase());
     if(header.join(',')!=='instrument_name,funding_rate,funding_time')throw new Error('OKX_FUNDING_ARCHIVE_SCHEMA');
     const times=lines.slice(1).map(line=>{
