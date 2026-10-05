@@ -17,7 +17,7 @@ const RULESET='CROSS-VENUE-FUNDING-EDGE-V2';
 const PACKAGE_SCHEMA='CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-PACKAGE-1';
 const BUILDER_SCHEMA='CROSS-VENUE-FUNDING-EDGE-V2-EVENT-BUILDER-1';
 const VALIDATED_KIND='VALIDATED_CROSS_VENUE_V2_SOURCE';
-const VALIDATED_TOKEN=Symbol('CROSS_VENUE_V2_VALIDATED_SOURCE');
+const VALIDATED_SOURCES=new WeakSet();
 const HOUR=60*60*1000;
 const PHASE_RANK=Object.freeze({
   FUNDING_SETTLEMENT:1,
@@ -128,8 +128,7 @@ export function validateCrossVenueV2BuilderSource({packageData,expectedReceiptDi
   if(common.length!==validation.receipt.commonFundingDecisions)
     fail('CROSS_VENUE_V2_BUILDER_COMMON_COUNT_MISMATCH');
 
-  return Object.freeze({
-    [VALIDATED_TOKEN]:true,
+  const handle=Object.freeze({
     validatedKind:VALIDATED_KIND,
     expectedReceiptDigest,
     validation:deepFreezeCopy(validation),
@@ -137,10 +136,12 @@ export function validateCrossVenueV2BuilderSource({packageData,expectedReceiptDi
     common,
     contract:CROSS_VENUE_FUNDING_EDGE_V2_SOURCE
   });
+  VALIDATED_SOURCES.add(handle);
+  return handle;
 }
 
 function requireValidated(validatedSource){
-  if(!isObj(validatedSource)||validatedSource[VALIDATED_TOKEN]!==true||validatedSource.validatedKind!==VALIDATED_KIND)
+  if(!isObj(validatedSource)||!VALIDATED_SOURCES.has(validatedSource)||validatedSource.validatedKind!==VALIDATED_KIND)
     fail('CROSS_VENUE_V2_BUILDER_VALIDATED_SOURCE_REQUIRED');
   if(validatedSource.validation?.receipt?.digest!==validatedSource.expectedReceiptDigest)
     fail('CROSS_VENUE_V2_BUILDER_VALIDATED_SOURCE_DIGEST_MISMATCH');
