@@ -487,6 +487,28 @@ test('B22 initial two-settlement window may be not-ready; unexplained-gap guard 
   assert.match(module,/CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP/);
 });
 
+test('B22b input gaps require an integrity event for the exact missing causal input',()=>{
+  const pkg=explainedFundingGapPackage();
+  const out=output(pkg,'discovery',pkg.receipt.digest);
+  const missing=BASE.receipt.split.discovery.times[50];
+  const slot=out.events.find(e=>e.kind==='COMMON_DECISION_SLOT'&&e.time===missing+F);
+  assert.ok(slot);
+  assert.equal(slot.sourceInputsReady,false);
+  assert.equal(slot.sourceReason,'FUNDING_INPUTS_INCOMPLETE_OR_STALE');
+  assert.ok(out.events.some(e=>
+    e.kind==='INTEGRITY_DETECTION'&&
+    e.integrityKind==='MISSING_SCHEDULED_FUNDING'&&
+    e.subjectTime===missing&&
+    e.time<=slot.time
+  ));
+
+  const module=fs.readFileSync(new URL('../research/cross-venue-funding-edge-v2-event-builder.js',import.meta.url),'utf8');
+  assert.ok(module.includes('function readinessGapExplained'));
+  assert.ok(module.includes('required.has(event.subjectTime)'));
+  assert.ok(module.includes('event.subjectTime===requiredMark'));
+  assert.equal(module.includes('!integrityEvents.some(e=>e.time<=t)'),false);
+});
+
 test('B29 recovery inputs are deterministic and their digest is exactly stream-bound',()=>{
   const a=buildCrossVenueV2RecoveryInputs({validatedSource:BASE_VALID,stream:BASE_DISCOVERY.stream});
   const b=buildCrossVenueV2RecoveryInputs({validatedSource:BASE_VALID,stream:BASE_DISCOVERY.stream});
