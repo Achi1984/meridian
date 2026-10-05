@@ -47,6 +47,8 @@ Target model policy when those models are actually available:
 - Review Agents: GPT-6-Sol
 - Specialist Subagents: at least GPT-6-Luna, upgraded for complexity/risk
 
+**Cross-model precedence:** These GPT-6 review targets are Lead-internal review targets only. For any change covered by `MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor`, merge additionally requires GREEN LIGHT from the independent cross-model reviewer named by `MERIDIAN_LEAD_LEASE.json.subAgent` on the exact PR HEAD-SHA. An internal GPT-6 review never substitutes for that cross-model review.
+
 If requested models are unavailable, the strongest available model is used and the system must not falsely claim another model performed the work.
 
 Task risk determines model strength: mechanical edits may use a lighter specialist; code, financial logic, architecture, research methodology, and high-risk trading logic use stronger reasoning. Reviews use the strongest available independent reviewer.
