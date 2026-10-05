@@ -224,8 +224,10 @@ export function degradationOutcome({positionOpenAtDetection:open}={}){
 }
 
 export function assertV2StageAdvanceAllowed(outcome){
-  if(outcome?.status==='INCONCLUSIVE'||outcome?.terminal===true||outcome?.mayAdvance===false&&outcome?.status==='INCONCLUSIVE')
+  if(outcome?.status==='INCONCLUSIVE'||outcome?.terminal===true)
     throw new Error('CROSS_VENUE_V2_INCONCLUSIVE_TERMINAL');
+  if(outcome?.mayAdvance!==true)
+    throw new Error('CROSS_VENUE_V2_STAGE_ADVANCE_BLOCKED');
   return true;
 }
 
