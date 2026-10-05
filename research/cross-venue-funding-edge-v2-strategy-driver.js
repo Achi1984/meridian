@@ -16,8 +16,12 @@ import {
 import {
   createCrossVenueV2StrategyAdapter
 } from './cross-venue-funding-edge-v2-strategy-adapter.js';
+import {
+  CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK
+} from './cross-venue-funding-edge-v2-stage-lock.js';
 
 const HOUR=60*60*1000;
+const CANONICAL_RECEIPT_DIGEST='822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5';
 const DRIVER_SCHEMA='CROSS-VENUE-FUNDING-EDGE-V2-STRATEGY-DRIVER-1';
 const ALLOWED_FINAL=new Set([
   V2_RUNNER_STATES.FLAT_ELIGIBLE,
@@ -89,6 +93,12 @@ function activateDecision(structuralDecision,slot,signal){
   });
 }
 
+export function assertCrossVenueV2SyntheticSourceAllowed(validatedSource){
+  if(validatedSource?.expectedReceiptDigest===CANONICAL_RECEIPT_DIGEST)
+    fail('CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER');
+  return true;
+}
+
 function internalRun({validatedSource,split}={}){
   const built=buildCrossVenueV2EventStream({validatedSource,split});
   const structural=adaptCrossVenueV2BuilderForRunner({builderOutput:built});
@@ -115,6 +125,50 @@ function internalRun({validatedSource,split}={}){
 
   const events=structural.events.filter(event=>event.kind!=='COMMON_DECISION');
   let terminal=false;
+
+  function appendTerminalPrefixSlotsThrough(limit,evidenceBoundary){
+    const existing=new Set(
+      events.filter(event=>event.kind==='COMMON_DECISION').map(event=>event.stableId)
+    );
+    for(const pendingSlot of slots){
+      if(pendingSlot.time>limit)break;
+      if(existing.has(pendingSlot.stableId))continue;
+
+      const beforeDecision=stateBefore(events,pendingSlot.time+1,recoveryInputs);
+      if(beforeDecision.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
+        return true;
+
+      const pendingSignal=strategy.entryAt({
+        decisionTime:pendingSlot.time,
+        sourceInputsReady:pendingSlot.sourceInputsReady,
+        segment:pendingSlot.segment
+      });
+      const pendingDecision=activateDecision(
+        structuralDecisions.get(pendingSlot.stableId),
+        pendingSlot,
+        pendingSignal
+      );
+      events.push(pendingDecision);
+      existing.add(pendingSlot.stableId);
+
+      if(
+        pendingSignal.entryActive!==true||
+        pendingDecision.inputsReady!==true||
+        pendingDecision.splitEligible!==true
+      )continue;
+
+      const pendingFillAt=pendingSlot.time+HOUR;
+      if(pendingFillAt>=evidenceBoundary)continue;
+      const beforePendingFill=stateBefore(events,pendingFillAt,recoveryInputs);
+      if(beforePendingFill.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
+        return true;
+      if(
+        beforePendingFill.status===V2_RUNNER_STATES.ENTRY_PENDING&&
+        beforePendingFill.pendingEntry?.decisionId===pendingDecision.stableId
+      )events.push(entryFillEvent(pendingSlot.time));
+    }
+    return false;
+  }
 
   slotLoop:
   for(const slot of slots){
@@ -186,13 +240,30 @@ function internalRun({validatedSource,split}={}){
         beforeExitFill.exitPending?.decisionId===exitEvent.stableId
       ){
         events.push(exitFillEvent(slot.time,exitFillAt));
-        const afterExitEvidence=stateBefore(
+        const evidenceBoundary=exitFillAt+HOUR+1;
+        const preliminaryExitEvidence=stateBefore(
           events,
-          exitFillAt+HOUR+1,
+          evidenceBoundary,
           recoveryInputs
         );
-        if(afterExitEvidence.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
-          terminal=true;
+        if(preliminaryExitEvidence.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE){
+          const prefixTerminal=appendTerminalPrefixSlotsThrough(
+            exitFillAt,
+            evidenceBoundary
+          );
+          if(prefixTerminal){
+            terminal=true;
+          }else{
+            const afterExitEvidence=stateBefore(
+              events,
+              evidenceBoundary,
+              recoveryInputs
+            );
+            if(afterExitEvidence.status!==V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
+              fail('CROSS_VENUE_V2_DRIVER_TERMINAL_PREFIX_DIVERGENCE');
+            terminal=true;
+          }
+        }
       }
       break;
     }
@@ -247,13 +318,20 @@ function internalRun({validatedSource,split}={}){
 export function runCrossVenueV2StrategyDriverSynthetic({syntheticOnly,...args}={}){
   if(syntheticOnly!==true)
     fail('CROSS_VENUE_V2_SYNTHETIC_DRIVER_FLAG_REQUIRED');
+  assertCrossVenueV2SyntheticSourceAllowed(args.validatedSource);
   return internalRun(args);
 }
 
-export function executeCrossVenueV2StrategyDriver({lock,...args}={}){
-  assertV2RunnerExecutionAuthorized(lock);
+export function executeCrossVenueV2StrategyDriver({
+  lock=CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK,
+  ...args
+}={}){
+  if(lock!==CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK)
+    fail('CROSS_VENUE_V2_DISCOVERY_LOCKED');
+  assertV2RunnerExecutionAuthorized(CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK);
   const result=internalRun(args);
   return Object.freeze({...result,syntheticOnly:false});
 }
 
+export const CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST=CANONICAL_RECEIPT_DIGEST;
 export const CROSS_VENUE_V2_STRATEGY_DRIVER_SCHEMA=DRIVER_SCHEMA;
