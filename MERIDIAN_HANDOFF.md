@@ -844,3 +844,17 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - Top-level Resume / Agent-State / Chat-Handoff checkpoint is aligned to that main SHA before PR CI.
 - Canonical V2 source lineage remains independently fixed at `63f93aa41b6e054b229309b6fd6fbc2447a92181` / run `37290831222` / receipt `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`.
 - This alignment changes no runner semantics, source evidence, stage lock, economics or PnL authorization.
+
+## SSOT UPDATE — 2026-10-05 · V2 runner merged and diagnostic source confirmation
+
+- PR #543 merged as `f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530` after exact-head Claude `CV2-RUNNER-IMPL-R2` GREEN LIGHT on `101a7ac9cc7bde3c9003d162a2bb2ca820fa9c63`.
+- Runner/state-machine and independent event-sourced ledger are now reviewed and frozen; no canonical runner execution or strategy PnL occurred.
+- V2 remains `SOURCE_AUDIT`; `discovery/validation/holdout/paper/live` remain false.
+- Post-merge Release Safety, Agent Orchestration, Runtime Smoke, Release Coordinator and Pages completed successfully.
+- Main push triggered later-commit diagnostic V2 Source Gate run `37299638135`, attempt 1, artifact `11341850465`.
+- Diagnostic receipt digest is exactly canonical: `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`; therefore the frozen Authorization rule classifies this as a determinism confirmation, never replacement evidence.
+- Diagnostic ZIP SHA-256 is `aa61864d36c5184e370b9412337e68ff560a4475db6bf1c46fa4f730ac7a3fc2`; diagnostic package SHA-256 is `15e7a656be11850ab67bd04af313663794445be9a2bcd0acb49195b76a53ed3a`.
+- Structured diff against canonical package `a2bb7802a6c6b4298466d16e0225ef616fe36ae2d85ac4af9d020127be4ce91b` has exactly one difference: `provenance.collectedAt`. Data arrays, integrity events, source receipt and semantic digests are unchanged.
+- Canonical source lineage remains run `37290831222`, attempt 1, commit `63f93aa41b6e054b229309b6fd6fbc2447a92181`, artifact `11336541442`; later run cannot replace it.
+- Next gate: pre-implementation cross-model design review for the canonical Source→Runner event builder. Builder must prove causal construction, complete split streams through required fill horizons, strict runner inputs, and builder-level G16–G18 invariance before implementation.
+

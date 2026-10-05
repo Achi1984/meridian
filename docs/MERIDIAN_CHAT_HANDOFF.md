@@ -1,16 +1,18 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 SOURCE_AUDIT runner implementation candidate awaiting cross-model review; no PnL**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 runner implementation reviewed/frozen at SOURCE_AUDIT; Event-Builder design review next; no PnL**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
-- Runner implementation candidate: **synthetic-only; exact-head Claude review required before merge**
+- Runner implementation: **merged/frozen/reviewed; CV2-RUNNER-IMPL-R2 GREEN LIGHT**
 - V2 stage remains: **SOURCE_AUDIT**; Discovery / Validation / Holdout / Paper / Live: **LOCKED**
 - Strategy PnL: **not calculated / not authorized**
+- Diagnostic V2 source confirmation: **Run 37299638135; receipt identical; canonical lineage unchanged**
+- Next gate: **pre-implementation Claude review of canonical Source→Runner event builder**
 
 - Build: **10.0-r113**
-- Verified main checkpoint: **dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92**
+- Verified main checkpoint: **f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**

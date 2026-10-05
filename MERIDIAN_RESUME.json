@@ -4,11 +4,11 @@
   "build": "10.0-r113",
   "branch": "main",
   "issue": 541,
-  "phase": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_CANDIDATE_NO_PNL",
+  "phase": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_FROZEN_NO_PNL",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92",
+    "verifiedSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
     "verifiedAt": "2026-10-05",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1134,7 +1134,7 @@
     },
     "crossVenueFundingEdgeV2": {
       "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
-      "status": "SOURCE_AUDIT_RUNNER_IMPLEMENTATION_CANDIDATE_NO_PNL",
+      "status": "SOURCE_AUDIT_RUNNER_IMPLEMENTATION_FROZEN_REVIEWED_NO_PNL",
       "stage": "SOURCE_AUDIT",
       "predecessor": "CROSS-VENUE-FUNDING-EDGE-V1",
       "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
@@ -1144,7 +1144,7 @@
       "holdoutAuthorized": false,
       "strategyPnlAuthorized": false,
       "executionImpact": false,
-      "nextRequiredGate": "CROSS_MODEL_REVIEW_V2_RUNNER_IMPLEMENTATION_NO_PNL",
+      "nextRequiredGate": "PREIMPLEMENTATION_REVIEW_V2_EVENT_BUILDER_NO_PNL",
       "requiredImplementationGuards": [
         "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
         "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
@@ -1168,9 +1168,23 @@
         "sourceState": "VALID_WITH_INTEGRITY_EPISODES",
         "retriesUsed": 0
       },
-      "runnerImplementationCandidate": true,
-      "runnerImplementationStatus": "SYNTHETIC_ONLY_AWAITING_CROSS_MODEL_REVIEW",
-      "runnerStrategyPnlCalculated": false
+      "runnerImplementationCandidate": false,
+      "runnerImplementationStatus": "FROZEN_REVIEWED_NO_PNL",
+      "runnerStrategyPnlCalculated": false,
+      "runnerImplementationMergeSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
+      "runnerImplementationReviewedHeadSha": "101a7ac9cc7bde3c9003d162a2bb2ca820fa9c63",
+      "runnerImplementationReview": "CV2-RUNNER-IMPL-R2_GREEN_LIGHT",
+      "diagnosticSourceConfirmation": {
+        "runId": 37299638135,
+        "commitSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
+        "artifactId": 11341850465,
+        "artifactZipSha256": "aa61864d36c5184e370b9412337e68ff560a4475db6bf1c46fa4f730ac7a3fc2",
+        "sourcePackageSha256": "15e7a656be11850ab67bd04af313663794445be9a2bcd0acb49195b76a53ed3a",
+        "receiptDigest": "822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5",
+        "classification": "DIAGNOSTIC_DETERMINISM_CONFIRMED_RECEIPT_IDENTICAL",
+        "packageDifference": "provenance.collectedAt only",
+        "canonicalReplacement": false
+      }
     }
   },
   "nonCanonicalResearch": [
@@ -1184,7 +1198,7 @@
     255,
     256
   ],
-  "nextAction": "Obtain exact-head Claude cross-model review for the CROSS-VENUE-FUNDING-EDGE-V2 runner implementation candidate after green CI. Keep V2 at SOURCE_AUDIT with discovery/validation/holdout/paper/live and strategy PnL locked. Do not execute the canonical runner or read the canonical source artifact in this PR.",
+  "nextAction": "Obtain a pre-implementation cross-model design review for the CROSS-VENUE-FUNDING-EDGE-V2 canonical Source-to-Runner event builder. Freeze causal event construction, split-stream completeness, strict runner inputs, and builder-level G16-G18 causality before any builder implementation. Keep V2 at SOURCE_AUDIT; do not execute the canonical runner, calculate strategy PnL, or authorize Discovery.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1225,7 +1239,7 @@
     "crossModelReviewSubAgent": "CLAUDE"
   },
   "researchDirection": {
-    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_CANDIDATE_NO_PNL",
+    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_IMPLEMENTATION_FROZEN_NO_PNL",
     "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1252,7 +1266,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_RUNNER_CROSS_MODEL_REVIEW_NO_PNL",
+    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_EVENT_BUILDER_PREIMPLEMENTATION_REVIEW_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",

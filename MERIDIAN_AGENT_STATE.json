@@ -127,11 +127,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-05T10:37:47Z",
-    "canonicalMainSha": "dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92",
+    "at": "2026-10-05T10:57:30Z",
+    "canonicalMainSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
     "build": "10.0-r113",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "V2 runner/ledger implementation candidate is synthetic-only and awaits exact-head Claude review. Base main is dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92; canonical source lineage remains 63f93aa41b6e054b229309b6fd6fbc2447a92181. SOURCE_AUDIT stays locked; no canonical runner execution or strategy PnL."
+    "note": "PR #543 merged reviewed V2 runner/ledger contract. Exact-head Claude CV2-RUNNER-IMPL-R2 GREEN LIGHT. Main post-merge gates all green. Later-commit V2 source run 37299638135 is diagnostic only; canonical receipt digest is identical, package differs only provenance.collectedAt, canonical source lineage remains unchanged. V2 stays SOURCE_AUDIT with no PnL or Discovery."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
@@ -153,7 +153,7 @@
     "strategyPnlObserved": false,
     "paperAuthorized": false,
     "liveAuthorized": false,
-    "next": "CROSS_MODEL_REVIEW_V2_RUNNER_IMPLEMENTATION_NO_PNL",
+    "next": "PREIMPLEMENTATION_REVIEW_V2_EVENT_BUILDER_NO_PNL",
     "sourceAuditEvaluated": true,
     "sourceAuditOutcome": "VALID_WITH_INTEGRITY_EPISODES",
     "canonicalSourceRun": {
@@ -164,7 +164,17 @@
       "artifactId": 11336541442,
       "receiptDigest": "822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5"
     },
-    "runnerImplementationCandidate": true,
-    "runnerImplementationStatus": "SYNTHETIC_ONLY_AWAITING_CROSS_MODEL_REVIEW"
+    "runnerImplementationCandidate": false,
+    "runnerImplementationStatus": "FROZEN_REVIEWED_NO_PNL",
+    "runnerImplementationMergeSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
+    "runnerImplementationReview": "CV2-RUNNER-IMPL-R2_GREEN_LIGHT",
+    "diagnosticSourceConfirmation": {
+      "runId": 37299638135,
+      "commitSha": "f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530",
+      "artifactId": 11341850465,
+      "receiptDigest": "822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5",
+      "classification": "DIAGNOSTIC_DETERMINISM_CONFIRMED_RECEIPT_IDENTICAL",
+      "canonicalReplacement": false
+    }
   }
 }
