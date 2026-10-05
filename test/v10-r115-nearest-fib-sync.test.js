@@ -64,8 +64,8 @@ test('r115 AUTO context is fail-closed, fresh-only and MANUAL cannot feed Opport
 
   assert.match(helper,/ctx\.mode!=='AUTO'/);
   assert.match(helper,/!freshTs\(ctx\.loadedAt\)/);
-  assert.match(update,/fibAutoContext\.delete\(String\(fibUi\.symbol/);
-  assert.match(update,/fibUi\.mode==='AUTO'\?fibNearestContext\(levels,current\):null/);
+  assert.match(update,/fibAutoContext\.delete\(key\)/);
+  assert.match(update,/mode==='AUTO'\?fibNearestContext\(levels,current\):null/);
   assert.match(update,/if\(autoNear\)fibAutoContext\.set/);
   assert.doesNotMatch(update,/mode:'MANUAL'.*fibAutoContext\.set/s);
 });
@@ -74,7 +74,7 @@ test('r115 refreshes Forecast Focus only after FIB calculation settles',()=>{
   const a=js.indexOf('async function updateFibMap(');
   const b=js.indexOf('function refreshForecastFocus(',a);
   const block=js.slice(a,b);
-  assert.match(block,/finally\{out\.setAttribute\('aria-busy','false'\);refreshForecastFocus\(view\)\}/);
+  assert.match(block,/finally\{\s*if\(run===fibRunSeq\)\{out\.setAttribute\('aria-busy','false'\);refreshForecastFocus\(view\)\}\s*\}/);
 });
 
 test('r115 nearest-FIB bridge remains presentation/context only',()=>{
