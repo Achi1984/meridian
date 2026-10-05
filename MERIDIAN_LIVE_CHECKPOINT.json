@@ -29,7 +29,7 @@
     "fundingCarryCandidateA": "COST_PREFILTER_PASS_SCOPED_DATA_DESIGN_NOT_AUTHORIZED"
   },
   "bootstrapOrder": [
-    "READ_LATEST_ISSUE_539_COMMENT",
+    "READ_ISSUE_539_SINCE_LAST_CHECKPOINT_AND_OPEN_REQUESTS",
     "READ_THIS_FILE",
     "FETCH_LIVE_MAIN_AND_CURRENT_CI",
     "INSPECT_ONLY_RELATED_OPEN_PRS_BRANCHES",
@@ -41,6 +41,8 @@
     "maxPayloadBytes": 4096,
     "noBulkContinuityDump": true,
     "checkpointAfterEveryMutation": true,
-    "repeatCompletedWritesAfterInterruption": false
+    "repeatCompletedWritesAfterInterruption": false,
+    "maxToolCallGroupsPerVisibleBurst": 1,
+    "maxVisibleBurstSeconds": 45
   }
-}
+}\n

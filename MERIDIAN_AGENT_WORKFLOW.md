@@ -371,7 +371,7 @@ Runtime honesty overrides cosmetic adherence to the workflow.
 
 To reduce chat-stream interruption risk without weakening repository safety:
 
-1. Before every Meridian work step, read the latest comment in Issue #539.
+1. Before every Meridian work step, read Issue #539 comments since the last durable checkpoint and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
 2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
 3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
 4. Expand the large continuity files only when the compact checkpoint disagrees with live GitHub state or historical detail is required for the current task.
