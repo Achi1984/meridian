@@ -1181,7 +1181,7 @@
     255,
     256
   ],
-  "nextAction": "Create a separate Cross-Venue Funding Edge V2 runner implementation PR while V2 remains SOURCE_AUDIT. Implement strict boolean entryActive validation, deterministic integrity-event episode state machine, pending-entry/open-position degradation wiring, independent cash/equity ledger construction, and generic causality tests. Do not execute strategy PnL or authorize Discovery until that implementation is frozen, CI-green and exact-head Claude-reviewed.",
+  "nextAction": "Create a separate CROSS-VENUE-FUNDING-EDGE-V2 runner implementation PR while V2 remains SOURCE_AUDIT. Implement strict boolean entryActive validation, deterministic integrity-event episode state machine, pending-entry/open-position degradation wiring, independent cash/equity ledger construction, and generic causality tests. Do not execute strategy PnL or authorize Discovery until that implementation is frozen, CI-green and exact-head Claude-reviewed.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
