@@ -5,7 +5,7 @@ import {
   canonicalFundingTime,normalizeFunding,normalizeMarks,usableFundingMap,
   fundingIntegrityEvents,markIntegrityEvents,integrityEventsForSource,
   commonFundingTimes,splitCommonTimes,decisionWithinCoverage,
-  marksCompleteBetween,recoveryAt,entryInputsReady,validateCrossVenueV2Source
+  marksCompleteBetween,recoveryAt,entryInputsReady,entryFillIntegrityOutcome,validateCrossVenueV2Source
 } from '../research/cross-venue-funding-edge-v2-data-contract.js';
 
 const H=60*60*1000;
@@ -145,12 +145,14 @@ test('mark completeness requires unique confirmed hourly rows',()=>{
   assert.ok(markIntegrityEvents(normalizeMarks(dup,'BINANCE'),'BINANCE',contract).some(x=>x.kind==='DUPLICATE_MARK'));
 });
 
-test('Recovery requires three consecutive common settlements and complete marks from degradation through recovery',()=>{
+test('Recovery at T uses only marks closed by T, through openTime T-1h',()=>{
   const common=[START+8*H,START+16*H,START+24*H,START+32*H];
   const bm=normalizeMarks(marks(),'BINANCE'),om=normalizeMarks(marks(),'OKX');
-  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:om},contract),START+24*H);
-  const gapBeforeFirstSettlement=normalizeMarks(marks().filter(x=>x.openTime!==START+4*H),'OKX');
-  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:gapBeforeFirstSettlement},contract),null);
+  const withoutCandleAtT=normalizeMarks(marks().filter(x=>x.openTime!==START+24*H),'OKX');
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:withoutCandleAtT},contract),START+24*H);
+
+  const missingLastClosed=normalizeMarks(marks().filter(x=>x.openTime!==START+23*H),'OKX');
+  assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:[],binanceMarks:bm,okxMarks:missingLastClosed},contract),null);
 });
 
 test('new integrity event before or inside a recovery sequence resets the episode clock',()=>{
@@ -162,17 +164,90 @@ test('new integrity event before or inside a recovery sequence resets the episod
   assert.equal(recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:later,binanceMarks:m,okxMarks:m},contract),START+40*H);
 });
 
-test('entry requires three fresh common funding inputs and the next confirmed mark on both venues',()=>{
+test('entry readiness at t uses only completed data available by t',()=>{
+  const t=START+16*H;
   const b=normalizeFunding(funding(),'BINANCE',contract),o=normalizeFunding(funding(),'OKX',contract);
   const bm=normalizeMarks(marks(),'BINANCE'),om=normalizeMarks(marks(),'OKX');
-  const ready=entryInputsReady({decisionTime:START+16*H,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
+  const ready=entryInputsReady({decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
   assert.equal(ready.ready,true);
-  assert.equal(ready.entryOpenTime,START+17*H);
-  const stale=entryInputsReady({decisionTime:START+16*H,binanceFunding:b.slice(1),okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
+  assert.equal(ready.entryOpenTime,t+H);
+  assert.equal(ready.lastClosedMarkTime,t-H);
+
+  const noFutureMarks=entryInputsReady({
+    decisionTime:t,
+    binanceFunding:b,
+    okxFunding:o,
+    binanceMarks:bm.filter(x=>x.openTime<t),
+    okxMarks:om.filter(x=>x.openTime<t)
+  },contract);
+  assert.deepEqual(noFutureMarks,ready);
+
+  const futureMutated=om.map(x=>x.openTime>=t?{...x,confirmed:false}:x);
+  assert.deepEqual(entryInputsReady({
+    decisionTime:t,
+    binanceFunding:b,
+    okxFunding:o,
+    binanceMarks:bm,
+    okxMarks:futureMutated
+  },contract),ready);
+
+  const stale=entryInputsReady({decisionTime:t,binanceFunding:b.slice(1),okxFunding:o,binanceMarks:bm,okxMarks:om},contract);
   assert.equal(stale.reason,'FUNDING_INPUTS_INCOMPLETE_OR_STALE');
-  const markGap=entryInputsReady({decisionTime:START+16*H,binanceFunding:b,okxFunding:o,binanceMarks:bm.filter(x=>x.openTime!==START+17*H),okxMarks:om},contract);
-  assert.equal(markGap.reason,'MARK_INPUTS_INCOMPLETE_OR_STALE');
-  assert.equal(entryInputsReady({decisionTime:START+16*H,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om,activeDegradation:true},contract).reason,'DATA_DEGRADED');
+
+  const lastClosedMissing=entryInputsReady({
+    decisionTime:t,binanceFunding:b,okxFunding:o,
+    binanceMarks:bm.filter(x=>x.openTime!==t-H),okxMarks:om
+  },contract);
+  assert.equal(lastClosedMissing.reason,'MARK_INPUTS_INCOMPLETE_OR_STALE');
+
+  const lastClosedUnconfirmed=entryInputsReady({
+    decisionTime:t,binanceFunding:b,okxFunding:o,
+    binanceMarks:bm,okxMarks:om.map(x=>x.openTime===t-H?{...x,confirmed:false}:x)
+  },contract);
+  assert.equal(lastClosedUnconfirmed.reason,'MARK_INPUTS_INCOMPLETE_OR_STALE');
+
+  assert.equal(entryInputsReady({decisionTime:t,binanceFunding:b,okxFunding:o,binanceMarks:bm,okxMarks:om,activeDegradation:true},contract).reason,'DATA_DEGRADED');
+});
+
+test('an invalid entry candle after an active ENTRY becomes terminal INCONCLUSIVE at its causal detection time',()=>{
+  const t=START+16*H,entryOpen=t+H,detection=entryOpen+H;
+  const bm=normalizeMarks(marks(),'BINANCE');
+  const baseOkx=marks();
+
+  const pending=entryFillIntegrityOutcome({
+    decisionTime:t,entryActive:true,asOfTime:detection-1,
+    binanceMarks:bm,okxMarks:normalizeMarks(baseOkx,'OKX')
+  },contract);
+  assert.equal(pending.status,'PENDING');
+
+  const missing=entryFillIntegrityOutcome({
+    decisionTime:t,entryActive:true,asOfTime:detection,
+    binanceMarks:bm,okxMarks:normalizeMarks(baseOkx.filter(x=>x.openTime!==entryOpen),'OKX')
+  },contract);
+  assert.equal(missing.status,'INCONCLUSIVE');
+  assert.equal(missing.okxStatus,'MISSING_MARK');
+
+  const duplicateRows=[...baseOkx,{...baseOkx.find(x=>x.openTime===entryOpen)}];
+  const duplicate=entryFillIntegrityOutcome({
+    decisionTime:t,entryActive:true,asOfTime:detection,
+    binanceMarks:bm,okxMarks:normalizeMarks(duplicateRows,'OKX')
+  },contract);
+  assert.equal(duplicate.status,'INCONCLUSIVE');
+  assert.equal(duplicate.okxStatus,'DUPLICATE_MARK');
+
+  const unconfirmed=entryFillIntegrityOutcome({
+    decisionTime:t,entryActive:true,asOfTime:detection,
+    binanceMarks:bm,
+    okxMarks:normalizeMarks(baseOkx.map(x=>x.openTime===entryOpen?{...x,confirmed:false}:x),'OKX')
+  },contract);
+  assert.equal(unconfirmed.status,'INCONCLUSIVE');
+  assert.equal(unconfirmed.okxStatus,'UNCONFIRMED_MARK');
+
+  const valid=entryFillIntegrityOutcome({
+    decisionTime:t,entryActive:true,asOfTime:detection,
+    binanceMarks:bm,okxMarks:normalizeMarks(baseOkx,'OKX')
+  },contract);
+  assert.equal(valid.status,'EXECUTED');
 });
 
 test('source validation may pass provenance with historical integrity episodes but never hides them',()=>{
@@ -241,4 +316,24 @@ test('source validation rejects rows outside the frozen funding and mark coverag
     open:100,high:101,low:99,close:100,confirmed:true
   });
   assert.equal(validateCrossVenueV2Source(markOut,contract).reason,'BINANCE_MARK_OUT_OF_RANGE');
+});
+
+
+test('future integrity events cannot alter a recovery decision at an earlier timestamp',()=>{
+  const recoveryTime=START+24*H;
+  const common=[START+8*H,START+16*H,recoveryTime,START+32*H];
+  const m=normalizeMarks(marks(),'BINANCE');
+  const kinds=[
+    'MISSING_SCHEDULED_FUNDING','FUNDING_GAP','DUPLICATE_FUNDING',
+    'DUPLICATE_CANONICAL_FUNDING','OFF_GRID_FUNDING',
+    'MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK'
+  ];
+  for(const kind of kinds){
+    const events=[{kind,venue:'OKX',detectionTime:recoveryTime+1}];
+    assert.equal(
+      recoveryAt({episodeStart:START+1,commonTimes:common,integrityEvents:events,binanceMarks:m,okxMarks:m},contract),
+      recoveryTime,
+      kind
+    );
+  }
 });
