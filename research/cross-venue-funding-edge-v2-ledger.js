@@ -114,6 +114,17 @@ export function buildV2EventSourcedLedger({
   assertUniqueVenueTime(ms,'CROSS_VENUE_V2_DUPLICATE_LEDGER_MARK');
 
   const fillGroups=groupByTime(xs),fundingGroups=groupByTime(fs),markGroups=groupByTime(ms);
+  const fillTimes=[...fillGroups.keys()].sort((a,b)=>a-b);
+  if(fillTimes.length%2!==0)fail('CROSS_VENUE_V2_LEDGER_POSITION_LEFT_OPEN');
+  for(let i=0;i<fillTimes.length;i+=2){
+    const entryTime=fillTimes[i],exitTime=fillTimes[i+1];
+    if(exitTime<=entryTime||(exitTime-entryTime)%HOUR!==0)fail('CROSS_VENUE_V2_LEDGER_MARK_GAP');
+    for(let t=entryTime;t<=exitTime;t+=HOUR){
+      const pair=markGroups.get(t)||[];
+      if(pair.length!==2||new Set(pair.map(x=>x.venue)).size!==2)
+        fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_MARK');
+    }
+  }
   const timeline=[...new Set([...fillGroups.keys(),...fundingGroups.keys(),...markGroups.keys()])].sort((a,b)=>a-b);
   const cash={BINANCE:openEq/2,OKX:openEq/2};
   const pos={
@@ -155,6 +166,7 @@ export function buildV2EventSourcedLedger({
         }
         if(!pairOpen())fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_POSITION');
         cycleOpen=true;
+        lastValuationTime=null;
       }else if(pairOpen()){
         for(const f of group){
           const p=pos[f.venue];
