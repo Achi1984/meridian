@@ -18,6 +18,15 @@ check(/^[a-f0-9]{40}$/.test(String(resume?.sourceOfTruth?.verifiedSha||'')),'res
 check(handoff.includes(`Build: **${resume.build}**`),'handoff build differs from resume');
 check(handoff.includes(`Verified main checkpoint: **${resume.sourceOfTruth.verifiedSha}**`),'handoff verified checkpoint differs from resume');
 check(state?.lastCheckpoint?.build===resume.build,'agent-state checkpoint build differs from resume');
+check(state?.lastCheckpoint?.canonicalMainSha===resume?.sourceOfTruth?.verifiedSha,'agent-state checkpoint main differs from resume verified main');
+const activeLane=resume?.researchDirection?.activeLane||null;
+check(activeLane==='CROSS_VENUE_FUNDING_EDGE_V2','active research lane must be Cross-Venue Funding Edge V2');
+check(String(resume?.researchDirection?.selected||'').startsWith('CROSS_VENUE_FUNDING_EDGE_V2'),'researchDirection.selected must match active Cross-Venue V2 lane');
+check(String(resume?.phase||'').includes('CROSS_VENUE_FUNDING_EDGE'),'resume phase must match active Cross-Venue lane');
+check(String(resume?.nextAction||'').includes('CROSS-VENUE-FUNDING-EDGE-V2'),'resume nextAction must match active Cross-Venue V2 lane');
+check(state?.researchCheckpoint?.successorRuleset==='CROSS-VENUE-FUNDING-EDGE-V2','agent-state research checkpoint must match active V2 ruleset');
+check(state?.researchCheckpoint?.successorStage==='PREREGISTERED','active V2 must remain PREREGISTERED before implementation/source-contract review');
+check(resume?.researchDirection?.qhImbalanceV1Status==='PAUSED_FROZEN_CANONICAL_PREREGISTERED_NO_PNL','Quarter-Hour lane must be explicitly paused while Cross-Venue V2 is active');
 
 const gate=resume?.researchDirection?.qhImbalanceV1CurrentGate||null;
 if(gate){
