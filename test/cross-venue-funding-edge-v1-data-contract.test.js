@@ -36,6 +36,15 @@ test('production source starts at objectively proven OKX funding archive coverag
 test('funding timestamps canonicalize only inside one-second tolerance',()=>{
   assert.equal(canonicalFundingTime(START+999,contract),START);
   assert.equal(canonicalFundingTime(START+1001,contract),null);
+  assert.equal(canonicalFundingTime(null,contract),null);
+  assert.equal(canonicalFundingTime('',contract),null);
+  assert.equal(canonicalFundingTime(undefined,contract),null);
+});
+
+test('source rejects off-grid funding timestamps as invalid before cadence checks',()=>{
+  const p=pack();
+  p.okxFunding[2].fundingTime=START+2*8*H+6*60*1000;
+  assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_INVALID_FUNDING');
 });
 
 test('normalized common funding decisions preserve six shared settlements',()=>{
