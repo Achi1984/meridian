@@ -31,11 +31,15 @@ The V2 source implementation must be frozen in a separate reviewed source-contra
 The source-contract PR must freeze exact timestamps using this predeclared rule:
 
 - raw start: `2022-03-01T00:00:00.000Z`;
-- raw coverage end: latest common on-grid funding settlement already contained in fully published authoritative source archives from both venues at the source-contract commit;
-- decision-window end: latest common on-grid settlement at least **24 hours before** raw coverage end, so a maximum-horizon position can close without requiring unpublished/future funding data;
-- after the source-contract PR merges, these timestamps are immutable inside V2.
+- `fundingCoverageEnd`: latest authoritative funding timestamp covered by fully published source archives from **both** venues at the source-contract commit;
+- `markCoverageEnd`: latest confirmed 1h mark-candle OPEN timestamp covered by authoritative mark history from **both** venues at the source-contract commit;
+- `coverageEnd = min(fundingCoverageEnd, markCoverageEnd)`;
+- decision-window end: the latest common on-grid scheduled settlement `t` for which **`t + 26 hours <= coverageEnd`**;
+- after the source-contract PR merges, raw start, `fundingCoverageEnd`, `markCoverageEnd`, `coverageEnd` and the derived decision-window end are immutable inside V2.
 
-No incomplete future archive may be assumed. No end boundary may be selected from PnL or strategy outcomes.
+The 26-hour reserve is structural: entry may occur at the first complete 1h mark OPEN after `t` (up to `t+1h`), the maximum holding horizon is 24 hours from actual entry, and final execution occurs at the first complete 1h mark OPEN strictly after the exit-decision timestamp (requiring coverage through `t+26h`).
+
+No incomplete future archive may be assumed. No end boundary may be selected from PnL, entries, exits or strategy outcomes.
 
 ## Authoritative raw funding
 
@@ -43,7 +47,11 @@ All authoritative venue funding records inside raw coverage are retained with th
 
 No interpolation, forward fill, synthetic settlement, timestamp deletion or timestamp relocation is allowed.
 
-A raw settlement is **on-grid** only when it is within ±1 second of its nearest exact UTC hour. Only on-grid settlements may be canonicalized to that hour.
+A raw settlement is **on-grid** only when it matches that venue's frozen scheduled settlement grid within ±1 second. Only on-grid settlements may be canonicalized to the corresponding scheduled timestamp.
+
+The V2 funding schedule is frozen independently for each venue as **8-hour settlements at 00:00 / 08:00 / 16:00 UTC, tolerance ±1 second**.
+
+The V2 ruleset never auto-adapts this grid. A provider interval change, extra settlement on another cadence, or any other deviation from the frozen 8h grid is an integrity event and places that venue in `DATA_DEGRADED`. Such a record remains in authoritative raw provenance but does not create a new common decision timestamp.
 
 An off-grid settlement remains in raw provenance but is never converted into a common signal/decision timestamp.
 
@@ -69,13 +77,31 @@ For a missing expected scheduled settlement, degradation is considered observabl
 
 ## Existing positions during degradation
 
-If degradation is observable while a position is open:
+A **degradation episode** begins at the first observable `DATA_DEGRADED` event and ends only after the Recovery rule below has been satisfied.
+
+If degradation becomes observable while no position is open:
+
+- entries are blocked until Recovery;
+- the episode alone does not make the run INCONCLUSIVE.
+
+If degradation becomes observable while a position is open:
 
 - new entries are already blocked;
-- the position exits at the first complete 1h mark OPEN strictly after the degradation-detection timestamp;
-- authoritative on-grid settlements that occurred after entry and before that exit are accounted exactly once under the normal funding rule.
+- a provisional model exit is the first complete confirmed 1h mark OPEN strictly after the degradation-detection timestamp;
+- authoritative on-grid settlements that occurred after entry and before that provisional exit are accounted exactly once under the normal funding rule.
 
-If an off-grid settlement occurs while a position is still open **without a prior observable missing scheduled settlement that already forced exit**, V2 does not estimate that settlement from hourly marks. The affected run/stage becomes **INCONCLUSIVE** and may not progress.
+However, the provisional exit is accepted as economically usable **only after the entire degradation episode is checked**.
+
+If the same degradation episode contains either:
+
+1. any authoritative off-grid funding settlement on either venue; or
+2. any missing or unconfirmed required 1h mark candle on either venue,
+
+then the affected run/stage becomes **INCONCLUSIVE**, regardless of whether a provisional model exit had already been identified.
+
+This prevents V2 from assuming that an exchange was executable merely because a historical mark candle exists during a venue/service outage, and prevents an off-grid funding cash flow from being silently skipped because the model had already declared an exit.
+
+Only when the degradation episode contains **no off-grid settlement** and the required mark history is complete and confirmed may the provisional exit remain valid.
 
 This rule prevents a source anomaly from being converted into guessed economics.
 
@@ -147,5 +173,17 @@ V2 is currently **PREREGISTERED only**.
 - Live: disabled
 
 The next allowed step is a separate implementation/source-contract PR that freezes exact source boundaries, deterministic integrity-event construction, receipts and regression tests. That PR requires cross-model review on its exact HEAD-SHA.
+
+Before that implementation PR may authorize a V2 source audit, it must prove at minimum:
+
+1. open position + missing scheduled settlement + later off-grid settlement in the same degradation episode => `INCONCLUSIVE`;
+2. open position + missing scheduled settlement + no off-grid settlement + complete confirmed marks => exit at the first complete confirmed 1h mark OPEN after detection, with authoritative funding booked exactly once;
+3. no open position at degradation detection => entry lock only, not automatically `INCONCLUSIVE`;
+4. decision timestamp exactly `coverageEnd - 26h` is admissible when otherwise common/on-grid, while any decision timestamp greater than `coverageEnd - 26h` is excluded;
+5. a synthetic provider change to a 4h funding interval causes `DATA_DEGRADED`, blocks entries and never creates new common decision timestamps from that 4h cadence;
+6. strict numeric parsing rejects null / blank / boolean source scalars instead of coercing them to zero;
+7. the collector itself refuses to execute source collection whenever the V2 stage lock does not explicitly authorize `sourceAudit:true`.
+
+If V2 reuses logic from `research/cross-venue-funding-edge-v1.js`, its coercive numeric validation must first be replaced with strict numeric handling and tested. Binance/OKX source parsers must likewise reject blank or non-numeric cells rather than silently coercing them with `Number()`.
 
 No V2 source audit or strategy PnL is authorized by this preregistration.
