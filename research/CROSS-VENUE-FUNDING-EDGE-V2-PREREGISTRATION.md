@@ -87,23 +87,13 @@ If degradation becomes observable while no position is open:
 If degradation becomes observable while a position is open:
 
 - new entries are already blocked;
-- a provisional model exit is the first complete confirmed 1h mark OPEN strictly after the degradation-detection timestamp;
-- authoritative on-grid settlements that occurred after entry and before that provisional exit are accounted exactly once under the normal funding rule.
+- the affected run/stage becomes **INCONCLUSIVE immediately for research purposes**;
+- no exit price, basis realization or post-detection funding path is modeled for that affected position;
+- later mark candles, later off-grid settlements, later recovery and apparent historical prices cannot convert the episode back into usable economic evidence.
 
-However, the provisional exit is accepted as economically usable **only after the entire degradation episode is checked**.
+This rule deliberately refuses to infer venue executability from mark/index history during a degradation episode. It also removes any need to decide whether an episode completed before `coverageEnd`: an open position at degradation onset is already sufficient to make the affected run/stage INCONCLUSIVE.
 
-If the same degradation episode contains either:
-
-1. any authoritative off-grid funding settlement on either venue; or
-2. any missing or unconfirmed required 1h mark candle on either venue,
-
-then the affected run/stage becomes **INCONCLUSIVE**, regardless of whether a provisional model exit had already been identified.
-
-This prevents V2 from assuming that an exchange was executable merely because a historical mark candle exists during a venue/service outage, and prevents an off-grid funding cash flow from being silently skipped because the model had already declared an exit.
-
-Only when the degradation episode contains **no off-grid settlement** and the required mark history is complete and confirmed may the provisional exit remain valid.
-
-This rule prevents a source anomaly from being converted into guessed economics.
+This rule prevents a source anomaly or venue outage from being converted into guessed economics.
 
 ## Recovery
 
@@ -176,13 +166,14 @@ The next allowed step is a separate implementation/source-contract PR that freez
 
 Before that implementation PR may authorize a V2 source audit, it must prove at minimum:
 
-1. open position + missing scheduled settlement + later off-grid settlement in the same degradation episode => `INCONCLUSIVE`;
-2. open position + missing scheduled settlement + no off-grid settlement + complete confirmed marks => exit at the first complete confirmed 1h mark OPEN after detection, with authoritative funding booked exactly once;
+1. open position + missing scheduled settlement + no later off-grid settlement + complete confirmed marks => `INCONCLUSIVE`;
+2. open position + missing scheduled settlement + later off-grid settlement in the same degradation episode => `INCONCLUSIVE`;
 3. no open position at degradation detection => entry lock only, not automatically `INCONCLUSIVE`;
-4. decision timestamp exactly `coverageEnd - 26h` is admissible when otherwise common/on-grid, while any decision timestamp greater than `coverageEnd - 26h` is excluded;
-5. a synthetic provider change to a 4h funding interval causes `DATA_DEGRADED`, blocks entries and never creates new common decision timestamps from that 4h cadence;
-6. strict numeric parsing rejects null / blank / boolean source scalars instead of coercing them to zero;
-7. the collector itself refuses to execute source collection whenever the V2 stage lock does not explicitly authorize `sourceAudit:true`.
+4. no implementation path may assign an economically valid exit, basis realization or post-detection funding path to a position that was open when degradation began;
+5. decision timestamp exactly `coverageEnd - 26h` is admissible when otherwise common/on-grid, while any decision timestamp greater than `coverageEnd - 26h` is excluded;
+6. a synthetic provider change to a 4h funding interval causes `DATA_DEGRADED`, blocks entries and never creates new common decision timestamps from that 4h cadence;
+7. strict numeric parsing rejects null / blank / boolean source scalars instead of coercing them to zero;
+8. the collector itself refuses to execute source collection whenever the V2 stage lock does not explicitly authorize `sourceAudit:true`.
 
 If V2 reuses logic from `research/cross-venue-funding-edge-v1.js`, its coercive numeric validation must first be replaced with strict numeric handling and tested. Binance/OKX source parsers must likewise reject blank or non-numeric cells rather than silently coercing them with `Number()`.
 
