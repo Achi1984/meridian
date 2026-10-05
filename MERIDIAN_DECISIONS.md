@@ -804,3 +804,13 @@ This file records durable project decisions and the reasoning behind them. Read 
 
 **CI:** Once V1 is closed, its historical source collector must not continue running on main. The V1 source workflow reads the stage lock and skips source collection whenever `sourceAudit !== true`.
 
+## D-076 — Cross-model review precedence over Lead-internal reviewer targets
+
+**Decision:** GPT-6 reviewer targets in `MERIDIAN_AGENT_WORKFLOW.md`, `MERIDIAN_AGENT_STATE.json` and `MERIDIAN_RESUME.json` are Lead-internal review targets only.
+
+For every change whose category is listed in `MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor`, merge additionally requires GREEN LIGHT from the independent cross-model reviewer named by `MERIDIAN_LEAD_LEASE.json.subAgent` on the exact current PR HEAD-SHA.
+
+An internal reviewer GREEN LIGHT never substitutes for the required cross-model review. Any new commit invalidates the prior cross-model GREEN LIGHT.
+
+**Lead handover:** `MERIDIAN_LEAD_LEASE.json` may validly be `HELD` or `RELEASED` according to `MERIDIAN_CROSS_MODEL_PROTOCOL.md`. Governance validation must permit both protocol states while remaining fail-closed on invalid role combinations, missing release metadata, or sub-agent merge/write permission.
+

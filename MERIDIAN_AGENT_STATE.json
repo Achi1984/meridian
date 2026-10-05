@@ -12,7 +12,10 @@
   "requestedModelRouting": {
     "mainAgent": "GPT-6-Astra",
     "reviewer": "GPT-6-Sol",
-    "subagentMinimum": "GPT-6-Luna"
+    "subagentMinimum": "GPT-6-Luna",
+    "scope": "LEAD_INTERNAL_TARGETS_ONLY",
+    "reviewerCrossModel": "CLAUDE",
+    "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md"
   },
   "runtimeCapabilityPolicy": {
     "neverClaimUnavailableModelOrAgent": true,
@@ -124,11 +127,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-05T06:20:00Z",
-    "canonicalMainSha": "a52c56010b9a547061c82d37840f5335465b3754",
+    "at": "2026-10-05T07:10:00Z",
+    "canonicalMainSha": "ae4d9f490a43972ad2fc3c768c8744849790ba22",
     "build": "10.0-r112",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Cross-Venue Funding Edge V1 strict validator fix is merged. Post-merge source run 37270798106 failed closed with OKX_INVALID_FUNDING. User selected Option A: close V1 at source stage and preregister V2. Current integration PR closes V1, preregisters V2, disables further V1 source collection, and keeps V2 Source Audit/PnL unauthorized pending a separate reviewed source-contract PR."
+    "note": "Cross-Venue Funding Edge V1 is SOURCE_CLOSED; V2 is PREREGISTERED. PR #532 merged Frozen Research Guard pinning for the V1 closure/V2 preregistration lineage. Active research lane is Cross-Venue V2 implementation/source-contract preparation. V2 Source Audit and strategy PnL remain unauthorized."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
@@ -150,6 +153,6 @@
     "strategyPnlObserved": false,
     "paperAuthorized": false,
     "liveAuthorized": false,
-    "next": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_EXACT_HEAD_REVIEW_BEFORE_SOURCE_AUDIT"
+    "next": "IMPLEMENT_V2_SOURCE_CONTRACT_AND_BEHAVIOR_GUARDS_EXACT_HEAD_REVIEW_BEFORE_SOURCE_AUDIT"
   }
 }

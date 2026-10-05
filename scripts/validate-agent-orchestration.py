@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import json
 from pathlib import Path
+from lead_lease_validation import validate_lead_lease
 
 ROOT=Path(__file__).resolve().parents[1]
 state=json.loads((ROOT/'MERIDIAN_AGENT_STATE.json').read_text())
 resume=json.loads((ROOT/'MERIDIAN_RESUME.json').read_text())
 version=json.loads((ROOT/'version.json').read_text())
+lease=json.loads((ROOT/'MERIDIAN_LEAD_LEASE.json').read_text())
 
 errors=[]
 
@@ -40,6 +42,9 @@ routing=state.get('requestedModelRouting',{})
 req(routing.get('mainAgent')=='GPT-6-Astra','requested main model routing changed')
 req(routing.get('reviewer')=='GPT-6-Sol','requested reviewer model routing changed')
 req(routing.get('subagentMinimum')=='GPT-6-Luna','requested subagent minimum routing changed')
+req(routing.get('scope')=='LEAD_INTERNAL_TARGETS_ONLY','requested model routing scope must be lead-internal only')
+req(routing.get('crossModelProtocol')=='MERIDIAN_CROSS_MODEL_PROTOCOL.md','cross-model protocol path mismatch')
+errors.extend(validate_lead_lease(lease,routing.get('reviewerCrossModel')))
 
 cap=state.get('runtimeCapabilityPolicy',{})
 req(cap.get('neverClaimUnavailableModelOrAgent') is True,'runtime honesty guard must be enabled')

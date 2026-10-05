@@ -780,3 +780,12 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - V2 is only `PREREGISTERED`. Its Source Audit remains disabled. The next allowed step is a separate V2 implementation/source-contract PR that freezes exact source boundaries and integrity-event construction before any V2 source audit or strategy PnL.
 - Closed V1 source collection must not continue on main; the V1 source workflow is stage-gated and skips collection when `sourceAudit !== true`.
 
+## SSOT UPDATE — 2026-10-05 · Active research lane / cross-model routing alignment
+
+- Canonical main checkpoint before this governance update: `ae4d9f490a43972ad2fc3c768c8744849790ba22`.
+- PR #530 is merged: Cross-Venue Funding Edge V1 is permanently `SOURCE_CLOSED`; V2 is `PREREGISTERED`.
+- PR #532 is merged: the canonical V1 closure / V2 preregistration lineage is pinned by the global Frozen Research Guard.
+- Active research lane is now explicitly `CROSS_VENUE_FUNDING_EDGE_V2`; Quarter-Hour Strategy V1 remains frozen/canonical but is **PAUSED** and must not be resumed implicitly.
+- GPT-6 routing fields are Lead-internal target routing only. Claude is the independent cross-model reviewer and must match `MERIDIAN_LEAD_LEASE.json.subAgent`.
+- Next allowed work: V2 implementation/source-contract only. V2 Source Audit, strategy PnL, Discovery, Paper and Live remain unauthorized.
+
