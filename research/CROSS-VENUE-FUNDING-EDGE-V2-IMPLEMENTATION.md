@@ -525,12 +525,12 @@ PR2 is the reviewed Layer-B/Driver bridge between the frozen PR1 structural even
 - Before finalization, the driver requires runner state in `FLAT_ELIGIBLE`, `DEGRADED_FLAT` or `TERMINAL_INCONCLUSIVE`; otherwise it throws `CROSS_VENUE_V2_STREAM_BOUNDARY_VIOLATION`.
 - Slots are processed causally in time order. No later strategy signal is calculated after a terminal runner outcome is observed.
 - If the runner becomes `TERMINAL_INCONCLUSIVE`, the serialized driver event stream is trimmed to the exact event prefix actually consumed by the runner trace.
-- For terminal post-`EXIT_FILL` +1h evidence, still-unemitted decision slots through `exitFill` and any matching entry fill due before that evidence boundary are inserted first, so the terminal trace reflects the exact causal prefix and frozen phase order.
+- Before any observed terminal boundary is finalized, still-unemitted decision slots that causally precede that evidence are inserted first, with matching entry fills only when their frozen phase/time precedes the boundary. This applies to terminality while a position is open, terminality before an `EXIT_FILL`, and post-`EXIT_FILL` +1h evidence. A decision at or after the terminal detection is never calculated because runner state is rechecked before each inserted slot.
 
 ### Authorization
 
 - `executeCrossVenueV2StrategyDriver` accepts only the imported `CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK` object by identity and passes that canonical object to `assertV2RunnerExecutionAuthorized`; caller-crafted locks cannot authorize execution.
-- `runCrossVenueV2StrategyDriverSynthetic` requires literal `syntheticOnly:true`, rejects the canonical source receipt digest `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`, and exists only for synthetic regression evidence.
+- `runCrossVenueV2StrategyDriverSynthetic` requires literal `syntheticOnly:true` and exists only for synthetic regression evidence. Before any builder/strategy execution it rejects the canonical source receipt digest `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`, the canonical integrity digest, or a match to any one of the four canonical per-stream data digests. Those denylist pins are hard-coded from the frozen source-evaluation metadata; the runtime does not read that file. A provenance-only receipt rewrap therefore cannot admit byte-identical canonical market data. A deliberately edited market row can change the data digest, but that altered market data is no longer the canonical source and remains outside this denylist's scope.
 - No PR2 module reads files, network, Actions, artifacts or `research/data`.
 - No canonical package is read or executed in this PR.
 - First canonical Source→Events→Adapter→Runner execution requires a separate reviewed execution/stage authorization.
