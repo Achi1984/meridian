@@ -20,7 +20,7 @@ Updated: **2026-10-05**
 - Secondary Funding-Carry Candidate A: **PASS_TO_DATA_DESIGN_SCOPED only; no data-design run authorized**
 
 - Build: **10.0-r115**
-- Verified main checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
+- Verified substantive checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -33,6 +33,8 @@ Updated: **2026-10-05**
 - Paper/live authorization: **false**
 
 Repository state remains the source of truth. Before every Meridian step, read Issue #539 first; then reconcile latest merged `main`, CI, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, and related PRs before any mutation.
+
+`verifiedSha`/the checkpoint above denotes the last non-continuity canonical product/research checkpoint. A continuity-only merge may advance live `main`; that is expected and must be reconciled rather than treated as product/research drift.
 
 ## Quarter-Hour data lineage
 
