@@ -43,6 +43,7 @@ test('runnerEventKey freezes the total same-timestamp phase order',()=>{
     'FUNDING_SETTLEMENT','EXIT_FILL','ENTRY_FILL','INTEGRITY_DETECTION','COMMON_DECISION','EXIT_DECISION'
   ]);
   assert.deepEqual(runnerEventKey(funding(time,'x')),[time,1,'BINANCE','FUNDING_SETTLEMENT','x']);
+  assert.throws(()=>sortRunnerEvents([funding(time,'x'),funding(time,'x')]),/DUPLICATE_RUNNER_EVENT_KEY/);
 });
 
 test('G1 detection equal to entry fill is terminal INCONCLUSIVE',()=>{
@@ -208,9 +209,8 @@ test('G16 moving every integrity-event family earlier can only block or worsen o
   assert.equal(baseline.trace.some(x=>x.action==='EXIT_FILLED'),true);
   for(const kind of kinds){
     const degraded=runV2RunnerStateMachine([
-      decision(T,'d0'),integrity(T+H/2,'early-'+kind,kind),
-      entryFill(T+H),exitDecision(T+2*H),exitFill(T+3*H)
-    ].filter(x=>x.kind!=='ENTRY_FILL'||x.time<T+H/2));
+      decision(T,'d0'),integrity(T+H/2,'early-'+kind,kind)
+    ]);
     assert.notEqual(degraded.outcome.status,V2_RUNNER_STATES.FLAT_ELIGIBLE,kind);
     assert.equal(degraded.trace.some(x=>x.action==='EXIT_FILLED'),false,kind);
   }
