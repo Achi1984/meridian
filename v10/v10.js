@@ -25,6 +25,7 @@ function readUiContext(){
 const savedUiContext=readUiContext();
 const fibUi={symbol:savedUiContext.fibSymbol,window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
 const fibAutoContext=new Map();
+let fibRunSeq=0;
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
@@ -1065,20 +1066,23 @@ async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
   fibUi.symbol=$('#fib-asset',view)?.value||fibUi.symbol;
   fibUi.window=Number($('#fib-window',view)?.value)||fibUi.window||90;
-  fibAutoContext.delete(String(fibUi.symbol||'').trim().toUpperCase());
+  const symbol=String(fibUi.symbol||'').trim().toUpperCase(),key=symbol,mode=fibUi.mode,windowSize=fibUi.window,run=++fibRunSeq;
+  fibAutoContext.delete(key);
   out.setAttribute('aria-busy','true');out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
   try{
     const fetchRows=H().marketKlines;
     let rows=null;
     if(typeof fetchRows==='function'){
-      try{rows=await fetchRows('4h',Math.min(300,Math.max(180,fibUi.window+5)),fibUi.symbol)}catch(e){if(fibUi.mode==='AUTO')throw e}
+      try{rows=await fetchRows('4h',Math.min(300,Math.max(180,windowSize+5)),symbol)}
+      catch(e){if(run!==fibRunSeq)return;if(mode==='AUTO')throw e}
     }
+    if(run!==fibRunSeq)return;
     const swingRows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x?.closeTime)>0&&Number(x.closeTime)<Date.now()-1000);if(rows?.source)swingRows.source=rows.source;
     let low,high,direction,bars=0,source='MANUAL';
-    if(fibUi.mode==='AUTO'){
+    if(mode==='AUTO'){
       if(!swingRows.length)throw new Error('Keine geschlossenen 4h-Kerzen verfügbar');
-      const sw=detectSwing(swingRows,fibUi.window);
-      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h CLOSED · '+(swingRows.source||'PUBLIC FUTURES');
+      const sw=detectSwing(swingRows,windowSize);
+      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+windowSize+'×4h CLOSED · '+(swingRows.source||'PUBLIC FUTURES');
       fibUi.autoLow=low;fibUi.autoHigh=high;fibUi.lastDirection=direction;
     }else{
       low=fibParse($('#fib-low',view)?.value??fibUi.manualLow);
@@ -1089,20 +1093,25 @@ async function updateFibMap(view){
     }
     if(!(low>0&&high>0&&high>low))throw new Error('Swing High muss über Swing Low liegen');
     let current=rows?.length?Number(rows.at(-1)?.close):null;
-    if(!(current>0))current=marketPrice(fibUi.symbol).value;
+    if(!(current>0))current=marketPrice(symbol).value;
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
-    const autoNear=fibUi.mode==='AUTO'?fibNearestContext(levels,current):null;
-    if(autoNear)fibAutoContext.set(String(fibUi.symbol||'').trim().toUpperCase(),{mode:'AUTO',near:autoNear,loadedAt:Date.now(),source});
+    const autoNear=mode==='AUTO'?fibNearestContext(levels,current):null;
+    if(run!==fibRunSeq)return;
+    if(autoNear)fibAutoContext.set(key,{mode:'AUTO',near:autoNear,loadedAt:Date.now(),source});
     let doubleAdvantage=null;
-    if(fibUi.mode==='AUTO'&&swingRows.length){
-      const parent=detectSwing(swingRows,fibUi.window),child=detectOpposingChildSwing(swingRows,parent,fibUi.window);
+    if(mode==='AUTO'&&swingRows.length){
+      const parent=detectSwing(swingRows,windowSize),child=detectOpposingChildSwing(swingRows,parent,windowSize);
       if(child)doubleAdvantage=skDoubleAdvantage(parent,child);
     }
-    out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
+    if(run!==fibRunSeq)return;
+    out.innerHTML=fibResultHtml({symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
   }catch(e){
+    if(run!==fibRunSeq)return;
     out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+esc(e?.message||e)+'</small></div>';
-  }finally{out.setAttribute('aria-busy','false');refreshForecastFocus(view)}
+  }finally{
+    if(run===fibRunSeq){out.setAttribute('aria-busy','false');refreshForecastFocus(view)}
+  }
 }
 function refreshForecastFocus(view){
   const old=$('.forecast-focus',view);if(old)old.outerHTML=forecastContextHtml(fibUi.symbol);
