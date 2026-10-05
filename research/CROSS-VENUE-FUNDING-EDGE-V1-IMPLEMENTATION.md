@@ -7,16 +7,30 @@ Auto-promotion: `false`
 
 This document resolves the remaining implementation and data-source ambiguities in the preregistered Cross-Venue Funding Edge V1 before any strategy PnL is calculated.
 
+## Pre-PnL source correction
+
+The first implementation candidate used Binance USD-M plus Bybit Linear. The first source-only workflow run `37234804097` failed before producing a source artifact because Bybit returned HTTP 403 to the GitHub-hosted runner. No strategy PnL, entry, exit, PF, expectancy or gate result was calculated or inspected.
+
+Bybit is therefore excluded under the preregistered reproducibility rule before any PnL.
+
+OKX was then tested from the same GitHub-hosted environment:
+
+- run `37265897307`: unsigned OKX historical funding and historical mark-price endpoints reachable;
+- run `37266098877`: March 2022 and September 2026 monthly BTC-USDT-SWAP funding archives returned by the public historical-market-data endpoint;
+- run `37266137577`: March 2022 static funding ZIP downloaded and SHA-256 hashed; CSV schema verified as `instId,fundingRate,fundingTime`; 1h historical mark-price candles independently returned for March 2022.
+
+This source correction is made while the ruleset remains at `SOURCE_AUDIT`, before a valid source package or any strategy result exists.
+
 ## Venue pair and instrument
 
-The first and only V1 venue pair is:
+The frozen V1 venue pair is:
 
 - Binance USD-M `BTCUSDT` perpetual
-- Bybit Linear `BTCUSDT` perpetual
+- OKX `BTC-USDT-SWAP` USDT-margined perpetual
 
-The pair is chosen before strategy results because both venues expose unauthenticated historical funding data and historical mark-price klines for the same linear USDT-settled BTC perpetual. Hyperliquid is not used in this V1 because its public `candleSnapshot` is trade OHLC rather than a historical mark/index series; its historical asset-context archive is Requester-Pays and would introduce a less reproducible source dependency.
+Both are linear USDT-settled BTC perpetuals with public historical funding records and historical mark-price data that are reproducibly accessible from the research runner.
 
-No venue substitution is permitted inside V1 after source collection or PnL inspection.
+No venue substitution is permitted after the first valid source package or PnL inspection.
 
 ## Frozen public sources
 
@@ -29,22 +43,43 @@ Authoritative public Binance Vision USD-M archive:
 - monthly ZIP + provider `.CHECKSUM`
 - missing/incomplete final month may be rebuilt only from provider daily ZIPs, each with its provider checksum
 
-### Bybit
+Every used Binance ZIP must match its provider checksum.
 
-Unauthenticated V5 public market API:
+### OKX funding
 
-- `GET /v5/market/funding/history?category=linear&symbol=BTCUSDT`
-- `GET /v5/market/mark-price-kline?category=linear&symbol=BTCUSDT&interval=60`
+Unsigned public historical-market-data endpoint:
 
-Every fetched Bybit page is retained in the source provenance as query bounds plus a SHA-256 digest of the raw response body. Pagination is fail-closed on non-progress, duplicates or invalid API status.
+- `GET /api/v5/public/market-data-history`
+- `module=3` — funding rate
+- `instType=SWAP`
+- `dateAggrType=monthly`
+- `instFamilyList=BTC-USDT`
+
+For each month, the returned static `BTC-USDT-SWAP-fundingrates-YYYY-MM.zip` is downloaded directly from the URL supplied by OKX and SHA-256 hashed locally. The monthly CSV is parsed only as:
+
+`BTC-USDT-SWAP,fundingRate,fundingTime`
+
+The query response data are also hashed and retained in provenance.
+
+### OKX mark prices
+
+Unsigned public endpoint:
+
+- `GET /api/v5/market/history-mark-price-candles`
+- `instId=BTC-USDT-SWAP`
+- `bar=1H`
+
+Pages are traversed backward without overlap/non-progress. Only confirmed historical candles are accepted. Each page's deterministic `data` payload is SHA-256 hashed together with its query parameters.
 
 ## Frozen raw window
 
-- start: `2021-01-01T00:00:00.000Z`
+- start: `2022-03-01T00:00:00.000Z`
 - end: `2026-09-30T23:59:59.999Z`
 - funding timestamp normalization tolerance: **1 second**
 - mark cadence: **1 hour**
 - maximum funding gap after coverage begins: **8 hours + 1 second**
+
+The start moves from the unproven 2021 candidate window to March 2022 solely because March 2022 is the first historical OKX funding archive boundary objectively verified before any PnL. This is a source-availability correction, not a strategy-window selection from returns.
 
 The source audit must prove continuous mark coverage and authoritative funding coverage for both venues. No interpolation, forward fill or synthetic funding is allowed.
 
@@ -58,9 +93,9 @@ The fixed 60/20/20 split is computed once from these common funding decision tim
 
 At common funding decision timestamp `t`:
 
-- `spread(t) = BybitFunding(t) - BinanceFunding(t)`
-- positive spread => candidate **LONG Binance / SHORT Bybit**
-- negative spread => candidate **LONG Bybit / SHORT Binance**
+- `spread(t) = OKXFunding(t) - BinanceFunding(t)`
+- positive spread => candidate **LONG Binance / SHORT OKX**
+- negative spread => candidate **LONG OKX / SHORT Binance**
 
 Only information already settled by `t` may be used.
 
@@ -83,7 +118,7 @@ If persistence is absent, the decision is NO TRADE. No alternate lookback or est
 
 A signal at funding time `t` may enter only at the first complete 1h mark-price candle OPEN whose timestamp is strictly greater than `t`. Same-timestamp prices can never be used to enter on a just-observed funding event.
 
-Exit signals use only completed information and execute at the next 1h mark OPEN strictly after the exit decision timestamp. A basis-risk breach is detected from a completed hourly mark observation and also exits on the following hourly mark open.
+Exit signals use only completed information and execute at the next 1h mark OPEN strictly after the exit-decision timestamp. A basis-risk breach is detected from a completed hourly mark observation and also exits on the following hourly mark open.
 
 ## Frozen costs
 
@@ -92,7 +127,7 @@ No volume/VIP/maker discount is credited.
 Per executed fill:
 
 - Binance taker fee: **5.0 bps**
-- Bybit taker fee: **5.5 bps**
+- OKX taker fee: **5.0 bps**
 - baseline adverse slippage: **3.0 bps**
 - stress adverse slippage: **6.0 bps** (exactly 2x baseline)
 
@@ -102,9 +137,9 @@ Per completed position cycle:
 
 For 10,000 USDT per leg:
 
-- baseline round-trip cost = **38.0 bps = 38.00 USDT**
-- stress round-trip cost = **50.0 bps = 50.00 USDT**
-- entry safety hurdle = **1.50 × baseline round-trip cost = 57.00 USDT**
+- baseline round-trip cost = **37.0 bps = 37.00 USDT**
+- stress round-trip cost = **49.0 bps = 49.00 USDT**
+- entry safety hurdle = **1.50 × baseline round-trip cost = 55.50 USDT**
 
 The operational buffer is charged even though the research model assumes both venues are pre-funded; it prevents cross-venue rebalancing/operational friction from being silently zero.
 
@@ -113,7 +148,7 @@ The operational buffer is charged even though the research model assumes both ve
 Entry is permitted only when:
 
 - three-spread persistence is valid;
-- projected 24h funding-spread income on 10,000 USDT is **strictly greater than 57.00 USDT**;
+- projected 24h funding-spread income on 10,000 USDT is **strictly greater than 55.50 USDT**;
 - required funding and mark inputs are complete and fresh;
 - there is no existing position.
 
@@ -141,7 +176,7 @@ Exit at the earliest of:
 5. 24h maximum holding horizon is reached;
 6. any required input fails integrity/staleness checks.
 
-Remaining close cost is both taker fees plus baseline slippage for the two closing fills: **16.5 bps = 16.50 USDT**. Its 1.50x safety buffer is **24.75 USDT**.
+Remaining close cost is both taker fees plus baseline slippage for the two closing fills: **16.0 bps = 16.00 USDT**. Its 1.50x safety buffer is **24.00 USDT**.
 
 A data-integrity exit makes the research stage INCONCLUSIVE rather than converting missing data into economic PnL.
 
@@ -179,13 +214,13 @@ Five windows are contiguous near-equal slices of the authorized split's common f
 
 ## Stage isolation
 
-The initial code is locked to `SOURCE_AUDIT`:
+The code remains locked to `SOURCE_AUDIT`:
 
 - Discovery: disabled
 - Validation: disabled
 - Holdout: disabled
 - Paper/live: disabled
 
-The source collector is not allowed to calculate strategy PnL, entries, exits, PF, expectancy or gate outcomes. Only after the source artifact is green will its exact receipt and split be frozen in a separate PR. Strategy PnL remains unauthorized until that second pre-result gate passes.
+The source collector is not allowed to calculate strategy PnL, entries, exits, PF, expectancy or gate outcomes. Only after a green source artifact will its exact receipt and split be frozen in a separate PR. Strategy PnL remains unauthorized until that second pre-result gate passes.
 
 Any post-result change to venue pair, projection, horizon, fees, slippage, operational buffer, basis limit, source window, split or gates requires a new ruleset.
