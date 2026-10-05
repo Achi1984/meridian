@@ -633,8 +633,9 @@ test('B22b input gaps require an integrity event for the exact missing causal in
 
   const module=fs.readFileSync(new URL('../research/cross-venue-funding-edge-v2-event-builder.js',import.meta.url),'utf8');
   assert.ok(module.includes('function readinessGapExplained'));
-  assert.ok(module.includes('required.has(event.subjectTime)'));
-  assert.ok(module.includes('event.subjectTime===requiredMark'));
+  assert.ok(module.includes('missing.every(({venue,time})=>'));
+  assert.ok(module.includes('event.venue===venue'));
+  assert.ok(module.includes('event.subjectTime===time'));
   assert.equal(module.includes('!integrityEvents.some(e=>e.time<=t)'),false);
 });
 
