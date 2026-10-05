@@ -62,8 +62,9 @@ function compareKeys(a,b){
   if(a[0]!==b[0])return a[0]-b[0];
   if(a[1]!==b[1])return a[1]-b[1];
   for(let i=2;i<a.length;i++){
-    const c=String(a[i]).localeCompare(String(b[i]));
-    if(c)return c;
+    const x=String(a[i]),y=String(b[i]);
+    if(x<y)return-1;
+    if(x>y)return 1;
   }
   return 0;
 }
