@@ -6,7 +6,12 @@ on:
       - "docs/AGENT_ORCHESTRATION.md"
       - "MERIDIAN_AGENT_STATE.json"
       - "MERIDIAN_RESUME.json"
+      - "MERIDIAN_LEAD_LEASE.json"
+      - "MERIDIAN_AGENT_WORKFLOW.md"
+      - "MERIDIAN_DECISIONS.md"
       - "scripts/validate-agent-orchestration.py"
+      - "scripts/lead_lease_validation.py"
+      - "test/test_lead_lease_validation.py"
       - ".github/workflows/agent-orchestration-safety.yml"
   push:
     branches:
@@ -15,7 +20,12 @@ on:
       - "docs/AGENT_ORCHESTRATION.md"
       - "MERIDIAN_AGENT_STATE.json"
       - "MERIDIAN_RESUME.json"
+      - "MERIDIAN_LEAD_LEASE.json"
+      - "MERIDIAN_AGENT_WORKFLOW.md"
+      - "MERIDIAN_DECISIONS.md"
       - "scripts/validate-agent-orchestration.py"
+      - "scripts/lead_lease_validation.py"
+      - "test/test_lead_lease_validation.py"
       - ".github/workflows/agent-orchestration-safety.yml"
   workflow_dispatch:
 
@@ -32,5 +42,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Test lead lease protocol states
+        run: python3 -m unittest test/test_lead_lease_validation.py
       - name: Validate orchestration contract and durable state
         run: python3 scripts/validate-agent-orchestration.py
