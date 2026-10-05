@@ -51,6 +51,9 @@ test('production source boundaries are frozen from the successful pre-contract p
   assert.equal(PROD.decisionWindowEnd,'2026-09-29T00:00:00.000Z');
   assert.equal(PROD.decisionReserveHours,26);
   assert.deepEqual(PROD.scheduleUtcHours,[0,8,16]);
+  assert.equal(PROD.coverageEvidence.workflowRunId,37280311203);
+  assert.equal(PROD.coverageEvidence.probeHeadSha,'80e7afddc7849197b608875bf6d6abec4f1b9bce');
+  assert.match(PROD.coverageEvidence.okxFundingSha256,/^[a-f0-9]{64}$/);
 });
 
 test('funding canonicalization accepts ±1s only on the frozen 00/08/16 UTC grid',()=>{
@@ -113,12 +116,17 @@ test('common decisions exclude duplicate invalid values but otherwise remain chr
   assert.deepEqual(common,[START,START+16*H]);
 });
 
-test('60/20/20 split is deterministic and independent of entry eligibility',()=>{
+test('60/20/20 split preserves the frozen V1 floor-60 / floor-80 rounding rule',()=>{
   const times=Array.from({length:10},(_,i)=>START+i*8*H);
   const s=splitCommonTimes(times);
   assert.equal(s.discovery.count,6);
   assert.equal(s.validation.count,2);
   assert.equal(s.holdout.count,2);
+
+  const eight=splitCommonTimes(Array.from({length:8},(_,i)=>START+i*8*H));
+  assert.equal(eight.discovery.count,4);
+  assert.equal(eight.validation.count,2);
+  assert.equal(eight.holdout.count,2);
 });
 
 test('decision window enforces the frozen 26h reserve',()=>{
@@ -219,4 +227,18 @@ test('mark validation rejects impossible OHLC relationships',()=>{
   const p=pack();
   p.okxMarks[5]={...p.okxMarks[5],high:98};
   assert.equal(validateCrossVenueV2Source(p,contract).reason,'OKX_INVALID_MARK');
+});
+
+
+test('source validation rejects rows outside the frozen funding and mark coverage',()=>{
+  const fundingOut=pack();
+  fundingOut.okxFunding.push({fundingTime:Date.parse(contract.fundingCoverageEnd)+8*H,fundingRate:.0001});
+  assert.equal(validateCrossVenueV2Source(fundingOut,contract).reason,'OKX_FUNDING_OUT_OF_RANGE');
+
+  const markOut=pack();
+  markOut.binanceMarks.push({
+    openTime:Date.parse(contract.markCoverageEnd)+H,
+    open:100,high:101,low:99,close:100,confirmed:true
+  });
+  assert.equal(validateCrossVenueV2Source(markOut,contract).reason,'BINANCE_MARK_OUT_OF_RANGE');
 });
