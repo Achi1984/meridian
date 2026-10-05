@@ -42,5 +42,16 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Claude hat aktuell nur Lesezugriff (Push und PR-Kommentare: HTTP 403). Claude liefert Reviews im Chat; der User leitet sie an den Lead weiter, der sie wörtlich als PR-Kommentar mit Quelle `Claude review` übernimmt.
-- Für einen Lead-Wechsel zu Claude ist die Claude GitHub App mit Schreibrechten zwingend.
+- Verbindliche Cross-Model-Mailbox ist GitHub Issue **#539**. Claude darf dort Review-Antworten kommentieren; diese Kommentare sind Koordination/Evidenz und ersetzen nie `main`, exakte PR-HEAD-Prüfung oder CI.
+- Nach Merge von `.github/workflows/claude-mailbox-review.yml` kann der Lead Claude ohne User-Relay auslösen, indem ein neuer Kommentar in #539 von `Achi1984` sowohl `@claude` als auch `CROSS_MODEL_REQUEST` enthält.
+- Der Workflow ist absichtlich Reviewer-only: `contents: read`, `pull-requests: read`, `actions: read`, nur `issues: write` für die Review-Antwort. Claude darf keine Dateien editieren, keinen Commit/Push/PR/Merge erzeugen, keine Locks/Stages ändern und keine Workflows dispatchen.
+- Für die Action muss das Repository-Secret `CLAUDE_CODE_OAUTH_TOKEN` vorhanden sein. Ohne Secret scheitert der Workflow fail-closed vor dem Reviewer-Lauf.
+- Die Lead-Lease-Regeln bleiben unverändert: ChatGPT ist Lead und alleiniger Merge-Owner. Ein Lead-Wechsel zu Claude benötigt weiterhin den formalen Lease-Wechsel aus Abschnitt 4.
+
+## 8. Automatischer Mailbox-Loop
+1. ChatGPT postet `@claude CROSS_MODEL_REQUEST <id>` in #539.
+2. Der GitHub-Workflow startet Claude nur für den eng definierten #539/Achi1984-Trigger.
+3. Claude prüft den exakten angeforderten SHA read-only und postet `CROSS_MODEL_RESPONSE <id>` in #539.
+4. ChatGPT liest #539 als verbindliche Mailbox, verarbeitet GREEN/REVISION_REQUIRED und führt nur bereits autorisierte Schritte aus.
+5. Jeder neue Commit invalidiert ein vorheriges GREEN LIGHT. Kein Workflow darf diese Exact-Head-Regel umgehen.
+6. User-Eingriff bleibt nur für Entscheidungen/Freigaben nötig, die laut Hard Gates ausdrücklich beim User liegen.
