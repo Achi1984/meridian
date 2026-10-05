@@ -372,6 +372,14 @@ test('validatedSource evidence is deeply immutable after validation',()=>{
   assert.throws(()=>{source.normalized.binanceMarks[0].close=999},/read only|Cannot assign/i);
 });
 
+test('validatedSource handle cannot be fabricated by copying a genuine handle',()=>{
+  const forged=Object.freeze({...BASE_VALID});
+  assert.throws(
+    ()=>buildCrossVenueV2EventStream({validatedSource:forged,split:'discovery'}),
+    /CROSS_VENUE_V2_BUILDER_VALIDATED_SOURCE_REQUIRED/
+  );
+});
+
 test('B13 malformed package, receipt, expected digest and row data fail closed',()=>{
   assert.throws(
     ()=>validateCrossVenueV2BuilderSource({packageData:BASE}),
