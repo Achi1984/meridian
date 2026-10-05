@@ -22,7 +22,9 @@ import {
   runCrossVenueV2StrategyDriverSynthetic,
   executeCrossVenueV2StrategyDriver,
   assertCrossVenueV2SyntheticSourceAllowed,
-  CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST
+  crossVenueV2ReceiptMatchesForbiddenPins,
+  CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST,
+  CROSS_VENUE_V2_CANONICAL_SOURCE_PINS
 } from '../research/cross-venue-funding-edge-v2-strategy-driver.js';
 import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK} from '../research/cross-venue-funding-edge-v2-stage-lock.js';
 
@@ -336,6 +338,74 @@ test('PR2 synthetic authorization rejects the canonical source receipt before ex
   );
 });
 
+test('PR2 synthetic source pin matcher blocks provenance-only rewrap identity and any matching stream digest',()=>{
+  const original=activePackage(TARGET);
+  const rewrapped=rebuild(original,d=>{
+    d.provenance.reviewerNote='rewrapped';
+  });
+  assert.notEqual(rewrapped.receipt.digest,original.receipt.digest);
+  assert.deepEqual(rewrapped.receipt.dataDigests,original.receipt.dataDigests);
+  assert.equal(rewrapped.receipt.integrityDigest,original.receipt.integrityDigest);
+
+  const keys=['binanceFunding','okxFunding','binanceMarks','okxMarks'];
+  const fixturePins={
+    receiptDigest:'f'.repeat(64),
+    integrityDigest:'e'.repeat(64),
+    dataDigests:{...original.receipt.dataDigests}
+  };
+  assert.equal(
+    crossVenueV2ReceiptMatchesForbiddenPins(rewrapped.receipt,fixturePins),
+    true
+  );
+  for(const key of keys){
+    assert.equal(
+      crossVenueV2ReceiptMatchesForbiddenPins(
+        rewrapped.receipt,
+        {dataDigests:{[key]:original.receipt.dataDigests[key]}}
+      ),
+      true,
+      key
+    );
+  }
+  assert.equal(
+    crossVenueV2ReceiptMatchesForbiddenPins(
+      rewrapped.receipt,
+      {dataDigests:Object.fromEntries(keys.map((key,i)=>[key,String(i).repeat(64)]))}
+    ),
+    false
+  );
+});
+
+test('PR2 canonical source pins exactly match frozen source-evaluation metadata',()=>{
+  const evaluation=JSON.parse(fs.readFileSync(
+    new URL('../research/cross-venue-funding-edge-v2-source-evaluation.json',import.meta.url),
+    'utf8'
+  ));
+  assert.deepEqual(CROSS_VENUE_V2_CANONICAL_SOURCE_PINS,{
+    receiptDigest:evaluation.canonicalSourceRun.receiptDigest,
+    integrityDigest:evaluation.digests.integrityDigest,
+    dataDigests:{
+      binanceFunding:evaluation.digests.binanceFunding,
+      okxFunding:evaluation.digests.okxFunding,
+      binanceMarks:evaluation.digests.binanceMarks,
+      okxMarks:evaluation.digests.okxMarks
+    }
+  });
+  assert.throws(
+    ()=>assertCrossVenueV2SyntheticSourceAllowed({
+      expectedReceiptDigest:'a'.repeat(64),
+      validation:{receipt:{
+        digest:'a'.repeat(64),
+        integrityDigest:'b'.repeat(64),
+        dataDigests:{
+          binanceFunding:CROSS_VENUE_V2_CANONICAL_SOURCE_PINS.dataDigests.binanceFunding
+        }
+      }}
+    }),
+    /CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER/
+  );
+});
+
 test('PR2 synthetic driver requires an explicit syntheticOnly flag',()=>{
   const pkg=activePackage(TARGET);
   assert.throws(
@@ -409,6 +479,70 @@ test('PR2 terminal post-exit evidence retains the exact causal slot/fill prefix'
   );
   assert.equal(result.outcome.terminal,true);
   assert.equal(result.outcome.reason,'OPEN_POSITION_AT_DATA_DEGRADATION');
+});
+
+test('PR2 in-hold terminal prefix retains every causal common decision before degradation',()=>{
+  const terminalDetection=TARGET+10*H;
+  const pkg=activePackage(TARGET,d=>{
+    setActiveFunding(d,TARGET+F);
+    d.binanceMarks=d.binanceMarks.filter(x=>x.openTime!==TARGET+9*H);
+  });
+  const source=validated(pkg);
+  const built=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
+  const result=runCrossVenueV2StrategyDriverSynthetic({
+    syntheticOnly:true,
+    validatedSource:source,
+    split:'discovery'
+  });
+  const retained=eventAt(result,'COMMON_DECISION',TARGET+F);
+  assert.ok(retained,'T+8h causal decision must remain visible before T+10h detection');
+  assert.equal(retained.entryActive,true);
+  const expectedCount=built.events.filter(
+    e=>e.kind==='COMMON_DECISION_SLOT'&&e.time<terminalDetection
+  ).length;
+  assert.equal(result.counts.commonDecisions,expectedCount);
+  assert.equal(result.outcome.terminal,true);
+  assert.equal(result.outcome.reason,'OPEN_POSITION_AT_DATA_DEGRADATION');
+  assert.equal(
+    result.events.some(e=>e.kind==='COMMON_DECISION'&&e.time>=terminalDetection),
+    false
+  );
+});
+
+test('PR2 exit-pending terminal prefix retains causal decisions before a between-decision-and-fill detection',()=>{
+  const exitDecisionAt=TARGET+15*H;
+  const exitFillAt=exitDecisionAt+H;
+  const terminalDetection=exitDecisionAt+H/2;
+  const pkg=activePackage(TARGET,d=>{
+    setActiveFunding(d,TARGET+F);
+    const b=d.binanceMarks.find(x=>x.openTime===TARGET+14*H);
+    const o=d.okxMarks.find(x=>x.openTime===TARGET+14*H);
+    assert.ok(b&&o);
+    b.close=99;
+    o.close=101;
+    d.binanceFunding.push({fundingTime:terminalDetection,fundingRate:.0001});
+  });
+  const source=validated(pkg);
+  const built=buildCrossVenueV2EventStream({validatedSource:source,split:'discovery'});
+  const result=runCrossVenueV2StrategyDriverSynthetic({
+    syntheticOnly:true,
+    validatedSource:source,
+    split:'discovery'
+  });
+  assert.ok(eventAt(result,'EXIT_DECISION',exitDecisionAt));
+  assert.equal(eventAt(result,'EXIT_FILL',exitFillAt),undefined);
+  const retained=eventAt(result,'COMMON_DECISION',TARGET+F);
+  assert.ok(retained,'T+8h causal decision must remain visible before exit-pending terminality');
+  const expectedCount=built.events.filter(
+    e=>e.kind==='COMMON_DECISION_SLOT'&&e.time<terminalDetection
+  ).length;
+  assert.equal(result.counts.commonDecisions,expectedCount);
+  assert.equal(result.outcome.terminal,true);
+  assert.equal(result.outcome.reason,'OPEN_POSITION_AT_DATA_DEGRADATION');
+  assert.equal(
+    result.events.some(e=>e.kind==='COMMON_DECISION'&&e.time>=terminalDetection),
+    false
+  );
 });
 
 test('PR2 terminal entry-candle failure prevents later decision exposure',()=>{
