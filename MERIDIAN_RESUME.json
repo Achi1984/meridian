@@ -1,14 +1,14 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r112",
+  "build": "10.0-r113",
   "branch": "main",
   "issue": 541,
   "phase": "CROSS_VENUE_FUNDING_EDGE_V2_SOURCE_AUDIT_EVALUATED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "63f93aa41b6e054b229309b6fd6fbc2447a92181",
+    "verifiedSha": "d4a628fee5cf527e0218b99635d80b9cd91bd0ad",
     "verifiedAt": "2026-10-05",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
