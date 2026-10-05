@@ -3,8 +3,8 @@
   "project": "MERIDIAN",
   "build": "10.0-r108",
   "branch": "main",
-  "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_STRATEGY_V1_PREREGISTRATION_CANONICAL_IMPLEMENTATION_REQUIRED",
+  "issue": 528,
+  "phase": "CROSS_VENUE_FUNDING_EDGE_V1_SOURCE_FAIL_V2_PREREGISTERED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
@@ -1116,6 +1116,35 @@
       "paperAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "crossVenueFundingEdgeV1": {
+      "ruleset": "CROSS-VENUE-FUNDING-EDGE-V1",
+      "status": "SOURCE_FAIL",
+      "stage": "SOURCE_CLOSED",
+      "decision": "CROSS_VENUE_V1_SOURCE_FAIL",
+      "evidenceMainSha": "a52c56010b9a547061c82d37840f5335465b3754",
+      "evidenceRunId": 37270798106,
+      "blockerIssue": 528,
+      "sourceAuditAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "strategyPnlInspected": false,
+      "executionImpact": false
+    },
+    "crossVenueFundingEdgeV2": {
+      "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
+      "status": "PREREGISTERED",
+      "stage": "PREREGISTERED",
+      "predecessor": "CROSS-VENUE-FUNDING-EDGE-V1",
+      "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
+      "sourceAuditAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "executionImpact": false,
+      "nextRequiredGate": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_ON_EXACT_REVIEWED_HEAD"
     }
   },
   "nonCanonicalResearch": [
@@ -1129,7 +1158,7 @@
     255,
     256
   ],
-  "nextAction": "The frozen Quarter-Hour Strategy V1 preregistration is canonical on Data V1.3 via merged PR #435. Next create a separate deterministic research implementation matching the frozen document exactly. Before any historical Strategy V1 evidence run, require unit tests for signal direction, 12h cohort expiry, net target accounting, turnover costs, no-lookahead execution pricing, funding sign/valuation, fixed blocks and primary gates, plus exact-head Release Safety and independent implementation review. Do not change preregistered strategy rules. Paper/live remain unauthorized.",
+  "nextAction": "After the reviewed V1-close/V2-preregistration PR merges, create a separate CROSS-VENUE-FUNDING-EDGE-V2 implementation/source-contract PR. Freeze exact source boundaries, deterministic integrity-event construction, source receipts and regression tests before any V2 source audit. V2 Source Audit and all strategy PnL remain unauthorized until that exact-head PR is CI-green and receives Claude GREEN LIGHT.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1160,7 +1189,11 @@
     "maxToolCallGroupsPerVisibleBurst": 2,
     "maxSameStatusPollsPerVisibleBurst": 1,
     "maxVisibleBurstSeconds": 90,
-    "userVisibleCheckpointRequired": true
+    "userVisibleCheckpointRequired": true,
+    "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md",
+    "leadLease": "MERIDIAN_LEAD_LEASE.json",
+    "crossModelLead": "CHATGPT",
+    "crossModelReviewSubAgent": "CLAUDE"
   },
   "researchDirection": {
     "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_SOURCE_REDESIGN",
