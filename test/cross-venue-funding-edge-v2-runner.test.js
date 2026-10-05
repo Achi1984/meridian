@@ -5,14 +5,15 @@ import {
   V2_RUNNER_STATES,runnerEventKey,sortRunnerEvents,runV2RunnerStateMachine,
   runnerStateAtTime,splitEntryAllowed,assertV2RunnerExecutionAuthorized
 } from '../research/cross-venue-funding-edge-v2-runner.js';
+import {recoveryAt} from '../research/cross-venue-funding-edge-v2-data-contract.js';
 
 const H=60*60*1000;
 const T=Date.parse('2026-01-01T00:00:00.000Z');
 
 const e=(kind,time,stableId,extra={})=>({kind,time,stableId,...extra});
 const decision=(time,stableId,{
-  entryActive=true,inputsReady=true,splitEligible=true,recoveryEligible=false
-}={})=>e('COMMON_DECISION',time,stableId,{entryActive,inputsReady,splitEligible,recoveryEligible});
+  entryActive=true,inputsReady=true,splitEligible=true
+}={})=>e('COMMON_DECISION',time,stableId,{entryActive,inputsReady,splitEligible});
 const integrity=(time,stableId,integrityKind='OFF_GRID_FUNDING')=>
   e('INTEGRITY_DETECTION',time,stableId,{venue:'OKX',integrityKind});
 const entryFill=(time,id='entry-fill')=>e('ENTRY_FILL',time,id,{venue:'PAIR'});
@@ -27,6 +28,13 @@ function completeCycle(){
     exitDecision(T+2*H),
     exitFill(T+3*H)
   ];
+}
+
+function recoveryInputs({missingBinance=null,missingOkx=null}={}){
+  const make=(missing)=>Array.from({length:49},(_,i)=>({
+    openTime:T+i*H,open:100,high:101,low:99,close:100,confirmed:true
+  })).filter(x=>x.openTime!==missing);
+  return{binanceMarks:make(missingBinance),okxMarks:make(missingOkx)};
 }
 
 test('runnerEventKey freezes the total same-timestamp phase order',()=>{
@@ -95,18 +103,18 @@ test('G6 cancelled pending entry never resurrects after recovery',()=>{
   const events=[
     decision(T,'old'),
     integrity(T+H/2,'i6'),
-    decision(T+8*H,'r1',{entryActive:false,recoveryEligible:false}),
-    decision(T+16*H,'r2',{entryActive:false,recoveryEligible:false}),
-    decision(T+24*H,'r3',{entryActive:false,recoveryEligible:true})
+    decision(T+8*H,'r1',{entryActive:false}),
+    decision(T+16*H,'r2',{entryActive:false}),
+    decision(T+24*H,'r3',{entryActive:false})
   ];
-  const recovered=runV2RunnerStateMachine(events);
+  const recovered=runV2RunnerStateMachine(events,{recoveryInputs:recoveryInputs()});
   assert.equal(recovered.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
   assert.equal(recovered.state.pendingEntry,null);
   assert.equal(recovered.trace.some(x=>x.action==='ENTRY_PENDING_CREATED_AFTER_RECOVERY'),false);
 
   const fresh=runV2RunnerStateMachine([
-    ...events,decision(T+32*H,'new',{entryActive:true,recoveryEligible:false})
-  ]);
+    ...events,decision(T+32*H,'new',{entryActive:true})
+  ],{recoveryInputs:recoveryInputs(),finalize:false});
   assert.equal(fresh.state.status,V2_RUNNER_STATES.ENTRY_PENDING);
   assert.equal(fresh.state.pendingEntry.decisionId,'new');
 });
@@ -117,7 +125,7 @@ test('G7 common decisions while pending or open are ignored and never pyramid',(
     decision(T+H/2,'d-pending'),
     entryFill(T+H),
     decision(T+3*H/2,'d-open')
-  ]);
+  ],{finalize:false});
   assert.equal(r.state.status,V2_RUNNER_STATES.POSITION_OPEN);
   assert.equal(r.trace.filter(x=>x.action==='DECISION_IGNORED_NO_PYRAMID').length,2);
   assert.equal(r.trace.filter(x=>x.action==='ENTRY_FILLED').length,1);
@@ -147,8 +155,8 @@ test('G10 a later integrity event before recovery resets the episode clock',()=>
     integrity(T+4*H,'reset','FUNDING_GAP'),
     decision(T+8*H,'r1',{entryActive:false}),
     decision(T+16*H,'r2',{entryActive:false}),
-    decision(T+24*H,'r3',{entryActive:false,recoveryEligible:true})
-  ]);
+    decision(T+24*H,'r3',{entryActive:false})
+  ],{recoveryInputs:recoveryInputs()});
   assert.equal(r.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
   assert.equal(r.trace.some(x=>x.action==='DEGRADATION_RESET'),true);
 });
@@ -159,8 +167,8 @@ test('G11 an integrity event exactly at candidate recovery T resets before the s
     decision(T+8*H,'r1',{entryActive:false}),
     decision(T+16*H,'r2',{entryActive:false}),
     integrity(T+24*H,'reset-at-t','MISSING_SCHEDULED_FUNDING'),
-    decision(T+24*H,'r3',{entryActive:false,recoveryEligible:false})
-  ]);
+    decision(T+24*H,'r3',{entryActive:false})
+  ],{recoveryInputs:recoveryInputs()});
   assert.equal(r.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
   assert.equal(r.state.recoveryCount,0);
   assert.equal(r.state.degradationResetAt,T+24*H);
@@ -171,7 +179,7 @@ test('G12 a gap in common settlements resets the consecutive recovery count',()=
     integrity(T,'start'),
     decision(T+8*H,'r1',{entryActive:false}),
     decision(T+24*H,'gap',{entryActive:false})
-  ]);
+  ],{recoveryInputs:recoveryInputs()});
   assert.equal(r.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
   assert.equal(r.state.recoveryCount,1);
   assert.equal(r.state.lastRecoverySettlementTime,T+24*H);
@@ -191,9 +199,9 @@ test('G15 split start state is derived causally from events strictly before the 
     integrity(T,'start'),
     decision(T+8*H,'r1',{entryActive:false}),
     decision(T+16*H,'r2',{entryActive:false}),
-    decision(T+24*H,'future-r3',{entryActive:false,recoveryEligible:true})
+    decision(T+24*H,'future-r3',{entryActive:false})
   ];
-  const s=runnerStateAtTime(events,T+20*H);
+  const s=runnerStateAtTime(events,T+20*H,{recoveryInputs:recoveryInputs()});
   assert.equal(s.status,V2_RUNNER_STATES.DEGRADED_FLAT);
   assert.equal(s.recoveryCount,2);
 });
@@ -249,7 +257,7 @@ test('G28 entryActive is a strict boolean in the runner contract',()=>{
   for(const bad of ['true',1,undefined,null]){
     assert.throws(()=>runV2RunnerStateMachine([
       e('COMMON_DECISION',T,'bad',{
-        entryActive:bad,inputsReady:true,splitEligible:true,recoveryEligible:false
+        entryActive:bad,inputsReady:true,splitEligible:true
       })
     ]),/INVALID_ENTRY_ACTIVE_FLAG/);
   }
@@ -269,4 +277,99 @@ test('G31 runner implementation tests do not consume canonical source packages o
   assert.doesNotMatch(bodies,/research\/data\/.*source.*\.json/i);
   const artifactId='113365'+'41442';
   assert.equal(bodies.includes(artifactId),false);
+});
+
+
+test('R2.1 pending entry without fill becomes terminal on the first later event',()=>{
+  const r=runV2RunnerStateMachine([
+    decision(T,'entry'),
+    decision(T+8*H,'later',{entryActive:false})
+  ]);
+  assert.equal(r.outcome.status,'INCONCLUSIVE');
+  assert.equal(r.outcome.reason,'ENTRY_FILL_MISSING');
+  assert.equal(r.trace.at(-1).action,'ENTRY_FILL_MISSING');
+});
+
+test('R2.2 exit pending without fill becomes terminal on the first later event',()=>{
+  const r=runV2RunnerStateMachine([
+    decision(T,'entry'),entryFill(T+H),exitDecision(T+2*H),
+    funding(T+8*H,'later')
+  ]);
+  assert.equal(r.outcome.status,'INCONCLUSIVE');
+  assert.equal(r.outcome.reason,'EXIT_FILL_MISSING');
+  assert.equal(r.trace.at(-1).action,'EXIT_FILL_MISSING');
+});
+
+test('R2.3 pending entry plus integrity at t+2h without fill is terminal data degradation, not throw',()=>{
+  const r=runV2RunnerStateMachine([
+    decision(T,'entry'),
+    integrity(T+2*H,'entry-candle','ENTRY_FILL_ANOMALY')
+  ]);
+  assert.equal(r.outcome.status,'INCONCLUSIVE');
+  assert.equal(r.outcome.reason,'ENTRY_FILL_DATA_DEGRADATION');
+  assert.equal(r.trace.at(-1).action,'ENTRY_FILL_DATA_DEGRADATION');
+});
+
+test('R2.4 run end with open pending or position is always terminal',()=>{
+  const pending=runV2RunnerStateMachine([decision(T,'entry')]);
+  assert.equal(pending.outcome.reason,'ENTRY_FILL_MISSING');
+
+  const open=runV2RunnerStateMachine([decision(T,'entry'),entryFill(T+H)]);
+  assert.equal(open.outcome.status,'INCONCLUSIVE');
+  assert.equal(open.outcome.reason,'OPEN_POSITION_AT_RUN_END');
+
+  const exitPending=runV2RunnerStateMachine([
+    decision(T,'entry'),entryFill(T+H),exitDecision(T+2*H)
+  ]);
+  assert.equal(exitPending.outcome.reason,'EXIT_FILL_MISSING');
+});
+
+test('R2.5 recovery is derived from recoveryAt and cannot be supplied by caller',()=>{
+  const events=[
+    integrity(T,'start'),
+    decision(T+8*H,'r1',{entryActive:false}),
+    decision(T+16*H,'r2',{entryActive:false}),
+    decision(T+24*H,'r3',{entryActive:false})
+  ];
+  const complete=recoveryInputs();
+  const r=runV2RunnerStateMachine(events,{recoveryInputs:complete});
+  assert.equal(r.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
+
+  const missing=recoveryInputs({missingOkx:T+23*H});
+  const blocked=runV2RunnerStateMachine(events,{recoveryInputs:missing});
+  assert.equal(blocked.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
+
+  const direct=recoveryAt({
+    episodeStart:T,
+    commonTimes:[T+8*H,T+16*H,T+24*H],
+    integrityEvents:[],
+    binanceMarks:complete.binanceMarks,
+    okxMarks:complete.okxMarks
+  });
+  assert.equal(direct,T+24*H);
+
+  assert.throws(()=>runV2RunnerStateMachine([
+    integrity(T,'start'),
+    e('COMMON_DECISION',T+8*H,'bad-flag',{
+      entryActive:false,inputsReady:true,splitEligible:true,recoveryEligible:true
+    })
+  ],{recoveryInputs:complete}),/CALLER_RECOVERY_FLAG_FORBIDDEN/);
+});
+
+test('R2.6 recovery requires T-1h marks but not the mark at T',()=>{
+  const events=[
+    integrity(T,'start'),
+    decision(T+8*H,'r1',{entryActive:false}),
+    decision(T+16*H,'r2',{entryActive:false}),
+    decision(T+24*H,'r3',{entryActive:false})
+  ];
+  const missingLastClosed=runV2RunnerStateMachine(events,{
+    recoveryInputs:recoveryInputs({missingOkx:T+23*H})
+  });
+  assert.equal(missingLastClosed.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
+
+  const missingAtT=runV2RunnerStateMachine(events,{
+    recoveryInputs:recoveryInputs({missingOkx:T+24*H})
+  });
+  assert.equal(missingAtT.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
 });
