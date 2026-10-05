@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK} from './cross-venue-funding-edge-v2-stage-lock.js';
+import {CROSS_VENUE_FUNDING_EDGE_V2_SOURCE,recoveryAt} from './cross-venue-funding-edge-v2-data-contract.js';
 
 const HOUR=60*60*1000;
 const FUNDING_INTERVAL=8*HOUR;
@@ -102,9 +103,9 @@ export function assertV2RunnerExecutionAuthorized(lock=CROSS_VENUE_FUNDING_EDGE_
   return true;
 }
 
-export function executeV2Runner({events=[],lock=CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK}={}){
+export function executeV2Runner({events=[],recoveryInputs=null,lock=CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK}={}){
   assertV2RunnerExecutionAuthorized(lock);
-  return runV2RunnerStateMachine(events);
+  return runV2RunnerStateMachine(events,{recoveryInputs});
 }
 
 function initialState(){
@@ -144,13 +145,22 @@ function snapshotState(s){
 function appendTrace(trace,event,from,to,action){
   trace.push(Object.freeze({event:eventView(event),from,to,action}));
 }
-function terminalize(s,event,trace,reason='OPEN_POSITION_AT_DATA_DEGRADATION'){
+function terminalize(s,event,trace,reason='OPEN_POSITION_AT_DATA_DEGRADATION',action='TERMINAL_INCONCLUSIVE'){
   const from=s.status;
   s.status=V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE;
   s.terminalReason=reason;
   s.pendingEntry=null;
   s.exitPending=null;
-  appendTrace(trace,event,from,s.status,'TERMINAL_INCONCLUSIVE');
+  appendTrace(trace,event,from,s.status,action);
+}
+function terminalizeRunEnd(s,trace,lastTime){
+  if(s.status===V2_RUNNER_STATES.ENTRY_PENDING){
+    terminalize(s,{time:s.pendingEntry.fillAt,kind:'RUN_END',venue:'',stableId:'run-end-entry'},trace,'ENTRY_FILL_MISSING','ENTRY_FILL_MISSING');
+  }else if(s.status===V2_RUNNER_STATES.EXIT_PENDING){
+    terminalize(s,{time:s.exitPending.fillAt,kind:'RUN_END',venue:'',stableId:'run-end-exit'},trace,'EXIT_FILL_MISSING','EXIT_FILL_MISSING');
+  }else if(s.status===V2_RUNNER_STATES.POSITION_OPEN){
+    terminalize(s,{time:lastTime??s.openPosition.entryFillTime,kind:'RUN_END',venue:'',stableId:'run-end-open'},trace,'OPEN_POSITION_AT_RUN_END','OPEN_POSITION_AT_RUN_END');
+  }
 }
 function degradeFlat(s,event,trace,action='DATA_DEGRADED'){
   const from=s.status;
@@ -177,32 +187,59 @@ function maybeOpenPending(s,event,trace,fromOverride=null){
   appendTrace(trace,event,from,s.status,'ENTRY_PENDING_CREATED');
 }
 
-function applyCommonDecision(s,event,trace){
-  const recoveryEligible=strictBoolean(event.recoveryEligible,'CROSS_VENUE_V2_INVALID_RECOVERY_FLAG');
+function recoveryContextFor(ordered,recoveryInputs){
+  if(!recoveryInputs||typeof recoveryInputs!=='object'||Array.isArray(recoveryInputs))
+    return null;
+  const {binanceMarks,okxMarks,contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE}=recoveryInputs;
+  if(!Array.isArray(binanceMarks)||!Array.isArray(okxMarks))
+    fail('CROSS_VENUE_V2_RECOVERY_MARKS_REQUIRED');
+  return{
+    commonTimes:ordered.filter(e=>e.kind==='COMMON_DECISION').map(e=>e.time),
+    integrityEvents:ordered.filter(e=>e.kind==='INTEGRITY_DETECTION').map(e=>({
+      kind:e.integrityKind??'INTEGRITY_DETECTION',
+      venue:e.venue??'',
+      detectionTime:e.time
+    })),
+    binanceMarks,
+    okxMarks,
+    contract
+  };
+}
+
+function applyCommonDecision(s,event,trace,recoveryContext){
   strictBoolean(event.entryActive,'CROSS_VENUE_V2_INVALID_ENTRY_ACTIVE_FLAG');
   strictBoolean(event.inputsReady,'CROSS_VENUE_V2_INVALID_ENTRY_INPUTS_FLAG');
   strictBoolean(event.splitEligible,'CROSS_VENUE_V2_INVALID_SPLIT_ELIGIBILITY_FLAG');
+  if(Object.hasOwn(event,'recoveryEligible'))
+    fail('CROSS_VENUE_V2_CALLER_RECOVERY_FLAG_FORBIDDEN');
 
   if([V2_RUNNER_STATES.ENTRY_PENDING,V2_RUNNER_STATES.POSITION_OPEN,V2_RUNNER_STATES.EXIT_PENDING].includes(s.status)){
     appendTrace(trace,event,s.status,s.status,'DECISION_IGNORED_NO_PYRAMID');
     return;
   }
   if(s.status===V2_RUNNER_STATES.FLAT_ELIGIBLE){
-    if(recoveryEligible)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
     maybeOpenPending(s,event,trace);
     return;
   }
   if(s.status!==V2_RUNNER_STATES.DEGRADED_FLAT)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
   if(event.time<=s.degradationResetAt){
-    if(recoveryEligible)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
     appendTrace(trace,event,s.status,s.status,'DEGRADED_DECISION_BLOCKED');
     return;
   }
+  if(!recoveryContext)fail('CROSS_VENUE_V2_RECOVERY_MARKS_REQUIRED');
 
   const consecutive=s.lastRecoverySettlementTime!==null&&event.time-s.lastRecoverySettlementTime===FUNDING_INTERVAL;
   const rawCount=s.lastRecoverySettlementTime===null?1:(consecutive?s.recoveryCount+1:1);
-  if(recoveryEligible){
-    if(rawCount<3)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
+  const recoveryTime=recoveryAt({
+    episodeStart:s.degradationResetAt,
+    commonTimes:recoveryContext.commonTimes,
+    integrityEvents:recoveryContext.integrityEvents,
+    binanceMarks:recoveryContext.binanceMarks,
+    okxMarks:recoveryContext.okxMarks
+  },recoveryContext.contract);
+
+  if(recoveryTime===event.time){
+    if(rawCount<3)fail('CROSS_VENUE_V2_RECOVERY_STATE_DIVERGENCE');
     const from=s.status;
     s.status=V2_RUNNER_STATES.FLAT_ELIGIBLE;
     s.recoveryCount=0;
@@ -222,7 +259,7 @@ function applyCommonDecision(s,event,trace){
   appendTrace(trace,event,from,s.status,'RECOVERY_PROGRESS');
 }
 
-function applyEvent(s,event,trace){
+function applyEvent(s,event,trace,recoveryContext){
   const key=runnerEventKey(event);
   event={...event,time:key[0],kind:key[3],venue:key[2],stableId:key[4]};
   const from=s.status;
@@ -246,7 +283,8 @@ function applyEvent(s,event,trace){
         degradeFlat(s,event,trace,'PENDING_ENTRY_CANCELLED_BY_DEGRADATION');
         return;
       }
-      fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
+      terminalize(s,event,trace,'ENTRY_FILL_DATA_DEGRADATION','ENTRY_FILL_DATA_DEGRADATION');
+      return;
     }
     if([V2_RUNNER_STATES.POSITION_OPEN,V2_RUNNER_STATES.EXIT_PENDING].includes(s.status)){
       terminalize(s,event,trace);
@@ -260,7 +298,7 @@ function applyEvent(s,event,trace){
   }
 
   if(event.kind==='COMMON_DECISION'){
-    applyCommonDecision(s,event,trace);
+    applyCommonDecision(s,event,trace,recoveryContext);
     return;
   }
 
@@ -296,14 +334,28 @@ function applyEvent(s,event,trace){
   fail('CROSS_VENUE_V2_INVALID_RUNNER_EVENT_KIND');
 }
 
-export function runV2RunnerStateMachine(events=[]){
+export function runV2RunnerStateMachine(events=[],{recoveryInputs=null,finalize=true}={}){
   const ordered=sortRunnerEvents(events);
+  const recoveryContext=recoveryContextFor(ordered,recoveryInputs);
   const state=initialState();
   const trace=[];
+  let lastTime=null;
   for(const event of ordered){
     if(state.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)break;
-    applyEvent(state,event,trace);
+    const key=runnerEventKey(event);
+    lastTime=key[0];
+    if(state.status===V2_RUNNER_STATES.ENTRY_PENDING&&key[0]>state.pendingEntry.fillAt&&key[3]!=='INTEGRITY_DETECTION'){
+      terminalize(state,event,trace,'ENTRY_FILL_MISSING','ENTRY_FILL_MISSING');
+      break;
+    }
+    if(state.status===V2_RUNNER_STATES.EXIT_PENDING&&key[0]>state.exitPending.fillAt){
+      terminalize(state,event,trace,'EXIT_FILL_MISSING','EXIT_FILL_MISSING');
+      break;
+    }
+    applyEvent(state,event,trace,recoveryContext);
   }
+  if(finalize&&state.status!==V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE)
+    terminalizeRunEnd(state,trace,lastTime);
   const frozenTrace=Object.freeze(trace);
   return Object.freeze({
     outcome:state.status===V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE
@@ -315,10 +367,10 @@ export function runV2RunnerStateMachine(events=[]){
   });
 }
 
-export function runnerStateBeforeTime(events=[],asOfTime){
+export function runnerStateBeforeTime(events=[],asOfTime,{recoveryInputs=null}={}){
   const t=strictTime(asOfTime);
   const prefix=sortRunnerEvents(events).filter(e=>runnerEventKey(e)[0]<t);
-  return runV2RunnerStateMachine(prefix).state;
+  return runV2RunnerStateMachine(prefix,{recoveryInputs,finalize:false}).state;
 }
 
 export const runnerStateAtTime=runnerStateBeforeTime;
