@@ -127,11 +127,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-05T07:10:00Z",
-    "canonicalMainSha": "ae4d9f490a43972ad2fc3c768c8744849790ba22",
+    "at": "2026-10-05T09:04:00Z",
+    "canonicalMainSha": "2e463a533e8d0a6de3b509620cb1af7da847acd5",
     "build": "10.0-r112",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Cross-Venue Funding Edge V1 is SOURCE_CLOSED; V2 is PREREGISTERED. PR #532 merged Frozen Research Guard pinning for the V1 closure/V2 preregistration lineage. Active research lane is Cross-Venue V2 implementation/source-contract preparation. V2 Source Audit and strategy PnL remain unauthorized."
+    "note": "PR #535 merged and froze Cross-Venue Funding Edge V2 implementation/source contract. This transition authorizes SOURCE_AUDIT only; Discovery/PnL/Paper/Live remain locked. After merge, the main-only source gate may collect source evidence."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
@@ -148,11 +148,11 @@
     "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
     "predecessorEvidenceRunId": 37270798106,
     "successorRuleset": "CROSS-VENUE-FUNDING-EDGE-V2",
-    "successorStage": "PREREGISTERED",
-    "sourceAuditAuthorized": false,
+    "successorStage": "SOURCE_AUDIT",
+    "sourceAuditAuthorized": true,
     "strategyPnlObserved": false,
     "paperAuthorized": false,
     "liveAuthorized": false,
-    "next": "IMPLEMENT_V2_SOURCE_CONTRACT_AND_BEHAVIOR_GUARDS_EXACT_HEAD_REVIEW_BEFORE_SOURCE_AUDIT"
+    "next": "RUN_V2_SOURCE_AUDIT_ON_MAIN_AND_EVALUATE_SOURCE_ONLY_NO_PNL"
   }
 }
