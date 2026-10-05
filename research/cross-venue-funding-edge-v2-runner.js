@@ -70,7 +70,13 @@ function compareKeys(a,b){
 
 export function sortRunnerEvents(events=[]){
   if(!Array.isArray(events))fail('CROSS_VENUE_V2_INVALID_RUNNER_EVENTS');
-  return [...events].sort((a,b)=>compareKeys(runnerEventKey(a),runnerEventKey(b)));
+  const keyed=events.map(event=>({event,key:runnerEventKey(event)}))
+    .sort((a,b)=>compareKeys(a.key,b.key));
+  for(let i=1;i<keyed.length;i++){
+    if(compareKeys(keyed[i-1].key,keyed[i].key)===0)
+      fail('CROSS_VENUE_V2_DUPLICATE_RUNNER_EVENT_KEY');
+  }
+  return keyed.map(x=>x.event);
 }
 
 export function splitEntryAllowed({decisionTime,nextSplitStart=null}={}){
@@ -93,6 +99,11 @@ export function assertV2RunnerExecutionAuthorized(lock=CROSS_VENUE_FUNDING_EDGE_
   if(!lock||lock.ruleset!=='CROSS-VENUE-FUNDING-EDGE-V2'||lock.discovery!==true)
     fail('CROSS_VENUE_V2_DISCOVERY_LOCKED');
   return true;
+}
+
+export function executeV2Runner({events=[],lock=CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK}={}){
+  assertV2RunnerExecutionAuthorized(lock);
+  return runV2RunnerStateMachine(events);
 }
 
 function initialState(){
@@ -303,8 +314,10 @@ export function runV2RunnerStateMachine(events=[]){
   });
 }
 
-export function runnerStateAtTime(events=[],asOfTime){
+export function runnerStateBeforeTime(events=[],asOfTime){
   const t=strictTime(asOfTime);
   const prefix=sortRunnerEvents(events).filter(e=>runnerEventKey(e)[0]<t);
   return runV2RunnerStateMachine(prefix).state;
 }
+
+export const runnerStateAtTime=runnerStateBeforeTime;
