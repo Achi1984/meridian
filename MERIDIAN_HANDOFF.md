@@ -838,3 +838,9 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - No canonical runner execution and no strategy PnL occurred.
 - Next required gate: exact-head Claude review of the implementation candidate after green CI. Merge does not authorize Discovery; any Research-stage transition requires a separate reviewed PR.
 
+## COORDINATION CHECKPOINT — 2026-10-05 · V2 runner candidate current-base checkpoint
+
+- Candidate branch base main is `dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92`; build remains `10.0-r113`.
+- Top-level Resume / Agent-State / Chat-Handoff checkpoint is aligned to that main SHA before PR CI.
+- Canonical V2 source lineage remains independently fixed at `63f93aa41b6e054b229309b6fd6fbc2447a92181` / run `37290831222` / receipt `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`.
+- This alignment changes no runner semantics, source evidence, stage lock, economics or PnL authorization.
