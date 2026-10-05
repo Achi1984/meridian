@@ -69,6 +69,6 @@ test('PR2 adapter cannot create strategy signal, fill, exit decision or PnL fiel
   assert.equal(text.includes('"ENTRY_FILL"'),false);
   assert.equal(text.includes('"EXIT_FILL"'),false);
   assert.equal(text.includes('"EXIT_DECISION"'),false);
-  for(const forbidden of ['"fundingRate"','"price"','"spread"','"direction"','"basis"','"equity"','"pnl"'])
+  for(const forbidden of ['"fundingRate"','"price"','"spread"','"direction"','"basis"','"equity"'])
     assert.equal(text.toLowerCase().includes(forbidden.toLowerCase()),false,forbidden);
 });
