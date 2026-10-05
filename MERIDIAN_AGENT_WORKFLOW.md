@@ -366,3 +366,18 @@ This is the intended orchestration architecture.
 If the current runtime does not expose true separate subagent instances or the requested GPT-6 model family, the Main Agent must use the strongest available tools/models, preserve the same decomposition and independent-review logic as far as technically possible, never claim a named model/agent ran when it did not, and distinguish an actual independent-agent review from a same-agent second-pass review.
 
 Runtime honesty overrides cosmetic adherence to the workflow.
+
+## STREAM-SAFE-V5 — compact resume and atomic tool bursts
+
+To reduce chat-stream interruption risk without weakening repository safety:
+
+1. Before every Meridian work step, read the latest comment in Issue #539.
+2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
+3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
+4. Expand the large continuity files only when the compact checkpoint disagrees with live GitHub state or historical detail is required for the current task.
+5. Perform at most one remote repository mutation per visible tool burst. After every mutation, emit a short user-visible checkpoint before the next mutation.
+6. Keep rendered tool payloads small (target <= 4096 bytes). Never dump whole large continuity files when only a few fields are needed.
+7. Never repeat a completed write after a streaming interruption. Reconcile #539 + compact checkpoint + live main first.
+8. Long or irreversible work must be split into durable atomic commits so an interrupted chat can resume from GitHub without reconstruction.
+9. A stream interruption is never evidence that a GitHub operation failed; repository state remains authoritative.
+10. These transport rules do not relax exact-head review, CI, Research-stage, PnL, execution, or Single-Writer gates.
