@@ -222,6 +222,30 @@ function integrityEvent(event,bounds){
   });
 }
 
+function readinessGapExplained(readiness,t,integrityEvents,contract){
+  if(readiness.reason==='FUNDING_INPUTS_INCOMPLETE_OR_STALE'){
+    const required=new Set([
+      t-2*contract.fundingIntervalMs,
+      t-contract.fundingIntervalMs,
+      t
+    ]);
+    return integrityEvents.some(event=>
+      event.time<=t&&
+      ['MISSING_SCHEDULED_FUNDING','DUPLICATE_CANONICAL_FUNDING'].includes(event.integrityKind)&&
+      required.has(event.subjectTime)
+    );
+  }
+  if(readiness.reason==='MARK_INPUTS_INCOMPLETE_OR_STALE'){
+    const requiredMark=t-contract.markIntervalMs;
+    return integrityEvents.some(event=>
+      event.time<=t&&
+      ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK'].includes(event.integrityKind)&&
+      event.subjectTime===requiredMark
+    );
+  }
+  return true;
+}
+
 function slotEvent(time,bounds,validatedSource,integrityEvents){
   const {normalized,contract}=validatedSource;
   const t=strictTime(time);
@@ -238,7 +262,7 @@ function slotEvent(time,bounds,validatedSource,integrityEvents){
     t>=initialWindowEnd&&
     readiness.ready===false&&
     ['FUNDING_INPUTS_INCOMPLETE_OR_STALE','MARK_INPUTS_INCOMPLETE_OR_STALE'].includes(readiness.reason)&&
-    !integrityEvents.some(e=>e.time<=t)
+    !readinessGapExplained(readiness,t,integrityEvents,contract)
   )fail('CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP');
 
   const segment=segmentFor(t,bounds);
