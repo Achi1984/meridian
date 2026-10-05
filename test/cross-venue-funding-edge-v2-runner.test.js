@@ -248,7 +248,9 @@ test('G19 split isolation requires decision + 26h to be strictly before next spl
 test('G28 entryActive is a strict boolean in the runner contract',()=>{
   for(const bad of ['true',1,undefined,null]){
     assert.throws(()=>runV2RunnerStateMachine([
-      decision(T,'bad',{entryActive:bad})
+      e('COMMON_DECISION',T,'bad',{
+        entryActive:bad,inputsReady:true,splitEligible:true,recoveryEligible:false
+      })
     ]),/INVALID_ENTRY_ACTIVE_FLAG/);
   }
 });
