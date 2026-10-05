@@ -800,3 +800,29 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - After reviewed merge, the frozen main-only V2 Source Gate may run the source collector automatically. The resulting run is source evidence only and cannot authorize a later stage.
 - Any later transition requires a separate exact-head cross-model review.
 
+## SSOT UPDATE — 2026-10-05 · Cross-Venue Funding Edge V2 canonical source audit result
+
+- Canonical main/source commit: `63f93aa41b6e054b229309b6fd6fbc2447a92181`.
+- Canonical V2 Source Gate run: `37290831222`, attempt `1`; source job `111700620728`.
+- Attempt classification fixed pre-result: `FINAL_SOURCE_SEMANTIC_RESULT / SUCCESSFUL VALIDATOR RESULT`; no retry was used.
+- Artifact: `11336541442` (`cross-venue-funding-edge-v2-source`), ZIP SHA-256 `97bf9772ed10e741d5a2a0de64ccde7e4dec703178f1b662796b0ce7f3258a32`, source package SHA-256 `a2bb7802a6c6b4298466d16e0225ef616fe36ae2d85ac4af9d020127be4ce91b`.
+- Canonical source receipt digest: `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`.
+- Validator state: `VALID_WITH_INTEGRITY_EPISODES`; 5,019 common funding decision timestamps; strategy PnL calculated = false.
+- Exactly three source-integrity events are preserved, all on OKX 2022-12-18: `FUNDING_GAP`, `MISSING_SCHEDULED_FUNDING` at 16:00 UTC, and authoritative `OFF_GRID_FUNDING` at 18:54 UTC.
+- These events are expected under the frozen V2 semantics and do not invalidate the source contract. Their economic consequence depends on future causal position state and has not been evaluated.
+- V2 remains at `SOURCE_AUDIT`; Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
+- Before any Discovery authorization, implement and review: strict boolean `entryActive`, deterministic degradation episode state machine, pending-entry/open-position wiring, independent cash/equity ledger, and generic causality tests.
+
+## COORDINATION CHECKPOINT — 2026-10-05 · PR #542 current-base refresh
+
+- While PR #542 awaited the independent Claude SOURCE_RECEIPT / DATA_CONTRACT review, canonical `main` advanced from `63f93aa41b6e054b229309b6fd6fbc2447a92181` to `d4a628fee5cf527e0218b99635d80b9cd91bd0ad` via the unrelated r113 COMMAND liquidation-distance UI change.
+- The main advance touches only UI/version/tests and does not overlap the ten PR #542 source-evaluation/continuity files.
+- This checkpoint intentionally changes no source evidence, receipt, data contract, stage lock, accounting or strategy logic. Its commit exists to force current-base PR CI and therefore invalidates the prior exact-head review request.
+- A new exact-head Claude request is required before merge. V2 remains `SOURCE_AUDIT`; no Source Audit rerun and no strategy PnL.
+
+## COORDINATION CHECKPOINT — 2026-10-05 · PR #542 current-base gate repair
+
+- Current-base CI on exact HEAD `3a937befde11ea97d443073bd5ba16f73bf6440a` correctly failed Agent Orchestration Safety because r113 raised `version.json.terminalBuild` to `10.0-r113` while PR #542 still persisted top-level continuity build `10.0-r112`.
+- Repair is continuity-only: align `MERIDIAN_RESUME.build`, `MERIDIAN_RESUME.sourceOfTruth.verifiedSha`, `MERIDIAN_AGENT_STATE.lastCheckpoint`, and the Chat Handoff build/checkpoint to current main `d4a628fee5cf527e0218b99635d80b9cd91bd0ad` / `10.0-r113`.
+- Canonical V2 source lineage remains `63f93aa41b6e054b229309b6fd6fbc2447a92181`; source evidence, receipt digests, collector, data contract, stage lock, accounting, Frozen Guard pins and strategy semantics are unchanged.
+- This repair creates a new exact HEAD and therefore requires Claude review loop 3/3 before merge. No Source Audit rerun and no strategy PnL.

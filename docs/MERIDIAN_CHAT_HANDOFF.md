@@ -1,12 +1,12 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 SOURCE_AUDIT authorized; source integrity only, no PnL**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 canonical SOURCE_AUDIT evidence VALID_WITH_INTEGRITY_EPISODES; no PnL**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
-- Build: **10.0-r112**
-- Verified main checkpoint: **2e463a533e8d0a6de3b509620cb1af7da847acd5**
+- Build: **10.0-r113**
+- Verified main checkpoint: **d4a628fee5cf527e0218b99635d80b9cd91bd0ad**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -89,5 +89,10 @@ This section supersedes the earlier “Exact next durable step” where it confl
 - V2 implementation/source contract is merged and frozen. This transition authorizes only `SOURCE_AUDIT`; strategy PnL and all later stages remain disabled.
 - PR #530 is merged. PR #532 subsequently froze the V1-closure/V2-preregistration lineage in the global Frozen Research Guard.
 - **Current exact next durable step:** obtain Claude GREEN LIGHT on this SOURCE_AUDIT transition PR. After merge, allow the already-frozen main-only V2 Source Gate to collect and validate source evidence. Inspect source integrity only; no strategy PnL or Discovery.
-- V2 Source Audit is the only authorized next research stage. Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
+- V2 canonical Source Audit has completed successfully at run `37290831222` / attempt 1 on main `63f93aa41b6e054b229309b6fd6fbc2447a92181`.
+- Canonical source state: `VALID_WITH_INTEGRITY_EPISODES`; receipt digest `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`; artifact `11336541442`.
+- Source integrity episode: exactly three OKX events on 2022-12-18 (gap, missing 16:00 settlement, authoritative 18:54 off-grid settlement).
+- The source-evaluation PR must durably persist the canonical run/artifact/receipt identity before any later transition.
+- V2 remains `SOURCE_AUDIT`. Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
+- **Current exact next durable step after source-evaluation merge:** implement the deterministic V2 runner/episode state machine, strict boolean `entryActive`, independent ledger/equity construction and generic causality tests — still without executing strategy PnL.
 

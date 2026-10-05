@@ -1,0 +1,86 @@
+{
+  "schema": "CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-EVALUATION-1",
+  "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
+  "stage": "SOURCE_AUDIT",
+  "sourceAuditOutcome": "VALID_WITH_INTEGRITY_EPISODES",
+  "sourceAuditFinal": true,
+  "strategyPnlCalculated": false,
+  "executionImpact": false,
+  "canonicalSourceRun": {
+    "runId": 37290831222,
+    "runAttempt": 1,
+    "sourceJobId": 111700620728,
+    "commitSha": "63f93aa41b6e054b229309b6fd6fbc2447a92181",
+    "artifactId": 11336541442,
+    "artifactName": "cross-venue-funding-edge-v2-source",
+    "artifactZipSha256": "97bf9772ed10e741d5a2a0de64ccde7e4dec703178f1b662796b0ce7f3258a32",
+    "sourcePackageSha256": "a2bb7802a6c6b4298466d16e0225ef616fe36ae2d85ac4af9d020127be4ce91b",
+    "receiptDigest": "822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5",
+    "artifactExpiresAt": "2027-01-03T09:33:33Z",
+    "classification": "FINAL_SOURCE_SEMANTIC_RESULT",
+    "retriesUsed": 0
+  },
+  "sourceSummary": {
+    "binanceFundingRows": 5024,
+    "okxFundingRows": 5024,
+    "binanceMarkRows": 40272,
+    "okxMarkRows": 40272,
+    "commonFundingDecisions": 5019,
+    "integrityEventCount": 3,
+    "split": {
+      "discovery": {
+        "count": 3011,
+        "start": "2022-03-01T00:00:00.000Z",
+        "end": "2024-11-28T16:00:00.000Z"
+      },
+      "validation": {
+        "count": 1004,
+        "start": "2024-11-29T00:00:00.000Z",
+        "end": "2025-10-29T08:00:00.000Z"
+      },
+      "holdout": {
+        "count": 1004,
+        "start": "2025-10-29T16:00:00.000Z",
+        "end": "2026-09-29T00:00:00.000Z"
+      }
+    }
+  },
+  "integrityEvents": [
+    {
+      "kind": "FUNDING_GAP",
+      "venue": "OKX",
+      "detectionTime": "2022-12-18T16:00:01.001Z",
+      "after": "2022-12-18T08:00:00.000Z",
+      "before": "2022-12-18T18:54:00.000Z",
+      "gapMs": 39240000
+    },
+    {
+      "kind": "MISSING_SCHEDULED_FUNDING",
+      "venue": "OKX",
+      "detectionTime": "2022-12-18T16:00:01.001Z",
+      "scheduledTime": "2022-12-18T16:00:00.000Z"
+    },
+    {
+      "kind": "OFF_GRID_FUNDING",
+      "venue": "OKX",
+      "detectionTime": "2022-12-18T18:54:00.000Z",
+      "rawTime": "2022-12-18T18:54:00.000Z"
+    }
+  ],
+  "digests": {
+    "integrityDigest": "0e0a7e1dc0b8ab616114d99ba7d475185b027caacdd1544d4ce06c8b2d9d4b07",
+    "provenanceDigest": "fe33cd2031b3740ba8b093521669ee8fe416ed6ac9a2259d4e18e4e065f9e5ea",
+    "binanceFunding": "442c4a68ef728ec42ccd0bedeb8a6c786e9ac9de573565d18aaaf9eb942ffef1",
+    "okxFunding": "f35f14e28c8d3093a7ceaceeb488f2b930f27530fed876936b3f5c8cfeeb2c9f",
+    "binanceMarks": "0a5679947c8bcd5562ef9aecded5eb36706fc33515e7821aeff6deaeb86e57a7",
+    "okxMarks": "ef7beb1a849710831c950cc561b90b7b80d3b0feb927bf7c966354cbde2c284b"
+  },
+  "interpretation": {
+    "sourceContractValid": true,
+    "integrityEpisodesExpectedByFrozenV2Semantics": true,
+    "sourceAuditEvidenceAccepted": true,
+    "discoveryAuthorized": false,
+    "strategyPnlAuthorized": false,
+    "laterStageTransitionAuthorized": false
+  }
+}
