@@ -4,10 +4,22 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-05 22:35 Europe/Vienna
+- last_update: 2026-10-05 23:10 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
+
+### 0000. UI-UX-DEEP-AUDIT-R0 → ADVISORY_COMPLETE
+- Backlog in #539 (Kommentar UI-UX-DEEP-AUDIT-R0). Empfohlenes r117-Bundle, nur Präsentation:
+  1. iOS-Inputs ≥16px (aktuell 7px → Auto-Zoom)
+  2. Liq-„STAGE SAFE“ (grün) neben „PROTECTION RISK“ entschärfen
+  3. Preisquelle im Liq-Strip kennzeichnen
+  4. Source-Chip für Nearest-FIB plus gleicher Referenzpreis
+  5. Command-Top-Fold im PARTIAL-Zustand (NEXT ACTION liegt aktuell bei ca. 950px)
+  6. Teilwert im Depot- und Command-Hero gleich anzeigen
+  7. QA-Harness: `qaView` asset-detail/paper fallen still auf Command zurück; Font-Floor- und Parity-Tests ergänzen
+- Danach r118: Typografie-Floor (aktuell bis 5px), Sprungleiste im Asset Detail (4117px).
+- r116 ändert davon nichts; den Loading-Text in r116 nicht anfassen.
 
 ### 000. R116-REBASE-PREP-AUDIT-R0 → ADVISORY_COMPLETE (keine Merge-Autorität)
 - Der frühere Review für #557 (Base f23fc2d) ist **nicht** mehr Merge-Autorität. Für den neuen r116-SHA ist ein neues Exact-Head-Review nötig.
