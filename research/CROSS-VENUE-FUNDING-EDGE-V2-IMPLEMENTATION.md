@@ -377,6 +377,7 @@ Architecture ownership remains strict:
 
 `validateCrossVenueV2BuilderSource({packageData, expectedReceiptDigest})` requires:
 
+- one immutable JSON-data snapshot is taken at the API boundary; every subsequent key/schema/receipt/integrity/normalization check derives only from that single snapshot (no second read from caller getters/proxies);
 - exact source-package top-level shape;
 - source schema `CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-PACKAGE-1`;
 - `researchOnly:true`, `executionImpact:false`, `stage:'SOURCE_AUDIT'`;
@@ -386,7 +387,7 @@ Architecture ownership remains strict:
 - package receipt, recomputed receipt and required expected receipt digest all identical;
 - package integrity events deep-equal to the frozen validator output.
 
-The returned validated-source handle is module-sealed and cannot be fabricated by callers.
+The returned validated-source handle is module-sealed and cannot be fabricated by callers. Its normalized rows therefore correspond exactly to the same snapshot authenticated by the recomputed receipt.
 
 ### PR1 event vocabulary
 
@@ -426,7 +427,8 @@ Every split stream starts at frozen `rawStart`.
 - non-final split entry eligibility is strict `decision + 26h < nextSplitStart`;
 - recovery marks are truncated to rows whose `openTime + 1h <= streamEnd`;
 - later-split rows may not alter prior split-local events or causal digest when split boundaries are held fixed.
-- full-package integrity events are validated once by the frozen source contract; the serialized split stream includes only events with `detectionTime <= streamEnd` and only the causal structural fields `{time,kind,venue,stableId,integrityKind,subjectTime,segment}`. Future-dependent audit detail such as `before`, `gapMs` or duplicate `count` is never serialized, so a later source row may refine global gap detail without changing the earlier split-local event or `streamDigest`.
+- full-package integrity events are validated once by the frozen source contract; before serialization, deep-identical frozen integrity events are collapsed to one structural event. This permits a valid pair of identical off-grid rows to remain evidenced by the dedicated `DUPLICATE_FUNDING` event without producing two indistinguishable `OFF_GRID_FUNDING` stable IDs. Non-identical events that still collide on stable ID remain hard errors.
+- the serialized split stream includes only events with `detectionTime <= streamEnd` and only the causal structural fields `{time,kind,venue,stableId,integrityKind,subjectTime,segment}`. Future-dependent audit detail such as `before`, `gapMs` or duplicate `count` is never serialized, so a later source row may refine global gap detail without changing the earlier split-local event or `streamDigest`.
 
 ### Source binding vs split-local causal digest
 
@@ -466,10 +468,10 @@ It returns only semantically normalized mark rows required by frozen `recoveryAt
 - no t+1h entry candle is inspected at decision t;
 - mark anomalies become observable only at their frozen detection timestamp;
 - initial history before three funding observations may be not-ready without error;
-- after the initial window, an incomplete/stale source input must be explained by an integrity event for the exact missing causal input: funding gaps map to one of the three required settlement times and mark gaps to the exact `t−1h` mark; an unrelated historical integrity event cannot explain it. Otherwise the builder fails closed as `CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP`;
+- after the initial window, an incomplete/stale source input must be explained by integrity evidence for **every** exact missing `(venue,time)` causal input: funding gaps map to the missing venue at one of the three required settlement times and mark gaps to the missing venue at the exact `t−1h` mark; an event from the other venue or an unrelated historical event cannot explain it. Otherwise the builder fails closed as `CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP`;
 - input permutations canonicalize to identical output/digests;
 - `provenance.collectedAt` alone cannot change any builder digest;
-- duplicate event keys/stable IDs are hard errors.
+- after the explicit deep-identical integrity collapse above, any remaining duplicate event key or stable ID is a hard error.
 
 No canonical Source→Events execution is authorized by this contract.
 
