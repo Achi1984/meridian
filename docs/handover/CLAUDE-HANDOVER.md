@@ -4,30 +4,18 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-05 20:05 Europe/Vienna
+- last_update: 2026-10-05 20:45 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
 
-### 0. PR #552 FIB-NEAREST-SYNC (r115): R1 → REVISION REQUIRED (review_loop 1/3)
-- Review: https://github.com/Achi1984/meridian/issues/539#issuecomment-6000099534
-- Verdict: `REVIEW af0063c66db48698edad879b60d59e5c99b5084d: REVISION REQUIRED`
-- **MAJOR (DATA_CONSISTENCY):** `updateFibMap` liest nach `await fetchRows` die globalen `fibUi.symbol` und `fibUi.mode`.
-  - Auslöser: Asset-Wechsel A→B, während der Fetch von A noch läuft. Kommen die Antworten in umgekehrter Reihenfolge an oder schlägt der Fetch von B fehl, landet der Nearest-FIB von A unter dem Key B.
-  - Folge: falscher Forecast Focus und falsches Scanner-Ranking; der Legacy-Fallback wird bis zu 3 Minuten überschrieben.
-  - Repro (synthetisch): SUI-Kontext 0.786 / 7.979 statt ca. 3.6.
-- **Fix:** Am Anfang von `updateFibMap` folgende Werte capturen: `symbol`, `key`, `mode`, `run=++fibRunSeq`.
-  - Danach nur noch die gecaptureten Werte statt der Globals verwenden.
-  - Nach dem `await`, vor `fibAutoContext.set` und vor dem Render jeweils `if(run!==fibRunSeq)return;` ausführen.
-  - `refreshForecastFocus` nur für den neuesten Run aufrufen.
-- **Regression:** Harness mit zwei überlappenden Aufrufen (A dann B):
-  - (a) B wird vor A aufgelöst: B-Kontext stammt nur aus den Daten von B.
-  - (b) B schlägt fehl: B-Kontext ist `null`.
-  - (c) Ein überholter Run rendert nicht.
-- NITs (nicht blockierend):
-  - Nach 3 Minuten fällt der Kontext auf Legacy zurück (ggf. wieder „—“). Besser: FIB bei jedem forced Refresh neu berechnen oder einen Stale-Hinweis zeigen.
-  - Fehlende Tests: Wechsel MANUAL→AUTO bei laufendem Fetch; CURRENT exakt auf einem Level.
-- Danach in #539 posten: `CROSS_MODEL_STATUS FIB-NEAREST-SYNC-R1` mit `REVISION_ADDRESSED`, dann `CROSS_MODEL_REQUEST FIB-NEAREST-SYNC-R2` (neuer HEAD, exakte CI).
+### 0. PR #552 FIB-NEAREST-SYNC (r115): R2 → GREEN LIGHT
+- Review: https://github.com/Achi1984/meridian/issues/539#issuecomment-6000698996
+- Verdict: `REVIEW f7b8d3b704634dffd50741f88ca4431d896ee4bf: GREEN LIGHT`
+- Merge ist **nur** auf exakt `f7b8d3b704634dffd50741f88ca4431d896ee4bf` erlaubt. Jeder weitere Commit macht das Verdict ungültig.
+- Der R1-MAJOR (Async-Race) ist geschlossen. Mit einem Harness verifiziert: Out-of-order-Antworten, Fehlschlag des neuesten Laufs, MANUAL↔AUTO-Wechsel, Fenster-Wechsel, Mixed-Case-Symbole.
+- NIT (optional): `fibRunSeq` ist über alle Views global. Ein überholter Forecast-Lauf lässt die versteckte Forecast-Map auf „lädt“ stehen. Das wird beim Navigieren geheilt (forced Render). Optional: zusätzlich ein Run-Token pro `out`-Element.
+- Nach dem Merge `CROSS_MODEL_STATUS FIB-NEAREST-SYNC-R2` mit Merge-SHA posten.
 
 ### 1. PR #551 FIB-MAP-V2 (r114): R1B → GREEN LIGHT
 - Review: https://github.com/Achi1984/meridian/issues/539#issuecomment-5999727319
