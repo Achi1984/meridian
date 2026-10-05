@@ -27,7 +27,12 @@ check(String(resume?.researchDirection?.selected||'').startsWith('CROSS_VENUE_FU
 check(String(resume?.phase||'').includes('CROSS_VENUE_FUNDING_EDGE'),'resume phase must match active Cross-Venue lane');
 check(String(resume?.nextAction||'').includes('CROSS-VENUE-FUNDING-EDGE-V2'),'resume nextAction must match active Cross-Venue V2 lane');
 check(state?.researchCheckpoint?.successorRuleset==='CROSS-VENUE-FUNDING-EDGE-V2','agent-state research checkpoint must match active V2 ruleset');
-check(state?.researchCheckpoint?.successorStage==='PREREGISTERED','active V2 must remain PREREGISTERED before implementation/source-contract review');
+check(state?.researchCheckpoint?.successorStage==='SOURCE_AUDIT','active V2 stage must be SOURCE_AUDIT after reviewed authorization');
+check(state?.researchCheckpoint?.sourceAuditAuthorized===true,'active V2 source audit must be authorized');
+check(state?.researchCheckpoint?.strategyPnlObserved===false,'V2 strategy PnL must remain unobserved during source audit');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.stage==='SOURCE_AUDIT','resume V2 stage must be SOURCE_AUDIT');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.sourceAuditAuthorized===true,'resume must authorize V2 source audit');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.strategyPnlAuthorized===false,'resume must keep V2 strategy PnL locked');
 check(resume?.researchDirection?.qhImbalanceV1Status==='PAUSED_FROZEN_CANONICAL_PREREGISTERED_NO_PNL','Quarter-Hour lane must be explicitly paused while Cross-Venue V2 is active');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor'),'agent workflow must define cross-model review-required categories');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.subAgent'),'agent workflow must bind cross-model review authority to lease.subAgent');

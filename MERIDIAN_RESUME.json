@@ -3,12 +3,12 @@
   "project": "MERIDIAN",
   "build": "10.0-r112",
   "branch": "main",
-  "issue": 528,
-  "phase": "CROSS_VENUE_FUNDING_EDGE_V1_SOURCE_FAIL_V2_PREREGISTERED",
+  "issue": 536,
+  "phase": "CROSS_VENUE_FUNDING_EDGE_V2_SOURCE_AUDIT_AUTHORIZED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "ae4d9f490a43972ad2fc3c768c8744849790ba22",
+    "verifiedSha": "2e463a533e8d0a6de3b509620cb1af7da847acd5",
     "verifiedAt": "2026-10-05",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -1134,17 +1134,17 @@
     },
     "crossVenueFundingEdgeV2": {
       "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
-      "status": "PREREGISTERED",
-      "stage": "PREREGISTERED",
+      "status": "SOURCE_AUDIT_AUTHORIZED",
+      "stage": "SOURCE_AUDIT",
       "predecessor": "CROSS-VENUE-FUNDING-EDGE-V1",
       "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
-      "sourceAuditAuthorized": false,
+      "sourceAuditAuthorized": true,
       "discoveryAuthorized": false,
       "validationAuthorized": false,
       "holdoutAuthorized": false,
       "strategyPnlAuthorized": false,
       "executionImpact": false,
-      "nextRequiredGate": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_ON_EXACT_REVIEWED_HEAD",
+      "nextRequiredGate": "RUN_AND_EVALUATE_V2_SOURCE_AUDIT_NO_PNL",
       "requiredImplementationGuards": [
         "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
         "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
@@ -1152,7 +1152,8 @@
         "If V2 reuses cross-venue-funding-edge-v1.js, replace coercive numeric validation with strict numeric handling and regression tests.",
         "Binance/OKX collector parsers must reject blank/non-numeric cells instead of Number() coercion.",
         "The V2 collector must itself reject execution unless the V2 stage lock explicitly has sourceAudit:true."
-      ]
+      ],
+      "implementationMergeSha": "2e463a533e8d0a6de3b509620cb1af7da847acd5"
     }
   },
   "nonCanonicalResearch": [
@@ -1166,7 +1167,7 @@
     255,
     256
   ],
-  "nextAction": "Create the separate CROSS-VENUE-FUNDING-EDGE-V2 implementation/source-contract PR only after governance continuity is aligned. Freeze fundingCoverageEnd, markCoverageEnd, t+26h decision coverage, fixed 00/08/16 UTC schedules, fail-closed degradation semantics, strict numeric parsing, duplicate/tie/recovery integrity rules, collector stage-lock self-check, and behavior tests. Do not run V2 Source Audit or strategy PnL until that exact-head PR is CI-green and Claude-reviewed.",
+  "nextAction": "After this SOURCE_AUDIT stage-transition PR receives exact-head Claude GREEN LIGHT and merges, allow the frozen main-only CROSS-VENUE-FUNDING-EDGE-V2 Source Gate to run the source collector. Evaluate source integrity/evidence only. Do not calculate strategy PnL or authorize Discovery, Validation, Holdout, Paper or Live. A later stage transition requires a separate reviewed PR.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1207,7 +1208,7 @@
     "crossModelReviewSubAgent": "CLAUDE"
   },
   "researchDirection": {
-    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_SOURCE_CONTRACT",
+    "selected": "CROSS_VENUE_FUNDING_EDGE_V2_SOURCE_AUDIT",
     "rationale": "Independent 2026 evidence on six Binance USDT-margined perpetuals reports quarter-hour opening order imbalance predicts returns over roughly 4-12 hours, while separate leakage-controlled microstructure evidence warns that generic short-horizon signals fail realistic fee tests. MERIDIAN therefore selects the clock-time-conditioned family for data feasibility only, not as a profitability claim.",
     "crossSectionalMomentum": "BENCHMARK_OR_LATER_CHALLENGER",
     "marketCapFoundation": "OPTIONAL_DIAGNOSTIC_NOT_BLOCKING",
@@ -1234,7 +1235,7 @@
       "GALA",
       "IMX"
     ],
-    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_IMPLEMENTATION_SOURCE_CONTRACT_NO_SOURCE_AUDIT",
+    "nextStage": "CROSS_VENUE_FUNDING_EDGE_V2_SOURCE_AUDIT_ONLY_NO_PNL",
     "v2DataFoundation": "FOUNDATION_PASS_8_OF_8",
     "singleVenueFundingCarryStatus": "TWO_INDEPENDENT_UNIVERSES_NOT_ROBUST",
     "fundingRiskBudgetV2Status": "IMMUTABLE_VALIDATION_FAIL",

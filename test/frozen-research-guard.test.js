@@ -12,6 +12,8 @@ test('frozen research manifest locks canonical Cross-Venue and Paper Edge lineag
     'research/cross-venue-funding-edge-v2-stage-lock.js',
     'test/cross-venue-funding-edge-v2-preregistration.test.js',
     'test/cross-venue-funding-edge-v2-stage-lock.test.js',
+    'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-AUTHORIZATION.md',
+    'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-AUTHORIZATION.md',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md',
     'research/cross-venue-funding-edge-v2.js',
