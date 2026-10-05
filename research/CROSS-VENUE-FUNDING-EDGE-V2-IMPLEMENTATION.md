@@ -271,8 +271,12 @@ Rules:
 - `FLAT_ELIGIBLE + INTEGRITY_DETECTION -> DEGRADED_FLAT`.
 - Eligible active common decision -> `ENTRY_PENDING`; fill occurs only at the predeclared `t+1h`.
 - `ENTRY_PENDING + detection before fill -> DEGRADED_FLAT`, pending entry permanently cancelled.
+- If the fill deadline passes and any later event arrives without the required `ENTRY_FILL`, the run becomes terminal `INCONCLUSIVE / ENTRY_FILL_MISSING`.
+- An integrity detection at or after the pending entry fill time without a valid fill is terminal `ENTRY_FILL_DATA_DEGRADATION`, never an illegal-transition escape.
 - `ENTRY_PENDING + fill -> POSITION_OPEN`.
 - `POSITION_OPEN + exit decision -> EXIT_PENDING`; fill occurs at decision +1h.
+- If the exit-fill deadline passes and any later event arrives without the required `EXIT_FILL`, the run becomes terminal `INCONCLUSIVE / EXIT_FILL_MISSING`.
+- A run that ends in `ENTRY_PENDING`, `POSITION_OPEN` or `EXIT_PENDING` is terminal, never a non-terminal partial cycle.
 - Any integrity detection while `POSITION_OPEN` or `EXIT_PENDING`, including exact entry/exit boundary ties, -> absorbing `TERMINAL_INCONCLUSIVE`.
 - `EXIT_PENDING + EXIT_FILL -> FLAT_ELIGIBLE`, but a detection at the same timestamp remains terminal by the inclusive position-at-detection rule.
 - Common decisions while pending/open are ignored; no pyramiding or averaging.
@@ -288,7 +292,9 @@ Rules:
 - settlements must remain exactly 8h consecutive;
 - any integrity detection at or before candidate `T` resets the sequence;
 - a detection exactly at `T` is processed before the common decision and `T` does not count;
-- recovery is only accepted when the frozen `recoveryAt` contract says the third-or-later candidate is causally complete, including required marks only through `T-1h`;
+- the runner derives common decision timestamps and integrity detections from its own ordered event stream and calls the frozen `recoveryAt` contract directly;
+- callers may not supply a `recoveryEligible` flag; such a flag is rejected;
+- the only external Recovery inputs are the two mark series (plus the frozen contract), and recovery is accepted only when `recoveryAt(...) === T`, including required marks only through `T-1h`;
 - a decision at the exact recovery timestamp may be used because its three spreads are the recovery settlements themselves.
 
 ### Independent event-sourced ledger
@@ -297,7 +303,7 @@ Rules:
 
 Ledger inputs:
 
-- paired fill records: `{venue, side, qty, markOpen, time, feeBps, slipBps}`;
+- paired fill records: entry `{venue, side, qty, markOpen, time, feeBps, slipBps}` and close `{..., exitDecisionTime}`; both close legs must carry the same strict `exitDecisionTime < exitFill`;
 - funding records: `{venue, rate, fundingMark, time}`;
 - hourly venue mark records;
 - the frozen 10,000 USDT notional per leg and operational buffer.
@@ -306,7 +312,8 @@ Ledger mechanics:
 
 - separate venue cash accounts;
 - signed position quantity: LONG positive, SHORT negative;
-- funding cash: `-signedQty * fundingMark * rate`;
+- funding cash: `-signedQty * fundingMark * rate`, but only for `entryFill < settlement <= exitDecision` using the close-fill `exitDecisionTime` independently inside the ledger;
+- funding rows with `exitDecision < settlement <= exitFill` remain visible as `FUNDING_OUT_OF_WINDOW` trace events with zero cash effect;
 - fill fees/slippage deducted from the fixed notional basis;
 - basis realization derived from signed quantity and mark movement;
 - operational buffer booked independently when a paired cycle closes;
