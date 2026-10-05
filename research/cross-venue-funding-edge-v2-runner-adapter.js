@@ -27,6 +27,28 @@ function digest(x){
 function exactKeys(value,expected,code){
   if(!isObj(value)||!isDeepStrictEqual(Object.keys(value).sort(),[...expected].sort()))fail(code);
 }
+function deepFreeze(x){
+  if(Array.isArray(x)){
+    for(const value of x)deepFreeze(value);
+    return Object.freeze(x);
+  }
+  if(isObj(x)){
+    for(const value of Object.values(x))deepFreeze(value);
+    return Object.freeze(x);
+  }
+  return x;
+}
+function snapshotJsonData(value){
+  let text;
+  try{text=JSON.stringify(value)}
+  catch{fail('CROSS_VENUE_V2_ADAPTER_BUILDER_SNAPSHOT')}
+  if(typeof text!=='string')fail('CROSS_VENUE_V2_ADAPTER_BUILDER_SNAPSHOT');
+  let parsed;
+  try{parsed=JSON.parse(text)}
+  catch{fail('CROSS_VENUE_V2_ADAPTER_BUILDER_SNAPSHOT')}
+  if(!isObj(parsed))fail('CROSS_VENUE_V2_ADAPTER_BUILDER_REQUIRED');
+  return deepFreeze(parsed);
+}
 function verifyBuilderOutput(builderOutput){
   exactKeys(builderOutput,TOP_LEVEL_KEYS,'CROSS_VENUE_V2_ADAPTER_BUILDER_KEYS');
   if(builderOutput.schema!==BUILDER_SCHEMA||builderOutput.ruleset!==RULESET)
@@ -91,15 +113,16 @@ function adaptEvent(event){
 
 export function adaptCrossVenueV2BuilderForRunner({builderOutput}={}){
   if(!isObj(builderOutput))fail('CROSS_VENUE_V2_ADAPTER_BUILDER_REQUIRED');
-  const {streamDigest,packageBoundDigest}=verifyBuilderOutput(builderOutput);
-  const events=sortRunnerEvents(builderOutput.events.map(adaptEvent));
+  const snapshot=snapshotJsonData(builderOutput);
+  const {streamDigest,packageBoundDigest}=verifyBuilderOutput(snapshot);
+  const events=sortRunnerEvents(snapshot.events.map(adaptEvent));
   for(const event of events)runnerEventKey(event);
   return Object.freeze({
     schema:ADAPTER_SCHEMA,ruleset:RULESET,researchOnly:true,executionImpact:false,
     strategyPnlCalculated:false,strategySignalsCalculated:false,
     sourceStreamDigest:streamDigest,sourcePackageBoundDigest:packageBoundDigest,
-    sourceReceiptDigest:builderOutput.sourceBinding.receiptDigest,
-    stream:builderOutput.stream,
+    sourceReceiptDigest:snapshot.sourceBinding.receiptDigest,
+    stream:snapshot.stream,
     events:Object.freeze(events)
   });
 }
