@@ -49,7 +49,7 @@ check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationCa
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationStatus==='FROZEN_REVIEWED_NO_PNL','V2 runner implementation must be frozen/reviewed after merge');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationMergeSha==='f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530','V2 runner implementation merge SHA mismatch');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationReview==='CV2-RUNNER-IMPL-R2_GREEN_LIGHT','V2 runner implementation review checkpoint mismatch');
-check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.nextRequiredGate==='PREIMPLEMENTATION_REVIEW_V2_EVENT_BUILDER_NO_PNL','V2 next gate must be event-builder preimplementation review, not Discovery');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.nextRequiredGate==='USER_AND_CROSS_MODEL_AUTHORIZATION_BEFORE_CANONICAL_V2_EXECUTION_OR_DISCOVERY','V2 next gate must require explicit user and cross-model authorization before canonical execution or Discovery');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerStrategyPnlCalculated===false,'V2 runner candidate must not calculate strategy PnL');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.discoveryAuthorized===false,'V2 Discovery must remain locked during runner implementation review');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.validationAuthorized===false,'V2 Validation must remain locked during runner implementation review');
@@ -57,8 +57,16 @@ check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.holdoutAuthorized===fa
 check(state?.researchCheckpoint?.runnerImplementationCandidate===false,'agent state must close V2 runner implementation candidate after merge');
 check(state?.researchCheckpoint?.runnerImplementationStatus==='FROZEN_REVIEWED_NO_PNL','agent state V2 runner status mismatch');
 check(state?.researchCheckpoint?.runnerImplementationMergeSha==='f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530','agent state V2 runner merge SHA mismatch');
-check(state?.researchCheckpoint?.next==='PREIMPLEMENTATION_REVIEW_V2_EVENT_BUILDER_NO_PNL','agent state V2 next gate mismatch');
+check(state?.researchCheckpoint?.next==='USER_AND_CROSS_MODEL_AUTHORIZATION_BEFORE_CANONICAL_V2_EXECUTION_OR_DISCOVERY','agent state V2 next gate mismatch');
 check(state?.researchCheckpoint?.strategyPnlObserved===false,'agent state must keep V2 strategy PnL unobserved');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.sourceCollectionSeal?.mergeSha==='9d0cddfc005af41b8795f6353530075367ddaec6','V2 source seal merge checkpoint mismatch');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.eventBuilder?.mergeSha==='ac962ec561c9e31715641986afd9f722ef9c5b38','V2 event builder merge checkpoint mismatch');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.structuralRunnerAdapter?.mergeSha==='3360fb555b56a1abf72924ece6554ecbcfdd72a3','V2 structural runner adapter merge checkpoint mismatch');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.strategyDriver?.mergeSha==='886544fe9220ce96204f7007b2488a1a97126b02','V2 strategy driver merge checkpoint mismatch');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.strategyDriver?.strategyPnlCalculated===false,'V2 strategy driver checkpoint must remain no-PnL');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.canonicalExecutionAuthorized===false,'V2 canonical execution must remain locked');
+check(state?.researchCheckpoint?.strategyDriver?.mergeSha==='886544fe9220ce96204f7007b2488a1a97126b02','agent state V2 strategy driver merge checkpoint mismatch');
+check(state?.researchCheckpoint?.canonicalExecutionAuthorized===false,'agent state V2 canonical execution must remain locked');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.diagnosticSourceConfirmation?.runId===37299638135,'V2 diagnostic source confirmation run mismatch');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.diagnosticSourceConfirmation?.receiptDigest===canonicalV2Source.receiptDigest,'V2 diagnostic receipt must match canonical receipt');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.diagnosticSourceConfirmation?.canonicalReplacement===false,'V2 diagnostic source run must never replace canonical evidence');
