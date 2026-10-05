@@ -39,12 +39,50 @@ test('funding timestamps canonicalize only inside one-second tolerance',()=>{
   assert.equal(canonicalFundingTime(null,contract),null);
   assert.equal(canonicalFundingTime('',contract),null);
   assert.equal(canonicalFundingTime(undefined,contract),null);
+  assert.equal(canonicalFundingTime(false,contract),null);
+  assert.equal(canonicalFundingTime(true,contract),null);
+  assert.equal(canonicalFundingTime([H],contract),null);
 });
 
 test('source rejects off-grid funding timestamps as invalid before cadence checks',()=>{
   const p=pack();
   p.okxFunding[2].fundingTime=START+2*8*H+6*60*1000;
   assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_INVALID_FUNDING');
+});
+
+test('source rejects coercible non-numeric funding rates instead of silently converting them to zero',()=>{
+  for(const bad of ['', '  ', false, true, []]){
+    const p=pack();
+    p.okxFunding[3].fundingRate=bad;
+    assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_INVALID_FUNDING');
+  }
+});
+
+test('source rejects blank funding timestamps as invalid before gap or range checks',()=>{
+  for(const bad of ['', '  ']){
+    const p=pack();
+    p.okxFunding[3].fundingTime=bad;
+    assert.equal(validateCrossVenueSource(p,contract).reason,'OKX_INVALID_FUNDING');
+  }
+});
+
+test('source rejects blank or boolean mark fields instead of coercing them to zero',()=>{
+  for(const field of ['open','high','low','close']){
+    for(const bad of ['', false]){
+      const p=pack();
+      p.binanceMarks[5][field]=bad;
+      assert.equal(validateCrossVenueSource(p,contract).reason,'BINANCE_INVALID_MARK');
+    }
+  }
+});
+
+test('numeric strings remain valid for funding rates and funding timestamps',()=>{
+  for(const rate of ['0.0001','0']){
+    const p=pack();
+    p.okxFunding=p.okxFunding.map(x=>({fundingTime:String(x.fundingTime),fundingRate:String(x.fundingRate)}));
+    p.okxFunding[3].fundingRate=rate;
+    assert.equal(validateCrossVenueSource(p,contract).ok,true);
+  }
 });
 
 test('normalized common funding decisions preserve six shared settlements',()=>{
