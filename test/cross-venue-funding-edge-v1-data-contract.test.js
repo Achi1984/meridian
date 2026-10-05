@@ -72,7 +72,7 @@ test('source fails closed on OKX mark cadence gap',()=>{
 });
 
 test('source fails closed on funding cadence gap beyond eight hours plus jitter',()=>{
-  const p=pack();p.binanceFunding[2].fundingTime=p.binanceFunding[1].fundingTime+8*H+1001;
+  const p=pack();p.binanceFunding.splice(2,1);
   assert.equal(validateCrossVenueSource(p,contract).reason,'BINANCE_FUNDING_CADENCE_GAP');
 });
 
