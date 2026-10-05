@@ -61,4 +61,15 @@ jobs:
           if(String(mark.code)!=='0'||rows.length<2)throw new Error('OKX_MARK_HISTORY_PROBE_FAILED');
           if(!g1.length&&!g2.length)throw new Error('OKX_2022_FUNDING_HISTORY_PROBE_FAILED');
           if(!g3.length)throw new Error('OKX_2026_FUNDING_HISTORY_PROBE_FAILED');
+
+          const url=g2[0]?.url||g1[0]?.url;
+          const rr=await fetch(url,{signal:AbortSignal.timeout(20000)});
+          if(!rr.ok)throw new Error('OKX_FUNDING_ARCHIVE_HTTP_'+rr.status);
+          const bytes=Buffer.from(await rr.arrayBuffer());
+          const crypto=await import('node:crypto');
+          const fs=await import('node:fs');
+          fs.writeFileSync('/tmp/okx-funding.zip',bytes);
+          console.log(JSON.stringify({label:'funding_zip',bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')}));
           NODE
+          unzip -l /tmp/okx-funding.zip
+          unzip -p /tmp/okx-funding.zip | head -n 5
