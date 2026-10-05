@@ -10,7 +10,8 @@
     "branch": "main",
     "verifiedSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "verifiedAt": "2026-10-05",
-    "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
+    "rule": "verifiedSha is the last non-continuity canonical product/research checkpoint. A continuity-only merge may advance live main without changing product/research semantics; always reconcile live main, Issue #539, PRs and CI before mutation.",
+    "checkpointKind": "LAST_NON_CONTINUITY_CANONICAL_CHECKPOINT"
   },
   "runtime": {
     "releaseSafety": "GREEN",
@@ -60,6 +61,16 @@
         }
       },
       "conclusion": "R108_DEPLOYMENT_RUNTIME_MARKET_CORE_PASS"
+    },
+    "currentCheckpointSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
+    "terminalBuild": "10.0-r115",
+    "postMergeVerification": {
+      "releaseSafetyRunId": 37357195842,
+      "visualQaRunId": 37357195857,
+      "runtimeSmokeRunId": 37357195901,
+      "releaseCoordinatorRunId": 37357195943,
+      "pagesRunId": 37357192838,
+      "status": "GREEN"
     }
   },
   "canonicalResearch": {
@@ -1649,10 +1660,10 @@
     "qhImbalanceV1PausedReason": "CURRENT_ACTIVE_RESEARCH_LANE_IS_CROSS_VENUE_FUNDING_EDGE_V2"
   },
   "activeUiLane": {
-    "terminalBuild": "10.0-r108",
-    "canonicalMainSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
-    "lastMergedPr": 428,
-    "status": "R108_LIVE_ACCEPTED",
+    "terminalBuild": "10.0-r115",
+    "canonicalMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
+    "lastMergedPr": 552,
+    "status": "R115_POST_MERGE_GREEN",
     "completedSequence": [
       "r93 COMMAND total-portfolio chart 1H/1D/1W",
       "r94 server-side Ledger/OKX portfolio authority + canonical history",
@@ -1669,7 +1680,10 @@
       "r105 Pionex history source alignment + freshness",
       "r106 market freshness lifecycle",
       "r107 market coverage diagnostics",
-      "r108 Paper readiness prefetch"
+      "r108 Paper readiness prefetch",
+      "r113 liquidation-distance command risk",
+      "r114 FIB map mobile clarity",
+      "r115 nearest FIB AUTO sync"
     ],
     "portfolioCheckpoint": {
       "lastObservedTotalUsd": 34848.5,
@@ -1681,7 +1695,7 @@
       "marketReady": true,
       "historyStatus": "R107_LIVE_PASS; 135 strict points; 1357 blocked; 1H READY; 1D/1W BUILDING; SPOT + FRESH PIONEX"
     },
-    "nextAction": "r108 live acceptance is complete. Reconcile main/PRs/CI and continue only the first incomplete milestone after r108. Do not repeat r93-r108 work.",
+    "nextAction": "r115 post-merge gates are green. Continue only from new user-observed UI/runtime evidence; do not repeat r113-r115 work.",
     "executionImpact": false,
     "liveVerification": {
       "r102": {
@@ -1820,7 +1834,7 @@
         "verdict": "FULL_LIVE_PASS"
       }
     },
-    "terminalReleaseSha": "6dbc5780ca73410833eda72e99f4b298515970cb",
+    "terminalReleaseSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "lastMergedOpsPr": 423,
     "observability": {
       "runtimeSmokeCommitStatusPr": 422,
@@ -1837,6 +1851,7 @@
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. Read Issue #539 first, then MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step without repeating merged work.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
     "currentMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
-    "currentBuild": "10.0-r115"
+    "currentBuild": "10.0-r115",
+    "currentMainSemantics": "LAST_NON_CONTINUITY_CANONICAL_CHECKPOINT; reconcile live GitHub main before every mutation"
   }
 }
