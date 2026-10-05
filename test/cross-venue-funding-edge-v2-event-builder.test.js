@@ -137,39 +137,27 @@ function anomalyPackage(){
       fundingRate:.00015
     });
 
+    const splitStart=BASE.receipt.split.validation.start;
+    d.okxFunding.push({fundingTime:splitStart-12*H,fundingRate:.00012});
+
     const entryDecision=BASE.receipt.split.discovery.times[100];
     d.binanceMarks=d.binanceMarks.filter(x=>x.openTime!==entryDecision+H);
     d.okxMarks.push({...d.okxMarks[600]});
     d.binanceMarks[700]={...d.binanceMarks[700],confirmed:false};
   }));
 }
-function lateMarkPackage(){
-  return cachedFixture('late-mark',()=>rebuild(BASE,d=>{
+function isolationPackage({futureRow=true}={}){
+  return cachedFixture('isolation-'+String(futureRow),()=>rebuild(BASE,d=>{
     const next=BASE.receipt.split.validation.start;
     const row=d.binanceMarks.find(x=>x.openTime===next);
     assert.ok(row);
     row.close=100.5;
-  }));
-}
-function tailGapPackage({futureRow}={}){
-  return cachedFixture('tail-gap-'+String(futureRow),()=>rebuild(BASE,d=>{
+
     const zero=Date.parse('2026-09-30T00:00:00.000Z');
     const eight=Date.parse('2026-09-30T08:00:00.000Z');
     d.okxFunding=d.okxFunding.filter(x=>
       x.fundingTime!==zero&&(futureRow===true||x.fundingTime!==eight)
     );
-  }));
-}
-function offgridNearSplitPackage(){
-  return cachedFixture('offgrid-near-split',()=>rebuild(BASE,d=>{
-    const splitStart=BASE.receipt.split.validation.start;
-    d.okxFunding.push({fundingTime:splitStart-12*H,fundingRate:.00012});
-  }));
-}
-function explainedFundingGapPackage(){
-  return cachedFixture('explained-funding-gap',()=>rebuild(BASE,d=>{
-    const missing=BASE.receipt.split.discovery.times[50];
-    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==missing);
   }));
 }
 function permutedPackage(){
