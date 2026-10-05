@@ -11,7 +11,7 @@ import {
 
 const execFileAsync=promisify(execFile);
 const BINANCE_ARCHIVE='https://data.binance.vision';
-const BYBIT_API='https://api.bybit.com';
+const OKX_API='https://www.okx.com';
 const START=Date.parse(CONTRACT.start),END=Date.parse(CONTRACT.end);
 const HOUR=60*60*1000,DAY=24*HOUR;
 
@@ -33,7 +33,16 @@ async function fetchRetry(url,options={},attempts=5){
   throw last;
 }
 
-async function archiveCsv(rel,name,{missingOk=false}={}){
+async function unzipText(bytes,name){
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'cross-venue-v1-')),zip=path.join(dir,name);
+  try{
+    await fs.writeFile(zip,bytes);
+    const {stdout}=await execFileAsync('unzip',['-p',zip],{maxBuffer:64*1024*1024});
+    return stdout;
+  }finally{await fs.rm(dir,{recursive:true,force:true})}
+}
+
+async function binanceArchiveCsv(rel,name,{missingOk=false}={}){
   const [zr,cr]=await Promise.all([
     fetchRetry(`${BINANCE_ARCHIVE}/${rel}`,{},3).catch(e=>e),
     fetchRetry(`${BINANCE_ARCHIVE}/${rel}.CHECKSUM`,{},3).catch(e=>e)
@@ -48,22 +57,17 @@ async function archiveCsv(rel,name,{missingOk=false}={}){
   if(!match||path.basename(match[2].trim())!==name)throw new Error('BINANCE_CHECKSUM_FORMAT '+rel);
   const expected=match[1].toLowerCase(),actual=sha256(bytes);
   if(actual!==expected)throw new Error('BINANCE_CHECKSUM_MISMATCH '+rel);
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'cross-venue-v1-')),zip=path.join(dir,name);
-  try{
-    await fs.writeFile(zip,bytes);
-    const {stdout}=await execFileAsync('unzip',['-p',zip],{maxBuffer:64*1024*1024});
-    return{csv:stdout,checksum:expected,rel};
-  }finally{await fs.rm(dir,{recursive:true,force:true})}
+  return{csv:await unzipText(bytes,name),checksum:expected,rel};
 }
 
-function parseMarkCsv(csv){
+function parseBinanceMarkCsv(csv){
   return String(csv||'').trim().split(/\r?\n/).filter(Boolean).filter(x=>/^\d/.test(x)).map(line=>{
     const r=line.split(',');
     return{openTime:Number(r[0]),open:Number(r[1]),high:Number(r[2]),low:Number(r[3]),close:Number(r[4])};
   });
 }
 
-function parseFundingCsv(csv){
+function parseBinanceFundingCsv(csv){
   const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(!lines.length)return[];
   const first=lines[0].split(',').map(x=>x.trim()),lower=first.map(x=>x.toLowerCase());
@@ -111,7 +115,7 @@ async function binanceDaily({year,month,kind,parse,receipts}){
     const rel=kind==='marks'
       ?`data/futures/um/daily/markPriceKlines/BTCUSDT/1h/${stem}.zip`
       :`data/futures/um/daily/fundingRate/BTCUSDT/${stem}.zip`;
-    const a=await archiveCsv(rel,`${stem}.zip`);
+    const a=await binanceArchiveCsv(rel,`${stem}.zip`);
     receipts.push({kind,scope:'daily',rel:a.rel,sha256:a.checksum});
     out.push(...parse(a.csv));
   }
@@ -124,7 +128,7 @@ async function binanceMonth({year,month,kind,parse,receipts}){
   const rel=kind==='marks'
     ?`data/futures/um/monthly/markPriceKlines/BTCUSDT/1h/${stem}.zip`
     :`data/futures/um/monthly/fundingRate/BTCUSDT/${stem}.zip`;
-  const a=await archiveCsv(rel,`${stem}.zip`,{missingOk:true});
+  const a=await binanceArchiveCsv(rel,`${stem}.zip`,{missingOk:true});
   if(a){
     const parsed=parse(a.csv),complete=kind==='marks'?markMonthCoverageOk(parsed,year,month):fundingMonthCoverageOk(parsed,year,month);
     if(complete){receipts.push({kind,scope:'monthly',rel:a.rel,sha256:a.checksum});return parsed}
@@ -136,72 +140,111 @@ async function collectBinance(){
   const funding=[],marks=[],receipts=[],sd=new Date(START),ed=new Date(END);
   for(let y=sd.getUTCFullYear(),m=sd.getUTCMonth()+1;y<ed.getUTCFullYear()||(y===ed.getUTCFullYear()&&m<=ed.getUTCMonth()+1);){
     const [mm,ff]=await Promise.all([
-      binanceMonth({year:y,month:m,kind:'marks',parse:parseMarkCsv,receipts}),
-      binanceMonth({year:y,month:m,kind:'funding',parse:parseFundingCsv,receipts})
+      binanceMonth({year:y,month:m,kind:'marks',parse:parseBinanceMarkCsv,receipts}),
+      binanceMonth({year:y,month:m,kind:'funding',parse:parseBinanceFundingCsv,receipts})
     ]);
     marks.push(...mm);funding.push(...ff);
     if(++m===13){m=1;y++}
   }
-  const f=funding.filter(x=>x.fundingTime>=START&&x.fundingTime<=END).sort((a,b)=>a.fundingTime-b.fundingTime);
-  const m=marks.filter(x=>x.openTime>=START&&x.openTime<=END).sort((a,b)=>a.openTime-b.openTime);
-  return{funding:f,marks:m,receipts};
+  return{
+    funding:funding.filter(x=>x.fundingTime>=START&&x.fundingTime<=END).sort((a,b)=>a.fundingTime-b.fundingTime),
+    marks:marks.filter(x=>x.openTime>=START&&x.openTime<=END).sort((a,b)=>a.openTime-b.openTime),
+    receipts
+  };
 }
 
-async function bybitPage(endpoint,params){
-  const u=new URL(BYBIT_API+endpoint);
+async function okxJson(endpoint,params){
+  const u=new URL(OKX_API+endpoint);
   for(const [k,v] of Object.entries(params))if(v!=null)u.searchParams.set(k,String(v));
   const r=await fetchRetry(u.toString());
   const raw=await r.text(),json=JSON.parse(raw);
-  if(Number(json?.retCode)!==0)throw new Error('BYBIT_API '+json?.retCode+' '+json?.retMsg);
-  return{json,receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(json?.result??null))}};
+  if(String(json?.code)!=='0')throw new Error('OKX_API '+json?.code+' '+json?.msg);
+  return{
+    json,
+    receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(json?.data??null))}
+  };
 }
 
-async function collectBybitFunding(){
-  const out=[],receipts=[];let cursor=END,guard=0;
-  while(cursor>=START&&guard++<200){
-    const page=await bybitPage('/v5/market/funding/history',{category:'linear',symbol:'BTCUSDT',startTime:START,endTime:cursor,limit:200});
-    receipts.push(page.receipt);
-    const rows=Array.isArray(page.json?.result?.list)?page.json.result.list:[];
-    if(!rows.length)break;
-    const parsed=rows.map(x=>({fundingRateTimestamp:Number(x.fundingRateTimestamp),fundingRate:Number(x.fundingRate)})).filter(x=>Number.isFinite(x.fundingRateTimestamp)&&Number.isFinite(x.fundingRate));
-    out.push(...parsed);
-    const min=Math.min(...parsed.map(x=>x.fundingRateTimestamp));
-    if(!Number.isFinite(min)||min>cursor)throw new Error('BYBIT_FUNDING_PAGINATION_NONPROGRESS');
-    if(min<=START)break;
-    cursor=min-1;
-    await sleep(100);
-  }
-  if(guard>=200)throw new Error('BYBIT_FUNDING_PAGINATION_GUARD');
-  return{rows:out.filter(x=>x.fundingRateTimestamp>=START&&x.fundingRateTimestamp<=END).sort((a,b)=>a.fundingRateTimestamp-b.fundingRateTimestamp),receipts};
+function parseOkxFundingCsv(csv){
+  const lines=String(csv||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  return lines.map(line=>{
+    const r=line.split(',');
+    if(r.length<3||r[0]!=='BTC-USDT-SWAP')throw new Error('OKX_FUNDING_ARCHIVE_SCHEMA');
+    const fundingRate=Number(r[1]),fundingTime=Number(r[2]);
+    if(!Number.isFinite(fundingRate)||!Number.isFinite(fundingTime))throw new Error('OKX_FUNDING_ARCHIVE_ROW');
+    return{fundingTime,fundingRate};
+  });
 }
 
-async function collectBybitMarks(){
-  const out=[],receipts=[];let cursor=END,guard=0;
-  while(cursor>=START&&guard++<200){
-    const page=await bybitPage('/v5/market/mark-price-kline',{category:'linear',symbol:'BTCUSDT',interval:'60',start:START,end:cursor,limit:1000});
-    receipts.push(page.receipt);
-    const rows=Array.isArray(page.json?.result?.list)?page.json.result.list:[];
-    if(!rows.length)break;
-    const parsed=rows.map(x=>({startTime:Number(x[0]),openPrice:Number(x[1]),highPrice:Number(x[2]),lowPrice:Number(x[3]),closePrice:Number(x[4])})).filter(x=>[x.startTime,x.openPrice,x.highPrice,x.lowPrice,x.closePrice].every(Number.isFinite));
-    out.push(...parsed);
-    const min=Math.min(...parsed.map(x=>x.startTime));
-    if(!Number.isFinite(min)||min>cursor)throw new Error('BYBIT_MARK_PAGINATION_NONPROGRESS');
-    if(min<=START)break;
-    cursor=min-1;
-    await sleep(100);
+async function collectOkxFunding(){
+  const rows=[],queryReceipts=[],archiveReceipts=[],sd=new Date(START),ed=new Date(END);
+  for(let y=sd.getUTCFullYear(),m=sd.getUTCMonth()+1;y<ed.getUTCFullYear()||(y===ed.getUTCFullYear()&&m<=ed.getUTCMonth()+1);){
+    const ym=`${y}-${String(m).padStart(2,'0')}`;
+    const calendarTs=Date.parse(`${ym}-01T00:00:00+08:00`);
+    const page=await okxJson('/api/v5/public/market-data-history',{
+      module:3,instType:'SWAP',dateAggrType:'monthly',begin:calendarTs,end:calendarTs,instFamilyList:'BTC-USDT'
+    });
+    queryReceipts.push(page.receipt);
+    const groups=(page.json?.data||[]).flatMap(x=>(x?.details||[]).flatMap(d=>d?.groupDetails||[]));
+    const filename=`BTC-USDT-SWAP-fundingrates-${ym}.zip`;
+    const file=groups.find(x=>x?.filename===filename);
+    if(!file?.url)throw new Error('OKX_FUNDING_ARCHIVE_MISSING '+ym);
+    const response=await fetchRetry(file.url,{},4),bytes=Buffer.from(await response.arrayBuffer());
+    const digest=sha256(bytes),csv=await unzipText(bytes,filename),parsed=parseOkxFundingCsv(csv);
+    archiveReceipts.push({filename,url:file.url,dateTs:Number(file.dateTs??file.dataTs),sha256:digest});
+    rows.push(...parsed);
+    await sleep(450);
+    if(++m===13){m=1;y++}
   }
-  if(guard>=200)throw new Error('BYBIT_MARK_PAGINATION_GUARD');
-  return{rows:out.filter(x=>x.startTime>=START&&x.startTime<=END).sort((a,b)=>a.startTime-b.startTime),receipts};
+  return{
+    rows:rows.filter(x=>x.fundingTime>=START&&x.fundingTime<=END).sort((a,b)=>a.fundingTime-b.fundingTime),
+    queryReceipts,archiveReceipts
+  };
+}
+
+async function collectOkxMarks(){
+  const rows=[],receipts=[];let cursor=END+1,guard=0,lastMin=Infinity;
+  while(cursor>START&&guard++<1000){
+    const page=await okxJson('/api/v5/market/history-mark-price-candles',{
+      instId:'BTC-USDT-SWAP',bar:'1H',after:cursor,limit:100
+    });
+    receipts.push(page.receipt);
+    const raw=Array.isArray(page.json?.data)?page.json.data:[];
+    if(!raw.length)break;
+    const parsed=raw.map(x=>({
+      openTime:Number(x[0]),open:Number(x[1]),high:Number(x[2]),low:Number(x[3]),close:Number(x[4]),confirm:String(x[5])
+    })).filter(x=>[x.openTime,x.open,x.high,x.low,x.close].every(Number.isFinite)&&x.confirm==='1');
+    if(!parsed.length)throw new Error('OKX_MARK_PAGE_EMPTY_AFTER_PARSE');
+    rows.push(...parsed.map(({confirm,...x})=>x));
+    const min=Math.min(...parsed.map(x=>x.openTime));
+    if(!Number.isFinite(min)||min>=lastMin)throw new Error('OKX_MARK_PAGINATION_NONPROGRESS');
+    lastMin=min;
+    if(min<=START)break;
+    cursor=min;
+    await sleep(125);
+  }
+  if(guard>=1000)throw new Error('OKX_MARK_PAGINATION_GUARD');
+  return{
+    rows:rows.filter(x=>x.openTime>=START&&x.openTime<=END).sort((a,b)=>a.openTime-b.openTime),
+    receipts
+  };
 }
 
 export async function collectCrossVenueFundingEdgeV1Source(){
-  const [binance,bybitFunding,bybitMarks]=await Promise.all([collectBinance(),collectBybitFunding(),collectBybitMarks()]);
+  const [binance,okxFunding,okxMarks]=await Promise.all([collectBinance(),collectOkxFunding(),collectOkxMarks()]);
   const provenance={
     collectedAt:new Date().toISOString(),
     binance:{provider:'Binance Vision',archive:BINANCE_ARCHIVE,receipts:binance.receipts},
-    bybit:{provider:'Bybit V5 public market API',baseUrl:BYBIT_API,fundingPageReceipts:bybitFunding.receipts,markPageReceipts:bybitMarks.receipts},
+    okx:{
+      provider:'OKX public historical market data',
+      baseUrl:OKX_API,
+      fundingQueryReceipts:okxFunding.queryReceipts,
+      fundingArchiveReceipts:okxFunding.archiveReceipts,
+      markPageReceipts:okxMarks.receipts
+    },
     binanceChecksumsVerified:true,
-    bybitPagesHashed:true,
+    okxFundingArchivesHashed:true,
+    okxMarkPagesHashed:true,
     strategyPnlCalculated:false
   };
   const packageData={
@@ -212,9 +255,9 @@ export async function collectCrossVenueFundingEdgeV1Source(){
     contract:CONTRACT,
     provenance,
     binanceFunding:binance.funding,
-    bybitFunding:bybitFunding.rows,
+    okxFunding:okxFunding.rows,
     binanceMarks:binance.marks,
-    bybitMarks:bybitMarks.rows
+    okxMarks:okxMarks.rows
   };
   const validation=validateCrossVenueSource(packageData);
   if(!validation.ok)throw new Error('CROSS_VENUE_V1_SOURCE_INVALID '+JSON.stringify(validation));
