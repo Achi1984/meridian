@@ -9,6 +9,7 @@ on:
       - "research/CROSS-VENUE-FUNDING-EDGE-V2-PREREGISTRATION.md"
       - "research/cross-venue-funding-edge-v2-stage-lock.js"
       - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
+      - "test/cross-venue-funding-edge-v2-preregistration.test.js"
       - "research/cross-venue-funding-edge-v1.js"
       - "research/cross-venue-funding-edge-v1-data-contract.js"
       - "research/cross-venue-funding-edge-v1-stage-lock.js"
@@ -66,7 +67,8 @@ jobs:
             test/cross-venue-funding-edge-v1.test.js \
             test/cross-venue-funding-edge-v1-data-contract.test.js \
             test/cross-venue-funding-edge-v1-stage-lock.test.js \
-            test/cross-venue-funding-edge-v2-stage-lock.test.js
+            test/cross-venue-funding-edge-v2-stage-lock.test.js \
+            test/cross-venue-funding-edge-v2-preregistration.test.js
       - name: Read V1 source-audit lock
         id: stage
         run: |
