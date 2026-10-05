@@ -115,11 +115,15 @@ test('S10 unknown outcome schema ruleset or stage fails closed',()=>{
   }
 });
 
-test('S11 stage lock ruleset and sourceAudit type are strict',()=>{
+test('S11 stage lock and durable continuity inputs are strict',()=>{
   const a=preEval();a.stageLock.sourceAudit='true';
   assert.throws(()=>v2SourceCollectionGate(a),/STAGE_LOCK_SOURCE_AUDIT_TYPE/);
   const b=preEval();b.stageLock.ruleset='OTHER';
   assert.throws(()=>v2SourceCollectionGate(b),/STAGE_LOCK_RULESET/);
+  const c=preEval();c.resumeV2=undefined;
+  assert.throws(()=>v2SourceCollectionGate(c),/RESUME_V2_MISSING/);
+  const d=preEval();d.agentCheckpoint=null;
+  assert.throws(()=>v2SourceCollectionGate(d),/AGENT_CHECKPOINT_MISSING/);
 });
 
 test('S12 current repository state is sealed SOURCE_FINAL_SKIP',()=>{
