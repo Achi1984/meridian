@@ -6,6 +6,8 @@ import {
   normalizeMarks,
   usableFundingMap,
   commonFundingTimes,
+  fundingIntegrityEvents,
+  markIntegrityEvents,
   entryInputsReady,
   validateCrossVenueV2Source
 } from './cross-venue-funding-edge-v2-data-contract.js';
@@ -293,8 +295,20 @@ function streamShape(bounds,recoveryInputsDigest){
   });
 }
 
+function causalIntegrityEvents(validatedSource,bounds){
+  const {normalized,contract}=requireValidated(validatedSource);
+  const fundingPrefix=rows=>rows.filter(row=>row.rawTime!==null&&row.rawTime<=bounds.streamEnd);
+  const markPrefix=rows=>rows.filter(row=>row.openTime+HOUR<=bounds.streamEnd);
+  return[
+    ...fundingIntegrityEvents(fundingPrefix(normalized.binanceFunding),'BINANCE',contract),
+    ...fundingIntegrityEvents(fundingPrefix(normalized.okxFunding),'OKX',contract),
+    ...markIntegrityEvents(markPrefix(normalized.binanceMarks),'BINANCE',contract),
+    ...markIntegrityEvents(markPrefix(normalized.okxMarks),'OKX',contract)
+  ].filter(event=>event.detectionTime<=bounds.streamEnd);
+}
+
 function eventCore(validatedSource,bounds){
-  const {validation,normalized,common,contract}=requireValidated(validatedSource);
+  const {normalized,common,contract}=requireValidated(validatedSource);
   const events=[];
 
   for(const [venue,rows] of [
@@ -306,8 +320,7 @@ function eventCore(validatedSource,bounds){
     }
   }
 
-  const integrityEvents=validation.integrityEvents
-    .filter(e=>e.detectionTime<=bounds.streamEnd)
+  const integrityEvents=causalIntegrityEvents(validatedSource,bounds)
     .map(e=>integrityEvent(e,bounds));
   events.push(...integrityEvents);
 
