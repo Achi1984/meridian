@@ -151,6 +151,15 @@ function lateMarkPackage(){
     row.close=100.5;
   }));
 }
+function tailGapPackage({futureRow}={}){
+  return cachedFixture('tail-gap-'+String(futureRow),()=>rebuild(BASE,d=>{
+    const zero=Date.parse('2026-09-30T00:00:00.000Z');
+    const eight=Date.parse('2026-09-30T08:00:00.000Z');
+    d.okxFunding=d.okxFunding.filter(x=>
+      x.fundingTime!==zero&&(futureRow===true||x.fundingTime!==eight)
+    );
+  }));
+}
 function offgridNearSplitPackage(){
   return cachedFixture('offgrid-near-split',()=>rebuild(BASE,d=>{
     const splitStart=BASE.receipt.split.validation.start;
@@ -270,6 +279,27 @@ test('B9 fixed-boundary later mark perturbation cannot change split-local causal
   assert.equal(out.streamDigest,BASE_DISCOVERY.streamDigest);
   assert.notDeepEqual(out.sourceBinding,BASE_DISCOVERY.sourceBinding);
   assert.notEqual(out.packageBoundDigest,BASE_DISCOVERY.packageBoundDigest);
+});
+
+test('B9c future funding row cannot retroactively create a prior-stream FUNDING_GAP',()=>{
+  const withFuture=tailGapPackage({futureRow:true});
+  const withoutFuture=tailGapPackage({futureRow:false});
+  const a=output(withFuture,'holdout',withFuture.receipt.digest);
+  const b=output(withoutFuture,'holdout',withoutFuture.receipt.digest);
+  const end=Date.parse(a.stream.streamEnd);
+
+  assert.deepEqual(a.stream,b.stream);
+  assert.deepEqual(a.events,b.events);
+  assert.deepEqual(a.counts,b.counts);
+  assert.equal(a.stream.recoveryInputsDigest,b.stream.recoveryInputsDigest);
+  assert.equal(a.streamDigest,b.streamDigest);
+  assert.notDeepEqual(a.sourceBinding,b.sourceBinding);
+  assert.notEqual(a.packageBoundDigest,b.packageBoundDigest);
+
+  const retro=e=>e.kind==='FUNDING_GAP'&&e.venue==='OKX'&&e.detectionTime<=end;
+  assert.equal(withFuture.integrityEvents.some(retro),true);
+  assert.equal(withoutFuture.integrityEvents.some(retro),false);
+  assert.equal(a.events.some(e=>e.kind==='INTEGRITY_DETECTION'&&e.integrityKind==='FUNDING_GAP'&&e.venue==='OKX'),false);
 });
 
 test('B9b boundary-changing source perturbation cannot pass the original receipt binding',()=>{
