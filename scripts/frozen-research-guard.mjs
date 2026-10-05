@@ -3,6 +3,17 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/CROSS-VENUE-FUNDING-EDGE-V1-SOURCE-DECISION.md':'27b0e5965b23e2574ea7e16ed9ee2e7d670aba8d',
+  'research/cross-venue-funding-edge-v1-stage-lock.js':'e8702969ee9f23f487b0d85a71af4cdece049727',
+  'test/cross-venue-funding-edge-v1-stage-lock.test.js':'f69d7e94f029b5fcb3109691b37b0ac381856595',
+  'research/CROSS-VENUE-FUNDING-EDGE-V2-PREREGISTRATION.md':'6d590fb5b8c7b49c9f5da5b70f0e0e67a72880fb',
+  'research/cross-venue-funding-edge-v2-stage-lock.js':'81e7e528cb320f9e2f50dd76712d3dd320f73f98',
+  'test/cross-venue-funding-edge-v2-preregistration.test.js':'8c48bf34b36fc1ac86f2922047ea74b1fc492350',
+  'test/cross-venue-funding-edge-v2-stage-lock.test.js':'965b1f91f28b110a95fcf18900360fc3ac54d266',
+  'research/PAPER-EDGE-V1-DISCOVERY-DECISION.md':'6221e3fd9645a7f1bd577b98c46662974127f070',
+  'research/paper-edge-v1-discovery-decision.json':'1a3d082b8c0ef85cb0fd5a773d029026818e3e9f',
+  'research/edge-v1-stage-lock.js':'e63c4d8018a2ef17ae0712f09ae190174cba659a',
+  'test/edge-v1-stage-lock.test.js':'fc8998aff337db7db3037bf01a97c4b658b4961b',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-ARCHIVE-RETRY-CORRECTION.md':'e2783e50a8cba6cd3278e80f608a6e6bf7f74c82',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-EVIDENCE.md':'626f7bbc82f841a2862a3257d2f4a6e187f56e37',
   'research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-AUTHORIZATION.md':'1d4ec4f2386005b7a5094ea3f4ea2d3143b9b9a7',
