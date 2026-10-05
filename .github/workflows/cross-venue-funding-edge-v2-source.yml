@@ -1,4 +1,4 @@
-name: MERIDIAN Cross-Venue Funding Edge V2 Source Audit
+name: MERIDIAN Cross-Venue Funding Edge V2 Source Gate
 
 on:
   pull_request:
@@ -39,6 +39,7 @@ concurrency:
 
 jobs:
   invariants:
+    name: invariants (no source collection)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -76,8 +77,12 @@ jobs:
         id: stage
         run: |
           node --input-type=module -e "import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK as x} from './research/cross-venue-funding-edge-v2-stage-lock.js'; console.log('source_audit='+(x.sourceAudit===true?'true':'false'))" >> "$GITHUB_OUTPUT"
+      - name: Report source gate state
+        run: |
+          echo "PR runs validate invariants only. Source collection is main-only and additionally requires sourceAudit=true."
 
   source:
+    name: source collection (main-only, stage-gated)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.invariants.outputs.source_audit == 'true'
     needs: invariants
     runs-on: ubuntu-latest
