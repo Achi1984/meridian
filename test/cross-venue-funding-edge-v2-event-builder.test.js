@@ -9,6 +9,7 @@ import {
   commonFundingTimes,
   recoveryAt,
   entryInputsReady,
+  sourceReceipt,
   validateCrossVenueV2Source
 } from '../research/cross-venue-funding-edge-v2-data-contract.js';
 import {
@@ -170,6 +171,13 @@ function explainedFundingGapPackage(){
   return cachedFixture('explained-funding-gap',()=>rebuild(BASE,d=>{
     const missing=BASE.receipt.split.discovery.times[50];
     d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==missing);
+  }));
+}
+function duplicateOffGridPackage(){
+  return cachedFixture('duplicate-off-grid',()=>rebuild(BASE,d=>{
+    const anchor=d.okxFunding[1000].fundingTime;
+    const row={fundingTime:anchor+2*H,fundingRate:.00015};
+    d.okxFunding.push({...row},{...row});
   }));
 }
 function permutedPackage(){
@@ -395,6 +403,66 @@ test('validatedSource handle cannot be fabricated by copying a genuine handle',(
     ()=>buildCrossVenueV2EventStream({validatedSource:forged,split:'discovery'}),
     /CROSS_VENUE_V2_BUILDER_VALIDATED_SOURCE_REQUIRED/
   );
+});
+
+test('PR1-1 source package is snapshotted once before validation and normalization',()=>{
+  const good=BASE.binanceMarks.map(x=>({...x}));
+  const changed=good.map((x,i)=>i===0?{...x,close:x.close+.5}:x);
+  let reads=0;
+  const tricky={...BASE};
+  Object.defineProperty(tricky,'binanceMarks',{
+    enumerable:true,
+    configurable:true,
+    get(){
+      reads+=1;
+      return reads===1?good:changed;
+    }
+  });
+
+  const handle=validateCrossVenueV2BuilderSource({
+    packageData:tricky,
+    expectedReceiptDigest:BASE.receipt.digest
+  });
+  assert.equal(reads,1);
+  assert.equal(handle.normalized.binanceMarks[0].close,good[0].close);
+
+  const recomputed=sourceReceipt(
+    BASE,
+    handle.normalized,
+    handle.validation.integrityEvents,
+    handle.common,
+    CONTRACT
+  );
+  assert.deepEqual(recomputed.dataDigests,handle.validation.receipt.dataDigests);
+  assert.equal(recomputed.digest,handle.validation.receipt.digest);
+});
+
+test('PR1-2 duplicate identical off-grid rows collapse structurally while duplicate evidence remains',()=>{
+  const pkg=duplicateOffGridPackage();
+  assert.equal(pkg.receipt.digest.length,64);
+  const dup=pkg.integrityEvents.find(e=>e.kind==='DUPLICATE_FUNDING'&&e.venue==='OKX');
+  assert.ok(dup);
+  const rawTime=dup.rawTime;
+  assert.equal(pkg.integrityEvents.filter(e=>
+    e.kind==='OFF_GRID_FUNDING'&&e.venue==='OKX'&&e.rawTime===rawTime
+  ).length,2);
+
+  const out=output(pkg,'discovery',pkg.receipt.digest);
+  const structural=out.events.filter(e=>e.venue==='OKX'&&e.subjectTime===rawTime);
+  assert.equal(structural.filter(e=>e.integrityKind==='OFF_GRID_FUNDING').length,1);
+  assert.equal(structural.filter(e=>e.integrityKind==='DUPLICATE_FUNDING').length,1);
+
+  const permuted={...pkg,okxFunding:[...pkg.okxFunding].reverse()};
+  const again=output(permuted,'discovery',permuted.receipt.digest);
+  assert.equal(again.streamDigest,out.streamDigest);
+  assert.equal(again.packageBoundDigest,out.packageBoundDigest);
+});
+
+test('PR1-3 readiness gap explanations are venue-exact for every missing causal input',()=>{
+  const module=fs.readFileSync(new URL('../research/cross-venue-funding-edge-v2-event-builder.js',import.meta.url),'utf8');
+  assert.match(module,/missing\.every\(\(\{venue,time\}\)=>/);
+  assert.match(module,/event\.venue===venue/);
+  assert.match(module,/event\.subjectTime===time/);
 });
 
 test('B13 malformed package, receipt, expected digest and row data fail closed',()=>{
