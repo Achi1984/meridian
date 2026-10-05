@@ -362,3 +362,113 @@ The implementation tests cover:
 
 No test in this runner contract executes the canonical V2 source package or strategy PnL.
 
+## Event Builder PR1 contract — pure source/calendar construction only
+
+Status: **SYNTHETIC-ONLY / NO CANONICAL SOURCE READ / NO RUNNER EXECUTION / NO SIGNALS / NO PNL / NO STAGE TRANSITION**.
+
+Architecture ownership remains strict:
+
+- PR1 Event Builder owns only source validation, canonical source/calendar event construction, stable IDs, split/warm-up boundaries and split-local causal digests.
+- PR2 Strategy Adapter/Driver, not this module, will later own synthetic-only strategy-signal construction and state-conditional ENTRY_FILL / EXIT_DECISION / EXIT_FILL emission.
+- The Runner remains the sole owner of degradation/recovery and position state.
+- PR0 independently patches exit-fill mark-anomaly terminality before PR2.
+
+### Builder input and validation
+
+`validateCrossVenueV2BuilderSource({packageData, expectedReceiptDigest})` requires:
+
+- exact source-package top-level shape;
+- source schema `CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-PACKAGE-1`;
+- `researchOnly:true`, `executionImpact:false`, `stage:'SOURCE_AUDIT'`;
+- `provenance.strategyPnlCalculated:false`;
+- source contract deep-equal to the frozen V2 source contract;
+- `validateCrossVenueV2Source(...).ok===true`;
+- package receipt, recomputed receipt and required expected receipt digest all identical;
+- package integrity events deep-equal to the frozen validator output.
+
+The returned validated-source handle is module-sealed and cannot be fabricated by callers.
+
+### PR1 event vocabulary
+
+The serialized builder stream may emit only:
+
+- `FUNDING_SETTLEMENT`;
+- `INTEGRITY_DETECTION`;
+- `COMMON_DECISION_SLOT`.
+
+`COMMON_DECISION_SLOT` is intentionally not a valid Runner event kind. Passing PR1 output directly to the Runner must fail.
+
+PR1 never emits:
+
+- `ENTRY_FILL`;
+- `EXIT_DECISION`;
+- `EXIT_FILL`;
+- rates, prices, spreads, direction, entryActive, basis, equity, PnL, PF, drawdown, expectancy or research-stage decisions.
+
+### Stable IDs
+
+Stable IDs depend only on causal source identity:
+
+- settlement: `FS|<venue>|<canonical ISO>`;
+- integrity: `ID|<venue>|<integrityKind>|<subject ISO>`;
+- decision slot: `CD|<decision ISO>`.
+
+No array index, source ordinal, wall-clock time, `collectedAt`, workflow run ID, attempt or artifact ID may enter a stable ID.
+
+### Split and warm-up construction
+
+Every split stream starts at frozen `rawStart`.
+
+- events before the split start are `WARMUP`;
+- warm-up decision slots are never split-eligible;
+- discovery/validation streams end at `nextSplitStart - 1ms`;
+- holdout ends at `decisionWindowEnd + 27h`;
+- non-final split entry eligibility is strict `decision + 26h < nextSplitStart`;
+- recovery marks are truncated to rows whose `openTime + 1h <= streamEnd`;
+- later-split rows may not alter prior split-local events or causal digest when split boundaries are held fixed.
+
+### Source binding vs split-local causal digest
+
+The Builder deliberately maintains two authority layers.
+
+Global `sourceBinding` contains the full-package source identity:
+
+- expected receipt digest;
+- recomputed receipt digest;
+- integrity digest;
+- full-package funding/mark data digests;
+- global common-decision count and split counts.
+
+This global binding is **not** part of split causality.
+
+`streamDigest` is the sole authority for split-local causal construction and hashes a canonical JSON envelope containing:
+
+- schema/ruleset/research/execution/signal/PnL flags;
+- frozen contract schema;
+- split stream metadata including `recoveryInputsDigest`;
+- ordered structural events;
+- event counts.
+
+Canonical JSON recursively sorts object keys, preserves array order and contains no whitespace.
+
+`packageBoundDigest` hashes the complete builder result except itself and is audit metadata binding `sourceBinding` to `streamDigest`. Later execution evidence must cite the pair `(receiptDigest, streamDigest)`; `packageBoundDigest` is not a split-isolation authority.
+
+### Recovery inputs
+
+`buildCrossVenueV2RecoveryInputs({validatedSource, stream})` is a separate pure PR1 API.
+
+It returns only semantically normalized mark rows required by frozen `recoveryAt`, including duplicates and unconfirmed rows without repair, truncated by the stream boundary. Prices are never serialized into the event-builder output. Only the deterministic `recoveryInputsDigest` is carried in `stream`.
+
+### Causal guardrails
+
+- source readiness at a slot is calculated with literal `activeDegradation:false`; degradation remains Runner-owned;
+- no t+1h entry candle is inspected at decision t;
+- mark anomalies become observable only at their frozen detection timestamp;
+- initial history before three funding observations may be not-ready without error;
+- after the initial window, an incomplete/stale source input without any causally observable integrity event fails closed as `CROSS_VENUE_V2_BUILDER_UNEXPLAINED_INPUT_GAP`;
+- input permutations canonicalize to identical output/digests;
+- `provenance.collectedAt` alone cannot change any builder digest;
+- duplicate event keys/stable IDs are hard errors.
+
+No canonical Source→Events execution is authorized by this contract.
+
