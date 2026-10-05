@@ -20,8 +20,8 @@ function strictPositive(value,code='CROSS_VENUE_V2_INVALID_LEDGER_INPUT'){
 function strictNonNegative(value,code='CROSS_VENUE_V2_INVALID_LEDGER_INPUT'){
   const n=strictFinite(value,code); if(n<0)fail(code); return n;
 }
-function strictTime(value){
-  if(typeof value!=='number'||!Number.isSafeInteger(value)||value<=0)fail('CROSS_VENUE_V2_INVALID_LEDGER_TIME');
+function strictTime(value,code='CROSS_VENUE_V2_INVALID_LEDGER_TIME'){
+  if(typeof value!=='number'||!Number.isSafeInteger(value)||value<=0)fail(code);
   return value;
 }
 function sha256(value){return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}
@@ -39,7 +39,7 @@ function normalizeFill(row){
   const slipBps=strictNonNegative(row.slipBps,'CROSS_VENUE_V2_INVALID_LEDGER_FILL');
   let exitDecisionTime=null;
   if(Object.hasOwn(row,'exitDecisionTime')){
-    exitDecisionTime=strictTime(row.exitDecisionTime);
+    exitDecisionTime=strictTime(row.exitDecisionTime,'CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
     if(exitDecisionTime>=time)fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
   }
   return Object.freeze({venue:row.venue,side:row.side,qty,markOpen,time,feeBps,slipBps,exitDecisionTime});
