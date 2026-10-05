@@ -33,6 +33,18 @@ check(state?.researchCheckpoint?.strategyPnlObserved===false,'V2 strategy PnL mu
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.stage==='SOURCE_AUDIT','resume V2 stage must be SOURCE_AUDIT');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.sourceAuditAuthorized===true,'resume must authorize V2 source audit');
 check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.strategyPnlAuthorized===false,'resume must keep V2 strategy PnL locked');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.sourceAuditEvaluated===true,'resume must persist evaluated V2 source audit');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.sourceAuditOutcome==='VALID_WITH_INTEGRITY_EPISODES','resume must persist canonical V2 source state');
+const canonicalV2Source=resume?.canonicalResearch?.crossVenueFundingEdgeV2?.canonicalSourceRun||{};
+check(canonicalV2Source.runId===37290831222,'canonical V2 source runId mismatch');
+check(canonicalV2Source.runAttempt===1,'canonical V2 source runAttempt mismatch');
+check(canonicalV2Source.commitSha==='63f93aa41b6e054b229309b6fd6fbc2447a92181','canonical V2 source commit mismatch');
+check(canonicalV2Source.artifactId===11336541442,'canonical V2 source artifact mismatch');
+check(canonicalV2Source.receiptDigest==='822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5','canonical V2 source receipt digest mismatch');
+check(state?.researchCheckpoint?.sourceAuditEvaluated===true,'agent state must persist evaluated V2 source audit');
+check(state?.researchCheckpoint?.sourceAuditOutcome==='VALID_WITH_INTEGRITY_EPISODES','agent state V2 source outcome mismatch');
+check(state?.researchCheckpoint?.canonicalSourceRun?.runId===canonicalV2Source.runId,'agent/resume V2 canonical source run mismatch');
+check(state?.researchCheckpoint?.canonicalSourceRun?.receiptDigest===canonicalV2Source.receiptDigest,'agent/resume V2 receipt digest mismatch');
 check(resume?.researchDirection?.qhImbalanceV1Status==='PAUSED_FROZEN_CANONICAL_PREREGISTERED_NO_PNL','Quarter-Hour lane must be explicitly paused while Cross-Venue V2 is active');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor'),'agent workflow must define cross-model review-required categories');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.subAgent'),'agent workflow must bind cross-model review authority to lease.subAgent');
