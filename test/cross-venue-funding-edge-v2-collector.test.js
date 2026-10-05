@@ -8,11 +8,11 @@ import {
   parseOkxFundingCsv,parseOkxMarkRows,stableOkxReceiptPayload
 } from '../scripts/collect-cross-venue-funding-edge-v2-source.mjs';
 
-test('collector refuses all source collection while V2 sourceAudit is false',async()=>{
-  assert.throws(()=>assertV2SourceAuditAuthorized(),/SOURCE_AUDIT_LOCKED/);
-  await assert.rejects(()=>collectCrossVenueFundingEdgeV2Source(),/SOURCE_AUDIT_LOCKED/);
+test('collector self-lock follows the authoritative V2 source-audit stage',()=>{
+  assert.equal(assertV2SourceAuditAuthorized(),true);
   assert.equal(assertV2SourceAuditAuthorized({ruleset:'CROSS-VENUE-FUNDING-EDGE-V2',sourceAudit:true}),true);
   assert.throws(()=>assertV2SourceAuditAuthorized({ruleset:'CROSS-VENUE-FUNDING-EDGE-V2',sourceAudit:false}),/SOURCE_AUDIT_LOCKED/);
+  assert.throws(()=>assertV2SourceAuditAuthorized({ruleset:'OTHER',sourceAudit:true}),/SOURCE_AUDIT_LOCKED/);
 });
 
 test('Binance funding parser accepts explicit numeric cells and rejects blanks',()=>{
