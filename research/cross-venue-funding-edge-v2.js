@@ -170,6 +170,7 @@ export function fundingCashflow({side,qty,mark,rate}={}){
   const q=finiteNumber(qty),m=finiteNumber(mark),r=finiteNumber(rate);
   if(q===null||m===null||r===null||q<=0||m<=0)throw new Error('CROSS_VENUE_V2_INVALID_FUNDING_CASHFLOW');
   const payment=q*m*r;
+  if(payment===0)return 0;
   return side==='LONG'?-payment:payment;
 }
 
