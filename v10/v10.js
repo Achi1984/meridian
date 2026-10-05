@@ -226,7 +226,7 @@ function criticalLiquidationSnapshot(rows){
 }
 function liquidationDisplayState(rows){
   const snap=criticalLiquidationSnapshot(rows),ok=snap?.status==='ok',verified=(snap?.verified??0)+'/'+(snap?.total??(rows||[]).length)+' bots verified';
-  return{ok,tone:ok?snap.stage.tone:'muted',liq:ok?snap.liq:null,current:ok?snap.current:null,buffer:ok?snap.buffer:null,stage:ok?snap.stage.label:'unavailable',source:snap?.status==='stale'?'bot feed stale':ok?(snap.side+' · smallest verified live buffer · '+snap.bufferSource+(snap.partial?' · partial':'')+' · '+verified):(verified+' · unavailable')};
+  return{ok,tone:ok?snap.stage.tone:'muted',liq:ok?snap.liq:null,current:ok?snap.current:null,buffer:ok?snap.buffer:null,stage:ok?snap.stage.label:'unavailable',source:snap?.status==='stale'?'bot feed stale':ok?(snap.side+' · smallest verified buffer · '+snap.bufferSource+(snap.partial?' · partial':'')+' · '+verified):(verified+' · unavailable')};
 }
 function pairCard(symbol,compact=false,open=false,assetLink=false){
   const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
