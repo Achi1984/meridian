@@ -1,9 +1,13 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 canonical SOURCE_AUDIT evidence VALID_WITH_INTEGRITY_EPISODES; no PnL**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 SOURCE_AUDIT runner implementation candidate awaiting cross-model review; no PnL**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
+
+- Runner implementation candidate: **synthetic-only; exact-head Claude review required before merge**
+- V2 stage remains: **SOURCE_AUDIT**; Discovery / Validation / Holdout / Paper / Live: **LOCKED**
+- Strategy PnL: **not calculated / not authorized**
 
 - Build: **10.0-r113**
 - Verified main checkpoint: **d4a628fee5cf527e0218b99635d80b9cd91bd0ad**
