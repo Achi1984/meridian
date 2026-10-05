@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const FROZEN_RESEARCH_BLOBS=Object.freeze({
+  'research/cross-venue-funding-edge-v2-runner-adapter.js':'de00cf0a89667373822b079d15c26a7fce2f3354',
+  'test/cross-venue-funding-edge-v2-runner-adapter.test.js':'cc1244e8c4f6df987457e7f62acac74c6b2dd14c',
   'research/CROSS-VENUE-FUNDING-EDGE-V1-SOURCE-DECISION.md':'27b0e5965b23e2574ea7e16ed9ee2e7d670aba8d',
   'research/cross-venue-funding-edge-v1-stage-lock.js':'e8702969ee9f23f487b0d85a71af4cdece049727',
   'test/cross-venue-funding-edge-v1-stage-lock.test.js':'f69d7e94f029b5fcb3109691b37b0ac381856595',
