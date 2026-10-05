@@ -791,3 +791,16 @@ This file records durable project decisions and the reasoning behind them. Read 
 **Semantics:** Pionex raw trend metadata is labeled RAW API TREND; normalized economic bot side remains the operative Long/Short representation.
 
 **Safety:** Presentation-only. Existing Safety > Data Guard > signal precedence and all execution-neutral behavior are unchanged.
+
+## D-075 — Cross-Venue Funding Edge V1 closes on source incompatibility; successor requires a new ruleset
+
+**Decision:** `CROSS-VENUE-FUNDING-EDGE-V1` is permanently closed at `SOURCE_CLOSED` with decision `CROSS_VENUE_V1_SOURCE_FAIL`. Discovery, Validation, Holdout, Paper and Live remain unauthorized.
+
+**Evidence:** After the strict raw-number validation fix merged on main `a52c56010b9a547061c82d37840f5335465b3754`, source run `37270798106` failed deterministically with `OKX_INVALID_FUNDING`. The authoritative OKX history contains an off-grid funding settlement incompatible with V1's frozen ±1 second canonicalization / 8h+1s source assumptions. No V1 strategy PnL was calculated or inspected.
+
+**Rule:** Do not relax V1, delete the exceptional record, trim the affected period, or special-case the observed date. Any continuation uses a newly preregistered successor.
+
+**Successor:** `CROSS-VENUE-FUNDING-EDGE-V2` is preregistered with generic fail-closed venue-outage/off-grid semantics while retaining V1 economic thresholds and gates. V2 remains `PREREGISTERED`; Source Audit stays disabled until a separate exact-window implementation/source-contract PR is frozen, CI-green and cross-model reviewed on its exact HEAD-SHA.
+
+**CI:** Once V1 is closed, its historical source collector must not continue running on main. The V1 source workflow reads the stage lock and skips source collection whenever `sourceAudit !== true`.
+
