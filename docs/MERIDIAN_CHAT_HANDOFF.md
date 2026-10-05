@@ -1,12 +1,12 @@
 # MERIDIAN Chat Handoff
 
-Status: **Data V1.3 PASS + Strategy V1 preregistration canonical**  
-Updated: **2026-10-02**
+Status: **Cross-Venue Funding Edge V1 source-failed; V2 preregistered pending reviewed transition merge**  
+Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
-- Build: **10.0-r108**
-- Verified main checkpoint: **cdf3b7db841816cd684a7a18a528299433ec703d**
+- Build: **10.0-r112**
+- Verified main checkpoint: **a52c56010b9a547061c82d37840f5335465b3754**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -72,3 +72,19 @@ Before the first historical evidence run, it must prove with tests and independe
 9. no Paper/live execution path.
 
 Only after exact-head Release Safety + implementation review may the historical V1.3 Strategy V1 signal/return/PnL run execute.
+
+## SSOT UPDATE — 2026-10-05 · Cross-Venue Funding Edge transition
+
+This section supersedes the earlier “Exact next durable step” where it conflicts.
+
+- Cross-model governance is active: ChatGPT Lead / Claude independent Review Sub-Agent.
+- Cross-Venue Funding Edge V1 remains execution-neutral and has never reached strategy PnL.
+- PR #529 fixed strict raw-number validation and merged on main `a52c56010b9a547061c82d37840f5335465b3754`.
+- Post-merge source run `37270798106` failed closed with `OKX_INVALID_FUNDING`; this is source-failure evidence, not a valid source receipt.
+- Blocker #528 plus independent Claude source forensics established that the authoritative OKX history contains an off-grid settlement incompatible with the frozen V1 source assumptions.
+- User selected Option A: V1 must close permanently as `CROSS_VENUE_V1_SOURCE_FAIL`; do not amend or rescue V1.
+- Successor `CROSS-VENUE-FUNDING-EDGE-V2` is preregistered with generic outage/off-grid semantics and unchanged economic thresholds/gates.
+- V2 remains `PREREGISTERED`; Source Audit is disabled.
+- Next durable step after the reviewed transition PR merges: create a separate V2 implementation/source-contract PR, freeze exact source boundaries and integrity-event construction, run CI, obtain Claude GREEN LIGHT on the exact HEAD, and only then consider a V2 source audit.
+- No V2 source audit, split lock, Discovery, strategy PnL, Paper or Live execution is currently authorized.
+

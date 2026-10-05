@@ -766,3 +766,17 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - Asset Watch overwrite remains fail-closed on `usableForOverwrite === true`.
 - Release Safety run #1429 is green on head `5c9f9c9dfaccde055cf22faee87e83088ece0888`.
 - PR #248 stays draft/unmerged. Current main is one coordination checkpoint beyond this PR base and does not overlap these files; Main Agent still owns final rebase/merge timing.
+
+---
+
+## SSOT UPDATE — 2026-10-05 · Cross-Venue Funding Edge V1 source closure / V2 preregistration
+
+- Cross-model governance is active: ChatGPT is Lead; Claude is independent Review Sub-Agent. Sensitive research PRs require Claude GREEN LIGHT on the exact PR HEAD-SHA plus green CI.
+- PR #529 merged validator correctness on main `a52c56010b9a547061c82d37840f5335465b3754`.
+- Post-merge Source Audit run `37270798106`: invariants SUCCESS, source FAILURE with `OKX_INVALID_FUNDING`. This is expected fail-closed evidence, not a source receipt or stage lock artifact.
+- Blocker issue #528 records the authoritative-source incompatibility. No Cross-Venue Funding Edge V1 strategy PnL was calculated or inspected.
+- User selected fail-closed option A: do not amend/rescue V1. V1 closes as `CROSS_VENUE_V1_SOURCE_FAIL`; all later V1 stages remain unauthorized.
+- `CROSS-VENUE-FUNDING-EDGE-V2` is a new preregistered successor. It retains V1 economics/gates but preregisters generic venue-outage/off-grid integrity semantics.
+- V2 is only `PREREGISTERED`. Its Source Audit remains disabled. The next allowed step is a separate V2 implementation/source-contract PR that freezes exact source boundaries and integrity-event construction before any V2 source audit or strategy PnL.
+- Closed V1 source collection must not continue on main; the V1 source workflow is stage-gated and skips collection when `sourceAudit !== true`.
+

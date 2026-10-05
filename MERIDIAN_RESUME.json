@@ -1,15 +1,15 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r108",
+  "build": "10.0-r112",
   "branch": "main",
-  "issue": 243,
-  "phase": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_STRATEGY_V1_PREREGISTRATION_CANONICAL_IMPLEMENTATION_REQUIRED",
+  "issue": 528,
+  "phase": "CROSS_VENUE_FUNDING_EDGE_V1_SOURCE_FAIL_V2_PREREGISTERED",
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
-    "verifiedAt": "2026-10-02",
+    "verifiedSha": "a52c56010b9a547061c82d37840f5335465b3754",
+    "verifiedAt": "2026-10-05",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
   "runtime": {
@@ -1116,6 +1116,43 @@
       "paperAuthorized": false,
       "promoted": false,
       "immutable": true
+    },
+    "crossVenueFundingEdgeV1": {
+      "ruleset": "CROSS-VENUE-FUNDING-EDGE-V1",
+      "status": "SOURCE_FAIL",
+      "stage": "SOURCE_CLOSED",
+      "decision": "CROSS_VENUE_V1_SOURCE_FAIL",
+      "evidenceMainSha": "a52c56010b9a547061c82d37840f5335465b3754",
+      "evidenceRunId": 37270798106,
+      "blockerIssue": 528,
+      "sourceAuditAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "strategyPnlInspected": false,
+      "executionImpact": false
+    },
+    "crossVenueFundingEdgeV2": {
+      "ruleset": "CROSS-VENUE-FUNDING-EDGE-V2",
+      "status": "PREREGISTERED",
+      "stage": "PREREGISTERED",
+      "predecessor": "CROSS-VENUE-FUNDING-EDGE-V1",
+      "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
+      "sourceAuditAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "executionImpact": false,
+      "nextRequiredGate": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_ON_EXACT_REVIEWED_HEAD",
+      "requiredImplementationGuards": [
+        "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
+        "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
+        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with ±1s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
+        "If V2 reuses cross-venue-funding-edge-v1.js, replace coercive numeric validation with strict numeric handling and regression tests.",
+        "Binance/OKX collector parsers must reject blank/non-numeric cells instead of Number() coercion.",
+        "The V2 collector must itself reject execution unless the V2 stage lock explicitly has sourceAudit:true."
+      ]
     }
   },
   "nonCanonicalResearch": [
@@ -1129,7 +1166,7 @@
     255,
     256
   ],
-  "nextAction": "The frozen Quarter-Hour Strategy V1 preregistration is canonical on Data V1.3 via merged PR #435. Next create a separate deterministic research implementation matching the frozen document exactly. Before any historical Strategy V1 evidence run, require unit tests for signal direction, 12h cohort expiry, net target accounting, turnover costs, no-lookahead execution pricing, funding sign/valuation, fixed blocks and primary gates, plus exact-head Release Safety and independent implementation review. Do not change preregistered strategy rules. Paper/live remain unauthorized.",
+  "nextAction": "After the reviewed V1-close/V2-preregistration PR merges, create a separate CROSS-VENUE-FUNDING-EDGE-V2 implementation/source-contract PR. Freeze fundingCoverageEnd, markCoverageEnd, the t+26h decision-window rule, fixed 00/08/16 UTC funding schedules, and deterministic degradation semantics where any position open at degradation onset makes the affected run/stage INCONCLUSIVE with no modeled exit/basis/post-detection funding path. Also enforce strict numeric parsing and a collector self-check of sourceAudit:true. Prove the preregistered regression cases before any V2 source audit. V2 Source Audit and all strategy PnL remain unauthorized until that exact-head PR is CI-green and receives Claude GREEN LIGHT.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1160,7 +1197,11 @@
     "maxToolCallGroupsPerVisibleBurst": 2,
     "maxSameStatusPollsPerVisibleBurst": 1,
     "maxVisibleBurstSeconds": 90,
-    "userVisibleCheckpointRequired": true
+    "userVisibleCheckpointRequired": true,
+    "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md",
+    "leadLease": "MERIDIAN_LEAD_LEASE.json",
+    "crossModelLead": "CHATGPT",
+    "crossModelReviewSubAgent": "CLAUDE"
   },
   "researchDirection": {
     "selected": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1_DATA_SOURCE_REDESIGN",

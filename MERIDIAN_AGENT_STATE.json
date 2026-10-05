@@ -124,11 +124,11 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-02T11:05:10Z",
-    "canonicalMainSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
-    "build": "10.0-r108",
+    "at": "2026-10-05T06:20:00Z",
+    "canonicalMainSha": "a52c56010b9a547061c82d37840f5335465b3754",
+    "build": "10.0-r112",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Data V1.3 remains canonical 120/120 PASS. Frozen Quarter-Hour Strategy V1 preregistration from #354 was rebound to Data V1.3 without strategy-rule changes and merged via PR #435. Next durable gate is deterministic Strategy V1 implementation plus exact-head tests/review before any historical signal/return/PnL run. Paper/live remain unauthorized."
+    "note": "Cross-Venue Funding Edge V1 strict validator fix is merged. Post-merge source run 37270798106 failed closed with OKX_INVALID_FUNDING. User selected Option A: close V1 at source stage and preregister V2. Current integration PR closes V1, preregisters V2, disables further V1 source collection, and keeps V2 Source Audit/PnL unauthorized pending a separate reviewed source-contract PR."
   },
   "nextChatBootstrap": [
     "Fetch latest main SHA",
@@ -139,17 +139,17 @@
     "Continue first incomplete durable step without repeating merged work"
   ],
   "researchCheckpoint": {
-    "family": "PERPETUAL_QUARTER_HOUR_BOUNDARY_IMBALANCE_V1",
-    "dataVersion": "V1.3",
-    "dataStatus": "PASS_120_OF_120",
-    "strategyVersion": "V1",
-    "strategyPreregistration": "FROZEN_CANONICAL",
-    "preregistrationPr": 435,
-    "preregistrationMergeSha": "cdf3b7db841816cd684a7a18a528299433ec703d",
-    "signalObserved": false,
-    "pnlObserved": false,
+    "family": "CROSS_VENUE_FUNDING_EDGE",
+    "predecessorRuleset": "CROSS-VENUE-FUNDING-EDGE-V1",
+    "predecessorStatus": "SOURCE_FAIL",
+    "predecessorDecision": "CROSS_VENUE_V1_SOURCE_FAIL",
+    "predecessorEvidenceRunId": 37270798106,
+    "successorRuleset": "CROSS-VENUE-FUNDING-EDGE-V2",
+    "successorStage": "PREREGISTERED",
+    "sourceAuditAuthorized": false,
+    "strategyPnlObserved": false,
     "paperAuthorized": false,
     "liveAuthorized": false,
-    "next": "IMPLEMENT_STRATEGY_V1_DETERMINISTIC_ENGINE_AND_TESTS_NO_PNL"
+    "next": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_EXACT_HEAD_REVIEW_BEFORE_SOURCE_AUDIT"
   }
 }
