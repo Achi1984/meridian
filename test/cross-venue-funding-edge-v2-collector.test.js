@@ -23,9 +23,12 @@ test('Binance funding parser accepts explicit numeric cells and rejects blanks',
   assert.throws(()=>parseBinanceFundingCsv('calc_time,symbol,last_funding_rate\n1760000000000,BTCUSDT,false\n'),/ARCHIVE_ROW/);
 });
 
-test('Binance mark parser rejects blank or non-numeric OHLC cells instead of coercing zero',()=>{
+test('Binance mark parser enforces explicit schema and rejects blank or non-numeric OHLC cells',()=>{
   const good='1760000000000,100,101,99,100.5,0,0,0\n';
   assert.deepEqual(parseBinanceMarkCsv(good),[{openTime:1760000000000,open:100,high:101,low:99,close:100.5,confirmed:true}]);
+  const headed='open_time,open,high,low,close,volume\n1760000000000,100,101,99,100.5,0\n';
+  assert.deepEqual(parseBinanceMarkCsv(headed),[{openTime:1760000000000,open:100,high:101,low:99,close:100.5,confirmed:true}]);
+  assert.throws(()=>parseBinanceMarkCsv('timestamp,open,high,low,close\n1760000000000,100,101,99,100.5\n'),/ARCHIVE_SCHEMA/);
   assert.throws(()=>parseBinanceMarkCsv('1760000000000,100,101,,100.5\n'),/ARCHIVE_ROW/);
   assert.throws(()=>parseBinanceMarkCsv('1760000000000,100,false,99,100.5\n'),/ARCHIVE_ROW/);
 });
@@ -37,10 +40,11 @@ test('OKX funding parser enforces exact schema instrument and strict cells',()=>
   assert.throws(()=>parseOkxFundingCsv('instrument_name,funding_rate,funding_time\nETH-USDT-SWAP,0.1,1760000000000\n'),/ARCHIVE_SCHEMA/);
 });
 
-test('OKX mark parser requires confirmed rows and strict explicit array positions',()=>{
+test('OKX mark parser preserves confirmation state and rejects invalid explicit cells',()=>{
   const good=[['1760000000000','100','101','99','100.5','1']];
   assert.deepEqual(parseOkxMarkRows(good),[{openTime:1760000000000,open:100,high:101,low:99,close:100.5,confirmed:true}]);
-  assert.throws(()=>parseOkxMarkRows([['1760000000000','100','101','99','100.5','0']]),/PAGE_ROW/);
+  assert.deepEqual(parseOkxMarkRows([['1760000000000','100','101','99','100.5','0']]),[{openTime:1760000000000,open:100,high:101,low:99,close:100.5,confirmed:false}]);
+  assert.throws(()=>parseOkxMarkRows([['1760000000000','100','101','99','100.5','2']]),/PAGE_ROW/);
   assert.throws(()=>parseOkxMarkRows([['1760000000000','100','','99','100.5','1']]),/PAGE_ROW/);
 });
 
@@ -59,4 +63,9 @@ test('new V2 source/data-contract code has no direct Number coercion outside str
   assert.doesNotMatch(collector,/\bNumber\s*\(/);
   assert.doesNotMatch(contract,/\bNumber\s*\(/);
   assert.equal((core.match(/\bNumber\s*\(/g)||[]).length,1);
+});
+
+
+test('Binance funding parser does not accept undocumented alias headers',()=>{
+  assert.throws(()=>parseBinanceFundingCsv('fundingtime,symbol,fundingrate\n1760000000000,BTCUSDT,0.0001\n'),/ARCHIVE_SCHEMA/);
 });
