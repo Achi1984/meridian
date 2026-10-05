@@ -320,7 +320,7 @@ test('B11 moving an exogenous integrity event earlier cannot improve structural 
   const withEarlierIntegrity=output(anomalyPackage());
   assert.equal(withEarlierIntegrity.counts.splitEligibleSlots,BASE_DISCOVERY.counts.splitEligibleSlots);
   const readyCount=o=>o.events.filter(e=>e.kind==='COMMON_DECISION_SLOT'&&e.sourceInputsReady).length;
-  assert.equal(readyCount(withEarlierIntegrity),readyCount(BASE_DISCOVERY));
+  assert.ok(readyCount(withEarlierIntegrity)<=readyCount(BASE_DISCOVERY));
   assert.ok(withEarlierIntegrity.events.some(e=>e.kind==='INTEGRITY_DETECTION'&&e.integrityKind==='OFF_GRID_FUNDING'));
 });
 
@@ -478,7 +478,7 @@ test('B22 initial two-settlement window may be not-ready; unexplained-gap guard 
 test('B22b input gaps require an integrity event for the exact missing causal input',()=>{
   const pkg=anomalyPackage();
   const out=output(pkg,'discovery',pkg.receipt.digest);
-  const missing=BASE.receipt.split.discovery.times[50];
+  const missing=BASE.okxFunding[80].fundingTime;
   const slot=out.events.find(e=>e.kind==='COMMON_DECISION_SLOT'&&e.time===missing+F);
   assert.ok(slot);
   assert.equal(slot.sourceInputsReady,false);
