@@ -181,6 +181,11 @@ function applyCommonDecision(s,event,trace){
     return;
   }
   if(s.status!==V2_RUNNER_STATES.DEGRADED_FLAT)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
+  if(event.time<=s.degradationResetAt){
+    if(recoveryEligible)fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
+    appendTrace(trace,event,s.status,s.status,'DEGRADED_DECISION_BLOCKED');
+    return;
+  }
 
   const consecutive=s.lastRecoverySettlementTime!==null&&event.time-s.lastRecoverySettlementTime===FUNDING_INTERVAL;
   const rawCount=s.lastRecoverySettlementTime===null?1:(consecutive?s.recoveryCount+1:1);
