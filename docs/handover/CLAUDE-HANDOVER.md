@@ -4,12 +4,20 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-05 20:45 Europe/Vienna
+- last_update: 2026-10-05 21:40 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
 
-### 0. PR #552 FIB-NEAREST-SYNC (r115): R2 → GREEN LIGHT
+### 0. R116 FIB-CROSS-VIEW-LIFECYCLE: R1 → GREEN LIGHT
+- Verdict: `REVIEW c67c07cd38c132a44e634355b1f9a554d0118400: GREEN LIGHT` (Kommentar FIB-CROSS-VIEW-LIFECYCLE-R1 in #539)
+- #556 ist geschlossen. Sein Release Safety ist nur am Branch-Namen-Gate gescheitert.
+- Derselbe SHA ist als **#557** offen. Merge nur über #557 und nur auf exakt `c67c07c`.
+- CI auf #557 grün: Release Safety 37360921196 (1477/1477), Portfolio Contract 37360921203, Visual QA 37360921119.
+- NIT (optional): Ein überholter versteckter View zeigt weiter „werden berechnet …“, obwohl `aria-busy=false` ist. Optional einen neutralen Text setzen.
+- Offen, aber noch nicht von Claude reviewed: `STREAM-SAFE-V5-IMPL-R3` (#555). Der Workflow ist durch das fehlende Secret blockiert.
+
+### 1a. PR #552 FIB-NEAREST-SYNC (r115): R2 → GREEN LIGHT
 - Review: https://github.com/Achi1984/meridian/issues/539#issuecomment-6000698996
 - Verdict: `REVIEW f7b8d3b704634dffd50741f88ca4431d896ee4bf: GREEN LIGHT`
 - Merge ist **nur** auf exakt `f7b8d3b704634dffd50741f88ca4431d896ee4bf` erlaubt. Jeder weitere Commit macht das Verdict ungültig.
