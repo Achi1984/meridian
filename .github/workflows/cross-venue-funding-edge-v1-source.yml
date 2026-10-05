@@ -5,6 +5,10 @@ on:
     paths:
       - "research/CROSS-VENUE-FUNDING-EDGE-V1-PREREGISTRATION.md"
       - "research/CROSS-VENUE-FUNDING-EDGE-V1-IMPLEMENTATION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V1-SOURCE-DECISION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-PREREGISTRATION.md"
+      - "research/cross-venue-funding-edge-v2-stage-lock.js"
+      - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
       - "research/cross-venue-funding-edge-v1.js"
       - "research/cross-venue-funding-edge-v1-data-contract.js"
       - "research/cross-venue-funding-edge-v1-stage-lock.js"
@@ -18,6 +22,10 @@ on:
       - main
     paths:
       - "research/CROSS-VENUE-FUNDING-EDGE-V1-IMPLEMENTATION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V1-SOURCE-DECISION.md"
+      - "research/CROSS-VENUE-FUNDING-EDGE-V2-PREREGISTRATION.md"
+      - "research/cross-venue-funding-edge-v2-stage-lock.js"
+      - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
       - "research/cross-venue-funding-edge-v1.js"
       - "research/cross-venue-funding-edge-v1-data-contract.js"
       - "research/cross-venue-funding-edge-v1-stage-lock.js"
@@ -38,6 +46,8 @@ jobs:
   invariants:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      source_audit: ${{ steps.stage.outputs.source_audit }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,19 +58,25 @@ jobs:
           node --check research/cross-venue-funding-edge-v1.js
           node --check research/cross-venue-funding-edge-v1-data-contract.js
           node --check research/cross-venue-funding-edge-v1-stage-lock.js
+          node --check research/cross-venue-funding-edge-v2-stage-lock.js
           node --check scripts/collect-cross-venue-funding-edge-v1-source.mjs
       - name: Verify frozen pre-result invariants
         run: |
           node --test \
             test/cross-venue-funding-edge-v1.test.js \
             test/cross-venue-funding-edge-v1-data-contract.test.js \
-            test/cross-venue-funding-edge-v1-stage-lock.test.js
+            test/cross-venue-funding-edge-v1-stage-lock.test.js \
+            test/cross-venue-funding-edge-v2-stage-lock.test.js
+      - name: Read V1 source-audit lock
+        id: stage
+        run: |
+          node --input-type=module -e "import {CROSS_VENUE_FUNDING_EDGE_V1_STAGE_LOCK as x} from './research/cross-venue-funding-edge-v1-stage-lock.js'; console.log('source_audit='+(x.sourceAudit===true?'true':'false'))" >> "$GITHUB_OUTPUT"
       - name: Assert collector cannot calculate strategy PnL
         run: |
           ! grep -E "profitFactor|expectancy|netPnl|runCrossVenue" scripts/collect-cross-venue-funding-edge-v1-source.mjs
 
   source:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.invariants.outputs.source_audit == 'true'
     needs: invariants
     runs-on: ubuntu-latest
     timeout-minutes: 45
