@@ -20,7 +20,9 @@ import {
 } from '../research/cross-venue-funding-edge-v2-strategy-adapter.js';
 import {
   runCrossVenueV2StrategyDriverSynthetic,
-  executeCrossVenueV2StrategyDriver
+  executeCrossVenueV2StrategyDriver,
+  assertCrossVenueV2SyntheticSourceAllowed,
+  CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST
 } from '../research/cross-venue-funding-edge-v2-strategy-driver.js';
 import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK} from '../research/cross-venue-funding-edge-v2-stage-lock.js';
 
@@ -125,6 +127,8 @@ function eventAt(result,kind,time){
 
 const BASE=finalize(makeDraft());
 const TARGET=BASE.receipt.split.discovery.times[100];
+const FINAL_DECISION=Date.parse(CONTRACT.decisionWindowEnd);
+const PRE_END_DECISION=FINAL_DECISION-F;
 const NEXT_SPLIT=BASE.receipt.split.validation.start;
 const LAST_ELIGIBLE=BASE.receipt.split.discovery.times
   .filter(t=>t+26*H<NEXT_SPLIT)
@@ -186,6 +190,50 @@ test('PR2 exit adapter trips the frozen basis risk rule on adverse closed-candle
   assert.equal(x.exit,true);
   assert.equal(x.reason,'BASIS_RISK_LIMIT');
   assert.equal(x.heldDirection,1);
+});
+
+test('PR2 exit adapter consumes a post-decision-window common settlement causally',()=>{
+  const pkg=activePackage(FINAL_DECISION,d=>{
+    const b=d.binanceFunding.find(x=>x.fundingTime===FINAL_DECISION+F);
+    const o=d.okxFunding.find(x=>x.fundingTime===FINAL_DECISION+F);
+    assert.ok(b&&o);
+    b.fundingRate=.0026;
+    o.fundingRate=.0001;
+  });
+  const x=createCrossVenueV2StrategyAdapter({normalized:normalized(pkg)})
+    .exitAt({
+      entryDecisionTime:FINAL_DECISION,
+      entryFillTime:FINAL_DECISION+H,
+      hour:FINAL_DECISION+F+H
+    });
+  assert.equal(x.exit,true);
+  assert.equal(x.reason,'SPREAD_NOT_PERSISTENT');
+});
+
+test('PR2 post-window funding cannot change an exit result at or before decisionWindowEnd',()=>{
+  const a=activePackage(PRE_END_DECISION);
+  const b=rebuild(a,d=>{
+    for(const time of [FINAL_DECISION+F,FINAL_DECISION+2*F]){
+      const bf=d.binanceFunding.find(x=>x.fundingTime===time);
+      const of=d.okxFunding.find(x=>x.fundingTime===time);
+      assert.ok(bf&&of);
+      bf.fundingRate=.0026;
+      of.fundingRate=.0001;
+    }
+  });
+  const x=createCrossVenueV2StrategyAdapter({normalized:normalized(a)})
+    .exitAt({
+      entryDecisionTime:PRE_END_DECISION,
+      entryFillTime:PRE_END_DECISION+H,
+      hour:FINAL_DECISION
+    });
+  const y=createCrossVenueV2StrategyAdapter({normalized:normalized(b)})
+    .exitAt({
+      entryDecisionTime:PRE_END_DECISION,
+      entryFillTime:PRE_END_DECISION+H,
+      hour:FINAL_DECISION
+    });
+  assert.deepEqual(x,y);
 });
 
 test('B26 sourceInputsReady true with missing decision funding is adapter integrity divergence',()=>{
@@ -252,6 +300,42 @@ test('B23 production driver remains locked at SOURCE_AUDIT',()=>{
   );
 });
 
+test('B23 caller-crafted discovery lock cannot authorize the production driver',()=>{
+  const fakeLock=Object.freeze({
+    ...CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK,
+    discovery:true
+  });
+  assert.throws(
+    ()=>executeCrossVenueV2StrategyDriver({lock:fakeLock}),
+    /CROSS_VENUE_V2_DISCOVERY_LOCKED/
+  );
+});
+
+test('PR2 synthetic authorization rejects the canonical source receipt before execution',()=>{
+  assert.equal(
+    CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST,
+    '822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5'
+  );
+  assert.throws(
+    ()=>assertCrossVenueV2SyntheticSourceAllowed({
+      expectedReceiptDigest:CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST
+    }),
+    /CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER/
+  );
+  assert.throws(
+    ()=>runCrossVenueV2StrategyDriverSynthetic({
+      syntheticOnly:true,
+      validatedSource:{expectedReceiptDigest:CROSS_VENUE_V2_CANONICAL_RECEIPT_DIGEST},
+      split:'discovery'
+    }),
+    /CROSS_VENUE_V2_CANONICAL_SOURCE_FORBIDDEN_IN_SYNTHETIC_DRIVER/
+  );
+  assert.equal(
+    assertCrossVenueV2SyntheticSourceAllowed(validated(activePackage(TARGET))),
+    true
+  );
+});
+
 test('PR2 synthetic driver requires an explicit syntheticOnly flag',()=>{
   const pkg=activePackage(TARGET);
   assert.throws(
@@ -300,6 +384,31 @@ test('PR2 driver delegates structural runner mapping and lineage to the reviewed
   assert.match(driver,/adaptCrossVenueV2BuilderForRunner\s*\(/);
   assert.doesNotMatch(driver,/function\s+runnerDecisionFromSlot/);
   assert.doesNotMatch(driver,/COMMON_DECISION_SLOT['"]\)\s*\{\s*return\s+Object\.freeze/);
+});
+
+test('PR2 terminal post-exit evidence retains the exact causal slot/fill prefix',()=>{
+  const exitFillAt=TARGET+F;
+  const pkg=activePackage(TARGET,d=>{
+    setActiveFunding(d,exitFillAt);
+    const b=d.binanceMarks.find(x=>x.openTime===TARGET+6*H);
+    const o=d.okxMarks.find(x=>x.openTime===TARGET+6*H);
+    assert.ok(b&&o);
+    b.close=99;
+    o.close=101;
+    d.binanceMarks=d.binanceMarks.filter(x=>x.openTime!==exitFillAt);
+  });
+  const result=driver(pkg);
+  assert.ok(eventAt(result,'EXIT_DECISION',TARGET+7*H));
+  assert.ok(eventAt(result,'EXIT_FILL',exitFillAt));
+  const nextDecision=eventAt(result,'COMMON_DECISION',exitFillAt);
+  assert.ok(nextDecision,'slot at exitFill must be retained before the later terminal event');
+  assert.equal(nextDecision.entryActive,true);
+  assert.ok(
+    eventAt(result,'ENTRY_FILL',exitFillAt+H),
+    'same slot entry fill precedes the +1h integrity event by frozen phase order'
+  );
+  assert.equal(result.outcome.terminal,true);
+  assert.equal(result.outcome.reason,'OPEN_POSITION_AT_DATA_DEGRADATION');
 });
 
 test('PR2 terminal entry-candle failure prevents later decision exposure',()=>{
