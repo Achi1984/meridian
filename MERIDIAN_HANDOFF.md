@@ -826,3 +826,15 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - Repair is continuity-only: align `MERIDIAN_RESUME.build`, `MERIDIAN_RESUME.sourceOfTruth.verifiedSha`, `MERIDIAN_AGENT_STATE.lastCheckpoint`, and the Chat Handoff build/checkpoint to current main `d4a628fee5cf527e0218b99635d80b9cd91bd0ad` / `10.0-r113`.
 - Canonical V2 source lineage remains `63f93aa41b6e054b229309b6fd6fbc2447a92181`; source evidence, receipt digests, collector, data contract, stage lock, accounting, Frozen Guard pins and strategy semantics are unchanged.
 - This repair creates a new exact HEAD and therefore requires Claude review loop 3/3 before merge. No Source Audit rerun and no strategy PnL.
+
+## SSOT UPDATE — 2026-10-05 · V2 runner implementation candidate — NO PNL
+
+- Branch: `research/cross-venue-funding-edge-v2-runner-contract`, based on main `dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92`.
+- Implements the Claude-reviewed pre-implementation design only: strict degradation/entry booleans, deterministic runner event ordering/state machine, split-isolation helper, self-locked runner entry, independent event-sourced ledger and synthetic causality/accounting regression tests.
+- `reconcileCycleAccounting` is removed from the public V2 primitive surface; reconciliation now requires a verified `EVENT_SOURCED_V2` ledger plus independent analytic decomposition.
+- Frozen Guard pins the updated V2 implementation/data-contract/core/tests plus the new runner/ledger modules and tests.
+- Canonical V2 source lineage and receipt remain unchanged; the canonical source artifact is not read by these tests.
+- Authoritative stage remains `SOURCE_AUDIT`; `discovery=false`, `validation=false`, `holdout=false`, `paper=false`, `live=false`.
+- No canonical runner execution and no strategy PnL occurred.
+- Next required gate: exact-head Claude review of the implementation candidate after green CI. Merge does not authorize Discovery; any Research-stage transition requires a separate reviewed PR.
+
