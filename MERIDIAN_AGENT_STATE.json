@@ -24,16 +24,21 @@
     "fallbackDisclosureRequired": true
   },
   "streamingGuard": {
-    "maxToolCallGroupsPerVisibleBurst": 2,
-    "checkpointBeforeLongOrIrreversibleStep": true,
-    "streamIsNeverSourceOfTruth": true,
-    "recoveryMode": "RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOMPLETE_DURABLE_STEP",
-    "repeatCompletedWritesAfterInterruption": false,
+    "protocol": "STREAM-SAFE-V5",
+    "compactBootstrapFile": "MERIDIAN_LIVE_CHECKPOINT.json",
+    "maxToolCallGroupsPerVisibleBurst": 1,
+    "maxMutationsPerVisibleBurst": 1,
     "maxSameStatusPollsPerVisibleBurst": 1,
-    "maxVisibleBurstSeconds": 90,
-    "maxPayloadBytes": 6144,
+    "maxVisibleBurstSeconds": 45,
+    "maxPayloadBytes": 4096,
+    "noBulkContinuityDump": true,
+    "expandLargeContinuityFilesOnlyOnMismatch": true,
+    "checkpointBeforeLongOrIrreversibleStep": true,
     "checkpointAfterEveryMutation": true,
     "userVisibleCheckpointRequired": true,
+    "streamIsNeverSourceOfTruth": true,
+    "recoveryMode": "READ_539_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI",
+    "repeatCompletedWritesAfterInterruption": false,
     "longOperationSplitRequired": true
   },
   "recoveryChecks": [
@@ -134,12 +139,12 @@
     "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source→Events→Strategy→Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
   },
   "nextChatBootstrap": [
-    "Fetch latest main SHA",
-    "Read MERIDIAN_RESUME.json",
-    "Read MERIDIAN_AGENT_STATE.json",
-    "Inspect related open PRs/branches and current CI",
-    "Compare against stored checkpoint",
-    "Continue first incomplete durable step without repeating merged work"
+    "Read latest Issue #539 comment",
+    "Read MERIDIAN_LIVE_CHECKPOINT.json",
+    "Fetch latest main SHA and current CI",
+    "Inspect only related open PRs/branches",
+    "Expand MERIDIAN_RESUME.json / MERIDIAN_HANDOFF.md only on mismatch or when historical detail is required",
+    "Continue first incomplete durable step without repeating completed work"
   ],
   "researchCheckpoint": {
     "family": "CROSS_VENUE_FUNDING_EDGE",
