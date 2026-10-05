@@ -505,7 +505,7 @@ PR2 is the reviewed Layer-B/Driver bridge between the frozen PR1 structural even
 ### Exit adapter
 
 - Exit checks run hourly for `h = entryFill+1h ... entryFill+24h`.
-- Funding/spread inputs are the last three completed common settlements with timestamp `<= h`.
+- Funding/spread inputs are the last three completed common usable settlements with `rawStart <= timestamp <= h`. Exit settlement selection intersects the two usable funding maps directly and deliberately does not apply the decision-window end clip; final Holdout positions may consume post-decision-window settlements that are already observable inside the reviewed stream boundary.
 - `remainingHours = (entryFill + 24h - h)`.
 - The frozen `exitDecision` primitive is authoritative.
 - Adapter-inconclusive output without prior runner integrity terminality is a fail-closed `CROSS_VENUE_V2_ADAPTER_INTEGRITY_DIVERGENCE`.
@@ -525,11 +525,12 @@ PR2 is the reviewed Layer-B/Driver bridge between the frozen PR1 structural even
 - Before finalization, the driver requires runner state in `FLAT_ELIGIBLE`, `DEGRADED_FLAT` or `TERMINAL_INCONCLUSIVE`; otherwise it throws `CROSS_VENUE_V2_STREAM_BOUNDARY_VIOLATION`.
 - Slots are processed causally in time order. No later strategy signal is calculated after a terminal runner outcome is observed.
 - If the runner becomes `TERMINAL_INCONCLUSIVE`, the serialized driver event stream is trimmed to the exact event prefix actually consumed by the runner trace.
+- For terminal post-`EXIT_FILL` +1h evidence, still-unemitted decision slots through `exitFill` and any matching entry fill due before that evidence boundary are inserted first, so the terminal trace reflects the exact causal prefix and frozen phase order.
 
 ### Authorization
 
-- `executeCrossVenueV2StrategyDriver` calls `assertV2RunnerExecutionAuthorized` first and therefore remains locked while discovery=false.
-- `runCrossVenueV2StrategyDriverSynthetic` requires literal `syntheticOnly:true` and exists only for synthetic regression evidence.
+- `executeCrossVenueV2StrategyDriver` accepts only the imported `CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK` object by identity and passes that canonical object to `assertV2RunnerExecutionAuthorized`; caller-crafted locks cannot authorize execution.
+- `runCrossVenueV2StrategyDriverSynthetic` requires literal `syntheticOnly:true`, rejects the canonical source receipt digest `822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5`, and exists only for synthetic regression evidence.
 - No PR2 module reads files, network, Actions, artifacts or `research/data`.
 - No canonical package is read or executed in this PR.
 - First canonical Source→Events→Adapter→Runner execution requires a separate reviewed execution/stage authorization.
