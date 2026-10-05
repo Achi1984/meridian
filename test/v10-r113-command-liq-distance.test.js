@@ -7,12 +7,14 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
-test('r113 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r113');
+test('r113+ release identity remains coherent and execution neutral',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const rev=Number(release.terminalBuild.split('r').at(-1));
+  assert.ok(rev>=113);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/COMMAND-LIVE-RISK-LIQUIDATION-DISTANCE/);
-  assert.equal(manifest.start_url,'./v10/?build=r113&fresh=r113');
-  assert.ok(js.includes("const BUILD='10.0-r113'"));
+  assert.equal(manifest.start_url,'./v10/?build=r'+rev+'&fresh=r'+rev);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r113 compact Command risk card exposes liquidation price current price buffer and stage',()=>{
