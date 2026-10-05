@@ -13,7 +13,9 @@ test('frozen research manifest locks canonical Cross-Venue and Paper Edge lineag
     'test/cross-venue-funding-edge-v2-preregistration.test.js',
     'test/cross-venue-funding-edge-v2-stage-lock.test.js',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-AUTHORIZATION.md',
-    'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-AUTHORIZATION.md',
+    'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-EVALUATION.md',
+    'research/cross-venue-funding-edge-v2-source-evaluation.json',
+    'test/cross-venue-funding-edge-v2-source-evaluation.test.js',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md',
     'research/cross-venue-funding-edge-v2.js',
@@ -76,6 +78,9 @@ test('guard rejects byte changes to frozen Cross-Venue preregistration and stage
 
 test('guard rejects byte changes to frozen V2 implementation source accounting or workflow files',()=>{
   const targets=[
+    'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-EVALUATION.md',
+    'research/cross-venue-funding-edge-v2-source-evaluation.json',
+    'test/cross-venue-funding-edge-v2-source-evaluation.test.js',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json',
     'research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md',
     'research/cross-venue-funding-edge-v2.js',
