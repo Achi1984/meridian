@@ -789,3 +789,14 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - GPT-6 routing fields are Lead-internal target routing only. Claude is the independent cross-model reviewer and must match `MERIDIAN_LEAD_LEASE.json.subAgent`.
 - Next allowed work: V2 implementation/source-contract only. V2 Source Audit, strategy PnL, Discovery, Paper and Live remain unauthorized.
 
+## SSOT UPDATE — 2026-10-05 · Cross-Venue Funding Edge V2 source-audit authorization
+
+- Canonical pre-transition main: `2e463a533e8d0a6de3b509620cb1af7da847acd5`.
+- PR #535 is merged. V2 implementation/source contract, strict collector, accounting primitives, causal entry/recovery rules, coverage evidence and source-gate workflow are frozen in the global Frozen Research Guard.
+- Post-merge V2 Source Gate run `37287414973`: invariants SUCCESS; source collection SKIPPED because `sourceAudit=false`.
+- Release Safety run `37287414943`: SUCCESS. Runtime Smoke run `37287414927`: SUCCESS.
+- This transition changes only the V2 research stage from `PREREGISTERED` to `SOURCE_AUDIT` and sets `sourceAudit:true`.
+- Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
+- After reviewed merge, the frozen main-only V2 Source Gate may run the source collector automatically. The resulting run is source evidence only and cannot authorize a later stage.
+- Any later transition requires a separate exact-head cross-model review.
+
