@@ -5,7 +5,7 @@ import {
   strictNum,costBreakdown,fundingSpread,conservativeProjection,entryDecision,
   remainingFundingIntervals,exitDecision,fundingCashflow,basisPnl,directionLegs,
   positionOpenAtDetection,degradationOutcome,assertV2StageAdvanceAllowed,
-  reconcileCycleAccounting,tradePathDigest,scenarioPathIdentity
+  tradePathDigest,scenarioPathIdentity
 } from '../research/cross-venue-funding-edge-v2.js';
 
 const BAD=[null,'','  ',false,true,[],NaN];
@@ -58,7 +58,7 @@ test('projection treats bad spread values as data-integrity failure, not an econ
 });
 
 test('exitDecision classifies invalid accounting inputs as INCONCLUSIVE',()=>{
-  const base={heldDirection:1,spreads:[.003,.003,.003],remainingHours:16,basisPnlUsd:0};
+  const base={heldDirection:1,spreads:[.003,.003,.003],remainingHours:16,basisPnlUsd:0,integrityOk:true};
   assert.equal(exitDecision(base).exit,false);
   assert.equal(exitDecision({...base,heldDirection:'1'}).inconclusive,true);
   assert.equal(exitDecision({...base,basisPnlUsd:null}).inconclusive,true);
@@ -125,27 +125,6 @@ test('open-position degradation is terminal INCONCLUSIVE and cannot advance',()=
   assert.equal(assertV2StageAdvanceAllowed({status:'PASS',terminal:false,mayAdvance:true}),true);
 });
 
-test('cycle accounting reconciles funding plus basis minus costs to equity delta',()=>{
-  const r=reconcileCycleAccounting({
-    fundingCashflows:[10,-2,5],
-    basisPnlUsd:7,
-    costsUsd:4,
-    openingEquity:20000,
-    closingEquity:20016
-  });
-  assert.equal(r.fundingUsd,13);
-  assert.equal(r.expectedDelta,16);
-  assert.equal(r.actualDelta,16);
-  assert.equal(r.ok,true);
-  assert.throws(()=>reconcileCycleAccounting({
-    fundingCashflows:[10,-2,5],
-    basisPnlUsd:7,
-    costsUsd:4,
-    openingEquity:20000,
-    closingEquity:20015
-  }),/ACCOUNTING_RECONCILIATION/);
-});
-
 const H=60*60*1000;
 
 test('frozen V2 config remains BTC-only and leverage-neutral',()=>{
@@ -174,4 +153,15 @@ test('baseline and stress scenarios preserve an identical trade path identity',(
   assert.equal(stress.tradePathDigest,digest);
   assert.equal(base.slippageBpsPerFill,3);
   assert.equal(stress.slippageBpsPerFill,6);
+});
+
+
+test('exit integrity flag fails closed when omitted or non-boolean',()=>{
+  const base={heldDirection:1,spreads:[.003,.003,.003],remainingHours:16,basisPnlUsd:0};
+  for(const bad of ['true',1,undefined,null]){
+    const r=exitDecision({...base,integrityOk:bad});
+    assert.equal(r.inconclusive,true);
+    assert.equal(r.reason,'DATA_INTEGRITY_FAILURE');
+  }
+  assert.equal(exitDecision(base).inconclusive,true);
 });

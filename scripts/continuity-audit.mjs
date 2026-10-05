@@ -45,6 +45,17 @@ check(state?.researchCheckpoint?.sourceAuditEvaluated===true,'agent state must p
 check(state?.researchCheckpoint?.sourceAuditOutcome==='VALID_WITH_INTEGRITY_EPISODES','agent state V2 source outcome mismatch');
 check(state?.researchCheckpoint?.canonicalSourceRun?.runId===canonicalV2Source.runId,'agent/resume V2 canonical source run mismatch');
 check(state?.researchCheckpoint?.canonicalSourceRun?.receiptDigest===canonicalV2Source.receiptDigest,'agent/resume V2 receipt digest mismatch');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationCandidate===true,'V2 runner implementation candidate flag must be true');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerImplementationStatus==='SYNTHETIC_ONLY_AWAITING_CROSS_MODEL_REVIEW','V2 runner implementation candidate must await cross-model review');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.nextRequiredGate==='CROSS_MODEL_REVIEW_V2_RUNNER_IMPLEMENTATION_NO_PNL','V2 next gate must be runner cross-model review, not Discovery');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.runnerStrategyPnlCalculated===false,'V2 runner candidate must not calculate strategy PnL');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.discoveryAuthorized===false,'V2 Discovery must remain locked during runner implementation review');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.validationAuthorized===false,'V2 Validation must remain locked during runner implementation review');
+check(resume?.canonicalResearch?.crossVenueFundingEdgeV2?.holdoutAuthorized===false,'V2 Holdout must remain locked during runner implementation review');
+check(state?.researchCheckpoint?.runnerImplementationCandidate===true,'agent state must persist V2 runner implementation candidate');
+check(state?.researchCheckpoint?.runnerImplementationStatus==='SYNTHETIC_ONLY_AWAITING_CROSS_MODEL_REVIEW','agent state V2 runner status mismatch');
+check(state?.researchCheckpoint?.next==='CROSS_MODEL_REVIEW_V2_RUNNER_IMPLEMENTATION_NO_PNL','agent state V2 next gate mismatch');
+check(state?.researchCheckpoint?.strategyPnlObserved===false,'agent state must keep V2 strategy PnL unobserved');
 check(resume?.researchDirection?.qhImbalanceV1Status==='PAUSED_FROZEN_CANONICAL_PREREGISTERED_NO_PNL','Quarter-Hour lane must be explicitly paused while Cross-Venue V2 is active');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor'),'agent workflow must define cross-model review-required categories');
 check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.subAgent'),'agent workflow must bind cross-model review authority to lease.subAgent');

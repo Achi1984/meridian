@@ -255,8 +255,9 @@ export function recoveryAt({episodeStart,commonTimes=[],integrityEvents=[],binan
   return null;
 }
 
-export function entryInputsReady({decisionTime,binanceFunding=[],okxFunding=[],binanceMarks=[],okxMarks=[],activeDegradation=false}={},contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
-  if(activeDegradation===true)return{ready:false,reason:'DATA_DEGRADED'};
+export function entryInputsReady({decisionTime,binanceFunding=[],okxFunding=[],binanceMarks=[],okxMarks=[],activeDegradation}={},contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
+  if(typeof activeDegradation!=='boolean')throw new Error('CROSS_VENUE_V2_INVALID_DEGRADATION_FLAG');
+  if(activeDegradation)return{ready:false,reason:'DATA_DEGRADED'};
   const t=strictTime(decisionTime);
   if(t===null||!decisionWithinCoverage(t,contract))return{ready:false,reason:'DECISION_OUTSIDE_FROZEN_WINDOW'};
   const b=usableFundingMap(binanceFunding),o=usableFundingMap(okxFunding);
@@ -278,8 +279,9 @@ function entryMarkStatus(rows=[],openTime){
   return'VALID';
 }
 
-export function entryFillIntegrityOutcome({decisionTime,entryActive=false,asOfTime,binanceMarks=[],okxMarks=[]}={},contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
-  if(entryActive!==true)return{status:'NOT_APPLICABLE',terminal:false,inconclusive:false};
+export function entryFillIntegrityOutcome({decisionTime,entryActive,asOfTime,binanceMarks=[],okxMarks=[]}={},contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
+  if(typeof entryActive!=='boolean')throw new Error('CROSS_VENUE_V2_INVALID_ENTRY_ACTIVE_FLAG');
+  if(!entryActive)return{status:'NOT_APPLICABLE',terminal:false,inconclusive:false};
   const t=strictTime(decisionTime),asOf=strictTime(asOfTime);
   if(t===null||asOf===null)return{status:'INCONCLUSIVE',terminal:true,inconclusive:true,reason:'DATA_INTEGRITY_FAILURE'};
   const entryOpenTime=t+contract.markIntervalMs;

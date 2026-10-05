@@ -138,7 +138,7 @@ export function remainingFundingIntervals(remainingHours,cfg=CROSS_VENUE_FUNDING
   return Math.max(0,Math.floor(h/(stepMs/3600000)));
 }
 
-export function exitDecision({heldDirection,spreads=[],remainingHours,basisPnlUsd,integrityOk=true}={},cfg=CROSS_VENUE_FUNDING_EDGE_V2_CONFIG){
+export function exitDecision({heldDirection,spreads=[],remainingHours,basisPnlUsd,integrityOk}={},cfg=CROSS_VENUE_FUNDING_EDGE_V2_CONFIG){
   if(integrityOk!==true)return{exit:true,reason:'DATA_INTEGRITY_FAILURE',inconclusive:true};
   if(typeof heldDirection!=='number'||![1,-1].includes(heldDirection))
     return{exit:true,reason:'DATA_INTEGRITY_FAILURE',inconclusive:true};
@@ -230,28 +230,6 @@ export function assertV2StageAdvanceAllowed(outcome){
   if(outcome?.mayAdvance!==true)
     throw new Error('CROSS_VENUE_V2_STAGE_ADVANCE_BLOCKED');
   return true;
-}
-
-export function reconcileCycleAccounting({fundingCashflows=[],basisPnlUsd,costsUsd,openingEquity,closingEquity,tolerance=1e-8}={}){
-  if(!Array.isArray(fundingCashflows))throw new Error('CROSS_VENUE_V2_INVALID_ACCOUNTING_INPUT');
-  const funding=fundingCashflows.map(finiteNumber);
-  const basis=finiteNumber(basisPnlUsd),costs=finiteNumber(costsUsd),open=finiteNumber(openingEquity),close=finiteNumber(closingEquity),tol=finiteNumber(tolerance);
-  if(funding.some(x=>x===null)||[basis,costs,open,close,tol].some(x=>x===null)||costs<0||open<0||close<0||tol<0)
-    throw new Error('CROSS_VENUE_V2_INVALID_ACCOUNTING_INPUT');
-  const fundingUsd=funding.reduce((a,b)=>a+b,0);
-  const expectedDelta=fundingUsd+basis-costs;
-  const actualDelta=close-open;
-  const reconciliationError=actualDelta-expectedDelta;
-  if(Math.abs(reconciliationError)>tol)throw new Error('CROSS_VENUE_V2_ACCOUNTING_RECONCILIATION');
-  return{
-    ok:true,
-    fundingUsd,
-    basisPnlUsd:basis,
-    costsUsd:costs,
-    expectedDelta,
-    actualDelta,
-    reconciliationError
-  };
 }
 
 function canonicalTradePath(path=[]){
