@@ -247,8 +247,9 @@ export function recoveryAt({episodeStart,commonTimes=[],integrityEvents=[],binan
     if(streak.length>need)streak=streak.slice(-need);
     if(streak.length!==need)continue;
     const markFrom=Math.ceil(resetAt/contract.markIntervalMs)*contract.markIntervalMs;
-    if(!marksCompleteBetween(binanceMarks,markFrom,time,contract))continue;
-    if(!marksCompleteBetween(okxMarks,markFrom,time,contract))continue;
+    const markTo=time-contract.markIntervalMs;
+    if(markTo>=markFrom&&!marksCompleteBetween(binanceMarks,markFrom,markTo,contract))continue;
+    if(markTo>=markFrom&&!marksCompleteBetween(okxMarks,markFrom,markTo,contract))continue;
     return time;
   }
   return null;
@@ -261,10 +262,44 @@ export function entryInputsReady({decisionTime,binanceFunding=[],okxFunding=[],b
   const b=usableFundingMap(binanceFunding),o=usableFundingMap(okxFunding);
   const required=[t-2*contract.fundingIntervalMs,t-contract.fundingIntervalMs,t];
   if(required.some(x=>!b.has(x)||!o.has(x)))return{ready:false,reason:'FUNDING_INPUTS_INCOMPLETE_OR_STALE'};
-  const entryOpen=t+contract.markIntervalMs;
+  const lastClosedMark=t-contract.markIntervalMs;
   const bm=confirmedUniqueMarkSet(binanceMarks),om=confirmedUniqueMarkSet(okxMarks);
-  if(!bm.has(entryOpen)||!om.has(entryOpen))return{ready:false,reason:'MARK_INPUTS_INCOMPLETE_OR_STALE'};
-  return{ready:true,reason:'READY',entryOpenTime:entryOpen};
+  if(!bm.has(lastClosedMark)||!om.has(lastClosedMark))return{ready:false,reason:'MARK_INPUTS_INCOMPLETE_OR_STALE'};
+  return{ready:true,reason:'READY',entryOpenTime:t+contract.markIntervalMs,lastClosedMarkTime:lastClosedMark};
+}
+
+function entryMarkStatus(rows=[],openTime){
+  const xs=rows.filter(x=>x?.openTime===openTime);
+  if(xs.length===0)return'MISSING_MARK';
+  if(xs.length>1)return'DUPLICATE_MARK';
+  const x=xs[0];
+  if(x.confirmed!==true)return'UNCONFIRMED_MARK';
+  if(![x.open,x.high,x.low,x.close].every(Number.isFinite)||x.open<=0||x.high<=0||x.low<=0||x.close<=0)return'INVALID_MARK';
+  return'VALID';
+}
+
+export function entryFillIntegrityOutcome({decisionTime,entryActive=false,asOfTime,binanceMarks=[],okxMarks=[]}={},contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
+  if(entryActive!==true)return{status:'NOT_APPLICABLE',terminal:false,inconclusive:false};
+  const t=strictTime(decisionTime),asOf=strictTime(asOfTime);
+  if(t===null||asOf===null)return{status:'INCONCLUSIVE',terminal:true,inconclusive:true,reason:'DATA_INTEGRITY_FAILURE'};
+  const entryOpenTime=t+contract.markIntervalMs;
+  const detectionTime=entryOpenTime+contract.markIntervalMs;
+  if(asOf<detectionTime)return{status:'PENDING',terminal:false,inconclusive:false,entryOpenTime,detectionTime};
+  const binanceStatus=entryMarkStatus(binanceMarks,entryOpenTime);
+  const okxStatus=entryMarkStatus(okxMarks,entryOpenTime);
+  if(binanceStatus!=='VALID'||okxStatus!=='VALID'){
+    return{
+      status:'INCONCLUSIVE',
+      terminal:true,
+      inconclusive:true,
+      reason:'ENTRY_FILL_DATA_DEGRADATION',
+      entryOpenTime,
+      detectionTime,
+      binanceStatus,
+      okxStatus
+    };
+  }
+  return{status:'EXECUTED',terminal:false,inconclusive:false,entryOpenTime,detectionTime};
 }
 
 export function sourceReceipt(packageData,normalized,events,common,contract=CROSS_VENUE_FUNDING_EDGE_V2_SOURCE){
