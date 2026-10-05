@@ -51,10 +51,10 @@ test('r17 holdout source loading fails closed before statistical evaluation',()=
 
 test('r17 Fib auto swing uses closed 4h anchors but retains a live current-price path',()=>{
   const block=v10.slice(v10.indexOf('async function updateFibMap'),v10.indexOf('function bindFibMap'));
-  assert.match(block,/Math\.min\(300,Math\.max\(180,fibUi\.window\+5\)\)/);
+  assert.match(block,/Math\.min\(300,Math\.max\(180,windowSize\+5\)\)/);
   assert.match(block,/const swingRows=.*closeTime.*Date\.now\(\)-1000/s);
-  assert.match(block,/detectSwing\(swingRows,fibUi\.window\)/);
-  assert.match(block,/detectOpposingChildSwing\(swingRows,parent,fibUi\.window\)/);
+  assert.match(block,/detectSwing\(swingRows,windowSize\)/);
+  assert.match(block,/detectOpposingChildSwing\(swingRows,parent,windowSize\)/);
   assert.match(block,/let current=rows\?\.length\?Number\(rows\.at\(-1\)\?\.close\):null/);
   assert.match(block,/×4h CLOSED/);
 });

@@ -22,19 +22,20 @@ function loadFibLayoutHarness(){
   `)(fibPlotPosition);
 }
 
-test('r114 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r114');
+test('r114+ release identity is coherent and execution neutral',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const rev=Number(release.terminalBuild.split('r').at(-1));
+  assert.ok(rev>=114);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/FIB-MAP-V2-MOBILE-CLARITY/);
-  assert.equal(manifest.start_url,'./v10/?build=r114&fresh=r114');
-  assert.match(html,/meridian-build" content="10\.0-r114"/);
-  assert.ok(js.includes("const BUILD='10.0-r114'"));
-  assert.ok(v9.includes("qs.set('build','r114')"));
-  assert.ok(v9html.includes("p.set('build','r114')"));
-  assert.match(v9,/portfolio-data-contract\.js\?v=10\.0-r114/);
-  assert.match(v9,/live-price-core-r18\.js\?v=10\.0-r114/);
+  assert.equal(manifest.start_url,'./v10/?build=r'+rev+'&fresh=r'+rev);
+  assert.ok(html.includes('meridian-build" content="'+release.terminalBuild+'"'));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
+  assert.ok(v9.includes("qs.set('build','r"+rev+"')"));
+  assert.ok(v9html.includes("p.set('build','r"+rev+"')"));
+  assert.ok(v9.includes('portfolio-data-contract.js?v='+release.terminalBuild));
+  assert.ok(v9.includes('live-price-core-r18.js?v='+release.terminalBuild));
 });
-
 test('r114 keeps exact FIB anchors while deconflicting display labels around CURRENT',()=>{
   const {fibLevelKey,fibDisplayLayout}=loadFibLayoutHarness();
   const levels=buildFibLevels(9.968,12.005,'UP');

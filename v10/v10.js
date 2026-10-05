@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r114';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r114';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r114';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r114';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r114';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r114';
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r115';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r115';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r115';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r115';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r115';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r115';
 // MERIDIAN v10 r113 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r114';
+const BUILD='10.0-r115';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -24,6 +24,8 @@ function readUiContext(){
 }
 const savedUiContext=readUiContext();
 const fibUi={symbol:savedUiContext.fibSymbol,window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};
+const fibAutoContext=new Map();
+let fibRunSeq=0;
 const skLabUi={symbol:'BTC',days:180,running:false,result:null,stability:null,gate:null,error:null,range:null};
 const skV2Ui={days:730,running:false,result:null,error:null,progress:'',completed:0,total:SK_RESEARCH_V2_ASSETS.length};
 const edgeUi={days:1460,running:false,tsmom:null,xsmom:null,error:null,progress:'',completed:0,total:DOCUMENTED_EDGE_ASSETS.length,loadedAssets:[]};
@@ -843,6 +845,20 @@ function marketSignal(i){
 
   return{label:'NEUTRAL',tone:'muted',score:peak,rank:1,confirmed:false};
 }
+function fibNearestContext(levels,currentInput){
+  const current=Number(currentInput);if(!(current>0))return null;
+  const next=adjacentFibLevels(levels,current),rows=[next.above,next.below].filter(x=>x&&Number.isFinite(Number(x.price))&&Number.isFinite(Number(x.ratio)));
+  if(!rows.length)return null;
+  rows.sort((a,b)=>Math.abs(Number(a.price)-current)-Math.abs(Number(b.price)-current)||Number(a.price)-Number(b.price));
+  const level=rows[0];
+  return{f:Number(level.ratio),price:Number(level.price)};
+}
+function fibAutoNear(symbol){
+  const key=String(symbol||'').trim().toUpperCase(),ctx=fibAutoContext.get(key);
+  if(!ctx||ctx.mode!=='AUTO'||!freshTs(ctx.loadedAt))return null;
+  const f=Number(ctx.near?.f),price=Number(ctx.near?.price);
+  return Number.isFinite(f)&&price>0?{f,price}:null;
+}
 function opportunityContext(symbol){
   const i=marketIntel(symbol),sig=marketSignal(i);
   if(!i||!intelFresh(i))return{available:false,score:0,label:'NO FRESH CONTEXT',tone:'muted',signal:sig.label,momentum:'—',fib:'—',reasons:['Frische technische Marktdaten fehlen']};
@@ -860,7 +876,7 @@ function opportunityContext(symbol){
   const p=Number(i.price),e20=Number(i.ema20),e50=Number(i.ema50),bullTrend=p>e20&&e20>e50,bearTrend=p<e20&&e20<e50,dir=sig.label.startsWith('BULL')?1:sig.label.startsWith('BEAR')?-1:0;
   if((dir===1&&bullTrend)||(dir===-1&&bearTrend)){score+=15;reasons.push('Trendstruktur bestätigt Richtung')}
   else if(bullTrend||bearTrend){score+=8;reasons.push('Trendstruktur vorhanden')}
-  const nearPrice=Number(i.near?.price),nearRatio=Number(i.near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null;
+  const near=fibAutoNear(symbol)||i.near,nearPrice=Number(near?.price),nearRatio=Number(near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null;
   if(fibDistance!=null){
     if(fibDistance<=1){score+=15;reasons.push('Nahe relevantem FIB-Level')}
     else if(fibDistance<=2.5){score+=10;reasons.push('FIB-Kontext in Reichweite')}
@@ -1050,19 +1066,23 @@ async function updateFibMap(view){
   const out=$('#fib-output',view);if(!out)return;
   fibUi.symbol=$('#fib-asset',view)?.value||fibUi.symbol;
   fibUi.window=Number($('#fib-window',view)?.value)||fibUi.window||90;
+  const symbol=String(fibUi.symbol||'').trim().toUpperCase(),key=symbol,mode=fibUi.mode,windowSize=fibUi.window,run=++fibRunSeq;
+  fibAutoContext.delete(key);
   out.setAttribute('aria-busy','true');out.innerHTML='<div class="fib-loading">4h-Swings, SK-Zonen und Fib-Level werden berechnet …</div>';
   try{
     const fetchRows=H().marketKlines;
     let rows=null;
     if(typeof fetchRows==='function'){
-      try{rows=await fetchRows('4h',Math.min(300,Math.max(180,fibUi.window+5)),fibUi.symbol)}catch(e){if(fibUi.mode==='AUTO')throw e}
+      try{rows=await fetchRows('4h',Math.min(300,Math.max(180,windowSize+5)),symbol)}
+      catch(e){if(run!==fibRunSeq)return;if(mode==='AUTO')throw e}
     }
+    if(run!==fibRunSeq)return;
     const swingRows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x?.closeTime)>0&&Number(x.closeTime)<Date.now()-1000);if(rows?.source)swingRows.source=rows.source;
     let low,high,direction,bars=0,source='MANUAL';
-    if(fibUi.mode==='AUTO'){
+    if(mode==='AUTO'){
       if(!swingRows.length)throw new Error('Keine geschlossenen 4h-Kerzen verfügbar');
-      const sw=detectSwing(swingRows,fibUi.window);
-      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+fibUi.window+'×4h CLOSED · '+(swingRows.source||'PUBLIC FUTURES');
+      const sw=detectSwing(swingRows,windowSize);
+      low=sw.low;high=sw.high;bars=sw.bars;direction=sw.direction;source='AUTO '+windowSize+'×4h CLOSED · '+(swingRows.source||'PUBLIC FUTURES');
       fibUi.autoLow=low;fibUi.autoHigh=high;fibUi.lastDirection=direction;
     }else{
       low=fibParse($('#fib-low',view)?.value??fibUi.manualLow);
@@ -1073,18 +1093,25 @@ async function updateFibMap(view){
     }
     if(!(low>0&&high>0&&high>low))throw new Error('Swing High muss über Swing Low liegen');
     let current=rows?.length?Number(rows.at(-1)?.close):null;
-    if(!(current>0))current=marketPrice(fibUi.symbol).value;
+    if(!(current>0))current=marketPrice(symbol).value;
     if(!(current>0))throw new Error('Aktueller Marktpreis fehlt');
     const levels=buildFibLevels(low,high,direction);
+    const autoNear=mode==='AUTO'?fibNearestContext(levels,current):null;
+    if(run!==fibRunSeq)return;
+    if(autoNear)fibAutoContext.set(key,{mode:'AUTO',near:autoNear,loadedAt:Date.now(),source});
     let doubleAdvantage=null;
-    if(fibUi.mode==='AUTO'&&swingRows.length){
-      const parent=detectSwing(swingRows,fibUi.window),child=detectOpposingChildSwing(swingRows,parent,fibUi.window);
+    if(mode==='AUTO'&&swingRows.length){
+      const parent=detectSwing(swingRows,windowSize),child=detectOpposingChildSwing(swingRows,parent,windowSize);
       if(child)doubleAdvantage=skDoubleAdvantage(parent,child);
     }
-    out.innerHTML=fibResultHtml({symbol:fibUi.symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
+    if(run!==fibRunSeq)return;
+    out.innerHTML=fibResultHtml({symbol,low,high,direction,current,levels,source,bars,doubleAdvantage});
   }catch(e){
+    if(run!==fibRunSeq)return;
     out.innerHTML='<div class="fib-error"><b>FIB NICHT VERFÜGBAR</b><small>'+esc(e?.message||e)+'</small></div>';
-  }finally{out.setAttribute('aria-busy','false')}
+  }finally{
+    if(run===fibRunSeq){out.setAttribute('aria-busy','false');refreshForecastFocus(view)}
+  }
 }
 function refreshForecastFocus(view){
   const old=$('.forecast-focus',view);if(old)old.outerHTML=forecastContextHtml(fibUi.symbol);
