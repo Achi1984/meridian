@@ -7,10 +7,12 @@ on:
       - "research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json"
       - "research/cross-venue-funding-edge-v2.js"
       - "research/cross-venue-funding-edge-v2-data-contract.js"
+      - "research/cross-venue-funding-edge-v2-source-gate.js"
       - "research/cross-venue-funding-edge-v2-stage-lock.js"
       - "scripts/collect-cross-venue-funding-edge-v2-source.mjs"
       - "test/cross-venue-funding-edge-v2.test.js"
       - "test/cross-venue-funding-edge-v2-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v2-source-gate.test.js"
       - "test/cross-venue-funding-edge-v2-collector.test.js"
       - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
       - ".github/workflows/cross-venue-funding-edge-v2-source.yml"
@@ -22,10 +24,12 @@ on:
       - "research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json"
       - "research/cross-venue-funding-edge-v2.js"
       - "research/cross-venue-funding-edge-v2-data-contract.js"
+      - "research/cross-venue-funding-edge-v2-source-gate.js"
       - "research/cross-venue-funding-edge-v2-stage-lock.js"
       - "scripts/collect-cross-venue-funding-edge-v2-source.mjs"
       - "test/cross-venue-funding-edge-v2.test.js"
       - "test/cross-venue-funding-edge-v2-data-contract.test.js"
+      - "test/cross-venue-funding-edge-v2-source-gate.test.js"
       - "test/cross-venue-funding-edge-v2-collector.test.js"
       - "test/cross-venue-funding-edge-v2-stage-lock.test.js"
       - ".github/workflows/cross-venue-funding-edge-v2-source.yml"
@@ -44,6 +48,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       source_audit: ${{ steps.stage.outputs.source_audit }}
+      source_gate: ${{ steps.gate.outputs.source_gate }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,17 +78,46 @@ jobs:
         run: |
           ! grep -E "profitFactor|expectancy|netPnl|runCrossVenue|discoveryResult|holdoutResult" \
             scripts/collect-cross-venue-funding-edge-v2-source.mjs
+      - name: Frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
       - name: Read V2 source-audit lock
         id: stage
         run: |
           node --input-type=module -e "import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK as x} from './research/cross-venue-funding-edge-v2-stage-lock.js'; console.log('source_audit='+(x.sourceAudit===true?'true':'false'))" >> "$GITHUB_OUTPUT"
+      - name: Compute V2 source gate
+        id: gate
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {v2SourceCollectionGate} from './research/cross-venue-funding-edge-v2-source-gate.js';
+          import {CROSS_VENUE_FUNDING_EDGE_V2_STAGE_LOCK as stageLock} from './research/cross-venue-funding-edge-v2-stage-lock.js';
+
+          const parse=(path,label)=>{
+            try{return JSON.parse(fs.readFileSync(path,'utf8'))}
+            catch(error){throw new Error('CROSS_VENUE_V2_SOURCE_GATE_INVALID_STATE:'+label+'_JSON_PARSE',{cause:error})}
+          };
+          const evaluationPath='research/cross-venue-funding-edge-v2-source-evaluation.json';
+          const evaluation=fs.existsSync(evaluationPath)?parse(evaluationPath,'EVALUATION'):null;
+          const resume=parse('MERIDIAN_RESUME.json','RESUME');
+          const agent=parse('MERIDIAN_AGENT_STATE.json','AGENT_STATE');
+          const state=v2SourceCollectionGate({
+            stageLock,
+            evaluation,
+            resumeV2:resume?.canonicalResearch?.crossVenueFundingEdgeV2,
+            agentCheckpoint:agent?.researchCheckpoint
+          });
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'source_gate='+state+'\n');
+          console.log('V2 source gate:',state);
+          NODE
       - name: Report source gate state
         run: |
-          echo "PR runs validate invariants only. Source collection is main-only and additionally requires sourceAudit=true."
+          echo "sourceAudit=${{ steps.stage.outputs.source_audit }}"
+          echo "sourceGate=${{ steps.gate.outputs.source_gate }}"
+          echo "PR runs always validate invariants only. Main source collection is allowed only for COLLECT_CANONICAL_SOURCE."
 
   source:
     name: source collection (main-only, stage-gated)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.invariants.outputs.source_audit == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.invariants.outputs.source_gate == 'COLLECT_CANONICAL_SOURCE'
     needs: invariants
     runs-on: ubuntu-latest
     timeout-minutes: 45
