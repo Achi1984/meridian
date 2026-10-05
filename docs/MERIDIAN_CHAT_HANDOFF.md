@@ -10,7 +10,7 @@ Updated: **2026-10-05**
 - Strategy PnL: **not calculated / not authorized**
 
 - Build: **10.0-r113**
-- Verified main checkpoint: **d4a628fee5cf527e0218b99635d80b9cd91bd0ad**
+- Verified main checkpoint: **dfa8b5e63afa74d28e21670cd9cbab0ae36a7e92**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
