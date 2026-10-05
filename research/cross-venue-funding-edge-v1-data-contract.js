@@ -16,11 +16,12 @@ export const CROSS_VENUE_FUNDING_EDGE_V1_SOURCE=Object.freeze({
   })
 });
 
-const finite=x=>Number.isFinite(Number(x));
+const strictNum=x=>(typeof x==='number'||(typeof x==='string'&&x.trim()!==''))?Number(x):NaN;
+const finite=x=>Number.isFinite(strictNum(x));
 const hash=x=>crypto.createHash('sha256').update(typeof x==='string'?x:JSON.stringify(x)).digest('hex');
 
 export function canonicalFundingTime(value,contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
-  const t=Number(value);
+  const t=strictNum(value);
   if(!Number.isFinite(t))return null;
   const h=contract.markIntervalMs;
   const canonical=Math.round(t/h)*h;
@@ -29,22 +30,22 @@ export function canonicalFundingTime(value,contract=CROSS_VENUE_FUNDING_EDGE_V1_
 
 export function normalizeFunding(rows=[],venue,contract=CROSS_VENUE_FUNDING_EDGE_V1_SOURCE){
   return (rows||[]).map(x=>{
-    const rawTime=Number(x?.fundingTime??x?.fundingRateTimestamp??x?.time??x?.ts);
-    const rate=Number(x?.fundingRate??x?.rate);
+    const rawTime=strictNum(x?.fundingTime??x?.fundingRateTimestamp??x?.time??x?.ts);
+    const rate=strictNum(x?.fundingRate??x?.rate);
     return{venue,rawTime,time:canonicalFundingTime(rawTime,contract),rate};
   }).sort((a,b)=>a.rawTime-b.rawTime);
 }
 
 export function normalizeMarks(rows=[],venue){
   return (rows||[]).map(x=>{
-    if(Array.isArray(x))return{venue,openTime:Number(x[0]),open:Number(x[1]),high:Number(x[2]),low:Number(x[3]),close:Number(x[4])};
+    if(Array.isArray(x))return{venue,openTime:strictNum(x[0]),open:strictNum(x[1]),high:strictNum(x[2]),low:strictNum(x[3]),close:strictNum(x[4])};
     return{
       venue,
-      openTime:Number(x?.openTime??x?.startTime??x?.time??x?.t??x?.ts),
-      open:Number(x?.open??x?.openPrice??x?.o),
-      high:Number(x?.high??x?.highPrice??x?.h),
-      low:Number(x?.low??x?.lowPrice??x?.l),
-      close:Number(x?.close??x?.closePrice??x?.c)
+      openTime:strictNum(x?.openTime??x?.startTime??x?.time??x?.t??x?.ts),
+      open:strictNum(x?.open??x?.openPrice??x?.o),
+      high:strictNum(x?.high??x?.highPrice??x?.h),
+      low:strictNum(x?.low??x?.lowPrice??x?.l),
+      close:strictNum(x?.close??x?.closePrice??x?.c)
     };
   }).sort((a,b)=>a.openTime-b.openTime);
 }
