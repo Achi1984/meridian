@@ -73,22 +73,38 @@ function latestBinanceMarkTs(csv){
   return Math.max(...lines.map(line=>strictTs(line.split(',')[0],'BINANCE_MARK')));
 }
 function dayStamp(ms){return new Date(ms).toISOString().slice(0,10)}
-async function latestBinanceDaily(kind){
-  const today=Math.floor(Date.now()/(24*HOUR))*24*HOUR;
-  for(let back=1;back<=14;back++){
-    const ds=dayStamp(today-back*24*HOUR);
-    const stem=kind==='funding'?'BTCUSDT-fundingRate-'+ds:'BTCUSDT-1h-'+ds;
+async function latestBinanceMonthly(kind){
+  const now=new Date();
+  for(let off=0;off<4;off++){
+    const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-off,1));
+    const ym=d.toISOString().slice(0,7);
+    const stem=kind==='funding'?'BTCUSDT-fundingRate-'+ym:'BTCUSDT-1h-'+ym;
     const rel=kind==='funding'
-      ?'data/futures/um/daily/fundingRate/BTCUSDT/'+stem+'.zip'
-      :'data/futures/um/daily/markPriceKlines/BTCUSDT/1h/'+stem+'.zip';
+      ?'data/futures/um/monthly/fundingRate/BTCUSDT/'+stem+'.zip'
+      :'data/futures/um/monthly/markPriceKlines/BTCUSDT/1h/'+stem+'.zip';
     try{
       const a=await binanceZip(rel,stem+'.zip');
-      return{time:kind==='funding'?latestBinanceFundingTs(a.csv):latestBinanceMarkTs(a.csv),receipt:{scope:'daily',date:ds,rel:a.rel,sha256:a.sha256}};
+      return{time:kind==='funding'?latestBinanceFundingTs(a.csv):latestBinanceMarkTs(a.csv),receipt:{scope:'monthly',month:ym,rel:a.rel,sha256:a.sha256}};
     }catch(e){
       if(!String(e&&e.message||'').includes('HTTP 404'))throw e;
     }
   }
-  throw new Error('BINANCE_'+kind.toUpperCase()+'_RECENT_ARCHIVE_NOT_FOUND');
+  throw new Error('BINANCE_'+kind.toUpperCase()+'_MONTHLY_ARCHIVE_NOT_FOUND');
+}
+async function latestBinanceDailyMark(){
+  const today=Math.floor(Date.now()/(24*HOUR))*24*HOUR;
+  for(let back=1;back<=14;back++){
+    const ds=dayStamp(today-back*24*HOUR);
+    const stem='BTCUSDT-1h-'+ds;
+    const rel='data/futures/um/daily/markPriceKlines/BTCUSDT/1h/'+stem+'.zip';
+    try{
+      const a=await binanceZip(rel,stem+'.zip');
+      return{time:latestBinanceMarkTs(a.csv),receipt:{scope:'daily',date:ds,rel:a.rel,sha256:a.sha256}};
+    }catch(e){
+      if(!String(e&&e.message||'').includes('HTTP 404'))throw e;
+    }
+  }
+  return latestBinanceMonthly('marks');
 }
 function stableOkxMarketData(data){
   return (Array.isArray(data)?data:[]).map(x=>{const y={...(x||{})};delete y.ts;return y});
@@ -145,7 +161,7 @@ async function latestOkxConfirmedMark(){
 function scheduledAtOrBefore(ms){return Math.floor(ms/FUNDING)*FUNDING}
 
 requirePrecontractState();
-const all=await Promise.all([latestBinanceDaily('funding'),latestBinanceDaily('marks'),latestOkxFundingArchive(),latestOkxConfirmedMark()]);
+const all=await Promise.all([latestBinanceMonthly('funding'),latestBinanceDailyMark(),latestOkxFundingArchive(),latestOkxConfirmedMark()]);
 const bf=all[0],bm=all[1],of=all[2],om=all[3];
 const fundingCoverageEnd=Math.min(bf.time,of.time);
 const markCoverageEnd=Math.min(bm.time,om.time);
