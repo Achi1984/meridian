@@ -1144,7 +1144,15 @@
       "holdoutAuthorized": false,
       "strategyPnlAuthorized": false,
       "executionImpact": false,
-      "nextRequiredGate": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_ON_EXACT_REVIEWED_HEAD"
+      "nextRequiredGate": "FREEZE_V2_IMPLEMENTATION_AND_SOURCE_CONTRACT_ON_EXACT_REVIEWED_HEAD",
+      "requiredImplementationGuards": [
+        "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
+        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with ±1s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
+        "If a position is open when degradation begins, any off-grid funding settlement or missing/unconfirmed required 1h mark in the same degradation episode makes the affected run/stage INCONCLUSIVE even if a provisional model exit was identified.",
+        "If V2 reuses cross-venue-funding-edge-v1.js, replace coercive numeric validation with strict numeric handling and regression tests.",
+        "Binance/OKX collector parsers must reject blank/non-numeric cells instead of Number() coercion.",
+        "The V2 collector must itself reject execution unless the V2 stage lock explicitly has sourceAudit:true."
+      ]
     }
   },
   "nonCanonicalResearch": [
@@ -1158,7 +1166,7 @@
     255,
     256
   ],
-  "nextAction": "After the reviewed V1-close/V2-preregistration PR merges, create a separate CROSS-VENUE-FUNDING-EDGE-V2 implementation/source-contract PR. Freeze exact source boundaries, deterministic integrity-event construction, source receipts and regression tests before any V2 source audit. V2 Source Audit and all strategy PnL remain unauthorized until that exact-head PR is CI-green and receives Claude GREEN LIGHT.",
+  "nextAction": "After the reviewed V1-close/V2-preregistration PR merges, create a separate CROSS-VENUE-FUNDING-EDGE-V2 implementation/source-contract PR. Freeze fundingCoverageEnd, markCoverageEnd, the t+26h decision-window rule, fixed 00/08/16 UTC funding schedules, deterministic degradation-episode semantics, strict numeric parsing and a collector self-check of sourceAudit:true. Prove the preregistered regression cases before any V2 source audit. V2 Source Audit and all strategy PnL remain unauthorized until that exact-head PR is CI-green and receives Claude GREEN LIGHT.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
