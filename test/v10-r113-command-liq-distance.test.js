@@ -24,7 +24,7 @@ test('r113 compact Command risk card exposes liquidation price current price buf
   assert.match(block,/LIQ BUFFER/);
   assert.match(block,/STAGE/);
   assert.match(block,/unavailable/);
-  assert.match(block,/smallest verified live buffer/);
+  assert.match(block,/smallest verified buffer/);
 });
 
 test('r113 reuses the existing three-step liquidation tone ladder',()=>{
