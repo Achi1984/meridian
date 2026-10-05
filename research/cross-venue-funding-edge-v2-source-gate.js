@@ -73,6 +73,8 @@ export function v2SourceCollectionGate({stageLock,evaluation,resumeV2,agentCheck
   if(!isObj(stageLock))invalid('STAGE_LOCK_MISSING');
   if(stageLock.ruleset!==RULESET)invalid('STAGE_LOCK_RULESET');
   if(typeof stageLock.sourceAudit!=='boolean')invalid('STAGE_LOCK_SOURCE_AUDIT_TYPE');
+  if(!isObj(resumeV2))invalid('RESUME_V2_MISSING');
+  if(!isObj(agentCheckpoint))invalid('AGENT_CHECKPOINT_MISSING');
 
   const hasEvaluation=evaluation!==null&&evaluation!==undefined;
   if(hasEvaluation){
