@@ -1,18 +1,26 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 runner implementation reviewed/frozen at SOURCE_AUDIT; Event-Builder design review next; no PnL**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 synthetic Source→Builder→Runner Adapter→Strategy/Driver reviewed/frozen at SOURCE_AUDIT; canonical execution/Discovery locked; no PnL**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
-- Runner implementation: **merged/frozen/reviewed; CV2-RUNNER-IMPL-R2 GREEN LIGHT**
+- V2 source collection seal: **merged/reviewed via #545; automatic recollection after final evaluation is fail-closed**
+- Exit-fill runner integrity fix: **merged/reviewed via #546**
+- Causal Event Builder PR1: **merged/reviewed/frozen via #547; synthetic-only**
+- Structural Runner Adapter: **merged/reviewed/frozen via #548; entryActive remains false structurally**
+- Strategy Adapter + causal Driver: **merged/reviewed/frozen via #549; Claude CV2-STRATEGY-DRIVER-PR2-IMPL-R3 GREEN LIGHT**
+- Claude mailbox bridge: **merged via #550; reviewer-only Issue #539 loop active**
+- Terminal UI: **r114 #551 + r115 #552 merged; post-merge Release Safety / Visual QA / Runtime Smoke / Release Coordinator / Pages GREEN**
 - V2 stage remains: **SOURCE_AUDIT**; Discovery / Validation / Holdout / Paper / Live: **LOCKED**
+- Canonical Source→Events→Strategy→Runner execution: **not authorized**
 - Strategy PnL: **not calculated / not authorized**
-- Diagnostic V2 source confirmation: **Run 37299638135; receipt identical; canonical lineage unchanged**
-- Next gate: **pre-implementation Claude review of canonical Source→Runner event builder**
+- Canonical source lineage remains run **37290831222**, receipt **822a42728e8f9c1da61059eb31d10fea9771adac34042dfede6fa9f3e63845d5**
+- Next research gate: **explicit user authorization + separate exact-head Claude review before canonical V2 execution or Discovery**
+- Secondary Funding-Carry Candidate A: **PASS_TO_DATA_DESIGN_SCOPED only; no data-design run authorized**
 
-- Build: **10.0-r113**
-- Verified main checkpoint: **f188fe5af0eba4e486f6ec9193f0a8b7f6a3f530**
+- Build: **10.0-r115**
+- Verified main checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -24,7 +32,7 @@ Updated: **2026-10-05**
 - Execution impact: **false**
 - Paper/live authorization: **false**
 
-Repository state remains the source of truth. Reconcile latest merged `main`, CI, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, and related PRs before any mutation.
+Repository state remains the source of truth. Before every Meridian step, read Issue #539 first; then reconcile latest merged `main`, CI, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, and related PRs before any mutation.
 
 ## Quarter-Hour data lineage
 
