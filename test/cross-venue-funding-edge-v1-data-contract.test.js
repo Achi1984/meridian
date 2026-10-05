@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseOkxFundingCsv} from '../scripts/collect-cross-venue-funding-edge-v1-source.mjs';
+import {parseOkxFundingCsv,stableOkxReceiptPayload} from '../scripts/collect-cross-venue-funding-edge-v1-source.mjs';
 import {
   CROSS_VENUE_FUNDING_EDGE_V1_SOURCE as BASE,
   canonicalFundingTime,normalizeFunding,normalizeMarks,commonFundingTimes,
@@ -128,4 +128,13 @@ test('OKX funding archive parser accepts only the verified official header schem
   assert.deepEqual(parseOkxFundingCsv('\uFEFF'+csv),parseOkxFundingCsv(csv));
   assert.throws(()=>parseOkxFundingCsv('symbol,rate,time\nBTC-USDT-SWAP,0.1,1\n'),/OKX_FUNDING_ARCHIVE_SCHEMA/);
   assert.throws(()=>parseOkxFundingCsv('instrument_name,funding_rate,funding_time\nETH-USDT-SWAP,0.1,1\n'),/OKX_FUNDING_ARCHIVE_SCHEMA/);
+});
+
+
+test('OKX historical funding query receipt excludes dynamic response timestamp',()=>{
+  const endpoint='/api/v5/public/market-data-history';
+  const a=[{ts:'100',dateAggrType:'monthly',totalSizeMB:'0',details:[{instFamily:'BTC-USDT'}]}];
+  const b=[{ts:'999',dateAggrType:'monthly',totalSizeMB:'0',details:[{instFamily:'BTC-USDT'}]}];
+  assert.deepEqual(stableOkxReceiptPayload(endpoint,a),stableOkxReceiptPayload(endpoint,b));
+  assert.deepEqual(stableOkxReceiptPayload('/api/v5/market/history-mark-price-candles',[['1','2']]),[['1','2']]);
 });
