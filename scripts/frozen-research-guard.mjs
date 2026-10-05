@@ -18,7 +18,7 @@ export const FROZEN_RESEARCH_BLOBS=Object.freeze({
   'scripts/collect-cross-venue-funding-edge-v2-source.mjs':'b6b66f5c36f5e3b52f4b45ca7cb33e794a64da7e',
   'test/cross-venue-funding-edge-v2.test.js':'00ec014e9ce24b5f02d1b2f437300af3a9dcadfd',
   'test/cross-venue-funding-edge-v2-data-contract.test.js':'32ea6f68f3da34379d78c8977cade8cf2fd42a1d',
-  'test/cross-venue-funding-edge-v2-collector.test.js':'b0fe85d393d3baea914f8b9f88039f0ad6e447ba',
+  'test/cross-venue-funding-edge-v2-collector.test.js':'d9ee431eae1a7f4bcc8419bfe56852e4acdb601c',
   '.github/workflows/cross-venue-funding-edge-v2-source.yml':'c322791646ea6b308ddab79912a030f9ff64699b',
   'research/PAPER-EDGE-V1-DISCOVERY-DECISION.md':'6221e3fd9645a7f1bd577b98c46662974127f070',
   'research/paper-edge-v1-discovery-decision.json':'1a3d082b8c0ef85cb0fd5a773d029026818e3e9f',
