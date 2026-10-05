@@ -271,7 +271,7 @@ function applyEvent(s,event,trace,recoveryContext){
   }
 
   if(event.kind==='INTEGRITY_DETECTION'){
-    if(s.status===V2_RUNNER_STATES.FLAT_ELIGIBLE){
+    if([V2_RUNNER_STATES.FLAT_ELIGIBLE,V2_RUNNER_STATES.DEGRADED_FLAT].includes(s.status)){
       if(s.lastExitFillTime===event.time){
         terminalize(s,event,trace);
         return;
@@ -284,7 +284,11 @@ function applyEvent(s,event,trace,recoveryContext){
         terminalize(s,event,trace,'EXIT_FILL_DATA_DEGRADATION','EXIT_FILL_DATA_DEGRADATION');
         return;
       }
-      degradeFlat(s,event,trace);
+      if(s.status===V2_RUNNER_STATES.FLAT_ELIGIBLE){
+        degradeFlat(s,event,trace);
+      }else{
+        degradeFlat(s,event,trace,'DEGRADATION_RESET');
+      }
       return;
     }
     if(s.status===V2_RUNNER_STATES.ENTRY_PENDING){
@@ -297,10 +301,6 @@ function applyEvent(s,event,trace,recoveryContext){
     }
     if([V2_RUNNER_STATES.POSITION_OPEN,V2_RUNNER_STATES.EXIT_PENDING].includes(s.status)){
       terminalize(s,event,trace);
-      return;
-    }
-    if(s.status===V2_RUNNER_STATES.DEGRADED_FLAT){
-      degradeFlat(s,event,trace,'DEGRADATION_RESET');
       return;
     }
     fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');
