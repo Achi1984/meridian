@@ -12,6 +12,7 @@ const T=Date.parse('2026-01-01T00:00:00.000Z');
 function syntheticCycle({
   entryTime=T,
   exitTime=T+16*H,
+  exitDecisionTime=exitTime-H,
   binanceSide='LONG',
   okxSide='SHORT',
   binanceEntry=100,
@@ -25,8 +26,8 @@ function syntheticCycle({
   const fills=[
     {venue:'BINANCE',side:binanceSide,qty:bq,markOpen:binanceEntry,time:entryTime,feeBps:5,slipBps},
     {venue:'OKX',side:okxSide,qty:oq,markOpen:okxEntry,time:entryTime,feeBps:5,slipBps},
-    {venue:'BINANCE',side:binanceSide,qty:bq,markOpen:binanceExit,time:exitTime,feeBps:5,slipBps},
-    {venue:'OKX',side:okxSide,qty:oq,markOpen:okxExit,time:exitTime,feeBps:5,slipBps}
+    {venue:'BINANCE',side:binanceSide,qty:bq,markOpen:binanceExit,time:exitTime,exitDecisionTime,feeBps:5,slipBps},
+    {venue:'OKX',side:okxSide,qty:oq,markOpen:okxExit,time:exitTime,exitDecisionTime,feeBps:5,slipBps}
   ];
   const marks=[];
   const steps=(exitTime-entryTime)/H;
@@ -152,4 +153,65 @@ test('hourly mark gaps and unpaired marks fail closed before ledger construction
   const x=syntheticCycle();
   x.marks=x.marks.filter(m=>!(m.venue==='OKX'&&m.time===T+5*H));
   assert.throws(()=>buildV2EventSourcedLedger(x),/UNPAIRED_LEDGER_MARK/);
+});
+
+
+test('R2 ledger excludes funding at exitFill when exitDecision is earlier',()=>{
+  const entry=T+9*H,exitDecisionTime=T+15*H,exitTime=T+16*H;
+  const x=syntheticCycle({
+    entryTime:entry,exitDecisionTime,exitTime,
+    funding:[
+      {venue:'BINANCE',time:exitTime,rate:.001,fundingMark:100},
+      {venue:'OKX',time:exitTime,rate:.002,fundingMark:100}
+    ]
+  });
+  const ledger=buildV2EventSourcedLedger(x);
+  assert.equal(ledger.events.filter(e=>e.kind==='FUNDING').length,0);
+  assert.equal(ledger.events.filter(e=>e.kind==='FUNDING_OUT_OF_WINDOW').length,2);
+  assert.equal(ledger.closingEquity-ledger.openingEquity,-37);
+  assert.equal(reconcileLedger({ledger,decomposition:{fundingCashflows:[],basisPnlUsd:0,costsUsd:37}}).ok,true);
+});
+
+test('R2 ledger books funding exactly at exitDecision',()=>{
+  const entry=T+9*H,exitDecisionTime=T+16*H,exitTime=T+17*H;
+  const x=syntheticCycle({
+    entryTime:entry,exitDecisionTime,exitTime,
+    funding:[
+      {venue:'BINANCE',time:exitDecisionTime,rate:.001,fundingMark:100},
+      {venue:'OKX',time:exitDecisionTime,rate:.002,fundingMark:100}
+    ]
+  });
+  const ledger=buildV2EventSourcedLedger(x);
+  const rows=ledger.events.filter(e=>e.kind==='FUNDING');
+  assert.equal(rows.length,2);
+  assert.equal(rows.find(e=>e.venue==='BINANCE').cashDelta,-10);
+  assert.equal(rows.find(e=>e.venue==='OKX').cashDelta,20);
+  assert.equal(ledger.closingEquity-ledger.openingEquity,-27);
+  assert.equal(reconcileLedger({ledger,decomposition:{fundingCashflows:[-10,20],basisPnlUsd:0,costsUsd:37}}).ok,true);
+});
+
+test('R2 ledger books funding strictly between entry and exitDecision',()=>{
+  const entry=T+9*H,settlement=T+12*H,exitDecisionTime=T+15*H,exitTime=T+16*H;
+  const x=syntheticCycle({
+    entryTime:entry,exitDecisionTime,exitTime,
+    funding:[{venue:'BINANCE',time:settlement,rate:.001,fundingMark:100}]
+  });
+  const ledger=buildV2EventSourcedLedger(x);
+  assert.equal(ledger.events.filter(e=>e.kind==='FUNDING').length,1);
+  assert.equal(ledger.events.find(e=>e.kind==='FUNDING').cashDelta,-10);
+});
+
+test('R2 ledger requires a strict exitDecisionTime on both close fills',()=>{
+  const missing=syntheticCycle();
+  delete missing.fills[2].exitDecisionTime;
+  assert.throws(()=>buildV2EventSourcedLedger(missing),/INVALID_EXIT_DECISION_TIME/);
+
+  const bad=syntheticCycle();
+  bad.fills[2].exitDecisionTime=bad.fills[2].time;
+  bad.fills[3].exitDecisionTime=bad.fills[3].time;
+  assert.throws(()=>buildV2EventSourcedLedger(bad),/INVALID_EXIT_DECISION_TIME/);
+
+  const mismatch=syntheticCycle();
+  mismatch.fills[2].exitDecisionTime-=H;
+  assert.throws(()=>buildV2EventSourcedLedger(mismatch),/INVALID_EXIT_DECISION_TIME/);
 });
