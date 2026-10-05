@@ -247,15 +247,46 @@ function readinessGapExplained(readiness,t,integrityEvents,contract){
   return true;
 }
 
-function slotEvent(time,bounds,validatedSource,integrityEvents){
-  const {normalized,contract}=validatedSource;
+function rowGroups(rows,key){
+  const out=new Map();
+  for(const row of rows){
+    const value=row[key];
+    if(!Number.isFinite(value))continue;
+    if(!out.has(value))out.set(value,[]);
+    out.get(value).push(row);
+  }
+  return out;
+}
+
+function readinessIndexes(validatedSource){
+  const {normalized}=requireValidated(validatedSource);
+  return Object.freeze({
+    binanceFunding:rowGroups(normalized.binanceFunding,'time'),
+    okxFunding:rowGroups(normalized.okxFunding,'time'),
+    binanceMarks:rowGroups(normalized.binanceMarks,'openTime'),
+    okxMarks:rowGroups(normalized.okxMarks,'openTime')
+  });
+}
+
+function rowsForTimes(index,times){
+  return times.flatMap(time=>index.get(time)||[]);
+}
+
+function slotEvent(time,bounds,validatedSource,integrityEvents,indexes){
+  const {contract}=validatedSource;
   const t=strictTime(time);
+  const requiredFunding=[
+    t-2*contract.fundingIntervalMs,
+    t-contract.fundingIntervalMs,
+    t
+  ];
+  const requiredMark=t-contract.markIntervalMs;
   const readiness=entryInputsReady({
     decisionTime:t,
-    binanceFunding:normalized.binanceFunding,
-    okxFunding:normalized.okxFunding,
-    binanceMarks:normalized.binanceMarks,
-    okxMarks:normalized.okxMarks,
+    binanceFunding:rowsForTimes(indexes.binanceFunding,requiredFunding),
+    okxFunding:rowsForTimes(indexes.okxFunding,requiredFunding),
+    binanceMarks:indexes.binanceMarks.get(requiredMark)||[],
+    okxMarks:indexes.okxMarks.get(requiredMark)||[],
     activeDegradation:false
   },contract);
   const initialWindowEnd=Date.parse(contract.rawStart)+2*contract.fundingIntervalMs;
@@ -333,8 +364,9 @@ function causalIntegrityEvents(validatedSource,bounds){
 }
 
 function eventCore(validatedSource,bounds){
-  const {normalized,common,contract}=requireValidated(validatedSource);
+  const {normalized,common}=requireValidated(validatedSource);
   const events=[];
+  const indexes=readinessIndexes(validatedSource);
 
   for(const [venue,rows] of [
     ['BINANCE',normalized.binanceFunding],
@@ -350,7 +382,7 @@ function eventCore(validatedSource,bounds){
   events.push(...integrityEvents);
 
   for(const time of common){
-    if(time<=bounds.streamEnd)events.push(slotEvent(time,bounds,validatedSource,integrityEvents,contract));
+    if(time<=bounds.streamEnd)events.push(slotEvent(time,bounds,validatedSource,integrityEvents,indexes));
   }
 
   events.sort(compareBuilderEvents);
