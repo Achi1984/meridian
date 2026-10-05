@@ -153,6 +153,17 @@ async function collectBinance(){
   };
 }
 
+export function stableOkxReceiptPayload(endpoint,data){
+  if(endpoint==='/api/v5/public/market-data-history'&&Array.isArray(data)){
+    return data.map(x=>{
+      const y={...(x||{})};
+      delete y.ts;
+      return y;
+    });
+  }
+  return data??null;
+}
+
 async function okxJson(endpoint,params){
   const u=new URL(OKX_API+endpoint);
   for(const [k,v] of Object.entries(params))if(v!=null)u.searchParams.set(k,String(v));
@@ -161,7 +172,7 @@ async function okxJson(endpoint,params){
   if(String(json?.code)!=='0')throw new Error('OKX_API '+json?.code+' '+json?.msg);
   return{
     json,
-    receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(json?.data??null))}
+    receipt:{endpoint,params:Object.fromEntries([...u.searchParams]),sha256:sha256(JSON.stringify(stableOkxReceiptPayload(endpoint,json?.data)))}
   };
 }
 
