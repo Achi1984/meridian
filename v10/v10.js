@@ -1,12 +1,12 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r112';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r112';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r112';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r112';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r112';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r112';
-// MERIDIAN v10 r112 — isolated presentation/command adapter over the validated v9 engine.
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r113';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r113';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r113';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r113';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r113';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r113';
+// MERIDIAN v10 r113 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r112';
+const BUILD='10.0-r113';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -203,6 +203,31 @@ function legRow(b){
   const mp=marketPrice(b.symbol),range=botRangeState(b,mp),type=botTypeLabel(b),grids=Number(b.grids),rangeText=range.available?precisePrice(b.lower)+' — '+precisePrice(b.upper):'—',rangeTone=!range.positionFresh?'muted':range.inRange?'safe':'watch',marker=range.positionFresh?'<i style="--range-pos:'+range.positionPct.toFixed(1)+'%"></i>':'';
   return '<div class="pair-leg '+((b.side||'LONG')==='SHORT'?'leg-short':'leg-long')+'"><div class="leg-head"><strong>'+(b.side||'LONG')+' · '+(b.leverage||'—')+'x</strong><span>'+esc(type)+(grids>0?' · '+Math.round(grids)+' GRIDS':'')+'</span></div><div class="leg-range"><div><span>RANGE</span><b>'+rangeText+'</b><small class="tone-'+rangeTone+'">'+esc(range.label)+(range.positionFresh?' · '+range.positionPct.toFixed(0)+'%':'')+'</small></div><div class="leg-range-track">'+marker+'</div></div><div class="leg-grid"><span>CAPITAL USD <b>'+(h.liveInvestUsdAvailable?.(b)?h.money(b.investUsd):'—')+'</b></span><span>PNL USD <b>'+(pnl==null?'—':h.money(pnl))+'</b></span><span>BE <b>'+(Number(b.be)>0?precisePrice(b.be):'—')+'</b></span><span>TP <b>'+(Number(b.tp)>0?precisePrice(b.tp):'—')+'</b></span><span>LIQ <b>'+(Number(b.liq)>0?precisePrice(b.liq):'—')+'</b></span><span>SL <b>'+sl+'</b></span><span>PUFFER <b>'+(r==null?'—':r.toFixed(1)+'%')+'</b></span></div></div>';
 }
+function liquidationStage(buffer){
+  const n=knownNumber(buffer)?Number(buffer):null;
+  if(n==null)return{label:'unavailable',tone:'muted'};
+  if(n<10)return{label:'DANGER',tone:'danger'};
+  if(n<18)return{label:'WATCH',tone:'watch'};
+  return{label:'SAFE',tone:'safe'};
+}
+function criticalLiquidationSnapshot(rows){
+  const h=H(),all=rows||[],total=all.length;
+  if(h.botFeedFresh?.()!==true)return{status:'stale',verified:0,total};
+  const ranked=all.map(b=>{
+    const liq=knownNumber(b?.liq)&&Number(b.liq)>0?Number(b.liq):null,rawCurrent=h.botMarketPrice?.(b),current=knownNumber(rawCurrent)&&Number(rawCurrent)>0?Number(rawCurrent):null,side=String(b?.side||'LONG').toUpperCase(),api=knownNumber(b?.buffer)&&Number(b.buffer)>0&&Number(b.buffer)<100?Number(b.buffer):null;
+    const live=liq!=null&&current!=null?(side==='SHORT'?(liq-current)/current*100:(current-liq)/current*100):null;
+    const buffer=api!=null&&live!=null?Math.min(api,live):(api??live);
+    const bufferSource=api!=null&&live!=null?(live<=api?'LIVE≤API':'API<LIVE'):live!=null?'LIVE':api!=null?'API':null;
+    return{buffer:knownNumber(buffer)?Number(buffer):null,liq,current,side,bufferSource};
+  }).filter(x=>x.buffer!=null&&x.liq!=null&&x.current!=null).sort((a,b)=>a.buffer-b.buffer);
+  if(!ranked.length)return{status:'unavailable',verified:0,total};
+  const x=ranked[0],verified=ranked.length,stage=liquidationStage(x.buffer);
+  return{status:'ok',buffer:x.buffer,liq:x.liq,current:x.current,stage,side:x.side||'BOT',bufferSource:x.bufferSource||'LIVE',verified,total,partial:verified<total};
+}
+function liquidationDisplayState(rows){
+  const snap=criticalLiquidationSnapshot(rows),ok=snap?.status==='ok',verified=(snap?.verified??0)+'/'+(snap?.total??(rows||[]).length)+' bots verified';
+  return{ok,tone:ok?snap.stage.tone:'muted',liq:ok?snap.liq:null,current:ok?snap.current:null,buffer:ok?snap.buffer:null,stage:ok?snap.stage.label:'unavailable',source:snap?.status==='stale'?'bot feed stale':ok?(snap.side+' · smallest verified buffer · '+snap.bufferSource+(snap.partial?' · partial':'')+' · '+verified):(verified+' · unavailable')};
+}
 function pairCard(symbol,compact=false,open=false,assetLink=false){
   const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
   if(!fresh&&!compact)return '';
@@ -212,7 +237,8 @@ function pairCard(symbol,compact=false,open=false,assetLink=false){
   const hedge=longUsd>0&&shortUsd!=null?shortUsd/longUsd*100:null,net=longUsd!=null&&shortUsd!=null?longUsd-shortUsd:null,pnlTone=pnl==null?'muted':pnl>0?'safe':pnl<0?'danger':'muted',range=botRangeSummary(rows,mp),rangeTone=!range.positionFresh?'muted':range.inRange===range.known?'safe':'watch',types=botTypeSummary(rows);
   const reason=esc(st.reason)+(exposureComplete?'':' · Exposure-Einheit unvollständig')+(pnlComplete?'':' · PnL-Summe unvollständig');
   const identityMeta=longs.length+' LONG · '+shorts.length+' SHORT · '+types;
-  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></div></div><div class="pair-reason">'+reason+'</div></article>';
+  const liqDisplay=liquidationDisplayState(rows),unavailable='unavailable',liqTone=liqDisplay.tone,liqPrice=liqDisplay.liq!=null?precisePrice(liqDisplay.liq):unavailable,currentPrice=liqDisplay.current!=null?precisePrice(liqDisplay.current):unavailable,bufferText=liqDisplay.buffer!=null?liqDisplay.buffer.toFixed(1)+'%':unavailable,stageText=liqDisplay.stage,marketText=knownNumber(mp.value)&&Number(mp.value)>0?precisePrice(mp.value):unavailable;
+  if(compact)return '<article class="asset-pair pair-compact"><div class="pair-head"><div><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><b class="pair-status tone-'+st.tone+'">'+st.label+'</b></div><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+marketText+'</b><small>'+esc(mp.source)+'</small></div><div><span>KNOWN NET NOTIONAL</span><b>'+(net==null?unavailable:h.money?.(net))+'</b></div><div><span>HEDGE</span><b>'+(hedge!=null?hedge.toFixed(1)+'%':unavailable)+'</b></div><div><span>PAIR PNL USD</span><b class="tone-'+pnlTone+'">'+(pnl==null?unavailable:h.money?.(pnl))+'</b></div></div><div class="compact-liq-strip tone-'+liqTone+'"><div><span>LIQUIDATION PRICE</span><b>'+liqPrice+'</b></div><div><span>CURRENT PRICE</span><b>'+currentPrice+'</b></div><div><span>LIQ BUFFER</span><b class="tone-'+liqTone+'">'+bufferText+'</b></div><div><span>STAGE</span><b class="tone-'+liqTone+'">'+stageText+'</b></div></div><small class="compact-liq-source">'+esc(liqDisplay.source)+'</small><div class="pair-reason">'+reason+'</div></article>';
   return '<details class="asset-pair asset-pair-details pair-tone-'+st.tone+'" data-symbol="'+esc(symbol)+'" '+(open?'open':'')+'><summary class="asset-pair-summary"><div class="asset-pair-identity"><span class="asset-symbol">'+symbol+'</span><small>'+identityMeta+'</small></div><div class="asset-glance"><span>PNL <b class="tone-'+pnlTone+'">'+(pnl==null?'—':h.money?.(pnl))+'</b></span><span>MIN LIQ <b class="tone-'+riskTone+'">'+(minRisk==null?'—':minRisk.toFixed(1)+'%')+'</b></span><span>HEDGE <b>'+(hedge!=null?hedge.toFixed(1)+'%':'—')+'</b></span><span>RANGE <b class="tone-'+rangeTone+'">'+esc(range.label)+'</b></span></div><div class="asset-pair-status-wrap"><b class="pair-status tone-'+st.tone+'">'+st.label+'</b><i class="asset-chevron" aria-hidden="true"></i></div></summary><div class="asset-pair-body"><div class="pair-summary"><div><span>MARKET PRICE</span><b>'+precisePrice(mp.value)+'</b><small>'+esc(mp.source)+'</small></div><div><span>LONG NOTIONAL</span><b>'+(longUsd==null?'—':h.money?.(longUsd))+'</b></div><div><span>SHORT NOTIONAL</span><b>'+(shortUsd==null?'—':h.money?.(shortUsd))+'</b></div><div><span>NET NOTIONAL</span><b>'+(net==null?'—':h.money?.(net))+'</b></div></div><div class="pair-reason">'+reason+'</div><div class="pair-legs">'+rows.map(legRow).join('')+'</div>'+(assetLink?'<div class="pair-detail-action">'+assetDetailButton(symbol,'ASSET DETAIL')+'</div>':'')+'</div></details>';
 }
 function criticalPair(){
