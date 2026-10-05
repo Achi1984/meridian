@@ -65,6 +65,7 @@ jobs:
           node --test \
             test/cross-venue-funding-edge-v2.test.js \
             test/cross-venue-funding-edge-v2-data-contract.test.js \
+            test/cross-venue-funding-edge-v2-source-gate.test.js \
             test/cross-venue-funding-edge-v2-collector.test.js \
             test/cross-venue-funding-edge-v2-preregistration.test.js \
             test/cross-venue-funding-edge-v2-stage-lock.test.js
