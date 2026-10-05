@@ -4,10 +4,18 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-05 21:50 Europe/Vienna
+- last_update: 2026-10-05 22:35 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
+
+### 000. R116-REBASE-PREP-AUDIT-R0 → ADVISORY_COMPLETE (keine Merge-Autorität)
+- Der frühere Review für #557 (Base f23fc2d) ist **nicht** mehr Merge-Autorität. Für den neuen r116-SHA ist ein neues Exact-Head-Review nötig.
+- Keine Dateiüberschneidung zwischen #557 und main 24d0f3e; der Rebase ist konfliktfrei. Die 9 Dateien müssen byte-identisch zu `c67c07c` bleiben.
+- **Lease-Falle:** Den #557-Branch in place aktualisieren. Ein neuer `v10-r116-*`-PR wird vom Release-Coordinator blockiert, solange #557 offen ist.
+- **#558 zuerst:** Dann muss das r116-PR zusätzlich genau 4 Build-Felder auf r116 setzen (Resume `build`, Checkpoint `terminalBuild`, Agent-State `lastCheckpoint.build`, CHAT_HANDOFF „Build:“). Sonst schlägt continuity-audit fehl.
+- **r116 zuerst:** Dann muss #558 diese 4 Felder beim Rebase nachziehen.
+- Vor dem neuen Review optional zwei Tests ergänzen: Cross-Output-Mode/Window-Supersession und Detached-Output.
 
 ### 00. PR #555 STREAM-SAFE-V5: R3 → GREEN LIGHT
 - Verdict: `REVIEW 48fd763d117e57d9d91ad42493bdcbe999870a3b: GREEN LIGHT` (Kommentar STREAM-SAFE-V5-IMPL-R3 in #539)
@@ -17,7 +25,7 @@ Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins od
   2. Die Continuity-Audit gleicht `lastSubstantiveCheckpoint` / `lastContinuityMerge` nicht gegen `resume.sourceOfTruth.verifiedSha` ab. Außerdem prüft Release Safety nicht, ob `resume.build` zu `version.json` passt (Staleness nach r116).
   3. Bootstrap-Schritt 1 sagt „latest comment“. Besser: alle #539-Kommentare seit dem letzten Checkpoint plus alle offenen Requests lesen.
 
-### 0. R116 FIB-CROSS-VIEW-LIFECYCLE: R1 → GREEN LIGHT
+### 0. R116 FIB-CROSS-VIEW-LIFECYCLE: R1 (veraltet, Base f23fc2d)
 - Verdict: `REVIEW c67c07cd38c132a44e634355b1f9a554d0118400: GREEN LIGHT` (Kommentar FIB-CROSS-VIEW-LIFECYCLE-R1 in #539)
 - #556 ist geschlossen. Sein Release Safety ist nur am Branch-Namen-Gate gescheitert.
 - Derselbe SHA ist als **#557** offen. Merge nur über #557 und nur auf exakt `c67c07c`.
