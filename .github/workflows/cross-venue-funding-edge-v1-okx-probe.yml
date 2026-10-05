@@ -1,0 +1,49 @@
+name: MERIDIAN Cross-Venue V1 OKX Source Probe
+
+on:
+  push:
+    branches:
+      - research/cross-venue-funding-edge-v1-okx-probe
+    paths:
+      - ".github/workflows/cross-venue-funding-edge-v1-okx-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Probe unsigned OKX historical source endpoints
+        shell: bash
+        run: |
+          node <<'NODE'
+          const base='https://www.okx.com';
+          async function get(path){
+            const r=await fetch(base+path,{headers:{accept:'application/json','user-agent':'MERIDIAN-source-probe/1.0'},signal:AbortSignal.timeout(20000)});
+            const text=await r.text();
+            console.log(JSON.stringify({path,status:r.status,contentType:r.headers.get('content-type'),bytes:text.length}));
+            if(!r.ok) throw new Error('HTTP '+r.status+' '+path+' '+text.slice(0,200));
+            const j=JSON.parse(text);
+            return j;
+          }
+
+          const funding=await get('/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=daily&begin=1647302400000&end=1647388799999&instFamilyList=BTC-USDT');
+          console.log(JSON.stringify({
+            funding:{code:funding.code,msg:funding.msg,count:Array.isArray(funding.data)?funding.data.length:null,keys:Array.isArray(funding.data)&&funding.data[0]?Object.keys(funding.data[0]):[]}
+          }));
+
+          const mark=await get('/api/v5/market/history-mark-price-candles?instId=BTC-USDT-SWAP&bar=1H&after=1647388800000&limit=10');
+          const rows=Array.isArray(mark.data)?mark.data:[];
+          console.log(JSON.stringify({
+            mark:{code:mark.code,msg:mark.msg,count:rows.length,latest:rows[0]?.[0]??null,earliest:rows.at(-1)?.[0]??null,rowWidth:rows[0]?.length??0}
+          }));
+
+          if(String(funding.code)!=='0'||!Array.isArray(funding.data)||!funding.data.length)throw new Error('OKX_FUNDING_HISTORY_PROBE_FAILED');
+          if(String(mark.code)!=='0'||rows.length<2)throw new Error('OKX_MARK_HISTORY_PROBE_FAILED');
+          NODE
