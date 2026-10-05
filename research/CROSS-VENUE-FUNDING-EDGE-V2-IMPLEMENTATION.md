@@ -278,6 +278,8 @@ Rules:
 - If the exit-fill deadline passes and any later event arrives without the required `EXIT_FILL`, the run becomes terminal `INCONCLUSIVE / EXIT_FILL_MISSING`.
 - A run that ends in `ENTRY_PENDING`, `POSITION_OPEN` or `EXIT_PENDING` is terminal, never a non-terminal partial cycle.
 - Any integrity detection while `POSITION_OPEN` or `EXIT_PENDING`, including exact entry/exit boundary ties, -> absorbing `TERMINAL_INCONCLUSIVE`.
+- `INTEGRITY_DETECTION.integrityKind` is mandatory and non-empty. Missing/blank kinds fail closed.
+- After a successful exit fill, a mark-integrity event `MISSING_MARK`, `DUPLICATE_MARK` or `UNCONFIRMED_MARK` detected exactly at `exitFill+1h` is terminal `EXIT_FILL_DATA_DEGRADATION`: that detection belongs to the candle whose OPEN supplied the exit fill. Funding-integrity events at that timestamp, or mark events later than `exitFill+1h`, degrade a flat run but are not terminal for the closed position.
 - `EXIT_PENDING + EXIT_FILL -> FLAT_ELIGIBLE`, but a detection at the same timestamp remains terminal by the inclusive position-at-detection rule.
 - Common decisions while pending/open are ignored; no pyramiding or averaging.
 - Cancelled pending entries never resurrect after recovery. A new entry requires a new post-recovery decision.
