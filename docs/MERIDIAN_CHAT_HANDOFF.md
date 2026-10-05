@@ -1,12 +1,12 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 source-failed; V2 preregistered pending reviewed transition merge**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 PREREGISTERED; implementation/source-contract is the active lane**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
 - Build: **10.0-r112**
-- Verified main checkpoint: **a52c56010b9a547061c82d37840f5335465b3754**
+- Verified main checkpoint: **ae4d9f490a43972ad2fc3c768c8744849790ba22**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -56,9 +56,11 @@ No historical Strategy V1 PnL has been authorized or inspected yet.
 - Common Paper `markPosition()` still has legacy opening-fee semantics; Challenger V3 compensates locally. Handle only in a dedicated accounting migration/regression work package.
 - Release Safety must execute `scripts/continuity-audit.mjs` as an explicit named hard gate, not merely expose it through an npm script.
 
-## Exact next durable step
+## SUPERSEDED prior next step — Quarter-Hour Strategy V1
 
-Create a separate **Strategy V1 deterministic implementation** work package.
+**PAUSED:** This preserved QH Strategy V1 work package is not the active research lane. Do not execute it while `MERIDIAN_RESUME.json` selects Cross-Venue Funding Edge V2.
+
+Historical next step was to create a separate **Strategy V1 deterministic implementation** work package.
 
 Before the first historical evidence run, it must prove with tests and independent review:
 1. signal direction and first-10-second boundary construction;
@@ -85,6 +87,7 @@ This section supersedes the earlier “Exact next durable step” where it confl
 - User selected Option A: V1 must close permanently as `CROSS_VENUE_V1_SOURCE_FAIL`; do not amend or rescue V1.
 - Successor `CROSS-VENUE-FUNDING-EDGE-V2` is preregistered with generic outage/off-grid semantics and unchanged economic thresholds/gates.
 - V2 remains `PREREGISTERED`; Source Audit is disabled.
-- Next durable step after the reviewed transition PR merges: create a separate V2 implementation/source-contract PR, freeze exact source boundaries and integrity-event construction, run CI, obtain Claude GREEN LIGHT on the exact HEAD, and only then consider a V2 source audit.
+- PR #530 is merged. PR #532 subsequently froze the V1-closure/V2-preregistration lineage in the global Frozen Research Guard.
+- **Current exact next durable step:** create a separate V2 implementation/source-contract PR, freeze exact source boundaries and integrity-event construction, run behavior tests and CI, obtain Claude GREEN LIGHT on the exact HEAD, and only then consider a V2 source audit.
 - No V2 source audit, split lock, Discovery, strategy PnL, Paper or Live execution is currently authorized.
 
