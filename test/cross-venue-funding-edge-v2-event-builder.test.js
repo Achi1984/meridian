@@ -155,9 +155,10 @@ function tailGapPackage({futureRow}={}){
   return cachedFixture('tail-gap-'+String(futureRow),()=>rebuild(BASE,d=>{
     const zero=Date.parse('2026-09-30T00:00:00.000Z');
     const eight=Date.parse('2026-09-30T08:00:00.000Z');
-    d.okxFunding=d.okxFunding.filter(x=>
-      x.fundingTime!==zero&&(futureRow===true||x.fundingTime!==eight)
-    );
+    const future=d.okxFunding.find(x=>x.fundingTime===eight);
+    assert.ok(future);
+    d.okxFunding=d.okxFunding.filter(x=>x.fundingTime!==zero&&x.fundingTime!==eight);
+    if(futureRow===true)d.okxFunding.push({...future},{...future});
   }));
 }
 function offgridNearSplitPackage(){
