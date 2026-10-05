@@ -7,6 +7,7 @@ const root=path.resolve(here,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const resume=JSON.parse(read('MERIDIAN_RESUME.json'));
 const state=JSON.parse(read('MERIDIAN_AGENT_STATE.json'));
+const liveCheckpoint=JSON.parse(read('MERIDIAN_LIVE_CHECKPOINT.json'));
 const handoff=read('docs/MERIDIAN_CHAT_HANDOFF.md');
 const agentWorkflow=read('MERIDIAN_AGENT_WORKFLOW.md');
 const decisions=read('MERIDIAN_DECISIONS.md');
