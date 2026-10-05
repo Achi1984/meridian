@@ -7,7 +7,7 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r112 release identity is coherent and execution neutral',()=>{
-  assert.match(release.terminalBuild,/^10\\.0-r\\d+$/);
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
   assert.ok(Number(release.terminalBuild.split('r').at(-1))>=112);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/FIB-ZONE-SIGNAL-SEPARATION-MOBILE-FIB-DECONFLICTION/);
