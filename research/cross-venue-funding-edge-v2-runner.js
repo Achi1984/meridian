@@ -53,6 +53,7 @@ export function runnerEventKey(event){
   const kind=strictString(event.kind,'CROSS_VENUE_V2_INVALID_RUNNER_EVENT_KIND');
   const phaseRank=V2_RUNNER_PHASE_RANK[kind];
   if(!Number.isInteger(phaseRank))fail('CROSS_VENUE_V2_INVALID_RUNNER_EVENT_KIND');
+  if(kind==='INTEGRITY_DETECTION')strictString(event.integrityKind,'CROSS_VENUE_V2_INVALID_INTEGRITY_KIND');
   const venue=event.venue??'';
   if(typeof venue!=='string')fail('CROSS_VENUE_V2_INVALID_RUNNER_EVENT_VENUE');
   const stableId=strictString(event.stableId,'CROSS_VENUE_V2_INVALID_RUNNER_EVENT_ID');
@@ -196,7 +197,7 @@ function recoveryContextFor(ordered,recoveryInputs){
   return{
     commonTimes:ordered.filter(e=>e.kind==='COMMON_DECISION').map(e=>e.time),
     integrityEvents:ordered.filter(e=>e.kind==='INTEGRITY_DETECTION').map(e=>({
-      kind:e.integrityKind??'INTEGRITY_DETECTION',
+      kind:e.integrityKind,
       venue:e.venue??'',
       detectionTime:e.time
     })),
@@ -270,12 +271,24 @@ function applyEvent(s,event,trace,recoveryContext){
   }
 
   if(event.kind==='INTEGRITY_DETECTION'){
-    if(s.status===V2_RUNNER_STATES.FLAT_ELIGIBLE){
+    if([V2_RUNNER_STATES.FLAT_ELIGIBLE,V2_RUNNER_STATES.DEGRADED_FLAT].includes(s.status)){
       if(s.lastExitFillTime===event.time){
         terminalize(s,event,trace);
         return;
       }
-      degradeFlat(s,event,trace);
+      if(
+        s.lastExitFillTime!==null&&
+        event.time===s.lastExitFillTime+HOUR&&
+        ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK'].includes(event.integrityKind)
+      ){
+        terminalize(s,event,trace,'EXIT_FILL_DATA_DEGRADATION','EXIT_FILL_DATA_DEGRADATION');
+        return;
+      }
+      if(s.status===V2_RUNNER_STATES.FLAT_ELIGIBLE){
+        degradeFlat(s,event,trace);
+      }else{
+        degradeFlat(s,event,trace,'DEGRADATION_RESET');
+      }
       return;
     }
     if(s.status===V2_RUNNER_STATES.ENTRY_PENDING){
@@ -288,10 +301,6 @@ function applyEvent(s,event,trace,recoveryContext){
     }
     if([V2_RUNNER_STATES.POSITION_OPEN,V2_RUNNER_STATES.EXIT_PENDING].includes(s.status)){
       terminalize(s,event,trace);
-      return;
-    }
-    if(s.status===V2_RUNNER_STATES.DEGRADED_FLAT){
-      degradeFlat(s,event,trace,'DEGRADATION_RESET');
       return;
     }
     fail('CROSS_VENUE_V2_ILLEGAL_TRANSITION');

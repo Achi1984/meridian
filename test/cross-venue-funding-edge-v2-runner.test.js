@@ -373,3 +373,94 @@ test('R2.6 recovery requires T-1h marks but not the mark at T',()=>{
   });
   assert.equal(missingAtT.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
 });
+
+
+test('R-X1 exit-fill mark anomaly at fill+1h is terminal INCONCLUSIVE for all frozen mark-integrity kinds',()=>{
+  for(const kind of ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK']){
+    const r=runV2RunnerStateMachine([
+      ...completeCycle(),
+      integrity(T+4*H,'exit-fill-'+kind,kind)
+    ]);
+    assert.equal(r.outcome.status,'INCONCLUSIVE',kind);
+    assert.equal(r.outcome.reason,'EXIT_FILL_DATA_DEGRADATION',kind);
+    assert.equal(r.state.status,V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE,kind);
+    assert.equal(r.trace.at(-1).action,'EXIT_FILL_DATA_DEGRADATION',kind);
+  }
+});
+
+test('R-X2 funding integrity at exitFill+1h degrades flat but is not terminal',()=>{
+  const r=runV2RunnerStateMachine([
+    ...completeCycle(),
+    integrity(T+4*H,'funding-after-exit','OFF_GRID_FUNDING')
+  ]);
+  assert.equal(r.outcome.terminal,false);
+  assert.equal(r.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
+  assert.equal(r.trace.at(-1).action,'DATA_DEGRADED');
+});
+
+test('R-X3 mark integrity at exitFill+2h is ordinary flat degradation, not exit-fill terminality',()=>{
+  const r=runV2RunnerStateMachine([
+    ...completeCycle(),
+    integrity(T+5*H,'late-mark','MISSING_MARK')
+  ]);
+  assert.equal(r.outcome.terminal,false);
+  assert.equal(r.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
+  assert.equal(r.trace.at(-1).action,'DATA_DEGRADED');
+});
+
+test('R-X4 every INTEGRITY_DETECTION requires a strict non-empty integrityKind',()=>{
+  for(const bad of [undefined,null,'']){
+    const row=e('INTEGRITY_DETECTION',T,'bad-kind',{venue:'OKX'});
+    if(bad!==undefined)row.integrityKind=bad;
+    assert.throws(()=>runV2RunnerStateMachine([row]),/INVALID_INTEGRITY_KIND/);
+  }
+});
+
+test('R-X5 normal complete-cycle trace digest is unchanged by the exit-fill integrity patch',()=>{
+  const r=runV2RunnerStateMachine(completeCycle());
+  assert.equal(r.traceDigest,'018e3a0b91bebb52ae644354e142892fe33733abc44fb5e3b320f01a1fe29bfc');
+  assert.equal(r.state.status,V2_RUNNER_STATES.FLAT_ELIGIBLE);
+});
+
+
+test('R-X6 prior funding degradation cannot mask exit-fill mark anomaly at fill+1h',()=>{
+  for(const kind of ['MISSING_MARK','DUPLICATE_MARK','UNCONFIRMED_MARK']){
+    const r=runV2RunnerStateMachine([
+      ...completeCycle(),
+      integrity(T+3*H+1001,'funding-before-exit-candle-'+kind,'MISSING_SCHEDULED_FUNDING'),
+      integrity(T+4*H,'exit-candle-after-degradation-'+kind,kind)
+    ]);
+    assert.equal(r.outcome.status,'INCONCLUSIVE',kind);
+    assert.equal(r.outcome.reason,'EXIT_FILL_DATA_DEGRADATION',kind);
+    assert.equal(r.state.status,V2_RUNNER_STATES.TERMINAL_INCONCLUSIVE,kind);
+    assert.equal(r.trace.at(-1).action,'EXIT_FILL_DATA_DEGRADATION',kind);
+  }
+});
+
+test('R-X7 same-timestamp funding degradation cannot mask later-sorted exit-fill mark anomaly',()=>{
+  const r=runV2RunnerStateMachine([
+    ...completeCycle(),
+    e('INTEGRITY_DETECTION',T+4*H,'binance-off-grid',{
+      venue:'BINANCE',integrityKind:'OFF_GRID_FUNDING'
+    }),
+    e('INTEGRITY_DETECTION',T+4*H,'okx-missing-mark',{
+      venue:'OKX',integrityKind:'MISSING_MARK'
+    })
+  ]);
+  assert.equal(r.outcome.status,'INCONCLUSIVE');
+  assert.equal(r.outcome.reason,'EXIT_FILL_DATA_DEGRADATION');
+  assert.equal(r.trace.at(-2).action,'DATA_DEGRADED');
+  assert.equal(r.trace.at(-1).action,'EXIT_FILL_DATA_DEGRADATION');
+});
+
+test('R-X8 prior degradation plus mark anomaly at exitFill+2h remains non-terminal degraded flat',()=>{
+  const r=runV2RunnerStateMachine([
+    ...completeCycle(),
+    integrity(T+3*H+30*60*1000,'half-hour-degradation','OFF_GRID_FUNDING'),
+    integrity(T+5*H,'late-exit-mark','MISSING_MARK')
+  ]);
+  assert.equal(r.outcome.terminal,false);
+  assert.equal(r.state.status,V2_RUNNER_STATES.DEGRADED_FLAT);
+  assert.equal(r.trace.at(-2).action,'DATA_DEGRADED');
+  assert.equal(r.trace.at(-1).action,'DEGRADATION_RESET');
+});
