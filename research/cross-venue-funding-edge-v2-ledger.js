@@ -37,7 +37,12 @@ function normalizeFill(row){
   const markOpen=strictPositive(row.markOpen,'CROSS_VENUE_V2_INVALID_LEDGER_FILL');
   const feeBps=strictNonNegative(row.feeBps,'CROSS_VENUE_V2_INVALID_LEDGER_FILL');
   const slipBps=strictNonNegative(row.slipBps,'CROSS_VENUE_V2_INVALID_LEDGER_FILL');
-  return Object.freeze({venue:row.venue,side:row.side,qty,markOpen,time,feeBps,slipBps});
+  let exitDecisionTime=null;
+  if(Object.hasOwn(row,'exitDecisionTime')){
+    exitDecisionTime=strictTime(row.exitDecisionTime);
+    if(exitDecisionTime>=time)fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
+  }
+  return Object.freeze({venue:row.venue,side:row.side,qty,markOpen,time,feeBps,slipBps,exitDecisionTime});
 }
 function normalizeFunding(row){
   if(!row||typeof row!=='object'||Array.isArray(row))fail('CROSS_VENUE_V2_INVALID_LEDGER_FUNDING');
@@ -116,9 +121,20 @@ export function buildV2EventSourcedLedger({
   const fillGroups=groupByTime(xs),fundingGroups=groupByTime(fs),markGroups=groupByTime(ms);
   const fillTimes=[...fillGroups.keys()].sort((a,b)=>a-b);
   if(fillTimes.length%2!==0)fail('CROSS_VENUE_V2_LEDGER_POSITION_LEFT_OPEN');
+  const cycles=[],cycleByEntry=new Map();
   for(let i=0;i<fillTimes.length;i+=2){
     const entryTime=fillTimes[i],exitTime=fillTimes[i+1];
     if(exitTime<=entryTime||(exitTime-entryTime)%HOUR!==0)fail('CROSS_VENUE_V2_LEDGER_MARK_GAP');
+    const entryPair=fillGroups.get(entryTime)||[],exitPair=fillGroups.get(exitTime)||[];
+    if(entryPair.length!==2||exitPair.length!==2)fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_FILL');
+    if(entryPair.some(x=>x.exitDecisionTime!==null))fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
+    if(exitPair.some(x=>x.exitDecisionTime===null))fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
+    const decisionTimes=[...new Set(exitPair.map(x=>x.exitDecisionTime))];
+    if(decisionTimes.length!==1)fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
+    const exitDecisionTime=decisionTimes[0];
+    if(exitDecisionTime<entryTime||exitDecisionTime>=exitTime)fail('CROSS_VENUE_V2_INVALID_EXIT_DECISION_TIME');
+    const cycle=Object.freeze({entryTime,exitDecisionTime,exitTime});
+    cycles.push(cycle);cycleByEntry.set(entryTime,cycle);
     for(let t=entryTime;t<=exitTime;t+=HOUR){
       const pair=markGroups.get(t)||[];
       if(pair.length!==2||new Set(pair.map(x=>x.venue)).size!==2)
@@ -132,7 +148,7 @@ export function buildV2EventSourcedLedger({
     OKX:{qty:0,avgEntry:null,side:null}
   };
   const events=[],equityPath=[];
-  let cycleOpen=false,lastValuationTime=null;
+  let cycleOpen=false,lastValuationTime=null,currentCycle=null;
 
   const positionOpen=()=>pos.BINANCE.qty!==0||pos.OKX.qty!==0;
   const pairOpen=()=>pos.BINANCE.qty!==0&&pos.OKX.qty!==0;
@@ -142,9 +158,25 @@ export function buildV2EventSourcedLedger({
     for(const f of fundingGroups.get(time)||[]){
       const p=pos[f.venue];
       if(p.qty===0)continue;
+      if(!currentCycle)fail('CROSS_VENUE_V2_LEDGER_CYCLE_STATE');
+      const inWindow=currentCycle.entryTime<time&&time<=currentCycle.exitDecisionTime;
+      if(!inWindow){
+        if(time>currentCycle.exitDecisionTime&&time<=currentCycle.exitTime){
+          events.push(Object.freeze({
+            kind:'FUNDING_OUT_OF_WINDOW',venue:f.venue,time,rate:f.rate,
+            fundingMark:f.fundingMark,positionQty:p.qty,cashDelta:0,
+            entryFillTime:currentCycle.entryTime,exitDecisionTime:currentCycle.exitDecisionTime,exitFillTime:currentCycle.exitTime
+          }));
+        }
+        continue;
+      }
       const cashDelta=-p.qty*f.fundingMark*f.rate;
       cash[f.venue]+=cashDelta;
-      events.push(Object.freeze({kind:'FUNDING',venue:f.venue,time,rate:f.rate,fundingMark:f.fundingMark,positionQty:p.qty,cashDelta}));
+      events.push(Object.freeze({
+        kind:'FUNDING',venue:f.venue,time,rate:f.rate,fundingMark:f.fundingMark,
+        positionQty:p.qty,cashDelta,entryFillTime:currentCycle.entryTime,
+        exitDecisionTime:currentCycle.exitDecisionTime,exitFillTime:currentCycle.exitTime
+      }));
     }
 
     const group=fillGroups.get(time)||[];
@@ -165,6 +197,8 @@ export function buildV2EventSourcedLedger({
           events.push(Object.freeze({kind:'FILL_OPEN',venue:f.venue,time,side:f.side,qty:f.qty,markOpen:f.markOpen,feeUsd,slippageUsd,cashDelta:-(feeUsd+slippageUsd)}));
         }
         if(!pairOpen())fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_POSITION');
+        currentCycle=cycleByEntry.get(time)??null;
+        if(!currentCycle)fail('CROSS_VENUE_V2_LEDGER_CYCLE_STATE');
         cycleOpen=true;
         lastValuationTime=null;
       }else if(pairOpen()){
@@ -177,7 +211,7 @@ export function buildV2EventSourcedLedger({
           const slippageUsd=notional*f.slipBps/10000;
           const cashDelta=realizedPnlUsd-feeUsd-slippageUsd;
           cash[f.venue]+=cashDelta;
-          events.push(Object.freeze({kind:'FILL_CLOSE',venue:f.venue,time,side:f.side,qty:f.qty,markOpen:f.markOpen,realizedPnlUsd,feeUsd,slippageUsd,cashDelta}));
+          events.push(Object.freeze({kind:'FILL_CLOSE',venue:f.venue,time,side:f.side,qty:f.qty,markOpen:f.markOpen,exitDecisionTime:f.exitDecisionTime,realizedPnlUsd,feeUsd,slippageUsd,cashDelta}));
           p.qty=0;p.avgEntry=null;p.side=null;
         }
         if(!pairFlat())fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_POSITION');
@@ -186,6 +220,7 @@ export function buildV2EventSourcedLedger({
         cash.OKX-=opsUsd/2;
         events.push(Object.freeze({kind:'OPS_BUFFER',venue:'PAIR',time,opsBufferBps:opsBps,cashDelta:-opsUsd}));
         cycleOpen=false;
+        currentCycle=null;
       }else{
         fail('CROSS_VENUE_V2_UNPAIRED_LEDGER_POSITION');
       }
