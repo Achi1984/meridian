@@ -13,7 +13,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,32 +27,38 @@ jobs:
           async function get(path){
             const r=await fetch(base+path,{headers:{accept:'application/json','user-agent':'MERIDIAN-source-probe/1.0'},signal:AbortSignal.timeout(20000)});
             const text=await r.text();
-            console.log(JSON.stringify({path,status:r.status,contentType:r.headers.get('content-type'),bytes:text.length}));
             if(!r.ok) throw new Error('HTTP '+r.status+' '+path+' '+text.slice(0,200));
-            const j=JSON.parse(text);
-            return j;
+            return JSON.parse(text);
+          }
+          function brief(label,j){
+            const d=Array.isArray(j.data)?j.data[0]:null,details=Array.isArray(d?.details)?d.details:[];
+            const groups=details.flatMap(x=>Array.isArray(x?.groupDetails)?x.groupDetails:[]);
+            console.log(JSON.stringify({
+              label,code:j.code,msg:j.msg,groups:groups.length,totalSizeMB:d?.totalSizeMB??null,
+              first:groups[0]?{filename:groups[0].filename,dateTs:groups[0].dateTs??groups[0].dataTs??null,sizeMB:groups[0].sizeMB,url:groups[0].url}:null,
+              last:groups.at(-1)?{filename:groups.at(-1).filename,dateTs:groups.at(-1).dateTs??groups.at(-1).dataTs??null,sizeMB:groups.at(-1).sizeMB,url:groups.at(-1).url}:null
+            }));
+            return groups;
           }
 
-          const funding=await get('/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=daily&begin=1647302400000&end=1647388799999&instFamilyList=BTC-USDT');
-          const fd=Array.isArray(funding.data)?funding.data[0]:null;
-          const details=Array.isArray(fd?.details)?fd.details:[];
-          console.log(JSON.stringify({
-            funding:{
-              code:funding.code,msg:funding.msg,count:Array.isArray(funding.data)?funding.data.length:null,
-              keys:fd?Object.keys(fd):[],
-              dateAggrType:fd?.dateAggrType??null,totalSizeMB:fd?.totalSizeMB??null,ts:fd?.ts??null,
-              detailsCount:details.length,
-              detailKeys:details[0]?Object.keys(details[0]):[],
-              firstDetail:details[0]??null
-            }
-          }));
+          // Module 3 calendar dates use UTC+8.
+          const d2022=Date.parse('2022-03-15T00:00:00+08:00');
+          const m2022=Date.parse('2022-03-01T00:00:00+08:00');
+          const m2026=Date.parse('2026-09-01T00:00:00+08:00');
+
+          const q1='/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=daily&begin='+d2022+'&end='+d2022+'&instFamilyList=ANY';
+          const q2='/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=monthly&begin='+m2022+'&end='+m2022+'&instFamilyList=BTC-USDT';
+          const q3='/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=monthly&begin='+m2026+'&end='+m2026+'&instFamilyList=BTC-USDT';
+
+          const g1=brief('funding_daily_any_2022_03_15',await get(q1));
+          const g2=brief('funding_monthly_btc_2022_03',await get(q2));
+          const g3=brief('funding_monthly_btc_2026_09',await get(q3));
 
           const mark=await get('/api/v5/market/history-mark-price-candles?instId=BTC-USDT-SWAP&bar=1H&after=1647388800000&limit=10');
           const rows=Array.isArray(mark.data)?mark.data:[];
-          console.log(JSON.stringify({
-            mark:{code:mark.code,msg:mark.msg,count:rows.length,latest:rows[0]?.[0]??null,earliest:rows.at(-1)?.[0]??null,rowWidth:rows[0]?.length??0}
-          }));
+          console.log(JSON.stringify({label:'mark_2022_03',code:mark.code,msg:mark.msg,count:rows.length,latest:rows[0]?.[0]??null,earliest:rows.at(-1)?.[0]??null,rowWidth:rows[0]?.length??0}));
 
-          if(String(funding.code)!=='0'||!Array.isArray(funding.data)||!funding.data.length)throw new Error('OKX_FUNDING_HISTORY_PROBE_FAILED');
           if(String(mark.code)!=='0'||rows.length<2)throw new Error('OKX_MARK_HISTORY_PROBE_FAILED');
+          if(!g1.length&&!g2.length)throw new Error('OKX_2022_FUNDING_HISTORY_PROBE_FAILED');
+          if(!g3.length)throw new Error('OKX_2026_FUNDING_HISTORY_PROBE_FAILED');
           NODE
