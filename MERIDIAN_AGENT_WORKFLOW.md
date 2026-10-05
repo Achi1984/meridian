@@ -267,7 +267,7 @@ To reduce chat-stream interruptions and make every interruption harmless:
 2. Fetch full diff/log content only when a failed gate or review defect requires it, and then only the relevant failure window.
 3. Keep each user-visible work cycle short: one implementation milestone, one gate milestone, or one merge milestone per update rather than one very long uninterrupted response.
 4. After every durable mutation, treat GitHub state (commit SHA, PR head, merge state, workflow run) as the checkpoint. Never rely on unsent chat text as the only record of progress.
-5. `MERIDIAN_AGENT_STATE.lastCheckpoint` is historical evidence: its `canonicalMainSha` and `build` describe the same verified checkpoint and must not be rewritten merely because the current terminal release advances. Current release identity belongs in `version.json`, `MERIDIAN_RESUME.json` and `MERIDIAN_LIVE_CHECKPOINT.json`.
+- Historical checkpoint semantics: `MERIDIAN_AGENT_STATE.lastCheckpoint` is historical evidence. Its `canonicalMainSha` and `build` describe the same verified checkpoint and must not be rewritten merely because the current terminal release advances. Current release identity belongs in `version.json`, `MERIDIAN_RESUME.json` and `MERIDIAN_LIVE_CHECKPOINT.json`.
 5. Before any post-interruption mutation, rerun the Resume preflight from 14.2.
 6. Batch independent read-only checks where possible, but serialize repository writes.
 7. Tool outputs should normally be reduced to the fields needed for the next decision: SHA, PR number, branch distance, gate status, failing step, and concise file list.
