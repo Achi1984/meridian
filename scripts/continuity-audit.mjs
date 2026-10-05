@@ -8,6 +8,8 @@ const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const resume=JSON.parse(read('MERIDIAN_RESUME.json'));
 const state=JSON.parse(read('MERIDIAN_AGENT_STATE.json'));
 const handoff=read('docs/MERIDIAN_CHAT_HANDOFF.md');
+const agentWorkflow=read('MERIDIAN_AGENT_WORKFLOW.md');
+const decisions=read('MERIDIAN_DECISIONS.md');
 const failures=[];
 const check=(ok,message)=>{if(!ok)failures.push(message);};
 
@@ -27,6 +29,12 @@ check(String(resume?.nextAction||'').includes('CROSS-VENUE-FUNDING-EDGE-V2'),'re
 check(state?.researchCheckpoint?.successorRuleset==='CROSS-VENUE-FUNDING-EDGE-V2','agent-state research checkpoint must match active V2 ruleset');
 check(state?.researchCheckpoint?.successorStage==='PREREGISTERED','active V2 must remain PREREGISTERED before implementation/source-contract review');
 check(resume?.researchDirection?.qhImbalanceV1Status==='PAUSED_FROZEN_CANONICAL_PREREGISTERED_NO_PNL','Quarter-Hour lane must be explicitly paused while Cross-Venue V2 is active');
+check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor'),'agent workflow must define cross-model review-required categories');
+check(agentWorkflow.includes('MERIDIAN_LEAD_LEASE.json.subAgent'),'agent workflow must bind cross-model review authority to lease.subAgent');
+check(agentWorkflow.includes('An internal GPT-6 review never substitutes'),'agent workflow must forbid internal review substitution');
+check(decisions.includes('D-076 — Cross-model review precedence over Lead-internal reviewer targets'),'decision log must record cross-model review precedence');
+check(decisions.includes('MERIDIAN_LEAD_LEASE.json.crossModelReviewRequiredFor'),'decision log must reference cross-model review-required categories');
+check(decisions.includes('MERIDIAN_LEAD_LEASE.json.subAgent'),'decision log must bind review authority to lease.subAgent');
 
 const gate=resume?.researchDirection?.qhImbalanceV1CurrentGate||null;
 if(gate){
