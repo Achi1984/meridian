@@ -5,6 +5,8 @@ const BUILDER_SCHEMA='CROSS-VENUE-FUNDING-EDGE-V2-EVENT-BUILDER-1';
 
 function fail(code){throw new Error(code)}
 function isObj(x){return !!x&&typeof x==='object'&&!Array.isArray(x)}
+function strictBoolean(x,code){if(typeof x!=='boolean')fail(code);return x}
+function strictDigest(x,code){if(typeof x!=='string'||!/^[a-f0-9]{64}$/.test(x))fail(code);return x}
 
 function adaptEvent(event){
   if(!isObj(event))fail('CROSS_VENUE_V2_ADAPTER_INVALID_EVENT');
@@ -15,8 +17,8 @@ function adaptEvent(event){
       venue:'',
       stableId:event.stableId,
       entryActive:false,
-      inputsReady:event.sourceInputsReady===true,
-      splitEligible:event.splitEligible===true
+      inputsReady:strictBoolean(event.sourceInputsReady,'CROSS_VENUE_V2_ADAPTER_INVALID_INPUTS_READY'),
+      splitEligible:strictBoolean(event.splitEligible,'CROSS_VENUE_V2_ADAPTER_INVALID_SPLIT_ELIGIBLE')
     });
   }
   if(event.kind==='FUNDING_SETTLEMENT'){
@@ -46,6 +48,8 @@ export function adaptCrossVenueV2BuilderForRunner({builderOutput}={}){
      builderOutput.strategyPnlCalculated!==false||builderOutput.strategySignalsCalculated!==false)
     fail('CROSS_VENUE_V2_ADAPTER_BUILDER_FLAGS');
   if(!Array.isArray(builderOutput.events))fail('CROSS_VENUE_V2_ADAPTER_EVENTS_REQUIRED');
+  const sourceStreamDigest=strictDigest(builderOutput.streamDigest,'CROSS_VENUE_V2_ADAPTER_STREAM_DIGEST');
+  const sourcePackageBoundDigest=strictDigest(builderOutput.packageBoundDigest,'CROSS_VENUE_V2_ADAPTER_PACKAGE_DIGEST');
 
   const events=sortRunnerEvents(builderOutput.events.map(adaptEvent));
   for(const event of events)runnerEventKey(event);
@@ -57,8 +61,8 @@ export function adaptCrossVenueV2BuilderForRunner({builderOutput}={}){
     executionImpact:false,
     strategyPnlCalculated:false,
     strategySignalsCalculated:false,
-    sourceStreamDigest:builderOutput.streamDigest,
-    sourcePackageBoundDigest:builderOutput.packageBoundDigest,
+    sourceStreamDigest,
+    sourcePackageBoundDigest,
     events:Object.freeze(events)
   });
 }
