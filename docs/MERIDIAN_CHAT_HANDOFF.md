@@ -5,8 +5,8 @@ Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
-- Build: **10.0-r112**
-- Verified main checkpoint: **63f93aa41b6e054b229309b6fd6fbc2447a92181**
+- Build: **10.0-r113**
+- Verified main checkpoint: **d4a628fee5cf527e0218b99635d80b9cd91bd0ad**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
