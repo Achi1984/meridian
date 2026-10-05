@@ -1,0 +1,69 @@
+{
+  "schema": "CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE-1",
+  "researchOnly": true,
+  "executionImpact": false,
+  "sourceAudit": false,
+  "strategyPnlCalculated": false,
+  "ratesEmitted": false,
+  "pricesEmitted": false,
+  "probe": {
+    "workflowRunId": 37280311203,
+    "probeHeadSha": "80e7afddc7849197b608875bf6d6abec4f1b9bce",
+    "checkedAt": "2026-10-05T07:53:56.566Z"
+  },
+  "funding": {
+    "binanceEnd": "2026-09-30T16:00:00.002Z",
+    "okxEnd": "2026-09-30T08:00:00.000Z",
+    "fundingCoverageEnd": "2026-09-30T08:00:00.000Z"
+  },
+  "marks": {
+    "binanceEnd": "2026-10-03T23:00:00.000Z",
+    "okxEnd": "2026-10-05T06:00:00.000Z",
+    "markCoverageEnd": "2026-10-03T23:00:00.000Z"
+  },
+  "coverageEnd": "2026-09-30T08:00:00.000Z",
+  "decisionWindowEnd": "2026-09-29T00:00:00.000Z",
+  "decisionReserveHours": 26,
+  "provenance": {
+    "binanceFunding": {
+      "scope": "monthly",
+      "month": "2026-09",
+      "rel": "data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2026-09.zip",
+      "sha256": "913cd31b8f924a06717a2fac17f3df6132c24ccded209eb3e4ae7d83e1b247f2"
+    },
+    "binanceMarks": {
+      "scope": "daily",
+      "date": "2026-10-03",
+      "rel": "data/futures/um/daily/markPriceKlines/BTCUSDT/1h/BTCUSDT-1h-2026-10-03.zip",
+      "sha256": "3ebf19fd6e1d4ca842691a5d3ef0d80aaacafb00143b5628556a0e9fd92c4a4e"
+    },
+    "okxFunding": {
+      "month": "2026-09",
+      "filename": "BTC-USDT-SWAP-fundingrates-2026-09.zip",
+      "url": "https://static.okx.com/cdn/okex/traderecords/swaprates/monthly/202609/BTC-USDT-SWAP-fundingrates-2026-09.zip?v=999",
+      "dateTs": 1788192000000,
+      "sha256": "ce5a600e578678a73294a316592afea9cc2a7f0702bf15d56eb0c9ee68fa5a65",
+      "query": {
+        "endpoint": "/api/v5/public/market-data-history",
+        "params": {
+          "module": "3",
+          "instType": "SWAP",
+          "dateAggrType": "monthly",
+          "begin": "1788192000000",
+          "end": "1788192000000",
+          "instFamilyList": "BTC-USDT"
+        },
+        "sha256": "ce5c91a8189273f5808e30a7eaf02db8dba8b2c6566d7caefd8139a8f690aced"
+      }
+    },
+    "okxMarks": {
+      "endpoint": "/api/v5/market/history-mark-price-candles",
+      "params": {
+        "instId": "BTC-USDT-SWAP",
+        "bar": "1H",
+        "limit": "100"
+      },
+      "sha256": "7d957103d496ebd83034713bd98921c2f84fdd8e452c3bde8d03528426a3e519"
+    }
+  }
+}
