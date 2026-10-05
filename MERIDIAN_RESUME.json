@@ -1187,7 +1187,10 @@
       "mainAgent": "GPT-6-Astra",
       "reviewer": "GPT-6-Sol",
       "subagentMinimum": "GPT-6-Luna",
-      "fallback": "STRONGEST_AVAILABLE_WITH_EXPLICIT_EXECUTION_MODE"
+      "fallback": "STRONGEST_AVAILABLE_WITH_EXPLICIT_EXECUTION_MODE",
+      "scope": "LEAD_INTERNAL_TARGETS_ONLY",
+      "reviewerCrossModel": "CLAUDE",
+      "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md"
     },
     "orchestrationBootstrapStatus": "COMPLETE",
     "orchestrationInstallationPr": 324,
