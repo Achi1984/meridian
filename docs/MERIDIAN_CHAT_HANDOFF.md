@@ -1,12 +1,12 @@
 # MERIDIAN Chat Handoff
 
-Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 PREREGISTERED; implementation/source-contract is the active lane**  
+Status: **Cross-Venue Funding Edge V1 SOURCE_CLOSED; V2 SOURCE_AUDIT authorized; source integrity only, no PnL**  
 Updated: **2026-10-05**
 
 ## Current durable checkpoint
 
 - Build: **10.0-r112**
-- Verified main checkpoint: **ae4d9f490a43972ad2fc3c768c8744849790ba22**
+- Verified main checkpoint: **2e463a533e8d0a6de3b509620cb1af7da847acd5**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
@@ -86,8 +86,8 @@ This section supersedes the earlier “Exact next durable step” where it confl
 - Blocker #528 plus independent Claude source forensics established that the authoritative OKX history contains an off-grid settlement incompatible with the frozen V1 source assumptions.
 - User selected Option A: V1 must close permanently as `CROSS_VENUE_V1_SOURCE_FAIL`; do not amend or rescue V1.
 - Successor `CROSS-VENUE-FUNDING-EDGE-V2` is preregistered with generic outage/off-grid semantics and unchanged economic thresholds/gates.
-- V2 remains `PREREGISTERED`; Source Audit is disabled.
+- V2 implementation/source contract is merged and frozen. This transition authorizes only `SOURCE_AUDIT`; strategy PnL and all later stages remain disabled.
 - PR #530 is merged. PR #532 subsequently froze the V1-closure/V2-preregistration lineage in the global Frozen Research Guard.
-- **Current exact next durable step:** create a separate V2 implementation/source-contract PR, freeze exact source boundaries and integrity-event construction, run behavior tests and CI, obtain Claude GREEN LIGHT on the exact HEAD, and only then consider a V2 source audit.
-- No V2 source audit, split lock, Discovery, strategy PnL, Paper or Live execution is currently authorized.
+- **Current exact next durable step:** obtain Claude GREEN LIGHT on this SOURCE_AUDIT transition PR. After merge, allow the already-frozen main-only V2 Source Gate to collect and validate source evidence. Inspect source integrity only; no strategy PnL or Discovery.
+- V2 Source Audit is the only authorized next research stage. Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
 
