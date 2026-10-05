@@ -34,8 +34,17 @@ jobs:
           }
 
           const funding=await get('/api/v5/public/market-data-history?module=3&instType=SWAP&dateAggrType=daily&begin=1647302400000&end=1647388799999&instFamilyList=BTC-USDT');
+          const fd=Array.isArray(funding.data)?funding.data[0]:null;
+          const details=Array.isArray(fd?.details)?fd.details:[];
           console.log(JSON.stringify({
-            funding:{code:funding.code,msg:funding.msg,count:Array.isArray(funding.data)?funding.data.length:null,keys:Array.isArray(funding.data)&&funding.data[0]?Object.keys(funding.data[0]):[]}
+            funding:{
+              code:funding.code,msg:funding.msg,count:Array.isArray(funding.data)?funding.data.length:null,
+              keys:fd?Object.keys(fd):[],
+              dateAggrType:fd?.dateAggrType??null,totalSizeMB:fd?.totalSizeMB??null,ts:fd?.ts??null,
+              detailsCount:details.length,
+              detailKeys:details[0]?Object.keys(details[0]):[],
+              firstDetail:details[0]??null
+            }
           }));
 
           const mark=await get('/api/v5/market/history-mark-price-candles?instId=BTC-USDT-SWAP&bar=1H&after=1647388800000&limit=10');
