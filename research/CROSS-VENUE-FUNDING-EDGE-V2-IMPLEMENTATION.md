@@ -208,3 +208,148 @@ Current authoritative V2 lock remains unchanged:
 - Live: false
 
 This PR is implementation/source-contract only. A later reviewed stage-transition PR is required before any V2 source collection can execute.
+
+## Runner contract addendum — frozen before any V2 strategy PnL
+
+Status of this addendum: **IMPLEMENTATION CONTRACT ONLY — NO RUNNER EXECUTION / NO DISCOVERY AUTHORIZATION / NO PNL**.
+
+The historical stage-isolation text above describes the earlier source-contract implementation PR. The authoritative stage lock now remains separately frozen at `SOURCE_AUDIT` with `sourceAudit:true` and `discovery/validation/holdout/paper/live:false`. This addendum does not change that lock.
+
+### Strict boolean API guards
+
+- `entryInputsReady.activeDegradation` is mandatory and must be a boolean. Any string, numeric, null or undefined value throws `CROSS_VENUE_V2_INVALID_DEGRADATION_FLAG`.
+- `entryFillIntegrityOutcome.entryActive` is mandatory and must be a boolean. Invalid values throw `CROSS_VENUE_V2_INVALID_ENTRY_ACTIVE_FLAG`.
+- `exitDecision.integrityOk` no longer defaults to healthy; omitted/non-true values fail closed as data-integrity failure.
+- Raw-number equity reconciliation is retired from the public V2 primitive surface. Reconciliation is through a verified event-sourced ledger object only.
+
+### Deterministic runner event order
+
+The only runner ordering key is `runnerEventKey(event)`:
+
+`(time_ms, phaseRank, venue, kind, stableId)`
+
+Equal timestamps use these immutable phase ranks:
+
+1. `FUNDING_SETTLEMENT`
+2. `EXIT_FILL`
+3. `ENTRY_FILL`
+4. `INTEGRITY_DETECTION`
+5. `COMMON_DECISION`
+6. `EXIT_DECISION`
+
+The complete key must be unique. Duplicate keys are a hard error.
+
+Consequences:
+
+- a detection tied with an entry fill sees the entry as open and is terminal `INCONCLUSIVE`;
+- a detection tied with an exit fill still treats the position as open through that timestamp and is terminal `INCONCLUSIVE`;
+- a detection tied with a common decision is processed first and blocks a new pending entry;
+- no alternate sorting path exists in the runner.
+
+### Frozen time rules
+
+- Entry fill: first complete 1h mark OPEN strictly after the decision timestamp, structurally `t+1h`.
+- Exit fill: first complete 1h mark OPEN strictly after exit decision, structurally `exitDecision+1h`.
+- Funding window: book settlement `s` only when `entryFill < s <= exitDecision`.
+- Horizon exit decision: `entryFill+24h`; fill follows one hour later.
+- Split isolation: an entry decision in a non-final split is eligible only when `decisionTime + 26h < nextSplitStart`. Equality is rejected. This prevents any Discovery/Validation cycle from reading later-split funding or marks.
+- Split start state is derived causally from events with timestamp strictly before the split start. An unresolved degradation episode carries into the split as degraded; no later data may heal the past.
+
+### Runner state machine
+
+States:
+
+- `FLAT_ELIGIBLE`
+- `ENTRY_PENDING`
+- `POSITION_OPEN`
+- `EXIT_PENDING`
+- `DEGRADED_FLAT`
+- `TERMINAL_INCONCLUSIVE`
+
+Rules:
+
+- `FLAT_ELIGIBLE + INTEGRITY_DETECTION -> DEGRADED_FLAT`.
+- Eligible active common decision -> `ENTRY_PENDING`; fill occurs only at the predeclared `t+1h`.
+- `ENTRY_PENDING + detection before fill -> DEGRADED_FLAT`, pending entry permanently cancelled.
+- `ENTRY_PENDING + fill -> POSITION_OPEN`.
+- `POSITION_OPEN + exit decision -> EXIT_PENDING`; fill occurs at decision +1h.
+- Any integrity detection while `POSITION_OPEN` or `EXIT_PENDING`, including exact entry/exit boundary ties, -> absorbing `TERMINAL_INCONCLUSIVE`.
+- `EXIT_PENDING + EXIT_FILL -> FLAT_ELIGIBLE`, but a detection at the same timestamp remains terminal by the inclusive position-at-detection rule.
+- Common decisions while pending/open are ignored; no pyramiding or averaging.
+- Cancelled pending entries never resurrect after recovery. A new entry requires a new post-recovery decision.
+- Illegal fills/decisions or impossible transitions throw `CROSS_VENUE_V2_ILLEGAL_TRANSITION`.
+- After terminal outcome the runner stops consuming later events. Later recovery, marks, funding or events cannot alter the outcome or causal trace.
+
+### Recovery
+
+`DEGRADED_FLAT` carries a recovery count `0..2` plus the latest reset time.
+
+- only a common usable on-grid settlement with timestamp strictly greater than the latest reset may advance recovery;
+- settlements must remain exactly 8h consecutive;
+- any integrity detection at or before candidate `T` resets the sequence;
+- a detection exactly at `T` is processed before the common decision and `T` does not count;
+- recovery is only accepted when the frozen `recoveryAt` contract says the third-or-later candidate is causally complete, including required marks only through `T-1h`;
+- a decision at the exact recovery timestamp may be used because its three spreads are the recovery settlements themselves.
+
+### Independent event-sourced ledger
+
+`research/cross-venue-funding-edge-v2-ledger.js` is intentionally arithmetically independent from the analytic strategy decomposition.
+
+Ledger inputs:
+
+- paired fill records: `{venue, side, qty, markOpen, time, feeBps, slipBps}`;
+- funding records: `{venue, rate, fundingMark, time}`;
+- hourly venue mark records;
+- the frozen 10,000 USDT notional per leg and operational buffer.
+
+Ledger mechanics:
+
+- separate venue cash accounts;
+- signed position quantity: LONG positive, SHORT negative;
+- funding cash: `-signedQty * fundingMark * rate`;
+- fill fees/slippage deducted from the fixed notional basis;
+- basis realization derived from signed quantity and mark movement;
+- operational buffer booked independently when a paired cycle closes;
+- hourly equity path = venue cash sum + unrealized signed-position value;
+- complete paired hourly marks are mandatory from entry through exit;
+- each returned ledger is marked `EVENT_SOURCED_V2` and protected by its own content digest.
+
+Forbidden inside the ledger arithmetic:
+
+- `fundingCashflow`;
+- `basisPnl`;
+- `costBreakdown`;
+- `directionLegs`.
+
+The analytic decomposition remains the independent side:
+
+- funding cashflows from the strategy primitives;
+- basis PnL from entry/exit marks;
+- frozen cost scenario.
+
+`reconcileLedger({ledger,decomposition})` first verifies ledger kind and digest, then compares ledger equity delta with the independent analytic decomposition at 1e-8 USD tolerance. Raw `openingEquity/closingEquity` objects are rejected.
+
+Later performance gates, if ever authorized, must derive equity and drawdown from the ledger path, never from the same pre-aggregated summands being reconciled.
+
+### Synthetic-only regression contract
+
+The implementation tests cover:
+
+- entry/exit/detection timestamp ties;
+- pending-entry cancellation and non-resurrection;
+- no-pyramid decisions;
+- illegal transitions;
+- input permutation invariance;
+- recovery resets, gaps, one-venue non-recovery and split-start carry;
+- generic earlier-integrity-event monotonicity across funding/mark/provenance/parser families;
+- terminal and prefix causality invariance;
+- strict 26h split isolation;
+- hand-calculated zero-move, funding-only, basis-only and mirrored-side accounting;
+- identical baseline/stress trade-path identity with exactly 12 USD frozen cost difference;
+- intentional cash/price/fee/qty/rate/sign corruption;
+- strict scalar typing;
+- runner self-lock while `stageLock.discovery !== true`;
+- an assertion that runner/ledger tests do not read the canonical source artifact/package.
+
+No test in this runner contract executes the canonical V2 source package or strategy PnL.
+
