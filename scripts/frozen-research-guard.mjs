@@ -13,7 +13,7 @@ export const FROZEN_RESEARCH_BLOBS=Object.freeze({
   'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-AUTHORIZATION.md':'a7623f82ce6049342f8ce3e338b27595e1f975f2',
   'research/CROSS-VENUE-FUNDING-EDGE-V2-SOURCE-AUDIT-EVALUATION.md':'04d8f5a59184a9812874123265bc05466b136f36',
   'research/cross-venue-funding-edge-v2-source-evaluation.json':'0cc60ce3dbee82d8f334074269832bcdc9e761f8',
-  'test/cross-venue-funding-edge-v2-source-evaluation.test.js':'58574edd13c76275a29e13cb27ee3028cf740c14',
+  'test/cross-venue-funding-edge-v2-source-evaluation.test.js':'1224cfad7ad4d20929e3881560bf6c1bf8fb4f58',
   'research/CROSS-VENUE-FUNDING-EDGE-V2-COVERAGE-EVIDENCE.json':'07c2778e0e91d68689bf0891e2c76f94ceaef1ac',
   'research/CROSS-VENUE-FUNDING-EDGE-V2-IMPLEMENTATION.md':'4903a0d7ec2a21cbc503cc07b481f7c7d0aa85f3',
   'research/cross-venue-funding-edge-v2.js':'2148e9ed047790df5a08d537720a3e5971a5f705',
