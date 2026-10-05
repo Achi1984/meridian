@@ -2,7 +2,7 @@ export const CROSS_VENUE_FUNDING_EDGE_V1='CROSS-VENUE-FUNDING-EDGE-V1';
 
 export const CROSS_VENUE_FUNDING_EDGE_V1_CONFIG=Object.freeze({
   symbol:'BTCUSDT',
-  venues:Object.freeze({binance:'BINANCE_USDM',bybit:'BYBIT_LINEAR'}),
+  venues:Object.freeze({binance:'BINANCE_USDM',okx:'OKX_USDT_SWAP'}),
   notionalPerLeg:10000,
   reservedCapital:20000,
   projectionIntervals:3,
@@ -10,7 +10,7 @@ export const CROSS_VENUE_FUNDING_EDGE_V1_CONFIG=Object.freeze({
   projectionHorizonHours:24,
   maxHoldingHours:24,
   binanceTakerBps:5,
-  bybitTakerBps:5.5,
+  okxTakerBps:5,
   slippageBps:3,
   stressSlippageBps:6,
   operationalBufferBps:5,
@@ -31,14 +31,14 @@ const sign=x=>Number(x)>0?1:Number(x)<0?-1:0;
 const abs=x=>Math.abs(Number(x));
 
 export function roundTripCosts(cfg=CROSS_VENUE_FUNDING_EDGE_V1_CONFIG){
-  const feeBps=2*Number(cfg.binanceTakerBps)+2*Number(cfg.bybitTakerBps);
+  const feeBps=2*Number(cfg.binanceTakerBps)+2*Number(cfg.okxTakerBps);
   const baseSlippageBps=4*Number(cfg.slippageBps);
   const stressSlippageBps=4*Number(cfg.stressSlippageBps);
   const baseBps=feeBps+baseSlippageBps+Number(cfg.operationalBufferBps);
   const stressBps=feeBps+stressSlippageBps+Number(cfg.operationalBufferBps);
   const baseUsd=Number(cfg.notionalPerLeg)*baseBps/10000;
   const stressUsd=Number(cfg.notionalPerLeg)*stressBps/10000;
-  const closeBps=Number(cfg.binanceTakerBps)+Number(cfg.bybitTakerBps)+2*Number(cfg.slippageBps);
+  const closeBps=Number(cfg.binanceTakerBps)+Number(cfg.okxTakerBps)+2*Number(cfg.slippageBps);
   const closeUsd=Number(cfg.notionalPerLeg)*closeBps/10000;
   return Object.freeze({
     feeBps,baseSlippageBps,stressSlippageBps,baseBps,stressBps,closeBps,
@@ -48,9 +48,9 @@ export function roundTripCosts(cfg=CROSS_VENUE_FUNDING_EDGE_V1_CONFIG){
   });
 }
 
-export function fundingSpread(binanceRate,bybitRate){
-  if(!finite(binanceRate)||!finite(bybitRate))throw new Error('CROSS_VENUE_V1_INVALID_FUNDING_RATE');
-  return Number(bybitRate)-Number(binanceRate);
+export function fundingSpread(binanceRate,okxRate){
+  if(!finite(binanceRate)||!finite(okxRate))throw new Error('CROSS_VENUE_V1_INVALID_FUNDING_RATE');
+  return Number(okxRate)-Number(binanceRate);
 }
 
 export function conservativeProjection(spreads=[],cfg=CROSS_VENUE_FUNDING_EDGE_V1_CONFIG){
@@ -65,7 +65,7 @@ export function conservativeProjection(spreads=[],cfg=CROSS_VENUE_FUNDING_EDGE_V
   return{
     valid:true,
     direction,
-    directionLabel:direction>0?'LONG_BINANCE_SHORT_BYBIT':'LONG_BYBIT_SHORT_BINANCE',
+    directionLabel:direction>0?'LONG_BINANCE_SHORT_OKX':'LONG_OKX_SHORT_BINANCE',
     conservative8hSpread,
     projectedSpread,
     projectedFundingUsd:Number(cfg.notionalPerLeg)*projectedSpread
@@ -114,15 +114,15 @@ export function fundingCashflow({side,qty,mark,rate}={}){
   return side==='LONG'?-payment:payment;
 }
 
-export function basisPnl({binanceSide,binanceQty,binanceEntry,binanceMark,bybitSide,bybitQty,bybitEntry,bybitMark}={}){
-  const fields=[binanceQty,binanceEntry,binanceMark,bybitQty,bybitEntry,bybitMark];
-  if(!['LONG','SHORT'].includes(binanceSide)||!['LONG','SHORT'].includes(bybitSide)||fields.some(x=>!finite(x)))throw new Error('CROSS_VENUE_V1_INVALID_BASIS_INPUT');
+export function basisPnl({binanceSide,binanceQty,binanceEntry,binanceMark,okxSide,okxQty,okxEntry,okxMark}={}){
+  const fields=[binanceQty,binanceEntry,binanceMark,okxQty,okxEntry,okxMark];
+  if(!['LONG','SHORT'].includes(binanceSide)||!['LONG','SHORT'].includes(okxSide)||fields.some(x=>!finite(x)))throw new Error('CROSS_VENUE_V1_INVALID_BASIS_INPUT');
   const leg=(side,qty,entry,mark)=>(side==='LONG'?1:-1)*Number(qty)*(Number(mark)-Number(entry));
-  return leg(binanceSide,binanceQty,binanceEntry,binanceMark)+leg(bybitSide,bybitQty,bybitEntry,bybitMark);
+  return leg(binanceSide,binanceQty,binanceEntry,binanceMark)+leg(okxSide,okxQty,okxEntry,okxMark);
 }
 
 export function directionLegs(direction){
-  if(Number(direction)===1)return{binance:'LONG',bybit:'SHORT'};
-  if(Number(direction)===-1)return{binance:'SHORT',bybit:'LONG'};
+  if(Number(direction)===1)return{binance:'LONG',okx:'SHORT'};
+  if(Number(direction)===-1)return{binance:'SHORT',okx:'LONG'};
   throw new Error('CROSS_VENUE_V1_INVALID_DIRECTION');
 }
