@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "protocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md",
+  "lead": "CHATGPT",
+  "subAgent": "CLAUDE",
+  "status": "HELD",
+  "acquiredAtMainSha": "24ed4408eb66c92b651c7c2c292623808d46f4e9",
+  "releasedAtMainSha": null,
+  "nextLead": null,
+  "crossModelReviewRequiredFor": [
+    "DATA_CONTRACT",
+    "SOURCE_RECEIPT",
+    "SPLIT_OR_STAGE_LOCK",
+    "ACCOUNTING",
+    "STRATEGY_PNL",
+    "RESEARCH_STAGE_TRANSITION"
+  ],
+  "subAgentMayPushMain": false,
+  "subAgentMayMerge": false
+}
