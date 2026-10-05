@@ -426,7 +426,7 @@ Every split stream starts at frozen `rawStart`.
 - non-final split entry eligibility is strict `decision + 26h < nextSplitStart`;
 - recovery marks are truncated to rows whose `openTime + 1h <= streamEnd`;
 - later-split rows may not alter prior split-local events or causal digest when split boundaries are held fixed.
-- full-package integrity events are validated for global source binding, but serialized stream integrity is re-derived from the causal source prefix only: funding rows with `rawTime <= streamEnd` and marks with `openTime + 1h <= streamEnd`; a future funding row may not retroactively create a prior-stream `FUNDING_GAP`.
+- full-package integrity events are validated once by the frozen source contract; the serialized split stream includes only events with `detectionTime <= streamEnd` and only the causal structural fields `{time,kind,venue,stableId,integrityKind,subjectTime,segment}`. Future-dependent audit detail such as `before`, `gapMs` or duplicate `count` is never serialized, so a later source row may refine global gap detail without changing the earlier split-local event or `streamDigest`.
 
 ### Source binding vs split-local causal digest
 
