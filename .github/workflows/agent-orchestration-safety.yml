@@ -13,6 +13,8 @@ on:
       - "scripts/lead_lease_validation.py"
       - "test/test_lead_lease_validation.py"
       - ".github/workflows/agent-orchestration-safety.yml"
+      - ".github/workflows/claude-mailbox-review.yml"
+      - "test/test_claude_mailbox_bridge.py"
   push:
     branches:
       - main
@@ -27,6 +29,8 @@ on:
       - "scripts/lead_lease_validation.py"
       - "test/test_lead_lease_validation.py"
       - ".github/workflows/agent-orchestration-safety.yml"
+      - ".github/workflows/claude-mailbox-review.yml"
+      - "test/test_claude_mailbox_bridge.py"
   workflow_dispatch:
 
 permissions:
@@ -46,3 +50,5 @@ jobs:
         run: python3 test/test_lead_lease_validation.py
       - name: Validate orchestration contract and durable state
         run: python3 scripts/validate-agent-orchestration.py
+      - name: Validate Claude mailbox bridge safety
+        run: python3 test/test_claude_mailbox_bridge.py
