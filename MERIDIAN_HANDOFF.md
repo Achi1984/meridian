@@ -819,3 +819,10 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - The main advance touches only UI/version/tests and does not overlap the ten PR #542 source-evaluation/continuity files.
 - This checkpoint intentionally changes no source evidence, receipt, data contract, stage lock, accounting or strategy logic. Its commit exists to force current-base PR CI and therefore invalidates the prior exact-head review request.
 - A new exact-head Claude request is required before merge. V2 remains `SOURCE_AUDIT`; no Source Audit rerun and no strategy PnL.
+
+## COORDINATION CHECKPOINT — 2026-10-05 · PR #542 current-base gate repair
+
+- Current-base CI on exact HEAD `3a937befde11ea97d443073bd5ba16f73bf6440a` correctly failed Agent Orchestration Safety because r113 raised `version.json.terminalBuild` to `10.0-r113` while PR #542 still persisted top-level continuity build `10.0-r112`.
+- Repair is continuity-only: align `MERIDIAN_RESUME.build`, `MERIDIAN_RESUME.sourceOfTruth.verifiedSha`, `MERIDIAN_AGENT_STATE.lastCheckpoint`, and the Chat Handoff build/checkpoint to current main `d4a628fee5cf527e0218b99635d80b9cd91bd0ad` / `10.0-r113`.
+- Canonical V2 source lineage remains `63f93aa41b6e054b229309b6fd6fbc2447a92181`; source evidence, receipt digests, collector, data contract, stage lock, accounting, Frozen Guard pins and strategy semantics are unchanged.
+- This repair creates a new exact HEAD and therefore requires Claude review loop 3/3 before merge. No Source Audit rerun and no strategy PnL.
