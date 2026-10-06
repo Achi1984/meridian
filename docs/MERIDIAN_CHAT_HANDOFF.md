@@ -111,3 +111,16 @@ This section supersedes the earlier “Exact next durable step” where it confl
 - V2 remains `SOURCE_AUDIT`. Discovery, Validation, Holdout, strategy PnL, Paper and Live remain unauthorized.
 - **Current exact next durable step after source-evaluation merge:** implement the deterministic V2 runner/episode state machine, strict boolean `entryActive`, independent ledger/equity construction and generic causality tests — still without executing strategy PnL.
 
+
+
+## CHAT HANDOFF — 2026-10-06
+
+- Live main: `ab1c4254168c5fa024405fcb92447e3f4151ed9a`
+- terminalBuild: `10.0-r126`
+- R126 / PR #586: MERGED, Claude exact-head GREEN_LIGHT, pre/post-merge core gates GREEN.
+- R126 Pages/Runtime incident: Runtime Smoke failed because public Pages still served r125 while Pages deploy stayed WAITING. Claude diagnosis run `37518085057`: LIKELY_ROOT_CAUSE = GitHub platform-side stall of legacy Pages deploy, not repo code/config. Do not blindly rerun or mutate; reconcile live Pages/runtime state first.
+- Stage 2 / PR #585: safely rebased on R126, exact head `2528ed285391e532b1055e18744aa9222f8e8c3a`, 0 behind, mergeable Draft, Release Safety + Visual QA GREEN, Claude GREEN_LIGHT. Still frozen; no release/merge authorization.
+- STREAM-SAFE-V7 design: Claude GREEN_LIGHT run `37518857170`. Goal: very short resumable turns. Key rule for next chat: one bounded state-pack/read per turn; after any mutation STOP; long CI/Claude request then STOP; no repeated polling; WAITING/no-op turns are valid; concise replies only.
+- Authoritative mailbox: Issue #571.
+- Hard boundaries unchanged: V2 SOURCE_AUDIT; canonicalExecutionAuthorized=false; strategyPnlAuthorized=false; discoveryAuthorized=false; validationAuthorized=false; holdoutAuthorized=false; paperAuthorized=false; liveAuthorized=false; no trading action.
+- Next chat bootstrap: user can write exactly `Go Meridian`. First action: reconcile #571 + live main + checkpoint + only relevant PR/runs. Do not repeat completed writes.
