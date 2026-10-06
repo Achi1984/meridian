@@ -102,6 +102,10 @@ req(coord.get('resumeOnInterruption')=='RECONCILE_REPO_THEN_CONTINUE_FIRST_INCOM
 req(resume.get('build')==version.get('terminalBuild'),'MERIDIAN_RESUME build must match version.json terminalBuild')
 req(coord.get('streamSafeProtocol')=='STREAM-SAFE-V5','resume stream-safe protocol must be V5')
 req(coord.get('compactBootstrap')=='MERIDIAN_LIVE_CHECKPOINT.json','compact bootstrap must be MERIDIAN_LIVE_CHECKPOINT.json')
+req(coord.get('maxToolCallGroupsPerVisibleBurst')==1,'resume tool-call group cap must be exactly 1')
+req(coord.get('maxVisibleBurstSeconds')==45,'resume visible burst time budget must be 45 seconds')
+req(coord.get('maxPayloadBytes')==4096,'resume stream payload budget must be 4096 bytes')
+req(coord.get('oneMutationPerBurst') is True,'resume must enforce one mutation per burst')
 
 if errors:
     for e in errors:

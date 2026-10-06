@@ -1265,7 +1265,7 @@
     "streamSafeProtocol": "STREAM-SAFE-V5",
     "maxToolCallGroupsPerVisibleBurst": 1,
     "maxSameStatusPollsPerVisibleBurst": 1,
-    "maxVisibleBurstSeconds": 90,
+    "maxVisibleBurstSeconds": 45,
     "userVisibleCheckpointRequired": true,
     "crossModelProtocol": "MERIDIAN_CROSS_MODEL_PROTOCOL.md",
     "leadLease": "MERIDIAN_LEAD_LEASE.json",
