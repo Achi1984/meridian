@@ -1,21 +1,28 @@
 name: R122 Release Identity Finalizer
+
 on:
   push:
-    branches: [v10-r122-top-fold-simplification]
-    paths: [.github/workflows/r122-release-identity-finalizer.yml]
+    branches:
+      - v10-r122-top-fold-simplification
+    paths:
+      - .github/workflows/r122-release-identity-finalizer.yml
+
 permissions:
   contents: write
+
 jobs:
   finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ github.sha }}, fetch-depth: 2}
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
       - name: Guard, finalize and self-delete
         shell: bash
         env:
           EVENT_BEFORE: ${{ github.event.before }}
-          EXPECTED_PARENT: f86c27160ed4a04e8f3a66c5326aac08addf024e
+          EXPECTED_PARENT: 4e9436f9f305cf8e4fc91b77572af4f412c62216
           TARGET_BRANCH: v10-r122-top-fold-simplification
         run: |
           set -euo pipefail
