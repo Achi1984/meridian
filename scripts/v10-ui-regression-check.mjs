@@ -190,7 +190,7 @@ must(js.includes('const nearBottom=scrollY+innerHeight>=root.scrollHeight-4'),'b
 must(js.includes('const navCandidates=nearBottom?'),'bottom-nav occlusion candidate scan missing');
 must(js.includes('navOcclusions'),'bottom-nav occlusion evidence missing');
 must(js.includes('layout.bottomClearance&&!report.bodyOverflow'),'bottom clearance must gate visual QA pass/fail');
-must(js.includes('layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant'),'view structural invariants must gate visual QA');
+must(/report\.ok=[^;\n]*layout\.commandHubInvariant[^;\n]*layout\.degradedPriorityInvariant[^;\n]*layout\.botAccordionInvariant[^;\n]*layout\.forecastFibInvariant[^;\n]*layout\.secondaryViewInvariant[^;\n]*layout\.partialValueParity/.test(js),'view structural invariants must gate visual QA');
 must(qa.includes("['command-bottom','command',6000]"),'Command bottom evidence capture missing');
 must(qa.includes("['bots-bottom','bots',6000]"),'Bots bottom evidence capture missing');
 must(qa.includes("['forecast-fib','market',1050]"),'Forecast FIB evidence capture missing');
