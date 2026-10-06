@@ -852,13 +852,13 @@ function fibNearestContext(levels,currentInput){
   if(!rows.length)return null;
   rows.sort((a,b)=>Math.abs(Number(a.price)-current)-Math.abs(Number(b.price)-current)||Number(a.price)-Number(b.price));
   const level=rows[0];
-  return{f:Number(level.ratio),price:Number(level.price)};
+  return{f:Number(level.ratio),price:Number(level.price),current};
 }
 function fibAutoNear(symbol){
   const key=String(symbol||'').trim().toUpperCase(),ctx=fibAutoContext.get(key);
   if(!ctx||ctx.mode!=='AUTO'||!freshTs(ctx.loadedAt))return null;
-  const f=Number(ctx.near?.f),price=Number(ctx.near?.price);
-  return Number.isFinite(f)&&price>0?{f,price}:null;
+  const f=Number(ctx.near?.f),price=Number(ctx.near?.price),current=Number(ctx.near?.current);
+  return Number.isFinite(f)&&price>0?{f,price,current:current>0?current:null,source:'AUTO-MAP'}:null;
 }
 function opportunityContext(symbol){
   const i=marketIntel(symbol),sig=marketSignal(i);
@@ -877,7 +877,7 @@ function opportunityContext(symbol){
   const p=Number(i.price),e20=Number(i.ema20),e50=Number(i.ema50),bullTrend=p>e20&&e20>e50,bearTrend=p<e20&&e20<e50,dir=sig.label.startsWith('BULL')?1:sig.label.startsWith('BEAR')?-1:0;
   if((dir===1&&bullTrend)||(dir===-1&&bearTrend)){score+=15;reasons.push('Trendstruktur bestätigt Richtung')}
   else if(bullTrend||bearTrend){score+=8;reasons.push('Trendstruktur vorhanden')}
-  const near=fibAutoNear(symbol)||i.near,nearPrice=Number(near?.price),nearRatio=Number(near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null;
+  const autoNear=fibAutoNear(symbol),near=autoNear||i.near,nearPrice=Number(near?.price),nearRatio=Number(near?.f),fibDistance=p>0&&nearPrice>0?Math.abs(nearPrice-p)/p*100:null,displayRef=autoNear&&Number(autoNear.current)>0?Number(autoNear.current):p,fibDisplayDistance=displayRef>0&&nearPrice>0?Math.abs(nearPrice-displayRef)/displayRef*100:null,fibSource=autoNear?'AUTO-MAP':'FEED';
   if(fibDistance!=null){
     if(fibDistance<=1){score+=15;reasons.push('Nahe relevantem FIB-Level')}
     else if(fibDistance<=2.5){score+=10;reasons.push('FIB-Kontext in Reichweite')}
@@ -886,13 +886,13 @@ function opportunityContext(symbol){
   if(sig.label==='CONFLICT'){score-=15;reasons.push('Bull/Bear-Konflikt')}
   score=Math.max(0,Math.min(100,Math.round(score)));
   const label=score>=80?'A · HIGH CONTEXT':score>=65?'B · GOOD CONTEXT':score>=50?'C · MIXED CONTEXT':'D · LOW CONTEXT',tone=score>=80?'safe':score>=60?'watch':'muted';
-  const fib=Number.isFinite(nearRatio)&&nearPrice>0?fmt(nearRatio,3)+' · '+H().money?.(nearPrice)+(fibDistance!=null?' · '+fmt(fibDistance,2)+'%':''):'—';
-  return{available:true,score,label,tone,signal:sig.label,momentum,fib,fibDistance,reasons};
+  const fib=Number.isFinite(nearRatio)&&nearPrice>0?fmt(nearRatio,3)+' · '+H().money?.(nearPrice)+(fibDisplayDistance!=null?' · '+fmt(fibDisplayDistance,2)+'%':''):'—';
+  return{available:true,score,label,tone,signal:sig.label,momentum,fib,fibDistance,fibDisplayDistance,fibSource,reasons};
 }
 function forecastContextHtml(symbol){
   const h=H(),ctx=opportunityContext(symbol),i=marketIntel(symbol),m=marketPrice(symbol);
   if(!ctx.available)return '<section class="forecast-focus forecast-focus-blocked"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>NO FRESH CONTEXT</b><small>FIB-/SK-Map kann separat laden; Opportunity Quality bleibt ohne frische Multi-Timeframe-Daten blockiert.</small></div></section>';
-  return '<section class="forecast-focus"><div class="forecast-focus-head"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>'+esc(ctx.signal)+'</b><small>'+h.money?.(m.value)+' · '+esc(m.source)+'</small></div><strong class="tone-'+ctx.tone+'">OPPORTUNITY '+ctx.score+'/100 · '+esc(ctx.label)+'</strong></div><div class="forecast-focus-grid"><span>MOMENTUM <b>'+esc(ctx.momentum)+'</b></span><span>NEAREST FIB <b>'+esc(ctx.fib)+'</b></span><span>RSI 1h / 4h <b>'+fmt(i?.rsi1h)+' · '+fmt(i?.rsi4)+'</b></span><span>MACD 1h / 4h <b>'+fmt(i?.macd1h?.hist,2)+' · '+fmt(i?.macd4?.hist,2)+'</b></span></div><small class="forecast-context-note">'+esc(ctx.reasons.slice(0,3).join(' · '))+' · Opportunity Quality ist Markt-Kontext, keine Renditeprognose oder Order-Freigabe.</small></section>';
+  return '<section class="forecast-focus"><div class="forecast-focus-head"><div><span>FORECAST FOCUS · '+esc(symbol)+'</span><b>'+esc(ctx.signal)+'</b><small>'+h.money?.(m.value)+' · '+esc(m.source)+'</small></div><strong class="tone-'+ctx.tone+'">OPPORTUNITY '+ctx.score+'/100 · '+esc(ctx.label)+'</strong></div><div class="forecast-focus-grid"><span>MOMENTUM <b>'+esc(ctx.momentum)+'</b></span><span>NEAREST FIB · '+esc(ctx.fibSource)+' <b>'+esc(ctx.fib)+'</b></span><span>RSI 1h / 4h <b>'+fmt(i?.rsi1h)+' · '+fmt(i?.rsi4)+'</b></span><span>MACD 1h / 4h <b>'+fmt(i?.macd1h?.hist,2)+' · '+fmt(i?.macd4?.hist,2)+'</b></span></div><small class="forecast-context-note">'+esc(ctx.reasons.slice(0,3).join(' · '))+' · Opportunity Quality ist Markt-Kontext, keine Renditeprognose oder Order-Freigabe.</small></section>';
 }
 function marketRow(symbol){
   const s=S(),h=H(),i=marketIntel(symbol),m=marketPrice(symbol);
