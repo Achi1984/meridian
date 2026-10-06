@@ -19,8 +19,9 @@ function adapt(){
 
   const title=hub.querySelector('.section-title h2');
   const note=hub.querySelector('.section-title small');
-  if(title)title.textContent='NEXT ACTION';
-  if(note)note.textContent='Priorität · read-only · keine Trading-Aktion';
+  if(title&&title.textContent!=='NEXT ACTION')title.textContent='NEXT ACTION';
+  const nextNote='Priorität · read-only · keine Trading-Aktion';
+  if(note&&note.textContent!==nextNote)note.textContent=nextNote;
 
   if(risk.previousElementSibling!==hub)hub.insertAdjacentElement('afterend',risk);
 
@@ -38,7 +39,7 @@ function adapt(){
 
   const remaining=root.querySelector('.command-attention');
   if(remaining&&remaining.previousElementSibling!==open)open.insertAdjacentElement('afterend',remaining);
-  root.dataset.r122Layout='true';
+  if(root.dataset.r122Layout!=='true')root.dataset.r122Layout='true';
 }
 
 function schedule(){
@@ -49,7 +50,7 @@ function schedule(){
 function start(){
   const root=view();if(!root)return;
   adapt();
-  new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
+  new MutationObserver(schedule).observe(root,{childList:true});
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
