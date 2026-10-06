@@ -1,0 +1,55 @@
+name: Mailbox R5 Durable Alignment Writer
+on:
+  push:
+    branches: [infra/claude-mailbox-r5]
+    paths: [.github/workflows/mailbox-r5-durable-alignment-writer.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Guard patch verify self-delete
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EXPECTED_PARENT: 608516a6e67254b8a54943e4a16d17ffdb8c94a0
+          TARGET_BRANCH: infra/claude-mailbox-r5
+        run: |
+          set -euo pipefail
+          test "$EVENT_BEFORE" = "$EXPECTED_PARENT"
+          test "$(git hash-object MERIDIAN_CROSS_MODEL_PROTOCOL.md)" = 94052588a0542f7c692b36e477d7d1faceeccd5e
+          test "$(git hash-object MERIDIAN_AGENT_STATE.json)" = c4a6dc2f1a891de41ae5e6e8145b10ad2782e7f0
+          test "$(git hash-object docs/MERIDIAN_CHAT_HANDOFF.md)" = b3b3da0e251c921817c138a340a0e038af3df7ab
+          python3 - <<'PY'
+          from pathlib import Path
+          def rep(path,old,new,n=1):
+              p=Path(path); s=p.read_text()
+              assert s.count(old)==n,(path,old,s.count(old),n)
+              p.write_text(s.replace(old,new))
+          p="MERIDIAN_CROSS_MODEL_PROTOCOL.md"
+          rep(p,"GitHub Issue **#539**","die in `MERIDIAN_LIVE_CHECKPOINT.json` unter `mailboxIssue` referenzierte GitHub Issue")
+          rep(p,"einen neuen Kommentar in #539 von","einen neuen Kommentar in der dort referenzierten Mailbox von")
+          rep(p,"in #539.","in der durch `mailboxIssue` referenzierten Mailbox.",2)
+          rep(p,"#539/Achi1984-Trigger","`mailboxIssue`/Achi1984-Trigger")
+          rep(p,"liest #539 als verbindliche Mailbox","liest die durch `mailboxIssue` referenzierte Issue als verbindliche Mailbox")
+          marker="- Die Lead-Lease-Regeln bleiben unverändert:"
+          add="- Mailbox-Hygiene: nur REQUEST/RESPONSE/NEEDS_USER_DECISION/finaler Merge-Status; INTENT/Fortschritt in einem editierbaren PR-Statuskommentar; Rollover bei >200 Kommentaren.\n"
+          s=Path(p).read_text(); assert s.count(marker)==1; Path(p).write_text(s.replace(marker,add+marker))
+          rep("MERIDIAN_AGENT_STATE.json","READ_539_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI","READ_CHECKPOINT_MAILBOX_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI")
+          rep("MERIDIAN_AGENT_STATE.json","Read Issue #539 comments since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items","Read MERIDIAN_LIVE_CHECKPOINT.mailboxIssue comments since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items")
+          rep("docs/MERIDIAN_CHAT_HANDOFF.md","reviewer-only Issue #539 loop active","reviewer-only checkpoint-driven mailbox loop active")
+          rep("docs/MERIDIAN_CHAT_HANDOFF.md","read Issue #539 first","read the issue referenced by `MERIDIAN_LIVE_CHECKPOINT.mailboxIssue` first")
+          PY
+          python3 -m json.tool MERIDIAN_AGENT_STATE.json >/dev/null
+          rm .github/workflows/mailbox-r5-durable-alignment-writer.yml
+          git diff --check
+          git config user.name "MERIDIAN Mailbox R5 Writer"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Infra: align durable mailbox references"
+          git push origin HEAD:"$TARGET_BRANCH"
