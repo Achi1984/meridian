@@ -22,6 +22,8 @@ const cases=[
   ['scanner-top','research',0],['scanner-bottom','research',6000],
   ['asset-detail-top','asset-detail',0],['asset-detail-bottom','asset-detail',6000],
   ['paper-top','paper',0],['paper-bottom','paper',6000],
+  ['mobile-375-command','command',0,null,'fresh',375,667],['mobile-375-forecast','market',0,null,'fresh',375,667],
+  ['mobile-320-command','command',0,null,'fresh',320,568],['mobile-320-forecast','market',0,null,'fresh',320,568],
   ['flow-primary-reset','command',900,'primary-reset'],
   ['flow-asset-return','depot',700,'asset-return'],
   ['flow-bot-toggle','bots',0,'bot-toggle'],
@@ -35,13 +37,13 @@ const cases=[
 function decodeText(s){
   return String(s||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 }
-function runChrome(name,kind,url,extra=[]){
+function runChrome(name,kind,url,caseViewport=viewport,extra=[]){
   const profile=path.join('/tmp','meridian-visual-qa-'+process.pid+'-'+name+'-'+kind);
   const virtualBudget=name.startsWith('flow-')?8000:2600;
   const args=[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--hide-scrollbars',
     '--run-all-compositor-stages-before-draw','--force-device-scale-factor=1',
-    '--window-size='+viewport.width+','+viewport.height,'--virtual-time-budget='+virtualBudget,
+    '--window-size='+caseViewport.width+','+caseViewport.height,'--virtual-time-budget='+virtualBudget,
     '--user-data-dir='+profile,...extra,url.toString()
   ];
   const p=spawnSync(chrome,args,{cwd:ROOT,encoding:'utf8',timeout:45000,maxBuffer:30*1024*1024});
@@ -56,12 +58,12 @@ function runChrome(name,kind,url,extra=[]){
 
 const summaries=[];
 for(let i=0;i<cases.length;i++){
-  const [name,view,scroll,flow,dataMode]=cases[i],png=path.join(OUT,name+'.png'),url=new URL(base);
-  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('build',revision);if(flow)url.searchParams.set('qaFlow',flow);if(dataMode)url.searchParams.set('qaData',dataMode);
+  const [name,view,scroll,flow,dataMode,width=viewport.width,height=viewport.height]=cases[i],caseViewport={width,height},png=path.join(OUT,name+'.png'),url=new URL(base);
+  url.searchParams.set('visualQa','1');url.searchParams.set('qaView',view);url.searchParams.set('qaScroll',String(scroll));url.searchParams.set('qaWidth',String(width));url.searchParams.set('qaHeight',String(height));url.searchParams.set('build',revision);if(flow)url.searchParams.set('qaFlow',flow);if(dataMode)url.searchParams.set('qaData',dataMode);
 
   // Chrome does not reliably emit --dump-dom when screenshot capture is requested in the same process.
   // Keep layout evaluation and evidence capture as separate deterministic invocations.
-  const domRun=runChrome(name,'dom',url,['--dump-dom']);
+  const domRun=runChrome(name,'dom',url,caseViewport,['--dump-dom']);
   const dom=String(domRun.stdout||'');
   const m=dom.match(/<pre id="visual-qa-report"[^>]*>([\s\S]*?)<\/pre>/);
   if(!m){
@@ -71,7 +73,7 @@ for(let i=0;i<cases.length;i++){
   }
   const report=JSON.parse(decodeText(m[1]));
 
-  const shotRun=runChrome(name,'shot',url,['--screenshot='+png]);
+  const shotRun=runChrome(name,'shot',url,caseViewport,['--screenshot='+png]);
   if(!fs.existsSync(png)||fs.statSync(png).size<1000){
     fs.writeFileSync(path.join(OUT,name+'-shot.stderr.txt'),String(shotRun.stderr||''));
     throw new Error(name+' screenshot missing or empty');
