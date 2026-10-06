@@ -1682,8 +1682,8 @@ function renderLab(){
 function localVisualQaConfig(){
   if(!['127.0.0.1','localhost'].includes(location.hostname))return null;
   const q=new URLSearchParams(location.search);if(q.get('visualQa')!=='1')return null;
-  const allowed=['command','depot','bots','market','research'],flows=['primary-reset','asset-return','bot-toggle','bot-filter-return','scanner-forecast-return','stale-recovery'],dataModes=['fresh','stale','error'],view=allowed.includes(q.get('qaView'))?q.get('qaView'):'command',scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0)),flow=flows.includes(q.get('qaFlow'))?q.get('qaFlow'):null,dataMode=dataModes.includes(q.get('qaData'))?q.get('qaData'):'fresh';
-  return{view,scroll,flow,dataMode};
+  const allowed=['command','depot','bots','market','research','asset-detail','paper'],flows=['primary-reset','asset-return','bot-toggle','bot-filter-return','scanner-forecast-return','stale-recovery'],dataModes=['fresh','stale','error'],requestedView=String(q.get('qaView')||'command'),view=allowed.includes(requestedView)?requestedView:requestedView,invalidView=allowed.includes(requestedView)?null:requestedView,scroll=Math.max(0,Math.min(6000,Number(q.get('qaScroll'))||0)),flow=flows.includes(q.get('qaFlow'))?q.get('qaFlow'):null,dataMode=dataModes.includes(q.get('qaData'))?q.get('qaData'):'fresh';
+  return{view,scroll,flow,dataMode,invalidView};
 }
 function setLocalVisualQaDataMode(mode,s=S(),now=Date.now()){
   if(!s)return;
@@ -1852,7 +1852,8 @@ async function runLocalInteractionQa(cfg){
 }
 function renderLocalVisualQa(cfg){
   try{
-    $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
+    if(cfg.invalidView)throw new Error('UNKNOWN_VISUAL_QA_VIEW '+cfg.invalidView);
+    $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
     $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
     renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
     window.scrollTo(0,cfg.scroll);
