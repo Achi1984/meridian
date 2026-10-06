@@ -5,13 +5,14 @@ import fs from 'node:fs';
 const helper=fs.readFileSync(new URL('../v10/r123-command-status-owner.js',import.meta.url),'utf8');
 const index=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+const build=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8')).terminalBuild;
 
 function block(a,b){const i=js.indexOf(a),j=js.indexOf(b,i+1);assert.ok(i>=0&&j>i,'expected '+a);return js.slice(i,j)}
 
 test('r123 loads after validated v10 and r122 layout',()=>{
-  const core=index.indexOf('./v10.js?v=10.0-r122');
-  const layout=index.indexOf('./r122-command-layout.js?v=10.0-r122');
-  const owner=index.indexOf('./r123-command-status-owner.js?v=10.0-r122');
+  const core=index.indexOf('./v10.js?v='+build);
+  const layout=index.indexOf('./r122-command-layout.js?v='+build);
+  const owner=index.indexOf('./r123-command-status-owner.js?v='+build);
   assert.ok(core>=0&&layout>core&&owner>layout);
 });
 
