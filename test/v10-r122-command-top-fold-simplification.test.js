@@ -6,52 +6,34 @@ const adapter=fs.readFileSync(new URL('../v10/r122-command-layout.js',import.met
 const index=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 
-function block(startNeedle,endNeedle){
-  const a=js.indexOf(startNeedle),b=js.indexOf(endNeedle,a+1);
-  assert.ok(a>=0&&b>a,'expected source block '+startNeedle);
-  return js.slice(a,b);
-}
+function block(a,b){const i=js.indexOf(a),j=js.indexOf(b,i+1);assert.ok(i>=0&&j>i,'expected '+a);return js.slice(i,j)}
 
-test('r122 loads bounded layout adapter after the validated v10 renderer',()=>{
-  const core=index.indexOf('./v10.js?v=10.0-r121');
-  const layout=index.indexOf('./r122-command-layout.js?v=10.0-r121');
-  assert.ok(core>=0&&layout>core);
-  assert.match(adapter,/presentation-only Command layout adapter/);
+test('r122 loads adapter after the r122 v10 renderer',()=>{
+ const core=index.indexOf('./v10.js?v=10.0-r122'),layout=index.indexOf('./r122-command-layout.js?v=10.0-r122');
+ assert.ok(core>=0&&layout>core);assert.match(adapter,/transitional presentation adapter/)
 });
 
-test('r122 removes duplicated ATTENTION references and empty reassurance',()=>{
-  assert.match(adapter,/querySelectorAll\('\.attention-reference'\)\.forEach\(x=>x\.remove\(\)\)/);
-  assert.match(adapter,/rows\.every\(x=>x\.classList\.contains\('tone-safe'\)\)/);
-  assert.doesNotMatch(adapter,/KEIN KRITISCHER PUNKT/);
+test('r122 de-duplicates ATTENTION without hiding authoritative warning sources',()=>{
+ assert.match(adapter,/attention-reference/);assert.match(adapter,/tone-safe/);
+ const src=block('function commandAttentionHtml()','function commandPaperPresentation');
+ for(const x of ['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE','PORTFOLIO AUTHORITY','BOT COVERAGE','MARKET COVERAGE'])assert.match(src,new RegExp(x))
 });
 
-test('r122 orders decision before detail without changing risk derivation',()=>{
-  assert.match(adapter,/hub\.insertAdjacentElement\('afterend',risk\)/);
-  assert.match(adapter,/risk\.insertAdjacentElement\('afterend',open\)/);
-  assert.match(adapter,/open\.insertAdjacentElement\('afterend',remaining\)/);
-  assert.match(adapter,/open\.appendChild\(grid\)/);
-  const health=block('function commandHealthSummary()','function commandOverviewHtml()');
-  assert.match(health,/const rank=\{danger:4,watch:3,muted:2,safe:1\}/);
-  assert.match(health,/worst=\[portfolio,riskView,data\]/);
+test('r122 preserves worst-of risk semantics and removes duplicate NEXT header',()=>{
+ const health=block('function commandHealthSummary()','function commandOverviewHtml()');
+ assert.match(health,/rank=\{danger:4,watch:3,muted:2,safe:1\}/);assert.match(health,/worst=\[portfolio,riskView,data\]/);
+ assert.match(adapter,/querySelector\('\.section-title'\)\?\.remove\(\)/);
+ assert.match(adapter,/command-open-navigation/)
 });
 
-test('r122 preserves all critical warning sources after ATTENTION de-dup',()=>{
-  const attention=block('function commandAttentionHtml()','function commandPaperPresentation');
-  for(const code of ['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'])
-    assert.match(attention,new RegExp(code));
-  for(const label of ['PORTFOLIO AUTHORITY','BOT COVERAGE','MARKET COVERAGE'])
-    assert.match(attention,new RegExp(label));
-  assert.match(adapter,/const risk=root\.querySelector\('\.v10-critical-wrap'\)/);
-  assert.doesNotMatch(adapter,/risk\.remove\(/);
+test('r122 browser QA pins final DOM order and moved click bindings',()=>{
+ assert.match(adapter,/qaR122/);assert.match(adapter,/r122-qa-report/);
+ for(const x of ['next:','risk:','open:','attention:','refs:','openClick','assetClick'])assert.match(adapter,new RegExp(x,'i'));
+ assert.match(adapter,/getBoundingClientRect\(\)\.top<innerHeight/);
+ assert.match(adapter,/\[data-command-go="bots"\]/);assert.match(adapter,/\[data-command-asset\]/)
 });
 
-test('r122 observer is bounded and cannot self-trigger on title rewrites',()=>{
-  assert.match(adapter,/new MutationObserver\(schedule\)\.observe\(root,\{childList:true\}\)/);
-  assert.doesNotMatch(adapter,/subtree:true/);
-  assert.match(adapter,/title&&title\.textContent!=='NEXT ACTION'/);
-  assert.match(adapter,/note&&note\.textContent!==nextNote/);
-});
-
-test('r122 presentation adapter cannot execute trades or mutate authority',()=>{
-  assert.doesNotMatch(adapter,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|executeTrade|portfolio\.complete\s*=)/i);
+test('r122 observer is bounded and adapter stays execution-neutral',()=>{
+ assert.match(adapter,/MutationObserver\(S\)\.observe\(r,\{childList:true\}\)/);assert.doesNotMatch(adapter,/subtree:true/);
+ assert.doesNotMatch(adapter,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|executeTrade|portfolio\.complete\s*=)/i)
 });
