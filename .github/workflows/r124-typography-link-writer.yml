@@ -1,0 +1,54 @@
+name: R124 Typography Link Writer
+
+on:
+  push:
+    branches:
+      - v10-r124-typography-floor
+    paths:
+      - .github/workflows/r124-typography-link-writer.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Guard patch verify self-delete
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EXPECTED_PARENT: 64ee98609502832da8298a4718493088fcd3ecdf
+          EXPECTED_INDEX_BLOB: 0bb0a97de6ae51432bfff5a012f450f82637944a
+          EXPECTED_CSS_BLOB: cdb9acd25f091e6c11dd3c128692862053a2084c
+          TARGET_BRANCH: v10-r124-typography-floor
+        run: |
+          set -euo pipefail
+          test "$EVENT_BEFORE" = "$EXPECTED_PARENT"
+          test "$(git hash-object v10/index.html)" = "$EXPECTED_INDEX_BLOB"
+          test "$(git hash-object v10/r124-typography-floor.css)" = "$EXPECTED_CSS_BLOB"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("v10/index.html")
+          s=p.read_text()
+          old='<link rel="stylesheet" href="./v10.css?v=10.0-r123">'
+          new=old+'<link rel="stylesheet" href="./r124-typography-floor.css?v=10.0-r123">'
+          assert s.count(old)==1
+          assert "r124-typography-floor.css" not in s
+          p.write_text(s.replace(old,new))
+          PY
+          grep -Fq 'r124-typography-floor.css?v=10.0-r123' v10/index.html
+          rm .github/workflows/r124-typography-link-writer.yml
+          git diff --check
+          printf '%s\n' .github/workflows/r124-typography-link-writer.yml v10/index.html | sort >/tmp/e
+          git diff --name-only | sort >/tmp/a
+          diff -u /tmp/e /tmp/a
+          git config user.name "MERIDIAN R124 Writer"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "R124: load typography floor"
+          git push origin HEAD:"$TARGET_BRANCH"
