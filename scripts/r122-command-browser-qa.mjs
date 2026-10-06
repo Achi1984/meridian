@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].filter(Boolean).find(fs.existsSync);
 if(!chrome)throw new Error('No Chrome/Chromium binary found');
-const base=process.env.MERIDIAN_R122_QA_BASE||'http://127.0.0.1:4173/v10/';
+const base=process.env.MERIDIAN_R122_QA_BASE||'http://127.0.0.1:4173/v10/visual-qa-frame.html';
 const sizes=[[390,844],[375,667],[320,568]];
 const decode=s=>String(s||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 for(const [w,h] of sizes){
