@@ -37,7 +37,7 @@
     "checkpointAfterEveryMutation": true,
     "userVisibleCheckpointRequired": true,
     "streamIsNeverSourceOfTruth": true,
-    "recoveryMode": "READ_539_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI",
+    "recoveryMode": "READ_CHECKPOINT_MAILBOX_THEN_COMPACT_CHECKPOINT_THEN_LIVE_MAIN_PRS_CI",
     "repeatCompletedWritesAfterInterruption": false,
     "longOperationSplitRequired": true,
     "intentJournalRequired": true,
@@ -149,7 +149,7 @@
     "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source→Events→Strategy→Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
   },
   "nextChatBootstrap": [
-    "Read Issue #539 comments since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items",
+    "Read mailboxIssue from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items",
     "Read MERIDIAN_LIVE_CHECKPOINT.json",
     "Fetch latest main SHA and current CI",
     "Inspect only related open PRs/branches",

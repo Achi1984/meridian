@@ -10,7 +10,7 @@ Updated: **2026-10-05**
 - Causal Event Builder PR1: **merged/reviewed/frozen via #547; synthetic-only**
 - Structural Runner Adapter: **merged/reviewed/frozen via #548; entryActive remains false structurally**
 - Strategy Adapter + causal Driver: **merged/reviewed/frozen via #549; Claude CV2-STRATEGY-DRIVER-PR2-IMPL-R3 GREEN LIGHT**
-- Claude mailbox bridge: **merged via #550; reviewer-only Issue #539 loop active**
+- Claude mailbox bridge: **merged via #550; active mailbox resolves from MERIDIAN_LIVE_CHECKPOINT.mailboxIssue (R5 #571)**
 - Terminal UI: **r114 #551 + r115 #552 merged; post-merge Release Safety / Visual QA / Runtime Smoke / Release Coordinator / Pages GREEN**
 - V2 stage remains: **SOURCE_AUDIT**; Discovery / Validation / Holdout / Paper / Live: **LOCKED**
 - Canonical Source→Events→Strategy→Runner execution: **not authorized**
@@ -33,7 +33,7 @@ Updated: **2026-10-05**
 - Execution impact: **false**
 - Paper/live authorization: **false**
 
-Repository state remains the source of truth. Before every Meridian step, read Issue #539 first; then reconcile latest merged `main`, CI, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, and related PRs before any mutation.
+Repository state remains the source of truth. Before every Meridian step, resolve `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json`, read that mailbox first, then reconcile latest merged `main`, CI, `MERIDIAN_RESUME.json`, `MERIDIAN_AGENT_STATE.json`, and related PRs before any mutation.
 
 ## Quarter-Hour data lineage
 
