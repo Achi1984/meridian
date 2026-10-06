@@ -12,7 +12,7 @@ function adapt(){
  const b=r.querySelector('.command-attention');if(b&&b.previousElementSibling!==o)o.insertAdjacentElement('afterend',b);r.dataset.r122Layout='true'
 }
 function S(){if(q)return;q=true;queueMicrotask(()=>{q=false;adapt()})}
-const W=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(r,0))));
+const W=()=>new Promise(r=>setTimeout(r,20));
 async function QA(){
  if(new URLSearchParams(location.search).get('qaR122')!=='1')return;
  for(let i=0;i<100&&!document.querySelector('#visual-qa-report');i++)await new Promise(r=>setTimeout(r,20));
