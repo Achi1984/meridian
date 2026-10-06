@@ -63,7 +63,7 @@ agent_workflow = Path("MERIDIAN_AGENT_WORKFLOW.md").read_text(encoding="utf-8")
 stream_safe = agent_workflow.split("## STREAM-SAFE-V7", 1)[1]
 first_rule = next(
     line for line in stream_safe.splitlines()
-    if re.match(r"^1\\.\\s+", line.strip())
+    if re.match(r"^1\.\s+", line.strip())
 )
 assert "mailboxIssue" in first_rule
 assert not re.search(r"Issue #\\d+", first_rule)
