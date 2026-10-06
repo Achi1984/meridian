@@ -66,4 +66,5 @@ test('r124 keeps 390/375/320 mobile QA and clipping guards active',()=>{
   assert.match(v10js,/!smallNavLabels\.length/);
   assert.match(v10js,/!navLabelClipping\.length/);
   assert.match(v10js,/!r124TrustClipping\.length/);
+  for(const name of ['mobile-375-command-stale','mobile-375-bots-error','mobile-320-command-stale','mobile-320-bots-error'])assert.ok(harness.includes("'"+name+"'"));
 });
