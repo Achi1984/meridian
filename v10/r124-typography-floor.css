@@ -1,0 +1,67 @@
+/* MERIDIAN R124 — role-based mobile typography floor. Presentation only. */
+
+/* Command: never hide the reason behind the single R123 status owner. */
+.command-health-chip>small{
+  display:block!important;
+  font-size:9px;
+  line-height:1.3;
+}
+.portfolio-hero-primary small,
+.command-hub-card>span,
+.command-hub-card>small,
+.command-next-decision>span,
+.command-next-decision>small,
+#view-command .data-state-item>span,
+#view-command .data-state-item>small,
+#view-command .portfolio-known-partial{
+  font-size:9px;
+  line-height:1.3;
+}
+#view-command .portfolio-range-switch button,
+#view-command .command-source-authority .portfolio-reconcile-actions button{
+  min-height:44px;
+  font-size:10px;
+}
+
+/* Depot: default-visible trust/detail text. */
+#view-depot .depot-asset-id small,
+#view-depot .depot-asset-glance span,
+#view-depot .depot-source-row span,
+#view-depot .depot-source-row small,
+#view-depot .depot-market-row span,
+#view-depot .depot-market-row small,
+#view-depot .depot-share-row span,
+#view-depot .depot-share-row small,
+#view-depot .depot-assets-head span,
+#view-depot .depot-assets-head small,
+#view-depot .v10-wallet-categories span,
+#view-depot .v10-wallet-categories small,
+#view-depot .depot-accounting-body{
+  font-size:9px;
+  line-height:1.3;
+}
+
+/* Bots: decision, filter and blocked-state text. */
+#view-bots .bot-tab-head-compact span,
+#view-bots .bot-tab-head-compact small,
+#view-bots .bot-filter-bar span,
+#view-bots .bot-filter-bar small,
+#view-bots .v10-live-overview span,
+#view-bots .snapshot-row span,
+#view-bots .pair-summary span,
+#view-bots .leg-grid span,
+#view-bots .scan-grid span,
+#view-bots .pair-head small,
+#view-bots .leg-head span,
+#view-bots .v10-live-blocked small{
+  font-size:9px;
+  line-height:1.3;
+}
+#view-bots .pair-status{font-size:11px}
+#view-bots .bot-filter-actions button{
+  min-height:44px;
+  font-size:10px;
+}
+
+/* Primary navigation is interactive text, not metadata. */
+nav button span{font-size:9px}
