@@ -5,7 +5,7 @@
 (function(){
   const local=['127.0.0.1','localhost'].includes(location.hostname);
   if(!local){document.body.textContent='LOCAL VISUAL QA ONLY';return}
-  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current',qaWidth=Math.max(240,Math.min(900,Number(q.get('qaWidth'))||390)),qaHeight=Math.max(400,Math.min(1200,Number(q.get('qaHeight'))||844));
+  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current',qaWidth=Math.max(240,Math.min(900,Number(q.get('qaWidth'))||390)),qaHeight=Math.max(400,Math.min(1200,Number(q.get('qaHeight'))||844)),qaR122=q.get('qaR122')==='1';
   const inner=new URL('./',location.href);
   inner.searchParams.set('visualQa','1');
   inner.searchParams.set('qaView',view);
@@ -13,22 +13,19 @@
   inner.searchParams.set('build',build);
   inner.searchParams.set('qaWidth',String(qaWidth));
   inner.searchParams.set('qaHeight',String(qaHeight));
-  for(const key of ['qaFlow','qaData']){
-    const value=q.get(key);
-    if(value)inner.searchParams.set(key,value);
-  }
+  for(const key of ['qaFlow','qaData']){const value=q.get(key);if(value)inner.searchParams.set(key,value)}
+  if(qaR122)inner.searchParams.set('qaR122','1');
   const frame=document.createElement('iframe');
-  frame.id='qa-frame';
-  frame.width=String(qaWidth);frame.height=String(qaHeight);
-  frame.src=inner.pathname+inner.search;
-  document.body.appendChild(frame);
+  frame.id='qa-frame';frame.width=String(qaWidth);frame.height=String(qaHeight);frame.src=inner.pathname+inner.search;document.body.appendChild(frame);
   let tries=0;
   const pump=()=>{
     tries++;
     try{
-      const inner=frame.contentDocument?.getElementById('visual-qa-report');
-      if(inner&&inner.textContent){
-        const out=document.createElement('pre');out.id='visual-qa-report';out.hidden=true;out.textContent=inner.textContent;document.body.appendChild(out);
+      const visual=frame.contentDocument?.getElementById('visual-qa-report');
+      const r122=qaR122?frame.contentDocument?.getElementById('r122-qa-report'):null;
+      if(visual&&visual.textContent&&(!qaR122||(r122&&r122.textContent))){
+        const out=document.createElement('pre');out.id='visual-qa-report';out.hidden=true;out.textContent=visual.textContent;document.body.appendChild(out);
+        if(qaR122){const extra=document.createElement('pre');extra.id='r122-qa-report';extra.hidden=true;extra.textContent=r122.textContent;document.body.appendChild(extra)}
         document.documentElement.dataset.visualQaReady=frame.contentDocument?.documentElement?.dataset?.visualQaReady||'ready';
         return;
       }
