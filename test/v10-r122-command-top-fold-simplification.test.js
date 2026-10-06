@@ -35,13 +35,21 @@ test('r122 orders decision before detail without changing risk derivation',()=>{
   assert.match(health,/worst=\[portfolio,riskView,data\]/);
 });
 
-test('r122 preserves existing warning sources and moves nodes only',()=>{
+test('r122 preserves all critical warning sources after ATTENTION de-dup',()=>{
   const attention=block('function commandAttentionHtml()','function commandPaperPresentation');
-  assert.match(attention,/PORTFOLIO AUTHORITY/);
-  assert.match(attention,/BOT COVERAGE/);
-  assert.match(attention,/MARKET COVERAGE/);
-  assert.match(adapter,/Moves existing DOM nodes only/);
+  for(const code of ['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'])
+    assert.match(attention,new RegExp(code));
+  for(const label of ['PORTFOLIO AUTHORITY','BOT COVERAGE','MARKET COVERAGE'])
+    assert.match(attention,new RegExp(label));
+  assert.match(adapter,/const risk=root\.querySelector\('\.v10-critical-wrap'\)/);
+  assert.doesNotMatch(adapter,/risk\.remove\(/);
+});
+
+test('r122 observer is bounded and cannot self-trigger on title rewrites',()=>{
   assert.match(adapter,/new MutationObserver\(schedule\)\.observe\(root,\{childList:true\}\)/);
+  assert.doesNotMatch(adapter,/subtree:true/);
+  assert.match(adapter,/title&&title\.textContent!=='NEXT ACTION'/);
+  assert.match(adapter,/note&&note\.textContent!==nextNote/);
 });
 
 test('r122 presentation adapter cannot execute trades or mutate authority',()=>{
