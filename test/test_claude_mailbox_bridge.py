@@ -66,7 +66,7 @@ first_rule = next(
     if re.match(r"^1\.\s+", line.strip())
 )
 assert "mailboxIssue" in first_rule
-assert not re.search(r"Issue #\\d+", first_rule)
+assert not re.search(r"Issue #\d+", first_rule)
 
 handoff = Path("docs/MERIDIAN_CHAT_HANDOFF.md").read_text(encoding="utf-8")
 bootstrap_line = next(x for x in handoff.splitlines() if "Before every Meridian step" in x)
