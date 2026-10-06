@@ -26,8 +26,9 @@ State:
 - Release Safety GREEN
 - Visual QA GREEN
 - Claude exact-head Draft review GREEN_LIGHT
-- terminalBuild remains 10.0-r125
-- release merge not authorized
+- release-candidate conversion explicitly authorized on 2026-10-06
+- candidate terminalBuild is 10.0-r126
+- merge authorized only after fresh exact-head CI + Claude GREEN_LIGHT
 
 Completion gate:
 - preserve fixed non-performance model order
@@ -201,5 +202,5 @@ Do not require the user to repeatedly say “Go” for routine implementation in
 
 ## Current next action
 
-R126 is technically ready as a frozen non-release Draft.  
-The next product transition is **R126 release-candidate conversion**, which requires a fresh explicit release authorization because the current Draft intentionally remains on terminalBuild 10.0-r125.
+R126 release-candidate conversion is explicitly authorized.  
+The next gate is **fresh exact-head R126 CI + independent Claude release review**, followed by merge only if the final candidate remains GREEN.

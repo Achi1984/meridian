@@ -16,7 +16,7 @@
     "progressLocation": "ONE_EDITED_PR_STATUS_COMMENT",
     "rolloverThresholdComments": 200
   },
-  "terminalBuild": "10.0-r125",
+  "terminalBuild": "10.0-r126",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
   "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
   "lastContinuityMerge": {
