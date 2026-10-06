@@ -2,9 +2,20 @@
   "schema": 1,
   "project": "MERIDIAN",
   "protocol": "STREAM-SAFE-V6",
-  "mailboxIssue": 539,
+  "mailboxIssue": 571,
   "lead": "CHATGPT",
   "reviewer": "CLAUDE",
+  "mailboxPolicy": {
+    "previousMailboxIssue": 539,
+    "allowedCommentKinds": [
+      "CROSS_MODEL_REQUEST",
+      "CROSS_MODEL_RESPONSE",
+      "CROSS_MODEL_STATUS NEEDS_USER_DECISION",
+      "FINAL_MERGE_STATUS"
+    ],
+    "progressLocation": "ONE_EDITED_PR_STATUS_COMMENT",
+    "rolloverThresholdComments": 200
+  },
   "terminalBuild": "10.0-r123",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
   "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
@@ -29,7 +40,7 @@
     "fundingCarryCandidateA": "COST_PREFILTER_PASS_SCOPED_DATA_DESIGN_NOT_AUTHORIZED"
   },
   "bootstrapOrder": [
-    "READ_ISSUE_539_SINCE_LAST_CHECKPOINT_AND_OPEN_REQUESTS",
+    "READ_MAILBOX_ISSUE_FROM_THIS_FILE_SINCE_LAST_CHECKPOINT_AND_OPEN_REQUESTS",
     "READ_THIS_FILE",
     "FETCH_LIVE_MAIN_AND_CURRENT_CI",
     "INSPECT_ONLY_RELATED_OPEN_PRS_BRANCHES",
@@ -60,5 +71,5 @@
       "HEAD_ADVANCED_DIFFERENT_DIFF_STOP"
     ]
   },
-  "lastSeenCommentId": 6012801528
+  "lastSeenCommentId": 6016389241
 }
