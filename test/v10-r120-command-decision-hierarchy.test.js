@@ -16,14 +16,15 @@ function block(startNeedle,endNeedle){
   return js.slice(a,b);
 }
 
-test('r120 release identity is coherent and preserves the UI principle',()=>{
-  assert.equal(release.terminalBuild,'10.0-r120');
+test('r120+ release identity is coherent and preserves the UI principle',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.match(/r(\d+)$/)?.[1]||0)>=120);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(checkpoint.terminalBuild,'10.0-r120');
-  assert.equal(resume.build,'10.0-r120');
-  assert.match(handoff,/Build: \*\*10\.0-r120\*\*/);
+  assert.equal(checkpoint.terminalBuild,release.terminalBuild);
+  assert.equal(resume.build,release.terminalBuild);
+  assert.ok(handoff.includes('Build: **'+release.terminalBuild+'**'));
   assert.match(handoff,/Complex inside – simple outside/);
-  assert.match(js,/const BUILD='10\.0-r120'/);
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r120 uses one scoped PORTFOLIO RISK DATA health model',()=>{
