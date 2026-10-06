@@ -453,13 +453,13 @@ function commandDataStrip(){
   return '<section class="command-source-strip"><div><span>MARKET</span><b class="tone-'+mr.tone+'">'+mr.label+'</b><small>'+esc(m.ageText)+' · '+m.freshAssets+'/'+m.totalAssets+' fresh · SYNC '+esc(m.syncStatus)+' · '+m.staleAssets+' stale · '+m.missingAssets+' missing · '+esc(m.transport)+(coverage?' · '+esc(coverage):'')+(m.error?' · '+esc(String(m.error).slice(0,90)):'')+'</small></div><div><span>BOT LAYER</span><b class="tone-'+br.tone+'">'+br.label+'</b><small>'+g.decisionReady+'/'+g.matched+' decision · '+esc(g.age)+'</small></div><div><span>ASSET WATCH</span><b>SNAPSHOT</b><small>'+esc(refAge||'—')+'</small></div><div><span>PORTFOLIO</span><b>'+portfolioLabel+'</b><small>Ledger auto + OKX ref + Pionex SSOT · PIONEX '+pionexAge+histText+' · stale Holdings fail-closed</small></div></section>';
 }
 function commandDataDisclosure(){
-  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),p=portfolioReadiness();
-  return '<details class="command-source-details"><summary><div><span>DATA SOURCES</span><b>MKT '+esc(mr.label)+' · BOT '+esc(br.label)+' · PORTFOLIO '+esc(p.label)+'</b></div><small>Provenance, Asset Watch und Historie</small></summary>'+commandDataStrip()+'</details>';
+  const g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),p=portfolioReadiness(),mkt=mr.label==='READY'?'FRESH':mr.label,bot=br.label==='READY'?'FRESH':br.label==='REF'?'REFERENCE':br.label;
+  return '<details class="command-source-details"><summary><div><span>DATA SOURCES</span><b>MKT '+esc(mkt)+' · BOT '+esc(bot)+' · PORTFOLIO '+esc(p.label)+'</b></div><small>Provenance, Asset Watch und Historie</small></summary>'+commandDataStrip()+'</details>';
 }
 function commandSystemDiagnostics(){
-  const g=syncHealth(),w=walletDiscoveryHealth(),ph=accountPositionHealth(),portfolioReady=S()?.portfolio?.complete===true,ready=g.decisionComplete&&w.status==='OK'&&ph.status==='OK'&&ph.fresh&&portfolioReady,details=document.createElement('details');
-  details.className='command-system-diagnostics';
-  details.innerHTML='<summary><div><span>SYSTEM STATUS</span><b class="tone-'+(ready?'safe':'watch')+'">'+(ready?'READY':'CHECK')+'</b></div><small>BOT '+g.decisionReady+'/'+g.matched+' · WALLET '+esc(w.label)+' · FUTURES '+esc(ph.label)+' · PORTFOLIO '+(portfolioReady?'READY':'PARTIAL')+'</small></summary><div class="command-system-diagnostics-body"></div>';
+  const g=syncHealth(),w=walletDiscoveryHealth(),ph=accountPositionHealth(),health=commandHealthSummary(),portfolioReady=S()?.portfolio?.complete===true,details=document.createElement('details');
+  details.className='command-system-diagnostics command-diagnostics';
+  details.innerHTML='<summary><div><span>DIAGNOSTICS</span><b class="tone-'+esc(health.overall.tone)+'">'+esc(health.overall.state)+'</b></div><small>BOT '+g.decisionReady+'/'+g.matched+' · WALLET '+esc(w.label)+' · FUTURES '+esc(ph.label)+' · PORTFOLIO '+(portfolioReady?'READY':'PARTIAL')+'</small></summary><div class="command-system-diagnostics-body command-diagnostics-body"></div>';
   const body=$('.command-system-diagnostics-body',details),live=document.createElement('div');live.innerHTML=liveOverview();const liveNode=live.firstElementChild;if(liveNode)body.append(liveNode);
   const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true);const guardNode=guard.firstElementChild;if(guardNode)body.append(guardNode);
   const account=document.createElement('div');account.innerHTML=accountPositionLayer(true);const accountNode=account.firstElementChild;if(accountNode)body.append(accountNode);
@@ -469,9 +469,9 @@ function commandSystemDiagnostics(){
 function renderSystemHeader(){
   const g=syncHealth(),m=marketHealth(),mr=marketReadiness(m),br=botReadiness(g),market=$('#market-status'),bot=$('#data-status');
   const set=(el,textName,className,title)=>{if(!el)return;if(el.textContent!==textName)el.textContent=textName;if(el.className!==className)el.className=className;if(el.title!==title)el.title=title};
-  const marketCoverage=marketCoverageIssueText(m);
-  set(market,'● MKT '+mr.label,'live '+mr.tone,(mr.label==='SYNCING'?'Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed':mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets+(marketCoverage?' · '+marketCoverage:''));
-  set(bot,'● BOT '+br.label,'live '+br.tone,g.detail);
+  const marketCoverage=marketCoverageIssueText(m),marketLabel=mr.label==='READY'?'FRESH':mr.label,botLabel=br.label==='READY'?'FRESH':br.label==='REF'?'REFERENCE':br.label;
+  set(market,'● MKT '+marketLabel,'live '+mr.tone,(mr.label==='SYNCING'?'Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed':mr.label==='READY'?'Alle erwarteten Futures-Marktdaten frisch':mr.label==='PARTIAL'?'BTC frisch, aber Markt-Coverage unvollständig':'Marktdaten nicht frisch genug')+' · '+m.freshAssets+'/'+m.totalAssets+(marketCoverage?' · '+marketCoverage:''));
+  set(bot,'● BOT '+botLabel,'live '+br.tone,g.detail);
 }
 function decorateA11y(){
   for(const el of [$('#market-status'),$('#data-status')])if(el)el.setAttribute('aria-live','polite');
@@ -588,7 +588,8 @@ function portfolioChartHeroHtml(){
     chart='<div class="portfolio-chart-plot"><svg viewBox="0 0 '+g.width+' '+g.height+'" preserveAspectRatio="none" role="img" aria-label="Gesamtportfolio Verlauf '+rangeLabel+'"><line class="portfolio-chart-grid" x1="16" y1="18" x2="984" y2="18"></line><line class="portfolio-chart-grid" x1="16" y1="130" x2="984" y2="130"></line><line class="portfolio-chart-grid" x1="16" y1="242" x2="984" y2="242"></line><path class="portfolio-chart-area" d="'+g.area+'"></path><path class="portfolio-chart-line" d="'+g.line+'"></path></svg><div class="portfolio-chart-axis"><span>'+esc(startLabel)+'</span><span>'+esc(minLabel)+' – '+esc(maxLabel)+'</span><span>'+esc(endLabel)+'</span></div></div>';
   }
   const degradedHistory='<div class="portfolio-degraded-history" role="status"><span>HISTORIE</span><b>'+esc(pausedHistory?'PAUSIERT · AUTHORITY FEHLT':'WARTET AUF PORTFOLIO AUTHORITY')+'</b><small>'+esc(pausedHistory?'Letzter valider STRICT_AUTHORITY-Punkt '+strictLatestAge+' · neue Punkte pausiert':'Verlauf startet erst mit vollständiger Portfolio Authority')+'</small></div>',historySurface=ready?portfolioHistoryIntegrityHtml()+chart:degradedHistory;
-  return '<section class="command-portfolio-hero '+(ready?'':'portfolio-degraded')+'"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small>'+partialNote+'</div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div></div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+historySurface+'</section>';
+  const portfolioDetails='<details class="command-diagnostics command-portfolio-details"><summary><div><span>PORTFOLIO DETAILS</span><b>'+esc(ready?'VERLAUF + QUELLEN':'AUTHORITY + QUELLEN')+'</b></div><small>7T · Venues · History · Audit</small></summary><div class="command-diagnostics-body"><div class="command-portfolio-secondary-metrics">'+deltaHtml(historyDelta(7*24*60*60*1000),'7T Δ')+'</div><div class="portfolio-range-switch" role="group" aria-label="Portfolio Verlauf">'+buttons+'</div>'+venueStrip+'<div class="portfolio-chart-meta"><div><span>'+rangeLabel+' VERLAUF</span>'+change+'</div><div class="portfolio-chart-meta-right">'+historyBadge+'<small>'+esc(historySource)+' · '+(m.currentIncluded?'AKTUELLER TOTAL EINGEBUNDEN':'NUR VALIDIERTE HISTORIE')+'</small></div></div>'+historySurface+'</div></details>';
+  return '<section class="command-portfolio-hero '+(ready?'':'portfolio-degraded')+'"><div class="portfolio-hero-primary"><div><span>GESAMTPORTFOLIO</span><strong>'+totalText+'</strong><small>'+(ready?'KANONISCHER VENUE-TOTAL · LEDGER + OKX + PIONEX':'AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET')+'</small>'+partialNote+'</div></div>'+portfolioDetails+'</section>';
 }
 function bindCommandPortfolioHero(view){
   view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -597,34 +598,44 @@ function bindCommandPortfolioHero(view){
     const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();current.replaceWith(box.firstElementChild);bindCommandPortfolioHero(view);
   }));
 }
+function commandHealthSummary(){
+  const rank={OPTIONAL:0,READY:1,PARTIAL:2,ATTENTION:3,ERROR:4},tone={OPTIONAL:'muted',READY:'safe',PARTIAL:'watch',ATTENTION:'watch',ERROR:'danger'},p=portfolioReadiness(),g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),crit=criticalPair();
+  const portfolio={key:'PORTFOLIO',state:p.label==='READY'?'READY':'ATTENTION',detail:p.detail};
+  let riskState='READY';if(!crit||['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(crit?.status?.code))riskState='PARTIAL';else if(['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW'].includes(crit.status.code))riskState='ATTENTION';
+  const risk={key:'RISK',state:riskState,detail:crit?(crit.symbol+' · '+crit.status.label):'Keine bewertbare Bot-Priorität',tone:riskState==='ATTENTION'?(crit?.status?.tone||'watch'):tone[riskState]};
+  const marketState=mr.label==='READY'?'READY':['PARTIAL','SYNCING','STALE'].includes(mr.label)?'PARTIAL':'ERROR',botState=br.label==='READY'?'READY':['ERROR','BLOCKED'].includes(br.label)?'ERROR':'PARTIAL',dataState=rank[botState]>=rank[marketState]?botState:marketState;
+  const data={key:'DATA',state:dataState,detail:'MKT '+(mr.label==='READY'?'FRESH':mr.label)+' · BOT '+(br.label==='READY'?'FRESH':br.label),tone:tone[dataState]};
+  portfolio.tone=tone[portfolio.state];if(!risk.tone)risk.tone=tone[risk.state];
+  const concerns=[portfolio,risk,data],overall=concerns.reduce((a,b)=>rank[b.state]>rank[a.state]?b:a,concerns[0]);
+  return{overall:{state:overall.state,tone:overall.tone,detail:overall.key+' · '+overall.detail},portfolio,risk,data};
+}
 function commandOverviewHtml(){
-  const s=S(),h=H(),p=s?.portfolio||{},g=syncHealth(),m=marketHealth(),crit=criticalPair(),d24=historyDelta(24*60*60*1000),d7=historyDelta(7*24*60*60*1000);
-  const risk=crit?.status||{label:'SYNC',tone:'muted',reason:'Noch keine bewertbare Bot-Priorität'};
-  const portfolioReady=p.complete===true,feedReady=g.decisionComplete&&m.coverageComplete;
-  const dataTone=feedReady?'safe':g.fresh||m.fresh?'watch':'danger',dataLabel=feedReady?'READY':g.fresh||m.fresh?'PARTIAL':'STALE';
-  // DATA FRESHNESS semantic contract: LIVE DATA covers feed freshness only; portfolio authority remains separate.
-  const cards='<section class="command-kpi-grid">'+deltaHtml(d24,'24H Δ')+deltaHtml(d7,'7T Δ')+'<div><span>RISK STATUS</span><b class="tone-'+esc(risk.tone)+'">'+esc(risk.label)+'</b><small>'+esc(crit?.symbol||'Portfolio')+'</small></div><div><span>LIVE DATA</span><b class="tone-'+dataTone+'">'+dataLabel+'</b><small>MKT '+m.freshAssets+'/'+m.totalAssets+' · BOT '+g.decisionReady+'/'+g.matched+'</small></div></section>';
-  return '<section class="command-overview-v2">'+cards+'</section>';
+  const health=commandHealthSummary(),d24=historyDelta(24*60*60*1000),chip=x=>'<div class="command-health-chip"><span>'+esc(x.key)+'</span><b class="tone-'+esc(x.tone)+'">'+esc(x.state)+'</b><small>'+esc(x.detail)+'</small></div>';
+  return '<section class="command-overview-v2"><div class="command-health-summary"><div class="command-health-head"><span>SYSTEM HEALTH</span><b class="tone-'+esc(health.overall.tone)+'">'+esc(health.overall.state)+'</b><small>'+esc(health.overall.detail)+'</small></div><section class="command-kpi-grid command-health-grid">'+deltaHtml(d24,'24H Δ')+chip(health.portfolio)+chip(health.risk)+chip(health.data)+'</section></div></section>';
 }
 function commandAttentionHtml(){
   const s=S(),p=s?.portfolio||{},g=syncHealth(),m=marketHealth(),crit=criticalPair(),portfolioReady=p.complete===true,items=[];
   if(!portfolioReady)items.push({tone:'danger',title:'PORTFOLIO AUTHORITY',detail:portfolioAuthorityDetail(p)});
-  if(crit&&['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'].includes(crit.status.code))items.push({tone:crit.status.tone,title:(crit.symbol||'BOT')+' · '+crit.status.label,detail:crit.status.reason});
+  if(crit&&['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','UNVERIFIED','DATA_STALE','MARKET_STALE'].includes(crit.status.code))items.push({tone:crit.status.tone,title:(crit.symbol||'BOT')+' · '+crit.status.label,detail:'Siehe NEXT ACTION · primäre Begründung oben',reference:true});
   if(!g.decisionComplete)items.push({tone:'watch',title:'BOT COVERAGE',detail:g.decisionReady+'/'+g.matched+' decision-ready · '+g.unmatched+' unmatched'+(g.ambiguous?' · '+g.ambiguous+' ambiguous':'')});
   if(!m.coverageComplete)items.push({tone:'watch',title:'MARKET COVERAGE',detail:m.freshAssets+'/'+m.totalAssets+' frisch · '+m.staleAssets+' stale · '+m.missingAssets+' missing'});
   const shown=items.slice(0,3);
-  return '<section class="command-attention"><div class="section-title"><h2>ATTENTION</h2><small>maximal drei Punkte · Safety und Datenqualität zuerst</small></div>'+(shown.length?shown.map(x=>'<article class="attention-row tone-'+x.tone+'"><b>'+esc(x.title)+'</b><small>'+esc(x.detail)+'</small></article>').join(''):'<article class="attention-row tone-safe"><b>KEIN KRITISCHER PUNKT</b><small>Portfolio-, Bot- und Marktquellen sind aktuell ohne priorisierten Blocker.</small></article>')+'</section>';
+  return '<section class="command-attention"><div class="section-title"><h2>ATTENTION</h2><small>maximal drei Punkte · Safety und Datenqualität zuerst</small></div>'+(shown.length?shown.map(x=>'<article class="attention-row '+(x.reference?'attention-reference ':'')+'tone-'+x.tone+'"><b>'+esc(x.title)+'</b><small>'+esc(x.detail)+'</small></article>').join(''):'<article class="attention-row tone-safe"><b>KEIN KRITISCHER PUNKT</b><small>Portfolio-, Bot- und Marktquellen sind aktuell ohne priorisierten Blocker.</small></article>')+'</section>';
+}
+function commandPaperPresentation(paper){
+  const label=String(paper?.label||'NOT LOADED'),raw=String(paper?.detail||'');
+  if(label==='BLOCKED')return{label:'ERROR · PAPER',tone:'danger',detail:'Safety-/Schema-Vertrag ungültig · optionaler Bereich blockiert',rawDetail:raw};
+  if(['ERROR','NOT LOADED','LOADING'].includes(label))return{label:'OPTIONAL · UNAVAILABLE',tone:'muted',detail:'Paper beeinflusst die Command-Entscheidung nicht',rawDetail:label==='ERROR'?raw:''};
+  if(['LAST GOOD','STALE'].includes(label))return{label:'OPTIONAL · AVAILABLE',tone:'watch',detail:'Paper-Snapshot vorhanden · nicht entscheidungsführend',rawDetail:''};
+  return{label:'OPTIONAL · AVAILABLE',tone:'muted',detail:'Paper-Modus · read-only · nicht entscheidungsführend',rawDetail:''};
 }
 function commandActionHubHtml(){
-  const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=paperReadiness(),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null,next=nextAction();
+  const p=portfolioReadiness(),b=botStateItem(),m=marketStateItem(),paper=commandPaperPresentation(paperReadiness()),crit=criticalPair(),asset=crit&&marketUniverse().includes(String(crit.symbol||'').toUpperCase())?String(crit.symbol).toUpperCase():null,next=nextAction();
   const item=(target,kicker,label,detail,tone='muted')=>'<button type="button" class="command-hub-card tone-'+esc(tone)+'" data-command-go="'+esc(target)+'"><span>'+esc(kicker)+'</span><b>'+esc(label)+'</b><small>'+esc(detail)+'</small></button>';
+  const why='<details class="command-next-explain"><summary>WHY · RISK · INVALIDATION</summary><div><span>WHY</span><small>'+esc(next.detail)+'</small><span>RISK</span><small>'+esc(crit?.status?.label||'DATA SYNC')+'</small><span>INVALIDATION</span><small>Neue Bot-/Marktdaten oder ein Statuswechsel ersetzen diese Darstellung.</small></div></details>';
   const nextHtml=asset?'<button type="button" class="command-next-decision command-next-action-open" data-command-asset="'+esc(asset)+'" aria-label="CRITICAL ASSET '+esc(asset)+' · '+esc(crit.status.label)+'"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></button>':'<div class="command-next-decision"><span>NEXT ACTION</span><b>'+esc(next.title)+'</b><small>'+esc(next.detail)+'</small></div>';
-  return '<section class="command-action-hub"><div class="section-title"><h2>NEXT / OPEN</h2><small>Priorität + Navigation · read-only · keine Trading-Aktion</small></div>'+nextHtml+'<div class="command-action-grid">'+
-    item('depot','DEPOT',p.label,p.detail,p.tone)+
-    item('bots','BOT CONTROL',b.label,b.detail,b.tone)+
-    item('market','FORECAST',m.label,m.detail,m.tone)+
-    item('paper','PAPER COCKPIT',paper.label,paper.detail,paper.tone)+
-  '</div></section>';
+  const paperDiagnostics=paper.rawDetail?'<details class="command-paper-diagnostics"><summary>PAPER DIAGNOSTICS</summary><small>'+esc(paper.rawDetail)+'</small></details>':'';
+  return '<section class="command-action-hub"><div class="section-title"><h2>NEXT / OPEN</h2><small>Priorität + Navigation · read-only · keine Trading-Aktion</small></div>'+nextHtml+why+'<div class="command-action-grid">'+item('depot','DEPOT',p.label,p.detail,p.tone)+item('bots','BOT CONTROL',b.label,b.detail,b.tone)+item('market','FORECAST',m.label,m.detail,m.tone)+item('paper','PAPER COCKPIT',paper.label,paper.detail,paper.tone)+'</div>'+paperDiagnostics+'</section>';
 }
 function bindCommandActionHub(view){
   $$('[data-command-go]',view).forEach(btn=>btn.addEventListener('click',()=>{
@@ -748,24 +759,33 @@ function bindRefreshControl(){
   const btn=$('#refresh-feeds');if(btn&&!btn.dataset.bound){btn.dataset.bound='1';btn.addEventListener('click',refreshFeeds)}
 }
 
+function commandRiskPriorityHtml(c){
+  const h=H(),rows=matchedRows(c.symbol),st=c.status,liq=liquidationDisplayState(rows),protectionConflict=st.code==='PROTECTION_RISK',liqTone=protectionConflict?'muted':liq.tone,liqPrice=liq.liq!=null?precisePrice(liq.liq):'unavailable',botMark=liq.current!=null?precisePrice(liq.current):'unavailable',buffer=liq.buffer!=null?liq.buffer.toFixed(1)+'%':'unavailable',stage=liq.stage==='SAFE'?'OK':liq.stage,s=S(),raw=s?.botFeedUpdatedAt,ts=Number(raw)||Date.parse(String(raw||'')),age=Number.isFinite(ts)?(h.ageText?.(Math.max(0,Date.now()-ts))||'—'):'—';
+  return '<article class="command-risk-priority tone-'+esc(st.tone)+'"><div class="command-risk-priority-head"><div><span>'+esc(c.symbol)+'</span><small>OVERALL ASSET RISK</small></div><b class="pair-status tone-'+esc(st.tone)+'">'+esc(st.label)+'</b></div><div class="command-liq-substatus"><div><span>LIQ-ABSTAND</span><b class="tone-'+esc(liqTone)+'">'+buffer+'</b></div><div><span>LIQ PRICE</span><b>'+liqPrice+'</b></div><div><span>BOT MARK</span><b>'+botMark+'</b></div><div><span>LIQ STATUS</span><b class="tone-'+esc(liqTone)+'">'+esc(stage)+'</b></div></div><small class="command-liq-note">LIQ = Teilstatus · Gesamt-Risiko bleibt '+esc(st.label)+' · '+esc(liq.source)+' · BOT SNAPSHOT '+esc(age)+'</small></article>';
+}
 function renderCommand(force=false){
   const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
   const legacyCommandSelectors=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
   const legacyCommandPresent=legacyCommandSelectors.some(sel=>$(sel,view))||!$('.command-portfolio-hero',view);
   if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
-  banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
+  banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Complex inside · simple outside · Entscheidung zuerst, Details bei Bedarf','live');
   dataGuardDecorate();
-  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
-  const hero=$('.portfolio-hero',view),degradedPortfolio=S()?.portfolio?.complete!==true,portfolioBox=document.createElement('div');portfolioBox.innerHTML=portfolioChartHeroHtml();const portfolioNode=portfolioBox.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',portfolioNode);const stateBox=document.createElement('div');stateBox.innerHTML=dataStateStripHtml('command');const stateNode=stateBox.firstElementChild;portfolioNode.insertAdjacentElement('afterend',stateNode);const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;stateNode.insertAdjacentElement('afterend',overviewNode);const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);if(degradedPortfolio){const nextPriority=$('.command-next-decision',hubNode);if(nextPriority){nextPriority.classList.add('command-next-priority');portfolioNode.insertAdjacentElement('beforebegin',nextPriority)}}const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);if(hero)hero.classList.add('command-source-authority');const c=criticalPair(),a=nextAction(),g=syncHealth(),source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;
-  (hero||overviewNode).insertAdjacentElement('afterend',sourceNode);
-  const wrap=document.createElement('section');wrap.className='v10-critical-wrap';
-  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
-  wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Safety/Data Guard überstimmt Trading-Signal</small></div>'+criticalHtml;
-  sourceNode.insertAdjacentElement('afterend',wrap);
-  const action=$('.command-action',view);if(action)action.remove(); // NEXT ACTION is consolidated in the r80 Command Action Hub.
-  const systemDiagnostics=commandSystemDiagnostics();wrap.insertAdjacentElement('afterend',systemDiagnostics);
-  for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
-  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
+  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-data-state-details,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
+  const hero=$('.portfolio-hero',view),portfolioBox=document.createElement('div');portfolioBox.innerHTML=portfolioChartHeroHtml();const portfolioNode=portfolioBox.firstElementChild;$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',portfolioNode);
+  const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;portfolioNode.insertAdjacentElement('afterend',overviewNode);
+  const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);
+  const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);
+  if(hero)hero.classList.add('command-source-authority');
+  const c=criticalPair(),g=syncHealth(),wrap=document.createElement('section');wrap.className='v10-critical-wrap';
+  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?commandRiskPriorityHtml(c):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
+  wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Gesamt-Risiko und Liquidation klar getrennt</small></div>'+criticalHtml;
+  attentionNode.insertAdjacentElement('afterend',wrap);
+  const source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;wrap.insertAdjacentElement('afterend',sourceNode);
+  const stateDetails=document.createElement('details');stateDetails.className='command-data-state-details command-diagnostics';stateDetails.innerHTML='<summary><div><span>DATA STATE</span><b>DETAILS</b></div><small>Portfolio · Bots · Markt getrennt prüfen</small></summary><div class="command-diagnostics-body">'+dataStateStripHtml('command')+'</div>';sourceNode.insertAdjacentElement('afterend',stateDetails);
+  const systemDiagnostics=commandSystemDiagnostics();stateDetails.insertAdjacentElement('afterend',systemDiagnostics);
+  const action=$('.command-action',view);if(action)action.remove();
+  for(const sel of legacyCommandSelectors) $(sel,view).forEach(x=>x.remove());
+  $('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
   bindCommandActionHub(view);
   bindCommandPortfolioHero(view);
 }
@@ -1752,19 +1772,20 @@ function writeLocalVisualQaReport(cfg){
   const nav=$('#nav')?.getBoundingClientRect(),root=document.documentElement,main=$('main'),mainRect=main?.getBoundingClientRect(),scannerButtons=[...active.querySelectorAll('.scanner-toolbar-actions button')].map(x=>x.getBoundingClientRect());
   const scannerActionsSameRow=cfg.view!=='research'||scannerButtons.length<2||Math.max(...scannerButtons.map(x=>x.top))-Math.min(...scannerButtons.map(x=>x.top))<=4;
   const commandHubCards=active.querySelectorAll('.command-hub-card').length,commandHubInvariant=cfg.view!=='command'||(commandHubCards>=4&&!!active.querySelector('.command-next-decision'));
-  const degradedPriorityInvariant=cfg.view!=='command'||S()?.portfolio?.complete===true||(()=>{const el=active.querySelector('.command-next-priority');return !!el&&el.getBoundingClientRect().top<innerHeight})();
+  const degradedPriorityInvariant=cfg.view!=='command'||(()=>{const el=active.querySelector('.command-next-decision');return !!el&&el.getBoundingClientRect().top<innerHeight})();
   const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect());let botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
   const botErrorSurfaceInvariant=cfg.view!=='bots'||cfg.dataMode!=='error'||!!active.querySelector('.bot-live-blocked');if(cfg.view==='bots'&&cfg.dataMode==='error')botAccordionInvariant=botErrorSurfaceInvariant;
   const forecastFibInvariant=cfg.view!=='market'||(!!active.querySelector('.fib-map-shell')&&!!active.querySelector('.fib-output'));
   const secondaryViewInvariant=cfg.view==='asset-detail'?!!active.querySelector('.asset-detail-topbar')&&!!active.querySelector('.fib-map-shell'):cfg.view==='paper'?!!active.querySelector('.paper-cockpit-toolbar'):true;
   const commandPartial=String($('#view-command .portfolio-known-partial b')?.textContent||'').trim(),depotPartial=String($('#view-depot .depot-known-partial b')?.textContent||'').trim(),portfolio=S()?.portfolio||{},partialSources=[portfolio.ledgerAutoUsd,portfolio.okxVenueUsd,portfolio.pionex].filter(knownNumber),partialSum=partialSources.reduce((sum,value)=>sum+Number(value),0),partialExpected=!portfolio.complete&&partialSources.length?(H().money?.(partialSum)||String(partialSum)):'',partialObserved=cfg.view==='command'?commandPartial:cfg.view==='depot'?depotPartial:'',partialValueParity=!['command','depot'].includes(cfg.view)||partialObserved===partialExpected;
-  const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top+1;
+  const commandDiagnosticsClosed=cfg.view!=='command'||[...active.querySelectorAll('.command-portfolio-details,.command-data-state-details,.command-system-diagnostics,.command-source-details')].every(el=>!el.open),commandHierarchyInvariant=cfg.view!=='command'||(()=>{const hero=active.querySelector('.command-portfolio-hero'),overview=active.querySelector('.command-overview-v2'),next=active.querySelector('.command-next-decision');return !!hero&&!!overview&&!!next&&hero.getBoundingClientRect().top<=overview.getBoundingClientRect().top&&overview.getBoundingClientRect().top<=next.getBoundingClientRect().top&&next.getBoundingClientRect().top<innerHeight})();
+  const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top-8;
   const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')].filter(visualQaVisible):[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
   const dataStates=Object.fromEntries([...active.querySelectorAll('.data-state-item')].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()])),dataStateInvariant=cfg.dataMode==='stale'?dataStates.BOTS==='REF'&&dataStates.MARKET==='STALE':cfg.dataMode==='error'?dataStates.BOTS==='ERROR'&&dataStates.MARKET==='STALE':true;
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===cfg.qaWidth&&viewport.h===cfg.qaHeight;
-  const layout={scannerActionsSameRow,commandHubInvariant,degradedPriorityInvariant,botAccordionInvariant,botErrorSurfaceInvariant,forecastFibInvariant,secondaryViewInvariant,partialValueParity,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
+  const layout={scannerActionsSameRow,commandHubInvariant,degradedPriorityInvariant,commandDiagnosticsClosed,commandHierarchyInvariant,botAccordionInvariant,botErrorSurfaceInvariant,forecastFibInvariant,secondaryViewInvariant,partialValueParity,nearBottom,bottomClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
   const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,dataStates,viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,smallFormControls,smallTrustText,smallTrustActions,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
-  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.degradedPriorityInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.secondaryViewInvariant&&layout.partialValueParity&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&layout.botErrorSurfaceInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!smallFormControls.length&&!smallTrustText.length&&!smallTrustActions.length&&!navOcclusions.length&&report.navInside;
+  report.ok=viewportMatch&&layout.scannerActionsSameRow&&layout.commandHubInvariant&&layout.degradedPriorityInvariant&&layout.commandDiagnosticsClosed&&layout.commandHierarchyInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant&&layout.secondaryViewInvariant&&layout.partialValueParity&&layout.bottomClearance&&!report.bodyOverflow&&layout.dataStateInvariant&&layout.botErrorSurfaceInvariant&&!report.activeOverflow&&!overflow.length&&!shortButtons.length&&!smallFormControls.length&&!smallTrustText.length&&!smallTrustActions.length&&!navOcclusions.length&&report.navInside;
   let pre=$('#visual-qa-report');if(!pre){pre=document.createElement('pre');pre.id='visual-qa-report';pre.hidden=true;document.body.appendChild(pre)}pre.textContent=JSON.stringify(report);
   document.documentElement.dataset.visualQaReady=report.ok?'pass':'fail';
   return report;
