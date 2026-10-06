@@ -36,7 +36,9 @@ test('r69 Command Center prioritizes wealth change risk freshness and attention'
   assert.match(v10,/24H Δ/);
   assert.match(v10,/7T Δ/);
   assert.match(v10,/RISK STATUS/);
-  assert.match(v10,/DATA FRESHNESS/);
+  assert.match(v10,/function commandHealthSummary\(\)/);
+  assert.match(v10,/command-health-summary/);
+  assert.match(v10,/chip\('DATA',h\.data\)/);
   assert.match(v10,/maximal drei Punkte/);
   assert.match(css,/\.command-kpi-grid/);
   assert.match(css,/\.command-attention/);

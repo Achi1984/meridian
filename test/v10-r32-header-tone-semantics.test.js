@@ -33,8 +33,9 @@ test('r32 header and source strip consume readiness tones directly',()=>{
   assert.doesNotMatch(strip,/mr\.tone==='mixed'/);
   assert.doesNotMatch(strip,/br\.tone==='reference'/);
   const header=v10.slice(v10.indexOf('function renderSystemHeader'),v10.indexOf('function decorateA11y'));
-  assert.match(header,/set\(market,'● MKT '\+mr\.label,'live '\+mr\.tone/);
-  assert.match(header,/set\(bot,'● BOT '\+br\.label,'live '\+br\.tone/);
+  assert.match(header,/freshness=x=>x\.label==='READY'\?'FRESH':x\.label/);
+  assert.match(header,/set\(market,'● MKT '\+freshness\(mr\),'live '\+mr\.tone/);
+  assert.match(header,/set\(bot,'● BOT '\+freshness\(br\),'live '\+br\.tone/);
 });
 
 test('r32 shell and CSS agree on the semantic tone vocabulary',()=>{

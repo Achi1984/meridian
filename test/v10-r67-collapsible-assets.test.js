@@ -7,7 +7,7 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r67 renders live assets as collapsible risk-first cards',()=>{
-  assert.match(v10,/function pairCard\(symbol,compact=false,open=false(?:,assetLink=false)?\)/);
+  assert.match(v10,/function pairCard\(symbol,compact=false,open=false,assetLink=false,decisionView=false\)/);
   assert.match(v10,/<details class="asset-pair asset-pair-details pair-tone-/);
   assert.match(v10,/data-symbol="/);
   assert.match(v10,/asset-glance/);
@@ -40,7 +40,10 @@ test('r67 provides expand and collapse controls for the asset list',()=>{
 });
 
 test('r67 keeps compact command risk cards while simplifying the BOTS view',()=>{
-  assert.match(v10,/if\(compact\)return '<article class="asset-pair pair-compact"/);
+  assert.match(v10,/decisionClass=decisionView\?' command-risk-card pair-tone-'\+st\.tone:''/);
+  assert.match(v10,/return '<article class="asset-pair pair-compact'\+decisionClass/);
+  assert.match(v10,/command-risk-card/);
+  assert.match(v10,/pair-tone-/);
   assert.match(v10,/BOT CONTROL CENTER/);
   assert.match(v10,/Risk-first Übersicht · Details nur bei Bedarf öffnen/);
   assert.match(css,/\.asset-pair-details>summary/);

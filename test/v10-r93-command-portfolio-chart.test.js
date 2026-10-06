@@ -51,7 +51,9 @@ test('r93 inserts the portfolio hero before data state and keeps missing authori
   const block=js.slice(start,end);
   assert.match(block,/portfolioBox\.innerHTML=portfolioChartHeroHtml\(\)/);
   assert.match(block,/insertAdjacentElement\('afterend',portfolioNode\)/);
-  assert.match(block,/portfolioNode\.insertAdjacentElement\('afterend',stateNode\)/);
+  assert.match(block,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+  assert.doesNotMatch(block,/stateBox\.innerHTML=dataStateStripHtml\('command'\)/);
+  assert.match(js,/dataStateStripHtml\('command'\)\+commandDataStrip\(\)/);
   assert.match(js,/AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET/);
   assert.match(js,/ready\?\(h\.money\?\.\(total\)\|\|String\(total\)\):'—'/);
 });

@@ -23,7 +23,8 @@ test('r85 gates bottom navigation occlusion at actual page bottom',()=>{
   assert.match(js,/const navCandidates=nearBottom\?/);
   assert.match(js,/navOcclusions/);
   assert.match(js,/bottomClearance=!nearBottom\|\|!nav\|\|!mainRect\|\|mainRect\.bottom<=nav\.top\+1/);
-  assert.match(js,/layout\.bottomClearance&&!report\.bodyOverflow/);
+  assert.match(js,/navEndClearance=!nearBottom/);
+  assert.match(js,/layout\.bottomClearance&&layout\.navEndClearance&&!report\.bodyOverflow/);
 });
 
 test('r85 adds view-specific structural visual invariants',()=>{

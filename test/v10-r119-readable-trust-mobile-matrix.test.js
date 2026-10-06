@@ -12,15 +12,17 @@ const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',impo
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v10index=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 
-test('r119 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r119');
+test('r119+ release identity remains coherent and execution neutral',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const revision=Number(release.terminalBuild.split('r').at(-1));
+  assert.ok(revision>=119);
   assert.equal(release.terminalExecutionImpact,false);
-  assert.equal(checkpoint.terminalBuild,'10.0-r119');
-  assert.equal(resume.build,'10.0-r119');
-  assert.equal(manifest.start_url,'./v10/?build=r119&fresh=r119');
-  assert.match(root,/10\.0-r119-production/);
-  assert.match(v10index,/10\.0-r119/);
-  assert.match(js,/const BUILD='10\.0-r119'/);
+  assert.equal(checkpoint.terminalBuild,release.terminalBuild);
+  assert.equal(resume.build,release.terminalBuild);
+  assert.equal(manifest.start_url,'./v10/?build=r'+revision+'&fresh=r'+revision);
+  assert.ok(root.includes(release.terminalBuild+'-production'));
+  assert.ok(v10index.includes(release.terminalBuild));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r119 lifts only decision and trust typography to a readable floor',()=>{

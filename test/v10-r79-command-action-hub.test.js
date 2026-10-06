@@ -72,7 +72,9 @@ test('r79 renderCommand rebuilds and binds the hub without replacing existing Ne
   assert.match(render,/\.command-action-hub/);
   assert.match(render,/commandActionHubHtml\(\)/);
   assert.match(render,/bindCommandActionHub\(view\)/);
-  assert.match(render,/NEXT ACTION/);
+  const hub=block('function commandActionHubHtml(){','function bindCommandActionHub(view){');
+  assert.match(hub,/NEXT ACTION/);
+  assert.match(render,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
 });
 
 test('r79 permanent UI regression gate freezes the Command Action Hub contract',()=>{
