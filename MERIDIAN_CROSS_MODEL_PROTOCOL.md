@@ -18,9 +18,9 @@ Begründung: Der Review muss unabhängig sein; ein zweites Modell findet systema
 ## 3. Ablauf pro Änderung
 1. Lead prüft vor jedem Write `main`-SHA und offene PRs.
 2. Lead öffnet PR mit: Ziel, Research-Stage, PnL berührt (ja/nein), `Review requested: Claude`.
-3. Claude reviewt den exakten PR-HEAD-SHA: `REVIEW <SHA>: GREEN LIGHT` oder `REVIEW <SHA>: REVISION REQUIRED` (Befund, Schwere, Beleg, geforderter Test).
+3. Claude reviewt den exakten PR-HEAD-SHA. Jedes GREEN LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN LIGHT verboten; Ergebnis ist REVISION REQUIRED oder BLOCKED mit Begründung.
 4. Merge nur bei grüner CI und GREEN LIGHT auf genau diesem SHA. Neuer Commit = altes GREEN LIGHT ungültig.
-5. Trivial (Text, Tests, CI-Fix ohne Research-Logik): Merge ohne Cross-Model-Review erlaubt, im PR `Cross-model review: skipped (trivial)` vermerken. Datenvertrag, Source Receipt, Split/Stage-Lock, Accounting, Strategy-PnL, Stage-Übergänge: Review Pflicht.
+5. Trivial (Text, Tests, CI-Fix ohne Research-Logik) kann ohne Cross-Model-Review bleiben. Datenvertrag, Source Receipt, Split/Stage-Lock, Accounting, Strategy-PnL, Stage-Übergänge sowie Agenten-Spielregeln/Workflow-Berechtigungen sind nie trivial und reviewpflichtig.
 6. Max. 3 Review-Loops, danach entscheidet der User.
 
 ## 4. Lead-Wechsel (Lease)
@@ -42,7 +42,7 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#571**. #539 ist Vorgänger und wird erst nach erfolgreichem R5-Smoke archiviert.
+- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#571**.
 - Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION` und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
 - Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
 - Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die Review-Antwort. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.

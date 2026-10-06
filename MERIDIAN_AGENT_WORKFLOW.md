@@ -248,6 +248,13 @@ MERIDIAN terminal releases use a single-writer lease:
 
 The repository enforces this with `scripts/release-coordinator.mjs`, the Release Safety guard, and the post-main stale-PR sweep workflow.
 
+### 14.1A UI Release Bundling
+- Small UI/presentation changes accumulate on one active release branch instead of separate rNN releases.
+- Maximum one UI/presentation terminal release merge per GitHub UTC calendar day.
+- Exception: a genuine bugfix or trust/safety defect that should not wait.
+- The bundle gets one exact-head review, one release-identity bump and one merge.
+- Infrastructure/docs/process PRs do not count and must not bump `terminalBuild`.
+
 ### 14.2 Interruption / Streaming Recovery
 
 After a tool interruption, streaming interruption, resumed conversation, or user “Fortsetzen” request:
@@ -316,6 +323,16 @@ Default behavior:
 - report the finished integrated result
 - interrupt only for required missing information, an unresolvable blocker, unresolved failure after three loops, or an action that requires explicit external authorization
 
+### 16.1 Mandatory User Escalation
+Post `CROSS_MODEL_STATUS NEEDS_USER_DECISION` with `@Achi1984` in #571 before proceeding for:
+- Stage/lock changes, canonical V2 run, strategy PnL, Discovery, Validation, Holdout, Paper or Live.
+- A new strategy or research direction.
+- Agent-rule changes: Lead lease, protocols, STREAM-SAFE version, bootstrap, review duties or workflow permissions.
+- Secrets, material costs or external services.
+- Review loop 3/3 without GREEN LIGHT.
+
+UI, tests, ordinary bugfixes and housekeeping remain autonomous when none applies.
+
 ## 17. Final Result Format
 
 For completed work, the Main Agent reports the following when the sections are relevant:
@@ -376,7 +393,7 @@ To reduce chat-stream interruption risk without weakening repository safety:
 2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
 3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
 4. Bound reads and rendered payloads: target <= 4096 bytes, inspect diff/stat before large files, and expand large continuity files only on mismatch or concrete detail need.
-5. Before a repository mutation, journal a unique `CROSS_MODEL_STATUS <op-id> INTENT` with target, expected pre-write head, expected blob/state and exact scope. Pure status/review comments are exempt.
+5. Before a repository mutation, journal op-id, target, expected head/blob/state and scope in the single continuously edited PR-local lead-status comment. Before a PR exists, carry the op-id in branch/commit and seed that status comment immediately after PR creation. Never post per-step INTENT/progress to the mailbox.
 6. Perform at most one remote mutation per visible burst. The next burst begins with reconciliation before any further mutation.
 7. Every write is conditional on the state that was read: use blob SHA and expected branch/head/base guards wherever the connector supports them. A rejected precondition means state changed, never blind retry.
 8. After an interrupted mutation: unchanged head permits at most one retry; advanced head with the intended diff means the write completed and must not be repeated; advanced head with a different diff means STOP and issue a new op-id only after reconciliation.
