@@ -388,21 +388,20 @@ If the current runtime does not expose true separate subagent instances or the r
 
 Runtime honesty overrides cosmetic adherence to the workflow.
 
-## STREAM-SAFE-V6 — journaled atomic bursts and interruption recovery
+## STREAM-SAFE-V7 — turn-bounded interruption recovery
 
-To reduce chat-stream interruption risk without weakening repository safety:
-
-1. Before every Meridian work step, read `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json`, then read that mailbox since the last seen durable comment and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
-2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
-3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
-4. Bound reads and rendered payloads: target <= 4096 bytes, inspect diff/stat before large files, and expand large continuity files only on mismatch or concrete detail need.
-5. Before a repository mutation, journal op-id, target, expected head/blob/state and scope in the single continuously edited PR-local lead-status comment. Before a PR exists, carry the op-id in branch/commit and seed that status comment immediately after PR creation. Never post per-step INTENT/progress to the mailbox.
-6. Perform at most one remote mutation per visible burst. The next burst begins with reconciliation before any further mutation.
-7. Every write is conditional on the state that was read: use blob SHA and expected branch/head/base guards wherever the connector supports them. A rejected precondition means state changed, never blind retry.
-8. After an interrupted mutation: unchanged head permits at most one retry; advanced head with the intended diff means the write completed and must not be repeated; advanced head with a different diff means STOP and issue a new op-id only after reconciliation.
-9. Duplicate INTENTs are idempotent only when op-id and scope are identical. Conflicting duplicate scopes are a STOP condition and must be superseded by a new op-id.
-10. Merge authority is exact: PR head and current live base must equal the reviewed SHAs, exact-head CI must be completed/successful, and merge must use an expected-head guard.
-11. After two interruptions at the same step, stop as `BLOCKED_STREAM`; do not attempt a third automatic retry.
-12. A stream interruption is never evidence that a GitHub operation failed; live GitHub state remains authoritative.
-13. Long or irreversible work must be split into durable atomic commits so an interrupted chat can resume from GitHub without reconstruction.
-14. These transport rules do not relax exact-head review, CI, Research-stage, PnL, execution, or Single-Writer gates.
+1. Start every turn by resolving `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json` and reconciling a bounded state pack: mailbox tail (max 5), checkpoint, live main, one relevant PR, and relevant run IDs/statuses.
+2. Bare `Go` means RECONCILE -> CLASSIFY -> one safe next action; never repeat the prior write.
+3. Maximum one remote tool-call group and one repository mutation per assistant turn.
+4. After any mutation, emit a short checkpoint and STOP. Reconcile on the next turn.
+5. A Claude request is a mutation: post it and stop; never wait for Claude in the same turn.
+6. Poll a still-running CI/reviewer/platform state at most once per user turn. `WAITING` is a valid terminal turn state; never sleep/retry-loop.
+7. Bound output to compact IDs/SHA/status/blocker only; no bulk mailbox or continuity dumps.
+8. Fetch logs only for a named failure and inspect at most one bounded failing log slice per turn.
+9. Preserve op-id/CAS discipline with expected branch head/blob/base and single-writer ownership.
+10. After interruption classify: `OP_APPLIED`, `OP_ABSENT`, `OP_CONFLICT`, `WAITING`, or `BLOCKED_STREAM`.
+11. Same Claude request ID on the same exact head must never be reposted while running or answered.
+12. Stop on the first unexpected head/check/scope state; diagnose on the next turn.
+13. Long or irreversible work must be split into durable atomic steps.
+14. End unfinished turns with one deterministic `NEXT:` line.
+15. These transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release, privacy, safety, or Single-Writer gates.

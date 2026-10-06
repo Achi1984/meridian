@@ -24,7 +24,7 @@
     "fallbackDisclosureRequired": true
   },
   "streamingGuard": {
-    "protocol": "STREAM-SAFE-V6",
+    "protocol": "STREAM-SAFE-V7",
     "compactBootstrapFile": "MERIDIAN_LIVE_CHECKPOINT.json",
     "maxToolCallGroupsPerVisibleBurst": 1,
     "maxMutationsPerVisibleBurst": 1,
@@ -49,7 +49,20 @@
     "mergeExactHeadAndBaseRequired": true,
     "boundedReadsRequired": true,
     "maxInterruptionsPerStep": 2,
-    "interruptionStopState": "BLOCKED_STREAM"
+    "interruptionStopState": "BLOCKED_STREAM",
+    "maxToolCallGroupsPerTurn": 1,
+    "maxMutationsPerTurn": 1,
+    "stopTurnAfterMutation": true,
+    "maxSameStatusPollsPerTurn": 1,
+    "maxCommentaryCheckpointsPerTurn": 2,
+    "maxToolResultEchoChars": 600,
+    "maxLogSlicePerTurn": 1,
+    "maxMailboxTailComments": 5,
+    "targetTurnSeconds": 20,
+    "maxTurnSeconds": 30,
+    "waitingIsTerminalTurnState": true,
+    "duplicateClaudeRequestPolicy": "SAME_ID_AND_HEAD_ONLY_NO_REPOST",
+    "nextStepLineRequired": true
   },
   "recoveryChecks": [
     "LATEST_MAIN_SHA",

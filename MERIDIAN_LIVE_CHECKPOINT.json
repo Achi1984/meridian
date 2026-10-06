@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "project": "MERIDIAN",
-  "protocol": "STREAM-SAFE-V6",
+  "protocol": "STREAM-SAFE-V7",
   "mailboxIssue": 571,
   "lead": "CHATGPT",
   "reviewer": "CLAUDE",
@@ -70,7 +70,20 @@
       "HEAD_UNCHANGED_RETRY_ONCE",
       "HEAD_ADVANCED_INTENDED_DIFF_DO_NOT_REPEAT",
       "HEAD_ADVANCED_DIFFERENT_DIFF_STOP"
-    ]
+    ],
+    "maxToolCallGroupsPerTurn": 1,
+    "maxMutationsPerTurn": 1,
+    "stopTurnAfterMutation": true,
+    "maxSameStatusPollsPerTurn": 1,
+    "maxCommentaryCheckpointsPerTurn": 2,
+    "maxToolResultEchoChars": 600,
+    "maxLogSlicePerTurn": 1,
+    "maxMailboxTailComments": 5,
+    "targetTurnSeconds": 20,
+    "maxTurnSeconds": 30,
+    "waitingIsTerminalTurnState": true,
+    "duplicateClaudeRequestPolicy": "SAME_ID_AND_HEAD_ONLY_NO_REPOST",
+    "nextStepLineRequired": true
   },
   "lastSeenCommentId": 6016389241,
   "quickCommand": "Go Meridian",
