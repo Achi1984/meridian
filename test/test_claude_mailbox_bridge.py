@@ -1,12 +1,24 @@
+import json
 from pathlib import Path
 
 WORKFLOW = Path(".github/workflows/claude-mailbox-review.yml")
+CHECKPOINT = Path("MERIDIAN_LIVE_CHECKPOINT.json")
 text = WORKFLOW.read_text(encoding="utf-8")
+checkpoint = json.loads(CHECKPOINT.read_text(encoding="utf-8"))
+mailbox_issue = int(checkpoint["mailboxIssue"])
+
+allowed_tools = (
+    '--allowedTools "Bash(gh api:*),Bash(gh pr view:*),Bash(gh pr diff:*),'
+    'Bash(gh run view:*),Bash(git:*),Bash(node --test:*),'
+    'Bash(node scripts/continuity-audit.mjs),'
+    'Bash(node scripts/frozen-research-guard.mjs),'
+    'Bash(python3 scripts/validate-agent-orchestration.py)"'
+)
 
 required = [
     "issue_comment:",
     "types: [created]",
-    "github.event.issue.number == 539",
+    f"github.event.issue.number == {mailbox_issue}",
     "github.event.comment.user.login == 'Achi1984'",
     "contains(github.event.comment.body, '@claude')",
     "contains(github.event.comment.body, 'CROSS_MODEL_REQUEST')",
@@ -19,8 +31,12 @@ required = [
     "Missing repository secret CLAUDE_CODE_OAUTH_TOKEN",
     "timeout-minutes: 35",
     "include_fix_links: false",
-    '--disallowedTools Edit,Write',
+    "--disallowedTools Edit,Write",
+    allowed_tools,
     "MERIDIAN REVIEWER-ONLY MODE",
+    f"Issue #{mailbox_issue} is the binding mailbox",
+    "gh api must not use POST/PATCH/PUT/DELETE",
+    "git must not checkout/switch/reset/clean/add/commit/rebase/merge/push/tag",
     "CHATGPT is Lead and sole merge owner",
     "no canonical Source Read/Run",
     "no PnL",
