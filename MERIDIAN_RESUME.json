@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r118",
+  "build": "10.0-r119",
   "branch": "main",
   "issue": 541,
   "phase": "CROSS_VENUE_FUNDING_EDGE_V2_STRATEGY_DRIVER_FROZEN_NO_PNL",
