@@ -32,6 +32,14 @@ test('r121 green LIQ styling is scoped to an overall safe Command card',()=>{
   assert.doesNotMatch(css,/(^|\n)\.command-liq-substatus \.tone-safe\{/);
 });
 
+test('r121 visual QA fails closed on safe LIQ tone inside a non-safe overall card',()=>{
+  const qa=block('function writeLocalVisualQaReport(','function writeLocalVisualQaError');
+  assert.match(qa,/commandRiskSubstatusViolations=cfg\.view==='command'/);
+  assert.match(qa,/commandRiskSubstatusDominance=commandRiskSubstatusViolations\.length===0/);
+  assert.match(qa,/commandRiskSubstatusViolations,navOcclusions/);
+  assert.match(qa,/layout\.commandRiskSubstatusDominance/);
+});
+
 test('r121 status-dominance presentation does not add execution paths',()=>{
   const pair=block('function pairCard(','function criticalPair()');
   assert.doesNotMatch(pair,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|postJson|executeTrade)/i);
