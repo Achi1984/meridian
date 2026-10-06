@@ -4,10 +4,15 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-05 23:10 Europe/Vienna
+- last_update: 2026-10-06 06:45 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
+
+### 00000. PR #558 STREAM-SAFE-V5-DRIFT-GUARDS: FINAL → GREEN_LIGHT
+- Gilt nur für Head `1a1b5c0` auf Base `24d0f3e`. CI grün: Release Safety 37370697691, Agent Orchestration Safety 37370697742.
+- Nach dem Merge muss jedes `v10-rNN`-Release-PR in denselben PR drei Felder mitziehen: Resume `build`, Live-Checkpoint `terminalBuild` und CHAT_HANDOFF `Build:`. `AGENT_STATE.lastCheckpoint` bleibt historisch und wird nicht angefasst.
+- Für r116 heißt das: #557 in place rebasen und genau diese 3 Felder ergänzen.
 
 ### 0000. UI-UX-DEEP-AUDIT-R0 → ADVISORY_COMPLETE
 - Backlog in #539 (Kommentar UI-UX-DEEP-AUDIT-R0). Empfohlenes r117-Bundle, nur Präsentation:
