@@ -20,6 +20,8 @@ const cases=[
   ['bots-top','bots',0],['bots-bottom','bots',6000],
   ['forecast-top','market',0],['forecast-fib','market',1050],['forecast-bottom','market',6000],
   ['scanner-top','research',0],['scanner-bottom','research',6000],
+  ['asset-detail-top','asset-detail',0],['asset-detail-bottom','asset-detail',6000],
+  ['paper-top','paper',0],['paper-bottom','paper',6000],
   ['flow-primary-reset','command',900,'primary-reset'],
   ['flow-asset-return','depot',700,'asset-return'],
   ['flow-bot-toggle','bots',0,'bot-toggle'],
