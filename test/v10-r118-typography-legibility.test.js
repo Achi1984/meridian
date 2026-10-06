@@ -20,12 +20,15 @@ test('r118 degraded portfolio history uses compact legible typography',()=>{
 });
 
 test('r118 release identity stays coherent and execution neutral',()=>{
-  assert.equal(version.terminalBuild,'10.0-r118');
-  assert.equal(checkpoint.terminalBuild,'10.0-r118');
-  assert.equal(resume.build,'10.0-r118');
-  assert.match(index,/10\.0-r118/);
-  assert.match(manifest,/r118/);
-  assert.match(v10Index,/10\.0-r118/);
-  assert.match(v10Js,/const BUILD='10\.0-r118'/);
+  const build=String(version.terminalBuild||'');
+  assert.match(build,/^10\.0-r\d+$/);
+  assert.ok(Number(build.split('r').at(-1))>=118);
+  assert.equal(checkpoint.terminalBuild,build);
+  assert.equal(resume.build,build);
+  const tag=build.split('-').at(-1);
+  assert.ok(index.includes(build));
+  assert.equal(JSON.parse(manifest).start_url,'./v10/?build='+tag+'&fresh='+tag);
+  assert.ok(v10Index.includes(build));
+  assert.ok(v10Js.includes("const BUILD='"+build+"'"));
   assert.equal(version.terminalExecutionImpact,false);
 });
