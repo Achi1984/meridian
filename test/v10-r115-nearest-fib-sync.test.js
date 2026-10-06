@@ -48,7 +48,7 @@ test('r115 reproduces the INJ screenshot and selects the true nearest AUTO FIB',
 
 test('r117 Forecast Focus labels AUTO vs FEED and keeps scoring semantics unchanged',()=>{
   const a=js.indexOf('function opportunityContext(symbol)');
-  const b=js.indexOf('function forecastContextHtml(',a);
+  const b=js.indexOf('function marketRow(',a);
   const block=js.slice(a,b);
   assert.match(block,/const autoNear=fibAutoNear\(symbol\),near=autoNear\|\|i\.near/);
   assert.match(block,/fibDistance=p>0&&nearPrice>0\?Math\.abs\(nearPrice-p\)\/p\*100:null/);

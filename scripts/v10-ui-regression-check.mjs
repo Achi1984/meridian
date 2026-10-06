@@ -162,7 +162,7 @@ must(String(release.dashboardShell||'').includes('VISUAL-QA-HARNESS'),'dashboard
 must(v9.includes("const LOCAL_VISUAL_QA=['127.0.0.1','localhost'].includes(location.hostname)"),'visual QA network freeze must remain localhost-only');
 must(js.includes('function localVisualQaConfig()'),'local visual QA config missing');
 must(js.includes("if(!['127.0.0.1','localhost'].includes(location.hostname))return null"),'visual QA fixture must remain localhost-only');
-must(js.includes("allowed=['command','depot','bots','market','research']"),'visual QA top-level view coverage missing');
+must(js.includes("allowed=['command','depot','bots','market','research','asset-detail','paper']"),'visual QA primary/secondary view coverage missing');
 must(js.includes("fibUi.mode='MANUAL'"),'visual QA deterministic FIB fixture missing');
 must(js.includes('function writeLocalVisualQaReport(cfg)'),'visual QA layout report missing');
 must(js.includes('bodyOverflow:root.scrollWidth>innerWidth+2'),'visual QA body overflow gate missing');

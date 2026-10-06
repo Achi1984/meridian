@@ -53,11 +53,13 @@ function loadHarness(fetchBySymbol){
   );
 }
 
-test('r116 release is execution-neutral and declares cross-view FIB lifecycle hardening',()=>{
-  assert.equal(release.terminalBuild,'10.0-r116');
+test('r116+ release remains execution-neutral and preserves cross-view FIB lifecycle hardening',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const rev=Number(release.terminalBuild.split('r').at(-1));
+  assert.ok(rev>=116,'release must not regress below r116');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/FIB-CROSS-VIEW-LIFECYCLE/);
-  assert.ok(js.includes("const BUILD='10.0-r116'"));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r116 superseded run in another view clears only its own busy lifecycle',async()=>{
