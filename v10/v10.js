@@ -1856,7 +1856,7 @@ async function runLocalInteractionQa(cfg){
 function renderLocalVisualQa(cfg){
   try{
     if(cfg.invalidView)throw new Error('UNKNOWN_VISUAL_QA_VIEW '+cfg.invalidView);
-    $('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
+    $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+cfg.view));
     $$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.v===cfg.view));
     renderActiveView(cfg.view,true);renderSystemHeader();decorateA11y();
     window.scrollTo(0,cfg.scroll);
