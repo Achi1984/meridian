@@ -49,7 +49,7 @@ It must not change:
 ## Progressive disclosure
 Preserve existing Scanner ranking/order and existing `details` disclosure.
 Do not remove the Forecast FIB map or violate `forecastFibInvariant`.
-Do not introduce a product-JS semantic path solely for presentation.
+One named render-order exception is allowed in `scannerLeaderCard`: the existing `scan-drill-actions` block moves before the existing `scannerConfluenceHtml(symbol)` output so State → Trust → Action is visible earlier on narrow mobile. This exception must preserve every string, selector, `data-*` attribute, event binding, score, ranking input and behavior; it creates no new product-JS semantic path.
 
 ## Visual-QA target
 - 390 / 375 / 320 Forecast + Scanner
