@@ -89,6 +89,11 @@ test('r114 makes CURRENT visually dominant and keeps anchor line separate from s
   assert.match(css,/@media\(max-width:600px\)[\s\S]*?\.fib-ladder\{height:430px\}/);
 });
 
+test('r117 mobile controls keep iOS-safe input typography',()=>{
+  assert.match(css,/v10 r117 · mobile form readability/);
+  assert.match(css,/@media\(max-width:600px\)[\s\S]*?\.v10-shell input,[\s\S]*?\.v10-shell select,[\s\S]*?\.v10-shell textarea\{font-size:16px\}/);
+});
+
 test('r114 compresses inactive Double Advantage but preserves active evidence wording',()=>{
   const a=js.indexOf('function fibSkCards(');
   const b=js.indexOf('function fibResultHtml(',a);
