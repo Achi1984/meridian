@@ -6,6 +6,9 @@ const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const qa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
 const checkpoint=JSON.parse(fs.readFileSync(new URL('../MERIDIAN_LIVE_CHECKPOINT.json',import.meta.url),'utf8'));
+const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
+const resume=JSON.parse(fs.readFileSync(new URL('../MERIDIAN_RESUME.json',import.meta.url),'utf8'));
+const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
 
 function block(name){
   const start=js.indexOf('function '+name);
@@ -13,6 +16,15 @@ function block(name){
   const end=js.indexOf('\nfunction ',start+10);
   return js.slice(start,end>start?end:js.length);
 }
+
+test('r120 release identity is coherent and execution neutral',()=>{
+  assert.equal(release.terminalBuild,'10.0-r120');
+  assert.equal(checkpoint.terminalBuild,release.terminalBuild);
+  assert.equal(resume.build,release.terminalBuild);
+  assert.equal(manifest.start_url,'./v10/?build=r120&fresh=r120');
+  assert.equal(release.terminalExecutionImpact,false);
+  assert.ok(js.includes("const BUILD='10.0-r120'"));
+});
 
 test('r120 defines one Command health hierarchy and freshness-scoped header labels',()=>{
   const health=block('commandHealthSummary'),overview=block('commandOverviewHtml'),header=block('renderSystemHeader');
