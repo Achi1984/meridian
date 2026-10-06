@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "project": "MERIDIAN",
-  "protocol": "STREAM-SAFE-V5",
+  "protocol": "STREAM-SAFE-V6",
   "mailboxIssue": 539,
   "lead": "CHATGPT",
   "reviewer": "CLAUDE",
@@ -43,6 +43,22 @@
     "checkpointAfterEveryMutation": true,
     "repeatCompletedWritesAfterInterruption": false,
     "maxToolCallGroupsPerVisibleBurst": 1,
-    "maxVisibleBurstSeconds": 45
-  }
+    "maxVisibleBurstSeconds": 45,
+    "intentJournalRequired": true,
+    "mutationOpIdRequired": true,
+    "duplicateIntentPolicy": "IDENTICAL_SCOPE_ONLY",
+    "conflictingDuplicateIntentPolicy": "STOP_AND_SUPERSEDE_WITH_NEW_OP_ID",
+    "compareAndSwapRequired": true,
+    "requireExpectedBranchHead": true,
+    "mergeExactHeadAndBaseRequired": true,
+    "boundedReadsRequired": true,
+    "maxInterruptionsPerStep": 2,
+    "interruptionStopState": "BLOCKED_STREAM",
+    "reconcileDecisionTable": [
+      "HEAD_UNCHANGED_RETRY_ONCE",
+      "HEAD_ADVANCED_INTENDED_DIFF_DO_NOT_REPEAT",
+      "HEAD_ADVANCED_DIFFERENT_DIFF_STOP"
+    ]
+  },
+  "lastSeenCommentId": 6012801528
 }
