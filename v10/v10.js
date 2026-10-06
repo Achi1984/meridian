@@ -1723,6 +1723,10 @@ function applyLocalVisualQaFixture(){
   s.pionexAccount={updatedAt:new Date(now).toISOString(),snapshotAt:new Date(now).toISOString(),walletStatus:'OK',spotBalances:[{coin:'USDT',free:33.01,frozen:0,debts:0},{coin:'BTC',free:.0000011,frozen:0,debts:0},{coin:'SOL',free:.00074,frozen:0,debts:0},{coin:'LINK',free:.0043,frozen:0,debts:0},{coin:'AVAX',free:.0024,frozen:0,debts:0}],futuresBalances:[],futuresPositions:[{asset:'SUI',symbol:'SUI_USDT_PERP',side:'LONG',leverage:3,markPrice:1.15,avgPrice:1.12,liquidationPrice:.66,unrealizedPnl:12.34,netSize:7689,positionAmt:1}],wallet:{prices:Object.fromEntries(universe.map(x=>[x,{priceInUsd:prices[x]||1}]))}};
   s.pionexBotSync={status:'OK',diagnostics:{listRows:s.bots.length}};s.pionexAccountSync={status:'OK'};
   setLocalVisualQaDataMode(cfg.dataMode,s,now);
+  if(cfg.view==='paper'){
+    paperCockpitUi.loading=false;paperCockpitUi.error=null;paperCockpitUi.loadedAt=now;paperCockpitUi.prefetchStarted=true;
+    paperCockpitUi.data={schemaVersion:'8.0-PAPER-OVERVIEW-V1',researchOnly:true,executionImpact:false,generatedAt:new Date(now).toISOString(),status:{safety:{paperTrading:true,liveTrading:false},engine:{running:true,marketFresh:true},db:{ok:true,mode:'VISUAL_QA'}},baseline:{account:{startEquity:10000,equity:10000,peakEquity:10000,realizedPnl:0,unrealizedPnl:0},trades:[]},challengerV2:{lifecycle:'WAITING',enabled:false},challengerV3:{lifecycle:'WAITING',enabled:false},directionalV4:{lifecycle:'WAITING',enabled:false},fundingCarryV2:{lifecycle:'WAITING',enabled:false},researchR42:[]};
+  }
   fibUi.symbol='BTC';fibUi.mode='MANUAL';fibUi.manualLow=74896.6;fibUi.manualHigh=87374.3;fibUi.direction='UP';
   window.MERIDIAN_VISUAL_QA=true;
   return cfg;
