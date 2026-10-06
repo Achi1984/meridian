@@ -18,7 +18,7 @@
   line-height:1.3;
 }
 #view-command .portfolio-range-switch button,
-#view-command .portfolio-reconcile-actions button{
+#view-command .command-source-authority .portfolio-reconcile-actions button{
   min-height:44px;
   font-size:10px;
 }
