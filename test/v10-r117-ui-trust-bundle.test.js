@@ -30,11 +30,13 @@ test('r117 Command risk presentation separates protection risk from liquidation 
   assert.doesNotMatch(src,/<span>CURRENT PRICE<\/span>/);
 });
 
-test('r117 degraded Command surfaces NEXT ACTION before the portfolio hero',()=>{
-  const src=block('function renderCommand(','function assetWatchShareCard()');
+test('r117+ keeps degraded NEXT ACTION prioritized while r120 preserves the total-first hierarchy',()=>{
+  const src=block('function renderCommand(','function assetWatchShareCard');
   assert.match(src,/degradedPortfolio=S\(\)\?\.portfolio\?\.complete!==true/);
   assert.match(src,/nextPriority\.classList\.add\('command-next-priority'\)/);
-  assert.match(src,/portfolioNode\.insertAdjacentElement\('beforebegin',nextPriority\)/);
+  assert.match(src,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+  assert.match(src,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
+  assert.doesNotMatch(src,/portfolioNode\.insertAdjacentElement\('beforebegin',nextPriority\)/);
 });
 
 test('r117 keeps FIB score semantics while exposing display provenance',()=>{
