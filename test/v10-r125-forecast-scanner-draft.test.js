@@ -101,7 +101,7 @@ test('r125 Scanner leader reorder preserves actions, confluence and ranking sema
   assert.ok(leader.includes('IM FORECAST ÖFFNEN'));
   assert.ok(v10js.includes('FRESH CONTEXT REQUIRED'));
 
-  assert.ok(card.includes("const open='<div class=\\\"scan-drill-actions\\\">"));
+  assert.ok(card.includes(`const open='<div class="scan-drill-actions">`));
   assert.ok(card.includes('data-forecast-asset'));
   assert.match(render,/return B\.score-A\.score\|\|sb\.rank-sa\.rank\|\|sb\.score-sa\.score/);
 });
