@@ -25,7 +25,8 @@ test('r117 Command risk presentation separates protection risk from liquidation 
   assert.match(src,/LIQ STATUS/);
   assert.match(src,/BOT SNAPSHOT/);
   assert.match(src,/protectionConflict=st\.code==='PROTECTION_RISK'/);
-  assert.match(src,/protectionConflict\?'muted':liqDisplay\.tone/);
+  assert.match(src,/overallRiskDominates=st\.tone!=='safe'&&liqDisplay\.tone==='safe'/);
+  assert.match(src,/liqTone=overallRiskDominates\?'muted':liqDisplay\.tone/);
   assert.match(src,/SL ungültig → siehe oben/);
   assert.doesNotMatch(src,/<span>CURRENT PRICE<\/span>/);
 });
