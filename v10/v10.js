@@ -232,7 +232,7 @@ function liquidationDisplayState(rows){
   return{ok,tone:ok?snap.stage.tone:'muted',liq:ok?snap.liq:null,current:ok?snap.current:null,buffer:ok?snap.buffer:null,stage:ok?snap.stage.label:'unavailable',source:snap?.status==='stale'?'bot feed stale':ok?(snap.side+' · smallest verified buffer · '+snap.bufferSource+(snap.partial?' · partial':'')+' · '+verified):(verified+' · unavailable')};
 }
 function pairCard(symbol,compact=false,open=false,assetLink=false){
-  const h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
+  const s=S(),h=H(),rows=matchedRows(symbol),st=pairStatus(symbol),fresh=h.botFeedFresh?.(),longs=rows.filter(b=>(b.side||'LONG')==='LONG'),shorts=rows.filter(b=>b.side==='SHORT'),mp=marketPrice(symbol);
   if(!fresh&&!compact)return '';
   const exposureState=h.exposureIntegrity?.(symbol),exposureComplete=exposureState?!!exposureState.complete:(fresh&&rows.length>0&&rows.every(b=>h.liveInvestUsdAvailable?.(b))),longUsd=exposureComplete?exposure(rows,'LONG'):null,shortUsd=exposureComplete?exposure(rows,'SHORT'):null;
   const pnlState=h.pnlIntegrity?.(symbol),pnlVals=fresh?rows.map(b=>h.botPnlUsd?.(b)?.value):[],pnlComplete=(pnlState?!!pnlState.complete:(fresh&&rows.length>0))&&pnlVals.length===rows.length&&pnlVals.every(x=>x!=null),pnl=pnlComplete?pnlVals.reduce((a,b)=>a+b,0):null;
