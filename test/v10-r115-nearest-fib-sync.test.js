@@ -19,13 +19,15 @@ function loadNearestHarness(){
   `)(adjacentFibLevels);
 }
 
-test('r115 release identity is coherent and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r115');
+test('r115+ release identity remains coherent and execution neutral',()=>{
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  const rev=Number(release.terminalBuild.split('r').at(-1));
+  assert.ok(rev>=115,'release must not regress below r115');
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(String(release.dashboardShell||''),/NEAREST-FIB-AUTO-SYNC/);
-  assert.equal(manifest.start_url,'./v10/?build=r115&fresh=r115');
-  assert.match(html,/meridian-build" content="10\.0-r115"/);
-  assert.ok(js.includes("const BUILD='10.0-r115'"));
+  assert.equal(manifest.start_url,`./v10/?build=r${rev}&fresh=r${rev}`);
+  assert.ok(html.includes('meridian-build" content="'+release.terminalBuild+'"'));
+  assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
 test('r115 reproduces the INJ screenshot and selects the true nearest AUTO FIB',()=>{
@@ -74,7 +76,8 @@ test('r115 refreshes Forecast Focus only after FIB calculation settles',()=>{
   const a=js.indexOf('async function updateFibMap(');
   const b=js.indexOf('function refreshForecastFocus(',a);
   const block=js.slice(a,b);
-  assert.match(block,/finally\{\s*if\(run===fibRunSeq\)\{out\.setAttribute\('aria-busy','false'\);refreshForecastFocus\(view\)\}\s*\}/);
+  assert.match(block,/if\(fibOutRun\.get\(out\)===run\)\{out\.setAttribute\('aria-busy','false'\);fibOutRun\.delete\(out\)\}/);
+  assert.match(block,/if\(run===fibRunSeq\)refreshForecastFocus\(view\)/);
 });
 
 test('r115 nearest-FIB bridge remains presentation/context only',()=>{
@@ -111,6 +114,7 @@ function loadUpdateHarness(fetchBySymbol){
     "const fibUi={symbol:'INJ',window:90,mode:'AUTO',manualHigh:null,manualLow:null,direction:'AUTO',autoHigh:null,autoLow:null,lastDirection:'UP'};",
     "const fibAutoContext=new Map();",
     "let fibRunSeq=0;",
+    "const fibOutRun=new WeakMap();",
     "const writes=[];",
     "const out={attrs:{},_html:'',setAttribute(k,v){this.attrs[k]=v},set innerHTML(v){this._html=String(v);writes.push(String(v))},get innerHTML(){return this._html}};",
     "const view={asset:'INJ',windowValue:'90',out};",
@@ -188,10 +192,12 @@ test('r115 snapshots async run identity and guards all post-await mutations',()=
   const b=js.indexOf('function refreshForecastFocus(',a);
   const block=js.slice(a,b);
   assert.match(block,/const symbol=String\(fibUi\.symbol\|\|''\)\.trim\(\)\.toUpperCase\(\),key=symbol,mode=fibUi\.mode,windowSize=fibUi\.window,run=\+\+fibRunSeq/);
+  assert.match(block,/fibOutRun\.set\(out,run\)/);
   assert.match(block,/fetchRows\('4h',Math\.min\(300,Math\.max\(180,windowSize\+5\)\),symbol\)/);
   assert.match(block,/if\(run!==fibRunSeq\)return/);
   assert.match(block,/current=marketPrice\(symbol\)\.value/);
   assert.match(block,/if\(autoNear\)fibAutoContext\.set\(key/);
   assert.match(block,/fibResultHtml\(\{symbol,low,high,direction,current,levels,source,bars,doubleAdvantage\}\)/);
-  assert.match(block,/if\(run===fibRunSeq\)\{out\.setAttribute\('aria-busy','false'\);refreshForecastFocus\(view\)\}/);
+  assert.match(block,/if\(fibOutRun\.get\(out\)===run\)\{out\.setAttribute\('aria-busy','false'\);fibOutRun\.delete\(out\)\}/);
+  assert.match(block,/if\(run===fibRunSeq\)refreshForecastFocus\(view\)/);
 });
