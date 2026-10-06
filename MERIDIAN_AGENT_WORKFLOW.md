@@ -368,17 +368,21 @@ If the current runtime does not expose true separate subagent instances or the r
 
 Runtime honesty overrides cosmetic adherence to the workflow.
 
-## STREAM-SAFE-V5 — compact resume and atomic tool bursts
+## STREAM-SAFE-V6 — journaled atomic bursts and interruption recovery
 
 To reduce chat-stream interruption risk without weakening repository safety:
 
-1. Before every Meridian work step, read Issue #539 comments since the last durable checkpoint and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
+1. Before every Meridian work step, read Issue #539 comments since the last seen durable comment and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
 2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
 3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
-4. Expand the large continuity files only when the compact checkpoint disagrees with live GitHub state or historical detail is required for the current task.
-5. Perform at most one remote repository mutation per visible tool burst. After every mutation, emit a short user-visible checkpoint before the next mutation.
-6. Keep rendered tool payloads small (target <= 4096 bytes). Never dump whole large continuity files when only a few fields are needed.
-7. Never repeat a completed write after a streaming interruption. Reconcile #539 + compact checkpoint + live main first.
-8. Long or irreversible work must be split into durable atomic commits so an interrupted chat can resume from GitHub without reconstruction.
-9. A stream interruption is never evidence that a GitHub operation failed; repository state remains authoritative.
-10. These transport rules do not relax exact-head review, CI, Research-stage, PnL, execution, or Single-Writer gates.
+4. Bound reads and rendered payloads: target <= 4096 bytes, inspect diff/stat before large files, and expand large continuity files only on mismatch or concrete detail need.
+5. Before a repository mutation, journal a unique `CROSS_MODEL_STATUS <op-id> INTENT` with target, expected pre-write head, expected blob/state and exact scope. Pure status/review comments are exempt.
+6. Perform at most one remote mutation per visible burst. The next burst begins with reconciliation before any further mutation.
+7. Every write is conditional on the state that was read: use blob SHA and expected branch/head/base guards wherever the connector supports them. A rejected precondition means state changed, never blind retry.
+8. After an interrupted mutation: unchanged head permits at most one retry; advanced head with the intended diff means the write completed and must not be repeated; advanced head with a different diff means STOP and issue a new op-id only after reconciliation.
+9. Duplicate INTENTs are idempotent only when op-id and scope are identical. Conflicting duplicate scopes are a STOP condition and must be superseded by a new op-id.
+10. Merge authority is exact: PR head and current live base must equal the reviewed SHAs, exact-head CI must be completed/successful, and merge must use an expected-head guard.
+11. After two interruptions at the same step, stop as `BLOCKED_STREAM`; do not attempt a third automatic retry.
+12. A stream interruption is never evidence that a GitHub operation failed; live GitHub state remains authoritative.
+13. Long or irreversible work must be split into durable atomic commits so an interrupted chat can resume from GitHub without reconstruction.
+14. These transport rules do not relax exact-head review, CI, Research-stage, PnL, execution, or Single-Writer gates.
