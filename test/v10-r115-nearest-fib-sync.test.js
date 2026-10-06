@@ -42,17 +42,19 @@ test('r115 reproduces the INJ screenshot and selects the true nearest AUTO FIB',
   assert.equal(next.below?.ratio,0.236);
   assert.ok(Math.abs(Number(next.below?.price)-7.490036)<1e-9);
 
-  assert.deepEqual(near,{f:0.236,price:7.490036});
+  assert.deepEqual(near,{f:0.236,price:7.490036,current});
   assert.ok(Math.abs((near.price-current)/current*100)<1);
 });
 
-test('r115 Forecast Focus prefers fresh AUTO FIB context and keeps legacy feed fallback',()=>{
+test('r117 Forecast Focus labels AUTO vs FEED and keeps scoring semantics unchanged',()=>{
   const a=js.indexOf('function opportunityContext(symbol)');
   const b=js.indexOf('function forecastContextHtml(',a);
   const block=js.slice(a,b);
-  assert.match(block,/const near=fibAutoNear\(symbol\)\|\|i\.near/);
-  assert.match(block,/nearPrice=Number\(near\?\.price\)/);
-  assert.match(block,/nearRatio=Number\(near\?\.f\)/);
+  assert.match(block,/const autoNear=fibAutoNear\(symbol\),near=autoNear\|\|i\.near/);
+  assert.match(block,/fibDistance=p>0&&nearPrice>0\?Math\.abs\(nearPrice-p\)\/p\*100:null/);
+  assert.match(block,/fibDisplayDistance=displayRef>0&&nearPrice>0/);
+  assert.match(block,/fibSource=autoNear\?'AUTO-MAP':'FEED'/);
+  assert.match(block,/NEAREST FIB · '\+esc\(ctx\.fibSource\)/);
   assert.match(block,/Nahe relevantem FIB-Level/);
 });
 
