@@ -73,3 +73,35 @@ test('r125 mobile stress matrix includes Forecast and Scanner stale error paths'
     'mobile-320-scanner-error'
   ]) assert.ok(visualQa.includes(name),'missing visual QA case '+name);
 });
+
+
+test('r125 Scanner leader reorder preserves actions, confluence and ranking semantics',()=>{
+  const leaderStart=v10js.indexOf('function scannerLeaderCard(symbol){');
+  const cardStart=v10js.indexOf('function scannerCard(symbol){',leaderStart);
+  const renderStart=v10js.indexOf('function renderScanner(force=false){',cardStart);
+  const skStart=v10js.indexOf('function skNum(',renderStart);
+  assert.ok(leaderStart>=0&&cardStart>leaderStart&&renderStart>cardStart&&skStart>renderStart);
+  const leader=v10js.slice(leaderStart,cardStart);
+  const card=v10js.slice(cardStart,renderStart);
+  const render=v10js.slice(renderStart,skStart);
+
+  const head=leader.indexOf('scanner-leader-head');
+  const grid=leader.indexOf('scanner-leader-grid');
+  const note=leader.indexOf('scanner-leader-note');
+  const actions=leader.indexOf('scan-drill-actions');
+  const confluence=leader.indexOf('scannerConfluenceHtml(symbol)');
+  assert.ok(head>=0&&head<grid&&grid<note&&note<actions&&actions<confluence);
+
+  assert.equal((leader.match(/scan-drill-actions/g)||[]).length,1);
+  assert.equal((leader.match(/data-forecast-asset/g)||[]).length,1);
+  assert.equal((leader.match(/<button/g)||[]).length,1);
+  assert.equal((leader.match(/addEventListener/g)||[]).length,0);
+  assert.equal((leader.match(/onclick/g)||[]).length,0);
+  assert.ok(leader.includes("assetDetailButton(symbol,'ASSET DETAIL')"));
+  assert.ok(leader.includes('IM FORECAST ÖFFNEN'));
+  assert.ok(v10js.includes('FRESH CONTEXT REQUIRED'));
+
+  assert.ok(card.includes("const open='<div class=\\\"scan-drill-actions\\\">"));
+  assert.ok(card.includes('data-forecast-asset'));
+  assert.match(render,/return B\.score-A\.score\|\|sb\.rank-sa\.rank\|\|sb\.score-sa\.score/);
+});
