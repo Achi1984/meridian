@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const draft=fs.readFileSync(new URL('../docs/r125-forecast-scanner-draft.md',import.meta.url),'utf8');
+const v10js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+const visualQa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
 const marker='/* MERIDIAN R125 · Forecast + Scanner decision hierarchy */';
 const start=css.indexOf(marker);
 const r125=start>=0?css.slice(start):'';
@@ -38,4 +40,36 @@ test('r125 core does not leak into Paper, Asset Detail, research rules or global
   }
   assert.doesNotMatch(r125,/!important/);
   assert.doesNotMatch(r125,/(?:^|\n)\s*(?:html|body|\*)\s*\{[^}]*font-size\s*:/m);
+});
+
+
+test('r125 visual QA contract covers Forecast and Scanner roles',()=>{
+  for(const selector of [
+    '#view-market .forecast-focus-head small',
+    '#view-market .forecast-focus-grid>span',
+    '#view-research .scanner-summary span',
+    '#view-research .scanner-leader-note',
+    '#view-research .scanner-toolbar small'
+  ]) assert.ok(v10js.includes(selector),'missing R125 trust selector '+selector);
+
+  for(const selector of [
+    '#view-research .scanner-toolbar-actions button',
+    '#view-research .scanner-leader .scan-forecast-open',
+    '#view-research .scanner-leader .asset-detail-open'
+  ]) assert.ok(v10js.includes(selector),'missing R125 strict action selector '+selector);
+
+  assert.match(v10js,/r125FirstActionInvariant/);
+  assert.match(v10js,/smallR125PrimaryText/);
+  assert.match(v10js,/r125TrustClipping/);
+});
+
+test('r125 mobile stress matrix includes Forecast and Scanner stale error paths',()=>{
+  for(const name of [
+    'mobile-375-forecast-stale',
+    'mobile-375-scanner-stale',
+    'mobile-375-scanner-error',
+    'mobile-320-forecast-stale',
+    'mobile-320-scanner-stale',
+    'mobile-320-scanner-error'
+  ]) assert.ok(visualQa.includes(name),'missing visual QA case '+name);
 });
