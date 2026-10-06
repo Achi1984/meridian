@@ -28,7 +28,8 @@ test('r117 compact Command risk card distinguishes market trust axes and bot mar
   assert.match(block,/unavailable/);
   assert.match(block,/smallest verified buffer/);
   assert.match(block,/protectionConflict=st\.code==='PROTECTION_RISK'/);
-  assert.match(block,/protectionConflict\?'muted':liqDisplay\.tone/);
+  assert.match(block,/overallRiskDominates=st\.tone!=='safe'&&liqDisplay\.tone==='safe'/);
+  assert.match(block,/liqTone=overallRiskDominates\?'muted':liqDisplay\.tone/);
   assert.match(block,/SL ungültig → siehe oben/);
   assert.doesNotMatch(block,/<span>CURRENT PRICE<\/span>/);
 });
