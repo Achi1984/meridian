@@ -55,4 +55,15 @@ test('r124 keeps 390/375/320 mobile QA and clipping guards active',()=>{
   assert.match(v10js,/navOcclusions/);
   assert.match(v10js,/navInside/);
   assert.match(v10js,/!overflow\.length/);
+  assert.match(v10js,/r124PrimaryTextSelectors/);
+  assert.match(v10js,/fontSize\)<11/);
+  assert.match(v10js,/r124ActionSelectors/);
+  assert.match(v10js,/\?10:9/);
+  assert.match(v10js,/smallNavLabels/);
+  assert.match(v10js,/navLabelClipping/);
+  assert.match(v10js,/r124TrustClipping/);
+  assert.match(v10js,/!smallR124PrimaryText\.length/);
+  assert.match(v10js,/!smallNavLabels\.length/);
+  assert.match(v10js,/!navLabelClipping\.length/);
+  assert.match(v10js,/!r124TrustClipping\.length/);
 });
