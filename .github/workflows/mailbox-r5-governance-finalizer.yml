@@ -1,0 +1,41 @@
+name: Mailbox R5 Governance Finalizer
+on:
+  push:
+    branches: [infra/claude-mailbox-r5]
+    paths: [.github/workflows/mailbox-r5-governance-finalizer.yml]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Guard patch audit self-delete
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EXPECTED_PARENT: b4bb87d9e990e11b10eac0fe98667217de0c06cc
+          TARGET_BRANCH: infra/claude-mailbox-r5
+        run: |
+          set -euo pipefail
+          test "$EVENT_BEFORE" = "$EXPECTED_PARENT"
+          test "$(git hash-object scripts/mailbox-r5-governance-finalizer.py)" = e314d8b6c67eb38b301b477ad47589dbd625eab9
+          test "$(git hash-object MERIDIAN_CROSS_MODEL_PROTOCOL.md)" = 94052588a0542f7c692b36e477d7d1faceeccd5e
+          test "$(git hash-object MERIDIAN_AGENT_STATE.json)" = c4a6dc2f1a891de41ae5e6e8145b10ad2782e7f0
+          test "$(git hash-object docs/MERIDIAN_CHAT_HANDOFF.md)" = b3b3da0e251c921817c138a340a0e038af3df7ab
+          python3 scripts/mailbox-r5-governance-finalizer.py
+          python3 test/test_claude_mailbox_bridge.py
+          python3 scripts/validate-agent-orchestration.py
+          node scripts/continuity-audit.mjs
+          node scripts/frozen-research-guard.mjs
+          rm scripts/mailbox-r5-governance-finalizer.py
+          rm .github/workflows/mailbox-r5-governance-finalizer.yml
+          git diff --check
+          git config user.name "MERIDIAN R5 Finalizer"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "INFRA R5: align mailbox governance references"
+          git push origin HEAD:"$TARGET_BRANCH"
