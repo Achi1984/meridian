@@ -9,10 +9,12 @@ const v10js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const visualQa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
 const marker='/* MERIDIAN R125 · Forecast + Scanner decision hierarchy */';
 const start=css.indexOf(marker);
-const r125=start>=0?css.slice(start):'';
+const successor=css.indexOf('/* v10 r126 · Paper authority/readability',start+marker.length);
+const r125=start>=0?css.slice(start,successor>start?successor:undefined):'';
 
 test('r125 release candidate is coherent, user-authorized and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r125');
+  const m=String(release.terminalBuild||'').match(/^10\.0-r(\d+)$/);
+  assert.ok(m&&Number(m[1])>=125);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(draft,/RELEASE CANDIDATE/);
   assert.match(draft,/USER OVERRIDE AUTHORIZED/);
