@@ -17,17 +17,18 @@ test('r91 top-fold clarity remains active on successor builds',()=>{
   assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
-test('r91 LIVE DATA freshness is independent from incomplete portfolio authority',()=>{
-  assert.match(js,/portfolioReady=p\.complete===true,feedReady=g\.decisionComplete&&m\.coverageComplete/);
-  assert.match(js,/<span>LIVE DATA<\/span>/);
-  assert.doesNotMatch(js,/dataReady=portfolioReady&&g\.decisionComplete&&m\.coverageComplete/);
+test('r91+ DATA health stays independent from portfolio authority',()=>{
+  const start=js.indexOf('function commandHealthSummary()'),end=js.indexOf('function commandAttentionHtml',start),block=js.slice(start,end);
+  assert.match(block,/const dataReady=br\.label==='READY'&&mr\.label==='READY'/);
+  assert.match(block,/const portfolio=p\.label==='READY'/);
+  assert.doesNotMatch(block,/dataReady=portfolio/);
 });
 
 test('r91 collapses verbose source provenance while retaining the source strip',()=>{
   assert.match(js,/function commandDataDisclosure\(\)/);
-  assert.match(js,/class="command-source-details"/);
+  assert.match(js,/class="command-source-details command-diagnostics"/);
   assert.match(js,/DATA SOURCES/);
-  assert.ok(js.includes("+commandDataStrip()+'</details>'"));
+  assert.match(js,/command-source-details-body[^\n]+dataStateStripHtml\('command'\)\+commandDataStrip\(\)/);
   assert.match(js,/source\.innerHTML=commandDataDisclosure\(\)/);
   assert.match(js,/\.command-source-details,\.command-source-strip/);
 });
@@ -37,5 +38,5 @@ test('r91 source disclosure stays touch-friendly and closed by default',()=>{
   const start=js.indexOf('function commandDataDisclosure()');
   const end=js.indexOf('function renderSystemHeader()',start);
   const block=js.slice(start,end);
-  assert.doesNotMatch(block,/<details class="command-source-details" open/);
+  assert.doesNotMatch(block,/<details class="command-source-details command-diagnostics" open/);
 });

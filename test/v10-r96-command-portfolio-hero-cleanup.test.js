@@ -37,8 +37,8 @@ test('r96 OKX UI uses server authority provenance rather than stale local-ref wo
 
 test('r96 Command collapses deep diagnostics under one system status disclosure',()=>{
   const start=js.indexOf('function commandSystemDiagnostics()'),end=js.indexOf('function renderSystemHeader()',start),block=js.slice(start,end);
-  assert.match(block,/details\.className='command-system-diagnostics'/);
-  assert.match(block,/SYSTEM STATUS/);
+  assert.match(block,/details\.className='command-system-diagnostics command-diagnostics'/);
+  assert.match(block,/DIAGNOSTICS/);
   assert.match(block,/dataGuardCard\(true\)/);
   assert.match(block,/accountPositionLayer\(true\)/);
   assert.match(block,/walletDiscoveryLayerCompact\(\)/);
@@ -47,7 +47,9 @@ test('r96 Command collapses deep diagnostics under one system status disclosure'
 
 test('r96 renderCommand inserts one collapsed diagnostics surface after live risk',()=>{
   const start=js.indexOf('function renderCommand(force=false)'),end=js.indexOf('function assetWatchShareCard()',start),block=js.slice(start,end);
-  assert.match(block,/const systemDiagnostics=commandSystemDiagnostics\(\);wrap\.insertAdjacentElement\('afterend',systemDiagnostics\)/);
+  assert.match(block,/const systemDiagnostics=commandSystemDiagnostics\(\)/);
+  assert.match(block,/insertAdjacentElement\('afterend',systemDiagnostics\)/);
+  assert.match(block,/portfolioDetails/);
   assert.match(block,/\.command-system-diagnostics/);
 });
 

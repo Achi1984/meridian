@@ -1882,7 +1882,7 @@ async function runLocalInteractionQa(cfg){
       const after=labels();
       checks.botRecovered=after.BOTS==='READY';
       checks.marketRecovered=after.MARKET==='READY';
-      checks.headersRecovered=String($('#data-status')?.textContent||'').includes('BOT READY')&&String($('#market-status')?.textContent||'').includes('MKT READY');
+      checks.headersRecovered=String($('#data-status')?.textContent||'').includes('BOT FRESH')&&String($('#market-status')?.textContent||'').includes('MKT FRESH');
     }else checks.knownFlow=false;
     writeLocalInteractionQaReport(cfg,checks);
   }catch(error){writeLocalVisualQaError(cfg,error)}

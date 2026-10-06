@@ -189,7 +189,7 @@ must(js.includes('const forecastFibInvariant='),'Forecast/FIB visual invariant m
 must(js.includes('const nearBottom=scrollY+innerHeight>=root.scrollHeight-4'),'bottom-state detector missing');
 must(js.includes('const navCandidates=nearBottom?'),'bottom-nav occlusion candidate scan missing');
 must(js.includes('navOcclusions'),'bottom-nav occlusion evidence missing');
-must(js.includes('layout.bottomClearance&&!report.bodyOverflow'),'bottom clearance must gate visual QA pass/fail');
+must(js.includes('layout.bottomClearance&&layout.navEndClearance&&!report.bodyOverflow'),'bottom + nav-end clearance must gate visual QA pass/fail');
 must(/report\.ok=[^;\n]*layout\.commandHubInvariant[^;\n]*layout\.degradedPriorityInvariant[^;\n]*layout\.botAccordionInvariant[^;\n]*layout\.forecastFibInvariant[^;\n]*layout\.secondaryViewInvariant[^;\n]*layout\.partialValueParity/.test(js),'view structural invariants must gate visual QA');
 must(qa.includes("['command-bottom','command',6000]"),'Command bottom evidence capture missing');
 must(qa.includes("['bots-bottom','bots',6000]"),'Bots bottom evidence capture missing');
@@ -276,8 +276,9 @@ must(css.includes('min-height:44px'),'touch target floor missing');
 
 /* r91 permanent Command top-fold clarity gates */
 must(String(release.dashboardShell||'').includes('COMMAND-TOP-FOLD-CLARITY'),'dashboardShell must declare Command top-fold clarity');
-must(js.includes("feedReady=g.decisionComplete&&m.coverageComplete"),'Live Data readiness must remain independent from portfolio authority');
-must(js.includes("<span>LIVE DATA</span>"),'Command LIVE DATA KPI missing');
+must(js.includes('function commandHealthSummary()'),'Command health summary missing');
+must(js.includes("const dataReady=br.label==='READY'&&mr.label==='READY'"),'Command data health must stay independent from portfolio authority');
+must(js.includes("chip('DATA',h.data)"),'Command DATA health chip missing');
 must(js.includes('function commandDataDisclosure()'),'Command source disclosure renderer missing');
 must(js.includes('source.innerHTML=commandDataDisclosure()'),'Command source details must be collapsed by default');
 must(css.includes('.command-source-details>summary'),'Command source disclosure styling missing');
@@ -340,7 +341,7 @@ must(js.includes("okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY'"),'OKX server aut
 must(v9.includes('okxVenueSource:okxVenue?.source||null'),'portfolio model must expose OKX authority source');
 must(!v9.includes("'LOCAL REF · '+okxAge"),'stale LOCAL REF label must remain removed');
 must(js.includes('function commandSystemDiagnostics()'),'collapsed Command system diagnostics missing');
-must(js.includes("details.className='command-system-diagnostics'"),'Command system diagnostics disclosure missing');
+must(js.includes("details.className='command-system-diagnostics command-diagnostics'"),'Command system diagnostics disclosure missing');
 must(js.includes("const guard=document.createElement('div');guard.innerHTML=dataGuardCard(true)"),'compact Data Guard must remain inside Command diagnostics');
 must(js.includes("const wallet=document.createElement('div');wallet.innerHTML=walletDiscoveryLayerCompact()"),'compact wallet diagnostics must remain inside Command diagnostics');
 must(css.includes('#view-command .data-state-items{grid-template-columns:repeat(3,minmax(0,1fr))'),'Command data-state compact row missing');
@@ -518,7 +519,8 @@ must(js.includes('points=strictPortfolioHistoryPoints()'),'history delta must us
 must(js.includes('const sourceMoney=v=>knownNumber(v)?'),'venue source cards must not coerce null authority to zero');
 must(js.includes('historyStale=!m.currentIncluded'),'stale chart date-label guard missing');
 must(js.includes('<span>WALLET <b>'),'Depot compact asset value must be labelled as wallet detail, not total holding');
-must(js.includes("portfolioReady=S()?.portfolio?.complete===true"),'system readiness must include portfolio authority');
+must(js.includes('const p=portfolioReadiness()'),'Command health must consume canonical portfolio readiness');
+must(js.includes("p.label==='BLOCKED'"),'Command health must preserve blocked portfolio authority');
 must(js.includes('function precisePrice(v){'),'sub-dollar price precision helper missing');
 
 must(js.includes("deltaAvailable=series.currentIncluded&&delta!=null&&startCovered&&endCovered"),'chart delta must require current canonical total');

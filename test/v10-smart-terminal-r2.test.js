@@ -43,7 +43,7 @@ test('v10 renders actionable pair cards only from fresh private rows and keeps r
 
 test('v10 command places critical asset and guarded next action ahead of legacy risk views',()=>{
   assert.match(js,/LIVE RISK PRIORITY/);
-  assert.match(js,/Safety\/Data Guard überstimmt Trading-Signal/);
+  assert.match(js,/Liquidation.*(?:Teilstatus|Substatus)/);
   assert.match(js,/KEINE AKTION · DATEN PRÜFEN/);
   assert.match(js,/LIQ-PUFFER PRÜFEN/);
   assert.match(js,/PROFIT LOCK PRÜFEN/);

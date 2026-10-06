@@ -29,12 +29,16 @@ test('r109 makes stale partial history visibly date-aware instead of looking fut
   assert.match(v10,/portfolioChartTimeLabel\(m\.first\?\.timestamp,range,historyStale\)/);
   assert.match(v10,/portfolioChartTimeLabel\(m\.last\?\.timestamp,range,historyStale\)/);
 });
-test('r109 distinguishes wallet detail from bot exposure and keeps system readiness authority-aware',()=>{
+test('r109+ distinguishes wallet detail from bot exposure and keeps Command health authority-aware',()=>{
   assert.match(v10,/<span>WALLET <b>/);
   assert.doesNotMatch(v10,/<span>HOLDING <b>/);
-  assert.match(v10,/portfolioReady=S\(\)\?\.portfolio\?\.complete===true/);
-  assert.match(v10,/&&portfolioReady/);
-  assert.match(v10,/PORTFOLIO '\+\(portfolioReady\?'READY':'PARTIAL'\)/);
+  const hStart=v10.indexOf('function commandHealthSummary()'),hEnd=v10.indexOf('function commandAttentionHtml',hStart),health=v10.slice(hStart,hEnd);
+  assert.match(health,/const p=portfolioReadiness\(\)/);
+  assert.match(health,/p\.label==='READY'/);
+  assert.match(health,/p\.label==='BLOCKED'/);
+  const dStart=v10.indexOf('function commandSystemDiagnostics()'),dEnd=v10.indexOf('function renderSystemHeader()',dStart),diag=v10.slice(dStart,dEnd);
+  assert.match(diag,/h=commandHealthSummary\(\)/);
+  assert.match(diag,/PORTFOLIO '\+esc\(h\.portfolio\.label\)/);
 });
 test('r109 preserves sub-dollar structural price precision without touching notional money formatting',()=>{
   assert.match(v10,/function precisePrice\(v\)/);
