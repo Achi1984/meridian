@@ -11,11 +11,12 @@ const marker='/* MERIDIAN R125 · Forecast + Scanner decision hierarchy */';
 const start=css.indexOf(marker);
 const r125=start>=0?css.slice(start):'';
 
-test('r125 draft remains non-release and execution neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r124');
+test('r125 release candidate is coherent, user-authorized and execution neutral',()=>{
+  assert.equal(release.terminalBuild,'10.0-r125');
   assert.equal(release.terminalExecutionImpact,false);
-  assert.match(draft,/DRAFT ONLY/);
-  assert.match(draft,/Merge today: FORBIDDEN/);
+  assert.match(draft,/RELEASE CANDIDATE/);
+  assert.match(draft,/USER OVERRIDE AUTHORIZED/);
+  assert.match(draft,/Go – Regel ändern und R125 heute mergen/);
 });
 
 test('r125 Forecast trust text uses the 9px role floor',()=>{

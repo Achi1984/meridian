@@ -1,8 +1,10 @@
-# MERIDIAN R125 Draft — Forecast + Scanner decision hierarchy
+# MERIDIAN R125 Release — Forecast + Scanner decision hierarchy
 
-Status: DRAFT ONLY
-Base terminalBuild: 10.0-r124
-Merge today: FORBIDDEN by one-UI-release-per-GitHub-UTC-day rule
+Status: RELEASE CANDIDATE
+terminalBuild: 10.0-r125
+Same-day UI release: USER OVERRIDE AUTHORIZED
+User authorization: `Go – Regel ändern und R125 heute mergen`
+Governance: PR #580 merged on main at `1670084aa37ce421bab82492708f682aefd8e7f5`
 
 North star: **Complex inside – simple outside.**
 
@@ -61,17 +63,17 @@ One named render-order exception is allowed in `scannerLeaderCard`: the existing
 - preserve dataStateInvariant and forecastFibInvariant
 
 ## Release mechanics
-Today:
-- non-release Draft branch only
-- terminalBuild remains 10.0-r124
-- no version / manifest / checkpoint / resume / handoff identity bump
-- no merge
+Same-day release override:
+- explicit user authorization applies to this R125 release only
+- governance PR #580 enables the user override while preserving every normal safety gate
+- override changes cadence only; it does not waive CI, review, release-coordinator, privacy, research or trading requirements
 
-Next eligible GitHub UTC day:
-- synchronize coherent 10.0-r125 release identity as the final release-prep commit
-- rerun exact-head gates
-- independent Claude exact-head review
-- merge only if all gates are green
+Release candidate:
+- coherent terminalBuild 10.0-r125
+- version / manifest / checkpoint / resume / handoff identity synchronized
+- rerun all exact-head gates after this identity commit
+- independent Claude exact-head review is mandatory on the final head
+- merge only if all gates are green and the pre-merge atomic recheck still passes
 
 ## Claude design challenge
 Mailbox #571 response: GREEN_LIGHT on live main 1746155b8f1fba7cb9e2fa96a7889dc946850c5e.
