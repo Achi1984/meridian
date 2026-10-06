@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
+const visualQa=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
 
 function block(startNeedle,endNeedle,src=js){
   const a=src.indexOf(startNeedle),b=src.indexOf(endNeedle,a+1);
@@ -49,4 +50,11 @@ test('r126 Paper builders remain read-only and do not add execution behavior',()
   const src=block('function paperModelCard(m){','async function loadPaperCockpit');
   assert.doesNotMatch(src,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|postJson|executeTrade)/i);
   assert.match(src,/models\\.map\\(paperModelCard\\)/);
+});
+
+test('r126 visual QA covers Paper trust states and fail-closed role gates',()=>{
+  for(const token of ['paper-stale','paper-error','paper-unavailable','paper-loading','paper-blocked','mobile-375-paper-unavailable','mobile-320-paper-blocked'])assert.ok(visualQa.includes(token),token);
+  for(const token of ['smallR126AuthorityText','smallR126PrimaryText','r126TrustClipping','r126PaperFirstViewportInvariant'])assert.ok(js.includes(token),token);
+  assert.match(js,/r126ActionSelectors=\['#view-paper \.paper-cockpit-toolbar button'\]/);
+  assert.match(js,/r126PaperFirstViewportInvariant/);
 });
