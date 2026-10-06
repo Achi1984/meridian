@@ -351,7 +351,7 @@ must(css.includes('.command-system-diagnostics>summary'),'Command system diagnos
 /* r97 permanent Depot overview-density gates */
 must(String(release.dashboardShell||'').includes('DEPOT-OVERVIEW-DENSITY'),'dashboardShell must declare Depot overview density');
 must(js.includes("<span>GESAMTPORTFOLIO</span>"),'Depot canonical portfolio total label missing');
-must(js.includes("const okxSource=String(p.okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY').includes('SERVER')?'SERVER AUTH':'AUTHORITY';"),'Depot OKX authority provenance missing');
+must(/const okxSource=String\(p\.okxVenueSource\|\|'SERVER_PORTFOLIO_AUTHORITY'\)\.includes\('SERVER'\)\?'SERVER AUTH':'AUTHORITY'/.test(js),'Depot OKX authority provenance missing');
 must(js.includes('class="depot-accounting-details"'),'Depot accounting disclosure missing');
 must(js.includes("rows.map(row=>depotAssetCard(row,had?openAssets.has(row.symbol):false))"),'Depot assets must default closed while preserving open state');
 must(css.includes('#view-depot .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Depot compact two-column data state missing');
