@@ -250,8 +250,11 @@ The repository enforces this with `scripts/release-coordinator.mjs`, the Release
 
 ### 14.1A UI Release Bundling
 - Small UI/presentation changes accumulate on one active release branch instead of separate rNN releases.
-- Maximum one UI/presentation terminal release merge per GitHub UTC calendar day.
-- Exception: a genuine bugfix or trust/safety defect that should not wait.
+- Standard cadence: maximum one UI/presentation terminal release merge per GitHub UTC calendar day.
+- Automatic exception: a genuine bugfix or trust/safety defect that should not wait.
+- Explicit user override: an additional UI/presentation terminal release may merge on the same GitHub UTC calendar day only when the user explicitly authorizes that additional same-day release after being told the standard cadence would otherwise block it.
+- A user-override release keeps every normal safety gate: coherent next-revision release identity, exact-head CI GREEN, exact-head independent Claude GREEN_LIGHT, pre-merge atomic recheck, single-writer lease, and `expected_head_sha` merge protection. The override changes cadence only; it never waives verification, review, release-coordinator, research, trading, privacy, or safety requirements.
+- Record the explicit user override in the active PR lead-status comment and final merge status.
 - The bundle gets one exact-head review, one release-identity bump and one merge.
 - Infrastructure/docs/process PRs do not count and must not bump `terminalBuild`.
 
