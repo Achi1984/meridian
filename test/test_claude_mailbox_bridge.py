@@ -4,6 +4,7 @@ from pathlib import Path
 
 WORKFLOW = Path(".github/workflows/claude-mailbox-review.yml")
 CHECKPOINT = Path("MERIDIAN_LIVE_CHECKPOINT.json")
+# Mailbox routing is intentionally derived from the durable live checkpoint.
 text = WORKFLOW.read_text(encoding="utf-8")
 checkpoint = json.loads(CHECKPOINT.read_text(encoding="utf-8"))
 mailbox_issue = int(checkpoint["mailboxIssue"])
