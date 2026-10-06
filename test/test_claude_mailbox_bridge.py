@@ -54,6 +54,11 @@ for label, value in [
     assert "mailboxIssue" in value, f"{label} must resolve mailboxIssue dynamically"
     assert not re.search(r"Issue #\d+", value), f"{label} hardcodes mailbox issue"
 
+agent_state = json.loads(Path("MERIDIAN_AGENT_STATE.json").read_text(encoding="utf-8"))
+agent_bootstrap = agent_state["nextChatBootstrap"][0]
+assert "mailboxIssue" in agent_bootstrap
+assert not re.search(r"Issue #\d+", agent_bootstrap)
+
 agent_workflow = Path("MERIDIAN_AGENT_WORKFLOW.md").read_text(encoding="utf-8")
 stream_safe = agent_workflow.split("## STREAM-SAFE-V6", 1)[1]
 first_rule = stream_safe.split("\n", 3)[3]
