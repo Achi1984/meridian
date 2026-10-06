@@ -19,7 +19,7 @@ Updated: **2026-10-05**
 - Next research gate: **explicit user authorization + separate exact-head Claude review before canonical V2 execution or Discovery**
 - Secondary Funding-Carry Candidate A: **PASS_TO_DATA_DESIGN_SCOPED only; no data-design run authorized**
 
-- Build: **10.0-r117**
+- Build: **10.0-r118**
 - Verified main checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
