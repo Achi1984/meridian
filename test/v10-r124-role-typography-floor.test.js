@@ -4,6 +4,8 @@ import fs from 'node:fs';
 
 const css=fs.readFileSync(new URL('../v10/r124-typography-floor.css',import.meta.url),'utf8');
 const v10index=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
+const harness=fs.readFileSync(new URL('../scripts/v10-visual-qa.mjs',import.meta.url),'utf8');
+const v10js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r124 typography floor is a presentation-only sidecar loaded after v10 css',()=>{
@@ -39,4 +41,18 @@ test('r124 excludes research, FIB and global typography overrides',()=>{
 test('r124 release remains execution neutral',()=>{
   assert.match(release.terminalBuild,/^10\.0-r\d+$/);
   assert.equal(release.terminalExecutionImpact,false);
+});
+
+test('r124 keeps 390/375/320 mobile QA and clipping guards active',()=>{
+  for(const width of [375,320]){
+    for(const [label,view] of [['command','command'],['depot','depot'],['bots','bots']]){
+      assert.ok(harness.includes("'mobile-"+width+"-"+label+"','"+view+"'"));
+    }
+  }
+  assert.match(harness,/const viewport=\{width:390,height:844\}/);
+  assert.match(v10js,/bodyOverflow/);
+  assert.match(v10js,/activeOverflow/);
+  assert.match(v10js,/navOcclusions/);
+  assert.match(v10js,/navInside/);
+  assert.match(v10js,/!overflow\.length/);
 });
