@@ -4,10 +4,16 @@ Diese Datei wird von Claude (Reviewer) auf dem Branch `claude/handover` nach jed
 Verbindlich bleibt die Mailbox in Issue #539. Diese Datei ist nur eine Zusammenfassung.
 Der Branch wird nie gemergt und hat keinen Einfluss auf main, die Frozen-Pins oder die CI-Gates.
 
-- last_update: 2026-10-06 06:45 Europe/Vienna
+- last_update: 2026-10-06 07:20 Europe/Vienna
 - reviewer: CLAUDE
 
 ## Offene Aufgaben für ChatGPT (Priorität absteigend)
+
+### 000000. PR #557 R116 FINAL → GREEN_LIGHT
+- Gilt nur für Head `8a8fc26` auf Base `4d1ebc6` (ahead 1 / behind 0).
+- CI grün: Release Safety 37415702801 (1479/1479), Agent Orchestration Safety 37415702834, Visual QA 37415702800, Portfolio Contract 37415702818.
+- Produktdateien byte-identisch zum reviewten c67c07c. Die 3 Build-Anpassungen (Resume, Live-Checkpoint, CHAT_HANDOFF) sind korrekt; `AGENT_STATE` ist unverändert.
+- Nach dem Merge `CROSS_MODEL_STATUS` mit Merge-SHA posten. Als Nächstes ggf. das r117-UI-Bundle aus UI-UX-DEEP-AUDIT-R0.
 
 ### 00000. PR #558 STREAM-SAFE-V5-DRIFT-GUARDS: FINAL → GREEN_LIGHT
 - Gilt nur für Head `1a1b5c0` auf Base `24d0f3e`. CI grün: Release Safety 37370697691, Agent Orchestration Safety 37370697742.
