@@ -40,7 +40,8 @@ test('r67 provides expand and collapse controls for the asset list',()=>{
 });
 
 test('r67 keeps compact command risk cards while simplifying the BOTS view',()=>{
-  assert.match(v10,/if\(compact\)return '<article class="asset-pair pair-compact/);
+  assert.match(v10,/decisionClass=decisionView\?' command-risk-card pair-tone-'\+st\.tone:''/);
+  assert.match(v10,/return '<article class="asset-pair pair-compact'\+decisionClass/);
   assert.match(v10,/command-risk-card/);
   assert.match(v10,/pair-tone-/);
   assert.match(v10,/BOT CONTROL CENTER/);
