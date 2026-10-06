@@ -5,11 +5,12 @@ import fs from 'node:fs';
 const adapter=fs.readFileSync(new URL('../v10/r122-command-layout.js',import.meta.url),'utf8');
 const index=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
+const build=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8')).terminalBuild;
 
 function block(a,b){const i=js.indexOf(a),j=js.indexOf(b,i+1);assert.ok(i>=0&&j>i,'expected '+a);return js.slice(i,j)}
 
 test('r122 loads adapter after the r122 v10 renderer',()=>{
- const core=index.indexOf('./v10.js?v=10.0-r122'),layout=index.indexOf('./r122-command-layout.js?v=10.0-r122');
+ const core=index.indexOf('./v10.js?v='+build),layout=index.indexOf('./r122-command-layout.js?v='+build);
  assert.ok(core>=0&&layout>core);assert.match(adapter,/transitional presentation adapter/)
 });
 
