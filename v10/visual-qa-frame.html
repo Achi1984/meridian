@@ -1,23 +1,25 @@
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MERIDIAN Visual QA Frame</title>
-<style>html,body{margin:0;padding:0;width:390px;height:844px;overflow:hidden;background:#05070b}iframe{display:block;width:390px;height:844px;border:0;margin:0;padding:0}</style></head>
+<style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#05070b}iframe{display:block;border:0;margin:0;padding:0}</style></head>
 <body><script>
 (function(){
   const local=['127.0.0.1','localhost'].includes(location.hostname);
   if(!local){document.body.textContent='LOCAL VISUAL QA ONLY';return}
-  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current';
+  const q=new URLSearchParams(location.search),view=q.get('qaView')||'command',scroll=q.get('qaScroll')||'0',build=q.get('build')||'current',qaWidth=Math.max(240,Math.min(900,Number(q.get('qaWidth'))||390)),qaHeight=Math.max(400,Math.min(1200,Number(q.get('qaHeight'))||844));
   const inner=new URL('./',location.href);
   inner.searchParams.set('visualQa','1');
   inner.searchParams.set('qaView',view);
   inner.searchParams.set('qaScroll',scroll);
   inner.searchParams.set('build',build);
+  inner.searchParams.set('qaWidth',String(qaWidth));
+  inner.searchParams.set('qaHeight',String(qaHeight));
   for(const key of ['qaFlow','qaData']){
     const value=q.get(key);
     if(value)inner.searchParams.set(key,value);
   }
   const frame=document.createElement('iframe');
   frame.id='qa-frame';
-  frame.width='390';frame.height='844';
+  frame.width=String(qaWidth);frame.height=String(qaHeight);
   frame.src=inner.pathname+inner.search;
   document.body.appendChild(frame);
   let tries=0;

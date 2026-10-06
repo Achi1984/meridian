@@ -162,7 +162,7 @@ must(String(release.dashboardShell||'').includes('VISUAL-QA-HARNESS'),'dashboard
 must(v9.includes("const LOCAL_VISUAL_QA=['127.0.0.1','localhost'].includes(location.hostname)"),'visual QA network freeze must remain localhost-only');
 must(js.includes('function localVisualQaConfig()'),'local visual QA config missing');
 must(js.includes("if(!['127.0.0.1','localhost'].includes(location.hostname))return null"),'visual QA fixture must remain localhost-only');
-must(js.includes("allowed=['command','depot','bots','market','research']"),'visual QA top-level view coverage missing');
+must(js.includes("allowed=['command','depot','bots','market','research','asset-detail','paper']"),'visual QA primary/secondary view coverage missing');
 must(js.includes("fibUi.mode='MANUAL'"),'visual QA deterministic FIB fixture missing');
 must(js.includes('function writeLocalVisualQaReport(cfg)'),'visual QA layout report missing');
 must(js.includes('bodyOverflow:root.scrollWidth>innerWidth+2'),'visual QA body overflow gate missing');
@@ -190,7 +190,7 @@ must(js.includes('const nearBottom=scrollY+innerHeight>=root.scrollHeight-4'),'b
 must(js.includes('const navCandidates=nearBottom?'),'bottom-nav occlusion candidate scan missing');
 must(js.includes('navOcclusions'),'bottom-nav occlusion evidence missing');
 must(js.includes('layout.bottomClearance&&!report.bodyOverflow'),'bottom clearance must gate visual QA pass/fail');
-must(js.includes('layout.commandHubInvariant&&layout.botAccordionInvariant&&layout.forecastFibInvariant'),'view structural invariants must gate visual QA');
+must(/report\.ok=[^;\n]*layout\.commandHubInvariant[^;\n]*layout\.degradedPriorityInvariant[^;\n]*layout\.botAccordionInvariant[^;\n]*layout\.forecastFibInvariant[^;\n]*layout\.secondaryViewInvariant[^;\n]*layout\.partialValueParity/.test(js),'view structural invariants must gate visual QA');
 must(qa.includes("['command-bottom','command',6000]"),'Command bottom evidence capture missing');
 must(qa.includes("['bots-bottom','bots',6000]"),'Bots bottom evidence capture missing');
 must(qa.includes("['forecast-fib','market',1050]"),'Forecast FIB evidence capture missing');
@@ -351,7 +351,7 @@ must(css.includes('.command-system-diagnostics>summary'),'Command system diagnos
 /* r97 permanent Depot overview-density gates */
 must(String(release.dashboardShell||'').includes('DEPOT-OVERVIEW-DENSITY'),'dashboardShell must declare Depot overview density');
 must(js.includes("<span>GESAMTPORTFOLIO</span>"),'Depot canonical portfolio total label missing');
-must(js.includes("const okxSource=String(p.okxVenueSource||'SERVER_PORTFOLIO_AUTHORITY').includes('SERVER')?'SERVER AUTH':'AUTHORITY';"),'Depot OKX authority provenance missing');
+must(/const okxSource=String\(p\.okxVenueSource\|\|'SERVER_PORTFOLIO_AUTHORITY'\)\.includes\('SERVER'\)\?'SERVER AUTH':'AUTHORITY'/.test(js),'Depot OKX authority provenance missing');
 must(js.includes('class="depot-accounting-details"'),'Depot accounting disclosure missing');
 must(js.includes("rows.map(row=>depotAssetCard(row,had?openAssets.has(row.symbol):false))"),'Depot assets must default closed while preserving open state');
 must(css.includes('#view-depot .data-state-items{grid-template-columns:repeat(2,minmax(0,1fr))'),'Depot compact two-column data state missing');

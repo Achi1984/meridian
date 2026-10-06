@@ -17,16 +17,20 @@ test('r113+ release identity remains coherent and execution neutral',()=>{
   assert.ok(js.includes("const BUILD='"+release.terminalBuild+"'"));
 });
 
-test('r113 compact Command risk card exposes liquidation price current price buffer and stage',()=>{
+test('r117 compact Command risk card distinguishes market trust axes and bot mark price',()=>{
   const a=js.indexOf('function liquidationStage(buffer)');
   const b=js.indexOf('function criticalPair()',a);
   const block=js.slice(a,b);
   assert.match(block,/LIQUIDATION PRICE/);
-  assert.match(block,/CURRENT PRICE/);
+  assert.match(block,/BOT MARK/);
   assert.match(block,/LIQ BUFFER/);
-  assert.match(block,/STAGE/);
+  assert.match(block,/LIQ STATUS/);
   assert.match(block,/unavailable/);
   assert.match(block,/smallest verified buffer/);
+  assert.match(block,/protectionConflict=st\.code==='PROTECTION_RISK'/);
+  assert.match(block,/protectionConflict\?'muted':liqDisplay\.tone/);
+  assert.match(block,/SL ungültig → siehe oben/);
+  assert.doesNotMatch(block,/<span>CURRENT PRICE<\/span>/);
 });
 
 test('r113 reuses the existing three-step liquidation tone ladder',()=>{

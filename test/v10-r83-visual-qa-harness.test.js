@@ -27,12 +27,12 @@ test('r83 visual fixture is localhost-only and disables live refresh only there'
   assert.match(v10,/q\.get\('visualQa'\)!=='1'/);
 });
 
-test('r83 deterministic fixture covers five top-level views and FIB manual state',()=>{
-  assert.match(v10,/allowed=\['command','depot','bots','market','research'\]/);
+test('r83+ deterministic fixture covers primary plus r117 secondary views and FIB manual state',()=>{
+  assert.match(v10,/allowed=\['command','depot','bots','market','research','asset-detail','paper'\]/);
   assert.match(v10,/s\.botIdentityMode='API_NATIVE'/);
   assert.match(v10,/s\.marketTransport='VISUAL_QA'/);
   assert.match(v10,/fibUi\.mode='MANUAL'/);
-  for(const x of ['command','depot','bots','market','research'])assert.ok(qa.includes("'"+x+"'"));
+  for(const x of ['command','depot','bots','market','research','asset-detail','paper'])assert.ok(qa.includes("'"+x+"'"));
 });
 
 test('r83 layout report gates overflow, short buttons and fixed nav containment',()=>{
@@ -43,12 +43,15 @@ test('r83 layout report gates overflow, short buttons and fixed nav containment'
   assert.match(qa,/if\(failed\.length\)/);
 });
 
-test('r83 forces the app into a same-origin 390x844 CSS viewport',()=>{
+test('r83+ keeps visual QA same-origin and r117 makes viewport dimensions real',()=>{
   const frame=fs.readFileSync(new URL('../v10/visual-qa-frame.html',import.meta.url),'utf8');
-  assert.match(frame,/width:390px;height:844px/);
-  assert.match(frame,/frame\.width='390';frame\.height='844'/);
+  assert.match(frame,/width:100%;height:100%/);
+  assert.match(frame,/frame\.width=String\(qaWidth\);frame\.height=String\(qaHeight\)/);
   assert.match(frame,/LOCAL VISUAL QA ONLY/);
-  assert.match(v10,/viewportMatch=viewport\.w===390&&viewport\.h===844/);
+  assert.match(v10,/viewportMatch=viewport\.w===cfg\.qaWidth&&viewport\.h===cfg\.qaHeight/);
+  assert.match(qa,/const viewport=\{width:390,height:844\}/);
+  assert.match(qa,/mobile-375-command/);
+  assert.match(qa,/mobile-320-command/);
   assert.match(qa,/visual-qa-frame\.html/);
 });
 

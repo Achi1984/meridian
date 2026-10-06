@@ -41,6 +41,22 @@ test('r111 explains why stale strict history is not advancing',()=>{
   assert.match(block,/LETZTER '\+strictLatestAge/);
 });
 
+test('r117 collapses degraded history and keeps NEXT ACTION room in the top fold',()=>{
+  const start=js.indexOf('function portfolioChartHeroHtml()'),end=js.indexOf('function bindCommandPortfolioHero',start),block=js.slice(start,end);
+  assert.match(block,/portfolio-degraded-history/);
+  assert.match(block,/historySurface=ready\?portfolioHistoryIntegrityHtml\(\)\+chart:degradedHistory/);
+  assert.match(block,/portfolio-degraded/);
+  assert.match(css,/\.portfolio-degraded-history\{/);
+});
+
+test('r117 Depot mirrors the known partial value without presenting it as total',()=>{
+  const start=js.indexOf('function renderDepot('),end=js.indexOf('function bindAssetDetailLinks',start),block=js.slice(start,end);
+  assert.match(block,/knownDepotSources=\[p\.ledgerAutoUsd,p\.okxVenueUsd,p\.pionex\]/);
+  assert.match(block,/TEILWERT, NICHT GESAMT/);
+  assert.match(block,/knownDepotPartialText/);
+  assert.match(block,/p\.complete\?h\.money\?\.\(p\.total\):'—'/);
+});
+
 test('r111 remains presentation-only',()=>{
   const start=js.indexOf('function portfolioHistoryIntegrityHtml()'),end=js.indexOf('function bindCommandPortfolioHero',start),block=js.slice(start,end);
   assert.doesNotMatch(block,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|postJson)/i);
