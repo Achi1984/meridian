@@ -1262,7 +1262,7 @@
     "orchestrationInstallationPr": 324,
     "orchestrationInstallationMergeSha": "832f46471f12b26016e00c9ba0c06677a32427b4",
     "orchestrationBootstrapRecoveredAfterStreamingInterruption": true,
-    "streamSafeProtocol": "STREAM-SAFE-V5",
+    "streamSafeProtocol": "STREAM-SAFE-V6",
     "maxToolCallGroupsPerVisibleBurst": 1,
     "maxSameStatusPollsPerVisibleBurst": 1,
     "maxVisibleBurstSeconds": 45,
