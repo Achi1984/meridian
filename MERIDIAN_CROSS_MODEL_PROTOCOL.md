@@ -42,16 +42,16 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Verbindliche Cross-Model-Mailbox ist GitHub Issue **#539**. Claude darf dort Review-Antworten kommentieren; diese Kommentare sind Koordination/Evidenz und ersetzen nie `main`, exakte PR-HEAD-Prüfung oder CI.
-- Nach Merge von `.github/workflows/claude-mailbox-review.yml` kann der Lead Claude ohne User-Relay auslösen, indem ein neuer Kommentar in #539 von `Achi1984` sowohl `@claude` als auch `CROSS_MODEL_REQUEST` enthält.
-- Der Workflow ist absichtlich Reviewer-only: `contents: read`, `pull-requests: read`, `actions: read`, nur `issues: write` für die Review-Antwort. Claude darf keine Dateien editieren, keinen Commit/Push/PR/Merge erzeugen, keine Locks/Stages ändern und keine Workflows dispatchen.
-- Für die Action muss das Repository-Secret `CLAUDE_CODE_OAUTH_TOKEN` vorhanden sein. Ohne Secret scheitert der Workflow fail-closed vor dem Reviewer-Lauf.
-- Die Lead-Lease-Regeln bleiben unverändert: ChatGPT ist Lead und alleiniger Merge-Owner. Ein Lead-Wechsel zu Claude benötigt weiterhin den formalen Lease-Wechsel aus Abschnitt 4.
+- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#571**. #539 ist Vorgänger und wird erst nach erfolgreichem R5-Smoke archiviert.
+- Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION` und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
+- Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
+- Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die Review-Antwort. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
+- Erlaubte read-only Prüfung: `gh api` nur GET, `gh pr view/diff`, `gh run view`, Git-Inspektion, `node --test`, Continuity Audit, Frozen Guard und Orchestration Validator.
+- `CLAUDE_CODE_OAUTH_TOKEN` muss vorhanden sein; ohne Secret fail-closed. ChatGPT bleibt Lead/Merge-Owner.
 
 ## 8. Automatischer Mailbox-Loop
-1. ChatGPT postet `@claude CROSS_MODEL_REQUEST <id>` in #539.
-2. Der GitHub-Workflow startet Claude nur für den eng definierten #539/Achi1984-Trigger.
-3. Claude prüft den exakten angeforderten SHA read-only und postet `CROSS_MODEL_RESPONSE <id>` in #539.
-4. ChatGPT liest #539 als verbindliche Mailbox, verarbeitet GREEN/REVISION_REQUIRED und führt nur bereits autorisierte Schritte aus.
-5. Jeder neue Commit invalidiert ein vorheriges GREEN LIGHT. Kein Workflow darf diese Exact-Head-Regel umgehen.
-6. User-Eingriff bleibt nur für Entscheidungen/Freigaben nötig, die laut Hard Gates ausdrücklich beim User liegen.
+1. Lead liest `mailboxIssue` aus dem Live Checkpoint und postet dort `@claude CROSS_MODEL_REQUEST <id>`.
+2. Workflow startet nur für diese Mailbox, `Achi1984` und `CROSS_MODEL_REQUEST`.
+3. Claude prüft exakten SHA/Base, CI und relevante lokale read-only Tests/Audits und postet `CROSS_MODEL_RESPONSE <id>` in derselben Mailbox.
+4. Jeder neue Commit invalidiert ein früheres GREEN LIGHT.
+5. User-Eingriff bleibt nur für explizite Hard-Gate-Entscheidungen nötig.

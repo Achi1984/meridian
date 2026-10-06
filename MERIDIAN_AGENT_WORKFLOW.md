@@ -372,7 +372,7 @@ Runtime honesty overrides cosmetic adherence to the workflow.
 
 To reduce chat-stream interruption risk without weakening repository safety:
 
-1. Before every Meridian work step, read Issue #539 comments since the last seen durable comment and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
+1. Before every Meridian work step, read `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json`, then read that mailbox since the last seen durable comment and all open `CROSS_MODEL_REQUEST` / `REVISION_REQUIRED` items.
 2. For routine continuation, read `MERIDIAN_LIVE_CHECKPOINT.json` before `MERIDIAN_RESUME.json`, `MERIDIAN_HANDOFF.md`, or other large continuity files.
 3. Reconcile live `main`, current CI and only the related PRs/branches against the compact checkpoint.
 4. Bound reads and rendered payloads: target <= 4096 bytes, inspect diff/stat before large files, and expand large continuity files only on mismatch or concrete detail need.
