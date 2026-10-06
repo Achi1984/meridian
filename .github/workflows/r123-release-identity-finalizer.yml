@@ -1,0 +1,57 @@
+name: R123 Release Identity Finalizer
+on:
+  push:
+    branches:
+      - v10-r123-command-status-owner
+    paths:
+      - .github/workflows/r123-release-identity-finalizer.yml
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Guard finalize self-delete
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EXPECTED_PARENT: 60325b707ac54a27c613b651b6e4351937a33a9b
+          TARGET_BRANCH: v10-r123-command-status-owner
+        run: |
+          set -euo pipefail
+          test "$EVENT_BEFORE" = "$EXPECTED_PARENT"
+          test "$(git hash-object v9/v9.js)" = ab39b8ffda83acc5cc38b38c7767e3cc5e22f0cd
+          test "$(git hash-object v9/index.html)" = 067dd8f0a0d33698c187be5d250f617786ecbf37
+          test "$(git hash-object MERIDIAN_RESUME.json)" = 4104001e086e114bff57964a58c8cf1147909a30
+          test "$(git hash-object MERIDIAN_LIVE_CHECKPOINT.json)" = 201893d9a58a69d73e54ed84b927e9d19e0a6933
+          test "$(git hash-object docs/MERIDIAN_CHAT_HANDOFF.md)" = 3261696a5970fb8c7daf8e9d54c13cf205fccd45
+          python3 - <<'PY'
+          from pathlib import Path
+          def rep(path,old,new,n=1):
+              p=Path(path); b=p.read_bytes(); o=old.encode(); q=new.encode()
+              assert b.count(o)==n,(path,b.count(o),n)
+              a=b.replace(o,q); assert a.count(o)==0
+              p.write_bytes(a)
+          rep("v9/v9.js","10.0-r122","10.0-r123",2)
+          rep("v9/v9.js","qs.set('build','r122')","qs.set('build','r123')")
+          rep("v9/index.html","p.set('build','r122')","p.set('build','r123')")
+          rep("MERIDIAN_RESUME.json",'"build": "10.0-r122"','"build": "10.0-r123"')
+          rep("MERIDIAN_LIVE_CHECKPOINT.json",'"terminalBuild": "10.0-r122"','"terminalBuild": "10.0-r123"')
+          rep("docs/MERIDIAN_CHAT_HANDOFF.md","Build: **10.0-r122**","Build: **10.0-r123**")
+          PY
+          node --check v9/v9.js
+          node -e "const f=require('fs');JSON.parse(f.readFileSync('MERIDIAN_RESUME.json'));JSON.parse(f.readFileSync('MERIDIAN_LIVE_CHECKPOINT.json'))"
+          rm .github/workflows/r123-release-identity-finalizer.yml
+          git diff --check
+          printf '%s\n' .github/workflows/r123-release-identity-finalizer.yml MERIDIAN_LIVE_CHECKPOINT.json MERIDIAN_RESUME.json docs/MERIDIAN_CHAT_HANDOFF.md v9/index.html v9/v9.js | sort >/tmp/e
+          git diff --name-only | sort >/tmp/a
+          diff -u /tmp/e /tmp/a
+          git config user.name "MERIDIAN R123 Finalizer"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "R123: finalize release identity"
+          git push origin HEAD:"$TARGET_BRANCH"
