@@ -22,9 +22,9 @@ Turn length is the primary transport budget.
 
 - Maximum one bounded remote tool-call group per assistant turn.
 - Maximum one repository mutation per assistant turn.
-- After any mutation: report a short checkpoint and end the turn. Reconcile on the next `Go`.
+- After any mutation: preserve a short auditable checkpoint (commit/op-id/PR-local status as appropriate) and end the turn. Under the approved decision-only policy, do not send unsolicited routine progress messages; reconcile on the next authorized chat or scheduled invocation.
 - A Claude request is a mutation: post it, then stop. Never wait for Claude in the same turn.
-- Poll a still-running CI/reviewer/platform state at most once per user turn. `WAITING` is a valid terminal turn state.
+- Poll a still-running CI/reviewer/platform state at most once per user turn. `WAITING` is a valid terminal turn state and is not, by itself, a reason to notify the user.
 - Prefer one bounded state pack: mailbox tail (max 5), checkpoint, live main, one relevant PR, relevant run IDs/statuses. No full mailbox dump.
 - Do not fetch log bodies unless a named job failed. Inspect at most one bounded failing log slice per turn.
 - Never use sleep/retry loops inside a turn.
@@ -34,7 +34,7 @@ Turn length is the primary transport budget.
 - At most two short user-visible checkpoints per turn.
 - Keep tool-result echoes compact; IDs, SHA, state and blocker only.
 - Bare `Go` always means RECONCILE -> CLASSIFY -> one safe next action. It never means repeat the previous write.
-- End each turn with one deterministic `NEXT:` line when work remains.
+- Preserve a deterministic next action in the durable operation checkpoint when work remains. Include a user-visible `NEXT:` line only when the user explicitly requests status or must make a decision.
 - Large or irreversible work must be split into durable atomic steps.
 - Transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release or Single-Writer gates.
 
@@ -104,8 +104,14 @@ ROBUST EDGE > WIN RATE
 PAPER FIRST > LIVE
 RISK > PROFIT MAXIMIZATION
 
-## Completion behavior
-Do not ask the user to repeat context already recoverable from GitHub.
-Keep user-facing replies short.
-Do not narrate routine reads or long tool chains.
-If no user decision is needed, advance one safe step and end with `NEXT:`.
+## Completion behavior — decision-only communication (approved 2026-10-07)
+
+Product Owner approval: GitHub mailbox #571 comment `6045216366` (`MERIDIAN-USER-COMMUNICATION-V2`).
+
+- Do not ask the user to repeat recoverable repository context.
+- Do not interrupt or send individual updates about ordinary defects, failing CI/QA, review corrections, stream recovery, retries, waiting states, or normal implementation/PR progress. Lead + Claude handle them internally and capture evidence in CI, commit op-ids, or PR-local status.
+- Request a user decision **only** when necessary to change product/development direction, architecture, scope or priorities, risk/trust/safety stance, meaningful cost or external service, agent/governance policy, release-cadence exception, strategy/research stage, or Paper/Live/trading authorization. Present a concise recommendation with options.
+- A failed gate never becomes permission to merge; fail closed and escalate only when a material Product Owner choice is actually required.
+- When the user explicitly requests a status or final deliverable, answer briefly and truthfully. Do not imply chat is running in the background; scheduled automations/workflows, where configured, remain independently governed.
+- This policy changes **communication only**. STREAM-SAFE-V7 mutation/turn limits, expected-head checks, release lease and cadence, exact-head CI, Claude review, Single-Writer, privacy and all research/trading authorization gates remain unchanged.
+
