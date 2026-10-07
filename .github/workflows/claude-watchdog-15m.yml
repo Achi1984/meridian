@@ -3,6 +3,11 @@ name: MERIDIAN Claude Development Watchdog
 on:
   schedule:
     - cron: '57 * * * *'
+  workflow_run:
+    workflows:
+      - MERIDIAN Release Safety
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -18,6 +23,10 @@ concurrency:
 
 jobs:
   watchdog:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.name == 'MERIDIAN Release Safety' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
@@ -202,7 +211,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            MERIDIAN DEVELOPMENT COPILOT — HOURLY STATE-CHANGE WATCHDOG
+            MERIDIAN DEVELOPMENT COPILOT — STATE-CHANGE WATCHDOG
 
             Repository: ${{ github.repository }}
             Binding mailbox: Issue #571
