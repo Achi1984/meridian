@@ -20,7 +20,8 @@ test('v9 r17 reference rows cannot drive Profit Lock actions',()=>{
   assert.match(js,/function status\(b\)\{if\(!liveMatched\(b\)\)return\['REF','muted'\]/);
   assert.match(js,/investUsd:num\(x\.investUsd\)/);
   assert.match(js,/_liveInvestUsd:num\(x\.investUsd\)!=null/);
-  assert.match(js,/state\.bots\.filter\(liveMatched\)\.map/);
+  assert.match(js,/state\.bots\.filter\(liveMatched\)\.filter\(b=>marketIntelFresh\(state\.assetIntel\[b\.symbol\]\)\)\.map/);
+  assert.match(js,/else if\(sa&&marketIntelFresh\(state\.assetIntel\[sa\.b\.symbol\]\)&&sa\.action!=='HOLD'\)/);
 });
 
 test('v9 r17 exposure is based on confirmed live capital only',()=>{
