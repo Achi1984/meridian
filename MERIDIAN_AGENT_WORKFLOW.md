@@ -363,3 +363,41 @@ Runtime honesty overrides cosmetic adherence to the workflow.
 13. Long or irreversible work must be split into durable atomic steps.
 14. End unfinished turns with one deterministic `NEXT:` line.
 15. These transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release, privacy, safety, or Single-Writer gates.
+
+
+## Transport V1 — source uploads versus rendered excerpts
+
+Authorization: mailbox #571 comment 6037360103 resolves proposal 6037209376.
+The user's exact approval is "MERIDIAN – Transport & Feedback V1". This section
+implements part A only. Part B (watchdog no-new-finding suppression) still needs
+separate implementation/tests and exact-head review. No schedule is changed here.
+
+- `maxPayloadBytes=4096` applies only to rendered progress/log excerpts, not source files.
+- `maxSourceFileBytes=262144` applies per file, measured as UTF-8 bytes, not characters.
+- `maxSerializedUploadBytes=393216` applies per complete serialized request, not per file.
+  Measure the native tool envelope and its encoded transport; use the larger size.
+  The contents wrapper's base64 expansion is counted, including metadata. A tree
+  upload with several individually valid files may still exceed the request limit.
+- Use `node scripts/stream-safe-preflight.mjs --upload-budget contents` (`blob` or
+  `tree` for Git-data actions) with complete native tool arguments from stdin. The
+  preflight rejects unsupported inputs, invalid Unicode and over-budget uploads;
+  its output contains byte counts and Git blob hashes, never the source content.
+  Do not substitute an abbreviated envelope. A platform/tool may impose a lower
+  limit: obey it; this contract does not expand actual tool capabilities.
+- The preflight is a Lead-invoked local check, not an interception of every connector
+  call. It performs no network request, upload, branch mutation or authorization.
+  It must be invoked for the exact payload to be sent. Pin and reconcile the active
+  policy first; a stale/old unscoped policy is rejected rather than silently enlarged.
+- Check source blob SHA before and after publication (`verifySourceBlob` can compare
+  local source with a returned blob SHA). A checksum proves bytes, not branch ownership.
+  Existing op-id, scope, expected-head/CAS, Single-Writer, no-blind-retry, one-mutation,
+  CI, independent exact-head review and protected-merge requirements remain binding.
+  Reference-only tree entries require those checks too; they do not upload new content.
+- The historical two-file 64-KiB exception is consumed by 74ed8fd1 and b8c35ab8.
+  This approved contract, not reuse of that exception, governs subsequent scoped files.
+
+The compact preflight status reads the canonical checkpoint instead of advertising
+obsolete STREAM-SAFE-V4 budgets. No research-stage, PnL, Paper or Live flag is changed.
+The separate Claude advisory task remains 11:50 / 19:50 Europe/Vienna; advisory
+feedback is not an exact-head implementation verdict. Runtime watchdog behavior is
+unchanged by this transport implementation.

@@ -83,7 +83,11 @@
     "maxTurnSeconds": 30,
     "waitingIsTerminalTurnState": true,
     "duplicateClaudeRequestPolicy": "SAME_ID_AND_HEAD_ONLY_NO_REPOST",
-    "nextStepLineRequired": true
+    "nextStepLineRequired": true,
+    "maxPayloadBytesScope": "RENDERED_PROGRESS_AND_LOG_EXCERPTS",
+    "maxSourceFileBytes": 262144,
+    "maxSerializedUploadBytes": 393216,
+    "transportApprovalCommentId": 6037360103
   },
   "lastSeenCommentId": 6016389241,
   "quickCommand": "Go Meridian",

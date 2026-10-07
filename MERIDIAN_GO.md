@@ -38,6 +38,17 @@ Turn length is the primary transport budget.
 - Large or irreversible work must be split into durable atomic steps.
 - Transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release or Single-Writer gates.
 
+### Source transport budgets (approved Transport & Feedback V1)
+`maxPayloadBytes=4096` bounds rendered progress/log excerpts only. Source uploads use
+`maxSourceFileBytes=262144` UTF-8 bytes per file and
+`maxSerializedUploadBytes=393216` bytes per complete encoded request.
+Run `node scripts/stream-safe-preflight.mjs --upload-budget contents` (or `blob` / `tree`)
+with the actual complete tool arguments on stdin before upload. Verify source blob
+SHA before/after publication and preserve the expected-head/CAS checks. A budget
+pass is not authorization, CI, review or permission to bypass one mutation per turn.
+Full details and approval provenance: `MERIDIAN_AGENT_WORKFLOW.md`, Transport V1.
+Watchdog suppression is a separate implementation; these budget changes do not enable it.
+
 ### Recovery classification
 After reconciliation classify the prior operation:
 - `OP_APPLIED`: intended effect exists -> do not repeat; advance.
