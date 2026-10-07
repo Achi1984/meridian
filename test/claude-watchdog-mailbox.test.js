@@ -238,3 +238,63 @@ test('future response is not accepted',()=>assert.equal(state([req(),res(undefin
 test('empty-but-successful paginated API snapshots are valid',()=>{
   const a=audit([[]],{prPages:[[]]});assert.equal(a.unresolved,'');assert.equal(a.reviewAuthorization,false);
 });
+
+// R130 follow-up to Claude watchdog comment 6033096578.
+const decisionTrailer='\n\nCROSS_MODEL_STATUS NEEDS_USER_DECISION\nreason: approval required';
+test('watchdog fingerprint remains recognized with the permitted user-decision trailer',()=>{
+  assert.equal(seen([[status({body:status().body+decisionTrailer})]]),true);
+});
+test('action envelope and CRLF preserve the permitted watchdog decision trailer',()=>{
+  const body=('**Claude finished @Achi1984\'s task in 1m** —— [View job](https://github.com/Achi1984/meridian/actions/runs/1)\n\n---\n'+status().body+decisionTrailer).replaceAll('\n','\r\n');
+  assert.equal(seen([[status({body})]]),true);
+});
+test('decision-trailer metadata cannot replace the first watchdog fingerprint',()=>{
+  const body=status().body+decisionTrailer+'\nfingerprint: '+'f'.repeat(64);
+  assert.equal(seen([[status({body})]]),true);
+  assert.equal(seen([[status({body})]],{fingerprint:'f'.repeat(64)}),false);
+});
+test('missing initial fingerprint cannot be supplied by a decision trailer',()=>{
+  const body=status().body.replace(`fingerprint: ${FP}\n`,'')+decisionTrailer+`\nfingerprint: ${FP}`;
+  assert.equal(seen([[status({body})]]),false);
+});
+for(const suffix of ['\nCROSS_MODEL_STATUS CLAUDE-DEVELOPMENT-WATCHDOG','\nCROSS_MODEL_STATUS OTHER',decisionTrailer]) {
+  test(`ambiguous extra status after a decision trailer is rejected ${suffix}`,()=>{
+    assert.equal(seen([[status({body:status().body+decisionTrailer+suffix})]]),false);
+  });
+}
+test('permitted decision trailer never authenticates a non-reviewer status',()=>{
+  assert.equal(seen([[status({user:OWNER,body:status().body+decisionTrailer})]]),false);
+});
+test('rejected owner request headers are counted across pages without double-counting',()=>{
+  const malformed=req('BAD-FIELD',{commentId:3});malformed.body+=`\nexact_head_sha: ${H} (note)`;
+  const missing=req('MISSING-HEAD',{commentId:4,head:null});
+  const a=audit([[req(),malformed],[missing,malformed]]);
+  assert.equal(a.diagnostics.rejectedOwnerRequestCount,2);
+  assert.equal(a.unresolved,key());
+  assert.equal(a.reviewAuthorization,false);
+});
+test('rejection diagnostics ignore outsiders and non-request owner discussion',()=>{
+  const a=audit([[req('bad;id',{user:OUTSIDER}),{...req('DISCUSSION',{commentId:4}),body:'Planning discussion'}]]);
+  assert.equal(a.diagnostics.rejectedOwnerRequestCount,0);
+});
+test('valid requests and valid retries are not counted as rejected owner records',()=>{
+  const a=audit([[req(),req(undefined,{commentId:3,time:NOW-1200000})]]);
+  assert.equal(a.diagnostics.rejectedOwnerRequestCount,0);
+  assert.equal(a.unresolved,key());
+});
+test('real state shell exposes rejection count without changing its fingerprint',()=>{
+  const plain=shell('state');
+  const malformed=req('bad;id',{commentId:9});
+  const rejected=shell('state',{pages:[[req()],[res(),malformed]]});
+  assert.equal(plain.status,0,plain.stderr);assert.equal(rejected.status,0,rejected.stderr);
+  assert.equal(plain.values.rejected_owner_requests,'0');
+  assert.equal(rejected.values.rejected_owner_requests,'1');
+  assert.equal(rejected.values.fingerprint,plain.values.fingerprint);
+  assert.match(rejected.stdout,/rejected owner requests: 1/);
+  assert.ok(rejected.text.trim().split('\n').every(x=>/^[a-z_]+=/.test(x)));
+});
+test('real decision shell dedupes decision-trailer status even without a cache hit',()=>{
+  const a=shell('decision',{pages:[[],[status({body:status().body+decisionTrailer})]]},{CACHE_HIT:'false'});
+  assert.equal(a.status,0,a.stderr);assert.equal(a.values.run_claude,'false');
+  assert.equal(a.values.reason,'FINGERPRINT_ALREADY_COMMENTED');
+});

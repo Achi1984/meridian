@@ -58,6 +58,8 @@ jobs:
           node scripts/watchdog-mailbox.mjs resolve \
             "$tmp/mailbox-pages.json" "$tmp/pr-pages.json" "$main_sha" "$now_epoch" > "$tmp/resolved.json"
           unresolved_request=$(jq -r '.unresolved' "$tmp/resolved.json")
+          rejected_owner_requests=$(jq -r '.diagnostics.rejectedOwnerRequestCount' "$tmp/resolved.json")
+          [[ "$rejected_owner_requests" =~ ^(0|[1-9][0-9]*)$ ]]
           [[ "$unresolved_request" != *$'\n'* && "$unresolved_request" != *$'\r'* ]]
           [[ "$unresolved_request" =~ ^[-A-Za-z0-9._@\|]*$ ]]
 
@@ -111,7 +113,7 @@ jobs:
 
           # Nothing reaches GITHUB_OUTPUT until all remote reads and shape checks succeed.
           for value in "$fingerprint" "$main_sha" "$active_pr" "$active_head" "$active_base" \
-            "$ci_summary" "$ci_pending" "$unresolved_request" "$mailbox_review_pending"; do
+            "$ci_summary" "$ci_pending" "$unresolved_request" "$mailbox_review_pending" "$rejected_owner_requests"; do
             [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]]
           done
           {
@@ -124,7 +126,9 @@ jobs:
             printf 'ci_pending=%s\n' "$ci_pending"
             printf 'unresolved_request=%s\n' "$unresolved_request"
             printf 'mailbox_review_pending=%s\n' "$mailbox_review_pending"
+            printf 'rejected_owner_requests=%s\n' "$rejected_owner_requests"
           } >> "$GITHUB_OUTPUT"
+          printf 'Watchdog mailbox rejected owner requests: %s\n' "$rejected_owner_requests"
           mkdir -p .watchdog
           printf '%s\n' "$raw" > .watchdog/state.txt
 

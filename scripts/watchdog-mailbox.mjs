@@ -64,10 +64,21 @@ function record(body, kind) {
   } else {
     text = text.replace(/^\*\*Claude finished [^\n]*\n\n---\n/, '');
   }
-  const [header, ...rest] = text.split('\n');
+  const [header, ...lines] = text.split('\n');
   const prefix = `${kind} `;
   if (!header.startsWith(prefix)) return null;
   const id = header.slice(prefix.length);
+  let rest = lines;
+  // The watchdog prompt permits this one trailing decision section. Parse only
+  // the initial status metadata; never accept another status or borrow fields
+  // from the trailer. Request/response record strictness remains unchanged.
+  if (kind === 'CROSS_MODEL_STATUS' && id === 'CLAUDE-DEVELOPMENT-WATCHDOG') {
+    const trailer = rest.indexOf('CROSS_MODEL_STATUS NEEDS_USER_DECISION');
+    if (trailer !== -1) {
+      if (rest.slice(trailer + 1).some(line => line.startsWith(prefix))) return null;
+      rest = rest.slice(0, trailer);
+    }
+  }
   if (!KEY.test(id) || rest.some(line => line.startsWith(prefix))) return null;
   const firstMetadata = rest.find(line => line.trim());
   if (firstMetadata && !/^[A-Za-z_][A-Za-z0-9_-]*:/.test(firstMetadata)) return null;
@@ -135,7 +146,13 @@ export function resolveMailbox({ pages, prPages, mainSha, nowMs }) {
   if (!isSha(mainSha || '') || (!Number.isSafeInteger(nowMs) || nowMs < 0)) fail('invalid live state');
   const comments = commentsFrom(pages), prs = prsFrom(prPages);
   const targets = new Map(prs.map(p => [p.number,p]));
-  const allRequests = comments.map(c => request(c,nowMs)).filter(Boolean);
+  const parsedRequests = comments.map(c => request(c,nowMs));
+  // Count rejected owner request-headed records without echoing untrusted text.
+  // Diagnostics are not part of unresolved keys or the state fingerprint.
+  const diagnostics = { rejectedOwnerRequestCount:comments.filter((c,i) =>
+    !parsedRequests[i] && trusted(c,OWNER) &&
+    c.body.replaceAll('\r\n','\n').startsWith('@claude\n\nCROSS_MODEL_REQUEST ')).length };
+  const allRequests = parsedRequests.filter(Boolean);
   // Most recent retry owns its tuple; do not reuse a response predating the retry.
   const requests = [...new Map(allRequests.map(r => [tuple(r),r])).values()];
   const responses = comments.map(c => response(c,nowMs)).filter(Boolean);
@@ -158,7 +175,7 @@ export function resolveMailbox({ pages, prPages, mainSha, nowMs }) {
   });
   const unresolved = [...new Set(items.filter(x => x.state === 'UNRESOLVED').map(tuple))].sort().join('|');
   if (/[\r\n]/.test(unresolved) || unresolved.length > 16384) fail('invalid unresolved output');
-  return { schema:'MERIDIAN-WATCHDOG-MAILBOX-V1', reviewAuthorization:false, executionImpact:false, unresolved, items, prs };
+  return { schema:'MERIDIAN-WATCHDOG-MAILBOX-V1', reviewAuthorization:false, executionImpact:false, unresolved, items, prs, diagnostics };
 }
 
 function cli(args) {
