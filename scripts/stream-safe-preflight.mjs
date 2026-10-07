@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
+import {transportLimits,checkVisibleBudget,checkUploadBudget} from './transport-budget.mjs';
 
 const shortSha=v=>String(v||'').slice(0,12)||null;
 const must=(ok,msg)=>{if(!ok)throw new Error(msg)};
 const readJson=p=>JSON.parse(fs.readFileSync(p,'utf8'));
+const policy=readJson(new URL('../MERIDIAN_LIVE_CHECKPOINT.json',import.meta.url));
+const limits=transportLimits(policy);
 
 export function compactWorkflowRuns(runs=[]){
   return (Array.isArray(runs)?runs:[])
@@ -15,9 +19,9 @@ export function compactWorkflowRuns(runs=[]){
 export function compactCheckpoint(input={}){
   const mainSha=shortSha(input.mainSha),headSha=shortSha(input.headSha),prNumber=Number.isInteger(Number(input.prNumber))?Number(input.prNumber):null;
   return {
-    protocol:'STREAM-SAFE-V4',
+    protocol:policy.protocol,
     resumeToken:[mainSha,input.branch||'main',headSha,prNumber==null?'no-pr':'pr-'+prNumber].filter(Boolean).join(':'),
-    streamBudget:{toolBatches:2,sameStatusPolls:1,maxPayloadBytes:6144,maxTurnSeconds:90,checkpointAfterMutation:true},
+    streamBudget:{toolBatches:policy.streamSafety.maxToolCallGroupsPerTurn,sameStatusPolls:policy.streamSafety.maxSameStatusPollsPerTurn,maxPayloadBytes:limits.visibleBytes,maxPayloadBytesScope:policy.streamSafety.maxPayloadBytesScope,maxSourceFileBytes:limits.fileBytes,maxSerializedUploadBytes:limits.requestBytes,maxTurnSeconds:policy.streamSafety.maxTurnSeconds,checkpointAfterMutation:policy.streamSafety.checkpointAfterEveryMutation},
     mainSha,
     terminalBuild:input.terminalBuild||null,
     branch:input.branch||null,
@@ -96,10 +100,24 @@ function localCheckpoint(){
   });
 }
 
-const direct=process.argv[1]&&new URL(import.meta.url).pathname.endsWith(process.argv[1].replaceAll('\\','/'));
+const direct=process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href;
 if(direct){
-  const out=process.env.GITHUB_TOKEN&&process.env.GITHUB_REPOSITORY?await githubCheckpoint():localCheckpoint();
-  const line=JSON.stringify(out);
-  if(Buffer.byteLength(line,'utf8')>4096)throw new Error('stream-safe checkpoint exceeded 4096 bytes');
-  console.log(line);
+  if(process.argv[2]==='--upload-budget'){
+    try{
+      const chunks=[];let size=0;
+      for await(const chunk of process.stdin){
+        size+=chunk.length;if(size>limits.requestBytes)throw new Error('REQUEST_TOO_LARGE');chunks.push(chunk);
+      }
+      const raw=Buffer.concat(chunks),text=raw.toString('utf8');
+      if(!Buffer.from(text,'utf8').equals(raw))throw new Error('INVALID_UTF8');
+      const out=checkUploadBudget(process.argv[3],JSON.parse(text),limits);
+      console.log(JSON.stringify(out));
+    }catch{
+      // Never echo source content, parse context, tokens or private payloads.
+      console.error('TRANSPORT_BUDGET: INPUT_REJECTED');process.exitCode=1;
+    }
+  }else{
+    const out=process.env.GITHUB_TOKEN&&process.env.GITHUB_REPOSITORY?await githubCheckpoint():localCheckpoint();
+    const line=JSON.stringify(out);checkVisibleBudget(line,limits);console.log(line);
+  }
 }
