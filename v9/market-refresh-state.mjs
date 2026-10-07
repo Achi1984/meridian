@@ -8,7 +8,8 @@ export const MARKET_FUTURE_TOLERANCE_MS = 30 * 1000;
 const ACTIONS = new Set(['HOLD', 'WATCH PROFIT', 'PROFIT LOCK CANDIDATE', 'RISK REVIEW']);
 const FAILURE_CODES = new Set(['INVALID_CLOCK', 'MISSING_SOURCE_TIMESTAMP', 'FUTURE_SOURCE_TIMESTAMP',
   'STALE_SOURCE_TIMESTAMP', 'INSUFFICIENT_BARS', 'INVALID_BARS', 'INVALID_ANALYSIS',
-  'INVALID_ACTIONS', 'OLDER_THAN_ACCEPTED', 'INVALID_TRANSPORT']);
+  'INVALID_ACTIONS', 'OLDER_THAN_ACCEPTED', 'INVALID_TRANSPORT', 'INVALID_BAR_TIMESTAMPS',
+  'STALE_CONFIRMATION_BARS']);
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const positive = n => finite(n) && n > 0;
 const assert = (condition, code) => { if (!condition) throw new Error(code); };
@@ -36,6 +37,19 @@ function validRows(rows, minimum) {
   assert(Array.isArray(rows) && rows.length >= minimum, 'INSUFFICIENT_BARS');
   assert(rows.every(row => row && positive(row.high) && positive(row.low) && positive(row.close) &&
     row.high >= row.low && row.high >= row.close && row.low <= row.close), 'INVALID_BARS');
+}
+// fetchedAt alone cannot prove that an upstream cache contains recent candles.
+// A confirmed bar can be one interval old, plus the unchanged evidence-age budget
+// and the existing one-second close-settlement window. This does not renew age.
+const INTERVAL_MS = Object.freeze({'15m':900000, '1h':3600000, '4h':14400000, '1d':86400000});
+function recentConfirmation(rows, interval, now) {
+  assert(rows.every((row, index) => positive(row.openTime) && positive(row.closeTime) &&
+    row.closeTime >= row.openTime && (index === 0 || row.openTime > rows[index-1].openTime)),
+    'INVALID_BAR_TIMESTAMPS');
+  const closed = rows.filter(row => row.closeTime < now - 1000);
+  assert(closed.length > 0, 'INSUFFICIENT_BARS');
+  assert(now - closed.at(-1).closeTime <= INTERVAL_MS[interval] + MARKET_MAX_AGE_MS + 1000,
+    'STALE_CONFIRMATION_BARS');
 }
 function acceptedAnalysis(value, timestamp, previous, extras, directional) {
   assert(value && typeof value === 'object' && !Array.isArray(value) && positive(value.price), 'INVALID_ANALYSIS');
@@ -104,6 +118,9 @@ export function createMarketRefreshController(deps) {
           sets.forEach(rows => validRows(rows, 1));
           const h1c = closedMarketRows(h1), h4c = closedMarketRows(h4);
           validRows(m15,35); validRows(h1c,60); validRows(h4c,100);
+          recentConfirmation(m15, '15m', stampNow);
+          recentConfirmation(h1c, '1h', stampNow);
+          recentConfirmation(h4c, '4h', stampNow);
           const transport = marketTransportLabel(...sets);
           assert(typeof transport === 'string' && transport.length > 0, 'INVALID_TRANSPORT');
           const assetTimestamp = sourceTime(sets.slice(0,3), stampNow);
@@ -112,6 +129,7 @@ export function createMarketRefreshController(deps) {
           const patch = { assetIntel: { ...(state.assetIntel || {}), [symbol]: asset } };
           if (btc) {
             const d1c = closedMarketRows(d1); validRows(d1c,210);
+            recentConfirmation(d1c, '1d', stampNow);
             const global = acceptedAnalysis(intel(m15,h1c,h4c,d1c), timestamp,
               state.intel, { confirmationBars:'CLOSED_1H_4H_1D', transport }, false);
             // A failed global candidate cannot partially replace the BTC tuple.
@@ -130,6 +148,12 @@ export function createMarketRefreshController(deps) {
       for (let i = 0; i < assets.length; i += 4) {
         await Promise.all(assets.slice(i,i+4).map(refreshAsset));
         if (i+4 < assets.length) await pause(220);
+      }
+      // Drop only assets that left the captured tracked universe, not failed assets.
+      const allowed = new Set(universe);
+      if (Object.keys(state.assetIntel || {}).some(symbol => !allowed.has(symbol))) {
+        state.assetIntel = Object.fromEntries(Object.entries(state.assetIntel || {}).filter(([symbol]) => allowed.has(symbol)));
+        if (state.lastGoodMarketSnapshot) state.lastGoodMarketSnapshot = { ...state.lastGoodMarketSnapshot, assetIntel: state.assetIntel };
       }
       await cross;
       state.marketSyncStatus = accepted.length ? (errors.length ? 'PARTIAL' : 'OK') : 'ERROR';

@@ -5,6 +5,7 @@ import {runTsmomClassic,TSMOM_ENGINE_REVISION} from '../research/documented-edge
 import {isPreEntryDoubleAdvantage,SK_RESEARCH_V2_ENGINE_REVISION} from '../research/sk-research-v2.js';
 
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const marketRefresh=fs.readFileSync(new URL('../v9/market-refresh-state.mjs',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const shell=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
@@ -26,8 +27,8 @@ test('r20 market universe follows current tracked sources and prunes ghost intel
   assert.match(v9,/function trackedMarketSymbols\(\)/);
   for(const token of ['state.referenceBots','state.bots','state.okxDcaBots','state.unmatchedLive'])assert.ok(v9.includes(token),token);
   assert.match(v9,/for\(const symbol of trackedMarketSymbols\(\)\)/);
-  assert.match(v9,/const allowed=new Set\(universe\)/);
-  assert.match(v9,/state\.assetIntel=Object\.fromEntries\(Object\.entries\(out\)\.filter/);
+  assert.match(marketRefresh,/const allowed = new Set\(universe\)/);
+  assert.match(marketRefresh,/state\.assetIntel = Object\.fromEntries\(Object\.entries\(state\.assetIntel \|\| \{\}\)\.filter/);
 
   const a=v10.indexOf('function marketUniverse()'),b=v10.indexOf('function marketSignal',a),block=v10.slice(a,b);
   assert.match(block,/referenceBots/);

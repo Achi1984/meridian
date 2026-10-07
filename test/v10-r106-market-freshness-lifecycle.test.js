@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {marketKlinesSnapshot,clearMarketFeedCache,MARKET_FEED_POLICY} from '../market-feed-gateway.js';
 
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const marketRefresh=fs.readFileSync(new URL('../v9/market-refresh-state.mjs',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
@@ -56,8 +57,9 @@ test('r106 client rejects over-age gateway fallback before using technical data'
 
 test('r106 market refresh exposes an explicit lifecycle instead of reporting stale while running',()=>{
   assert.match(v9,/marketSyncStatus:'IDLE'/);
-  assert.match(v9,/state\.marketSyncStatus='RUNNING';state\.marketSyncStartedAt=Date\.now\(\);notifyData\(\)/);
-  assert.match(v9,/state\.marketSyncStatus=btcRows\?\(errors\.length\?'PARTIAL':'OK'\):'ERROR'/);
+  assert.match(marketRefresh,/marketSyncStatus: 'RUNNING', marketSyncStartedAt: startedAt/);
+  assert.match(v9,/return await refreshMarketIntel\(\)/);
+  assert.match(marketRefresh,/marketSyncStatus = accepted\.length \? \(errors\.length \? 'PARTIAL' : 'OK'\) : 'ERROR'/);
   assert.match(v10,/if\(m\.syncing\)return\{label:'SYNCING',tone:'watch'\}/);
   assert.match(v10,/Technischer Markt-Refresh läuft; alter Stand bleibt fail-closed/);
 });
