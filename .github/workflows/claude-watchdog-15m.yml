@@ -2,15 +2,8 @@ name: MERIDIAN Claude Development Watchdog
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '57 * * * *'
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - MERIDIAN Runtime Smoke
-      - MERIDIAN Asset Watch Mirror
-      - MERIDIAN Research Snapshot
-    types:
-      - completed
 
 permissions:
   contents: read
@@ -47,7 +40,7 @@ jobs:
           active=$(jq -c --argjson cutoff "$cutoff" '
             [
               .[]
-              | select(.headRefName != "ops/claude-watchdog-15m")
+              | select(.headRefName != "governance-watchdog-quota-r1")
               | select((.title | test("research"; "i")) | not)
               | . + {updatedEpoch:(.updatedAt | fromdateiso8601)}
               | select(.updatedEpoch >= $cutoff)
@@ -56,7 +49,7 @@ jobs:
             | last // empty
           ' <<<"$prs")
 
-          main_sha=$(git rev-parse HEAD)
+          main_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq '.sha')
           active_pr=""
           active_head=""
           active_base=""
@@ -90,15 +83,56 @@ jobs:
             fi
           fi
 
-          raw="${main_sha}|${active_pr}|${active_head}|${active_base}|${active_draft}|${ci_summary}"
+          mailbox=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/571/comments?per_page=100")
+          now_epoch=$(date -u +%s)
+          request_cutoff=$((now_epoch - 86400))
+          mature_cutoff=$((now_epoch - 600))
+
+          unresolved_request=$(jq -r \
+            --argjson request_cutoff "$request_cutoff" \
+            --argjson mature_cutoff "$mature_cutoff" '
+            [ .[]
+              | select(.body | startswith("@claude\n\nCROSS_MODEL_REQUEST "))
+              | {
+                  request: (.body | capture("CROSS_MODEL_REQUEST (?<id>[^\\n]+)").id),
+                  head: (try (.body | capture("exact_head_sha: (?<head>[0-9a-f]{40})").head) catch "NO_HEAD"),
+                  createdEpoch: (.created_at | fromdateiso8601)
+                }
+              | select(.createdEpoch >= $request_cutoff)
+              | select(.createdEpoch <= $mature_cutoff)
+            ] as $requests
+            | [ .[]
+                | select(.body | contains("CROSS_MODEL_RESPONSE "))
+                | {
+                    request: (.body | capture("CROSS_MODEL_RESPONSE (?<id>[^\\n]+)").id),
+                    head: (try (.body | capture("reviewed_head: (?<head>[0-9a-f]{40})").head) catch "NO_HEAD")
+                  }
+              ] as $responses
+            | [ $requests[]
+                | . as $req
+                | select(($responses | any(.request == $req.request and .head == $req.head)) | not)
+              ]
+            | sort_by(.request, .head)
+            | map("\(.request)@\(.head)")
+            | join("|")
+          ' <<<"$mailbox")
+
+          mailbox_review_pending=$(gh api -X GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/claude-mailbox-review.yml/runs?status=in_progress&per_page=10" \
+            --jq '.total_count > 0')
+
+          raw="${main_sha}|${active_pr}|${active_head}|${unresolved_request}"
           fingerprint=$(printf '%s' "$raw" | sha256sum | awk '{print $1}')
 
           echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
           echo "active_pr=$active_pr" >> "$GITHUB_OUTPUT"
           echo "active_head=$active_head" >> "$GITHUB_OUTPUT"
           echo "active_base=$active_base" >> "$GITHUB_OUTPUT"
           echo "ci_summary=$ci_summary" >> "$GITHUB_OUTPUT"
           echo "ci_pending=$ci_pending" >> "$GITHUB_OUTPUT"
+          echo "unresolved_request=$unresolved_request" >> "$GITHUB_OUTPUT"
+          echo "mailbox_review_pending=$mailbox_review_pending" >> "$GITHUB_OUTPUT"
 
           mkdir -p .watchdog
           printf '%s\n' "$raw" > .watchdog/state.txt
@@ -130,8 +164,12 @@ jobs:
             exit 0
           fi
 
-          # Storm guard: if Claude already posted this exact fingerprint but the
-          # action later failed before cache-save, do not spend tokens again.
+          if [ -n "${{ steps.state.outputs.unresolved_request }}" ] && [ "${{ steps.state.outputs.mailbox_review_pending }}" = "true" ]; then
+            echo "run_claude=false" >> "$GITHUB_OUTPUT"
+            echo "reason=MAILBOX_REVIEW_PENDING" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           seen_comment=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/571/comments?per_page=100" \
             --jq '.[] | select(.body | contains("CROSS_MODEL_STATUS CLAUDE-DEVELOPMENT-WATCHDOG")) | .body' \
             | grep -F "fingerprint: ${STATE_FINGERPRINT}" \
@@ -164,31 +202,33 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            MERIDIAN DEVELOPMENT COPILOT — EVENT-DRIVEN WATCHDOG
+            MERIDIAN DEVELOPMENT COPILOT — HOURLY STATE-CHANGE WATCHDOG
 
             Repository: ${{ github.repository }}
             Binding mailbox: Issue #571
-            Live main: ${{ github.sha }}
+            Live main: ${{ steps.state.outputs.main_sha }}
             State fingerprint: ${{ steps.state.outputs.fingerprint }}
             Active recent non-research PR: ${{ steps.state.outputs.active_pr || 'NONE' }}
             Active PR head: ${{ steps.state.outputs.active_head || 'NONE' }}
             Active PR base: ${{ steps.state.outputs.active_base || 'NONE' }}
             Relevant CI: ${{ steps.state.outputs.ci_summary }}
+            Unanswered Claude request(s): ${{ steps.state.outputs.unresolved_request || 'NONE' }}
 
             You are Claude, MERIDIAN's independent reviewer/challenger and architecture sparring partner.
             ChatGPT remains Lead, implementer and sole merge owner.
 
             First read MERIDIAN_LIVE_CHECKPOINT.json, MERIDIAN_GO.md and the latest relevant context from Issue #571.
-            If an active PR exists, independently inspect its exact head/base, diff and relevant CI. Challenge correctness, UX simplicity, architecture and regressions.
-            If no active PR exists, inspect current main and propose exactly one high-value next development step aligned with "Complex inside — simple outside".
+            If an unanswered CROSS_MODEL_REQUEST exists, process that exact request and do not create a separate watchdog recommendation for the same head.
+            Otherwise, if an active PR exists, independently inspect its exact head/base, diff and relevant CI. Challenge correctness, UX simplicity, architecture and regressions.
+            If neither exists, inspect current main and propose exactly one high-value next development step aligned with "Complex inside — simple outside".
 
             Repository code is read-only in this run. Never merge, push, edit files, dispatch workflows or change research/trading authorization.
             V2 SOURCE_AUDIT and all canonical execution/PnL/Discovery/Validation/Holdout/Paper/Live gates remain untouched unless the user has explicitly authorized them.
 
-            Post exactly one concise comment to Issue #571:
+            Post exactly one concise comment to Issue #571. If answering an existing CROSS_MODEL_REQUEST, use that request's required CROSS_MODEL_RESPONSE format. Otherwise post:
             CROSS_MODEL_STATUS CLAUDE-DEVELOPMENT-WATCHDOG
             fingerprint: ${{ steps.state.outputs.fingerprint }}
-            main: ${{ github.sha }}
+            main: ${{ steps.state.outputs.main_sha }}
             active_pr: ${{ steps.state.outputs.active_pr || 'NONE' }}
             verdict: GREEN | CHALLENGE | NEXT_STEP
             Then concise evidence and exactly one recommended next action for ChatGPT.
