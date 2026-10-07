@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const marketRefresh=fs.readFileSync(new URL('../v9/market-refresh-state.mjs',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
@@ -37,8 +38,8 @@ test('r13 aligns technical price sources to liquid perpetual futures and tight c
 
 test('r13 separates market freshness, bot freshness and Asset Watch reference',()=>{
   assert.match(v9,/marketPriceSyncedAt:null/);
-  assert.match(v9,/function marketRowsTimestamp\(\.\.\.sets\)/);
-  assert.match(v9,/updatedAt:marketRowsTimestamp\(/);
+  assert.match(v9,/const refreshMarketIntel=createMarketRefreshController\(/);
+  assert.match(marketRefresh,/updatedAt: timestamp/);
   assert.match(v10,/function marketHealth\(\)/);
   assert.match(v10,/● MKT /);
   assert.match(v10,/● BOT /);

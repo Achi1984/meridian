@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {marketKlinesSnapshot,clearMarketFeedCache,MARKET_FEED_POLICY} from '../market-feed-gateway.js';
 
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const marketRefresh=fs.readFileSync(new URL('../v9/market-refresh-state.mjs',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
@@ -80,9 +81,10 @@ test('r65 gateway rejects unsafe market query values',async()=>{
 test('r65 browser technical feed uses authenticated gateway first and preserves upstream age',()=>{
   assert.match(v9,/getJson\('\/api\/private\/market-klines\?'/);
   assert.match(v9,/rows\.transport='MERIDIAN_GATEWAY'/);
-  assert.match(v9,/rows\.fetchedAt=num\(j\.fetchedAt\)\|\|Date\.now\(\)/);
-  assert.match(v9,/function marketRowsTimestamp\(\.\.\.sets\)/);
-  assert.match(v9,/state\.marketSyncedAt=num\(state\.intel\?\.updatedAt\)\|\|Date\.now\(\)/);
+  assert.match(v9,/GATEWAY_UNTRUSTED_TIMESTAMP/);
+  assert.match(v9,/rows\.fetchedAt=fetchedAt/);
+  assert.match(v9,/const refreshMarketIntel=createMarketRefreshController\(/);
+  assert.match(marketRefresh,/marketSyncedAt: timestamp/);
   assert.match(v9,/DIRECT_FALLBACK/);
 });
 

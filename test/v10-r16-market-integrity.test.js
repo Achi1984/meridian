@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const marketRefresh=fs.readFileSync(new URL('../v9/market-refresh-state.mjs',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const html=fs.readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
@@ -20,9 +21,13 @@ test('r16 derives OKX close times and confirms higher timeframes on closed candl
   assert.match(v9,/MARKET_INTERVAL_MS/);
   assert.ok(v9.includes('closeTime:+x[0]+Math.max(1,span)-1'));
   assert.match(v9,/function closedMarketRows\(rows\)/);
-  assert.match(v9,/h1c=closedMarketRows\(h1\),h4c=closedMarketRows\(h4\),d1c=closedMarketRows\(d1\)/);
-  assert.match(v9,/confirmationBars:'CLOSED_1H_4H_1D'/);
-  assert.match(v9,/confirmationBars:'CLOSED_1H_4H'/);
+  assert.match(v9,/const refreshMarketIntel=createMarketRefreshController\(\{[\s\S]*?marketKlines,closedMarketRows,intel,profitLockIntel/);
+  assert.match(marketRefresh,/const h1c = closedMarketRows\(h1\), h4c = closedMarketRows\(h4\)/);
+  assert.match(marketRefresh,/const d1c = closedMarketRows\(d1\)/);
+  assert.match(marketRefresh,/profitLockIntel\(m15,h1c,h4c\)/);
+  assert.match(marketRefresh,/intel\(m15,h1c,h4c,d1c\)/);
+  assert.match(marketRefresh,/confirmationBars:'CLOSED_1H_4H_1D'/);
+  assert.match(marketRefresh,/confirmationBars:'CLOSED_1H_4H'/);
 });
 
 test('r16 historical research excludes an unfinished current candle',()=>{
