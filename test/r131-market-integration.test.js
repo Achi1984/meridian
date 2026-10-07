@@ -41,7 +41,12 @@ function harness(){
   // Execute production transport, candle filtering, analytics and syncIntel wrapper.
   // Only I/O, time, observers and the state container are fakes; no real endpoints.
   const load=new Function('createMarketRefreshController','state','num','getJson','fetchTimed','trackedMarketSymbols','notifyData','renderHeaderTruth','Date',production+'\nreturn{syncIntel,marketKlines,intel,profitLockIntel,closedMarketRows};');
-  h.api=load(createMarketRefreshController,state,num,getJson,fetchTimed,()=>h.symbols,()=>h.notifications.push(structuredClone(state)),()=>{},Clock);
+  // Observe actual production analytics inputs without replacing their calculations.
+  const observedController=deps=>createMarketRefreshController({...deps,
+    intel:(...sets)=>{h.globalInputs=structuredClone(sets);return deps.intel(...sets)},
+    profitLockIntel:(...sets)=>{h.directionalInputs=structuredClone(sets);return deps.profitLockIntel(...sets)}
+  });
+  h.api=load(observedController,state,num,getJson,fetchTimed,()=>h.symbols,()=>h.notifications.push(structuredClone(state)),()=>{},Clock);
   return h;
 }
 const unavailable=async()=>{throw new Error('synthetic unavailable')};
@@ -222,5 +227,27 @@ for(const [extra,accepted] of [[180999,true],[181000,false]]) {
     }))}));
     await h.api.syncIntel();assert.equal(!!h.state.intel,accepted);
     if(!accepted)assert.match(h.state.marketError,/STALE_CONFIRMATION_BARS/);
+  });
+}
+
+
+for(const [interval,index] of [['1h',1],['4h',2],['1d',3]]) {
+  test('R131 integration unfinished '+interval+' confirmation never reaches actual analytics',async()=>{
+    const h=harness();h.symbols=['BTC'];
+    h.faults.set('BTC:'+interval,out=>{
+      const last=out.rows.at(-1);last.closeTime=T+SPAN[interval];
+      return out;
+    });
+    await h.api.syncIntel();
+    assert.equal(h.state.marketSyncStatus,'OK');
+    const globalRows=h.globalInputs[index];
+    assert.ok(globalRows.length>0);
+    assert.ok(globalRows.every(row=>row.closeTime<T-1000),'global analytics received unfinished confirmation');
+    assert.equal(globalRows.at(-1).closeTime,T-SPAN[interval]-1);
+    if(index<3) {
+      const directionalRows=h.directionalInputs[index];
+      assert.deepEqual(directionalRows,globalRows);
+      assert.ok(directionalRows.every(row=>row.closeTime<T-1000),'directional analytics received unfinished confirmation');
+    }
   });
 }
