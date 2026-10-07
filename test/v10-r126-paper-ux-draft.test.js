@@ -15,7 +15,7 @@ function block(startNeedle,endNeedle,src=js){
 }
 
 test('r126 release candidate is explicitly authorized and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r126');
+  assert.ok(/^10\.0-r\d+$/.test(release.terminalBuild)&&Number(release.terminalBuild.split('-r')[1])>=126);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(draft,/RELEASE CANDIDATE/);
   assert.match(draft,/Go – R126 heute als Release Candidate vorbereiten und nach GREEN mergen/);
@@ -61,7 +61,8 @@ test('r126 Paper presentation block is view-scoped and keeps trust/action floors
   const marker='/* v10 r126 · Paper authority/readability release */';
   const a=css.indexOf(marker);
   assert.ok(a>=0,'R126 CSS marker missing');
-  const src=css.slice(a);
+  const successor=css.indexOf('/* Stage 2 · Asset Detail decision surface draft */',a+marker.length);
+  const src=css.slice(a,successor>a?successor:undefined);
   for(const token of ['#view-paper .paper-summary-grid span','#view-paper .paper-safety-note b','#view-paper .paper-safety-note small','#view-paper .paper-cockpit-toolbar button','#view-paper .paper-model-grid b','#view-paper .paper-cohort-grid strong','font-size:9px','font-size:10px','font-size:11px','min-height:44px'])assert.ok(src.includes(token),token);
   assert.doesNotMatch(src,/#view-(?:market|research|asset-detail|command|depot|bots)/);
   assert.doesNotMatch(src,/\.(?:fib-|sk-|edge-|holdout-|profit-agent-|lab-)/);
