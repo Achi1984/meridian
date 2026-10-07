@@ -19,7 +19,7 @@ Updated: **2026-10-05**
 - Next research gate: **explicit user authorization + separate exact-head Claude review before canonical V2 execution or Discovery**
 - Secondary Funding-Carry Candidate A: **PASS_TO_DATA_DESIGN_SCOPED only; no data-design run authorized**
 
-- Build: **10.0-r126**
+- Build: **10.0-r127**
 - UI-Leitprinzip: **Complex inside – simple outside.**
 - Verified main checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
 - UI/runtime r108 acceptance: **PASS**
@@ -116,7 +116,7 @@ This section supersedes the earlier “Exact next durable step” where it confl
 ## CHAT HANDOFF — 2026-10-06
 
 - Live main: `ab1c4254168c5fa024405fcb92447e3f4151ed9a`
-- terminalBuild: `10.0-r126`
+- terminalBuild: `10.0-r127`
 - R126 / PR #586: MERGED, Claude exact-head GREEN_LIGHT, pre/post-merge core gates GREEN.
 - R126 Pages/Runtime incident: Runtime Smoke failed because public Pages still served r125 while Pages deploy stayed WAITING. Claude diagnosis run `37518085057`: LIKELY_ROOT_CAUSE = GitHub platform-side stall of legacy Pages deploy, not repo code/config. Do not blindly rerun or mutate; reconcile live Pages/runtime state first.
 - Stage 2 / PR #585: safely rebased on R126, exact head `2528ed285391e532b1055e18744aa9222f8e8c3a`, 0 behind, mergeable Draft, Release Safety + Visual QA GREEN, Claude GREEN_LIGHT. Still frozen; no release/merge authorization.
