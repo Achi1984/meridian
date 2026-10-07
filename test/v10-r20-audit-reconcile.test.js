@@ -55,7 +55,8 @@ test('r20 readiness distinguishes market stale missing and bot READY PARTIAL SAF
   assert.match(v10,/missingAssets=missingSymbols\.length/);
   assert.match(v10,/function marketReadiness\(m\)/);
   assert.match(v10,/function botReadiness\(g\)/);
-  for(const token of ["label:'READY'","label:'PARTIAL'","label:'SAFETY'","label:'STALE'","label:'REF'"])assert.ok(v10.includes(token),token);
+  for(const token of ["label:'READY'","label:'PARTIAL'","label:'SAFETY'","label:'STALE'"])assert.ok(v10.includes(token),token);
+  assert.match(v10,/lastGoodAvailable\?'STALE':'REF'/);
   assert.match(v10,/stale ·/);
   assert.match(v10,/missing/);
 });
