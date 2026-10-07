@@ -89,3 +89,55 @@ test("watchdog mailbox filter handles answered, unanswered, exact-head, ignores 
     ].join("|")
   );
 });
+
+
+test("R129 watchdog delivery resilience keeps a narrow successful Release Safety fallback", () => {
+  const source = readFileSync(WORKFLOW, "utf8");
+
+  assert.match(source, /schedule:\n\s+- cron: '57 \* \* \* \*'/);
+  assert.match(source, /workflow_dispatch:/);
+
+  const trigger = source.slice(
+    source.indexOf("on:"),
+    source.indexOf("\npermissions:")
+  );
+  assert.match(trigger, /workflow_run:\n\s+workflows:\n\s+- MERIDIAN Release Safety\n\s+types:\n\s+- completed/);
+  assert.doesNotMatch(trigger, /MERIDIAN Visual QA|MERIDIAN Runtime Smoke|MERIDIAN Agent Orchestration Safety/);
+
+  const jobGate = source.slice(
+    source.indexOf("jobs:"),
+    source.indexOf("\n    runs-on:")
+  );
+  assert.match(jobGate, /github\.event_name != 'workflow_run'/);
+  assert.match(jobGate, /github\.event\.workflow_run\.name == 'MERIDIAN Release Safety'/);
+  assert.match(jobGate, /github\.event\.workflow_run\.conclusion == 'success'/);
+});
+
+test("R129 preserves state-change and duplicate-suppression gates before Claude invocation", () => {
+  const source = readFileSync(WORKFLOW, "utf8");
+  const decision = source.slice(
+    source.indexOf("- name: Decide whether Claude is needed"),
+    source.indexOf("- name: Require Claude credential")
+  );
+
+  assert.match(decision, /steps\.seen\.outputs\.cache-hit/);
+  assert.match(decision, /reason=UNCHANGED/);
+  assert.match(decision, /steps\.state\.outputs\.ci_pending/);
+  assert.match(decision, /reason=CI_PENDING/);
+  assert.match(decision, /steps\.state\.outputs\.mailbox_review_pending/);
+  assert.match(decision, /reason=MAILBOX_REVIEW_PENDING/);
+  assert.match(decision, /fingerprint: \$\{STATE_FINGERPRINT\}/);
+  assert.match(decision, /reason=FINGERPRINT_ALREADY_COMMENTED/);
+  assert.match(decision, /run_claude=true/);
+  assert.match(decision, /reason=STATE_CHANGED/);
+});
+
+test("R129 keeps the Claude step behind the decision gate", () => {
+  const source = readFileSync(WORKFLOW, "utf8");
+  const claude = source.slice(
+    source.indexOf("- name: Claude development copilot"),
+    source.indexOf("- name: Save successful Claude fingerprint")
+  );
+  assert.match(claude, /if: steps\.decision\.outputs\.run_claude == 'true'/);
+  assert.match(source, /MERIDIAN DEVELOPMENT COPILOT — STATE-CHANGE WATCHDOG/);
+});
