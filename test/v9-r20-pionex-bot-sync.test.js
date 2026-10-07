@@ -35,9 +35,9 @@ test('r20 frontend accepts normalized Pionex Bot API field aliases',()=>{
 });
 
 test('r20+ uses selected Pionex source and raw source row count',()=>{
-  assert.match(js,/state\.botApiRows=num\(feed\?\.apiRows\)\?\?live\.length/);
+  assert.match(js,/botApiRows:num\(feed\?\.apiRows\)\?\?live\.length/);
   assert.match(js,/state\.pionexBotSync=d\?\.pionexBotSync\|\|null/);
-  assert.match(js,/state\.botFeedSource=String\(feed\?\.source/);
+  assert.match(js,/botFeedSource:String\(feed\?\.source/);
 });
 
 test('r20 production version is consistent',()=>{
