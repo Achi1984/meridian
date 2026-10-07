@@ -663,7 +663,7 @@ function bindCommandActionHub(view){
     if(target==='paper'){showSecondaryView('paper','research',{returnView:'command',navKey:'command',label:'COMMAND'});return}
     $('#nav button[data-v="'+target+'"]')?.click();
   }));
-  $('[data-command-asset]',view)?.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')});
+  $('[data-command-asset]',view).forEach(btn=>btn.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')}));
 }
 function pionexDetailAssets(){
   const s=S(),account=s?.pionexAccount||{},prices=account?.wallet?.prices||{},rows=[...(account.spotBalances||[]),...(account.futuresBalances||[])],map=new Map();
@@ -779,32 +779,129 @@ function bindRefreshControl(){
   const btn=$('#refresh-feeds');if(btn&&!btn.dataset.bound){btn.dataset.bound='1';btn.addEventListener('click',refreshFeeds)}
 }
 
-function renderCommand(force=false){
-  const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
-  const legacyCommandSelectors=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
-  const legacyCommandPresent=legacyCommandSelectors.some(sel=>$(sel,view))||!$('.command-portfolio-hero',view);
-  if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
-  banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
-  dataGuardDecorate();
-  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
-  const hero=$('.portfolio-hero',view),degradedPortfolio=S()?.portfolio?.complete!==true,portfolioBox=document.createElement('div');portfolioBox.innerHTML=portfolioChartHeroHtml();const portfolioNode=portfolioBox.firstElementChild,portfolioDetails=$('.command-portfolio-details',portfolioNode);if(portfolioDetails)portfolioDetails.remove();$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',portfolioNode);
-  const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;portfolioNode.insertAdjacentElement('afterend',overviewNode);
-  const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);if(degradedPortfolio){const nextPriority=$('.command-next-decision',hubNode);if(nextPriority)nextPriority.classList.add('command-next-priority')}
-  const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);
-  if(hero)hero.classList.add('command-source-authority');
-  const c=criticalPair(),g=syncHealth(),wrap=document.createElement('section');wrap.className='v10-critical-wrap';
-  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true,false,false,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
-  wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Overall Risk zuerst · Liquidation ist nur ein Teilstatus</small></div>'+criticalHtml;
-  attentionNode.insertAdjacentElement('afterend',wrap);
-  const source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;wrap.insertAdjacentElement('afterend',sourceNode);
-  if(portfolioDetails)sourceNode.insertAdjacentElement('afterend',portfolioDetails);
-  const action=$('.command-action',view);if(action)action.remove();
-  const systemDiagnostics=commandSystemDiagnostics();(portfolioDetails||sourceNode).insertAdjacentElement('afterend',systemDiagnostics);
-  for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
-  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
-  bindCommandActionHub(view);
-  bindCommandPortfolioHero(view);
+// R132: native Command decision owner. Read-only; the existing rank/freshness guards remain authoritative.
+function commandProModel(now=Date.now()){
+  const s=S()||{},p=portfolioReadiness(),g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),critical=criticalPair();
+  const verified=!!(critical&&g.fresh&&matchedRows(critical.symbol).length&&
+    !['DATA_STALE','UNVERIFIED','MARKET_STALE'].includes(critical.status.code));
+  const urgent=verified&&['LIQ_RISK','PROTECTION_RISK'].includes(critical.status.code);
+  const riskRows=g.fresh?symbols().map(symbol=>({symbol,status:pairStatus(symbol)}))
+    .filter(x=>['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','PROFIT_LOCK','WATCH_PROFIT'].includes(x.status.code))
+    .sort((a,b)=>b.status.rank-a.status.rank||a.symbol.localeCompare(b.symbol)).slice(0,3):[];
+  const risk=verified?{label:urgent?'GEFAHR':critical.status.code==='HOLD'?'KEIN SIGNAL':'BEOBACHTEN',
+    tone:critical.status.tone,detail:critical.symbol+' · '+critical.status.reason}
+    :{label:'UNGEKLÄRT',tone:'muted',detail:'Keine vollständig verifizierte private Risikoabdeckung'};
+  const dataComplete=p.label==='READY'&&g.decisionComplete&&m.coverageComplete;
+  const data={label:dataComplete?'VOLLSTÄNDIG':'TEILWEISE',tone:dataComplete?'safe':'watch',
+    detail:'Portfolio '+p.label+' · Bots '+br.label+' · Markt '+mr.label};
+  const bs=String(s.botRefreshStatus||'IDLE'),ms=String(s.marketSyncStatus||'IDLE'),
+    running=bs==='RUNNING'||ms==='RUNNING',failed=['ERROR','PARTIAL'].includes(bs)||['ERROR','PARTIAL'].includes(ms);
+  const refresh={label:running?'LÄUFT':failed?'TEILFEHLER':'RUHIG',tone:failed?'watch':'muted',
+    detail:'Bot '+bs+' · Markt '+ms+' · Aktualisierung verlängert keine Quellzeit'};
+  let action,asset=null,target='bots',tone='muted',consequence='Read-only Entscheidungsunterstützung · keine automatische Order.';
+  if(urgent){
+    action=nextAction();asset=critical.symbol;tone='danger';
+    consequence='Bestätigtes Kapitalrisiko zuerst prüfen; keine automatische Order.';
+  }else if(p.label!=='READY'){
+    action={title:'PORTFOLIO-VOLLSTÄNDIGKEIT PRÜFEN',detail:p.detail};target='depot';tone='watch';
+    consequence='Gesamtwert und Performance bleiben bis zur Authority-Klärung unbekannt.';
+  }else if(!g.decisionComplete){
+    action={title:'BOT-DATEN PRÜFEN',detail:g.detail};target='bots';tone='watch';
+    consequence='Unvollständige Botdaten erlauben keine abgeleitete Handelsentscheidung.';
+  }else if(!m.fresh||!m.coverageComplete){
+    action={title:'MARKTDATEN PRÜFEN',detail:m.ageText+' · '+m.freshAssets+'/'+m.totalAssets+' Assets frisch'};
+    target='market';tone='watch';
+    consequence='Abhängige Momentum-Signale blockiert; verifizierte Kapitalrisiken bleiben sichtbar.';
+  }else{
+    action=nextAction();
+    asset=verified&&critical.status.code!=='HOLD'?critical.symbol:null;
+    tone=verified?critical.status.tone:'muted';
+  }
+  return{now,urgent,action,asset,target,tone,consequence,risk,data,refresh,riskRows,
+    riskComplete:g.fresh&&g.coverageComplete&&m.coverageComplete};
 }
+function commandProHealthHtml(model){
+  const item=(name,x)=>'<div class="command-pro-health-item tone-'+esc(x.tone)+'"><span>'+esc(name)+'</span><b>'+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></div>';
+  return '<section class="command-pro-health" aria-label="Kapitalrisiko, Datenlage und Aktualisierung">'+
+    item('KAPITALRISIKO',model.risk)+item('DATENLAGE',model.data)+item('AKTUALISIERUNG',model.refresh)+'</section>';
+}
+function commandProDecisionHtml(model){
+  const attr=model.asset?'data-command-asset="'+esc(model.asset)+'"':'data-command-go="'+esc(model.target)+'"',
+    label=model.asset?'Asset prüfen':model.target==='depot'?'Portfolio prüfen':model.target==='market'?'Markt prüfen':'Bots prüfen';
+  return '<section class="command-pro-decision tone-'+esc(model.tone)+'" data-command-decision-owner="r132" role="region" aria-label="Jetzt wichtig">'+
+    '<div class="command-next-decision"><span>JETZT WICHTIG</span><b>'+esc(model.action.title)+'</b><small>'+esc(model.action.detail)+'</small></div>'+
+    '<p class="command-pro-consequence">'+esc(model.consequence)+'</p>'+
+    '<button type="button" class="command-pro-review" '+attr+'>'+esc(label)+' →</button></section>';
+}
+function commandProRiskHtml(model){
+  const rows=model.riskRows.map(x=>'<article class="command-pro-risk-row tone-'+esc(x.status.tone)+'">'+
+    '<div><b>'+esc(x.symbol)+'</b><span>'+esc(x.status.label)+'</span><small>'+esc(x.status.reason)+'</small></div>'+
+    '<button type="button" data-command-asset="'+esc(x.symbol)+'">Details</button></article>').join('');
+  return '<section class="v10-critical-wrap command-pro-risks" aria-label="Priorisierte Risiken">'+
+    '<div class="section-title"><h2>RISIKOFOKUS</h2><small>Safety-Ranking · maximal drei Positionen</small></div>'+
+    (rows||'<p class="command-pro-risk-empty">'+esc(model.riskComplete?'Kein bestätigter Risiko- oder Profit-Warnhinweis.':'Risikoabdeckung unvollständig · Datenquellen prüfen.')+'</p>')+'</section>';
+}
+function commandProNavigationHtml(){
+  const p=portfolioReadiness(),g=syncHealth(),m=marketReadiness(marketHealth()),paper=commandPaperPresentation(paperReadiness());
+  const item=(target,label,status)=>'<button type="button" class="command-hub-card" data-command-go="'+target+'"><span>'+label+'</span><b>'+esc(status)+'</b></button>';
+  return '<details class="command-pro-quicklinks"><summary>Weitere Bereiche öffnen</summary><div class="command-action-grid">'+
+    item('depot','DEPOT',p.label)+item('bots','BOTS',g.decisionReady+'/'+g.matched+' prüfbar')+
+    item('market','FORECAST',m.label)+item('paper','PAPER',paper.label)+'</div></details>';
+}
+function renderCommand(force=false){
+  const view=$('#view-command'),hero=view&&$('.portfolio-hero',view);
+  if(!view||!hero)return;
+  const legacy=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
+  if(!force&&!legacy.some(sel=>$(sel,view))&&$('.command-pro-decision',view)&&$('.command-source-details',view))return;
+  const opened={source:$('.command-source-details',view)?.open===true,
+    portfolio:$('.command-portfolio-details',view)?.open===true,
+    navigation:$('.command-pro-quicklinks',view)?.open===true};
+  banner('#view-command','COMMAND','PORTFOLIO & RISIKO','Eine Entscheidung, klare Prioritäten und nachvollziehbare Quellen','live');
+  dataGuardDecorate();
+  // Keep legacy authority buttons alive while their disclosure is replaced.
+  hero.remove();
+  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip,.command-pro-health,.command-pro-decision,.command-pro-quicklinks').forEach(x=>x.remove());
+  const asNode=html=>{const box=document.createElement('div');box.innerHTML=html;return box.firstElementChild},
+    model=commandProModel(),portfolio=asNode(portfolioChartHeroHtml()),portfolioDetails=$('.command-portfolio-details',portfolio);
+  if(portfolioDetails){portfolioDetails.remove();portfolioDetails.open=opened.portfolio}
+  const health=asNode(commandProHealthHtml(model)),decision=asNode(commandProDecisionHtml(model)),
+    risks=asNode(commandProRiskHtml(model)),links=asNode(commandProNavigationHtml());
+  links.open=opened.navigation;
+  const mode=$('.v10-mode-banner',view);
+  if(model.urgent){
+    mode.insertAdjacentElement('afterend',decision);
+    decision.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+  }else{
+    mode.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+    health.insertAdjacentElement('afterend',decision);
+  }
+  (model.urgent?health:decision).insertAdjacentElement('afterend',risks);
+  risks.insertAdjacentElement('afterend',links);
+  const source=asNode(commandDataDisclosure()),summary=$('summary',source);
+  source.open=opened.source;
+  const title=summary?.querySelector('span'),subtitle=summary?.querySelector('b');
+  if(title)title.textContent='DATEN & QUELLEN';
+  if(subtitle)subtitle.textContent='Quellengültigkeit, Authority und Diagnose';
+  const body=$('.command-source-details-body',source),system=commandSystemDiagnostics(),
+    diag=$('.command-system-diagnostics-body',system);
+  hero.classList.add('command-source-authority');
+  if(body){
+    body.append(hero);
+    if(diag){
+      const header=document.createElement('h3');header.textContent='Technische Diagnose';
+      body.append(header,diag);
+    }
+  }
+  links.insertAdjacentElement('afterend',source);
+  if(portfolioDetails)source.insertAdjacentElement('beforebegin',portfolioDetails);
+  $('.command-action',view)?.remove();
+  for(const sel of legacy)$$(sel,view).forEach(x=>x.remove());
+  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
+  bindCommandActionHub(view);bindCommandPortfolioHero(view);
+}
+
 function assetWatchShareCard(){
   const h=H(),available=typeof h.manageAssetWatchShare==='function',msg=assetWatchShareUi.message||'Erstellt einen eigenen widerrufbaren Read-only-Link nur für den bereinigten Asset-Watch-Bot-Snapshot.';
   return '<section class="asset-watch-share-card"><div><span>ASSET WATCH API LINK</span><b class="tone-'+esc(assetWatchShareUi.tone)+'">'+(assetWatchShareUi.busy?'ARBEITET…':assetWatchShareUi.shareUrl?'AKTIV · LINK IM SPEICHER':'BEREIT')+'</b><small>'+esc(msg)+'</small></div><div class="asset-watch-share-actions"><button type="button" data-asset-watch-share="rotate" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>'+(assetWatchShareUi.shareUrl?'NEUEN LINK ERSTELLEN':'LINK ERSTELLEN')+'</button><button type="button" data-asset-watch-share="copy" '+(!assetWatchShareUi.shareUrl||assetWatchShareUi.busy?'disabled':'')+'>LINK KOPIEREN</button><button type="button" data-asset-watch-share="revoke" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>WIDERRUFEN</button></div><small>Der Link enthält einen separaten, auf Asset Watch begrenzten Token. Er erlaubt keine Trades und keinen Zugriff auf das übrige private Dashboard.</small></section>';
