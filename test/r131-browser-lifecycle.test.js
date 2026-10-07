@@ -20,7 +20,7 @@ function rows(symbol,interval,limit,now=Date.now()){
   return Array.from({length:n},(_,i)=>{const openTime=now-(n-i)*span,close=p*(1+(i-n/2)*.0002);return{openTime,closeTime:openTime+span-1,high:close*1.003,low:close*.997,close}});
 }
 function dashboard(caseName){
-  const now=Date.now(),age=caseName==='pwa-resume'?896000:1000,updatedAt=now-age,buffer=caseName==='expiry'?8:25;
+  const now=Date.now(),age=caseName==='pwa-resume'?896000:1000,updatedAt=new Date(now-age).toISOString(),buffer=caseName==='expiry'?8:25;
   return{
     pionexBotSync:{status:'DISABLED_MISSING_CREDENTIALS'},
     pionexAccountSync:{status:'OK',updatedAt},
