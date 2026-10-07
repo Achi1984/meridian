@@ -622,7 +622,7 @@ function bindCommandPortfolioHero(view){
     nextDetails.remove();nextDetails.open=wasOpen;
     current.replaceWith(replacement);
     details.replaceWith(nextDetails);
-    bindCommandPortfolioHero(view);
+    bindCommandPortfolioHero(view);bindCommandProDisclosures(view);
     nextDetails.querySelector('[data-portfolio-range="'+range+'"]')?.focus({preventScroll:true});
   }));
 }
@@ -773,6 +773,7 @@ function renderDepot(force=false){
 }
 function showSecondaryView(v,navKey='research',context=null,scrollY=0){
   const from=activeViewKey();
+  if(from==='command'&&v!=='command')captureCommandProDisclosures();
   if(context!==false&&['asset-detail','paper','more','market'].includes(v)&&from!==v){
     const meta=context&&typeof context==='object'?context:{},returnView=meta.returnView||from,returnNav=meta.navKey||activeNavKey();
     viewContextUi[v]={returnView,navKey:returnNav,label:meta.label||VIEW_LABELS[returnView]||String(returnView||'ZURÜCK').toUpperCase(),scrollY:Math.max(0,Number(window.scrollY)||0)};
@@ -792,6 +793,22 @@ function bindRefreshControl(){
   const btn=$('#refresh-feeds');if(btn&&!btn.dataset.bound){btn.dataset.bound='1';btn.addEventListener('click',refreshFeeds)}
 }
 
+// R132: Command disclosure state must survive navigation and v9-originated re-renders.
+const commandProDisclosureState={source:false,portfolio:false,navigation:false};
+const commandProDisclosureSelectors={source:'.command-source-details',portfolio:'.command-portfolio-details',navigation:'.command-pro-quicklinks'};
+function captureCommandProDisclosures(view=$('#view-command')){
+  if(!view)return;
+  for(const [key,selector] of Object.entries(commandProDisclosureSelectors)){
+    const el=$(selector,view);if(el)commandProDisclosureState[key]=el.open===true;
+  }
+}
+function bindCommandProDisclosures(view){
+  for(const [key,selector] of Object.entries(commandProDisclosureSelectors)){
+    const el=$(selector,view);if(!el||el.dataset.r132ToggleBound==='1')continue;
+    el.dataset.r132ToggleBound='1';
+    el.addEventListener('toggle',()=>{if(el.isConnected)commandProDisclosureState[key]=el.open===true});
+  }
+}
 // R132: native Command decision owner. Read-only; the existing rank/freshness guards remain authoritative.
 function commandProModel(now=Date.now()){
   const s=S()||{},p=portfolioReadiness(),g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),critical=criticalPair();
@@ -866,14 +883,14 @@ function renderCommand(force=false){
   if(!view||!hero)return;
   const legacy=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
   if(!force&&!legacy.some(sel=>$(sel,view))&&$('.command-pro-decision',view)&&$('.command-source-details',view))return;
-  const opened={source:$('.command-source-details',view)?.open===true,
-    portfolio:$('.command-portfolio-details',view)?.open===true,
-    navigation:$('.command-pro-quicklinks',view)?.open===true};
+  captureCommandProDisclosures(view);
+  const opened={...commandProDisclosureState};
+  const focusedRange=document.activeElement?.closest?.('#view-command [data-portfolio-range]')?.dataset?.portfolioRange||null;
   banner('#view-command','COMMAND','PORTFOLIO & RISIKO','Eine Entscheidung, klare Prioritäten und nachvollziehbare Quellen','live');
   dataGuardDecorate();
   // Keep legacy authority buttons alive while their disclosure is replaced.
   hero.remove();
-  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip,.command-pro-health,.command-pro-decision,.command-pro-quicklinks').forEach(x=>x.remove());
+  view.querySelectorAll('.command-portfolio-hero,.command-portfolio-details,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip,.command-pro-health,.command-pro-decision,.command-pro-quicklinks').forEach(x=>x.remove());
   const asNode=html=>{const box=document.createElement('div');box.innerHTML=html;return box.firstElementChild},
     model=commandProModel(),portfolio=asNode(portfolioChartHeroHtml()),portfolioDetails=$('.command-portfolio-details',portfolio);
   if(portfolioDetails){portfolioDetails.remove();portfolioDetails.open=opened.portfolio}
@@ -912,7 +929,8 @@ function renderCommand(force=false){
   $('.command-action',view)?.remove();
   for(const sel of legacy)$$(sel,view).forEach(x=>x.remove());
   $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
-  bindCommandActionHub(view);bindCommandPortfolioHero(view);
+  bindCommandActionHub(view);bindCommandPortfolioHero(view);bindCommandProDisclosures(view);
+  if(focusedRange&&view.classList.contains('active'))$('[data-portfolio-range="'+focusedRange+'"]',view)?.focus({preventScroll:true});
 }
 
 function assetWatchShareCard(){
@@ -2072,6 +2090,7 @@ function bindV10NavigationAuthority(){
     b.onclick=e=>{
       e?.preventDefault?.();
       const v=String(b.dataset.v||'command');
+      if(activeViewKey()==='command')captureCommandProDisclosures();
       delete viewContextUi[v];
       const ok=bridge()?.goView?.(v);
       if(!ok){
