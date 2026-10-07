@@ -291,17 +291,17 @@ function syncHealth(){
   else if(botApiStatus==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(botApiStatus==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
   else if(botApiStatus==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,marketReady,pnlMissing,marketMissing,safetyMissing,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail};
+  const refreshStatus=String(s?.botRefreshStatus||'IDLE'),refreshing=refreshStatus==='RUNNING',refreshDegraded=['PARTIAL','ERROR'].includes(refreshStatus),lastGoodAvailable=!!s?.botFeedTimestampTrusted&&s?.botFeedUpdatedAt!=null;
+  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,marketReady,pnlMissing,marketMissing,safetyMissing,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail,refreshStatus,refreshing,refreshDegraded,refreshError:s?.botRefreshError||null,lastGoodAvailable};
 }
 function marketReadiness(m){
-  if(m.syncing)return{label:'SYNCING',tone:'watch'};
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
+  if(m.syncing)return{label:'SYNCING',tone:'watch'};
   if(m.fresh)return{label:'PARTIAL',tone:'watch'};
   return{label:'STALE',tone:'watch'};
 }
 function botReadiness(g){
-  if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
-  if(!g.fresh)return{label:'REF',tone:'muted'};
+  if(!g.fresh)return{label:g.lastGoodAvailable?'STALE':'REF',tone:g.lastGoodAvailable?'watch':'muted'};
   if(g.decisionComplete)return{label:'READY',tone:'safe'};
   if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
   if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
@@ -318,12 +318,22 @@ function portfolioReadiness(){
   return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:portfolioAuthorityDetail(p)};
 }
 function marketStateItem(){
-  const m=marketHealth(),r=marketReadiness(m),coverage=marketCoverageIssueText(m),detail=m.syncing?'Refresh läuft · letzter vollständiger Stand '+String(m.ageText||'—'):String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'+(coverage?' · '+coverage:'');
+  const m=marketHealth(),r=marketReadiness(m),coverage=marketCoverageIssueText(m);
+  const detail=m.syncing&&m.fresh
+    ?'AKTUALISIERUNG LÄUFT · letzter gültiger Stand '+String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'
+    :m.syncing
+      ?'AKTUALISIERUNG LÄUFT · noch kein vollständiger Stand'
+      :String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'+(coverage?' · '+coverage:'');
   return{key:'MARKET',label:r.label,tone:r.tone,detail};
 }
 function botStateItem(){
   const g=syncHealth(),r=botReadiness(g);
-  return{key:'BOTS',label:r.label,tone:r.tone,detail:String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready'};
+  let detail=String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  if(g.refreshing&&g.lastGoodAvailable)detail='AKTUALISIERUNG LÄUFT · letzter gültiger Stand '+String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  else if(g.refreshing)detail='AKTUALISIERUNG LÄUFT · noch kein vollständiger Stand';
+  else if(g.refreshDegraded&&g.lastGoodAvailable&&g.fresh)detail='REFRESH '+g.refreshStatus+' · letzter gültiger Stand '+String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  else if(g.refreshDegraded&&g.lastGoodAvailable&&!g.fresh)detail='STALE · letzter gültiger Stand '+String(g.age||'—')+' · Refresh '+g.refreshStatus;
+  return{key:'BOTS',label:r.label,tone:r.tone,detail};
 }
 function paperReadiness(){
   const d=paperCockpitUi.data;
