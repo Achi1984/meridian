@@ -248,60 +248,18 @@ MERIDIAN terminal releases use a single-writer lease:
 
 The repository enforces this with `scripts/release-coordinator.mjs`, the Release Safety guard, and the post-main stale-PR sweep workflow.
 
-### 14.1A UI Release Bundling
-- Small UI/presentation changes accumulate on one active release branch instead of separate rNN releases.
+### 14.1A Release cadence and explicit override
+
 - Standard cadence: maximum one UI/presentation terminal release merge per GitHub UTC calendar day.
 - Automatic exception: a genuine bugfix or trust/safety defect that should not wait.
-- Explicit user override: an additional UI/presentation terminal release may merge on the same GitHub UTC calendar day only when the user explicitly authorizes that additional same-day release after being told the standard cadence would otherwise block it.
-- A user-override release keeps every normal safety gate: coherent next-revision release identity, exact-head CI GREEN, exact-head independent Claude GREEN_LIGHT, pre-merge atomic recheck, single-writer lease, and `expected_head_sha` merge protection. The override changes cadence only; it never waives verification, review, release-coordinator, research, trading, privacy, or safety requirements.
-- Record the explicit user override in the active PR lead-status comment and final merge status.
-- The bundle gets one exact-head review, one release-identity bump and one merge.
-- Infrastructure/docs/process PRs do not count and must not bump `terminalBuild`.
-
-### 14.2 Interruption / Streaming Recovery
-
-After a tool interruption, streaming interruption, resumed conversation, or user “Fortsetzen” request:
-
-1. Perform the Resume preflight before any mutation.
-2. Treat repo state as authoritative over chat summaries.
-3. Detect already-completed commits/PRs/merges and skip them.
-4. If a parallel actor advanced `main`, invalidate the old release plan and recompute the next revision.
-5. Never replay a write merely because the previous response was interrupted; verify whether it already landed first.
-6. Never merge a PR whose gates belong to an older head SHA or an older `main` base.
-
-### 14.3 Streaming-Safe Execution Protocol
-
-To reduce chat-stream interruptions and make every interruption harmless:
-
-1. Prefer compact metadata queries over full diffs, full logs, or whole-file dumps.
-2. Fetch full diff/log content only when a failed gate or review defect requires it, and then only the relevant failure window.
-3. Keep each user-visible work cycle short: one implementation milestone, one gate milestone, or one merge milestone per update rather than one very long uninterrupted response.
-4. After every durable mutation, treat GitHub state (commit SHA, PR head, merge state, workflow run) as the checkpoint. Never rely on unsent chat text as the only record of progress.
-- Historical checkpoint semantics: `MERIDIAN_AGENT_STATE.lastCheckpoint` is historical evidence. Its `canonicalMainSha` and `build` describe the same verified checkpoint and must not be rewritten merely because the current terminal release advances. Current release identity belongs in `version.json`, `MERIDIAN_RESUME.json` and `MERIDIAN_LIVE_CHECKPOINT.json`.
-5. Before any post-interruption mutation, rerun the Resume preflight from 14.2.
-6. Batch independent read-only checks where possible, but serialize repository writes.
-7. Tool outputs should normally be reduced to the fields needed for the next decision: SHA, PR number, branch distance, gate status, failing step, and concise file list.
-8. Do not paste large raw CI logs into the conversation. Extract only the failing tests and the minimal surrounding evidence.
-9. When a long-running release is healthy, send short checkpoint updates instead of holding the entire result until the end.
-10. A streaming interruption must never trigger blind replay of a merge, commit, release bump, or external action.
-
-This protocol reduces transport/output pressure, while the existing GitHub checkpoint and exact-head rules ensure correctness even if the UI stream still disconnects.
-
-
-### 14.4 Hard Streaming Budgets
-
-The following limits are mandatory for interactive repository work:
-
-- **Tool-call budget:** after at most 2 consecutive repository/tool-call groups, emit a short user-visible checkpoint before any third group.
-- **Polling budget:** do not poll the same workflow/status more than 2 consecutive times without a checkpoint or a state-changing event.
-- **Output budget:** a single tool result surfaced back into the orchestration context should normally stay below 6 KB. Filter, slice, or summarize inside the tool call before returning text.
-- **Log/diff budget:** never emit a complete large CI log, full large diff, or whole large source file when a targeted search/window is sufficient. Return only the failing test, relevant lines, SHA/status, or a concise file list.
-- **Retry budget:** after 2 identical tool failures, stop repeating the same call. Re-read state, switch method, or report the blocker.
-- **Mutation checkpoint:** every commit, PR creation/update, merge, release bump, or deployment state change must be followed by a durable identifier (SHA/PR/run/deploy status) before the next mutation.
-- **Resume command:** after any interruption, prefer `node scripts/stream-safe-preflight.mjs` (or the equivalent GitHub metadata query when operating remotely) before any mutation.
-- **No blind continuation:** a resumed stream may continue analysis immediately, but must not write/merge/release until the preflight confirms current state.
-
-These are transport-safety limits, not quality shortcuts. Large investigations are split into multiple small verified milestones rather than one oversized streamed response. A visible burst should also end or checkpoint by 90 seconds, whichever comes first. Every durable mutation is followed by a concise user-visible checkpoint before further mutation.
+- Any additional same-day UI/presentation terminal release is blocked unless a release-specific `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` names the exact blocked release and the cadence conflict, and the user explicitly authorizes that exact release.
+- A same-day override is single-use. It applies only to the named release and never carries forward to another release, branch or later decision.
+- A prior user statement must never be generalized into standing override authority. Example: `Go – Regel ändern und R125 heute mergen` authorized R125 only.
+- Every override release still requires all normal exact-head CI, Claude review, expected-head merge protection and Single-Writer safeguards.
+- Before every `@claude` request, check the authoritative mailbox for the same Request-ID + exact head. If an unanswered matching request exists, do not repost. If a matching response exists, do not repost.
+- Any change to autonomy rules, release cadence, watchdog/workflow behavior, scheduler behavior or 24/7 operating rules requires `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` plus an explicit user answer before merge. Post-hoc authorization is invalid.
+- Current 24/7 MERIDIAN operation is explicitly user-authorized. Quota control comes from state-change detection, deduplication and staggered scheduling, not quiet hours.
+- GitHub scheduled workflows are best-effort. Do not create further Ops PRs solely to improve cron reliability unless a demonstrated configuration defect exists.
 
 ## 15. Documentation and Continuity
 
