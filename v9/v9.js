@@ -5,7 +5,7 @@ if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r126');
+    qs.set('build','r127');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }
