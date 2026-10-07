@@ -291,17 +291,17 @@ function syncHealth(){
   else if(botApiStatus==='OK'&&fresh&&unmatched)detail=unmatched+' unterstützte Bot-Row(s) nicht sicher gematcht · nur gematchte Rows werden verwendet.';
   else if(botApiStatus==='OK'&&fresh&&decisionReady<matched)detail='Bot-Safety ist frisch, aber '+(matched-decisionReady)+' Row(s) sind noch nicht decision-ready (PnL oder Marktfeed fehlt/stale).';
   else if(botApiStatus==='OK'&&fresh)detail='Private Pionex Bot-Daten und zugehörige Marktdaten sind decision-ready · '+decisionReady+'/'+matched+'.';
-  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,marketReady,pnlMissing,marketMissing,safetyMissing,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail};
+  const refreshStatus=String(s?.botRefreshStatus||'IDLE'),refreshing=refreshStatus==='RUNNING',refreshDegraded=['PARTIAL','ERROR'].includes(refreshStatus),lastGoodAvailable=!!s?.botFeedTimestampTrusted&&s?.botFeedUpdatedAt!=null;
+  return{apiRows:shownApiRows,supported,raw:supported,matched,safetyReady,pnlReady,marketReady,pnlMissing,marketMissing,safetyMissing,decisionReady,decisionComplete,actionable,unmatched,ambiguous,status,botApiStatus,walletFeed,identityMode,apiNative,age,fresh,coverageComplete,detail,refreshStatus,refreshing,refreshDegraded,refreshError:s?.botRefreshError||null,lastGoodAvailable};
 }
 function marketReadiness(m){
-  if(m.syncing)return{label:'SYNCING',tone:'watch'};
   if(m.fresh&&m.coverageComplete)return{label:'READY',tone:'safe'};
+  if(m.syncing)return{label:'SYNCING',tone:'watch'};
   if(m.fresh)return{label:'PARTIAL',tone:'watch'};
   return{label:'STALE',tone:'watch'};
 }
 function botReadiness(g){
-  if(g.status==='ERROR')return{label:'ERROR',tone:'danger'};
-  if(!g.fresh)return{label:'REF',tone:'muted'};
+  if(!g.fresh)return{label:g.lastGoodAvailable?'STALE':'REF',tone:g.lastGoodAvailable?'watch':'muted'};
   if(g.decisionComplete)return{label:'READY',tone:'safe'};
   if(g.decisionReady>0)return{label:'PARTIAL',tone:'watch'};
   if(g.safetyReady>0)return{label:'SAFETY',tone:'watch'};
@@ -318,12 +318,22 @@ function portfolioReadiness(){
   return{key:'PORTFOLIO',label:known?'PARTIAL':'BLOCKED',tone:known?'watch':'muted',detail:portfolioAuthorityDetail(p)};
 }
 function marketStateItem(){
-  const m=marketHealth(),r=marketReadiness(m),coverage=marketCoverageIssueText(m),detail=m.syncing?'Refresh läuft · letzter vollständiger Stand '+String(m.ageText||'—'):String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'+(coverage?' · '+coverage:'');
+  const m=marketHealth(),r=marketReadiness(m),coverage=marketCoverageIssueText(m);
+  const detail=m.syncing&&m.fresh
+    ?'AKTUALISIERUNG LÄUFT · letzter gültiger Stand '+String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'
+    :m.syncing
+      ?'AKTUALISIERUNG LÄUFT · noch kein vollständiger Stand'
+      :String(m.ageText||'—')+' · '+m.freshAssets+'/'+m.totalAssets+' frisch'+(coverage?' · '+coverage:'');
   return{key:'MARKET',label:r.label,tone:r.tone,detail};
 }
 function botStateItem(){
   const g=syncHealth(),r=botReadiness(g);
-  return{key:'BOTS',label:r.label,tone:r.tone,detail:String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready'};
+  let detail=String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  if(g.refreshing&&g.lastGoodAvailable)detail='AKTUALISIERUNG LÄUFT · letzter gültiger Stand '+String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  else if(g.refreshing)detail='AKTUALISIERUNG LÄUFT · noch kein vollständiger Stand';
+  else if(g.refreshDegraded&&g.lastGoodAvailable&&g.fresh)detail='REFRESH '+g.refreshStatus+' · letzter gültiger Stand '+String(g.age||'—')+' · '+g.decisionReady+'/'+g.matched+' decision-ready';
+  else if(g.refreshDegraded&&g.lastGoodAvailable&&!g.fresh)detail='STALE · letzter gültiger Stand '+String(g.age||'—')+' · Refresh '+g.refreshStatus;
+  return{key:'BOTS',label:r.label,tone:r.tone,detail};
 }
 function paperReadiness(){
   const d=paperCockpitUi.data;
@@ -1814,7 +1824,7 @@ function writeLocalVisualQaReport(cfg){
   const commandPartial=String($('#view-command .portfolio-known-partial b')?.textContent||'').trim(),depotPartial=String($('#view-depot .depot-known-partial b')?.textContent||'').trim(),portfolio=S()?.portfolio||{},partialSources=[portfolio.ledgerAutoUsd,portfolio.okxVenueUsd,portfolio.pionex].filter(knownNumber),partialSum=partialSources.reduce((sum,value)=>sum+Number(value),0),partialExpected=!portfolio.complete&&partialSources.length?(H().money?.(partialSum)||String(partialSum)):'',partialObserved=cfg.view==='command'?commandPartial:cfg.view==='depot'?depotPartial:'',partialValueParity=!['command','depot'].includes(cfg.view)||partialObserved===partialExpected;
   const nearBottom=scrollY+innerHeight>=root.scrollHeight-4,bottomClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top+1,navEndClearance=!nearBottom||!nav||!mainRect||mainRect.bottom<=nav.top-8;
   const navCandidates=nearBottom?[...active.querySelectorAll('button,summary,input,select,.fib-level,.fib-current,.sk-zone')].filter(visualQaVisible):[],navOcclusions=!nav?[]:navCandidates.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>nav.top+1&&r.top<nav.bottom-1}).map(el=>(el.textContent||el.getAttribute('aria-label')||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70));
-  const dataStates=Object.fromEntries([...active.querySelectorAll('.data-state-item')].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()])),hasMarketState=Object.prototype.hasOwnProperty.call(dataStates,'MARKET'),hasBotState=Object.prototype.hasOwnProperty.call(dataStates,'BOTS'),dataStateInvariant=cfg.dataMode==='stale'?(!hasMarketState||dataStates.MARKET==='STALE')&&(!hasBotState||dataStates.BOTS==='REF'):cfg.dataMode==='error'?(!hasMarketState||dataStates.MARKET==='STALE')&&(!hasBotState||dataStates.BOTS==='ERROR'):true;
+  const dataStates=Object.fromEntries([...active.querySelectorAll('.data-state-item')].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()])),hasMarketState=Object.prototype.hasOwnProperty.call(dataStates,'MARKET'),hasBotState=Object.prototype.hasOwnProperty.call(dataStates,'BOTS'),dataStateInvariant=cfg.dataMode==='stale'?(!hasMarketState||dataStates.MARKET==='STALE')&&(!hasBotState||dataStates.BOTS==='STALE'):cfg.dataMode==='error'?(!hasMarketState||dataStates.MARKET==='STALE')&&(!hasBotState||dataStates.BOTS==='STALE'):true;
   const viewport={w:innerWidth,h:innerHeight},viewportMatch=viewport.w===cfg.qaWidth&&viewport.h===cfg.qaHeight;
   const layout={scannerActionsSameRow,r125FirstActionInvariant,r126PaperFirstViewportInvariant,r126RenderedModelOrderInvariant,r126RenderedR42Invariant,stage2AssetDetailFirstViewportInvariant,stage2AssetDetailGuardAboveNav,commandHubInvariant,degradedPriorityInvariant,commandFirstViewportInvariant,commandDiagnosticsCollapsed,commandRiskSubstatusDominance,botAccordionInvariant,botErrorSurfaceInvariant,forecastFibInvariant,secondaryViewInvariant,partialValueParity,nearBottom,bottomClearance,navEndClearance,dataStateInvariant,commandHubCards,botSummaryCount:botSummaries.length};
   const report={build:BUILD,view:cfg.view,scroll:cfg.scroll,actualScroll:Math.round(scrollY),dataMode:cfg.dataMode,dataStates,viewport,viewportMatch,layout,documentHeight:root.scrollHeight,documentWidth:root.scrollWidth,bodyOverflow:root.scrollWidth>innerWidth+2,activeOverflow:active?active.scrollWidth>active.clientWidth+2:true,keyOverflow:overflow,shortButtons,smallFormControls,smallTrustText,smallTrustActions,smallR124PrimaryText,smallR125PrimaryText,smallR126AuthorityText,smallR126PrimaryText,smallStage2AuthorityText,smallStage2PrimaryText,smallNavLabels,navLabelClipping,r124TrustClipping,r125TrustClipping,r126TrustClipping,stage2TrustClipping,commandRiskSubstatusViolations,navOcclusions,navInside:!!nav&&nav.left>=-2&&nav.right<=innerWidth+2,ok:false};
@@ -1900,8 +1910,8 @@ async function runLocalInteractionQa(cfg){
     }else if(cfg.flow==='stale-recovery'){
       const labels=()=>Object.fromEntries([...$('#view-command')?.querySelectorAll('.data-state-item')||[]].map(el=>[String(el.querySelector('span')?.textContent||'').trim(),String(el.querySelector('b')?.textContent||'').trim()]));
       const before=labels();
-      checks.startsStale=before.BOTS==='REF'&&before.MARKET==='STALE';
-      checks.headersStale=String($('#data-status')?.textContent||'').includes('BOT REF')&&String($('#market-status')?.textContent||'').includes('MKT STALE');
+      checks.startsStale=before.BOTS==='STALE'&&before.MARKET==='STALE';
+      checks.headersStale=String($('#data-status')?.textContent||'').includes('BOT STALE')&&String($('#market-status')?.textContent||'').includes('MKT STALE');
       checks.failClosedBefore=!!$('#view-command .blocked-critical');
       setLocalVisualQaDataMode('fresh',S(),Date.now());
       renderActiveView('command',true);renderSystemHeader();decorateA11y();await visualQaSettle();

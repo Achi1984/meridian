@@ -20,15 +20,24 @@ test('r18 browser requests are bounded by AbortController timeouts',()=>{
 
 test('r18 private and market syncs are single-flight',()=>{
   assert.match(v9,/let syncBusy=false/);
-  assert.match(v9,/if\(syncBusy\)return false;syncBusy=true/);
-  assert.match(v9,/finally\{syncBusy=false;notifyData\(\)\}/);
+  assert.match(v9,/if\(syncBusy\)return false;\s*syncBusy=true/);
+  const syncStart=v9.indexOf('async function sync(){');
+  assert.ok(syncStart>=0,'sync source missing');
+  const syncFinally=v9.indexOf('}finally{',syncStart);
+  const syncBusyClear=v9.indexOf('syncBusy=false',syncStart);
+  const syncNotify=v9.indexOf('notifyData()',syncBusyClear);
+  assert.ok(syncFinally>syncStart,'sync finally missing');
+  assert.ok(syncBusyClear>syncFinally,'sync must clear busy in finally');
+  assert.ok(syncNotify>syncBusyClear,'sync must notify after clearing busy');
   assert.match(v9,/let syncIntelBusy=false/);
   assert.match(v9,/if\(syncIntelBusy\)return false;syncIntelBusy=true/);
-  const intelBlock=v9.slice(v9.indexOf('async function syncIntel(){'),v9.indexOf('\nfunction risk(',v9.indexOf('async function syncIntel(){')));
-  assert.match(intelBlock,/finally\{/);
-  assert.match(intelBlock,/syncIntelBusy=false/);
+  const intelStart=v9.indexOf('async function syncIntel(){');
+  assert.ok(intelStart>=0,'syncIntel source missing');
+  const intelFinally=v9.indexOf('}finally{',intelStart);
+  const intelBusyClear=v9.indexOf('syncIntelBusy=false',intelFinally);
+  assert.ok(intelFinally>intelStart,'syncIntel finally missing');
+  assert.ok(intelBusyClear>intelFinally,'syncIntel must clear busy in finally');
 });
-
 test('r18+ v10 refresh is event-driven and does not call legacy go(current) inside sync',()=>{
   assert.match(v9,/window\.dispatchEvent\(new CustomEvent\('meridian:data'\)\)/);
   assert.match(v10,/window\.addEventListener\('meridian:data',[\s\S]*schedule\(true\)/);

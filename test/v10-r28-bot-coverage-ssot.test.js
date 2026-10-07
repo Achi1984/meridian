@@ -38,10 +38,10 @@ test('r28 unmatched or ambiguous live rows fail coverage closed',()=>{
   assert.equal(stale.coverageComplete,false);
 });
 
-test('r28 legacy Data Truth, header and state source reuse the shared coverage contract',()=>{
+test('r28 legacy Data Truth and header reuse shared coverage while atomic publish preserves equivalent source semantics',()=>{
   assert.match(v9,/function botFeedCoverage\(\)/);
   assert.match(v9,/coverageComplete=fresh&&supported>0&&unmatched===0&&ambiguous===0/);
-  assert.match(v9,/state\.source=coverage\.coverageComplete\?'FRESH':coverage\.matched\?'MIXED':'REFERENCE'/);
+  assert.match(v9,/source=supported>0&&matched===supported&&candidateUnmatched\.length===0&&candidateAmbiguous===0\?'FRESH':matched\?'MIXED':'REFERENCE'/);
   const truth=v9.slice(v9.indexOf('function dataTruthCard(){'),v9.indexOf('function portfolioPionexAgeText'));
   assert.match(truth,/const coverage=botFeedCoverage\(\)/);
   assert.match(truth,/BOT MATCH<\/span><b>\$\{matched\}\/\$\{coverage\.supported\}/);

@@ -16,8 +16,8 @@ test('r32 header readiness emits only semantic v10 tone classes',()=>{
   assert.match(market,/label:'PARTIAL',tone:'watch'/);
   assert.match(market,/label:'STALE',tone:'watch'/);
   assert.doesNotMatch(market,/tone:'mixed'/);
-  assert.match(bot,/label:'ERROR',tone:'danger'/);
-  assert.match(bot,/label:'REF',tone:'muted'/);
+  assert.match(bot,/label:g\.lastGoodAvailable\?'STALE':'REF',tone:g\.lastGoodAvailable\?'watch':'muted'/);
+  assert.match(bot,/label:g\.lastGoodAvailable\?'STALE':'REF',tone:g\.lastGoodAvailable\?'watch':'muted'/);
   assert.match(bot,/label:'READY',tone:'safe'/);
   assert.match(bot,/label:'PARTIAL',tone:'watch'/);
   assert.match(bot,/label:'SAFETY',tone:'watch'/);
