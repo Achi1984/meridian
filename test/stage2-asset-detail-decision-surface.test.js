@@ -14,7 +14,7 @@ function block(startNeedle,endNeedle,src=js){
 }
 
 test('Stage 2 draft stays non-release and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r126');
+  assert.equal(release.terminalBuild,'10.0-r127');
   assert.equal(release.terminalExecutionImpact,false);
 });
 
@@ -36,6 +36,8 @@ test('Stage 2 preserves the r73 Asset Detail separation and read-only contract',
   assert.match(render,/data-asset-back data-context-back="asset-detail"/);
   const guard=render.indexOf('asset-detail-accounting-guard'),hero=render.indexOf('asset-detail-hero');
   assert.ok(guard>=0&&hero>guard,'READ-ONLY authority must precede Asset Detail evidence hero');
+  const market=render.indexOf('MARKET'),holding=render.indexOf('KNOWN HOLDING DETAIL'),bots=render.indexOf('LIVE BOTS'),quality=render.indexOf('OPPORTUNITY QUALITY');
+  assert.ok(market>=0&&holding>market&&bots>holding&&quality>bots,'Asset Detail evidence hero order must remain MARKET -> HOLDING -> LIVE BOTS -> OPPORTUNITY');
   assert.doesNotMatch(render,/known\s*\+\s*exposure|valueUsd\s*\+\s*longUsd|valueUsd\s*\+\s*shortUsd/);
   assert.doesNotMatch(render,/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|postJson|executeTrade)/i);
 });
