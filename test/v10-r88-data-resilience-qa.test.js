@@ -29,8 +29,8 @@ test('r88 exposes stale and error fixtures only through localhost visual QA',()=
 test('r88 stale/error states are evidence-gated in the rendered DATA STATE strip',()=>{
   assert.match(js,/hasMarketState=Object\.prototype\.hasOwnProperty\.call\(dataStates,'MARKET'\)/);
   assert.match(js,/hasBotState=Object\.prototype\.hasOwnProperty\.call\(dataStates,'BOTS'\)/);
-  assert.match(js,/dataStateInvariant=cfg\.dataMode==='stale'\?\(!hasMarketState\|\|dataStates\.MARKET==='STALE'\)&&\(!hasBotState\|\|dataStates\.BOTS==='REF'\)/);
-  assert.match(js,/:cfg\.dataMode==='error'\?\(!hasMarketState\|\|dataStates\.MARKET==='STALE'\)&&\(!hasBotState\|\|dataStates\.BOTS==='ERROR'\):true/);
+  assert.match(js,/dataStateInvariant=cfg\.dataMode==='stale'\?\(!hasMarketState\|\|dataStates\.MARKET==='STALE'\)&&\(!hasBotState\|\|dataStates\.BOTS==='STALE'\)/);
+  assert.match(js,/:cfg\.dataMode==='error'\?\(!hasMarketState\|\|dataStates\.MARKET==='STALE'\)&&\(!hasBotState\|\|dataStates\.BOTS==='STALE'\):true/);
   assert.match(js,/layout\.dataStateInvariant/);
   assert.ok(qa.includes("['data-command-stale','command',0,null,'stale']"));
   assert.ok(qa.includes("['data-bots-error','bots',0,null,'error']"));
@@ -38,7 +38,7 @@ test('r88 stale/error states are evidence-gated in the rendered DATA STATE strip
 
 test('r88 recovery flow proves stale state fails closed and recovers without reload',()=>{
   assert.match(js,/cfg\.flow==='stale-recovery'/);
-  assert.match(js,/checks\.startsStale=before\.BOTS==='REF'&&before\.MARKET==='STALE'/);
+  assert.match(js,/checks\.startsStale=before\.BOTS==='STALE'&&before\.MARKET==='STALE'/);
   assert.match(js,/checks\.failClosedBefore=!!\$\('#view-command \.blocked-critical'\)/);
   assert.match(js,/setLocalVisualQaDataMode\('fresh',S\(\),Date\.now\(\)\)/);
   assert.match(js,/checks\.botRecovered=after\.BOTS==='READY'/);

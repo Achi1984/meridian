@@ -20,8 +20,8 @@ test('r18 browser requests are bounded by AbortController timeouts',()=>{
 
 test('r18 private and market syncs are single-flight',()=>{
   assert.match(v9,/let syncBusy=false/);
-  assert.match(v9,/if\(syncBusy\)return false;syncBusy=true/);
-  assert.match(v9,/finally\{syncBusy=false;notifyData\(\)\}/);
+  assert.match(v9,/if\(syncBusy\)return false;\s*syncBusy=true/);
+  assert.match(v9,/finally\{\s*syncBusy=false;\s*notifyData\(\)\s*\}/);
   assert.match(v9,/let syncIntelBusy=false/);
   assert.match(v9,/if\(syncIntelBusy\)return false;syncIntelBusy=true/);
   const intelBlock=v9.slice(v9.indexOf('async function syncIntel(){'),v9.indexOf('\nfunction risk(',v9.indexOf('async function syncIntel(){')));
