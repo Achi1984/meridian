@@ -663,7 +663,7 @@ function bindCommandActionHub(view){
     if(target==='paper'){showSecondaryView('paper','research',{returnView:'command',navKey:'command',label:'COMMAND'});return}
     $('#nav button[data-v="'+target+'"]')?.click();
   }));
-  $('[data-command-asset]',view).forEach(btn=>btn.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')}));
+  $$('[data-command-asset]',view).forEach(btn=>btn.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')}));
 }
 function pionexDetailAssets(){
   const s=S(),account=s?.pionexAccount||{},prices=account?.wallet?.prices||{},rows=[...(account.spotBalances||[]),...(account.futuresBalances||[])],map=new Map();
