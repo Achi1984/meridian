@@ -58,6 +58,17 @@ Mailbox is reserved for:
 
 INTENT/progress belongs in one continuously updated PR-local lead-status comment. Rollover the mailbox when the configured comment threshold is exceeded, and update routing coherently before archiving the predecessor.
 
+## Product-owner governance
+- Standard UI/presentation terminal cadence: maximum one UI release merge per calendar day. Genuine bugfix/trust/safety fixes are excepted.
+- Any additional same-day UI release requires a release-specific `CROSS_MODEL_STATUS NEEDS_USER_DECISION` that names the blocked release and the cadence conflict, followed by an explicit user answer authorizing that exact release. The authorization is single-use and does not carry forward to later releases.
+- A prior user override may never be generalized into a standing exception. In particular, "Go – Regel ändern und R125 heute mergen" authorized R125 only.
+- Before every `@claude` request, inspect the authoritative mailbox for the same Request-ID + exact head. If an unanswered matching request already exists, do not repost. If a matching response already exists, do not repost.
+- Changes to autonomy rules, release cadence, watchdog/workflow behavior, scheduler behavior, or 24/7 operating rules always require `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` and an explicit user answer before merge. Post-hoc authorization is invalid.
+- Current 24/7 MERIDIAN operation is explicitly user-authorized. ChatGPT Autopilot and Claude Watchdog may run 24/7; quota protection must come from state-change detection, deduplication and staggered scheduling rather than quiet hours.
+- Scheduling target: ChatGPT Autopilot at minute :27 and Claude Watchdog at minute :57, avoiding intentional parallel starts.
+- GitHub scheduled workflows are best-effort. Do not open further Ops PRs solely to make cron delivery "reliable"; only act if a completed source/expected workflow demonstrates a real configuration defect.
+- These governance rules never relax exact-head CI/review, expected-head merge protection, Single-Writer, research-stage, PnL, execution, privacy or safety gates.
+
 ## Hard research / trading boundaries
 The live checkpoint is authoritative. Unless it explicitly says otherwise, do not perform or authorize:
 - canonical execution
