@@ -608,9 +608,22 @@ function portfolioChartHeroHtml(){
 }
 function bindCommandPortfolioHero(view){
   view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
-    const next=String(btn.dataset.portfolioRange||'').toLowerCase();if(!PORTFOLIO_CHART_WINDOWS[next]||next===portfolioChartUi.range)return;
-    portfolioChartUi.range=next;const current=$('.command-portfolio-hero',view);if(!current)return;
-    const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();current.replaceWith(box.firstElementChild);bindCommandPortfolioHero(view);
+    const range=String(btn.dataset.portfolioRange||'').toLowerCase();
+    if(!PORTFOLIO_CHART_WINDOWS[range]||range===portfolioChartUi.range)return;
+    const current=$('.command-portfolio-hero',view),details=$('.command-portfolio-details',view);
+    // R132 owns exactly one, separately positioned disclosure. Never nest a new copy on range changes.
+    if(!current||!details)return;
+    const previousRange=portfolioChartUi.range;
+    portfolioChartUi.range=range;
+    const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();
+    const replacement=box.firstElementChild,nextDetails=$('.command-portfolio-details',replacement);
+    if(!replacement||!nextDetails){portfolioChartUi.range=previousRange;return}
+    const wasOpen=details.open;
+    nextDetails.remove();nextDetails.open=wasOpen;
+    current.replaceWith(replacement);
+    details.replaceWith(nextDetails);
+    bindCommandPortfolioHero(view);
+    nextDetails.querySelector('[data-portfolio-range="'+range+'"]')?.focus({preventScroll:true});
   }));
 }
 function commandHealthSummary(){
