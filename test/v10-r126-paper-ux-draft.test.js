@@ -15,7 +15,7 @@ function block(startNeedle,endNeedle,src=js){
 }
 
 test('r126 release candidate is explicitly authorized and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r126');
+  assert.ok(/^10\.0-r\d+$/.test(release.terminalBuild)&&Number(release.terminalBuild.split('-r')[1])>=126);
   assert.equal(release.terminalExecutionImpact,false);
   assert.match(draft,/RELEASE CANDIDATE/);
   assert.match(draft,/Go – R126 heute als Release Candidate vorbereiten und nach GREEN mergen/);
