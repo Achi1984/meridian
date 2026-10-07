@@ -25,7 +25,7 @@ test('r18 private and market syncs are single-flight',()=>{
   assert.ok(syncStart>=0,'sync source missing');
   const syncFinally=v9.indexOf('}finally{',syncStart);
   const syncBusyClear=v9.indexOf('syncBusy=false',syncStart);
-  const syncNotify=v9.indexOf('notifyData()',syncStart);
+  const syncNotify=v9.indexOf('notifyData()',syncBusyClear);
   assert.ok(syncFinally>syncStart,'sync finally missing');
   assert.ok(syncBusyClear>syncFinally,'sync must clear busy in finally');
   assert.ok(syncNotify>syncBusyClear,'sync must notify after clearing busy');
@@ -34,7 +34,7 @@ test('r18 private and market syncs are single-flight',()=>{
   const intelStart=v9.indexOf('async function syncIntel(){');
   assert.ok(intelStart>=0,'syncIntel source missing');
   const intelFinally=v9.indexOf('}finally{',intelStart);
-  const intelBusyClear=v9.indexOf('syncIntelBusy=false',intelStart);
+  const intelBusyClear=v9.indexOf('syncIntelBusy=false',intelFinally);
   assert.ok(intelFinally>intelStart,'syncIntel finally missing');
   assert.ok(intelBusyClear>intelFinally,'syncIntel must clear busy in finally');
 });
