@@ -21,7 +21,8 @@ test('r18 browser requests are bounded by AbortController timeouts',()=>{
 test('r18 private and market syncs are single-flight',()=>{
   assert.match(v9,/let syncBusy=false/);
   assert.match(v9,/if\(syncBusy\)return false;\s*syncBusy=true/);
-  const syncBlock=v9.slice(v9.indexOf('async function sync(){'),v9.indexOf('\nasync function syncIntel(){'));
+  const syncStart=v9.indexOf('async function sync(){'),syncEnd=v9.indexOf('\nasync function syncIntel(){',syncStart),syncBlock=v9.slice(syncStart,syncEnd);
+  assert.ok(syncStart>=0&&syncEnd>syncStart,'sync source missing');
   assert.match(syncBlock,/finally\{/);
   assert.match(syncBlock,/syncBusy=false/);
   assert.match(syncBlock,/notifyData\(\)/);
