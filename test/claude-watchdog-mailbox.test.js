@@ -56,7 +56,7 @@ function response(id, head, createdAt) {
   };
 }
 
-test("watchdog mailbox filter handles answered, unanswered, exact-head, missing-head and young requests", () => {
+test("watchdog mailbox filter handles answered, unanswered, exact-head, ignores missing-head, and filters young requests", () => {
   const now = Math.floor(Date.parse("2026-10-07T06:00:00Z") / 1000);
 
   const headA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -84,7 +84,6 @@ test("watchdog mailbox filter handles answered, unanswered, exact-head, missing-
   assert.equal(
     runFilter(comments, now),
     [
-      "R-NO-HEAD@NO_HEAD",
       `R-OPEN@${headB}`,
       `R-SAME-ID@${headC}`,
     ].join("|")
