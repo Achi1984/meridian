@@ -17,6 +17,7 @@ export function transition(task,event){
  if(typeof event.opId!=='string'||!event.opId.trim())throw Error('MISSING_OP_ID');
  if(task.opIds!==undefined&&(!Array.isArray(task.opIds)||task.opIds.some(x=>typeof x!=='string')))throw Error('INVALID_JOURNAL');
  if(task.lastOpId===event.opId||task.opIds?.includes(event.opId))throw Error('DUPLICATE_OP_ID');
+ if(event.expectedBase!==undefined&&event.expectedBase!==task.base)throw Error('STALE_BASE');
  if(!transitions[task.state]?.includes(event.to))throw Error('INVALID_TRANSITION');
  if(event.to==='CLAIMED'&&(!event.writer||task.writer&&task.writer!==event.writer))throw Error('WRITER_CONFLICT');
  if(task.writer&&event.writer!==task.writer&&event.to!==STATES.BLOCKED)throw Error('WRITER_CONFLICT');
@@ -26,6 +27,6 @@ export function transition(task,event){
  if(task.state===STATES.REPAIR&&event.to===STATES.CI_CHECK&&event.newHead===undefined)throw Error('HEAD_ADVANCE_REQUIRED');
  if(event.newHead!==undefined&&(event.to!==STATES.CI_CHECK||task.state!==STATES.REPAIR||!validSha(event.newHead)||event.newHead===task.head))throw Error('INVALID_HEAD_ADVANCE');
  let attempts=task.attempts;
- if(event.to==='REPAIR'){if(attempts>=3)throw Error('REPAIR_BUDGET_EXHAUSTED');attempts++;}
+ if(event.to==='REPAIR'){if(attempts>=3)return Object.freeze({...task,state:STATES.BLOCKED,blockReason:'REPAIR_BUDGET_EXHAUSTED',revision:task.revision+1,lastOpId:event.opId,opIds:[...(task.opIds??[]),event.opId]});attempts++;}
  return Object.freeze({...task,state:event.to,head:event.newHead??task.head,ciEvidence:event.to===STATES.REVIEW_REQUESTED?event.ci:null,reviewEvidence:event.to===STATES.REVIEW_GREEN?event.review:null,blockReason:event.to===STATES.BLOCKED?event.reason:null,attempts,revision:task.revision+1,lastOpId:event.opId,opIds:[...(task.opIds??(task.lastOpId?[task.lastOpId]:[])),event.opId],writer:task.writer??event.writer??null});
 }
