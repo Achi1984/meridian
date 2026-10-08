@@ -40,7 +40,7 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
 });
 
 test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
- assert.equal((html.match(/<script\\b/gi)||[]).length,1,'exactly one script element');
+ assert.equal((html.match(/<script\b/gi)||[]).length,1,'exactly one script element');
  assert.match(html,/<script>/,'script must have no attributes');
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
