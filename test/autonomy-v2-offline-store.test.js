@@ -69,3 +69,23 @@ test('claim rejects lease expiry overflow without charging budget',()=>{
  assert.equal(s.claim(args({now:Number.MAX_SAFE_INTEGER,ttl:20})).reason,'INVALID_CLAIM');
  assert.equal(s.snapshot('T1').budget.used,0);
 });
+
+test('restored claimed state requires positive lease expiry and replay history',()=>{
+ const s=createOfflineStore([fixture()]);assert.equal(s.claim(args()).ok,true);
+ const claimed=s.snapshot('T1');
+ for(const bad of [
+   {...claimed,lease:{...claimed.lease,expiresAt:0}},
+   {...claimed,applied:[]},
+   {...claimed,applied:undefined},
+ ]) assert.throws(()=>createOfflineStore([bad]),/INVALID_RESTORED_TASK/);
+});
+test('store expiry inspection delegates both waiting and expired decisions',()=>{
+ const s=createOfflineStore([fixture()]);assert.equal(s.claim(args()).ok,true);
+ assert.deepEqual(s.inspectExpired('T1',110),{action:'NO_ACTION'});
+ assert.deepEqual(s.inspectExpired('T1',120),{action:'RECONCILE_REQUIRED',fence:1});
+});
+test('negative claim time fails closed',()=>{
+ const s=createOfflineStore([fixture()]);
+ assert.equal(s.claim(args({now:-1})).reason,'INVALID_CLAIM');
+ assert.equal(s.snapshot('T1').budget.used,0);
+});
