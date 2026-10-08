@@ -867,7 +867,7 @@ function commandProRiskHtml(model){
   const rows=model.riskRows.map(x=>'<article class="command-pro-risk-row tone-'+esc(x.status.tone)+'">'+
     '<div><b>'+esc(x.symbol)+'</b><span>'+esc(x.status.label)+'</span><small>'+esc(x.status.reason)+'</small></div>'+
     '<button type="button" data-command-asset="'+esc(x.symbol)+'">Details</button></article>').join('');
-  return '<section class="v10-critical-wrap command-pro-risks" aria-label="Priorisierte Risiken">'+
+  return '<section class="v10-critical-wrap command-pro-risks'+(model.risk.label==='UNGEKLÄRT'?' blocked-critical':'')+'" aria-label="Priorisierte Risiken">'+
     '<div class="section-title"><h2>RISIKOFOKUS</h2><small>Safety-Ranking · maximal drei Positionen</small></div>'+
     (rows||'<p class="command-pro-risk-empty">'+esc(model.riskComplete?'Kein bestätigter Risiko- oder Profit-Warnhinweis.':'Risikoabdeckung unvollständig · Datenquellen prüfen.')+'</p>')+'</section>';
 }
@@ -912,7 +912,9 @@ function renderCommand(force=false){
     portfolio.insertAdjacentElement('afterend',health);
     health.insertAdjacentElement('afterend',decision);
   }
-  (model.urgent?health:model.degradedAuthority?health:decision).insertAdjacentElement('afterend',risks);
+  // Keep risks after health for incomplete authority, while retaining the guarded urgent/normal anchor.
+  if(model.degradedAuthority)health.insertAdjacentElement('afterend',risks);
+  else (model.urgent?health:decision).insertAdjacentElement('afterend',risks);
   risks.insertAdjacentElement('afterend',links);
   const source=asNode(commandDataDisclosure()),summary=$('summary',source);
   source.open=opened.source;
