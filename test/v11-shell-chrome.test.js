@@ -24,6 +24,7 @@ if(typeof WebSocket!=='function'){
  const child=spawnSync(process.execPath,['--experimental-websocket','--test',fileURLToPath(import.meta.url)],{encoding:'utf8',timeout:115000,env:{...process.env,V11_CDP_CHILD:'1'}});
  assert.equal(child.status,0,'WebSocket-enabled Node child failed: '+String(child.stdout).slice(-1200)+' '+String(child.stderr).slice(-1200));
  const evidence=String(child.stdout).split('\n').filter(line=>line.includes('V11_CDP_WIDTH'));
+ console.log('V11_CDP_CHILD_OUTPUT',String(child.stdout).slice(-1600));
  assert.equal(evidence.length,4,'Expected four actual CDP width measurements');
  for(const line of evidence)console.log(line);
  return;
