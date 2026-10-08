@@ -9,7 +9,7 @@ export function reconcileSnapshot(local, remote, intent) {
   if (typeof intent.opId !== 'string' || !intent.opId)
     return Object.freeze({action:'BLOCK',reason:'INVALID_OP_ID'});
   if (remote.opIds.includes(intent.opId))
-    return Object.freeze({action:'ALREADY_APPLIED',reason:'REMOTE_OP_ID_PRESENT'});
+    return Object.freeze({action:'OP_ID_SEEN',reason:'VERIFY_INTENDED_DIFF_BEFORE_COMPLETION'});
   if (remote.revision !== local.revision || remote.head !== local.head)
     return Object.freeze({action:'BLOCK',reason:'REMOTE_ADVANCED'});
   if (remote.writer && remote.writer !== intent.writer)
