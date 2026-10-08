@@ -9,7 +9,7 @@ test('exhausted quota blocks claim',()=>{assert.equal(assessClaim({...task(),bud
 test('lease expiry requires reconciliation before claim',()=>{assert.equal(assessClaim({...task(),lease:{owner:'lead',expiresAt:99}},proposal()).reason,'RECONCILE_LEASE_FIRST');});
 test('another writer lease blocks claim',()=>{assert.equal(assessClaim({...task(),lease:{owner:'other',expiresAt:200}},proposal()).allow,false);});
 test('stale base and revision block claim',()=>{assert.equal(assessClaim(task(),{...proposal(),expectedBase:head}).reason,'STALE_CAS');assert.equal(assessClaim(task(),{...proposal(),expectedRevision:0}).allow,false);});
-const review=()=>({source:'github-api-verified',author:'claude[bot]',commentId:5,head,base,liveHead:head,verdict:'GREEN_LIGHT',ci:{head,base,conclusion:'success',testCount:2}});
+const review=()=>({source:'synthetic-unverified',author:'claude[bot]',commentId:5,head,base,liveHead:head,verdict:'GREEN_LIGHT',ci:{head,base,conclusion:'success',testCount:2}});
 test('synthetic verified review evidence passes',()=>{assert.equal(verifyReviewSnapshot(review(),{head,base}).valid,true);});
 test('spoofed author, stale head and skipped CI reject',()=>{
  assert.equal(verifyReviewSnapshot({...review(),author:'attacker'},{head,base}).valid,false);
