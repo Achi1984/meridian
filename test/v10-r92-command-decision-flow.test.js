@@ -19,8 +19,18 @@ test('r92 Command decision-flow contract remains active on successor builds',()=
 
 test('r92 renders Next/Open before Attention as separate decision surfaces',()=>{
   assert.match(js,/function commandAttentionHtml\(\)/);
-  assert.match(js,/attentionWrap\.innerHTML=commandAttentionHtml\(\)/);
-  assert.match(js,/hubNode\.insertAdjacentElement\('afterend',attentionNode\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 replaces duplicated attention with a single verified decision owner.
+    assert.match(js,/data-command-decision-owner="r132"/);
+    assert.match(js,/commandProDecisionHtml\(model\)/);
+    assert.match(js,/commandProRiskHtml\(model\)/);
+    assert.match(js,/\(model\.urgent\?health:decision\)\.insertAdjacentElement\('afterend',risks\)/);
+    assert.match(js,/risks\.insertAdjacentElement\('afterend',links\)/);
+    assert.match(js,/\.command-attention,\.v10-critical-wrap/);
+  }else{
+    assert.match(js,/attentionWrap\.innerHTML=commandAttentionHtml\(\)/);
+    assert.match(js,/hubNode\.insertAdjacentElement\('afterend',attentionNode\)/);
+  }
 });
 
 test('r92 collapses fresh account positions in Command while keeping Bots full detail',()=>{
