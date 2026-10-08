@@ -46,6 +46,23 @@
     .state-dot{width:7px;height:7px;border-radius:50%;background:#b2a379;display:inline-block;flex:none}
     .card{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(160deg,#172337,#111b29 67%);padding:19px;margin-bottom:12px;box-shadow:0 9px 26px #00000015}
     .card-muted{background:#111923}
+    /* A1 semantic accents: visual categories, never synthetic risk verdicts. */
+    :root{--positive:#2ecf9a;--attention:#f3b94f;--critical:#f16b78;--research:#b69bff}
+    .card{box-shadow:0 12px 30px #00000025,inset 0 1px #ffffff08}
+    .decision{background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b)}
+    .trust-cell:nth-child(1){border-top:2px solid var(--brand);background:linear-gradient(160deg,#162c42,#101b28 70%)}
+    .trust-cell:nth-child(2){border-top:2px solid var(--positive);background:linear-gradient(160deg,#12352f,#101b28 70%)}
+    .trust-cell:nth-child(3){border-top:2px solid var(--research);background:linear-gradient(160deg,#292342,#101b28 70%)}
+    .state-dot{background:var(--attention)}
+    #view-depot .view-placeholder{border-top:3px solid var(--brand)}
+    #view-bots .view-placeholder{border-top:3px solid var(--positive)}
+    #view-market .view-placeholder{border-top:3px solid var(--research)}
+    #view-research .view-placeholder{border-top:3px solid #d49aff}
+    #nav button[data-v="depot"].active{color:var(--brand)}
+    #nav button[data-v="bots"].active{color:var(--positive)}
+    #nav button[data-v="market"].active{color:var(--research)}
+    #nav button[data-v="research"].active{color:#d49aff}
+
     .decision{border-color:#466b96;background:linear-gradient(135deg,#182f48,#111c2b 70%);position:relative}
     .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
     .card-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:13px}
