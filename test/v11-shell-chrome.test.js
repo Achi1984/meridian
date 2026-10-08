@@ -9,11 +9,9 @@ import {fileURLToPath} from 'node:url';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 const page=fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const source=readFileSync(page,'utf8');
-const probe=`<style>html{width:100%;max-width:100%;}</style><script>
+const probe=`<script>
 window.addEventListener('load',()=>{
-document.querySelector('meta[name=viewport]').setAttribute('content','width=device-width,initial-scale=1');
-const root=document.documentElement;root.style.width='\${width}px';root.style.maxWidth='\${width}px';
-const out={width:root.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:root.getBoundingClientRect().width,
+const out={width:innerWidth,body:document.body.scrollWidth,viewport:document.documentElement.clientWidth,
 nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').length};
 for(const b of document.querySelectorAll('#nav button')){
 const label=b.querySelector('span:last-child');const s=getComputedStyle(label);
@@ -32,8 +30,9 @@ for(const width of [320,375,390,430]){
  try{
   const html=join(dir,'index.html');
   writeFileSync(html,source.replace('</body>',probe+'</body>'));
+  const chromeWidth=width+16;
   const run=spawnSync(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
-   '--window-size='+width+',844','--hide-scrollbars','--force-device-scale-factor=1','--virtual-time-budget=1500',
+   '--window-size='+chromeWidth+',844','--hide-scrollbars','--force-device-scale-factor=1','--virtual-time-budget=1500',
    '--user-data-dir='+join(dir,'profile'),'--dump-dom','file://'+html],
    {encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
   assert.equal(run.status,0,'Chrome '+width+': '+String(run.stderr).slice(-500));
@@ -41,7 +40,7 @@ for(const width of [320,375,390,430]){
   assert.ok(match,'missing browser measurement '+width);
   const x=JSON.parse(decodeURIComponent(match[1].replaceAll('&amp;','&')));
   console.log('V11_CHROME_WIDTH',width,JSON.stringify(x));
-  assert.equal(x.width,width,'Emulated layout viewport must match requested mobile width');
+  assert.equal(x.viewport,width,'Chrome content viewport must match requested mobile width');
   assert.ok(x.body<=x.viewport+1,'horizontal overflow '+width);
   assert.equal(x.decision,1);
   assert.equal(x.nav.length,5);
