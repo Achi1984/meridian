@@ -23,7 +23,7 @@ export function planReview(task, event, verifiedSnapshot) {
       event?.review?.verdict !== 'GREEN_LIGHT')
     return Object.freeze({ok:false,reason:'EVIDENCE_MISMATCH'});
   try {
-    return Object.freeze({ok:true,next:transition(task,{...event,to:STATES.REVIEW_GREEN})});
+    return Object.freeze({ok:true,next:transition(task,{...event,verifiedSynthetic:true,to:STATES.REVIEW_GREEN})});
   } catch(error) {
     return Object.freeze({ok:false,reason:String(error.message)});
   }
