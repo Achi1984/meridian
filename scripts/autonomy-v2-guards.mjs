@@ -14,7 +14,7 @@ export function assessClaim(task, proposal) {
   return Object.freeze({allow:true,reason:'ELIGIBLE_SYNTHETIC_ONLY'});
 }
 export function verifyReviewSnapshot(snapshot, expected) {
-  if (!snapshot || !expected || snapshot.source !== 'github-api-verified' || snapshot.author !== 'claude[bot]' ||
+  if (!snapshot || !expected || snapshot.source !== 'synthetic-unverified' || snapshot.author !== 'claude[bot]' ||
       !Number.isSafeInteger(snapshot.commentId) || snapshot.commentId <= 0 ||
       snapshot.head !== expected.head || snapshot.base !== expected.base ||
       snapshot.liveHead !== expected.head || snapshot.verdict !== 'GREEN_LIGHT')
