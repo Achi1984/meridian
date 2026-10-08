@@ -23,7 +23,7 @@ test('invalid transition and missing operation id fail closed',()=>{
 });
 test('CI exact head evidence required before review',()=>{
  assert.throws(()=>transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED)),/CI_NOT_GREEN/);
- assert.equal(transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED,{ci:'SUCCESS_EXACT_HEAD'})).state,STATES.REVIEW_REQUESTED);
+ assert.equal(transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED,{ci:{runId:123,head:SHA,conclusion:'success',testCount:10}})).state,STATES.REVIEW_REQUESTED);
 });
 test('review is bound to exact head and base',()=>{
  const t=task(STATES.REVIEW_REQUESTED,{writer:'lead'});
@@ -43,4 +43,22 @@ test('blocked state cannot restart automatically',()=>{
 });
 test('input task is not mutated',()=>{
  const t=task();transition(t,ev(STATES.CLAIMED));assert.equal(t.state,STATES.QUEUED);assert.equal(t.revision,0);
+});
+
+test('repair updates head with CAS and clears stale evidence',()=>{
+ const next='c'.repeat(40),t=task(STATES.REPAIR,{writer:'lead',ciEvidence:{runId:1},reviewEvidence:{verdict:'GREEN_LIGHT'}});
+ const n=transition(t,ev(STATES.CI_CHECK,{newHead:next}));
+ assert.equal(n.head,next);assert.equal(n.ciEvidence,null);assert.equal(n.reviewEvidence,null);
+ assert.throws(()=>transition(t,ev(STATES.CI_CHECK,{newHead:'bad'})),/INVALID_HEAD_ADVANCE/);
+});
+test('CI evidence must match exact head and nonzero test count',()=>{
+ const t=task(STATES.CI_CHECK,{writer:'lead'});
+ for(const ci of [{runId:1,head:BASE,conclusion:'success',testCount:10},{runId:1,head:SHA,conclusion:'failure',testCount:10},{runId:1,head:SHA,conclusion:'success',testCount:0}])
+ assert.throws(()=>transition(t,ev(STATES.REVIEW_REQUESTED,{ci})),/CI_NOT_GREEN/);
+});
+test('supervisor can block with reason but cannot impersonate writer',()=>{
+ const t=task(STATES.CI_CHECK,{writer:'lead'});
+ assert.throws(()=>transition(t,ev(STATES.BLOCKED,{writer:'supervisor'})),/BLOCK_REASON_REQUIRED/);
+ assert.equal(transition(t,ev(STATES.BLOCKED,{writer:'supervisor',reason:'lease expired'})).state,STATES.BLOCKED);
+ assert.throws(()=>transition(t,ev(STATES.REPAIR,{writer:'supervisor'})),/WRITER_CONFLICT/);
 });
