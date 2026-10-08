@@ -847,7 +847,7 @@ function commandProModel(now=Date.now()){
     asset=verified&&critical.status.code!=='HOLD'?critical.symbol:null;
     tone=verified?critical.status.tone:'muted';
   }
-  return{now,urgent,action,asset,target,tone,consequence,risk,data,refresh,riskRows,
+  return{now,urgent,degradedAuthority:p.label!=='READY',action,asset,target,tone,consequence,risk,data,refresh,riskRows,
     riskComplete:g.fresh&&g.coverageComplete&&m.coverageComplete};
 }
 function commandProHealthHtml(model){
@@ -898,7 +898,12 @@ function renderCommand(force=false){
     risks=asNode(commandProRiskHtml(model)),links=asNode(commandProNavigationHtml());
   links.open=opened.navigation;
   const mode=$('.v10-mode-banner',view);
+  if(model.degradedAuthority)decision.setAttribute('data-command-degraded','');
   if(model.urgent){
+    mode.insertAdjacentElement('afterend',decision);
+    decision.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+  }else if(model.degradedAuthority){
     mode.insertAdjacentElement('afterend',decision);
     decision.insertAdjacentElement('afterend',portfolio);
     portfolio.insertAdjacentElement('afterend',health);
@@ -907,7 +912,7 @@ function renderCommand(force=false){
     portfolio.insertAdjacentElement('afterend',health);
     health.insertAdjacentElement('afterend',decision);
   }
-  (model.urgent?health:decision).insertAdjacentElement('afterend',risks);
+  (model.urgent?health:model.degradedAuthority?health:decision).insertAdjacentElement('afterend',risks);
   risks.insertAdjacentElement('afterend',links);
   const source=asNode(commandDataDisclosure()),summary=$('summary',source);
   source.open=opened.source;
@@ -1942,7 +1947,7 @@ function writeLocalVisualQaReport(cfg){
   const stage2AssetDetailGuardAboveNav=cfg.view!=='asset-detail'||cfg.scroll>0||(()=>{const guard=active.querySelector('.asset-detail-accounting-guard'),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;if(!guard||!visualQaVisible(guard))return false;const r=guard.getBoundingClientRect();return r.top>=0&&r.bottom<=navTop})();
   const commandHubCards=active.querySelectorAll('.command-hub-card').length,commandHubInvariant=cfg.view!=='command'||(commandHubCards>=4&&!!active.querySelector('.command-next-decision'));
   const degradedPriorityInvariant=cfg.view!=='command'||cfg.scroll>0||S()?.portfolio?.complete===true||(()=>{const el=active.querySelector('.command-pro-decision')||active.querySelector('.command-next-priority'),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;if(!el)return false;const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=navTop})();
-  const commandFirstViewportInvariant=cfg.view!=='command'||cfg.scroll>0||(()=>{const hero=active.querySelector('.command-first-portfolio')||active.querySelector('.command-portfolio-hero'),health=active.querySelector('.command-pro-health')||active.querySelector('.command-health-summary'),next=active.querySelector('.command-pro-decision')||active.querySelector('.command-next-decision');if(!hero||!health||!next)return false;const hr=hero.getBoundingClientRect(),sr=health.getBoundingClientRect(),nr=next.getBoundingClientRect(),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;return next.classList.contains('tone-danger')?(nr.top<=hr.top&&hr.top<=sr.top&&nr.top>=0&&nr.bottom<=navTop):(hr.top<=sr.top&&sr.top<=nr.top&&nr.top>=0&&nr.bottom<=navTop)})();
+  const commandFirstViewportInvariant=cfg.view!=='command'||cfg.scroll>0||(()=>{const hero=active.querySelector('.command-first-portfolio')||active.querySelector('.command-portfolio-hero'),health=active.querySelector('.command-pro-health')||active.querySelector('.command-health-summary'),next=active.querySelector('.command-pro-decision')||active.querySelector('.command-next-decision');if(!hero||!health||!next)return false;const hr=hero.getBoundingClientRect(),sr=health.getBoundingClientRect(),nr=next.getBoundingClientRect(),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;return next.classList.contains('tone-danger')?(nr.top<=hr.top&&hr.top<=sr.top&&nr.top>=0&&nr.bottom<=navTop):next.hasAttribute('data-command-degraded')?(nr.top<=hr.top&&hr.top<=sr.top&&nr.top>=0&&nr.bottom<=navTop):(hr.top<=sr.top&&sr.top<=nr.top&&nr.top>=0&&nr.bottom<=navTop)})();
   const commandDiagnosticsCollapsed=cfg.view!=='command'||[...active.querySelectorAll('.command-diagnostics')].every(el=>!el.open);
   const commandRiskSubstatusViolations=cfg.view==='command'?[...active.querySelectorAll('.command-risk-card:not(.pair-tone-safe) .command-liq-substatus .tone-safe')].filter(visualQaVisible).map(el=>(el.textContent||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70)):[],commandRiskSubstatusDominance=commandRiskSubstatusViolations.length===0;
   const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect());let botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
