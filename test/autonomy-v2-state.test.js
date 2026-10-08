@@ -91,3 +91,11 @@ test('base mismatch blocks stale evidence',()=>{
 test('missing expected base fails closed',()=>{assert.throws(()=>transition(task(),ev(STATES.CLAIMED,{expectedBase:undefined})),/STALE_BASE/);});
 test('unclaimed writer cannot operate active task',()=>{assert.throws(()=>transition(task(STATES.CI_CHECK,{writer:null}),ev(STATES.REPAIR)),/MISSING_CLAIMED_WRITER/);});
 test('review green requires matching prior CI evidence',()=>{assert.throws(()=>transition(task(STATES.REVIEW_REQUESTED,{ciEvidence:null}),ev(STATES.REVIEW_GREEN,{review:{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:1}})),/STALE_REVIEW/);});
+
+test('review requires persisted matching CI evidence',()=>{
+ const review={head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:7};
+ const valid=task(STATES.REVIEW_REQUESTED,{ciEvidence:{head:SHA,base:BASE,conclusion:'success',testCount:1}});
+ assert.equal(transition(valid,ev(STATES.REVIEW_GREEN,{review})).state,STATES.REVIEW_GREEN);
+ for(const ciEvidence of [null,{head:BASE,base:BASE},{head:SHA,base:SHA}])
+  assert.throws(()=>transition(task(STATES.REVIEW_REQUESTED,{ciEvidence}),ev(STATES.REVIEW_GREEN,{review})),/STALE_REVIEW/);
+});
