@@ -1,21 +1,9 @@
-// Offline-only deterministic restart fixture. No persistence or dispatch.
+// Actual snapshot/rebuild/replay fixture for deterministic crash simulation.
 import {createOfflineStore} from './autonomy-v2-offline-store.mjs';
-export function replayRestart(initial, operations) {
-  if (!Array.isArray(operations)) throw Error('INVALID_OPERATIONS');
-  const store=createOfflineStore(initial);
-  const results=[];
-  for (const operation of operations) {
-    if (!operation || operation.type!=='CLAIM') {
-      results.push({ok:false,reason:'UNSUPPORTED_OPERATION'});
-      break;
-    }
-    if (!operation.args || typeof operation.args !== 'object' || Array.isArray(operation.args)) {
-      results.push({ok:false,reason:'INVALID_CLAIM'});
-      break;
-    }
-    const result=store.claim(operation.args);
-    results.push({ok:result.ok,reason:result.reason??'CLAIMED'});
-    if (!result.ok) break;
-  }
-  return Object.freeze({results:Object.freeze(results),audit:store.audit()});
+const METHODS=Object.freeze({CLAIM:'claim',MARK_RECOVERY:'markRecovery',REQUEUE:'reconcileToQueue',COMPLETE:'complete'});
+export function replayRestart(initial,operations,{crashAfter=Number.POSITIVE_INFINITY}={}){
+  if(!Array.isArray(operations)||!(Number.isSafeInteger(crashAfter)||crashAfter===Number.POSITIVE_INFINITY)||crashAfter<0)throw Error('INVALID_OPERATIONS');
+  let store=createOfflineStore(initial),applied=0,restarts=0;const results=[];
+  for(const operation of operations){if(applied===crashAfter){store=createOfflineStore(store.snapshotAll());restarts++;}const method=operation&&METHODS[operation.type];if(!method){results.push({ok:false,reason:'UNSUPPORTED_OPERATION'});break;}const value=store[method](operation.args);results.push({ok:value.ok,reason:value.reason});if(!value.ok)break;applied++;}
+  return Object.freeze({results:Object.freeze(results),audit:store.audit(),snapshot:store.snapshotAll(),restarts});
 }
