@@ -58,3 +58,6 @@ Exact workflow triggers, token permissions, quota ceilings, allowed task classes
 
 ## Synthetic coordinator
 `autonomy-v2-coordinator.mjs` composes offline claim eligibility, evidence validation and replay planning, with no I/O or dispatch. It is **not** an authenticated GitHub adapter: its `verifiedSnapshot` argument is caller-controlled. A production boundary must construct that object from authenticated GitHub API reads and enforce identity, fresh head/base and single-writer lease atomically. The pure `transition()` function remains directly callable; callers must not bypass coordinator checks in any future operational integration. No operational approval is implied.
+
+## Final review blocker register
+Before any Phase-1 operational adapter: prohibit direct unguarded `transition()` use for CLAIMED and REVIEW_GREEN; require trusted atomic lease/budget verification and authenticated GitHub review evidence at the enforcement boundary. Synthetic planner functions do not provide this security. Map real mailbox verdict vocabulary explicitly, bind review to request ID and CI run ID, and recheck live head/base before HUMAN_GATE. Current prototype is not approved for dispatch. These are release blockers, not optional optimizations.
