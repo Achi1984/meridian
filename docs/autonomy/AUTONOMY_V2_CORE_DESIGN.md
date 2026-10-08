@@ -49,3 +49,6 @@ Rollback: disable new dispatch path, preserve journal, stop new claims, reconcil
 
 ## Required Product Owner decisions before Phase 2
 Exact workflow triggers, token permissions, quota ceilings, allowed task classes, branch protections, watchdog cadence and recovery owner. Any production release or merge remains a separate gate.
+
+## Synthetic dry-run extension
+`scripts/autonomy-v2-simulate.mjs` and `scripts/autonomy-v2-guards.mjs` are pure offline helpers with synthetic fixtures only. A `source: github-api-verified` string is **not** proof of API authentication; no network adapter exists. Lease reconciliation and budget decisions are advisory test models, not durable locks, token spending guards or operational authorization. Do not dispatch tasks or treat these functions as sufficient for Phase 2. Phase-1 implementation still requires a durable atomic store, real trusted evidence retrieval, authenticated actor checks, replay compaction and explicit Product Owner approval for any operational changes.
