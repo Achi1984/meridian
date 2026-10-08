@@ -12,7 +12,8 @@ export function createOfflineStore(initial = []) {
         (item.state === 'QUEUED' && (item.lease != null || item.writer != null)) ||
         (item.state === 'CLAIMED' && (!item.lease || typeof item.writer !== 'string' || !item.writer ||
           item.lease.owner !== item.writer || item.lease.fence !== item.revision ||
-          !Number.isSafeInteger(item.lease.expiresAt) || item.budget.used < 1))) throw Error('INVALID_RESTORED_TASK');
+          !Number.isSafeInteger(item.lease.expiresAt) || item.lease.expiresAt < 1 ||
+          !Array.isArray(item.applied) || item.applied.length < 1 || item.budget.used < 1))) throw Error('INVALID_RESTORED_TASK');
     tasks.set(item.taskId, structuredClone(item));
   }
   const audit = [];
@@ -23,7 +24,7 @@ export function createOfflineStore(initial = []) {
   function claim({taskId, writer, revision, head, base, now, ttl, opId}) {
     const t = tasks.get(taskId);
     if (!t) return {ok:false,reason:'UNKNOWN_TASK'};
-    if (typeof writer !== 'string' || !writer.trim() || typeof opId !== 'string' || !opId.trim() || !Number.isSafeInteger(now) || !Number.isSafeInteger(ttl) || ttl <= 0) return {ok:false,reason:'INVALID_CLAIM'};
+    if (typeof writer !== 'string' || !writer.trim() || typeof opId !== 'string' || !opId.trim() || !Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(ttl) || ttl <= 0) return {ok:false,reason:'INVALID_CLAIM'};
     if (t.applied?.includes(opId)) return {ok:false,reason:'OP_ID_SEEN'};
     if (t.revision !== revision || t.head !== head || t.base !== base) return {ok:false,reason:'STALE_CAS'};
     if (t.state !== 'QUEUED') return {ok:false,reason:'NOT_QUEUED'};
