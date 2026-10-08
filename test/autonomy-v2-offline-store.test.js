@@ -16,10 +16,15 @@ test('CAS, duplicate delivery and a second writer fail without mutation',()=>{
 test('operation ids are globally unique across tasks and restore',()=>{
  const s=createOfflineStore([fixture(),fixture('T2')]);assert.equal(s.claim(args()).ok,true);
  assert.equal(s.claim(args({taskId:'T2',opId:'op1'})).reason,'OP_ID_COLLISION');
- assert.throws(()=>createOfflineStore([fixture('A',{operations:[{opId:'same',kind:'NOTE',units:0}]}),fixture('B',{operations:[{opId:'same',kind:'NOTE',units:0}]})]),/DUPLICATE_GLOBAL_OP_ID/);
+ const a=createOfflineStore([fixture('A')]),b=createOfflineStore([fixture('B')]);
+ a.claim(args({taskId:'A',opId:'same'}));b.claim(args({taskId:'B',opId:'same'}));
+ assert.throws(()=>createOfflineStore([...a.snapshotAll(),...b.snapshotAll()]),/DUPLICATE_GLOBAL_OP_ID/);
 });
 test('restored budget is reconciled from charge ledger, not operation count',()=>{
- const valid=fixture('T',{budget:{limit:5,used:2},operations:[{opId:'charge',kind:'IO',units:2},{opId:'free',kind:'NOTE',units:0}]});
+ const s=createOfflineStore([fixture('T')]);s.claim(args({taskId:'T'}));
+ s.markRecovery({taskId:'T',revision:1,fence:1,now:120,opId:'recover'});
+ s.reconcileToQueue({taskId:'T',revision:2,fence:1,opId:'queue'});
+ const valid=s.claim(args({taskId:'T',revision:3,opId:'claim2'})).task;
  assert.equal(createOfflineStore([valid]).snapshot('T').budget.used,2);
  assert.throws(()=>createOfflineStore([{...valid,budget:{limit:5,used:1}}]),/INVALID_RESTORED_TASK/);
 });
