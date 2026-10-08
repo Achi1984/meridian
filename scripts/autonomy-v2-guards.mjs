@@ -5,7 +5,7 @@ export function assessClaim(task, proposal) {
   if (!proposal.writer || typeof proposal.writer !== 'string') return Object.freeze({allow:false,reason:'MISSING_WRITER'});
   if (task.lease && (!Number.isSafeInteger(task.lease.expiresAt) || !task.lease.owner)) return Object.freeze({allow:false,reason:'INVALID_LEASE'});
   if (task.lease?.owner && task.lease.owner !== proposal.writer) return Object.freeze({allow:false,reason:'RECONCILE_LEASE_FIRST'});
-  if (task.lease && task.lease.expiresAt <= proposal.now) return Object.freeze({allow:false,reason:'RECONCILE_LEASE_FIRST'});
+  if (task.lease) return Object.freeze({allow:false,reason:'RECONCILE_LEASE_FIRST'});
   const budget=task.budget;
   if (!budget || !Number.isSafeInteger(budget.limit) || !Number.isSafeInteger(budget.used) || budget.limit < 0 || budget.used < 0 || budget.used >= budget.limit)
     return Object.freeze({allow:false,reason:'BUDGET_EXHAUSTED'});
