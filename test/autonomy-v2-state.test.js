@@ -23,12 +23,12 @@ test('invalid transition and missing operation id fail closed',()=>{
 });
 test('CI exact head evidence required before review',()=>{
  assert.throws(()=>transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED)),/CI_NOT_GREEN/);
- assert.equal(transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED,{ci:{runId:123,head:SHA,conclusion:'success',testCount:10}})).state,STATES.REVIEW_REQUESTED);
+ assert.equal(transition(task(STATES.CI_CHECK,{writer:'lead'}),ev(STATES.REVIEW_REQUESTED,{ci:{runId:123,head:SHA,base:BASE,conclusion:'success',testCount:10}})).state,STATES.REVIEW_REQUESTED);
 });
 test('review is bound to exact head and base',()=>{
  const t=task(STATES.REVIEW_REQUESTED,{writer:'lead'});
  assert.throws(()=>transition(t,ev(STATES.REVIEW_GREEN,{review:{head:BASE,base:BASE,verdict:'GREEN_LIGHT'}})),/STALE_REVIEW/);
- assert.equal(transition(t,ev(STATES.REVIEW_GREEN,{review:{head:SHA,base:BASE,verdict:'GREEN_LIGHT'}})).state,STATES.REVIEW_GREEN);
+ assert.equal(transition(t,ev(STATES.REVIEW_GREEN,{review:{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:123}})).state,STATES.REVIEW_GREEN);
 });
 test('repair attempts are bounded to three',()=>{
  for(let n=0;n<3;n++)assert.equal(transition(task(STATES.CI_CHECK,{attempts:n,writer:'lead'}),ev(STATES.REPAIR)).attempts,n+1);
@@ -53,7 +53,7 @@ test('repair updates head with CAS and clears stale evidence',()=>{
 });
 test('CI evidence must match exact head and nonzero test count',()=>{
  const t=task(STATES.CI_CHECK,{writer:'lead'});
- for(const ci of [{runId:1,head:BASE,conclusion:'success',testCount:10},{runId:1,head:SHA,conclusion:'failure',testCount:10},{runId:1,head:SHA,conclusion:'success',testCount:0}])
+ for(const ci of [{runId:1,head:BASE,base:BASE,conclusion:'success',testCount:10},{runId:1,head:SHA,base:BASE,conclusion:'failure',testCount:10},{runId:1,head:SHA,base:BASE,conclusion:'success',testCount:0},{runId:1,head:SHA,base:SHA,conclusion:'success',testCount:10}])
  assert.throws(()=>transition(t,ev(STATES.REVIEW_REQUESTED,{ci})),/CI_NOT_GREEN/);
 });
 test('supervisor can block with reason but cannot impersonate writer',()=>{
@@ -76,4 +76,10 @@ test('old operation ID cannot be replayed after intervening operations',()=>{
 });
 test('malformed operation journal is rejected',()=>{
  assert.throws(()=>transition(task(STATES.QUEUED,{opIds:'invalid'}),ev(STATES.CLAIMED)),/INVALID_JOURNAL/);
+});
+
+test('reviewer identity and comment id are mandatory',()=>{
+ const t=task(STATES.REVIEW_REQUESTED,{writer:'lead'});
+ for(const review of [{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'OTHER',commentId:1},{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:0}])
+ assert.throws(()=>transition(t,ev(STATES.REVIEW_GREEN,{review})),/STALE_REVIEW/);
 });
