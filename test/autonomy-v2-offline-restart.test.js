@@ -16,3 +16,19 @@ test('unknown operation stops safely',()=>{
  const result=replayRestart([task],[{type:'DELETE',args}]);
  assert.equal(result.results[0].reason,'UNSUPPORTED_OPERATION');assert.equal(result.audit.length,0);
 });
+
+test('missing claim arguments fail closed without mutation',()=>{
+ const result=replayRestart([task],[{type:'CLAIM'}]);
+ assert.deepEqual(result.results,[{ok:false,reason:'INVALID_CLAIM'}]);
+ assert.equal(result.audit.length,0);
+});
+test('non-string operation identity fails closed',()=>{
+ const result=replayRestart([task],[{type:'CLAIM',args:{...args,opId:1}}]);
+ assert.equal(result.results[0].reason,'INVALID_CLAIM');
+ assert.equal(result.audit.length,0);
+});
+test('non-string writer fails closed',()=>{
+ const result=replayRestart([task],[{type:'CLAIM',args:{...args,writer:{}}}]);
+ assert.equal(result.results[0].reason,'INVALID_CLAIM');
+ assert.equal(result.audit.length,0);
+});
