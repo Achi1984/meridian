@@ -52,3 +52,6 @@ Exact workflow triggers, token permissions, quota ceilings, allowed task classes
 
 ## Synthetic dry-run extension
 `scripts/autonomy-v2-simulate.mjs` and `scripts/autonomy-v2-guards.mjs` are pure offline helpers with synthetic fixtures only. A `source: github-api-verified` string is **not** proof of API authentication; no network adapter exists. Lease reconciliation and budget decisions are advisory test models, not durable locks, token spending guards or operational authorization. Do not dispatch tasks or treat these functions as sufficient for Phase 2. Phase-1 implementation still requires a durable atomic store, real trusted evidence retrieval, authenticated actor checks, replay compaction and explicit Product Owner approval for any operational changes.
+
+## Offline recovery prototype
+`autonomy-v2-recovery.mjs` compares synthetic local/remote snapshots and an operation intent, returns `ALREADY_APPLIED`, `BLOCK`, or `RETRY_ELIGIBLE` without writing anything, and summarizes synthetic audit counters. These results are **advisory**, not authoritative remote reconciliation: a real adapter must atomically reread trusted remote head, base, writer lease and operation journal immediately before any mutation, and fence concurrent writers. No persistence, authenticated GitHub adapter or production dispatch is provided.
