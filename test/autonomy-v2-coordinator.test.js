@@ -13,7 +13,7 @@ test('coordinator refuses expired lease without reconciliation',()=>{
  assert.equal(planClaim({...task(),lease:{owner:'lead',expiresAt:99}},claim()).reason,'RECONCILE_LEASE_FIRST');
 });
 test('review planner refuses caller assertion without verified snapshot',()=>{
- const t={...task(),state:STATES.REVIEW_REQUESTED,writer:'lead',ciEvidence:{head,base}};
+ const t={...task(),state:STATES.REVIEW_REQUESTED,writer:'lead',ciEvidence:{head,base,conclusion:'success',testCount:1}};
  const ev={...claim(),review:{head,base,reviewer:'CLAUDE',commentId:5,verdict:'GREEN_LIGHT'}};
  assert.equal(planReview(t,ev,null).ok,false);
 });
