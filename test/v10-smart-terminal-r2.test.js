@@ -52,7 +52,14 @@ test('v10 command places critical asset and guarded next action ahead of legacy 
   }else{
     assert.match(js,/LIVE RISK PRIORITY/);
   }
-  assert.match(js,/Liquidation.*(?:Teilstatus|Substatus)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    assert.match(js,/matchedRows\(critical\.symbol\)\.length/);
+    assert.match(js,/PORTFOLIO-VOLLSTÄNDIGKEIT PRÜFEN/);
+    assert.match(js,/BOT-DATEN PRÜFEN/);
+    assert.match(js,/MARKTDATEN PRÜFEN/);
+  }else{
+    assert.match(js,/Liquidation.*(?:Teilstatus|Substatus)/);
+  }
   assert.match(js,/KEINE AKTION · DATEN PRÜFEN/);
   assert.match(js,/LIQ-PUFFER PRÜFEN/);
   assert.match(js,/PROFIT LOCK PRÜFEN/);
