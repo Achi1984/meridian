@@ -32,7 +32,7 @@ test('review is bound to exact head and base',()=>{
 });
 test('repair attempts are bounded to three',()=>{
  for(let n=0;n<3;n++)assert.equal(transition(task(STATES.CI_CHECK,{attempts:n,writer:'lead'}),ev(STATES.REPAIR)).attempts,n+1);
- assert.throws(()=>transition(task(STATES.CI_CHECK,{attempts:3,writer:'lead'}),ev(STATES.REPAIR)),/REPAIR_BUDGET_EXHAUSTED/);
+ assert.equal(transition(task(STATES.CI_CHECK,{attempts:3,writer:'lead'}),ev(STATES.REPAIR)).state,STATES.BLOCKED);
 });
 test('human gate is terminal, not auto-approved',()=>{
  assert.throws(()=>transition(task(STATES.HUMAN_GATE,{writer:'lead'}),ev(STATES.CLAIMED)),/INVALID_TRANSITION/);
@@ -82,4 +82,8 @@ test('reviewer identity and comment id are mandatory',()=>{
  const t=task(STATES.REVIEW_REQUESTED,{writer:'lead'});
  for(const review of [{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'OTHER',commentId:1},{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:0}])
  assert.throws(()=>transition(t,ev(STATES.REVIEW_GREEN,{review})),/STALE_REVIEW/);
+});
+
+test('base mismatch blocks stale evidence',()=>{
+ assert.throws(()=>transition(task(),ev(STATES.CLAIMED,{expectedBase:SHA})),/STALE_BASE/);
 });
