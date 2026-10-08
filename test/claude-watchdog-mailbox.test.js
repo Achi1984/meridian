@@ -42,7 +42,7 @@ function runScript(name) {
 
 // Product-owner hourly-only rule supersedes the old R129 event-driven trigger.
 test('Watchdog: hourly :57 plus manual dispatch only, no event-driven trigger',()=>{
-  const trigger=WORKFLOW.slice(WORKFLOW.indexOf('\\non:'),WORKFLOW.indexOf('\\npermissions:'));
+  const trigger=WORKFLOW.slice(WORKFLOW.indexOf('\non:'),WORKFLOW.indexOf('\npermissions:'));
   assert.match(trigger,/schedule:\\n\\s+- cron: '57 \\* \\* \\* \\*'/);
   assert.match(trigger,/workflow_dispatch:/);
   assert.equal((trigger.match(/cron:/g)||[]).length,1);
