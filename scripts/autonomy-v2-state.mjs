@@ -20,6 +20,11 @@ export function transition(task,event){
  if(!validSha(event.expectedBase)||event.expectedBase!==task.base)throw Error('STALE_BASE');
  if(!transitions[task.state]?.includes(event.to))throw Error('INVALID_TRANSITION');
  if(task.state!==STATES.QUEUED&&task.state!==STATES.BLOCKED&&(!task.writer||typeof task.writer!=='string'))throw Error('MISSING_CLAIMED_WRITER');
+ if(event.to===STATES.CLAIMED){
+  if(!task.budget||!Number.isSafeInteger(task.budget.limit)||!Number.isSafeInteger(task.budget.used)||task.budget.used<0||task.budget.used>=task.budget.limit)throw Error('CLAIM_BUDGET_NOT_VERIFIED');
+  if(!Number.isSafeInteger(event.now)||event.now<0||task.lease)throw Error('CLAIM_LEASE_RECONCILIATION_REQUIRED');
+ }
+ if(event.to===STATES.REVIEW_GREEN&&event.verifiedSynthetic!==true)throw Error('REVIEW_VERIFICATION_REQUIRED');
  if(event.to==='CLAIMED'&&(!event.writer||task.writer&&task.writer!==event.writer))throw Error('WRITER_CONFLICT');
  if(task.writer&&event.writer!==task.writer&&event.to!==STATES.BLOCKED)throw Error('WRITER_CONFLICT');
  if(event.to===STATES.BLOCKED&&(!event.reason||typeof event.reason!=='string'))throw Error('BLOCK_REASON_REQUIRED');
