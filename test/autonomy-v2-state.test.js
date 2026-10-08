@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transition,STATES} from '../scripts/autonomy-v2-state.mjs';
 const SHA='a'.repeat(40),BASE='b'.repeat(40);
-const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,writer:null,...overrides});
-const ev=(to,overrides={})=>({to,expectedRevision:0,expectedHead:SHA,opId:'op-1',writer:'lead',...overrides});
+const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,writer:state===STATES.QUEUED?null:'lead',ciEvidence:state===STATES.REVIEW_REQUESTED?{head:SHA,base:BASE}:null,...overrides});
+const ev=(to,overrides={})=>({to,expectedRevision:0,expectedHead:SHA,expectedBase:BASE,opId:'op-1',writer:'lead',...overrides});
 test('claim and implement require a consistent single writer',()=>{
  const claimed=transition(task(),ev(STATES.CLAIMED));
  assert.equal(claimed.writer,'lead');
@@ -87,3 +87,7 @@ test('reviewer identity and comment id are mandatory',()=>{
 test('base mismatch blocks stale evidence',()=>{
  assert.throws(()=>transition(task(),ev(STATES.CLAIMED,{expectedBase:SHA})),/STALE_BASE/);
 });
+
+test('missing expected base fails closed',()=>{assert.throws(()=>transition(task(),ev(STATES.CLAIMED,{expectedBase:undefined})),/STALE_BASE/);});
+test('unclaimed writer cannot operate active task',()=>{assert.throws(()=>transition(task(STATES.CI_CHECK,{writer:null}),ev(STATES.REPAIR)),/MISSING_CLAIMED_WRITER/);});
+test('review green requires matching prior CI evidence',()=>{assert.throws(()=>transition(task(STATES.REVIEW_REQUESTED,{ciEvidence:null}),ev(STATES.REVIEW_GREEN,{review:{head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:1}})),/STALE_REVIEW/);});
