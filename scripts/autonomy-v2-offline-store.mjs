@@ -1,14 +1,11 @@
 // In-memory, deterministic Phase-1B laboratory only. No disk, network or dispatch.
 import {planOfflineRecovery} from './autonomy-v2-offline-recovery.mjs';
+import {isOfflineDataRecord as record} from './autonomy-v2-offline-data.mjs';
 const SHA=/^[0-9a-f]{40}$/;
 const STATES=new Set(['QUEUED','CLAIMED','RECOVERY_PENDING','COMPLETED','FAILED']);
 const clone=value=>structuredClone(value);
 const result=(ok,reason,task)=>Object.freeze({ok,reason,...(task?{task:clone(task)}:{})});
 // Snapshots are plain data. Reject inherited fields, accessors and schema extensions.
-const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&
-  [Object.prototype,null].includes(Object.getPrototypeOf(value))&&
-  Reflect.ownKeys(value).every(key=>typeof key==='string'&&Object.getOwnPropertyDescriptor(value,key).enumerable&&
-    Object.hasOwn(Object.getOwnPropertyDescriptor(value,key),'value'));
 const schema=(value,required,optional=[])=>record(value)&&required.every(key=>Object.hasOwn(value,key))&&
   Object.keys(value).every(key=>required.includes(key)||optional.includes(key));
 const text=value=>typeof value==='string'&&value.trim().length>0;

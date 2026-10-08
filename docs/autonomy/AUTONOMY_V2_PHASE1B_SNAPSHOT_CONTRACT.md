@@ -4,6 +4,33 @@ This contract addresses Claude's `CHANGES_REQUIRED` review of PR #611, mailbox
 #571 comment 6065144005, at head `548ba776392cb05447487dfd88288237adbb60d6`.
 It applies only to the in-memory laboratory. It grants no operational authority.
 
+## Consolidation decision
+
+The implementation follows PR #613 comment 6067930276. Both complete five-file
+deltas were compared against their common #611 base. The canonical patch is #613
+at `b2966239d777df06b3f2cfe9435c87211923bb53`, whose formal Claude review is
+6067845479. PR #612 at `a8b5eadc573dd438b04a9902d41a3f6f3dbe1dbe` is an
+alternative with different API and snapshot semantics. This consolidation is a
+new Draft stacked on #613; it does not merge, close or modify either predecessor.
+The earlier GREEN is evidence about its old head, not approval of this new head.
+
+| Concern | #612 | Selected contract |
+| --- | --- | --- |
+| Recovery clock | Safe nonnegative integer | Same validation already exists in #613; now tested across all recovery states |
+| Completion after expiry | Required clock and rejection at expiry | #613 advisory expiry until explicit recovery revokes the writer; offline only |
+| Snapshot ledger | Additional writer/clock metadata, consecutive fences | #613 four-field ledger, increasing CLAIM fences and nextFence above all history; existing valid #613 fixtures retained |
+| Audit returned by restart | Aggregates all simulation epochs | Current process epoch only, matching store audit |
+| Recovery inspection | Caller CAS | Named Phase-1A waiting/expiry/stale-CAS cases carried forward |
+| Crash after final operation | Neither harness rebuilt at that boundary | Rebuild exactly once, including an empty list and terminal outcomes |
+
+The recovery planner has the identical source blob
+`f1a69e3295606ef63f48da995e450bb599d54207` at both old heads. No missing clock
+validation was imported or claimed. Additional regression cases exercise unsafe
+clock inputs, the last safe clock, near-exhausted fences, quota precedence and
+rejected-ID retry. A shared plain-data guard now rejects malformed, inherited or
+accessor-bearing planner contexts, restart options and operation wrappers before
+reading their values. This follows #613's stricter own-data-field checks.
+
 ## Restore and replay
 
 A task starts QUEUED at revision zero with an empty operation ledger. Every
@@ -32,6 +59,12 @@ fields. Unknown kinds, extensions, inherited fields, accessors, invalid counters
 duplicate IDs and illegal transitions fail closed. Invalid legacy fixtures using
 NOTE or IO charges are rejected rather than silently migrated.
 
+The input boundary is serialized JSON or equivalent plain data records, including
+null-prototype records. Hostile executable JavaScript proxies are outside this
+contract: reflective operations may invoke proxy traps. A durable adapter must
+parse serialized input at a trusted boundary rather than accept arbitrary live
+objects. The plain-data guard does not provide an execution sandbox.
+
 The ledger contains operation ID, kind, units and fence. It does not reconstruct
 historical writer identities or timestamps. These are validated fields of the
 current lease, not authenticated evidence. There is no protection against an
@@ -59,8 +92,13 @@ side-effect boundary before any dispatch is authorized.
 `audit()` is process-local and resets on rebuild. `snapshotAll()` retains the
 operation ledger and replay index authority for the fixture. `replayRestart`
 returns the current process's audit, not a merged pre-crash audit. It simulates one
-crash between accepted operations, including before the first operation; it does
-not model a crash inside an atomic durable write or real concurrent processes.
+crash at the selected boundary of accepted operations, including before the first
+and after the final operation. `crashAfter: 0` rebuilds an empty operation list once.
+`crashAfter: operations.length` rebuilds after all operations succeed, leaving an
+empty current-epoch audit and an intact snapshot/replay index. An index above the
+number of accepted operations, or the default Infinity, produces no restart.
+Rejected operations do not advance that counter. The harness does not model a
+crash inside an atomic durable write or real concurrent processes.
 
 ## Verification
 
