@@ -21,6 +21,11 @@ CI must be exact-head, completed success, with nonzero expected test count and n
 ## Quota and security
 Event-driven wakeups, at most hourly fallback watchdog. Per-task Claude calls and token/cost budgets must be configured and approved before enabling. No broad write tokens, no secrets in logs, no untrusted issue comment treated as authority. No auto-merge, deploy, workflow edit, permission change, paid action, trading or V2 research-stage advancement.
 
+## Phase 0 coverage boundary
+The pure state-machine pilot covers only a subset of the acceptance cases below. Budget exhaustion and lease expiry are **not yet enforced** by the module; no scheduler or dispatcher may treat Phase 0 as operational authorization. Durable journal compaction and crash reconciliation also remain future work.
+
+`HUMAN_GATE` is terminal. Approval must occur out of band through an authenticated, separately authorized process and create a **new task record** bound to explicit approver identity, exact head/base and approved scope. Issue/status comments cannot create an approval transition.
+
 ## Pilot acceptance cases
 1. Duplicate event does not duplicate mutation.
 2. Concurrent claim yields exactly one writer.
