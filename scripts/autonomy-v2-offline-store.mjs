@@ -39,10 +39,10 @@ export function createOfflineStore(initial = []) {
     audit.push(Object.freeze({taskId,opId,revision:next.revision,action:'CLAIMED'}));
     return {ok:true,task:structuredClone(next)};
   }
-  function inspectExpired(taskId,now) {
+  function inspectExpired(taskId,now,expectedRevision,expectedFence) {
     const t=tasks.get(taskId);
     if (!t || !Number.isSafeInteger(now)) return {action:'BLOCK',reason:'INVALID_INSPECTION'};
-    const decision=planOfflineRecovery(t,{now,expectedRevision:t.revision,expectedFence:t.lease?.fence});
+    const decision=planOfflineRecovery(t,{now,expectedRevision,expectedFence});
     if (decision.action==='WAIT' || decision.action==='NO_ACTION') return {action:'NO_ACTION'};
     if (decision.action==='HUMAN_RECONCILIATION_REQUIRED')
       return {action:'RECONCILE_REQUIRED',fence:decision.fence};
