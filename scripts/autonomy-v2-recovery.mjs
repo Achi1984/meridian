@@ -2,7 +2,7 @@
 export function reconcileSnapshot(local, remote, intent) {
   if (!local || !remote || !intent || !Number.isSafeInteger(local.revision) || !Number.isSafeInteger(remote.revision))
     return Object.freeze({action:'BLOCK',reason:'INVALID_SNAPSHOT'});
-  if (local.taskId !== remote.taskId || local.base !== remote.base)
+  if (typeof local.taskId !== 'string' || !local.taskId.trim() || typeof remote.taskId !== 'string' || !remote.taskId.trim() || local.taskId !== remote.taskId || local.base !== remote.base)
     return Object.freeze({action:'BLOCK',reason:'IDENTITY_OR_BASE_CHANGED'});
   if (!Array.isArray(remote.opIds) || remote.opIds.some(x=>typeof x!=='string'))
     return Object.freeze({action:'BLOCK',reason:'UNTRUSTED_REMOTE_JOURNAL'});
