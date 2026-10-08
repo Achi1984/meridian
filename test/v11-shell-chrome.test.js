@@ -21,7 +21,9 @@ body:document.body.scrollWidth,root:document.documentElement.scrollWidth});
 }return x;})()`;
 test('V11 Chrome CDP: true 320/375/390/430 mobile layout and navigation',{timeout:120000},async()=>{
 if(typeof WebSocket!=='function'){
- const child=spawnSync(process.execPath,['--experimental-websocket','--test',fileURLToPath(import.meta.url)],{encoding:'utf8',timeout:115000,env:{...process.env,V11_CDP_CHILD:'1'}});
+ const childEnv={...process.env,V11_CDP_CHILD:'1'};
+ delete childEnv.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{encoding:'utf8',timeout:115000,env:childEnv});
  assert.equal(child.status,0,'WebSocket-enabled Node child failed: '+String(child.stdout).slice(-1200)+' '+String(child.stderr).slice(-1200));
  const evidence=String(child.stdout).split('\n').filter(line=>line.includes('V11_CDP_WIDTH'));
  console.log('V11_CDP_CHILD_OUTPUT',String(child.stdout).slice(-1600));
