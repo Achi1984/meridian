@@ -4,7 +4,7 @@ import {planClaim,planReview,planResume} from '../scripts/autonomy-v2-coordinato
 import {STATES} from '../scripts/autonomy-v2-state.mjs';
 const head='a'.repeat(40),base='b'.repeat(40);
 const task=()=>({state:STATES.QUEUED,revision:0,attempts:0,head,base,writer:null,budget:{limit:2,used:0},opIds:[]});
-const claim=()=>({now:100,expectedRevision:0,expectedHead:head,expectedBase:base,opId:'claim-1',writer:'lead'});
+const claim=()=>({now:100,expectedRevision:0,expectedHead:head,expectedBase:base,opId:'claim-1',writer:'lead',verifiedSynthetic:true});
 test('coordinator claim respects quota and state CAS',()=>{
  assert.equal(planClaim(task(),claim()).next.state,STATES.CLAIMED);
  assert.equal(planClaim({...task(),budget:{limit:1,used:1}},claim()).reason,'BUDGET_EXHAUSTED');
