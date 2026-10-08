@@ -20,7 +20,7 @@ export async function withMobileChrome(chrome,width,url,probe){
   if(!port)throw Error('Chrome DevTools startup timeout');
   const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
   const page=targets.find(x=>x.type==='page');if(!page)throw Error('No Chrome page target');
-  if(typeof WebSocket!=='function')throw Error('Node WebSocket unavailable');
+  if(typeof WebSocket!=='function')throw Error('Node WebSocket unavailable; run Node with --experimental-websocket');
   ws=new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{
    ws.addEventListener('open',resolve,{once:true});
