@@ -90,6 +90,39 @@ async function commandProbe(){
     const buttonsAccessible=targets.length>0&&targetSizes.every(h=>h>=44);
     const mode=new URLSearchParams(location.search).get('qaData')||'fresh';
     const staleGuard=mode!=='stale'||!(/NICHTS ZU TUN/.test(String(decision?.textContent||'')));
+    // Deterministic browser-only verified liquidation fixture. It must exercise
+    // the *real* bot-risk and Command rendering path, not a text/DOM mock.
+    let verifiedLiquidationFirst=false,verifiedAssetNavigation=false;
+    if(mode==='fresh'){
+      const bridge=window.MERIDIAN_V10_BRIDGE,state=bridge?.getState?.(),helpers=bridge?.helpers;
+      const candidate=state?.bots?.find(x=>helpers?.liveMatched?.(x));
+      if(candidate&&helpers?.botFeedFresh?.()){
+        for(const bot of state.bots){bot.sl=0;bot.buffer=35}
+        candidate.buffer=5; // real h.risk() -> LIQ_RISK, no protection override
+        document.querySelector('#nav button[data-v="bots"]')?.click();
+        await sleep(65);
+        document.querySelector('#nav button[data-v="command"]')?.click();
+        await sleep(100);
+        const critical=document.querySelector('#view-command .command-pro-decision');
+        const hero=document.querySelector('#view-command .command-portfolio-hero');
+        const assetButton=critical?.querySelector('[data-command-asset]');
+        const riskRows=[...document.querySelectorAll('#view-command .command-pro-risk-row')];
+        verifiedLiquidationFirst=!!critical?.classList.contains('tone-danger')&&
+          critical.textContent.includes('LIQ-PUFFER PRÜFEN')&&
+          assetButton?.dataset.commandAsset===candidate.symbol&&
+          !!(critical.compareDocumentPosition(hero)&Node.DOCUMENT_POSITION_FOLLOWING)&&
+          riskRows.some(row=>row.textContent.includes(candidate.symbol)&&row.textContent.includes('LIQ RISK'))&&
+          document.querySelectorAll('#view-command [data-command-decision-owner="r132"]').length===1;
+        if(verifiedLiquidationFirst){
+          assetButton.click();await sleep(80);
+          verifiedAssetNavigation=document.querySelector('#view-asset-detail')?.classList.contains('active')===true;
+        }
+      }
+    }
+    const staleUnverified=mode!=='stale'||(
+      !decision?.classList.contains('tone-safe')&&
+      document.querySelector('#view-command .command-pro-health')?.textContent?.includes('UNGEKLÄRT')===true
+    );
     const checks={
       initial:initial.owner===1&&initial.portfolio===1&&initial.portfolioDetails===1&&initial.sources===1&&initial.sourceAuthority===1,
       repeatedRenders:anomalies.length===0&&counts.length>=40,
@@ -101,6 +134,9 @@ async function commandProbe(){
       provenanceCollapsedByDefault:initiallyCollapsed,
       unknownPortfolioNotZero:partialValue,
       criticalDominance:priority,
+      verifiedLiquidationFirst:mode==='fresh'?verifiedLiquidationFirst:true,
+      verifiedAssetNavigation:mode==='fresh'?verifiedAssetNavigation:true,
+      staleUnverified,
       riskRowsBounded:snapshot().riskRows<=3,
       fiveTabs:tabs.join(',')==='command,depot,bots,market,research',
       minimumTouchTarget:buttonsAccessible,
