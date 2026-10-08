@@ -1,6 +1,7 @@
 // MERIDIAN11-CDP-TEST-R1: real mobile layout metrics via Chrome DevTools.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
@@ -18,6 +19,11 @@ visible:[...document.querySelectorAll('.view')].filter(v=>!v.hidden).map(v=>v.id
 current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(v=>v.dataset.v)});
 }return x;})()`;
 test('V11 Chrome CDP: true 320/375/390/430 mobile layout and navigation',{timeout:120000},async()=>{
+if(typeof WebSocket!=='function'){
+ const child=spawnSync(process.execPath,['--experimental-websocket','--test',fileURLToPath(import.meta.url)],{encoding:'utf8',timeout:115000,env:{...process.env,V11_CDP_CHILD:'1'}});
+ assert.equal(child.status,0,'WebSocket-enabled Node child failed: '+String(child.stdout).slice(-1200)+' '+String(child.stderr).slice(-1200));
+ return;
+}
 assert.ok(chrome,'Chrome binary required');
 for(const width of [320,375,390,430]){
  const x=await withMobileChrome(chrome,width,page,probe);
