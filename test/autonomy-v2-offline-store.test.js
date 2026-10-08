@@ -39,3 +39,33 @@ test('returned snapshots cannot mutate store',()=>{
  const s=createOfflineStore([fixture()]);const t=s.snapshot('T1');t.budget.used=99;
  assert.equal(s.snapshot('T1').budget.used,0);
 });
+
+test('snapshot rebuild retains replay protection without double spending',()=>{
+ const s=createOfflineStore([fixture()]);assert.equal(s.claim(args()).ok,true);
+ const restored=createOfflineStore([s.snapshot('T1')]);
+ assert.equal(restored.claim(args()).reason,'OP_ID_SEEN');
+ assert.equal(restored.snapshot('T1').budget.used,1);
+ assert.equal(restored.snapshot('T1').lease.fence,1);
+});
+test('malformed restored states fail closed at construction',()=>{
+ const claimed={...fixture(),state:'CLAIMED',revision:1,writer:'lead',budget:{limit:2,used:1},applied:['op1'],
+   lease:{owner:'lead',fence:1,expiresAt:120}};
+ for(const broken of [
+   {...claimed,lease:null},
+   {...claimed,lease:{...claimed.lease,owner:'other'}},
+   {...claimed,lease:{...claimed.lease,fence:0}},
+   {...claimed,budget:{limit:1,used:2}},
+   {...claimed,applied:['op1','op1']},
+   {...fixture(),lease:claimed.lease},
+   {...fixture(),revision:-1},
+ ]) assert.throws(()=>createOfflineStore([broken]),/INVALID_RESTORED_TASK/);
+});
+test('queued lease requires reconciliation and preserves budget',()=>{
+ const invalid={...fixture(),lease:{owner:'lead',fence:0,expiresAt:120}};
+ assert.throws(()=>createOfflineStore([invalid]),/INVALID_RESTORED_TASK/);
+});
+test('claim rejects lease expiry overflow without charging budget',()=>{
+ const s=createOfflineStore([fixture()]);
+ assert.equal(s.claim(args({now:Number.MAX_SAFE_INTEGER,ttl:20})).reason,'INVALID_CLAIM');
+ assert.equal(s.snapshot('T1').budget.used,0);
+});
