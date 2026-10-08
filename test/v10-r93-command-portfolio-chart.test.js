@@ -49,9 +49,19 @@ test('r93 inserts the portfolio hero before data state and keeps missing authori
   const start=js.indexOf('function renderCommand(force=false)');
   const end=js.indexOf('function assetWatchShareCard()',start);
   const block=js.slice(start,end);
-  assert.match(block,/portfolioBox\.innerHTML=portfolioChartHeroHtml\(\)/);
-  assert.match(block,/insertAdjacentElement\('afterend',portfolioNode\)/);
-  assert.match(block,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 retains canonical hero and puts verified critical danger first.
+    assert.match(block,/portfolio=asNode\(portfolioChartHeroHtml\(\)\)/);
+    assert.match(block,/if\(model\.urgent\)/);
+    assert.match(block,/decision\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(block,/mode\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(block,/portfolio\.insertAdjacentElement\('afterend',health\)/);
+    assert.match(block,/health\.insertAdjacentElement\('afterend',decision\)/);
+  }else{
+    assert.match(block,/portfolioBox\.innerHTML=portfolioChartHeroHtml\(\)/);
+    assert.match(block,/insertAdjacentElement\('afterend',portfolioNode\)/);
+    assert.match(block,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+  }
   assert.doesNotMatch(block,/stateBox\.innerHTML=dataStateStripHtml\('command'\)/);
   assert.match(js,/dataStateStripHtml\('command'\)\+commandDataStrip\(\)/);
   assert.match(js,/AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET/);
