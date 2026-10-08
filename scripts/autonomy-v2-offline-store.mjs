@@ -22,7 +22,7 @@ export function createOfflineStore(initial = []) {
   function claim({taskId, writer, revision, head, base, now, ttl, opId}) {
     const t = tasks.get(taskId);
     if (!t) return {ok:false,reason:'UNKNOWN_TASK'};
-    if (!writer || !opId || !Number.isSafeInteger(now) || !Number.isSafeInteger(ttl) || ttl <= 0) return {ok:false,reason:'INVALID_CLAIM'};
+    if (typeof writer !== 'string' || !writer.trim() || typeof opId !== 'string' || !opId.trim() || !Number.isSafeInteger(now) || !Number.isSafeInteger(ttl) || ttl <= 0) return {ok:false,reason:'INVALID_CLAIM'};
     if (t.applied?.includes(opId)) return {ok:false,reason:'OP_ID_SEEN'};
     if (t.revision !== revision || t.head !== head || t.base !== base) return {ok:false,reason:'STALE_CAS'};
     if (t.state !== 'QUEUED') return {ok:false,reason:'NOT_QUEUED'};
