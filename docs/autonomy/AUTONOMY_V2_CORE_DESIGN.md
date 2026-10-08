@@ -18,6 +18,9 @@ A worker may claim only by atomic compare-and-swap against a durable task revisi
 ## Review / CI
 CI must be exact-head, completed success, with nonzero expected test count and no silently skipped required checks. Claude reviews independently at the same head/base and is read-only except the one response comment. A new commit invalidates review. Limit retries to three repair loops; repeated identical errors should terminate early.
 
+## Phase 1 authenticity and journal prerequisites
+`REVIEW_GREEN` in Phase 0 validates only supplied evidence fields, not GitHub identity. Before any operational adapter emits a review event, it MUST independently retrieve the comment via GitHub API, verify actual author, comment ID, exact head/base, and current PR head. Never trust caller-supplied `reviewer` or `commentId` alone. The durable journal MUST define a bounded retention/compaction policy with an immutable replay index before dispatch; the Phase-0 unbounded in-memory `opIds` is not production-ready.
+
 ## Quota and security
 Event-driven wakeups, at most hourly fallback watchdog. Per-task Claude calls and token/cost budgets must be configured and approved before enabling. No broad write tokens, no secrets in logs, no untrusted issue comment treated as authority. No auto-merge, deploy, workflow edit, permission change, paid action, trading or V2 research-stage advancement.
 
