@@ -1,4 +1,5 @@
 // In-memory, deterministic Phase-1 laboratory only. No disk, GitHub, network or dispatch.
+import {planOfflineRecovery} from './autonomy-v2-offline-recovery.mjs';
 export function createOfflineStore(initial = []) {
   const tasks = new Map();
   for (const item of initial) {
@@ -40,8 +41,11 @@ export function createOfflineStore(initial = []) {
   function inspectExpired(taskId,now) {
     const t=tasks.get(taskId);
     if (!t || !Number.isSafeInteger(now)) return {action:'BLOCK',reason:'INVALID_INSPECTION'};
-    if (!t.lease || t.lease.expiresAt>now) return {action:'NO_ACTION'};
-    return {action:'RECONCILE_REQUIRED',fence:t.lease.fence};
+    const decision=planOfflineRecovery(t,{now,expectedRevision:t.revision,expectedFence:t.lease?.fence});
+    if (decision.action==='WAIT' || decision.action==='NO_ACTION') return {action:'NO_ACTION'};
+    if (decision.action==='HUMAN_RECONCILIATION_REQUIRED')
+      return {action:'RECONCILE_REQUIRED',fence:decision.fence};
+    return {action:'BLOCK',reason:decision.reason};
   }
   return Object.freeze({snapshot,claim,inspectExpired,audit:()=>structuredClone(audit)});
 }
