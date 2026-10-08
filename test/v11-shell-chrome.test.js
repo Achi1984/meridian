@@ -9,10 +9,11 @@ import {fileURLToPath} from 'node:url';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 const page=fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const source=readFileSync(page,'utf8');
-const probe=`<script>
+const probe=`<style>html{width:100%;max-width:100%;}</style><script>
 window.addEventListener('load',()=>{
 document.querySelector('meta[name=viewport]').setAttribute('content','width=device-width,initial-scale=1');
-const out={width:innerWidth,body:document.body.scrollWidth,viewport:document.documentElement.clientWidth,
+const root=document.documentElement;root.style.width='\${width}px';root.style.maxWidth='\${width}px';
+const out={width:root.getBoundingClientRect().width,body:document.body.scrollWidth,viewport:root.getBoundingClientRect().width,
 nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').length};
 for(const b of document.querySelectorAll('#nav button')){
 const label=b.querySelector('span:last-child');const s=getComputedStyle(label);
@@ -40,7 +41,7 @@ for(const width of [320,375,390,430]){
   assert.ok(match,'missing browser measurement '+width);
   const x=JSON.parse(decodeURIComponent(match[1].replaceAll('&amp;','&')));
   console.log('V11_CHROME_WIDTH',width,JSON.stringify(x));
-  assert.equal(x.width,width,'Chrome viewport must match requested mobile width');
+  assert.equal(x.width,width,'Emulated layout viewport must match requested mobile width');
   assert.ok(x.body<=x.viewport+1,'horizontal overflow '+width);
   assert.equal(x.decision,1);
   assert.equal(x.nav.length,5);
