@@ -11,3 +11,5 @@ test('base change blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...
 test('different writer blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),writer:'other'},intent()).reason,'WRITER_CONFLICT'));
 test('malformed remote journal blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),opIds:'new'},intent()).reason,'UNTRUSTED_REMOTE_JOURNAL'));
 test('audit summary counts accepted and rejected events',()=>assert.deepEqual(summarizeSimulation([{revision:1},{rejected:'DUPLICATE_OP_ID'}]),{events:2,accepted:1,rejected:1,duplicateRejects:1}));
+
+test('missing task identity blocks replay',()=>{const t={...local(),taskId:undefined};assert.equal(reconcileSnapshot(t,t,intent()).reason,'IDENTITY_OR_BASE_CHANGED');});
