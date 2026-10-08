@@ -16,12 +16,16 @@ test('CAS, duplicate delivery and a second writer fail without mutation',()=>{
 test('operation ids are globally unique across tasks and restore',()=>{
  const s=createOfflineStore([fixture(),fixture('T2')]);assert.equal(s.claim(args()).ok,true);
  assert.equal(s.claim(args({taskId:'T2',opId:'op1'})).reason,'OP_ID_COLLISION');
- assert.throws(()=>createOfflineStore([fixture('A',{operations:[{opId:'same',kind:'NOTE',units:0}]}),fixture('B',{operations:[{opId:'same',kind:'NOTE',units:0}]})]),/DUPLICATE_GLOBAL_OP_ID/);
+ const claimed=s.snapshot('T1');
+ assert.throws(()=>createOfflineStore([{...claimed,taskId:'A'},{...claimed,taskId:'B'}]),/DUPLICATE_GLOBAL_OP_ID/);
 });
 test('restored budget is reconciled from charge ledger, not operation count',()=>{
- const valid=fixture('T',{budget:{limit:5,used:2},operations:[{opId:'charge',kind:'IO',units:2},{opId:'free',kind:'NOTE',units:0}]});
- assert.equal(createOfflineStore([valid]).snapshot('T').budget.used,2);
- assert.throws(()=>createOfflineStore([{...valid,budget:{limit:5,used:1}}]),/INVALID_RESTORED_TASK/);
+ const s=createOfflineStore([fixture()]);s.claim(args());
+ s.markRecovery({taskId:'T1',revision:1,fence:1,now:120,opId:'recover'});
+ s.reconcileToQueue({taskId:'T1',revision:2,fence:1,opId:'queue'});
+ const valid=s.snapshot('T1');assert.equal(valid.operations.length,3);
+ assert.equal(createOfflineStore([valid]).snapshot('T1').budget.used,1);
+ assert.throws(()=>createOfflineStore([{...valid,budget:{limit:5,used:2}}]),/INVALID_RESTORED_TASK/);
 });
 test('strict identities, bounded lease arithmetic and malformed snapshots fail closed',()=>{
  assert.throws(()=>createOfflineStore([fixture('T',{head:'main'})]),/INVALID_RESTORED_TASK/);
@@ -42,7 +46,7 @@ test('expiry requires explicit fenced recovery before a new claim',()=>{
 test('stale fence cannot complete and deterministic failure is terminal',()=>{
  const s=createOfflineStore([fixture()]),claimed=s.claim(args()).task;
  assert.equal(s.complete({taskId:'T1',revision:1,fence:0,writer:'lead',opId:'done'}).reason,'STALE_FENCE');
- const failed=s.complete({taskId:'T1',revision:claimed.revision,fence:1,writer:'lead',opId:'fail',outcome:'FAILED'});
+ const failed=s.complete({taskId:'T1',revision:claimed.revision,fence:1,writer:'lead',now:119,opId:'fail',outcome:'FAILED'});
  assert.equal(failed.task.state,'FAILED');assert.equal(failed.task.lease,null);
 });
 test('returned snapshots cannot mutate store',()=>{const s=createOfflineStore([fixture()]),copy=s.snapshot('T1');copy.budget.used=99;assert.equal(s.snapshot('T1').budget.used,0);});
