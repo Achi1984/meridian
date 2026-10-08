@@ -62,3 +62,18 @@ test('supervisor can block with reason but cannot impersonate writer',()=>{
  assert.equal(transition(t,ev(STATES.BLOCKED,{writer:'supervisor',reason:'lease expired'})).state,STATES.BLOCKED);
  assert.throws(()=>transition(t,ev(STATES.REPAIR,{writer:'supervisor'})),/WRITER_CONFLICT/);
 });
+
+test('repair cannot return to CI without a new head',()=>{
+ const t=task(STATES.REPAIR,{writer:'lead'});
+ assert.throws(()=>transition(t,ev(STATES.CI_CHECK)),/HEAD_ADVANCE_REQUIRED/);
+ assert.throws(()=>transition(t,ev(STATES.CI_CHECK,{newHead:SHA})),/INVALID_HEAD_ADVANCE/);
+});
+test('old operation ID cannot be replayed after intervening operations',()=>{
+ const first=transition(task(),ev(STATES.CLAIMED));
+ const second=transition(first,ev(STATES.IMPLEMENTING,{expectedRevision:1,opId:'op-2'}));
+ assert.deepEqual(second.opIds,['op-1','op-2']);
+ assert.throws(()=>transition(second,ev(STATES.CI_CHECK,{expectedRevision:2,opId:'op-1'})),/DUPLICATE_OP_ID/);
+});
+test('malformed operation journal is rejected',()=>{
+ assert.throws(()=>transition(task(STATES.QUEUED,{opIds:'invalid'}),ev(STATES.CLAIMED)),/INVALID_JOURNAL/);
+});
