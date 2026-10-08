@@ -42,7 +42,16 @@ test('v10 renders actionable pair cards only from fresh private rows and keeps r
 });
 
 test('v10 command places critical asset and guarded next action ahead of legacy risk views',()=>{
-  assert.match(js,/LIVE RISK PRIORITY/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 replaces the legacy title with one verified, prioritized decision surface.
+    assert.match(js,/data-command-decision-owner="r132"/);
+    assert.match(js,/JETZT WICHTIG/);
+    assert.match(js,/const urgent=verified&&\['LIQ_RISK','PROTECTION_RISK'\]\.includes\(critical\.status\.code\)/);
+    assert.match(js,/decision\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(js,/\.sort\(\(a,b\)=>b\.status\.rank-a\.status\.rank\)/);
+  }else{
+    assert.match(js,/LIVE RISK PRIORITY/);
+  }
   assert.match(js,/Liquidation.*(?:Teilstatus|Substatus)/);
   assert.match(js,/KEINE AKTION · DATEN PRÜFEN/);
   assert.match(js,/LIQ-PUFFER PRÜFEN/);
