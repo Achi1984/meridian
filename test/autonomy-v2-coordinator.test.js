@@ -18,7 +18,7 @@ test('review planner refuses caller assertion without verified snapshot',()=>{
  assert.equal(planReview(t,ev,null).ok,false);
 });
 test('review planner binds snapshot to exact comment',()=>{
- const t={...task(),state:STATES.REVIEW_REQUESTED,writer:'lead',ciEvidence:{head,base}};
+ const t={...task(),state:STATES.REVIEW_REQUESTED,writer:'lead',ciEvidence:{head,base,conclusion:'success',testCount:1}};
  const ev={...claim(),review:{head,base,reviewer:'CLAUDE',commentId:5,verdict:'GREEN_LIGHT'}};
  const snap={source:'synthetic-unverified',author:'claude[bot]',commentId:6,head,base,liveHead:head,verdict:'GREEN_LIGHT',ci:{head,base,conclusion:'success',testCount:1}};
  assert.equal(planReview(t,ev,snap).reason,'EVIDENCE_MISMATCH');
