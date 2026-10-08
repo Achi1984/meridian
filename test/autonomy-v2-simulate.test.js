@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { simulate } from '../scripts/autonomy-v2-simulate.mjs';
 import { STATES } from '../scripts/autonomy-v2-state.mjs';
 const head='a'.repeat(40), base='b'.repeat(40);
-const initial=()=>({state:STATES.QUEUED,revision:0,attempts:0,head,base,writer:null,lastOpId:null});
-const event=(opId,revision=0)=>({to:STATES.CLAIMED,expectedRevision:revision,expectedHead:head,expectedBase:base,opId,writer:'lead'});
+const initial=()=>({state:STATES.QUEUED,revision:0,attempts:0,head,base,writer:null,lastOpId:null,budget:{limit:2,used:0}});
+const event=(opId,revision=0)=>({to:STATES.CLAIMED,expectedRevision:revision,expectedHead:head,expectedBase:base,opId,now:100,writer:'lead'});
 test('synthetic queue claim is deterministic and non-mutating',()=>{
  const t=initial(), result=simulate([event('one')],t);
  assert.equal(result.task.state,STATES.CLAIMED);
