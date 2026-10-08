@@ -61,3 +61,6 @@ Exact workflow triggers, token permissions, quota ceilings, allowed task classes
 
 ## Final review blocker register
 Before any Phase-1 operational adapter: prohibit direct unguarded `transition()` use for CLAIMED and REVIEW_GREEN; require trusted atomic lease/budget verification and authenticated GitHub review evidence at the enforcement boundary. Synthetic planner functions do not provide this security. Map real mailbox verdict vocabulary explicitly, bind review to request ID and CI run ID, and recheck live head/base before HUMAN_GATE. Current prototype is not approved for dispatch. These are release blockers, not optional optimizations.
+
+## Phase-1 readiness gates (unapproved)
+Do not treat offline GREEN as permission to activate a worker. Remaining mandatory integration work: authenticated GitHub review and CI run/request ID binding; mailbox verdict mapping (`GREEN LIGHT` to internal `GREEN_LIGHT`); durable lease issuance/consumption and budget accounting; bounded immutable replay index; live head/base check at HUMAN_GATE; and protected dispatcher that cannot call raw transitions without authoritative guards. Separate Product Owner approval is required before any workflow/permission/spend change.
