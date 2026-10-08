@@ -16,7 +16,8 @@ x.nav.push({name:b.dataset.v,font:parseFloat(s.fontSize),height:b.getBoundingCli
 fit:l.scrollWidth<=l.clientWidth+1,oneLine:l.getBoundingClientRect().height<=parseFloat(s.fontSize)*1.3});
 b.click();x.views.push({name:b.dataset.v,
 visible:[...document.querySelectorAll('.view')].filter(v=>!v.hidden).map(v=>v.id),
-current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(v=>v.dataset.v)});
+current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(v=>v.dataset.v),
+body:document.body.scrollWidth,root:document.documentElement.scrollWidth});
 }return x;})()`;
 test('V11 Chrome CDP: true 320/375/390/430 mobile layout and navigation',{timeout:120000},async()=>{
 if(typeof WebSocket!=='function'){
@@ -38,6 +39,7 @@ for(const width of [320,375,390,430]){
  for(const v of x.views){
   assert.deepEqual(v.visible,['view-'+v.name]);
   assert.deepEqual(v.current,[v.name]);
+  assert.ok(v.body<=width+1&&v.root<=width+1,'view overflow '+width+' '+v.name);
  }
 }
 });
