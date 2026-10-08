@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b111b">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="meridian-ui-generation" content="11-preview">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>MERIDIAN 11 — Next Generation · Entwurf</title>
+  <!-- GATE A0: Standalone public source preview. No manifest, API, token, data engine, storage, orders or service worker.
+       The v9 engine is intentionally NOT loaded until the single-engine / lifecycle / safety tests exist.
+       Noindex does not make this private: any future Pages publication makes the source publicly accessible. -->
+  <style>
+    :root {
+      color-scheme:dark;
+      --bg:#080d15;--surface:#111a27;--surface-2:#172336;--line:#2a394e;
+      --muted:#99a9bc;--text:#f2f6fb;--brand:#7bb6ff;--brand-dim:#132840;
+      --safe-bottom:env(safe-area-inset-bottom, 0px);
+      --radius:20px;--container:760px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg)}
+    body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:var(--text)}
+    button{font:inherit}
+    button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .app-shell{min-height:100dvh;min-height:100vh;background:radial-gradient(ellipse 105% 460px at 60% -200px,#244465 0%,transparent 75%),var(--bg)}
+    .topbar{padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,calc((100vw - var(--container))/2)) 15px;border-bottom:1px solid #1b293a}
+    .header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .identity{display:flex;align-items:center;gap:11px;min-width:0}
+    .mark{width:37px;height:37px;display:grid;place-items:center;flex:none;border-radius:12px;background:linear-gradient(145deg,#345d88,#0d2138);color:#d5e9ff;font-size:23px;font-weight:750}
+    .brand{font-size:17px;font-weight:760;letter-spacing:.045em;line-height:1.15}
+    .brand small{display:block;font-size:10px;font-weight:650;letter-spacing:.17em;color:var(--brand);margin-top:4px}
+    .preview-pill{border:1px solid #44607b;color:#d7e6f6;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:760;letter-spacing:.08em;white-space:nowrap;background:#142235}
+    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}
+    .view[hidden]{display:none!important}
+    .view{animation:appear .16s ease-out}
+    @keyframes appear{from{opacity:.75;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+    .eyebrow{font-size:11px;letter-spacing:.15em;font-weight:750;color:var(--brand)}
+    .section-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:2px 0 16px}
+    h1{font-size:clamp(26px,6vw,36px);line-height:1.12;letter-spacing:-.045em;margin:8px 0 8px;font-weight:780}
+    h2{font-size:16px;letter-spacing:-.015em;line-height:1.3;margin:0;font-weight:730}
+    p{margin:0;color:var(--muted)}
+    .sub{font-size:13px;max-width:52ch}
+    .state-label{display:inline-flex;align-items:center;gap:7px;color:#c2cfdc;font-size:11px;font-weight:740;letter-spacing:.06em}
+    .state-dot{width:7px;height:7px;border-radius:50%;background:#b2a379;display:inline-block;flex:none}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(160deg,#172337,#111b29 67%);padding:19px;margin-bottom:12px;box-shadow:0 9px 26px #00000015}
+    .card-muted{background:#111923}
+    .decision{border-color:#466b96;background:linear-gradient(135deg,#182f48,#111c2b 70%);position:relative}
+    .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
+    .card-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:13px}
+    .card-kicker{font-size:11px;letter-spacing:.13em;font-weight:790;color:#a9cffa}
+    .decision h2{font-size:19px;line-height:1.27;letter-spacing:-.03em;margin-bottom:9px}
+    .decision p{font-size:13px;line-height:1.58;color:#c6d2df}
+    .limited{display:inline-block;border:1px solid #5a6778;color:#e0d8ba;border-radius:6px;padding:3px 7px;font-size:10px;line-height:1.4;font-weight:750;white-space:nowrap}
+    .footnote{font-size:11px;color:#a6b6c8;margin-top:14px;padding-top:12px;border-top:1px solid #ffffff18}
+    .portfolio-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:6px 0 12px}
+    .portfolio-value{font-size:clamp(34px,8vw,50px);font-weight:720;line-height:1.1;letter-spacing:-.06em}
+    .portfolio-description{font-size:12px;color:#a9b8c9;margin-top:4px}
+    .caption{font-size:11px;color:#aebdcc;line-height:1.55}
+    .trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+    .trust-cell{border:1px solid #344356;border-radius:12px;padding:11px 8px;background:#101b28;min-width:0}
+    .trust-cell strong{font-size:10px;letter-spacing:.04em;color:#e5edf8;display:block;overflow-wrap:anywhere}
+    .trust-cell span{display:block;color:#8da4bd;font-size:10px;margin-top:4px;overflow-wrap:anywhere}
+    .section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:20px 0 11px}
+    .section-title small{font-size:10px;color:var(--muted);white-space:nowrap}
+    .empty-state{display:flex;align-items:flex-start;gap:10px}
+    .empty-symbol{width:31px;height:31px;display:grid;place-items:center;border:1px solid #34465c;color:#d6dfec;border-radius:10px;flex:none;font-size:17px}
+    .empty-state b{font-size:13px;font-weight:710}
+    .empty-state p{font-size:12px;margin-top:4px;line-height:1.6}
+    details{border:1px solid var(--line);border-radius:15px;background:#101824;overflow:hidden;margin:16px 0}
+    summary{min-height:48px;padding:13px 15px;cursor:pointer;color:#d4e2ef;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:730;letter-spacing:.06em;font-size:11px}
+    summary::marker{content:""}
+    summary::-webkit-details-marker{display:none}
+    summary span:last-child{color:var(--muted);font-size:17px;transition:transform .2s}
+    details[open] summary span:last-child{transform:rotate(45deg)}
+    .details-body{border-top:1px solid var(--line);padding:13px 15px}
+    .details-body p{font-size:12px;line-height:1.75}
+    .details-body p+p{margin-top:8px}
+    .view-placeholder{padding:26px 18px;min-height:180px;display:flex;flex-direction:column;justify-content:center}
+    .view-placeholder p{font-size:13px;line-height:1.7;margin-top:10px}
+    .section-footer{margin-top:14px;color:#7d91a6;font-size:11px;text-align:center}
+    #nav{position:fixed;z-index:10;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:#0d1522f5;border-top:1px solid #2c3d50;padding:8px max(6px,calc((100vw - 740px)/2)) calc(8px + var(--safe-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    #nav button{appearance:none;-webkit-appearance:none;color:#91a5b9;background:none;border:0;border-radius:12px;min-height:53px;padding:6px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;min-width:0}
+    #nav button span{font-size:9px;line-height:1.2;font-weight:750;letter-spacing:.01em;max-width:100%;overflow-wrap:anywhere}
+    #nav button .nav-icon{font-size:20px;line-height:1.15;font-weight:540;letter-spacing:0;color:inherit}
+    #nav button.active{background:#17304a;color:#a9d4ff}
+    #nav button:active{background:#254161}
+    @media(max-width:350px){
+      .topbar{padding-left:13px;padding-right:13px}
+      .container{padding-left:12px;padding-right:12px}
+      .card{padding:15px}
+      .preview-pill{font-size:9px;padding:5px 7px}
+      .trust-grid{gap:5px}.trust-cell{padding:9px 6px}
+      #nav button span{font-size:8.5px}
+      .decision h2{font-size:18px}
+    }
+    @media(prefers-reduced-motion:reduce){.view{animation:none}details summary span:last-child{transition:none}}
+  </style>
+</head>
+<body>
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="static-no-live-data" data-execution-impact="false">
+  <header class="topbar">
+    <div class="header-inner">
+      <div class="identity">
+        <span class="mark" aria-hidden="true">M</span>
+        <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
+      </div>
+      <span class="preview-pill">UI-ENTWURF</span>
+    </div>
+  </header>
+  <main id="app-main" class="container">
+    <section id="view-command" class="view active" aria-labelledby="command-heading">
+      <div class="section-intro">
+        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Alles Wesentliche.<br>Ein Blick.</h1><p class="sub">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>
+      </div>
+      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Datenanbindung steht noch aus</h2>
+        <p>In dieser Vorschau liegen keine verifizierten Depot-, Bot- oder Marktdaten vor. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
+        <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Vorschau ohne Kontozugriff</div>
+      </section>
+      <section class="card" aria-label="Portfolio">
+        <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
+        <div class="portfolio-row"><div><div class="portfolio-value" aria-label="Portfoliowert unbekannt">—</div><div class="portfolio-description">Gesamtwert nicht verifiziert</div></div></div>
+        <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
+        <div class="trust-grid" aria-label="Datenquellenstatus">
+          <div class="trust-cell"><strong>DEPOT</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
+        </div>
+      </section>
+      <div class="section-title"><h2>Risikomonitor</h2><small>KEINE VERIFIZIERTE ABDECKUNG</small></div>
+      <section class="card card-muted" aria-label="Risikostatus unbekannt">
+        <div class="empty-state"><div class="empty-symbol" aria-hidden="true">—</div><div><b>Risikostatus nicht bestimmbar</b><p>Risikoprüfungen werden erst nach der sicheren Anbindung gültiger Daten sichtbar. Fehlende Daten sind keine Entwarnung.</p></div></div>
+      </section>
+      <details class="command-source-details">
+        <summary><span>DATEN &amp; QUELLEN</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p><b>Modus:</b> Statische, öffentliche Entwicklungs-Vorschau.</p>
+          <p><b>Daten:</b> Keine Live-Feeds, keine private Kontoanbindung, keine Handelsfreigabe.</p>
+          <p><b>Grundlage:</b> MERIDIAN 11 Architekturentscheid #603. Die geprüfte v10-Engine bleibt separat.</p>
+        </div>
+      </details>
+      <p class="section-footer">MERIDIAN 11 · DESIGN-SCAFFOLD · NICHT PRODUKTIV</p>
+    </section>
+    <section id="view-depot" class="view" aria-labelledby="depot-heading" hidden>
+      <div class="eyebrow">KAPITAL &amp; ÜBERSICHT</div><h1 id="depot-heading">Depot</h1>
+      <div class="card view-placeholder"><h2>Portfolio mit Herkunft statt Schätzungen.</h2><p>Für die nächste Ausbaustufe vorgesehen: bestätigter Gesamtwert, Vermögensstruktur und geprüfter Verlauf über 1h / 1d / 1w. In dieser Vorschau sind keine Daten verbunden.</p></div>
+    </section>
+    <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
+      <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
+      <div class="card view-placeholder"><h2>Jeder Bot. Klarer Status.</h2><p>Geplant sind verifizierte Bot-Karten mit Quelle, Gebühren, Risikopuffer und Schutzstatus. Ohne Live-Belege wird nichts als sicher oder profitabel markiert.</p></div>
+    </section>
+    <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
+      <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
+      <div class="card view-placeholder"><h2>Zonen verstehen. Entscheidungen prüfen.</h2><p>FIB-Zonen, Szenarien und Trendwenden werden später mit verifizierten Quellen und erkennbaren Unsicherheiten dargestellt. Keine Live-Signale in dieser Vorschau.</p></div>
+    </section>
+    <section id="view-research" class="view" aria-labelledby="scanner-heading" hidden>
+      <div class="eyebrow">RESEARCH &amp; CHANCEN</div><h1 id="scanner-heading">Scanner</h1>
+      <div class="card view-placeholder"><h2>Chancen erst nach Evidenz.</h2><p>Der Opportunity Scanner bleibt eine Research-Oberfläche. Es werden keine Handelsaufträge, Paper-Bots oder freigegebenen Signale vorgetäuscht.</p></div>
+    </section>
+    <section id="view-asset-detail" class="view" aria-label="Asset Detail" hidden></section>
+    <section id="view-paper" class="view" aria-label="Paper" hidden></section>
+    <section id="view-more" class="view" aria-label="Mehr" hidden></section>
+  </main>
+  <nav id="nav" aria-label="Hauptnavigation">
+    <button type="button" data-v="command" class="active" aria-current="page" aria-controls="view-command"><span class="nav-icon" aria-hidden="true">⌂</span><span>COMMAND</span></button>
+    <button type="button" data-v="depot" aria-controls="view-depot"><span class="nav-icon" aria-hidden="true">◉</span><span>DEPOT</span></button>
+    <button type="button" data-v="bots" aria-controls="view-bots"><span class="nav-icon" aria-hidden="true">▦</span><span>BOTS</span></button>
+    <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span></button>
+    <button type="button" data-v="research" aria-controls="view-research"><span class="nav-icon" aria-hidden="true">◇</span><span>SCANNER</span></button>
+  </nav>
+</div>
+<script>
+/* A0: UI-only navigation. No imports, fetch, timers, orders, storage or engine bootstrap. */
+(function () {
+  'use strict';
+  const nav = document.getElementById('nav');
+  const tabs = Array.from(nav.querySelectorAll('button[data-v]'));
+  const views = new Map(tabs.map(function (button) {
+    return [button.dataset.v, document.getElementById('view-' + button.dataset.v)];
+  }));
+  function activate(name) {
+    if (!views.has(name)) return;
+    tabs.forEach(function (button) {
+      const active = button.dataset.v === name;
+      button.classList.toggle('active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    });
+    views.forEach(function (view, key) {
+      view.hidden = key !== name;
+      view.classList.toggle('active', key === name);
+    });
+  }
+  nav.addEventListener('click', function (event) {
+    const button = event.target.closest('button[data-v]');
+    if (!button || !nav.contains(button)) return;
+    activate(button.dataset.v);
+  });
+})();
+</script>
+</body>
+</html>
