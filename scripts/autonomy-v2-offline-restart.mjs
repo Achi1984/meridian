@@ -9,6 +9,10 @@ export function replayRestart(initial, operations) {
       results.push({ok:false,reason:'UNSUPPORTED_OPERATION'});
       break;
     }
+    if (!operation.args || typeof operation.args !== 'object' || Array.isArray(operation.args)) {
+      results.push({ok:false,reason:'INVALID_CLAIM'});
+      break;
+    }
     const result=store.claim(operation.args);
     results.push({ok:result.ok,reason:result.reason??'CLAIMED'});
     if (!result.ok) break;
