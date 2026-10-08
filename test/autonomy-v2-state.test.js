@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transition,STATES} from '../scripts/autonomy-v2-state.mjs';
 const SHA='a'.repeat(40),BASE='b'.repeat(40);
-const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,writer:state===STATES.QUEUED?null:'lead',ciEvidence:state===STATES.REVIEW_REQUESTED?{head:SHA,base:BASE}:null,...overrides});
+const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,writer:state===STATES.QUEUED?null:'lead',ciEvidence:state===STATES.REVIEW_REQUESTED?{head:SHA,base:BASE,conclusion:'success',testCount:1}:null,...overrides});
 const ev=(to,overrides={})=>({to,expectedRevision:0,expectedHead:SHA,expectedBase:BASE,opId:'op-1',writer:'lead',...overrides});
 test('claim and implement require a consistent single writer',()=>{
  const claimed=transition(task(),ev(STATES.CLAIMED));
@@ -97,5 +97,11 @@ test('review requires persisted matching CI evidence',()=>{
  const valid=task(STATES.REVIEW_REQUESTED,{ciEvidence:{head:SHA,base:BASE,conclusion:'success',testCount:1}});
  assert.equal(transition(valid,ev(STATES.REVIEW_GREEN,{review})).state,STATES.REVIEW_GREEN);
  for(const ciEvidence of [null,{head:BASE,base:BASE},{head:SHA,base:SHA}])
+  assert.throws(()=>transition(task(STATES.REVIEW_REQUESTED,{ciEvidence}),ev(STATES.REVIEW_GREEN,{review})),/STALE_REVIEW/);
+});
+
+test('review green rejects forged CI conclusion or zero tests',()=>{
+ const review={head:SHA,base:BASE,verdict:'GREEN_LIGHT',reviewer:'CLAUDE',commentId:9};
+ for(const ciEvidence of [{head:SHA,base:BASE,conclusion:'failure',testCount:1},{head:SHA,base:BASE,conclusion:'success',testCount:0}])
   assert.throws(()=>transition(task(STATES.REVIEW_REQUESTED,{ciEvidence}),ev(STATES.REVIEW_GREEN,{review})),/STALE_REVIEW/);
 });
