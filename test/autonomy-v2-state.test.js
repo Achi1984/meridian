@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transition,STATES} from '../scripts/autonomy-v2-state.mjs';
 const SHA='a'.repeat(40),BASE='b'.repeat(40);
-const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,writer:state===STATES.QUEUED?null:'lead',ciEvidence:state===STATES.REVIEW_REQUESTED?{head:SHA,base:BASE,conclusion:'success',testCount:1}:null,...overrides});
-const ev=(to,overrides={})=>({to,expectedRevision:0,expectedHead:SHA,expectedBase:BASE,opId:'op-1',writer:'lead',...overrides});
+const task=(state=STATES.QUEUED,overrides={})=>({state,revision:0,attempts:0,head:SHA,base:BASE,lastOpId:null,budget:{limit:2,used:0},writer:state===STATES.QUEUED?null:'lead',ciEvidence:state===STATES.REVIEW_REQUESTED?{head:SHA,base:BASE,conclusion:'success',testCount:1}:null,...overrides});
+const ev=(to,overrides={})=>({to,expectedRevision:0,expectedHead:SHA,expectedBase:BASE,opId:'op-1',now:100,verifiedSynthetic:true,writer:'lead',...overrides});
 test('claim and implement require a consistent single writer',()=>{
  const claimed=transition(task(),ev(STATES.CLAIMED));
  assert.equal(claimed.writer,'lead');
