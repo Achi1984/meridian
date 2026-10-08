@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {reconcileSnapshot,summarizeSimulation} from '../scripts/autonomy-v2-recovery.mjs';
+const head='a'.repeat(40),base='b'.repeat(40);
+const local=()=>({taskId:'t1',revision:2,head,base,writer:'lead',opIds:['old']});
+const intent=()=>({opId:'new',writer:'lead',expectedRevision:2,expectedHead:head,expectedBase:base});
+test('replay only eligible after exact remote reconciliation',()=>assert.equal(reconcileSnapshot(local(),local(),intent()).action,'RETRY_ELIGIBLE'));
+test('applied op id is idempotently recognized',()=>assert.equal(reconcileSnapshot(local(),{...local(),revision:3,opIds:['old','new']},intent()).action,'ALREADY_APPLIED'));
+test('head change blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),head:'c'.repeat(40)},intent()).reason,'REMOTE_ADVANCED'));
+test('base change blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),base:'c'.repeat(40)},intent()).reason,'IDENTITY_OR_BASE_CHANGED'));
+test('different writer blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),writer:'other'},intent()).reason,'WRITER_CONFLICT'));
+test('malformed remote journal blocks replay',()=>assert.equal(reconcileSnapshot(local(),{...local(),opIds:'new'},intent()).reason,'UNTRUSTED_REMOTE_JOURNAL'));
+test('audit summary counts accepted and rejected events',()=>assert.deepEqual(summarizeSimulation([{revision:1},{rejected:'DUPLICATE_OP_ID'}]),{events:2,accepted:1,rejected:1,duplicateRejects:1}));
