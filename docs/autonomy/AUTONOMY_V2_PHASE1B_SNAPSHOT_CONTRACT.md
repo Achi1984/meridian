@@ -30,6 +30,8 @@ clock inputs, the last safe clock, near-exhausted fences, quota precedence and
 rejected-ID retry. A shared plain-data guard now rejects malformed, inherited or
 accessor-bearing planner contexts, restart options and operation wrappers before
 reading their values. This follows #613's stricter own-data-field checks.
+The input guard and whitespace-only lease-writer rejection are new planner checks
+in this consolidation; the safe-integer clock check itself is unchanged.
 
 ## Restore and replay
 
