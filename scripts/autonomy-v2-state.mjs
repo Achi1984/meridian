@@ -15,8 +15,8 @@ export function transition(task,event){
  if(!task||!event||!Number.isSafeInteger(task.revision)||!Number.isSafeInteger(task.attempts))throw Error('invalid task');
  if(event.expectedRevision!==task.revision||!validSha(event.expectedHead)||event.expectedHead!==task.head||!validSha(task.base))throw Error('STALE_CAS');
  if(typeof event.opId!=='string'||!event.opId.trim())throw Error('MISSING_OP_ID');
- if(task.lastOpId===event.opId||task.opIds?.includes(event.opId))throw Error('DUPLICATE_OP_ID');
  if(task.opIds!==undefined&&(!Array.isArray(task.opIds)||task.opIds.some(x=>typeof x!=='string')))throw Error('INVALID_JOURNAL');
+ if(task.lastOpId===event.opId||task.opIds?.includes(event.opId))throw Error('DUPLICATE_OP_ID');
  if(!transitions[task.state]?.includes(event.to))throw Error('INVALID_TRANSITION');
  if(event.to==='CLAIMED'&&(!event.writer||task.writer&&task.writer!==event.writer))throw Error('WRITER_CONFLICT');
  if(task.writer&&event.writer!==task.writer&&event.to!==STATES.BLOCKED)throw Error('WRITER_CONFLICT');
