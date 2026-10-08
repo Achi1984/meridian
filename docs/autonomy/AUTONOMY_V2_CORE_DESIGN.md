@@ -55,3 +55,6 @@ Exact workflow triggers, token permissions, quota ceilings, allowed task classes
 
 ## Offline recovery prototype
 `autonomy-v2-recovery.mjs` compares synthetic local/remote snapshots and an operation intent, returns `ALREADY_APPLIED`, `BLOCK`, or `RETRY_ELIGIBLE` without writing anything, and summarizes synthetic audit counters. These results are **advisory**, not authoritative remote reconciliation: a real adapter must atomically reread trusted remote head, base, writer lease and operation journal immediately before any mutation, and fence concurrent writers. No persistence, authenticated GitHub adapter or production dispatch is provided.
+
+## Synthetic coordinator
+`autonomy-v2-coordinator.mjs` composes offline claim eligibility, evidence validation and replay planning, with no I/O or dispatch. It is **not** an authenticated GitHub adapter: its `verifiedSnapshot` argument is caller-controlled. A production boundary must construct that object from authenticated GitHub API reads and enforce identity, fresh head/base and single-writer lease atomically. The pure `transition()` function remains directly callable; callers must not bypass coordinator checks in any future operational integration. No operational approval is implied.
