@@ -16,3 +16,5 @@ test('spoofed author, stale head and skipped CI reject',()=>{
  assert.equal(verifyReviewSnapshot({...review(),liveHead:base},{head,base}).valid,false);
  assert.equal(verifyReviewSnapshot({...review(),ci:{...review().ci,testCount:0}},{head,base}).valid,false);
 });
+
+test('same owner active lease also requires reconciliation',()=>{assert.equal(assessClaim({...task(),lease:{owner:'lead',expiresAt:200}},proposal()).reason,'RECONCILE_LEASE_FIRST');});
