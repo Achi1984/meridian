@@ -1,14 +1,11 @@
 // In-memory, deterministic Phase-1B laboratory only. No disk, network or dispatch.
 import {planOfflineRecovery} from './autonomy-v2-offline-recovery.mjs';
+import {isOfflineDataRecord as record,isOfflineDataArray as list} from './autonomy-v2-offline-data.mjs';
 const SHA=/^[0-9a-f]{40}$/;
 const STATES=new Set(['QUEUED','CLAIMED','RECOVERY_PENDING','COMPLETED','FAILED']);
 const clone=value=>structuredClone(value);
 const result=(ok,reason,task)=>Object.freeze({ok,reason,...(task?{task:clone(task)}:{})});
 // Snapshots are plain data. Reject inherited fields, accessors and schema extensions.
-const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&
-  [Object.prototype,null].includes(Object.getPrototypeOf(value))&&
-  Reflect.ownKeys(value).every(key=>typeof key==='string'&&Object.getOwnPropertyDescriptor(value,key).enumerable&&
-    Object.hasOwn(Object.getOwnPropertyDescriptor(value,key),'value'));
 const schema=(value,required,optional=[])=>record(value)&&required.every(key=>Object.hasOwn(value,key))&&
   Object.keys(value).every(key=>required.includes(key)||optional.includes(key));
 const text=value=>typeof value==='string'&&value.trim().length>0;
@@ -20,7 +17,7 @@ function validateTask(input) {
     typeof input.base!=='string'||!SHA.test(input.base)||
     !Number.isSafeInteger(input.nextFence)||input.nextFence<1||!schema(input.budget,['limit','used'])||!Number.isSafeInteger(input.budget.limit)||
     input.budget.limit<1||!Number.isSafeInteger(input.budget.used)||input.budget.used<0||input.budget.used>input.budget.limit||
-    !Array.isArray(input.operations)) invalid();
+    !list(input.operations)) invalid();
   const ids=new Set();let charged=0,state='QUEUED',latestFence=0;
   for(const op of input.operations){
     if(!schema(op,['opId','kind','units','fence'])||!text(op.opId)||ids.has(op.opId)||
@@ -48,7 +45,7 @@ function validateTask(input) {
   }else if(input.lease!=null||input.writer!=null) invalid();
 }
 export function createOfflineStore(initial=[]) {
-  if(!Array.isArray(initial))throw Error('INVALID_SNAPSHOT');
+  if(!list(initial))throw Error('INVALID_SNAPSHOT');
   const tasks=new Map(),opOwners=new Map(),audit=[];
   for(const raw of initial){validateTask(raw);if(tasks.has(raw.taskId))throw Error('INVALID_TASK_ID');
     for(const op of raw.operations){if(opOwners.has(op.opId))throw Error('DUPLICATE_GLOBAL_OP_ID');opOwners.set(op.opId,raw.taskId);}tasks.set(raw.taskId,clone(raw));}
