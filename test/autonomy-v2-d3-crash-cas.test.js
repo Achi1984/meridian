@@ -1,5 +1,5 @@
 /**
- * MERIDIAN D3-09..D3-16: executable offline, synthetic model tests.
+ * MERIDIAN D3-09..D3-27: executable offline, synthetic model tests.
  * Operation: MERIDIAN-D3-CRASH-CAS-MODEL-20261009-001
  * THIS IS NOT A DURABLE STORE, A REAL ATTESTATION, OR AN EXECUTION ADAPTER.
  * No network, file I/O, credentials, remote provider, workflow, or trading.
@@ -37,7 +37,7 @@ function finalize(s) {
 function initial() {
   return finalize({schema:2,storeUUID:'meridian-d3-offline-fixture',generation:0,writerEpoch:1,
     fenceHighWater:0,timeHighWater:0,nextFence:1,policyRoot,ledgerRoot:'',replayRoot:'',
-    budget:{day:'2026-10-09',cap:12,reserved:0,settled:0,released:0,overrun:0},
+    budget:{day:'2026-10-09',cap:POLICY.maxDaily,reserved:0,settled:0,released:0,overrun:0},
     costIncident:false,
     activeLease:null,tasks:{},index:{},receipts:{},events:[],effectCount:0});
 }
@@ -135,6 +135,7 @@ class Fixture {
       s.fenceHighWater===a.fenceHighWater && s.writerEpoch===a.writerEpoch &&
       s.timeHighWater===a.timeHighWater,'AUTHORITY_MISMATCH');
     requireRule(s.ledgerRoot===hash(s.events)&&s.replayRoot===hash(s.index),'REPLAY_INTEGRITY_FAILURE');
+    requireRule(s.budget.cap===POLICY.maxDaily,'POLICY_BUDGET_MISMATCH');
     const rebuilt={};for(const event of s.events){
       requireRule(!rebuilt[event.id] && typeof event.digest==='string','INVALID_EVENT_LEDGER');
       rebuilt[event.id]=event.digest;
@@ -533,4 +534,102 @@ test('scope assertion: no real effects or external side-effect capabilities',()=
   assert.equal(f.read().budget.settled,3);
   assert.equal(f.read().budget.released,5);
   assert.equal(f.read().tasks['task-A'].status,'COMPLETED');
+});
+
+// CODEX #622: additional offline regression evidence; NOT independent Claude execution.
+// Rehashed candidates below test semantic guards, not a real authentication boundary.
+function publishSyntheticCandidate(f,state) {
+  const anchor=anchorFor(state,'synthetic-forgery','synthetic-forgery');
+  f.journal.set(anchor.stateDigest,{state,anchor});f.anchor=anchor;
+}
+function settledFixture(cost=3) {
+  const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
+  for(const kind of ['PREPARE','INTENT'])f.run(operation(kind,'task-A',f.read().tasks['task-A'].revision));
+  const receipt=operation('RECEIPT','task-A',f.read().tasks['task-A'].revision);
+  receipt.cost=cost;
+  receipt.providerReceipt={3:'synthetic:',8:'synthetic-full:',11:'synthetic-overrun:'}[cost]+'task-A';
+  f.run(receipt);f.run(operation('SETTLE','task-A',f.read().tasks['task-A'].revision));
+  return f;
+}
+
+test('D3-23: persisted budget cap is bound to immutable synthetic policy',async t=>{
+  for(const cap of [0,11,13,100,-1,'12',null])await t.test('reject cap '+JSON.stringify(cap),()=>{
+    const f=new Fixture(),s=copy(f.read());s.budget.cap=cap;
+    publishSyntheticCandidate(f,s);
+    assert.throws(()=>f.read(),/POLICY_BUDGET_MISMATCH/);
+    assert.throws(()=>f.restart(),/POLICY_BUDGET_MISMATCH/);
+  });
+  await t.test('rehashed cap increase cannot bypass a legitimately exhausted daily budget',()=>{
+    const f=settledFixture(8),before=f.read();
+    assert.throws(()=>f.run(operation('PREPARE','task-B',1)),/DAILY_CAP_EXCEEDED/);
+    const s=copy(before);s.budget.cap=100;publishSyntheticCandidate(f,s);
+    const anchor=copy(f.anchor);
+    assert.throws(()=>f.run(operation('PREPARE','task-B',1)),/POLICY_BUDGET_MISMATCH/);
+    assert.deepEqual(f.anchor,anchor,'rejected PREPARE must not commit');
+    assert.deepEqual(f.local,before,'rejection must not materialize a candidate');
+    assert.equal(before.effectCount,0);
+  });
+  await t.test('unchanged policy cap permits normal settlement',()=>{
+    const f=settledFixture();assert.equal(f.read().budget.cap,POLICY.maxDaily);
+    assert.equal(f.read().budget.settled,3);assert.equal(f.read().effectCount,0);
+  });
+});
+
+test('D3-24: every receipt-event identity field rejects self-consistent forgery',async t=>{
+  const changes={opId:'other-op',kind:'PREPARE',taskId:'task-B',generation:0,status:'RECOVERED'};
+  for(const [field,value] of Object.entries(changes))await t.test(field,()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));const s=copy(f.read());
+    s.receipts['op-ADMIT-task-A'][field]=value;publishSyntheticCandidate(f,s);
+    assert.throws(()=>f.read(),/RECEIPT_EVENT_MISMATCH/);
+  });
+  await t.test('cross-task receipt swap preserves counts but must fail association',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
+    const s=copy(f.read()),a=copy(s.receipts['op-ADMIT-task-A']);
+    s.receipts['op-ADMIT-task-A']=s.receipts['op-ADMIT-task-B'];s.receipts['op-ADMIT-task-B']=a;
+    assert.equal(Object.keys(s.receipts).length,s.events.length);
+    publishSyntheticCandidate(f,s);assert.throws(()=>f.read(),/RECEIPT_EVENT_MISMATCH/);
+  });
+});
+
+test('D3-25: all four task/global budget sums reject independently rehashed divergence',async t=>{
+  for(const field of ['reservation','actualCost','releasedCost','overrun'])await t.test(field,()=>{
+    const f=settledFixture(field==='overrun'?11:3),s=copy(f.read());
+    s.tasks['task-A'][field]+=1;publishSyntheticCandidate(f,s);
+    assert.throws(()=>f.read(),/BUDGET_TASK_MISMATCH/);
+  });
+});
+
+test('D3-26: semantic replay conflicts and earlier-operation reconcile cover all transitions',async t=>{
+  for(const kind of kinds)await t.test(kind,()=>{
+    const {f,cmd}=scenario(kind),staged=f.stage(cmd);f.fsync(staged);f.cas(staged);
+    f.run(operation('ADMIT','task-B'));
+    const before=f.read(),anchor=copy(f.anchor);
+    assert.deepEqual(f.reconcile(staged),{status:'ALREADY_APPLIED',receipt:before.receipts[cmd.id]});
+    const changed=kind==='ADMIT'?{...cmd,limit:7}:{...cmd,revision:cmd.revision+1};
+    assert.throws(()=>f.stage(changed),/OP_PAYLOAD_CONFLICT/);
+    assert.throws(()=>f.run(changed),/OP_PAYLOAD_CONFLICT/);
+    assert.throws(()=>f.reconcile({...staged,cmd:changed,digest:hash(changed)}),/OP_PAYLOAD_CONFLICT/);
+    assert.equal(f.run(cmd).status,'ALREADY_APPLIED');
+    assert.deepEqual(f.read(),before);assert.deepEqual(f.anchor,anchor);
+    assert.equal(f.read().effectCount,0);
+  });
+});
+
+test('D3-27: valid budget continuation and exhausted counters preserve atomic rejection',async t=>{
+  await t.test('settled 3 plus reserved 8 remains permitted under cap 12',()=>{
+    const f=settledFixture();assert.equal(f.run(operation('PREPARE','task-B',1)).status,'APPLIED');
+    const s=f.read();assert.equal(s.budget.settled+s.budget.reserved,11);
+    assert.equal(s.budget.cap,12);assert.equal(s.costIncident,false);assert.equal(s.effectCount,0);
+  });
+  for(const field of ['generation','timeHighWater','nextFence','taskRevision'])await t.test(field,()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));const s=copy(f.read());
+    if(field==='taskRevision')s.tasks['task-A'].revision=Number.MAX_SAFE_INTEGER;
+    else s[field]=Number.MAX_SAFE_INTEGER;
+    publishSyntheticCandidate(f,s);f.local=copy(s);
+    const before=f.read(),anchor=copy(f.anchor),versions=f.journal.size;
+    const cmd=operation('PREPARE','task-A',s.tasks['task-A'].revision);
+    assert.throws(()=>f.run(cmd),/COUNTER_EXHAUSTED/);
+    assert.deepEqual(f.read(),before);assert.deepEqual(f.anchor,anchor);assert.deepEqual(f.local,before);
+    assert.equal(f.journal.size,versions,'overflow must fail before fsync');
+  });
 });
