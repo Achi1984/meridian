@@ -6,6 +6,10 @@
  * node --test --test-reporter=tap test/autonomy-v2-d3-crash-cas.test.js
  * LIMITATION: independent monotone witness is NOT implemented: coherent rollback of
  * the anchor and a matching old journal version is undetectable in this model.
+ * LIMITATION: unknown ATTEMPT_INTENT outcome blocks the lease and reserved budget;
+ * there is deliberately no automated recovery until an authenticated provider
+ * proves the result/absence. Fixture receipts are NOT authenticated evidence.
+ * The in-memory model is not the D3 durable store and cannot authorize dispatch.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,8 +26,6 @@ const canonical = x => {
 const hash = x => createHash('sha256').update(canonical(x)).digest('hex');
 const requireRule = (ok, code) => { if (!ok) throw Error(code); };
 const safeAdd = (x, y) => { const n=x+y; requireRule(Number.isSafeInteger(n), 'COUNTER_EXHAUSTED'); return n; };
-const taskA = { taskId: 'task-A', taskLimit: 8 };
-const taskB = { taskId: 'task-B', taskLimit: 8 };
 const POLICY = Object.freeze({ id:'D3-POLICY-SYNTHETIC', repository:'Achi1984/meridian', maxDaily:12, maxTask:8, allowed:['ADMIT','PREPARE','INTENT','RECEIPT','SETTLE','RECOVER'] });
 const policyRoot = hash(POLICY);
 
@@ -35,7 +37,8 @@ function finalize(s) {
 function initial() {
   return finalize({schema:2,storeUUID:'meridian-d3-offline-fixture',generation:0,writerEpoch:1,
     fenceHighWater:0,timeHighWater:0,nextFence:1,policyRoot,ledgerRoot:'',replayRoot:'',
-    budget:{day:'2026-10-09',cap:12,reserved:0,settled:0,released:0},
+    budget:{day:'2026-10-09',cap:12,reserved:0,settled:0,released:0,overrun:0},
+    costIncident:false,
     activeLease:null,tasks:{},index:{},receipts:{},events:[],effectCount:0});
 }
 function anchorFor(s, commandId = 'GENESIS', commandDigest = 'GENESIS') {
@@ -66,11 +69,12 @@ function transition(committed,cmd) {
     requireRule(cmd.taskId==='task-A'||cmd.taskId==='task-B','INVALID_TASK');
     requireRule(!s.tasks[cmd.taskId], 'DUPLICATE_TASK');
     requireRule(cmd.limit===8, 'POLICY_DENIED');
-    s.tasks[cmd.taskId]={status:'QUEUED',revision:1,fence:0,reservation:0,receipt:null,intent:null};
+    s.tasks[cmd.taskId]={status:'QUEUED',revision:1,fence:0,reservation:0,receipt:null,intent:null,actualCost:0,releasedCost:0,overrun:0};
   } else {
     const t=s.tasks[cmd.taskId];
     requireRule(cmd.revision===t.revision, 'STALE_TASK_REVISION');
     if(cmd.kind==='PREPARE') {
+      requireRule(!s.costIncident, 'COST_INCIDENT');
       requireRule(t.status==='QUEUED' && !s.activeLease, 'SINGLE_WRITER_BUSY');
       const used=safeAdd(s.budget.reserved,s.budget.settled);
       requireRule(safeAdd(used,8)<=s.budget.cap,'DAILY_CAP_EXCEEDED');
@@ -84,20 +88,26 @@ function transition(committed,cmd) {
       t.status='ATTEMPT_INTENT';t.intent='fake-effect:'+cmd.taskId;
     } else if(cmd.kind==='RECEIPT') {
       requireRule(t.status==='ATTEMPT_INTENT'&&!t.receipt, 'INVALID_TRANSITION');
-      requireRule(cmd.cost===3 && cmd.providerReceipt==='synthetic:'+cmd.taskId,'UNAUTHENTICATED_FIXTURE_RECEIPT');
+      const fakeReceipts={3:'synthetic:',8:'synthetic-full:',11:'synthetic-overrun:'};
+      requireRule(Object.hasOwn(fakeReceipts,cmd.cost)&&cmd.providerReceipt===fakeReceipts[cmd.cost]+cmd.taskId,
+        'UNAUTHENTICATED_FIXTURE_RECEIPT');
       t.receipt={cost:cmd.cost,providerReceipt:cmd.providerReceipt};
     } else if(cmd.kind==='SETTLE') {
       requireRule(t.status==='ATTEMPT_INTENT'&&t.receipt&&s.activeLease?.taskId===cmd.taskId,'RECOVERY_REQUIRED');
-      const cost=t.receipt.cost;requireRule(cost<=t.reservation,'COST_INCIDENT');
+      const cost=t.receipt.cost,release=Math.max(0,t.reservation-cost),overrun=Math.max(0,cost-t.reservation);
       s.budget.reserved-=t.reservation;
       s.budget.settled=safeAdd(s.budget.settled,cost);
-      s.budget.released=safeAdd(s.budget.released,t.reservation-cost);
-      t.reservation=0;t.status='COMPLETED';s.activeLease=null;
+      s.budget.released=safeAdd(s.budget.released,release);
+      s.budget.overrun=safeAdd(s.budget.overrun,overrun);
+      t.actualCost=cost;t.releasedCost=release;t.overrun=overrun;
+      t.reservation=0;t.status=overrun?'COST_INCIDENT':'COMPLETED';
+      s.costIncident ||= overrun>0;s.activeLease=null;
     } else if(cmd.kind==='RECOVER') {
       // Fixture proves there was no committed attempt, hence zero effect/cost.
       requireRule(t.status==='PREPARED'&&t.intent===null&&s.activeLease?.taskId===cmd.taskId,'RECOVERY_REQUIRED');
       s.budget.reserved-=t.reservation;
       s.budget.released=safeAdd(s.budget.released,t.reservation);
+      t.releasedCost=t.reservation;
       t.reservation=0;t.status='INTERRUPTED';s.activeLease=null;
     }
     t.revision=safeAdd(t.revision,1);
@@ -130,8 +140,23 @@ class Fixture {
       rebuilt[event.id]=event.digest;
     }
     requireRule(same(rebuilt,s.index) && Object.keys(s.receipts).length===s.events.length,'TRUNCATED_REPLAY_INDEX');
+    for(let i=0;i<s.events.length;i++){
+      const event=s.events[i],receipt=s.receipts[event.id];
+      requireRule(!!receipt && receipt.opId===event.id && receipt.kind===event.kind &&
+        receipt.taskId===event.taskId && receipt.generation===i+1,'RECEIPT_EVENT_MISMATCH');
+    }
+    const taskValues=Object.values(s.tasks);
+    const sum=(field)=>taskValues.reduce((total,t)=>safeAdd(total,t[field]),0);
+    requireRule(sum('reservation')===s.budget.reserved && sum('actualCost')===s.budget.settled &&
+      sum('releasedCost')===s.budget.released && sum('overrun')===s.budget.overrun,
+      'BUDGET_TASK_MISMATCH');
+    requireRule(s.costIncident===taskValues.some(t=>t.status==='COST_INCIDENT') &&
+      (s.activeLease===null || s.tasks[s.activeLease.taskId]?.fence===s.activeLease.fence),
+      'LEASE_OR_INCIDENT_MISMATCH');
     requireRule(s.nextFence>s.fenceHighWater && s.budget.reserved>=0 && s.budget.settled>=0 &&
-      s.budget.released>=0 && s.budget.reserved+s.budget.settled<=s.budget.cap,'INVARIANT_FAILURE');
+      s.budget.released>=0 && s.budget.overrun>=0 &&
+      (s.budget.reserved+s.budget.settled<=s.budget.cap || s.costIncident),
+      'INVARIANT_FAILURE');
     return s;
   }
   restart(){this.local=this.read();return copy(this.local);}
@@ -172,8 +197,10 @@ class Fixture {
   // No new send/side-effect is ever authorized by reconciliation.
   reconcile(staged){
     const current=this.read();
-    if(this.anchor.commitOpId===staged.cmd.id && this.anchor.commitDigest===staged.digest)
+    if(current.index[staged.cmd.id]){
+      requireRule(current.index[staged.cmd.id]===staged.digest,'OP_PAYLOAD_CONFLICT');
       return {status:'ALREADY_APPLIED',receipt:copy(current.receipts[staged.cmd.id])};
+    }
     if(same(this.anchor,staged.base))return {status:'ABSENT_CONFIRMED'};
     return {status:'STALE_CHECKPOINT'};
   }
@@ -220,6 +247,8 @@ test('D3-10: C2 committed before materialization (all six transitions)',async t=
   for(const kind of kinds)await t.test(kind,()=>{
     const {f,cmd}=scenario(kind),before=f.read();
     assert.throws(()=>f.run(cmd,{crash:'C2'}),/CRASH_C2/);
+    assert.deepEqual(f.local,before,'C2 must occur BEFORE materialization');
+    assert.equal(f.read().generation,before.generation+1);
     const committed=f.restart();
     assert.equal(committed.generation,before.generation+1);
     assert.equal(committed.index[cmd.id],hash(cmd));
@@ -234,6 +263,7 @@ test('D3-11: C3 lost acknowledgment exactly-once replay (all six transitions)',a
   for(const kind of kinds)await t.test(kind,()=>{
     const {f,cmd}=scenario(kind);
     assert.throws(()=>f.run(cmd,{crash:'C3'}),/CRASH_C3/);
+    assert.deepEqual(f.local,f.read(),'C3 must occur AFTER materialization');
     const before=observable(f.restart()),anchor=copy(f.anchor),prior=copy(f.read().receipts[cmd.id]);
     assert.deepEqual(f.run(cmd),{status:'ALREADY_APPLIED',receipt:prior});
     assert.deepEqual(observable(f.restart()),before);
@@ -269,7 +299,7 @@ test('D3-12: lost CAS acknowledgment: won/absent/competitor and fsync failure',a
   });
 });
 
-test('D3-13: coherent local rollback cannot defeat retained anchor',async t=>{
+test('D3-13: stale local snapshot cannot defeat retained anchor',async t=>{
   await t.test('old local snapshot is ignored; exact latest anchor version wins',()=>{
     const f=new Fixture();f.run(operation('ADMIT'));const old=copy(f.local);
     for(const kind of ['PREPARE','INTENT','RECEIPT','SETTLE']){
@@ -363,7 +393,7 @@ test('D3 supplementary recovery probe: ATTEMPT_INTENT without receipt retains re
   });
 });
 
-test('D3-16: two independent writers, reversed CAS and daily-cap racing',async t=>{
+test('D3-16: two in-memory writers, reversed CAS races (not daily-cap coverage)',async t=>{
   for(const winner of ['X','Y'])await t.test(`ADMIT winner ${winner}`,()=>{
     const f=new Fixture();const x=f.stage(operation('ADMIT')),y=f.stage(operation('ADMIT','task-B'));
     f.fsync(x);f.fsync(y);
@@ -373,7 +403,7 @@ test('D3-16: two independent writers, reversed CAS and daily-cap racing',async t
     assert.equal(Object.keys(after.tasks).length,1);
     assert.equal(Object.keys(after.index).length,1);
   });
-  for(const winner of ['X','Y'])await t.test(`PREPARE + daily cap winner ${winner}`,()=>{
+  for(const winner of ['X','Y'])await t.test(`PREPARE CAS winner ${winner}`,()=>{
     const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
     const a=f.stage(operation('PREPARE','task-A',1));
     const b=f.stage(operation('PREPARE','task-B',1));
@@ -385,6 +415,82 @@ test('D3-16: two independent writers, reversed CAS and daily-cap racing',async t
     assert.equal(s.tasks[lose.cmd.taskId].status,'QUEUED');
     assert.equal(Object.keys(s.index).length,3);
   });
+});
+
+
+test('D3-17: earlier applied operation reconciles after later commits',()=>{
+  const f=new Fixture();const command=operation('ADMIT');const staged=f.stage(command);
+  f.fsync(staged);f.cas(staged);f.local=copy(staged.candidate.state);
+  f.run(operation('ADMIT','task-B'));
+  assert.deepEqual(f.reconcile(staged),{status:'ALREADY_APPLIED',receipt:f.read().receipts[command.id]});
+  assert.equal(f.read().generation,2);
+  assert.throws(()=>f.reconcile({...staged,digest:'forged'}),/OP_PAYLOAD_CONFLICT/);
+});
+
+test('D3-18: cross-check event receipt association and task budget sums',async t=>{
+  await t.test('forged unrelated receipt with matching count is rejected',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));const s=copy(f.read());
+    delete s.receipts['op-ADMIT-task-A'];s.receipts['unrelated']={opId:'unrelated',kind:'ADMIT',taskId:'task-A',status:'APPLIED',generation:1};
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/RECEIPT_EVENT_MISMATCH/);
+  });
+  await t.test('receipt generation mismatch fails even when hashes are recomputed',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));const s=copy(f.read());
+    s.receipts['op-ADMIT-task-A'].generation=99;
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/RECEIPT_EVENT_MISMATCH/);
+  });
+  await t.test('forged reservation mismatch rejected despite valid digest',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('PREPARE','task-A',1));
+    const s=copy(f.read());s.budget.reserved=0;
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/BUDGET_TASK_MISMATCH/);
+  });
+  await t.test('forged settled-cost sum rejected',()=>{
+    const f=new Fixture();for(const kind of ['ADMIT','PREPARE','INTENT','RECEIPT','SETTLE']){
+      f.run(operation(kind,'task-A',f.read().tasks['task-A']?.revision??null));
+    }
+    const s=copy(f.read());s.tasks['task-A'].actualCost=0;
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/BUDGET_TASK_MISMATCH/);
+  });
+});
+
+test('D3-19: actual daily-cap denial after legitimate 8-unit settlement',()=>{
+  const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
+  for(const kind of ['PREPARE','INTENT'])f.run(operation(kind,'task-A',f.read().tasks['task-A'].revision));
+  const full=operation('RECEIPT','task-A',f.read().tasks['task-A'].revision);
+  full.cost=8;full.providerReceipt='synthetic-full:task-A';f.run(full);
+  f.run(operation('SETTLE','task-A',f.read().tasks['task-A'].revision));
+  assert.equal(f.read().budget.settled,8);assert.equal(f.read().budget.reserved,0);
+  const before=f.read();
+  assert.throws(()=>f.run(operation('PREPARE','task-B',1)),/DAILY_CAP_EXCEEDED/);
+  assert.deepEqual(f.read(),before);
+});
+
+test('D3-20: synthetic overrun records true cost and freezes new attempts',()=>{
+  const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
+  for(const kind of ['PREPARE','INTENT'])f.run(operation(kind,'task-A',f.read().tasks['task-A'].revision));
+  const over=operation('RECEIPT','task-A',f.read().tasks['task-A'].revision);
+  over.cost=11;over.providerReceipt='synthetic-overrun:task-A';f.run(over);
+  f.run(operation('SETTLE','task-A',f.read().tasks['task-A'].revision));
+  const state=f.read();
+  assert.equal(state.tasks['task-A'].status,'COST_INCIDENT');
+  assert.deepEqual(state.budget,{day:'2026-10-09',cap:12,reserved:0,settled:11,released:0,overrun:3});
+  assert.equal(state.costIncident,true);
+  assert.throws(()=>f.run(operation('PREPARE','task-B',1)),/COST_INCIDENT/);
+  assert.equal(f.read().effectCount,0);
+});
+
+test('D3-21 LIMITATION: unknown ATTEMPT_INTENT liveness fails closed',()=>{
+  const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('ADMIT','task-B'));
+  for(const kind of ['PREPARE','INTENT'])f.run(operation(kind,'task-A',f.read().tasks['task-A'].revision));
+  const state=f.read(),second=operation('PREPARE','task-B',1);
+  assert.equal(state.budget.reserved,8);
+  assert.throws(()=>f.run(second),/SINGLE_WRITER_BUSY/);
+  assert.throws(()=>f.run(operation('RECOVER','task-A',state.tasks['task-A'].revision)),/RECOVERY_REQUIRED/);
+  assert.deepEqual(f.read(),state);
+  // Await separately authenticated result/absence evidence before a future recovery design.
 });
 
 test('scope assertion: no real effects or external side-effect capabilities',()=>{
