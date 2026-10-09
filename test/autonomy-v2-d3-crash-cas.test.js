@@ -143,7 +143,8 @@ class Fixture {
     for(let i=0;i<s.events.length;i++){
       const event=s.events[i],receipt=s.receipts[event.id];
       requireRule(!!receipt && receipt.opId===event.id && receipt.kind===event.kind &&
-        receipt.taskId===event.taskId && receipt.generation===i+1,'RECEIPT_EVENT_MISMATCH');
+        receipt.taskId===event.taskId && receipt.generation===i+1 &&
+        receipt.status==='APPLIED','RECEIPT_EVENT_MISMATCH');
     }
     const taskValues=Object.values(s.tasks);
     const sum=(field)=>taskValues.reduce((total,t)=>safeAdd(total,t[field]),0);
@@ -197,8 +198,11 @@ class Fixture {
   // No new send/side-effect is ever authorized by reconciliation.
   reconcile(staged){
     const current=this.read();
+    // The fixture does not authenticate tickets, but never trusts a caller-supplied digest.
+    const actualDigest=hash(staged.cmd);
+    requireRule(actualDigest===staged.digest,'STAGED_DIGEST_MISMATCH');
     if(current.index[staged.cmd.id]){
-      requireRule(current.index[staged.cmd.id]===staged.digest,'OP_PAYLOAD_CONFLICT');
+      requireRule(current.index[staged.cmd.id]===actualDigest,'OP_PAYLOAD_CONFLICT');
       return {status:'ALREADY_APPLIED',receipt:copy(current.receipts[staged.cmd.id])};
     }
     if(same(this.anchor,staged.base))return {status:'ABSENT_CONFIRMED'};
@@ -424,7 +428,7 @@ test('D3-17: earlier applied operation reconciles after later commits',()=>{
   f.run(operation('ADMIT','task-B'));
   assert.deepEqual(f.reconcile(staged),{status:'ALREADY_APPLIED',receipt:f.read().receipts[command.id]});
   assert.equal(f.read().generation,2);
-  assert.throws(()=>f.reconcile({...staged,digest:'forged'}),/OP_PAYLOAD_CONFLICT/);
+  assert.throws(()=>f.reconcile({...staged,digest:'forged'}),/STAGED_DIGEST_MISMATCH/);
 });
 
 test('D3-18: cross-check event receipt association and task budget sums',async t=>{
@@ -491,6 +495,33 @@ test('D3-21 LIMITATION: unknown ATTEMPT_INTENT liveness fails closed',()=>{
   assert.throws(()=>f.run(operation('RECOVER','task-A',state.tasks['task-A'].revision)),/RECOVERY_REQUIRED/);
   assert.deepEqual(f.read(),state);
   // Await separately authenticated result/absence evidence before a future recovery design.
+});
+
+test('D3-22: receipt status, staged digest and incident flag are fail-closed',async t=>{
+  await t.test('receipt status must match event even after recomputed hashes',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));const s=copy(f.read());
+    s.receipts['op-ADMIT-task-A'].status='FORGED';
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/RECEIPT_EVENT_MISMATCH/);
+  });
+  await t.test('reconcile recomputes staged command digest rather than trusting caller',()=>{
+    const f=new Fixture(),staged=f.stage(operation('ADMIT'));
+    f.fsync(staged);f.cas(staged);
+    assert.deepEqual(f.reconcile(staged),{status:'ALREADY_APPLIED',receipt:f.read().receipts[staged.cmd.id]});
+    assert.throws(()=>f.reconcile({...staged,digest:'forged'}),/STAGED_DIGEST_MISMATCH/);
+    assert.throws(()=>f.reconcile({...staged,cmd:{...staged.cmd,limit:7}}),/STAGED_DIGEST_MISMATCH/);
+  });
+  await t.test('cost incident cannot be cleared by a self-consistent forged candidate',()=>{
+    const f=new Fixture();f.run(operation('ADMIT'));
+    for(const kind of ['PREPARE','INTENT'])f.run(operation(kind,'task-A',f.read().tasks['task-A'].revision));
+    const over=operation('RECEIPT','task-A',f.read().tasks['task-A'].revision);
+    over.cost=11;over.providerReceipt='synthetic-overrun:task-A';f.run(over);
+    f.run(operation('SETTLE','task-A',f.read().tasks['task-A'].revision));
+    const s=copy(f.read());assert.equal(s.costIncident,true);
+    s.costIncident=false;
+    const anchor=anchorFor(s,'forged','forged');f.journal.set(anchor.stateDigest,{state:s,anchor});f.anchor=anchor;
+    assert.throws(()=>f.read(),/LEASE_OR_INCIDENT_MISMATCH/);
+  });
 });
 
 test('scope assertion: no real effects or external side-effect capabilities',()=>{
