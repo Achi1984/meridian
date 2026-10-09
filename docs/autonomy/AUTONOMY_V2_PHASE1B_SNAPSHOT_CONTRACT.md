@@ -62,7 +62,14 @@ duplicate IDs and illegal transitions fail closed. Invalid legacy fixtures using
 NOTE or IO charges are rejected rather than silently migrated.
 
 The input boundary is serialized JSON or equivalent plain data records, including
-null-prototype records. Hostile executable JavaScript proxies are outside this
+null-prototype records. Snapshot task lists, operation ledgers and restart
+operation lists must be dense ordinary arrays with own enumerable data indices.
+Sparse arrays, subclasses, custom prototypes, symbol/custom properties, index
+accessors and hidden indices are rejected before iteration or cloning. Frozen
+ordinary arrays remain valid. This closes a restore gap where a custom iterator
+could validate a different ledger from the one structuredClone actually stored,
+allowing lower fences and replay-index disagreement. Descriptor validation does
+not invoke index getters. Hostile executable JavaScript proxies are outside this
 contract: reflective operations may invoke proxy traps. A durable adapter must
 parse serialized input at a trusted boundary rather than accept arbitrary live
 objects. The plain-data guard does not provide an execution sandbox.
