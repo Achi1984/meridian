@@ -3,7 +3,9 @@
  * Operation: MERIDIAN-D3-CRASH-CAS-MODEL-20261009-001
  * THIS IS NOT A DURABLE STORE, A REAL ATTESTATION, OR AN EXECUTION ADAPTER.
  * No network, file I/O, credentials, remote provider, workflow, or trading.
- * node --test --test-reporter=tap d3-crash-cas-offline.test.mjs
+ * node --test --test-reporter=tap test/autonomy-v2-d3-crash-cas.test.js
+ * LIMITATION: independent monotone witness is NOT implemented: coherent rollback of
+ * the anchor and a matching old journal version is undetectable in this model.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -286,7 +288,18 @@ test('D3-13: coherent local rollback cannot defeat retained anchor',async t=>{
   });
 });
 
-test('D3-14: identity and high-water rollback rejected',async t=>{
+test('D3-13 LIMITATION: coherent authority rollback is undetectable without an independent witness',()=>{
+  const f=new Fixture();const oldAnchor=copy(f.anchor),oldSnapshot=copy(f.read());
+  f.run(operation('ADMIT'));assert.equal(f.read().generation,1);
+  // Simulate compromise/rollback of the authority itself, with the old journal retained.
+  f.anchor=oldAnchor;f.local=oldSnapshot;
+  assert.deepEqual(f.restart(),oldSnapshot);
+  assert.equal(f.read().generation,0);
+  assert.equal(f.read().tasks['task-A'],undefined);
+  // This is a deliberate demonstration of an unsupported threat model, NOT a guard PASS.
+});
+
+test('D3-14: mismatched anchor tuple and identity rejected (not coherent anchor rollback)',async t=>{
   for(const field of ['storeUUID','generation','writerEpoch','fenceHighWater','timeHighWater','replayRoot'])await t.test(field,()=>{
     const f=new Fixture();f.run(operation('ADMIT'));f.run(operation('PREPARE','task-A',1));
     if(field==='storeUUID')f.anchor.storeUUID='other-installation';
@@ -320,6 +333,33 @@ test('D3-15: unavailable authority, damaged candidate/replay and speculative poi
     const f=new Fixture();f.run(operation('ADMIT'));f.journal.delete(f.anchor.stateDigest);
     assert.throws(()=>f.restart(),/MISSING_AUTHORITY_VERSION/);
     assert.equal(f.anchor.generation,1);
+  });
+});
+
+test('D3 supplementary recovery probe: ATTEMPT_INTENT without receipt retains reservation',async t=>{
+  for(const cut of ['C0','C1','C2','C3'])await t.test(`RECEIPT ${cut}`,()=>{
+    const {f,cmd}=scenario('RECEIPT');
+    assert.equal(f.read().tasks['task-A'].status,'ATTEMPT_INTENT');
+    assert.throws(()=>f.run(cmd,{crash:cut}),new RegExp(`CRASH_${cut}`));
+    const s=f.restart(),task=s.tasks['task-A'];
+    assert.equal(task.status,'ATTEMPT_INTENT');
+    assert.equal(s.budget.reserved,8);
+    assert.equal(s.budget.settled,0);
+    assert.equal(s.budget.released,0);
+    assert.equal(s.activeLease?.taskId,'task-A');
+    assert.equal(s.effectCount,0);
+    if(cut==='C0'||cut==='C1') {
+      assert.equal(task.receipt,null);
+      assert.throws(()=>f.run(operation('SETTLE','task-A',task.revision)),/RECOVERY_REQUIRED/);
+    } else {
+      assert.deepEqual(task.receipt,{cost:3,providerReceipt:'synthetic:task-A'});
+      assert.equal(f.run(cmd).status,'ALREADY_APPLIED');
+    }
+    assert.throws(()=>f.run(operation('RECOVER','task-A',task.revision)),/RECOVERY_REQUIRED/);
+    assert.throws(()=>f.run(operation('INTENT','task-A',task.revision)),/OP_PAYLOAD_CONFLICT/);
+    const secondIntent={...operation('INTENT','task-A',task.revision),id:'op-INTENT-task-A-second'};
+    assert.throws(()=>f.run(secondIntent),/INVALID_TRANSITION/);
+    assert.equal(f.read().budget.reserved,8);
   });
 });
 
