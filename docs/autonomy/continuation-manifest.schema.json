@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MERIDIAN inactive continuation manifest claims",
+  "description": "Structural schema only. Passing is not authorization. The pure validator also checks ordered dependencies, uniqueness, cap and window relationships.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repository", "baseSha", "issuedAt", "expiresAt", "maxInvocations", "ownerApprovalRef", "packets"],
+  "properties": {
+    "schema": {"const": 1},
+    "repository": {"const": "Achi1984/meridian"},
+    "baseSha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "issuedAt": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "expiresAt": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "maxInvocations": {"type": "integer", "minimum": 1, "maximum": 8},
+    "ownerApprovalRef": {"type": "string", "pattern": "^https://github\\.com/Achi1984/meridian/issues/571#issuecomment-[1-9][0-9]{0,19}$"},
+    "packets": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "paths", "dependencies", "dependencyGate", "outputClass", "templateDigest"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+          "paths": {
+            "type": "array", "minItems": 2, "maxItems": 2,
+            "prefixItems": [
+              {"type": "string", "maxLength": 160, "pattern": "^docs/v11/[A-Za-z0-9][A-Za-z0-9_-]*\\.md$"},
+              {"type": "string", "maxLength": 160, "pattern": "^test/v11-[a-z0-9][a-z0-9-]*\\.test\\.js$"}
+            ],
+            "items": false
+          },
+          "dependencies": {"type": "array", "maxItems": 7, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}},
+          "dependencyGate": {"enum": ["draft", "merged"]},
+          "outputClass": {"const": "docs-with-trusted-test"},
+          "templateDigest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}
