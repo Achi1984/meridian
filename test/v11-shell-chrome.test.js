@@ -7,11 +7,15 @@ import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 const page=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
-const probe=`(()=>{const x={width:innerWidth,viewport:document.documentElement.clientWidth,
+const probe=`(()=>{const tokenColor=token=>{const node=document.createElement('span');node.style.color='var('+token+')';document.body.append(node);const color=getComputedStyle(node).color;node.remove();return color;};
+const x={width:innerWidth,viewport:document.documentElement.clientWidth,
 body:document.body.scrollWidth,root:document.documentElement.scrollWidth,dpr:devicePixelRatio,
 nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').length,
 decisionBackground:getComputedStyle(document.querySelector('.decision')).backgroundImage,
 sourceLabels:[...document.querySelectorAll('.trust-cell span')].map(n=>n.textContent),
+attentionColor:tokenColor('--attention'),positiveColor:tokenColor('--positive'),
+unknownBotsAccents:[getComputedStyle(document.querySelector('.trust-cell:nth-child(2)')).borderTopColor,getComputedStyle(document.querySelector('#view-bots .view-placeholder')).borderTopColor],
+unknownBotsBackground:getComputedStyle(document.querySelector('.trust-cell:nth-child(2)')).backgroundImage,
 stateColor:getComputedStyle(document.querySelector('.preview-status strong')).color};
 for(const b of document.querySelectorAll('#nav button')){
 const l=b.querySelector('span:last-child'),s=getComputedStyle(l);
@@ -43,6 +47,11 @@ for(const width of [320,375,390,430]){
  assert.equal(x.decision,1);assert.equal(x.nav.length,5);
  assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
  assert.deepEqual(x.sourceLabels,['Unbekannt','Unbekannt','Unbekannt'],'category colors do not verify sources');
+ for(const accent of x.unknownBotsAccents){
+  assert.equal(accent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
+  assert.notEqual(accent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
+ }
+ assert.match(x.unknownBotsBackground,/rgb\(53, 43, 24\)/,'unknown BOTS trust-cell uses amber dark background');
  assert.equal(x.stateColor,'rgb(240, 202, 133)','A2 unknown-state color stays independent');
  const categoryColors={command:'rgb(169, 212, 255)',depot:'rgb(123, 182, 255)',bots:'rgb(46, 207, 154)',market:'rgb(182, 155, 255)',research:'rgb(212, 154, 255)'};
  for(const n of x.nav){
