@@ -42,7 +42,7 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#571**.
+- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#639**.
 - Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION` und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
 - Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
 - Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die Review-Antwort. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
