@@ -133,3 +133,30 @@ test('consistent historical evidence can repeat across packets without granting 
   p.responses=p.responses.filter(r=>r.headSha!==p.headSha);
   assert.equal(run(p,q).find(r=>r.workId===p.workId).status,'WAITING_REVIEW');
 });
+test('running owners cannot mask stale or failed supplied CI',()=>{
+  for(const [change,status,reason] of [
+    [p=>p.ci.headSha='c'.repeat(40),'BLOCKED','STALE_CI'],
+    [p=>p.ci.baseSha='c'.repeat(40),'BLOCKED','STALE_CI'],
+    [p=>p.ci.jobs[0].conclusion='FAILURE','BLOCKED','CI_FAILED'],
+    [p=>{p.ci.jobs[0].passed=9;p.ci.jobs[0].failed=1;},'BLOCKED','CI_FAILED'],
+    [()=>{},'WAITING_AGENT','OWNER_IN_FLIGHT'],
+    [p=>p.ci=null,'WAITING_AGENT','OWNER_IN_FLIGHT'],
+    [p=>p.ci.jobs[0].conclusion='PENDING','WAITING_AGENT','OWNER_IN_FLIGHT']
+  ]) {
+    const p=packet();p.execution='RUNNING';p.owner='CODEX';change(p);
+    const actual=run(p)[0];assert.equal(actual.status,status);assert.equal(actual.reason,reason);
+  }
+});
+test('CI reorder preserves reconciliation, review and stale-before-failed precedence',()=>{
+  const p=packet();p.owner='CODEX';p.execution='RUNNING';
+  p.ci.headSha='c'.repeat(40);p.ci.jobs[0].conclusion='FAILURE';
+  assert.equal(run(p)[0].reason,'STALE_CI');
+  p.responses[0].verdict='REVISION_REQUIRED';assert.equal(run(p)[0].reason,'STRICTEST_VERDICT');
+  p.execution='UNKNOWN';assert.equal(run(p)[0].reason,'RECONCILE_UNKNOWN_OUTCOME');
+});
+test('invalid nested repository fails closed even for historical evidence',()=>{
+  for(const kind of ['responses','inFlight']) {
+    const p=packet(),row=historicalScope();row.repository='other/repository';
+    addHistory(p,kind,row,50);assert.throws(()=>run(p),/INVALID_SCOPE/);
+  }
+});

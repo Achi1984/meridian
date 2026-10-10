@@ -72,7 +72,9 @@ part of packet identity. Output ordering is stable by status then work ID.
 Unknown outcomes block pending reconciliation. Any overlapping scopes among
 current work packets conservatively block both, including planned work and
 ancestor directory scopes. No automatic conflict winner or retry is selected.
-Running packets wait for their owner. CI must match both pins; stale head/base
+Running packets wait for their owner unless supplied CI is stale or failed;
+those CI blockers take precedence over `WAITING_AGENT`. Null or pending CI
+keeps an active owner in `WAITING_AGENT`. CI must match both pins; stale head/base
 evidence intentionally returns `BLOCKED / STALE_CI` and requires a fresh
 reconciled snapshot rather than speculative continuation. Reviews reuse the
 existing strictest-verdict and deduplication rules. Missing evidence waits.

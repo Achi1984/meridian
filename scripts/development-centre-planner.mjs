@@ -119,10 +119,10 @@ export function planWork(input) {
       && w.paths.some(a => other.paths.some(b => overlaps(a, b))))) {
       status = 'BLOCKED'; reason = 'OVERLAPPING_SCOPE';
     } else if (review.status === 'BLOCKED') { status = 'BLOCKED'; reason = review.reason; }
+    else if (w.ci !== null && (w.ci.headSha !== w.headSha || w.ci.baseSha !== w.baseSha)) { status = 'BLOCKED'; reason = 'STALE_CI'; }
+    else if (w.ci !== null && w.ci.jobs.some(j => j.conclusion === 'FAILURE' || j.failed > 0)) { status = 'BLOCKED'; reason = 'CI_FAILED'; }
     else if (w.execution === 'RUNNING') { status = 'WAITING_AGENT'; reason = 'OWNER_IN_FLIGHT'; }
     else if (w.ci === null) { status = 'WAITING_CI'; reason = 'CI_MISSING'; }
-    else if (w.ci.headSha !== w.headSha || w.ci.baseSha !== w.baseSha) { status = 'BLOCKED'; reason = 'STALE_CI'; }
-    else if (w.ci.jobs.some(j => j.conclusion === 'FAILURE' || j.failed > 0)) { status = 'BLOCKED'; reason = 'CI_FAILED'; }
     else if (w.ci.jobs.some(j => j.conclusion === 'PENDING') || s.requiredJobs.some(name => !w.ci.jobs.some(j => j.name === name && j.conclusion === 'SUCCESS'
       && j.total > 0 && j.passed === j.total))) { status = 'WAITING_CI'; reason = 'CI_INCOMPLETE'; }
     else if (review.status !== 'REVIEWED') { status = 'WAITING_REVIEW'; reason = review.reason; }
