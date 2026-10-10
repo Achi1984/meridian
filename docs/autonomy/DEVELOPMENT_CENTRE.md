@@ -46,9 +46,15 @@ are `SUCCESS`, `PENDING`, `FAILURE`. Counts are nonnegative safe integers with
 `passed + failed = total`; every required job must succeed with positive totals.
 Required job identifiers intentionally represent test-bearing jobs; non-test jobs
 need a separately designed schema rather than invented test counts. All other
-job failures also block. Required-job selection is caller-supplied policy, not
+job failures also block. Any pending job, including a non-required job, waits
+with `WAITING_CI / CI_INCOMPLETE`; failures take precedence over pending jobs. Required-job selection is caller-supplied policy, not
 verified repository policy. Identifiers use 3–128 letters/digits/`.`/`_`/`:`/`-`,
-starting with a letter/digit. Collections allow at most 128 members; strings 1024
+starting with a letter/digit. The collector must map GitHub display names to
+stable, collision-free schema IDs and preserve the source-to-ID mapping in its
+own provenance record; names containing spaces and the short name `ci` are
+invalid here. The same mapping must be used for required jobs and observed jobs.
+Do not silently sanitize two names into the same ID or discard pending checks.
+Collections allow at most 128 members; strings 1024
 characters; depth 12; total cloned values 20,000. This is a snapshot limit, not a
 queue retention policy.
 
@@ -62,7 +68,9 @@ part of packet identity. Output ordering is stable by status then work ID.
 Unknown outcomes block pending reconciliation. Any overlapping scopes among
 current work packets conservatively block both, including planned work and
 ancestor directory scopes. No automatic conflict winner or retry is selected.
-Running packets wait for their owner. CI must match both pins; reviews reuse the
+Running packets wait for their owner. CI must match both pins; stale head/base
+evidence intentionally returns `BLOCKED / STALE_CI` and requires a fresh
+reconciled snapshot rather than speculative continuation. reviews reuse the
 existing strictest-verdict and deduplication rules. Missing evidence waits.
 
 `READY_FOR_OWNER_DECISION` means supplied evidence is internally consistent only.

@@ -73,3 +73,22 @@ test('snapshot-wide review and CI identities cannot attest conflicting heads',()
   assert.throws(()=>run(p,ciCollision),/CI_RUN_CONFLICT/);
   assert.ok(run(p,second()).every(r=>r.status==='READY_FOR_OWNER_DECISION'));
 });
+
+test('additional pending CI jobs delay readiness; failures retain precedence',()=>{
+  const p=packet();
+  p.ci.jobs.push({name:'optional-check',conclusion:'PENDING',total:0,passed:0,failed:0});
+  assert.equal(run(p)[0].status,'WAITING_CI');
+  assert.equal(run(p)[0].reason,'CI_INCOMPLETE');
+  p.ci.jobs.push({name:'failed-check',conclusion:'FAILURE',total:1,passed:0,failed:1});
+  assert.equal(run(p)[0].status,'BLOCKED');
+  assert.equal(run(p)[0].reason,'CI_FAILED');
+  p.ci.jobs.pop();
+  p.ci.jobs[1].conclusion='SUCCESS';
+  assert.equal(run(p)[0].status,'READY_FOR_OWNER_DECISION');
+});
+test('job IDs require explicit valid collector mappings',()=>{
+  for(const name of ['ci','Release Safety']) {
+    assert.throws(()=>planWork({requiredJobs:[name],work:[packet()]}),/INVALID_COLLECTION/);
+    const p=packet();p.ci.jobs[0].name=name;assert.throws(()=>run(p),/INVALID_CI/);
+  }
+});

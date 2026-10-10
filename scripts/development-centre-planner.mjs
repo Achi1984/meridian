@@ -108,7 +108,7 @@ export function planWork(input) {
     else if (w.ci === null) { status = 'WAITING_CI'; reason = 'CI_MISSING'; }
     else if (w.ci.headSha !== w.headSha || w.ci.baseSha !== w.baseSha) { status = 'BLOCKED'; reason = 'STALE_CI'; }
     else if (w.ci.jobs.some(j => j.conclusion === 'FAILURE' || j.failed > 0)) { status = 'BLOCKED'; reason = 'CI_FAILED'; }
-    else if (s.requiredJobs.some(name => !w.ci.jobs.some(j => j.name === name && j.conclusion === 'SUCCESS'
+    else if (w.ci.jobs.some(j => j.conclusion === 'PENDING') || s.requiredJobs.some(name => !w.ci.jobs.some(j => j.name === name && j.conclusion === 'SUCCESS'
       && j.total > 0 && j.passed === j.total))) { status = 'WAITING_CI'; reason = 'CI_INCOMPLETE'; }
     else if (review.status !== 'REVIEWED') { status = 'WAITING_REVIEW'; reason = review.reason; }
     else { status = 'READY_FOR_OWNER_DECISION'; reason = 'OFFLINE_CONSISTENT_ONLY'; }
