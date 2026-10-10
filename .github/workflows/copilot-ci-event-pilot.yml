@@ -39,7 +39,7 @@ jobs:
           import datetime, json, os, pathlib, re, signal, subprocess, sys, time, urllib.request
           REPO = 'Achi1984/meridian'
           BRANCH = 'feat/v11-version-history-20261010'
-          DEADLINE = datetime.datetime.fromisoformat('2026-10-10T17:20:00+00:00').timestamp()
+          DEADLINE = datetime.datetime.fromisoformat('2026-10-10T17:45:00+00:00').timestamp()
           # Exact workflow identities are part of the reviewed control, never event inputs.
           RELEASE_ID = 347821227
           RELEASE_PATH = '.github/workflows/backend-safety.yml'
