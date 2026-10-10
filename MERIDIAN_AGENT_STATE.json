@@ -24,12 +24,8 @@
     "fallbackDisclosureRequired": true
   },
   "streamingGuard": {
-    "protocol": "STREAM-SAFE-V7",
+    "protocol": "STREAM-SAFE-V8",
     "compactBootstrapFile": "MERIDIAN_LIVE_CHECKPOINT.json",
-    "maxToolCallGroupsPerVisibleBurst": 1,
-    "maxMutationsPerVisibleBurst": 1,
-    "maxSameStatusPollsPerVisibleBurst": 1,
-    "maxVisibleBurstSeconds": 45,
     "maxPayloadBytes": 4096,
     "noBulkContinuityDump": true,
     "expandLargeContinuityFilesOnlyOnMismatch": true,
@@ -50,19 +46,25 @@
     "boundedReadsRequired": true,
     "maxInterruptionsPerStep": 2,
     "interruptionStopState": "BLOCKED_STREAM",
-    "maxToolCallGroupsPerTurn": 1,
-    "maxMutationsPerTurn": 1,
-    "stopTurnAfterMutation": true,
-    "maxSameStatusPollsPerTurn": 1,
-    "maxCommentaryCheckpointsPerTurn": 2,
+    "stopTurnAfterMutation": false,
     "maxToolResultEchoChars": 600,
-    "maxLogSlicePerTurn": 1,
     "maxMailboxTailComments": 5,
-    "targetTurnSeconds": 20,
-    "maxTurnSeconds": 30,
     "waitingIsTerminalTurnState": true,
     "duplicateClaudeRequestPolicy": "SAME_ID_AND_HEAD_ONLY_NO_REPOST",
-    "nextStepLineRequired": true
+    "nextStepLineRequired": true,
+    "executionUnit": "AUTHORIZED_WORK_PACKAGE",
+    "maxSameStatusPollsPerSession": 1,
+    "maxConcurrentWritersPerBranch": 1,
+    "operationIntentRequired": true,
+    "expectedStateGuardRequired": true,
+    "reconcileAfterEveryMutation": true,
+    "ownerMergeApprovalRequired": true,
+    "automaticDispatchAuthorized": false,
+    "additionalSpendAuthorized": false,
+    "workflowChangesAuthorized": false,
+    "readOnlyConflictDiagnosisAllowed": true,
+    "successfulCiEvidenceReadAllowed": true,
+    "policyProposalCommentId": 6096562356
   },
   "recoveryChecks": [
     "LATEST_MAIN_SHA",
@@ -159,7 +161,7 @@
     "canonicalMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "build": "10.0-r115",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source→Events→Strategy→Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
+    "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source\u2192Events\u2192Strategy\u2192Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
   },
   "nextChatBootstrap": [
     "Read mailboxIssue from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items",

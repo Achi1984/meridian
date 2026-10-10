@@ -21,7 +21,7 @@ export function compactCheckpoint(input={}){
   return {
     protocol:policy.protocol,
     resumeToken:[mainSha,input.branch||'main',headSha,prNumber==null?'no-pr':'pr-'+prNumber].filter(Boolean).join(':'),
-    streamBudget:{toolBatches:policy.streamSafety.maxToolCallGroupsPerTurn,sameStatusPolls:policy.streamSafety.maxSameStatusPollsPerTurn,maxPayloadBytes:limits.visibleBytes,maxPayloadBytesScope:policy.streamSafety.maxPayloadBytesScope,maxSourceFileBytes:limits.fileBytes,maxSerializedUploadBytes:limits.requestBytes,maxTurnSeconds:policy.streamSafety.maxTurnSeconds,checkpointAfterMutation:policy.streamSafety.checkpointAfterEveryMutation},
+    streamBudget:{executionUnit:policy.streamSafety.executionUnit,sameStatusPolls:policy.streamSafety.maxSameStatusPollsPerSession,maxPayloadBytes:limits.visibleBytes,maxPayloadBytesScope:policy.streamSafety.maxPayloadBytesScope,maxSourceFileBytes:limits.fileBytes,maxSerializedUploadBytes:limits.requestBytes,checkpointAfterMutation:policy.streamSafety.checkpointAfterEveryMutation},
     mainSha,
     terminalBuild:input.terminalBuild||null,
     branch:input.branch||null,
