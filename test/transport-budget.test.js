@@ -63,7 +63,7 @@ test('CLI invalid JSON rejects without leaking input or parse context',()=>{
   assert.equal(run.status,1);assert.equal(run.stderr.trim(),'TRANSPORT_BUDGET: INPUT_REJECTED');assert.ok(!run.stderr.includes(marker));
 });
 test('Canonical budgets and operating/research boundaries are kept distinct',()=>{
-  assert.equal(cp.protocol,'STREAM-SAFE-V7');assert.equal(cp.streamSafety.maxMutationsPerTurn,1);assert.equal(cp.streamSafety.stopTurnAfterMutation,true);
+  assert.equal(cp.protocol,'STREAM-SAFE-V8');assert.equal(cp.streamSafety.executionUnit,'AUTHORIZED_WORK_PACKAGE');assert.equal(cp.streamSafety.stopTurnAfterMutation,false);assert.equal(cp.streamSafety.checkpointAfterEveryMutation,true);assert.equal(cp.streamSafety.ownerMergeApprovalRequired,true);assert.equal(cp.streamSafety.additionalSpendAuthorized,false);assert.equal(cp.streamSafety.automaticDispatchAuthorized,false);assert.equal(cp.streamSafety.workflowChangesAuthorized,false);assert.ok(!Object.hasOwn(cp.streamSafety,'maxMutationsPerTurn'));
   assert.equal(cp.streamSafety.compareAndSwapRequired,true);assert.equal(cp.streamSafety.requireExpectedBranchHead,true);assert.equal(cp.streamSafety.mergeExactHeadAndBaseRequired,true);
   assert.equal(cp.streamSafety.transportApprovalCommentId,6037360103);assert.equal(cp.activeResearch.stage,'SOURCE_AUDIT');
   const flags=Object.entries(cp.activeResearch).filter(([k])=>k.endsWith('Authorized'));assert.equal(flags.length,7);assert.ok(flags.every(([,v])=>v===false));
