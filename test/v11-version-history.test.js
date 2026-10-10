@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
+const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+test('version disclosure distinguishes published terminal from integrated preview with evidence',()=>{
+ assert.match(html,/id="version-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="version-panel"/);
+ assert.match(html,/id="version-panel"[^>]*aria-labelledby="version-history-heading" hidden/);
+ assert.match(html,/Terminal 10\.0-r127/);
+ const release=JSON.parse(readFileSync(new URL('../version.json',import.meta.url),'utf8'));
+ assert.ok(html.includes('Terminal '+release.terminalBuild),'displayed terminal must match repository terminalBuild, not legacy version');
+ assert.match(html,/Meridian 11 · A2<\/strong><span class="version-status">Vorschau/);
+ assert.match(html,/pull\/623/);assert.match(html,/pull\/552/);
+ assert.match(html,/Integrationsdaten sind keine Veröffentlichungsdaten/);
+ assert.doesNotMatch(html,/Meridian 11 · A1/);
+});
+test('version button toggles, Escape closes and restores focus without touching app data',()=>{
+ const listeners=()=>({handlers:{},addEventListener(k,f){this.handlers[k]=f;}});
+ const toggle=Object.assign(listeners(),{attrs:{'aria-expanded':'false'},setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;}});
+ const panel=Object.assign(listeners(),{hidden:true});
+ const nav=Object.assign(listeners(),{querySelectorAll:()=>[]});
+ const nodes=new Map([['nav',nav],['version-toggle',toggle],['version-panel',panel]]);
+ vm.runInNewContext(script,{document:{getElementById:id=>nodes.get(id)}},{timeout:250});
+ toggle.handlers.click();assert.equal(panel.hidden,false);assert.equal(toggle.attrs['aria-expanded'],'true');
+ let prevented=false;panel.handlers.keydown({key:'Escape',preventDefault(){prevented=true;}});
+ assert.equal(panel.hidden,true);assert.equal(toggle.attrs['aria-expanded'],'false');assert.equal(toggle.focused,true);assert.equal(prevented,true);
+ toggle.handlers.click();toggle.handlers.click();assert.equal(panel.hidden,true);
+ toggle.handlers.keydown({key:'Escape',preventDefault(){throw Error('closed panel consumed Escape');}});
+});
