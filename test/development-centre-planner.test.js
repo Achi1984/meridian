@@ -160,3 +160,28 @@ test('invalid nested repository fails closed even for historical evidence',()=>{
     addHistory(p,kind,row,50);assert.throws(()=>run(p),/INVALID_SCOPE/);
   }
 });
+test('active-scope adverse reviews cannot hide inside another packet',()=>{
+  for(const verdict of ['REVISION_REQUIRED','NEEDS_MORE_EVIDENCE','CHANGES_REQUIRED','STALE_HEAD']) {
+    const [p,q]=independentPair();q.responses.push({...p.responses[0],reviewCommentId:50,verdict});
+    for(const order of [[p,q],[q,p]]) {
+      const results=run(...order);
+      assert.equal(results.find(r=>r.workId===p.workId).reason,'STRICTEST_VERDICT');
+      assert.equal(results.find(r=>r.workId===q.workId).status,'READY_FOR_OWNER_DECISION');
+    }
+  }
+});
+test('in-flight evidence routes to its active scope regardless of containing packet',()=>{
+  const [p,q]=independentPair();
+  const row=Object.fromEntries(['repository','requestId','opId','headSha','baseSha'].map(k=>[k,p[k]]));
+  q.inFlight.push(row);p.responses=[];
+  for(const order of [[p,q],[q,p]])assert.equal(run(...order).find(r=>r.workId===p.workId).reason,'ALREADY_REQUESTED');
+  q.responses.push({...row,reviewCommentId:50,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'});
+  assert.ok(run(p,q).every(r=>r.status==='READY_FOR_OWNER_DECISION'),'answered in-flight request retains existing GREEN semantics');
+});
+test('alternate request on an active head cannot hide in foreign historical rows',()=>{
+  for(const kind of ['responses','inFlight']) {
+    const [p,q]=independentPair();
+    const row={...historicalScope(),headSha:p.headSha};addHistory(q,kind,row,50);
+    for(const order of [[p,q],[q,p]])assert.equal(run(...order).find(r=>r.workId===p.workId).reason,'HEAD_ALREADY_SCOPED');
+  }
+});

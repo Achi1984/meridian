@@ -77,7 +77,7 @@ export function planWork(input) {
     need(['NONE', 'CHATGPT', 'CODEX', 'COPILOT'].includes(w.owner)
       && ['PLANNED', 'RUNNING', 'UNKNOWN'].includes(w.execution), 'INVALID_EXECUTION');
     need(w.execution !== 'RUNNING' || w.owner !== 'NONE', 'OWNER_REQUIRED');
-    const review = classifyReview({...scope(w), responses: w.responses, inFlight: w.inFlight}, scope(w));
+    classifyReview({...scope(w), responses: w.responses, inFlight: w.inFlight}, scope(w));
     // classifyReview validates each row; now bind every scope across packets too.
     for (const row of [w, ...w.responses, ...w.inFlight]) bindScope(row);
     for (const row of w.responses) {
@@ -109,10 +109,26 @@ export function planWork(input) {
     }
     need(!heads.has(w.headSha) || heads.get(w.headSha) === signature, 'HEAD_ALREADY_SCOPED');
     heads.set(w.headSha, signature);
-    deliveries.set(deliveryId, signature); works.set(w.workId, {w, review, signature});
+    deliveries.set(deliveryId, signature); works.set(w.workId, {w, signature});
   }
   const packets = [...works.values()];
-  const results = packets.map(({w, review}) => {
+  // Route all validated evidence by head, not by its container packet. Including
+  // alternate request IDs on that head preserves the coordinator's dedupe guard.
+  const evidenceByHead = new Map();
+  for (const {w} of packets) {
+    for (const kind of ['responses', 'inFlight']) {
+      for (const row of w[kind]) {
+        if (!evidenceByHead.has(row.headSha)) evidenceByHead.set(row.headSha, {responses: new Map(), inFlight: new Map()});
+        const key = kind === 'responses' ? row.reviewCommentId : canonical(scope(row));
+        evidenceByHead.get(row.headSha)[kind].set(key, row);
+      }
+    }
+  }
+  const results = packets.map(({w}) => {
+    const evidence = evidenceByHead.get(w.headSha);
+    const review = classifyReview({...scope(w),
+      responses: evidence ? [...evidence.responses.values()] : [],
+      inFlight: evidence ? [...evidence.inFlight.values()] : []}, scope(w));
     let status, reason;
     if (w.execution === 'UNKNOWN') { status = 'BLOCKED'; reason = 'RECONCILE_UNKNOWN_OUTCOME'; }
     else if (packets.some(({w: other}) => other.workId !== w.workId

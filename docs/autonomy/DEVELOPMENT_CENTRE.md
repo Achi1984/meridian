@@ -64,7 +64,15 @@ CI run IDs must also have identical evidence bindings across the entire snapshot
 Every top-level and nested response/in-flight scope shares snapshot-wide bindings:
 a request or operation ID cannot refer to different scope pins, and a head cannot
 refer to different bases. Consistent historical rows may repeat across packets;
-they do not substitute for a review of the current request/head. A head
+they do not substitute for a review of the current request/head. After all packets
+are validated, responses and in-flight rows are deduplicated and routed to their
+active head across the entire snapshot. Their containing packet does not determine
+which work they affect. Alternate request IDs on an active head still block;
+the strictest matching verdict wins even when carried in another packet. Matching
+GREEN answers an in-flight request under the existing coordinator rules. Unrelated
+historical heads remain historical. The existing coordinator limit of 256 unique
+responses and 256 unique in-flight scopes per routed head remains fail-closed;
+the planner never truncates adverse evidence to fit that limit. A head
 cannot be reintroduced under a different work packet. Updates belong in a new
 reconciled snapshot, not appended alongside an old version. Array ordering is
 part of packet identity. Output ordering is stable by status then work ID.
