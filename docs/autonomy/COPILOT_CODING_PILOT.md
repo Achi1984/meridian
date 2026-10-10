@@ -1,3 +1,51 @@
+# Trial 3 proposal — SOURCE ONLY; owner activation approval pending
+
+This candidate is preparation only. Its proposed constants are not permission to
+merge or activate the listener, change repository settings, rerun CI, or call a
+model. Earlier trial approvals below do not authorize trial 3. Obtain an explicit
+owner decision for this exact packet, deadline, source attempt and temporary PR
+setting before deployment or execution. Fresh exact-head CI and Claude review,
+then successful postmerge gates, remain mandatory.
+
+Proposed bounded trial (not activated):
+
+- Source: Release Safety run `38070967939`, exactly attempt `5`, PR653 head
+  `2b267ecc0f94565fe005156bf45e8f0ae139eb9b`.
+- Fixed new claim/output branch: `pilot/version-history-ledger-20261010-t3`.
+- Fixed packet identity: `version-history-ledger-20261010-t3`.
+- Proposed hard cutoff: `2026-10-10T19:30:00Z` (21:30 Europe/Vienna), epoch
+  `1791660600`. This extension is not yet authorized.
+- At most one bounded CLI invocation and one new Draft PR, only the existing two
+  approved ledger/test paths. No product merge or recursive next task.
+
+Preserve the original claim branch and PR656, currently head
+`11439f80293c4cac71624fe8e834a0abf7f01dee`; no reset, force push, deletion or
+reuse. Candidate base is `c70c20da744a441c1bcbd38ff6a0225fb7fcdbcb`. PR656
+must remain unmerged until the trial decision: its output paths are currently
+absent from main. If PR656 is merged first, stop and redesign/review this packet
+rather than overwrite those files under this proposal. The old source attempt4 is already complete and cannot be replayed. Only
+if approved, deploy and verify this candidate first, then request exactly one
+source rerun to attempt5 and perform the required maintainer approval. A failed
+or uncertain claim/generation/publication consumes trial3; no further source
+attempt, alternate branch suffix or failed-job-only inference retry is allowed.
+Control attempts1/2 remain bound into the durable claim and owner identity.
+
+Temporarily enabling the combined repository-wide PR create/approve setting also
+requires the explicit trial3 decision. Restore OFF on completion or cutoff; leave
+default token permissions read-only and all spending controls unchanged. Existing
+observer workflows stay disabled. No model calls have been made for this proposal.
+
+Success means the real provider output passes both deterministic ledger gates,
+creates the new Draft, and passes the unchanged trusted test during independent
+audit. This would prove a bounded quality-checked CI-to-Draft packet, not autonomous
+CI approval, merge or further packet selection. Extra prose still needs human review.
+
+The sections below record prior approvals and experiments only; where their
+activation language conflicts with this proposal, this pending-approval section
+controls trial3. No historic approval carries forward automatically.
+
+---
+
 # One-packet coding pilot — approved bounded trial, pending gates
 
 Owner approved proposal mailbox571/6100575756 at 2026-10-10 20:05:46 Europe/Vienna

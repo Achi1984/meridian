@@ -27,7 +27,7 @@ import copy, io, json, os, pathlib, stat, tempfile, time, unittest.mock as mock,
 repo={'full_name':p.REPO,'fork':False,'owner':{'login':'Achi1984','type':'User'}}
 base='a'*40
 def fixture():
-    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':4,
+    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':5,
       'path':'.github/workflows/backend-safety.yml','event':'pull_request','status':'completed','conclusion':'success',
       'repository':repo,'head_repository':repo,'head_branch':'copilot/packet','pull_requests':[{'number':653}]}
     data={'actions/runs/'+str(p.SOURCE_RUN):source,'pulls/653':{'number':653,'state':'open','merged':False,
@@ -59,10 +59,10 @@ def rejects(fn):
     except (ValueError,UnicodeError):pass
     else:raise AssertionError('unsafe value accepted')
 `;
-test('fresh source binding permits approved attempt4 but denies stale/fork/foreign CI', () => {
+test('fresh source binding permits proposed attempt5 but denies stale/fork/foreign CI', () => {
   python(fixture + String.raw`
-result=trial(accept=True); assert result['source_attempt']==4
-for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',3),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
+result=trial(accept=True); assert result['source_attempt']==5
+for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',4),('run_attempt',6),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
     trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update({field:value}))
 trial(lambda d,e:e.update(action='requested'))
 trial(lambda d,e:e['repository'].update(fork=True))
@@ -278,7 +278,7 @@ test('maintainer approval attempt2 is admitted consistently while other actors a
   assert.match(workflow, /github\.triggering_actor == 'Achi1984'/);
   python(fixture + String.raw`
 for attempt in ('1','2'):
-    assert trial(accept=True,attempt=attempt)['source_attempt']==4
+    assert trial(accept=True,attempt=attempt)['source_attempt']==5
     for actor in ('Copilot','other-owner','',None):trial(attempt=attempt,actor=actor or '')
 for attempt in ('0','3','99','-1','02',''):
     trial(attempt=attempt)
@@ -386,5 +386,39 @@ def api(path,method='GET',*args,**kwargs):
 with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'validate_claim',return_value=(claim,'d'*40)), \
      mock.patch.dict(os.environ,{'CLAIM_SHA':claim,'ARTIFACT_ID':'300'}),mock.patch.object(p,'api',side_effect=api), \
      mock.patch.object(p,'artifact_bytes',return_value=raw):rejects(p.publish)
+`);
+});
+
+
+test('trial3 requires a fresh fixed packet and cannot reuse or reset a consumed claim', () => {
+  python(fixture + String.raw`
+evidence=trial(accept=True)
+assert p.SOURCE_ATTEMPT==5 and p.DEADLINE==1791660600
+assert p.BRANCH=='pilot/version-history-ledger-20261010-t3'
+assert evidence['packet']=='version-history-ledger-20261010-t3'
+claim='c'*40;tree='d'*40
+old=copy.deepcopy(evidence);old['packet']='version-history-ledger-20261010'
+# Even when other evidence is identical, an old packet cannot become trial3's claim.
+stored={'message':p.claim_message(old),'parents':[{'sha':base}],'tree':{'sha':tree}}
+reads=[]
+def api(path,*args,**kwargs):
+    reads.append(path)
+    if path=='git/ref/heads/'+p.BRANCH:return {'object':{'sha':claim}}
+    if path=='git/commits/'+claim:return stored
+    if path=='git/commits/'+base:return {'tree':{'sha':tree}}
+    raise AssertionError('unexpected API path or mutation: '+path)
+with mock.patch.dict(os.environ,{'CLAIM_SHA':claim}),mock.patch.object(p,'api',side_effect=api):
+    rejects(lambda:p.validate_claim(evidence))
+    stored['message']=p.claim_message(evidence)
+    assert p.validate_claim(evidence)==(claim,tree)
+    reads.clear()
+    with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'generate') as generate:
+        rejects(p.claim)
+        assert reads==['git/ref/heads/'+p.BRANCH]
+        generate.assert_not_called()
+# Both source hint and fresh API binding reject already-consumed or future attempts.
+for attempt in (4,6):
+    trial(lambda d,e:e['workflow_run'].update(run_attempt=attempt))
+    trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update(run_attempt=attempt))
 `);
 });

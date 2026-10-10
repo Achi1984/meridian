@@ -22,9 +22,9 @@ REPO = 'Achi1984/meridian'
 SOURCE_SHA = '2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
 RELEASE_ID = 347821227
 SOURCE_RUN = 38070967939
-SOURCE_ATTEMPT = 4
-DEADLINE = 1791658800  # 2026-10-10T19:00:00Z
-BRANCH = 'pilot/version-history-ledger-20261010'
+SOURCE_ATTEMPT = 5
+DEADLINE = 1791660600  # Proposed 2026-10-10T19:30:00Z; owner activation approval pending
+BRANCH = 'pilot/version-history-ledger-20261010-t3'
 PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
 ARTIFACT = 'version-history-ledger-packet'
 MAX_BYTES = 65536
@@ -144,7 +144,7 @@ def identity():
         milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha'],
                            'pr_url':'https://github.com/' + REPO + '/pull/' + str(number),
                            'commit_url':'https://github.com/' + REPO + '/commit/' + item['merge_commit_sha']})
-    return {'repository':REPO, 'packet':'version-history-ledger-20261010', 'control_run':int(os.environ['GITHUB_RUN_ID']),
+    return {'repository':REPO, 'packet':'version-history-ledger-20261010-t3', 'control_run':int(os.environ['GITHUB_RUN_ID']),
             'control_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'source_run':source['id'], 'source_attempt':source['run_attempt'], 'source_head':SOURCE_SHA,
             'base':base, 'milestones':milestones}
