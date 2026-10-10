@@ -28,8 +28,12 @@ There is no checkout or execution of repository scripts. Copilot 1.0.95 installs
 without lifecycle scripts or a token; that exact install and version startup
 were verified during the preceding manual pilot preparation. Node 22+ and the
 expected CLI version are checked before a token is supplied to the model process.
-The only exposed tool is `view`, and reads are explicitly denied alongside shell,
-writes, URLs and memory; MCP, custom instructions and remote sessions are disabled.
+The availability allowlist contains only `view`, which is also explicitly excluded,
+leaving no model tools. Shell, write, URL and memory denials remain defense in depth;
+MCP, custom instructions and remote sessions are disabled. CLI 1.0.95 local permission
+help does not document the online reference's `read` permission category, so the
+pilot does not rely on `--deny-tool=read` to prevent file access. Unsupported filter
+combinations must fail closed, never be relaxed automatically.
 
 ## Delivery, time and spending boundaries
 

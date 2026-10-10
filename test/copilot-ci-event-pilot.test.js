@@ -18,6 +18,7 @@ test('pilot has only the approved source trigger and bounded read-only authority
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /@github\/copilot@1\.0\.95/);
   assert.match(source, /--available-tools=view/);
+  assert.match(source, /--excluded-tools=view/);
   assert.match(source, /--deny-tool=shell,write,read,url,memory/);
   assert.doesNotMatch(source, /--autopilot|--allow-all|--resume/);
   assert.equal((source.match(/subprocess.Popen\(/g) || []).length, 1);
@@ -149,6 +150,7 @@ with tempfile.TemporaryDirectory() as tmp:
         ns['gate'].assert_called_once()
         assert spawn.call_args.kwargs['start_new_session'] is True
         assert '--available-tools=view' in spawn.call_args.args[0]
+        assert '--excluded-tools=view' in spawn.call_args.args[0]
         assert '--deny-tool=shell,write,read,url,memory' in spawn.call_args.args[0]
     with mock.patch('sys.argv',['gate.py','invoke']),mock.patch('time.time',return_value=ns['DEADLINE']), \
          mock.patch('subprocess.Popen') as spawn:

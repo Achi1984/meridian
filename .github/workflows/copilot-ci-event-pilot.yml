@@ -151,7 +151,8 @@ jobs:
               env = dict(os.environ, COPILOT_HOME=str(root / 'config'), COPILOT_AUTO_UPDATE='false')
               command = [str(root / 'cli/node_modules/.bin/copilot'), '--no-auto-update', '--no-custom-instructions',
                          '--disable-builtin-mcps', '--no-ask-user', '--no-remote', '--no-remote-export',
-                         '--available-tools=view', '--deny-tool=shell,write,read,url,memory', '--no-color', '-s', '-p', prompt]
+                         '--available-tools=view', '--excluded-tools=view', '--deny-tool=shell,write,read,url,memory',
+                         '--no-color', '-s', '-p', prompt]
               # Revalidate the absolute deadline immediately before spawning; kill the whole group at timeout.
               duration = bounded_time()
               with (root / 'response.txt').open('wb') as output, (root / 'error.txt').open('wb') as error:
