@@ -143,6 +143,7 @@ def identity():
                 and item['base'].get('ref') == 'main' and own(item['base'].get('repo')), 'Milestone not verified')
         milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha']})
     return {'packet':'version-history-ledger-20261010', 'control_run':int(os.environ['GITHUB_RUN_ID']),
+            'control_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'source_run':source['id'], 'source_attempt':source['run_attempt'], 'source_head':SOURCE_SHA,
             'base':base, 'milestones':milestones}
 

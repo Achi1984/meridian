@@ -312,3 +312,29 @@ with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ,{'GITHUB_O
         assert len(writes)==2
 `);
 });
+
+
+test('partial job rerun cannot reuse a prior-attempt claim before generation or publication', () => {
+  python(fixture + String.raw`
+first=trial(accept=True,attempt='1');approved=trial(accept=True,attempt='2')
+assert first['control_attempt']==1 and approved['control_attempt']==2
+assert {**first,'control_attempt':2}==approved
+claim='c'*40;tree='d'*40
+stored={'message':p.claim_message(first),'parents':[{'sha':base}],'tree':{'sha':tree}}
+def fake(path,*args,**kwargs):
+    if path=='git/ref/heads/'+p.BRANCH:return {'object':{'sha':claim}}
+    if path=='git/commits/'+claim:return stored
+    if path=='git/commits/'+base:return {'tree':{'sha':tree}}
+    raise AssertionError('Unexpected API or mutation: '+path)
+with mock.patch.dict(os.environ,{'CLAIM_SHA':claim}),mock.patch.object(p,'api',side_effect=fake):
+    assert p.validate_claim(first)==(claim,tree)
+    rejects(lambda:p.validate_claim(approved))
+    with mock.patch.object(p,'identity',return_value=approved),mock.patch('subprocess.Popen') as spawn, \
+         mock.patch.object(p,'verify_cli_tools') as probe,mock.patch.object(p,'artifact_bytes') as download:
+        rejects(p.generate);rejects(p.publish)
+        spawn.assert_not_called();probe.assert_not_called();download.assert_not_called()
+    stored['message']=p.claim_message(approved)
+    assert p.validate_claim(approved)==(claim,tree)
+    rejects(lambda:p.validate_claim(first))
+`);
+});
