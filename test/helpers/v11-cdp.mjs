@@ -37,16 +37,19 @@ export async function withMobileChrome(chrome,width,url,probe){
    ws.send(JSON.stringify({id,method,params}));
   });
   await call('Page.enable');await call('Runtime.enable');
+  await call('Emulation.setFocusEmulationEnabled',{enabled:true});
   await call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true,
    screenWidth:width,screenHeight:844});
-  await call('Page.navigate',{url});
+  const navigation=await call('Page.navigate',{url});
+  if(navigation.errorText)throw Error('Page navigation failed: '+navigation.errorText);
   let loaded=false;
   for(let i=0;i<100;i++){
-   const r=await call('Runtime.evaluate',{expression:'document.readyState',returnByValue:true});
-   if(r.result?.value==='complete'){loaded=true;break;}
+   const r=await call('Runtime.evaluate',{expression:'location.href === '+JSON.stringify(url)+' && document.readyState === "complete"',returnByValue:true});
+   if(r.result?.value===true){loaded=true;break;}
    await sleep(50);
   }
   if(!loaded)throw Error('Page load timeout');
+  if(typeof probe==='function')return await probe(call);
   const r=await call('Runtime.evaluate',{expression:probe,returnByValue:true});
   if(r.exceptionDetails)throw Error('CDP probe exception '+JSON.stringify(r.exceptionDetails));
   return r.result?.value;
