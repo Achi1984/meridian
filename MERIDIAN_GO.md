@@ -10,33 +10,32 @@ When the user says **Go Meridian**, continue MERIDIAN autonomously from the real
 2. Resolve the active Claude mailbox from `mailboxIssue`; read only the bounded latest relevant request/response/status items.
 3. Fetch live `main` SHA, `version.json -> terminalBuild`, the one relevant PR and its relevant runs.
 4. Reconcile any interrupted operation before writing. Repository state is authoritative.
-5. Continue exactly one safe next action unless a real user decision or authorization gate is required.
+5. Continue the authorized work package unless a real user decision or authorization gate is required.
 
 ## Roles
-- ChatGPT: Lead architect, implementer, product owner and merge owner.
+- ChatGPT: Lead architect, implementer and merge owner; Christoph/Achi1984 is Project Owner.
 - Claude: independent read-only reviewer/challenger. Exact-head review before critical merge.
 - Claude may use the read-only surfaces granted by the mailbox workflow, but may not edit/write repository content or mutate GitHub except the requested mailbox response comment.
 
-## STREAM-SAFE-V7
-Turn length is the primary transport budget.
+## STREAM-SAFE-V8 — recoverable work packages
 
-- Maximum one bounded remote tool-call group per assistant turn.
-- Maximum one repository mutation per assistant turn.
-- After any mutation: report a short checkpoint and end the turn. Reconcile on the next `Go`.
-- A Claude request is a mutation: post it, then stop. Never wait for Claude in the same turn.
-- Poll a still-running CI/reviewer/platform state at most once per user turn. `WAITING` is a valid terminal turn state.
-- Prefer one bounded state pack: mailbox tail (max 5), checkpoint, live main, one relevant PR, relevant run IDs/statuses. No full mailbox dump.
-- Do not fetch log bodies unless a named job failed. Inspect at most one bounded failing log slice per turn.
-- Never use sleep/retry loops inside a turn.
-- Stop on the first unexpected state (head moved, unknown/red check, scope drift) and diagnose on the next turn.
-- Never repeat a write after interruption without reconciliation. Use op-id plus expected head/blob/base guards.
-- Same Claude request ID + same exact head must never be reposted while running or already answered.
-- At most two short user-visible checkpoints per turn.
-- Keep tool-result echoes compact; IDs, SHA, state and blocker only.
-- Bare `Go` always means RECONCILE -> CLASSIFY -> one safe next action. It never means repeat the previous write.
-- End each turn with one deterministic `NEXT:` line when work remains.
-- Large or irreversible work must be split into durable atomic steps.
-- Transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release or Single-Writer gates.
+1. Before work, resolve `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json`, read its bounded latest relevant items and reconcile live main, branch, PR and CI.
+
+A task is bounded by its authorized objective, allowed files, branch owner, acceptance tests, budget constraints and stopping conditions, rather than by chat turns. One Go resumes the first incomplete authorized step after reconciliation; it never repeats the previous write blindly.
+
+- Multiple sequential reads, implementation steps, tests and guarded writes are allowed within one authorized work package. No 30-second or one-tool-group chat limit applies.
+- Before each write, record intent and a unique op-id, check branch ownership and expected head/base/blob. Use atomic expected-state guards where required; unavailable guards block the write.
+- After each write, reconcile the actual effect and record a durable checkpoint before dependent work. A checkpoint is not proof of durable replay protection or authenticated transport.
+- One writer per branch; integration and release numbering belong to the lead. Isolated agents may implement, test and prepare a Draft PR only within their delegated scope.
+- Stop dependent writes on conflicts, unknown outcomes or scope drift. Read-only diagnosis may continue immediately. Retry at most once after verified OP_ABSENT; never replay OP_APPLIED. A second interruption yields BLOCKED_STREAM.
+- Read bounded successful-CI evidence as well as named failures. Preserve payload/source budgets and mailbox tail limits. Never dump entire mailboxes.
+- No sleep or polling loops. Poll unchanged external work at most once per session. WAITING records request/run IDs and the resume condition. Existing authorized agents may finish their packet; future dispatch requires a real, separately authorized mechanism.
+- Keep one edited progress comment per PR. Deduplicate reviewer requests by request ID and exact head. Give concise milestone updates without requiring a new Go for each internal step.
+- Stop at completion, missing authorization, unresolved conflict, exhausted authorized budget, unavailable capability or external dependency. End unfinished reports with NEXT.
+- Exact-head/base CI and independent review remain mandatory. Changed heads invalidate prior gates. Project Owner approval of the concrete merge candidate remains required.
+- This policy does not authorize production activation, trading, extra spending, workflow/permission/secret/scheduler changes, or a continuously running chat. Existing research and release boundaries remain.
+
+Proposal: mailbox #571 comment 6096562356. This candidate requires independent review and explicit Project Owner merge approval before adoption.
 
 ### Source transport budgets (approved Transport & Feedback V1)
 `maxPayloadBytes=4096` bounds rendered progress/log excerpts only. Source uploads use
@@ -45,7 +44,7 @@ Turn length is the primary transport budget.
 Run `node scripts/stream-safe-preflight.mjs --upload-budget contents` (or `blob` / `tree`)
 with the actual complete tool arguments on stdin before upload. Verify source blob
 SHA before/after publication and preserve the expected-head/CAS checks. A budget
-pass is not authorization, CI, review or permission to bypass one mutation per turn.
+pass is not authorization, CI, review or permission to bypass operation guards.
 Full details and approval provenance: `MERIDIAN_AGENT_WORKFLOW.md`, Transport V1.
 Watchdog suppression is a separate implementation; these budget changes do not enable it.
 
@@ -53,7 +52,7 @@ Watchdog suppression is a separate implementation; these budget changes do not e
 After reconciliation classify the prior operation:
 - `OP_APPLIED`: intended effect exists -> do not repeat; advance.
 - `OP_ABSENT`: effect absent and expected base/head unchanged -> eligible for one guarded retry.
-- `OP_CONFLICT`: head/base moved or different operation owns the state -> stop and supersede with a new op-id next turn.
+- `OP_CONFLICT`: head/base moved or different operation owns the state -> stop dependent writes, diagnose read-only and supersede only after ownership/scope reconciliation.
 - `WAITING`: external work still running -> report exact IDs/status and end the turn.
 - `BLOCKED_STREAM`: second interruption of the same step -> stop automatic retries.
 
@@ -108,4 +107,4 @@ RISK > PROFIT MAXIMIZATION
 Do not ask the user to repeat context already recoverable from GitHub.
 Keep user-facing replies short.
 Do not narrate routine reads or long tool chains.
-If no user decision is needed, advance one safe step and end with `NEXT:`.
+If no user decision is needed, advance the authorized work package and end with `NEXT:`.
