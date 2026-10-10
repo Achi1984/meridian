@@ -32,7 +32,7 @@ A task is bounded by its authorized objective, allowed files, branch owner, acce
 - No sleep or polling loops. Poll unchanged external work at most once per session. WAITING records request/run IDs and the resume condition. Existing authorized agents may finish their packet; future dispatch requires a real, separately authorized mechanism.
 - Keep one edited progress comment per PR. Deduplicate reviewer requests by request ID and exact head. Give concise milestone updates without requiring a new Go for each internal step.
 - Stop at completion, missing authorization, unresolved conflict, exhausted authorized budget, unavailable capability or external dependency. End unfinished reports with NEXT.
-- Exact-head/base CI and independent review remain mandatory. Changed heads invalidate prior gates. Project Owner approval of the concrete merge candidate remains required.
+- Exact-head/base CI and independent review remain mandatory. Changed heads invalidate prior gates. Project Owner approval remains required; after explicit adoption, qualifying routine candidates may satisfy it through docs/autonomy/ROUTINE_MERGE_POLICY.md. Reserved or ambiguous candidates still require concrete owner approval.
 - This policy does not authorize production activation, trading, extra spending, workflow/permission/secret/scheduler changes, or a continuously running chat. Existing research and release boundaries remain.
 
 Proposal: mailbox #571 comment 6096562356. This candidate requires independent review and explicit Project Owner merge approval before adoption.
@@ -108,3 +108,13 @@ Do not ask the user to repeat context already recoverable from GitHub.
 Keep user-facing replies short.
 Do not narrate routine reads or long tool chains.
 If no user decision is needed, advance the authorized work package and end with `NEXT:`.
+
+## Bounded standing owner approval for routine merges
+
+The rule in `docs/autonomy/ROUTINE_MERGE_POLICY.md` becomes effective only after independent exact-head review and explicit Project Owner approval of the concrete policy-adoption PR, followed by its guarded merge. Preparation consent or this document on a draft branch is not adoption.
+
+After adoption, ChatGPT as sole merge owner may apply the standing approval to routine bugfixes, tests and already authorized product packets only when every policy gate is satisfied using authenticated live evidence. Record the approved work-packet scope, exact head/base, CI run IDs/totals, independent review, policy-adoption evidence and the eligibility result before the guarded merge. The offline classifier is advisory and cannot authenticate evidence or authorize a write.
+
+`ownerMergeApprovalRequired` remains true: the adopted bounded standing approval is one permitted form of owner approval; it is never optional. Architecture/direction, budget, security/permissions, policy/workflows/schedulers, release-governance changes, production activation and research/trading changes remain individually owner-gated. Existing UI cadence, expected-state protection, single-writer and research gates remain unchanged. Unknown scope, conflicting findings or missing evidence stops the affected work package.
+
+Immediately publish `FINAL_MERGE_STATUS` after each merge. Do not merge another dependent candidate until all required post-merge checks succeed; failure or unknown outcome stops that pipeline and triggers reconciliation. The owner may revoke this standing approval at any time. No new automated dispatcher, credentials, schedule, deployment authority or spending is introduced.
