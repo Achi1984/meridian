@@ -36,7 +36,10 @@
     .version-toggle small{display:block;color:#b6c9de;font-size:10px;font-weight:500;margin-top:2px}
     .version-panel{max-width:var(--container);margin:12px auto 0;border:1px solid #44607b;border-radius:14px;padding:14px;background:#111d2c}
     .version-panel[hidden]{display:none}
-    .version-panel h2{font-size:14px}.version-panel p{font-size:12px;margin-top:4px}
+    .version-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .version-panel-heading h2{font-size:14px;margin:0}
+    .version-close{flex:none;min-height:44px;padding:6px 10px;border:1px solid #44607b;border-radius:9px;background:#142235;color:var(--text);font-size:12px;white-space:nowrap;cursor:pointer}
+    .version-panel p{font-size:12px;margin-top:4px}
     .version-panel a{color:#a9d4ff;text-underline-offset:3px}
     .version-history-list{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:10px}
     .version-history-list li{border-top:1px solid var(--line);padding-top:9px}
@@ -171,7 +174,10 @@
       <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau<small>Versionsverlauf ▾</small></button>
     </div>
     <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
-      <h2 id="version-history-heading">Versionen im Überblick</h2>
+      <div class="version-panel-heading">
+        <h2 id="version-history-heading">Versionen im Überblick</h2>
+        <button id="version-close" class="version-close" type="button" aria-label="Versionsverlauf schließen">Schließen</button>
+      </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
         <li><strong>Terminal 10.0-r127</strong><span class="version-status">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href="https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json">Versionsnachweis</a></p></li>
@@ -289,6 +295,7 @@
   });
   const versionToggle = document.getElementById('version-toggle');
   const versionPanel = document.getElementById('version-panel');
+  const versionClose = document.getElementById('version-close');
   if (versionToggle && versionPanel) {
     const setVersionOpen = function (open) {
       versionPanel.hidden = !open;
@@ -297,6 +304,12 @@
     versionToggle.addEventListener('click', function () {
       setVersionOpen(versionPanel.hidden);
     });
+    if (versionClose) {
+      versionClose.addEventListener('click', function () {
+        setVersionOpen(false);
+        versionToggle.focus({preventScroll: true});
+      });
+    }
     const closeVersionOnEscape = function (event) {
       if (event.key === 'Escape' && !versionPanel.hidden) {
         event.preventDefault();
