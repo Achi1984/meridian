@@ -70,6 +70,31 @@ test('claim receipt matches runtime binding and is durable against exact and alt
   }finally{rmSync(directory,{recursive:true,force:true});}
 });
 
+test('ledger uniqueness is per request ID, not per head or packet; authorization remains upstream',()=>{
+  const directory=temp(),db=join(directory,'claims.sqlite');
+  const firstRequest=binding({requestId:'separately-authorized-review-a'});
+  const secondRequest={...firstRequest,requestId:'separately-authorized-review-b'};
+  try{
+    // API semantics only: these inputs do not attest separate authorization.
+    // Runtime packet binding additionally requires a matching embedded request ID.
+    const first=run(db,firstRequest),second=run(db,secondRequest);
+    assert.equal(first.status,0,first.stderr);
+    assert.equal(second.status,0,second.stderr);
+    const firstReceipt=JSON.parse(first.stdout),secondReceipt=JSON.parse(second.stdout);
+    assert.deepEqual(firstReceipt.binding,firstRequest);
+    assert.deepEqual(secondReceipt.binding,secondRequest);
+    assert.notEqual(firstReceipt.claimId,secondReceipt.claimId);
+    for(const request of [firstRequest,secondRequest]){
+      for(const replay of [request,{...request,packetSha256:'d'.repeat(64)}]){
+        const result=run(db,replay);
+        assert.equal(result.status,2,result.stderr);
+        assert.equal(result.stdout,'');
+        assert.equal(JSON.parse(result.stderr).error,'CLAIM_ALREADY_CONSUMED');
+      }
+    }
+  }finally{rmSync(directory,{recursive:true,force:true});}
+});
+
 test('competing processes can consume a request only once',async()=>{
   const directory=temp(),db=join(directory,'claims.sqlite'),request=binding();
   try{

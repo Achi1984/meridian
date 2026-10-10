@@ -39,6 +39,24 @@ payloads using the same request ID fail closed. Claims are never released or
 expired out of the ledger; a process crash after commit does not make a request
 reusable.
 
+Uniqueness is deliberately per authorization request (`requestId`), not a
+lifetime ban on reviewing the same head or packet. Distinct, separately
+authorized requests may review the same source, including independent model
+reviews and an explicitly authorized follow-up. The ledger accepts distinct
+request IDs even when all other supplied binding fields match; each consumed
+ID remains permanently unavailable, including when its payload is altered.
+Changing or inventing an ID does not create authorization. The trusted upstream
+coordinator must authenticate each separately authorized request, deduplicate
+accidental deliveries and same-head triggers, and enforce the shared review
+budget. Retries, duplicate deliveries and unknown outcomes must retain the
+original request ID; automatic retry by minting a new ID is prohibited.
+
+The runtime also binds the request ID inside the hashed review packet. A new
+authorized runtime request therefore needs a matching packet and digest;
+changing only the descriptor's ID cannot reuse the old packet. The ledger's
+API-level acceptance of distinct IDs is not proof of runtime acceptance or
+upstream authorization.
+
 The database must be durable and shared by every worker that may claim the same
 request. A local SQLite file is not automatically shared between GitHub runners;
 deployment must provide a single suitable storage location with correct SQLite
