@@ -38,7 +38,7 @@ test('Terminal öffnen is the only source change and stays outside version histo
 });
 
 function deploymentServer(){
-  const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'the actual v11 source has its known UI-only inline script');
   const scriptHash=createHash('sha256').update(inlineScript).digest('base64');
   const policies=new Map();
