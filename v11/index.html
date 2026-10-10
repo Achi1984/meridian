@@ -32,6 +32,17 @@
     .brand{font-size:17px;font-weight:760;letter-spacing:.045em;line-height:1.15}
     .brand small{display:block;font-size:10px;font-weight:650;letter-spacing:.17em;color:var(--brand);margin-top:4px}
     .preview-pill{border:1px solid #44607b;color:#d7e6f6;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:760;letter-spacing:.08em;white-space:nowrap;background:#142235}
+    .version-toggle{flex:none;min-height:44px;min-width:44px;cursor:pointer;letter-spacing:0;text-align:left}
+    .version-toggle small{display:block;color:#b6c9de;font-size:10px;font-weight:500;margin-top:2px}
+    .version-panel{max-width:var(--container);margin:12px auto 0;border:1px solid #44607b;border-radius:14px;padding:14px;background:#111d2c}
+    .version-panel[hidden]{display:none}
+    .version-panel h2{font-size:14px}.version-panel p{font-size:12px;margin-top:4px}
+    .version-panel a{color:#a9d4ff;text-underline-offset:3px}
+    .version-history-list{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:10px}
+    .version-history-list li{border-top:1px solid var(--line);padding-top:9px}
+    .version-history-list strong{font-size:12px;color:var(--text)}
+    .version-status{font-size:10px;color:#f0ca85;margin-left:6px;white-space:nowrap}
+    @media(max-width:350px){.header-inner{gap:8px}.version-toggle{padding:6px 8px}}
     .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}
     .view[hidden]{display:none!important}
     .view{animation:appear .16s ease-out}
@@ -157,8 +168,18 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <span class="preview-pill">UI-ENTWURF</span>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau<small>Versionsverlauf ▾</small></button>
     </div>
+    <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
+      <h2 id="version-history-heading">Versionen im Überblick</h2>
+      <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
+      <ul class="version-history-list">
+        <li><strong>Terminal 10.0-r127</strong><span class="version-status">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href="https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json">Versionsnachweis</a></p></li>
+        <li><strong>Meridian 11 · A2</strong><span class="version-status">Vorschau</span><p>Am 10.10.2026 integriert: mobile Layouts, Tastaturbedienung und klar gekennzeichnete Beispielzustände. Weiterhin ohne Live-Daten. <a href="https://github.com/Achi1984/meridian/pull/623">Änderungsnachweis</a></p></li>
+        <li><strong>Terminal · R115</strong><span class="version-status">Verlauf</span><p>Am 05.10.2026 integriert: Forecast und FIB-Karte verwenden konsistente nächste Kursmarken. <a href="https://github.com/Achi1984/meridian/pull/552">Änderungsnachweis</a></p></li>
+      </ul>
+      <p>Statischer Verlauf · Integrationsdaten sind keine Veröffentlichungsdaten. Mit Escape schließen.</p>
+    </section>
   </header>
   <main id="app-main" class="container" tabindex="-1">
     <section id="view-command" class="view active" aria-labelledby="command-heading">
@@ -266,6 +287,26 @@
     if (!button || !nav.contains(button)) return;
     activate(button.dataset.v);
   });
+  const versionToggle = document.getElementById('version-toggle');
+  const versionPanel = document.getElementById('version-panel');
+  if (versionToggle && versionPanel) {
+    const setVersionOpen = function (open) {
+      versionPanel.hidden = !open;
+      versionToggle.setAttribute('aria-expanded', String(open));
+    };
+    versionToggle.addEventListener('click', function () {
+      setVersionOpen(versionPanel.hidden);
+    });
+    const closeVersionOnEscape = function (event) {
+      if (event.key === 'Escape' && !versionPanel.hidden) {
+        event.preventDefault();
+        setVersionOpen(false);
+        versionToggle.focus({preventScroll: true});
+      }
+    };
+    versionToggle.addEventListener('keydown', closeVersionOnEscape);
+    versionPanel.addEventListener('keydown', closeVersionOnEscape);
+  }
   /* Local presentation examples only: never connected to portfolio, risk or data sources. */
   const preview = document.getElementById('data-state-preview');
   if (preview) {
@@ -293,4 +334,5 @@
 </script>
 </body>
 </html>
+
 
