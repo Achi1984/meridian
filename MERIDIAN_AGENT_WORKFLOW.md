@@ -285,7 +285,7 @@ Default behavior:
 - interrupt only for required missing information, an unresolvable blocker, unresolved failure after three loops, or an action that requires explicit external authorization
 
 ### 16.1 Mandatory User Escalation
-Post `CROSS_MODEL_STATUS NEEDS_USER_DECISION` with `@Achi1984` in #571 before proceeding for:
+Post `CROSS_MODEL_STATUS NEEDS_USER_DECISION` with `@Achi1984` in the active checkpoint mailbox before proceeding for:
 - Stage/lock changes, canonical V2 run, strategy PnL, Discovery, Validation, Holdout, Paper or Live.
 - A new strategy or research direction.
 - Agent-rule changes: Lead lease, protocols, STREAM-SAFE version, bootstrap, review duties or workflow permissions.

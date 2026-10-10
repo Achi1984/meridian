@@ -74,3 +74,10 @@ assert "mailboxIssue" in bootstrap_line
 assert not re.search(r"Issue #\d+", bootstrap_line)
 
 print("MERIDIAN Claude mailbox bridge static safety: PASS")
+
+# Rollover must move every operational reviewer/watchdog target together.
+watchdog = Path(".github/workflows/claude-watchdog-15m.yml").read_text(encoding="utf-8")
+assert set(re.findall(r"/issues/(\d+)/comments", watchdog)) == {str(mailbox_issue)}
+assert set(re.findall(r"[Ii]ssue #(\d+)", watchdog)) == {str(mailbox_issue)}
+assert set(re.findall(r"[Ii]ssue #(\d+)", text)) == {str(mailbox_issue)}
+assert checkpoint["mailboxPolicy"]["previousMailboxIssue"] != mailbox_issue
