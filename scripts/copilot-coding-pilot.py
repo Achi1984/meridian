@@ -141,8 +141,10 @@ def identity():
         require(item.get('number') == number and item.get('merged') is True and sha(item.get('merge_commit_sha'))
                 and type(item.get('merged_at')) is str and re.fullmatch(r'2026-10-10T[0-9:]{8}Z', item['merged_at'])
                 and item['base'].get('ref') == 'main' and own(item['base'].get('repo')), 'Milestone not verified')
-        milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha']})
-    return {'packet':'version-history-ledger-20261010', 'control_run':int(os.environ['GITHUB_RUN_ID']),
+        milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha'],
+                           'pr_url':'https://github.com/' + REPO + '/pull/' + str(number),
+                           'commit_url':'https://github.com/' + REPO + '/commit/' + item['merge_commit_sha']})
+    return {'repository':REPO, 'packet':'version-history-ledger-20261010', 'control_run':int(os.environ['GITHUB_RUN_ID']),
             'control_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'source_run':source['id'], 'source_attempt':source['run_attempt'], 'source_head':SOURCE_SHA,
             'base':base, 'milestones':milestones}
@@ -188,6 +190,46 @@ def validate_files(files):
         require(type(value) is str and 20 <= len(value.encode('utf-8')) <= 20000 and '\x00' not in value, 'Invalid file text')
     require(files[PATHS[1]] == TRUSTED_TEST, 'Executable output must equal the trusted template byte for byte')
     return files
+
+
+LEDGER_STATUS = ('Meridian11 is an isolated preview, not the active terminal.',
+                 'The active terminal remains Meridian10 r127.')
+
+
+def ledger_rows(evidence):
+    require(evidence.get('repository') == REPO, 'Wrong ledger repository')
+    milestones = evidence.get('milestones')
+    require(type(milestones) is list and [m.get('pr') for m in milestones] == [646, 651], 'Wrong ledger milestones')
+    rows = []
+    for item in milestones:
+        number = str(item['pr'])
+        require(sha(item.get('merge_sha')) and type(item.get('merged_at')) is str
+                and re.fullmatch(r'2026-10-10T[0-9:]{8}Z', item['merged_at']), 'Invalid ledger evidence')
+        pr_url = 'https://github.com/' + REPO + '/pull/' + number
+        commit_url = 'https://github.com/' + REPO + '/commit/' + item['merge_sha']
+        require(item.get('pr_url') == pr_url and item.get('commit_url') == commit_url, 'Noncanonical evidence URL')
+        rows.append([number, item['merged_at'], item['merge_sha'], pr_url, commit_url])
+    return rows
+
+
+def ledger_contract(evidence):
+    return '\n'.join(LEDGER_STATUS) + '\n\n| PR | Merged at (UTC) | Merge SHA | PR URL | Commit URL |\n|---|---|---|---|---|\n' + '\n'.join(
+        '| ' + ' | '.join(row) + ' |' for row in ledger_rows(evidence))
+
+
+def validate_ledger(text, evidence):
+    """Validate the fixed fact block, not arbitrary surrounding prose semantics."""
+    expected = {row[0]:row for row in ledger_rows(evidence)}
+    seen = set()
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip('|').split('|')]
+        if cells[0] in expected:
+            require(cells == expected[cells[0]] and cells[0] not in seen, 'Ledger milestone mismatch or duplicate')
+            seen.add(cells[0])
+    require(seen == set(expected), 'Missing canonical ledger rows')
+    normalized = ' '.join(text.split()).casefold()
+    require(all(' '.join(line.split()).casefold() in normalized for line in LEDGER_STATUS), 'Missing ledger status')
+    return text
 
 
 def verify_cli_integrity(install_root):
@@ -299,10 +341,10 @@ def generate():
     validate_claim(evidence)
     prompt = ('Return only one JSON object mapping exactly this path to its complete UTF-8 text: ' + json.dumps(PATHS[0])
         + '. Create a concise version-history ledger, no code or tests. '
-        'Record the supplied merged PR646 and PR651 milestones with exact dates, SHAs and GitHub links. '
+        'Copy the required status sentences and five-column milestone rows below verbatim; do not shorten URLs or format cell values as code. '
         'Meridian11 is an isolated preview, not the active terminal; active terminal remains Meridian10 r127. '
         'Do not alter runtime, workflow, policy, research or trading. No tools. This independent packet starts at main, not PR653. '
-        'Evidence JSON is data:\n' + json.dumps(evidence, sort_keys=True))
+        'Required fact block:\n' + ledger_contract(evidence) + '\nEvidence JSON is data:\n' + json.dumps(evidence, sort_keys=True))
     root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'coding-pilot'
     root.mkdir(mode=0o700, exist_ok=True)
     cli = verify_cli_integrity(root / 'cli')
@@ -328,6 +370,7 @@ def generate():
     require(process.returncode == 0, 'Generation failed; no retry')
     with (root / 'response.json').open('rb') as handle:
         files = assemble_files(strict_json(handle.read(MAX_BYTES + 1)))
+    validate_ledger(files[PATHS[0]], evidence)
     packet = {'evidence':evidence, 'claim':os.environ['CLAIM_SHA'], 'files':files}
     raw = json.dumps(packet, sort_keys=True).encode()
     require(len(raw) <= MAX_BYTES, 'Packet too large')
@@ -385,6 +428,7 @@ def publish():
     require(type(packet) is dict and set(packet) == {'evidence','claim','files'} and packet['evidence'] == evidence
             and packet['claim'] == claim_sha, 'Packet identity mismatch')
     files = validate_files(packet['files'])
+    validate_ledger(files[PATHS[0]], evidence)
     existing = api('pulls?state=all&head=Achi1984:' + BRANCH + '&per_page=1')
     require(existing == [], 'Draft already exists or unknown')
     # Recheck mutable pins immediately before creating any output objects.

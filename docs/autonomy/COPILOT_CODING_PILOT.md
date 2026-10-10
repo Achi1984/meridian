@@ -181,3 +181,30 @@ are now pinned. A final binary rehash occurs immediately before real Popen, afte
 the local probe. Fresh CI/review remain mandatory; permission changes and the
 single source rerun are sequenced after deployment checks. Restore PR setting OFF
 after trial and report actual claim, model, Draft, rejected gates and consumption.
+
+## Output-quality correction after the completed trial
+
+The owner-approved trial succeeded technically: source38070967939 attempt4,
+control38075839772 attempt2, Draft656 head6177b83e. Its ledger omitted absolute
+PR URLs, so the unchanged trusted test failed in an isolated output audit.
+The original output and consumed claim remain evidence; neither is reset here.
+
+This correction passes the canonical repository, PR URLs and commit URLs in live
+verified evidence. The prompt supplies a required five-column Markdown fact block
+(PR, UTC date, SHA, PR URL, commit URL) and two fixed preview/terminal statements.
+The generator and publisher both validate that block against fresh evidence.
+Whitespace around cells and surrounding Markdown are free; each milestone row
+must preserve the complete association, occur exactly once and contain canonical
+URLs. Wrong/relative URLs, swapped dates or SHAs, missing rows and status facts
+fail before artifact creation or Git publication. The trusted JavaScript template
+is unchanged and no generated JavaScript is executed by these validators.
+
+This validates the required fact block, not every statement in arbitrary extra
+prose. Output remains a Draft requiring review. The actual failed ledger is a
+regression fixture. Tests also prove invalid generated output creates no artifact
+and an invalid transported packet reaches no publisher Git mutation.
+
+Source run/attempt, deadline, branch and permissions are unchanged. The existing
+claim is consumed. New evidence fields intentionally make an old claim unequal;
+there is no migration/reset or automatic inference retry. This source correction
+alone grants no new live window, packet identity, event or permission change.
