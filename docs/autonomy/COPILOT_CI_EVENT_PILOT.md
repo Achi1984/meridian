@@ -1,7 +1,7 @@
 # Bounded CI event observation pilot
 
 Owner authorized this experiment in chat at 18:22:59 Europe/Vienna on
-2026-10-10, ending at 19:20 the same day (`2026-10-10T17:20:00Z`). It permits
+2026-10-10, extended by the owner at 19:05:37 Vienna to end at 19:45 the same day (`2026-10-10T17:45:00Z`). It permits
 read-only Copilot observations and recommendations from the existing subscription,
 not implementation, merge, deployment, research activation or additional spending.
 
@@ -65,7 +65,7 @@ unchanged. Lead retains all merge authority.
 
 Before merge/run, require exact-head/base CI and independent review under existing
 Lead gates. Record source/control SHAs, source and pilot run IDs, observation status
-and actual usage when available. At 19:20 Vienna, report results using the existing
+and actual usage when available. At 19:45 Vienna, report results using the existing
 scheduled report and disable this workflow; disable earlier on any unexpected
 behavior. Cancellation/disable prevents future work but does not undo observations
 already completed. Do not rerun failed attempts or extend the deadline/cap without
