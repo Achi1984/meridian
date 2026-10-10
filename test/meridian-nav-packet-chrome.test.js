@@ -19,13 +19,21 @@ async function interact(call){
   return r.result?.value;
  };
  const key=async(key,code,virtual)=>{
-  await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,windowsVirtualKeyCode:virtual,nativeVirtualKeyCode:virtual});
+  // Match Chrome/Puppeteer keyboard semantics: Enter carries a carriage-return
+  // character so native buttons receive keypress; non-text keys use rawKeyDown.
+  const text=key==='Enter'?'\r':'';
+  await call('Input.dispatchKeyEvent',{type:text?'keyDown':'rawKeyDown',key,code,text,unmodifiedText:text,
+   windowsVirtualKeyCode:virtual,nativeVirtualKeyCode:virtual});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:virtual,nativeVirtualKeyCode:virtual});
  };
  await call('Page.bringToFront');
  await evaluate(`(()=>{
-  window.__meridianNavQA={start:location.href,activations:[],historyInitiallyHidden:document.getElementById('version-panel').hidden};
+  window.__meridianNavQA={start:location.href,activations:[],historyActivations:[],keys:[],historyInitiallyHidden:document.getElementById('version-panel').hidden};
+  for(const type of ['keydown','keypress','keyup'])document.addEventListener(type,event=>{
+   window.__meridianNavQA.keys.push({type:event.type,key:event.key,target:event.target.id||event.target.className,trusted:event.isTrusted});
+  },true);
   document.addEventListener('click',event=>{
+   if(event.target.closest?.('#version-toggle'))window.__meridianNavQA.historyActivations.push({trusted:event.isTrusted});
    const link=event.target.closest?.('a.terminal-entry-link');if(!link)return;
    event.preventDefault();
    window.__meridianNavQA.activations.push({trusted:event.isTrusted,href:link.getAttribute('href'),prevented:event.defaultPrevented});
@@ -47,10 +55,14 @@ async function interact(call){
  assert.deepEqual(activation,[{trusted:true,href:'../v10/',prevented:true}], 'trusted Enter activation intercepted');
  assert.equal(await evaluate('location.href===window.__meridianNavQA.start'),true,'must not load terminal');
  // Existing history behavior uses native keyboard activation and Escape dismissal.
- await evaluate("document.getElementById('version-toggle').focus(); true");
+ assert.equal(await evaluate("document.getElementById('version-toggle').focus(); document.activeElement.id"),'version-toggle','history button focused before key input');
  await key('Enter','Enter',13);
  const opened=await evaluate("!document.getElementById('version-panel').hidden && document.getElementById('version-toggle').getAttribute('aria-expanded')==='true'");
- assert.equal(opened,true,'history opens through Enter');
+ const historyEvidence=await evaluate('({keys:window.__meridianNavQA.keys,clicks:window.__meridianNavQA.historyActivations})');
+ assert.ok(historyEvidence.keys.some(e=>e.type==='keypress'&&e.key==='Enter'&&e.target==='version-toggle'&&e.trusted),
+  'native button receives trusted Enter keypress: '+JSON.stringify(historyEvidence));
+ assert.deepEqual(historyEvidence.clicks,[{trusted:true}],'one native history activation: '+JSON.stringify(historyEvidence));
+ assert.equal(opened,true,'history opens through Enter: '+JSON.stringify(historyEvidence));
  await key('Escape','Escape',27);
  const closed=await evaluate("document.getElementById('version-panel').hidden && document.getElementById('version-toggle').getAttribute('aria-expanded')==='false' && document.activeElement.id==='version-toggle'");
  assert.equal(closed,true,'Escape closes history and restores focus');
