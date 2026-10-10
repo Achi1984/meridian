@@ -157,6 +157,10 @@
     /* Narrow screens give the longer full labels more room without shrinking text or touch targets. */
     @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.1fr)}.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
     @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
+    /* Fixed packet A: visible terminal entry; no data or execution changes. */
+    .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
+    .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
+    .terminal-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
   </style>
 </head>
 <body>
@@ -170,6 +174,9 @@
       </div>
       <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau<small>Versionsverlauf ▾</small></button>
     </div>
+    <nav class="terminal-entry" aria-label="Terminal-Zugang">
+      <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
+    </nav>
     <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
       <h2 id="version-history-heading">Versionen im Überblick</h2>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
