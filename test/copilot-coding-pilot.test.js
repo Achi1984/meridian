@@ -129,7 +129,7 @@ with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'
 test('publisher only stages the two approved files and creates a Draft on claimed branch', () => {
   python(fixture + String.raw`
 evidence=trial(accept=True); claim='c'*40; tree='d'*40; newtree='e'*40; newcommit='f'*40
-packet={'evidence':evidence,'claim':claim,'files':{p.PATHS[0]:'Valid preview ledger content',p.PATHS[1]:p.TRUSTED_TEST}}
+packet={'evidence':evidence,'claim':claim,'files':{p.PATHS[0]:p.ledger_contract(evidence),p.PATHS[1]:p.TRUSTED_TEST}}
 buf=io.BytesIO()
 with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dumps(packet))
 raw=buf.getvalue()
@@ -336,5 +336,55 @@ with mock.patch.dict(os.environ,{'CLAIM_SHA':claim}),mock.patch.object(p,'api',s
     stored['message']=p.claim_message(approved)
     assert p.validate_claim(approved)==(claim,tree)
     rejects(lambda:p.validate_claim(first))
+`);
+});
+
+test('ledger contract rejects actual pilot output and mismatched milestone associations', () => {
+  const original = readFileSync(new URL('./fixtures/copilot-ledger-relative-links.md', import.meta.url), 'utf8');
+  python(fixture + `\nbad_original=${JSON.stringify(original)}\n` + String.raw`
+evidence=trial(accept=True);good=p.ledger_contract(evidence)
+assert p.validate_ledger(good,evidence)==good
+assert p.validate_ledger('# History\n\n'+good.replace(' | ','  |  ')+'\n\nAdditional review notes.',evidence)
+rejects(lambda:p.validate_ledger(bad_original,evidence))
+for bad in [good.replace('/pull/646','/pull/6460'),good.replace('Achi1984/meridian','other/repo'),
+            good.replace(evidence['milestones'][0]['merge_sha'],'e'*40,1),
+            good.replace(evidence['milestones'][0]['merged_at'],'2026-10-10T00:00:00Z',1),
+            good.replace('r127','r128'),good.replace(p.LEDGER_STATUS[0],''),
+            good+'\n'+good.splitlines()[-1], '\n'.join(good.splitlines()[:-1])]:
+    rejects(lambda:p.validate_ledger(bad,evidence))
+# Make dates and SHAs distinct, then swap just their associations, not all values.
+evidence['milestones'][1].update(merge_sha='e'*40,merged_at='2026-10-10T18:00:00Z',commit_url='https://github.com/'+p.REPO+'/commit/'+'e'*40)
+good=p.ledger_contract(evidence);rows=good.splitlines();a=rows[-2].split('|');b=rows[-1].split('|')
+a[2],b[2]=b[2],a[2];rows[-2]='|'.join(a);rows[-1]='|'.join(b)
+rejects(lambda:p.validate_ledger('\n'.join(rows),evidence))
+`);
+});
+
+test('invalid ledger is rejected before generator artifact and publisher mutations', () => {
+  python(fixture + String.raw`
+evidence=trial(accept=True);claim='c'*40
+bad={p.PATHS[0]:'Meridian11 preview with only relative pull/646 and pull/651; Meridian10 r127.',p.PATHS[1]:p.TRUSTED_TEST}
+with tempfile.TemporaryDirectory() as tmp,mock.patch.object(p,'identity',return_value=evidence), \
+     mock.patch.object(p,'validate_claim'),mock.patch.object(p,'verify_cli_integrity',return_value=pathlib.Path('/tmp/cli')), \
+     mock.patch.object(p,'verify_cli_tools'),mock.patch.dict(os.environ,{'RUNNER_TEMP':tmp,'GH_TOKEN':'readonly','CLAIM_SHA':claim}), \
+     mock.patch('time.time',return_value=p.DEADLINE-120):
+    def fake_process(command,**kwargs):
+        assert p.ledger_contract(evidence) in command[-1]
+        kwargs['stdout'].write(json.dumps({p.PATHS[0]:bad[p.PATHS[0]]}).encode());kwargs['stdout'].flush()
+        proc=mock.Mock();proc.returncode=0;proc.wait.return_value=0;return proc
+    with mock.patch('subprocess.Popen',side_effect=fake_process):rejects(p.generate)
+    assert not (pathlib.Path(tmp)/'coding-pilot/packet.json').exists()
+packet={'evidence':evidence,'claim':claim,'files':bad}
+buf=io.BytesIO()
+with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dumps(packet))
+raw=buf.getvalue()
+artifact={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':len(raw),
+ 'workflow_run':{'id':200,'head_sha':base},'digest':'sha256:'+p.hashlib.sha256(raw).hexdigest()}
+def api(path,method='GET',*args,**kwargs):
+    assert method=='GET' and path=='actions/artifacts/300','unexpected mutation or publication path'
+    return artifact
+with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'validate_claim',return_value=(claim,'d'*40)), \
+     mock.patch.dict(os.environ,{'CLAIM_SHA':claim,'ARTIFACT_ID':'300'}),mock.patch.object(p,'api',side_effect=api), \
+     mock.patch.object(p,'artifact_bytes',return_value=raw):rejects(p.publish)
 `);
 });
