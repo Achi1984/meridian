@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import { digest, exactKeys, freeze, isHash, must as contractMust } from './codex-bridge-contract.mjs';
+import { createHash } from 'node:crypto';
 
 const STORE_FILE = 'replay-store.json';
 const PENDING_FILE = 'replay-store.pending';
@@ -40,6 +40,65 @@ const fail = code => {
 const must = (ok, code) => {
   if (!ok) fail(code);
 };
+const isHash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+
+function exactKeys(value, keys, code) {
+  must(value !== null && typeof value === 'object' && !types.isProxy(value)
+    && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype, code);
+  const names = Reflect.ownKeys(value);
+  must(names.length === keys.length && names.every(k => typeof k === 'string' && keys.includes(k)), code);
+}
+
+function canonicalJson(input) {
+  const seen = new Set();
+  const walk = (value, depth) => {
+    must(depth <= 12, 'HASH_CANONICAL_INVALID');
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') {
+      must(Number.isSafeInteger(value), 'HASH_CANONICAL_INVALID');
+      return value;
+    }
+    if (typeof value === 'string') {
+      must(value.isWellFormed(), 'HASH_CANONICAL_INVALID');
+      return value;
+    }
+    must(value !== null && typeof value === 'object' && !types.isProxy(value), 'HASH_CANONICAL_INVALID');
+    must(Object.getPrototypeOf(value) === (Array.isArray(value) ? Array.prototype : Object.prototype), 'HASH_CANONICAL_INVALID');
+    must(!seen.has(value), 'HASH_CANONICAL_INVALID');
+    seen.add(value);
+    const names = Reflect.ownKeys(value);
+    must(names.every(name => typeof name === 'string'), 'HASH_CANONICAL_INVALID');
+    const read = name => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, name);
+      must(descriptor && descriptor.enumerable && Object.hasOwn(descriptor, 'value'), 'HASH_CANONICAL_INVALID');
+      return walk(descriptor.value, depth + 1);
+    };
+    let result;
+    if (Array.isArray(value)) {
+      must(names.length === value.length + 1 && names.every(name => name === 'length' || /^(0|[1-9][0-9]*)$/.test(name)), 'HASH_CANONICAL_INVALID');
+      result = Array.from({ length: value.length }, (_, index) => read(String(index)));
+    } else {
+      must(!names.some(name => name === '__proto__' || name === 'constructor' || name === 'prototype'), 'HASH_CANONICAL_INVALID');
+      result = {};
+      for (const name of [...names].sort()) result[name] = read(name);
+    }
+    seen.delete(value);
+    return result;
+  };
+  return JSON.stringify(walk(input, 0));
+}
+
+function digest(value) {
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
+}
+
+function freeze(value) {
+  if (value !== null && typeof value === 'object') {
+    for (const child of Object.values(value)) freeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 function strictRecord(value, keys, code = 'INVALID_OBJECT') {
   must(value !== null && typeof value === 'object' && !types.isProxy(value)
@@ -299,7 +358,7 @@ export function openReplayStore(root, storeScope) {
         return result;
       }
 
-      contractMust(current.state.entries.length < MAX_ENTRIES, 'STORE_CAPACITY_REACHED');
+      must(current.state.entries.length < MAX_ENTRIES, 'STORE_CAPACITY_REACHED');
       const entry = {
         revision: current.state.revision + 1,
         previous: current.state.head,
