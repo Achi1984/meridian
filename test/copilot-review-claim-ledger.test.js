@@ -28,6 +28,23 @@ function concurrentRun(db,value){
     child.stdin.end(JSON.stringify(value));
   });
 }
+function holdWriteLock(db,durationMs){
+  const script='import sqlite3,sys,time\nc=sqlite3.connect(sys.argv[1],timeout=10,isolation_level=None)\nc.execute("BEGIN IMMEDIATE")\nprint("LOCKED",flush=True)\ntime.sleep(int(sys.argv[2])/1000)\nc.commit()\nc.close()';
+  const child=spawn('python3',['-u','-c',script,db,String(durationMs)],{stdio:['ignore','pipe','pipe']});
+  const done=new Promise(resolve=>child.once('close',resolve));
+  return new Promise((resolve,reject)=>{
+    let output='';
+    child.stdout.setEncoding('utf8').on('data',chunk=>{
+      output+=chunk;
+      if(output.includes('LOCKED\n')) resolve({child,done});
+    });
+    child.stderr.setEncoding('utf8').on('data',chunk=>output+=chunk);
+    child.on('error',reject);
+    child.on('close',code=>{
+      if(!output.includes('LOCKED\n')) reject(new Error(`lock holder exited ${code}: ${output}`));
+    });
+  });
+}
 
 test('module import performs no database or other external work',()=>{
   const directory=temp(),db=join(directory,'not-created.sqlite');
@@ -63,6 +80,28 @@ test('competing processes can consume a request only once',async()=>{
     for(const result of results.filter(item=>item.code===2))
       assert.equal(JSON.parse(result.stderr).error,'CLAIM_ALREADY_CONSUMED');
   }finally{rmSync(directory,{recursive:true,force:true});}
+});
+
+test('claim expiring while waiting for SQLite write lock is rejected without a row',async()=>{
+  const directory=temp(),db=join(directory,'claims.sqlite');
+  let holder;
+  try{
+    holder=await holdWriteLock(db,2800);
+    const request=binding({requestId:'expires-during-lock',expiresAt:Date.now()+1800});
+    const started=Date.now(),result=await concurrentRun(db,request),elapsed=Date.now()-started;
+    assert.ok(elapsed>=1800,`ledger returned before expiry after ${elapsed}ms`);
+    assert.equal(result.code,2,result.stderr);
+    assert.equal(JSON.parse(result.stderr).error,'EXPIRED');
+    const rows=spawnSync('python3',['-c',
+      `import sqlite3,sys\nc=sqlite3.connect(sys.argv[1])\nt=c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='consumed_claims'").fetchone()\nprint(c.execute('SELECT COUNT(*) FROM consumed_claims').fetchone()[0] if t else 0)`,
+      db
+    ],{encoding:'utf8'});
+    assert.equal(rows.status,0,rows.stderr);
+    assert.equal(rows.stdout.trim(),'0');
+  }finally{
+    if(holder) await holder.done;
+    rmSync(directory,{recursive:true,force:true});
+  }
 });
 
 test('expired and out-of-window bindings fail before creating a database',()=>{

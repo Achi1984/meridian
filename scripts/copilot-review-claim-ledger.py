@@ -144,6 +144,8 @@ def consume_claim(database, binding):
         connection.execute("PRAGMA busy_timeout = 10000")
         connection.execute("PRAGMA synchronous = FULL")
         connection.execute("BEGIN IMMEDIATE")
+        current_time = int(time.time() * 1000)
+        binding = _validate_binding(binding, current_time)
         connection.execute(
             """CREATE TABLE IF NOT EXISTS consumed_claims (
                 request_id TEXT PRIMARY KEY,
@@ -179,6 +181,10 @@ def consume_claim(database, binding):
             ),
         )
         connection.commit()
+    except ClaimLedgerError:
+        if connection is not None:
+            connection.rollback()
+        raise
     except sqlite3.IntegrityError:
         if connection is not None:
             connection.rollback()
