@@ -105,7 +105,9 @@ def sha(value):
 def identity():
     remaining()
     require(os.environ['GITHUB_REPOSITORY'] == REPO and os.environ['GITHUB_EVENT_NAME'] == 'workflow_run'
-            and os.environ['GITHUB_REF'] == 'refs/heads/main' and os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'Wrong control identity')
+            and os.environ['GITHUB_REF'] == 'refs/heads/main'
+            and os.environ['GITHUB_RUN_ATTEMPT'] in ('1', '2')
+            and os.environ.get('GITHUB_TRIGGERING_ACTOR') == 'Achi1984', 'Wrong control identity')
     event = strict_json(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_bytes())
     hint = event['workflow_run']
     require(event.get('action') == 'completed' and own(event.get('repository')), 'Wrong event origin')

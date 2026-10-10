@@ -12,7 +12,9 @@ jobs:
     if: >-
       github.repository == 'Achi1984/meridian' &&
       github.event.workflow_run.head_sha == '2b267ecc0f94565fe005156bf45e8f0ae139eb9b' &&
-      github.event.workflow_run.conclusion == 'success' && github.run_attempt == 1
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.run_attempt == 1 || github.run_attempt == 2) &&
+      github.triggering_actor == 'Achi1984'
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:

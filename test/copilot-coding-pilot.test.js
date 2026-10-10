@@ -41,12 +41,12 @@ def fixture():
           'merged_at':'2026-10-10T16:00:00Z','base':{'ref':'main','repo':repo}}
     event={'action':'completed','repository':repo,'workflow_run':copy.deepcopy(source)}
     return copy.deepcopy(data),copy.deepcopy(event)
-def trial(change=lambda d,e:None, accept=False):
+def trial(change=lambda d,e:None, accept=False, attempt='1', actor='Achi1984'):
     data,event=fixture(); change(data,event)
     with tempfile.TemporaryDirectory() as tmp:
         eventpath=pathlib.Path(tmp)/'event.json'; eventpath.write_text(json.dumps(event))
         env={'GITHUB_REPOSITORY':p.REPO,'GITHUB_EVENT_NAME':'workflow_run','GITHUB_REF':'refs/heads/main',
-          'GITHUB_RUN_ATTEMPT':'1','GITHUB_RUN_ID':'200','GITHUB_SHA':base,'GITHUB_EVENT_PATH':str(eventpath)}
+          'GITHUB_RUN_ATTEMPT':attempt,'GITHUB_TRIGGERING_ACTOR':actor,'GITHUB_RUN_ID':'200','GITHUB_SHA':base,'GITHUB_EVENT_PATH':str(eventpath)}
         with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'api',side_effect=lambda path:copy.deepcopy(data[path])),mock.patch('time.time',return_value=p.DEADLINE-60):
             try: result=p.identity()
             except (ValueError,KeyError,TypeError):
@@ -269,5 +269,46 @@ with tempfile.TemporaryDirectory() as tmp:
         lockpath.write_text(json.dumps(lock))
         binary.unlink(); binary.symlink_to(root/'package-lock.json');rejects(lambda:p.verify_cli_integrity(root))
         spawn.assert_not_called()
+`);
+});
+
+
+test('maintainer approval attempt2 is admitted consistently while other actors and attempts fail closed', () => {
+  assert.match(workflow, /\(github\.run_attempt == 1 \|\| github\.run_attempt == 2\)/);
+  assert.match(workflow, /github\.triggering_actor == 'Achi1984'/);
+  python(fixture + String.raw`
+for attempt in ('1','2'):
+    assert trial(accept=True,attempt=attempt)['source_attempt']==3
+    for actor in ('Copilot','other-owner','',None):trial(attempt=attempt,actor=actor or '')
+for attempt in ('0','3','99','-1','02',''):
+    trial(attempt=attempt)
+trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update(run_attempt=2),attempt='2')
+trial(lambda d,e:d['pulls/653']['head'].update(sha='b'*40),attempt='2')
+`);
+});
+
+test('approval attempt cannot consume a second durable claim even after an unconsumed first attempt', () => {
+  python(fixture + String.raw`
+created=False; writes=[]
+def fake(path,method='GET',payload=None,expected=200):
+    global created
+    if path=='git/ref/heads/'+p.BRANCH:
+        if not created:raise urllib.error.HTTPError('url',404,'absent',{},None)
+        return {'object':{'sha':'c'*40}}
+    if path=='git/commits/'+base:return {'tree':{'sha':'d'*40}}
+    writes.append((path,method))
+    if path=='git/commits':return {'sha':'c'*40}
+    if path=='git/refs':
+        assert not created;created=True
+        return {'ref':'refs/heads/'+p.BRANCH,'object':{'sha':'c'*40}}
+    raise AssertionError(path)
+with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ,{'GITHUB_OUTPUT':str(pathlib.Path(tmp)/'out')}):
+    with mock.patch.object(p,'identity',return_value=trial(accept=True,attempt='2')),mock.patch.object(p,'api',side_effect=fake):
+        p.claim()
+    assert created and len(writes)==2
+    for attempt in ('1','2'):
+        with mock.patch.object(p,'identity',return_value=trial(accept=True,attempt=attempt)),mock.patch.object(p,'api',side_effect=fake):
+            rejects(p.claim)
+        assert len(writes)==2
 `);
 });
