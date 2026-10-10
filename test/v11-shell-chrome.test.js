@@ -6,7 +6,7 @@ import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
-const page='file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
+const page=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const probe=`(()=>{const x={width:innerWidth,viewport:document.documentElement.clientWidth,
 body:document.body.scrollWidth,root:document.documentElement.scrollWidth,dpr:devicePixelRatio,
 nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').length};
