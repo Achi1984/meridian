@@ -19,6 +19,54 @@ const contract=read('portfolio-data-contract.js');
 const historyStore=read('portfolio-history-store.js');
 const marketFeed=read('market-feed-gateway.js');
 const authorityUpdate=read('portfolio-authority-update.js');
+const commandPro=js.includes('function commandProModel(now=Date.now()){');
+if(commandPro){
+  // R132 is a successor of R90-96, not an exception to data/risk authority.
+  // Fail closed on missing proof; only obsolete DOM wiring gets a successor path.
+  const modelStart=js.indexOf('function commandProModel(now=Date.now()){');
+  const modelEnd=js.indexOf('function commandProHealthHtml(model){',modelStart);
+  const renderStart=js.indexOf('function renderCommand(force=false){');
+  const renderEnd=js.indexOf('function assetWatchShareCard()',renderStart);
+  must(modelStart>=0&&modelEnd>modelStart&&renderStart>=0&&renderEnd>renderStart,'R132 exact view-model/render ownership missing');
+  const model=js.slice(modelStart,modelEnd),render=js.slice(renderStart,renderEnd);
+  const browser=read('test/r132-command-pro-browser.test.js');
+  for(const token of [
+    "const verified=!!(critical&&g.fresh&&matchedRows(critical.symbol).length&&",
+    "!['DATA_STALE','UNVERIFIED','MARKET_STALE'].includes(critical.status.code)",
+    "const urgent=verified&&['LIQ_RISK','PROTECTION_RISK'].includes(critical.status.code)",
+    "action=nextAction();asset=critical.symbol;tone='danger'",
+    "action={title:'PORTFOLIO-VOLLSTÄNDIGKEIT PRÜFEN',detail:p.detail}",
+    "Gesamtwert und Performance bleiben bis zur Authority-Klärung unbekannt.",
+    ".sort((a,b)=>b.status.rank-a.status.rank",
+    ".slice(0,3)"
+  ])must(model.includes(token),'R132 safety/readiness/ranking contract missing: '+token);
+  for(const token of [
+    "model=commandProModel()",
+    "portfolio=asNode(portfolioChartHeroHtml())",
+    "decision=asNode(commandProDecisionHtml(model))",
+    "risks=asNode(commandProRiskHtml(model))",
+    "source=asNode(commandDataDisclosure())",
+    "source.open=opened.source",
+    "if(portfolioDetails){portfolioDetails.remove();portfolioDetails.open=opened.portfolio}",
+    "if(portfolioDetails)source.insertAdjacentElement('beforebegin',portfolioDetails)",
+    "bindCommandProDisclosures(view)",
+    "if(model.urgent){",
+    "mode.insertAdjacentElement('afterend',decision)",
+    "decision.insertAdjacentElement('afterend',portfolio)",
+    "mode.insertAdjacentElement('afterend',portfolio)",
+    "health.insertAdjacentElement('afterend',decision)"
+  ])must(render.includes(token),'R132 Command hierarchy/authority DOM contract missing: '+token);
+  must(js.includes('const commandProDisclosureState={source:false,portfolio:false,navigation:false}'),'R132 sources must default closed');
+  must(js.includes('data-command-decision-owner="r132"'),'R132 single decision owner marker missing');
+  must(js.includes('function bindCommandActionHub(view)'),'R132 Command navigation binding missing');
+  must(js.includes("openAssetDetail(symbol,'command','command')"),'R132 critical asset drill-down missing');
+  must(css.includes('#view-command .command-pro-review')&&css.includes('min-height:48px'),'R132 action touch target missing');
+  for(const token of ['for(let i=0;i<20;i++)','singleDecisionAndDisclosure','criticalDominance','unknownPortfolioNotZero','provenanceCollapsedByDefault','sourceOpenAfterNavigation','staleNotAllClear','minimumTouchTarget','noHorizontalOverflow'])
+    must(browser.includes(token),'R132 real-browser acceptance gate missing: '+token);
+  must(!/(?:submitOrder|placeOrder|createOrder|cancelOrder|transferFunds|postJson|executeTrade|\/trade\/order)/i.test(model+'\n'+render),
+    'R132 view-model and Command renderer must remain presentation-only');
+}
+
 
 const build=String(release.terminalBuild||'');
 const rev=build.split('-').at(-1)||'';
@@ -281,15 +329,23 @@ must(js.includes('function commandHealthSummary()'),'Command health summary miss
 must(js.includes("const dataReady=br.label==='READY'&&mr.label==='READY'"),'Command data health must stay independent from portfolio authority');
 must(js.includes("chip('DATA',h.data)"),'Command DATA health chip missing');
 must(js.includes('function commandDataDisclosure()'),'Command source disclosure renderer missing');
-must(js.includes('source.innerHTML=commandDataDisclosure()'),'Command source details must be collapsed by default');
+must(commandPro
+  ?js.includes('const commandProDisclosureState={source:false,portfolio:false,navigation:false}')&&js.includes('source=asNode(commandDataDisclosure())')&&js.includes('source.open=opened.source')&&js.includes('bindCommandProDisclosures(view)')
+  :js.includes('source.innerHTML=commandDataDisclosure()'),'Command source details must be collapsed by default and user disclosure state preserved');
 must(css.includes('.command-source-details>summary'),'Command source disclosure styling missing');
 
 
 /* r92 permanent Command decision-flow gates */
 must(String(release.dashboardShell||'').includes('COMMAND-DECISION-FLOW'),'dashboardShell must declare Command decision flow');
 must(js.includes('function commandAttentionHtml()'),'Command Attention standalone renderer missing');
-must(js.includes("attentionWrap.innerHTML=commandAttentionHtml()"),'Command Attention must render after Next/Open');
-must(js.includes("hubNode.insertAdjacentElement('afterend',attentionNode)"),'Command Attention ordering must follow Next/Open');
+if(commandPro){
+  must(js.includes('decision=asNode(commandProDecisionHtml(model))')&&js.includes('risks=asNode(commandProRiskHtml(model))'),'Command Pro must own one decision and one risk focus');
+  must(js.includes("(model.urgent?health:decision).insertAdjacentElement('afterend',risks)")&&js.includes("risks.insertAdjacentElement('afterend',links)"),'R132 decision/risk/navigation order missing');
+  must(js.includes('.command-attention,.v10-critical-wrap')&&js.includes('data-command-decision-owner="r132"'),'R132 duplicate attention must be removed, replaced by one decision owner');
+}else{
+  must(js.includes("attentionWrap.innerHTML=commandAttentionHtml()"),'Command Attention must render after Next/Open');
+  must(js.includes("hubNode.insertAdjacentElement('afterend',attentionNode)"),'Command Attention ordering must follow Next/Open');
+}
 must(js.includes('command-position-details'),'Command Account Futures disclosure missing');
 must(css.includes('.command-position-details>summary'),'Command Account Futures disclosure styling missing');
 
@@ -304,7 +360,9 @@ must(js.includes("PORTFOLIO_CHART_WINDOWS=Object.freeze({ '1h':60*60*1000,'1d':2
 must(js.includes("String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'"),'portfolio chart must use strict authority history only');
 must(js.includes('function portfolioChartHeroHtml()'),'portfolio chart hero renderer missing');
 must(js.includes('function bindCommandPortfolioHero(view)'),'portfolio chart range binding missing');
-must(js.includes("portfolioBox.innerHTML=portfolioChartHeroHtml()"),'portfolio chart must render into Command top fold');
+must(commandPro
+  ?js.includes('portfolio=asNode(portfolioChartHeroHtml())')&&js.includes("mode.insertAdjacentElement('afterend',portfolio)")&&js.includes("decision.insertAdjacentElement('afterend',portfolio)")
+  :js.includes("portfolioBox.innerHTML=portfolioChartHeroHtml()"),'portfolio chart must render first normally, following verified critical danger');
 must(js.includes("bindCommandPortfolioHero(view)"),'portfolio chart controls must be bound');
 must(css.includes('.command-portfolio-hero'),'dominant portfolio hero styling missing');
 must(css.includes('.portfolio-range-switch button'),'portfolio range controls styling missing');

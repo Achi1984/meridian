@@ -47,10 +47,20 @@ test('r96 Command collapses deep diagnostics under one system status disclosure'
 
 test('r96 renderCommand inserts one collapsed diagnostics surface after live risk',()=>{
   const start=js.indexOf('function renderCommand(force=false)'),end=js.indexOf('function assetWatchShareCard()',start),block=js.slice(start,end);
-  assert.match(block,/const systemDiagnostics=commandSystemDiagnostics\(\)/);
-  assert.match(block,/insertAdjacentElement\('afterend',systemDiagnostics\)/);
-  assert.match(block,/portfolioDetails/);
-  assert.match(block,/\.command-system-diagnostics/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 consolidates diagnostics into one closed source disclosure after risk.
+    assert.match(block,/source=asNode\(commandDataDisclosure\(\)\)/);
+    assert.match(block,/source\.open=opened\.source/);
+    assert.match(block,/bindCommandProDisclosures\(view\)/);
+    assert.match(block,/risks\.insertAdjacentElement\('afterend',links\)/);
+    assert.match(block,/portfolioDetails/);
+    assert.match(block,/\.command-system-diagnostics/);
+  }else{
+    assert.match(block,/const systemDiagnostics=commandSystemDiagnostics\(\)/);
+    assert.match(block,/insertAdjacentElement\('afterend',systemDiagnostics\)/);
+    assert.match(block,/portfolioDetails/);
+    assert.match(block,/\.command-system-diagnostics/);
+  }
 });
 
 test('r96 Command data state is a compact three-column health row on mobile',()=>{

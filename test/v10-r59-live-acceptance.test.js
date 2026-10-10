@@ -8,9 +8,18 @@ const css=fs.readFileSync(new URL('../v10/v10.css',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
 
 test('r59 command layer removes legacy repaint duplicates before early return',()=>{
-  assert.match(v10,/const legacyCommandSelectors=\[[^\]]*\.data-truth[^\]]*\]/s);
-  assert.match(v10,/legacyCommandPresent=legacyCommandSelectors\.some/);
-  assert.match(v10,/!force&&!legacyCommandPresent&&\$\('\.command-source-strip'/);
+  if(v10.includes('function commandProModel(now=Date.now()){')){
+    // R132 must remove all old Command surfaces before its idempotent early return.
+    assert.match(v10,/const legacy=\[[^\]]*\.data-truth[^\]]*\]/s);
+    assert.match(v10,/!force&&!legacy\.some\(sel=>\$\(sel,view\)\)/);
+    assert.match(v10,/view\.querySelectorAll\('\.command-portfolio-hero,[^']*\.command-attention,[^']*\.v10-critical-wrap/);
+    assert.match(v10,/data-command-decision-owner="r132"/);
+    assert.match(v10,/captureCommandProDisclosures\(view\)/);
+  }else{
+    assert.match(v10,/const legacyCommandSelectors=\[[^\]]*\.data-truth[^\]]*\]/s);
+    assert.match(v10,/legacyCommandPresent=legacyCommandSelectors\.some/);
+    assert.match(v10,/!force&&!legacyCommandPresent&&\$\('\.command-source-strip'/);
+  }
   assert.match(css,/#view-command \.data-truth,[\s\S]*#view-command \.command-bots\{display:none!important\}/);
 });
 
