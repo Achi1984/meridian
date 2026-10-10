@@ -79,7 +79,12 @@ part of packet identity. Output ordering is stable by status then work ID.
 
 Unknown outcomes block pending reconciliation. Any overlapping scopes among
 current work packets conservatively block both, including planned work and
-ancestor directory scopes. No automatic conflict winner or retry is selected.
+ancestor directory scopes. No automatic conflict winner or retry is selected. Overlaps are indexed once with
+a sorted segment-prefix sweep, rather than comparing every pair of paths for
+every work item. Exact matches and directory ancestors conflict across owners;
+nesting within one work packet and lexical near-prefixes such as `src-ab` do not.
+For P paths, indexing uses O(P log P) string comparisons plus a linear sweep and
+O(P) auxiliary storage; string comparisons remain bounded by path-length limits.
 Running packets wait for their owner unless supplied CI is stale or failed;
 those CI blockers take precedence over `WAITING_AGENT`. Null or pending CI
 keeps an active owner in `WAITING_AGENT`. CI must match both pins; stale head/base

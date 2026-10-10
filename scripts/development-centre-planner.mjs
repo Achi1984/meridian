@@ -45,7 +45,33 @@ const scopeFields = ['requestId', 'opId', 'headSha', 'baseSha', 'repository'];
 const scope = w => Object.fromEntries(scopeFields.map(k => [k, w[k]]));
 const pathValid = p => typeof p === 'string' && /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(p)
   && p.split('/').every(x => x !== '.' && x !== '..');
-const overlaps = (a, b) => a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+// A trailing separator makes exact paths and descendants one contiguous sorted
+// interval, even around names such as src-ab, src.ab and src0. No path-pair scan.
+function conflictingWork(packets) {
+  const entries = packets.flatMap(({w}) => w.paths.map(path => ({key: path + '/', owner: w.workId})));
+  entries.sort((a,b) => a.key < b.key ? -1 : a.key > b.key ? 1 : a.owner < b.owner ? -1 : a.owner > b.owner ? 1 : 0);
+  const nextDifferent = new Array(entries.length);
+  for (let i = entries.length - 1; i >= 0; i--) {
+    nextDifferent[i] = i + 1 < entries.length && entries[i].owner === entries[i+1].owner
+      ? nextDifferent[i+1] : i + 1;
+  }
+  const conflicts = new Set(), ancestors = [], owners = new Map();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    while (ancestors.length && !entry.key.startsWith(ancestors.at(-1).key)) {
+      const owner = ancestors.pop().owner, count = owners.get(owner) - 1;
+      if (count) owners.set(owner,count); else owners.delete(owner);
+    }
+    // Earlier equal/ancestor paths and later equal/descendant paths are both
+    // considered. Same-owner nesting never creates a cross-work conflict.
+    const next = entries[nextDifferent[i]];
+    if (owners.size > 1 || (owners.size === 1 && !owners.has(entry.owner))
+      || (next && next.key.startsWith(entry.key))) conflicts.add(entry.owner);
+    ancestors.push(entry);
+    owners.set(entry.owner,(owners.get(entry.owner) || 0) + 1);
+  }
+  return conflicts;
+}
 
 /** Returns proposals, not leases, authenticated evidence, dispatches or merge permission. */
 export function planWork(input) {
@@ -112,6 +138,7 @@ export function planWork(input) {
     deliveries.set(deliveryId, signature); works.set(w.workId, {w, signature});
   }
   const packets = [...works.values()];
+  const overlapping = conflictingWork(packets);
   // Route all validated evidence by head, not by its container packet. Including
   // alternate request IDs on that head preserves the coordinator's dedupe guard.
   const evidenceByHead = new Map();
@@ -131,8 +158,7 @@ export function planWork(input) {
       inFlight: evidence ? [...evidence.inFlight.values()] : []}, scope(w));
     let status, reason;
     if (w.execution === 'UNKNOWN') { status = 'BLOCKED'; reason = 'RECONCILE_UNKNOWN_OUTCOME'; }
-    else if (packets.some(({w: other}) => other.workId !== w.workId
-      && w.paths.some(a => other.paths.some(b => overlaps(a, b))))) {
+    else if (overlapping.has(w.workId)) {
       status = 'BLOCKED'; reason = 'OVERLAPPING_SCOPE';
     } else if (review.status === 'BLOCKED') { status = 'BLOCKED'; reason = review.reason; }
     else if (w.ci !== null && (w.ci.headSha !== w.headSha || w.ci.baseSha !== w.baseSha)) { status = 'BLOCKED'; reason = 'STALE_CI'; }

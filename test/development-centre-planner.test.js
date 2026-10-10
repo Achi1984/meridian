@@ -185,3 +185,27 @@ test('alternate request on an active head cannot hide in foreign historical rows
     for(const order of [[p,q],[q,p]])assert.equal(run(...order).find(r=>r.workId===p.workId).reason,'HEAD_ALREADY_SCOPED');
   }
 });
+function scopedWork(index,paths) {
+  return {deliveryId:'EVENT'+index,workId:'WORK'+index,requestId:'REQUEST'+index,opId:'OPERATION'+index,
+    repository:'Achi1984/meridian',headSha:(index+1).toString(16).padStart(40,'0'),baseSha:base,
+    paths,owner:'NONE',execution:'PLANNED',ci:null,responses:[],inFlight:[]};
+}
+test('maximum valid nonoverlap snapshot remains deterministic and conflict-free',()=>{
+  const work=Array.from({length:128},(_,i)=>scopedWork(i,Array.from({length:128},(_,j)=>'owner'+i+'/file'+j)));
+  const start=performance.now(),results=run(...work);
+  console.log('MAX_PATH_SNAPSHOT_MS',Math.round(performance.now()-start));
+  assert.equal(results.length,128);assert.ok(results.every(r=>r.reason==='CI_MISSING'));
+  assert.deepEqual(run(...work.slice().reverse()),results);
+});
+test('indexed overlaps match segment-prefix oracle across nesting and lexical boundaries',()=>{
+  const choices=['src','src/a','src/a/b','src-ab','src.ab','src0','src_','src/a-b','src/a.b','src/a0','Src','other/x'];
+  for(let seed=0;seed<48;seed++) {
+    const work=Array.from({length:5},(_,i)=>scopedWork(i,[...new Set([choices[(seed+i*3)%choices.length],choices[(seed*5+i*7)%choices.length]])]));
+    const expected=work.filter(a=>work.some(b=>a.workId!==b.workId&&a.paths.some(x=>b.paths.some(y=>x===y||x.startsWith(y+'/')||y.startsWith(x+'/'))))).map(w=>w.workId).sort();
+    const results=run(...work);
+    assert.deepEqual(results.filter(r=>r.reason==='OVERLAPPING_SCOPE').map(r=>r.workId).sort(),expected);
+    assert.deepEqual(run(...work.slice().reverse()),results);
+  }
+  const own=scopedWork(0,['src','src/a','src/a/b']);
+  assert.equal(run(own)[0].reason,'CI_MISSING','same-work nesting is allowed');
+});
