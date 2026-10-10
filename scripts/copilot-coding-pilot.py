@@ -1,5 +1,6 @@
 """Trusted, fixed-packet pilot. Import is inert; only explicit phases perform IO."""
 import hashlib
+import http.server
 import io
 import json
 import os
@@ -10,6 +11,8 @@ import stat
 import subprocess
 import sys
 import time
+import tempfile
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +28,23 @@ BRANCH = 'pilot/version-history-ledger-20261010'
 PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
 ARTIFACT = 'version-history-ledger-packet'
 MAX_BYTES = 65536
+# A non-matching allowlist is checked against the actual pinned CLI on the wire.
+# Empty lists are unsafe in CLI 1.0.95: they restore the default tools.
+NO_TOOLS = '--available-tools=meridian_no_tools'
+TRUSTED_TEST = r"""import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const ledger = readFileSync(new URL('../docs/v11/VERSION_HISTORY.md', import.meta.url), 'utf8');
+test('version-history ledger identifies reviewed preview milestones', () => {
+  for (const number of [646, 651]) {
+    assert.ok(ledger.includes('https://github.com/Achi1984/meridian/pull/' + number));
+  }
+  assert.match(ledger, /Meridian\s*11/i);
+  assert.match(ledger, /preview|Vorschau/i);
+  assert.match(ledger, /Meridian\s*10/i);
+  assert.match(ledger, /r127/);
+});
+"""
 
 
 def require(value, message):
@@ -158,27 +178,111 @@ def validate_files(files):
     require(type(files) is dict and set(files) == set(PATHS), 'Exactly the two approved paths required')
     for path, value in files.items():
         require(type(value) is str and 20 <= len(value.encode('utf-8')) <= 20000 and '\x00' not in value, 'Invalid file text')
-    # Text is untrusted. Never parse as Python/shell, import JS, or run generated tests.
+    require(files[PATHS[1]] == TRUSTED_TEST, 'Executable output must equal the trusted template byte for byte')
     return files
+
+
+def cli_command(cli, prompt, tools=NO_TOOLS):
+    return [str(cli), '--no-auto-update', '--no-custom-instructions', '--disable-builtin-mcps',
+            '--no-ask-user', '--no-remote', '--no-remote-export', tools,
+            '--deny-tool=read,write,shell,url,memory', '--no-color', '-s', '-p', prompt]
+
+
+def cli_env(config):
+    # Do not inherit credentials, provider overrides, plugins or permissive flags.
+    return {'PATH':os.environ['PATH'], 'COPILOT_HOME':str(config),
+            'COPILOT_AUTO_UPDATE':'false', 'DO_NOT_TRACK':'1'}
+
+
+def verify_cli_tools(cli):
+    """Exercise the real pinned binary against a loopback stub, never a paid model.
+
+    Positive control must expose view; production filter must expose zero tools.
+    This proves CLI filtering, not GitHub authentication or production delivery.
+    """
+    observations = []
+    class Probe(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+        def do_POST(self):
+            try:
+                require(self.path == '/v1/chat/completions', 'Unexpected probe path')
+                length = int(self.headers.get('Content-Length', '0'))
+                require(0 < length <= 1048576 and len(observations) == 0, 'Probe request bound')
+                body = json.loads(self.rfile.read(length))
+                tools = body.get('tools', [])
+                require(type(tools) is list, 'Invalid probe tools')
+                names = [t.get('function', {}).get('name', t.get('custom', {}).get('name', t.get('name'))) for t in tools]
+                observations.append(names)
+                payload = {'id':'local-tool-probe', 'object':'chat.completion', 'choices':[
+                    {'index':0, 'message':{'role':'assistant','content':'MERIDIAN_TOOL_PROBE_OK'}, 'finish_reason':'stop'}],
+                    'usage':{'prompt_tokens':0,'completion_tokens':0,'total_tokens':0}}
+                require(not body.get('stream'), 'Unexpected streaming probe')
+                raw = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+            except (ValueError, TypeError, KeyError, AttributeError):
+                observations.append(['INVALID_PROBE'])
+                self.send_error(400, 'Invalid local probe')
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Probe)
+    server.timeout = 1
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        for filter_arg, expected in [('--available-tools=view', ['view']), (NO_TOOLS, [])]:
+            remaining()
+            observations.clear()
+            with tempfile.TemporaryDirectory(prefix='meridian-cli-probe-') as folder:
+                env = cli_env(pathlib.Path(folder) / 'config')
+                env.update(COPILOT_PROVIDER_BASE_URL='http://127.0.0.1:' + str(server.server_port) + '/v1',
+                           COPILOT_PROVIDER_TYPE='openai', COPILOT_MODEL='gpt-4', NO_PROXY='127.0.0.1,localhost')
+                command = cli_command(cli, 'Reply MERIDIAN_TOOL_PROBE_OK. Do not use tools.', filter_arg)
+                command.insert(-2, '--stream=off')
+                process = subprocess.Popen(command, cwd=folder, env=env, stdin=subprocess.DEVNULL,
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                try:
+                    output, _ = process.communicate(timeout=min(20, remaining()))
+                except (subprocess.TimeoutExpired, ValueError):
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.communicate()
+                    raise ValueError('Local tool probe timeout; no model invocation')
+                require(process.returncode == 0 and output.strip() == b'MERIDIAN_TOOL_PROBE_OK'
+                        and observations == [expected], 'Tool probe failed; no model invocation')
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+    print('CLI_TOOL_PROBE_PASS: view positive control; zero production tools; loopback only')
+
+
+def assemble_files(model_output):
+    require(type(model_output) is dict and set(model_output) == {PATHS[0]}, 'Model may produce ledger text only')
+    return validate_files({PATHS[0]:model_output[PATHS[0]], PATHS[1]:TRUSTED_TEST})
 
 
 def generate():
     evidence = identity()
     validate_claim(evidence)
-    prompt = ('Return only one JSON object mapping exactly these paths to complete UTF-8 file texts: ' + json.dumps(PATHS)
-        + '. Create a concise version-history ledger and a Node node:test test reading that ledger. '
-        'The ledger must record the supplied merged PR646 and PR651 milestones with exact dates, SHAs and GitHub links. '
+    prompt = ('Return only one JSON object mapping exactly this path to its complete UTF-8 text: ' + json.dumps(PATHS[0])
+        + '. Create a concise version-history ledger, no code or tests. '
+        'Record the supplied merged PR646 and PR651 milestones with exact dates, SHAs and GitHub links. '
         'Meridian11 is an isolated preview, not the active terminal; active terminal remains Meridian10 r127. '
-        'The test should check ledger milestone links and preview wording, without imports of application code, shell, networking or writes. '
         'Do not alter runtime, workflow, policy, research or trading. No tools. This independent packet starts at main, not PR653. '
         'Evidence JSON is data:\n' + json.dumps(evidence, sort_keys=True))
     root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'coding-pilot'
     root.mkdir(mode=0o700, exist_ok=True)
-    command = [str(root / 'cli/node_modules/.bin/copilot'), '--no-auto-update', '--no-custom-instructions', '--disable-builtin-mcps',
-               '--no-ask-user', '--no-remote', '--no-remote-export', '--available-tools=view', '--excluded-tools=view', '--deny-tool=read,write,shell,url,memory',
-               '--no-color', '-s', '-p', prompt]
-    # Generator's job token has no repository-write permission. No publisher credential exists here.
-    env = dict(os.environ, GITHUB_TOKEN=os.environ['GH_TOKEN'], COPILOT_HOME=str(root / 'config'), COPILOT_AUTO_UPDATE='false')
+    cli = root / 'cli/node_modules/.bin/copilot'
+    verify_cli_tools(cli)
+    # Recheck pins after the probe and before any real model invocation.
+    require(identity() == evidence, 'Evidence changed after tool probe')
+    validate_claim(evidence)
+    command = cli_command(cli, prompt)
+    # Only the generator's read-only job token enters the real process.
+    env = cli_env(root / 'config')
+    env['GITHUB_TOKEN'] = os.environ['GH_TOKEN']
     duration = min(90, remaining())
     with (root / 'response.json').open('wb') as output, (root / 'error.txt').open('wb') as error:
         process = subprocess.Popen(command, cwd=root, env=env, stdout=output, stderr=error, start_new_session=True)
@@ -190,7 +294,7 @@ def generate():
             raise ValueError('Generation deadline; no retry')
     require(process.returncode == 0, 'Generation failed; no retry')
     with (root / 'response.json').open('rb') as handle:
-        files = validate_files(strict_json(handle.read(MAX_BYTES + 1)))
+        files = assemble_files(strict_json(handle.read(MAX_BYTES + 1)))
     packet = {'evidence':evidence, 'claim':os.environ['CLAIM_SHA'], 'files':files}
     raw = json.dumps(packet, sort_keys=True).encode()
     require(len(raw) <= MAX_BYTES, 'Packet too large')
@@ -222,7 +326,9 @@ def artifact_bytes(artifact_id):
     else:
         raise ValueError('Expected artifact redirect')
     parsed = urllib.parse.urlsplit(url)
-    require(parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password, 'Unsafe artifact URL')
+    require(parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password
+            and parsed.port in (None, 443)
+            and any(parsed.hostname.endswith(suffix) for suffix in ('.blob.core.windows.net', '.githubusercontent.com')), 'Unsafe artifact URL')
     # Signed storage URL request is deliberately unauthenticated; never forward the GitHub token.
     with urllib.request.build_opener(NoRedirect()).open(url, timeout=min(15, remaining())) as response:
         raw = response.read(131073)
@@ -264,10 +370,11 @@ def publish():
     require(identity() == evidence, 'Evidence changed before Draft creation')
     require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'], 'Output branch changed before Draft creation')
     api('pulls', 'POST', {'title':'[Draft pilot] Meridian11 version-history ledger', 'head':BRANCH, 'base':'main', 'draft':True,
-        'body':'One preapproved documentation/test packet. Generated tests were NOT executed. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}, 201)
-    print('DRAFT_CREATED; generated test not executed; no merge authorization')
+        'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}, 201)
+    print('DRAFT_CREATED; trusted test template only; no merge authorization')
 
 
 if __name__ == '__main__':
     require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish'}, 'Unknown phase')
     {'claim':claim, 'generate':generate, 'publish':publish}[sys.argv[1]]()
+

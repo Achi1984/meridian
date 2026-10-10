@@ -53,7 +53,7 @@ jobs:
           node -e 'if (Number(process.versions.node.split(".")[0]) < 22) throw Error("Node 22+ required")'
           npm install --prefix "$RUNNER_TEMP/coding-pilot/cli" --ignore-scripts --no-audit --no-fund @github/copilot@1.0.95
           "$RUNNER_TEMP/coding-pilot/cli/node_modules/.bin/copilot" --version | grep -F 'GitHub Copilot CLI 1.0.95.'
-      - name: Generate JSON only with no repository-write credential
+      - name: Verify actual tool surface locally, then generate ledger JSON
         env:
           GH_TOKEN: ${{ github.token }}
           CLAIM_SHA: ${{ needs.claim.outputs.claim }}
@@ -88,3 +88,4 @@ jobs:
           CLAIM_SHA: ${{ needs.claim.outputs.claim }}
           ARTIFACT_ID: ${{ needs.generate.outputs.artifact }}
         run: python3 "$RUNNER_TEMP/pilot.py" publish
+

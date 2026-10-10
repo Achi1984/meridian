@@ -80,7 +80,7 @@ with mock.patch('time.time',return_value=p.DEADLINE):rejects(p.remaining)
 });
 test('JSON and ZIP reject duplicate keys, traversal, symlinks, extra files and oversized content', () => {
   python(fixture + String.raw`
-good={path:'Valid preview ledger content' for path in p.PATHS}
+good={p.PATHS[0]:'Valid preview ledger content',p.PATHS[1]:p.TRUSTED_TEST}
 assert p.validate_files(good)==good
 for data in [{},dict(good,**{'../escape':'bad'}),{p.PATHS[0]:'x'},dict(good,**{p.PATHS[0]:'x'*20001}),dict(good,**{p.PATHS[0]:'x\0'*20})]:
     rejects(lambda:p.validate_files(data))
@@ -129,7 +129,7 @@ with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'
 test('publisher only stages the two approved files and creates a Draft on claimed branch', () => {
   python(fixture + String.raw`
 evidence=trial(accept=True); claim='c'*40; tree='d'*40; newtree='e'*40; newcommit='f'*40
-packet={'evidence':evidence,'claim':claim,'files':{path:'Valid preview ledger content' for path in p.PATHS}}
+packet={'evidence':evidence,'claim':claim,'files':{p.PATHS[0]:'Valid preview ledger content',p.PATHS[1]:p.TRUSTED_TEST}}
 buf=io.BytesIO()
 with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dumps(packet))
 raw=buf.getvalue()
@@ -177,13 +177,73 @@ with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'
     generate.assert_not_called()
 with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p,'identity',return_value=evidence), \
      mock.patch.object(p,'validate_claim'),mock.patch.dict(os.environ,{'RUNNER_TEMP':tmp,'GH_TOKEN':'readonly-test','CLAIM_SHA':'c'*40}), \
-     mock.patch('time.time',return_value=p.DEADLINE-2),mock.patch('subprocess.Popen') as spawn,mock.patch('os.killpg') as kill:
+     mock.patch('time.time',return_value=p.DEADLINE-2),mock.patch.object(p,'verify_cli_tools'),mock.patch('subprocess.Popen') as spawn,mock.patch('os.killpg') as kill:
     proc=spawn.return_value;proc.pid=999
     proc.wait.side_effect=[p.subprocess.TimeoutExpired('copilot',2),0]
     rejects(p.generate)
     kill.assert_called_once_with(999,p.signal.SIGKILL)
-    assert '--excluded-tools=view' in spawn.call_args.args[0]
+    assert p.NO_TOOLS in spawn.call_args.args[0]
+    assert '--excluded-tools=view' not in spawn.call_args.args[0]
 with mock.patch('time.time',return_value=p.DEADLINE),mock.patch('subprocess.Popen') as spawn:
     rejects(p.generate);spawn.assert_not_called()
+`);
+});
+
+
+test('model produces documentation only and executable text must match the trusted template exactly', () => {
+  python(fixture + String.raw`
+good=p.assemble_files({p.PATHS[0]:'Meridian11 preview; Meridian10 r127'})
+assert good[p.PATHS[1]]==p.TRUSTED_TEST
+rejects(lambda:p.assemble_files({**good}))
+rejects(lambda:p.assemble_files({p.PATHS[1]:p.TRUSTED_TEST}))
+for injected in [p.TRUSTED_TEST+'\nfetch("https://invalid.test")',
+  p.TRUSTED_TEST.replace('node:fs','node:child_process'),
+  p.TRUSTED_TEST+'\nprocess["env"]',
+  p.TRUSTED_TEST+'\nconst f = ({}).constructor.constructor; f("return process")()',
+  p.TRUSTED_TEST.replace('readFileSync','writeFileSync'),
+  p.TRUSTED_TEST+'\n/* harmless-looking modification */',
+  p.TRUSTED_TEST.replace('const ledger', 'const lеdger')]:
+    rejects(lambda:p.validate_files({**good,p.PATHS[1]:injected}))
+`);
+});
+
+test('generator strips inherited credentials and permissive/provider environment', () => {
+  python(fixture + String.raw`
+with mock.patch.dict(os.environ,{'GH_TOKEN':'private','GITHUB_TOKEN':'private','COPILOT_ALLOW_ALL':'true',
+    'COPILOT_PROVIDER_BASE_URL':'https://invalid.test','COPILOT_PROVIDER_API_KEY':'private',
+    'NODE_OPTIONS':'--require /tmp/injected.js','BASH_ENV':'/tmp/injected.sh'}):
+    env=p.cli_env(pathlib.Path('/tmp/isolated-config'))
+    assert set(env)=={'PATH','COPILOT_HOME','COPILOT_AUTO_UPDATE','DO_NOT_TRACK'}
+    assert env['COPILOT_AUTO_UPDATE']=='false'
+    args=p.cli_command('/tmp/copilot','prompt')
+    assert args.count(p.NO_TOOLS)==1
+    assert '--available-tools' not in args and '--excluded-tools=view' not in args
+`);
+});
+
+test('zero-tool verification failure prevents real generation and packet output', () => {
+  python(fixture + String.raw`
+evidence=trial(accept=True)
+with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p,'identity',return_value=evidence), \
+     mock.patch.object(p,'validate_claim'),mock.patch.dict(os.environ,{'RUNNER_TEMP':tmp,'GH_TOKEN':'readonly','CLAIM_SHA':'c'*40}), \
+     mock.patch.object(p,'verify_cli_tools',side_effect=ValueError('tool exposed')) as probe, \
+     mock.patch('subprocess.Popen') as spawn:
+    rejects(p.generate)
+    probe.assert_called_once();spawn.assert_not_called()
+    assert not (pathlib.Path(tmp)/'coding-pilot/packet.json').exists()
+`);
+});
+
+test('artifact redirect rejects foreign hosts and credential-bearing URLs without second request', () => {
+  python(fixture + String.raw`
+for url in ['https://evil.test/a','https://blob.core.windows.net.evil.test/a',
+            'https://user@valid.blob.core.windows.net/a','http://valid.blob.core.windows.net/a',
+            'https://valid.blob.core.windows.net:8443/a']:
+    error=urllib.error.HTTPError('url',302,'redirect',{'Location':url},None)
+    with mock.patch('time.time',return_value=p.DEADLINE-60),mock.patch.dict(os.environ,{'GH_TOKEN':'private'}), \
+         mock.patch('urllib.request.build_opener') as opener:
+        opener.return_value.open.side_effect=error
+        rejects(lambda:p.artifact_bytes('300'))
+        assert opener.return_value.open.call_count==1
 `);
 });
