@@ -143,7 +143,8 @@
     .preview-status[data-state="loading"] strong{color:var(--state-loading)}
     .preview-status[data-state="error"]{border-color:#9b5c68;background:#281c27}
     .preview-status[data-state="error"] strong{color:var(--state-error)}
-    @media(max-width:350px){.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
+    /* Narrow screens give the longer full labels more room without shrinking text or touch targets. */
+    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.1fr)}.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
     @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
   </style>
 </head>
