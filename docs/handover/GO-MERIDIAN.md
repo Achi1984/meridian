@@ -19,16 +19,11 @@ Before every MERIDIAN work step:
 5. Check only relevant open PRs/branches.
 6. Treat GitHub live state as authoritative; never repeat an uncertain write after a stream interruption.
 
-Follow **STREAM-SAFE-V7**:
-- one bounded remote tool-call group per assistant turn;
-- at most one repository mutation per assistant turn;
-- after a mutation, stop and reconcile next turn;
-- Claude request is a mutation: post, then stop;
-- at most one poll per turn; WAITING is terminal for that turn;
-- use CAS / expected SHA where applicable;
-- never duplicate a Claude request for the same request-id + head;
-- stop on surprises;
-- unfinished work ends with NEXT.
+Follow the active protocol in `MERIDIAN_LIVE_CHECKPOINT.json` and `MERIDIAN_GO.md`.
+V8 uses authorized work packages with guarded atomic writes and checkpoints,
+independent exact-head review and explicit Project Owner merge approval.
+A policy update does not authorize dispatch, spending or workflow changes.
+Historical snapshots below are not live-state evidence.
 
 ## Current live state
 - Repository: `Achi1984/meridian`

@@ -232,7 +232,7 @@ Default flow:
 16. Verify production/deployment behavior with Runtime Smoke when available.
 17. Update continuity documentation for durable architecture/rule/limitation/next-step changes.
 
-The user does not need to approve each merge once the agreed gates pass.
+Each merge requires explicit Project Owner approval of the concrete candidate in addition to the agreed gates.
 
 ### 14.1 Single-Writer Release Lease
 
@@ -346,24 +346,25 @@ If the current runtime does not expose true separate subagent instances or the r
 
 Runtime honesty overrides cosmetic adherence to the workflow.
 
-## STREAM-SAFE-V7 — turn-bounded interruption recovery
+## STREAM-SAFE-V8 — recoverable work packages
 
-1. Start every turn by resolving `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json` and reconciling a bounded state pack: mailbox tail (max 5), checkpoint, live main, one relevant PR, and relevant run IDs/statuses.
-2. Bare `Go` means RECONCILE -> CLASSIFY -> one safe next action; never repeat the prior write.
-3. Maximum one remote tool-call group and one repository mutation per assistant turn.
-4. After any mutation, emit a short checkpoint and STOP. Reconcile on the next turn.
-5. A Claude request is a mutation: post it and stop; never wait for Claude in the same turn.
-6. Poll a still-running CI/reviewer/platform state at most once per user turn. `WAITING` is a valid terminal turn state; never sleep/retry-loop.
-7. Bound output to compact IDs/SHA/status/blocker only; no bulk mailbox or continuity dumps.
-8. Fetch logs only for a named failure and inspect at most one bounded failing log slice per turn.
-9. Preserve op-id/CAS discipline with expected branch head/blob/base and single-writer ownership.
-10. After interruption classify: `OP_APPLIED`, `OP_ABSENT`, `OP_CONFLICT`, `WAITING`, or `BLOCKED_STREAM`.
-11. Same Claude request ID on the same exact head must never be reposted while running or answered.
-12. Stop on the first unexpected head/check/scope state; diagnose on the next turn.
-13. Long or irreversible work must be split into durable atomic steps.
-14. End unfinished turns with one deterministic `NEXT:` line.
-15. These transport rules never relax exact-head review, CI, Research-stage, PnL, execution, release, privacy, safety, or Single-Writer gates.
+1. Before work, resolve `mailboxIssue` from `MERIDIAN_LIVE_CHECKPOINT.json`, read its bounded latest relevant items and reconcile live main, branch, PR and CI.
 
+A task is bounded by its authorized objective, allowed files, branch owner, acceptance tests, budget constraints and stopping conditions, rather than by chat turns. One Go resumes the first incomplete authorized step after reconciliation; it never repeats the previous write blindly.
+
+- Multiple sequential reads, implementation steps, tests and guarded writes are allowed within one authorized work package. No 30-second or one-tool-group chat limit applies.
+- Before each write, record intent and a unique op-id, check branch ownership and expected head/base/blob. Use atomic expected-state guards where required; unavailable guards block the write.
+- After each write, reconcile the actual effect and record a durable checkpoint before dependent work. A checkpoint is not proof of durable replay protection or authenticated transport.
+- One writer per branch; integration and release numbering belong to the lead. Isolated agents may implement, test and prepare a Draft PR only within their delegated scope.
+- Stop dependent writes on conflicts, unknown outcomes or scope drift. Read-only diagnosis may continue immediately. Retry at most once after verified OP_ABSENT; never replay OP_APPLIED. A second interruption yields BLOCKED_STREAM.
+- Read bounded successful-CI evidence as well as named failures. Preserve payload/source budgets and mailbox tail limits. Never dump entire mailboxes.
+- No sleep or polling loops. Poll unchanged external work at most once per session. WAITING records request/run IDs and the resume condition. Existing authorized agents may finish their packet; future dispatch requires a real, separately authorized mechanism.
+- Keep one edited progress comment per PR. Deduplicate reviewer requests by request ID and exact head. Give concise milestone updates without requiring a new Go for each internal step.
+- Stop at completion, missing authorization, unresolved conflict, exhausted authorized budget, unavailable capability or external dependency. End unfinished reports with NEXT.
+- Exact-head/base CI and independent review remain mandatory. Changed heads invalidate prior gates. Project Owner approval of the concrete merge candidate remains required.
+- This policy does not authorize production activation, trading, extra spending, workflow/permission/secret/scheduler changes, or a continuously running chat. Existing research and release boundaries remain.
+
+Proposal: mailbox #571 comment 6096562356. This candidate requires independent review and explicit Project Owner merge approval before adoption.
 
 ## Transport V1 — source uploads versus rendered excerpts
 
@@ -390,7 +391,7 @@ separate implementation/tests and exact-head review. No schedule is changed here
   policy first; a stale/old unscoped policy is rejected rather than silently enlarged.
 - Check source blob SHA before and after publication (`verifySourceBlob` can compare
   local source with a returned blob SHA). A checksum proves bytes, not branch ownership.
-  Existing op-id, scope, expected-head/CAS, Single-Writer, no-blind-retry, one-mutation,
+  Existing op-id, scope, expected-head/CAS, Single-Writer, no-blind-retry, per-operation reconciliation,
   CI, independent exact-head review and protected-merge requirements remain binding.
   Reference-only tree entries require those checks too; they do not upload new content.
 - The historical two-file 64-KiB exception is consumed by 74ed8fd1 and b8c35ab8.
