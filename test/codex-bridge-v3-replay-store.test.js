@@ -123,8 +123,12 @@ test('simultaneous competing reservations across child processes are atomic', { 
   const { root, replay } = fixture(t);
   const expected = token(replay.snapshot());
   const script = 'import {openReplayStore} from ' + JSON.stringify(moduleURL) + ';'
-    + "process.send('ready');process.on('message',()=>{try{const s=openReplayStore(process.argv[1],JSON.parse(process.argv[2])).reserve(JSON.parse(process.argv[3]),JSON.parse(process.argv[4]));"
-    + "process.send({ok:true,revision:s.revision});}catch(e){process.send({ok:false,code:e.code});}process.disconnect();});";
+    + "const req=JSON.parse(process.argv[3]);const cas=JSON.parse(process.argv[4]);"
+    + "process.send('ready');process.on('message',()=>{let store;"
+    + "try{store=openReplayStore(process.argv[1],JSON.parse(process.argv[2]));}"
+    + "catch(e){process.send({stage:'open',ok:false,code:e.code});process.disconnect();return;}"
+    + "try{const s=store.reserve(req,cas);process.send({stage:'mutate',ok:true,revision:s.revision,requestId:req.requestId});}"
+    + "catch(e){process.send({stage:'mutate',ok:false,code:e.code});}process.disconnect();});";
   const children = Array.from({ length: 2 }, (_, i) => child(t, script, [
     root,
     JSON.stringify(scope()),
@@ -149,9 +153,23 @@ test('simultaneous competing reservations across child processes are atomic', { 
   children.forEach(({ processChild }) => processChild.send('go'));
   const outcomes = await Promise.all(responses);
   assert.equal(outcomes.filter(x => x.ok).length, 1);
-  assert.ok(['STORE_LOCKED_RECONCILE_REQUIRED', 'CAS_CONFLICT_RECONCILE_REQUIRED', 'STORE_UNCERTAIN_RECONCILE_REQUIRED'].includes(outcomes.find(x => !x.ok).code));
+  const winner = outcomes.find(x => x.ok);
+  assert.equal(winner.stage, 'mutate');
+  assert.equal(winner.revision, 1);
+  for (const loser of outcomes.filter(x => !x.ok)) {
+    if (loser.stage === 'open') {
+      assert.ok(['STORE_LOCKED_RECONCILE_REQUIRED', 'STORE_UNCERTAIN_RECONCILE_REQUIRED'].includes(loser.code));
+    } else {
+      assert.equal(loser.stage, 'mutate');
+      assert.ok(['STORE_LOCKED_RECONCILE_REQUIRED', 'CAS_CONFLICT_RECONCILE_REQUIRED'].includes(loser.code));
+    }
+  }
   const final = openReplayStore(root, scope()).snapshot();
   assert.equal(final.revision, 1);
+  assert.equal(final.records.length, 1);
+  assert.equal(final.records[0].identity.requestId, winner.requestId);
+  assert.equal(existsSync(join(root, 'writer.lock')), false);
+  assert.equal(existsSync(join(root, 'replay-store.pending')), false);
 });
 
 test('actual process death after successful reserve persists replay and blocks duplicate intent', { timeout: 10000 }, async t => {
@@ -238,6 +256,22 @@ test('retained handle rejects substituted root symlink before mutation effects',
   assert.equal(existsSync(join(original, 'replay-store.pending')), false);
 });
 
+test('retained handle rejects real directory swap before reserve mutation effects', t => {
+  const { root, parent, replay } = fixture(t);
+  const expected = token(replay.snapshot());
+  const original = join(parent, 'original');
+  renameSync(root, original);
+  createReplayStore(root, scope());
+
+  fail(() => replay.reserve(identity(), expected), 'STORE_ROOT_UNSAFE');
+  assert.equal(openReplayStore(root, scope()).snapshot().revision, 0);
+  assert.equal(openReplayStore(original, scope()).snapshot().revision, 0);
+  assert.equal(existsSync(join(root, 'writer.lock')), false);
+  assert.equal(existsSync(join(root, 'replay-store.pending')), false);
+  assert.equal(existsSync(join(original, 'writer.lock')), false);
+  assert.equal(existsSync(join(original, 'replay-store.pending')), false);
+});
+
 test('unsafe permissions fail closed', t => {
   const { root } = fixture(t);
   chmodSync(root, 0o755);
@@ -255,6 +289,25 @@ test('retained handle rejects unsafe root permissions before mutation effects', 
   const state = openReplayStore(root, scope()).snapshot();
   assert.equal(state.revision, 1);
   assert.equal(state.records[0].status, 'RESERVED_OFFLINE');
+});
+
+test('retained handle rejects real directory swap before markUnknown mutation effects', t => {
+  const { root, parent, replay } = fixture(t);
+  const reserved = replay.reserve(identity(), token(replay.snapshot()));
+  const original = join(parent, 'original');
+  renameSync(root, original);
+  createReplayStore(root, scope());
+
+  fail(() => replay.markUnknown(identity(), token(reserved)), 'STORE_ROOT_UNSAFE');
+  const replacement = openReplayStore(root, scope()).snapshot();
+  assert.equal(replacement.revision, 0);
+  const originalState = openReplayStore(original, scope()).snapshot();
+  assert.equal(originalState.revision, 1);
+  assert.equal(originalState.records[0].status, 'RESERVED_OFFLINE');
+  assert.equal(existsSync(join(root, 'writer.lock')), false);
+  assert.equal(existsSync(join(root, 'replay-store.pending')), false);
+  assert.equal(existsSync(join(original, 'writer.lock')), false);
+  assert.equal(existsSync(join(original, 'replay-store.pending')), false);
 });
 
 test('store API rejects proxy/getter identities before reservation', t => {

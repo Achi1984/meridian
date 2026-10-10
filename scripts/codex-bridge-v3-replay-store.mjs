@@ -160,6 +160,13 @@ function privateRoot(root) {
   must(stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(root) === root, 'STORE_ROOT_UNSAFE');
   must((stat.mode & 0o077) === 0, 'STORE_ROOT_UNSAFE');
   if (typeof process.getuid === 'function') must(stat.uid === process.getuid(), 'STORE_ROOT_UNSAFE');
+  must(Number.isSafeInteger(stat.dev) && Number.isSafeInteger(stat.ino), 'STORE_ROOT_UNSAFE');
+  return Object.freeze({ dev: stat.dev, ino: stat.ino });
+}
+
+function pinnedRoot(root, expectedIdentity) {
+  const current = privateRoot(root);
+  must(current.dev === expectedIdentity.dev && current.ino === expectedIdentity.ino, 'STORE_ROOT_UNSAFE');
 }
 
 function syncDir(root) {
@@ -311,14 +318,14 @@ export function createReplayStore(root, storeScope) {
 
 export function openReplayStore(root, storeScope) {
   const scope = validateStoreScope(storeScope);
-  privateRoot(root);
+  const rootIdentity = privateRoot(root);
   must(existsSync(join(root, STORE_FILE)), 'STORE_MISSING');
   must(!existsSync(join(root, LOCK_FILE)), 'STORE_LOCKED_RECONCILE_REQUIRED');
   must(!existsSync(join(root, PENDING_FILE)), 'STORE_UNCERTAIN_RECONCILE_REQUIRED');
   readState(root, scope);
 
   const snapshot = () => {
-    privateRoot(root);
+    pinnedRoot(root, rootIdentity);
     must(!existsSync(join(root, LOCK_FILE)), 'STORE_LOCKED_RECONCILE_REQUIRED');
     must(!existsSync(join(root, PENDING_FILE)), 'STORE_UNCERTAIN_RECONCILE_REQUIRED');
     return summarize(readState(root, scope));
@@ -327,7 +334,7 @@ export function openReplayStore(root, storeScope) {
   const mutate = (expected, makeEntry, options) => {
     const cas = validateCas(expected);
     const config = validateOptions(options);
-    privateRoot(root);
+    pinnedRoot(root, rootIdentity);
     let lockHeld = false;
     let uncertain = false;
     let phase = 'START';

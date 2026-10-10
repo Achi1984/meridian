@@ -32,7 +32,8 @@ Assumptions (explicitly limited):
 - local filesystem semantics with atomic rename in one directory
 - ownership/permissions are enforced (`0700` directory, `0600` files)
 - symlink/path hazards are rejected (`O_NOFOLLOW`, root realpath checks)
-- root safety is revalidated at mutation entry before lock creation
+- root safety is revalidated at snapshot/mutation entry before lock creation
+- replay handles pin root directory identity (`dev`/`ino`) and reject later path substitutions
 
 Not claimed:
 - distributed safety
@@ -45,6 +46,8 @@ Not claimed:
 The store is fail-closed.
 If a process dies or failpoint triggers after lock acquisition in uncertain persistence phases, lock is intentionally retained.
 The store does not auto-expire locks and does not perform stale-lock takeover.
+Read-side lock/pending checks (`openReplayStore` and `snapshot`) are separate non-atomic probes and can race with active writers.
+On race, behavior remains fail-closed (`STORE_LOCKED_RECONCILE_REQUIRED` / `STORE_UNCERTAIN_RECONCILE_REQUIRED`) rather than inferring success.
 
 `UNKNOWN_OUTCOME` is terminal for replay progression in this module.
 Once a reservation is marked unknown, replay remains blocked (`UNKNOWN_OUTCOME_BLOCKED`) pending operator reconciliation.
