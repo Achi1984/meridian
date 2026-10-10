@@ -49,7 +49,6 @@
     /* A1 semantic accents: visual categories, never synthetic risk verdicts. */
     :root{--positive:#2ecf9a;--attention:#f3b94f;--critical:#f16b78;--research:#b69bff}
     .card{box-shadow:0 12px 30px #00000025,inset 0 1px #ffffff08}
-    .decision{background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b)}
     .trust-cell:nth-child(1){border-top:2px solid var(--brand);background:linear-gradient(160deg,#162c42,#101b28 70%)}
     .trust-cell:nth-child(2){border-top:2px solid var(--positive);background:linear-gradient(160deg,#12352f,#101b28 70%)}
     .trust-cell:nth-child(3){border-top:2px solid var(--research);background:linear-gradient(160deg,#292342,#101b28 70%)}
@@ -63,7 +62,7 @@
     #nav button[data-v="market"].active{color:var(--research)}
     #nav button[data-v="research"].active{color:#d49aff}
 
-    .decision{border-color:#466b96;background:linear-gradient(135deg,#182f48,#111c2b 70%);position:relative}
+    .decision{border-color:#466b96;background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b);position:relative}
     .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
     .card-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:13px}
     .card-kicker{font-size:11px;letter-spacing:.13em;font-weight:790;color:#a9cffa}
@@ -113,9 +112,43 @@
       .decision h2{font-size:18px}
     }
     @media(prefers-reduced-motion:reduce){.view{animation:none}details summary span:last-child{transition:none}}
+
+    /* A2: evidence-state hierarchy and accessible layout; A1 category accents stay separate. */
+    :root{--state-unknown:#f0ca85;--state-loading:#b7d8ff;--state-error:#ff9ba7}
+    .skip-link{position:fixed;top:12px;left:12px;z-index:20;transform:translateY(-200%);padding:12px 16px;border-radius:10px;background:#e5f0ff;color:#101b28;font-weight:750}
+    .skip-link:focus{transform:none}
+    .view h1:focus{outline:0}
+    .view h1:focus-visible{outline:3px solid #9bc9ff;outline-offset:5px;border-radius:4px}
+    .limited{border-color:#776346;color:var(--state-unknown);background:#30271c}
+    .state-label{color:var(--state-unknown)}
+    .card-head,.section-title{flex-wrap:wrap}
+    .card-head>*{min-width:0}
+    .state-label,.section-title small{white-space:normal;overflow-wrap:anywhere}
+    .section-title small{font-size:11px;line-height:1.5}
+    .empty-state>div:last-child{min-width:0}
+    .view-placeholder h2,.view-placeholder p,.decision p{overflow-wrap:anywhere}
+    .container{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+    #nav{padding-left:max(6px,env(safe-area-inset-left,0px),calc((100vw - 740px)/2));padding-right:max(6px,env(safe-area-inset-right,0px),calc((100vw - 740px)/2))}
+    details:focus-within{overflow:visible}
+    summary:focus-visible{outline-offset:-4px;border-radius:14px}
+    .data-state-preview{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+    .data-state-preview h2{font-size:13px;margin-bottom:6px}
+    .state-controls{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+    .state-controls button{min-height:44px;min-width:44px;padding:9px 12px;border:1px solid #425772;border-radius:10px;background:#142235;color:#c6d2df;font-size:12px;cursor:pointer}
+    .state-controls button[aria-pressed="true"]{border-color:#9bc9ff;background:#223c59;color:#f2f6fb}
+    .preview-status{padding:14px;border:1px solid #776346;border-radius:12px;background:#1c2028;overflow-wrap:anywhere}
+    .preview-status strong{display:block;font-size:13px;color:var(--state-unknown)}
+    .preview-status p{margin-top:6px;font-size:12px;color:#c6d2df}
+    .preview-status[data-state="loading"]{border-color:#567a9f;background:#142235}
+    .preview-status[data-state="loading"] strong{color:var(--state-loading)}
+    .preview-status[data-state="error"]{border-color:#9b5c68;background:#281c27}
+    .preview-status[data-state="error"] strong{color:var(--state-error)}
+    @media(max-width:350px){.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
+    @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
   </style>
 </head>
 <body>
+<a class="skip-link" href="#app-main">Zum Inhalt</a>
 <div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="static-no-live-data" data-execution-impact="false">
   <header class="topbar">
     <div class="header-inner">
@@ -126,7 +159,7 @@
       <span class="preview-pill">UI-ENTWURF</span>
     </div>
   </header>
-  <main id="app-main" class="container">
+  <main id="app-main" class="container" tabindex="-1">
     <section id="view-command" class="view active" aria-labelledby="command-heading">
       <div class="section-intro">
         <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Alles Wesentliche.<br>Ein Blick.</h1><p class="sub">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>
@@ -157,6 +190,19 @@
           <p><b>Modus:</b> Statische, öffentliche Entwicklungs-Vorschau.</p>
           <p><b>Daten:</b> Keine Live-Feeds, keine private Kontoanbindung, keine Handelsfreigabe.</p>
           <p><b>Grundlage:</b> MERIDIAN 11 Architekturentscheid #603. Die geprüfte v10-Engine bleibt separat.</p>
+          <section id="data-state-preview" class="data-state-preview" aria-labelledby="state-preview-heading">
+            <h2 id="state-preview-heading">Datenstatus · Darstellungsbeispiele</h2>
+            <p>Nur Ansichtsmuster ohne Kontozugriff. Depotwert und Risikostatus bleiben unbekannt.</p>
+            <div class="state-controls" role="group" aria-label="Beispielzustand wählen">
+              <button type="button" data-preview-state="unknown" aria-pressed="true" aria-controls="preview-data-status">Unbekannt</button>
+              <button type="button" data-preview-state="loading" aria-pressed="false" aria-controls="preview-data-status">Lädt</button>
+              <button type="button" data-preview-state="error" aria-pressed="false" aria-controls="preview-data-status">Fehler</button>
+            </div>
+            <div id="preview-data-status" class="preview-status" data-state="unknown" role="status" aria-live="polite" aria-atomic="true">
+              <strong>Beispiel: Daten unbekannt</strong>
+              <p>Ohne verifizierte Quelle bleiben Wert und Risiko unbestimmt. Fehlende Daten sind keine Entwarnung.</p>
+            </div>
+          </section>
         </div>
       </details>
       <p class="section-footer">MERIDIAN 11 · DESIGN-SCAFFOLD · NICHT PRODUKTIV</p>
@@ -207,13 +253,43 @@
       view.hidden = key !== name;
       view.classList.toggle('active', key === name);
     });
+    const heading = views.get(name).querySelector?.('h1');
+    if (heading) {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({preventScroll: true});
+      heading.scrollIntoView({block: 'start'});
+    }
   }
   nav.addEventListener('click', function (event) {
     const button = event.target.closest('button[data-v]');
     if (!button || !nav.contains(button)) return;
     activate(button.dataset.v);
   });
+  /* Local presentation examples only: never connected to portfolio, risk or data sources. */
+  const preview = document.getElementById('data-state-preview');
+  if (preview) {
+    const controls = Array.from(preview.querySelectorAll('button[data-preview-state]'));
+    const status = document.getElementById('preview-data-status');
+    const examples = new Map([
+      ['unknown', ['Beispiel: Daten unbekannt', 'Ohne verifizierte Quelle bleiben Wert und Risiko unbestimmt. Fehlende Daten sind keine Entwarnung.']],
+      ['loading', ['Beispiel: Daten werden geprüft', 'Eine laufende Prüfung ist noch kein verifiziertes Ergebnis. Depotwert und Risikostatus bleiben unbekannt.']],
+      ['error', ['Beispiel: Daten nicht verfügbar', 'Die Prüfung konnte nicht abgeschlossen werden. Es wird kein Ersatzwert und keine Entwarnung angezeigt.']]
+    ]);
+    preview.addEventListener('click', function (event) {
+      const button = event.target.closest('button[data-preview-state]');
+      if (!button || !preview.contains(button)) return;
+      const state = examples.has(button.dataset.previewState) ? button.dataset.previewState : 'unknown';
+      const text = examples.get(state);
+      status.dataset.state = state;
+      status.querySelector('strong').textContent = text[0];
+      status.querySelector('p').textContent = text[1];
+      controls.forEach(function (control) {
+        control.setAttribute('aria-pressed', String(control.dataset.previewState === state));
+      });
+    });
+  }
 })();
 </script>
 </body>
 </html>
+

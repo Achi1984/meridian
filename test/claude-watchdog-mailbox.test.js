@@ -40,18 +40,14 @@ function runScript(name) {
   return WORKFLOW.slice(begin,end).split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
 }
 
-// These cases preserve the prior R129 trigger and quota contracts, but execute the
-// resolver/decision path instead of only matching the presence of source strings.
-test('R129: :57, dispatch, completed Release Safety and success-only fallback unchanged',()=>{
-  assert.match(WORKFLOW,/schedule:\n\s+- cron: '57 \* \* \* \*'/);
-  assert.match(WORKFLOW,/workflow_dispatch:/);
+// Product-owner hourly-only rule supersedes the old R129 event-driven trigger.
+test('Watchdog: hourly :57 plus manual dispatch only, no event-driven trigger',()=>{
   const trigger=WORKFLOW.slice(WORKFLOW.indexOf('\non:'),WORKFLOW.indexOf('\npermissions:'));
-  assert.match(trigger,/workflow_run:\n\s+workflows:\n\s+- MERIDIAN Release Safety\n\s+types:\n\s+- completed/);
-  assert.doesNotMatch(trigger,/MERIDIAN Visual QA|MERIDIAN Runtime Smoke|MERIDIAN Agent Orchestration Safety/);
-  const gate=WORKFLOW.slice(WORKFLOW.indexOf('jobs:'),WORKFLOW.indexOf('\n    runs-on:'));
-  assert.match(gate,/github\.event_name != 'workflow_run'/);
-  assert.match(gate,/workflow_run\.name == 'MERIDIAN Release Safety'/);
-  assert.match(gate,/workflow_run\.conclusion == 'success'/);
+  assert.match(trigger,/schedule:\n\s+- cron: '57 \* \* \* \*'/);
+  assert.match(trigger,/workflow_dispatch:/);
+  assert.equal((trigger.match(/cron:/g)||[]).length,1);
+  assert.doesNotMatch(trigger,/workflow_run:|pull_request:|push:|issues:|issue_comment:/);
+  assert.doesNotMatch(WORKFLOW,/github\.event_name != 'workflow_run'|github\.event\.workflow_run/);
 });
 test('R129: Claude, credential and cache-save gates remain decision-controlled',()=>{
   assert.equal((WORKFLOW.match(/if: steps\.decision\.outputs\.run_claude == 'true'/g)||[]).length,3);
