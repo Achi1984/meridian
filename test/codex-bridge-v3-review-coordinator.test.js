@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {classifyReview} from '../scripts/codex-bridge-v3-review-coordinator.mjs';
+const head='a'.repeat(40),other='b'.repeat(40),requestId='REQ-001';
+const check=x=>classifyReview({requestId,headSha:head,...x});
+test('unrequested is never automatically dispatched',()=>assert.deepEqual(check({}),{status:'UNREQUESTED',reason:'OFFLINE_ONLY',mayRequest:false,mayMerge:false}));
+test('inflight exact request waits without repost',()=>assert.equal(check({inFlight:[{requestId,headSha:head}]}).status,'WAITING'));
+test('green verdict cannot authorize merge',()=>assert.deepEqual(check({responses:[{requestId,headSha:head,verdict:'GREEN_LIGHT'}]}),{status:'REVIEWED',reason:'GREEN_UNVERIFIED',mayRequest:false,mayMerge:false}));
+for(const verdict of ['NEEDS_MORE_EVIDENCE','REVISION_REQUIRED','CHANGES_REQUIRED','STALE_HEAD'])test(verdict+' blocks even with green',()=>assert.equal(check({responses:[{requestId,headSha:head,verdict:'GREEN_LIGHT'},{requestId,headSha:head,verdict}]}).status,'BLOCKED'));
+test('stale response head fails closed',()=>assert.throws(()=>check({responses:[{requestId,headSha:other,verdict:'GREEN_LIGHT'}]}),{code:'REQUEST_HEAD_CONFLICT'}));
+test('stale inflight head fails closed',()=>assert.throws(()=>check({inFlight:[{requestId,headSha:other}]}),{code:'INFLIGHT_HEAD_CONFLICT'}));
+test('unknown verdict fails closed',()=>assert.throws(()=>check({responses:[{requestId,headSha:head,verdict:'UNKNOWN'}]}),{code:'UNKNOWN_VERDICT'}));
+test('invalid scope fails closed',()=>assert.throws(()=>classifyReview({requestId:'',headSha:head}),{code:'INVALID_SCOPE'}));
+test('invalid collection fails closed',()=>assert.throws(()=>check({responses:{}}),{code:'INVALID_COLLECTION'}));
