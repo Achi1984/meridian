@@ -11,7 +11,7 @@ import re
 REPOSITORY = 'Achi1984/meridian'
 ACTIVE = False
 POLICY = None  # Explicit reviewed model ID/allowlist and required workflow IDs.
-MAX_PACKET_BYTES = 65536
+MAX_PACKET_BYTES = 131072
 
 
 def require(value, message='Invalid advisory review contract'):
@@ -95,7 +95,7 @@ def evidence_checked(evidence, policy):
     paths = evidence['changed_paths']
     require(type(paths) is list and 0 < len(paths) <= 64 and all(path(item) for item in paths)
             and len(set(paths)) == len(paths))
-    require(text(evidence['diff'], 32768) and evidence['diff_truncated'] is False,
+    require(text(evidence['diff'], 65536) and evidence['diff_truncated'] is False,
             'Complete bounded diff required')
     checks = evidence['checks']
     require(type(checks) is list and len(checks) == len(policy['required_checks']))

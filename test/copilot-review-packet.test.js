@@ -50,7 +50,7 @@ assert packet['payload']['reviewer']=={'provider':'github-copilot','family':'cla
 test('missing failed stale or model-claimed CI evidence cannot create review packet',()=>{
  python(String.raw`
 for key,value in [('repository','other/repo'),('pr',True),('pr',0),('head_sha','A'*40),('head_sha',base),
- ('base_sha','b'*39),('request_id',''),('diff_truncated',True),('diff','x'*32769),
+ ('base_sha','b'*39),('request_id',''),('diff_truncated',True),('diff','x'*65537),
  ('changed_paths',['../escape']),('changed_paths',['v11/index.html','v11/index.html']),('checks',[])]:
  rejects(lambda:p.build_packet(dict(evidence,**{key:value}),policy=policy))
 for key,value in [('name','unknown-check'),('workflow_id',True),('workflow_id',1),('run_id',True),('run_attempt',0),
@@ -100,9 +100,12 @@ test('raw model JSON rejects duplicate keys, nonfinite values and oversized inpu
 packet,verdict,execution=setup()
 good=json.dumps(verdict)
 duplicates=good[:-1]+',"outcome":"no_findings"}'
-for raw in [duplicates,good[:-1]+',"extra":NaN}',good[:-1]+',"extra":Infinity}','x'*65537]:
+for raw in [duplicates,good[:-1]+',"extra":NaN}',good[:-1]+',"extra":Infinity}','x'*131073]:
  rejects(lambda:p.validate_verdict(packet,raw,execution,policy=policy))
 assert p.parse_json(b'{"ok":true}')=={'ok':True}
+assert p.MAX_PACKET_BYTES==131072
+assert p.parse_json(json.dumps({'text':'x'*100000}))['text']=='x'*100000
+rejects(lambda:p.canonical({'text':'x'*131072}))
 for raw in ('{"x":1e999}','{"x":-1e999}','{"x":0.5}'):
  rejects(lambda:p.parse_json(raw))
 `);
@@ -117,5 +120,10 @@ assert packet['payload']['authority']=='advisory-only'
 data['checks'][0]['conclusion']='failure';assert packet['payload']['evidence']['checks'][0]['conclusion']=='success'
 packet,verdict,execution=setup();result=p.validate_verdict(packet,verdict,execution,policy=policy)
 verdict['summary']='changed';assert result['review']['summary']!='changed'
+# A larger bounded real-review input must not be rejected by the old 32KiB ceiling.
+large=copy.deepcopy(evidence);large['diff']='x'*40000
+assert len(p.build_packet(large,policy=policy)['payload']['evidence']['diff'])==40000
+large['diff']='x'*65536;assert p.build_packet(large,policy=policy)
+large['diff']='x'*65537;rejects(lambda:p.build_packet(large,policy=policy))
 `);
 });
