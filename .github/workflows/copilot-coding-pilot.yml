@@ -1,0 +1,90 @@
+name: MERIDIAN One Packet Coding Pilot
+on:
+  workflow_run:
+    workflows: [MERIDIAN Release Safety]
+    types: [completed]
+permissions: {}
+concurrency:
+  group: meridian-one-packet-coding-pilot
+  cancel-in-progress: false
+jobs:
+  claim:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.workflow_run.head_sha == '2b267ecc0f94565fe005156bf45e8f0ae139eb9b' &&
+      github.event.workflow_run.conclusion == 'success' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    outputs:
+      claim: ${{ steps.claim.outputs.claim }}
+    steps:
+      - name: Load only trusted control helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=$GITHUB_SHA" -H 'Accept:application/vnd.github.raw+json' > "$RUNNER_TEMP/pilot.py"
+      - id: claim
+        name: Validate live scope and atomically claim fixed packet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 "$RUNNER_TEMP/pilot.py" claim
+  generate:
+    needs: claim
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      copilot-requests: write
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Load trusted helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=$GITHUB_SHA" -H 'Accept:application/vnd.github.raw+json' > "$RUNNER_TEMP/pilot.py"
+      - name: Install pinned CLI without token
+        run: |
+          set -euo pipefail
+          node -e 'if (Number(process.versions.node.split(".")[0]) < 22) throw Error("Node 22+ required")'
+          npm install --prefix "$RUNNER_TEMP/coding-pilot/cli" --ignore-scripts --no-audit --no-fund @github/copilot@1.0.95
+          "$RUNNER_TEMP/coding-pilot/cli/node_modules/.bin/copilot" --version | grep -F 'GitHub Copilot CLI 1.0.95.'
+      - name: Generate JSON only with no repository-write credential
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLAIM_SHA: ${{ needs.claim.outputs.claim }}
+        run: python3 "$RUNNER_TEMP/pilot.py" generate
+      - name: Recheck expiry before artifact transport
+        run: python3 -c 'import os, runpy; runpy.run_path(os.environ["RUNNER_TEMP"] + "/pilot.py", run_name="expiry_check")["remaining"]()'
+      - id: upload
+        name: Upload only generated packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: version-history-ledger-packet
+          path: ${{ runner.temp }}/coding-pilot/packet.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+  publish:
+    needs: [claim, generate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Load trusted helper, never artifact code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=$GITHUB_SHA" -H 'Accept:application/vnd.github.raw+json' > "$RUNNER_TEMP/pilot.py"
+      - name: Validate artifact and create one Draft PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLAIM_SHA: ${{ needs.claim.outputs.claim }}
+          ARTIFACT_ID: ${{ needs.generate.outputs.artifact }}
+        run: python3 "$RUNNER_TEMP/pilot.py" publish
