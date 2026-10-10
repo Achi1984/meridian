@@ -22,7 +22,7 @@ REPO = 'Achi1984/meridian'
 SOURCE_SHA = '2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
 RELEASE_ID = 347821227
 SOURCE_RUN = 38070967939
-SOURCE_ATTEMPT = 3
+SOURCE_ATTEMPT = 4
 DEADLINE = 1791658800  # 2026-10-10T19:00:00Z
 BRANCH = 'pilot/version-history-ledger-20261010'
 PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
@@ -105,7 +105,9 @@ def sha(value):
 def identity():
     remaining()
     require(os.environ['GITHUB_REPOSITORY'] == REPO and os.environ['GITHUB_EVENT_NAME'] == 'workflow_run'
-            and os.environ['GITHUB_REF'] == 'refs/heads/main' and os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'Wrong control identity')
+            and os.environ['GITHUB_REF'] == 'refs/heads/main'
+            and os.environ['GITHUB_RUN_ATTEMPT'] in ('1', '2')
+            and os.environ.get('GITHUB_TRIGGERING_ACTOR') == 'Achi1984', 'Wrong control identity')
     event = strict_json(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_bytes())
     hint = event['workflow_run']
     require(event.get('action') == 'completed' and own(event.get('repository')), 'Wrong event origin')
@@ -141,6 +143,7 @@ def identity():
                 and item['base'].get('ref') == 'main' and own(item['base'].get('repo')), 'Milestone not verified')
         milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha']})
     return {'packet':'version-history-ledger-20261010', 'control_run':int(os.environ['GITHUB_RUN_ID']),
+            'control_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'source_run':source['id'], 'source_attempt':source['run_attempt'], 'source_head':SOURCE_SHA,
             'base':base, 'milestones':milestones}
 

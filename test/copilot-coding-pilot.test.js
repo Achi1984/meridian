@@ -27,7 +27,7 @@ import copy, io, json, os, pathlib, stat, tempfile, time, unittest.mock as mock,
 repo={'full_name':p.REPO,'fork':False,'owner':{'login':'Achi1984','type':'User'}}
 base='a'*40
 def fixture():
-    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':3,
+    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':4,
       'path':'.github/workflows/backend-safety.yml','event':'pull_request','status':'completed','conclusion':'success',
       'repository':repo,'head_repository':repo,'head_branch':'copilot/packet','pull_requests':[{'number':653}]}
     data={'actions/runs/'+str(p.SOURCE_RUN):source,'pulls/653':{'number':653,'state':'open','merged':False,
@@ -41,12 +41,12 @@ def fixture():
           'merged_at':'2026-10-10T16:00:00Z','base':{'ref':'main','repo':repo}}
     event={'action':'completed','repository':repo,'workflow_run':copy.deepcopy(source)}
     return copy.deepcopy(data),copy.deepcopy(event)
-def trial(change=lambda d,e:None, accept=False):
+def trial(change=lambda d,e:None, accept=False, attempt='1', actor='Achi1984'):
     data,event=fixture(); change(data,event)
     with tempfile.TemporaryDirectory() as tmp:
         eventpath=pathlib.Path(tmp)/'event.json'; eventpath.write_text(json.dumps(event))
         env={'GITHUB_REPOSITORY':p.REPO,'GITHUB_EVENT_NAME':'workflow_run','GITHUB_REF':'refs/heads/main',
-          'GITHUB_RUN_ATTEMPT':'1','GITHUB_RUN_ID':'200','GITHUB_SHA':base,'GITHUB_EVENT_PATH':str(eventpath)}
+          'GITHUB_RUN_ATTEMPT':attempt,'GITHUB_TRIGGERING_ACTOR':actor,'GITHUB_RUN_ID':'200','GITHUB_SHA':base,'GITHUB_EVENT_PATH':str(eventpath)}
         with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'api',side_effect=lambda path:copy.deepcopy(data[path])),mock.patch('time.time',return_value=p.DEADLINE-60):
             try: result=p.identity()
             except (ValueError,KeyError,TypeError):
@@ -59,10 +59,10 @@ def rejects(fn):
     except (ValueError,UnicodeError):pass
     else:raise AssertionError('unsafe value accepted')
 `;
-test('fresh source binding permits approved attempt3 but denies stale/fork/foreign CI', () => {
+test('fresh source binding permits approved attempt4 but denies stale/fork/foreign CI', () => {
   python(fixture + String.raw`
-result=trial(accept=True); assert result['source_attempt']==3
-for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',2),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
+result=trial(accept=True); assert result['source_attempt']==4
+for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',3),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
     trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update({field:value}))
 trial(lambda d,e:e.update(action='requested'))
 trial(lambda d,e:e['repository'].update(fork=True))
@@ -269,5 +269,72 @@ with tempfile.TemporaryDirectory() as tmp:
         lockpath.write_text(json.dumps(lock))
         binary.unlink(); binary.symlink_to(root/'package-lock.json');rejects(lambda:p.verify_cli_integrity(root))
         spawn.assert_not_called()
+`);
+});
+
+
+test('maintainer approval attempt2 is admitted consistently while other actors and attempts fail closed', () => {
+  assert.match(workflow, /\(github\.run_attempt == 1 \|\| github\.run_attempt == 2\)/);
+  assert.match(workflow, /github\.triggering_actor == 'Achi1984'/);
+  python(fixture + String.raw`
+for attempt in ('1','2'):
+    assert trial(accept=True,attempt=attempt)['source_attempt']==4
+    for actor in ('Copilot','other-owner','',None):trial(attempt=attempt,actor=actor or '')
+for attempt in ('0','3','99','-1','02',''):
+    trial(attempt=attempt)
+trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update(run_attempt=3),attempt='2')
+trial(lambda d,e:d['pulls/653']['head'].update(sha='b'*40),attempt='2')
+`);
+});
+
+test('approval attempt cannot consume a second durable claim even after an unconsumed first attempt', () => {
+  python(fixture + String.raw`
+created=False; writes=[]
+def fake(path,method='GET',payload=None,expected=200):
+    global created
+    if path=='git/ref/heads/'+p.BRANCH:
+        if not created:raise urllib.error.HTTPError('url',404,'absent',{},None)
+        return {'object':{'sha':'c'*40}}
+    if path=='git/commits/'+base:return {'tree':{'sha':'d'*40}}
+    writes.append((path,method))
+    if path=='git/commits':return {'sha':'c'*40}
+    if path=='git/refs':
+        assert not created;created=True
+        return {'ref':'refs/heads/'+p.BRANCH,'object':{'sha':'c'*40}}
+    raise AssertionError(path)
+with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ,{'GITHUB_OUTPUT':str(pathlib.Path(tmp)/'out')}):
+    with mock.patch.object(p,'identity',return_value=trial(accept=True,attempt='2')),mock.patch.object(p,'api',side_effect=fake):
+        p.claim()
+    assert created and len(writes)==2
+    for attempt in ('1','2'):
+        with mock.patch.object(p,'identity',return_value=trial(accept=True,attempt=attempt)),mock.patch.object(p,'api',side_effect=fake):
+            rejects(p.claim)
+        assert len(writes)==2
+`);
+});
+
+
+test('partial job rerun cannot reuse a prior-attempt claim before generation or publication', () => {
+  python(fixture + String.raw`
+first=trial(accept=True,attempt='1');approved=trial(accept=True,attempt='2')
+assert first['control_attempt']==1 and approved['control_attempt']==2
+assert {**first,'control_attempt':2}==approved
+claim='c'*40;tree='d'*40
+stored={'message':p.claim_message(first),'parents':[{'sha':base}],'tree':{'sha':tree}}
+def fake(path,*args,**kwargs):
+    if path=='git/ref/heads/'+p.BRANCH:return {'object':{'sha':claim}}
+    if path=='git/commits/'+claim:return stored
+    if path=='git/commits/'+base:return {'tree':{'sha':tree}}
+    raise AssertionError('Unexpected API or mutation: '+path)
+with mock.patch.dict(os.environ,{'CLAIM_SHA':claim}),mock.patch.object(p,'api',side_effect=fake):
+    assert p.validate_claim(first)==(claim,tree)
+    rejects(lambda:p.validate_claim(approved))
+    with mock.patch.object(p,'identity',return_value=approved),mock.patch('subprocess.Popen') as spawn, \
+         mock.patch.object(p,'verify_cli_tools') as probe,mock.patch.object(p,'artifact_bytes') as download:
+        rejects(p.generate);rejects(p.publish)
+        spawn.assert_not_called();probe.assert_not_called();download.assert_not_called()
+    stored['message']=p.claim_message(approved)
+    assert p.validate_claim(approved)==(claim,tree)
+    rejects(lambda:p.validate_claim(first))
 `);
 });
