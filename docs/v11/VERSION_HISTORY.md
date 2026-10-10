@@ -17,12 +17,10 @@
 
 ## Merged milestones
 
-| PR | Merged at (UTC) | Merge SHA | GitHub links (repo-relative) |
-|----|-----------------|-----------|------------------------------|
-| 646 | 2026-10-10T17:02:53Z | `0c0c1dadfb183f520bbb846d5cf9e6d2e7a925b2` | `pull/646`, `commit/0c0c1dadfb183f520bbb846d5cf9e6d2e7a925b2` |
-| 651 | 2026-10-10T17:09:56Z | `56cb8cf80472fee2e300a79366e491731bdfccf6` | `pull/651`, `commit/56cb8cf80472fee2e300a79366e491731bdfccf6` |
-
-Links are relative to the repository root on GitHub (`https://github.com/<owner>/<repo>/`). The supplied evidence did not name the owner or repository, so no absolute URL is given.
+| PR | Merged at (UTC) | Merge SHA | GitHub links |
+|----|-----------------|-----------|--------------|
+| 646 | 2026-10-10T17:02:53Z | `0c0c1dadfb183f520bbb846d5cf9e6d2e7a925b2` | https://github.com/Achi1984/meridian/pull/646, https://github.com/Achi1984/meridian/commit/0c0c1dadfb183f520bbb846d5cf9e6d2e7a925b2 |
+| 651 | 2026-10-10T17:09:56Z | `56cb8cf80472fee2e300a79366e491731bdfccf6` | https://github.com/Achi1984/meridian/pull/651, https://github.com/Achi1984/meridian/commit/56cb8cf80472fee2e300a79366e491731bdfccf6 |
 
 ## Ledger
 
