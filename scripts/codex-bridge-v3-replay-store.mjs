@@ -327,6 +327,7 @@ export function openReplayStore(root, storeScope) {
   const mutate = (expected, makeEntry, options) => {
     const cas = validateCas(expected);
     const config = validateOptions(options);
+    privateRoot(root);
     let lockHeld = false;
     let uncertain = false;
     let phase = 'START';

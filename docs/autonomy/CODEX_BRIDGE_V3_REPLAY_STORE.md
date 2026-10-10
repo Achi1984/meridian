@@ -32,10 +32,12 @@ Assumptions (explicitly limited):
 - local filesystem semantics with atomic rename in one directory
 - ownership/permissions are enforced (`0700` directory, `0600` files)
 - symlink/path hazards are rejected (`O_NOFOLLOW`, root realpath checks)
+- root safety is revalidated at mutation entry before lock creation
 
 Not claimed:
 - distributed safety
 - adversarial rollback protection
+- complete TOCTOU elimination from prechecks alone
 - same-account hostile writer protection
 - exactly-once external effects
 

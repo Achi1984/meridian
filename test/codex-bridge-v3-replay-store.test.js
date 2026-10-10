@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -148,7 +149,7 @@ test('simultaneous competing reservations across child processes are atomic', { 
   children.forEach(({ processChild }) => processChild.send('go'));
   const outcomes = await Promise.all(responses);
   assert.equal(outcomes.filter(x => x.ok).length, 1);
-  assert.ok(['STORE_LOCKED_RECONCILE_REQUIRED', 'CAS_CONFLICT_RECONCILE_REQUIRED'].includes(outcomes.find(x => !x.ok).code));
+  assert.ok(['STORE_LOCKED_RECONCILE_REQUIRED', 'CAS_CONFLICT_RECONCILE_REQUIRED', 'STORE_UNCERTAIN_RECONCILE_REQUIRED'].includes(outcomes.find(x => !x.ok).code));
   const final = openReplayStore(root, scope()).snapshot();
   assert.equal(final.revision, 1);
 });
@@ -219,10 +220,41 @@ test('symlink hazards are rejected', t => {
   assert.throws(() => openReplayStore(root, scope()), error => error.code === 'ELOOP');
 });
 
+test('retained handle rejects substituted root symlink before mutation effects', t => {
+  const { root, parent, replay } = fixture(t);
+  const other = join(parent, 'other');
+  createReplayStore(other, scope());
+  const expected = token(replay.snapshot());
+  const original = join(parent, 'original');
+  renameSync(root, original);
+  symlinkSync(other, root);
+
+  fail(() => replay.reserve(identity(), expected), 'STORE_ROOT_UNSAFE');
+  assert.equal(openReplayStore(other, scope()).snapshot().revision, 0);
+  assert.equal(openReplayStore(original, scope()).snapshot().revision, 0);
+  assert.equal(existsSync(join(other, 'writer.lock')), false);
+  assert.equal(existsSync(join(other, 'replay-store.pending')), false);
+  assert.equal(existsSync(join(original, 'writer.lock')), false);
+  assert.equal(existsSync(join(original, 'replay-store.pending')), false);
+});
+
 test('unsafe permissions fail closed', t => {
   const { root } = fixture(t);
   chmodSync(root, 0o755);
   fail(() => openReplayStore(root, scope()), 'STORE_ROOT_UNSAFE');
+});
+
+test('retained handle rejects unsafe root permissions before mutation effects', t => {
+  const { root, replay } = fixture(t);
+  const reserved = replay.reserve(identity(), token(replay.snapshot()));
+  chmodSync(root, 0o755);
+  fail(() => replay.markUnknown(identity(), token(reserved)), 'STORE_ROOT_UNSAFE');
+  assert.equal(existsSync(join(root, 'writer.lock')), false);
+  assert.equal(existsSync(join(root, 'replay-store.pending')), false);
+  chmodSync(root, 0o700);
+  const state = openReplayStore(root, scope()).snapshot();
+  assert.equal(state.revision, 1);
+  assert.equal(state.records[0].status, 'RESERVED_OFFLINE');
 });
 
 test('store API rejects proxy/getter identities before reservation', t => {
