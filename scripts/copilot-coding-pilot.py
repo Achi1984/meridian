@@ -28,6 +28,8 @@ BRANCH = 'pilot/version-history-ledger-20261010-t3'
 PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
 ARTIFACT = 'version-history-ledger-packet'
 MAX_BYTES = 65536
+# Inactive until a reviewed installation pins its actual bot login. Never inferred from output.
+PUBLISHER_BOT_LOGIN = None
 # A non-matching allowlist is checked against the actual pinned CLI on the wire.
 # Empty lists are unsafe in CLI 1.0.95: they restore the default tools.
 NO_TOOLS = '--available-tools=meridian_no_tools'
@@ -79,12 +81,34 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def api(path, method='GET', payload=None, expected=200):
+def publisher_token():
+    token = os.environ.get('MERIDIAN_PUBLISHER_TOKEN', '')
+    require(type(PUBLISHER_BOT_LOGIN) is str and re.fullmatch(r'[a-zA-Z0-9-]+\[bot\]', PUBLISHER_BOT_LOGIN),
+            'Publisher bot identity not configured')
+    require(token.startswith('ghs_') and len(token) > 4 and not any(c.isspace() for c in token)
+            and token != os.environ.get('GH_TOKEN'), 'Separate installation publisher token required')
+    # Token format is not proof of installation scope or expiry; minting is a separate gate.
+    return token
+
+
+def draft_payload():
+    return {'title':'[Draft pilot] Meridian11 version-history ledger', 'head':BRANCH, 'base':'main', 'draft':True,
+        'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}
+
+
+def api(path, method='GET', payload=None, expected=200, *, publisher=False):
     remaining()
     require(path and not path.startswith('/') and '..' not in path, 'Invalid API path')
+    if publisher:
+        require(path == 'pulls' and method == 'POST' and expected == 201 and payload == draft_payload(),
+                'Publisher credential restricted to the fixed Draft creation')
+        token = publisher_token()
+    else:
+        require(not (path == 'pulls' and method == 'POST'), 'Draft creation requires separate publisher')
+        token = os.environ['GH_TOKEN']
     request = urllib.request.Request('https://api.github.com/repos/' + REPO + '/' + path,
         data=None if payload is None else json.dumps(payload).encode(), method=method,
-        headers={'Authorization':'Bearer ' + os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json', 'Content-Type':'application/json'})
+        headers={'Authorization':'Bearer ' + token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json'})
     # Mutations are deliberately never retried, including uncertain network outcomes.
     with urllib.request.build_opener(NoRedirect()).open(request, timeout=min(15, remaining())) as response:
         require(response.status == expected, 'Unexpected API status')
@@ -412,9 +436,22 @@ def artifact_bytes(artifact_id):
     return raw
 
 
+def validate_published_draft(pr, commit, base):
+    require(type(pr) is dict and type(pr.get('number')) is int and pr['number'] > 0
+            and pr.get('state') == 'open' and pr.get('draft') is True
+            and pr.get('user', {}).get('login') == PUBLISHER_BOT_LOGIN
+            and pr.get('user', {}).get('type') == 'Bot', 'Draft response identity mismatch')
+    head, target = pr.get('head', {}), pr.get('base', {})
+    require(head.get('sha') == commit and head.get('ref') == BRANCH and own(head.get('repo'))
+            and target.get('sha') == base and target.get('ref') == 'main' and own(target.get('repo')),
+            'Draft response source or target mismatch')
+    return pr['number']
+
+
 def publish():
     evidence = identity()
     claim_sha, tree = validate_claim(evidence)
+    publisher_token()  # Fail before downloads or publication writes when configuration is absent.
     artifact_id = os.environ['ARTIFACT_ID']
     require(re.fullmatch('[1-9][0-9]*', artifact_id), 'Invalid artifact ID')
     artifact = api('actions/artifacts/' + artifact_id)
@@ -446,12 +483,13 @@ def publish():
     require(updated['object']['sha'] == commit['sha'], 'Branch update outcome unknown')
     require(identity() == evidence, 'Evidence changed before Draft creation')
     require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'], 'Output branch changed before Draft creation')
-    api('pulls', 'POST', {'title':'[Draft pilot] Meridian11 version-history ledger', 'head':BRANCH, 'base':'main', 'draft':True,
-        'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}, 201)
+    pr = api('pulls', 'POST', draft_payload(), 201, publisher=True)
+    validate_published_draft(pr, commit['sha'], evidence['base'])
     print('DRAFT_CREATED; trusted test template only; no merge authorization')
 
 
 if __name__ == '__main__':
     require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish','verify-cli'}, 'Unknown phase')
     {'claim':claim, 'generate':generate, 'publish':publish, 'verify-cli':verify_installed_cli}[sys.argv[1]]()
+
 
