@@ -89,7 +89,8 @@
     "workflowChangesAuthorized": false,
     "readOnlyConflictDiagnosisAllowed": true,
     "successfulCiEvidenceReadAllowed": true,
-    "policyProposalCommentId": 6096562356
+    "policyProposalCommentId": 6096562356,
+    "protocol": "STREAM-SAFE-V8"
   },
   "lastSeenCommentId": 6016389241,
   "quickCommand": "Go Meridian",

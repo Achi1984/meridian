@@ -161,7 +161,7 @@
     "canonicalMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
     "build": "10.0-r115",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source\u2192Events\u2192Strategy\u2192Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
+    "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source→Events→Strategy→Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
   },
   "nextChatBootstrap": [
     "Read mailboxIssue from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items",

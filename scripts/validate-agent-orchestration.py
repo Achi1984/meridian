@@ -110,7 +110,7 @@ checkpoint=json.loads((ROOT/'MERIDIAN_LIVE_CHECKPOINT.json').read_text())
 req(checkpoint.get('protocol')=='STREAM-SAFE-V8','checkpoint protocol mismatch')
 from work_package_policy import validate_policy
 for label, policy in [('checkpoint',checkpoint.get('streamSafety',{})),('agent',sg),('resume',coord)]:
-    errors.extend(label+': '+e for e in validate_policy(policy))
+    errors.extend(label+': '+e for e in validate_policy(policy, label))
 
 if errors:
     for e in errors:

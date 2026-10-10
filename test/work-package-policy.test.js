@@ -9,5 +9,5 @@ test('V8 policy negative controls run in the existing Node CI suite', () => {
     cwd: root, encoding: 'utf8', timeout: 10000,
   });
   assert.equal(result.status, 0, `${result.error || ''}\n${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 6 tests/);
+  assert.match(result.stderr, /Ran 8 tests/);
 });

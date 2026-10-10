@@ -1148,7 +1148,7 @@
       "requiredImplementationGuards": [
         "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
         "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
-        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with \u00b11s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
+        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with ±1s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
         "If V2 reuses cross-venue-funding-edge-v1.js, replace coercive numeric validation with strict numeric handling and regression tests.",
         "Binance/OKX collector parsers must reject blank/non-numeric cells instead of Number() coercion.",
         "The V2 collector must itself reject execution unless the V2 stage lock explicitly has sourceAudit:true."
@@ -1290,7 +1290,8 @@
     "workflowChangesAuthorized": false,
     "readOnlyConflictDiagnosisAllowed": true,
     "successfulCiEvidenceReadAllowed": true,
-    "policyProposalCommentId": 6096562356
+    "policyProposalCommentId": 6096562356,
+    "protocol": "STREAM-SAFE-V8"
   },
   "researchDirection": {
     "selected": "CROSS_VENUE_FUNDING_EDGE_V2_STRATEGY_DRIVER_FROZEN_NO_PNL",
@@ -1836,7 +1837,7 @@
         "liveData": "READY",
         "marketCoverage": "15/15",
         "botCoverage": "24/24",
-        "dataSources": "MKT READY \u00b7 BOT READY \u00b7 PORTFOLIO READY",
+        "dataSources": "MKT READY · BOT READY · PORTFOLIO READY",
         "verdict": "FULL_LIVE_PASS"
       }
     },

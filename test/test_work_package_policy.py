@@ -14,11 +14,11 @@ class WorkPackagePolicyTests(unittest.TestCase):
         self.policy = json.loads((ROOT / 'MERIDIAN_LIVE_CHECKPOINT.json').read_text())['streamSafety']
 
     def test_canonical_copies_agree(self):
-        for filename, key in [('MERIDIAN_LIVE_CHECKPOINT.json', 'streamSafety'),
-                              ('MERIDIAN_AGENT_STATE.json', 'streamingGuard'),
-                              ('MERIDIAN_RESUME.json', 'coordination')]:
+        for kind, filename, key in [('checkpoint', 'MERIDIAN_LIVE_CHECKPOINT.json', 'streamSafety'),
+                              ('agent', 'MERIDIAN_AGENT_STATE.json', 'streamingGuard'),
+                              ('resume', 'MERIDIAN_RESUME.json', 'coordination')]:
             with self.subTest(filename=filename):
-                self.assertEqual(validate_policy(json.loads((ROOT / filename).read_text())[key]), [])
+                self.assertEqual(validate_policy(json.loads((ROOT / filename).read_text())[key], kind), [])
 
     def test_no_implicit_authority(self):
         for key in ['automaticDispatchAuthorized', 'additionalSpendAuthorized', 'workflowChangesAuthorized']:
@@ -53,6 +53,21 @@ class WorkPackagePolicyTests(unittest.TestCase):
             candidate = copy.deepcopy(self.policy)
             candidate[key] = 1
             self.assertTrue(validate_policy(candidate))
+
+    def test_protocol_and_unknown_authority_rejected(self):
+        for kind, filename, key in [('checkpoint', 'MERIDIAN_LIVE_CHECKPOINT.json', 'streamSafety'),
+                                   ('agent', 'MERIDIAN_AGENT_STATE.json', 'streamingGuard'),
+                                   ('resume', 'MERIDIAN_RESUME.json', 'coordination')]:
+            original = json.loads((ROOT / filename).read_text())[key]
+            for field, value in [('protocol', 'STREAM-SAFE-V7'), ('mayTrade', True), ('unexpected', False)]:
+                candidate = copy.deepcopy(original)
+                candidate[field] = value
+                self.assertTrue(validate_policy(candidate, kind))
+
+    def test_documented_guard_unavailability_blocks_write(self):
+        sentence = 'unavailable guards block the write.'
+        for filename in ['MERIDIAN_GO.md', 'MERIDIAN_AGENT_WORKFLOW.md']:
+            self.assertIn(sentence, (ROOT / filename).read_text())
 
     def test_malformed_policy_rejected(self):
         for candidate in [None, [], 'V8', {}]:
