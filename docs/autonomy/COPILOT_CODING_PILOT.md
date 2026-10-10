@@ -1,20 +1,25 @@
-# One-packet coding pilot — inactive preparation
+# One-packet coding pilot — approved bounded trial, pending gates
 
-Owner approval: 2026-10-10 19:34:38 Europe/Vienna, mailbox comment 6100312058.
-Hard expiry: **2026-10-10T17:45:00Z (19:45 Vienna)**. Missing that window leaves
-this packet inactive. Extending only a timestamp is not renewed authorization.
+Owner approved proposal mailbox571/6100575756 at 2026-10-10 20:05:46 Europe/Vienna
+("Ok freigabe erteilt"). Hard expiry: **2026-10-10T19:00:00Z (21:00 Vienna)**.
+One model invocation and at most one isolated Draft PR; no recursive tasks,
+automatic product merge, new secrets or paid overage.
 
-This is draft preparation awaiting review, not evidence of an operational chain.
-PR653's successful CI completion predates this listener. GitHub does not replay
-that event when a workflow is added. No synthetic dispatch, rerun, bootstrap,
-schedule or deadline extension is authorized to manufacture delivery.
+After fresh exact-head CI and Claude review, merge this listener and verify required
+postmerge checks. Only then rerun source run38070967939 once to attempt3. The old
+completed attempt2 is not replayed. No dispatch or synthetic commit is authorized.
+Temporarily enable the repository-wide combined PR create/approve Actions setting;
+restore OFF at completion or deadline. Default token permissions stay read-only.
+The owner explicitly accepts B1: local zero-tool proof is not independent proof of
+authenticated GitHub model transport. Token isolation and publisher validation stay.
+This approval does not demonstrate a working chain; actual execution must be audited.
 
 ## One fixed independent packet
 
 Only Release Safety workflow 347821227, `.github/workflows/backend-safety.yml`,
 successful completed pull-request CI for PR653 at
 `2b267ecc0f94565fe005156bf45e8f0ae139eb9b` can pass. Source attempts are compared
-to the one authorized source run `38070967939`, attempt `2`; no other attempt or
+to the one authorized source run `38070967939`, attempt `3`; no other attempt or
 run is accepted, even at the same head.
 Fresh reads verify the open PR, same-repository non-fork head, main base, unchanged
 control main with successful push Release Safety and Runtime Smoke checks, and
@@ -166,3 +171,13 @@ zero-tool preflight has been demonstrated. Either supply that evidence or obtain
 explicit informed acceptance of this residual risk for the bounded test. The
 generator token remains read-only; the separate publisher only accepts ledger text
 and the exact trusted test. Source GREEN is not activation readiness.
+
+## R4 activation reconciliation
+
+R3 source GREEN6100548127; CI38074092725 passed2145 tests. Those gates do not
+cover R4. The above owner approval supersedes historical pending-decision and
+expired-window statements in the R2/R3 history. Source attempt3 and 21:00 cutoff
+are now pinned. A final binary rehash occurs immediately before real Popen, after
+the local probe. Fresh CI/review remain mandatory; permission changes and the
+single source rerun are sequenced after deployment checks. Restore PR setting OFF
+after trial and report actual claim, model, Draft, rejected gates and consumption.

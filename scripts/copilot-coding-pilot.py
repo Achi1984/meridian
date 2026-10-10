@@ -22,8 +22,8 @@ REPO = 'Achi1984/meridian'
 SOURCE_SHA = '2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
 RELEASE_ID = 347821227
 SOURCE_RUN = 38070967939
-SOURCE_ATTEMPT = 2
-DEADLINE = 1791654300  # 2026-10-10T17:45:00Z
+SOURCE_ATTEMPT = 3
+DEADLINE = 1791658800  # 2026-10-10T19:00:00Z
 BRANCH = 'pilot/version-history-ledger-20261010'
 PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
 ARTIFACT = 'version-history-ledger-packet'
@@ -313,6 +313,8 @@ def generate():
     env['GITHUB_TOKEN'] = os.environ['GH_TOKEN']
     duration = min(90, remaining())
     with (root / 'response.json').open('wb') as output, (root / 'error.txt').open('wb') as error:
+        verify_cli_integrity(root / 'cli')
+        remaining()
         process = subprocess.Popen(command, cwd=root, env=env, stdout=output, stderr=error, start_new_session=True)
         try:
             process.wait(timeout=min(duration, remaining()))

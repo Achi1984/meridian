@@ -27,7 +27,7 @@ import copy, io, json, os, pathlib, stat, tempfile, time, unittest.mock as mock,
 repo={'full_name':p.REPO,'fork':False,'owner':{'login':'Achi1984','type':'User'}}
 base='a'*40
 def fixture():
-    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':2,
+    source={'id':p.SOURCE_RUN,'workflow_id':p.RELEASE_ID,'head_sha':p.SOURCE_SHA,'run_attempt':3,
       'path':'.github/workflows/backend-safety.yml','event':'pull_request','status':'completed','conclusion':'success',
       'repository':repo,'head_repository':repo,'head_branch':'copilot/packet','pull_requests':[{'number':653}]}
     data={'actions/runs/'+str(p.SOURCE_RUN):source,'pulls/653':{'number':653,'state':'open','merged':False,
@@ -59,10 +59,10 @@ def rejects(fn):
     except (ValueError,UnicodeError):pass
     else:raise AssertionError('unsafe value accepted')
 `;
-test('fresh source binding permits approved attempt2 but denies stale/fork/foreign CI', () => {
+test('fresh source binding permits approved attempt3 but denies stale/fork/foreign CI', () => {
   python(fixture + String.raw`
-result=trial(accept=True); assert result['source_attempt']==2
-for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',3),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
+result=trial(accept=True); assert result['source_attempt']==3
+for field,value in [('workflow_id',9),('head_sha','b'*40),('run_attempt',2),('status','queued'),('conclusion','failure'),('event','push'),('pull_requests',[])]:
     trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update({field:value}))
 trial(lambda d,e:e.update(action='requested'))
 trial(lambda d,e:e['repository'].update(fork=True))
