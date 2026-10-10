@@ -37,13 +37,15 @@ export function validateManifest(input) {
   array(input.packets,8,'PACKETS');
   need(input.packets.length>0 && Number.isSafeInteger(input.maxInvocations)
     && input.maxInvocations>0 && input.maxInvocations<=input.packets.length,'INVOCATION_CAP');
-  const seen = new Set();
+  const seen = new Set(), paths = new Set();
   const packets = input.packets.map(p => {
     object(p,['id','paths','dependencies','dependencyGate','outputClass','templateDigest'],'PACKET_SCHEMA');
     need(id(p.id) && !seen.has(p.id),'PACKET_ID');
     array(p.paths,2,'PACKET_PATHS');
     need(p.paths.length===2 && p.paths.every(path) && p.paths[0].startsWith('docs/v11/')
       && p.paths[1].startsWith('test/v11-'),'PACKET_PATHS');
+    need(p.paths.every(x=>!paths.has(x)),'DUPLICATE_PATH');
+    p.paths.forEach(x=>paths.add(x));
     array(p.dependencies,7,'DEPENDENCIES');
     need(p.dependencies.every(d=>id(d)&&seen.has(d)) && new Set(p.dependencies).size===p.dependencies.length,'DEPENDENCIES');
     need(['draft','merged'].includes(p.dependencyGate) && p.outputClass==='docs-with-trusted-test'
@@ -78,6 +80,7 @@ function validateLedger(m,l) {
     object(p,['id','state','baseSha','headSha','ciHeadSha','reviewHeadSha','mergeSha'],'LEDGER_PACKET');
     need(p.id===m.packets[i].id && states.includes(p.state),'LEDGER_PACKET');
     for (const key of ['baseSha','headSha','ciHeadSha','reviewHeadSha','mergeSha']) need(p[key]===null || sha(p[key]),'LEDGER_SHA');
+    need(p.headSha===null || p.headSha!==m.baseSha,'HEAD_EQUALS_BASE');
     if(p.state==='READY') need(p.baseSha===null && p.headSha===null && p.ciHeadSha===null && p.reviewHeadSha===null && p.mergeSha===null,'READY_HAS_HISTORY');
     else { consumed++; need(p.baseSha===m.baseSha,'BASE_MISMATCH'); }
     if(['CLAIMED','GENERATING'].includes(p.state)) need(p.headSha===null && p.ciHeadSha===null && p.reviewHeadSha===null && p.mergeSha===null,'PRE_DRAFT_HISTORY');
@@ -94,11 +97,12 @@ function validateLedger(m,l) {
         return m.packets[i].dependencyGate==='merged'?parent?.state==='COMPLETE_MERGED':
           ['COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED'].includes(parent?.state);
       }),'DEPENDENCY_INVALIDATED');
+      need(l.packets.slice(0,i).every(x=>['COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED'].includes(x.state)),'PACKET_ORDER');
     }
   });
   need(consumed<=m.maxInvocations,'INVOCATION_CAP');
   if(l.revoked) need(l.packets.every(p=>p.state==='READY' ||
-    (p.state==='UNKNOWN_OUTCOME' && p.ciHeadSha===null && p.reviewHeadSha===null)),'REVOKED_READINESS');
+    (['FAILED','UNKNOWN_OUTCOME'].includes(p.state) && p.ciHeadSha===null && p.reviewHeadSha===null)),'REVOKED_READINESS');
   else need(l.packets.filter(p=>busy.has(p.state)).length<=1,'MULTIPLE_WRITERS');
 }
 
@@ -115,9 +119,10 @@ export function advance(manifest,ledger,event,now) {
   const p=packets.find(p=>p.id===event.packetId), spec=m.packets.find(p=>p.id===event.packetId);
   const revoke = () => {
     for(const item of packets) if(item.state!=='READY') {
-      item.state='UNKNOWN_OUTCOME';item.ciHeadSha=null;item.reviewHeadSha=null;
+      if(item.state!=='FAILED') item.state='UNKNOWN_OUTCOME';
+      item.ciHeadSha=null;item.reviewHeadSha=null;
     }
-    return wrap(m,ledger.revision+1,true,packets);
+    const out=wrap(m,ledger.revision+1,true,packets);validateLedger(m,out);return out;
   };
   if(event.type==='REVOKE') {
     need(event.sha===null,'UNEXPECTED_SHA'); return revoke();

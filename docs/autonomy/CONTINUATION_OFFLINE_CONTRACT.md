@@ -38,6 +38,10 @@ contract; publisher validation is separate. A valid digest string is not proof
 that an approved template exists.
 
 Dependencies must refer to earlier packet IDs; cycles and duplicates are rejected.
+Paths must also be unique across the entire manifest. The model carries no changed-
+file observation: a head SHA is never proof it touched only those paths. Enforcing
+the manifest against real diffs and trusted template bytes belongs to the publisher,
+which is not implemented here. A Draft head equal to the base is rejected.
 Claims follow manifest order; a failed or unstarted earlier packet cannot be
 skipped automatically, even when paths are disjoint. Dependencies are revalidated
 on every accepted snapshot, not only at claim time.
@@ -79,6 +83,8 @@ If another packet has already consumed a claim, an observed head change or revie
 revocation conservatively revokes the entire batch. The same applies to review
 revocation after a merge observation. Every consumed packet becomes UNKNOWN_OUTCOME
 and loses effective CI/review readiness; base/head/merge history is retained.
+Already FAILED packets retain that distinction through revocation. Revoked outputs
+are validated like other outputs; a repeated REVOKE cannot restore readiness.
 This records late invalidation even when another writer is already active. No
 dependent step can advance, and consumed slots cannot be restored. It deliberately
 prefers a full-batch stop over selective recovery, which is not implemented here.
@@ -94,6 +100,11 @@ an empty local JSON file cannot establish that no earlier invocation occurred.
 Expiry prevents every non-revocation transition. Revocation can still be recorded
 after expiry and prevents continuation. There is no inference that an expired
 remote process has been cancelled. Reconcile accepted requests and preserve evidence.
+Some external observations (for example a Lead merge racing a busy descendant,
+or a late review change after expiry) are deliberately rejected rather than applied.
+A future consumer must record the raw observation in its durable audit, revoke the
+batch, and reconcile; it must never discard the rejection and continue on the old
+snapshot. That adapter behavior is not provided by this offline reducer.
 
 ## Verification and next gate
 

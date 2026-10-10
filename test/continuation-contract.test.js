@@ -153,3 +153,28 @@ test('observing a Lead merge after two reviewed Drafts retains valid draft depen
   l=run(m,l,'POST_MERGE_PASSED','first',D);
   assert.deepEqual(l.packets.map(x=>x.state),['COMPLETE_MERGED','COMPLETE_DRAFT']);
 });
+test('restored independent active packet cannot skip a READY or FAILED predecessor',()=>{
+  for(const state of ['READY','FAILED']){
+    const m=fixture();m.packets[1].dependencies=[];let l=run(m,completed(m),'CLAIM','second',A);
+    const restored=JSON.parse(JSON.stringify(l));
+    restored.packets[0]={id:'first',state,baseSha:state==='READY'?null:A,headSha:null,ciHeadSha:null,reviewHeadSha:null,mergeSha:null};
+    rejects(()=>run(m,restored,'MODEL_STARTED','second'),'PACKET_ORDER');
+  }
+});
+test('packet paths cannot overlap and Draft head cannot equal the base',()=>{
+  for(const slot of [0,1]){const m=fixture();m.packets[1].paths[slot]=m.packets[0].paths[slot];rejects(()=>validateManifest(m),'DUPLICATE_PATH');}
+  const m=fixture();let l=run(m,initialLedger(m),'CLAIM','first',A);l=run(m,l,'MODEL_STARTED');
+  rejects(()=>run(m,l,'DRAFT_OBSERVED','first',A),'HEAD_EQUALS_BASE');
+  l=run(m,l,'DRAFT_OBSERVED','first',B);rejects(()=>run(m,l,'HEAD_CHANGED','first',A),'HEAD_EQUALS_BASE');
+});
+test('failed evidence survives repeated revocation and claims stay consumed',()=>{
+  const m=fixture();let l=run(m,initialLedger(m),'CLAIM','first',A);l=run(m,l,'FAIL');
+  l=run(m,l,'REVOKE');l=run(m,l,'REVOKE');
+  assert.equal(l.packets[0].state,'FAILED');assert.equal(l.revoked,true);
+  rejects(()=>run(m,l,'CLAIM','first',A),'REVOKED');
+});
+test('external merge racing active work is rejected and explicit revocation freezes the old snapshot',()=>{
+  const m=fixture();let l=run(m,completed(m),'CLAIM','second',A);
+  rejects(()=>run(m,l,'MERGE_OBSERVED','first',D),'MULTIPLE_WRITERS');
+  l=run(m,l,'REVOKE');rejects(()=>run(m,l,'MODEL_STARTED','second'),'REVOKED');
+});
