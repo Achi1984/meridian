@@ -1,0 +1,34 @@
+name: FIB Level Bot V1 Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'fib-level-bot-v1.js'
+      - 'scripts/fib-level-bot-v1-evidence.mjs'
+      - 'test/fib-level-bot-v1.test.js'
+      - 'research/fib-level-bot-v1-design.md'
+      - '.github/workflows/fib-level-bot-v1-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run FIB Level Bot V1 unit tests
+        run: node --test test/fib-level-bot-v1.test.js
+      - name: Run locked public-data evidence
+        run: node scripts/fib-level-bot-v1-evidence.mjs
+      - name: Upload V1 evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fib-level-bot-v1-evidence
+          path: artifacts/fib-level-bot-v1-evidence.json
+          if-no-files-found: error
