@@ -177,7 +177,7 @@ with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'
     generate.assert_not_called()
 with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p,'identity',return_value=evidence), \
      mock.patch.object(p,'validate_claim'),mock.patch.dict(os.environ,{'RUNNER_TEMP':tmp,'GH_TOKEN':'readonly-test','CLAIM_SHA':'c'*40}), \
-     mock.patch('time.time',return_value=p.DEADLINE-2),mock.patch.object(p,'verify_cli_tools'),mock.patch('subprocess.Popen') as spawn,mock.patch('os.killpg') as kill:
+     mock.patch('time.time',return_value=p.DEADLINE-2),mock.patch.object(p,'verify_cli_tools'),mock.patch.object(p,'verify_cli_integrity',return_value=pathlib.Path('/tmp/pinned-cli')),mock.patch('subprocess.Popen') as spawn,mock.patch('os.killpg') as kill:
     proc=spawn.return_value;proc.pid=999
     proc.wait.side_effect=[p.subprocess.TimeoutExpired('copilot',2),0]
     rejects(p.generate)
@@ -226,6 +226,7 @@ test('zero-tool verification failure prevents real generation and packet output'
 evidence=trial(accept=True)
 with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p,'identity',return_value=evidence), \
      mock.patch.object(p,'validate_claim'),mock.patch.dict(os.environ,{'RUNNER_TEMP':tmp,'GH_TOKEN':'readonly','CLAIM_SHA':'c'*40}), \
+     mock.patch.object(p,'verify_cli_integrity',return_value=pathlib.Path('/tmp/pinned-cli')), \
      mock.patch.object(p,'verify_cli_tools',side_effect=ValueError('tool exposed')) as probe, \
      mock.patch('subprocess.Popen') as spawn:
     rejects(p.generate)
@@ -245,5 +246,28 @@ for url in ['https://evil.test/a','https://blob.core.windows.net.evil.test/a',
         opener.return_value.open.side_effect=error
         rejects(lambda:p.artifact_bytes('300'))
         assert opener.return_value.open.call_count==1
+`);
+});
+
+test('CLI integrity verifies both packages and actual binary before any CLI execution', () => {
+  assert.ok(workflow.indexOf('pilot.py" verify-cli') < workflow.indexOf('copilot" --no-auto-update --version'));
+  assert.doesNotMatch(workflow, /node_modules\/\.bin\/copilot/);
+  python(fixture + String.raw`
+with tempfile.TemporaryDirectory() as tmp:
+    root=pathlib.Path(tmp); binary=root/'node_modules/@github/copilot-linux-x64/copilot'
+    binary.parent.mkdir(parents=True); binary.write_bytes(b'trusted-local-fixture')
+    lock={'packages':{'node_modules/'+name:{'version':'1.0.95','integrity':integrity}
+      for name,integrity in p.CLI_PACKAGE_INTEGRITIES.items()}}
+    lockpath=root/'package-lock.json';lockpath.write_text(json.dumps(lock))
+    with mock.patch.object(p,'CLI_BINARY_SHA256',p.hashlib.sha256(binary.read_bytes()).hexdigest()),mock.patch('subprocess.Popen') as spawn:
+        assert p.verify_cli_integrity(root)==binary
+        binary.write_bytes(b'tampered');rejects(lambda:p.verify_cli_integrity(root))
+        binary.write_bytes(b'trusted-local-fixture')
+        for name in p.CLI_PACKAGE_INTEGRITIES:
+            modified=copy.deepcopy(lock);modified['packages']['node_modules/'+name]['integrity']='sha512-forged'
+            lockpath.write_text(json.dumps(modified));rejects(lambda:p.verify_cli_integrity(root))
+        lockpath.write_text(json.dumps(lock))
+        binary.unlink(); binary.symlink_to(root/'package-lock.json');rejects(lambda:p.verify_cli_integrity(root))
+        spawn.assert_not_called()
 `);
 });

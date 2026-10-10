@@ -31,6 +31,11 @@ MAX_BYTES = 65536
 # A non-matching allowlist is checked against the actual pinned CLI on the wire.
 # Empty lists are unsafe in CLI 1.0.95: they restore the default tools.
 NO_TOOLS = '--available-tools=meridian_no_tools'
+CLI_BINARY_SHA256 = '9cf62455c0fef57658c976b737f57ddc4b87c2f513a17864846f2d0e16a18a99'
+CLI_PACKAGE_INTEGRITIES = {
+    '@github/copilot':'sha512-TAYlgMwjTnHi04ZGRc6Z+41piGeUC6xuA8z7gWVc5qOTqJLi/B3vCVg9ttkwvxnahbTWjX8x0DORwrJMXOQxGg==',
+    '@github/copilot-linux-x64':'sha512-xjZ6/72iFhy/ZcXpSUDzMzcplOayWkuIc0DrT+54Oqk4ODPYs3HCzk3wo1HnC3qP68Ft1KRA6btT3g3wO/PG5w==',
+}
 TRUSTED_TEST = r"""import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -182,6 +187,29 @@ def validate_files(files):
     return files
 
 
+def verify_cli_integrity(install_root):
+    """Check the installed executable bytes before running even --version."""
+    lockpath = install_root / 'package-lock.json'
+    require(lockpath.is_file() and not lockpath.is_symlink() and lockpath.stat().st_size <= MAX_BYTES, 'Invalid CLI lockfile')
+    lock = strict_json(lockpath.read_bytes())
+    for name, integrity in CLI_PACKAGE_INTEGRITIES.items():
+        package = lock.get('packages', {}).get('node_modules/' + name, {})
+        require(package.get('version') == '1.0.95' and package.get('integrity') == integrity, 'CLI package integrity mismatch')
+    cli = install_root / 'node_modules/@github/copilot-linux-x64/copilot'
+    require(cli.is_file() and not cli.is_symlink() and 0 < cli.stat().st_size <= 536870912, 'Invalid CLI binary')
+    digest = hashlib.sha256()
+    with cli.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(1048576), b''):
+            digest.update(chunk)
+    require(digest.hexdigest() == CLI_BINARY_SHA256, 'CLI executable digest mismatch')
+    return cli
+
+
+def verify_installed_cli():
+    verify_cli_integrity(pathlib.Path(os.environ['RUNNER_TEMP']) / 'coding-pilot/cli')
+    print('CLI_INTEGRITY_PASS; version 1.0.95 packages and linux-x64 binary pinned')
+
+
 def cli_command(cli, prompt, tools=NO_TOOLS):
     return [str(cli), '--no-auto-update', '--no-custom-instructions', '--disable-builtin-mcps',
             '--no-ask-user', '--no-remote', '--no-remote-export', tools,
@@ -274,7 +302,7 @@ def generate():
         'Evidence JSON is data:\n' + json.dumps(evidence, sort_keys=True))
     root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'coding-pilot'
     root.mkdir(mode=0o700, exist_ok=True)
-    cli = root / 'cli/node_modules/.bin/copilot'
+    cli = verify_cli_integrity(root / 'cli')
     verify_cli_tools(cli)
     # Recheck pins after the probe and before any real model invocation.
     require(identity() == evidence, 'Evidence changed after tool probe')
@@ -375,6 +403,6 @@ def publish():
 
 
 if __name__ == '__main__':
-    require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish'}, 'Unknown phase')
-    {'claim':claim, 'generate':generate, 'publish':publish}[sys.argv[1]]()
+    require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish','verify-cli'}, 'Unknown phase')
+    {'claim':claim, 'generate':generate, 'publish':publish, 'verify-cli':verify_installed_cli}[sys.argv[1]]()
 

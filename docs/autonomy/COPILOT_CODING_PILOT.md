@@ -139,3 +139,30 @@ NEXT: independent exact-head R2 review and full CI. Then prepare a separately
 approved activation window and fresh eligible event. The old completed attempt 2
 cannot be replayed; extending a timestamp alone is insufficient. Do not merge this
 expired experiment merely because source tests pass.
+
+
+## R3 integrity and activation-setting reconciliation
+
+R2 source review: Claude GREEN for source only, comment 6100491523 on
+`64e0c7c3eb390de479bc2e2ab8b248abbaefefd7`; that review does not cover R3.
+
+Before executing even `--version`, the workflow now verifies both pinned package
+integrities in the npm lockfile and SHA-256 of the actual linux-x64 executable:
+`9cf62455c0fef57658c976b737f57ddc4b87c2f513a17864846f2d0e16a18a99`.
+It runs that binary directly, not the npm JavaScript loader. Generation verifies
+it again before its tool probe. Mismatched version, package integrity, binary bytes,
+symlink or size fails closed. Installation still disables lifecycle scripts.
+
+Read-only GitHub Actions settings check on 2026-10-10 after 19:57 Vienna:
+**Allow GitHub Actions to create and approve pull requests is OFF.** It was not
+changed. The default token remains read-only for contents/packages. The setting
+is repository-wide and combines PR creation and approval; it cannot be described
+as permission for this pilot alone. A specific owner decision is required before
+changing it. This workflow never submits an approving review.
+
+R2 finding B1 remains an activation gate: the loopback test observes client-side
+filtering under BYOK, not the authenticated GitHub transport. No authenticated
+zero-tool preflight has been demonstrated. Either supply that evidence or obtain
+explicit informed acceptance of this residual risk for the bounded test. The
+generator token remains read-only; the separate publisher only accepts ledger text
+and the exact trusted test. Source GREEN is not activation readiness.
