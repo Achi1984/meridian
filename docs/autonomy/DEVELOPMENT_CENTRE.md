@@ -60,7 +60,11 @@ queue retention policy.
 
 Duplicate deliveries/work collapse only for identical packet content (excluding
 delivery ID); conflicting work/request/operation identities fail closed. Review comment IDs and
-CI run IDs must also have identical evidence bindings across the entire snapshot. A head
+CI run IDs must also have identical evidence bindings across the entire snapshot.
+Every top-level and nested response/in-flight scope shares snapshot-wide bindings:
+a request or operation ID cannot refer to different scope pins, and a head cannot
+refer to different bases. Consistent historical rows may repeat across packets;
+they do not substitute for a review of the current request/head. A head
 cannot be reintroduced under a different work packet. Updates belong in a new
 reconciled snapshot, not appended alongside an old version. Array ordering is
 part of packet identity. Output ordering is stable by status then work ID.
@@ -70,7 +74,7 @@ current work packets conservatively block both, including planned work and
 ancestor directory scopes. No automatic conflict winner or retry is selected.
 Running packets wait for their owner. CI must match both pins; stale head/base
 evidence intentionally returns `BLOCKED / STALE_CI` and requires a fresh
-reconciled snapshot rather than speculative continuation. reviews reuse the
+reconciled snapshot rather than speculative continuation. Reviews reuse the
 existing strictest-verdict and deduplication rules. Missing evidence waits.
 
 `READY_FOR_OWNER_DECISION` means supplied evidence is internally consistent only.

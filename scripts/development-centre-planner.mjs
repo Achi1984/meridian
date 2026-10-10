@@ -54,6 +54,19 @@ export function planWork(input) {
   need(Array.isArray(s.requiredJobs) && s.requiredJobs.length > 0 && s.requiredJobs.every(id)
     && new Set(s.requiredJobs).size === s.requiredJobs.length && Array.isArray(s.work), 'INVALID_COLLECTION');
   const deliveries = new Map(), works = new Map(), requests = new Map(), operations = new Map(), heads = new Map(), reviewIds = new Map(), ciRuns = new Map();
+  const scopedRequests = new Map(), scopedOperations = new Map(), headBases = new Map();
+  const bindScope = row => {
+    const binding = canonical(scope(row));
+    for (const [map, key, code] of [
+      [scopedRequests, row.requestId, 'REQUEST_SCOPE_CONFLICT'],
+      [scopedOperations, row.opId, 'OP_SCOPE_CONFLICT'],
+      [headBases, row.headSha, 'HEAD_BASE_CONFLICT']
+    ]) {
+      const value = map === headBases ? row.baseSha : binding;
+      need(!map.has(key) || map.get(key) === value, code);
+      map.set(key, value);
+    }
+  };
   for (const w of s.work) {
     shape(w, ['deliveryId', 'workId', ...scopeFields, 'paths', 'owner', 'execution', 'ci', 'responses', 'inFlight']);
     need([w.deliveryId, w.workId, w.requestId, w.opId].every(id)
@@ -65,6 +78,8 @@ export function planWork(input) {
       && ['PLANNED', 'RUNNING', 'UNKNOWN'].includes(w.execution), 'INVALID_EXECUTION');
     need(w.execution !== 'RUNNING' || w.owner !== 'NONE', 'OWNER_REQUIRED');
     const review = classifyReview({...scope(w), responses: w.responses, inFlight: w.inFlight}, scope(w));
+    // classifyReview validates each row; now bind every scope across packets too.
+    for (const row of [w, ...w.responses, ...w.inFlight]) bindScope(row);
     for (const row of w.responses) {
       const binding = canonical(row);
       need(!reviewIds.has(row.reviewCommentId) || reviewIds.get(row.reviewCommentId) === binding, 'REVIEW_ID_CONFLICT');

@@ -92,3 +92,44 @@ test('job IDs require explicit valid collector mappings',()=>{
     const p=packet();p.ci.jobs[0].name=name;assert.throws(()=>run(p),/INVALID_CI/);
   }
 });
+function independentPair() {
+  const p=packet(),q=packet();
+  Object.assign(q,{deliveryId:'EVT002',workId:'WORK002',requestId:'REQ002',opId:'OP002',headSha:'d'.repeat(40),paths:['other.js']});
+  Object.assign(q.responses[0],{requestId:q.requestId,opId:q.opId,headSha:q.headSha,reviewCommentId:43});
+  Object.assign(q.ci,{headSha:q.headSha,runId:124});return [p,q];
+}
+function historicalScope() {
+  return {repository:'Achi1984/meridian',requestId:'HISTREQ',opId:'HISTOP',headSha:'e'.repeat(40),baseSha:base};
+}
+function addHistory(work,kind,row,commentId) {
+  work[kind].push(kind==='responses'?{...row,reviewCommentId:commentId,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'}:row);
+}
+test('nested response and in-flight scopes must agree across the entire snapshot',()=>{
+  for(const firstKind of ['responses','inFlight'])for(const secondKind of ['responses','inFlight']) {
+    for(const [change,expected] of [
+      [r=>{r.headSha='f'.repeat(40);r.opId='OTHEROP';},/REQUEST_SCOPE_CONFLICT/],
+      [r=>{r.headSha='f'.repeat(40);r.requestId='OTHERREQ';},/OP_SCOPE_CONFLICT/],
+      [r=>{r.baseSha='c'.repeat(40);r.requestId='OTHERREQ';r.opId='OTHEROP';},/HEAD_BASE_CONFLICT/]
+    ]) {
+      const [p,q]=independentPair(),a=historicalScope(),b={...a};change(b);
+      addHistory(p,firstKind,a,50);addHistory(q,secondKind,b,51);
+      assert.throws(()=>run(p,q),expected,firstKind+' / '+secondKind);
+      assert.throws(()=>run(q,p),expected,'reversed '+firstKind+' / '+secondKind);
+    }
+  }
+});
+test('nested identities cannot conflict with another top-level packet',()=>{
+  for(const kind of ['responses','inFlight']) {
+    const [p,q]=independentPair(),row=historicalScope();row.requestId=q.requestId;
+    addHistory(p,kind,row,50);assert.throws(()=>run(p,q),/REQUEST_SCOPE_CONFLICT/);
+    assert.throws(()=>run(q,p),/REQUEST_SCOPE_CONFLICT/);
+  }
+});
+test('consistent historical evidence can repeat across packets without granting current review',()=>{
+  const [p,q]=independentPair(),history=historicalScope();
+  addHistory(p,'responses',history,50);addHistory(q,'responses',{...history},50);
+  addHistory(p,'inFlight',{...history});addHistory(q,'inFlight',{...history});
+  assert.ok(run(p,q).every(r=>r.status==='READY_FOR_OWNER_DECISION'));
+  p.responses=p.responses.filter(r=>r.headSha!==p.headSha);
+  assert.equal(run(p,q).find(r=>r.workId===p.workId).status,'WAITING_REVIEW');
+});
