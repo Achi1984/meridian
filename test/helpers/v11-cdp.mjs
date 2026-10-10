@@ -4,7 +4,7 @@ import {existsSync,readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-export async function withMobileChrome(chrome,width,url,probe){
+export async function withMobileChrome(chrome,width,url,probe,interact){
  const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
  const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
   '--remote-debugging-port=0','--user-data-dir='+dir,'about:blank'],{stdio:'ignore',detached:true});
@@ -50,6 +50,10 @@ export async function withMobileChrome(chrome,width,url,probe){
   }
   if(!loaded)throw Error('Page load timeout');
   if(typeof probe==='function')return await probe(call);
+  if(interact!==undefined){
+   if(typeof interact!=='function')throw Error('CDP interaction must be a function');
+   await interact(call);
+  }
   const r=await call('Runtime.evaluate',{expression:probe,returnByValue:true});
   if(r.exceptionDetails)throw Error('CDP probe exception '+JSON.stringify(r.exceptionDetails));
   return r.result?.value;
