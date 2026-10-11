@@ -9,6 +9,14 @@ const v11=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 const goStart=v9.indexOf('function go(v){');
 const goEnd=v9.indexOf('\nfunction notifyData(){',goStart);
 const goSource=goStart>=0&&goEnd>goStart?v9.slice(goStart,goEnd).trim():'';
+const renderMatches=[...v9.matchAll(/const render=\{([^}]+)\};let current='command';/g)];
+assert.equal(renderMatches.length,1,'the production renderer map must remain uniquely extractable');
+const renderEntries=renderMatches[0][1];
+assert.match(renderEntries,/^[A-Za-z_$][\w$]*(?:,[A-Za-z_$][\w$]*)*$/,
+  'production renderer map must remain a list of shorthand renderer keys');
+const renderKeys=renderEntries.split(',');
+assert.deepEqual(renderKeys,['command','bots','market','research','more'],
+  'production renderer keys changed; review the V11 mapping explicitly');
 const bindStart=v9.indexOf("document.querySelectorAll('#nav button').forEach(b=>b.onclick=");
 const bindEnd=bindStart>=0?v9.indexOf(';',bindStart)+1:-1;
 const bindSource=bindStart>=0&&bindEnd>bindStart?v9.slice(bindStart,bindEnd):'';
@@ -55,10 +63,11 @@ function harness(){
       selector==='#nav button'?tabs:[]
   };
   const window={MERIDIAN_V10:true,dispatchEvent:event=>events.push(event)};
+  const render=Object.fromEntries(renderKeys.map(key=>[key,()=>{rendered.push(key);return 'v9-render:'+key}]));
   const context={
     document,window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail}},
     queueMicrotask:callback=>callback(),$:(selector)=>views.get(selector.replace('#view-',''))||null,
-    render:Object.fromEntries([...views.keys()].map(key=>[key,()=>{rendered.push(key);return 'v9-render:'+key}])),
+    render,
     bindResearch:()=>{},bindPortfolioRefEditor:()=>{}
   };
   vm.runInNewContext(v11,context,{timeout:250});
@@ -67,10 +76,9 @@ function harness(){
   return{tabs,views,callbacks,events,rendered,context};
 }
 
-function click(tab,callbacks){
-  const event={target:{closest:()=>tab}};
+function invokeHandlersInVm(tab,callbacks){
   tab.onclick();
-  callbacks.get('click')(event);
+  callbacks.get('click')({target:{closest:()=>tab}});
 }
 
 test('actual v9 go() changes active classes but leaves the v11 visibility and ARIA state stale',()=>{
@@ -95,14 +103,23 @@ test('actual v9 go() changes active classes but leaves the v11 visibility and AR
   assert.equal(h.tabs[0].getAttribute('aria-current'),undefined);
 });
 
-test('actual v9 per-button and v11 delegated navigation owners both run for one tab click',()=>{
-  const h=harness(),button=h.tabs.find(tab=>tab.dataset.v==='depot');
-  click(button,h.callbacks);
+test('actual v9 renderer map has no V11 depot renderer and go(depot) emits no view event',()=>{
+  const h=harness();
+  assert.equal(h.rendered.includes('depot'),false);
+  assert.equal(Object.hasOwn(h.context.render,'depot'),false);
+  assert.throws(()=>h.context.go('depot'),/render\[v\] is not a function/);
+  assert.deepEqual(h.events.filter(event=>event.type==='meridian:view'),[],
+    'go(depot) throws before the production meridian:view dispatch');
+});
 
-  assert.deepEqual(h.rendered,['depot'],'the v9 onclick rendered while the v11 delegated handler also ran');
-  assert.equal(h.views.get('depot').hidden,false);
+test('supported tab handlers can both be invoked in the VM harness',()=>{
+  const h=harness(),button=h.tabs.find(tab=>tab.dataset.v==='bots');
+  invokeHandlersInVm(button,h.callbacks);
+
+  assert.deepEqual(h.rendered,['bots'],'the V9 renderer stub for an actual production key ran');
+  assert.equal(h.views.get('bots').hidden,false);
   assert.equal(h.views.get('command').hidden,true);
   assert.equal(button.getAttribute('aria-current'),'page');
   assert.equal(h.events.filter(event=>event.type==='meridian:view').length,1,
-    'the production v9 navigation also emits meridian:view');
+    'invoking the extracted V9 owner emitted meridian:view; this VM sequence does not assert browser click propagation');
 });
