@@ -74,21 +74,30 @@ jobs:
           overwrite: false
   publish:
     needs: [claim, generate]
+    environment: meridian-draft-publisher
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
       contents: write
       actions: read
-      pull-requests: write
+      pull-requests: read
     steps:
-      - name: Load trusted helper, never artifact code
+      - name: Load and verify immutable trusted publisher files
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api "repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=$GITHUB_SHA" -H 'Accept:application/vnd.github.raw+json' > "$RUNNER_TEMP/pilot.py"
-      - name: Validate artifact and create one Draft PR
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/trusted-publisher"
+          cd "$RUNNER_TEMP/trusted-publisher"
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=4f651947073e348203f9579d2efc52c40b4394e5' -H 'Accept:application/vnd.github.raw+json' > copilot-coding-pilot.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-broker.py?ref=4f651947073e348203f9579d2efc52c40b4394e5' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-broker.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-runner.py?ref=4f651947073e348203f9579d2efc52c40b4394e5' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-runner.py
+          printf '%s\n' '778d235a4101a57af7a16020b9dd0e1d6041010d699aea983ca0fc17b82526b2  copilot-coding-pilot.py' 'cc06195689da4f1fa8bf63aa8cce55cd98fdfd603f4b395009c9fce9a418dd38  copilot-publisher-broker.py' 'e91427d74bd7c86cd94899f544a8b99d076daf187eef0ddbc84b0a61fd361c5b  copilot-publisher-runner.py' | sha256sum --check --strict -
+      - name: Validate artifact and create one Draft with scoped App token
         env:
           GH_TOKEN: ${{ github.token }}
           CLAIM_SHA: ${{ needs.claim.outputs.claim }}
           ARTIFACT_ID: ${{ needs.generate.outputs.artifact }}
-        run: python3 "$RUNNER_TEMP/pilot.py" publish
-
+          MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
+        run: exec python3 -I "$RUNNER_TEMP/trusted-publisher/copilot-publisher-runner.py"
