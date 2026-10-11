@@ -11,7 +11,8 @@ const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 // PR #677: base a5ba7eca2004ce51ec98720955b5fcc3716f09ef + history-close delta.
 // Scope approved in #571 comment 6107229650; terminal-entry insertions removed
-// for this baseline. Exact byte guard and all browser assertions stay intact.
+// for this baseline. PR #699 additionally reverses only the viewport fallback
+// pair below before hashing. All other bytes and browser assertions stay guarded.
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const css=`    /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
@@ -36,8 +37,11 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(anchor[0][0],'<a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>');
   assert.ok(anchor[0].index<html.indexOf('<section id="version-panel"'));
   assert.match(html,/id="version-panel"[^>]* hidden/);
-  const restored=html.replace(css,'').replace(entry,'');
-  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except the two terminal-entry insertions must match the reviewed history-close baseline');
+  const viewportPair='min-height:100vh;min-height:100dvh;';
+  assert.equal(html.split(viewportPair).length-1,1,'exactly one progressive viewport fallback');
+  const restored=html.replace(css,'').replace(entry,'')
+    .replace(viewportPair,'min-height:100dvh;min-height:100vh;');
+  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions and the checked viewport pair must match the reviewed history-close baseline');
 });
 
 function deploymentServer(){
