@@ -41,6 +41,10 @@ const depotAfter=`      <section class="card" aria-labelledby="depot-summary-hea
         <p class="caption">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>
       </section>
       <p class="caption">Diese Vorschau hat keinen Kontozugriff. „Terminal öffnen“ führt zum separaten Terminal.</p>`;
+// Exact preview revision delta; the historical baseline remains unchanged.
+const revisionBefore="11 · Vorschau<small>Versionsverlauf ▾</small>";
+const revisionAfter="11 · Vorschau #700<small>Versionsverlauf ▾</small>";
+const revisionRow="        <li><strong>Meridian 11 · #700</strong><span class=\"version-status\">Vorschaustand</span><p>Depotübersicht mit klar gekennzeichnetem Gesamtwert, Datenquelle und Aktualität. Ohne Live-Daten. <a href=\"https://github.com/Achi1984/meridian/pull/700\">Änderungsnachweis #700</a></p></li>\n";
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 
 function gitBlob(content){
@@ -58,9 +62,12 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   const viewportPair='min-height:100vh;min-height:100dvh;';
   assert.equal(html.split(viewportPair).length-1,1,'exactly one progressive viewport fallback');
   assert.equal(html.split(depotAfter).length-1,1,'exactly one reviewed Depot panel');
+  assert.equal(html.split(revisionAfter).length-1,1,'one current preview revision label');
+  assert.equal(html.split(revisionRow).length-1,1,'one matching preview history row');
   const restored=html.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
+    .replace(revisionAfter,revisionBefore).replace(revisionRow,'')
     .replace(viewportPair,'min-height:100dvh;min-height:100vh;');
-  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot delta must match the reviewed history-close baseline');
+  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
 function deploymentServer(){
