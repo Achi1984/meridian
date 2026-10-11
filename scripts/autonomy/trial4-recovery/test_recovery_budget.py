@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import importlib.util
 import pathlib
+import sys
 import time
 import unittest
 from unittest.mock import patch
@@ -66,10 +67,79 @@ class BudgetTests(unittest.TestCase):
             self.assertEqual([m for m,u in calls].count('DELETE'),1)
         finally:b.close()
 
+    def test_pending_work_alarm_at_exact_broker_finally_boundary(self):
+        for invalid_mint in (False, True):
+            with self.subTest(pre_yield_failure=invalid_mint):
+                b=l.ExecutionBudget();b.job_end=time.time()+1200
+                broker,factory,calls=self.broker_fixture(b)
+                original_http=broker.github_http
+                if invalid_mint:
+                    def bad_mint(*args):
+                        status,result=original_http(*args)
+                        if args[0]=='POST':result['permissions']={'contents':'write'}
+                        return status,result
+                    broker.github_http=bad_mint
+                target=next(i for i,line in enumerate((ROOT/'publisher_broker.py').read_text().splitlines(),1)
+                            if line.strip()=='if token is not None:')
+                hit=[]
+                def trace(frame,event,arg):
+                    if event=='line' and frame.f_code.co_name=='publisher_token' and frame.f_lineno==target:
+                        hit.append(True)
+                        self.assertIsNotNone(b.cleanup_deadline)
+                        # Simulate a pending work signal delivered after switching phases,
+                        # exactly before broker's unprotected first finally statement.
+                        b.expired(None,None)
+                    return trace
+                b.install();sys.settrace(trace)
+                try:
+                    if invalid_mint:
+                        with self.assertRaises(broker.BrokerError):
+                            with factory():self.fail('invalid scope yielded')
+                    else:
+                        with factory():pass
+                        self.assertTrue(factory.receipt()['revocation_confirmed'])
+                    self.assertEqual(hit,[True]);self.assertEqual([m for m,u in calls].count('DELETE'),1)
+                finally:sys.settrace(None);b.close()
+
+    def test_work_alarm_interrupting_preyield_cleanup_hook_still_revokes(self):
+        b=l.ExecutionBudget();b.job_end=time.time()+1200
+        broker,factory,calls=self.broker_fixture(b)
+        original_http=broker.github_http
+        def bad_mint(*args):
+            status,result=original_http(*args)
+            if args[0]=='POST':result['permissions']={'contents':'write'}
+            return status,result
+        broker.github_http=bad_mint
+        target=next(i for i,line in enumerate((ROOT/'publisher_broker.py').read_text().splitlines(),1)
+                    if line.strip()=="observe('cleanup_started')")
+        hits=[]
+        def trace(frame,event,arg):
+            if event=='line' and frame.f_code.co_name=='publisher_token' and frame.f_lineno==target:
+                hits.append(True);b.alarm_deadline=time.monotonic()-1
+                b.expired(None,None)
+            return trace
+        b.install();sys.settrace(trace)
+        try:
+            with self.assertRaises(broker.BrokerError):
+                with factory():self.fail('invalid scope yielded')
+            self.assertEqual(hits,[True]);self.assertEqual([m for m,u in calls].count('DELETE'),1)
+        finally:sys.settrace(None);b.close()
+
+    def test_cleanup_transition_is_idempotent_and_stale_signal_preserves_deadline(self):
+        b=l.ExecutionBudget()
+        with patch.object(l.time,'monotonic',return_value=100),patch.object(l.signal,'setitimer') as alarm:
+            b.begin_cleanup();deadline=b.cleanup_deadline
+            b.begin_cleanup();b.expired(None,None)
+            self.assertEqual(b.cleanup_deadline,deadline)
+            self.assertEqual([x.args[1] for x in alarm.call_args_list],[60,60])
+        with patch.object(l.time,'monotonic',return_value=161):
+            with self.assertRaises(TimeoutError):b.expired(None,None)
+
     def test_operation_alarm_is_replaced_not_rearmed_for_cleanup(self):
         b=l.ExecutionBudget()
         with patch.object(l.signal,'setitimer') as alarm:
             with b.cleanup():pass
-            self.assertEqual([x.args[1] for x in alarm.call_args_list],[60,0])
+            values=[x.args[1] for x in alarm.call_args_list]
+            self.assertEqual(len(values),2);self.assertTrue(59 < values[0] <= 60);self.assertEqual(values[1],0)
 
 if __name__=='__main__':unittest.main()

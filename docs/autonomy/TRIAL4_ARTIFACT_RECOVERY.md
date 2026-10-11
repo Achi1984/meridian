@@ -6,7 +6,7 @@ The only output is one App-authored draft containing the exact two previously ge
 
 `approved_base` has no workflow default. It must equal the reviewed main SHA, GitHub execution/workflow SHA, authenticated run head and live main. The launcher compares the complete workflow bytes against the rendered immutable template, authenticates the owner and native environment approval, and reconciles the original fixed failed-job receipt. The original artifact, source run, source PR, original claim, green main checks and absence of output paths/PRs are checked before writes. A distinct atomic recovery branch claim consumes the one-shot identity; uncertainty requires reconciliation, never automatic retry.
 
-Ordinary job credentials prepare the branch but cannot create the PR through this adapter. Only the existing verified broker's repository-scoped PR-write App token can perform the fixed draft POST. Success requires a validated response and confirmed token revocation with the expected App/install/repository identities. The broker source is retained byte-for-byte and hash-checked. No credentials are persisted or included in receipts.
+Ordinary job credentials prepare the branch but cannot create the PR through this adapter. Only the existing verified broker's repository-scoped PR-write App token can perform the fixed draft POST. Success requires a validated response and confirmed token revocation with the expected App/install/repository identities. The recovery-local broker is hash-checked and differs from the reviewed baseline only by an exception-path cleanup-start observer hook; the historical broker and evidence are untouched. No credentials are persisted or included in receipts.
 
 ## Repository mapping and verification
 
@@ -30,3 +30,9 @@ Remaining deployment gates are real immutable anchoring, reviewed integration an
 The job timeout is 20 minutes; the loader is limited to 3 minutes and the secret-bearing step to 15 minutes. A process watchdog interrupts ordinary launcher work after 10 minutes. The authenticated current job start also binds a 20-minute job budget, and minting requires at least 4 minutes of normal work plus cleanup/native termination margin remaining. The original artifact and completed diagnostic deadlines are not modified by the separate owner extension.
 
 The Linux alarm interrupts slow reads as well as ordinary Python work. The broker replaces the operation alarm with a separate 60-second cleanup alarm during DELETE, allowing revocation after the authorization deadline. Failed or timed-out cleanup reports reconciliation required, never success. Runner loss, force cancellation or SIGKILL can still prevent cleanup; an issued token may remain valid until its verified GitHub expiry (at most one hour). This residual platform limit is not presented as guaranteed revocation.
+
+## R3 cleanup transition
+
+The factory enters cleanup mode in its yield-finally before control returns to the broker. Pre-yield broker failures enter the same mode through an explicit cleanup-start hook in the broker exception handler, before its finally. The revocation observer and DELETE adapter provide idempotent fallbacks. The signal handler compares the current phase deadline, so a stale pending work signal delivered after transition cannot throw into broker cleanup; it rearms only the remaining cleanup budget. The cleanup deadline is never extended by repeated transitions.
+
+Boundary regressions inject the stale work signal at the broker's first unprotected finally statement for both normal context exit and retained-token scope validation failure. Each path performs exactly one DELETE. The updated broker digest must be included in the new immutable source anchor; it must not be represented as the unchanged baseline.

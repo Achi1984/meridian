@@ -228,6 +228,12 @@ def publisher_token(*, http, sign, pins=None, clock=time.time, observer=None):
         yield token
     except BaseException:
         failure = stage
+        # Recovery observer switches watchdog mode before entering token cleanup.
+        # If the one-shot work alarm interrupts this hook, finally still revokes.
+        try:
+            observe('cleanup_started')
+        except BaseException:
+            pass
     finally:
         if token is not None:
             # Observer failures must never skip the actual revoke request.

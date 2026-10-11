@@ -16,7 +16,7 @@ WORKFLOW = '.github/workflows/trial4-artifact-recovery.yml'
 ROOT = pathlib.Path(__file__).resolve().parent
 FILES = ('recovery_core.py', 'recovery_http.py', 'recovery_launcher.py', 'publisher_broker.py',
          'evidence/validate_original_packet.py', 'evidence/original-pilot.py', 'workflow.template.yml')
-BROKER_HASH = '1f061f04c543c13c87bccf3e025267014900ca028fd261ac2166f9db7e267ad3'
+BROKER_HASH = 'd82b29832dbbbf3d419e41b5a81f4f6ff54585e6cbca4f07be411f81b5f35c44'
 PINS = {'app_id': 5272026, 'app_slug': 'meridian-draft-publisher', 'bot_login': 'meridian-draft-publisher[bot]',
         'installation_id': 170212503, 'account_id': 319562141, 'account_login': 'Achi1984',
         'repository_id': 1342084551, 'repository_full_name': 'Achi1984/meridian'}
@@ -39,14 +39,21 @@ class ExecutionBudget:
         self.started = time.monotonic()
         self.job_end = None
         self.previous_handler = None
+        self.cleanup_deadline = None
+        self.alarm_deadline = self.started + self.WORK_SECONDS
 
-    @staticmethod
-    def expired(signum, frame):
+    def expired(self, signum, frame):
+        # A pending old work signal can arrive after cleanup mode was armed.
+        remaining = self.alarm_deadline - time.monotonic()
+        if remaining > 0:
+            signal.setitimer(signal.ITIMER_REAL, remaining)
+            return
         raise TimeoutError('RECOVERY_EXECUTION_BUDGET')
 
     def install(self):
+        self.alarm_deadline = self.started + self.WORK_SECONDS
         self.previous_handler = signal.signal(signal.SIGALRM, self.expired)
-        signal.setitimer(signal.ITIMER_REAL, self.WORK_SECONDS)
+        signal.setitimer(signal.ITIMER_REAL, max(.001, self.alarm_deadline - time.monotonic()))
 
     def close(self):
         signal.setitimer(signal.ITIMER_REAL, 0)
@@ -71,10 +78,18 @@ class ExecutionBudget:
             require(self.job_end is not None and remaining >= self.MINT_RESERVE_SECONDS
                     and self.job_end - time.time() >= self.MINT_RESERVE_SECONDS + self.CLEANUP_SECONDS + self.NATIVE_MARGIN_SECONDS)
 
+    def begin_cleanup(self):
+        if self.cleanup_deadline is None:
+            next_deadline = time.monotonic() + self.CLEANUP_SECONDS
+            # Set the logical deadline first so stale pending signals cannot raise.
+            self.alarm_deadline = next_deadline
+            self.cleanup_deadline = next_deadline
+            signal.setitimer(signal.ITIMER_REAL, max(.001, self.cleanup_deadline - time.monotonic()))
+
     @contextlib.contextmanager
     def cleanup(self):
-        # Replace, never re-arm the expired operation alarm during token revocation.
-        signal.setitimer(signal.ITIMER_REAL, self.CLEANUP_SECONDS)
+        # Idempotent fallback for errors before the publisher context yielded.
+        self.begin_cleanup()
         try:
             yield
         finally:
@@ -190,6 +205,11 @@ class BrokerFactory:
         self.events = {}; self.used = False
 
     def observe(self, event, **fields):
+        if event in {'cleanup_started', 'revocation_attempted'}:
+            self.budget.begin_cleanup()
+        if event == 'cleanup_started':
+            require(not fields)
+            return
         expected = {'app_verified': {'app_id'}, 'installation_verified': {'installation_id'},
                     'mint_attempted': {'mint_requested_at'}, 'mint_response_received': set(),
                     'scope_verified': {'repository_id', 'expires_at'}, 'revocation_attempted': set(),
@@ -213,7 +233,11 @@ class BrokerFactory:
         self.used = True
         with self.broker.publisher_token(http=self.bounded_http, sign=self.broker.rsa_signer(self.key),
                                         pins=dict(PINS), observer=self.observe) as token:
-            yield token
+            try:
+                yield token
+            finally:
+                # Enter cleanup BEFORE control resumes inside broker.__exit__.
+                self.budget.begin_cleanup()
 
     def receipt(self):
         expected = {'app_verified', 'installation_verified', 'mint_attempted', 'mint_response_received',
