@@ -31,7 +31,7 @@ const depotAfter=`      <section class="card" aria-labelledby="depot-summary-hea
         <div class="portfolio-row"><div><p class="caption">Gesamtwert</p><div class="portfolio-value" aria-label="Gesamtwert unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
         <p class="caption">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>
         <div class="trust-grid" aria-label="Datenstatus des Depots">
-          <div class="trust-cell"><strong>Quelle</strong><span>Keine verbunden</span></div>
+          <div class="trust-cell"><strong>Quelle</strong><span>Nicht verbunden</span></div>
           <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
           <div class="trust-cell"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>
         </div>
@@ -164,7 +164,7 @@ async function browserRun(call,start,width,expectedBuild,server){
       })()`);
       assert.equal(depot.label,'Statische Vorschau');
       assert.equal(depot.value,'Gesamtwert unbekannt');
-      assert.deepEqual(depot.states,[['Quelle','Keine verbunden'],['Aktualität','Keine bestätigten Daten'],['Verlauf','Nicht verfügbar']]);
+      assert.deepEqual(depot.states,[['Quelle','Nicht verbunden'],['Aktualität','Keine bestätigten Daten'],['Verlauf','Nicht verfügbar']]);
       assert.equal(depot.viewport,width);
       assert.ok(depot.body<=width+1&&depot.root<=width+1,'Depot panel overflow at '+width);
     }
