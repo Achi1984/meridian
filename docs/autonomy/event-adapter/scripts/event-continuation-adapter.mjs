@@ -34,7 +34,8 @@ const scopeKeys=['repository','requestId','opId','headSha','baseSha'];
 export function reconcileContinuation(input){
  const x=copy(input);shape(x,['trigger','config','expected','snapshot','manifest','ledger','requiredJobs']);
  const e=x.expected,s=x.snapshot;
- shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds']);
+ shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci']);
+ if(e.ci!==null)shape(e.ci,['runId','runAttempt','workflowId','headSha']);
  shape(s,['repository','observedAt','mainSha','pr','work','eventBinding','ciBinding']);
  if(s.ciBinding!==null)shape(s.ciBinding,['runId','runAttempt','workflowId','headSha']);
  shape(s.pr,['headSha','baseSha','state','mergeSha']);shape(s.eventBinding,['eventIdentity','revisionDigest']);
@@ -76,6 +77,17 @@ export function reconcileContinuation(input){
  }else if(event.claims.action==='deleted')return stop('BLOCKED','REVIEW_EVENT_DELETED');
  else if(!s.work.responses.some(r=>r.reviewCommentId===event.claims.commentId))return stop('RECONCILE_EVENT','REVIEW_EVENT_NOT_IN_SNAPSHOT');
  if(plan.status==='BLOCKED')return stop('BLOCKED',plan.reason);
+ // Both workflow and mailbox paths consume CI. Bind independently pinned exact
+ // attempt/workflow/head before any CI_PASSED, REVIEW_PASSED or retained readiness.
+ // Adverse evidence above retains precedence and invalidates completed readiness.
+ if(s.work.ci!==null){
+  const identity=['runId','runAttempt','workflowId','headSha'];
+  const valid=v=>v&&['runId','runAttempt','workflowId'].every(k=>integer(v[k])&&v[k]>0)&&sha(v.headSha);
+  if(!valid(e.ci)||!valid(s.ciBinding)||identity.some(k=>e.ci[k]!==s.ciBinding[k])
+    ||e.ci.runId!==s.work.ci.runId||e.ci.headSha!==e.headSha||e.ci.headSha!==s.work.ci.headSha
+    ||!x.config.workflowIds.includes(e.ci.workflowId))return stop('RECONCILE_EVENT','CI_BINDING_INVALID');
+ }
+
  if(plan.status==='WAITING_AGENT')return stop('WAITING_AGENT',plan.reason);
  if(plan.status==='WAITING_CI')return stop('WAITING_CI',plan.reason);
  let ledger=x.ledger;

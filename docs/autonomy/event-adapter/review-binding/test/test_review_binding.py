@@ -34,7 +34,7 @@ def adapter_input(o,e):
     payload={'repository':{'full_name':scope['repository'],'fork':False},'action':o['eventAction'],'issue':{'number':571},'comment':comment}
     binding={'eventIdentity':'mailbox-comment:Achi1984/meridian:571:789','revisionDigest':hashlib.sha256(json.dumps(claims,separators=(',',':')).encode()).hexdigest()}
     work={'deliveryId':'EVT001','workId':'WORK001',**scope,'paths':manifest['packets'][0]['paths'],'owner':'CODEX','execution':'PLANNED','ci':{'headSha':B,'baseSha':A,'runId':456,'jobs':[{'name':'release-tests','conclusion':'SUCCESS','total':10,'passed':10,'failed':0}]},'responses':[],'inFlight':[]}
-    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[123]},'expected':{**scope,'packetId':'first','mainSha':A,'now':1500,'maxAgeSeconds':60},
+    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[123]},'expected':{**scope,'packetId':'first','mainSha':A,'now':1500,'maxAgeSeconds':60,'ci':dict(e['scope']['ci'])},
             'snapshot':{'repository':scope['repository'],'observedAt':1499,'mainSha':A,'pr':{'headSha':B,'baseSha':A,'state':'open','mergeSha':None},'work':work,'eventBinding':binding,'ciBinding':dict(e['scope']['ci'])},'manifest':manifest,'ledger':ledger,'requiredJobs':['release-tests']}
 
 def composed(o,e):

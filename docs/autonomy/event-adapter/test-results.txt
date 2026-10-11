@@ -1,25 +1,28 @@
-✔ source fixtures preserve exact Git blobs (4.036136ms)
-✔ exact supplied snapshot composes real module transitions, immutable inputs and false authority (23.049628ms)
-✔ CI completion advances once to review waiting, then separate mailbox snapshot completes (20.244077ms)
-✔ same snapshot after completion produces no additional transition (13.237644ms)
-✔ event hint cannot substitute separately supplied snapshot or expected pins (5.079629ms)
-✔ opaque mailbox GREEN does not replace missing independently supplied review (2.32363ms)
-✔ deleted mailbox event cannot reuse snapshot review (2.431154ms)
-✔ run attempt and revision mismatch demand fresh reconciliation (2.382468ms)
-✔ main movement never advances old manifest, even if caller updates expected main (6.31913ms)
-✔ merged PR and postmerge reducer state cannot produce next claim on stale base (7.136932ms)
-✔ freshness, future timestamps and widened age window fail closed (3.351045ms)
-✔ head/base/request/path mismatch cannot advance (6.596859ms)
-✔ unknown outcome remains halted across snapshot restart and base movement (2.14515ms)
-✔ failed job missing required job contradictory review and active owner never complete (8.866848ms)
-✔ expired manifest cannot progress and missing completed review is revoked through reducer (2.75828ms)
-✔ forged authority malformed ledger getters proxies and sparse arrays reject without executing accessors (7.854509ms)
-✔ blocking observations revoke a previously complete draft instead of retaining reusable readiness (19.394034ms)
-ℹ tests 17
+✔ source fixtures preserve exact Git blobs (5.090951ms)
+✔ exact supplied snapshot composes real module transitions, immutable inputs and false authority (25.022064ms)
+✔ CI completion advances once to review waiting, then separate mailbox snapshot completes (13.265943ms)
+✔ same snapshot after completion produces no additional transition (10.343044ms)
+✔ event hint cannot substitute separately supplied snapshot or expected pins (3.93628ms)
+✔ opaque mailbox GREEN does not replace missing independently supplied review (3.007875ms)
+✔ deleted mailbox event cannot reuse snapshot review (1.917461ms)
+✔ run attempt and revision mismatch demand fresh reconciliation (4.007295ms)
+✔ main movement never advances old manifest, even if caller updates expected main (5.841755ms)
+✔ merged PR and postmerge reducer state cannot produce next claim on stale base (3.848018ms)
+✔ freshness, future timestamps and widened age window fail closed (2.413272ms)
+✔ head/base/request/path mismatch cannot advance (7.10244ms)
+✔ unknown outcome remains halted across snapshot restart and base movement (4.924454ms)
+✔ failed job missing required job contradictory review and active owner never complete (11.304358ms)
+✔ expired manifest cannot progress and missing completed review is revoked through reducer (5.382042ms)
+✔ forged authority malformed ledger getters proxies and sparse arrays reject without executing accessors (7.713035ms)
+✔ blocking observations revoke a previously complete draft instead of retaining reusable readiness (23.996121ms)
+✔ mailbox CI_WAIT and REVIEW_WAIT require independently pinned CI binding before advancement (54.093701ms)
+✔ mailbox invalid CI binding revokes COMPLETE_DRAFT and preserves adverse-review precedence (6.65182ms)
+✔ missing mailbox CI only waits and valid mailbox CI_WAIT still advances (3.585755ms)
+ℹ tests 20
 ℹ suites 0
-ℹ pass 17
+ℹ pass 20
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 393.979458
+ℹ duration_ms 636.967699

@@ -237,7 +237,7 @@ def reconcile(event_name, payload, control_sha, api):
         name, path = WORKFLOWS[workflow_id]
         need(run.get("name") == name and run.get("path") == path, "WORKFLOW_IDENTITY")
         need(run.get("status") == "completed" and run.get("conclusion") in
-             ("success", "failure", "cancelled", "timed_out", "skipped", "neutral", "action_required", "stale"), "RUN_TERMINAL")
+             ("success", "failure", "cancelled", "timed_out", "skipped", "neutral", "action_required", "stale", "startup_failure"), "RUN_TERMINAL")
         attempt, head = run.get("run_attempt"), run.get("head_sha")
         need(integer(attempt) and sha(head), "RUN_FIELDS")
         need(hint.get("run_attempt") == attempt and hint.get("head_sha") == head

@@ -8,7 +8,7 @@ Run with Node 22+ from this directory:
 node --test test/*.test.mjs
 ```
 
-Local result: 17 tests passed, zero failures/skips/cancellations, Node v24.19.0. Independent delegated reviewer also ran 17/17. Fixtures are unchanged pinned sources; the first regression verifies their Git blobs against provenance.json. No external dependency or download is needed.
+Local result after the mailbox CI-binding fix: 20 tests passed, zero failures/skips/cancellations, Node v24.19.0. Fresh independent review is required for the corrected bytes. Fixtures are unchanged pinned sources; the first regression verifies their Git blobs against provenance.json. No external dependency or download is needed.
 
 ## Existing code reused
 
@@ -23,7 +23,7 @@ No second ledger state machine or collector is implemented. A search also found 
 
 `reconcileContinuation({trigger,config,expected,snapshot,manifest,ledger,requiredJobs})` returns an immutable offline decision and reducer ledger. All authentication/provenance/authorization/dispatch/merge/durability flags remain false. The input fixture in test/event-continuation-adapter.test.mjs is a complete schema example.
 
-`expected` carries separately reconciled repository, packet/request/operation identities, head/base/main pins, caller clock and age limit (at most 300 seconds). `snapshot` supplies repository, observation time, current main, PR head/base/state/merge, the planner's work row, exact event identity/revision, and separate CI run/attempt/workflow/head binding. These are **unverified caller claims**, including timestamps and CI/review data. Independent-looking JSON objects cannot establish independence or provenance.
+`expected` carries separately reconciled repository, packet/request/operation identities, head/base/main pins, independently expected CI run/attempt/workflow/head pins, caller clock and age limit (at most 300 seconds). `snapshot` supplies repository, observation time, current main, PR head/base/state/merge, the planner's work row, exact event identity/revision, and separate CI run/attempt/workflow/head binding. These are **unverified caller claims**, including timestamps and CI/review data. Independent-looking JSON objects cannot establish independence or provenance.
 
 The future trusted caller must fetch and authenticate current repository/PR state, actual CI jobs from the exact run attempt, required checks, review identity and complete review evidence. It must map reviewer claims to the observed comment version/body digest; matching comment IDs alone is not proof of current review. eventBinding and ciBinding are consistency assertions, not authenticated receipts. The snapshot clock must come from trusted time. Latest attempt selection and job-to-attempt provenance remain the caller's responsibility. Serialized JSON must be strictly decoded upstream, including duplicate-key rejection; this API accepts bounded plain data objects, not raw snapshot JSON.
 
@@ -47,3 +47,5 @@ The existing reducer has no exported ledger validator. The adapter validates the
 provenance.json records full commit/blob pins for #642, #648, #661 and main. The originals remain unchanged. Publication preserves this exact local structure under docs/autonomy/event-adapter/, including explicit pinned fixture copies, so reviewed source/test hashes remain unchanged. Do not copy this source-only package into production imports implicitly.
 
 Remaining real boundary: authenticated event receiver and current evidence collection, durable shared consumption/lease/fencing, bounded model execution, output publication, independent review transport and guarded merge under concrete owner authorization. No existing hourly automation was enabled or modified.
+
+Mailbox CI-binding correction: every path consuming work.ci now compares snapshot.ciBinding against independently supplied expected.ci, the observed work run/head and the configured workflow allowlist, with positive run/attempt/workflow identifiers. CI_WAIT, REVIEW_WAIT and COMPLETE_DRAFT cannot advance or retain readiness with null or mismatched binding. Existing adverse-review/deletion invalidation retains precedence.

@@ -26,6 +26,9 @@ These are point-in-time reads, not an atomic GitHub snapshot: the PR may move af
 its read even if main does not. No review verdicts are collected.
 The receipt must never replace a fresh guarded mutation preflight.
 
+Terminal non-success conclusions, including `startup_failure`, produce metadata-only
+receipts. They do not fetch job lists/logs or attach successful CI evidence.
+
 ## Release Safety reported test counters
 
 Only the successful `syntax` job with an exactly matching run/attempt/head and one
@@ -47,7 +50,9 @@ run is reread after log retrieval to catch changed attempts. Authority and
 `source.ciEvidence.adapterFields.workCi` maps to the existing adapter's `work.ci`;
 `adapterFields.ciBinding` maps to its exact runId/runAttempt/workflowId/headSha
 binding. No new parallel planning schema is needed. A caller must still supply
-separately bound expected scope, manifest, PR snapshot and event revision.
+separately bound expected scope, manifest, PR snapshot and event revision. Its
+`expected.ci` must independently pin the accepted run ID, attempt, workflow ID and
+head; copying the receipt binding into expected input is not independent evidence.
 
 For comment events only exact current comment ID/revision/author/mailbox metadata
 is retained. Bodies are received inside the REST response but never interpreted,

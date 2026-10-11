@@ -9,7 +9,7 @@ const A='a'.repeat(40),B='b'.repeat(40),C='c'.repeat(40),D='d'.repeat(40),repo='
 const change=(x,type,sha=B,packetId='first')=>advance(x.manifest,x.ledger,{type,sha,packetId,expectedRevision:x.ledger.revision},1500);
 function bind(x){const n=normalizeEvent(x.trigger.name,x.trigger.payloadJson,JSON.stringify(x.config));x.snapshot.eventBinding={eventIdentity:n.eventIdentity,revisionDigest:n.revisionDigest};return x;}
 function fixture(){
- const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60};
+ const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
  const scope=Object.fromEntries(['repository','requestId','opId','headSha','baseSha'].map(k=>[k,expected[k]]));
  const manifest={schema:1,repository:repo,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:2,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:['first','second'].map((id,i)=>({id,paths:[`docs/v11/${id}.md`,`test/v11-${id}.test.js`],dependencies:i?['first']:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}))};
  const work={deliveryId:'EVT001',workId:'WORK001',...scope,paths:manifest.packets[0].paths,owner:'CODEX',execution:'PLANNED',ci:{headSha:B,baseSha:A,runId:456,jobs:[{name:'release-tests',conclusion:'SUCCESS',total:10,passed:10,failed:0}]},responses:[{...scope,reviewCommentId:789,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'}],inFlight:[]};
@@ -83,4 +83,17 @@ test('forged authority malformed ledger getters proxies and sparse arrays reject
 
 test('blocking observations revoke a previously complete draft instead of retaining reusable readiness',()=>{
  for(const edit of [x=>x.snapshot.work.ci.jobs[0].conclusion='FAILURE',x=>x.snapshot.work.ci.jobs=[],x=>mailbox(x,'deleted'),x=>x.snapshot.mainSha=D]){const x=fixture();x.ledger=reconcileContinuation(x).ledger;edit(x);const r=reconcileContinuation(x);assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');assert.equal(r.ledger.revoked,true);assert.equal(r.ledger.packets[0].state,'UNKNOWN_OUTCOME');}
+});
+
+test('mailbox CI_WAIT and REVIEW_WAIT require independently pinned CI binding before advancement',()=>{
+ const edits=[x=>x.snapshot.ciBinding=null,x=>x.snapshot.ciBinding.runId=999,x=>x.snapshot.ciBinding.runAttempt=2,x=>x.snapshot.ciBinding.runAttempt=0,x=>x.snapshot.ciBinding.workflowId=999,x=>x.snapshot.ciBinding.headSha=C,x=>x.expected.ci=null,x=>{x.expected.ci.workflowId=999;x.snapshot.ciBinding.workflowId=999;}];
+ for(const state of ['CI_WAIT','REVIEW_WAIT'])for(const edit of edits){const x=mailbox(fixture());if(state==='REVIEW_WAIT')x.ledger=change(x,'CI_PASSED',B);edit(x);const before=structuredClone(x.ledger);const r=reconcileContinuation(x);assert.equal(r.decision,'RECONCILE_EVENT');assert.equal(r.reason,'CI_BINDING_INVALID');assert.deepEqual(r.ledger,before);}
+});
+test('mailbox invalid CI binding revokes COMPLETE_DRAFT and preserves adverse-review precedence',()=>{
+ const x=mailbox(fixture());x.ledger=reconcileContinuation(x).ledger;x.snapshot.ciBinding=null;const r=reconcileContinuation(x);assert.equal(r.reason,'CI_BINDING_INVALID');assert.equal(r.ledger.revoked,true);assert.equal(r.ledger.packets[0].state,'UNKNOWN_OUTCOME');
+ const y=mailbox(fixture());y.ledger=reconcileContinuation(y).ledger;y.snapshot.ciBinding=null;y.snapshot.work.responses[0].verdict='REVISION_REQUIRED';const blocked=reconcileContinuation(y);assert.equal(blocked.reason,'STRICTEST_VERDICT');assert.equal(blocked.ledger.revoked,true);
+});
+test('missing mailbox CI only waits and valid mailbox CI_WAIT still advances',()=>{
+ const x=mailbox(fixture());x.snapshot.work.ci=null;x.snapshot.ciBinding=null;x.expected.ci=null;const r=reconcileContinuation(x);assert.equal(r.decision,'WAITING_CI');assert.deepEqual(r.ledger,x.ledger);
+ const y=mailbox(fixture());const ready=reconcileContinuation(y);assert.equal(ready.decision,'READY_FOR_OWNER_DECISION');assert.equal(ready.ledger.packets[0].state,'COMPLETE_DRAFT');
 });

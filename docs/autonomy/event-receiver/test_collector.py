@@ -76,6 +76,19 @@ class Tests(unittest.TestCase):
         self.assertEqual(mapped["ciBinding"], {"headSha": B, "runId": 123, "runAttempt": 1, "workflowId": 347821227})
         self.assertFalse(r["source"]["ciEvidence"]["authenticated"])
 
+    def test_non_success_receipts_never_require_successful_job_logs(self):
+        for conclusion in ("startup_failure", "failure", "cancelled", "timed_out", "skipped", "neutral", "action_required", "stale"):
+            with self.subTest(conclusion=conclusion):
+                event, api = workflow()
+                api.rows["actions/runs/123"]["conclusion"] = conclusion
+                event["workflow_run"]["conclusion"] = conclusion
+                receipt = reconcile("workflow_run", event, A, api)
+                self.assertEqual(receipt["source"]["conclusion"], conclusion)
+                self.assertNotIn("ciEvidence", receipt["source"])
+                self.assertFalse(receipt["dispatchAllowed"])
+                self.assertFalse(receipt["mergeAllowed"])
+                self.assertEqual(api.calls, ["commits/main", "actions/runs/123", "pulls/702", "commits/main"])
+
     def test_wrong_repository_and_fork(self):
         for bad in ({"full_name": "attacker/repo", "fork": False}, {"full_name": "Achi1984/meridian", "fork": True}):
             e, api = workflow(); e["repository"] = bad
@@ -248,7 +261,8 @@ const {initialLedger,advance}=await import(new URL('../fixtures/scripts/continua
 const {receipt,payload}=JSON.parse(readFileSync(0,'utf8'));
 const A='a'.repeat(40),B='b'.repeat(40),repository='Achi1984/meridian';
 const mapped=receipt.source.ciEvidence.adapterFields;
-const expected={repository,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60};
+const expected={repository,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,
+ ci:{runId:123,runAttempt:1,workflowId:347821227,headSha:B}};
 const paths=['docs/v11/first.md','test/v11-first.test.js'];
 const manifest={schema:1,repository,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:1,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:[{id:'first',paths,dependencies:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}]};
 let ledger=initialLedger(manifest);
