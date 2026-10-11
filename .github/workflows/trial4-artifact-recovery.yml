@@ -1,0 +1,42 @@
+name: MERIDIAN Original Trial4 Artifact Recovery
+on:
+  workflow_dispatch:
+    inputs:
+      approved_base:
+        description: Exact reviewed main SHA approved for this single recovery
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: meridian-trial4-artifact-recovery1
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: ${{ github.repository == 'Achi1984/meridian' && github.ref == 'refs/heads/main' && github.triggering_actor == 'Achi1984' && github.run_attempt == 1 }}
+    environment: meridian-draft-publisher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Load immutable reviewed recovery files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/recovery/evidence"
+          cd "$RUNNER_TEMP/recovery"
+          for path in recovery_core.py recovery_http.py recovery_launcher.py publisher_broker.py evidence/validate_original_packet.py evidence/original-pilot.py workflow.template.yml; do
+            gh api "repos/Achi1984/meridian/contents/scripts/autonomy/trial4-recovery/$path?ref=d20fc79ddadb26ea0b8dda6fbce1e252c311a5ba" -H 'Accept:application/vnd.github.raw+json' > "$path"
+          done
+          printf '%s\n' '1e1fe082d1d33594fdbf0321ca8947d804289d84e301ec389234e308adb5e8e5  recovery_core.py' 'f483681772af4a5467cedb4aace262457e30c052961824ba46abdf0af92cf450  recovery_http.py' '8441624198454bff924b7955e68f53fa8c6f695547e7d9387f933b94cb521f04  recovery_launcher.py' '1f061f04c543c13c87bccf3e025267014900ca028fd261ac2166f9db7e267ad3  publisher_broker.py' 'ae202bd358f370c565de28ee00c2585a0c29a0e2d415a46dfb70875501c5114c  evidence/validate_original_packet.py' '4786e18ec611a22a9c6cebb476cb6910d7f5812c7240c64432b50916e05b16df  evidence/original-pilot.py' '4c49cd7e6a1f1022cf2f5316a5985859980e351f6d44fc19a7a9f5888747b9e4  workflow.template.yml' | sha256sum --check --strict -
+      - name: Authenticate recovery and publish only the preserved artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_RECOVERY_BASE: ${{ inputs.approved_base }}
+          RECOVERY_SOURCE_COMMIT: d20fc79ddadb26ea0b8dda6fbce1e252c311a5ba
+          MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
+        run: exec python3 -I "$RUNNER_TEMP/recovery/recovery_launcher.py"
