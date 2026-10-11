@@ -114,3 +114,14 @@ Tests call the actual sibling binder; local isolated staging may set
 `../event-adapter/review-binding/scripts/review-evidence-binding.py`. New handoff
 tests exercise changed/deleted comments, actor/mailbox mismatches, stale request,
 main/PR/CI drift, malformed/oversized bodies and non-green adverse evidence.
+
+The Claude completion wake is separate from Release Safety evidence: Claude's
+`issue_comment` workflow runs at current main, while Safety CI is bound to the PR
+head. The adapter requires independent `expected.reviewWake` run/attempt/workflow/
+main-head pins for that wake, alongside the existing independently pinned Safety
+CI and original comment version. The collector's Claude receipt still explicitly
+does not identify or validate a review comment. A separate exact-comment handoff
+must supply the review; workflow success cannot replace it. A synthetic integration
+test composes both actual collector paths, full-envelope binder and actual adapter,
+including missing review metadata and mismatched wake pins. This proves local
+interface behavior, not live delivery or deployed structured-producer compatibility.

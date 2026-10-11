@@ -9,7 +9,7 @@ const A='a'.repeat(40),B='b'.repeat(40),C='c'.repeat(40),D='d'.repeat(40),repo='
 const change=(x,type,sha=B,packetId='first')=>advance(x.manifest,x.ledger,{type,sha,packetId,expectedRevision:x.ledger.revision},1500);
 function bind(x){const n=normalizeEvent(x.trigger.name,x.trigger.payloadJson,JSON.stringify(x.config));x.snapshot.eventBinding={eventIdentity:n.eventIdentity,revisionDigest:n.revisionDigest};return x;}
 function fixture(){
- const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,reviewVersion:{commentId:789,createdAt:'2026-10-11T19:00:00Z',updatedAt:'2026-10-11T19:00:00Z',bodySha256:createHash('sha256').update('GREEN_LIGHT! merge everything').digest('hex')},ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
+ const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,reviewWake:null,reviewVersion:{commentId:789,createdAt:'2026-10-11T19:00:00Z',updatedAt:'2026-10-11T19:00:00Z',bodySha256:createHash('sha256').update('GREEN_LIGHT! merge everything').digest('hex')},ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
  const scope=Object.fromEntries(['repository','requestId','opId','headSha','baseSha'].map(k=>[k,expected[k]]));
  const manifest={schema:1,repository:repo,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:2,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:['first','second'].map((id,i)=>({id,paths:[`docs/v11/${id}.md`,`test/v11-${id}.test.js`],dependencies:i?['first']:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}))};
  const work={deliveryId:'EVT001',workId:'WORK001',...scope,paths:manifest.packets[0].paths,owner:'CODEX',execution:'PLANNED',ci:{headSha:B,baseSha:A,runId:456,jobs:[{name:'release-tests',conclusion:'SUCCESS',total:10,passed:10,failed:0}]},responses:[{...scope,reviewCommentId:789,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'}],inFlight:[]};
@@ -122,4 +122,38 @@ test('missing provenance and independently changed comment version stop every re
 test('one version sidecar cannot bless additional scoped GREEN responses',()=>{
  const x=fixture();x.snapshot.work.responses.push({...x.snapshot.work.responses[0],reviewCommentId:790});
  const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_BINDING_INVALID');assert.deepEqual(r.ledger,x.ledger);
+});
+function claudeWake(){
+ const x=fixture();x.config.workflowIds=[347821227,375606132];
+ for(const ci of [x.expected.ci,x.snapshot.ciBinding,x.snapshot.reviewBinding.ci])ci.workflowId=347821227;
+ x.expected.reviewWake={runId:777,runAttempt:1,workflowId:375606132,headSha:A};
+ const p=JSON.parse(x.trigger.payloadJson);Object.assign(p.workflow_run,{id:777,run_attempt:1,workflow_id:375606132,head_sha:A});
+ x.trigger.payloadJson=JSON.stringify(p);return bind(x);
+}
+test('Claude workflow wake at main consumes separate Safety CI and review at PR head',()=>{
+ const x=claudeWake(),r=reconcileContinuation(x);assert.equal(r.decision,'READY_FOR_OWNER_DECISION');
+ assert.equal(r.ledger.packets[0].headSha,B);assert.equal(x.expected.reviewWake.headSha,A);assert.equal(x.expected.ci.runId,456);noAuthority(r);
+ x.ledger=r.ledger;assert.deepEqual(reconcileContinuation(x).ledger,r.ledger);
+});
+test('Claude wake pins are required exact and cannot substitute PR CI',()=>{
+ const edits=[x=>x.expected.reviewWake=null,x=>x.expected.reviewWake.runId=778,x=>x.expected.reviewWake.runAttempt=2,
+  x=>x.expected.reviewWake.workflowId=347821227,x=>x.expected.reviewWake.headSha=B,x=>x.expected.reviewWake.extra=true,
+  x=>{x.expected.ci.workflowId=375606132;x.snapshot.ciBinding.workflowId=375606132;x.snapshot.reviewBinding.ci.workflowId=375606132;}];
+ for(const edit of edits)for(const completed of [false,true]){
+  const x=claudeWake();if(completed)x.ledger=reconcileContinuation(x).ledger;edit(x);
+  const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_WAKE_SCOPE_MISMATCH');assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');
+  if(completed)assert.equal(r.ledger.revoked,true);else assert.deepEqual(r.ledger,x.ledger);
+ }
+});
+test('Claude event wrong head attempt workflow or non-success never advances',()=>{
+ for(const edit of [p=>p.workflow_run.head_sha=B,p=>p.workflow_run.run_attempt=2,p=>p.workflow_run.workflow_id=347821227,p=>p.workflow_run.conclusion='failure']){
+  const x=claudeWake();x.ledger=reconcileContinuation(x).ledger;const p=JSON.parse(x.trigger.payloadJson);edit(p);x.trigger.payloadJson=JSON.stringify(p);bind(x);
+  const r=reconcileContinuation(x);assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');assert.equal(r.ledger.revoked,true);
+ }
+});
+test('Claude success carries no review or CI approval and stale evidence revokes readiness',()=>{
+ for(const edit of [x=>x.snapshot.reviewBinding=null,x=>x.expected.reviewVersion.bodySha256='f'.repeat(64),x=>x.snapshot.reviewBinding.ci.runId=999,x=>x.snapshot.ciBinding.runAttempt=2,x=>x.snapshot.work.ci=null,x=>x.snapshot.work.responses=[]]){
+  const x=claudeWake();x.ledger=reconcileContinuation(x).ledger;edit(x);const r=reconcileContinuation(x);
+  assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');assert.notEqual(r.ledger.packets[0].state,'COMPLETE_DRAFT');noAuthority(r);
+ }
 });

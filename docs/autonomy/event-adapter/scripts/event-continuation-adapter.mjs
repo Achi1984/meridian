@@ -34,7 +34,7 @@ const scopeKeys=['repository','requestId','opId','headSha','baseSha'];
 export function reconcileContinuation(input){
  const x=copy(input);shape(x,['trigger','config','expected','snapshot','manifest','ledger','requiredJobs']);
  const e=x.expected,s=x.snapshot;
- shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci','reviewVersion']);
+ shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci','reviewVersion','reviewWake']);
  if(e.ci!==null)shape(e.ci,['runId','runAttempt','workflowId','headSha']);
  shape(s,['repository','observedAt','mainSha','pr','work','eventBinding','ciBinding','reviewBinding']);
  if(s.ciBinding!==null)shape(s.ciBinding,['runId','runAttempt','workflowId','headSha']);
@@ -72,7 +72,14 @@ export function reconcileContinuation(input){
  if(s.eventBinding.eventIdentity!==event.eventIdentity||s.eventBinding.revisionDigest!==event.revisionDigest)return stop('RECONCILE_EVENT','EVENT_SNAPSHOT_MISMATCH');
  if(event.eventName==='workflow_run'){
   const c=event.claims;
-  if(!s.work.ci||!s.ciBinding||['runId','runAttempt','workflowId','headSha'].some(k=>c[k]!==s.ciBinding[k])||c.runId!==s.work.ci.runId||c.headSha!==e.headSha)return stop('RECONCILE_EVENT','CI_EVENT_SCOPE_MISMATCH');
+  if(c.workflowId===375606132){
+   // Claude's mailbox workflow runs at current main, independently of the PR
+   // Safety run. A wake carries no review verdict and never substitutes for CI.
+   const w=e.reviewWake,keys=['runId','runAttempt','workflowId','headSha'];
+   if(!w||typeof w!=='object'||Array.isArray(w)||Object.keys(w).length!==keys.length||!keys.every(k=>Object.hasOwn(w,k))
+     ||keys.some(k=>w[k]!==c[k])||w.workflowId!==375606132||w.headSha!==e.mainSha||w.headSha!==s.mainSha
+     ||e.ci?.workflowId!==347821227)return stop('RECONCILE_EVENT','REVIEW_WAKE_SCOPE_MISMATCH');
+  }else if(!s.work.ci||!s.ciBinding||['runId','runAttempt','workflowId','headSha'].some(k=>c[k]!==s.ciBinding[k])||c.runId!==s.work.ci.runId||c.headSha!==e.headSha)return stop('RECONCILE_EVENT','CI_EVENT_SCOPE_MISMATCH');
   if(c.conclusion!=='success')return stop('BLOCKED','NON_SUCCESS_TRIGGER');
  }else if(event.claims.action==='deleted')return stop('BLOCKED','REVIEW_EVENT_DELETED');
  else if(!s.work.responses.some(r=>r.reviewCommentId===event.claims.commentId))return stop('RECONCILE_EVENT','REVIEW_EVENT_NOT_IN_SNAPSHOT');

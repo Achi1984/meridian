@@ -1,13 +1,17 @@
 """Synthetic complete-envelope collection through the actual sibling binder."""
 import hashlib
+import copy
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import unittest
 
 from review_handoff import collect_review
 from test_review_handoff import fixture, A
+from test_collector import REPO, workflow
+from collector import reconcile
 
 
 POLICY = {'requiredChecks': [{'id': 'release-tests', 'commandSha256': 'd' * 64}]}
@@ -86,6 +90,74 @@ class EvidenceHandoffTests(unittest.TestCase):
                     lambda observation, pins: self.binder.bind_envelope(observation, pins, json.dumps(policy)))
                 self.assertEqual(result['decision'], 'BLOCKED')
                 self.assertIsNone(result['plannerResponse'])
+
+    def test_claude_completion_composes_separate_ci_and_original_review(self):
+        expected, api, body = self.candidate()
+        safety_event, _ = workflow()
+        safety = reconcile('workflow_run', safety_event, A, api)
+        run = {'id': 777, 'run_attempt': 1, 'workflow_id': 375606132,
+               'name': 'MERIDIAN Claude Mailbox Review',
+               'path': '.github/workflows/claude-mailbox-review.yml',
+               'repository': REPO, 'head_repository': REPO, 'head_sha': A,
+               'status': 'completed', 'conclusion': 'success', 'event': 'issue_comment'}
+        event = {'repository': REPO, 'action': 'completed', 'workflow_run': copy.deepcopy(run)}
+        api.rows['actions/runs/777'] = run
+        wake = reconcile('workflow_run', event, A, api)
+        self.assertEqual(wake['source']['reviewEvidence'], 'NOT_COLLECTED_REQUEST_COMMENT_BINDING_REQUIRED')
+        bound = collect_review(json.dumps(expected), A, 'edited', api,
+            lambda observation, pins: self.binder.bind_envelope(observation, pins, json.dumps(POLICY)))
+        observation = {'repository': REPO['full_name'], 'issueNumber': 571, 'eventAction': 'edited',
+            'comment': {key: api.rows['issues/comments/789'][key]
+                        for key in ('id', 'user', 'created_at', 'updated_at', 'body')}}
+        candidate = self.adapter_fixtures.adapter_input(observation, expected)
+        candidate['config']['workflowIds'] = [347821227, 375606132]
+        candidate['trigger'] = {'name': 'workflow_run', 'payloadJson': json.dumps(event)}
+        # Independent test pins, never copied from a binder result or the observed run.
+        candidate['expected']['reviewWake'] = {'runId': 777, 'runAttempt': 1,
+                                              'workflowId': 375606132, 'headSha': A}
+        self.assertEqual({key: wake['source'][key] for key in ('runId', 'workflowId', 'headSha')},
+                         {'runId': 777, 'workflowId': 375606132, 'headSha': A})
+        self.assertEqual(wake['source']['attempt'], 1)
+        fields = safety['source']['ciEvidence']['adapterFields']
+        candidate['snapshot']['work']['ci'] = fields['workCi']
+        candidate['snapshot']['ciBinding'] = fields['ciBinding']
+        candidate['requiredJobs'] = ['syntax']
+        adapter = self.adapter_fixtures.ROOT.parent / 'scripts/event-continuation-adapter.mjs'
+        normalizer = self.adapter_fixtures.ROOT.parent / 'fixtures/scripts/event-continuation-intake.mjs'
+        script = """import fs from 'node:fs';
+const {reconcileContinuation}=await import(process.argv[1]);
+const {normalizeEvent}=await import(process.argv[2]);
+const {candidate:x,bound}=JSON.parse(fs.readFileSync(0,'utf8'));
+const event=normalizeEvent(x.trigger.name,x.trigger.payloadJson,JSON.stringify(x.config));
+x.snapshot.eventBinding={eventIdentity:event.eventIdentity,revisionDigest:event.revisionDigest};
+x.snapshot.work.responses=bound.plannerResponse?[bound.plannerResponse]:[];
+x.snapshot.reviewBinding=bound.reviewBinding??null;
+process.stdout.write(JSON.stringify(reconcileContinuation(x)));"""
+        def evaluate(value, binding):
+            process = subprocess.run(['node', '--input-type=module', '-e', script,
+                                      adapter.as_uri(), normalizer.as_uri()],
+                input=json.dumps({'candidate': value, 'bound': binding}), text=True,
+                capture_output=True, timeout=10)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            return json.loads(process.stdout)
+        ready = evaluate(candidate, bound)
+        self.assertEqual(ready['decision'], 'READY_FOR_OWNER_DECISION')
+        self.assertEqual(ready['ledger']['packets'][0]['state'], 'COMPLETE_DRAFT')
+        for key in ('authenticated', 'provenanceVerified', 'authorized', 'dispatchAllowed', 'mergeAllowed', 'durable'):
+            self.assertIs(ready[key], False)
+        for missing in ({**bound, 'plannerResponse': None, 'reviewBinding': None},
+                        {**bound, 'reviewBinding': None}):
+            changed = copy.deepcopy(candidate); changed['ledger'] = ready['ledger']
+            rejected = evaluate(changed, missing)
+            self.assertNotEqual(rejected['decision'], 'READY_FOR_OWNER_DECISION')
+            self.assertNotEqual(rejected['ledger']['packets'][0]['state'], 'COMPLETE_DRAFT')
+        for key, value in (('runId', 778), ('runAttempt', 2), ('workflowId', 347821227), ('headSha', 'c' * 40)):
+            with self.subTest(wake_pin=key):
+                changed = copy.deepcopy(candidate); changed['ledger'] = ready['ledger']
+                changed['expected']['reviewWake'][key] = value
+                rejected = evaluate(changed, bound)
+                self.assertNotEqual(rejected['decision'], 'READY_FOR_OWNER_DECISION')
+                self.assertTrue(rejected['ledger']['revoked'])
 
 
 if __name__ == '__main__':
