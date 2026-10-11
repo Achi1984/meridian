@@ -1,0 +1,44 @@
+name: MERIDIAN Original Trial4 Artifact Recovery
+on:
+  workflow_dispatch:
+    inputs:
+      approved_base:
+        description: Exact reviewed main SHA approved for this single recovery
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: meridian-trial4-artifact-recovery1
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: ${{ github.repository == 'Achi1984/meridian' && github.ref == 'refs/heads/main' && github.triggering_actor == 'Achi1984' && github.run_attempt == 1 }}
+    environment: meridian-draft-publisher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Load immutable reviewed recovery files
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/recovery/evidence"
+          cd "$RUNNER_TEMP/recovery"
+          for path in recovery_core.py recovery_http.py recovery_launcher.py publisher_broker.py evidence/validate_original_packet.py evidence/original-pilot.py workflow.template.yml; do
+            gh api "repos/Achi1984/meridian/contents/scripts/autonomy/trial4-recovery/$path?ref=__SOURCE_COMMIT__" -H 'Accept:application/vnd.github.raw+json' > "$path"
+          done
+          printf '%s\n' '__HASH_0__  recovery_core.py' '__HASH_1__  recovery_http.py' '__HASH_2__  recovery_launcher.py' '__HASH_3__  publisher_broker.py' '__HASH_4__  evidence/validate_original_packet.py' '__HASH_5__  evidence/original-pilot.py' '__HASH_6__  workflow.template.yml' | sha256sum --check --strict -
+      - name: Authenticate recovery and publish only the preserved artifact
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_RECOVERY_BASE: ${{ inputs.approved_base }}
+          RECOVERY_SOURCE_COMMIT: __SOURCE_COMMIT__
+          MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
+        run: exec python3 -I "$RUNNER_TEMP/recovery/recovery_launcher.py"
