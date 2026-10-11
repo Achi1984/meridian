@@ -9,7 +9,10 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
-const preimageBlob='5dc0fc4970f9c67a3c0d1a5e2467bf721566d5f3';
+// PR #677: base a5ba7eca2004ce51ec98720955b5fcc3716f09ef + history-close delta.
+// Scope approved in #571 comment 6107229650; terminal-entry insertions removed
+// for this baseline. Exact byte guard and all browser assertions stay intact.
+const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const css=`    /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
     .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
@@ -25,7 +28,7 @@ function gitBlob(content){
   return createHash('sha1').update(`blob ${Buffer.byteLength(content)}\0`).update(content).digest('hex');
 }
 
-test('Terminal öffnen is the only source change and stays outside version history',()=>{
+test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   assert.equal(css.trimEnd(),html.match(/    \/\* Fixed packet A:[\s\S]*?    \.terminal-entry-link:focus-visible\{[^\n]*\}\n/)?.[0]?.trimEnd());
   assert.equal(html.split(entry).length-1,1);
   const anchor=[...html.matchAll(/<a\b[^>]*class="terminal-entry-link"[^>]*>[\s\S]*?<\/a>/g)];
@@ -34,7 +37,7 @@ test('Terminal öffnen is the only source change and stays outside version histo
   assert.ok(anchor[0].index<html.indexOf('<section id="version-panel"'));
   assert.match(html,/id="version-panel"[^>]* hidden/);
   const restored=html.replace(css,'').replace(entry,'');
-  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except the two approved insertions must be unchanged');
+  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except the two terminal-entry insertions must match the reviewed history-close baseline');
 });
 
 function deploymentServer(){
