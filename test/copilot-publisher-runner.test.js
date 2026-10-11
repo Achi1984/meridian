@@ -42,7 +42,7 @@ for value in invalid:
         assert r.main()==1
         assert secret not in os.environ
         sibling.assert_not_called()
-        output.assert_called_once_with('PUBLISHER_STOPPED; reconcile outcome before retry',file=sys.stderr)
+        output.assert_any_call('PUBLISHER_STOPPED; reconcile outcome before retry',file=sys.stderr)
 with mock.patch.dict(os.environ,{secret:key},clear=True),mock.patch.object(sys,'argv',['runner.py','publish']), \
      mock.patch.object(r,'sibling') as sibling,mock.patch('builtins.print'):
     assert r.main()==1 and secret not in os.environ
@@ -55,7 +55,7 @@ test('runner passes real broker factory only after publish checks and clears sec
 broker=r.sibling('copilot-publisher-broker.py')
 for entered in (False,True):
     events=[];pilot=mock.Mock()
-    def publish(*,publisher_factory):
+    def publish(*,publisher_factory,observer=None):
         assert secret not in os.environ
         assert pilot.PUBLISHER_BOT_LOGIN==r.PINS['bot_login']
         events.append('validated')
@@ -72,7 +72,7 @@ for entered in (False,True):
         return sign
     sign=mock.Mock()
     @contextlib.contextmanager
-    def token_context(*,http,sign,pins):
+    def token_context(*,http,sign,pins,observer=None):
         assert http is broker.github_http and pins==r.PINS
         assert pins is not r.PINS
         events.append('mint')
@@ -83,7 +83,8 @@ for entered in (False,True):
          mock.patch.object(broker,'rsa_signer',side_effect=signer) as signing, \
          mock.patch.object(broker,'publisher_token',side_effect=token_context) as token, \
          mock.patch('builtins.print') as output:
-        assert r.main()==(0 if entered else 1)
+        # Mock publisher omits evidence events, so even a returned call is not receipt-success.
+        assert r.main()==1
         assert [call.args[0] for call in load.call_args_list]==['copilot-coding-pilot.py','copilot-publisher-broker.py']
         assert signing.call_count==int(entered) and token.call_count==int(entered)
         assert events==(['validated','signer','mint','post','revoke'] if entered else ['validated'])
@@ -93,7 +94,7 @@ for entered in (False,True):
 test('runner uses actual broker identity checks and sanitizes signer errors without exposing key', () => {
   python(fixture+String.raw`
 broker=r.sibling('copilot-publisher-broker.py');pilot=mock.Mock()
-def publish(*,publisher_factory):
+def publish(*,publisher_factory,observer=None):
     with publisher_factory():raise AssertionError('must fail before yielding')
 pilot.publish.side_effect=publish
 with mock.patch.dict(os.environ,{secret:key},clear=True),mock.patch.object(sys,'argv',['runner.py']), \
@@ -102,7 +103,7 @@ with mock.patch.dict(os.environ,{secret:key},clear=True),mock.patch.object(sys,'
      mock.patch.object(broker,'github_http') as http,mock.patch('builtins.print') as output:
     assert r.main()==1
     http.assert_not_called()
-    output.assert_called_once_with('PUBLISHER_STOPPED; reconcile outcome before retry',file=sys.stderr)
+    output.assert_any_call('PUBLISHER_STOPPED; reconcile outcome before retry',file=sys.stderr)
 `);
 });
 
@@ -125,4 +126,31 @@ test('publish alone receives protected-environment secret and executes only veri
   assert.match(executor,/MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: \$\{\{ secrets\.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY \}\}/);
   assert.match(executor,/run: exec python3 -I "\$RUNNER_TEMP\/trusted-publisher\/copilot-publisher-runner\.py"/);
   assert.doesNotMatch(executor,/\$\{\{ github\.event|MERIDIAN_PUBLISHER_TOKEN|run: \|/);
+});
+
+test('receipt rejects untrusted payloads and duplicate or reversed events without logging them', () => {
+  python(String.raw`
+import json
+receipt=r.Receipt()
+for event,fields in [('unknown',{'key':'secret-marker'}),('draft_validated',{'pr_number':True}),
+                     ('app_verified',{'app_id':{'token':'secret-marker'}}),
+                     ('scope_verified',{'repository_id':1,'expires_at':'secret-marker'}),
+                     ('mint_attempted',{'mint_requested_at':-1}),
+                     ('revocation_confirmed',{'raw':'secret-marker'})]:
+    try:receipt.observe(event,**fields)
+    except ValueError:pass
+    else:raise AssertionError('bad receipt accepted')
+receipt.observe('publication_attempted')
+for event in ('publication_attempted','validated'):
+    try:receipt.observe(event)
+    except ValueError:pass
+    else:raise AssertionError('duplicate or reversed event accepted')
+with mock.patch('builtins.print') as output:
+    receipt.emit(False)
+    text=output.call_args.args[0]
+    assert 'secret-marker' not in text
+    assert json.loads(text.split(' ',1)[1])['outcome']=='reconciliation_required'
+with mock.patch.object(r,'run'),mock.patch.object(sys,'argv',['runner.py']),mock.patch('builtins.print',side_effect=OSError('log unavailable')):
+    assert r.main()==1
+`);
 });

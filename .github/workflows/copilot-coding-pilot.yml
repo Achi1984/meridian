@@ -90,10 +90,10 @@ jobs:
           umask 077
           mkdir "$RUNNER_TEMP/trusted-publisher"
           cd "$RUNNER_TEMP/trusted-publisher"
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=30c351bc12f623de69d2d9f6862a0238c7cc572a' -H 'Accept:application/vnd.github.raw+json' > copilot-coding-pilot.py
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-broker.py?ref=30c351bc12f623de69d2d9f6862a0238c7cc572a' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-broker.py
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-runner.py?ref=30c351bc12f623de69d2d9f6862a0238c7cc572a' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-runner.py
-          printf '%s\n' '778d235a4101a57af7a16020b9dd0e1d6041010d699aea983ca0fc17b82526b2  copilot-coding-pilot.py' 'cc06195689da4f1fa8bf63aa8cce55cd98fdfd603f4b395009c9fce9a418dd38  copilot-publisher-broker.py' 'c8dcad6a9e205fec71100a4f22a8f2923bfc0357e932a4ec12277b360e0d2f4d  copilot-publisher-runner.py' | sha256sum --check --strict -
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-coding-pilot.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-broker.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-broker.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-runner.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-runner.py
+          printf '%s\n' '3ba7bc24f6027e4b7a01dbcaeaefc3ea18e59ad8a882f501d1ff2e08aa132075  copilot-coding-pilot.py' '1f061f04c543c13c87bccf3e025267014900ca028fd261ac2166f9db7e267ad3  copilot-publisher-broker.py' 'dede8ac10341fbfb51bbfe779660e622272875eb7301edcbfdd9688ce39c631a  copilot-publisher-runner.py' | sha256sum --check --strict -
       - name: Validate artifact and create one Draft with scoped App token
         env:
           GH_TOKEN: ${{ github.token }}

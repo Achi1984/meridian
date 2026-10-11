@@ -22,7 +22,7 @@ def response():
         'head':{'sha':commit,'ref':p.BRANCH,'repo':copy.deepcopy(repo)},
         'base':{'sha':base,'ref':'main','repo':copy.deepcopy(repo)}}
 def evidence():
-    return {'repository':p.REPO,'control_run':200,'base':base,'milestones':[
+    return {'repository':p.REPO,'control_run':200,'control_attempt':1,'base':base,'milestones':[
         {'pr':n,'merged_at':'2026-10-10T16:00:00Z','merge_sha':'b'*40,
          'pr_url':'https://github.com/'+p.REPO+'/pull/'+str(n),
          'commit_url':'https://github.com/'+p.REPO+'/commit/'+'b'*40} for n in (646,651)]}
@@ -199,10 +199,18 @@ with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dum
 raw=buf.getvalue()
 artifact={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':len(raw),
     'workflow_run':{'id':200,'head_sha':base},'digest':'sha256:'+p.hashlib.sha256(raw).hexdigest()}
+rspec=importlib.util.spec_from_file_location('runner',pathlib.Path(p.__file__).with_name('copilot-publisher-runner.py'))
+r=importlib.util.module_from_spec(rspec);rspec.loader.exec_module(r)
 original_api=p.api
 minted_token='ghs_minted_memory_B'
 assert env['MERIDIAN_PUBLISHER_TOKEN']!=minted_token
-for outcome in ('success','post-error','wrong-response','revoke-error','unknown-mint','not-context'):
+for outcome in ('success','post-error','wrong-response','revoke-error','unknown-mint','not-context','observer-mint','observer-revoke','observer-confirm'):
+    receipt=r.Receipt()
+    def observer(event,**fields):
+        assert all(type(value) in (str,int) for value in fields.values())
+        receipt.observe(event,**fields)
+        if (outcome,event) in [('observer-mint','mint_response_received'),('observer-revoke','revocation_attempted'),('observer-confirm','revocation_confirmed')]:
+            raise ValueError('observer failed '+minted_token)
     events=[];refs=[claim,commit,commit]
     def http(method,url,credential,payload):
         path=url.removeprefix(b.API)
@@ -236,7 +244,7 @@ for outcome in ('success','post-error','wrong-response','revoke-error','unknown-
     def factory():
         assert ('PATCH','git/refs/heads/'+p.BRANCH) in events
         if outcome=='not-context':return object()
-        return b.publisher_token(http=http,sign=lambda message:b'x'*256,pins=pins,clock=lambda:p.DEADLINE-60)
+        return b.publisher_token(http=http,sign=lambda message:b'x'*256,pins=pins,clock=lambda:p.DEADLINE-60,observer=observer)
     with mock.patch.dict(os.environ,{**env,'ARTIFACT_ID':'300'},clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot), \
          mock.patch.object(p,'identity',return_value=data),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
          mock.patch.object(p,'api',side_effect=api),mock.patch.object(p,'artifact_bytes',return_value=raw), \
@@ -252,9 +260,9 @@ for outcome in ('success','post-error','wrong-response','revoke-error','unknown-
             result.read.return_value=json.dumps({**response(),'draft':False} if outcome=='wrong-response' else response()).encode()
             return result
         opener.return_value.open.side_effect=open_request
-        if outcome=='success':p.publish(factory);output.assert_called_once()
+        if outcome=='success':p.publish(factory,observer=observer);output.assert_called_once()
         else:
-            try:p.publish(factory)
+            try:p.publish(factory,observer=observer)
             except (b.BrokerError,TypeError) as error:
                 if outcome=='not-context':assert isinstance(error,TypeError)
                 else:assert isinstance(error,b.BrokerError)
@@ -263,7 +271,7 @@ for outcome in ('success','post-error','wrong-response','revoke-error','unknown-
                 assert minted_token not in str(error) and env['MERIDIAN_PUBLISHER_TOKEN'] not in str(error)
             else:raise AssertionError('failure swallowed')
             output.assert_not_called()
-        expected_posts=0 if outcome in ('unknown-mint','not-context') else 1
+        expected_posts=0 if outcome in ('unknown-mint','not-context','observer-mint') else 1
         assert opener.return_value.open.call_count==expected_posts
     assert events.count(('POST','pulls'))==expected_posts
     assert events.count(('POST','/app/installations/202/access_tokens'))==(0 if outcome=='not-context' else 1)
@@ -271,6 +279,13 @@ for outcome in ('success','post-error','wrong-response','revoke-error','unknown-
     assert events.index(('PATCH','git/refs/heads/'+p.BRANCH))<len(events)
     if outcome not in ('unknown-mint','not-context'):
         assert events[-1]==('DELETE','/installation/token')
+    with mock.patch('builtins.print') as receipt_output:
+        receipt.emit(outcome=='success')
+        text=receipt_output.call_args.args[0]
+        assert minted_token not in text and env['MERIDIAN_PUBLISHER_TOKEN'] not in text
+        logged=json.loads(text.split(' ',1)[1])
+        assert logged['outcome']==('success' if outcome=='success' else 'reconciliation_required')
+        assert len((text+'\n').encode())<=4096
 assert b.PINS is None and p.PUBLISHER_BOT_LOGIN is None
 `);
 });

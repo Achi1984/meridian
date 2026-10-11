@@ -112,3 +112,14 @@ The key may enter only the trusted step environment, is removed from Python's en
 No new source event, packet branch, invocation budget or deadline is set here. The existing Trial3 event and expired/consumed claim are deliberately retained, so this workflow preparation is not a live pilot. A separate reviewed fresh-packet change and effective administrative gates must precede any attempt. Never rerun/reset the old claim as a substitute.
 
 Operational proof still outstanding: authenticated App/installation checks, one actual App-authored Draft, automatic required CI start, and non-secret mint/expiry/revocation evidence. Offline tests cannot establish these. Main/environment settings and actual key storage are not modified by this candidate.
+
+
+## Publisher outcome receipt candidate
+
+The runner emits one bounded, fixed-prefix JSON receipt into the existing publisher job log after the helper and broker have exited. The schema admits only reviewed identifiers, hashes, booleans, timestamps and fixed outcome/stage values. It must never include tokens, keys, JWTs, raw API responses, arbitrary URLs, environment contents or exception text. This is operational evidence, not a credential or an authorization signal.
+
+An attempted mutation is recorded before the first output-object write; an uncertain tree, commit, branch update, mint or Draft POST requires reconciliation. A successful outcome requires a validated returned Draft and confirmed token revocation after cleanup. A stopped outcome is reserved for rejection before side effects. Missing receipts after hard termination are unknown outcomes. Observer or output failures must not prevent revocation, cause a retry, or turn an ambiguous result into success.
+
+The log is retained only under GitHub's configured retention and can be deleted; it is not immutable audit storage. Preserve required non-secret evidence in the subsequent project checkpoint. The separate read-only reconciler must establish actual follow-on CI start and completion; the publisher cannot claim those from its POST response.
+
+No new artifact, external sink, access permission, packet, deadline, scheduler or live execution is introduced. Source updates require a new immutable source anchor and literal workflow hash repin. Existing consumed Trial3 remains unchanged. Tests use synthetic credentials and mocked transport; they do not prove a live mint or revocation.
