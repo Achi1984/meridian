@@ -122,7 +122,7 @@ bad={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':100,'workflow_ru
 with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'validate_claim',return_value=('c'*40,'d'*40)), \
      mock.patch.dict(os.environ,{'ARTIFACT_ID':'300','MERIDIAN_PUBLISHER_TOKEN':'ghs_fixture_app'}),mock.patch.object(p,'PUBLISHER_BOT_LOGIN','fixture-app[bot]'),mock.patch.object(p,'api',return_value=bad) as api, \
      mock.patch.object(p,'artifact_bytes') as download:
-    rejects(p.publish);assert api.call_count==1;download.assert_not_called()
+    rejects(lambda:p.publish(mock.Mock()));assert api.call_count==1;download.assert_not_called()
 `);
 });
 
@@ -136,9 +136,9 @@ raw=buf.getvalue()
 artifact={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':len(raw),
   'workflow_run':{'id':200,'head_sha':base},'digest':'sha256:'+p.hashlib.sha256(raw).hexdigest()}
 writes=[]; branch_reads=0
-def fake(path,method='GET',payload=None,expected=200,*,publisher=False):
+def fake(path,method='GET',payload=None,expected=200,*,publisher_token=None):
     global branch_reads
-    assert publisher == (path=='pulls' and method=='POST')
+    assert (publisher_token is not None) == (path=='pulls' and method=='POST')
     if method!='GET':writes.append((path,method,payload,expected))
     if path=='actions/artifacts/300':return artifact
     if path.startswith('pulls?'):return []
@@ -154,7 +154,7 @@ def fake(path,method='GET',payload=None,expected=200,*,publisher=False):
     raise AssertionError(path)
 with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
      mock.patch.dict(os.environ,{'ARTIFACT_ID':'300','MERIDIAN_PUBLISHER_TOKEN':'ghs_fixture_app'}),mock.patch.object(p,'PUBLISHER_BOT_LOGIN','fixture-app[bot]'),mock.patch.object(p,'api',side_effect=fake), \
-     mock.patch.object(p,'artifact_bytes',return_value=raw):p.publish()
+     mock.patch.object(p,'artifact_bytes',return_value=raw):p.publish(lambda:__import__('contextlib').nullcontext('ghs_fixture_app'))
 assert [x[0] for x in writes]==['git/trees','git/commits','git/refs/heads/'+p.BRANCH,'pulls']
 assert [x['path'] for x in writes[0][2]['tree']]==list(p.PATHS)
 assert all(x['mode']=='100644' for x in writes[0][2]['tree'])
@@ -389,7 +389,7 @@ with mock.patch.object(p,'identity',return_value=evidence),mock.patch.object(p,'
      mock.patch.dict(os.environ,{'CLAIM_SHA':claim,'ARTIFACT_ID':'300','MERIDIAN_PUBLISHER_TOKEN':'ghs_fixture_app'}), \
      mock.patch.object(p,'PUBLISHER_BOT_LOGIN','fixture-app[bot]'),mock.patch.object(p,'api',side_effect=api) as api_mock, \
      mock.patch.object(p,'artifact_bytes',return_value=raw) as download:
-    rejects(p.publish)
+    rejects(lambda:p.publish(mock.Mock()))
     api_mock.assert_called_once_with('actions/artifacts/300');download.assert_called_once_with('300')
 `);
 });
@@ -427,4 +427,5 @@ for attempt in (4,6):
     trial(lambda d,e:d['actions/runs/'+str(p.SOURCE_RUN)].update(run_attempt=attempt))
 `);
 });
+
 

@@ -39,7 +39,7 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_B
         ('git/trees','POST',{'tree':[]},201),('git/refs/heads/'+p.BRANCH,'PATCH',{'sha':commit,'force':False},200)]:
         result.status=status;p.api(path,method,payload,status)
         assert opener.return_value.open.call_args.args[0].get_header('Authorization')=='Bearer '+env['GH_TOKEN']
-    result.status=201;p.api('pulls','POST',p.draft_payload(),201,publisher=True)
+    result.status=201;p.api('pulls','POST',p.draft_payload(),201,publisher_token=env['MERIDIAN_PUBLISHER_TOKEN'])
     request=opener.return_value.open.call_args.args[0]
     assert request.get_header('Authorization')=='Bearer '+env['MERIDIAN_PUBLISHER_TOKEN']
     assert json.loads(request.data)==p.draft_payload()
@@ -48,25 +48,26 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_B
                  ('pulls','POST',{**p.draft_payload(),'head':'other'},201),
                  ('pulls','POST',{**p.draft_payload(),'body':'injected'},201),
                  ('pulls','POST',p.draft_payload(),200)]:
-        opener.reset_mock();rejects(lambda:p.api(*args,publisher=True));opener.assert_not_called()
+        opener.reset_mock();rejects(lambda:p.api(*args,publisher_token=env['MERIDIAN_PUBLISHER_TOKEN']));opener.assert_not_called()
     opener.reset_mock();rejects(lambda:p.api('pulls','POST',p.draft_payload(),201));opener.assert_not_called()
 `);
 });
 
-test('missing separate credential or unpinned bot stops publication before downloads and writes', () => {
+test('unwired factory or unpinned bot stops publication before downloads and writes', () => {
   python(String.raw`
-for values,login in [({'GH_TOKEN':'ghs_job_token'},bot),(env,None),
-    ({**env,'MERIDIAN_PUBLISHER_TOKEN':env['GH_TOKEN']},bot),
-    ({**env,'MERIDIAN_PUBLISHER_TOKEN':'github_pat_not_supported'},bot),
-    ({**env,'MERIDIAN_PUBLISHER_TOKEN':'ghs_invalid\n'},bot),(env,'ordinary-user')]:
-    with mock.patch.dict(os.environ,values,clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',login), \
+for factory,login in [(None,bot),(42,bot),(lambda:None,None),(lambda:None,'ordinary-user')]:
+    with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',login), \
          mock.patch.object(p,'identity',return_value=evidence()),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
          mock.patch.object(p,'api') as api,mock.patch.object(p,'artifact_bytes') as download:
-        rejects(p.publish);api.assert_not_called();download.assert_not_called()
+        rejects(lambda:p.publish(factory));api.assert_not_called();download.assert_not_called()
 assert p.PUBLISHER_BOT_LOGIN is None
 assert p.SOURCE_SHA=='2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
 assert p.SOURCE_RUN==38070967939 and p.SOURCE_ATTEMPT==5 and p.DEADLINE==1791660600
 assert p.BRANCH=='pilot/version-history-ledger-20261010-t3'
+with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot), mock.patch('time.time',return_value=p.DEADLINE-60), mock.patch('urllib.request.build_opener') as opener:
+    for token in [None,False,42,'',env['GH_TOKEN'],'github_pat_invalid','ghs_bad\n','ghs_'+'x'*4096]:
+        rejects(lambda:p.api('pulls','POST',p.draft_payload(),201,publisher_token=token))
+    opener.assert_not_called()
 `);
 });
 
@@ -105,7 +106,7 @@ with mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot):
 `);
 });
 
-test('full publisher revalidates packet, keeps Git writes on ordinary API and validates PR response', () => {
+test('publisher enters memory credential only after branch work and revokes on success, POST failure, interrupt or invalid response', () => {
   python(String.raw`
 data=evidence();packet={'evidence':data,'claim':claim,'files':p.assemble_files({p.PATHS[0]:p.ledger_contract(data)})}
 buf=io.BytesIO()
@@ -113,26 +114,59 @@ with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dum
 raw=buf.getvalue()
 artifact={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':len(raw),
     'workflow_run':{'id':200,'head_sha':base},'digest':'sha256:'+p.hashlib.sha256(raw).hexdigest()}
-for valid in (True,False):
-    calls=[];reads=[claim,commit]
-    def fake(path,method='GET',payload=None,expected=200,*,publisher=False):
-        calls.append((path,method,publisher))
-        if path=='actions/artifacts/300':return artifact
-        if path.startswith('pulls?'):return []
+for outcome in ('success','post-error','interrupt','bad-response','bad-token','bad-artifact','bad-digest','bad-packet','bad-ledger','existing-pr','branch-error','mint-evidence-drift','mint-branch-drift'):
+    calls=[];reads=[claim,commit,commit];lifecycle=[]
+    @__import__('contextlib').contextmanager
+    def factory():
+        assert calls[-1][0]=='git/ref/heads/'+p.BRANCH
+        assert any(c[1]=='PATCH' for c in calls)
+        lifecycle.append('mint')
+        try:yield 'invalid' if outcome=='bad-token' else 'ghs_memory_only_fixture'
+        finally:lifecycle.append('revoke')
+    def fake(path,method='GET',payload=None,expected=200,*,publisher_token=None):
+        calls.append((path,method,publisher_token is not None))
+        if path=='actions/artifacts/300':
+            if outcome=='bad-artifact':return {**artifact,'expired':True}
+            if outcome=='bad-digest':return {**artifact,'digest':'sha256:invalid'}
+            return artifact
+        if path.startswith('pulls?'):return [response()] if outcome=='existing-pr' else []
         if path=='git/trees':return {'sha':newtree}
         if path=='git/commits':return {'sha':commit}
         if path=='git/ref/heads/main':return {'object':{'sha':base}}
-        if path=='git/ref/heads/'+p.BRANCH:return {'object':{'sha':reads.pop(0)}}
-        if path=='git/refs/heads/'+p.BRANCH:return {'object':{'sha':commit}}
-        if path=='pulls':return response() if valid else {**response(),'draft':False}
+        if path=='git/ref/heads/'+p.BRANCH:
+            value=reads.pop(0)
+            return {'object':{'sha':base if outcome=='mint-branch-drift' and lifecycle else value}}
+        if path=='git/refs/heads/'+p.BRANCH:
+            if outcome=='branch-error':raise ValueError('branch outcome unknown')
+            return {'object':{'sha':commit}}
+        if path=='pulls':
+            assert lifecycle==['mint'] and publisher_token=='ghs_memory_only_fixture'
+            if outcome=='post-error':raise ValueError('POST failed')
+            if outcome=='interrupt':raise KeyboardInterrupt()
+            return {**response(),'draft':False} if outcome=='bad-response' else response()
         raise AssertionError(path)
     with mock.patch.dict(os.environ,{**env,'ARTIFACT_ID':'300'},clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot), \
-         mock.patch.object(p,'identity',return_value=data),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
+         mock.patch.object(p,'identity',side_effect=lambda: {**data,'base':'9'*40} if outcome=='mint-evidence-drift' and lifecycle else data),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
          mock.patch.object(p,'api',side_effect=fake),mock.patch.object(p,'artifact_bytes',return_value=raw),mock.patch('builtins.print') as output:
-        if valid:p.publish();output.assert_called_once()
-        else:rejects(p.publish);output.assert_not_called()
-    assert [c for c in calls if c[2]]==[('pulls','POST',True)]
-    assert [c for c in calls if c[1]!='GET']==[('git/trees','POST',False),('git/commits','POST',False),('git/refs/heads/'+p.BRANCH,'PATCH',False),('pulls','POST',True)]
+        actual_packet=copy.deepcopy(packet)
+        if outcome=='bad-packet':actual_packet['claim']='x'*40
+        if outcome=='bad-ledger':actual_packet['files'][p.PATHS[0]]='Invalid ledger text with no evidence'
+        with mock.patch.object(p,'unpack',return_value=actual_packet):
+            if outcome=='success':p.publish(factory);output.assert_called_once()
+            elif outcome=='interrupt':
+                try:p.publish(factory)
+                except KeyboardInterrupt:pass
+                else:raise AssertionError('interrupt swallowed')
+                output.assert_not_called()
+            else:rejects(lambda:p.publish(factory));output.assert_not_called()
+    early=outcome in ('bad-artifact','bad-digest','bad-packet','bad-ledger','existing-pr','branch-error')
+    assert lifecycle==([] if early else ['mint','revoke'])
+    posts=[c for c in calls if c[2]]
+    assert posts==([] if early or outcome in ('bad-token','mint-evidence-drift','mint-branch-drift') else [('pulls','POST',True)])
+    if outcome in ('bad-artifact','bad-digest','bad-packet','bad-ledger','existing-pr'):
+        assert all(c[1]=='GET' for c in calls)
+    if outcome=='success':
+        assert [c for c in calls if c[1]!='GET']==[('git/trees','POST',False),('git/commits','POST',False),('git/refs/heads/'+p.BRANCH,'PATCH',False),('pulls','POST',True)]
 `);
 });
 
@@ -147,3 +181,4 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch('time.time',return_va
     assert request.get_header('Authorization')=='Bearer '+env['GH_TOKEN']
 `);
 });
+
