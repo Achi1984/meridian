@@ -9,7 +9,8 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/id="version-panel"[^>]*aria-labelledby="version-history-heading" hidden/);
  assert.match(html,/id="version-close"[^>]*aria-label="Versionsverlauf schließen">Schließen<\/button>/);
  assert.match(html,/Terminal 10\.0-r127/);
- assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau #700<small>/);
+ assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B1<small>/);
+ assert.match(html,/Meridian 11 · B1<\/strong><span class="version-status">Vorschaustand/);
  assert.match(html,/Meridian 11 · #700<\/strong><span class="version-status">Vorschaustand/);
  assert.match(html,/pull\/700">Änderungsnachweis #700/);
  const release=JSON.parse(readFileSync(new URL('../version.json',import.meta.url),'utf8'));

@@ -45,6 +45,25 @@ const depotAfter=`      <section class="card" aria-labelledby="depot-summary-hea
 const revisionBefore="11 · Vorschau<small>Versionsverlauf ▾</small>";
 const revisionAfter="11 · Vorschau #700<small>Versionsverlauf ▾</small>";
 const revisionRow="        <li><strong>Meridian 11 · #700</strong><span class=\"version-status\">Vorschaustand</span><p>Depotübersicht mit klar gekennzeichnetem Gesamtwert, Datenquelle und Aktualität. Ohne Live-Daten. <a href=\"https://github.com/Achi1984/meridian/pull/700\">Änderungsnachweis #700</a></p></li>\n";
+// Exact Bots B1 preview delta; do not relax the historical source guard.
+const botsBefore='      <div class="card view-placeholder"><h2>Jeder Bot. Klarer Status.</h2><p>Geplant sind verifizierte Bot-Karten mit Quelle, Gebühren, Risikopuffer und Schutzstatus. Ohne Live-Belege wird nichts als sicher oder profitabel markiert.</p></div>';
+const botsAfter=`      <section class="card view-placeholder" aria-labelledby="bots-summary-heading">
+        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Statische Vorschau</span></div>
+        <div class="portfolio-row"><div><p class="caption">Aktive Bots</p><div class="portfolio-value" aria-label="Anzahl aktiver Bots unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
+        <p class="caption">Keine Botdaten verbunden. Die Anzahl ist unbekannt – nicht null.</p>
+        <div class="trust-grid" aria-label="Datenstatus der Bots">
+          <div class="trust-cell"><strong>Quelle</strong><span>Nicht verbunden</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
+          <div class="trust-cell"><strong>Risiko</strong><span>Nicht bestimmbar</span></div>
+        </div>
+      </section>
+      <section class="card card-muted" aria-labelledby="bots-status-heading">
+        <h2 id="bots-status-heading">Deine Bots</h2>
+        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <p class="caption">Diese Vorschau hat keinen Kontozugriff und steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>`;
+const botsRevisionLabel='11 · Vorschau B1<small>Versionsverlauf ▾</small>';
+const botsRevisionRow='        <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>\n';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 
 function gitBlob(content){
@@ -62,9 +81,13 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   const viewportPair='min-height:100vh;min-height:100dvh;';
   assert.equal(html.split(viewportPair).length-1,1,'exactly one progressive viewport fallback');
   assert.equal(html.split(depotAfter).length-1,1,'exactly one reviewed Depot panel');
-  assert.equal(html.split(revisionAfter).length-1,1,'one current preview revision label');
+  assert.equal(html.split(botsAfter).length-1,1,'exactly one Bots overview');
+  assert.equal(html.split(botsRevisionLabel).length-1,1,'one Bots preview revision');
+  assert.equal(html.split(botsRevisionRow).length-1,1,'one Bots preview history row');
+  const reviewedHtml=html.replace(botsAfter,botsBefore).replace(botsRevisionLabel,revisionAfter).replace(botsRevisionRow,'');
+  assert.equal(reviewedHtml.split(revisionAfter).length-1,1,'one current preview revision label');
   assert.equal(html.split(revisionRow).length-1,1,'one matching preview history row');
-  const restored=html.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
+  const restored=reviewedHtml.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
     .replace(revisionAfter,revisionBefore).replace(revisionRow,'')
     .replace(viewportPair,'min-height:100dvh;min-height:100vh;');
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
@@ -161,6 +184,22 @@ async function browserRun(call,start,width,expectedBuild,server){
       view:[...document.querySelectorAll('.view')].filter(view=>!view.hidden).map(view=>view.id),
       current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(button=>button.dataset.v)
     })`),{view:['view-'+tab],current:[tab]},'native Enter tab navigation: '+tab);
+    if(tab==='bots'){
+      const bots=await evaluate(`(()=>{
+        const panel=document.getElementById('view-bots');
+        return {label:panel.querySelector('.limited').textContent,
+          value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
+          states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
+          controls:panel.querySelectorAll('button,input,select,form').length,
+          viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
+      })()`);
+      assert.equal(bots.label,'Statische Vorschau');
+      assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
+      assert.deepEqual(bots.states,[['Quelle','Nicht verbunden'],['Aktualität','Keine bestätigten Daten'],['Risiko','Nicht bestimmbar']]);
+      assert.equal(bots.controls,0,'no bot execution controls');
+      assert.equal(bots.viewport,width);
+      assert.ok(bots.body<=width+1&&bots.root<=width+1,'Bots panel overflow at '+width);
+    }
     if(tab==='depot'){
       const depot=await evaluate(`(()=>{
         const panel=document.getElementById('view-depot');
