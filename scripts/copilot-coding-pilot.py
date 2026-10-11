@@ -19,13 +19,13 @@ import urllib.request
 import zipfile
 
 REPO = 'Achi1984/meridian'
-SOURCE_SHA = '2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
+SOURCE_SHA = '99eff9111d4ca42d8d89cd88ee5b2831c36282bb'
 RELEASE_ID = 347821227
-SOURCE_RUN = 38070967939
-SOURCE_ATTEMPT = 5
-DEADLINE = 1791660600  # Proposed 2026-10-10T19:30:00Z; owner activation approval pending
-BRANCH = 'pilot/version-history-ledger-20261010-t3'
-PATHS = ('docs/v11/VERSION_HISTORY.md', 'test/v11-version-history-ledger.test.js')
+SOURCE_RUN = 38141528699
+SOURCE_ATTEMPT = 2
+DEADLINE = 1791730800  # Proposed 2026-10-11T15:00:00Z; owner activation approval pending
+BRANCH = 'pilot/version-history-ledger-20261011-t4'
+PATHS = ('docs/v11/VERSION_HISTORY_TRIAL4.md', 'test/v11-version-history-ledger-trial4.test.js')
 ARTIFACT = 'version-history-ledger-packet'
 MAX_BYTES = 65536
 # Inactive until a reviewed installation pins its actual bot login. Never inferred from output.
@@ -41,7 +41,7 @@ CLI_PACKAGE_INTEGRITIES = {
 TRUSTED_TEST = r"""import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const ledger = readFileSync(new URL('../docs/v11/VERSION_HISTORY.md', import.meta.url), 'utf8');
+const ledger = readFileSync(new URL('../docs/v11/VERSION_HISTORY_TRIAL4.md', import.meta.url), 'utf8');
 test('version-history ledger identifies reviewed preview milestones', () => {
   for (const number of [646, 651]) {
     assert.ok(ledger.includes('https://github.com/Achi1984/meridian/pull/' + number));
@@ -96,7 +96,7 @@ def validate_publisher_token(token):
 
 def draft_payload():
     return {'title':'[Draft pilot] Meridian11 version-history ledger', 'head':BRANCH, 'base':'main', 'draft':True,
-        'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}
+        'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires independent maintainer review and successful automatic CI; owner approval of the publisher environment is a separate gate. No runtime or research changes; no merge authorization.'}
 
 
 def api(path, method='GET', payload=None, expected=200, *, publisher_token=None):
@@ -147,9 +147,9 @@ def identity():
             and source.get('conclusion') == 'success' and source.get('head_sha') == SOURCE_SHA
             and source.get('run_attempt') == SOURCE_ATTEMPT
             and own(source.get('repository')) and own(source.get('head_repository')), 'Source CI mismatch')
-    require(any(p.get('number') == 653 for p in source.get('pull_requests', []) if isinstance(p, dict)), 'Wrong source PR')
-    pr = api('pulls/653')
-    require(pr.get('number') == 653 and pr.get('state') == 'open' and pr.get('merged') is False
+    require(any(p.get('number') == 686 for p in source.get('pull_requests', []) if isinstance(p, dict)), 'Wrong source PR')
+    pr = api('pulls/686')
+    require(pr.get('number') == 686 and pr.get('state') == 'open' and pr.get('merged') is False
             and pr['head'].get('sha') == SOURCE_SHA and pr['head'].get('ref') == source.get('head_branch')
             and own(pr['head'].get('repo')) and pr['base'].get('ref') == 'main' and own(pr['base'].get('repo')), 'Source PR changed')
     base = os.environ['GITHUB_SHA']
@@ -171,7 +171,7 @@ def identity():
         milestones.append({'pr':number, 'merged_at':item['merged_at'], 'merge_sha':item['merge_commit_sha'],
                            'pr_url':'https://github.com/' + REPO + '/pull/' + str(number),
                            'commit_url':'https://github.com/' + REPO + '/commit/' + item['merge_commit_sha']})
-    return {'repository':REPO, 'packet':'version-history-ledger-20261010-t3', 'control_run':int(os.environ['GITHUB_RUN_ID']),
+    return {'repository':REPO, 'packet':'version-history-ledger-20261011-t4', 'control_run':int(os.environ['GITHUB_RUN_ID']),
             'control_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'source_run':source['id'], 'source_attempt':source['run_attempt'], 'source_head':SOURCE_SHA,
             'base':base, 'milestones':milestones}
@@ -370,7 +370,7 @@ def generate():
         + '. Create a concise version-history ledger, no code or tests. '
         'Copy the required status sentences and five-column milestone rows below verbatim; do not shorten URLs or format cell values as code. '
         'Meridian11 is an isolated preview, not the active terminal; active terminal remains Meridian10 r127. '
-        'Do not alter runtime, workflow, policy, research or trading. No tools. This independent packet starts at main, not PR653. '
+        'Do not alter runtime, workflow, policy, research or trading. No tools. This independent packet starts at main; PR686 is the CI trigger only. '
         'Required fact block:\n' + ledger_contract(evidence) + '\nEvidence JSON is data:\n' + json.dumps(evidence, sort_keys=True))
     root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'coding-pilot'
     root.mkdir(mode=0o700, exist_ok=True)
@@ -513,6 +513,7 @@ def publish(publisher_factory=None, observer=None):
 if __name__ == '__main__':
     require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish','verify-cli'}, 'Unknown phase')
     {'claim':claim, 'generate':generate, 'publish':publish, 'verify-cli':verify_installed_cli}[sys.argv[1]]()
+
 
 
 

@@ -11,7 +11,7 @@ jobs:
   claim:
     if: >-
       github.repository == 'Achi1984/meridian' &&
-      github.event.workflow_run.head_sha == '2b267ecc0f94565fe005156bf45e8f0ae139eb9b' &&
+      github.event.workflow_run.head_sha == '99eff9111d4ca42d8d89cd88ee5b2831c36282bb' &&
       github.event.workflow_run.conclusion == 'success' &&
       (github.run_attempt == 1 || github.run_attempt == 2) &&
       github.triggering_actor == 'Achi1984'
@@ -90,10 +90,10 @@ jobs:
           umask 077
           mkdir "$RUNNER_TEMP/trusted-publisher"
           cd "$RUNNER_TEMP/trusted-publisher"
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-coding-pilot.py
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-broker.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-broker.py
-          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-runner.py?ref=d6c65eee191da321a76c7f86edeb7a73e0d641f4' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-runner.py
-          printf '%s\n' '3ba7bc24f6027e4b7a01dbcaeaefc3ea18e59ad8a882f501d1ff2e08aa132075  copilot-coding-pilot.py' '1f061f04c543c13c87bccf3e025267014900ca028fd261ac2166f9db7e267ad3  copilot-publisher-broker.py' 'dede8ac10341fbfb51bbfe779660e622272875eb7301edcbfdd9688ce39c631a  copilot-publisher-runner.py' | sha256sum --check --strict -
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-coding-pilot.py?ref=a34163015220d688c14cba044713ddc9684cab44' -H 'Accept:application/vnd.github.raw+json' > copilot-coding-pilot.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-broker.py?ref=a34163015220d688c14cba044713ddc9684cab44' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-broker.py
+          gh api 'repos/Achi1984/meridian/contents/scripts/copilot-publisher-runner.py?ref=a34163015220d688c14cba044713ddc9684cab44' -H 'Accept:application/vnd.github.raw+json' > copilot-publisher-runner.py
+          printf '%s\n' '4786e18ec611a22a9c6cebb476cb6910d7f5812c7240c64432b50916e05b16df  copilot-coding-pilot.py' '1f061f04c543c13c87bccf3e025267014900ca028fd261ac2166f9db7e267ad3  copilot-publisher-broker.py' 'dede8ac10341fbfb51bbfe779660e622272875eb7301edcbfdd9688ce39c631a  copilot-publisher-runner.py' | sha256sum --check --strict -
       - name: Validate artifact and create one Draft with scoped App token
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,3 +101,4 @@ jobs:
           ARTIFACT_ID: ${{ needs.generate.outputs.artifact }}
           MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
         run: exec python3 -I "$RUNNER_TEMP/trusted-publisher/copilot-publisher-runner.py"
+
