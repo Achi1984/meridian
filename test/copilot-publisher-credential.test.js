@@ -34,7 +34,7 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_B
      mock.patch('time.time',return_value=p.DEADLINE-60),mock.patch('urllib.request.build_opener') as opener:
     result=opener.return_value.open.return_value.__enter__.return_value
     result.read.return_value=b'{}'
-    for path,method,payload,status in [('pulls/653','GET',None,200),('actions/artifacts/300','GET',None,200),
+    for path,method,payload,status in [('pulls/686','GET',None,200),('actions/artifacts/300','GET',None,200),
         ('git/commits','POST',{'message':'claim'},201),('git/refs','POST',{'ref':'refs/heads/'+p.BRANCH},201),
         ('git/trees','POST',{'tree':[]},201),('git/refs/heads/'+p.BRANCH,'PATCH',{'sha':commit,'force':False},200)]:
         result.status=status;p.api(path,method,payload,status)
@@ -43,7 +43,7 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_B
     request=opener.return_value.open.call_args.args[0]
     assert request.get_header('Authorization')=='Bearer '+env['MERIDIAN_PUBLISHER_TOKEN']
     assert json.loads(request.data)==p.draft_payload()
-    for args in [('pulls/653','GET',None,200),('git/refs','POST',{},201),
+    for args in [('pulls/686','GET',None,200),('git/refs','POST',{},201),
                  ('pulls','POST',{**p.draft_payload(),'draft':False},201),
                  ('pulls','POST',{**p.draft_payload(),'head':'other'},201),
                  ('pulls','POST',{**p.draft_payload(),'body':'injected'},201),
@@ -61,9 +61,9 @@ for factory,login in [(None,bot),(42,bot),(lambda:None,None),(lambda:None,'ordin
          mock.patch.object(p,'api') as api,mock.patch.object(p,'artifact_bytes') as download:
         rejects(lambda:p.publish(factory));api.assert_not_called();download.assert_not_called()
 assert p.PUBLISHER_BOT_LOGIN is None
-assert p.SOURCE_SHA=='2b267ecc0f94565fe005156bf45e8f0ae139eb9b'
-assert p.SOURCE_RUN==38070967939 and p.SOURCE_ATTEMPT==5 and p.DEADLINE==1791660600
-assert p.BRANCH=='pilot/version-history-ledger-20261010-t3'
+assert p.SOURCE_SHA=='99eff9111d4ca42d8d89cd88ee5b2831c36282bb'
+assert p.SOURCE_RUN==38141528699 and p.SOURCE_ATTEMPT==2 and p.DEADLINE==1791730800
+assert p.BRANCH=='pilot/version-history-ledger-20261011-t4'
 with mock.patch.dict(os.environ,env,clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot), mock.patch('time.time',return_value=p.DEADLINE-60), mock.patch('urllib.request.build_opener') as opener:
     for token in [None,False,42,'',env['GH_TOKEN'],'github_pat_invalid','ghs_bad\n','ghs_'+'x'*4096]:
         rejects(lambda:p.api('pulls','POST',p.draft_payload(),201,publisher_token=token))
@@ -289,3 +289,4 @@ for outcome in ('success','post-error','wrong-response','revoke-error','unknown-
 assert b.PINS is None and p.PUBLISHER_BOT_LOGIN is None
 `);
 });
+
