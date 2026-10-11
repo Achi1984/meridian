@@ -106,8 +106,16 @@ test('r13 expands release syntax coverage and mobile accessibility guardrails',(
 test('r13 legacy bridge cannot crash on unknown USD exposure and COMMAND is idempotent',()=>{
   assert.match(v9,/shareText=rv\.share==null\?'Exposure —':rv\.share\.toFixed\(1\)/);
   assert.match(v9,/capitalComplete=fresh\.length>0&&fresh\.every\(liveInvestUsdAvailable\)/);
-  assert.match(v10,/legacyCommandPresent=legacyCommandSelectors\.some/);
-  assert.match(v10,/if\(!force&&!legacyCommandPresent&&\$\('\.command-source-strip',view\)&&\$\('\.v10-critical-wrap',view\)&&\$\('\.v10-data-guard',view\)\)return/);
+  if(v10.includes('function commandProModel(now=Date.now()){')){
+    // R132: legacy removal and idempotent return must survive DOM ownership migration.
+    assert.match(v10,/const legacy=\[/);
+    assert.match(v10,/legacy\.some\(sel=>\$\(sel,view\)\)/);
+    assert.match(v10,/if\(!force&&!legacy\.some\(sel=>\$\(sel,view\)\)&&\$\('\.command-pro-decision',view\)&&\$\('\.command-source-details',view\)\)return/);
+    assert.match(v10,/captureCommandProDisclosures\(view\)/);
+  }else{
+    assert.match(v10,/legacyCommandPresent=legacyCommandSelectors\.some/);
+    assert.match(v10,/if\(!force&&!legacyCommandPresent&&\$\('\.command-source-strip',view\)&&\$\('\.v10-critical-wrap',view\)&&\$\('\.v10-data-guard',view\)\)return/);
+  }
 });
 
 test('r13 stale public prices cannot drive bot risk fallbacks',()=>{

@@ -69,12 +69,22 @@ test('r79 critical asset drill-down uses Asset Detail and returns to Command',()
 
 test('r79 renderCommand rebuilds and binds the hub without replacing existing Next Action',()=>{
   const render=block('function renderCommand(force=false){','function assetWatchShareCard(){');
-  assert.match(render,/\.command-action-hub/);
-  assert.match(render,/commandActionHubHtml\(\)/);
   assert.match(render,/bindCommandActionHub\(view\)/);
-  const hub=block('function commandActionHubHtml(){','function bindCommandActionHub(view){');
-  assert.match(hub,/NEXT ACTION/);
-  assert.match(render,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
+  if(v10.includes('function commandProModel(now=Date.now()){')){
+    // R132 consolidates NEXT ACTION into the one guarded decision owner.
+    assert.match(render,/commandProNavigationHtml\(\)/);
+    assert.match(render,/commandProDecisionHtml\(model\)/);
+    assert.match(render,/data-command-decision-owner|commandProDecisionHtml\(model\)/);
+    assert.match(render,/risks\.insertAdjacentElement\('afterend',links\)/);
+    const bind=block('function bindCommandActionHub(view){','function pionexDetailAssets(){');
+    assert.match(bind,/data-command-go/);
+    assert.match(bind,/data-command-asset/);
+  }else{
+    assert.match(render,/\.command-action-hub/);
+    assert.match(render,/commandActionHubHtml\(\)/);
+    assert.match(hub,/NEXT ACTION/);
+    assert.match(render,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
+  }
 });
 
 test('r79 permanent UI regression gate freezes the Command Action Hub contract',()=>{

@@ -33,11 +33,41 @@ test('r117 Command risk presentation separates protection risk from liquidation 
 
 test('r117+ keeps degraded NEXT ACTION prioritized while r120 preserves the total-first hierarchy',()=>{
   const src=block('function renderCommand(','function assetWatchShareCard');
-  assert.match(src,/degradedPortfolio=S\(\)\?\.portfolio\?\.complete!==true/);
-  assert.match(src,/nextPriority\.classList\.add\('command-next-priority'\)/);
-  assert.match(src,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
-  assert.match(src,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
-  assert.doesNotMatch(src,/portfolioNode\.insertAdjacentElement\('beforebegin',nextPriority\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 preserves the original intent: verified capital danger wins;
+    // otherwise a degraded portfolio must trigger a guarded review action,
+    // never a fabricated total, clean HOLD or unverified trade suggestion.
+    const model=block('function commandProModel(','function commandProHealthHtml');
+    const decision=block('function commandProDecisionHtml(','function commandProRiskHtml');
+    const hero=block('function portfolioChartHeroHtml()','function bindCommandPortfolioHero');
+    assert.match(model,/const urgent=verified&&\['LIQ_RISK','PROTECTION_RISK'\]\.includes\(critical\.status\.code\)/);
+    assert.match(model,/if\(urgent\)\{[\s\S]*?action=nextAction\(\);asset=critical\.symbol;tone='danger'/);
+    assert.match(model,/\}else if\(p\.label!=='READY'\)\{/);
+    assert.match(model,/action=\{title:'PORTFOLIO-VOLLSTÄNDIGKEIT PRÜFEN',detail:p\.detail\}/);
+    assert.match(model,/target='depot';tone='watch'/);
+    assert.match(model,/Gesamtwert und Performance bleiben bis zur Authority-Klärung unbekannt/);
+    assert.ok(model.indexOf('if(urgent){')<model.indexOf("else if(p.label!=='READY')"),'verified critical risk must precede missing portfolio authority');
+    assert.match(hero,/ready=p\.complete===true&&Number\.isFinite\(total\)&&total>=0/);
+    assert.match(hero,/totalText=ready\?/);
+    assert.match(hero,/AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET/);
+    assert.match(decision,/data-command-decision-owner="r132"/);
+    assert.match(decision,/esc\(model\.action\.detail\)/);
+    assert.match(src,/if\(model\.urgent\)\{/);
+    assert.match(src,/mode\.insertAdjacentElement\('afterend',decision\)/);
+    assert.match(src,/decision\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(src,/mode\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(src,/health\.insertAdjacentElement\('afterend',decision\)/);
+    const browser=fs.readFileSync(new URL('./r132-command-pro-browser.test.js',import.meta.url),'utf8');
+    assert.match(browser,/criticalDominance/);
+    assert.match(browser,/unknownPortfolioNotZero/);
+    assert.match(browser,/staleNotAllClear/);
+  }else{
+    assert.match(src,/degradedPortfolio=S\(\)\?\.portfolio\?\.complete!==true/);
+    assert.match(src,/nextPriority\.classList\.add\('command-next-priority'\)/);
+    assert.match(src,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+    assert.match(src,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
+    assert.doesNotMatch(src,/portfolioNode\.insertAdjacentElement\('beforebegin',nextPriority\)/);
+  }
 });
 
 test('r117 keeps FIB score semantics while exposing display provenance',()=>{

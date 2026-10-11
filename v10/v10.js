@@ -608,9 +608,22 @@ function portfolioChartHeroHtml(){
 }
 function bindCommandPortfolioHero(view){
   view.querySelectorAll('[data-portfolio-range]').forEach(btn=>btn.addEventListener('click',()=>{
-    const next=String(btn.dataset.portfolioRange||'').toLowerCase();if(!PORTFOLIO_CHART_WINDOWS[next]||next===portfolioChartUi.range)return;
-    portfolioChartUi.range=next;const current=$('.command-portfolio-hero',view);if(!current)return;
-    const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();current.replaceWith(box.firstElementChild);bindCommandPortfolioHero(view);
+    const range=String(btn.dataset.portfolioRange||'').toLowerCase();
+    if(!PORTFOLIO_CHART_WINDOWS[range]||range===portfolioChartUi.range)return;
+    const current=$('.command-portfolio-hero',view),details=$('.command-portfolio-details',view);
+    // R132 owns exactly one, separately positioned disclosure. Never nest a new copy on range changes.
+    if(!current||!details)return;
+    const previousRange=portfolioChartUi.range;
+    portfolioChartUi.range=range;
+    const box=document.createElement('div');box.innerHTML=portfolioChartHeroHtml();
+    const replacement=box.firstElementChild,nextDetails=$('.command-portfolio-details',replacement);
+    if(!replacement||!nextDetails){portfolioChartUi.range=previousRange;return}
+    const wasOpen=details.open;
+    nextDetails.remove();nextDetails.open=wasOpen;
+    current.replaceWith(replacement);
+    details.replaceWith(nextDetails);
+    bindCommandPortfolioHero(view);bindCommandProDisclosures(view);
+    nextDetails.querySelector('[data-portfolio-range="'+range+'"]')?.focus({preventScroll:true});
   }));
 }
 function commandHealthSummary(){
@@ -663,7 +676,7 @@ function bindCommandActionHub(view){
     if(target==='paper'){showSecondaryView('paper','research',{returnView:'command',navKey:'command',label:'COMMAND'});return}
     $('#nav button[data-v="'+target+'"]')?.click();
   }));
-  $('[data-command-asset]',view)?.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')});
+  $$('[data-command-asset]',view).forEach(btn=>btn.addEventListener('click',e=>{const symbol=String(e.currentTarget?.dataset?.commandAsset||'').toUpperCase();if(symbol)openAssetDetail(symbol,'command','command')}));
 }
 function pionexDetailAssets(){
   const s=S(),account=s?.pionexAccount||{},prices=account?.wallet?.prices||{},rows=[...(account.spotBalances||[]),...(account.futuresBalances||[])],map=new Map();
@@ -760,6 +773,7 @@ function renderDepot(force=false){
 }
 function showSecondaryView(v,navKey='research',context=null,scrollY=0){
   const from=activeViewKey();
+  if(from==='command'&&v!=='command')captureCommandProDisclosures();
   if(context!==false&&['asset-detail','paper','more','market'].includes(v)&&from!==v){
     const meta=context&&typeof context==='object'?context:{},returnView=meta.returnView||from,returnNav=meta.navKey||activeNavKey();
     viewContextUi[v]={returnView,navKey:returnNav,label:meta.label||VIEW_LABELS[returnView]||String(returnView||'ZURÜCK').toUpperCase(),scrollY:Math.max(0,Number(window.scrollY)||0)};
@@ -779,32 +793,153 @@ function bindRefreshControl(){
   const btn=$('#refresh-feeds');if(btn&&!btn.dataset.bound){btn.dataset.bound='1';btn.addEventListener('click',refreshFeeds)}
 }
 
-function renderCommand(force=false){
-  const view=$('#view-command');if(!view||!$('.portfolio-hero',view))return;
-  const legacyCommandSelectors=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
-  const legacyCommandPresent=legacyCommandSelectors.some(sel=>$(sel,view))||!$('.command-portfolio-hero',view);
-  if(!force&&!legacyCommandPresent&&$('.command-source-strip',view)&&$('.v10-critical-wrap',view)&&$('.v10-data-guard',view))return;
-  banner('#view-command','COMMAND','PORTFOLIO + RISK DECISION SUPPORT','Was braucht Aufmerksamkeit? Gesamtvermögen, Risiko und Datenstatus zuerst','live');
-  dataGuardDecorate();
-  view.querySelectorAll('.command-portfolio-hero,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip').forEach(x=>x.remove());
-  const hero=$('.portfolio-hero',view),degradedPortfolio=S()?.portfolio?.complete!==true,portfolioBox=document.createElement('div');portfolioBox.innerHTML=portfolioChartHeroHtml();const portfolioNode=portfolioBox.firstElementChild,portfolioDetails=$('.command-portfolio-details',portfolioNode);if(portfolioDetails)portfolioDetails.remove();$('.v10-mode-banner',view)?.insertAdjacentElement('afterend',portfolioNode);
-  const overview=document.createElement('div');overview.innerHTML=commandOverviewHtml();const overviewNode=overview.firstElementChild;portfolioNode.insertAdjacentElement('afterend',overviewNode);
-  const hubWrap=document.createElement('div');hubWrap.innerHTML=commandActionHubHtml();const hubNode=hubWrap.firstElementChild;overviewNode.insertAdjacentElement('afterend',hubNode);if(degradedPortfolio){const nextPriority=$('.command-next-decision',hubNode);if(nextPriority)nextPriority.classList.add('command-next-priority')}
-  const attentionWrap=document.createElement('div');attentionWrap.innerHTML=commandAttentionHtml();const attentionNode=attentionWrap.firstElementChild;hubNode.insertAdjacentElement('afterend',attentionNode);
-  if(hero)hero.classList.add('command-source-authority');
-  const c=criticalPair(),g=syncHealth(),wrap=document.createElement('section');wrap.className='v10-critical-wrap';
-  const realAsset=!!(c&&g.fresh&&matchedRows(c.symbol).length&&!['DATA_STALE','MARKET_STALE','UNVERIFIED'].includes(c.status.code)),criticalHtml=realAsset?pairCard(c.symbol,true,false,false,true):'<article class="asset-pair pair-compact blocked-critical"><div class="pair-head"><span class="asset-symbol">'+esc(c?.symbol||'BOT DATA')+'</span><b class="pair-status tone-muted">'+esc(c?.status.label||'BLOCKED')+'</b></div><div class="pair-reason">'+esc(c?.status.reason||'Keine frischen privaten Bot-Daten')+'</div></article>';
-  wrap.innerHTML='<div class="section-title"><h2>'+(realAsset?'LIVE RISK PRIORITY':'LIVE BOT STATUS')+'</h2><small>Overall Risk zuerst · Liquidation ist nur ein Teilstatus</small></div>'+criticalHtml;
-  attentionNode.insertAdjacentElement('afterend',wrap);
-  const source=document.createElement('div');source.innerHTML=commandDataDisclosure();const sourceNode=source.firstElementChild;wrap.insertAdjacentElement('afterend',sourceNode);
-  if(portfolioDetails)sourceNode.insertAdjacentElement('afterend',portfolioDetails);
-  const action=$('.command-action',view);if(action)action.remove();
-  const systemDiagnostics=commandSystemDiagnostics();(portfolioDetails||sourceNode).insertAdjacentElement('afterend',systemDiagnostics);
-  for(const sel of legacyCommandSelectors) $$(sel,view).forEach(x=>x.remove());
-  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
-  bindCommandActionHub(view);
-  bindCommandPortfolioHero(view);
+// R132: Command disclosure state must survive navigation and v9-originated re-renders.
+const commandProDisclosureState={source:false,portfolio:false,navigation:false};
+const commandProDisclosureSelectors={source:'.command-source-details',portfolio:'.command-portfolio-details',navigation:'.command-pro-quicklinks'};
+function captureCommandProDisclosures(view=$('#view-command')){
+  if(!view)return;
+  for(const [key,selector] of Object.entries(commandProDisclosureSelectors)){
+    const el=$(selector,view);if(el)commandProDisclosureState[key]=el.open===true;
+  }
 }
+function bindCommandProDisclosures(view){
+  for(const [key,selector] of Object.entries(commandProDisclosureSelectors)){
+    const el=$(selector,view);if(!el||el.dataset.r132ToggleBound==='1')continue;
+    el.dataset.r132ToggleBound='1';
+    el.addEventListener('toggle',()=>{if(el.isConnected)commandProDisclosureState[key]=el.open===true});
+  }
+}
+// R132: native Command decision owner. Read-only; the existing rank/freshness guards remain authoritative.
+function commandProModel(now=Date.now()){
+  const s=S()||{},p=portfolioReadiness(),g=syncHealth(),m=marketHealth(),br=botReadiness(g),mr=marketReadiness(m),critical=criticalPair();
+  const verified=!!(critical&&g.fresh&&matchedRows(critical.symbol).length&&
+    !['DATA_STALE','UNVERIFIED','MARKET_STALE'].includes(critical.status.code));
+  const urgent=verified&&['LIQ_RISK','PROTECTION_RISK'].includes(critical.status.code);
+  const riskRows=g.fresh?symbols().map(symbol=>({symbol,status:pairStatus(symbol)}))
+    .filter(x=>['LIQ_RISK','PROTECTION_RISK','RISK_REVIEW','PROFIT_LOCK','WATCH_PROFIT'].includes(x.status.code))
+    .sort((a,b)=>b.status.rank-a.status.rank||a.symbol.localeCompare(b.symbol)).slice(0,3):[];
+  const risk=verified?{label:urgent?'GEFAHR':critical.status.code==='HOLD'?'KEIN SIGNAL':'BEOBACHTEN',
+    tone:critical.status.tone,detail:critical.symbol+' · '+critical.status.reason}
+    :{label:'UNGEKLÄRT',tone:'muted',detail:'Keine vollständig verifizierte private Risikoabdeckung'};
+  const dataComplete=p.label==='READY'&&g.decisionComplete&&m.coverageComplete;
+  const data={label:dataComplete?'VOLLSTÄNDIG':'TEILWEISE',tone:dataComplete?'safe':'watch',
+    detail:'Portfolio '+p.label+' · Bots '+br.label+' · Markt '+mr.label};
+  const bs=String(s.botRefreshStatus||'IDLE'),ms=String(s.marketSyncStatus||'IDLE'),
+    running=bs==='RUNNING'||ms==='RUNNING',failed=['ERROR','PARTIAL'].includes(bs)||['ERROR','PARTIAL'].includes(ms);
+  const refresh={label:running?'LÄUFT':failed?'TEILFEHLER':'RUHIG',tone:failed?'watch':'muted',
+    detail:'Bot '+bs+' · Markt '+ms+' · Aktualisierung verlängert keine Quellzeit'};
+  let action,asset=null,target='bots',tone='muted',consequence='Read-only Entscheidungsunterstützung · keine automatische Order.';
+  if(urgent){
+    action=nextAction();asset=critical.symbol;tone='danger';
+    consequence='Bestätigtes Kapitalrisiko zuerst prüfen; keine automatische Order.';
+  }else if(p.label!=='READY'){
+    action={title:'PORTFOLIO-VOLLSTÄNDIGKEIT PRÜFEN',detail:p.detail};target='depot';tone='watch';
+    consequence='Gesamtwert und Performance bleiben bis zur Authority-Klärung unbekannt.';
+  }else if(!g.decisionComplete){
+    action={title:'BOT-DATEN PRÜFEN',detail:g.detail};target='bots';tone='watch';
+    consequence='Unvollständige Botdaten erlauben keine abgeleitete Handelsentscheidung.';
+  }else if(!m.fresh||!m.coverageComplete){
+    action={title:'MARKTDATEN PRÜFEN',detail:m.ageText+' · '+m.freshAssets+'/'+m.totalAssets+' Assets frisch'};
+    target='market';tone='watch';
+    consequence='Abhängige Momentum-Signale blockiert; verifizierte Kapitalrisiken bleiben sichtbar.';
+  }else{
+    action=nextAction();
+    asset=verified&&critical.status.code!=='HOLD'?critical.symbol:null;
+    tone=verified?critical.status.tone:'muted';
+  }
+  return{now,urgent,degradedAuthority:p.label!=='READY',action,asset,target,tone,consequence,risk,data,refresh,riskRows,
+    riskComplete:g.fresh&&g.coverageComplete&&m.coverageComplete};
+}
+function commandProHealthHtml(model){
+  const item=(name,x)=>'<div class="command-pro-health-item tone-'+esc(x.tone)+'"><span>'+esc(name)+'</span><b>'+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></div>';
+  return '<section class="command-pro-health" aria-label="Kapitalrisiko, Datenlage und Aktualisierung">'+
+    item('KAPITALRISIKO',model.risk)+item('DATENLAGE',model.data)+item('AKTUALISIERUNG',model.refresh)+'</section>';
+}
+function commandProDecisionHtml(model){
+  const attr=model.asset?'data-command-asset="'+esc(model.asset)+'"':'data-command-go="'+esc(model.target)+'"',
+    label=model.asset?'Asset prüfen':model.target==='depot'?'Portfolio prüfen':model.target==='market'?'Markt prüfen':'Bots prüfen';
+  return '<section class="command-pro-decision tone-'+esc(model.tone)+'" data-command-decision-owner="r132" role="region" aria-label="Jetzt wichtig">'+
+    '<div class="command-next-decision"><span>JETZT WICHTIG</span><b>'+esc(model.action.title)+'</b><small>'+esc(model.action.detail)+'</small></div>'+
+    '<p class="command-pro-consequence">'+esc(model.consequence)+'</p>'+
+    '<button type="button" class="command-pro-review" '+attr+'>'+esc(label)+' →</button></section>';
+}
+function commandProRiskHtml(model){
+  const rows=model.riskRows.map(x=>'<article class="command-pro-risk-row tone-'+esc(x.status.tone)+'">'+
+    '<div><b>'+esc(x.symbol)+'</b><span>'+esc(x.status.label)+'</span><small>'+esc(x.status.reason)+'</small></div>'+
+    '<button type="button" data-command-asset="'+esc(x.symbol)+'">Details</button></article>').join('');
+  return '<section class="v10-critical-wrap command-pro-risks'+(model.risk.label==='UNGEKLÄRT'?' blocked-critical':'')+'" aria-label="Priorisierte Risiken">'+
+    '<div class="section-title"><h2>RISIKOFOKUS</h2><small>Safety-Ranking · maximal drei Positionen</small></div>'+
+    (rows||'<p class="command-pro-risk-empty">'+esc(model.riskComplete?'Kein bestätigter Risiko- oder Profit-Warnhinweis.':'Risikoabdeckung unvollständig · Datenquellen prüfen.')+'</p>')+'</section>';
+}
+function commandProNavigationHtml(){
+  const p=portfolioReadiness(),g=syncHealth(),m=marketReadiness(marketHealth()),paper=commandPaperPresentation(paperReadiness());
+  const item=(target,label,status)=>'<button type="button" class="command-hub-card" data-command-go="'+target+'"><span>'+label+'</span><b>'+esc(status)+'</b></button>';
+  return '<details class="command-pro-quicklinks"><summary>Weitere Bereiche öffnen</summary><div class="command-action-grid">'+
+    item('depot','DEPOT',p.label)+item('bots','BOTS',g.decisionReady+'/'+g.matched+' prüfbar')+
+    item('market','FORECAST',m.label)+item('paper','PAPER',paper.label)+'</div></details>';
+}
+function renderCommand(force=false){
+  const view=$('#view-command'),hero=view&&$('.portfolio-hero',view);
+  if(!view||!hero)return;
+  const legacy=['.risk-cockpit','.exposure-card','.manual-strip','.okx-strip','.risk-v2','.lock-radar','.quick-grid','.command-bots','.data-truth'];
+  if(!force&&!legacy.some(sel=>$(sel,view))&&$('.command-pro-decision',view)&&$('.command-source-details',view))return;
+  captureCommandProDisclosures(view);
+  const opened={...commandProDisclosureState};
+  const focusedRange=document.activeElement?.closest?.('#view-command [data-portfolio-range]')?.dataset?.portfolioRange||null;
+  banner('#view-command','COMMAND','PORTFOLIO & RISIKO','Eine Entscheidung, klare Prioritäten und nachvollziehbare Quellen','live');
+  dataGuardDecorate();
+  // Keep legacy authority buttons alive while their disclosure is replaced.
+  hero.remove();
+  view.querySelectorAll('.command-portfolio-hero,.command-portfolio-details,.data-state-strip,.command-overview-v2,.command-action-hub,.command-attention,.v10-critical-wrap,.command-system-diagnostics,.v10-data-guard,.v10-live-overview,.v10-live-blocked,.v10-account-position-layer,.v10-wallet-discovery,.command-source-details,.command-source-strip,.command-pro-health,.command-pro-decision,.command-pro-quicklinks').forEach(x=>x.remove());
+  const asNode=html=>{const box=document.createElement('div');box.innerHTML=html;return box.firstElementChild},
+    model=commandProModel(),portfolio=asNode(portfolioChartHeroHtml()),portfolioDetails=$('.command-portfolio-details',portfolio);
+  if(portfolioDetails){portfolioDetails.remove();portfolioDetails.open=opened.portfolio}
+  const health=asNode(commandProHealthHtml(model)),decision=asNode(commandProDecisionHtml(model)),
+    risks=asNode(commandProRiskHtml(model)),links=asNode(commandProNavigationHtml());
+  links.open=opened.navigation;
+  const mode=$('.v10-mode-banner',view);
+  if(model.degradedAuthority)decision.setAttribute('data-command-degraded','');
+  if(model.urgent){
+    mode.insertAdjacentElement('afterend',decision);
+    decision.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+  }else if(model.degradedAuthority){
+    mode.insertAdjacentElement('afterend',decision);
+    decision.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+  }else{
+    mode.insertAdjacentElement('afterend',portfolio);
+    portfolio.insertAdjacentElement('afterend',health);
+    health.insertAdjacentElement('afterend',decision);
+  }
+  // Keep risks after health for incomplete authority, while retaining the guarded urgent/normal anchor.
+  if(model.degradedAuthority)health.insertAdjacentElement('afterend',risks);
+  else (model.urgent?health:decision).insertAdjacentElement('afterend',risks);
+  risks.insertAdjacentElement('afterend',links);
+  const source=asNode(commandDataDisclosure()),summary=$('summary',source);
+  source.open=opened.source;
+  const title=summary?.querySelector('span'),subtitle=summary?.querySelector('b');
+  if(title)title.textContent='DATEN & QUELLEN';
+  if(subtitle)subtitle.textContent='Quellengültigkeit, Authority und Diagnose';
+  const body=$('.command-source-details-body',source),system=commandSystemDiagnostics(),
+    diag=$('.command-system-diagnostics-body',system);
+  hero.classList.add('command-source-authority');
+  if(body){
+    body.append(hero);
+    if(diag){
+      const header=document.createElement('h3');header.textContent='Technische Diagnose';
+      body.append(header,diag);
+    }
+  }
+  links.insertAdjacentElement('afterend',source);
+  if(portfolioDetails)source.insertAdjacentElement('beforebegin',portfolioDetails);
+  $('.command-action',view)?.remove();
+  for(const sel of legacy)$$(sel,view).forEach(x=>x.remove());
+  $$('.section-title',view).filter(x=>['RISK PRIORITY','ASSET RISK MAP'].includes($('h2',x)?.textContent||'')).forEach(x=>x.remove());
+  bindCommandActionHub(view);bindCommandPortfolioHero(view);bindCommandProDisclosures(view);
+  if(focusedRange&&view.classList.contains('active'))$('[data-portfolio-range="'+focusedRange+'"]',view)?.focus({preventScroll:true});
+}
+
 function assetWatchShareCard(){
   const h=H(),available=typeof h.manageAssetWatchShare==='function',msg=assetWatchShareUi.message||'Erstellt einen eigenen widerrufbaren Read-only-Link nur für den bereinigten Asset-Watch-Bot-Snapshot.';
   return '<section class="asset-watch-share-card"><div><span>ASSET WATCH API LINK</span><b class="tone-'+esc(assetWatchShareUi.tone)+'">'+(assetWatchShareUi.busy?'ARBEITET…':assetWatchShareUi.shareUrl?'AKTIV · LINK IM SPEICHER':'BEREIT')+'</b><small>'+esc(msg)+'</small></div><div class="asset-watch-share-actions"><button type="button" data-asset-watch-share="rotate" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>'+(assetWatchShareUi.shareUrl?'NEUEN LINK ERSTELLEN':'LINK ERSTELLEN')+'</button><button type="button" data-asset-watch-share="copy" '+(!assetWatchShareUi.shareUrl||assetWatchShareUi.busy?'disabled':'')+'>LINK KOPIEREN</button><button type="button" data-asset-watch-share="revoke" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>WIDERRUFEN</button></div><small>Der Link enthält einen separaten, auf Asset Watch begrenzten Token. Er erlaubt keine Trades und keinen Zugriff auf das übrige private Dashboard.</small></section>';
@@ -1813,8 +1948,8 @@ function writeLocalVisualQaReport(cfg){
   const stage2AssetDetailFirstViewportInvariant=cfg.view!=='asset-detail'||cfg.scroll>0||(()=>{const back=active.querySelector('.asset-detail-topbar>button'),symbol=active.querySelector('.asset-detail-topbar>div>b'),status=active.querySelector('.asset-detail-topbar>strong'),hero=active.querySelector('.asset-detail-hero>div'),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;if(!back||!symbol||!status||!hero||![back,symbol,status,hero].every(visualQaVisible))return false;const br=back.getBoundingClientRect(),sr=symbol.getBoundingClientRect(),tr=status.getBoundingClientRect(),hr=hero.getBoundingClientRect();return br.top>=0&&br.bottom<=navTop&&sr.top>=0&&sr.bottom<=navTop&&tr.top>=0&&tr.bottom<=navTop&&hr.top<navTop})();
   const stage2AssetDetailGuardAboveNav=cfg.view!=='asset-detail'||cfg.scroll>0||(()=>{const guard=active.querySelector('.asset-detail-accounting-guard'),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;if(!guard||!visualQaVisible(guard))return false;const r=guard.getBoundingClientRect();return r.top>=0&&r.bottom<=navTop})();
   const commandHubCards=active.querySelectorAll('.command-hub-card').length,commandHubInvariant=cfg.view!=='command'||(commandHubCards>=4&&!!active.querySelector('.command-next-decision'));
-  const degradedPriorityInvariant=cfg.view!=='command'||S()?.portfolio?.complete===true||(()=>{const el=active.querySelector('.command-next-priority');return !!el&&el.getBoundingClientRect().top<innerHeight})();
-  const commandFirstViewportInvariant=cfg.view!=='command'||cfg.scroll>0||(()=>{const hero=active.querySelector('.command-first-portfolio'),health=active.querySelector('.command-health-summary'),next=active.querySelector('.command-next-decision');if(!hero||!health||!next)return false;const hr=hero.getBoundingClientRect(),sr=health.getBoundingClientRect(),nr=next.getBoundingClientRect();return hr.top<=sr.top&&sr.top<=nr.top&&nr.top<innerHeight})();
+  const degradedPriorityInvariant=cfg.view!=='command'||cfg.scroll>0||S()?.portfolio?.complete===true||(()=>{const el=active.querySelector('.command-pro-decision')||active.querySelector('.command-next-priority'),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;if(!el)return false;const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=navTop})();
+  const commandFirstViewportInvariant=cfg.view!=='command'||cfg.scroll>0||(()=>{const hero=active.querySelector('.command-first-portfolio')||active.querySelector('.command-portfolio-hero'),health=active.querySelector('.command-pro-health')||active.querySelector('.command-health-summary'),next=active.querySelector('.command-pro-decision')||active.querySelector('.command-next-decision');if(!hero||!health||!next)return false;const hr=hero.getBoundingClientRect(),sr=health.getBoundingClientRect(),nr=next.getBoundingClientRect(),navTop=$('#nav')?.getBoundingClientRect().top??innerHeight;return next.classList.contains('tone-danger')?(nr.top<=hr.top&&hr.top<=sr.top&&nr.top>=0&&nr.bottom<=navTop):next.hasAttribute('data-command-degraded')?(nr.top<=hr.top&&hr.top<=sr.top&&nr.top>=0&&nr.bottom<=navTop):(hr.top<=sr.top&&sr.top<=nr.top&&nr.top>=0&&nr.bottom<=navTop)})();
   const commandDiagnosticsCollapsed=cfg.view!=='command'||[...active.querySelectorAll('.command-diagnostics')].every(el=>!el.open);
   const commandRiskSubstatusViolations=cfg.view==='command'?[...active.querySelectorAll('.command-risk-card:not(.pair-tone-safe) .command-liq-substatus .tone-safe')].filter(visualQaVisible).map(el=>(el.textContent||el.className||el.tagName).trim().replace(/\s+/g,' ').slice(0,70)):[],commandRiskSubstatusDominance=commandRiskSubstatusViolations.length===0;
   const botSummaries=[...active.querySelectorAll('.asset-pair-details>summary')].map(x=>x.getBoundingClientRect());let botAccordionInvariant=cfg.view!=='bots'||(botSummaries.length>0&&botSummaries.every(r=>r.height>=44));
@@ -1962,6 +2097,7 @@ function bindV10NavigationAuthority(){
     b.onclick=e=>{
       e?.preventDefault?.();
       const v=String(b.dataset.v||'command');
+      if(activeViewKey()==='command')captureCommandProDisclosures();
       delete viewContextUi[v];
       const ok=bridge()?.goView?.(v);
       if(!ok){

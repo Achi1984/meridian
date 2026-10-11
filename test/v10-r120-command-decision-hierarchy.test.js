@@ -46,11 +46,34 @@ test('r120 collapses complexity behind a total-first decision hierarchy',()=>{
   assert.match(hero,/portfolio-primary-delta/);
   assert.match(hero,/command-portfolio-details/);
   assert.match(hero,/7T Δ/);
-  assert.match(render,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
-  assert.match(render,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
-  assert.match(render,/portfolioDetails=.*command-portfolio-details/);
-  assert.match(render,/if\(portfolioDetails\)portfolioDetails\.remove\(\)/);
-  assert.match(render,/sourceNode\.insertAdjacentElement\('afterend',portfolioDetails\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 successor: portfolio first normally; verified capital danger first by exception.
+    // Keep the original R120 assertions active on older layouts.
+    const model=block('function commandProModel(','function commandProHealthHtml');
+    assert.match(hero,/ready=p\.complete===true&&Number\.isFinite\(total\)&&total>=0/);
+    assert.match(hero,/AUTHORITY UNVOLLSTÄNDIG · GESAMTWERT BEWUSST AUSGEBLENDET/);
+    assert.match(render,/model=commandProModel\(\)/);
+    assert.match(render,/if\(model\.urgent\)\{[\s\S]*?mode\.insertAdjacentElement\('afterend',decision\);[\s\S]*?decision\.insertAdjacentElement\('afterend',portfolio\)/);
+    assert.match(render,/else\{[\s\S]*?mode\.insertAdjacentElement\('afterend',portfolio\);[\s\S]*?portfolio\.insertAdjacentElement\('afterend',health\);[\s\S]*?health\.insertAdjacentElement\('afterend',decision\)/);
+    assert.match(model,/const urgent=verified&&\['LIQ_RISK','PROTECTION_RISK'\]\.includes\(critical\.status\.code\)/);
+    assert.match(render,/portfolioDetails=\$\('\.command-portfolio-details',portfolio\)/);
+    assert.match(render,/if\(portfolioDetails\)\{portfolioDetails\.remove\(\);portfolioDetails\.open=opened\.portfolio\}/);
+    assert.match(render,/if\(portfolioDetails\)source\.insertAdjacentElement\('beforebegin',portfolioDetails\)/);
+    assert.match(render,/\.command-portfolio-hero,\.command-portfolio-details,\.data-state-strip/);
+    assert.match(render,/captureCommandProDisclosures\(view\)/);
+    assert.match(render,/bindCommandProDisclosures\(view\)/);
+    const browser=fs.readFileSync(new URL('./r132-command-pro-browser.test.js',import.meta.url),'utf8');
+    assert.match(browser,/for\(let i=0;i<20;i\+\+\)/);
+    assert.match(browser,/singleDecisionAndDisclosure/);
+    assert.match(browser,/unknownPortfolioNotZero/);
+    assert.match(browser,/criticalDominance/);
+  }else{
+    assert.match(render,/portfolioNode\.insertAdjacentElement\('afterend',overviewNode\)/);
+    assert.match(render,/overviewNode\.insertAdjacentElement\('afterend',hubNode\)/);
+    assert.match(render,/portfolioDetails=.*command-portfolio-details/);
+    assert.match(render,/if\(portfolioDetails\)portfolioDetails\.remove\(\)/);
+    assert.match(render,/sourceNode\.insertAdjacentElement\('afterend',portfolioDetails\)/);
+  }
   assert.doesNotMatch(render,/dataStateStripHtml\('command'\)/);
 });
 
@@ -73,7 +96,29 @@ test('r120 has one full critical warning and scopes liquidation as a sub-status'
   assert.match(pair,/LIQ-ABSTAND/);
   assert.match(pair,/command-liq-substatus/);
   assert.match(pair,/decisionView\?'':'<div class="pair-reason">/);
-  assert.match(render,/pairCard\(c\.symbol,true,false,false,true\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // A single R132 decision owner retains verified overall-risk/protection precedence.
+    // Detailed liquidation is available through the preserved Asset Detail pairCard.
+    const model=block('function commandProModel(','function commandProHealthHtml');
+    const decision=block('function commandProDecisionHtml(','function commandProRiskHtml');
+    const riskRows=block('function commandProRiskHtml(','function commandProNavigationHtml');
+    assert.match(model,/critical=criticalPair\(\)/);
+    assert.match(model,/const verified=!!\(critical&&g\.fresh&&matchedRows\(critical\.symbol\)\.length&&/);
+    assert.match(model,/!\['DATA_STALE','UNVERIFIED','MARKET_STALE'\]\.includes\(critical\.status\.code\)/);
+    assert.match(model,/const urgent=verified&&\['LIQ_RISK','PROTECTION_RISK'\]\.includes\(critical\.status\.code\)/);
+    assert.match(model,/action=nextAction\(\);asset=critical\.symbol;tone='danger'/);
+    assert.match(model,/\.sort\(\(a,b\)=>b\.status\.rank-a\.status\.rank/);
+    assert.match(model,/\.slice\(0,3\)/);
+    assert.match(decision,/data-command-decision-owner="r132"/);
+    assert.match(decision,/esc\(model\.action\.detail\)/);
+    assert.match(decision,/model\.asset\?'data-command-asset=/);
+    assert.match(riskRows,/esc\(x\.status\.reason\)/);
+    assert.match(riskRows,/data-command-asset=/);
+    assert.match(render,/\(model\.urgent\?health:decision\)\.insertAdjacentElement\('afterend',risks\)/);
+    assert.match(render,/bindCommandActionHub\(view\)/);
+  }else{
+    assert.match(render,/pairCard\(c\.symbol,true,false,false,true\)/);
+  }
   assert.match(css,/\.command-liq-substatus\{/);
   assert.match(css,/\.command-risk-card\.pair-tone-watch\{border-left-color:var\(--amber\)\}/);
 });

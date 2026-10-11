@@ -29,7 +29,15 @@ test('r91 collapses verbose source provenance while retaining the source strip',
   assert.match(js,/class="command-source-details command-diagnostics"/);
   assert.match(js,/DATA SOURCES/);
   assert.match(js,/command-source-details-body[^\n]+dataStateStripHtml\('command'\)\+commandDataStrip\(\)/);
-  assert.match(js,/source\.innerHTML=commandDataDisclosure\(\)/);
+  if(js.includes('function commandProModel(now=Date.now()){')){
+    // R132 preserves one source disclosure, closed by default and restored on rerender.
+    assert.match(js,/const commandProDisclosureState=\{source:false,portfolio:false,navigation:false\}/);
+    assert.match(js,/source=asNode\(commandDataDisclosure\(\)\)/);
+    assert.match(js,/source\.open=opened\.source/);
+    assert.match(js,/bindCommandProDisclosures\(view\)/);
+  }else{
+    assert.match(js,/source\.innerHTML=commandDataDisclosure\(\)/);
+  }
   assert.match(js,/\.command-source-details,\.command-source-strip/);
 });
 
