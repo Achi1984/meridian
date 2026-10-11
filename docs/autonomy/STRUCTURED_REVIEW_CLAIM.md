@@ -21,3 +21,13 @@ The existing classifyReview API and its deduplication behavior remain unchanged.
 A later reviewed workflow may request structured output using the exported schema and pass the decoded result to this validator. That wiring is absent here. The current Claude action's automatically issued App token is revoked before action return; a native approval step must not try to reuse it. A separate explicitly reviewed credential/hook design and effective administrative controls are still required before key storage or pilot activation.
 
 Tests cover malformed fields, scope and CI mismatches, hostile objects, non-GREEN outcomes, immutable input handling and permanently false authority. They validate offline behavior, not live reviewer identity or branch-protection enforcement.
+
+## Serialized transport adapter
+
+`scripts/structured-review-transport.py` adds a provider-independent decoder in front of the existing validator. Standard input is a JSON object with exactly two fields, `claim` and `expected`, each containing its own serialized JSON object. Expected pins must still come from an independently reconciled request, never from the claim itself.
+
+The outer frame is limited to 131072 UTF-8 bytes and one object level; each inner string is limited to 16384 UTF-8 bytes and two object levels. Arrays, duplicate decoded keys (including escaped aliases), non-finite numbers and malformed JSON are rejected before validation. Duplicate detection covers the serialized strings actually received; it cannot recover keys discarded by an upstream parser.
+
+The adapter resolves Node from the trusted launcher's PATH and invokes fixed code with canonical JSON on stdin, no shell, a sanitized child environment and a five-second timeout. The launcher PATH, adapter and sibling validator are trusted inputs, not response-controlled fields. The fixed child writer limits its result to 2048 UTF-8 bytes; capture_output is not an operating-system memory limit against a malicious replacement executable or validator. Errors expose fixed codes, not raw input or child diagnostics. Importing the module performs no I/O.
+
+A zero exit code means a structurally valid claim, including non-GREEN verdicts; it does not mean approval or authority. Authentication, provenance, authorization, dispatch, merge and activation flags remain false. This adapter adds no workflow consumer, model call, credential reuse, native approval or administrative change. Offline tests do not establish provider schema compatibility or live reviewer identity.
