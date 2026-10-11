@@ -10,7 +10,7 @@ def fixture():
  expected={'repository':'Achi1984/meridian','requestId':'REQ001','opId':'OP001','headSha':B,'baseSha':A,'prNumber':703,'ci':{'runId':456,'runAttempt':1,'workflowId':123,'headSha':B}}
  claim={'schemaVersion':1,**expected,'verdict':'GREEN_LIGHT','ci':{**expected['ci'],'status':'completed','conclusion':'success'}}
  policy={'requiredChecks':[{'id':'release-safety','commandSha256':'c'*64},{'id':'exact-head','commandSha256':'d'*64}]}
- checks=[{'id':r['id'],'commandSha256':r['commandSha256'],'executed':True,'status':'passed','exitCode':0,'evidenceSha256':'e'*64,'headSha':B,'baseSha':A,'requestId':'REQ001','ci':dict(expected['ci'])} for r in policy['requiredChecks']]
+ checks=[{'id':r['id'],'commandSha256':r['commandSha256'],'executed':True,'status':'passed','exitCode':0,'evidenceSha256':'e'*64,'headSha':B,'baseSha':A,'requestId':'REQ001','opId':expected['opId'],'prNumber':expected['prNumber'],'ci':dict(expected['ci'])} for r in policy['requiredChecks']]
  return claim,{'findings':[],'checks':checks},expected,policy
 
 def produce(c,a,e,p):return contract.produce_envelope(json.dumps(c),json.dumps(a),json.dumps(e),json.dumps(p))
@@ -31,6 +31,18 @@ class EvidenceTests(unittest.TestCase):
   for edit in edits:
    b=json.loads(body);edit(b)
    with self.assertRaises(ValueError):validate(rehash(b),e,p)
+ def test_check_operation_pr_required_and_strict_even_after_rehash(self):
+  c,a,e,p=fixture();body=produce(c,a,e,p)
+  for key,value in (('opId','OP002'),('prNumber',704),('prNumber',True)):
+   b=json.loads(body);b['assessment']['checks'][0][key]=value
+   with self.assertRaisesRegex(ValueError,'CHECK_SCOPE_MISMATCH'):validate(rehash(b),e,p)
+  for key in ('opId','prNumber'):
+   b=json.loads(body);del b['assessment']['checks'][0][key]
+   with self.assertRaises(ValueError):validate(rehash(b),e,p)
+  c,a,e,p=fixture();c['prNumber']=e['prNumber']=1
+  for row in a['checks']:row['prNumber']=1
+  body=json.loads(produce(c,a,e,p));body['assessment']['checks'][0]['prNumber']=True
+  with self.assertRaisesRegex(ValueError,'CHECK_SCOPE_MISMATCH'):validate(rehash(body),e,p)
  def test_rehashed_missing_failed_or_unexecuted_check_forbids_green(self):
   c,a,e,p=fixture();body=produce(c,a,e,p)
   edits=[lambda b:b['assessment']['checks'].pop(),lambda b:b['assessment']['checks'][0].update(status='failed',exitCode=1),lambda b:b['assessment']['checks'][0].update(status='not_executed',executed=False,exitCode=None,evidenceSha256=None)]

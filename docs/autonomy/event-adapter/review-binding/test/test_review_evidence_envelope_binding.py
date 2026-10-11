@@ -21,7 +21,7 @@ def fixture(verdict='GREEN_LIGHT'):
     scope=expected['scope']
     assessment={'findings':[],'checks':[{'id':'release-tests','commandSha256':'d'*64,
         'executed':True,'status':'passed','exitCode':0,'evidenceSha256':'e'*64,
-        'headSha':scope['headSha'],'baseSha':scope['baseSha'],'requestId':scope['requestId'],'ci':dict(scope['ci'])}]}
+        'headSha':scope['headSha'],'baseSha':scope['baseSha'],'requestId':scope['requestId'],'opId':scope['opId'],'prNumber':scope['prNumber'],'ci':dict(scope['ci'])}]}
     if verdict != 'GREEN_LIGHT':
         assessment['findings']=[{'severity':'blocking','text':'Revision needed for supplied test fixture.'}]
     body=contract.produce_envelope(json.dumps(claim),json.dumps(assessment),json.dumps(scope),json.dumps(POLICY))

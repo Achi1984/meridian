@@ -69,11 +69,11 @@ def validate_envelope(body_raw,expected_scope_raw,required_policy_raw):
         blocking=blocking or finding['severity']=='blocking'
     checks=assessment['checks'];need(type(checks) is list and len(checks)<=16,'CHECKS_BOUND')
     required={r['id']:r['commandSha256'] for r in policy['requiredChecks']};seen=set();all_passed=True
-    fields=('id','commandSha256','executed','status','exitCode','evidenceSha256','headSha','baseSha','requestId','ci')
+    fields=('id','commandSha256','executed','status','exitCode','evidenceSha256','headSha','baseSha','requestId','opId','prNumber','ci')
     for check in checks:
         shape(check,fields);need(ident(check['id']) and check['id'] not in seen,'CHECK_DUPLICATE_OR_ID');seen.add(check['id'])
         need(check['id'] in required and check['commandSha256']==required[check['id']],'CHECK_POLICY_MISMATCH')
-        need(all(check[k]==expected[k] for k in ('headSha','baseSha','requestId')),'CHECK_SCOPE_MISMATCH')
+        need(all(type(check[k]) is type(expected[k]) and check[k]==expected[k] for k in ('headSha','baseSha','requestId','opId','prNumber')),'CHECK_SCOPE_MISMATCH')
         shape(check['ci'],('runId','runAttempt','workflowId','headSha'))
         need(all(type(check['ci'][k]) is type(expected['ci'][k]) and check['ci'][k]==expected['ci'][k] for k in check['ci']),'CHECK_CI_MISMATCH')
         need(type(check['executed']) is bool and check['status'] in ('passed','failed','not_executed'),'CHECK_STATUS_INVALID')

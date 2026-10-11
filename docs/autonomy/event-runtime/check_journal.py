@@ -67,7 +67,7 @@ def validate_receipt(receipt,b):
     need(times[1]>=times[0],'RECEIPT_TIME')
     record={k:v for k,v in receipt.items() if k not in ('evidenceSha256','check')}
     need(executor.digest(canonical(record).encode())==receipt['evidenceSha256'],'RECEIPT_EVIDENCE')
-    expected={'id':b['checkId'],'commandSha256':b['commandSha256'],'executed':True,'status':'passed' if code==0 else 'failed','exitCode':code,'evidenceSha256':receipt['evidenceSha256'],**{k:b['scope'][k] for k in ('headSha','baseSha','requestId','ci')}}
+    expected={'id':b['checkId'],'commandSha256':b['commandSha256'],'executed':True,'status':'passed' if code==0 else 'failed','exitCode':code,'evidenceSha256':receipt['evidenceSha256'],**{k:b['scope'][k] for k in ('headSha','baseSha','requestId','opId','prNumber','ci')}}
     need(canonical(receipt['check'])==canonical(expected),'RECEIPT_CHECK')
     raw=canonical(receipt);need(len(raw.encode())<=8192,'RECEIPT_BOUND');return raw
 

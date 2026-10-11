@@ -1,5 +1,6 @@
 """Actual local execution -> v2 contract; synthetic Git is not remote provenance."""
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -70,6 +71,26 @@ class ExecutionEvidenceTests(unittest.TestCase):
             self.assertEqual(result['assessment'], assessment)
             for flag in contract.FLAGS:
                 self.assertIs(result[flag], False)
+            binder_spec = importlib.util.spec_from_file_location('execution_binder', source / 'review-binding/scripts/review-evidence-envelope-binding.py')
+            binder = importlib.util.module_from_spec(binder_spec); binder_spec.loader.exec_module(binder)
+            actor = {'id':209825114,'login':'claude[bot]','type':'Bot'}
+            stamp = '2026-10-11T20:00:00Z'
+            def bind_body(raw, expected_scope):
+                observed = {'repository':scope['repository'],'issueNumber':571,'eventAction':'created','comment':{'id':789,'user':actor,'created_at':stamp,'updated_at':stamp,'body':raw}}
+                expected = {'scope':expected_scope,'actor':actor,'version':{'commentId':789,'createdAt':stamp,'updatedAt':stamp,'bodySha256':hashlib.sha256(raw.encode()).hexdigest()},'issueNumber':571,'reviewerFamily':'claude'}
+                return binder.bind_envelope(json.dumps(observed),json.dumps(expected),json.dumps(executor.REQUIRED_POLICY))
+            self.assertEqual(bind_body(body, scope)['decision'],'CANDIDATE_REVIEW')
+            # Replay the unchanged RECOVERED actual execution check under a new
+            # claim/pin while request/head/base/CI all remain identical.
+            for changed in ({'opId':'OP-OTHER'},{'prNumber':704}):
+                target = {**scope,**changed}; target_claim = {**claim,**changed}
+                with self.assertRaisesRegex(ValueError,'CHECK_SCOPE_MISMATCH'):
+                    contract.produce_envelope(json.dumps(target_claim),json.dumps(assessment),json.dumps(target),json.dumps(executor.REQUIRED_POLICY))
+                forged = json.loads(body);forged['claim']=target_claim
+                forged['evidenceSha256']=contract.digest({k:v for k,v in forged.items() if k!='evidenceSha256'})
+                rejected=bind_body(contract.canonical(forged),target)
+                self.assertEqual(rejected['reason'],'CHECK_SCOPE_MISMATCH');self.assertIsNone(rejected['plannerResponse'])
+                self.assertIsNone(rejected['reviewBinding'])
             for mutation in ({'headSha': 'f' * 40}, {'status': 'failed', 'exitCode': 1}):
                 altered = copy.deepcopy(assessment)
                 altered['checks'][0].update(mutation)

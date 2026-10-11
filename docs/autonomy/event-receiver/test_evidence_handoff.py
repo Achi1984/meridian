@@ -38,6 +38,7 @@ class EvidenceHandoffTests(unittest.TestCase):
             'executed': True, 'status': 'passed', 'exitCode': 0,
             'evidenceSha256': 'e' * 64, 'headSha': scope['headSha'],
             'baseSha': scope['baseSha'], 'requestId': scope['requestId'],
+            'opId': scope['opId'], 'prNumber': scope['prNumber'],
             'ci': dict(scope['ci']),
         }]}
         body = self.binder._contract.produce_envelope(

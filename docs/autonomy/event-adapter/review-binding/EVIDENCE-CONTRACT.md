@@ -15,7 +15,7 @@ Assessment contains exactly findings and checks. Up to 16 findings contain sever
 
 ```text
 id, commandSha256, executed, status, exitCode, evidenceSha256,
-headSha, baseSha, requestId, ci
+headSha, baseSha, requestId, opId, prNumber, ci
 ```
 
 CI identity is the exact runId/runAttempt/workflowId/headSha already pinned independently. A not_executed check requires executed=false, exitCode=null and evidenceSha256=null. Passed/failed checks require executed=true and a SHA256 evidence reference; passed requires exit 0, failed requires exit 1–255. Boolean exit codes are rejected. Evidence hashes refer to caller-supplied execution evidence; the contract does not retrieve or authenticate that evidence.
@@ -39,3 +39,5 @@ python -I review-binding/test/test_review_evidence_contract.py
 ```
 
 Eleven tests cover deterministic serialization, all false authority, assessment tampering, rehashed wrong scope/CI/policy, missing/failed/not-executed mandatory checks, duplicate/unexpected checks, blocking findings, contradictory execution status, adverse verdict preservation, findings inside body integrity, independent policy replacement/emptiness rejection, bounds, duplicate JSON keys and missing verdict rejection. All check records are synthetic; no tested command is asserted to have run by this contract.
+
+Each check now explicitly binds opId and prNumber as well as request/head/base/CI. Scope comparison is type-exact (a boolean cannot substitute for PR number 1). Older check projections lacking either field fail closed; reconstructing a review requires the original execution scope, never filling the missing fields from a new target claim.

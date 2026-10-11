@@ -95,5 +95,5 @@ def execute_check(repo_root, expected_scope, timeout_seconds=30):
     evidence=digest(canonical(record).encode())
     check={'id':CHECK_ID,'commandSha256':COMMAND_SHA256,'executed':True,
            'status':'passed' if code==0 else 'failed','exitCode':code,'evidenceSha256':evidence,
-           **{key:scope[key] for key in ('headSha','baseSha','requestId','ci')}}
+           **{key:scope[key] for key in ('headSha','baseSha','requestId','opId','prNumber','ci')}}
     return {**record,'evidenceSha256':evidence,'check':check}

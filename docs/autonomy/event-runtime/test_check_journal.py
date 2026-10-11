@@ -15,7 +15,7 @@ import check_executor as e
 def scope(n=1):return {'repository':'Achi1984/meridian','requestId':'REQ'+str(n),'opId':'OP'+str(n),'headSha':'a'*40,'baseSha':'b'*40,'prNumber':703,'ci':{'runId':123,'runAttempt':1,'workflowId':456,'headSha':'a'*40}}
 def receipt(s,code=0):
  r={'kind':'LOCAL_CHECK_EXECUTION','scope':s,'commandSha256':e.COMMAND_SHA256,'exitCode':code,'stdoutSha256':e.digest(b'out'),'stderrSha256':e.digest(b''),'startedAt':'2026-10-11T20:00:00.000000Z','finishedAt':'2026-10-11T20:00:01.000000Z',**e.FLAGS}
- r['evidenceSha256']=e.digest(e.canonical(r).encode());r['check']={'id':e.CHECK_ID,'commandSha256':e.COMMAND_SHA256,'executed':True,'status':'passed' if code==0 else 'failed','exitCode':code,'evidenceSha256':r['evidenceSha256'],**{k:s[k] for k in ('headSha','baseSha','requestId','ci')}};return r
+ r['evidenceSha256']=e.digest(e.canonical(r).encode());r['check']={'id':e.CHECK_ID,'commandSha256':e.COMMAND_SHA256,'executed':True,'status':'passed' if code==0 else 'failed','exitCode':code,'evidenceSha256':r['evidenceSha256'],**{k:s[k] for k in ('headSha','baseSha','requestId','opId','prNumber','ci')}};return r
 class Tests(unittest.TestCase):
  def setUp(self):self.tmp=tempfile.TemporaryDirectory();self.db=str(pathlib.Path(self.tmp.name)/'checks.sqlite');j.initialize(self.db)
  def tearDown(self):self.tmp.cleanup()
@@ -71,6 +71,19 @@ class Tests(unittest.TestCase):
   x=receipt(s);x['scope']=dict(s,prNumber=True)
   record={k:v for k,v in x.items() if k not in ('check','evidenceSha256')};x['evidenceSha256']=e.digest(e.canonical(record).encode());x['check']['evidenceSha256']=x['evidenceSha256']
   with self.assertRaisesRegex(j.JournalError,'RECEIPT_BINDING'):j.complete(self.db,r,x)
+ def test_check_projection_operation_pr_and_legacy_omission_rejected(self):
+  r=j.mark_started(self.db,self.reserve())
+  for key,value in (('opId','OP-OTHER'),('prNumber',704),('prNumber',True)):
+   x=receipt(scope());x['check'][key]=value
+   with self.assertRaisesRegex(j.JournalError,'RECEIPT_CHECK'):j.complete(self.db,r,x)
+  for key in ('opId','prNumber'):
+   x=receipt(scope());del x['check'][key]
+   with self.assertRaisesRegex(j.JournalError,'RECEIPT_CHECK'):j.complete(self.db,r,x)
+  done=j.complete(self.db,r,receipt(scope()))
+  with sqlite3.connect(self.db) as c:
+   raw,bound=c.execute('SELECT receipt,binding FROM checks').fetchone();old=json.loads(raw);del old['check']['opId'];raw=j.canonical(old)
+   c.execute('UPDATE checks SET receipt=?,digest=?',(raw,j.identity(bound+'\n'+raw)))
+  with self.assertRaisesRegex(j.JournalError,'RECEIPT_CHECK'):self.recover()
  def test_capacity_no_pruning(self):
   old=j.MAX_ROWS;j.MAX_ROWS=0
   try:
