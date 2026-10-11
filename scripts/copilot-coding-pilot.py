@@ -81,11 +81,14 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def publisher_token():
-    token = os.environ.get('MERIDIAN_PUBLISHER_TOKEN', '')
+def validate_publisher_config():
     require(type(PUBLISHER_BOT_LOGIN) is str and re.fullmatch(r'[a-zA-Z0-9-]+\[bot\]', PUBLISHER_BOT_LOGIN),
             'Publisher bot identity not configured')
-    require(token.startswith('ghs_') and len(token) > 4 and not any(c.isspace() for c in token)
+
+
+def validate_publisher_token(token):
+    validate_publisher_config()
+    require(type(token) is str and token.startswith('ghs_') and 4 < len(token) <= 4096 and not any(c.isspace() for c in token)
             and token != os.environ.get('GH_TOKEN'), 'Separate installation publisher token required')
     # Token format is not proof of installation scope or expiry; minting is a separate gate.
     return token
@@ -96,13 +99,13 @@ def draft_payload():
         'body':'One preapproved documentation/test packet. Ledger text is model output; test code is an exact trusted template. Requires maintainer review and CI approval. No runtime or research changes; no merge authorization.'}
 
 
-def api(path, method='GET', payload=None, expected=200, *, publisher=False):
+def api(path, method='GET', payload=None, expected=200, *, publisher_token=None):
     remaining()
     require(path and not path.startswith('/') and '..' not in path, 'Invalid API path')
-    if publisher:
+    if publisher_token is not None:
         require(path == 'pulls' and method == 'POST' and expected == 201 and payload == draft_payload(),
                 'Publisher credential restricted to the fixed Draft creation')
-        token = publisher_token()
+        token = validate_publisher_token(publisher_token)
     else:
         require(not (path == 'pulls' and method == 'POST'), 'Draft creation requires separate publisher')
         token = os.environ['GH_TOKEN']
@@ -448,10 +451,11 @@ def validate_published_draft(pr, commit, base):
     return pr['number']
 
 
-def publish():
+def publish(publisher_factory=None):
     evidence = identity()
     claim_sha, tree = validate_claim(evidence)
-    publisher_token()  # Fail before downloads or publication writes when configuration is absent.
+    validate_publisher_config()
+    require(callable(publisher_factory), 'Publisher context factory not configured')
     artifact_id = os.environ['ARTIFACT_ID']
     require(re.fullmatch('[1-9][0-9]*', artifact_id), 'Invalid artifact ID')
     artifact = api('actions/artifacts/' + artifact_id)
@@ -483,13 +487,21 @@ def publish():
     require(updated['object']['sha'] == commit['sha'], 'Branch update outcome unknown')
     require(identity() == evidence, 'Evidence changed before Draft creation')
     require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'], 'Output branch changed before Draft creation')
-    pr = api('pulls', 'POST', draft_payload(), 201, publisher=True)
-    validate_published_draft(pr, commit['sha'], evidence['base'])
+    # No App token is requested during artifact processing or ordinary branch writes.
+    # The trusted, separately reviewed factory must revoke in its finally block.
+    with publisher_factory() as token:
+        validate_publisher_token(token)
+        require(identity() == evidence, 'Evidence changed during publisher authentication')
+        require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'],
+                'Output branch changed during publisher authentication')
+        pr = api('pulls', 'POST', draft_payload(), 201, publisher_token=token)
+        validate_published_draft(pr, commit['sha'], evidence['base'])
     print('DRAFT_CREATED; trusted test template only; no merge authorization')
 
 
 if __name__ == '__main__':
     require(len(sys.argv) == 2 and sys.argv[1] in {'claim','generate','publish','verify-cli'}, 'Unknown phase')
     {'claim':claim, 'generate':generate, 'publish':publish, 'verify-cli':verify_installed_cli}[sys.argv[1]]()
+
 
 
