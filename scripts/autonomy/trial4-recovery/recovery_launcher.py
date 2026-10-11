@@ -84,7 +84,12 @@ class ExecutionBudget:
             # Set the logical deadline first so stale pending signals cannot raise.
             self.alarm_deadline = next_deadline
             self.cleanup_deadline = next_deadline
-            signal.setitimer(signal.ITIMER_REAL, max(.001, self.cleanup_deadline - time.monotonic()))
+        remaining = self.cleanup_deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('RECOVERY_CLEANUP_BUDGET')
+        # A previous one-shot alarm may have been caught by an observer.
+        # Every entry restores only the original absolute deadline's remainder.
+        signal.setitimer(signal.ITIMER_REAL, remaining)
 
     @contextlib.contextmanager
     def cleanup(self):

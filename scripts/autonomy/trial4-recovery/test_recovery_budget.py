@@ -131,9 +131,42 @@ class BudgetTests(unittest.TestCase):
             b.begin_cleanup();deadline=b.cleanup_deadline
             b.begin_cleanup();b.expired(None,None)
             self.assertEqual(b.cleanup_deadline,deadline)
-            self.assertEqual([x.args[1] for x in alarm.call_args_list],[60,60])
+            self.assertEqual([x.args[1] for x in alarm.call_args_list],[60,60,60])
         with patch.object(l.time,'monotonic',return_value=161):
             with self.assertRaises(TimeoutError):b.expired(None,None)
+
+    def test_repeated_cleanup_rearms_remaining_and_never_extends_deadline(self):
+        b=l.ExecutionBudget()
+        with patch.object(l.signal,'setitimer') as alarm:
+            with patch.object(l.time,'monotonic',return_value=100):b.begin_cleanup()
+            with patch.object(l.time,'monotonic',return_value=115):b.begin_cleanup()
+            self.assertEqual(b.cleanup_deadline,160)
+            self.assertEqual([x.args[1] for x in alarm.call_args_list],[60,45])
+            with patch.object(l.time,'monotonic',return_value=160):
+                with self.assertRaises(TimeoutError):b.begin_cleanup()
+            self.assertEqual(len(alarm.call_args_list),2)
+
+    def test_swallowed_cleanup_expiry_forbids_delete_and_false_receipt(self):
+        clock=[100]
+        with patch.object(l.time,'monotonic',side_effect=lambda:clock[0]):
+            b=l.ExecutionBudget();b.job_end=time.time()+1200
+            broker,factory,calls=self.broker_fixture(b)
+            original_observe=factory.observe
+            def observe(event,**fields):
+                if event=='revocation_attempted':
+                    clock[0]=b.cleanup_deadline+1
+                    b.expired(None,None)  # Broker catches this observer exception.
+                return original_observe(event,**fields)
+            factory.observe=observe
+            b.install()
+            try:
+                with self.assertRaises(broker.BrokerError):
+                    with factory():pass
+                self.assertEqual([m for m,u in calls].count('POST'),1)
+                self.assertEqual([m for m,u in calls].count('DELETE'),0)
+                with self.assertRaises(ValueError):factory.receipt()
+                self.assertEqual(b.cleanup_deadline,160)
+            finally:b.close()
 
     def test_operation_alarm_is_replaced_not_rearmed_for_cleanup(self):
         b=l.ExecutionBudget()
