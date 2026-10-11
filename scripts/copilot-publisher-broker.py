@@ -156,13 +156,17 @@ def jwt(pins, sign, now):
 
 
 @contextlib.contextmanager
-def publisher_token(*, http, sign, pins=None, clock=time.time):
+def publisher_token(*, http, sign, pins=None, clock=time.time, observer=None):
     """Yield one scoped credential to trusted publisher only; revoke on every exit.
 
     Unknown mint outcomes stop without retry. If no token was received, revocation
     is impossible and the caller must reconcile before any subsequent attempt.
     GitHub lifetime remains up to one hour; local pilot deadlines do not shorten it.
     """
+    def observe(event, **fields):
+        if observer is not None:
+            observer(event, **fields)
+
     token = None
     failure = None
     revoke_failed = False
@@ -186,16 +190,21 @@ def publisher_token(*, http, sign, pins=None, clock=time.time):
                 and app.get('slug') == approved['app_slug'])
         account(app.get('owner'), approved)
         permissions(app.get('permissions'))
+        observe('app_verified', app_id=approved['app_id'])
         stage = 'installation identity'
         installation(get('/app/installations/' + str(approved['installation_id'])), approved)
         # App JWT verifies this exact repository is installed before any mint.
         installation(get('/repos/' + approved['repository_full_name'] + '/installation'), approved)
+        observe('installation_verified', installation_id=approved['installation_id'])
         stage = 'mint outcome unknown'
+        if observer is not None:
+            observe('mint_attempted', mint_requested_at=int(clock()))
         status, minted = http('POST', API + '/app/installations/' + str(approved['installation_id']) + '/access_tokens',
                               auth, {'repository_ids':[approved['repository_id']], 'permissions':{'pull_requests':'write'}})
         # Retain a usable token before validating any other response field/status.
         if type(minted) is dict and bearer(minted.get('token')):
             token = minted['token']
+        observe('mint_response_received')
         stage = 'mint response validation'
         require(status == 201 and token is not None)
         require(minted.get('repository_selection') == 'selected')
@@ -214,17 +223,28 @@ def publisher_token(*, http, sign, pins=None, clock=time.time):
                 and type(listing.get('repositories')) is list and len(listing['repositories']) == 1)
         repository(listing['repositories'][0], approved)
         require(0 < expiry - clock() <= 3600)
+        observe('scope_verified', repository_id=approved['repository_id'], expires_at=int(expiry))
         stage = 'trusted publisher'
         yield token
     except BaseException:
         failure = stage
     finally:
         if token is not None:
+            # Observer failures must never skip the actual revoke request.
+            try:
+                observe('revocation_attempted')
+            except BaseException:
+                failure = failure or 'receipt observation'
             try:
                 status, _ = http('DELETE', API + '/installation/token', token, None)
                 require(status == 204)
             except BaseException:
                 revoke_failed = True
+            else:
+                try:
+                    observe('revocation_confirmed')
+                except BaseException:
+                    failure = failure or 'receipt observation'
     if failure is not None or revoke_failed:
         message = ('Publisher broker failed at ' + failure) if failure else 'Publisher broker completed'
         if revoke_failed:
