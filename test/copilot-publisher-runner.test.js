@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const helper = fileURLToPath(new URL('../scripts/copilot-publisher-runner.py', import.meta.url));
 const workflow = readFileSync(new URL('../.github/workflows/copilot-coding-pilot.yml', import.meta.url), 'utf8');
 function python(body) {
-  const result = spawnSync('python3', ['-c', `import importlib.util, os, sys, base64, contextlib, unittest.mock as mock\nspec=importlib.util.spec_from_file_location('runner',${JSON.stringify(helper)})\nr=importlib.util.module_from_spec(spec)\nspec.loader.exec_module(r)\n${body}`], {encoding:'utf8'});
+  const result = spawnSync('python3', ['-I', '-c', `import importlib.util, os, sys, base64, contextlib, unittest.mock as mock\nspec=importlib.util.spec_from_file_location('runner',${JSON.stringify(helper)})\nr=importlib.util.module_from_spec(spec)\nspec.loader.exec_module(r)\n${body}`], {encoding:'utf8'});
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 const fixture = String.raw`
@@ -152,5 +152,53 @@ with mock.patch('builtins.print') as output:
     assert json.loads(text.split(' ',1)[1])['outcome']=='reconciliation_required'
 with mock.patch.object(r,'run'),mock.patch.object(sys,'argv',['runner.py']),mock.patch('builtins.print',side_effect=OSError('log unavailable')):
     assert r.main()==1
+`);
+});
+
+test('startup receipt distinguishes transport, module loading and prepublication failures without exception data', () => {
+  python(fixture+String.raw`
+import io, json
+marker='DO_NOT_LOG_EXCEPTION_OR_SECRET'
+real_sibling=r.sibling
+for failure,expected in [('arguments','initial'),('key','arguments_validated'),
+                         ('pilot','key_transport_validated'),('broker','pilot_loaded'),
+                         ('evidence','broker_loaded')]:
+    pilot=mock.Mock()
+    pilot.publish.side_effect=ValueError(marker)
+    def load(name):
+        if (failure=='pilot' and name=='copilot-coding-pilot.py') or (failure=='broker' and name=='copilot-publisher-broker.py'):
+            raise ValueError(marker)
+        return pilot if name=='copilot-coding-pilot.py' else real_sibling(name)
+    stdout=io.StringIO();stderr=io.StringIO()
+    value=marker if failure=='key' else key
+    argv=['runner.py','unexpected'] if failure=='arguments' else ['runner.py']
+    with mock.patch.dict(os.environ,{secret:value},clear=True),mock.patch.object(sys,'argv',argv), \
+         mock.patch.object(r,'sibling',side_effect=load),contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr), \
+         mock.patch('urllib.request.build_opener',side_effect=AssertionError('network forbidden')), \
+         mock.patch('subprocess.run',side_effect=AssertionError('child forbidden')):
+        assert r.main()==1 and secret not in os.environ
+    output=stdout.getvalue()
+    receipt=json.loads(output.split(' ',1)[1])
+    assert receipt['stage']==expected,receipt
+    assert receipt['outcome']=='stopped'
+    assert not any(receipt.get(event) for event in ('publication_attempted','mint_attempted','post_attempted'))
+    assert marker not in output+stderr.getvalue()
+    assert key not in output+stderr.getvalue()
+`);
+});
+
+test('actual isolated runner loads verified sibling files and stops without network on missing event identity', () => {
+  python(fixture+String.raw`
+import io, json
+stdout=io.StringIO();stderr=io.StringIO()
+with mock.patch.dict(os.environ,{secret:key},clear=True),mock.patch.object(sys,'argv',['runner.py']), \
+     contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr), \
+     mock.patch('urllib.request.build_opener',side_effect=AssertionError('network forbidden')) as network, \
+     mock.patch('subprocess.run',side_effect=AssertionError('child forbidden')) as child:
+    assert r.main()==1
+    assert secret not in os.environ
+    network.assert_not_called();child.assert_not_called()
+receipt=json.loads(stdout.getvalue().split(' ',1)[1])
+assert receipt['stage']=='broker_loaded' and receipt['outcome']=='stopped'
 `);
 });
