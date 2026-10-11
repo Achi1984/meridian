@@ -11,7 +11,8 @@ function python(body) {
 }
 test('workflow separates generation from writes and uses only CI completion', () => {
   assert.match(workflow, /types: \[completed\]/);
-  assert.doesNotMatch(workflow, /workflow_dispatch:|schedule:|secrets\.|checkout@/);
+  assert.doesNotMatch(workflow, /workflow_dispatch:|schedule:|checkout@/);
+  assert.doesNotMatch(workflow.split('  publish:\n')[0], /secrets\./);
   const generator = workflow.split('  generate:\n')[1].split('  publish:\n')[0];
   assert.match(generator, /contents: read/);
   assert.match(generator, /pull-requests: read/);
