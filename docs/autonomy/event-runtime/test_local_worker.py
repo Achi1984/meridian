@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import tempfile
 import time
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 import durable_inbox as inbox
@@ -59,6 +61,67 @@ class WorkerTests(unittest.TestCase):
         for key in ("authenticated", "provenanceVerified", "authorized", "dispatchAllowed", "mergeAllowed"):
             self.assertFalse(result[key]); self.assertFalse(result["decision"][key])
         self.assertEqual(json.loads(inbox.inspect_event(db, event)["resultJson"])["decision"], "READY_FOR_OWNER_DECISION")
+        restored = worker.recover_completed(db, event, binding)
+        self.assertEqual(restored["recovered"]["ledger"], result["decision"]["ledger"])
+        self.assertNotIn("planner", restored["recovered"])
+
+    def test_actual_process_crash_after_commit_recovers_without_execution(self):
+        observation, expected = self.fixtures.fixture()
+        self.input["snapshot"]["work"]["responses"] = [self.fixtures.bind(observation, expected)["plannerResponse"]]
+        raw = json.dumps(self.input, separators=(",", ":")).encode()
+        binding = {**self.binding, "payloadSha256": hashlib.sha256(raw).hexdigest()}
+        db = str(Path(self.temp.name) / "crash-after.sqlite"); inbox.initialize(db)
+        event = inbox.enqueue(db, binding)["eventId"]
+        expected_decision = worker.execute_adapter(raw.decode(), binding, 5)
+        self.assertEqual(expected_decision["ledger"]["packets"][0]["state"], "COMPLETE_DRAFT")
+        self._crash_worker(db, event, raw, "after")
+        recovered = self._recover_process(db, event, binding)
+        self.assertEqual(recovered["recovered"]["ledger"], expected_decision["ledger"])
+        self.assertEqual(recovered["recovered"]["decision"], "READY_FOR_OWNER_DECISION")
+        self.assertFalse(recovered["mergeAllowed"])
+        with self.assertRaises(inbox.InboxError): inbox.claim(db, event, "worker2")
+
+    def test_actual_process_crash_before_commit_keeps_started_nonreplayable(self):
+        self._crash_worker(self.db, self.event, self.raw, "before")
+        self.assertEqual(inbox.inspect_event(self.db, self.event)["state"], "STARTED")
+        with self.assertRaises(worker.WorkerError): worker.recover_completed(self.db, self.event, self.binding)
+        with self.assertRaises(inbox.InboxError): inbox.claim(self.db, self.event, "worker2")
+
+    def _crash_worker(self, db, event, raw, when):
+        script = r'''
+import json,os,sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import local_worker as worker
+worker.ADAPTER=Path(sys.argv[2])
+request=json.load(sys.stdin)
+original=worker.inbox.complete
+def crash(*args,**kwargs):
+    if request['when']=='before': os._exit(17)
+    original(*args,**kwargs)
+    os._exit(17)
+worker.inbox.complete=crash
+worker.run_once(request['db'],request['event'],'worker-child',request['payload'].encode())
+raise SystemExit(19)
+'''
+        result = subprocess.run([sys.executable, "-B", "-c", script, str(Path(worker.__file__).parent), str(worker.ADAPTER)],
+            input=json.dumps({"db": db, "event": event, "payload": raw.decode(), "when": when}), text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 17, result.stderr)
+
+    def _recover_process(self, db, event, binding):
+        script = r'''
+import json,sys
+sys.path.insert(0,sys.argv[1])
+import local_worker as worker
+def forbidden(*args,**kwargs):raise RuntimeError('NO_EXECUTION_DURING_RECOVERY')
+worker.execute_adapter=forbidden
+request=json.load(sys.stdin)
+print(json.dumps(worker.recover_completed(request['db'],request['event'],request['binding'])))
+'''
+        result = subprocess.run([sys.executable, "-B", "-c", script, str(Path(worker.__file__).parent)],
+            input=json.dumps({"db": db, "event": event, "binding": binding}), text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
 
     def test_database_loss_after_start_reports_unsettled_without_recreation(self):
         original = worker.execute_adapter

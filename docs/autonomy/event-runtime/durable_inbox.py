@@ -9,6 +9,7 @@ import sqlite3
 MAX_EVENTS=1000
 MAX_STORED_BYTES=1048576
 MAX_RESULT_BYTES=512
+MAX_CONTINUATION_BYTES=16384
 MAX_INT=9007199254740991
 FIELDS={'repository','eventIdentity','revisionDigest','headSha','baseSha','payloadSha256'}
 
@@ -36,6 +37,59 @@ def _validate(binding):
     return _canonical(binding)
 def _key(binding):return hashlib.sha256(_canonical([binding['repository'],binding['eventIdentity'],binding['revisionDigest']]).encode()).hexdigest()
 
+def _projection(raw,binding):
+    need(type(raw) is str,'CONTINUATION_REQUIRED')
+    try:need(len(raw.encode('utf-8'))<=MAX_CONTINUATION_BYTES,'CONTINUATION_BOUND')
+    except UnicodeError:raise InboxError('CONTINUATION_INVALID')
+    def pairs(items):
+        obj={}
+        for key,value in items:
+            need(key not in obj,'CONTINUATION_INVALID');obj[key]=value
+        return obj
+    try:value=json.loads(raw,object_pairs_hook=pairs,parse_constant=lambda _:need(False,'CONTINUATION_INVALID'))
+    except (ValueError,RecursionError):raise InboxError('CONTINUATION_INVALID')
+    flags={'authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'}
+    need(type(value) is dict and set(value)=={'kind','decision','reason','eventIdentity','revisionDigest','packetId','ledger'}|flags,'CONTINUATION_SCHEMA')
+    need(value['kind']=='OFFLINE_CONTINUATION_DECISION' and all(value[k] is False for k in flags),'CONTINUATION_AUTHORITY')
+    need(value['eventIdentity']==binding['eventIdentity'] and value['revisionDigest']==binding['revisionDigest'],'CONTINUATION_EVENT_MISMATCH')
+    need(value['decision'] in ('READY_FOR_OWNER_DECISION','WAITING_REVIEW','WAITING_CI','WAITING_AGENT','WAITING_DRAFT','BLOCKED','RECONCILE_NEW_MANIFEST','RECONCILE_EVENT'),'CONTINUATION_DECISION')
+    need(type(value['reason']) is str and re.fullmatch(r'[A-Z][A-Z0-9_]{0,119}',value['reason']),'CONTINUATION_REASON')
+    ledger=value['ledger'];lf={'dispatchAllowed','mergeAllowed','authenticated','durable'}
+    need(type(ledger) is dict and set(ledger)=={'kind','manifestDigest','revision','revoked','packets'}|lf,'CONTINUATION_LEDGER_SCHEMA')
+    need(ledger['kind']=='OFFLINE_CLAIMS_ONLY' and _digest(ledger['manifestDigest']) and type(ledger['revision']) is int and 0<=ledger['revision']<=MAX_INT
+         and type(ledger['revoked']) is bool and all(ledger[k] is False for k in lf),'CONTINUATION_LEDGER_INVALID')
+    packets=ledger['packets'];need(type(packets) is list and 1<=len(packets)<=8,'CONTINUATION_PACKETS')
+    ids=set();active=None;busy=0
+    for index,item in enumerate(packets):
+        need(type(item) is dict and set(item)=={'id','state','baseSha','headSha','ciHeadSha','reviewHeadSha','mergeSha'},'CONTINUATION_PACKET_SCHEMA')
+        need(type(item['id']) is str and re.fullmatch(r'[a-z][a-z0-9-]{0,63}',item['id']) and item['id'] not in ids,'CONTINUATION_PACKET_ID')
+        ids.add(item['id']);state=item['state'];need(state in ('READY','CLAIMED','GENERATING','CI_WAIT','REVIEW_WAIT','COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED','FAILED','UNKNOWN_OUTCOME'),'CONTINUATION_STATE')
+        for k in ('baseSha','headSha','ciHeadSha','reviewHeadSha','mergeSha'):need(item[k] is None or _sha(item[k]),'CONTINUATION_SHA')
+        if state=='READY':need(all(item[k] is None for k in ('baseSha','headSha','ciHeadSha','reviewHeadSha','mergeSha')),'CONTINUATION_HISTORY')
+        else:need(item['baseSha']==binding['baseSha'],'CONTINUATION_BASE_MISMATCH')
+        if item['headSha'] is not None:need(item['headSha']!=item['baseSha'],'CONTINUATION_SHA')
+        if state in ('CLAIMED','GENERATING'):need(all(item[k] is None for k in ('headSha','ciHeadSha','reviewHeadSha','mergeSha')),'CONTINUATION_HISTORY')
+        if state in ('CI_WAIT','REVIEW_WAIT','COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED'):need(_sha(item['headSha']),'CONTINUATION_HISTORY')
+        if state=='CI_WAIT':need(all(item[k] is None for k in ('ciHeadSha','reviewHeadSha','mergeSha')),'CONTINUATION_HISTORY')
+        if state in ('REVIEW_WAIT','COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED'):need(item['ciHeadSha']==item['headSha'],'CONTINUATION_HISTORY')
+        if state=='REVIEW_WAIT':need(item['reviewHeadSha'] is None and item['mergeSha'] is None,'CONTINUATION_HISTORY')
+        if state in ('COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED'):need(item['reviewHeadSha']==item['headSha'],'CONTINUATION_HISTORY')
+        if state=='COMPLETE_DRAFT':need(item['mergeSha'] is None,'CONTINUATION_HISTORY')
+        if state in ('MERGE_WAIT','COMPLETE_MERGED'):need(_sha(item['mergeSha']),'CONTINUATION_HISTORY')
+        if ledger['revoked']:need(state=='READY' or (state in ('FAILED','UNKNOWN_OUTCOME') and item['ciHeadSha'] is None and item['reviewHeadSha'] is None),'CONTINUATION_REVOKED')
+        if not ledger['revoked'] and state not in ('READY','FAILED','UNKNOWN_OUTCOME'):
+            need(all(previous['state'] in ('COMPLETE_DRAFT','MERGE_WAIT','COMPLETE_MERGED') for previous in packets[:index]),'CONTINUATION_PACKET_ORDER')
+        if state in ('CLAIMED','GENERATING','CI_WAIT','REVIEW_WAIT','MERGE_WAIT','UNKNOWN_OUTCOME'):busy+=1
+        if item['id']==value['packetId']:active=item
+    need(active is not None and (ledger['revoked'] or busy<=1),'CONTINUATION_ACTIVE')
+    need(active['headSha'] is None or active['headSha']==binding['headSha'],'CONTINUATION_HEAD_MISMATCH')
+    if value['decision']=='READY_FOR_OWNER_DECISION':need(active['state']=='COMPLETE_DRAFT' and not ledger['revoked'],'CONTINUATION_READINESS')
+    canonical=_canonical(value);need(len(canonical.encode())<=MAX_CONTINUATION_BYTES,'CONTINUATION_BOUND')
+    return canonical
+
+def _projection_digest(binding_json,continuation_json):
+    return hashlib.sha256((binding_json+'\n'+continuation_json).encode()).hexdigest()
+
 def initialize(database):
     """Explicit local provisioning only; existing/missing-corrupt stores never reset."""
     path=_path(database)
@@ -52,8 +106,8 @@ def initialize(database):
         connection.execute('''CREATE TABLE events (event_id TEXT PRIMARY KEY, binding TEXT NOT NULL,
             state TEXT NOT NULL CHECK(state IN ('QUEUED','CLAIMED','STARTED','COMPLETE','UNKNOWN')),
             owner TEXT, fence INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts BETWEEN 0 AND 1),
-            result_sha TEXT, result_json TEXT)''')
-        connection.execute('PRAGMA user_version=1');connection.commit()
+            result_sha TEXT, result_json TEXT, continuation_json TEXT, continuation_sha TEXT)''')
+        connection.execute('PRAGMA user_version=2');connection.commit()
     except sqlite3.Error:raise InboxError('DATABASE_CREATE_FAILED')
     finally:
         if connection is not None:connection.close()
@@ -64,7 +118,7 @@ def _connection(database):
     try:
         c=sqlite3.connect(path.as_uri()+'?mode=rw',uri=True,timeout=5,isolation_level=None)
         c.execute('PRAGMA synchronous=FULL');c.execute('PRAGMA max_page_count=1024');c.execute('BEGIN IMMEDIATE')
-        need(c.execute('PRAGMA user_version').fetchone()==(1,),'DATABASE_SCHEMA')
+        need(c.execute('PRAGMA user_version').fetchone()==(2,),'DATABASE_SCHEMA')
         need(c.execute('PRAGMA page_size').fetchone()==(4096,),'DATABASE_SCHEMA')
         need(c.execute('SELECT COUNT(*) FROM meta').fetchone()==(1,),'DATABASE_SCHEMA')
         return c
@@ -75,9 +129,30 @@ def _connection(database):
 
 def _receipt(row):
     need(row is not None,'EVENT_NOT_FOUND')
-    event_id,binding,state,owner,fence,attempts,result_sha,result_json=row
+    event_id,binding,state,owner,fence,attempts,result_sha,result_json,continuation_json,continuation_sha=row
+    decoded=json.loads(binding);need(_validate(decoded)==binding and _key(decoded)==event_id,'STORED_BINDING_CORRUPT')
+    if state in ('COMPLETE','UNKNOWN'):need(_digest(result_sha),'STORED_RESULT_DIGEST')
+    else:need(result_sha is None and result_json is None,'STORED_RESULT_STATE')
+    summary=None
+    if result_json is not None:
+        need(type(result_json) is str and len(result_json.encode())<=MAX_RESULT_BYTES,'STORED_SUMMARY_INVALID')
+        def unique(items):
+            out={}
+            for key,value in items:need(key not in out,'STORED_SUMMARY_INVALID');out[key]=value
+            return out
+        try:summary=json.loads(result_json,object_pairs_hook=unique)
+        except (ValueError,RecursionError):raise InboxError('STORED_SUMMARY_INVALID')
+        need(type(summary) is dict and set(summary)=={'decision','reason'} and type(summary['reason']) is str
+             and re.fullmatch(r'[A-Z][A-Z0-9_]{0,119}',summary['reason']),'STORED_SUMMARY_INVALID')
+        need(state!='UNKNOWN' or summary['decision']=='UNKNOWN','STORED_SUMMARY_INVALID')
+
+    if continuation_json is not None:
+        need(state=='COMPLETE' and _digest(continuation_sha),'STORED_CONTINUATION_INVALID')
+        need(_projection(continuation_json,decoded)==continuation_json and _projection_digest(binding,continuation_json)==continuation_sha,'STORED_CONTINUATION_DIGEST')
+        if summary is not None:need(all(summary[k]==json.loads(continuation_json)[k] for k in ('decision','reason')),'STORED_SUMMARY_MISMATCH')
+    else:need(state!='COMPLETE' and continuation_sha is None,'STORED_CONTINUATION_MISSING')
     return {'eventId':event_id,'binding':json.loads(binding),'state':state,'owner':owner,'fence':fence,'attempts':attempts,
-            'resultSha256':result_sha,'resultJson':result_json,'authenticated':False,'provenanceVerified':False,
+            'resultSha256':result_sha,'resultJson':result_json,'continuationJson':continuation_json,'continuationSha256':continuation_sha,'authenticated':False,'provenanceVerified':False,
             'authorized':False,'dispatchAllowed':False,'mergeAllowed':False,'mayWrite':False,'distributed':False}
 
 def _run(database,operation):
@@ -89,7 +164,7 @@ def _run(database,operation):
         if c.in_transaction:c.rollback()
         c.close()
 
-def _usage(c):return c.execute('SELECT COUNT(*),COALESCE(SUM(length(CAST(binding AS BLOB))+COALESCE(length(CAST(result_json AS BLOB)),0)),0) FROM events').fetchone()
+def _usage(c):return c.execute('SELECT COUNT(*),COALESCE(SUM(length(CAST(binding AS BLOB))+COALESCE(length(CAST(result_json AS BLOB)),0)+COALESCE(length(CAST(continuation_json AS BLOB)),0)),0) FROM events').fetchone()
 
 def enqueue(database,binding):
     serialized=_validate(binding);event_id=_key(binding)
@@ -130,7 +205,7 @@ def start(database,receipt):
         return _receipt(c.execute('SELECT * FROM events WHERE event_id=?',(row[0],)).fetchone())
     return _run(database,op)
 
-def _finish(database,receipt,outcome,result_sha256,result_json):
+def _finish(database,receipt,outcome,result_sha256,result_json,continuation_json=None):
     need(_digest(result_sha256),'RESULT_DIGEST_INVALID')
     need(result_json is None or type(result_json) is str,'RESULT_INVALID')
     if result_json is not None:
@@ -151,13 +226,20 @@ def _finish(database,receipt,outcome,result_sha256,result_json):
     def op(c):
         row=_bound(c,receipt)
         need(row[2] in (('STARTED',) if outcome=='COMPLETE' else ('CLAIMED','STARTED')),'INVALID_SETTLEMENT')
-        count,total=_usage(c);need(total+(len(result_json.encode()) if result_json is not None else 0)<=MAX_STORED_BYTES,'INBOX_CAPACITY')
-        c.execute('UPDATE events SET state=?,result_sha=?,result_json=? WHERE event_id=?',(outcome,result_sha256,result_json,row[0]))
+        need(outcome=='COMPLETE' or continuation_json is None,'UNKNOWN_HAS_CONTINUATION')
+        projection=_projection(continuation_json,json.loads(row[1])) if outcome=='COMPLETE' else None
+        projection_sha=_projection_digest(row[1],projection) if projection is not None else None
+        if result_json is not None and projection is not None:
+            summary=json.loads(result_json);record=json.loads(projection)
+            need(all(summary[k]==record[k] for k in ('decision','reason')),'CONTINUATION_SUMMARY_MISMATCH')
+
+        count,total=_usage(c);need(total+(len(result_json.encode()) if result_json is not None else 0)+(len(projection.encode()) if projection is not None else 0)<=MAX_STORED_BYTES,'INBOX_CAPACITY')
+        c.execute('UPDATE events SET state=?,result_sha=?,result_json=?,continuation_json=?,continuation_sha=? WHERE event_id=?',(outcome,result_sha256,result_json,projection,projection_sha,row[0]))
         if outcome=='COMPLETE':c.execute('UPDATE meta SET active=NULL WHERE id=1')
         return _receipt(c.execute('SELECT * FROM events WHERE event_id=?',(row[0],)).fetchone())
     return _run(database,op)
 
-def complete(database,receipt,result_sha256,result_json=None):return _finish(database,receipt,'COMPLETE',result_sha256,result_json)
+def complete(database,receipt,result_sha256,result_json=None,continuation_json=None):return _finish(database,receipt,'COMPLETE',result_sha256,result_json,continuation_json)
 def unknown(database,receipt,result_sha256,result_json=None):return _finish(database,receipt,'UNKNOWN',result_sha256,result_json)
 def inspect_event(database,event_id):
     need(_digest(event_id),'EVENT_ID_INVALID')

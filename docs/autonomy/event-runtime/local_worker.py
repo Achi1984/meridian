@@ -51,6 +51,38 @@ def strict_json(raw):
         parse_constant=lambda _: (_ for _ in ()).throw(WorkerError("NONFINITE_JSON")))
 
 
+RECOVERY_KEYS = ("kind", "decision", "reason", "eventIdentity", "revisionDigest", "ledger",
+                 "authenticated", "provenanceVerified", "authorized", "dispatchAllowed", "mergeAllowed", "durable")
+
+
+def recovery_projection(decision, binding, packet_id):
+    """Retain only the actual adapter's minimal continuation state, never planner."""
+    require(type(decision) is dict and all(key in decision for key in RECOVERY_KEYS), "RECOVERY_SHAPE")
+    require(decision["kind"] == "OFFLINE_CONTINUATION_DECISION"
+            and decision["eventIdentity"] == binding["eventIdentity"]
+            and decision["revisionDigest"] == binding["revisionDigest"], "RECOVERY_BINDING")
+    require(all(decision[key] is False for key in ("authenticated", "provenanceVerified", "authorized", "dispatchAllowed", "mergeAllowed", "durable")), "RECOVERY_AUTHORITY")
+    result = {key: decision[key] for key in RECOVERY_KEYS}
+    result["packetId"] = packet_id
+    return result
+
+
+def recover_completed(database, event_id, expected_binding):
+    """Read verified committed continuation only; never execute or reclaim work."""
+    receipt = inbox.inspect_event(database, event_id)
+    require(receipt["state"] == "COMPLETE" and receipt["binding"] == expected_binding, "RECOVERY_NOT_MATCHED_COMPLETE")
+    raw = receipt.get("continuationJson")
+    canonical_binding = json.dumps(expected_binding, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    require(type(raw) is str and hashlib.sha256((canonical_binding + "\n" + raw).encode()).hexdigest() == receipt.get("continuationSha256"), "RECOVERY_DIGEST")
+    recovered = strict_json(raw)
+    require(set(recovered) == set(RECOVERY_KEYS) | {"packetId"}, "RECOVERY_SHAPE")
+    projection = recovery_projection(recovered, expected_binding, recovered["packetId"])
+    return {"state": "COMPLETE", "eventId": event_id, "persistConfirmed": True,
+        "recovered": projection, "continuationSha256": receipt["continuationSha256"],
+        "fullResultSha256": receipt["resultSha256"], "authenticated": False, "provenanceVerified": False,
+        "authorized": False, "dispatchAllowed": False, "mergeAllowed": False}
+
+
 def execute_adapter(payload, binding, timeout_seconds, preflight=False):
     """Fixed trusted Node module; bounds enforced while pipes are consumed."""
     require(type(timeout_seconds) in (int, float) and 0 < timeout_seconds <= 10, "TIMEOUT_BOUND")
@@ -124,7 +156,9 @@ def run_once(database, event_id, owner, payload_raw, timeout_seconds=5):
         require(len(result_json.encode()) <= MAX_OUTPUT, "RESULT_BOUND")
         digest = hashlib.sha256(result_json.encode()).hexdigest()
         summary = json.dumps({"decision": decision["decision"], "reason": decision["reason"]}, separators=(",", ":"))
-        settled = inbox.complete(database, active, digest, result_json=summary)
+        projection = recovery_projection(decision, binding, value["expected"]["packetId"])
+        continuation = json.dumps(projection, sort_keys=True, separators=(",", ":"))
+        settled = inbox.complete(database, active, digest, result_json=summary, continuation_json=continuation)
         return {"state": settled["state"], "eventId": event_id, "decision": decision,
             "persistConfirmed": True,
             "authenticated": False, "authorized": False, "provenanceVerified": False,

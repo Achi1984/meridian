@@ -3,9 +3,10 @@
 `local_worker.run_once(database,event_id,owner,payload_raw)` consumes at most the
 explicitly named local inbox event. It does not select a next task, poll, invoke a
 model, access GitHub or perform remote writes. Database provisioning and enqueue
-are separate explicit operations. The database stores only event metadata/digests
-and a small decision/reason summary plus full decision SHA256, not raw payload,
-comment body, adapter snapshot or model output.
+are separate explicit operations. The schema2 database stores event metadata/digests,
+a small decision/reason summary, full decision SHA256 and a strict minimal recovery
+projection with the actual continuation ledger, not raw payload, comment body,
+planner, adapter input snapshot or model output.
 
 Before claiming, the worker compares exact input bytes SHA256 and expected scope
 to the persisted binding and calls the actual canonical event normalizer through
@@ -28,11 +29,18 @@ If settlement itself cannot be persisted, the returned state is UNSETTLED with
 loss or SIGKILL may leave CLAIMED/STARTED; restart cannot replay that consumed
 event or clear the active slot. Operator reconciliation is intentionally required.
 This local fence is not an expiring lease and does not coordinate separate hosts.
-Only the summary and full-result digest persist. A crash after COMPLETE before the
-caller receives the full adapter result cannot reconstruct its continuation ledger
-from this inbox and cannot replay the consumed event. An atomic durable ledger/result
-handoff is a remaining deployment prerequisite; this packet does not provide full
-autonomous result recovery.
+COMPLETE settlement stores the minimal actual adapter decision/ledger projection
+in the same transaction as state/fence settlement. Its separate digest binds the
+canonical inbox binding (including payload/head/base/event revision) and projection.
+`recover_completed(database,event_id,expected_binding)` verifies matching completed
+state, independently supplied binding and the stored digest, then returns the
+allowlisted projection without executing Node, reclaiming or replaying the event.
+An actual subprocess crash after commit and before return is tested: a new process
+recovers the exact COMPLETE_DRAFT ledger. A crash before commit remains STARTED and
+locked. Projection/summary consistency and structure are validated by the inbox.
+Legacy schema1 stores fail closed; this package never migrates or recreates them.
+This is same-host local result recovery, not authenticated/distributed durability,
+automatic operator reconciliation or recovery from database deletion/corruption.
 
 The existing `event-write-fence.py` requires a real changed intendedHead for remote
 write tracking; the review claim ledger binds a model invocation. Neither is
