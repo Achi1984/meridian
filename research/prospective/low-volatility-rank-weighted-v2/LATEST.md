@@ -1,11 +1,11 @@
 # Low-Volatility Rank-Weighted V2 — Prospective Shadow Snapshot
 
-Snapshot: **2026-10-03T000000Z**
-Decision/status: **PROSPECTIVE_WAITING_FOR_START**
-Cutoff: **2026-10-03T00:00:00Z**
+Snapshot: **2026-10-10T000000Z**
+Decision/status: **PROSPECTIVE_COLLECTING**
+Cutoff: **2026-10-10T00:00:00Z**
 Prospective start: **2026-10-10T00:00:00Z**
 Completed prospective observations: **0**
 Timely snapshot: **true**
 
 Research/shadow only. No Paper or live order was created. No automatic promotion.
-Source digest SHA-256: a3a1d459701b83ad00a6d488401b4d3869e643a3ca295ec94c8b68b5806194d5
+Source digest SHA-256: 351a85a037dad4cadec5c7cf2af8f29a3c431079edaef07363901a35ac6c699c

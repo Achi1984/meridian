@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "MERIDIAN-LOWVOL-RANK-WEIGHTED-V2-PROSPECTIVE-SNAPSHOT-1",
+  "snapshotId": "2026-10-10T000000Z",
+  "sourceDigestSha256": "351a85a037dad4cadec5c7cf2af8f29a3c431079edaef07363901a35ac6c699c",
+  "sourceReceipt": {
+    "manifestSha256": "ac7cf72fb53771c4a75b46fe3c567feb48b3a2804718f59f14124eca2da078dc",
+    "files": {
+      "BTC": "fa8aa19f68000686766ba9b196808ed2a436e8b8ff81574e4e57586f494ec575",
+      "ETH": "24bcc086877c787169451611257e41af3460c38aeee14e3901a17a37cefd6236",
+      "BNB": "978cf14f1e762e9646c5407c50bafc12a29d91c668876b4308031b4c3af684f1",
+      "SOL": "e71952c64c610c5b2966a075c56973e7361a880b9f1ad81f5f95b8ae2159116d",
+      "XRP": "4eb9d4d586477c38113ae483d741809d6923960e1d7c44c26a209fd8ed25674e",
+      "ADA": "6b5be1b7716431b0734964f3422fdd85f069bc5cc0cd5c5088d4496ca4433713",
+      "DOGE": "8b58493cf581eebcf1823425437656b42d570f1749ecedce1246ada1abf7620d",
+      "LINK": "dde0e911bb9e8e4448b60bbb21db730dddaeba856dc2b9b543c3db09935bb28f",
+      "DOT": "56e426f4131b915b414f03e9412f978a8b1b754547e67375b086380d284545ba",
+      "LTC": "02d635ac9b6eaf9cb4db59fadf5d6b3e8358cf83c91ed28049f35542bb4c8a75",
+      "BCH": "7c4eb59b3e79ca3ebaecb2a0b2ed48d60e13264bf2d09f28044c4617f15ee3d7",
+      "AVAX": "eb8330705d8800e7737cc04fca41c583396a124f6e8b5056e783b0beb774cd1b"
+    },
+    "manifestPayloadSha256": "c6eef111e3575bc77825c797d83d6d6b3aeabfaf0c8643165d14913176d77650"
+  },
+  "binanceServerTime": 1791708305499,
+  "sourceCollectedAt": 1791708305499,
+  "cutoff": 1791590400000,
+  "cutoffIso": "2026-10-10T00:00:00Z",
+  "prospectiveStart": 1791590400000,
+  "prospectiveStartIso": "2026-10-10T00:00:00Z",
+  "result": {
+    "ruleset": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+    "stage": "PROSPECTIVE_PAPER_SHADOW",
+    "decision": "PROSPECTIVE_COLLECTING",
+    "prospectiveStart": 1791590400000,
+    "gateEnd": 1798848000000,
+    "cutoff": 1791590400000,
+    "collectedAt": 1791708305499,
+    "timely": true,
+    "completedObservations": 0,
+    "eligibleGateObservations": 0,
+    "researchOnly": true,
+    "executionImpact": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false,
+    "autoPromotion": false,
+    "holdoutDecision": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+    "dataIntegrityFailure": false,
+    "monitoring": null,
+    "gateSample": null,
+    "gate": null
+  }
+}
