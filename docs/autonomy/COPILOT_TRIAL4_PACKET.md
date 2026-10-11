@@ -1,6 +1,6 @@
 # Proposed finite Trial4 — awaiting concrete activation approval
 
-This is a preparation candidate, not activation authority. Do not trigger the source run until the final source/workflow commit has independent review, owner approval and green CI, and all controls below have been verified live. Placeholder loader pins are not publishable.
+This is a preparation candidate, not activation authority. Do not trigger the source run until the final source/workflow commit has independent review, owner approval and green CI, and all controls below have been verified live. Immutable source anchoring is complete as recorded below; verify the pinned bytes against the final candidate before approval.
 
 ## Fixed packet
 
@@ -20,7 +20,7 @@ The model generates only the isolated Trial4 ledger text for the existing #646/#
 
 ## Activation sequence
 
-1. Complete real immutable source anchoring for helper, broker and runner, and replace every local placeholder with that verified commit and each actual SHA-256. Preserve the existing loader test unchanged.
+1. Verify the completed immutable source anchor `a34163015220d688c14cba044713ddc9684cab44` and the three SHA-256 pins recorded in the workflow against the actual helper, broker and runner bytes. Anchoring is already complete; no placeholder replacement remains. Preserve the existing loader test unchanged.
 2. Obtain independent review and explicit owner approval for the exact activation changes, including the model invocation before the publisher environment gate. Keep additional paid usage disabled and verify available quota.
 3. Reverify effective main protections with no bypass and the publisher environment restricted to main with owner approval. The lead has verified the active ruleset requires one approving review. For #686, Copilot submitted native `APPROVED` on exact head `99eff9111d4ca42d8d89cd88ee5b2831c36282bb`, and GitHub displayed one approving review under merge requirements. This observed acceptance does not approve this Trial4 candidate or a different head. The separate independent exact-head review gate remains required.
 4. Merge only with exact-head CI/review and owner authorization. Wait until both Release Safety and Runtime Smoke push runs on that final control-main commit succeed. Reconcile the live source PR still open at the exact pinned head, source run still at attempt 1, fresh branch absent, and deadline still sufficient.
