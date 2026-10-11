@@ -1,7 +1,11 @@
 import copy
 import json
 import unittest
-from collector import GitHub, NoRedirect, MAX_BYTES, Rejected, decode, reconcile
+import urllib.error
+import os
+import subprocess
+from pathlib import Path
+from collector import GitHub, NoRedirect, MAX_BYTES, MAX_LOG, Rejected, decode, reconcile, parse_tap_summary, ci_evidence, adapter_ci_fields
 
 A, B, C = (x * 40 for x in "abc")
 REPO = {"full_name": "Achi1984/meridian", "id": 1342084551, "fork": False}
@@ -12,10 +16,28 @@ class API:
         self.rows, self.calls = rows, []
     def __call__(self, path):
         self.calls.append(path)
+        if "/jobs?" in path and path not in self.rows:
+            return {"total_count": 1, "jobs": [job(self.rows["actions/runs/123"])]}
         value = self.rows[path]
         if isinstance(value, Exception):
             raise value
         return copy.deepcopy(value)
+    def job_log(self, job_id):
+        self.calls.append("job-log/" + str(job_id))
+        return self.rows.get("log", tap())
+
+
+def job(run, identity=456):
+    return {"id": identity, "run_id": run["id"], "run_attempt": run["run_attempt"], "head_sha": run["head_sha"],
+            "name": "syntax", "status": "completed", "conclusion": "success",
+            "steps": [{"name": "Research and auth regression tests", "number": 9, "status": "completed", "conclusion": "success"}]}
+
+
+def tap():
+    lines = ["##[group]Run node --test test/*.test.js", "##[endgroup]", "# \\# tests 99",
+             "# tests 10", "# pass 10", "# fail 0", "# cancelled 0", "# skipped 0", "# todo 0",
+             "##[group]Run node scripts/release-sync.mjs --check"]
+    return "\n".join("2026-10-11T19:15:04.3410297Z " + line for line in lines).encode()
 
 
 def workflow():
@@ -45,7 +67,14 @@ class Tests(unittest.TestCase):
         self.assertEqual(r["source"]["baseSha"], A)
         self.assertFalse(r["dispatchAllowed"])
         self.assertFalse(r["mergeAllowed"])
-        self.assertEqual(api.calls, ["commits/main", "actions/runs/123", "pulls/702", "commits/main"])
+        self.assertEqual(api.calls, ["commits/main", "actions/runs/123", "pulls/702",
+            "actions/runs/123/attempts/1/jobs?per_page=50&page=1", "job-log/456", "actions/runs/123", "commits/main"])
+        self.assertEqual(r["source"]["ciEvidence"]["jobs"][0]["total"], 10)
+        mapped = r["source"]["ciEvidence"]["adapterFields"]
+        self.assertEqual(mapped["workCi"], {"headSha": B, "baseSha": A, "runId": 123,
+            "jobs": [{"name": "syntax", "conclusion": "SUCCESS", "total": 10, "passed": 10, "failed": 0}]})
+        self.assertEqual(mapped["ciBinding"], {"headSha": B, "runId": 123, "runAttempt": 1, "workflowId": 347821227})
+        self.assertFalse(r["source"]["ciEvidence"]["authenticated"])
 
     def test_wrong_repository_and_fork(self):
         for bad in ({"full_name": "attacker/repo", "fork": False}, {"full_name": "Achi1984/meridian", "fork": True}):
@@ -88,6 +117,7 @@ class Tests(unittest.TestCase):
             if path == "commits/main" and path in api.calls:
                 return {"sha": C}
             return api(path)
+        moved.job_log = api.job_log
         with self.assertRaisesRegex(Rejected, "MAIN_MOVED"): reconcile("workflow_run", e, A, moved)
 
     def test_push_only_current_main(self):
@@ -158,6 +188,122 @@ class Tests(unittest.TestCase):
                 return response
         gh.opener = Oversized()
         with self.assertRaisesRegex(Rejected, "RESPONSE_SIZE"): gh("commits/main")
+
+    def test_job_pagination_complete_partial_duplicate(self):
+        e, api = workflow(); run = api.rows["actions/runs/123"]
+        jobs = [job(run, i + 1) for i in range(51)]
+        for i, j in enumerate(jobs[1:]): j["name"] = "other-" + str(i)
+        one = "actions/runs/123/attempts/1/jobs?per_page=50&page=1"
+        two = "actions/runs/123/attempts/1/jobs?per_page=50&page=2"
+        api.rows[one] = {"total_count": 51, "jobs": jobs[:50]}
+        api.rows[two] = {"total_count": 51, "jobs": jobs[50:]}
+        self.assertEqual(ci_evidence(api, run)["jobCount"], 51)
+        api.rows[two]["jobs"] = []
+        with self.assertRaisesRegex(Rejected, "JOB_PAGE_PARTIAL"): ci_evidence(api, run)
+        api.rows[two]["jobs"] = [jobs[0]]
+        with self.assertRaisesRegex(Rejected, "JOB_DUPLICATE"): ci_evidence(api, run)
+        api.rows[two]["total_count"] = 52
+        with self.assertRaisesRegex(Rejected, "JOB_PAGE_PARTIAL"): ci_evidence(api, run)
+
+    def test_job_wrong_attempt_and_step(self):
+        e, api = workflow(); run = api.rows["actions/runs/123"]
+        key = "actions/runs/123/attempts/1/jobs?per_page=50&page=1"
+        j = job(run); j["run_attempt"] = 2
+        api.rows[key] = {"total_count": 1, "jobs": [j]}
+        with self.assertRaisesRegex(Rejected, "JOB_SCOPE"): ci_evidence(api, run)
+        j["run_attempt"] = 1; j["steps"] = []
+        with self.assertRaisesRegex(Rejected, "TEST_STEP_IDENTITY"): ci_evidence(api, run)
+        j["steps"] = job(run)["steps"]; j["conclusion"] = "failure"
+        with self.assertRaisesRegex(Rejected, "REQUIRED_JOB_NOT_SUCCESS"): ci_evidence(api, run)
+
+    def test_run_attempt_changes_during_log_read(self):
+        e, api = workflow(); original = copy.deepcopy(api.rows["actions/runs/123"])
+        def changed_log(identity):
+            api.rows["actions/runs/123"]["run_attempt"] = 2
+            return tap()
+        api.job_log = changed_log
+        with self.assertRaisesRegex(Rejected, "RUN_MOVED"): ci_evidence(api, original)
+
+    def test_adapter_mapping_does_not_promote_modified_claims(self):
+        e, api = workflow(); evidence = ci_evidence(api, api.rows["actions/runs/123"])
+        for key, value in (("conclusion", "failure"), ("total", 0), ("passed", 9), ("failed", None)):
+            bad = copy.deepcopy(evidence); bad["jobs"][0][key] = value
+            with self.assertRaises(Rejected): adapter_ci_fields(bad, A)
+        bad = copy.deepcopy(evidence); bad["authenticated"] = True
+        with self.assertRaises(Rejected): adapter_ci_fields(bad, A)
+
+    def test_actual_sibling_adapter_consumes_collector_projection(self):
+        default = Path(__file__).resolve().parent.parent / "event-adapter/scripts/event-continuation-adapter.mjs"
+        adapter = Path(os.environ.get("MERIDIAN_TEST_ADAPTER", str(default))).resolve()
+        self.assertTrue(adapter.is_file(), "stage sibling event-adapter or set MERIDIAN_TEST_ADAPTER for local tests")
+        event, api = workflow()
+        receipt = reconcile("workflow_run", event, A, api)
+        program = r'''
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const location=process.argv[1];
+const {reconcileContinuation}=await import(location);
+const {normalizeEvent}=await import(new URL('../fixtures/scripts/event-continuation-intake.mjs',location));
+const {initialLedger,advance}=await import(new URL('../fixtures/scripts/continuation-contract.mjs',location));
+const {receipt,payload}=JSON.parse(readFileSync(0,'utf8'));
+const A='a'.repeat(40),B='b'.repeat(40),repository='Achi1984/meridian';
+const mapped=receipt.source.ciEvidence.adapterFields;
+const expected={repository,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60};
+const paths=['docs/v11/first.md','test/v11-first.test.js'];
+const manifest={schema:1,repository,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:1,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:[{id:'first',paths,dependencies:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}]};
+let ledger=initialLedger(manifest);
+for(const [type,sha] of [['CLAIM',A],['MODEL_STARTED',null],['DRAFT_OBSERVED',B]])ledger=advance(manifest,ledger,{type,sha,packetId:'first',expectedRevision:ledger.revision},1500);
+const config={repository,mailboxIssue:571,workflowIds:[347821227]};
+const trigger={name:'workflow_run',payloadJson:JSON.stringify(payload)};
+const normalized=normalizeEvent(trigger.name,trigger.payloadJson,JSON.stringify(config));
+const work={deliveryId:'EVT001',workId:'WORK001',repository,requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,paths,owner:'CODEX',execution:'PLANNED',ci:mapped.workCi,responses:[],inFlight:[]};
+const snapshot={repository,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:{eventIdentity:normalized.eventIdentity,revisionDigest:normalized.revisionDigest},ciBinding:mapped.ciBinding};
+const result=reconcileContinuation({trigger,config,expected,snapshot,manifest,ledger,requiredJobs:['syntax']});
+assert.equal(result.decision,'WAITING_REVIEW');assert.equal(result.ledger.packets[0].state,'REVIEW_WAIT');
+for(const key of ['authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'])assert.equal(result[key],false);
+console.log('collector-to-existing-adapter: WAITING_REVIEW; authority false');
+'''
+        result = subprocess.run(["node", "--input-type=module", "-e", program, adapter.as_uri()],
+            input=json.dumps({"receipt": receipt, "payload": event}), capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("WAITING_REVIEW", result.stdout)
+
+    def test_totals_missing_ambiguous_failed_and_nested(self):
+        self.assertEqual(parse_tap_summary(tap())["total"], 10)
+        for raw in (tap().replace(b"# pass 10", b"# pass 9"), tap().replace(b"# tests 10", b"# \\# tests 10"),
+                    tap().replace(b"# skipped 0", b"# skipped 1"), tap() + b"\n" + tap(),
+                    tap().replace(b"# tests 10", b"# tests 10\n2026-10-11T19:15:04Z # tests 10")):
+            with self.assertRaises(Rejected): parse_tap_summary(raw)
+
+    def test_job_logs_redirect_strips_token_bounds_and_rejects(self):
+        gh = GitHub("secret-test-token")
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, size): self.size = size; return tap()
+        class Opener:
+            destination = "https://example.blob.core.windows.net/log?sig=opaque"
+            def __init__(self): self.requests = []
+            def open(self, req, timeout):
+                self.requests.append(req)
+                if len(self.requests) == 1:
+                    raise urllib.error.HTTPError(req.full_url, 302, "redirect", {"Location": self.destination}, None)
+                self.response = Response(); return self.response
+        stub = Opener(); gh.opener = stub
+        self.assertEqual(gh.job_log(456), tap())
+        self.assertIn("Authorization", dict(stub.requests[0].header_items()))
+        self.assertNotIn("Authorization", dict(stub.requests[1].header_items()))
+        self.assertEqual(stub.response.size, MAX_LOG + 1)
+        for destination in ("https://attacker.invalid/log", "http://a.blob.core.windows.net/log", "https://user:pass@a.blob.core.windows.net/log", "https://a.blob.core.windows.net:444/log"):
+            stub = Opener(); stub.destination = destination; gh.opener = stub
+            with self.assertRaises(Rejected): gh.job_log(456)
+            self.assertEqual(len(stub.requests), 1)
+        class Again(Opener):
+            def open(self, req, timeout):
+                raise urllib.error.HTTPError(req.full_url, 302, "redirect", {"Location": self.destination}, None)
+        gh.opener = Again()
+        with self.assertRaises(Rejected): gh.job_log(456)
 
 
 if __name__ == "__main__":
