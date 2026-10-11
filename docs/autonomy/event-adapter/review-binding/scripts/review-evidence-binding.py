@@ -56,7 +56,9 @@ def guard_exact_comment(observation_raw, expected_raw):
     _need('copilot' not in actor['login'].lower(), 'COPILOT_SUBSTITUTION_REJECTED')
     _need(actor == {'id':209825114,'login':'claude[bot]','type':'Bot'}, 'CLAUDE_ACTOR_PIN_REQUIRED')
     _need(scope['repository'] == observed['repository'] == 'Achi1984/meridian'
-          and _positive(expected['issueNumber']) and observed['issueNumber'] == expected['issueNumber'], 'REPOSITORY_OR_MAILBOX_MISMATCH')
+          and type(expected['issueNumber']) is int and type(observed['issueNumber']) is int
+          and expected['issueNumber'] == observed['issueNumber'], 'REPOSITORY_OR_MAILBOX_MISMATCH')
+    _need(expected['issueNumber'] == 571, 'MAILBOX_PIN_REQUIRED')
     _need(observed['eventAction'] in ('created','edited','deleted'), 'EVENT_ACTION_INVALID')
     _need(_positive(version['commentId']) and _timestamp(version['createdAt'])
           and _timestamp(version['updatedAt']) and version['updatedAt'] >= version['createdAt']

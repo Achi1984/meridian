@@ -87,5 +87,16 @@ class BindingTests(unittest.TestCase):
     def test_mailbox_repository_and_comment_id_bound(self):
         for edit in (lambda o:o.update(repository='other/repo'),lambda o:o.update(issueNumber=572),lambda o:o['comment'].update(id=790)):
             o,e=fixture();edit(o);self.assertEqual(bind(o,e)['decision'],'BLOCKED')
+    def test_caller_cannot_reconfigure_canonical_mailbox(self):
+        for mailbox in (572,1,True,'571',571.0):
+            with self.subTest(mailbox=mailbox):
+                o,e=fixture();o['issueNumber']=e['issueNumber']=mailbox
+                result=bind(o,e)
+                self.assertEqual(result['decision'],'BLOCKED')
+                if type(mailbox) is int:self.assertEqual(result['reason'],'MAILBOX_PIN_REQUIRED')
+                self.assertIsNone(result['plannerResponse'])
+                for flag in ('authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'):
+                    self.assertIs(result[flag],False)
+        o,e=fixture();self.assertEqual(bind(o,e)['decision'],'CANDIDATE_REVIEW')
 
 if __name__=='__main__':unittest.main(verbosity=2)
