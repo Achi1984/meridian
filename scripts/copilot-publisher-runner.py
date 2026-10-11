@@ -56,6 +56,8 @@ def sibling(name):
 
 # Only fixed event names and typed scalar evidence cross this boundary.
 EVENTS = {
+    'arguments_validated': {}, 'key_transport_validated': {},
+    'pilot_loaded': {}, 'broker_loaded': {},
     'validated': {'control_run':'id', 'control_attempt':'id', 'source_run':'id',
                   'source_attempt':'id', 'source_sha':'sha', 'control_sha':'sha',
                   'claim_sha':'sha', 'branch':'branch', 'artifact_id':'id'},
@@ -110,9 +112,15 @@ class Receipt:
 
 
 def run(observer=None):
+    def observe(event):
+        if observer is not None:
+            observer(event)
     key = private_key()
+    observe('key_transport_validated')
     pilot = sibling('copilot-coding-pilot.py')
+    observe('pilot_loaded')
     broker = sibling('copilot-publisher-broker.py')
+    observe('broker_loaded')
     pilot.PUBLISHER_BOT_LOGIN = PINS['bot_login']
 
     def factory():
@@ -130,6 +138,7 @@ def main():
         if len(sys.argv) != 1:
             os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)
             raise ValueError('No publisher arguments accepted')
+        receipt.observe('arguments_validated')
         run(observer=receipt.observe)
         completed = True
         return 0
@@ -141,6 +150,7 @@ def main():
             pass
         return 1
     finally:
+        os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)
         try:
             outcome = receipt.emit(completed)
             if completed and outcome != 'success':
