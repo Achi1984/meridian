@@ -56,7 +56,7 @@ class Tests(unittest.TestCase):
    o.return_value.open.side_effect=urllib.error.HTTPError('x',302,'redirect',{'Location':'https://evil.invalid/path'},None)
    with self.assertRaises(ValueError):self.api.signed_download('actions/artifacts/11705462075/zip',20)
    self.assertEqual(o.return_value.open.call_count,1)
-  with patch.object(h.time,'time',return_value=1791741600),patch.object(h.urllib.request,'build_opener') as o:
+  with patch.object(h.time,'time',return_value=1791748800),patch.object(h.urllib.request,'build_opener') as o:
    with self.assertRaises(ValueError):self.api('git/commits','POST',{})
    o.assert_not_called()
 if __name__=='__main__':unittest.main()

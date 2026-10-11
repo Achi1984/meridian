@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DEADLINE = 1791741600
+DEADLINE = 1791748800
 ROOT = 'https://api.github.com/repos/Achi1984/meridian/'
 
 
