@@ -182,3 +182,95 @@ with mock.patch.dict(os.environ,env,clear=True),mock.patch('time.time',return_va
 `);
 });
 
+test('real broker context drives publisher HTTP credential and reconciles exceptional lifecycle outcomes', () => {
+  python(String.raw`
+spec=importlib.util.spec_from_file_location('broker',pathlib.Path(p.__file__).with_name('copilot-publisher-broker.py'))
+b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
+pins={'app_id':101,'app_slug':'reviewed-fixture-app','bot_login':bot,'installation_id':202,
+      'account_id':b.ACCOUNT_ID,'account_login':'Achi1984','repository_id':b.REPOSITORY_ID,'repository_full_name':p.REPO}
+owner={'id':b.ACCOUNT_ID,'login':'Achi1984','type':'User'}
+brepo={**repo,'id':b.REPOSITORY_ID,'owner':owner}
+perms={'metadata':'read','pull_requests':'write'}
+install={'id':202,'app_id':101,'app_slug':pins['app_slug'],'repository_selection':'selected',
+         'suspended_at':None,'target_id':b.ACCOUNT_ID,'target_type':'User','account':owner,'permissions':perms}
+data=evidence();packet={'evidence':data,'claim':claim,'files':p.assemble_files({p.PATHS[0]:p.ledger_contract(data)})}
+buf=io.BytesIO()
+with zipfile.ZipFile(buf,'w') as archive:archive.writestr('packet.json',json.dumps(packet))
+raw=buf.getvalue()
+artifact={'id':300,'name':p.ARTIFACT,'expired':False,'size_in_bytes':len(raw),
+    'workflow_run':{'id':200,'head_sha':base},'digest':'sha256:'+p.hashlib.sha256(raw).hexdigest()}
+original_api=p.api
+minted_token='ghs_minted_memory_B'
+assert env['MERIDIAN_PUBLISHER_TOKEN']!=minted_token
+for outcome in ('success','post-error','wrong-response','revoke-error','unknown-mint','not-context'):
+    events=[];refs=[claim,commit,commit]
+    def http(method,url,credential,payload):
+        path=url.removeprefix(b.API)
+        events.append((method,path))
+        if path=='/app':return 200,{'id':101,'slug':pins['app_slug'],'owner':owner,'permissions':perms}
+        if path in ('/app/installations/202','/repos/'+p.REPO+'/installation'):return 200,install
+        if path=='/app/installations/202/access_tokens':
+            assert payload=={'repository_ids':[b.REPOSITORY_ID],'permissions':{'pull_requests':'write'}}
+            if outcome=='unknown-mint':raise TimeoutError('uncertain fixture mint')
+            expiry=b.datetime.datetime.fromtimestamp(p.DEADLINE-60+1800,b.datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            return 201,{'token':minted_token,'expires_at':expiry,'repository_selection':'selected','permissions':perms,'repositories':[brepo]}
+        if path=='/installation/repositories?per_page=100':
+            assert credential==minted_token
+            return 200,{'total_count':1,'repositories':[brepo]}
+        if path=='/installation/token':
+            assert method=='DELETE' and credential==minted_token and payload is None
+            return (500 if outcome=='revoke-error' else 204),None
+        raise AssertionError('unexpected broker path')
+    def api(path,method='GET',payload=None,expected=200,*,publisher_token=None):
+        events.append((method,path))
+        if path=='pulls':return original_api(path,method,payload,expected,publisher_token=publisher_token)
+        assert publisher_token is None
+        if path=='actions/artifacts/300':return artifact
+        if path.startswith('pulls?'):return []
+        if path=='git/trees':return {'sha':newtree}
+        if path=='git/commits':return {'sha':commit}
+        if path=='git/ref/heads/main':return {'object':{'sha':base}}
+        if path=='git/ref/heads/'+p.BRANCH:return {'object':{'sha':refs.pop(0)}}
+        if path=='git/refs/heads/'+p.BRANCH:return {'object':{'sha':commit}}
+        raise AssertionError('unexpected ordinary path')
+    def factory():
+        assert ('PATCH','git/refs/heads/'+p.BRANCH) in events
+        if outcome=='not-context':return object()
+        return b.publisher_token(http=http,sign=lambda message:b'x'*256,pins=pins,clock=lambda:p.DEADLINE-60)
+    with mock.patch.dict(os.environ,{**env,'ARTIFACT_ID':'300'},clear=True),mock.patch.object(p,'PUBLISHER_BOT_LOGIN',bot), \
+         mock.patch.object(p,'identity',return_value=data),mock.patch.object(p,'validate_claim',return_value=(claim,tree)), \
+         mock.patch.object(p,'api',side_effect=api),mock.patch.object(p,'artifact_bytes',return_value=raw), \
+         mock.patch('time.time',return_value=p.DEADLINE-60),mock.patch('urllib.request.build_opener') as opener, \
+         mock.patch('builtins.print') as output:
+        def open_request(request,**kwargs):
+            assert request.full_url=='https://api.github.com/repos/'+p.REPO+'/pulls'
+            assert request.method=='POST' and json.loads(request.data)==p.draft_payload()
+            assert request.get_header('Authorization')=='Bearer '+minted_token
+            assert env['MERIDIAN_PUBLISHER_TOKEN'] not in str(request.headers)
+            if outcome=='post-error':raise TimeoutError('uncertain fixture POST')
+            result=mock.MagicMock();result.__enter__.return_value=result;result.status=201
+            result.read.return_value=json.dumps({**response(),'draft':False} if outcome=='wrong-response' else response()).encode()
+            return result
+        opener.return_value.open.side_effect=open_request
+        if outcome=='success':p.publish(factory);output.assert_called_once()
+        else:
+            try:p.publish(factory)
+            except (b.BrokerError,TypeError) as error:
+                if outcome=='not-context':assert isinstance(error,TypeError)
+                else:assert isinstance(error,b.BrokerError)
+                if outcome=='revoke-error':assert 'reconciliation required' in str(error)
+                if outcome=='unknown-mint':assert 'mint outcome unknown' in str(error)
+                assert minted_token not in str(error) and env['MERIDIAN_PUBLISHER_TOKEN'] not in str(error)
+            else:raise AssertionError('failure swallowed')
+            output.assert_not_called()
+        expected_posts=0 if outcome in ('unknown-mint','not-context') else 1
+        assert opener.return_value.open.call_count==expected_posts
+    assert events.count(('POST','pulls'))==expected_posts
+    assert events.count(('POST','/app/installations/202/access_tokens'))==(0 if outcome=='not-context' else 1)
+    assert events.count(('DELETE','/installation/token'))==(0 if outcome in ('unknown-mint','not-context') else 1)
+    assert events.index(('PATCH','git/refs/heads/'+p.BRANCH))<len(events)
+    if outcome not in ('unknown-mint','not-context'):
+        assert events[-1]==('DELETE','/installation/token')
+assert b.PINS is None and p.PUBLISHER_BOT_LOGIN is None
+`);
+});
