@@ -83,7 +83,21 @@ def _projection(raw,binding):
         if item['id']==value['packetId']:active=item
     need(active is not None and (ledger['revoked'] or busy<=1),'CONTINUATION_ACTIVE')
     need(active['headSha'] is None or active['headSha']==binding['headSha'],'CONTINUATION_HEAD_MISMATCH')
-    if value['decision']=='READY_FOR_OWNER_DECISION':need(active['state']=='COMPLETE_DRAFT' and not ledger['revoked'],'CONTINUATION_READINESS')
+    # Mirrors adapter return branches, not a second transition engine. stop()
+    # revokes COMPLETE_DRAFT; early terminal/revoked inputs return BLOCKED.
+    decision=value['decision'];state=active['state'];revoked=ledger['revoked']
+    pre_draft=('READY','CLAIMED','GENERATING')
+    if decision=='READY_FOR_OWNER_DECISION':valid=state=='COMPLETE_DRAFT' and not revoked
+    elif decision=='WAITING_REVIEW':
+        # REVIEW_REVOKED also revokes the whole ledger if another packet started.
+        valid=(state=='REVIEW_WAIT' and not revoked) or (state=='UNKNOWN_OUTCOME' and revoked)
+    elif decision=='WAITING_DRAFT':valid=state in pre_draft and not revoked
+    elif decision=='BLOCKED':valid=state!='COMPLETE_DRAFT'
+    else:
+        allowed=pre_draft+('CI_WAIT','REVIEW_WAIT')
+        if decision=='RECONCILE_NEW_MANIFEST':allowed+=('MERGE_WAIT','COMPLETE_MERGED')
+        valid=(revoked and state=='UNKNOWN_OUTCOME') or (not revoked and state in allowed)
+    need(valid,'CONTINUATION_DECISION_STATE')
     canonical=_canonical(value);need(len(canonical.encode())<=MAX_CONTINUATION_BYTES,'CONTINUATION_BOUND')
     return canonical
 

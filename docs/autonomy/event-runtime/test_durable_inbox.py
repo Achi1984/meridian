@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 import pathlib
 import sqlite3
 import subprocess
@@ -155,6 +156,51 @@ class InboxTests(unittest.TestCase):
   child=subprocess.run([sys.executable,'-I','-c',code,str(ROOT/'durable_inbox.py'),self.db,json.dumps(c),projection(c)],capture_output=True,text=True,timeout=10);self.assertEqual(child.returncode,0,child.stderr)
   saved=inbox.inspect_event(self.db,c['eventId']);self.assertEqual(saved['state'],'COMPLETE');self.assertEqual(json.loads(saved['continuationJson'])['ledger']['revision'],5)
   with self.assertRaisesRegex(inbox.InboxError,'ATTEMPT_CONSUMED'):inbox.claim(self.db,c['eventId'],'worker2')
+ def test_impossible_decision_state_rejected_on_commit_and_recovery(self):
+  c=inbox.start(self.db,inbox.claim(self.db,self.enqueue()['eventId'],'worker1'))
+  for decision in ('WAITING_CI','WAITING_AGENT','WAITING_REVIEW','WAITING_DRAFT','BLOCKED','RECONCILE_EVENT','RECONCILE_NEW_MANIFEST'):
+   with self.subTest(decision=decision):
+    p=json.loads(projection(c));p['decision']=decision
+    with self.assertRaisesRegex(inbox.InboxError,'CONTINUATION_DECISION_STATE'):inbox.complete(self.db,c,'d'*64,continuation_json=json.dumps(p))
+  self.assertEqual(inbox.inspect_event(self.db,c['eventId'])['state'],'STARTED')
+  done=complete(self.db,c,'d'*64)
+  p=json.loads(done['continuationJson']);p['decision']='BLOCKED';raw=inbox._canonical(p)
+  digest=inbox._projection_digest(inbox._canonical(c['binding']),raw)
+  with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET continuation_json=?,continuation_sha=? WHERE event_id=?',(raw,digest,c['eventId']))
+  with self.assertRaisesRegex(inbox.InboxError,'CONTINUATION_DECISION_STATE'):inbox.inspect_event(self.db,c['eventId'])
+ def test_actual_adapter_return_branches_survive_projection(self):
+  default=ROOT.parent/'event-adapter/scripts/event-continuation-adapter.mjs'
+  if not default.is_file():default=ROOT.parent/'event_bridge/scripts/event-continuation-adapter.mjs'
+  adapter=pathlib.Path(os.environ.get('MERIDIAN_TEST_ADAPTER',str(default))).resolve()
+  spec=importlib.util.spec_from_file_location('actual_adapter_fixtures',adapter.parent.parent/'review-binding/test/test_review_binding.py')
+  f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
+  script="import {readFileSync} from 'node:fs'; const {reconcileContinuation}=await import(process.argv[1]); console.log(JSON.stringify(reconcileContinuation(JSON.parse(readFileSync(0,'utf8')))));"
+  cases=[('ready','READY_FOR_OWNER_DECISION'),('review','WAITING_REVIEW'),('ci','WAITING_CI'),('agent','WAITING_AGENT'),('closed','BLOCKED'),('event','RECONCILE_EVENT'),('main','RECONCILE_NEW_MANIFEST'),('draft','WAITING_DRAFT'),('review-chain','WAITING_REVIEW'),('merge','RECONCILE_NEW_MANIFEST'),('unknown','BLOCKED')]
+  for mode,decision in cases:
+   with self.subTest(mode=mode):
+    o,e=f.fixture();x=f.adapter_input(o,e);x['snapshot']['work']['responses']=[{**{k:e['scope'][k] for k in ('repository','requestId','opId','headSha','baseSha')},'reviewCommentId':789,'reviewAuthor':'CLAUDE','verdict':'GREEN_LIGHT'}]
+    packet=x['ledger']['packets'][0];packet.update(state='COMPLETE_DRAFT',reviewHeadSha=f.B)
+    if mode in ('review','review-chain'):x['snapshot']['work']['responses'][0].update(requestId='REQ002',opId='OP002',headSha='c'*40)
+    if mode=='ci':x['snapshot']['work']['ci']=None
+    if mode=='agent':x['snapshot']['work']['execution']='RUNNING'
+    if mode=='closed':x['snapshot']['pr']['state']='closed'
+    if mode=='event':x['snapshot']['eventBinding']['revisionDigest']='e'*64
+    if mode=='main':x['snapshot']['mainSha']='c'*40
+    if mode=='unknown':x['snapshot']['work']['execution']='UNKNOWN'
+    if mode=='merge':packet.update(state='MERGE_WAIT',mergeSha='c'*40)
+    if mode=='draft':packet.update(state='CLAIMED',headSha=None,ciHeadSha=None,reviewHeadSha=None)
+    if mode=='review-chain':
+     x['manifest']['maxInvocations']=2
+     second={**x['manifest']['packets'][0],'id':'second','paths':['docs/v11/second.md','test/v11-second.test.js']};x['manifest']['packets'].append(second)
+     x['ledger']['manifestDigest']=hashlib.sha256(json.dumps(x['manifest'],separators=(',',':')).encode()).hexdigest()
+     x['ledger']['packets'].append({'id':'second','state':'CLAIMED','baseSha':f.A,'headSha':None,'ciHeadSha':None,'reviewHeadSha':None,'mergeSha':None})
+    run=subprocess.run(['node','--input-type=module','-e',script,adapter.as_uri()],input=json.dumps(x),capture_output=True,text=True,timeout=30)
+    self.assertEqual(run.returncode,0,run.stderr);result=json.loads(run.stdout);self.assertEqual(result['decision'],decision)
+    result.pop('planner');result['packetId']='first'
+    b={'repository':e['scope']['repository'],'eventIdentity':result['eventIdentity'],'revisionDigest':result['revisionDigest'],'headSha':f.B,'baseSha':f.A,'payloadSha256':hashlib.sha256(json.dumps(x).encode()).hexdigest()}
+    db=str(pathlib.Path(self.temp.name)/(mode+'.sqlite'));inbox.initialize(db);queued=inbox.enqueue(db,b);c=inbox.start(db,inbox.claim(db,queued['eventId'],'worker1'))
+    done=inbox.complete(db,c,'d'*64,continuation_json=json.dumps(result));self.assertEqual(inbox.inspect_event(db,c['eventId']),done)
+    if mode=='review-chain':self.assertTrue(result['ledger']['revoked']);self.assertEqual(result['ledger']['packets'][0]['state'],'UNKNOWN_OUTCOME')
  def test_authority_always_false(self):
   r=self.enqueue()
   for key in ('authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','mayWrite','distributed'):self.assertIs(r[key],False)
