@@ -40,7 +40,11 @@ Historic bot snapshot atomicity (R128, merged #593) and market/lifecycle integri
 
 Exact commands and observed outcomes are recorded here after local validation. A test passing means only that its stated source/shell condition was observed; it does not change the BLOCKED status above.
 
-- Pending at document authoring: focused boundary test and existing V11 shell tests.
+- `node --test test/v11-engine-bridge-readiness.test.js` — **2 passed, 0 failed**.
+- `node --test test/v11-engine-bridge-readiness.test.js test/v11-shell-safety.test.js test/v11-shell-navigation.test.js` — **6 passed, 0 failed**.
+- `node --test test/v11-engine-bridge-readiness.test.js test/v11-shell-safety.test.js test/v11-shell-navigation.test.js test/v11-shell-chrome.test.js` — **6 passed, 1 failed**; the existing Chrome CDP test could not start DevTools before its timeout.
+- `node --test test/*.test.js` — **2,132 passed, 5 failed** (2,137 total). All five failures were `ERR_MODULE_NOT_FOUND` for the already-declared `pg` package in existing tests (`okx-portfolio-authority-sync`, `pionex-account-read-sync`, `pionex-bot-auto-sync`, `portfolio-history-runtime`, and `v10-r66-wallet-pnl-normalization`). This is an incomplete suite result, not a PASS.
+- `git diff --check` — passed.
 - Not run: live/private API calls, real account fixtures, self-booted engine, deployment, merge, or PWA activation.
 
 ## Current limits and next gate

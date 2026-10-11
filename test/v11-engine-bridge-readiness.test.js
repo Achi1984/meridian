@@ -50,7 +50,7 @@ function harness(){
     addEventListener:(type,callback)=>callbacks.set(type,callback)
   };
   const document={
-    getElementById:id=>id==='nav'?nav:views.get(id.replace(/^view-/,'') )||null,
+    getElementById:id=>id==='nav'?nav:views.get(id.replace(/^view-/,''))||null,
     querySelectorAll:selector=>selector==='.view'?[...views.values()]:
       selector==='#nav button'?tabs:[]
   };
