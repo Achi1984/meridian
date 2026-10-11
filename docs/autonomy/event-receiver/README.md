@@ -91,3 +91,26 @@ The direct composition test feeds the collector's unchanged `workCi`/`ciBinding`
 projection into that adapter and requires `WAITING_REVIEW`, with all authority
 flags false. Review metadata/structured body binding is a separate packet; the
 current live Claude producer's prose is not silently accepted as that contract.
+
+## Separate exact-comment handoff (not wired into the workflow)
+
+`review_handoff.py` adds an executable read-only seam to the existing sibling
+review binder. A caller supplies independent expected main, request/op, PR/head/base,
+CI run/attempt/workflow and comment ID/version/body-digest pins. It reads the exact
+mailbox571 comment, verifies Claude's numeric actor209825114/login/type, open PR
+and successful exact CI source, then calls the unchanged structured binder with
+the complete body in transient memory only. Comment, PR, CI and main are reread
+after binding; edits, deletion/404, moved pins and partial/error responses discard
+the candidate. The emitted <=4096-byte result excludes bodies and exception text;
+authority/authentication/provenance flags remain false. Even a valid structured
+claim is only a candidate, not permission to act.
+
+No `receiver.yml` behavior changes. The live prose-producing Claude path remains
+blocked until a separately reviewed producer contract exists. There is no
+automatic request discovery or self-selected expected version. Read-only GETs
+remain point-in-time and cannot replace a future fenced mutation preflight.
+Tests call the actual sibling binder; local isolated staging may set
+`MERIDIAN_TEST_BINDER` to its module path, while default packaged paths use
+`../event-adapter/review-binding/scripts/review-evidence-binding.py`. New handoff
+tests exercise changed/deleted comments, actor/mailbox mismatches, stale request,
+main/PR/CI drift, malformed/oversized bodies and non-green adverse evidence.
