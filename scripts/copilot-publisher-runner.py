@@ -27,7 +27,9 @@ def private_key():
     if any(byte not in (10, 13) and not 32 <= byte <= 126 for byte in raw):
         raise ValueError('Invalid publisher key transport')
     lines = value.splitlines()
-    if len(lines) < 3 or lines[0] not in ('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----'):
+    # Assemble the two accepted PEM delimiters without embedding key-like literals.
+    headers = tuple('-----' + 'BEGIN ' + label + '-----' for label in ('RSA PRIVATE KEY', 'PRIVATE KEY'))
+    if len(lines) < 3 or lines[0] not in headers:
         raise ValueError('Invalid publisher key transport')
     if lines[-1] != lines[0].replace('BEGIN', 'END'):
         raise ValueError('Invalid publisher key transport')

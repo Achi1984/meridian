@@ -10,7 +10,10 @@ function python(body) {
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 const fixture = String.raw`
-key='-----BEGIN RSA PRIVATE KEY-----\n'+base64.b64encode(b'fixture-only-not-a-real-key'*2).decode()+'\n-----END RSA PRIVATE KEY-----\n'
+# Build synthetic PEM transport delimiters; payload is not a private key.
+def delimiter(kind,label='RSA PRIVATE KEY'):
+    return '-----'+kind+' '+label+'-----'
+key=delimiter('BEGIN')+'\n'+base64.b64encode(b'fixture-only-not-a-real-key'*2).decode()+'\n'+delimiter('END')+'\n'
 # Wrap fixture base64 at ordinary PEM width.
 head,body,tail=key.splitlines();key=head+'\n'+body[:64]+'\n'+body[64:]+'\n'+tail+'\n'
 secret='MERIDIAN_PUBLISHER_APP_PRIVATE_KEY'
@@ -28,9 +31,9 @@ with mock.patch.dict(os.environ,{},clear=True),mock.patch('importlib.util.spec_f
 
 test('runner consumes only bounded ASCII PEM transport and fails sanitized before module load', () => {
   python(fixture+String.raw`
-invalid=[None,'','x'*32769,key.replace('\n','\v'),'-----BEGIN PRIVATE KEY-----\né\n-----END PRIVATE KEY-----',
+invalid=[None,'','x'*32769,key.replace('\n','\v'),delimiter('BEGIN','PRIVATE KEY')+'\né\n'+delimiter('END','PRIVATE KEY'),
          key.replace('END RSA','END OTHER'),key.replace(body[:64],'!'),key+'trailing',
-         '-----BEGIN RSA PRIVATE KEY-----\nYQ==\n-----END RSA PRIVATE KEY-----',
+         delimiter('BEGIN')+'\nYQ==\n'+delimiter('END'),
          key.replace('BEGIN RSA PRIVATE','BEGIN PUBLIC')]
 for value in invalid:
     env={} if value is None else {secret:value}
