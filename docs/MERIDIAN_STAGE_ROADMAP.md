@@ -11,7 +11,7 @@ Default cadence:
 - ChatGPT owns architecture, implementation, product direction and merge coordination.
 - Claude performs one independent exact-head review near the end of each major stage, plus earlier challenge reviews only when the scope materially affects trust, safety, research semantics or release governance.
 - Intermediate commits, test fixes and refactors stay inside the stage unless they create a real product decision.
-- User escalation is reserved for explicit authorization gates, meaningful product choices, release-cadence overrides, trading/research-stage transitions and safety-sensitive changes.
+- User escalation is reserved for explicit authorization gates, meaningful product choices, release-governance changes, trading/research-stage transitions and safety-sensitive changes.
 - Every stage closes with exact-head CI evidence, regression checks and a concise stage result.
 - Repository live state remains authoritative.
 

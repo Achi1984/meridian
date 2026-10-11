@@ -248,14 +248,11 @@ MERIDIAN terminal releases use a single-writer lease:
 
 The repository enforces this with `scripts/release-coordinator.mjs`, the Release Safety guard, and the post-main stale-PR sweep workflow.
 
-### 14.1A Release cadence and explicit override
+### 14.1A Release governance
 
-- Standard cadence: maximum one UI/presentation terminal release merge per GitHub UTC calendar day.
-- Automatic exception: a genuine bugfix or trust/safety defect that should not wait.
-- Any additional same-day UI/presentation terminal release is blocked unless a release-specific `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` names the exact blocked release and the cadence conflict, and the user explicitly authorizes that exact release.
-- A same-day override is single-use. It applies only to the named release and never carries forward to another release, branch or later decision.
-- A prior user statement must never be generalized into standing override authority. Example: `Go – Regel ändern und R125 heute mergen` authorized R125 only.
-- Every override release still requires all normal exact-head CI, Claude review, expected-head merge protection and Single-Writer safeguards.
+- UI/presentation terminal releases have no daily count cap. Additional same-day UI releases do not require a cadence-specific exception.
+- The Project Owner explicitly removed the one-UI-release-per-day limit on 2026-10-11 at 20:47:32 Vienna: "Wir werden die Grenze 1UI Veröffentlichen aufheben" (mailbox #571 comment 6112437050). This removes only the daily cap and its same-day exception gate; it grants no additional merge, deployment or execution authority.
+- Every UI release still requires Project Owner approval under the applicable policy, all normal exact-head CI, independent Claude review, expected-head merge protection and Single-Writer safeguards. Required post-merge checks must succeed before dependent work continues.
 - Before every `@claude` request, check the authoritative mailbox for the same Request-ID + exact head. If an unanswered matching request exists, do not repost. If a matching response exists, do not repost.
 - Any change to autonomy rules, release cadence, watchdog/workflow behavior, scheduler behavior or 24/7 operating rules requires `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` plus an explicit user answer before merge. Post-hoc authorization is invalid.
 - Current 24/7 MERIDIAN operation is explicitly user-authorized. Quota control comes from state-change detection, deduplication and staggered scheduling, not quiet hours.
@@ -409,6 +406,6 @@ The rule in `docs/autonomy/ROUTINE_MERGE_POLICY.md` becomes effective only after
 
 After adoption, ChatGPT as sole merge owner may apply the standing approval to routine bugfixes, tests and already authorized product packets only when every policy gate is satisfied using authenticated live evidence. Record the approved work-packet scope, exact head/base, CI run IDs/totals, independent review, policy-adoption evidence and the eligibility result before the guarded merge. The offline classifier is advisory and cannot authenticate evidence or authorize a write.
 
-`ownerMergeApprovalRequired` remains true: the adopted bounded standing approval is one permitted form of owner approval; it is never optional. Architecture/direction, budget, security/permissions, policy/workflows/schedulers, release-governance changes, production activation and research/trading changes remain individually owner-gated. Existing UI cadence, expected-state protection, single-writer and research gates remain unchanged. Unknown scope, conflicting findings or missing evidence stops the affected work package.
+`ownerMergeApprovalRequired` remains true: the adopted bounded standing approval is one permitted form of owner approval; it is never optional. Architecture/direction, budget, security/permissions, policy/workflows/schedulers, release-governance changes, production activation and research/trading changes remain individually owner-gated. The daily UI-release cap is removed; expected-state protection, single-writer and research gates remain unchanged. Unknown scope, conflicting findings or missing evidence stops the affected work package.
 
 Immediately publish `FINAL_MERGE_STATUS` after each merge. Do not merge another dependent candidate until all required post-merge checks succeed; failure or unknown outcome stops that pipeline and triggers reconciliation. The owner may revoke this standing approval at any time. No new automated dispatcher, credentials, schedule, deployment authority or spending is introduced.
