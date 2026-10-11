@@ -10,7 +10,7 @@ From the repository/package parent, with Python 3 and Node 22+ on the trusted PA
 python -I review-binding/test/test_review_binding.py
 ```
 
-From the local workspace root the equivalent is `python -I event_bridge/review-binding/test/test_review_binding.py`. The 14-test suite exercises the actual sibling event-continuation-adapter.mjs via a test-only Node bridge. It needs no network or installed package. Two original validator/transport fixtures are Git-blob checked against provenance.json.
+From the repository root the equivalent is `python -I docs/autonomy/event-adapter/review-binding/test/test_review_binding.py`. The 14-test suite exercises the actual sibling event-continuation-adapter.mjs via a test-only Node bridge. It needs no network or installed package. Two original validator/transport fixtures are Git-blob checked against provenance.json. Run all inactive source suites with `python3 -B docs/autonomy/verify-source.py`.
 
 ## Existing contracts reused
 

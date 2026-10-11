@@ -27,6 +27,7 @@ def main():
     for label, folder in (
         ('Review binding and structured producer', root / 'event-adapter' / 'review-binding' / 'test'),
         ('Receiver and comment handoff', root / 'event-receiver'),
+        ('Persistent inbox and bounded local worker', root / 'event-runtime'),
     ):
         if not list(folder.glob('test_*.py')):
             raise SystemExit(f'Missing test suite: {label}')
