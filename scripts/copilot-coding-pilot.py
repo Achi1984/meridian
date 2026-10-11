@@ -451,7 +451,10 @@ def validate_published_draft(pr, commit, base):
     return pr['number']
 
 
-def publish(publisher_factory=None):
+def publish(publisher_factory=None, observer=None):
+    def observe(event, **fields):
+        if observer is not None:
+            observer(event, **fields)
     evidence = identity()
     claim_sha, tree = validate_claim(evidence)
     validate_publisher_config()
@@ -475,7 +478,11 @@ def publish(publisher_factory=None):
     # Recheck mutable pins immediately before creating any output objects.
     require(identity() == evidence, 'Evidence changed before publication')
     validate_claim(evidence)
+    observe('validated', control_run=evidence['control_run'], control_attempt=evidence.get('control_attempt'),
+            source_run=SOURCE_RUN, source_attempt=SOURCE_ATTEMPT, source_sha=SOURCE_SHA,
+            control_sha=evidence['base'], claim_sha=claim_sha, branch=BRANCH, artifact_id=int(artifact_id))
     entries = [{'path':path,'mode':'100644','type':'blob','content':files[path]} for path in PATHS]
+    observe('publication_attempted')
     new_tree = api('git/trees', 'POST', {'base_tree':tree,'tree':entries}, 201)
     require(sha(new_tree.get('sha')) and new_tree['sha'] != tree, 'Invalid or empty tree')
     commit = api('git/commits', 'POST', {'message':'docs(v11): draft version-history ledger', 'tree':new_tree['sha'], 'parents':[claim_sha]}, 201)
@@ -485,6 +492,7 @@ def publish(publisher_factory=None):
     # Parent is the claim. Non-fast-forward rejects a competing branch update; never force.
     updated = api('git/refs/heads/' + BRANCH, 'PATCH', {'sha':commit['sha'],'force':False})
     require(updated['object']['sha'] == commit['sha'], 'Branch update outcome unknown')
+    observe('branch_updated', output_sha=commit['sha'])
     require(identity() == evidence, 'Evidence changed before Draft creation')
     require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'], 'Output branch changed before Draft creation')
     # No App token is requested during artifact processing or ordinary branch writes.
@@ -494,8 +502,11 @@ def publish(publisher_factory=None):
         require(identity() == evidence, 'Evidence changed during publisher authentication')
         require(api('git/ref/heads/' + BRANCH)['object']['sha'] == commit['sha'],
                 'Output branch changed during publisher authentication')
+        observe('post_attempted')
         pr = api('pulls', 'POST', draft_payload(), 201, publisher_token=token)
-        validate_published_draft(pr, commit['sha'], evidence['base'])
+        observe('post_received')
+        number = validate_published_draft(pr, commit['sha'], evidence['base'])
+        observe('draft_validated', pr_number=number)
     print('DRAFT_CREATED; trusted test template only; no merge authorization')
 
 
