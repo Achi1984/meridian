@@ -31,14 +31,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/recovery/evidence"
           cd "$RUNNER_TEMP/recovery"
           for path in recovery_core.py recovery_http.py recovery_launcher.py publisher_broker.py evidence/validate_original_packet.py evidence/original-pilot.py workflow.template.yml; do
-            gh api "repos/Achi1984/meridian/contents/scripts/autonomy/trial4-recovery/$path?ref=2b39e64319877a1dd6f3c25e2e136e864c9f177d" -H 'Accept:application/vnd.github.raw+json' > "$path"
+            gh api "repos/Achi1984/meridian/contents/scripts/autonomy/trial4-recovery/$path?ref=699b330b5a8358b1cae545ffa8cd221edc612dc4" -H 'Accept:application/vnd.github.raw+json' > "$path"
           done
-          printf '%s\n' '0a76cca90f4a2801594de3aa412af13d42bea24df8d09f836c65123987667809  recovery_core.py' 'b30d4ec736b09b89535b3e2a4956b74f5158441e4a5e9509dc5ebb33f2d9fff5  recovery_http.py' '665957a738a9f2415fc26a0e5540a229d88ec16308d74d4f2bc1fa5c5ecf269e  recovery_launcher.py' 'd82b29832dbbbf3d419e41b5a81f4f6ff54585e6cbca4f07be411f81b5f35c44  publisher_broker.py' 'ae202bd358f370c565de28ee00c2585a0c29a0e2d415a46dfb70875501c5114c  evidence/validate_original_packet.py' '4786e18ec611a22a9c6cebb476cb6910d7f5812c7240c64432b50916e05b16df  evidence/original-pilot.py' 'abef10fed103f2daaaa2e4fa4b94857df7d00f5501a67a9f2cf09c7f9ee17785  workflow.template.yml' | sha256sum --check --strict -
+          printf '%s\n' '0a76cca90f4a2801594de3aa412af13d42bea24df8d09f836c65123987667809  recovery_core.py' 'b30d4ec736b09b89535b3e2a4956b74f5158441e4a5e9509dc5ebb33f2d9fff5  recovery_http.py' '888f79f8a407108a783c92ecea6e79868097c7d6ce8fd88e57e879c70aec3feb  recovery_launcher.py' 'd82b29832dbbbf3d419e41b5a81f4f6ff54585e6cbca4f07be411f81b5f35c44  publisher_broker.py' 'ae202bd358f370c565de28ee00c2585a0c29a0e2d415a46dfb70875501c5114c  evidence/validate_original_packet.py' '4786e18ec611a22a9c6cebb476cb6910d7f5812c7240c64432b50916e05b16df  evidence/original-pilot.py' 'abef10fed103f2daaaa2e4fa4b94857df7d00f5501a67a9f2cf09c7f9ee17785  workflow.template.yml' | sha256sum --check --strict -
       - name: Authenticate recovery and publish only the preserved artifact
         timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
           APPROVED_RECOVERY_BASE: ${{ inputs.approved_base }}
-          RECOVERY_SOURCE_COMMIT: 2b39e64319877a1dd6f3c25e2e136e864c9f177d
+          RECOVERY_SOURCE_COMMIT: 699b330b5a8358b1cae545ffa8cd221edc612dc4
           MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
         run: exec python3 -I "$RUNNER_TEMP/recovery/recovery_launcher.py"
