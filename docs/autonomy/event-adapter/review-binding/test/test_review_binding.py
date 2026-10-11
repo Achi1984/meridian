@@ -33,9 +33,28 @@ def adapter_input(o,e):
     comment=o['comment'];claims={'issueNumber':571,'commentId':789,'action':o['eventAction'],'createdAt':comment['created_at'],'updatedAt':comment['updated_at'],'bodyDigest':hashlib.sha256(comment['body'].encode()).hexdigest()}
     payload={'repository':{'full_name':scope['repository'],'fork':False},'action':o['eventAction'],'issue':{'number':571},'comment':comment}
     binding={'eventIdentity':'mailbox-comment:Achi1984/meridian:571:789','revisionDigest':hashlib.sha256(json.dumps(claims,separators=(',',':')).encode()).hexdigest()}
-    work={'deliveryId':'EVT001','workId':'WORK001',**scope,'paths':manifest['packets'][0]['paths'],'owner':'CODEX','execution':'PLANNED','ci':{'headSha':B,'baseSha':A,'runId':456,'jobs':[{'name':'release-tests','conclusion':'SUCCESS','total':10,'passed':10,'failed':0}]},'responses':[],'inFlight':[]}
-    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[123]},'expected':{**scope,'packetId':'first','mainSha':A,'now':1500,'maxAgeSeconds':60,'ci':dict(e['scope']['ci'])},
-            'snapshot':{'repository':scope['repository'],'observedAt':1499,'mainSha':A,'pr':{'headSha':B,'baseSha':A,'state':'open','mergeSha':None},'work':work,'eventBinding':binding,'ciBinding':dict(e['scope']['ci'])},'manifest':manifest,'ledger':ledger,'requiredJobs':['release-tests']}
+    work={'deliveryId':'EVT001','workId':'WORK001',**scope,'paths':manifest['packets'][0]['paths'],'owner':'CODEX','execution':'PLANNED','ci':{'headSha':B,'baseSha':A,'runId':e['scope']['ci']['runId'],'jobs':[{'name':'release-tests','conclusion':'SUCCESS','total':10,'passed':10,'failed':0}]},'responses':[],'inFlight':[]}
+    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[e['scope']['ci']['workflowId']]},'expected':{**scope,'packetId':'first','mainSha':A,'now':1500,'maxAgeSeconds':60,'ci':dict(e['scope']['ci']),'reviewVersion':dict(e['version'])},
+            'snapshot':{'repository':scope['repository'],'observedAt':1499,'mainSha':A,'pr':{'headSha':B,'baseSha':A,'state':'open','mergeSha':None},'work':work,'eventBinding':binding,'ciBinding':dict(e['scope']['ci']),'reviewBinding':None},'manifest':manifest,'ledger':ledger,'requiredJobs':['release-tests']}
+
+def run_bound_adapter(binding, adapter):
+    process=subprocess.run(['node',str(ROOT/'test'/'adapter-bridge.mjs')],input=json.dumps({'binding':binding,'adapter':adapter}),text=True,capture_output=True,timeout=10)
+    if process.returncode:raise AssertionError(process.stderr)
+    return json.loads(process.stdout)
+
+def stale_variants(observed, expected):
+    import copy
+    fresh=copy.deepcopy(observed);pins=copy.deepcopy(expected)
+    fresh['eventAction']='edited';fresh['comment']['body']+=' '
+    fresh['comment']['updated_at']='2026-10-11T19:00:01Z'
+    pins['version']['updatedAt']=fresh['comment']['updated_at']
+    pins['version']['bodySha256']=hashlib.sha256(fresh['comment']['body'].encode()).hexdigest()
+    yield adapter_input(fresh,pins)
+    changed=adapter_input(observed,expected)
+    changed['expected']['ci']['runId']=457
+    changed['snapshot']['ciBinding']['runId']=457
+    changed['snapshot']['work']['ci']['runId']=457
+    yield changed
 
 def composed(o,e):
     binding=bind(o,e)
@@ -48,6 +67,15 @@ class BindingTests(unittest.TestCase):
         for row in json.loads((ROOT/'provenance.json').read_text()):
             raw=(ROOT/row['localPath']).read_bytes()
             self.assertEqual(hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),row['blob'])
+    def test_bound_review_rejects_rehashed_edit_and_new_ci_run(self):
+        o,e=fixture();bound=bind(o,e)
+        self.assertEqual(bound['reviewBinding'],{**e['version'],'ci':e['scope']['ci']})
+        for changed in stale_variants(o,e):
+            result=run_bound_adapter(bound,changed)
+            self.assertNotEqual(result['decision'],'READY_FOR_OWNER_DECISION')
+    def test_invalid_comment_emits_no_review_binding(self):
+        o,e=fixture();o['comment']['body']+=' '
+        self.assertIsNone(bind(o,e)['reviewBinding'])
     def test_matching_structured_claim_stays_unverified(self):
         o,e=fixture();r=bind(o,e);self.assertEqual(r['decision'],'CANDIDATE_REVIEW');self.assertEqual(r['plannerResponse']['verdict'],'GREEN_LIGHT')
         for field in ('authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'):self.assertIs(r[field],False)

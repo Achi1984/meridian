@@ -178,7 +178,7 @@ class InboxTests(unittest.TestCase):
   cases=[('ready','READY_FOR_OWNER_DECISION'),('review','WAITING_REVIEW'),('ci','WAITING_CI'),('agent','WAITING_AGENT'),('closed','BLOCKED'),('event','RECONCILE_EVENT'),('main','RECONCILE_NEW_MANIFEST'),('draft','WAITING_DRAFT'),('review-chain','WAITING_REVIEW'),('merge','RECONCILE_NEW_MANIFEST'),('unknown','BLOCKED')]
   for mode,decision in cases:
    with self.subTest(mode=mode):
-    o,e=f.fixture();x=f.adapter_input(o,e);x['snapshot']['work']['responses']=[{**{k:e['scope'][k] for k in ('repository','requestId','opId','headSha','baseSha')},'reviewCommentId':789,'reviewAuthor':'CLAUDE','verdict':'GREEN_LIGHT'}]
+    o,e=f.fixture();x=f.adapter_input(o,e);bound=f.bind(o,e);x['snapshot']['work']['responses']=[bound['plannerResponse']];x['snapshot']['reviewBinding']=bound['reviewBinding']
     packet=x['ledger']['packets'][0];packet.update(state='COMPLETE_DRAFT',reviewHeadSha=f.B)
     if mode in ('review','review-chain'):x['snapshot']['work']['responses'][0].update(requestId='REQ002',opId='OP002',headSha='c'*40)
     if mode=='ci':x['snapshot']['work']['ci']=None

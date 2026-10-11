@@ -59,7 +59,7 @@ def check_ci(api, scope):
 def collect_review(expected_raw, main_sha, event_action, api, bind_review):
     """GET-only collection; bind exact independently supplied pins; never emit body."""
     blocked = {"kind": "UNVERIFIED_REVIEW_HANDOFF", "decision": "BLOCKED", "reason": "HANDOFF_INVALID",
-        "plannerResponse": None, "version": None, "authenticated": False, "provenanceVerified": False,
+        "plannerResponse": None, "version": None, "reviewBinding": None, "authenticated": False, "provenanceVerified": False,
         "authorized": False, "dispatchAllowed": False, "mergeAllowed": False, "durable": False}
     try:
         need(type(expected_raw) is str and len(expected_raw.encode()) <= 16384, "EXPECTED_BOUND")
@@ -92,7 +92,8 @@ def collect_review(expected_raw, main_sha, event_action, api, bind_review):
         need(obj(api("commits/main")).get("sha") == main_sha, "MAIN_CHANGED")
         # Explicit allowlisted projection only; neither raw inputs nor helper diagnostics.
         receipt = {**blocked, "decision": result["decision"], "reason": result["reason"],
-                   "plannerResponse": result.get("plannerResponse"), "version": result.get("version")}
+                   "plannerResponse": result.get("plannerResponse"), "version": result.get("version"),
+                   "reviewBinding": result.get("reviewBinding")}
         need(len(json.dumps(receipt).encode()) <= 4096, "HANDOFF_RECEIPT_BOUND")
         return receipt
     except Exception:

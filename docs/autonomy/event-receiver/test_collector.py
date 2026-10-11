@@ -262,7 +262,7 @@ const {receipt,payload}=JSON.parse(readFileSync(0,'utf8'));
 const A='a'.repeat(40),B='b'.repeat(40),repository='Achi1984/meridian';
 const mapped=receipt.source.ciEvidence.adapterFields;
 const expected={repository,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,
- ci:{runId:123,runAttempt:1,workflowId:347821227,headSha:B}};
+ ci:{runId:123,runAttempt:1,workflowId:347821227,headSha:B},reviewVersion:null};
 const paths=['docs/v11/first.md','test/v11-first.test.js'];
 const manifest={schema:1,repository,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:1,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:[{id:'first',paths,dependencies:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}]};
 let ledger=initialLedger(manifest);
@@ -271,7 +271,7 @@ const config={repository,mailboxIssue:571,workflowIds:[347821227]};
 const trigger={name:'workflow_run',payloadJson:JSON.stringify(payload)};
 const normalized=normalizeEvent(trigger.name,trigger.payloadJson,JSON.stringify(config));
 const work={deliveryId:'EVT001',workId:'WORK001',repository,requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,paths,owner:'CODEX',execution:'PLANNED',ci:mapped.workCi,responses:[],inFlight:[]};
-const snapshot={repository,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:{eventIdentity:normalized.eventIdentity,revisionDigest:normalized.revisionDigest},ciBinding:mapped.ciBinding};
+const snapshot={repository,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:{eventIdentity:normalized.eventIdentity,revisionDigest:normalized.revisionDigest},ciBinding:mapped.ciBinding,reviewBinding:null};
 const result=reconcileContinuation({trigger,config,expected,snapshot,manifest,ledger,requiredJobs:['syntax']});
 assert.equal(result.decision,'WAITING_REVIEW');assert.equal(result.ledger.packets[0].state,'REVIEW_WAIT');
 for(const key of ['authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'])assert.equal(result[key],false);

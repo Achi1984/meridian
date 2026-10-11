@@ -10,7 +10,7 @@ From the repository/package parent, with Python 3 and Node 22+ on the trusted PA
 python -I review-binding/test/test_review_binding.py
 ```
 
-From the repository root the equivalent is `python -I docs/autonomy/event-adapter/review-binding/test/test_review_binding.py`. The 14-test suite exercises the actual sibling event-continuation-adapter.mjs via a test-only Node bridge. It needs no network or installed package. Two original validator/transport fixtures are Git-blob checked against provenance.json. Run all inactive source suites with `python3 -B docs/autonomy/verify-source.py`.
+From the repository root the equivalent is `python -I docs/autonomy/event-adapter/review-binding/test/test_review_binding.py`. The binding suite exercises the actual sibling event-continuation-adapter.mjs via a test-only Node bridge. It needs no network or installed package. Two original validator/transport fixtures are Git-blob checked against provenance.json. Run all inactive source suites with `python3 -B docs/autonomy/verify-source.py`.
 
 ## Existing contracts reused
 
@@ -39,3 +39,5 @@ A body must itself be the complete JSON claim. Plain text, Markdown code fences 
 The trusted launcher owns Python/Node executable and fixture bytes. The original transport resolves Node through that launcher PATH; returned model strings cannot select executables. The binder returns fixed error codes without raw comment content or subprocess diagnostics. It grants no native GitHub approval or branch-protection authority.
 
 Tests demonstrate real code composition with synthetic metadata: successful candidate -> actual adapter's simulated COMPLETE_DRAFT; prose/changed/deleted claims cannot produce readiness; adverse review reaches the adapter's STRICTEST_VERDICT stop. They also cover exact identity, disallowed substitution, request/head/base/PR/CI drift, duplicate keys, payload bounds and pinned fixture integrity.
+
+A successful binder also returns `reviewBinding`: the guarded original comment ID, creation/update timestamps and whole-body SHA-256, plus the validated claim CI run/attempt/workflow/head identity. Pass it unchanged beside the planner response; independently supply the current expected review version. Planner response alone is insufficient for adapter readiness, including workflow-completion wakes. The handoff carries this metadata through its existing rereads. No authentication or new action authority is granted.

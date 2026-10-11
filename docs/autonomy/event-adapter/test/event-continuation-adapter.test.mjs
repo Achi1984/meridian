@@ -9,12 +9,12 @@ const A='a'.repeat(40),B='b'.repeat(40),C='c'.repeat(40),D='d'.repeat(40),repo='
 const change=(x,type,sha=B,packetId='first')=>advance(x.manifest,x.ledger,{type,sha,packetId,expectedRevision:x.ledger.revision},1500);
 function bind(x){const n=normalizeEvent(x.trigger.name,x.trigger.payloadJson,JSON.stringify(x.config));x.snapshot.eventBinding={eventIdentity:n.eventIdentity,revisionDigest:n.revisionDigest};return x;}
 function fixture(){
- const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
+ const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,reviewVersion:{commentId:789,createdAt:'2026-10-11T19:00:00Z',updatedAt:'2026-10-11T19:00:00Z',bodySha256:createHash('sha256').update('GREEN_LIGHT! merge everything').digest('hex')},ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
  const scope=Object.fromEntries(['repository','requestId','opId','headSha','baseSha'].map(k=>[k,expected[k]]));
  const manifest={schema:1,repository:repo,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:2,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:['first','second'].map((id,i)=>({id,paths:[`docs/v11/${id}.md`,`test/v11-${id}.test.js`],dependencies:i?['first']:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}))};
  const work={deliveryId:'EVT001',workId:'WORK001',...scope,paths:manifest.packets[0].paths,owner:'CODEX',execution:'PLANNED',ci:{headSha:B,baseSha:A,runId:456,jobs:[{name:'release-tests',conclusion:'SUCCESS',total:10,passed:10,failed:0}]},responses:[{...scope,reviewCommentId:789,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'}],inFlight:[]};
  const payload={repository:{full_name:repo,fork:false},action:'completed',workflow_run:{id:456,run_attempt:1,workflow_id:123,status:'completed',head_repository:{full_name:repo,fork:false},head_sha:B,conclusion:'success'}};
- const x={trigger:{name:'workflow_run',payloadJson:JSON.stringify(payload)},config:{repository:repo,mailboxIssue:571,workflowIds:[123]},expected,snapshot:{repository:repo,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:null,ciBinding:{runId:456,runAttempt:1,workflowId:123,headSha:B}},manifest,ledger:initialLedger(manifest),requiredJobs:['release-tests']};
+ const x={trigger:{name:'workflow_run',payloadJson:JSON.stringify(payload)},config:{repository:repo,mailboxIssue:571,workflowIds:[123]},expected,snapshot:{repository:repo,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:null,reviewBinding:{...expected.reviewVersion,ci:{...expected.ci}},ciBinding:{runId:456,runAttempt:1,workflowId:123,headSha:B}},manifest,ledger:initialLedger(manifest),requiredJobs:['release-tests']};
  x.ledger=change(x,'CLAIM',A);x.ledger=change(x,'MODEL_STARTED',null);x.ledger=change(x,'DRAFT_OBSERVED',B);return bind(x);
 }
 const noAuthority=o=>{for(const k of ['authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'])assert.equal(o[k],false,k);};
@@ -96,4 +96,30 @@ test('mailbox invalid CI binding revokes COMPLETE_DRAFT and preserves adverse-re
 test('missing mailbox CI only waits and valid mailbox CI_WAIT still advances',()=>{
  const x=mailbox(fixture());x.snapshot.work.ci=null;x.snapshot.ciBinding=null;x.expected.ci=null;const r=reconcileContinuation(x);assert.equal(r.decision,'WAITING_CI');assert.deepEqual(r.ledger,x.ledger);
  const y=mailbox(fixture());const ready=reconcileContinuation(y);assert.equal(ready.decision,'READY_FOR_OWNER_DECISION');assert.equal(ready.ledger.packets[0].state,'COMPLETE_DRAFT');
+});
+
+test('old GREEN cannot survive same-comment edit despite refreshed event identity',()=>{
+ const x=mailbox(fixture());x.ledger=reconcileContinuation(x).ledger;
+ const payload=JSON.parse(x.trigger.payloadJson);payload.action='edited';payload.comment.updated_at='2026-10-11T19:01:00Z';payload.comment.body='REVISION_REQUIRED';
+ x.trigger.payloadJson=JSON.stringify(payload);bind(x);
+ const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_EVENT_VERSION_MISMATCH');assert.equal(r.ledger.revoked,true);noAuthority(r);
+});
+test('current CI cannot inherit review bound to a previous run on either wake',()=>{
+ for(const mail of [false,true]){
+  const x=mail?mailbox(fixture()):fixture();x.ledger=reconcileContinuation(x).ledger;
+  x.expected.ci.runId=999;x.snapshot.ciBinding.runId=999;x.snapshot.work.ci.runId=999;
+  if(!mail){const p=JSON.parse(x.trigger.payloadJson);p.workflow_run.id=999;x.trigger.payloadJson=JSON.stringify(p);bind(x);}
+  const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_BINDING_INVALID');assert.equal(r.ledger.revoked,true);
+ }
+});
+test('missing provenance and independently changed comment version stop every ready state',()=>{
+ for(const state of ['CI_WAIT','REVIEW_WAIT','COMPLETE_DRAFT'])for(const edit of [x=>x.snapshot.reviewBinding=null,x=>x.expected.reviewVersion=null,x=>x.expected.reviewVersion.bodySha256='e'.repeat(64),x=>x.snapshot.reviewBinding.ci.runAttempt=2]){
+  const x=fixture();if(state!=='CI_WAIT')x.ledger=change(x,'CI_PASSED');if(state==='COMPLETE_DRAFT')x.ledger=change(x,'REVIEW_PASSED');edit(x);
+  const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_BINDING_INVALID');assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');
+  if(state==='COMPLETE_DRAFT')assert.equal(r.ledger.revoked,true);else assert.deepEqual(r.ledger,x.ledger);
+ }
+});
+test('one version sidecar cannot bless additional scoped GREEN responses',()=>{
+ const x=fixture();x.snapshot.work.responses.push({...x.snapshot.work.responses[0],reviewCommentId:790});
+ const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_BINDING_INVALID');assert.deepEqual(r.ledger,x.ledger);
 });

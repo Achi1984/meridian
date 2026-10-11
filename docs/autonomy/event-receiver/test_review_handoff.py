@@ -39,6 +39,7 @@ class HandoffTests(unittest.TestCase):
         expected, api = fixture(); receipt = self.run_handoff(expected, api)
         self.assertEqual(receipt["decision"], "CANDIDATE_REVIEW")
         self.assertEqual(receipt["plannerResponse"]["reviewCommentId"], 789)
+        self.assertEqual(receipt["reviewBinding"], {**expected["version"], "ci": expected["scope"]["ci"]})
         self.assertNotIn('schemaVersion', json.dumps(receipt))
         for key in ("authenticated", "provenanceVerified", "authorized", "dispatchAllowed", "mergeAllowed", "durable"):
             self.assertFalse(receipt[key])

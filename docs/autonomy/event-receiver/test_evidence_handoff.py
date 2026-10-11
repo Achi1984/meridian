@@ -21,6 +21,9 @@ class EvidenceHandoffTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('handoff_envelope_binder', path)
         cls.binder = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.binder)
+        fixtures_path=path.parent.parent/'test'/'test_review_binding.py'
+        fixture_spec=importlib.util.spec_from_file_location('handoff_adapter_fixtures',fixtures_path)
+        cls.adapter_fixtures=importlib.util.module_from_spec(fixture_spec);fixture_spec.loader.exec_module(cls.adapter_fixtures)
 
     def candidate(self):
         expected, api = fixture()
@@ -50,12 +53,25 @@ class EvidenceHandoffTests(unittest.TestCase):
         self.assertEqual(seen, [body])
         self.assertEqual(result['decision'], 'CANDIDATE_REVIEW')
         self.assertEqual(result['version'], expected['version'])
+        self.assertEqual(result['reviewBinding'], {**expected['version'], 'ci': expected['scope']['ci']})
         self.assertEqual(result['plannerResponse']['verdict'], 'GREEN_LIGHT')
         self.assertEqual(api.calls.count('issues/comments/789'), 2)
         self.assertNotIn('assessment', json.dumps(result))
         self.assertNotIn('commandSha256', json.dumps(result))
         for key in ('authenticated', 'provenanceVerified', 'authorized', 'dispatchAllowed', 'mergeAllowed', 'durable'):
             self.assertIs(result[key], False)
+
+    def test_collected_binding_blocks_stale_edit_and_ci_in_actual_adapter(self):
+        expected,api,body=self.candidate()
+        result=collect_review(json.dumps(expected),A,'edited',api,
+            lambda observation,pins:self.binder.bind_envelope(observation,pins,json.dumps(POLICY)))
+        observation={'repository':expected['scope']['repository'],'issueNumber':571,'eventAction':'edited',
+            'comment':{key:api.rows['issues/comments/789'][key] for key in ('id','user','created_at','updated_at','body')}}
+        fresh=self.adapter_fixtures.run_bound_adapter(result,self.adapter_fixtures.adapter_input(observation,expected))
+        self.assertEqual(fresh['decision'],'READY_FOR_OWNER_DECISION')
+        for changed in self.adapter_fixtures.stale_variants(observation,expected):
+            rejected=self.adapter_fixtures.run_bound_adapter(result,changed)
+            self.assertNotEqual(rejected['decision'],'READY_FOR_OWNER_DECISION')
 
     def test_edit_or_independent_policy_mismatch_cannot_produce_candidate(self):
         for edit_body in (True, False):

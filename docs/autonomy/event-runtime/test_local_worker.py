@@ -50,7 +50,9 @@ class WorkerTests(unittest.TestCase):
 
     def test_actual_adapter_ready_decision_retains_false_authority(self):
         observation, expected = self.fixtures.fixture()
-        self.input["snapshot"]["work"]["responses"] = [self.fixtures.bind(observation, expected)["plannerResponse"]]
+        bound = self.fixtures.bind(observation, expected)
+        self.input["snapshot"]["work"]["responses"] = [bound["plannerResponse"]]
+        self.input["snapshot"]["reviewBinding"] = bound["reviewBinding"]
         raw = json.dumps(self.input, separators=(",", ":")).encode()
         binding = {**self.binding, "payloadSha256": hashlib.sha256(raw).hexdigest()}
         db = str(Path(self.temp.name) / "ready.sqlite"); inbox.initialize(db)
@@ -67,7 +69,9 @@ class WorkerTests(unittest.TestCase):
 
     def test_actual_process_crash_after_commit_recovers_without_execution(self):
         observation, expected = self.fixtures.fixture()
-        self.input["snapshot"]["work"]["responses"] = [self.fixtures.bind(observation, expected)["plannerResponse"]]
+        bound = self.fixtures.bind(observation, expected)
+        self.input["snapshot"]["work"]["responses"] = [bound["plannerResponse"]]
+        self.input["snapshot"]["reviewBinding"] = bound["reviewBinding"]
         raw = json.dumps(self.input, separators=(",", ":")).encode()
         binding = {**self.binding, "payloadSha256": hashlib.sha256(raw).hexdigest()}
         db = str(Path(self.temp.name) / "crash-after.sqlite"); inbox.initialize(db)

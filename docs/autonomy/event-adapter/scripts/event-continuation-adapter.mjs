@@ -34,9 +34,9 @@ const scopeKeys=['repository','requestId','opId','headSha','baseSha'];
 export function reconcileContinuation(input){
  const x=copy(input);shape(x,['trigger','config','expected','snapshot','manifest','ledger','requiredJobs']);
  const e=x.expected,s=x.snapshot;
- shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci']);
+ shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci','reviewVersion']);
  if(e.ci!==null)shape(e.ci,['runId','runAttempt','workflowId','headSha']);
- shape(s,['repository','observedAt','mainSha','pr','work','eventBinding','ciBinding']);
+ shape(s,['repository','observedAt','mainSha','pr','work','eventBinding','ciBinding','reviewBinding']);
  if(s.ciBinding!==null)shape(s.ciBinding,['runId','runAttempt','workflowId','headSha']);
  shape(s.pr,['headSha','baseSha','state','mergeSha']);shape(s.eventBinding,['eventIdentity','revisionDigest']);
  shape(x.trigger,['name','payloadJson']);
@@ -90,6 +90,22 @@ export function reconcileContinuation(input){
 
  if(plan.status==='WAITING_AGENT')return stop('WAITING_AGENT',plan.reason);
  if(plan.status==='WAITING_CI')return stop('WAITING_CI',plan.reason);
+ // A planner response discards the claim's version and CI pins. Reattach only
+ // separately validated binder evidence, then compare independent current pins.
+ // These caller-supplied objects are still not authenticated by this adapter.
+ if(plan.status==='READY_FOR_OWNER_DECISION'){
+  const versionKeys=['commentId','createdAt','updatedAt','bodySha256'];
+  const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
+  const timestamp=v=>typeof v==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString()===v.replace('Z','.000Z');
+  const validVersion=v=>v&&integer(v.commentId)&&v.commentId>0&&timestamp(v.createdAt)&&timestamp(v.updatedAt)&&v.updatedAt>=v.createdAt&&typeof v.bodySha256==='string'&&/^[a-f0-9]{64}$/.test(v.bodySha256);
+  const r=s.reviewBinding,v=e.reviewVersion,ciKeys=['runId','runAttempt','workflowId','headSha'];
+  const scoped=s.work.responses.filter(row=>scopeKeys.every(k=>row[k]===e[k]));
+  if(!exact(r,[...versionKeys,'ci'])||!exact(v,versionKeys)||!validVersion(r)||!validVersion(v)
+    ||versionKeys.some(k=>r[k]!==v[k])||!exact(r.ci,ciKeys)||!e.ci||ciKeys.some(k=>r.ci[k]!==e.ci[k])
+    ||scoped.length!==1||scoped[0].reviewCommentId!==r.commentId||scoped[0].verdict!=='GREEN_LIGHT')return stop('RECONCILE_EVENT','REVIEW_BINDING_INVALID');
+  if(event.eventName==='issue_comment'&&(event.claims.commentId!==r.commentId||event.claims.createdAt!==r.createdAt
+    ||event.claims.updatedAt!==r.updatedAt||event.claims.bodyDigest!==r.bodySha256))return stop('RECONCILE_EVENT','REVIEW_EVENT_VERSION_MISMATCH');
+ }
  let ledger=x.ledger;
  const move=(type)=>{ledger=advance(m,ledger,{type,packetId:e.packetId,sha:e.headSha,expectedRevision:ledger.revision},e.now);};
  if(packet.state==='CI_WAIT')move('CI_PASSED');

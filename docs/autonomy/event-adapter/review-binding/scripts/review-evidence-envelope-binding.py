@@ -22,9 +22,10 @@ def bind_envelope(observation_raw, expected_raw, required_policy_raw):
     Only a fully valid v2 envelope can expose a plannerResponse, including adverse
     verdicts. Full bodies/findings/check commands remain transient in memory.
     """
-    def result(decision, reason, response=None, version=None, digest=None):
+    def result(decision, reason, response=None, version=None, digest=None, ci=None):
         return {'kind':'UNVERIFIED_REVIEW_ENVELOPE_BINDING', 'decision':decision,
                 'reason':reason, 'plannerResponse':response, 'version':version,
+                'reviewBinding':{**version,'ci':dict(ci)} if version is not None and ci is not None else None,
                 'evidenceSha256':digest, 'authenticated':False,
                 'provenanceVerified':False, 'authorized':False, 'dispatchAllowed':False,
                 'mergeAllowed':False, 'durable':False}
@@ -41,7 +42,7 @@ def bind_envelope(observation_raw, expected_raw, required_policy_raw):
         green = checked['verdict'] == 'GREEN_LIGHT'
         return result('CANDIDATE_REVIEW' if green else 'BLOCKED',
                       'COMPLETE_ENVELOPE_BOUND_UNVERIFIED' if green else 'NON_GREEN_REVIEW',
-                      response, dict(expected['version']), checked['evidenceSha256'])
+                      response, dict(expected['version']), checked['evidenceSha256'], scope['ci'])
     except (ValueError, TypeError, UnicodeError, RecursionError, KeyError) as error:
         code = str(error)
         return result('BLOCKED', code if re.fullmatch(r'[A-Z][A-Z_]{2,79}', code) else 'ENVELOPE_BINDING_INVALID')
