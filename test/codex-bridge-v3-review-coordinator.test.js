@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Worker} from 'node:worker_threads';
 import {validateEvidence} from '../scripts/codex-bridge-v3-evidence.mjs';
-import {classifyReview} from '../scripts/codex-bridge-v3-review-coordinator.mjs';
+import {classifyReview, validateStructuredReviewClaim, STRUCTURED_REVIEW_CLAIM_SCHEMA} from '../scripts/codex-bridge-v3-review-coordinator.mjs';
 
 const scope = () => ({requestId:'REQ-001',opId:'OP-001',headSha:'a'.repeat(40),
   baseSha:'b'.repeat(40),repository:'Achi1984/meridian'});
@@ -214,4 +214,97 @@ test('frozen JSON-shaped snapshots are accepted and never thawed',()=>{
   const pinned=Object.freeze(scope()),row=Object.freeze(response());
   const value=Object.freeze({...pinned,responses:Object.freeze([row]),inFlight:Object.freeze([])});
   denied(classifyReview(value,pinned));assert.ok(Object.isFrozen(value.responses));
+});
+
+const ciIdentity = () => ({runId:100,runAttempt:1,workflowId:200,headSha:scope().headSha});
+const structuredPins = () => ({...scope(),prNumber:123,ci:ciIdentity()});
+const structuredClaim = () => ({schemaVersion:1,...scope(),prNumber:123,verdict:'GREEN_LIGHT',
+  ci:{...ciIdentity(),status:'completed',conclusion:'success'}});
+test('structured claims preserve all existing verdicts as unauthenticated non-authorizing claims',()=>{
+  for(const verdict of STRUCTURED_REVIEW_CLAIM_SCHEMA.properties.verdict.enum){
+    const value={...structuredClaim(),verdict},expected=structuredPins();
+    const before=structuredClone({value,expected});
+    const result=validateStructuredReviewClaim(value,expected);denied(result);
+    assert.equal(result.verdict,verdict);assert.equal(result.status,verdict==='GREEN_LIGHT'?'REVIEWED':'BLOCKED');
+    assert.deepEqual({value,expected},before);
+    assert.deepEqual(validateStructuredReviewClaim(value,expected),result);
+  }
+});
+test('structured scope and CI identity independently pin every identity field',()=>{
+  for(const field of [...Object.keys(scope()),'prNumber']){
+    const value=structuredClaim();value[field]=field==='prNumber'?124:field.endsWith('Sha')?'c'.repeat(40):field==='repository'?'other/repo':'OTHER-001';
+    fail(()=>validateStructuredReviewClaim(value,structuredPins()),field==='repository'?'INVALID_SCOPE':'SCOPE_MISMATCH');
+  }
+  for(const field of Object.keys(ciIdentity())){
+    const value=structuredClaim();value.ci[field]=field==='headSha'?'c'.repeat(40):999;
+    fail(()=>validateStructuredReviewClaim(value,structuredPins()),'CI_IDENTITY_MISMATCH');
+  }
+  const pins=structuredPins();pins.ci.headSha='c'.repeat(40);
+  fail(()=>validateStructuredReviewClaim(structuredClaim(),pins),'CI_IDENTITY_MISMATCH');
+});
+test('structured unknown/missing fields and model-provided provenance are rejected at each level',()=>{
+  for(const location of ['claim','expected','ci','expectedCI']){
+    for(const mode of ['missing','extra','symbol','provenance']){
+      const claim=structuredClaim(),expected=structuredPins();
+      const obj=location==='claim'?claim:location==='expected'?expected:location==='ci'?claim.ci:expected.ci;
+      if(mode==='missing')delete obj[Object.keys(obj)[0]];
+      else Object.defineProperty(obj,mode==='symbol'?Symbol('extra'):mode==='provenance'?'authenticated':'extra',{value:true,enumerable:true});
+      fail(()=>validateStructuredReviewClaim(claim,expected),'INVALID_SCHEMA');
+    }
+  }
+});
+for(const where of ['claim','expected','ci','expectedCI'])test('structured hostile descriptors at '+where+' never execute',()=>{
+  for(const kind of ['proxy','revoked','accessor']){
+    let calls=0,claim=structuredClaim(),expected=structuredPins();
+    const obj=where==='claim'?claim:where==='expected'?expected:where==='ci'?claim.ci:expected.ci;
+    let hostile=obj;
+    if(kind==='accessor')Object.defineProperty(obj,Object.keys(obj)[0],{enumerable:true,get(){calls++;throw Error('getter');}});
+    else if(kind==='revoked'){const x=Proxy.revocable(obj,{});x.revoke();hostile=x.proxy;}
+    else hostile=new Proxy(obj,{get(){calls++;throw Error('trap');},getPrototypeOf(){calls++;throw Error('trap');},ownKeys(){calls++;throw Error('trap');}});
+    if(where==='claim')claim=hostile;else if(where==='expected')expected=hostile;else if(where==='ci')claim.ci=hostile;else expected.ci=hostile;
+    fail(()=>validateStructuredReviewClaim(claim,expected),kind==='accessor'?'ACCESSOR_OR_HIDDEN_FIELD':'INVALID_OBJECT');assert.equal(calls,0);
+  }
+});
+test('structured integer bounds and coercion hooks are strict for claims and expected pins',()=>{
+  let calls=0;const hostile={[Symbol.toPrimitive](){calls++;throw Error('coercion');}};
+  for(const value of [true,'1',0,-1,1.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,hostile]){
+    for(const side of ['claim','expected'])for(const field of ['prNumber','runId','runAttempt','workflowId']){
+      const claim=structuredClaim(),expected=structuredPins(),obj=side==='claim'?claim:expected;
+      if(field==='prNumber')obj[field]=value;else obj.ci[field]=value;
+      fail(()=>validateStructuredReviewClaim(claim,expected),field==='prNumber'?'INVALID_PR_NUMBER':'INVALID_CI_IDENTITY');
+    }
+  }
+  for(const [field,code] of [['schemaVersion','UNKNOWN_SCHEMA_VERSION'],['verdict','UNKNOWN_VERDICT'],['requestId','INVALID_SCOPE']]){
+    const value={...structuredClaim(),[field]:hostile};fail(()=>validateStructuredReviewClaim(value,structuredPins()),code);
+  }
+  for(const field of ['status','conclusion']){const value=structuredClaim();value.ci[field]=hostile;fail(()=>validateStructuredReviewClaim(value,structuredPins()),'INVALID_CI_STATE');}
+  assert.equal(calls,0);
+});
+test('CI action success never substitutes for a structured verdict, GREEN requires consistent completed success',()=>{
+  const value=structuredClaim();delete value.verdict;
+  fail(()=>validateStructuredReviewClaim(value,structuredPins()),'INVALID_SCHEMA');
+  for(const status of ['queued','in_progress','completed'])for(const conclusion of [null,...STRUCTURED_REVIEW_CLAIM_SCHEMA.properties.ci.properties.conclusion.enum.filter(x=>x!==null)]){
+    const claim=structuredClaim();Object.assign(claim.ci,{status,conclusion});
+    const consistent=status==='completed'?conclusion!==null:conclusion===null;
+    if(!consistent)fail(()=>validateStructuredReviewClaim(claim,structuredPins()),'INCONSISTENT_CI_STATE');
+    else if(status!=='completed'||conclusion!=='success')fail(()=>validateStructuredReviewClaim(claim,structuredPins()),'GREEN_CI_CONFLICT');
+    else denied(validateStructuredReviewClaim(claim,structuredPins()));
+    claim.verdict='NEEDS_MORE_EVIDENCE';
+    if(consistent)denied(validateStructuredReviewClaim(claim,structuredPins()));
+  }
+});
+test('structured schema is deeply frozen, closed, bounded and describes implementation fields',()=>{
+  const schema=STRUCTURED_REVIEW_CLAIM_SCHEMA;
+  function frozen(x){if(x&&typeof x==='object'){assert.ok(Object.isFrozen(x));Object.values(x).forEach(frozen);}}
+  frozen(schema);
+  for(const obj of [schema,schema.properties.ci]){assert.equal(obj.additionalProperties,false);assert.deepEqual([...obj.required].sort(),Object.keys(obj.properties).sort());}
+  assert.deepEqual([...schema.required].sort(),Object.keys(structuredClaim()).sort());
+  assert.deepEqual([...schema.properties.ci.required].sort(),Object.keys(structuredClaim().ci).sort());
+  assert.equal(schema.properties.prNumber.maximum,Number.MAX_SAFE_INTEGER);
+  assert.equal(schema.properties.requestId.maxLength,128);
+  assert.equal(schema.properties.headSha.maxLength,40);
+  assert.throws(()=>schema.properties.verdict.enum.push('BLOCKED'),TypeError);
+  const value=structuredClaim(),pins=structuredPins();value.prNumber=pins.prNumber=Number.MAX_SAFE_INTEGER;
+  value.requestId=pins.requestId='R'.repeat(128);denied(validateStructuredReviewClaim(value,pins));
+  fail(()=>validateStructuredReviewClaim(JSON.stringify(value),pins),'INVALID_OBJECT');
 });
