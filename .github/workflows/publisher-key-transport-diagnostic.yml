@@ -1,0 +1,56 @@
+name: MERIDIAN Publisher Key Transport Diagnostic
+on:
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: meridian-publisher-key-transport-diagnostic
+  cancel-in-progress: false
+jobs:
+  transport:
+    # Manual, owner-triggered, first attempt only; existing environment approval is also required.
+    if: ${{ github.repository == 'Achi1984/meridian' && github.ref == 'refs/heads/main' && github.triggering_actor == 'Achi1984' && github.run_attempt == 1 }}
+    environment: meridian-draft-publisher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Validate key transport only
+        env:
+          MERIDIAN_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.MERIDIAN_PUBLISHER_APP_PRIVATE_KEY }}
+        run: |
+          exec python3 -I - <<'PY'
+          import os
+          value = os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)
+          import time
+          if time.time() >= 1791734400:
+              value = None
+              print('MERIDIAN_KEY_TRANSPORT WINDOW_EXPIRED')
+              raise SystemExit(2)
+          import base64
+
+          def validate_transport(value):
+              if type(value) is not str or not 32 <= len(value) <= 32768:
+                  raise ValueError('Rejected')
+              raw = value.encode('ascii')
+              if any(byte not in (10, 13) and not 32 <= byte <= 126 for byte in raw):
+                  raise ValueError('Rejected')
+              lines = value.splitlines()
+              headers = tuple('-----' + 'BEGIN ' + label + '-----' for label in ('RSA PRIVATE KEY', 'PRIVATE KEY'))
+              if len(lines) < 3 or lines[0] not in headers:
+                  raise ValueError('Rejected')
+              if lines[-1] != lines[0].replace('BEGIN', 'END'):
+                  raise ValueError('Rejected')
+              if any(not line or len(line) > 76 for line in lines[1:-1]):
+                  raise ValueError('Rejected')
+              if len(base64.b64decode(''.join(lines[1:-1]), validate=True)) < 32:
+                  raise ValueError('Rejected')
+
+          try:
+              validate_transport(value)
+          except Exception:
+              print('MERIDIAN_KEY_TRANSPORT REJECTED')
+              raise SystemExit(1)
+          finally:
+              value = None
+          print('MERIDIAN_KEY_TRANSPORT ACCEPTED_TRANSPORT_ONLY')
+          PY
