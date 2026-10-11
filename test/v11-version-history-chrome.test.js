@@ -10,7 +10,10 @@ test('version history: native keyboard, focus and compact viewport at four mobil
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
   assert.equal(child.status,0,String(child.stdout).slice(-1600)+String(child.stderr).slice(-800));
-  assert.equal(String(child.stdout).split('\n').filter(l=>l.includes('V11_HISTORY_WIDTH')).length,4);return;
+  const measurements=String(child.stdout).split('\n').filter(l=>l.includes('V11_HISTORY_WIDTH'));
+  assert.equal(measurements.length,4);
+  for(const line of measurements) console.log(line);
+  return;
  }
  assert.ok(chrome,'Chrome binary required');
  const url=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
@@ -39,6 +42,7 @@ test('version history: native keyboard, focus and compact viewport at four mobil
    const reachable=await evaluate(`(()=>{const p=document.getElementById('version-panel'),targets=[...p.querySelectorAll('.version-history-list li'),p.querySelector('p:last-child')],positions=[];for(const item of targets){item.scrollIntoView({block:'end'});const r=item.getBoundingClientRect();positions.push({top:r.top,bottom:r.bottom});}return {positions,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};})()`);
    assert.equal(reachable.positions.length,4);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport');assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
    await evaluate(`window.scrollTo(0,0)`);
+   assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.classList.contains('terminal-entry-link')`),true,'existing terminal access remains keyboard reachable');
    await key('Tab','Tab',9);
