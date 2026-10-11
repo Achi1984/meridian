@@ -29,7 +29,7 @@ def execute(value):
     environment = {'PATH': os.environ['PATH']}
     if value is not None:
         environment[SECRET] = value
-    wrapper = 'import time; time.time=lambda:1791734300; exec(compile(' + repr(CODE) + ',"<exact-inline>","exec"))'
+    wrapper = 'import time; time.time=lambda:1791737900; exec(compile(' + repr(CODE) + ',"<exact-inline>","exec"))'
     return subprocess.run(['python3', '-I', '-c', wrapper], env=environment, text=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
 
@@ -52,7 +52,7 @@ class KeyTransportTests(unittest.TestCase):
         self.assertIsInstance(tree.body[1], ast.Assign)
         self.assertEqual(ast.unparse(tree.body[1].value), "os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)")
         self.assertIsInstance(tree.body[3], ast.If)
-        self.assertEqual(ast.unparse(tree.body[3].test), 'time.time() >= 1791734400')
+        self.assertEqual(ast.unparse(tree.body[3].test), 'time.time() >= 1791738000')
         imports = {name.name for node in ast.walk(tree) if isinstance(node, ast.Import) for name in node.names}
         self.assertEqual(imports, {'os', 'time', 'base64'})
         self.assertFalse(any(isinstance(node, ast.ImportFrom) for node in ast.walk(tree)))
@@ -62,7 +62,7 @@ class KeyTransportTests(unittest.TestCase):
                                  "''.join", 'validate_transport', 'print', 'SystemExit', 'time.time'})
 
     def test_expired_window_removes_secret_without_processing_it(self):
-        wrapper = "import os,time\ntime.time=lambda:1791734400\ntry:\n exec(compile(" + repr(CODE) + ",'<exact-inline>','exec'))\nexcept SystemExit as stopped:\n assert stopped.code==2\n assert 'MERIDIAN_PUBLISHER_APP_PRIVATE_KEY' not in os.environ\n assert value is None\n assert 'base64' not in globals() and 'validate_transport' not in globals()\n raise"
+        wrapper = "import os,time\ntime.time=lambda:1791738000\ntry:\n exec(compile(" + repr(CODE) + ",'<exact-inline>','exec'))\nexcept SystemExit as stopped:\n assert stopped.code==2\n assert 'MERIDIAN_PUBLISHER_APP_PRIVATE_KEY' not in os.environ\n assert value is None\n assert 'base64' not in globals() and 'validate_transport' not in globals()\n raise"
         result = subprocess.run(['python3', '-I', '-c', wrapper], env={'PATH': os.environ['PATH'], SECRET: fixture()},
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
         self.assertEqual(result.returncode, 2)

@@ -22,7 +22,7 @@ jobs:
           import os
           value = os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)
           import time
-          if time.time() >= 1791734400:
+          if time.time() >= 1791738000:
               value = None
               print('MERIDIAN_KEY_TRANSPORT WINDOW_EXPIRED')
               raise SystemExit(2)
