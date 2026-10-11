@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import unittest
 import check_executor as executor
+import check_journal as journal
+import durable_check
 
 
 class ExecutionEvidenceTests(unittest.TestCase):
@@ -21,7 +23,10 @@ class ExecutionEvidenceTests(unittest.TestCase):
         contract = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(contract)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory) / 'checkout'
+            root.mkdir()
+            database = Path(directory) / 'checks.sqlite'
+            journal.initialize(database)
             def git(*args):
                 return subprocess.check_output(['git', *args], cwd=root, text=True,
                                                stderr=subprocess.DEVNULL).strip()
@@ -41,7 +46,12 @@ class ExecutionEvidenceTests(unittest.TestCase):
                      'opId': 'OP-INTEGRATION', 'headSha': head, 'baseSha': base,
                      'prNumber': 703, 'ci': {'runId': 1, 'runAttempt': 1,
                                            'workflowId': 2, 'headSha': head}}
-            receipt = executor.execute_check(root, scope)
+            execution = durable_check.run_check_once(database, root, scope)
+            self.assertEqual(execution['state'], 'COMPLETE')
+            self.assertTrue(execution['persistConfirmed'])
+            recovered = durable_check.recover_completed_check(database, scope)
+            self.assertEqual(recovered, execution)
+            receipt = recovered['receipt']
             self.assertTrue(receipt['check']['executed'])
             self.assertEqual(receipt['check']['status'], 'passed')
             self.assertEqual(receipt['exitCode'], 0)
