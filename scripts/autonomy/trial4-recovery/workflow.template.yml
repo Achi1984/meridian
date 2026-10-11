@@ -15,13 +15,14 @@ jobs:
     if: ${{ github.repository == 'Achi1984/meridian' && github.ref == 'refs/heads/main' && github.triggering_actor == 'Achi1984' && github.run_attempt == 1 }}
     environment: meridian-draft-publisher
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
     permissions:
       contents: write
       actions: read
       pull-requests: read
     steps:
       - name: Load immutable reviewed recovery files
+        timeout-minutes: 3
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -34,6 +35,7 @@ jobs:
           done
           printf '%s\n' '__HASH_0__  recovery_core.py' '__HASH_1__  recovery_http.py' '__HASH_2__  recovery_launcher.py' '__HASH_3__  publisher_broker.py' '__HASH_4__  evidence/validate_original_packet.py' '__HASH_5__  evidence/original-pilot.py' '__HASH_6__  workflow.template.yml' | sha256sum --check --strict -
       - name: Authenticate recovery and publish only the preserved artifact
+        timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
           APPROVED_RECOVERY_BASE: ${{ inputs.approved_base }}

@@ -1,6 +1,7 @@
 """Protected-job launcher. Import inert; no credentials or network until main()."""
 import base64
 import contextlib
+import datetime
 import hashlib
 import importlib.util
 import json
@@ -8,6 +9,8 @@ import os
 import pathlib
 import re
 import sys
+import signal
+import time
 
 WORKFLOW = '.github/workflows/trial4-artifact-recovery.yml'
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -22,6 +25,60 @@ PINS = {'app_id': 5272026, 'app_slug': 'meridian-draft-publisher', 'bot_login': 
 def require(condition):
     if not condition:
         raise ValueError('LAUNCHER_CHECK_FAILED')
+
+
+class ExecutionBudget:
+    """Linux watchdog leaves cleanup time before native step/job termination."""
+    WORK_SECONDS = 600
+    CLEANUP_SECONDS = 60
+    MINT_RESERVE_SECONDS = 240
+    JOB_SECONDS = 1200
+    NATIVE_MARGIN_SECONDS = 60
+
+    def __init__(self):
+        self.started = time.monotonic()
+        self.job_end = None
+        self.previous_handler = None
+
+    @staticmethod
+    def expired(signum, frame):
+        raise TimeoutError('RECOVERY_EXECUTION_BUDGET')
+
+    def install(self):
+        self.previous_handler = signal.signal(signal.SIGALRM, self.expired)
+        signal.setitimer(signal.ITIMER_REAL, self.WORK_SECONDS)
+
+    def close(self):
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        if self.previous_handler is not None:
+            signal.signal(signal.SIGALRM, self.previous_handler)
+
+    def bind_job(self, timestamp):
+        require(type(timestamp) is str and re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', timestamp))
+        started = datetime.datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()
+        require(started <= time.time() + 5)
+        self.job_end = started + self.JOB_SECONDS
+        remaining_work = self.WORK_SECONDS - (time.monotonic() - self.started)
+        require(self.job_end - time.time() >= remaining_work + self.CLEANUP_SECONDS + self.NATIVE_MARGIN_SECONDS)
+        self.check()
+
+    def check(self, *, mint=False):
+        remaining = self.WORK_SECONDS - (time.monotonic() - self.started)
+        require(remaining > 0)
+        if self.job_end is not None:
+            require(self.job_end - time.time() > self.CLEANUP_SECONDS + self.NATIVE_MARGIN_SECONDS)
+        if mint:
+            require(self.job_end is not None and remaining >= self.MINT_RESERVE_SECONDS
+                    and self.job_end - time.time() >= self.MINT_RESERVE_SECONDS + self.CLEANUP_SECONDS + self.NATIVE_MARGIN_SECONDS)
+
+    @contextlib.contextmanager
+    def cleanup(self):
+        # Replace, never re-arm the expired operation alarm during token revocation.
+        signal.setitimer(signal.ITIMER_REAL, self.CLEANUP_SECONDS)
+        try:
+            yield
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
 
 
 def load(name):
@@ -82,6 +139,12 @@ def authenticated_context(api, core, env):
             and core.own(run.get('repository')) and core.own(run.get('head_repository')))
     for field in ('actor', 'triggering_actor'):
         require(run.get(field, {}).get('login') == 'Achi1984' and run[field].get('id') == 319562141)
+    jobs = api('actions/runs/' + run_id_text + '/attempts/1/jobs?per_page=100')
+    require(type(jobs.get('total_count')) is int and jobs['total_count'] == 1
+            and type(jobs.get('jobs')) is list and len(jobs['jobs']) == 1)
+    job = jobs['jobs'][0]
+    require(job.get('run_id') == run_id and job.get('run_attempt') == 1 and job.get('name') == 'recover'
+            and job.get('status') == 'in_progress' and job.get('conclusion') is None)
     require(api('git/ref/heads/main')['object']['sha'] == base)
     # Compare all reviewed workflow bytes, including source hashes, environment and exact loader/entrypoint.
     workflow_file = api('contents/' + WORKFLOW + '?ref=' + base)
@@ -105,7 +168,8 @@ def authenticated_context(api, core, env):
             and any(e.get('id') == 24007408163 and e.get('name') == 'meridian-draft-publisher'
                     and e.get('can_admins_bypass') is False for e in approval.get('environments', [])))
     return {'repository': core.REPO, 'ref': 'refs/heads/main', 'sha': base, 'event': 'workflow_dispatch',
-            'actor': 'Achi1984', 'attempt': 1, 'run_id': run_id, 'environment_approved': True}
+            'actor': 'Achi1984', 'attempt': 1, 'run_id': run_id, 'environment_approved': True,
+            'job_started_at': job.get('started_at')}
 
 
 def key_transport(value):
@@ -121,8 +185,9 @@ def key_transport(value):
 
 
 class BrokerFactory:
-    def __init__(self, broker, key, window):
-        self.broker = broker; self.key = key; self.window = window; self.events = {}; self.used = False
+    def __init__(self, broker, key, window, budget):
+        self.broker = broker; self.key = key; self.window = window; self.budget = budget
+        self.events = {}; self.used = False
 
     def observe(self, event, **fields):
         expected = {'app_verified': {'app_id'}, 'installation_verified': {'installation_id'},
@@ -135,8 +200,11 @@ class BrokerFactory:
 
     def bounded_http(self, method, url, credential, payload):
         # Expiry stops minting and identity requests, but never token cleanup.
-        if not (method == 'DELETE' and url == 'https://api.github.com/installation/token' and payload is None):
-            self.window()
+        if method == 'DELETE' and url == 'https://api.github.com/installation/token' and payload is None:
+            with self.budget.cleanup():
+                return self.broker.github_http(method, url, credential, payload)
+        self.window()
+        self.budget.check(mint=(method == 'POST'))
         return self.broker.github_http(method, url, credential, payload)
 
     @contextlib.contextmanager
@@ -160,26 +228,34 @@ def main():
     # Remove the secret before loading any sibling or spawning the existing signer's isolated OpenSSL process.
     value = os.environ.pop('MERIDIAN_PUBLISHER_APP_PRIVATE_KEY', None)
     report = {'outcome': 'stopped', 'stage': 'launcher', 'model_calls': 0}
+    budget = ExecutionBudget()
     try:
+        budget.install()
         require(len(sys.argv) == 1)
         core = load('recovery_core.py'); http = load('recovery_http.py')
+        original_window = core.window
+        def guarded_window():
+            original_window(); budget.check()
+        core.window = guarded_window
         core.window()
         key = key_transport(value); value = None
         api = http.GitHub(os.environ['GH_TOKEN'], core)
         context = authenticated_context(api, core, os.environ)
+        budget.bind_job(context['job_started_at'])
         failure_log = api.signed_download('actions/jobs/114492680461/logs', 1048576)
         validate_failure_receipt(failure_log, http.strict_json)
         context['original_failure_reconciled'] = True
         archive = api.signed_download('actions/artifacts/11705462075/zip', 131072)
         helper = (ROOT / 'evidence/original-pilot.py').read_bytes()
         broker = load('publisher_broker.py')
-        factory = BrokerFactory(broker, key, core.window)
+        factory = BrokerFactory(broker, key, core.window, budget)
         report = core.recover_once(config={**core.CONFIGURED, 'base': context['sha']}, context=context, api=api,
             publisher_factory=factory, publisher_receipt=factory.receipt, archive=archive, helper_bytes=helper)
         return 0 if report.get('outcome') == 'prepared_draft' else 1
     except BaseException:
         return 1
     finally:
+        budget.close()
         value = None
         print('MERIDIAN_RECOVERY_RECEIPT ' + json.dumps(report, sort_keys=True, separators=(',', ':')))
 

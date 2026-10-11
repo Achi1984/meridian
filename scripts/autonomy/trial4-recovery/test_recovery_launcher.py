@@ -26,6 +26,7 @@ class LauncherTests(unittest.TestCase):
             actor=owner,triggering_actor=owner),
             'actions/workflows/trial4-artifact-recovery.yml':{'id':777,'path':l.WORKFLOW},
             'git/ref/heads/main':{'object':{'sha':base}},
+            'actions/runs/999/attempts/1/jobs?per_page=100':{'total_count':1,'jobs':[{'run_id':999,'run_attempt':1,'name':'recover','status':'in_progress','conclusion':None,'started_at':'2026-10-11T16:30:00Z'}]},
             'contents/'+l.WORKFLOW+'?ref='+base:{'encoding':'base64','type':'file',
                 'content':base64.b64encode(l.render_workflow('a'*40).encode()).decode()},
             'actions/runs/999/approvals':[{'state':'approved','user':owner,
@@ -76,7 +77,7 @@ class LauncherTests(unittest.TestCase):
     def test_deadline_blocks_mint_but_never_revoke(self):
         calls=[]
         broker=types.SimpleNamespace(github_http=lambda *args:(calls.append(args) or (204,{})))
-        factory=l.BrokerFactory(broker,b'synthetic',c.window)
+        factory=l.BrokerFactory(broker,b'synthetic',c.window,l.ExecutionBudget())
         with patch.object(c.time,'time',return_value=c.DEADLINE-1):
             factory.bounded_http('GET','https://api.github.com/app','jwt',None)
         with patch.object(c.time,'time',return_value=c.DEADLINE):
@@ -85,7 +86,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual([a[0] for a in calls],['GET','DELETE'])
 
     def test_broker_receipt_requires_confirmed_cleanup(self):
-        factory=l.BrokerFactory(None,b'synthetic',lambda:None)
+        factory=l.BrokerFactory(None,b'synthetic',lambda:None,l.ExecutionBudget())
         events=[('app_verified',{'app_id':5272026}),('installation_verified',{'installation_id':170212503}),
             ('mint_attempted',{'mint_requested_at':1791736000}),('mint_response_received',{}),
             ('scope_verified',{'repository_id':1342084551,'expires_at':1791738000}),('revocation_attempted',{})]
