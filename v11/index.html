@@ -175,7 +175,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau #700<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B1<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -187,6 +187,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>
         <li><strong>Meridian 11 · #700</strong><span class="version-status">Vorschaustand</span><p>Depotübersicht mit klar gekennzeichnetem Gesamtwert, Datenquelle und Aktualität. Ohne Live-Daten. <a href="https://github.com/Achi1984/meridian/pull/700">Änderungsnachweis #700</a></p></li>
         <li><strong>Terminal 10.0-r127</strong><span class="version-status">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href="https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json">Versionsnachweis</a></p></li>
         <li><strong>Meridian 11 · A2</strong><span class="version-status">Vorschau</span><p>Am 10.10.2026 integriert: mobile Layouts, Tastaturbedienung und klar gekennzeichnete Beispielzustände. Weiterhin ohne Live-Daten. <a href="https://github.com/Achi1984/meridian/pull/623">Änderungsnachweis</a></p></li>
@@ -263,7 +264,21 @@
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
-      <div class="card view-placeholder"><h2>Jeder Bot. Klarer Status.</h2><p>Geplant sind verifizierte Bot-Karten mit Quelle, Gebühren, Risikopuffer und Schutzstatus. Ohne Live-Belege wird nichts als sicher oder profitabel markiert.</p></div>
+      <section class="card view-placeholder" aria-labelledby="bots-summary-heading">
+        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Statische Vorschau</span></div>
+        <div class="portfolio-row"><div><p class="caption">Aktive Bots</p><div class="portfolio-value" aria-label="Anzahl aktiver Bots unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
+        <p class="caption">Keine Botdaten verbunden. Die Anzahl ist unbekannt – nicht null.</p>
+        <div class="trust-grid" aria-label="Datenstatus der Bots">
+          <div class="trust-cell"><strong>Quelle</strong><span>Nicht verbunden</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
+          <div class="trust-cell"><strong>Risiko</strong><span>Nicht bestimmbar</span></div>
+        </div>
+      </section>
+      <section class="card card-muted" aria-labelledby="bots-status-heading">
+        <h2 id="bots-status-heading">Deine Bots</h2>
+        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <p class="caption">Diese Vorschau hat keinen Kontozugriff und steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>
     </section>
     <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
       <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
