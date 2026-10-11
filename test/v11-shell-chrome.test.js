@@ -12,10 +12,10 @@ const x={width:innerWidth,viewport:document.documentElement.clientWidth,
 body:document.body.scrollWidth,root:document.documentElement.scrollWidth,dpr:devicePixelRatio,
 nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').length,
 decisionBackground:getComputedStyle(document.querySelector('.decision')).backgroundImage,
-sourceLabels:[...document.querySelectorAll('.trust-cell span')].map(n=>n.textContent),
+sourceLabels:[...document.querySelectorAll('#view-command .trust-cell span')].map(n=>n.textContent),
 attentionColor:tokenColor('--attention'),positiveColor:tokenColor('--positive'),
-unknownBotsAccents:[getComputedStyle(document.querySelector('.trust-cell:nth-child(2)')).borderTopColor,getComputedStyle(document.querySelector('#view-bots .view-placeholder')).borderTopColor],
-unknownBotsBackground:getComputedStyle(document.querySelector('.trust-cell:nth-child(2)')).backgroundImage,
+unknownBotsAccents:[getComputedStyle(document.querySelector('#view-command .trust-cell:nth-child(2)')).borderTopColor,getComputedStyle(document.querySelector('#view-bots .view-placeholder')).borderTopColor],
+unknownBotsBackground:getComputedStyle(document.querySelector('#view-command .trust-cell:nth-child(2)')).backgroundImage,
 stateColor:getComputedStyle(document.querySelector('.preview-status strong')).color};
 for(const b of document.querySelectorAll('#nav button')){
 const l=b.querySelector('span:last-child'),s=getComputedStyle(l);

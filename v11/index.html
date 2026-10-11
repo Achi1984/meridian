@@ -244,7 +244,21 @@
     </section>
     <section id="view-depot" class="view" aria-labelledby="depot-heading" hidden>
       <div class="eyebrow">KAPITAL &amp; ÜBERSICHT</div><h1 id="depot-heading">Depot</h1>
-      <div class="card view-placeholder"><h2>Portfolio mit Herkunft statt Schätzungen.</h2><p>Für die nächste Ausbaustufe vorgesehen: bestätigter Gesamtwert, Vermögensstruktur und geprüfter Verlauf über 1h / 1d / 1w. In dieser Vorschau sind keine Daten verbunden.</p></div>
+      <section class="card" aria-labelledby="depot-summary-heading">
+        <div class="card-head"><h2 id="depot-summary-heading">Depotübersicht</h2><span class="limited">Statische Vorschau</span></div>
+        <div class="portfolio-row"><div><p class="caption">Gesamtwert</p><div class="portfolio-value" aria-label="Gesamtwert unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
+        <p class="caption">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>
+        <div class="trust-grid" aria-label="Datenstatus des Depots">
+          <div class="trust-cell"><strong>Quelle</strong><span>Keine verbunden</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
+          <div class="trust-cell"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>
+        </div>
+      </section>
+      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
+        <h2 id="depot-holdings-heading">Deine Bestände</h2>
+        <p class="caption">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>
+      </section>
+      <p class="caption">Diese Vorschau hat keinen Kontozugriff. „Terminal öffnen“ führt zum separaten Terminal.</p>
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>

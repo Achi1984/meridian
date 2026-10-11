@@ -12,7 +12,8 @@ const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 // PR #677: base a5ba7eca2004ce51ec98720955b5fcc3716f09ef + history-close delta.
 // Scope approved in #571 comment 6107229650; terminal-entry insertions removed
 // for this baseline. PR #699 additionally reverses only the viewport fallback
-// pair below before hashing. All other bytes and browser assertions stay guarded.
+// pair below before hashing. The Depot packet reverses its exact asserted markup
+// below as well. All other bytes and browser assertions stay guarded.
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const css=`    /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
@@ -23,6 +24,23 @@ const entry=`    <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
     </nav>
 `;
+// Exact Depot-only delta; no wildcard removal and the original baseline hash stays fixed.
+const depotBefore=`      <div class="card view-placeholder"><h2>Portfolio mit Herkunft statt Schätzungen.</h2><p>Für die nächste Ausbaustufe vorgesehen: bestätigter Gesamtwert, Vermögensstruktur und geprüfter Verlauf über 1h / 1d / 1w. In dieser Vorschau sind keine Daten verbunden.</p></div>`;
+const depotAfter=`      <section class="card" aria-labelledby="depot-summary-heading">
+        <div class="card-head"><h2 id="depot-summary-heading">Depotübersicht</h2><span class="limited">Statische Vorschau</span></div>
+        <div class="portfolio-row"><div><p class="caption">Gesamtwert</p><div class="portfolio-value" aria-label="Gesamtwert unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
+        <p class="caption">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>
+        <div class="trust-grid" aria-label="Datenstatus des Depots">
+          <div class="trust-cell"><strong>Quelle</strong><span>Keine verbunden</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
+          <div class="trust-cell"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>
+        </div>
+      </section>
+      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
+        <h2 id="depot-holdings-heading">Deine Bestände</h2>
+        <p class="caption">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>
+      </section>
+      <p class="caption">Diese Vorschau hat keinen Kontozugriff. „Terminal öffnen“ führt zum separaten Terminal.</p>`;
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 
 function gitBlob(content){
@@ -39,9 +57,10 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.match(html,/id="version-panel"[^>]* hidden/);
   const viewportPair='min-height:100vh;min-height:100dvh;';
   assert.equal(html.split(viewportPair).length-1,1,'exactly one progressive viewport fallback');
-  const restored=html.replace(css,'').replace(entry,'')
+  assert.equal(html.split(depotAfter).length-1,1,'exactly one reviewed Depot panel');
+  const restored=html.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
     .replace(viewportPair,'min-height:100dvh;min-height:100vh;');
-  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions and the checked viewport pair must match the reviewed history-close baseline');
+  assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot delta must match the reviewed history-close baseline');
 });
 
 function deploymentServer(){
@@ -135,6 +154,20 @@ async function browserRun(call,start,width,expectedBuild,server){
       view:[...document.querySelectorAll('.view')].filter(view=>!view.hidden).map(view=>view.id),
       current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(button=>button.dataset.v)
     })`),{view:['view-'+tab],current:[tab]},'native Enter tab navigation: '+tab);
+    if(tab==='depot'){
+      const depot=await evaluate(`(()=>{
+        const panel=document.getElementById('view-depot');
+        return {label:panel.querySelector('.limited').textContent,
+          value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
+          states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
+          viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
+      })()`);
+      assert.equal(depot.label,'Statische Vorschau');
+      assert.equal(depot.value,'Gesamtwert unbekannt');
+      assert.deepEqual(depot.states,[['Quelle','Keine verbunden'],['Aktualität','Keine bestätigten Daten'],['Verlauf','Nicht verfügbar']]);
+      assert.equal(depot.viewport,width);
+      assert.ok(depot.body<=width+1&&depot.root<=width+1,'Depot panel overflow at '+width);
+    }
   }
   await evaluate(`document.getElementById('version-toggle').focus();true`);
   await key('Enter','Enter',13);
