@@ -31,7 +31,9 @@ function normalizedSide(v){
 // Only explicit normalized enums cross the sanitized boundary. Never infer
 // COIN-M from the symbol, side or investment currency; missing remains unknown.
 function projectedEnum(value,allowed){
-  return typeof value==='string'&&allowed.includes(value)?value:null;
+  if(typeof value!=='string'||value.length>128)return null;
+  const normalized=value.trim();
+  return allowed.includes(normalized)?normalized:null;
 }
 function sanitizedBot(bot={}){
   const symbol=String(bot.symbol||'').trim().toUpperCase()||null;

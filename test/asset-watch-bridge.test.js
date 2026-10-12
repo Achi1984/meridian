@@ -120,7 +120,7 @@ test('explicit COIN-M provenance is preserved without reversing the existing sid
 test('missing or arbitrary provenance stays null and cannot leak caller text',()=>{
   const x=buildAssetWatchApiSnapshot(state(),{now:NOW});
   for(const key of ['cateType','botType','sideSource'])assert.equal(x.bots[0][key],null);
-  for(const value of [true,1,{},[],null,'secret-marker','INVERSE',' inverse ']){
+  for(const value of [true,1,{},[],null,'secret-marker','INVERSE',' '.repeat(129)+'inverse']){
     const input=state();input.pionexRisk.bots=[bot({cateType:value,botType:value,sideSource:value})];
     const result=buildAssetWatchApiSnapshot(input,{now:NOW});
     for(const key of ['cateType','botType','sideSource'])assert.equal(result.bots[0][key],null);
@@ -141,4 +141,16 @@ test('fingerprint detects provenance changes while raw IDs remain absent',()=>{
   assert.notEqual(first.snapshotFingerprint,second.snapshotFingerprint);
   assert.doesNotMatch(JSON.stringify(second),/987654321|raw-secret-bot-id/);
   assert.equal(second.readOnly,true);assert.equal(second.executionImpact,false);
+});
+
+test('whitespace-padded supported provenance follows existing upstream type validation',()=>{
+  for(const botType of ['futures_grid','future_hedge_grid']){
+    const input=state();input.pionexRisk.bots=[bot({botType:' \t'+botType+'\n ',cateType:' inverse ',sideSource:' trend_inverse_asset '})];
+    const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+    assert.equal(x.bots[0].botType,botType);assert.equal(x.bots[0].cateType,'inverse');assert.equal(x.bots[0].sideSource,'trend_inverse_asset');
+    assert.equal(x.bots[0].side,'LONG');assert.equal(x.usableForOverwrite,true);
+  }
+  const input=state();input.pionexRisk.bots=[bot({botType:' arbitrary-secret ',cateType:1,sideSource:{value:'trend'}})];
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  for(const key of ['botType','cateType','sideSource'])assert.equal(x.bots[0][key],null);
 });
