@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const helper = fileURLToPath(new URL('../scripts/native-copilot-task-runtime.py', import.meta.url));
 
 const runPython = String.raw`
-import hashlib, importlib.util, json, os, tempfile
+import hashlib, importlib.util, json, os, tempfile, time
 spec = importlib.util.spec_from_file_location('runtime', HELPER)
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
@@ -26,7 +26,7 @@ config = {
     'workflow_name': d.RELEASE_SAFETY_WORKFLOW_NAME,
     'workflow_path': d.RELEASE_SAFETY_WORKFLOW_PATH,
     'authorization_identity': 'approved-owner',
-    'authorization_expires_at': 2000,
+    'authorization_expires_at': int(time.time()) + 3600,
     'expected_assignees': [],
 }
 task = d.ApprovedTask.from_mapping(config)
@@ -141,7 +141,7 @@ def invoke(task_value=task, event_value=event, token='token-value',
            capability=True, path=None, identity='runtime-test-v1'):
     return r.run_once(
         task_value, event_value, token, verified_user_token_auth=capability,
-        journal_path=path, journal_identity=identity, clock=lambda: 1000,
+        journal_path=path, journal_identity=identity,
     )
 
 def output(**values):
@@ -214,6 +214,31 @@ assert not any(call[0] == 'POST' for call in FakeHTTPS.calls)
 output(**out)
 `);
   assert.ok(Object.values(result).every((value) => ['BLOCKED', 'INACTIVE'].includes(value.status)));
+});
+
+test('expired authorization cannot mutate remotely and runtime rejects a supplied clock', () => {
+  const result = python(runPython + String.raw`
+directory, path, journal = setup()
+expired_config = dict(config)
+expired_config['authorization_expires_at'] = 1
+expired_task = d.ApprovedTask.from_mapping(expired_config)
+expired = invoke(task_value=expired_task, path=path)
+assert expired['status'] == 'EXPIRED'
+assert not FakeHTTPS.calls
+try:
+    r.run_once(
+        task, event, 'token-value', verified_user_token_auth=True,
+        journal_path=path, journal_identity='runtime-test-v1', clock=lambda: 0,
+    )
+except TypeError:
+    rejected_clock = True
+else:
+    rejected_clock = False
+assert rejected_clock and not FakeHTTPS.calls
+output(expired=expired, rejectedClock=rejected_clock)
+`);
+  assert.equal(result.expired.status, 'EXPIRED');
+  assert.equal(result.rejectedClock, true);
 });
 
 test('duplicate and nonfinite API JSON are rejected before any POST', () => {

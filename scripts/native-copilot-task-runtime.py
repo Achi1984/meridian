@@ -193,7 +193,7 @@ def _validate_event(task, event):
 
 def run_once(approved_task, event, user_token=None, *,
              verified_user_token_auth=False, journal_path=None,
-             journal_identity=None, clock=None):
+             journal_identity=None):
     """Validate one trigger, then invoke the existing dispatcher exactly once.
 
     `verified_user_token_auth` is an externally verified capability assertion;
@@ -222,7 +222,6 @@ def run_once(approved_task, event, user_token=None, *,
     return _dispatcher.execute(
         approved_task, transport,
         verified_user_token_auth=True,
-        clock=clock,
         attempt_journal=journal,
     )
 
