@@ -105,6 +105,8 @@ class FakeHTTPS:
         if method == 'POST' and path == 'git/refs':
             if FakeHTTPS.claim_timeout_before_persist:
                 raise TimeoutError('private timeout detail token-value')
+            if FakeHTTPS.claimed:
+                return FakeResponse(409, b'')
             request = json.loads(body)
             FakeHTTPS.claimed = True
             return FakeResponse(201, json.dumps({
@@ -138,10 +140,13 @@ def setup():
     return directory, path, journal
 
 def invoke(task_value=task, event_value=event, token='token-value',
-           capability=True, path=None, identity='runtime-test-v1'):
+           capability=True, path=None, identity='runtime-test-v1',
+           fence_mode='sqlite'):
     return r.run_once(
         task_value, event_value, token, verified_user_token_auth=capability,
-        journal_path=path, journal_identity=identity,
+        journal_path=path if fence_mode == 'sqlite' else None,
+        journal_identity=identity if fence_mode == 'sqlite' else None,
+        fence_mode=fence_mode,
     )
 
 def output(**values):
@@ -180,6 +185,31 @@ output(first=first, second=second, requests=len(FakeHTTPS.calls))
 `);
   assert.equal(result.first.status, 'ASSIGNED');
   assert.equal(result.second.status, 'CLAIMED');
+});
+
+test('runtime GitHub-ref lane requires its explicit mode and a verified user token', () => {
+  const result = python(runPython + String.raw`
+directory, path, journal = setup()
+first = invoke(fence_mode='github_ref')
+second = invoke(fence_mode='github_ref')
+assert first['status'] == 'ASSIGNED'
+assert second['status'] == 'CLAIM_EXISTS'
+assert FakeHTTPS.assignments == 1
+claims = [call for call in FakeHTTPS.calls if call[0] == 'POST' and call[1] == 'git/refs']
+assert len(claims) == 2
+assert all(call[1] != 'git/ref/heads/native-copilot-claims/github-only-issue-717'
+           for call in FakeHTTPS.calls)
+setup()
+inactive = invoke(fence_mode='github_ref', capability=False)
+assert inactive['status'] == 'INACTIVE' and not FakeHTTPS.calls
+setup()
+bad_mode = invoke(fence_mode='unknown')
+assert bad_mode['status'] == 'BLOCKED' and not FakeHTTPS.calls
+output(first=first, second=second, inactive=inactive, badMode=bad_mode)
+`);
+  assert.equal(result.first.status, 'ASSIGNED');
+  assert.equal(result.second.status, 'CLAIM_EXISTS');
+  assert.equal(result.inactive.status, 'INACTIVE');
 });
 
 test('event mismatch, absent capability, and missing journal fail before HTTPS', () => {

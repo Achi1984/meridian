@@ -2,11 +2,11 @@
 
 Activation is a separate owner decision. A caller must supply one immutable
 ApprovedTask, matching event pins, an externally verified user-to-server token
-capability, and the path plus independently retained identity of an already
-provisioned SQLiteAttemptJournal. This adapter never provisions credentials or
-journal storage. A durable host and separately retained journal identity are
-deployment prerequisites; temporary Actions storage, caches, and artifacts are
-not durable journals. No same-identity snapshot rollback detection is claimed.
+capability, and an explicit fence mode. The default SQLite mode needs an existing
+durable journal; the GitHub-ref candidate needs no journal but strands ambiguous
+or already-claimed tasks. This adapter provisions neither credentials nor
+journal storage. The GitHub-ref mode depends on atomic unique creation and
+permanent ref retention, assumptions pending integration validation.
 Eligible tokens are PAT, OAuth, or GitHub App user-to-server tokens, never an
 App installation token or Actions GITHUB_TOKEN. The capability is not inferred
 from token text.
@@ -35,6 +35,8 @@ _HTTPS_CONNECTION = http.client.HTTPSConnection
 SHA_RE = re.compile(r'[0-9a-f]{40}\Z')
 CLAIM_PATH_RE = re.compile(
     r'git/ref/heads/native-copilot-claims/issue-([1-9][0-9]{0,18})-([0-9a-f]{24})\Z')
+GITHUB_ONLY_CLAIM_PATH_RE = re.compile(
+    r'git/ref/heads/native-copilot-claims/github-only-issue-([1-9][0-9]{0,18})\Z')
 
 
 def _load_dispatcher():
@@ -67,7 +69,11 @@ def _allowed_path(method, path):
         if re.fullmatch(r'issues/[1-9][0-9]{0,18}', path):
             return _valid_positive_pin(int(path.rsplit('/', 1)[1]))
         match = CLAIM_PATH_RE.fullmatch(path)
-        return bool(match and _valid_positive_pin(int(match.group(1))))
+        github_only_match = GITHUB_ONLY_CLAIM_PATH_RE.fullmatch(path)
+        return bool(
+            (match and _valid_positive_pin(int(match.group(1))))
+            or (github_only_match
+                and _valid_positive_pin(int(github_only_match.group(1)))))
     if method == 'POST':
         return (path == 'git/refs'
                 or bool(re.fullmatch(r'issues/[1-9][0-9]{0,18}/assignees', path)
@@ -86,9 +92,10 @@ def _request_body(method, path, payload):
         if set(payload) != {'ref', 'sha'}:
             raise ValueError('invalid request')
         claim = payload['ref']
-        if (type(claim) is not str or not claim.startswith('refs/')
-                or not CLAIM_PATH_RE.fullmatch(
-                    'git/ref/' + claim.removeprefix('refs/'))
+        claim_path = ('git/ref/' + claim.removeprefix('refs/')
+                      if type(claim) is str and claim.startswith('refs/') else '')
+        if (not CLAIM_PATH_RE.fullmatch(claim_path)
+                and not GITHUB_ONLY_CLAIM_PATH_RE.fullmatch(claim_path)
                 or type(payload['sha']) is not str
                 or not SHA_RE.fullmatch(payload['sha'])):
             raise ValueError('invalid request')
@@ -154,7 +161,7 @@ class GitHubHTTPS:
             raw = response.read(max_response_bytes)
             if type(raw) is not bytes or len(raw) > max_response_bytes:
                 raise RuntimeError('invalid HTTP response')
-            return raw
+            return _dispatcher.TransportResponse(status, raw)
         except _dispatcher.APIError:
             raise
         except Exception:
@@ -193,7 +200,7 @@ def _validate_event(task, event):
 
 def run_once(approved_task, event, user_token=None, *,
              verified_user_token_auth=False, journal_path=None,
-             journal_identity=None):
+             journal_identity=None, fence_mode='sqlite'):
     """Validate one trigger, then invoke the existing dispatcher exactly once.
 
     `verified_user_token_auth` is an externally verified capability assertion;
@@ -211,11 +218,18 @@ def run_once(approved_task, event, user_token=None, *,
     if not verified_user_token_auth:
         return _dispatcher._response('INACTIVE', operation_id)
     try:
-        if (type(journal_path) is not str or len(journal_path) > 4096
-                or not os.path.isabs(journal_path) or os.path.islink(journal_path)
-                or not os.path.isfile(journal_path)):
-            raise ValueError('invalid journal')
-        journal = _dispatcher.SQLiteAttemptJournal(journal_path, journal_identity)
+        if fence_mode == 'sqlite':
+            if (type(journal_path) is not str or len(journal_path) > 4096
+                    or not os.path.isabs(journal_path) or os.path.islink(journal_path)
+                    or not os.path.isfile(journal_path)):
+                raise ValueError('invalid journal')
+            journal = _dispatcher.SQLiteAttemptJournal(journal_path, journal_identity)
+        elif fence_mode == 'github_ref':
+            if journal_path is not None or journal_identity is not None:
+                raise ValueError('journal does not match fence mode')
+            journal = None
+        else:
+            raise ValueError('invalid fence mode')
         transport = GitHubHTTPS(user_token)
     except Exception:
         return _dispatcher._response('BLOCKED', operation_id)
@@ -223,6 +237,7 @@ def run_once(approved_task, event, user_token=None, *,
         approved_task, transport,
         verified_user_token_auth=True,
         attempt_journal=journal,
+        fence_mode=fence_mode,
     )
 
 

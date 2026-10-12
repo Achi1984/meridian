@@ -148,6 +148,106 @@ def output(**values):
     print(json.dumps(values, separators=(',', ':')))
 `;
 
+const githubHarness = String.raw`
+import threading
+
+class SharedGitHub:
+    refs = {}
+    assignments = 0
+    calls = []
+    lock = threading.Lock()
+    barrier = None
+    behavior = None
+
+    def __init__(self, task, body=body, main=base):
+        self.task = task
+        self.data = {
+            'actions/runs/' + str(task.release_run_id): {
+                'id': task.release_run_id, 'run_attempt': task.release_run_attempt,
+                'workflow_id': task.workflow_id, 'name': task.workflow_name,
+                'path': task.workflow_path, 'head_sha': main, 'head_branch': 'main',
+                'event': 'push', 'status': 'completed', 'conclusion': 'success',
+                'repository': {'full_name': task.repository},
+                'actor': {'login': task.authorization_identity},
+                'triggering_actor': {'login': task.authorization_identity},
+            },
+            issue_path: {
+                'number': task.issue_number, 'state': 'open', 'repository_url': repo_url,
+                'body': body, 'assignees': [],
+            },
+            main_path: {'object': {'sha': main}},
+        }
+        self.run_reads = 0
+
+    def __call__(self, method, path, payload, max_response_bytes):
+        with SharedGitHub.lock:
+            SharedGitHub.calls.append((method, path))
+        if method == 'GET' and path in self.data:
+            if path.startswith('actions/runs/'):
+                self.run_reads += 1
+                if SharedGitHub.behavior == 'crash_after_201' and self.run_reads > 1:
+                    raise RuntimeError('simulated process loss after claim 201')
+            return json.dumps(self.data[path], separators=(',', ':')).encode()
+        if method == 'GET' and path.startswith('git/ref/heads/native-copilot-claims/'):
+            raise AssertionError('GitHub-ref lane must not read a claim for ownership')
+        if method == 'POST' and path == 'git/refs':
+            if SharedGitHub.barrier is not None:
+                SharedGitHub.barrier.wait(timeout=5)
+            if SharedGitHub.behavior == 'validation_422':
+                raise d.APIError(422)
+            if SharedGitHub.behavior == 'lost_before_persist':
+                raise TimeoutError('lost before persistence')
+            with SharedGitHub.lock:
+                if payload['ref'] in SharedGitHub.refs:
+                    raise d.APIError(409)
+                SharedGitHub.refs[payload['ref']] = payload['sha']
+            if SharedGitHub.behavior == 'persist_timeout':
+                raise TimeoutError('persisted but response lost')
+            response = {'ref': payload['ref'], 'object': {'sha': payload['sha']}}
+            if SharedGitHub.behavior == 'malformed_201':
+                response['ref'] = 'refs/heads/not-the-claim'
+            if SharedGitHub.behavior == 'malformed_object':
+                response['object'] = []
+            if SharedGitHub.behavior == 'malformed_sha':
+                response['object']['sha'] = 'b' * 40
+            if SharedGitHub.behavior == 'missing_ref':
+                response.pop('ref')
+            if SharedGitHub.behavior == 'wrong_status':
+                status = 200
+            else:
+                status = 201
+            return d.TransportResponse(
+                status, json.dumps(response, separators=(',', ':')).encode())
+        if method == 'POST' and path == 'issues/717/assignees':
+            with SharedGitHub.lock:
+                SharedGitHub.assignments += 1
+                self.data[issue_path]['assignees'] = [{'login': d.ASSIGNEE}]
+            if SharedGitHub.behavior == 'assignment_timeout':
+                raise TimeoutError('assignment response lost')
+            return json.dumps({
+                'number': 717, 'repository_url': repo_url,
+                'assignees': [{'login': d.ASSIGNEE}],
+            }, separators=(',', ':')).encode()
+        raise AssertionError('unexpected request ' + method + ' ' + path)
+
+task = d.ApprovedTask.from_mapping(config)
+
+def github_execute(client, task_value=None):
+    if task_value is None:
+        task_value = task
+    return d.execute(
+        task_value, client, verified_user_token_auth=True, clock=lambda: 1000,
+        fence_mode='github_ref')
+
+def reset_github():
+    SharedGitHub.refs = {}
+    SharedGitHub.assignments = 0
+    SharedGitHub.calls = []
+    SharedGitHub.barrier = None
+    SharedGitHub.behavior = None
+
+`;
+
 function python(body) {
   const source = body.replace('HELPER', JSON.stringify(helper));
   const result = spawnSync('python3', ['-B', '-c', source], {encoding: 'utf8'});
@@ -183,6 +283,166 @@ output(first=first, second=second)
 `);
   assert.equal(result.first.status, 'ASSIGNED');
   assert.equal(result.second.status, 'CLAIMED');
+});
+
+test('GitHub-ref fence allows assignment only to this invocation receiving 201', () => {
+  const result = python(runPython + githubHarness + String.raw`
+reset_github()
+first = SharedGitHub(task)
+second = SharedGitHub(task)
+SharedGitHub.barrier = threading.Barrier(2)
+results = []
+threads = [
+    threading.Thread(target=lambda client=client: results.append(github_execute(client)))
+    for client in (first, second)
+]
+for thread in threads: thread.start()
+for thread in threads: thread.join(timeout=10)
+assert all(not thread.is_alive() for thread in threads)
+assert sorted(value['status'] for value in results) == ['ASSIGNED', 'CLAIM_EXISTS']
+assert SharedGitHub.assignments == 1
+claim_posts = [call for call in SharedGitHub.calls if call == ('POST', 'git/refs')]
+assert len(claim_posts) == 2
+assert not any(method == 'GET' and path.startswith('git/ref/heads/native-copilot-claims/')
+               for method, path in SharedGitHub.calls)
+output(concurrent=[value['status'] for value in results], assignments=SharedGitHub.assignments)
+`);
+  assert.deepEqual([...result.concurrent].sort(), ['ASSIGNED', 'CLAIM_EXISTS']);
+  assert.equal(result.assignments, 1);
+});
+
+test('GitHub-ref fence never recovers claim ownership after uncertain outcomes or restart', () => {
+  const result = python(runPython + githubHarness + String.raw`
+out = {}
+for behavior, expected in (
+    ('persist_timeout', 'UNKNOWN'),
+    ('malformed_201', 'UNKNOWN'),
+    ('malformed_object', 'UNKNOWN'),
+    ('malformed_sha', 'UNKNOWN'),
+    ('missing_ref', 'UNKNOWN'),
+    ('wrong_status', 'UNKNOWN'),
+):
+    reset_github()
+    SharedGitHub.behavior = behavior
+    first = github_execute(SharedGitHub(task))
+    assert first['status'] == expected
+    SharedGitHub.behavior = None
+    restarted = github_execute(SharedGitHub(task))
+    assert restarted['status'] == 'CLAIM_EXISTS'
+    assert SharedGitHub.assignments == 0
+    assert len([call for call in SharedGitHub.calls if call == ('POST', 'git/refs')]) == 2
+    out[behavior] = restarted['status']
+
+reset_github()
+SharedGitHub.behavior = 'validation_422'
+rejected = github_execute(SharedGitHub(task))
+assert rejected['status'] == 'CLAIM_REJECTED'
+assert SharedGitHub.assignments == 0 and not SharedGitHub.refs
+out['validation_422'] = rejected['status']
+
+reset_github()
+SharedGitHub.behavior = 'lost_before_persist'
+first = github_execute(SharedGitHub(task))
+assert first['status'] == 'UNKNOWN' and not SharedGitHub.refs
+SharedGitHub.behavior = None
+retry = github_execute(SharedGitHub(task))
+assert retry['status'] == 'ASSIGNED' and SharedGitHub.assignments == 1
+out['lost_before_persist'] = retry['status']
+
+reset_github()
+SharedGitHub.behavior = 'assignment_timeout'
+first = github_execute(SharedGitHub(task))
+assert first['status'] == 'UNKNOWN' and SharedGitHub.assignments == 1
+SharedGitHub.behavior = None
+restart = github_execute(SharedGitHub(task))
+assert restart['status'] == 'CLAIM_EXISTS' and SharedGitHub.assignments == 1
+out['assignment_response_lost'] = restart['status']
+
+reset_github()
+SharedGitHub.behavior = 'crash_after_201'
+crashed = github_execute(SharedGitHub(task))
+assert crashed['status'] == 'BLOCKED_CLAIMED'
+SharedGitHub.behavior = None
+restarted = github_execute(SharedGitHub(task))
+assert restarted['status'] == 'CLAIM_EXISTS' and SharedGitHub.assignments == 0
+out['crash_after_201'] = restarted['status']
+
+reset_github()
+SharedGitHub.behavior = 'malformed_201'
+first = github_execute(SharedGitHub(task))
+assert first['status'] == 'UNKNOWN' and SharedGitHub.assignments == 0
+assert github_execute(SharedGitHub(task))['status'] == 'CLAIM_EXISTS'
+out['malformed_201'] = first['status']
+output(**out)
+`);
+  assert.equal(result.persist_timeout, 'CLAIM_EXISTS');
+  assert.equal(result.lost_before_persist, 'ASSIGNED');
+  assert.equal(result.assignment_response_lost, 'CLAIM_EXISTS');
+  assert.equal(result.crash_after_201, 'CLAIM_EXISTS');
+});
+
+test('GitHub-ref key survives issue, main, expiry, and run identity changes', () => {
+  const result = python(runPython + githubHarness + String.raw`
+reset_github()
+SharedGitHub.behavior = 'malformed_201'
+first = github_execute(SharedGitHub(task))
+assert first['status'] == 'UNKNOWN'
+SharedGitHub.behavior = None
+
+variants = []
+for index, changes in enumerate((
+    {'body': 'edited issue body'},
+    {'main': 'b' * 40},
+    {'authorization_expires_at': 3000},
+    {'release_run_id': 54321},
+)):
+    changed = copy.deepcopy(config)
+    body_value = changes.get('body', body)
+    main_value = changes.get('main', base)
+    changed.update({key: value for key, value in changes.items()
+                    if key not in ('body', 'main')})
+    changed['issue_body_sha256'] = hashlib.sha256(body_value.encode()).hexdigest()
+    changed['expected_main_sha'] = main_value
+    changed_task = d.ApprovedTask.from_mapping(changed)
+    client = SharedGitHub(changed_task, body=body_value, main=main_value)
+    result_value = github_execute(client, changed_task)
+    assert result_value['status'] == 'CLAIM_EXISTS'
+    variants.append(result_value['status'])
+assert SharedGitHub.assignments == 0
+assert len([call for call in SharedGitHub.calls if call == ('POST', 'git/refs')]) == 5
+output(variants=variants, claimPosts=5)
+`);
+  assert.deepEqual(result.variants, Array(4).fill('CLAIM_EXISTS'));
+  assert.equal(result.claimPosts, 5);
+});
+
+test('GitHub-ref fence is explicit and never substitutes for the SQLite journal', () => {
+  const result = python(runPython + String.raw`
+m = MockTransport()
+missing = d.execute(
+    d.ApprovedTask.from_mapping(config), m, verified_user_token_auth=True,
+    clock=lambda: 1000, fence_mode='sqlite')
+assert missing['status'] == 'BLOCKED' and not m.calls
+m = MockTransport()
+unexpected_journal = d.execute(
+    d.ApprovedTask.from_mapping(config), m, verified_user_token_auth=True,
+    clock=lambda: 1000, attempt_journal=m.journal, fence_mode='github_ref')
+assert unexpected_journal['status'] == 'BLOCKED' and not m.calls
+m = MockTransport()
+inactive = d.execute(
+    d.ApprovedTask.from_mapping(config), m, verified_user_token_auth=False,
+    clock=lambda: 1000, fence_mode='github_ref')
+assert inactive['status'] == 'INACTIVE' and not m.calls
+m = MockTransport()
+rejected = d.execute(
+    d.ApprovedTask.from_mapping(config), m, verified_user_token_auth=True,
+    clock=lambda: 1000, fence_mode='unknown')
+assert rejected['status'] == 'BLOCKED' and not m.calls
+output(missing=missing['status'], unexpected=unexpected_journal['status'],
+       inactive=inactive['status'], rejected=rejected['status'])
+`);
+  assert.equal(result.missing, 'BLOCKED');
+  assert.equal(result.inactive, 'INACTIVE');
 });
 
 test('changed issue or main before claim, and after claim, never assigns', () => {
