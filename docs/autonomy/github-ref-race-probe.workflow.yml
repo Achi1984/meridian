@@ -1,0 +1,55 @@
+# INERT SPECIMEN: outside .github/workflows; installation/run needs explicit approval.
+# Requires reviewed source merged first; replace REVIEWED_COMMIT_SHA with its full SHA.
+name: Meridian create-only reference experiment
+on:
+  workflow_dispatch:
+    inputs:
+      probe_id:
+        description: Previously approved unique 16-32 lowercase alphanumeric experiment ID
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: meridian-ref-probe-${{ inputs.probe_id }}
+  cancel-in-progress: false
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require the exact owner-approved experiment identity
+        env:
+          REQUESTED_PROBE_ID: ${{ inputs.probe_id }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          approved = 'APPROVED_PROBE_ID'
+          assert re.fullmatch(r'[a-z0-9]{16,32}', approved)
+          assert os.environ['REQUESTED_PROBE_ID'] == approved
+          PY
+      - name: Obtain exactly the reviewed script
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import http.client, os
+          sha = 'REVIEWED_COMMIT_SHA'
+          assert len(sha) == 40 and all(c in '0123456789abcdef' for c in sha)
+          c = http.client.HTTPSConnection('api.github.com', timeout=10)
+          c.request('GET', '/repos/Achi1984/meridian/contents/scripts/github-ref-race-probe.py?ref=' + sha,
+                    headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+                             'Accept': 'application/vnd.github.raw+json', 'User-Agent': 'meridian-ref-probe-loader'})
+          r = c.getresponse()
+          assert r.status == 200
+          raw = r.read(32769)
+          assert len(raw) <= 32768
+          c.close()
+          open('github-ref-race-probe.py', 'xb').write(raw)
+          PY
+      - name: Three bounded create-only attempts; preserve reference
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MERIDIAN_REF_PROBE_ACK: CREATE_THREE_ATTEMPTS_KEEP_REF_FOREVER
+          MERIDIAN_REF_PROBE_ID: ${{ inputs.probe_id }}
+        run: python3 -B github-ref-race-probe.py
