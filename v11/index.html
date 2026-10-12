@@ -164,6 +164,12 @@
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
     .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
     .terminal-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .autonomy-strip{max-width:var(--container);margin:12px auto 0;padding:12px 14px;border:1px solid #776346;border-radius:12px;background:#171e29;overflow-wrap:anywhere}
+    .autonomy-strip h2{font-size:13px;margin-bottom:4px}
+    .autonomy-strip p,.autonomy-strip summary{font-size:12px;letter-spacing:0}
+    .autonomy-strip strong{color:var(--state-unknown)}
+    .autonomy-strip details{margin:8px 0 0;background:transparent}
+    .autonomy-strip a{color:#a9d4ff;text-underline-offset:3px}
   </style>
 </head>
 <body>
@@ -175,11 +181,25 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B1<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B2<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
     </nav>
+    <section id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
+      <h2 id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong></h2>
+      <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+      <details>
+        <summary><span>Betrieb &amp; letzte Änderung</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+          <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+          <p><b>Diese Vorschau · B2:</b> Statusleiste ergänzt. Integrationszeit und Änderungsnachweis stehen für diesen Entwurf noch aus.</p>
+          <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+          <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+        </div>
+      </details>
+    </section>
     <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
       <div class="version-panel-heading">
         <h2 id="version-history-heading">Versionen im Überblick</h2>
@@ -187,6 +207,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B2</strong><span class="version-status">Vorschaustand</span><p>Statusleiste für autonome Entwicklung mit ausdrücklich unbekanntem Betriebsstatus. Noch ohne Betriebssignal.</p></li>
         <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>
         <li><strong>Meridian 11 · #700</strong><span class="version-status">Vorschaustand</span><p>Depotübersicht mit klar gekennzeichnetem Gesamtwert, Datenquelle und Aktualität. Ohne Live-Daten. <a href="https://github.com/Achi1984/meridian/pull/700">Änderungsnachweis #700</a></p></li>
         <li><strong>Terminal 10.0-r127</strong><span class="version-status">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href="https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json">Versionsnachweis</a></p></li>
@@ -384,5 +405,6 @@
 </script>
 </body>
 </html>
+
 
 
