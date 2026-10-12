@@ -108,3 +108,49 @@ test('snapshot fingerprint is stable across bot order and changes when a limit c
   assert.equal(x1.snapshotFingerprint,x2.snapshotFingerprint);
   assert.notEqual(x1.snapshotFingerprint,x3.snapshotFingerprint);
 });
+
+
+test('explicit COIN-M provenance is preserved without reversing the existing side',()=>{
+  const input=state();input.pionexRisk.bots=[bot({cateType:'inverse',botType:'futures_grid',side:'SHORT',sideSource:'economic_inverse_asset'})];
+  const before=structuredClone(input),x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.bots[0].cateType,'inverse');assert.equal(x.bots[0].botType,'futures_grid');
+  assert.equal(x.bots[0].sideSource,'economic_inverse_asset');assert.equal(x.bots[0].side,'SHORT');
+  assert.equal(x.source,'PIONEX_BOT_API');assert.equal(x.usableForOverwrite,true);assert.deepEqual(input,before);
+});
+test('missing or arbitrary provenance stays null and cannot leak caller text',()=>{
+  const x=buildAssetWatchApiSnapshot(state(),{now:NOW});
+  for(const key of ['cateType','botType','sideSource'])assert.equal(x.bots[0][key],null);
+  for(const value of [true,1,{},[],null,'secret-marker','INVERSE',' '.repeat(129)+'inverse']){
+    const input=state();input.pionexRisk.bots=[bot({cateType:value,botType:value,sideSource:value})];
+    const result=buildAssetWatchApiSnapshot(input,{now:NOW});
+    for(const key of ['cateType','botType','sideSource'])assert.equal(result.bots[0][key],null);
+    assert.ok(!JSON.stringify(result).includes('secret-marker'));
+    assert.equal(result.bots[0].symbol,'HBAR'); // Symbol/currency never implies inverse.
+  }
+});
+test('existing wallet selection and stale protection preserve typed provenance',()=>{
+  const input=state({pionexBotSync:{status:'ERROR'},pionexAccount:{walletBotRisk:{snapshotAt:'2026-09-28T20:41:00.000Z',detailsComplete:true,bots:[bot({source:'PIONEX_WALLET_BOT_DETAIL',cateType:'inverse',botType:'future_hedge_grid',sideSource:'trend_inverse_asset'})]}}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});assert.equal(x.source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.equal(x.bots[0].cateType,'inverse');assert.equal(x.bots[0].botType,'future_hedge_grid');assert.equal(x.bots[0].sideSource,'trend_inverse_asset');
+  const stale=buildAssetWatchApiSnapshot(input,{now:NOW+3600000});assert.equal(stale.usableForOverwrite,false);assert.equal(stale.fresh,false);
+});
+test('fingerprint detects provenance changes while raw IDs remain absent',()=>{
+  const input=state();input.pionexRisk.bots=[bot({cateType:'linear',botType:'futures_grid',sideSource:'trend'})];
+  const first=buildAssetWatchApiSnapshot(input,{now:NOW});
+  input.pionexRisk.bots[0].cateType='inverse';const second=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.notEqual(first.snapshotFingerprint,second.snapshotFingerprint);
+  assert.doesNotMatch(JSON.stringify(second),/987654321|raw-secret-bot-id/);
+  assert.equal(second.readOnly,true);assert.equal(second.executionImpact,false);
+});
+
+test('whitespace-padded supported provenance follows existing upstream type validation',()=>{
+  for(const botType of ['futures_grid','future_hedge_grid']){
+    const input=state();input.pionexRisk.bots=[bot({botType:' \t'+botType+'\n ',cateType:' inverse ',sideSource:' trend_inverse_asset '})];
+    const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+    assert.equal(x.bots[0].botType,botType);assert.equal(x.bots[0].cateType,'inverse');assert.equal(x.bots[0].sideSource,'trend_inverse_asset');
+    assert.equal(x.bots[0].side,'LONG');assert.equal(x.usableForOverwrite,true);
+  }
+  const input=state();input.pionexRisk.bots=[bot({botType:' arbitrary-secret ',cateType:1,sideSource:{value:'trend'}})];
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  for(const key of ['botType','cateType','sideSource'])assert.equal(x.bots[0][key],null);
+});

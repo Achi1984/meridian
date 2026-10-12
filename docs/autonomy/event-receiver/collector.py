@@ -145,8 +145,23 @@ def parse_tap_summary(raw):
             "cancelled": rows["cancelled"], "skipped": rows["skipped"], "todo": rows["todo"]}
 
 
+def run_pr_binding(run, code):
+    prs = run.get("pull_requests")
+    need(type(prs) is list and len(prs) == 1, code)
+    associated = prs[0]
+    need(type(associated) is dict, code)
+    number, head, base = associated.get("number"), associated.get("head"), associated.get("base")
+    need(integer(number) and type(head) is dict and sha(head.get("sha"))
+         and type(base) is dict and sha(base.get("sha"))
+         and type(base.get("ref")) is str, code)
+    return number, head["sha"], base["sha"], base["ref"]
+
+
 def ci_evidence(api, run):
     run_id, attempt, head = run["id"], run["run_attempt"], run["head_sha"]
+    source_event = run.get("event")
+    pr_binding = run_pr_binding(run, "RUN_MOVED") if (
+        type(source_event) is str and source_event == "pull_request") else None
     jobs, count = [], None
     for page in range(1, 4):
         data = obj(api(f"actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=50&page={page}"))
@@ -179,6 +194,9 @@ def ci_evidence(api, run):
     # Re-read after log transport: a rerun must not substitute newer attempt evidence.
     fresh = obj(api("actions/runs/" + str(run_id)))
     need(all(fresh.get(k) == run.get(k) for k in ("id", "run_attempt", "head_sha", "workflow_id", "status", "conclusion")), "RUN_MOVED")
+    if pr_binding is not None:
+        need(type(fresh.get("event")) is str and fresh.get("event") == "pull_request"
+             and run_pr_binding(fresh, "RUN_MOVED") == pr_binding, "RUN_MOVED")
     return {"runId": run_id, "runAttempt": attempt, "workflowId": run["workflow_id"], "headSha": head,
         "completeJobPagination": True, "jobCount": len(jobs),
         "jobs": [{"id": job["id"], "name": "syntax", "status": "completed", "conclusion": "success", **counters}],

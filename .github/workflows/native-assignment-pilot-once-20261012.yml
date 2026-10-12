@@ -1,0 +1,131 @@
+# Proposed one-shot activation; requires explicit owner approval before installation/use.
+name: Meridian one native assignment pilot once
+on:
+  workflow_dispatch:
+    inputs:
+      config_commit_sha:
+        description: Exact independently reviewed config commit approved for this one run
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: meridian-native-assignment-pilot-once
+  cancel-in-progress: false
+jobs:
+  pilot:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.repository.owner.type == 'User' &&
+      github.repository_owner == 'Achi1984' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Obtain pinned reviewed runtime and exact approved configuration
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CONFIG_COMMIT_SHA: ${{ inputs.config_commit_sha }}
+        run: |
+          python3 - <<'PY'
+          import http.client, os, re
+          source_sha = 'fc706326c1af1ac63303d273467d2100ec83b3a3'
+          config_sha = os.environ.get('CONFIG_COMMIT_SHA', '')
+          assert re.fullmatch('[0-9a-f]{40}', config_sha)
+          files = [
+              ('scripts/native-copilot-task-dispatch.py', 'native-copilot-task-dispatch.py', source_sha),
+              ('scripts/native-copilot-task-runtime.py', 'native-copilot-task-runtime.py', source_sha),
+              ('docs/autonomy/native-assignment-pilot-config.json', 'approved-task.json', config_sha),
+          ]
+          for remote, local, sha in files:
+              c = http.client.HTTPSConnection('api.github.com', timeout=10)
+              try:
+                  c.request('GET', '/repos/Achi1984/meridian/contents/' + remote + '?ref=' + sha,
+                      headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+                               'Accept': 'application/vnd.github.raw+json',
+                               'User-Agent': 'meridian-native-pilot-loader'})
+                  r = c.getresponse()
+                  assert r.status == 200
+                  raw = r.read(65537)
+                  assert len(raw) <= 65536
+                  open(local, 'xb').write(raw)
+              finally:
+                  c.close()
+          PY
+      - name: Validate config against executing main before exposing user token
+        run: |
+          python3 -B - <<'PY'
+          import importlib.util, json, os
+          spec = importlib.util.spec_from_file_location('native_runtime', 'native-copilot-task-runtime.py')
+          r = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(r)
+          with open('approved-task.json', 'rb') as f:
+              raw = f.read(4097)
+          assert len(raw) <= 4096
+          cfg = json.loads(raw, object_pairs_hook=r._dispatcher._unique_object,
+                           parse_constant=r._dispatcher._reject_nonfinite)
+          task = r._dispatcher.ApprovedTask.from_mapping(cfg)
+          assert task.expected_main_sha == os.environ['GITHUB_SHA']
+          PY
+      - name: One approved assignment with permanent GitHub claim
+        env:
+          # Name is a proposal, not evidence that this credential exists or is suitable.
+          NATIVE_USER_TOKEN: ${{ secrets.MERIDIAN_NATIVE_AGENT_TOKEN }}
+        run: |
+          python3 -B - <<'PY'
+          import sys
+          try:
+              import http.client, importlib.util, json, os, sys
+              spec = importlib.util.spec_from_file_location('native_runtime', 'native-copilot-task-runtime.py')
+              r = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(r)
+              with open('approved-task.json', 'rb') as f:
+                  raw = f.read(4097)
+              assert len(raw) <= 4096
+              cfg = json.loads(raw, object_pairs_hook=r._dispatcher._unique_object,
+                               parse_constant=r._dispatcher._reject_nonfinite)
+              task = r._dispatcher.ApprovedTask.from_mapping(cfg)
+              assert task.expected_main_sha == os.environ['GITHUB_SHA']
+              event = {'run_id': task.release_run_id, 'run_attempt': task.release_run_attempt,
+                       'workflow_id': task.workflow_id, 'head_sha': task.expected_main_sha,
+                       'repository': task.repository}
+              # Owner must confirm user-token provenance, repository permissions and expiry
+              # in the activation approval. GET /user verifies account identity only.
+              token = os.environ.get('NATIVE_USER_TOKEN', '')
+              assert token and len(token) <= 8192 and token.isascii()
+              assert all(33 <= ord(c) <= 126 for c in token)
+              connection = http.client.HTTPSConnection('api.github.com', timeout=10)
+              try:
+                  connection.request('GET', '/user', headers={
+                      'Authorization': 'Bearer ' + token,
+                      'Accept': 'application/vnd.github+json',
+                      'User-Agent': 'meridian-native-pilot-account-check'})
+                  response = connection.getresponse()
+                  assert response.status == 200
+                  identity_raw = response.read(8193)
+                  assert len(identity_raw) <= 8192
+                  identity = json.loads(identity_raw,
+                      object_pairs_hook=r._dispatcher._unique_object,
+                      parse_constant=r._dispatcher._reject_nonfinite)
+                  assert type(identity) is dict
+                  assert identity.get('login') == 'Achi1984' and identity.get('type') == 'User'
+              finally:
+                  connection.close()
+              # This true assertion combines separately approved credential provenance
+              # with the account check; account identity alone is not permission proof.
+              verified_user_token_auth = True
+              result = r.run_once(task, event, os.environ.get('NATIVE_USER_TOKEN'),
+                                  verified_user_token_auth=verified_user_token_auth,
+                                  fence_mode='github_ref')
+              print(json.dumps(result, separators=(',', ':')))
+              sys.exit(0 if result['status'] == 'ASSIGNED' else 1)
+          except Exception:
+              print('{"status":"BLOCKED_CREDENTIAL_OR_CONFIG"}')
+              sys.exit(1)
+          PY
