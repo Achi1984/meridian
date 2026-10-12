@@ -34,11 +34,11 @@ const scopeKeys=['repository','requestId','opId','headSha','baseSha'];
 export function reconcileContinuation(input){
  const x=copy(input);shape(x,['trigger','config','expected','snapshot','manifest','ledger','requiredJobs']);
  const e=x.expected,s=x.snapshot;
- shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','now','maxAgeSeconds','ci','reviewVersion','reviewWake']);
+ shape(e,['repository','packetId','requestId','opId','headSha','baseSha','mainSha','prNumber','now','maxAgeSeconds','ci','reviewVersion','reviewWake']);
  if(e.ci!==null)shape(e.ci,['runId','runAttempt','workflowId','headSha']);
  shape(s,['repository','observedAt','mainSha','pr','work','eventBinding','ciBinding','reviewBinding']);
  if(s.ciBinding!==null)shape(s.ciBinding,['runId','runAttempt','workflowId','headSha']);
- shape(s.pr,['headSha','baseSha','state','mergeSha']);shape(s.eventBinding,['eventIdentity','revisionDigest']);
+ shape(s.pr,['prNumber','headSha','baseSha','state','mergeSha']);shape(s.eventBinding,['eventIdentity','revisionDigest']);
  shape(x.trigger,['name','payloadJson']);
  need(e.repository==='Achi1984/meridian'&&s.repository===e.repository,'REPOSITORY_MISMATCH');
  need([e.headSha,e.baseSha,e.mainSha,s.mainSha,s.pr.headSha,s.pr.baseSha].every(sha),'INVALID_SHA');
@@ -57,7 +57,7 @@ export function reconcileContinuation(input){
  const packet=x.ledger.packets.find(p=>p.id===e.packetId);
  const results=planWork({requiredJobs:x.requiredJobs,work:[s.work]});const plan=results[0];
  need(scopeKeys.every(k=>s.work[k]===e[k]),'EXPECTED_WORK_SCOPE_MISMATCH');
- need(s.pr.headSha===e.headSha&&s.pr.baseSha===e.baseSha,'EXPECTED_PR_SCOPE_MISMATCH');
+ need(integer(e.prNumber)&&e.prNumber>0&&integer(s.pr.prNumber)&&s.pr.prNumber>0&&s.pr.prNumber===e.prNumber&&s.pr.headSha===e.headSha&&s.pr.baseSha===e.baseSha,'EXPECTED_PR_SCOPE_MISMATCH');
  need(spec.paths.length===s.work.paths.length&&spec.paths.every(p=>s.work.paths.includes(p)),'PACKET_PATH_MISMATCH');
  need(packet.headSha===null||packet.headSha===e.headSha,'LEDGER_HEAD_MISMATCH');
  const result=(decision,reason,ledger=x.ledger)=>freeze({kind:'OFFLINE_CONTINUATION_DECISION',decision,reason,
@@ -107,8 +107,8 @@ export function reconcileContinuation(input){
   const validVersion=v=>v&&integer(v.commentId)&&v.commentId>0&&timestamp(v.createdAt)&&timestamp(v.updatedAt)&&v.updatedAt>=v.createdAt&&typeof v.bodySha256==='string'&&/^[a-f0-9]{64}$/.test(v.bodySha256);
   const r=s.reviewBinding,v=e.reviewVersion,ciKeys=['runId','runAttempt','workflowId','headSha'];
   const scoped=s.work.responses.filter(row=>scopeKeys.every(k=>row[k]===e[k]));
-  if(!exact(r,[...versionKeys,'ci'])||!exact(v,versionKeys)||!validVersion(r)||!validVersion(v)
-    ||versionKeys.some(k=>r[k]!==v[k])||!exact(r.ci,ciKeys)||!e.ci||ciKeys.some(k=>r.ci[k]!==e.ci[k])
+  if(!exact(r,[...versionKeys,'ci','prNumber'])||!exact(v,versionKeys)||!validVersion(r)||!validVersion(v)
+    ||!integer(r.prNumber)||r.prNumber<=0||r.prNumber!==e.prNumber||versionKeys.some(k=>r[k]!==v[k])||!exact(r.ci,ciKeys)||!e.ci||ciKeys.some(k=>r.ci[k]!==e.ci[k])
     ||scoped.length!==1||scoped[0].reviewCommentId!==r.commentId||scoped[0].verdict!=='GREEN_LIGHT')return stop('RECONCILE_EVENT','REVIEW_BINDING_INVALID');
   if(event.eventName==='issue_comment'&&(event.claims.commentId!==r.commentId||event.claims.createdAt!==r.createdAt
     ||event.claims.updatedAt!==r.updatedAt||event.claims.bodyDigest!==r.bodySha256))return stop('RECONCILE_EVENT','REVIEW_EVENT_VERSION_MISMATCH');

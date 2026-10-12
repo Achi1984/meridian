@@ -88,10 +88,10 @@ def bind_review(observation_raw, expected_raw):
     No GitHub read, native approval, reviewer authentication or permission occurs.
     Body must itself be the complete structured JSON claim, not model prose.
     """
-    def result(decision, reason, response=None, version=None, ci=None):
+    def result(decision, reason, response=None, version=None, ci=None, pr_number=None):
         return {'kind':'UNVERIFIED_REVIEW_BINDING','decision':decision,'reason':reason,
                 'plannerResponse':response,'version':version,
-                'reviewBinding':{**version,'ci':dict(ci)} if version is not None and ci is not None else None,
+                'reviewBinding':{**version,'ci':dict(ci),'prNumber':pr_number} if version is not None and ci is not None else None,
                 'authenticated':False,'provenanceVerified':False,'authorized':False,
                 'dispatchAllowed':False,'mergeAllowed':False,'durable':False}
     try:
@@ -102,7 +102,7 @@ def bind_review(observation_raw, expected_raw):
         response.update(reviewCommentId=comment['id'], reviewAuthor='CLAUDE', verdict=checked['verdict'])
         return result('CANDIDATE_REVIEW' if checked['verdict'] == 'GREEN_LIGHT' else 'BLOCKED',
                       'STRUCTURED_CLAIM_BOUND_UNVERIFIED' if checked['verdict'] == 'GREEN_LIGHT' else 'NON_GREEN_REVIEW',
-                      response, dict(version), scope['ci'])
+                      response, dict(version), scope['ci'], scope['prNumber'])
     except (ValueError, TypeError, UnicodeError, RecursionError) as error:
         # Only fixed codes; raw metadata, body or subprocess diagnostics never leave.
         code = str(error)

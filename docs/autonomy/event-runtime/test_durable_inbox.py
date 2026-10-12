@@ -168,6 +168,15 @@ class InboxTests(unittest.TestCase):
   digest=inbox._projection_digest(inbox._canonical(c['binding']),raw)
   with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET continuation_json=?,continuation_sha=? WHERE event_id=?',(raw,digest,c['eventId']))
   with self.assertRaisesRegex(inbox.InboxError,'CONTINUATION_DECISION_STATE'):inbox.inspect_event(self.db,c['eventId'])
+ def test_impossible_blocked_merge_reason_rejected_even_after_rehash(self):
+  c=inbox.start(self.db,inbox.claim(self.db,self.enqueue()['eventId'],'worker1'))
+  for state in ('MERGE_WAIT','COMPLETE_MERGED'):
+   p=json.loads(projection(c));p.update(decision='BLOCKED',reason='PR_CLOSED');p['ledger']['packets'][0].update(state=state,mergeSha='c'*40)
+   with self.assertRaisesRegex(inbox.InboxError,'CONTINUATION_DECISION_STATE'):inbox.complete(self.db,c,'d'*64,continuation_json=json.dumps(p))
+  complete(self.db,c,'d'*64)
+  raw=inbox._canonical(p);digest=inbox._projection_digest(inbox._canonical(c['binding']),raw)
+  with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET continuation_json=?,continuation_sha=?',(raw,digest))
+  with self.assertRaisesRegex(inbox.InboxError,'CONTINUATION_DECISION_STATE'):inbox.inspect_event(self.db,c['eventId'])
  def test_actual_adapter_return_branches_survive_projection(self):
   default=ROOT.parent/'event-adapter/scripts/event-continuation-adapter.mjs'
   if not default.is_file():default=ROOT.parent/'event_bridge/scripts/event-continuation-adapter.mjs'
@@ -175,7 +184,7 @@ class InboxTests(unittest.TestCase):
   spec=importlib.util.spec_from_file_location('actual_adapter_fixtures',adapter.parent.parent/'review-binding/test/test_review_binding.py')
   f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
   script="import {readFileSync} from 'node:fs'; const {reconcileContinuation}=await import(process.argv[1]); console.log(JSON.stringify(reconcileContinuation(JSON.parse(readFileSync(0,'utf8')))));"
-  cases=[('ready','READY_FOR_OWNER_DECISION'),('review','WAITING_REVIEW'),('ci','WAITING_CI'),('agent','WAITING_AGENT'),('closed','BLOCKED'),('event','RECONCILE_EVENT'),('main','RECONCILE_NEW_MANIFEST'),('draft','WAITING_DRAFT'),('review-chain','WAITING_REVIEW'),('merge','RECONCILE_NEW_MANIFEST'),('unknown','BLOCKED')]
+  cases=[('ready','READY_FOR_OWNER_DECISION'),('review','WAITING_REVIEW'),('ci','WAITING_CI'),('agent','WAITING_AGENT'),('closed','BLOCKED'),('event','RECONCILE_EVENT'),('main','RECONCILE_NEW_MANIFEST'),('draft','WAITING_DRAFT'),('review-chain','WAITING_REVIEW'),('merge','RECONCILE_NEW_MANIFEST'),('unknown','BLOCKED'),('unknown-merge','BLOCKED'),('unknown-merged','BLOCKED')]
   for mode,decision in cases:
    with self.subTest(mode=mode):
     o,e=f.fixture();x=f.adapter_input(o,e);bound=f.bind(o,e);x['snapshot']['work']['responses']=[bound['plannerResponse']];x['snapshot']['reviewBinding']=bound['reviewBinding']
@@ -186,8 +195,8 @@ class InboxTests(unittest.TestCase):
     if mode=='closed':x['snapshot']['pr']['state']='closed'
     if mode=='event':x['snapshot']['eventBinding']['revisionDigest']='e'*64
     if mode=='main':x['snapshot']['mainSha']='c'*40
-    if mode=='unknown':x['snapshot']['work']['execution']='UNKNOWN'
-    if mode=='merge':packet.update(state='MERGE_WAIT',mergeSha='c'*40)
+    if mode in ('unknown','unknown-merge','unknown-merged'):x['snapshot']['work']['execution']='UNKNOWN'
+    if mode in ('merge','unknown-merge','unknown-merged'):packet.update(state='COMPLETE_MERGED' if mode=='unknown-merged' else 'MERGE_WAIT',mergeSha='c'*40)
     if mode=='draft':packet.update(state='CLAIMED',headSha=None,ciHeadSha=None,reviewHeadSha=None)
     if mode=='review-chain':
      x['manifest']['maxInvocations']=2

@@ -58,7 +58,7 @@ class EvidenceHandoffTests(unittest.TestCase):
         self.assertEqual(seen, [body])
         self.assertEqual(result['decision'], 'CANDIDATE_REVIEW')
         self.assertEqual(result['version'], expected['version'])
-        self.assertEqual(result['reviewBinding'], {**expected['version'], 'ci': expected['scope']['ci']})
+        self.assertEqual(result['reviewBinding'], {**expected['version'], 'ci': expected['scope']['ci'], 'prNumber': expected['scope']['prNumber']})
         self.assertEqual(result['plannerResponse']['verdict'], 'GREEN_LIGHT')
         self.assertEqual(api.calls.count('issues/comments/789'), 2)
         self.assertNotIn('assessment', json.dumps(result))

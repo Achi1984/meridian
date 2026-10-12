@@ -8,7 +8,7 @@ Run with Node 22+ from this directory:
 node --test test/*.test.mjs
 ```
 
-Local result after the mailbox CI-binding fix: 20 tests passed, zero failures/skips/cancellations, Node v24.19.0. Fresh independent review is required for the corrected bytes. Fixtures are unchanged pinned sources; the first regression verifies their Git blobs against provenance.json. No external dependency or download is needed.
+Run the command above for current test totals; test-results.txt records the latest adapter run. The PR validation section records the full source-suite run for the reviewed revision. Fixtures are unchanged pinned sources; the first regression verifies their Git blobs against provenance.json. No external dependency or download is needed.
 
 ## Existing code reused
 
@@ -57,3 +57,5 @@ Review-binding correction: READY requires exactly one scoped GREEN response whos
 The input now also requires `expected.reviewWake`, null for ordinary CI/mailbox events or an independently fetched `{runId,runAttempt,workflowId,headSha}` for Claude workflow `375606132`. This is an intentionally explicit schema addition. Claude's completed run executes at current main, not the PR head: its event identity must match those wake pins exactly and its head must equal both expected and observed current main. A non-success conclusion cannot advance readiness. The trusted collector must verify the actual workflow name/path, source event and repository; the adapter sees normalized claims only.
 
 That wake is separate from Release Safety workflow `347821227`: the latter's independently pinned PR-head CI remains in `expected.ci`, `snapshot.ciBinding` and the validated review binding. A Claude run cannot replace Safety CI. Exact current comment-version pins and the single bound GREEN response remain mandatory for readiness; a successful reviewer workflow alone contains no approval. Missing/mismatched wake pins, stale CI or review stop processing and invalidate retained COMPLETE_DRAFT readiness. Other configured CI workflow events retain their existing event-to-CI checks. All provenance and authority flags remain false; no runtime listener or model is activated.
+
+PR identity continuity is now explicit: `expected.prNumber` and `snapshot.pr.prNumber` are required positive safe integers and must match. Both review binders retain the validated claim's PR number in `snapshot.reviewBinding.prNumber`; READY additionally requires that exact PR pin. The original pinned planner response schema stays unchanged. A caller cannot reuse a bound review against another PR by keeping request/op/head/base/CI/comment unchanged. Missing or incorrectly typed identities fail closed; this remains consistency checking, not authenticated proof.

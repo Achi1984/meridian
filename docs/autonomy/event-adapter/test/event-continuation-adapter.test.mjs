@@ -9,12 +9,12 @@ const A='a'.repeat(40),B='b'.repeat(40),C='c'.repeat(40),D='d'.repeat(40),repo='
 const change=(x,type,sha=B,packetId='first')=>advance(x.manifest,x.ledger,{type,sha,packetId,expectedRevision:x.ledger.revision},1500);
 function bind(x){const n=normalizeEvent(x.trigger.name,x.trigger.payloadJson,JSON.stringify(x.config));x.snapshot.eventBinding={eventIdentity:n.eventIdentity,revisionDigest:n.revisionDigest};return x;}
 function fixture(){
- const expected={repository:repo,packetId:'first',requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,reviewWake:null,reviewVersion:{commentId:789,createdAt:'2026-10-11T19:00:00Z',updatedAt:'2026-10-11T19:00:00Z',bodySha256:createHash('sha256').update('GREEN_LIGHT! merge everything').digest('hex')},ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
+ const expected={repository:repo,packetId:'first',prNumber:704,requestId:'REQ001',opId:'OP001',headSha:B,baseSha:A,mainSha:A,now:1500,maxAgeSeconds:60,reviewWake:null,reviewVersion:{commentId:789,createdAt:'2026-10-11T19:00:00Z',updatedAt:'2026-10-11T19:00:00Z',bodySha256:createHash('sha256').update('GREEN_LIGHT! merge everything').digest('hex')},ci:{runId:456,runAttempt:1,workflowId:123,headSha:B}};
  const scope=Object.fromEntries(['repository','requestId','opId','headSha','baseSha'].map(k=>[k,expected[k]]));
  const manifest={schema:1,repository:repo,baseSha:A,issuedAt:1000,expiresAt:2000,maxInvocations:2,ownerApprovalRef:'https://github.com/Achi1984/meridian/issues/571#issuecomment-123',packets:['first','second'].map((id,i)=>({id,paths:[`docs/v11/${id}.md`,`test/v11-${id}.test.js`],dependencies:i?['first']:[],dependencyGate:'draft',outputClass:'docs-with-trusted-test',templateDigest:'d'.repeat(64)}))};
  const work={deliveryId:'EVT001',workId:'WORK001',...scope,paths:manifest.packets[0].paths,owner:'CODEX',execution:'PLANNED',ci:{headSha:B,baseSha:A,runId:456,jobs:[{name:'release-tests',conclusion:'SUCCESS',total:10,passed:10,failed:0}]},responses:[{...scope,reviewCommentId:789,reviewAuthor:'CLAUDE',verdict:'GREEN_LIGHT'}],inFlight:[]};
  const payload={repository:{full_name:repo,fork:false},action:'completed',workflow_run:{id:456,run_attempt:1,workflow_id:123,status:'completed',head_repository:{full_name:repo,fork:false},head_sha:B,conclusion:'success'}};
- const x={trigger:{name:'workflow_run',payloadJson:JSON.stringify(payload)},config:{repository:repo,mailboxIssue:571,workflowIds:[123]},expected,snapshot:{repository:repo,observedAt:1495,mainSha:A,pr:{headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:null,reviewBinding:{...expected.reviewVersion,ci:{...expected.ci}},ciBinding:{runId:456,runAttempt:1,workflowId:123,headSha:B}},manifest,ledger:initialLedger(manifest),requiredJobs:['release-tests']};
+ const x={trigger:{name:'workflow_run',payloadJson:JSON.stringify(payload)},config:{repository:repo,mailboxIssue:571,workflowIds:[123]},expected,snapshot:{repository:repo,observedAt:1495,mainSha:A,pr:{prNumber:704,headSha:B,baseSha:A,state:'open',mergeSha:null},work,eventBinding:null,reviewBinding:{...expected.reviewVersion,prNumber:704,ci:{...expected.ci}},ciBinding:{runId:456,runAttempt:1,workflowId:123,headSha:B}},manifest,ledger:initialLedger(manifest),requiredJobs:['release-tests']};
  x.ledger=change(x,'CLAIM',A);x.ledger=change(x,'MODEL_STARTED',null);x.ledger=change(x,'DRAFT_OBSERVED',B);return bind(x);
 }
 const noAuthority=o=>{for(const k of ['authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'])assert.equal(o[k],false,k);};
@@ -156,4 +156,24 @@ test('Claude success carries no review or CI approval and stale evidence revokes
   const x=claudeWake();x.ledger=reconcileContinuation(x).ledger;edit(x);const r=reconcileContinuation(x);
   assert.notEqual(r.decision,'READY_FOR_OWNER_DECISION');assert.notEqual(r.ledger.packets[0].state,'COMPLETE_DRAFT');noAuthority(r);
  }
+});
+test('review PR pin cannot move with same request operation head CI and comment',()=>{
+ for(const complete of [false,true]){
+  const x=fixture();if(complete)x.ledger=reconcileContinuation(x).ledger;
+  x.expected.prNumber=705;x.snapshot.pr.prNumber=705;
+  const r=reconcileContinuation(x);assert.equal(r.reason,'REVIEW_BINDING_INVALID');
+  if(complete)assert.equal(r.ledger.revoked,true);else assert.deepEqual(r.ledger,x.ledger);
+ }
+});
+test('PR identities require exact positive integers on all three boundaries',()=>{
+ for(const field of ['expected','snapshot','review'])for(const value of [true,0,'704',704.5]){
+  const x=fixture();
+  if(field==='expected')x.expected.prNumber=value;
+  if(field==='snapshot')x.snapshot.pr.prNumber=value;
+  if(field==='review')x.snapshot.reviewBinding.prNumber=value;
+  if(value===704.5)assert.throws(()=>reconcileContinuation(x),/INVALID_NUMBER/);
+  else if(field==='review')assert.equal(reconcileContinuation(x).reason,'REVIEW_BINDING_INVALID');
+  else assert.throws(()=>reconcileContinuation(x),/EXPECTED_PR_SCOPE_MISMATCH/);
+ }
+ const x=fixture();x.snapshot.pr.prNumber=705;assert.throws(()=>reconcileContinuation(x),/EXPECTED_PR_SCOPE_MISMATCH/);
 });

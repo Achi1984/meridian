@@ -92,7 +92,12 @@ def _projection(raw,binding):
         # REVIEW_REVOKED also revokes the whole ledger if another packet started.
         valid=(state=='REVIEW_WAIT' and not revoked) or (state=='UNKNOWN_OUTCOME' and revoked)
     elif decision=='WAITING_DRAFT':valid=state in pre_draft and not revoked
-    elif decision=='BLOCKED':valid=state!='COMPLETE_DRAFT'
+    elif decision=='BLOCKED':
+        valid=state!='COMPLETE_DRAFT'
+        # Merge states normally reconcile before later stop reasons. Only the
+        # adapter's earlier unknown-execution guard can block these states.
+        if state in ('MERGE_WAIT','COMPLETE_MERGED'):
+            valid=value['reason']=='RECONCILE_UNKNOWN_OR_FAILED'
     else:
         allowed=pre_draft+('CI_WAIT','REVIEW_WAIT')
         if decision=='RECONCILE_NEW_MANIFEST':allowed+=('MERGE_WAIT','COMPLETE_MERGED')

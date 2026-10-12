@@ -49,10 +49,16 @@ class EnvelopeBindingTests(unittest.TestCase):
         self.assertNotIn('assessment',json.dumps(b));self.assertNotIn('commandSha256',json.dumps(b))
     def test_full_envelope_stale_edit_or_ci_binding_cannot_reuse_green(self):
         o,e=fixture();bound=bind(o,e)
-        self.assertEqual(bound['reviewBinding'],{**e['version'],'ci':e['scope']['ci']})
+        self.assertEqual(bound['reviewBinding'],{**e['version'],'ci':e['scope']['ci'],'prNumber':e['scope']['prNumber']})
         for changed in fixtures.stale_variants(o,e):
             result=fixtures.run_bound_adapter(bound,changed)
             self.assertNotEqual(result['decision'],'READY_FOR_OWNER_DECISION')
+    def test_actual_bound_review_cannot_move_to_another_pr(self):
+        o,e=fixture();bound=bind(o,e);adapter=fixtures.adapter_input(o,e)
+        adapter['expected']['prNumber']=adapter['snapshot']['pr']['prNumber']=705
+        result=fixtures.run_bound_adapter(bound,adapter)
+        self.assertEqual(result['reason'],'REVIEW_BINDING_INVALID')
+        self.assertNotEqual(result['decision'],'READY_FOR_OWNER_DECISION')
     def test_adverse_verdict_preserved_in_actual_adapter(self):
         o,e=fixture('REVISION_REQUIRED');b,r=compose(o,e)
         self.assertEqual(b['plannerResponse']['verdict'],'REVISION_REQUIRED')

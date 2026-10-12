@@ -34,8 +34,8 @@ def adapter_input(o,e):
     payload={'repository':{'full_name':scope['repository'],'fork':False},'action':o['eventAction'],'issue':{'number':571},'comment':comment}
     binding={'eventIdentity':'mailbox-comment:Achi1984/meridian:571:789','revisionDigest':hashlib.sha256(json.dumps(claims,separators=(',',':')).encode()).hexdigest()}
     work={'deliveryId':'EVT001','workId':'WORK001',**scope,'paths':manifest['packets'][0]['paths'],'owner':'CODEX','execution':'PLANNED','ci':{'headSha':B,'baseSha':A,'runId':e['scope']['ci']['runId'],'jobs':[{'name':'release-tests','conclusion':'SUCCESS','total':10,'passed':10,'failed':0}]},'responses':[],'inFlight':[]}
-    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[e['scope']['ci']['workflowId']]},'expected':{**scope,'packetId':'first','mainSha':A,'now':1500,'maxAgeSeconds':60,'reviewWake':None,'ci':dict(e['scope']['ci']),'reviewVersion':dict(e['version'])},
-            'snapshot':{'repository':scope['repository'],'observedAt':1499,'mainSha':A,'pr':{'headSha':B,'baseSha':A,'state':'open','mergeSha':None},'work':work,'eventBinding':binding,'ciBinding':dict(e['scope']['ci']),'reviewBinding':None},'manifest':manifest,'ledger':ledger,'requiredJobs':['release-tests']}
+    return {'trigger':{'name':'issue_comment','payloadJson':json.dumps(payload)},'config':{'repository':scope['repository'],'mailboxIssue':571,'workflowIds':[e['scope']['ci']['workflowId']]},'expected':{**scope,'packetId':'first','prNumber':e['scope']['prNumber'],'mainSha':A,'now':1500,'maxAgeSeconds':60,'reviewWake':None,'ci':dict(e['scope']['ci']),'reviewVersion':dict(e['version'])},
+            'snapshot':{'repository':scope['repository'],'observedAt':1499,'mainSha':A,'pr':{'prNumber':e['scope']['prNumber'],'headSha':B,'baseSha':A,'state':'open','mergeSha':None},'work':work,'eventBinding':binding,'ciBinding':dict(e['scope']['ci']),'reviewBinding':None},'manifest':manifest,'ledger':ledger,'requiredJobs':['release-tests']}
 
 def run_bound_adapter(binding, adapter):
     process=subprocess.run(['node',str(ROOT/'test'/'adapter-bridge.mjs')],input=json.dumps({'binding':binding,'adapter':adapter}),text=True,capture_output=True,timeout=10)
@@ -69,7 +69,7 @@ class BindingTests(unittest.TestCase):
             self.assertEqual(hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),row['blob'])
     def test_bound_review_rejects_rehashed_edit_and_new_ci_run(self):
         o,e=fixture();bound=bind(o,e)
-        self.assertEqual(bound['reviewBinding'],{**e['version'],'ci':e['scope']['ci']})
+        self.assertEqual(bound['reviewBinding'],{**e['version'],'ci':e['scope']['ci'],'prNumber':e['scope']['prNumber']})
         for changed in stale_variants(o,e):
             result=run_bound_adapter(bound,changed)
             self.assertNotEqual(result['decision'],'READY_FOR_OWNER_DECISION')
@@ -81,6 +81,12 @@ class BindingTests(unittest.TestCase):
         for field in ('authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable'):self.assertIs(r[field],False)
     def test_actual_adapter_positive_composition(self):
         o,e=fixture();b,r=composed(o,e);self.assertEqual(r['decision'],'READY_FOR_OWNER_DECISION');self.assertEqual(r['ledger']['packets'][0]['state'],'COMPLETE_DRAFT');self.assertIs(r['authenticated'],False)
+    def test_actual_bound_review_cannot_move_to_another_pr(self):
+        o,e=fixture();bound=bind(o,e);adapter=adapter_input(o,e)
+        adapter['expected']['prNumber']=adapter['snapshot']['pr']['prNumber']=705
+        result=run_bound_adapter(bound,adapter)
+        self.assertEqual(result['reason'],'REVIEW_BINDING_INVALID')
+        self.assertNotEqual(result['decision'],'READY_FOR_OWNER_DECISION')
     def test_prose_and_markdown_are_not_structured_claims(self):
         for body in ('GREEN_LIGHT approved','```json\n{}\n```'):
             o,e=fixture();o['comment']['body']=body;repin(o,e);b,r=composed(o,e);self.assertEqual(b['reason'],'STRUCTURED_CLAUDE_CLAIM_MISSING');self.assertNotEqual(r['decision'],'READY_FOR_OWNER_DECISION')

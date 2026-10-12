@@ -64,3 +64,5 @@ Historical-base limitation: if the caller updates the expected/event binding bas
 ## Durable fixed-check receipts
 
 The optional [check journal](CHECK-JOURNAL.md) and [durable check wrapper](DURABLE-CHECK.md) preserve the fixed executor receipt across local process restarts. They use a separate explicitly initialized database outside the checkout; the continuation inbox schema is unchanged. A committed STARTED reservation cannot automatically replay after a crash. Recovered check evidence remains historical and grants no fresh execution, review or merge authority.
+
+Merge-state BLOCKED projections remain valid only for `RECONCILE_UNKNOWN_OR_FAILED`: the actual adapter checks unknown execution before its merge-state reconciliation branch. Other BLOCKED reasons (for example PR_CLOSED) cannot accompany MERGE_WAIT/COMPLETE_MERGED and are rejected at commit and recovery, including after a recomputed digest. Actual adapter outcomes for both merge states retain the legitimate early-stop case.
