@@ -261,6 +261,12 @@ def reconcile(event_name, payload, control_sha, api):
             ph, pb = obj(pr.get("head")), obj(pr.get("base"))
             repository(ph.get("repo")); repository(pb.get("repo"))
             need(ph.get("sha") == head and pb.get("sha") == main and pb.get("ref") == "main", "STALE_PR")
+            # Reported run association must match the fresh PR; do not relabel
+            # old CI with a newer base. This is not checkout authentication.
+            associated = obj(prs[0])
+            ah, ab = obj(associated.get("head")), obj(associated.get("base"))
+            need(ah.get("sha") == head and ab.get("sha") == main
+                 and ab.get("ref") == "main", "STALE_RUN_PR")
             source.update({"prNumber": number, "baseSha": main})
         else:
             need(source_event == "push" and head == main and run.get("head_branch") == "main", "PUSH_SCOPE")
