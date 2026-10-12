@@ -177,13 +177,40 @@ def _receipt(row):
 def _run(database,operation):
     c=_connection(database)
     try:
-        value=operation(c);c.commit();return value
+        _store_invariants(c)
+        value=operation(c)
+        _store_invariants(c)
+        c.commit();return value
     except sqlite3.Error:raise InboxError('INBOX_STORAGE_ERROR')
     finally:
         if c.in_transaction:c.rollback()
         c.close()
 
 def _usage(c):return c.execute('SELECT COUNT(*),COALESCE(SUM(length(CAST(binding AS BLOB))+COALESCE(length(CAST(result_json AS BLOB)),0)+COALESCE(length(CAST(continuation_json AS BLOB)),0)),0) FROM events').fetchone()
+
+def _store_invariants(c):
+    """Reject inconsistent local state; never repair or release consumed attempts."""
+    count,total=_usage(c)
+    need(count<=MAX_EVENTS and total<=MAX_STORED_BYTES,'INBOX_CAPACITY')
+    meta=c.execute('SELECT id,fence,active FROM meta').fetchone()
+    need(meta is not None and meta[0]==1 and type(meta[1]) is int and 0<=meta[1]<=MAX_INT,'STORED_META')
+    fences=[];unresolved=[]
+    for raw in c.execute('SELECT * FROM events'):
+        row=_receipt(raw)
+        state=row['state'];fence=row['fence'];attempts=row['attempts'];owner=row['owner']
+        need(state in ('QUEUED','CLAIMED','STARTED','COMPLETE','UNKNOWN'),'STORED_STATE')
+        need(type(fence) is int and type(attempts) is int,'STORED_STATE')
+        if state=='QUEUED':
+            need(owner is None and fence==0 and attempts==0,'STORED_STATE')
+        else:
+            need(_owner(owner) and 0<fence<=MAX_INT and attempts==1,'STORED_STATE')
+            fences.append(fence)
+            if state!='COMPLETE':unresolved.append(row)
+    need(len(set(fences))==len(fences) and meta[1]==max(fences,default=0),'STORED_FENCE')
+    need(len(unresolved)<=1,'STORED_ACTIVE')
+    if unresolved:
+        need((meta[2],meta[1])==(unresolved[0]['eventId'],unresolved[0]['fence']),'STORED_ACTIVE')
+    else:need(meta[2] is None,'STORED_ACTIVE')
 
 def enqueue(database,binding):
     serialized=_validate(binding);event_id=_key(binding)
