@@ -1,14 +1,14 @@
 {
   "repository": "Achi1984/meridian",
-  "issue_number": null,
-  "issue_body_sha256": null,
-  "expected_main_sha": null,
-  "release_run_id": null,
-  "release_run_attempt": null,
-  "workflow_id": null,
+  "issue_number": 728,
+  "issue_body_sha256": "72a001e8838e9ca4d9f12f566f35dccc1fb6ff53304a0b51276da704a2f92f26",
+  "expected_main_sha": "9bb4037a5054ca11992461fecef43d0b1e4fe3fc",
+  "release_run_id": 38287756990,
+  "release_run_attempt": 1,
+  "workflow_id": 347821227,
   "workflow_name": "MERIDIAN Release Safety",
   "workflow_path": ".github/workflows/backend-safety.yml",
   "authorization_identity": "Achi1984",
-  "authorization_expires_at": 0,
+  "authorization_expires_at": 1791830700,
   "expected_assignees": []
 }
