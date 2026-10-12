@@ -28,6 +28,8 @@ import sys
 
 REPOSITORY = 'Achi1984/meridian'
 ASSIGNEE = 'copilot-swe-agent[bot]'
+RELEASE_SAFETY_WORKFLOW_NAME = 'MERIDIAN Release Safety'
+RELEASE_SAFETY_WORKFLOW_PATH = '.github/workflows/backend-safety.yml'
 MAX_REQUESTS = 12
 MAX_RESPONSE_BYTES = 65536
 MAX_ASSIGNEES = 20
@@ -93,10 +95,13 @@ def _validate_task(task):
     for number in (task.release_run_id, task.release_run_attempt, task.workflow_id):
         if type(number) is not int or number <= 0:
             raise ValueError('invalid configuration')
-    if (type(task.workflow_name) is not str or not task.workflow_name
+    if (type(task.workflow_name) is not str
+            or task.workflow_name != RELEASE_SAFETY_WORKFLOW_NAME
             or len(task.workflow_name) > 200):
         raise ValueError('invalid configuration')
-    if (type(task.workflow_path) is not str or not re.fullmatch(
+    if (type(task.workflow_path) is not str
+            or task.workflow_path != RELEASE_SAFETY_WORKFLOW_PATH
+            or not re.fullmatch(
             r'\.github/workflows/[A-Za-z0-9._/-]{1,180}\.ya?ml', task.workflow_path)
             or '..' in task.workflow_path.split('/')
             or '//' in task.workflow_path):

@@ -136,7 +136,14 @@ function python(body) {
   const source = body.replace('HELPER', JSON.stringify(helper));
   const result = spawnSync('python3', ['-B', '-c', source], {encoding: 'utf8'});
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  return JSON.parse(result.stdout);
+  const returned = JSON.parse(result.stdout);
+  const serialized = JSON.stringify(returned);
+  for (const sentinel of ['******', 'transport detail must stay private']) {
+    assert.ok(!serialized.includes(sentinel), `returned result leaked ${sentinel}`);
+    assert.ok(!result.stdout.includes(sentinel), `stdout leaked ${sentinel}`);
+    assert.ok(!result.stderr.includes(sentinel), `stderr leaked ${sentinel}`);
+  }
+  return returned;
 }
 
 test('dispatches the fixed approved issue once and preserves the durable claim', () => {
@@ -292,6 +299,19 @@ for key, value in (
     m = MockTransport(); m.data['actions/runs/' + str(run_id)][key] = value
     out['run_' + key] = execute(m)
     assert not m.claimed
+m = MockTransport()
+alternative = copy.deepcopy(config)
+alternative['workflow_name'] = 'Alternative workflow'
+alternative['workflow_path'] = '.github/workflows/alternative.yml'
+m.data['actions/runs/' + str(run_id)]['name'] = alternative['workflow_name']
+m.data['actions/runs/' + str(run_id)]['path'] = alternative['workflow_path']
+try:
+    execute(m, cfg=alternative)
+except ValueError:
+    out['paired_alternative_workflow'] = 'REJECTED'
+else:
+    raise AssertionError('accepted paired alternative workflow')
+assert not m.calls
 m = MockTransport(); m.data['actions/runs/' + str(run_id)]['actor']['login'] = 'other'
 out['actor'] = execute(m); assert not m.claimed
 for triggering_actor in (None, 'malformed', {'login': 'other'}):
