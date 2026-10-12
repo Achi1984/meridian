@@ -1,0 +1,16 @@
+Title: Document the observed GitHub reference-fence integration result
+
+One bounded source-only documentation task for the first native assignment pilot.
+Create only docs/autonomy/REF-FENCE-OBSERVATION-20261012.md. Describe the evidence
+from GitHub Actions run 38281115194: consult the actual run and logs; distinguish
+observed concurrent-create/restart behavior from assumptions about universal
+linearizability and permanent retention. Do not fabricate unavailable evidence.
+State that this observation does not prove a complete autonomous development loop.
+
+Acceptance: one concise document (maximum 100 lines), exact run link, observed
+outcome and limitations, no unsupported readiness or exactly-once claim. Open a
+draft PR; report the final commit and checks performed. No changes outside that
+single path. Do not alter code/workflows/permissions/secrets/ref retention or run
+live experiments. No native assignment, second task, activation, trading, spending,
+or merging. Stop and report if evidence or target scope is unavailable.
+
