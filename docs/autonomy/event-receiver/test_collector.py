@@ -336,6 +336,51 @@ collector.cli()
         api.job_log = changed_log
         with self.assertRaisesRegex(Rejected, "RUN_MOVED"): ci_evidence(api, original)
 
+    def test_run_pr_binding_changes_during_log_read(self):
+        changes = (
+            (("number",), 703), (("head", "sha"), C),
+            (("base", "sha"), C), (("base", "ref"), "other"),
+        )
+        for path, value in changes:
+            with self.subTest(path=path):
+                event, api = workflow()
+                def changed_log(identity):
+                    associated = api.rows["actions/runs/123"]["pull_requests"][0]
+                    target = associated
+                    for key in path[:-1]:
+                        target = target[key]
+                    target[path[-1]] = value
+                    return tap()
+                api.job_log = changed_log
+                with self.assertRaisesRegex(Rejected, "RUN_MOVED"):
+                    reconcile("workflow_run", event, A, api)
+
+    def test_pr_binding_snapshot_does_not_alias_run(self):
+        _, api = workflow()
+        run = api.rows["actions/runs/123"]
+        def changed_log(identity):
+            run["pull_requests"][0]["base"]["sha"] = C
+            return tap()
+        api.job_log = changed_log
+        with self.assertRaisesRegex(Rejected, "RUN_MOVED"):
+            ci_evidence(api, run)
+
+    def test_malformed_fresh_run_pr_binding_rejected(self):
+        malformed = (
+            None, [], [{}],
+            [{"number": True, "head": {"sha": B}, "base": {"sha": A, "ref": "main"}}],
+            [{"number": 702, "head": {"sha": B}, "base": {"sha": A, "ref": True}}],
+        )
+        for association in malformed:
+            with self.subTest(association=association):
+                event, api = workflow()
+                def changed_log(identity):
+                    api.rows["actions/runs/123"]["pull_requests"] = association
+                    return tap()
+                api.job_log = changed_log
+                with self.assertRaisesRegex(Rejected, "RUN_MOVED"):
+                    reconcile("workflow_run", event, A, api)
+
     def test_adapter_mapping_does_not_promote_modified_claims(self):
         e, api = workflow(); evidence = ci_evidence(api, api.rows["actions/runs/123"])
         for key, value in (("conclusion", "failure"), ("total", 0), ("passed", 9), ("failed", None)):
