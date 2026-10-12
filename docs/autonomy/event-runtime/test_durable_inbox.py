@@ -166,6 +166,24 @@ class InboxTests(unittest.TestCase):
      with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(active,))
      self.assert_store_rejected_without_changes(other,'STORED_ACTIVE')
      with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(first['eventId'],))
+ def test_corrupt_binding_reports_stable_error_without_mutation_or_content(self):
+  corrupt=self.enqueue();other=self.enqueue(2)
+  invalid_values=['private-unparseable-content', '{"private":"secret"', 'null', '[]', '42', '"private-secret"', '{}', b'private-blob', '['*1100]
+  for field,value in (('repository','wrong'),('headSha',42),('eventIdentity',None)):
+   bad=binding();bad[field]=value;invalid_values.append(json.dumps(bad))
+  for raw in invalid_values:
+   with self.subTest(raw_type=type(raw).__name__):
+    with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET binding=? WHERE event_id=?',(raw,corrupt['eventId']))
+    def snapshot():
+     with sqlite3.connect(self.db) as db:return list(db.iterdump())
+    before=snapshot()
+    operations=(lambda:inbox.inspect_event(self.db,corrupt['eventId']),lambda:inbox.inspect_event(self.db,other['eventId']),lambda:self.enqueue(),lambda:self.enqueue(3),lambda:inbox.claim(self.db,corrupt['eventId'],'worker1'),lambda:inbox.claim(self.db,other['eventId'],'worker1'))
+    for operation in operations:
+     with self.assertRaises(inbox.InboxError) as caught:operation()
+     self.assertEqual(caught.exception.code,'STORED_BINDING_CORRUPT')
+     self.assertEqual(str(caught.exception),'STORED_BINDING_CORRUPT')
+     self.assertTrue(caught.exception.__suppress_context__)
+     self.assertEqual(snapshot(),before)
  def test_orphan_active_lock_is_rejected(self):
   e=self.enqueue()
   with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(e['eventId'],))
