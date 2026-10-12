@@ -311,9 +311,20 @@ def main():
         json.dump(receipt, stream, sort_keys=True)
 
 
-if __name__ == "__main__":
+def cli():
     try:
         main()
-    except Exception:
-        # Never echo API bodies, credentials, event comments or exception contents.
-        raise SystemExit("Read-only reconciliation rejected; no receipt produced")
+    except Exception as error:
+        # Only exact built-in strings from our own rejection type may select a
+        # public diagnostic. Never format arbitrary exception content/subclasses.
+        code = "REJECTED"
+        if type(error) is Rejected and len(error.args) == 1 and type(error.args[0]) is str:
+            if error.args[0] in ("STALE_RUN_PR", "STALE_PR", "STALE_EVENT",
+                                  "CONTROL_NOT_CURRENT_MAIN", "MAIN_MOVED"):
+                code = error.args[0]
+        raise SystemExit("Read-only reconciliation rejected [" + code + "]; no receipt produced") from None
+
+
+if __name__ == "__main__":
+    cli()
+

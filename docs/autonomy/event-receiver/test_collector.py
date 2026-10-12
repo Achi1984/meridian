@@ -4,6 +4,10 @@ import unittest
 import urllib.error
 import os
 import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
+import collector
 from pathlib import Path
 from collector import GitHub, NoRedirect, MAX_BYTES, MAX_LOG, Rejected, decode, reconcile, parse_tap_summary, ci_evidence, adapter_ci_fields
 
@@ -62,6 +66,67 @@ def comment():
 
 
 class Tests(unittest.TestCase):
+    def test_cli_only_emits_allowlisted_stale_codes(self):
+        for code in ("STALE_RUN_PR", "STALE_PR", "STALE_EVENT", "CONTROL_NOT_CURRENT_MAIN", "MAIN_MOVED"):
+            with self.subTest(code=code), patch.object(collector, "main", side_effect=Rejected(code)):
+                with self.assertRaises(SystemExit) as raised:
+                    collector.cli()
+                self.assertEqual(raised.exception.code,
+                    "Read-only reconciliation rejected [" + code + "]; no receipt produced")
+
+    def test_cli_suppresses_unknown_and_hostile_exception_contents(self):
+        class HostileString(str):
+            def __str__(self):
+                raise AssertionError("string conversion forbidden")
+            def __eq__(self, other):
+                raise AssertionError("comparison forbidden")
+            def __hash__(self):
+                raise AssertionError("hash forbidden")
+        class HostileRejected(Rejected):
+            def __str__(self):
+                raise AssertionError("exception conversion forbidden")
+            @property
+            def args(self):
+                raise AssertionError("subclass args access forbidden")
+        errors = [Rejected("SECRET_BODY"), Rejected("STALE_PR\nSECRET"),
+                  Rejected("STALE_PR", "SECRET"), Rejected(), Rejected([]),
+                  Rejected(HostileString("STALE_PR")), HostileRejected("STALE_PR"),
+                  ValueError("STALE_PR"), RuntimeError("TOKEN_SECRET")]
+        for error in errors:
+            with patch.object(collector, "main", side_effect=error):
+                with self.assertRaises(SystemExit) as raised:
+                    collector.cli()
+                self.assertEqual(raised.exception.code,
+                    "Read-only reconciliation rejected [REJECTED]; no receipt produced")
+
+    def test_actual_cli_stale_and_unexpected_failures_exit_one_without_receipt(self):
+        program = r'''
+import json, os, pathlib, sys
+sys.path.insert(0, sys.argv[1])
+import collector
+from test_collector import workflow, A, C
+event, api = workflow()
+api.rows['actions/runs/123']['pull_requests'][0]['base']['sha'] = C
+collector.GitHub = lambda token: api
+event_path = pathlib.Path(sys.argv[2]) / 'event.json'
+event_path.write_text(json.dumps(event))
+os.environ.update(GITHUB_EVENT_PATH=str(event_path), GITHUB_EVENT_NAME='workflow_run',
+    GITHUB_SHA=A, GH_TOKEN='TOKEN_SECRET', RECEIPT_PATH=str(event_path.parent / 'receipt.json'))
+if sys.argv[3] == 'unexpected':
+    def broken(): raise RuntimeError('TOKEN_SECRET\nSECRET_BODY')
+    collector.main = broken
+collector.cli()
+'''
+        for mode, code in (("stale", "STALE_RUN_PR"), ("unexpected", "REJECTED")):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                result = subprocess.run([sys.executable, "-I", "-B", "-c", program,
+                    str(Path(__file__).resolve().parent), tmp, mode], capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(result.stderr,
+                    "Read-only reconciliation rejected [" + code + "]; no receipt produced\n")
+                self.assertFalse((Path(tmp) / "receipt.json").exists())
+
     def test_valid_ci_receipt_no_authority(self):
         e, api = workflow()
         r = reconcile("workflow_run", e, A, api)
@@ -356,3 +421,4 @@ console.log('collector-to-existing-adapter: WAITING_REVIEW; authority false');
 
 if __name__ == "__main__":
     unittest.main()
+
