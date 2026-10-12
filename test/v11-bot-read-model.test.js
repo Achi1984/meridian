@@ -48,3 +48,13 @@ test('malformed identities and symbols fail closed without partial rows',()=>{
     const out=buildBotReadModel(input,{now});assert.equal(out.status,'UNKNOWN');assert.deepEqual(out.bots,[]);
   }
 });
+test('calendar normalization cannot make an invalid timestamp fresh',()=>{
+  for(const [stamp,clock] of [['2026-02-30T19:59:00Z','2026-03-02T20:00:00Z'],
+    ['2026-04-31T19:59:00.000Z','2026-05-01T20:00:00Z'],
+    ['2026-10-11T24:00:00Z','2026-10-12T00:01:00Z']]){
+    const input=fixture();input.sourceSnapshotAt=stamp;
+    assert.equal(buildBotReadModel(input,{now:Date.parse(clock)}).status,'UNKNOWN');
+  }
+  const input=fixture();input.sourceSnapshotAt='2028-02-29T19:59:00.123Z';
+  assert.equal(buildBotReadModel(input,{now:Date.parse('2028-02-29T20:00:00Z')}).status,'FRESH_SNAPSHOT');
+});

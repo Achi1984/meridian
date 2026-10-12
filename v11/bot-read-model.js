@@ -15,6 +15,8 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   const time = typeof stamp === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(stamp)
     ? Date.parse(stamp) : NaN;
   if (!Number.isFinite(time) || time > now) return result;
+  const canonicalStamp = stamp.includes('.') ? stamp : stamp.replace('Z', '.000Z');
+  if (new Date(time).toISOString() !== canonicalStamp) return result;
   const limit = snapshot.freshnessLimitMs;
   if (!Number.isFinite(limit) || limit <= 0 || limit > MAX_AGE) return result;
   const age = now - time;
