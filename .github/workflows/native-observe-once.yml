@@ -1,0 +1,73 @@
+# INACTIVE TEMPLATE: do not install or mark a pilot PR ready without separate
+# owner authorization of the concrete workflow head and single read-only run.
+# Exact pilot-head authorization is procedural before the ready_for_review event;
+# this source cannot contain its own commit SHA. Reruns are not durably prevented.
+name: MERIDIAN Native Review Read Only Pilot
+on:
+  pull_request:
+    types: [ready_for_review]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  observe:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.sender.login == 'Achi1984' &&
+      github.event.sender.id == 319562141 &&
+      github.event.pull_request.head.repo.full_name == 'Achi1984/meridian' &&
+      github.event.pull_request.head.ref == 'pilot/native-review-read-once-736' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.base.sha == '03f5c78068b74fdeb0e3c02450a0b5a389b0612b' &&
+      github.event.pull_request.draft == false &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: b42966ab3ba05964bca4d9fcfb2bb00cea85922d
+      EXPECTED_MAIN: 03f5c78068b74fdeb0e3c02450a0b5a389b0612b
+      EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+      PILOT_PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Verify fixed control and event scope, fetch reviewed source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$EVENT_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PILOT_PR" =~ ^[1-9][0-9]*$ ]]
+          test "$(gh api repos/Achi1984/meridian/commits/main --jq .sha)" = "$EXPECTED_MAIN"
+          test "$(gh api "repos/Achi1984/meridian/pulls/$PILOT_PR" --jq .head.sha)" = "$EVENT_HEAD"
+          mkdir "$RUNNER_TEMP/native-review-observe"
+          cd "$RUNNER_TEMP/native-review-observe"
+          for file in collector.py review_handoff.py native_review_observation.py native_review_transport.py native_review_observe.py; do
+            gh api "repos/Achi1984/meridian/contents/docs/autonomy/event-receiver/$file?ref=$SOURCE_SHA" -H 'Accept:application/vnd.github.raw+json' > "$file"
+            test "$(wc -c < "$file")" -le 262144
+          done
+          cat > pins.json <<'JSON'
+          {"scope":{"prNumber":736,"headSha":"2b4bce3ff1ece837b19e8acdf655db6d922390b8","baseSha":"03f5c78068b74fdeb0e3c02450a0b5a389b0612b","ci":{"runId":38306411836,"runAttempt":1,"workflowId":347821227,"headSha":"2b4bce3ff1ece837b19e8acdf655db6d922390b8"}},"review":{"id":5495805683,"submittedAt":"2026-10-12T20:48:50Z","bodySha256":"e94a2027902dc9d215e1dd740beddd15a9bc61365c148e5a1b8ec1609b9c12df"}}
+          JSON
+      - name: Observe once and emit redacted incomplete receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/native-review-observe"
+          status=0
+          python3 -I -B native_review_observe.py --allow-read-only-network pins.json > receipt.json || status=$?
+          test "$status" -eq 2
+          test "$(gh api repos/Achi1984/meridian/commits/main --jq .sha)" = "$EXPECTED_MAIN"
+          test "$(gh api "repos/Achi1984/meridian/pulls/$PILOT_PR" --jq .head.sha)" = "$EVENT_HEAD"
+          python3 -I -B - <<'PY'
+          import json
+          from pathlib import Path
+          raw = Path('receipt.json').read_bytes()
+          assert len(raw) <= 4096
+          result = json.loads(raw)
+          assert result['status'] == 'OBSERVED_APPROVAL_INCOMPLETE'
+          assert result['plannerResponse'] is None
+          for key in ('authenticated', 'provenanceVerified', 'authorized', 'dispatchAllowed', 'mergeAllowed', 'durable', 'fullReviewEvidence'):
+              assert result[key] is False
+          print(raw.decode('utf-8'))
+          PY
