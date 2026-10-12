@@ -2,7 +2,7 @@
 
 This packet adds a manual entrypoint to the merged observer and exact-pin GET
 transport. It does not install a workflow or activate event-driven operation.
-Import is inert. The explicit command flag permits one bounded read-only call;
+Import is inert. The explicit command flag permits one bounded observation comprising up to nine GitHub GET requests;
 it is not owner approval, complete review evidence or dispatch authority.
 
 ## Concrete candidate
@@ -46,3 +46,31 @@ No authenticated invocation has been performed in preparation of this packet.
 Tests use mocked HTTP responses and a synthetic token only. Run the collector,
 observer, transport and entrypoint suites together; stage the existing sibling
 event adapter for its collector integration test.
+
+## Inactive Actions execution proposal
+
+`native-observe-once.yml` is a reviewable template under docs, not an installed
+workflow. Its five Python modules are pinned to immutable source commit
+`b42966ab3ba05964bca4d9fcfb2bb00cea85922d` (bytecode fix included).
+The proposal performs at most 18 explicit GitHub GETs: five source downloads,
+four main/pilot-head guard reads, and up to nine observer reads. No intentional
+retry, schedule, checkout, repository mutation or new credential is included.
+The existing ephemeral `github.token` receives read-only contents/actions/PR
+permissions. Temporary runner files hold source, pins and the redacted receipt.
+The launcher's no-file-write statement above applies to the Python observation,
+not this workflow's preparation of temporary files.
+
+After review, separately authorize installing the exact template as
+`.github/workflows/native-observe-once.yml` on the fixed pilot branch. Prepare
+its Draft PR, independently review the final pilot head, then obtain concrete
+owner approval for one ready-for-review transition after live pin reconciliation.
+Do not merge PR736 or change main first. Different sender, base or target pins
+block rather than silently repin. The workflow cannot embed its own commit hash;
+root verifies the approved exact head before triggering and the workflow verifies
+its event head against the live PR before and after observation.
+
+`run_attempt == 1` blocks reruns, not repeated ready events. This is a single
+procedurally authorized invocation, not durable exactly-once delivery. No second
+ready transition or retry is authorized. Event delivery and sender identity must
+be verified from the actual run. A matching receipt remains incomplete and grants
+no dispatch or merge authority. No workflow has been installed or run.
