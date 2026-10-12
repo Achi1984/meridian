@@ -22,7 +22,7 @@ function projection(state) {
         !Number.isFinite(Date.parse(model.snapshotAt))) return {status:'unavailable',bots:[]};
     const canonicalStamp=model.snapshotAt.includes('.') ? model.snapshotAt : model.snapshotAt.replace('Z','.000Z');
     if (new Date(model.snapshotAt).toISOString() !== canonicalStamp) return {status:'unavailable',bots:[]};
-    const bots = model.bots.map(bot => {
+    const bots = Array.from(model.bots, bot => {
       if (typeof bot?.symbol !== 'string' || !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) throw new Error();
       return {symbol:bot.symbol, side:ownLabel(SIDES,bot.side),
         type:ownLabel(TYPES,bot.type), category:ownLabel(CATEGORIES,bot.category)};

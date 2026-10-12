@@ -59,6 +59,16 @@ test('unknown enums stay unknown, including inherited object names',()=>{
   renderBotReadState(target,state);assert.equal((target.textContent.match(/Unbekannt/g)||[]).length,3);
   assert.doesNotMatch(target.textContent,/constructor|__proto__|secret/);
 });
+test('sparse and undefined rows clear prior private data without throwing',()=>{
+  for(const bots of [Array(1),[undefined],[fresh().model.bots[0],,]]) {
+    const target=root();renderBotReadState(target,fresh());
+    assert.match(target.textContent,/BTC/);
+    const state=fresh();state.model.bots=bots;
+    assert.doesNotThrow(()=>assert.equal(renderBotReadState(target,state),'unavailable'));
+    assert.equal(all(target,'li').length,0);assert.equal(all(target,'time').length,0);
+    assert.doesNotMatch(target.textContent,/BTC|2026-10-12/);
+  }
+});
 test('empty fresh snapshot reports absence rather than implying safety or active bots',()=>{
   const target=root(),state=fresh();state.model.bots=[];renderBotReadState(target,state);
   assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine Bots in diesem Snapshot/);
