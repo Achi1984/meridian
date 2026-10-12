@@ -8,7 +8,8 @@ GITHUB_TOKEN. This module neither obtains credentials nor infers auth capability
 from token text; there is no fallback to publisher App credentials.
 
 The injected transport must read at most the supplied MAX_RESPONSE_BYTES + 1
-bytes and return those raw bytes; this component rejects oversized or malformed
+bytes and return those raw bytes, or a status-bearing response when the caller
+needs to verify an HTTP status. This component rejects oversized or malformed
 data before JSON parsing. It cannot limit allocations made inside an untrusted
 transport implementation.
 
@@ -248,6 +249,17 @@ def _claim_ref(task):
         task.issue_number, _operation_id(task))
 
 
+def _github_only_claim_ref(task):
+    return 'refs/heads/native-copilot-claims/github-only-issue-{}'.format(
+        task.issue_number)
+
+
+@dataclass(frozen=True)
+class TransportResponse:
+    status: int
+    body: bytes
+
+
 def _unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -281,7 +293,7 @@ class _Client:
         self.transport = transport
         self.count = 0
 
-    def request(self, method, path, payload=None):
+    def request(self, method, path, payload=None, *, required_status=None):
         self.count += 1
         if self.count > MAX_REQUESTS:
             raise ValueError('request limit')
@@ -294,6 +306,16 @@ class _Client:
             raise RuntimeError('transport failure') from None
         except Exception:
             raise RuntimeError('transport failure') from None
+        if type(result) is TransportResponse:
+            if type(result.status) is not int or not 100 <= result.status <= 599:
+                raise RuntimeError('invalid transport response')
+            if not 200 <= result.status <= 299:
+                raise APIError(result.status)
+            if required_status is not None and result.status != required_status:
+                raise APIError(result.status)
+            result = result.body
+        elif required_status is not None:
+            raise RuntimeError('unverified response status')
         return _check_response(result)
 
 
@@ -399,15 +421,16 @@ def _response(status, operation_id):
 
 
 def execute(task, transport, *, verified_user_token_auth=False, clock=None,
-            attempt_journal=None):
+            attempt_journal=None, fence_mode='sqlite'):
     """Execute at most one assignment; never retry an ambiguous operation.
 
     `verified_user_token_auth` is an activation assertion supplied only after an
     external owner verifies that `transport` uses an eligible user-to-server
     token. Token syntax is neither checked nor accepted by this component.
-    Active execution requires an explicit SQLiteAttemptJournal on stable storage.
-    Its operation fence is committed before the first remote mutation and has no
-    supported reset or retention-expiry path.
+    The default SQLite mode requires an explicit durable SQLiteAttemptJournal.
+    The explicit github_ref mode instead relies on a permanent create-only ref
+    and proceeds only on this invocation's validated HTTP 201 response. Its
+    atomicity and retention assumptions require integration validation.
     """
     operation_id = None
     claimed = False
@@ -417,7 +440,11 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None,
         operation_id = _operation_id(task)
         if type(verified_user_token_auth) is not bool or not verified_user_token_auth:
             return _response('INACTIVE', operation_id)
-        if type(attempt_journal) is not SQLiteAttemptJournal:
+        if type(fence_mode) is not str or fence_mode not in ('sqlite', 'github_ref'):
+            raise _Blocked()
+        if fence_mode == 'sqlite' and type(attempt_journal) is not SQLiteAttemptJournal:
+            raise _Blocked()
+        if fence_mode == 'github_ref' and attempt_journal is not None:
             raise _Blocked()
         if clock is None:
             import time
@@ -431,49 +458,73 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None,
         _verified_issue(client, task)
         _verified_main(client, task)
 
-        claim_ref = _claim_ref(task)
-        try:
-            client.request('GET', 'git/ref/heads/' + claim_ref.removeprefix('refs/heads/'))
-        except APIError as error:
-            if error.status != 404:
-                raise
+        if fence_mode == 'github_ref':
+            claim_ref = _github_only_claim_ref(task)
+            try:
+                _check_authorization(task, clock)
+                created = client.request(
+                    'POST', 'git/refs',
+                    {'ref': claim_ref, 'sha': task.expected_main_sha},
+                    required_status=201)
+            except APIError as error:
+                if error.status == 409:
+                    return _response('CLAIM_EXISTS', operation_id)
+                if error.status == 422:
+                    return _response('CLAIM_REJECTED', operation_id)
+                return _response('UNKNOWN', operation_id)
+            except _Expired:
+                return _response('EXPIRED', operation_id)
+            except Exception:
+                return _response('UNKNOWN', operation_id)
+            claimed = True
+            if (created.get('ref') != claim_ref
+                    or type(created.get('object')) is not dict
+                    or created['object'].get('sha') != task.expected_main_sha):
+                return _response('UNKNOWN', operation_id)
         else:
-            return _response('CLAIMED', operation_id)
-
-        try:
-            _check_authorization(task, clock)
-        except _Expired:
-            return _response('EXPIRED', operation_id)
-        except Exception:
-            return _response('BLOCKED', operation_id)
-
-        try:
-            if not attempt_journal.consume(operation_id):
-                return _response('FENCED', operation_id)
-        except Exception:
-            return _response('BLOCKED', operation_id)
-
-        try:
-            _check_authorization(task, clock)
-        except _Expired:
-            return _response('EXPIRED', operation_id)
-        except Exception:
-            return _response('BLOCKED', operation_id)
-
-        try:
-            created = client.request('POST', 'git/refs', {
-                'ref': claim_ref, 'sha': task.expected_main_sha,
-            })
-        except APIError as error:
-            if error.status in (409, 422):
+            claim_ref = _claim_ref(task)
+            try:
+                client.request('GET', 'git/ref/heads/' + claim_ref.removeprefix('refs/heads/'))
+            except APIError as error:
+                if error.status != 404:
+                    raise
+            else:
                 return _response('CLAIMED', operation_id)
-            return _response('UNKNOWN', operation_id)
-        except Exception:
-            return _response('UNKNOWN', operation_id)
-        claimed = True
-        if (created.get('ref') != claim_ref or type(created.get('object')) is not dict
-                or created['object'].get('sha') != task.expected_main_sha):
-            return _response('UNKNOWN', operation_id)
+
+            try:
+                _check_authorization(task, clock)
+            except _Expired:
+                return _response('EXPIRED', operation_id)
+            except Exception:
+                return _response('BLOCKED', operation_id)
+
+            try:
+                if not attempt_journal.consume(operation_id):
+                    return _response('FENCED', operation_id)
+            except Exception:
+                return _response('BLOCKED', operation_id)
+
+            try:
+                _check_authorization(task, clock)
+            except _Expired:
+                return _response('EXPIRED', operation_id)
+            except Exception:
+                return _response('BLOCKED', operation_id)
+
+            try:
+                created = client.request('POST', 'git/refs', {
+                    'ref': claim_ref, 'sha': task.expected_main_sha,
+                })
+            except APIError as error:
+                if error.status in (409, 422):
+                    return _response('CLAIMED', operation_id)
+                return _response('UNKNOWN', operation_id)
+            except Exception:
+                return _response('UNKNOWN', operation_id)
+            claimed = True
+            if (created.get('ref') != claim_ref or type(created.get('object')) is not dict
+                    or created['object'].get('sha') != task.expected_main_sha):
+                return _response('UNKNOWN', operation_id)
 
         try:
             _verified_run(client, task)
