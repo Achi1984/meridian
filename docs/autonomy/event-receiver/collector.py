@@ -75,9 +75,11 @@ class GitHub:
         self.token = token
         self.opener = urllib.request.build_opener(NoRedirect())
 
+    def _allowed_path(self, path):
+        return type(path) is str and re.fullmatch(r"(?:commits/main|pulls/[1-9][0-9]*|actions/runs/[1-9][0-9]*|actions/runs/[1-9][0-9]*/attempts/[1-9][0-9]*/jobs\?per_page=50&page=[1-3]|issues/571|issues/comments/[1-9][0-9]*)", path) is not None
+
     def __call__(self, path):
-        need(re.fullmatch(r"(?:commits/main|pulls/[1-9][0-9]*|actions/runs/[1-9][0-9]*|actions/runs/[1-9][0-9]*/attempts/[1-9][0-9]*/jobs\?per_page=50&page=[1-3]|issues/571|issues/comments/[1-9][0-9]*)", path) is not None,
-             "API_PATH")
+        need(self._allowed_path(path), "API_PATH")
         request = urllib.request.Request("https://api.github.com/repos/" + REPO + "/" + path,
             headers={"Authorization": "Bearer " + self.token,
                      "Accept": "application/vnd.github+json", "User-Agent": "meridian-readonly-reconcile",
@@ -345,4 +347,3 @@ def cli():
 
 if __name__ == "__main__":
     cli()
-
