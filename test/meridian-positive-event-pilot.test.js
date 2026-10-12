@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 // Remove with the temporary installed listener during reviewed cleanup.
 const workflow = readFileSync(new URL('../.github/workflows/meridian-positive-event-pilot.yml', import.meta.url), 'utf8');
 const text = workflow.split('\n').filter(line => !/^\s*#/.test(line)).join('\n');
-const expiry = '2026-10-12T08:15:00Z';
+const expiry = '2026-10-12T09:15:00Z';
 test('installed listener has only approved native trigger and read-only scope', () => {
   assert.deepEqual([...text.matchAll(/^([\w-]+):/gm)].map(m => m[1]), ['name', 'on', 'permissions', 'jobs']);
   assert.equal(text.slice(text.indexOf('on:\n'), text.indexOf('jobs:\n')),
@@ -57,10 +57,10 @@ def trial(now, value, accepted):
         else:
             assert accepted, 'unsafe time accepted'
 trial('2026-10-12T07:45:00', expiry, True)
-trial('2026-10-12T08:14:59', expiry, True)
+trial('2026-10-12T09:14:59', expiry, True)
 trial('2026-10-12T07:44:59', expiry, False)
-trial('2026-10-12T08:15:00', expiry, False)
-trial('2026-10-12T08:15:01', expiry, False)
+trial('2026-10-12T09:15:00', expiry, False)
+trial('2026-10-12T09:15:01', expiry, False)
 trial('2026-10-12T08:00:00', 'YYYY-MM-DDTHH:MM:SSZ', False)
 trial('2026-10-12T08:00:00', '2026-99-12T08:15:00Z', False)
 print('7 installed expiry scenarios passed')

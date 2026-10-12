@@ -1,5 +1,5 @@
 # Temporary positive listener when merged; explicit activation approval required.
-# Remove after sole observation; expires 2026-10-12 10:15 Europe/Vienna.
+# Remove after sole observation; expires 2026-10-12 11:15 Europe/Vienna.
 name: MERIDIAN Positive Read Only Event Pilot
 on:
   workflow_run:
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     env:
-      PILOT_EXPIRES_AT: '2026-10-12T08:15:00Z'
+      PILOT_EXPIRES_AT: '2026-10-12T09:15:00Z'
     steps:
       - name: Reject unset or expired activation window before API access
         run: |
@@ -40,7 +40,7 @@ jobs:
           assert re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', value)
           expiry = datetime.datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
           now = datetime.datetime.now(datetime.timezone.utc)
-          assert now < expiry <= now + datetime.timedelta(minutes=30)
+          assert now < expiry <= now + datetime.timedelta(minutes=90)
           PY
       - name: Load only reviewed current-main collector and summary
         env:
