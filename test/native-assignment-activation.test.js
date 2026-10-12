@@ -4,9 +4,33 @@ import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 const workflow=readFileSync(new URL('../.github/workflows/native-assignment-pilot-once-20261012.yml',import.meta.url),'utf8');
 const programs=[...workflow.matchAll(/          python3(?: -B)? - <<'PY'\n([\s\S]*?)          PY/g)].map(m=>m[1].replace(/^          /gm,''));
+function validatePilotGate(source) {
+  const pilot=source.match(/^  pilot:\n([\s\S]*?)(?=^  [a-z_]+:|$(?![\s\S]))/m)?.[1];
+  assert.ok(pilot);
+  const gate=pilot.match(/^    if: >-\n([\s\S]*?)(?=^    runs-on:)/m)?.[1];
+  assert.ok(gate);
+  assert.deepEqual(gate.trim().split(/\s*&&\s*/).sort(),[
+    "github.repository == 'Achi1984/meridian'",
+    "github.event.repository.owner.type == 'User'",
+    "github.repository_owner == 'Achi1984'",
+    "github.actor == 'Achi1984'",
+    "github.triggering_actor == 'Achi1984'",
+    "github.event_name == 'workflow_dispatch'",
+    "github.ref == 'refs/heads/main'",
+    'github.run_number == 1','github.run_attempt == 1',
+  ].sort());
+}
 test('one-shot gates, fixed execution source and pre-secret validation remain bounded',()=>{
   assert.equal(programs.length,3);
-  for(const pin of ["github.actor == 'Achi1984'","github.triggering_actor == 'Achi1984'","github.ref == 'refs/heads/main'",'github.run_number == 1','github.run_attempt == 1','timeout-minutes: 3','permissions: {}','contents: read'])assert.ok(workflow.includes(pin));
+  validatePilotGate(workflow);
+  for(const condition of ["github.actor == 'Achi1984'","github.triggering_actor == 'Achi1984'",'github.run_number == 1','github.run_attempt == 1']){
+    const mutant=workflow.replace(condition,'true')+'\n# '+condition+'\n';
+    assert.throws(()=>validatePilotGate(mutant));
+  }
+  assert.throws(()=>validatePilotGate(workflow.replace(' &&',' ||')));
+  assert.match(workflow,/^permissions: \{\}$/m);
+  assert.match(workflow,/^    permissions:\n      contents: read$/m);
+  assert.match(workflow,/^    timeout-minutes: 3$/m);
   assert.match(programs[0],/source_sha = 'fc706326c1af1ac63303d273467d2100ec83b3a3'/);
   assert.match(programs[0],/re.fullmatch\('\[0-9a-f\]\{40\}', config_sha\)/);
   assert.ok(workflow.indexOf('Validate config against executing main')<workflow.indexOf('NATIVE_USER_TOKEN:'));
@@ -33,7 +57,10 @@ class Response:
   return self.raw
 class HTTPS:
  def __init__(self,host,timeout): assert host=='api.github.com' and timeout==10
- def request(self,method,path,headers): assert method=='GET' and path=='/user'
+ def request(self,method,path,headers):
+  assert method=='GET' and path=='/user'
+  assert headers['Authorization']=='Bearer '+os.environ['NATIVE_USER_TOKEN']
+  assert headers['Accept']=='application/vnd.github+json'
  def getresponse(self): return Response()
  def close(self): pass
 with tempfile.TemporaryDirectory() as directory:
