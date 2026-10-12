@@ -43,4 +43,4 @@ Generic development Go covers this preparation only. Installation review must ap
 
 ## Prepared files
 
-All four files target `docs/autonomy/event-receiver/`: `positive-native-pilot.yml` (inactive), `receipt_summary.py`, `test_positive_pilot.py` and this proposal. Candidate expiry `2026-10-12T00:00:00Z` is already expired and deliberately rejects execution. Installation requires replacing it with a reviewed concrete future UTC deadline, no more than 30 minutes away when executing. The candidate is not an activation authorization.
+All four files target `docs/autonomy/event-receiver/`: `positive-native-pilot.yml` (inactive), `receipt_summary.py`, `test_positive_pilot.py` and this proposal. Candidate expiry `2026-10-12T00:00:00Z` is already expired and deliberately rejects execution. Installation requires replacing it with a reviewed concrete future UTC deadline, no more than 90 minutes away when executing. The candidate is not an activation authorization.

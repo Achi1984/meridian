@@ -15,7 +15,7 @@ def check_expiry(value, now=None):
     require(type(value) is str and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value) is not None)
     expires = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
     now = now or datetime.datetime.now(datetime.timezone.utc)
-    require(now < expires <= now + datetime.timedelta(minutes=30))
+    require(now < expires <= now + datetime.timedelta(minutes=90))
 
 
 def summarize(receipt, expected_head, expected_run):

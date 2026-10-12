@@ -61,7 +61,7 @@ class Tests(unittest.TestCase):
 
     def test_expiry_window_and_inactive_literal(self):
         check_expiry("2026-10-12T09:15:00Z", NOW)
-        for value in ("YYYY-MM-DDTHH:MM:SSZ", "2026-10-12T00:00:00Z", "2026-10-12T09:00:00Z", "2026-10-12T09:31:00Z"):
+        for value in ("YYYY-MM-DDTHH:MM:SSZ", "2026-10-12T00:00:00Z", "2026-10-12T09:00:00Z", "2026-10-12T10:31:00Z"):
             with self.assertRaises(ValueError): check_expiry(value, NOW)
         self.assertIn("PILOT_EXPIRES_AT: '2026-10-12T00:00:00Z'", WORKFLOW)
         code = WORKFLOW.split("python3 -I -B - <<'PY'\n", 1)[1].split("\n          PY", 1)[0]
