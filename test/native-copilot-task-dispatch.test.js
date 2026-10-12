@@ -285,6 +285,51 @@ output(first=first, second=second)
   assert.equal(result.second.status, 'CLAIMED');
 });
 
+test('observed assignee-name variants remain UNKNOWN and cannot replay the GitHub-ref assignment', () => {
+  // Synthetic response shapes derived from the later issue read, not a capture
+  // of run 38291703961's POST response. This reproduces a possible mismatch;
+  // it does not establish the actual cause or authorize accepting a new identity.
+  const result = python(runPython + githubHarness + String.raw`
+out = {}
+for label, logins in (
+    ('display_login', ['Copilot']),
+    ('display_login_and_owner', ['Copilot', 'Achi1984']),
+    ('request_login_and_added_owner', [d.ASSIGNEE, 'Achi1984']),
+):
+    reset_github()
+    client = SharedGitHub(task)
+    def observed_shape(method, path, payload, limit):
+        raw = client(method, path, payload, limit)
+        if method == 'POST' and path == 'issues/717/assignees':
+            response = json.loads(raw)
+            response['assignees'] = [{'login': login} for login in logins]
+            return json.dumps(response, separators=(',', ':')).encode()
+        return raw
+    first = github_execute(observed_shape)
+    assert first['status'] == 'UNKNOWN'
+    assert set(first) == {'status', 'operationId'}
+    assert first['operationId'] == d._operation_id(task)
+    assert SharedGitHub.assignments == 1
+    claim = d._github_only_claim_ref(task)
+    assert SharedGitHub.refs == {claim: task.expected_main_sha}
+
+    # Fresh client deliberately sees the old unassigned issue. The retained
+    # create-only reference still prevents a second assignment.
+    restarted = github_execute(SharedGitHub(task))
+    assert restarted['status'] == 'CLAIM_EXISTS'
+    assert SharedGitHub.assignments == 1
+    assert SharedGitHub.refs == {claim: task.expected_main_sha}
+    assert len([call for call in SharedGitHub.calls
+                if call == ('POST', 'issues/717/assignees')]) == 1
+    out[label] = {'first': first['status'], 'restart': restarted['status']}
+output(**out)
+`);
+  assert.equal(Object.keys(result).length, 3);
+  for (const value of Object.values(result)) {
+    assert.deepEqual(value, {first: 'UNKNOWN', restart: 'CLAIM_EXISTS'});
+  }
+});
+
 test('GitHub-ref fence allows assignment only to this invocation receiving 201', () => {
   const result = python(runPython + githubHarness + String.raw`
 reset_github()
@@ -865,3 +910,4 @@ test('CLI reports inactive without a transport or live execution', () => {
   assert.deepEqual(JSON.parse(result.stdout), {status: 'INACTIVE', operationId: null});
   assert.equal(result.stderr, '');
 });
+
