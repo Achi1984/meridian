@@ -42,7 +42,7 @@ All authentication/provenance/authorization/dispatch/merge/write flags remain fa
 python -I docs/autonomy/event-runtime/test_durable_inbox.py
 ```
 
-Twenty-four tests cover explicit initialization, missing/corrupt stores, duplicate and conflicting revisions, claim/start/complete, durable summary, UNKNOWN blocking a different revision, monotone fences, stale owners/receipts, six competing processes, two different events competing for the one scope, abrupt subprocess exit after STARTED, row/byte capacity, metadata-only restrictions, invalid input and false authority.
+The inbox tests cover explicit initialization, missing/corrupt stores, duplicate and conflicting revisions, claim/start/complete, durable summary, UNKNOWN blocking a different revision, monotone fences, stale owners/receipts, six competing processes, two different events competing for the one scope, abrupt subprocess exit after STARTED, row/byte capacity, metadata-only restrictions, invalid input and false authority.
 
 
 ## Schema 2 atomic continuation handoff
