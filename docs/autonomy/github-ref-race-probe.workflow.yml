@@ -8,13 +8,25 @@ on:
         description: Previously approved unique 16-32 lowercase alphanumeric experiment ID
         required: true
         type: string
-permissions:
-  contents: write
+permissions: {}
 concurrency:
   group: meridian-ref-probe-${{ inputs.probe_id }}
   cancel-in-progress: false
 jobs:
   experiment:
+    # Disabled specimen: run_number 0 cannot execute; pin approved run on activation.
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.repository.owner.type == 'User' &&
+      github.repository_owner == 'Achi1984' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 0 &&
+      github.run_attempt == 1
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

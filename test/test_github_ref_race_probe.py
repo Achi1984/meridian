@@ -64,6 +64,20 @@ class ProbeTests(unittest.TestCase):
         self.assertIn("assert os.environ['REQUESTED_PROBE_ID'] == approved", workflow)
         self.assertLess(workflow.index('Require the exact owner-approved'), workflow.index('Obtain exactly'))
 
+    def test_specimen_owner_and_disabled_run_gate_precedes_write_permission(self):
+        workflow = (Path(__file__).parents[1] / 'docs/autonomy/github-ref-race-probe.workflow.yml').read_text()
+        self.assertIn('permissions: {}', workflow)
+        for condition in ("github.repository == 'Achi1984/meridian'",
+                          "github.event.repository.owner.type == 'User'",
+                          "github.repository_owner == 'Achi1984'",
+                          "github.actor == 'Achi1984'",
+                          "github.triggering_actor == 'Achi1984'",
+                          "github.event_name == 'workflow_dispatch'",
+                          "github.ref == 'refs/heads/main'",
+                          'github.run_number == 0', 'github.run_attempt == 1'):
+            self.assertIn(condition, workflow)
+            self.assertLess(workflow.index(condition), workflow.index('contents: write'))
+
     def test_transport_target_budget_response_and_sanitization(self):
         calls = []
         class Response:

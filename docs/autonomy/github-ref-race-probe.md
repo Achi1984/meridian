@@ -39,3 +39,9 @@ the token can create the reference and the reference will remain retained,
 and obtain explicit approval for the exact experiment and contents:write job.
 Do not bypass restrictive rules. No extra subscription or paid runner is needed;
 existing Actions quota is consumed. Native assignment authorization is separate.
+
+The specimen has no global token permissions. Its contents-write job is gated
+to owner Achi1984 as both actor and triggering_actor, the exact repository,
+manual dispatch on main, and attempt 1. Run number 0 deliberately disables the
+job until the concrete activation approval pins one exact real run number.
+Changing that gate or rerunning is not authorized by source publication.
