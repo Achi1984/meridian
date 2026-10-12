@@ -243,10 +243,27 @@ def _claim_ref(task):
         task.issue_number, _operation_id(task))
 
 
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate response key')
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite(value):
+    raise ValueError('invalid response constant')
+
+
 def _check_response(value):
     if type(value) is not bytes or len(value) > MAX_RESPONSE_BYTES:
         raise ValueError('invalid response size')
-    value = json.loads(value.decode('utf-8'))
+    value = json.loads(
+        value.decode('utf-8'),
+        object_pairs_hook=_unique_object,
+        parse_constant=_reject_nonfinite,
+    )
     if type(value) is not dict:
         raise ValueError('invalid response')
     return value

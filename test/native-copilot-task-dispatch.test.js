@@ -65,6 +65,7 @@ class MockTransport:
         self.assignment_timeout = False
         self.assignment_http_error = False
         self.assignment_response = None
+        self.raw_run_after_claim = None
         self.changed_after_claim = None
         self.changed_before_claim = None
         self.changed_run_after_claim = None
@@ -100,6 +101,8 @@ class MockTransport:
             if self.claimed and self.changed_run_after_claim:
                 key, value = self.changed_run_after_claim
                 self.data[path][key] = value
+            if self.claimed and self.raw_run_after_claim is not None:
+                return self.raw_run_after_claim
             return self.response(copy.deepcopy(self.data[path]), max_response_bytes)
         if path.startswith('git/ref/heads/native-copilot-claims/') and method == 'GET':
             if self.advance_before_claim_post:
@@ -373,6 +376,60 @@ for raw in (b'{' * (d.MAX_RESPONSE_BYTES + 1), b'{not-json'):
 output(**out)
 `);
   assert.ok(Object.values(result).every((status) => status.status === 'BLOCKED'));
+});
+
+test('raw JSON rejects duplicate keys and nonfinite constants before mutation', () => {
+  const result = python(runPython + String.raw`
+out = {}
+valid_run = json.dumps(fixtures()['actions/runs/' + str(run_id)], separators=(',', ':'))
+malformed_runs = {
+    'duplicate_conclusion': valid_run.replace(
+        '"conclusion":"success"', '"conclusion":"failure","conclusion":"success"'),
+    'duplicate_nested_identity': valid_run.replace(
+        '"actor":{"login":"approved-owner"}',
+        '"actor":{"login":"approved-owner","login":"approved-owner"}'),
+    'nan': valid_run.replace(
+        '"name":"MERIDIAN Release Safety"',
+        '"name":"MERIDIAN Release Safety","extra":NaN'),
+    'infinity': valid_run.replace(
+        '"name":"MERIDIAN Release Safety"',
+        '"name":"MERIDIAN Release Safety","extra":Infinity'),
+    'negative_infinity': valid_run.replace(
+        '"name":"MERIDIAN Release Safety"',
+        '"name":"MERIDIAN Release Safety","extra":-Infinity'),
+}
+for key, raw in malformed_runs.items():
+    m = MockTransport()
+    m.raw_overrides[('GET', 'actions/runs/' + str(run_id))] = raw.encode()
+    out[key] = execute(m)
+    assert out[key]['status'] == 'BLOCKED'
+    assert not any(c[0] == 'POST' for c in m.calls)
+output(**out)
+`);
+  assert.ok(Object.values(result).every((status) => status.status === 'BLOCKED'));
+});
+
+test('invalid JSON on post-claim run reread blocks assignment and preserves the fence', () => {
+  const result = python(runPython + String.raw`
+m = MockTransport()
+valid_run = json.dumps(fixtures()['actions/runs/' + str(run_id)], separators=(',', ':'))
+m.raw_run_after_claim = valid_run.replace(
+    '"actor":{"login":"approved-owner"}',
+    '"actor":{"login":"approved-owner","login":"approved-owner"}').encode()
+first = execute(m)
+assert first['status'] == 'BLOCKED_CLAIMED' and m.claimed
+assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
+reopened = d.SQLiteAttemptJournal(m.journal_path, JOURNAL_IDENTITY)
+m.raw_run_after_claim = None
+assert not reopened.consume(d._operation_id(d.ApprovedTask.from_mapping(config)))
+second = execute(m, journal=reopened)
+assert second['status'] == 'CLAIMED'
+assert len([c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs']) == 1
+assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
+output(first=first, second=second)
+`);
+  assert.equal(result.first.status, 'BLOCKED_CLAIMED');
+  assert.equal(result.second.status, 'CLAIMED');
 });
 
 test('journal requires explicit provisioning and fails closed on missing, replaced, or reset storage', () => {
