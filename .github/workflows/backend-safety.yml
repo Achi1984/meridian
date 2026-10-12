@@ -57,6 +57,8 @@ jobs:
       - name: Frozen research lineage
         run: node scripts/frozen-research-guard.mjs
       - name: Research and auth regression tests
+        env:
+          V11_A2_EVIDENCE_DIR: artifacts/v11-visual-qa
         run: node --test test/*.test.js
       - name: Release authority consistency
         run: |
@@ -73,3 +75,12 @@ jobs:
       - name: Assert paper-only invariant
         run: |
           grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
+
+      - name: Upload V11 visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-v11-visual-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/v11-visual-qa/*.png
+          if-no-files-found: error
+          retention-days: 7
