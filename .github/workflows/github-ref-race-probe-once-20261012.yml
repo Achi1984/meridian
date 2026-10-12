@@ -1,0 +1,66 @@
+# Owner approved one bounded integration run, 2026-10-12 18:35 Europe/Vienna.
+name: Meridian create-only reference experiment
+on:
+  workflow_dispatch:
+    inputs:
+      probe_id:
+        description: Previously approved unique 16-32 lowercase alphanumeric experiment ID
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: meridian-ref-probe-${{ inputs.probe_id }}
+  cancel-in-progress: false
+jobs:
+  experiment:
+    # One-shot installation candidate: first run and first attempt only.
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.repository.owner.type == 'User' &&
+      github.repository_owner == 'Achi1984' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require the exact owner-approved experiment identity
+        env:
+          REQUESTED_PROBE_ID: ${{ inputs.probe_id }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          approved = 'meridian20261012race01'
+          assert re.fullmatch(r'[a-z0-9]{16,32}', approved)
+          assert os.environ['REQUESTED_PROBE_ID'] == approved
+          PY
+      - name: Obtain exactly the reviewed script
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import http.client, os
+          sha = 'd5090798b23e5e19ea984d5391d65152732b2cc6'
+          assert len(sha) == 40 and all(c in '0123456789abcdef' for c in sha)
+          c = http.client.HTTPSConnection('api.github.com', timeout=10)
+          c.request('GET', '/repos/Achi1984/meridian/contents/scripts/github-ref-race-probe.py?ref=' + sha,
+                    headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+                             'Accept': 'application/vnd.github.raw+json', 'User-Agent': 'meridian-ref-probe-loader'})
+          r = c.getresponse()
+          assert r.status == 200
+          raw = r.read(32769)
+          assert len(raw) <= 32768
+          c.close()
+          open('github-ref-race-probe.py', 'xb').write(raw)
+          PY
+      - name: Three bounded create-only attempts; preserve reference
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MERIDIAN_REF_PROBE_ACK: CREATE_THREE_ATTEMPTS_KEEP_REF_FOREVER
+          MERIDIAN_REF_PROBE_ID: ${{ inputs.probe_id }}
+        run: python3 -B github-ref-race-probe.py
