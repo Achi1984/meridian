@@ -300,8 +300,9 @@ for triggering_actor in (None, 'malformed', {'login': 'other'}):
         del m.data['actions/runs/' + str(run_id)]['triggering_actor']
     else:
         m.data['actions/runs/' + str(run_id)]['triggering_actor'] = triggering_actor
-    out['triggering_actor_' + str(triggering_actor)] = execute(m)
-    assert not m.claimed
+    key = 'triggering_actor_' + str(triggering_actor)
+    out[key] = execute(m)
+    assert out[key]['status'] == 'BLOCKED' and not m.claimed
 m = MockTransport(); out['expired'] = execute(m, now=2000); assert not m.calls
 m = MockTransport(); m.data[issue_path]['assignees'] = [{'login': d.ASSIGNEE}]
 out['copilot_assigned'] = execute(m); assert not m.claimed
