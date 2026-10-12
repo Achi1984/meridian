@@ -44,7 +44,8 @@ def workflow():
     run = {"id": 123, "workflow_id": 347821227, "name": "MERIDIAN Release Safety",
         "path": ".github/workflows/backend-safety.yml", "repository": REPO,
         "head_repository": REPO, "head_sha": B, "status": "completed", "conclusion": "success",
-        "run_attempt": 1, "event": "pull_request", "pull_requests": [{"number": 702}]}
+        "run_attempt": 1, "event": "pull_request", "pull_requests": [{"number": 702,
+            "head": {"sha": B}, "base": {"sha": A, "ref": "main"}}]}
     pr = {"number": 702, "state": "open", "head": {"sha": B, "repo": REPO},
           "base": {"sha": A, "repo": REPO, "ref": "main"}}
     event = {"repository": REPO, "action": "completed", "workflow_run": copy.deepcopy(run)}
@@ -115,6 +116,39 @@ class Tests(unittest.TestCase):
         for value in (None, [], [{"number": 702}, {"number": 703}], [{}]):
             e, api = workflow(); api.rows["actions/runs/123"]["pull_requests"] = value
             with self.assertRaises(Rejected): reconcile("workflow_run", e, A, api)
+
+    def test_old_run_base_cannot_be_relabelled_as_current_main(self):
+        e, api = workflow()
+        api.rows["actions/runs/123"]["pull_requests"][0]["base"]["sha"] = C
+        self.assertEqual(api.rows["pulls/702"]["base"]["sha"], A)
+        with self.assertRaisesRegex(Rejected, "STALE_RUN_PR"):
+            reconcile("workflow_run", e, A, api)
+        self.assertFalse(any("jobs?" in call or "job-log/" in call for call in api.calls))
+
+    def test_run_associated_head_and_base_ref_must_match(self):
+        for part, key, value in (("head", "sha", C), ("base", "ref", "other")):
+            with self.subTest(part=part, key=key):
+                e, api = workflow()
+                api.rows["actions/runs/123"]["pull_requests"][0][part][key] = value
+                with self.assertRaisesRegex(Rejected, "STALE_RUN_PR"):
+                    reconcile("workflow_run", e, A, api)
+
+    def test_missing_or_malformed_run_association_fields_rejected(self):
+        for part in ("head", "base"):
+            for value in (None, [], "invalid", {}, {"sha": None}, {"sha": True}):
+                with self.subTest(part=part, value=value):
+                    e, api = workflow()
+                    api.rows["actions/runs/123"]["pull_requests"][0][part] = value
+                    with self.assertRaises(Rejected):
+                        reconcile("workflow_run", e, A, api)
+            e, api = workflow()
+            del api.rows["actions/runs/123"]["pull_requests"][0][part]
+            with self.assertRaises(Rejected):
+                reconcile("workflow_run", e, A, api)
+        e, api = workflow()
+        del api.rows["actions/runs/123"]["pull_requests"][0]["base"]["ref"]
+        with self.assertRaisesRegex(Rejected, "STALE_RUN_PR"):
+            reconcile("workflow_run", e, A, api)
 
     def test_missing_fields_and_api_failure(self):
         e, api = workflow(); api.rows["actions/runs/123"] = {}
