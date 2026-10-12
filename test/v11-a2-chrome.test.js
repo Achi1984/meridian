@@ -40,7 +40,7 @@ const probe = `(() => {
     }
   }
   tabs[0].click();
-  const disclosure = document.querySelector('details');
+  const disclosure = document.querySelector('details.command-source-details');
   disclosure.open = true;
   const controls = [...document.querySelectorAll('button[data-preview-state]')];
   const status = document.getElementById('preview-data-status');
@@ -110,10 +110,10 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
         await key('Enter', 'Enter');
         assert.equal(await evaluate('document.activeElement.closest(".view").id'), 'view-' + view, 'native Enter navigation');
       }
-      await evaluate('document.querySelector("#nav button").click(); document.querySelector("details").open = false; document.querySelector("summary").focus()');
+      await evaluate('document.querySelector("#nav button").click(); document.querySelector("details.command-source-details").open = false; document.querySelector("details.command-source-details > summary").focus()');
       await key(' ', 'Space');
-      assert.equal(await evaluate('document.querySelector("details").open'), true, 'native Space opens disclosure');
-      assert.equal(await evaluate('getComputedStyle(document.querySelector("summary")).outlineStyle'), 'solid', 'keyboard disclosure focus indicator');
+      assert.equal(await evaluate('document.querySelector("details.command-source-details").open'), true, 'native Space opens disclosure');
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("details.command-source-details > summary")).outlineStyle'), 'solid', 'keyboard disclosure focus indicator');
       await evaluate('document.querySelector("button[data-preview-state=loading]").focus()');
       await key(' ', 'Space');
       assert.equal(await evaluate('document.getElementById("preview-data-status").dataset.state'), 'loading', 'native Space selects loading example');
@@ -126,7 +126,7 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
           const image = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
           writeFileSync(join(evidence, `v11-a2-${width}-${state}.png`), Buffer.from(image.data, 'base64'));
         }
-        await evaluate('document.querySelector("details").open = false; window.scrollTo(0,0)');
+        await evaluate('document.querySelector("details.command-source-details").open = false; window.scrollTo(0,0)');
         const image = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
         writeFileSync(join(evidence, `v11-a2-${width}-command.png`), Buffer.from(image.data, 'base64'));
       }

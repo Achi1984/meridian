@@ -64,6 +64,11 @@ const botsAfter=`      <section class="card view-placeholder" aria-labelledby="b
       <p class="caption">Diese Vorschau hat keinen Kontozugriff und steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>`;
 const botsRevisionLabel='11 · Vorschau B1<small>Versionsverlauf ▾</small>';
 const botsRevisionRow='        <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>\n';
+// Exact B2 additions: reverse only these literal bytes; preserve the historical hash.
+const autonomyCss="    .autonomy-strip{max-width:var(--container);margin:12px auto 0;padding:12px 14px;border:1px solid #776346;border-radius:12px;background:#171e29;overflow-wrap:anywhere}\n    .autonomy-strip h2{font-size:13px;margin-bottom:4px}\n    .autonomy-strip p,.autonomy-strip summary{font-size:12px;letter-spacing:0}\n    .autonomy-strip strong{color:var(--state-unknown)}\n    .autonomy-strip details{margin:8px 0 0;background:transparent}\n    .autonomy-strip a{color:#a9d4ff;text-underline-offset:3px}\n";
+const autonomyStrip="    <section id=\"autonomy-status\" class=\"autonomy-strip\" aria-labelledby=\"autonomy-heading\" data-state=\"unknown\" data-source=\"none\">\n      <h2 id=\"autonomy-heading\">Autonome Entwicklung · <strong>Unbekannt</strong></h2>\n      <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>\n      <details>\n        <summary><span>Betrieb &amp; letzte Änderung</span><span aria-hidden=\"true\">+</span></summary>\n        <div class=\"details-body\">\n          <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>\n          <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>\n          <p><b>Diese Vorschau · B2:</b> Statusleiste ergänzt. Integrationszeit und Änderungsnachweis stehen für diesen Entwurf noch aus.</p>\n          <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime=\"2026-10-11T19:30:28Z\">11.10.2026, 21:30 Uhr Wien</time> · <a href=\"https://github.com/Achi1984/meridian/pull/702\">Änderungsnachweis #702</a>.</p>\n          <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>\n        </div>\n      </details>\n    </section>\n";
+const autonomyRevisionRow="        <li><strong>Meridian 11 · B2</strong><span class=\"version-status\">Vorschaustand</span><p>Statusleiste für autonome Entwicklung mit ausdrücklich unbekanntem Betriebsstatus. Noch ohne Betriebssignal.</p></li>\n";
+const autonomyRevisionLabel="11 · Vorschau B2<small>Versionsverlauf ▾</small>";
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 
 function gitBlob(content){
@@ -82,9 +87,12 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(html.split(viewportPair).length-1,1,'exactly one progressive viewport fallback');
   assert.equal(html.split(depotAfter).length-1,1,'exactly one reviewed Depot panel');
   assert.equal(html.split(botsAfter).length-1,1,'exactly one Bots overview');
-  assert.equal(html.split(botsRevisionLabel).length-1,1,'one Bots preview revision');
+  for (const delta of [autonomyCss,autonomyStrip,autonomyRevisionRow,autonomyRevisionLabel]) assert.equal(html.split(delta).length-1,1,'exactly one literal B2 delta');
+  assert.ok(html.endsWith('</html>\n\n\n\n'),'exact B2 transport trailing newline');
+  const beforeB2=html.slice(0,-1).replace(autonomyCss,'').replace(autonomyStrip,'').replace(autonomyRevisionRow,'').replace(autonomyRevisionLabel,botsRevisionLabel);
+  assert.equal(beforeB2.split(botsRevisionLabel).length-1,1,'one restored Bots preview revision');
   assert.equal(html.split(botsRevisionRow).length-1,1,'one Bots preview history row');
-  const reviewedHtml=html.replace(botsAfter,botsBefore).replace(botsRevisionLabel,revisionAfter).replace(botsRevisionRow,'');
+  const reviewedHtml=beforeB2.replace(botsAfter,botsBefore).replace(botsRevisionLabel,revisionAfter).replace(botsRevisionRow,'');
   assert.equal(reviewedHtml.split(revisionAfter).length-1,1,'one current preview revision label');
   assert.equal(html.split(revisionRow).length-1,1,'one matching preview history row');
   const restored=reviewedHtml.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
