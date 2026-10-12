@@ -150,6 +150,59 @@ class InboxTests(unittest.TestCase):
   with self.assertRaisesRegex(inbox.InboxError,'INBOX_STORAGE_ERROR'):complete(self.db,c,'d'*64)
   saved=inbox.inspect_event(self.db,c['eventId']);self.assertEqual(saved['state'],'STARTED');self.assertIsNone(saved['continuationJson'])
   with self.assertRaisesRegex(inbox.InboxError,'INBOX_BUSY'):inbox.claim(self.db,other['eventId'],'worker2')
+ def assert_store_rejected_without_changes(self,event,code):
+  def snapshot():
+   with sqlite3.connect(self.db) as db:return list(db.iterdump())
+  before=snapshot()
+  for op in (lambda:inbox.inspect_event(self.db,event['eventId']),lambda:inbox.claim(self.db,event['eventId'],'worker2'),lambda:self.enqueue(3)):
+   with self.assertRaisesRegex(inbox.InboxError,code):op()
+   self.assertEqual(snapshot(),before)
+ def test_cleared_or_wrong_active_lock_blocks_recovery_and_new_claim(self):
+  first=self.enqueue();other=self.enqueue(2);c=inbox.start(self.db,inbox.claim(self.db,first['eventId'],'worker1'))
+  for state in ('STARTED','UNKNOWN'):
+   if state=='UNKNOWN':inbox.unknown(self.db,c,'d'*64)
+   for active in (None,other['eventId']):
+    with self.subTest(state=state,active=active):
+     with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(active,))
+     self.assert_store_rejected_without_changes(other,'STORED_ACTIVE')
+     with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(first['eventId'],))
+ def test_orphan_active_lock_is_rejected(self):
+  e=self.enqueue()
+  with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET active=?',(e['eventId'],))
+  self.assert_store_rejected_without_changes(e,'STORED_ACTIVE')
+ def test_meta_fence_mismatch_is_rejected(self):
+  e=self.enqueue();inbox.claim(self.db,e['eventId'],'worker1')
+  for fence in (0,2):
+   with self.subTest(fence=fence):
+    with sqlite3.connect(self.db) as db:db.execute('UPDATE meta SET fence=?',(fence,))
+    self.assert_store_rejected_without_changes(e,'STORED_FENCE')
+ def test_multiple_unresolved_and_duplicate_fences_are_rejected(self):
+  first=self.enqueue();other=self.enqueue(2);inbox.claim(self.db,first['eventId'],'worker1')
+  for fence,code in ((2,'STORED_ACTIVE'),(1,'STORED_FENCE')):
+   with self.subTest(fence=fence):
+    with sqlite3.connect(self.db) as db:
+     db.execute("UPDATE events SET state='CLAIMED',owner='worker2',fence=?,attempts=1 WHERE event_id=?",(fence,other['eventId']))
+     db.execute('UPDATE meta SET fence=?,active=?',(fence,other['eventId']))
+    self.assert_store_rejected_without_changes(other,code)
+ def test_inconsistent_queued_and_consumed_fields_are_rejected(self):
+  e=self.enqueue()
+  for sql in ("UPDATE events SET owner='worker1'","UPDATE events SET fence=1","UPDATE events SET attempts=1"):
+   with self.subTest(sql=sql):
+    with sqlite3.connect(self.db) as db:db.execute(sql)
+    self.assert_store_rejected_without_changes(e,'STORED_STATE')
+    with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET owner=NULL,fence=0,attempts=0')
+  inbox.claim(self.db,e['eventId'],'worker1')
+  with sqlite3.connect(self.db) as db:db.execute('UPDATE events SET attempts=0')
+  self.assert_store_rejected_without_changes(e,'STORED_STATE')
+ def test_post_operation_invariant_failure_rolls_back_claim(self):
+  e=self.enqueue()
+  with sqlite3.connect(self.db) as db:
+   db.execute("CREATE TRIGGER corrupt_lock AFTER UPDATE OF active ON meta WHEN NEW.active IS NOT NULL BEGIN UPDATE meta SET active=NULL WHERE id=1; END")
+  with self.assertRaisesRegex(inbox.InboxError,'STORED_ACTIVE'):inbox.claim(self.db,e['eventId'],'worker1')
+  saved=inbox.inspect_event(self.db,e['eventId']);self.assertEqual(saved['state'],'QUEUED');self.assertEqual(saved['attempts'],0);self.assertEqual(saved['fence'],0)
+  with sqlite3.connect(self.db) as db:
+   self.assertEqual(db.execute('SELECT fence,active FROM meta').fetchone(),(0,None));db.execute('DROP TRIGGER corrupt_lock')
+  self.assertEqual(inbox.claim(self.db,e['eventId'],'worker1')['fence'],1)
  def test_process_exit_after_complete_commit_preserves_recoverable_ledger(self):
   c=inbox.start(self.db,inbox.claim(self.db,self.enqueue()['eventId'],'worker1'))
   code="import importlib.util,json,os,sys;s=importlib.util.spec_from_file_location('inbox',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);m.complete(sys.argv[2],json.loads(sys.argv[3]),'d'*64,continuation_json=sys.argv[4]);os._exit(0)"
