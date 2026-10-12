@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 
 const source=readFileSync(new URL('../.github/workflows/native-observe-once.yml',import.meta.url),'utf8');
 const MAIN='03f5c78068b74fdeb0e3c02450a0b5a389b0612b';
@@ -15,6 +16,9 @@ const invocation='python3 -I -B native_review_observe.py --allow-read-only-netwo
 // This is a deliberately narrow frozen pilot contract, not a general YAML parser
 // or execution authorization. Changed scope requires explicit test re-review.
 function validate(raw) {
+  const bytes=Buffer.from(raw,'utf8');
+  const blob=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+  assert.equal(blob,'eaaea83d461259cf0a6f89bac6094b59a8987598','exact reviewed workflow bytes');
   const text=raw.split('\n').filter(line=>!/^\s*#/.test(line)).join('\n');
   const has=value=>assert.ok(text.includes(value),'missing safety boundary: '+value);
   assert.equal((text.match(/^on:/gm)||[]).length,1);
@@ -69,6 +73,7 @@ test('both pilot shell blocks remain syntactically valid without execution',()=>
 });
 test('unsafe trigger, authority, control and receipt mutations are rejected',()=>{
   const mutations=[
+    ['          status=0','          status=0\n          echo extra-command'],
     ['types: [ready_for_review]','types: [opened, synchronize, ready_for_review]'],
     ['  contents: read','  contents: write'],
     ['    runs-on:', '    permissions:\n      contents: write\n    runs-on:'],
