@@ -1,7 +1,10 @@
 """Manual bounded native review observation; importing this module is inert."""
+import sys
+if __name__ == '__main__':
+    # Suppress cache writes even if the caller omitted the documented -B flag.
+    sys.dont_write_bytecode = True
 import json
 import os
-import sys
 if __name__ == '__main__':
     # Isolated Python excludes cwd/PYTHONPATH; load only reviewed sibling modules.
     if not sys.flags.isolated:

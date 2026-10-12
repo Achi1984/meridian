@@ -4,6 +4,8 @@ import json
 import unittest
 import subprocess
 import sys
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch, mock_open
 import native_review_observe as cli
@@ -12,6 +14,21 @@ from test_native_review_transport import Opener
 
 
 class EntrypointTests(unittest.TestCase):
+    def test_isolated_startup_without_B_creates_no_bytecode(self):
+        source = Path(cli.__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as directory:
+            staged = Path(directory)
+            for name in ('native_review_observe.py', 'native_review_observation.py',
+                         'native_review_transport.py', 'review_handoff.py', 'collector.py'):
+                shutil.copyfile(source / name, staged / name)
+            result = subprocess.run([sys.executable, '-I', str(staged / 'native_review_observe.py')],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(json.loads(result.stdout)['reason'], 'OBSERVATION_NOT_COMPLETED')
+            self.assertEqual(result.stderr, '')
+            self.assertEqual(list(staged.rglob('__pycache__')), [])
+            self.assertEqual(list(staged.rglob('*.pyc')), [])
+
     def test_actual_isolated_startup_and_missing_opt_in(self):
         script = str(Path(cli.__file__).resolve())
         for flags, reason in ((['-I', '-B'], 'OBSERVATION_NOT_COMPLETED'),
