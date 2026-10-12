@@ -230,6 +230,7 @@ def _verified_run(client, task):
     run = client.request('GET', 'actions/runs/{}'.format(task.release_run_id))
     repository = run.get('repository')
     actor = run.get('actor')
+    triggering_actor = run.get('triggering_actor')
     if (type(run.get('id')) is not int or run['id'] != task.release_run_id
             or type(run.get('run_attempt')) is not int
             or run['run_attempt'] != task.release_run_attempt
@@ -245,7 +246,9 @@ def _verified_run(client, task):
             or type(repository) is not dict
             or repository.get('full_name') != task.repository
             or type(actor) is not dict
-            or actor.get('login') != task.authorization_identity):
+            or actor.get('login') != task.authorization_identity
+            or type(triggering_actor) is not dict
+            or triggering_actor.get('login') != task.authorization_identity):
         raise _Blocked()
 
 

@@ -43,6 +43,7 @@ def fixtures():
             'status': 'completed', 'conclusion': 'success',
             'repository': {'full_name': d.REPOSITORY},
             'actor': {'login': 'approved-owner'},
+            'triggering_actor': {'login': 'approved-owner'},
         },
         issue_path: {
             'number': 717, 'state': 'open', 'repository_url': repo_url,
@@ -229,6 +230,7 @@ out = {}
 for key, value in (
     ('run_attempt', 3), ('status', 'in_progress'), ('conclusion', 'failure'),
     ('head_sha', 'b' * 40), ('workflow_id', 999), ('actor', {'login': 'other'}),
+    ('triggering_actor', {'login': 'other'}),
 ):
     m = MockTransport(); m.changed_run_after_claim = (key, value)
     out[key] = execute(m)
@@ -292,6 +294,14 @@ for key, value in (
     assert not m.claimed
 m = MockTransport(); m.data['actions/runs/' + str(run_id)]['actor']['login'] = 'other'
 out['actor'] = execute(m); assert not m.claimed
+for triggering_actor in (None, 'malformed', {'login': 'other'}):
+    m = MockTransport()
+    if triggering_actor is None:
+        del m.data['actions/runs/' + str(run_id)]['triggering_actor']
+    else:
+        m.data['actions/runs/' + str(run_id)]['triggering_actor'] = triggering_actor
+    out['triggering_actor_' + str(triggering_actor)] = execute(m)
+    assert not m.claimed
 m = MockTransport(); out['expired'] = execute(m, now=2000); assert not m.calls
 m = MockTransport(); m.data[issue_path]['assignees'] = [{'login': d.ASSIGNEE}]
 out['copilot_assigned'] = execute(m); assert not m.claimed
