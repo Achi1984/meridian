@@ -75,6 +75,7 @@ with tempfile.TemporaryDirectory() as directory:
    with contextlib.redirect_stdout(out):
     try:exec(program)
     except SystemExit as e:assert e.code==(0 if expected else 1)
+    else:raise AssertionError('credential program must exit')
    assert len(calls)==expected
    assert 'never-print-secret' not in out.getvalue()
    if expected:assert calls[0]['verified_user_token_auth'] is True and calls[0]['fence_mode']=='github_ref'
@@ -82,10 +83,18 @@ with tempfile.TemporaryDirectory() as directory:
   with contextlib.redirect_stdout(out):
    try:exec(program)
    except SystemExit as e:assert e.code==1
+   else:raise AssertionError('missing-token program must exit')
   assert not calls and not http_calls
   assert json.loads(out.getvalue())=={'status':'BLOCKED_MISSING_NATIVE_USER_TOKEN'}
 print('credential scenarios passed')
 `.replace('PROGRAM',JSON.stringify(programs[2]));
   const r=spawnSync('python3',['-B','-c',source],{encoding:'utf8',timeout:5000});
   assert.equal(r.status,0,r.stderr);
+  for (const statement of ['    try:exec(program)', '   try:exec(program)']) {
+    const mutant=source.replace('\n'+statement+'\n','\n'+statement.replace('exec(program)','pass')+'\n');
+    assert.notEqual(mutant,source);
+    const rejected=spawnSync('python3',['-B','-c',mutant],{encoding:'utf8',timeout:5000});
+    assert.notEqual(rejected.status,0);
+    assert.match(rejected.stderr,/program must exit/);
+  }
 });
