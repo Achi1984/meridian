@@ -28,6 +28,11 @@ function normalizedSide(v){
   const s=String(v||'').trim().toUpperCase();
   return ['LONG','SHORT','NEUTRAL'].includes(s)?s:null;
 }
+// Only explicit normalized enums cross the sanitized boundary. Never infer
+// COIN-M from the symbol, side or investment currency; missing remains unknown.
+function projectedEnum(value,allowed){
+  return typeof value==='string'&&allowed.includes(value)?value:null;
+}
 function sanitizedBot(bot={}){
   const symbol=String(bot.symbol||'').trim().toUpperCase()||null;
   const side=normalizedSide(bot.side);
@@ -35,6 +40,9 @@ function sanitizedBot(bot={}){
     botRef:botRef(bot),
     symbol,
     side,
+    cateType:projectedEnum(bot.cateType,['inverse','linear']),
+    botType:projectedEnum(bot.botType,['futures_grid','future_hedge_grid']),
+    sideSource:projectedEnum(bot.sideSource,['economic_inverse_asset','trend_inverse_asset','trend']),
     leverage:num(bot.leverage),
     limits:{
       lower:num(bot.lower),
@@ -150,3 +158,4 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
     }
   };
 }
+
