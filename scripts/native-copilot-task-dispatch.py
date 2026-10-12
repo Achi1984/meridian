@@ -19,6 +19,9 @@ last read, and GitHub does not provide an atomic SHA snapshot for this assignmen
 The injected transport is a trust boundary: its caller must provide the verified
 user-token authentication prerequisite. This source adds no permissions and
 does not install or schedule any automation.
+
+Issue, run, workflow, and attempt pins are positive signed 64-bit integers,
+keeping their derived request paths and claim refs bounded before formatting.
 """
 
 from dataclasses import dataclass
@@ -39,6 +42,7 @@ RELEASE_SAFETY_WORKFLOW_PATH = '.github/workflows/backend-safety.yml'
 MAX_REQUESTS = 12
 MAX_RESPONSE_BYTES = 65536
 MAX_ASSIGNEES = 20
+MAX_SIGNED_64_BIT_PIN = (1 << 63) - 1
 LOGIN_RE = re.compile(
     r'(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?'
     r'|[A-Za-z0-9](?:[A-Za-z0-9-]{0,31}[A-Za-z0-9])?\[bot\])\Z')
@@ -92,14 +96,15 @@ def _validate_task(task):
     if (type(task) is not ApprovedTask or type(task.repository) is not str
             or task.repository != REPOSITORY):
         raise ValueError('invalid configuration')
-    if type(task.issue_number) is not int or task.issue_number <= 0:
+    if (type(task.issue_number) is not int
+            or not 0 < task.issue_number <= MAX_SIGNED_64_BIT_PIN):
         raise ValueError('invalid configuration')
     if type(task.issue_body_sha256) is not str or not BODY_DIGEST_RE.fullmatch(task.issue_body_sha256):
         raise ValueError('invalid configuration')
     if type(task.expected_main_sha) is not str or not SHA_RE.fullmatch(task.expected_main_sha):
         raise ValueError('invalid configuration')
     for number in (task.release_run_id, task.release_run_attempt, task.workflow_id):
-        if type(number) is not int or number <= 0:
+        if type(number) is not int or not 0 < number <= MAX_SIGNED_64_BIT_PIN:
             raise ValueError('invalid configuration')
     if (type(task.workflow_name) is not str
             or task.workflow_name != RELEASE_SAFETY_WORKFLOW_NAME

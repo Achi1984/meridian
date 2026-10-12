@@ -351,6 +351,92 @@ output(**out)
   assert.equal(result.copilot_assigned.status, 'BLOCKED');
 });
 
+test('numeric task pins are bounded before transport or journal mutation', () => {
+  const result = python(runPython + String.raw`
+out = {}
+maximum = d.MAX_SIGNED_64_BIT_PIN
+boundary = copy.deepcopy(config)
+for key in ('issue_number', 'release_run_id', 'release_run_attempt', 'workflow_id'):
+    boundary[key] = maximum
+task = d.ApprovedTask.from_mapping(boundary)
+assert all(getattr(task, key) == maximum for key in (
+    'issue_number', 'release_run_id', 'release_run_attempt', 'workflow_id'))
+assert len(d._claim_ref(task)) < 128
+m = MockTransport()
+run_path = 'actions/runs/' + str(maximum)
+issue_max_path = 'issues/' + str(maximum)
+claim_ref = d._claim_ref(task)
+claim_path = 'git/ref/heads/' + claim_ref.removeprefix('refs/heads/')
+run = fixtures()['actions/runs/' + str(run_id)]
+run.update({'id': maximum, 'run_attempt': maximum, 'workflow_id': maximum})
+issue = fixtures()[issue_path]
+issue['number'] = maximum
+calls = []
+def boundary_transport(method, path, payload, max_response_bytes):
+    assert max_response_bytes == d.MAX_RESPONSE_BYTES + 1
+    calls.append((method, path, payload))
+    if method == 'GET' and path == run_path:
+        return m.response(run, max_response_bytes)
+    if method == 'GET' and path == issue_max_path:
+        return m.response(issue, max_response_bytes)
+    if method == 'GET' and path == main_path:
+        return m.response({'object': {'sha': base}}, max_response_bytes)
+    if method == 'GET' and path == claim_path:
+        raise d.APIError(404)
+    if method == 'POST' and path == 'git/refs':
+        return m.response({'ref': payload['ref'], 'object': {'sha': payload['sha']}},
+                          max_response_bytes)
+    if method == 'POST' and path == issue_max_path + '/assignees':
+        return m.response({
+            'number': maximum, 'repository_url': repo_url,
+            'assignees': [{'login': d.ASSIGNEE}],
+        }, max_response_bytes)
+    raise AssertionError('unexpected boundary request')
+accepted = d.execute(
+    task, boundary_transport, verified_user_token_auth=True,
+    clock=lambda: 1000, attempt_journal=m.journal)
+assert accepted['status'] == 'ASSIGNED'
+assert any(path == run_path for _, path, _ in calls)
+assert any(path == issue_max_path for _, path, _ in calls)
+assert any(path == issue_max_path + '/assignees' for _, path, _ in calls)
+out['maximum'] = accepted['status']
+
+consume = d.SQLiteAttemptJournal.consume
+for key in ('issue_number', 'release_run_id', 'release_run_attempt', 'workflow_id'):
+    for invalid in (False, 0, -1, maximum + 1, 10 ** 3999):
+        bad = copy.deepcopy(config)
+        bad[key] = invalid
+        try:
+            d.ApprovedTask.from_mapping(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('accepted out-of-range ' + key)
+        m = MockTransport()
+        task = d.ApprovedTask(**{
+            **{name: value for name, value in config.items()
+               if name != 'expected_assignees'},
+            'expected_assignees': tuple(config['expected_assignees']),
+            key: invalid,
+        })
+        consume_calls = []
+        def track_consume(journal, operation_id):
+            consume_calls.append(operation_id)
+            return consume(journal, operation_id)
+        d.SQLiteAttemptJournal.consume = track_consume
+        try:
+            blocked = d.execute(
+                task, m, verified_user_token_auth=True,
+                clock=lambda: m.now, attempt_journal=m.journal)
+        finally:
+            d.SQLiteAttemptJournal.consume = consume
+        assert blocked['status'] == 'BLOCKED'
+        assert not m.calls and not consume_calls
+output(**out)
+`);
+  assert.equal(result.maximum, 'ASSIGNED');
+});
+
 test('raw responses are capped before parsing and malformed bytes never mutate', () => {
   const result = python(runPython + String.raw`
 out = {}
