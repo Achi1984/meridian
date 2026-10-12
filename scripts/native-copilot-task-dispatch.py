@@ -7,6 +7,11 @@ that this assignment API does not accept an App installation token or Actions
 GITHUB_TOKEN. This module neither obtains credentials nor infers auth capability
 from token text; there is no fallback to publisher App credentials.
 
+The injected transport must read at most the supplied MAX_RESPONSE_BYTES + 1
+bytes and return those raw bytes; this component rejects oversized or malformed
+data before JSON parsing. It cannot limit allocations made inside an untrusted
+transport implementation.
+
 Issue assignment uses GitHub's public-preview REST `agent_assignment` fields.
 `base_branch: main` pins a branch name, not a commit: `main` can move after the
 last read, and GitHub does not provide an atomic SHA snapshot for this assignment.
@@ -24,6 +29,7 @@ import os
 import re
 import sqlite3
 import sys
+from urllib.parse import quote
 
 
 REPOSITORY = 'Achi1984/meridian'
@@ -130,36 +136,94 @@ def _operation_id(task):
 
 
 class SQLiteAttemptJournal:
-    """Durable one-shot fence; callers must retain its database indefinitely.
+    """Durable one-shot fence; provision once and retain its database indefinitely.
 
-    Use an absolute path on stable, access-controlled storage that survives
-    process and machine restarts. SQLite serializes competing writers; a
-    successful `consume` commits with FULL synchronous durability before the
-    remote claim is attempted. Never delete, replace, roll back, or restore this
-    database from a snapshot that predates a consumed operation. Disposable
-    runner storage does not provide the required replay-safety guarantee.
+    Provision explicitly before activation with a stable caller-held identity.
+    Dispatch only opens an existing database and validates its schema and
+    identity; it never creates or resets storage. Use an absolute path on stable,
+    access-controlled storage that survives process and machine restarts. SQLite
+    serializes competing writers; a successful `consume` commits with FULL
+    synchronous durability before the remote claim is attempted. Never delete,
+    replace, roll back, or restore this database from a snapshot that predates a
+    consumed operation. Restoring an old snapshot with the same identity remains
+    an operational storage boundary, not cryptographic rollback protection.
+    Disposable runner storage does not provide the required guarantee.
     """
 
-    __slots__ = ('_path',)
+    __slots__ = ('_path', '_identity', '_uri')
 
-    def __init__(self, path):
+    def __init__(self, path, journal_identity):
         if (type(path) is not str or not os.path.isabs(path)
                 or path == ':memory:' or path.startswith('file:')):
             raise ValueError('invalid journal path')
+        if (type(journal_identity) is not str
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', journal_identity)):
+            raise ValueError('invalid journal identity')
         self._path = os.path.abspath(path)
+        self._identity = journal_identity
+        self._uri = 'file:{}?mode=rw'.format(quote(self._path, safe='/'))
+
+    @classmethod
+    def provision(cls, path, journal_identity):
+        """Create a new journal exclusively; never overwrite existing storage."""
+        journal = cls(path, journal_identity)
+        descriptor = os.open(
+            journal._path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        os.close(descriptor)
+        connection = sqlite3.connect(
+            journal._uri, uri=True, timeout=10, isolation_level=None)
+        try:
+            connection.execute('PRAGMA synchronous=FULL')
+            connection.execute('BEGIN IMMEDIATE')
+            connection.execute(
+                'CREATE TABLE journal_metadata '
+                '(key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID')
+            connection.execute(
+                'CREATE TABLE consumed_operations '
+                '(operation_id TEXT PRIMARY KEY) WITHOUT ROWID')
+            connection.executemany(
+                'INSERT INTO journal_metadata (key, value) VALUES (?, ?)',
+                (('schema_version', '1'), ('journal_identity', journal._identity)))
+            connection.execute('COMMIT')
+        except Exception:
+            if connection.in_transaction:
+                connection.execute('ROLLBACK')
+            raise
+        finally:
+            connection.close()
+        return journal
 
     def consume(self, operation_id):
         if type(operation_id) is not str or not re.fullmatch(r'[0-9a-f]{24}', operation_id):
             raise ValueError('invalid operation')
         connection = sqlite3.connect(
-            self._path, timeout=10, isolation_level=None)
+            self._uri, uri=True, timeout=10, isolation_level=None)
         try:
-            connection.execute('PRAGMA journal_mode=DELETE')
             connection.execute('PRAGMA synchronous=FULL')
             connection.execute('BEGIN IMMEDIATE')
-            connection.execute(
-                'CREATE TABLE IF NOT EXISTS consumed_operations '
-                '(operation_id TEXT PRIMARY KEY) WITHOUT ROWID')
+            schemas = connection.execute(
+                "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+            expected_schemas = {
+                'journal_metadata': (
+                    'create table journal_metadata '
+                    '(key text primary key, value text not null) without rowid'),
+                'consumed_operations': (
+                    'create table consumed_operations '
+                    '(operation_id text primary key) without rowid'),
+            }
+            if (len(schemas) != len(expected_schemas)
+                    or any(kind != 'table' or name not in expected_schemas
+                           or ' '.join(sql.lower().split()) != expected_schemas[name]
+                           for kind, name, sql in schemas)):
+                raise ValueError('invalid journal schema')
+            metadata = dict(connection.execute(
+                'SELECT key, value FROM journal_metadata').fetchall())
+            if metadata != {
+                    'schema_version': '1',
+                    'journal_identity': self._identity,
+            }:
+                raise ValueError('invalid journal identity')
             cursor = connection.execute(
                 'INSERT OR IGNORE INTO consumed_operations (operation_id) VALUES (?)',
                 (operation_id,))
@@ -180,12 +244,11 @@ def _claim_ref(task):
 
 
 def _check_response(value):
+    if type(value) is not bytes or len(value) > MAX_RESPONSE_BYTES:
+        raise ValueError('invalid response size')
+    value = json.loads(value.decode('utf-8'))
     if type(value) is not dict:
         raise ValueError('invalid response')
-    encoded = json.dumps(value, ensure_ascii=True, allow_nan=False,
-                         separators=(',', ':')).encode('ascii')
-    if len(encoded) > MAX_RESPONSE_BYTES:
-        raise ValueError('oversized response')
     return value
 
 
@@ -201,7 +264,8 @@ class _Client:
         if self.count > MAX_REQUESTS:
             raise ValueError('request limit')
         try:
-            result = self.transport(method, path, payload)
+            result = self.transport(
+                method, path, payload, MAX_RESPONSE_BYTES + 1)
         except APIError as error:
             if type(error.status) is int and 100 <= error.status <= 599:
                 raise

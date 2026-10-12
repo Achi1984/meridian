@@ -16,6 +16,7 @@ base = 'a' * 40
 run_id = 12345
 issue_path = 'issues/717'
 main_path = 'git/ref/heads/main'
+JOURNAL_IDENTITY = 'native-copilot-dispatch-test-v1'
 claim_ref = None
 repo_url = 'https://api.github.com/repos/' + d.REPOSITORY
 config = {
@@ -69,34 +70,44 @@ class MockTransport:
         self.changed_run_after_claim = None
         self.advance_before_claim_post = False
         self.advance_on_claim = False
+        self.raw_overrides = {}
         self.now = 1000
         self.journal_dir = tempfile.TemporaryDirectory()
         self.journal_path = os.path.join(self.journal_dir.name, 'attempts.sqlite3')
-        self.journal = d.SQLiteAttemptJournal(self.journal_path)
-    def __call__(self, method, path, payload):
-        self.calls.append((method, path, copy.deepcopy(payload)))
+        self.journal = d.SQLiteAttemptJournal.provision(
+            self.journal_path, JOURNAL_IDENTITY)
+    def response(self, value, max_response_bytes):
+        assert max_response_bytes == d.MAX_RESPONSE_BYTES + 1
+        return json.dumps(value, separators=(',', ':')).encode('utf-8')
+    def __call__(self, method, path, payload, max_response_bytes):
+        assert max_response_bytes == d.MAX_RESPONSE_BYTES + 1
+        self.calls.append((method, path, copy.deepcopy(payload), max_response_bytes))
+        if (method, path) in self.raw_overrides:
+            return self.raw_overrides[(method, path)]
         if path == issue_path and method == 'GET':
             if self.changed_before_claim == 'issue' and not self.claimed:
                 self.data[issue_path]['body'] = 'changed'
             if self.changed_after_claim == 'issue' and self.claimed:
                 self.data[issue_path]['body'] = 'changed'
-            return copy.deepcopy(self.data[issue_path])
+            return self.response(copy.deepcopy(self.data[issue_path]), max_response_bytes)
         if path == main_path and method == 'GET':
             if self.changed_before_claim == 'main' and not self.claimed:
                 self.data[main_path]['object']['sha'] = 'b' * 40
             if self.changed_after_claim == 'main' and self.claimed:
                 self.data[main_path]['object']['sha'] = 'b' * 40
-            return copy.deepcopy(self.data[main_path])
+            return self.response(copy.deepcopy(self.data[main_path]), max_response_bytes)
         if path == 'actions/runs/' + str(run_id) and method == 'GET':
             if self.claimed and self.changed_run_after_claim:
                 key, value = self.changed_run_after_claim
                 self.data[path][key] = value
-            return copy.deepcopy(self.data[path])
+            return self.response(copy.deepcopy(self.data[path]), max_response_bytes)
         if path.startswith('git/ref/heads/native-copilot-claims/') and method == 'GET':
             if self.advance_before_claim_post:
                 self.now = 3000
             if self.claimed or self.competing:
-                return {'ref': path.removeprefix('git/'), 'object': {'sha': base}}
+                return self.response(
+                    {'ref': path.removeprefix('git/'), 'object': {'sha': base}},
+                    max_response_bytes)
             raise d.APIError(404)
         if path == 'git/refs' and method == 'POST':
             if self.post_conflict:
@@ -108,16 +119,18 @@ class MockTransport:
                 self.now = 3000
             if self.claim_timeout:
                 raise TimeoutError('transport detail must stay private')
-            return {'ref': payload['ref'], 'object': {'sha': payload['sha']}}
+            return self.response(
+                {'ref': payload['ref'], 'object': {'sha': payload['sha']}},
+                max_response_bytes)
         if path == 'issues/717/assignees' and method == 'POST':
             if self.assignment_timeout:
                 raise TimeoutError('******')
             if self.assignment_http_error:
                 raise d.APIError(500)
-            return self.assignment_response or {
+            return self.response(self.assignment_response or {
                 'number': 717, 'repository_url': repo_url,
                 'assignees': [{'login': d.ASSIGNEE}],
-            }
+            }, max_response_bytes)
         raise AssertionError('unexpected request')
 
 def execute(mock, cfg=None, verified=True, now=1000, journal=None):
@@ -221,7 +234,7 @@ assert first['status'] == 'EXPIRED'
 assert not claim_posts
 assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
 m.now = 1000
-second = execute(m, journal=d.SQLiteAttemptJournal(m.journal_path))
+second = execute(m, journal=d.SQLiteAttemptJournal(m.journal_path, JOURNAL_IDENTITY))
 assert second['status'] == 'FENCED'
 assert len([c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs']) == 0
 assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
@@ -335,6 +348,70 @@ output(**out)
   assert.equal(result.copilot_assigned.status, 'BLOCKED');
 });
 
+test('raw responses are capped before parsing and malformed bytes never mutate', () => {
+  const result = python(runPython + String.raw`
+out = {}
+for raw in (b'{' * (d.MAX_RESPONSE_BYTES + 1), b'{not-json'):
+    m = MockTransport()
+    m.raw_overrides[('GET', 'actions/runs/' + str(run_id))] = raw
+    parses = d.json.loads
+    parsed = []
+    def track_parse(value, *args, **kwargs):
+        parsed.append(value)
+        return parses(value, *args, **kwargs)
+    d.json.loads = track_parse
+    try:
+        out[str(len(raw))] = execute(m)
+    finally:
+        d.json.loads = parses
+    assert out[str(len(raw))]['status'] == 'BLOCKED'
+    assert not any(c[0] == 'POST' for c in m.calls)
+    if len(raw) > d.MAX_RESPONSE_BYTES:
+        assert parsed == []
+    else:
+        assert parsed == [raw.decode('utf-8')]
+output(**out)
+`);
+  assert.ok(Object.values(result).every((status) => status.status === 'BLOCKED'));
+});
+
+test('journal requires explicit provisioning and fails closed on missing, replaced, or reset storage', () => {
+  const result = python(runPython + String.raw`
+out = {}
+for replacement in ('deleted', 'empty', 'mismatched'):
+    m = MockTransport()
+    m.claim_timeout_before_persist = True
+    first = execute(m)
+    assert first['status'] == 'UNKNOWN'
+    claim_posts = len([c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs'])
+    assignment_posts = len([c for c in m.calls if c[0] == 'POST' and c[1] == 'issues/717/assignees'])
+    if replacement == 'deleted':
+        os.unlink(m.journal_path)
+    elif replacement == 'empty':
+        os.unlink(m.journal_path)
+        open(m.journal_path, 'wb').close()
+    else:
+        os.unlink(m.journal_path)
+        d.SQLiteAttemptJournal.provision(m.journal_path, 'different-journal-v1')
+    reopened = d.SQLiteAttemptJournal(m.journal_path, JOURNAL_IDENTITY)
+    out[replacement] = execute(m, journal=reopened)
+    assert out[replacement]['status'] == 'BLOCKED'
+    assert len([c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs']) == claim_posts
+    assert len([c for c in m.calls if c[0] == 'POST' and c[1] == 'issues/717/assignees']) == assignment_posts
+m = MockTransport()
+try:
+    d.SQLiteAttemptJournal.provision(m.journal_path, JOURNAL_IDENTITY)
+except FileExistsError:
+    out['no_overwrite'] = 'REJECTED'
+else:
+    raise AssertionError('provisioning overwrote existing journal')
+assert execute(m)['status'] == 'ASSIGNED'
+output(**out)
+`);
+  assert.ok(Object.values(result).every((value) =>
+    value === 'REJECTED' || value.status === 'BLOCKED'));
+});
+
 test('missing verified auth capability, competing claims, and uncertain assignment fail closed', () => {
   const result = python(runPython + String.raw`
 out = {}
@@ -355,7 +432,7 @@ assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
 m = MockTransport(); m.claim_timeout_before_persist = True
 out['claim_timeout_before_persist'] = execute(m)
 assert out['claim_timeout_before_persist']['status'] == 'UNKNOWN' and not m.claimed
-reopened_journal = d.SQLiteAttemptJournal(m.journal_path)
+reopened_journal = d.SQLiteAttemptJournal(m.journal_path, JOURNAL_IDENTITY)
 assert execute(m, journal=reopened_journal)['status'] == 'FENCED'
 assert len([c for c in m.calls if c[1] == 'git/refs' and c[0] == 'POST']) == 1
 assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
