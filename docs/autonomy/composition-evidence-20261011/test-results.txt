@@ -1,0 +1,18 @@
+✔ four imported sources match immutable upstream Git blobs (4.057961ms)
+✔ event is only a reconciliation hint: no direct ledger or planner conversion exists (13.210889ms)
+✔ opaque GREEN mailbox prose cannot become an approval (8.54007ms)
+✔ explicit synthetic collector fixtures compose CI review completion and second packet claim (12.339397ms)
+✔ normalized duplicate delivery is deterministic but carries no durable dedupe or claim (4.798297ms)
+✔ unknown outcome survives serialized snapshot and blocks retry and next packet (3.45167ms)
+✔ head change invalidates prior CI and review across planner and continuation (4.241303ms)
+✔ missing job and contradictory review prevent planner readiness (4.412709ms)
+✔ merge completion has a genuine fixed-base boundary; do not fake automatic rebase (2.793946ms)
+✔ planner is post-head only; it cannot assign a first implementation task (0.468878ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 269.625485

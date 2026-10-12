@@ -1,0 +1,50 @@
+# INACTIVE TEMPLATE. Merely storing this file does not install a workflow.
+# Installation in .github/workflows is a separately reviewed owner decision.
+name: MERIDIAN Read Only Event Reconciliation
+on:
+  workflow_run:
+    workflows: [MERIDIAN Release Safety, MERIDIAN Claude Mailbox Review]
+    types: [completed]
+  issue_comment:
+    types: [created, edited]
+permissions:
+  contents: read
+  actions: read
+  issues: read
+  pull-requests: read
+jobs:
+  reconcile:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      (github.event_name == 'workflow_run' ||
+       (github.event.issue.number == 571 &&
+        (github.event.comment.user.login == 'claude[bot]' ||
+         github.event.comment.user.login == 'Achi1984')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Load collector from this immutable default-branch control SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(gh api repos/Achi1984/meridian/commits/main --jq .sha)" = "$GITHUB_SHA"
+          gh api "repos/Achi1984/meridian/contents/docs/autonomy/event-receiver/collector.py?ref=$GITHUB_SHA" -H 'Accept:application/vnd.github.raw+json' > "$RUNNER_TEMP/collector.py"
+          test "$(wc -c < "$RUNNER_TEMP/collector.py")" -le 262144
+      - name: Read bounded source metadata and write local receipt only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECEIPT_PATH: ${{ runner.temp }}/meridian-event-receipt.json
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -I -B "$RUNNER_TEMP/collector.py"
+      - name: Retain typed receipt without source payloads
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: meridian-event-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/meridian-event-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false

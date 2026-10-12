@@ -1,0 +1,38 @@
+✔ source fixtures preserve exact Git blobs (8.60803ms)
+✔ exact supplied snapshot composes real module transitions, immutable inputs and false authority (25.383541ms)
+✔ CI completion advances once to review waiting, then separate mailbox snapshot completes (14.87304ms)
+✔ same snapshot after completion produces no additional transition (6.508037ms)
+✔ event hint cannot substitute separately supplied snapshot or expected pins (3.142714ms)
+✔ opaque mailbox GREEN does not replace missing independently supplied review (2.474692ms)
+✔ deleted mailbox event cannot reuse snapshot review (2.224321ms)
+✔ run attempt and revision mismatch demand fresh reconciliation (5.331636ms)
+✔ main movement never advances old manifest, even if caller updates expected main (6.698598ms)
+✔ merged PR and postmerge reducer state cannot produce next claim on stale base (7.051325ms)
+✔ freshness, future timestamps and widened age window fail closed (16.434088ms)
+✔ head/base/request/path mismatch cannot advance (12.460677ms)
+✔ unknown outcome remains halted across snapshot restart and base movement (2.328547ms)
+✔ failed job missing required job contradictory review and active owner never complete (21.034025ms)
+✔ expired manifest cannot progress and missing completed review is revoked through reducer (18.719864ms)
+✔ forged authority malformed ledger getters proxies and sparse arrays reject without executing accessors (10.353923ms)
+✔ blocking observations revoke a previously complete draft instead of retaining reusable readiness (46.289472ms)
+✔ mailbox CI_WAIT and REVIEW_WAIT require independently pinned CI binding before advancement (69.01037ms)
+✔ mailbox invalid CI binding revokes COMPLETE_DRAFT and preserves adverse-review precedence (6.889723ms)
+✔ missing mailbox CI only waits and valid mailbox CI_WAIT still advances (5.350059ms)
+✔ old GREEN cannot survive same-comment edit despite refreshed event identity (4.711091ms)
+✔ current CI cannot inherit review bound to a previous run on either wake (13.758778ms)
+✔ missing provenance and independently changed comment version stop every ready state (28.144013ms)
+✔ one version sidecar cannot bless additional scoped GREEN responses (2.150908ms)
+✔ Claude workflow wake at main consumes separate Safety CI and review at PR head (6.795024ms)
+✔ Claude wake pins are required exact and cannot substitute PR CI (54.360358ms)
+✔ Claude event wrong head attempt workflow or non-success never advances (18.340116ms)
+✔ Claude success carries no review or CI approval and stale evidence revokes readiness (20.831247ms)
+✔ review PR pin cannot move with same request operation head CI and comment (9.983542ms)
+✔ PR identities require exact positive integers on all three boundaries (20.332647ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 772.813343

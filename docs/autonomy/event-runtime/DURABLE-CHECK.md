@@ -1,0 +1,9 @@
+# Durable fixed check wrapper (source-only)
+
+`run_check_once(database, repo_root, scope, timeout_seconds=30)` reserves the exact scope and fixed catalog command, commits STARTED, invokes the existing `check_executor.execute_check` once, then commits its exact receipt through the journal. Initialize the database explicitly outside the checkout; the journal's own writes must not dirty the tested tree. The only command remains the adapter test leaf, never the full verifier.
+
+`recover_completed_check(database, scope)` reads the journal-verified completed receipt without running a subprocess, claiming work or resetting state. A nonzero completed process retains its failed check row. A crash after completion can recover the exact receipt despite lost acknowledgment. A crash after STARTED leaves that identity consumed and the journal locked, even if execution had not yet begun. No timer, lease, automatic retry or resume exists.
+
+Executor or persistence errors attempt UNKNOWN settlement. If this also fails, the wrapper reports UNSETTLED with `persistConfirmed:false`, never fictitious durable success. Missing databases are not recreated. Invalid/dirty checkout detection happens after STARTED and therefore consumes that reservation conservatively.
+
+Tests run real fixed commands in synthetic clean Git repositories and use separate Python processes for crashes after STARTED and after COMPLETE. Recovery after COMPLETE works even after deleting the checkout, with byte-equivalent receipt data. This proves local composition and same-host storage behavior, not GitHub origin or remote delivery. No raw output or command body is persisted. Existing executor trust limitations apply: supplied checkout/code must be trusted; this is not a sandbox. All authentication, provenance and action-authority flags remain false. No workflow, remote calls or activation are introduced.
