@@ -57,10 +57,17 @@ class MockTransport:
         self.calls = []
         self.claimed = False
         self.competing = False
+        self.post_conflict = False
+        self.claim_timeout = False
         self.assignment_timeout = False
         self.assignment_http_error = False
+        self.assignment_response = None
         self.changed_after_claim = None
         self.changed_before_claim = None
+        self.changed_run_after_claim = None
+        self.advance_before_claim_post = False
+        self.advance_on_claim = False
+        self.now = 1000
     def __call__(self, method, path, payload):
         self.calls.append((method, path, copy.deepcopy(payload)))
         if path == issue_path and method == 'GET':
@@ -76,28 +83,42 @@ class MockTransport:
                 self.data[main_path]['object']['sha'] = 'b' * 40
             return copy.deepcopy(self.data[main_path])
         if path == 'actions/runs/' + str(run_id) and method == 'GET':
+            if self.claimed and self.changed_run_after_claim:
+                key, value = self.changed_run_after_claim
+                self.data[path][key] = value
             return copy.deepcopy(self.data[path])
         if path.startswith('git/ref/heads/native-copilot-claims/') and method == 'GET':
+            if self.advance_before_claim_post:
+                self.now = 3000
             if self.claimed or self.competing:
                 return {'ref': path.removeprefix('git/'), 'object': {'sha': base}}
             raise d.APIError(404)
         if path == 'git/refs' and method == 'POST':
-            if self.competing:
+            if self.post_conflict:
                 raise d.APIError(422)
             self.claimed = True
+            if self.advance_on_claim:
+                self.now = 3000
+            if self.claim_timeout:
+                raise TimeoutError('transport detail must stay private')
             return {'ref': payload['ref'], 'object': {'sha': payload['sha']}}
         if path == 'issues/717/assignees' and method == 'POST':
             if self.assignment_timeout:
                 raise TimeoutError('******')
             if self.assignment_http_error:
                 raise d.APIError(500)
-            return {'assignees': [{'login': d.ASSIGNEE}]}
+            return self.assignment_response or {
+                'number': 717, 'repository_url': repo_url,
+                'assignees': [{'login': d.ASSIGNEE}],
+            }
         raise AssertionError('unexpected request')
 
 def execute(mock, cfg=None, verified=True, now=1000):
+    if now is not None:
+        mock.now = now
     return d.execute(
         d.ApprovedTask.from_mapping(config if cfg is None else cfg),
-        mock, verified_user_token_auth=verified, now=now)
+        mock, verified_user_token_auth=verified, clock=lambda: mock.now)
 
 def output(**values):
     print(json.dumps(values, separators=(',', ':')))
@@ -147,6 +168,66 @@ output(**out)
   }
 });
 
+test('expiry is rechecked before claim and assignment using the live injected clock', () => {
+  const result = python(runPython + String.raw`
+out = {}
+m = MockTransport(); m.advance_before_claim_post = True
+out['before_claim'] = execute(m, now=None)
+assert out['before_claim']['status'] == 'EXPIRED'
+assert not m.claimed and not any(c[1] == 'git/refs' for c in m.calls)
+m = MockTransport(); m.advance_on_claim = True
+out['after_claim'] = execute(m)
+assert out['after_claim']['status'] == 'BLOCKED_CLAIMED'
+assert m.claimed and not any(c[1] == 'issues/717/assignees' for c in m.calls)
+output(**out)
+`);
+  assert.equal(result.before_claim.status, 'EXPIRED');
+  assert.equal(result.after_claim.status, 'BLOCKED_CLAIMED');
+});
+
+test('source run is reread after claim and any changed run binding blocks assignment', () => {
+  const result = python(runPython + String.raw`
+out = {}
+for key, value in (
+    ('run_attempt', 3), ('status', 'in_progress'), ('conclusion', 'failure'),
+    ('head_sha', 'b' * 40), ('workflow_id', 999), ('actor', {'login': 'other'}),
+):
+    m = MockTransport(); m.changed_run_after_claim = (key, value)
+    out[key] = execute(m)
+    assert m.claimed
+    assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
+output(**out)
+`);
+  for (const status of Object.values(result)) assert.equal(status.status, 'BLOCKED_CLAIMED');
+});
+
+test('assignment response must bind the requested issue and repository', () => {
+  const result = python(runPython + String.raw`
+out = {}
+for key, value in (
+    ('number', 999), ('repository_url', 'https://api.github.com/repos/other/repo'),
+    ('pull_request', {'url': 'https://api.github.com/repos/Achi1984/meridian/pulls/717'}),
+    ('assignees', [{'login': d.ASSIGNEE}, {'login': d.ASSIGNEE}]),
+    ('assignees', [{'login': 'someone-else'}]),
+):
+    m = MockTransport()
+    m.assignment_response = {
+        'number': 717, 'repository_url': repo_url,
+        'assignees': [{'login': d.ASSIGNEE}],
+    }
+    if value is None:
+        m.assignment_response.pop(key)
+    else:
+        m.assignment_response[key] = value
+    out[key + str(value)] = execute(m)
+    assert out[key + str(value)]['status'] == 'UNKNOWN' and m.claimed
+    assert execute(m)['status'] == 'CLAIMED'
+    assert len([c for c in m.calls if c[1] == 'issues/717/assignees']) == 1
+output(**out)
+`);
+  assert.ok(Object.values(result).every((status) => status.status === 'UNKNOWN'));
+});
+
 test('strictly rejects malformed configuration, wrong run bindings, expiry, and assigned issues', () => {
   const result = python(runPython + String.raw`
 out = {}
@@ -189,7 +270,13 @@ test('missing verified auth capability, competing claims, and uncertain assignme
   const result = python(runPython + String.raw`
 out = {}
 m = MockTransport(); out['inactive'] = execute(m, verified=False); assert not m.calls
-m = MockTransport(); m.competing = True; out['competing'] = execute(m)
+m = MockTransport(); m.post_conflict = True; out['competing'] = execute(m)
+assert any(c[1] == 'git/refs' and c[0] == 'POST' for c in m.calls)
+assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
+m = MockTransport(); m.claim_timeout = True; out['claim_timeout'] = execute(m)
+assert m.claimed and out['claim_timeout']['status'] == 'UNKNOWN'
+assert execute(m)['status'] == 'CLAIMED'
+assert len([c for c in m.calls if c[1] == 'git/refs' and c[0] == 'POST']) == 1
 assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
 m = MockTransport(); m.assignment_timeout = True; out['timeout'] = execute(m)
 assert m.claimed

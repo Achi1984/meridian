@@ -159,6 +159,22 @@ class _Blocked(Exception):
     pass
 
 
+class _Expired(Exception):
+    pass
+
+
+def _check_authorization(task, clock):
+    try:
+        current_time = clock()
+    except Exception:
+        raise _Blocked() from None
+    if (type(current_time) not in (int, float) or type(current_time) is bool
+            or not math.isfinite(current_time)):
+        raise _Blocked()
+    if current_time >= task.authorization_expires_at:
+        raise _Expired()
+
+
 def _verified_run(client, task):
     run = client.request('GET', 'actions/runs/{}'.format(task.release_run_id))
     repository = run.get('repository')
@@ -214,11 +230,30 @@ def _verified_main(client, task):
         raise _Blocked()
 
 
+def _verified_assignment_response(result, task):
+    if (type(result.get('number')) is not int
+            or result['number'] != task.issue_number
+            or result.get('repository_url') != 'https://api.github.com/repos/' + task.repository
+            or 'pull_request' in result):
+        raise ValueError('assignment response identity mismatch')
+    assignees = result.get('assignees')
+    if type(assignees) is not list or len(assignees) > MAX_ASSIGNEES + 1:
+        raise ValueError('assignment response invalid')
+    logins = []
+    for assignee in assignees:
+        if type(assignee) is not dict or type(assignee.get('login')) is not str:
+            raise ValueError('assignment response invalid')
+        logins.append(assignee['login'])
+    expected = sorted((*task.expected_assignees, ASSIGNEE))
+    if len(set(logins)) != len(logins) or sorted(logins) != expected:
+        raise ValueError('assignment response mismatch')
+
+
 def _response(status, operation_id):
     return {'status': status, 'operationId': operation_id}
 
 
-def execute(task, transport, *, verified_user_token_auth=False, now=None):
+def execute(task, transport, *, verified_user_token_auth=False, clock=None):
     """Execute at most one assignment; never retry an ambiguous operation.
 
     `verified_user_token_auth` is an activation assertion supplied only after an
@@ -233,14 +268,12 @@ def execute(task, transport, *, verified_user_token_auth=False, now=None):
         operation_id = _operation_id(task)
         if type(verified_user_token_auth) is not bool or not verified_user_token_auth:
             return _response('INACTIVE', operation_id)
-        if now is None:
+        if clock is None:
             import time
-            now = time.time()
-        if (type(now) not in (int, float) or type(now) is bool
-                or not math.isfinite(now)):
+            clock = time.time
+        if not callable(clock):
             raise _Blocked()
-        if now >= task.authorization_expires_at:
-            return _response('EXPIRED', operation_id)
+        _check_authorization(task, clock)
 
         client = _Client(transport)
         _verified_run(client, task)
@@ -255,6 +288,13 @@ def execute(task, transport, *, verified_user_token_auth=False, now=None):
                 raise
         else:
             return _response('CLAIMED', operation_id)
+
+        try:
+            _check_authorization(task, clock)
+        except _Expired:
+            return _response('EXPIRED', operation_id)
+        except Exception:
+            return _response('BLOCKED', operation_id)
 
         try:
             created = client.request('POST', 'git/refs', {
@@ -272,8 +312,14 @@ def execute(task, transport, *, verified_user_token_auth=False, now=None):
             return _response('UNKNOWN', operation_id)
 
         try:
+            _verified_run(client, task)
             _verified_issue(client, task)
             _verified_main(client, task)
+        except Exception:
+            return _response('BLOCKED_CLAIMED', operation_id)
+
+        try:
+            _check_authorization(task, clock)
         except Exception:
             return _response('BLOCKED_CLAIMED', operation_id)
 
@@ -281,12 +327,10 @@ def execute(task, transport, *, verified_user_token_auth=False, now=None):
         result = client.request('POST', 'issues/{}/assignees'.format(task.issue_number), {
             'assignees': [ASSIGNEE],
         })
-        result_assignees = result.get('assignees')
-        if type(result_assignees) is not list or not any(
-                type(item) is dict and item.get('login') == ASSIGNEE
-                for item in result_assignees):
-            return _response('UNKNOWN', operation_id)
+        _verified_assignment_response(result, task)
         return _response('ASSIGNED', operation_id)
+    except _Expired:
+        return _response('EXPIRED', operation_id)
     except APIError:
         if assigning:
             return _response('UNKNOWN', operation_id)
