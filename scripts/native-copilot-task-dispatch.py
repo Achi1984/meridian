@@ -360,6 +360,13 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None,
             return _response('BLOCKED', operation_id)
 
         try:
+            _check_authorization(task, clock)
+        except _Expired:
+            return _response('EXPIRED', operation_id)
+        except Exception:
+            return _response('BLOCKED', operation_id)
+
+        try:
             created = client.request('POST', 'git/refs', {
                 'ref': claim_ref, 'sha': task.expected_main_sha,
             })

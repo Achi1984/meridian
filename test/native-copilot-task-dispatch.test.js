@@ -195,6 +195,34 @@ output(**out)
   assert.equal(result.after_claim.status, 'BLOCKED_CLAIMED');
 });
 
+test('expiry during durable consume keeps the local fence and prevents the claim POST', () => {
+  const result = python(runPython + String.raw`
+m = MockTransport()
+consume = d.SQLiteAttemptJournal.consume
+def slow_consume(journal, operation_id):
+    consumed = consume(journal, operation_id)
+    m.now = 3000
+    return consumed
+d.SQLiteAttemptJournal.consume = slow_consume
+try:
+    first = execute(m)
+finally:
+    d.SQLiteAttemptJournal.consume = consume
+claim_posts = [c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs']
+assert first['status'] == 'EXPIRED'
+assert not claim_posts
+assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
+m.now = 1000
+second = execute(m, journal=d.SQLiteAttemptJournal(m.journal_path))
+assert second['status'] == 'FENCED'
+assert len([c for c in m.calls if c[0] == 'POST' and c[1] == 'git/refs']) == 0
+assert not any(c[0] == 'POST' and c[1] == 'issues/717/assignees' for c in m.calls)
+output(first=first, second=second)
+`);
+  assert.equal(result.first.status, 'EXPIRED');
+  assert.equal(result.second.status, 'FENCED');
+});
+
 test('source run is reread after claim and any changed run binding blocks assignment', () => {
   const result = python(runPython + String.raw`
 out = {}
