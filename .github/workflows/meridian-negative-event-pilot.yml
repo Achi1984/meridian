@@ -1,7 +1,6 @@
-# INACTIVE TEMPLATE. Merely storing this file does not install a workflow.
-# Installation and literal source pins require a separately reviewed owner decision.
-# NEGATIVE transport probe: expected stale-base rejection, not accepted CI evidence.
-# Install only after explicit owner activation approval; see NEGATIVE-PILOT-20261012.md.
+# Temporary listener once merged to default main; explicitly owner-approved.
+# Negative transport probe only; remove after the single authorized observation.
+# Procedure: docs/autonomy/event-receiver/NEGATIVE-PILOT-20261012.md.
 name: MERIDIAN Bounded Read Only Event Pilot
 on:
   workflow_run:
@@ -14,7 +13,7 @@ permissions:
   pull-requests: read
 jobs:
   reconcile:
-    # This file is inactive under docs; installation requires owner approval.
+    # Installed listener; only the approved source attempt may reach the collector.
     # The pin is one independently verified CI run; no caller-selected inputs.
     if: >-
       github.repository == 'Achi1984/meridian' &&
@@ -48,12 +47,3 @@ jobs:
           RECEIPT_PATH: ${{ runner.temp }}/meridian-event-receipt.json
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 -I -B "$RUNNER_TEMP/collector.py"
-      - name: Retain typed receipt without source payloads
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: meridian-pilot-receipt-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/meridian-event-receipt.json
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: false
-
