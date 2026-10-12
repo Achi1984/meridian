@@ -7,6 +7,10 @@ that this assignment API does not accept an App installation token or Actions
 GITHUB_TOKEN. This module neither obtains credentials nor infers auth capability
 from token text; there is no fallback to publisher App credentials.
 
+Issue assignment uses GitHub's public-preview REST `agent_assignment` fields.
+`base_branch: main` pins a branch name, not a commit: `main` can move after the
+last read, and GitHub does not provide an atomic SHA snapshot for this assignment.
+
 The injected transport is a trust boundary: its caller must provide the verified
 user-token authentication prerequisite. This source adds no permissions and
 does not install or schedule any automation.
@@ -16,7 +20,9 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+import os
 import re
+import sqlite3
 import sys
 
 
@@ -116,6 +122,51 @@ def _operation_id(task):
         separators=(',', ':'), ensure_ascii=True,
     )
     return hashlib.sha256(stable_identity.encode('ascii')).hexdigest()[:24]
+
+
+class SQLiteAttemptJournal:
+    """Durable one-shot fence; callers must retain its database indefinitely.
+
+    Use an absolute path on stable, access-controlled storage that survives
+    process and machine restarts. SQLite serializes competing writers; a
+    successful `consume` commits with FULL synchronous durability before the
+    remote claim is attempted. Never delete, replace, roll back, or restore this
+    database from a snapshot that predates a consumed operation. Disposable
+    runner storage does not provide the required replay-safety guarantee.
+    """
+
+    __slots__ = ('_path',)
+
+    def __init__(self, path):
+        if (type(path) is not str or not os.path.isabs(path)
+                or path == ':memory:' or path.startswith('file:')):
+            raise ValueError('invalid journal path')
+        self._path = os.path.abspath(path)
+
+    def consume(self, operation_id):
+        if type(operation_id) is not str or not re.fullmatch(r'[0-9a-f]{24}', operation_id):
+            raise ValueError('invalid operation')
+        connection = sqlite3.connect(
+            self._path, timeout=10, isolation_level=None)
+        try:
+            connection.execute('PRAGMA journal_mode=DELETE')
+            connection.execute('PRAGMA synchronous=FULL')
+            connection.execute('BEGIN IMMEDIATE')
+            connection.execute(
+                'CREATE TABLE IF NOT EXISTS consumed_operations '
+                '(operation_id TEXT PRIMARY KEY) WITHOUT ROWID')
+            cursor = connection.execute(
+                'INSERT OR IGNORE INTO consumed_operations (operation_id) VALUES (?)',
+                (operation_id,))
+            consumed = cursor.rowcount == 1
+            connection.execute('COMMIT')
+            return consumed
+        except Exception:
+            if connection.in_transaction:
+                connection.execute('ROLLBACK')
+            raise
+        finally:
+            connection.close()
 
 
 def _claim_ref(task):
@@ -253,12 +304,16 @@ def _response(status, operation_id):
     return {'status': status, 'operationId': operation_id}
 
 
-def execute(task, transport, *, verified_user_token_auth=False, clock=None):
+def execute(task, transport, *, verified_user_token_auth=False, clock=None,
+            attempt_journal=None):
     """Execute at most one assignment; never retry an ambiguous operation.
 
     `verified_user_token_auth` is an activation assertion supplied only after an
     external owner verifies that `transport` uses an eligible user-to-server
     token. Token syntax is neither checked nor accepted by this component.
+    Active execution requires an explicit SQLiteAttemptJournal on stable storage.
+    Its operation fence is committed before the first remote mutation and has no
+    supported reset or retention-expiry path.
     """
     operation_id = None
     claimed = False
@@ -268,6 +323,8 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None):
         operation_id = _operation_id(task)
         if type(verified_user_token_auth) is not bool or not verified_user_token_auth:
             return _response('INACTIVE', operation_id)
+        if type(attempt_journal) is not SQLiteAttemptJournal:
+            raise _Blocked()
         if clock is None:
             import time
             clock = time.time
@@ -293,6 +350,12 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None):
             _check_authorization(task, clock)
         except _Expired:
             return _response('EXPIRED', operation_id)
+        except Exception:
+            return _response('BLOCKED', operation_id)
+
+        try:
+            if not attempt_journal.consume(operation_id):
+                return _response('FENCED', operation_id)
         except Exception:
             return _response('BLOCKED', operation_id)
 
@@ -326,6 +389,10 @@ def execute(task, transport, *, verified_user_token_auth=False, clock=None):
         assigning = True
         result = client.request('POST', 'issues/{}/assignees'.format(task.issue_number), {
             'assignees': [ASSIGNEE],
+            'agent_assignment': {
+                'target_repo': task.repository,
+                'base_branch': 'main',
+            },
         })
         _verified_assignment_response(result, task)
         return _response('ASSIGNED', operation_id)

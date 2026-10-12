@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const helper = fileURLToPath(new URL('../scripts/native-copilot-task-dispatch.py', import.meta.url));
 
 const runPython = String.raw`
-import copy, hashlib, importlib.util, json
+import copy, hashlib, importlib.util, json, os, tempfile
 spec = importlib.util.spec_from_file_location('dispatcher', HELPER)
 d = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(d)
@@ -59,6 +59,7 @@ class MockTransport:
         self.competing = False
         self.post_conflict = False
         self.claim_timeout = False
+        self.claim_timeout_before_persist = False
         self.assignment_timeout = False
         self.assignment_http_error = False
         self.assignment_response = None
@@ -68,6 +69,9 @@ class MockTransport:
         self.advance_before_claim_post = False
         self.advance_on_claim = False
         self.now = 1000
+        self.journal_dir = tempfile.TemporaryDirectory()
+        self.journal_path = os.path.join(self.journal_dir.name, 'attempts.sqlite3')
+        self.journal = d.SQLiteAttemptJournal(self.journal_path)
     def __call__(self, method, path, payload):
         self.calls.append((method, path, copy.deepcopy(payload)))
         if path == issue_path and method == 'GET':
@@ -96,6 +100,8 @@ class MockTransport:
         if path == 'git/refs' and method == 'POST':
             if self.post_conflict:
                 raise d.APIError(422)
+            if self.claim_timeout_before_persist:
+                raise TimeoutError('transport detail must stay private')
             self.claimed = True
             if self.advance_on_claim:
                 self.now = 3000
@@ -113,12 +119,13 @@ class MockTransport:
             }
         raise AssertionError('unexpected request')
 
-def execute(mock, cfg=None, verified=True, now=1000):
+def execute(mock, cfg=None, verified=True, now=1000, journal=None):
     if now is not None:
         mock.now = now
     return d.execute(
         d.ApprovedTask.from_mapping(config if cfg is None else cfg),
-        mock, verified_user_token_auth=verified, clock=lambda: mock.now)
+        mock, verified_user_token_auth=verified, clock=lambda: mock.now,
+        attempt_journal=mock.journal if journal is None else journal)
 
 def output(**values):
     print(json.dumps(values, separators=(',', ':')))
@@ -141,7 +148,10 @@ posts = [call for call in m.calls if call[0] == 'POST' and call[1] == 'issues/71
 claim_posts = [call for call in m.calls if call[0] == 'POST' and call[1] == 'git/refs']
 assert first['status'] == 'ASSIGNED'
 assert second['status'] == 'CLAIMED'
-assert len(posts) == 1 and posts[0][2] == {'assignees': [d.ASSIGNEE]}
+assert len(posts) == 1 and posts[0][2] == {
+    'assignees': [d.ASSIGNEE],
+    'agent_assignment': {'target_repo': d.REPOSITORY, 'base_branch': 'main'},
+}
 assert len(claim_posts) == 1 and m.claimed
 assert first_count <= d.MAX_REQUESTS
 assert len(m.calls) - first_count <= d.MAX_REQUESTS
@@ -270,12 +280,24 @@ test('missing verified auth capability, competing claims, and uncertain assignme
   const result = python(runPython + String.raw`
 out = {}
 m = MockTransport(); out['inactive'] = execute(m, verified=False); assert not m.calls
+m = MockTransport(); out['missing_journal'] = d.execute(
+    d.ApprovedTask.from_mapping(config), m, verified_user_token_auth=True,
+    clock=lambda: m.now)
+assert out['missing_journal']['status'] == 'BLOCKED' and not m.calls
 m = MockTransport(); m.post_conflict = True; out['competing'] = execute(m)
-assert any(c[1] == 'git/refs' and c[0] == 'POST' for c in m.calls)
+assert len([c for c in m.calls if c[1] == 'git/refs' and c[0] == 'POST']) == 1
+assert any(c[1].startswith('git/ref/heads/native-copilot-claims/') and c[0] == 'GET' for c in m.calls)
 assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
 m = MockTransport(); m.claim_timeout = True; out['claim_timeout'] = execute(m)
 assert m.claimed and out['claim_timeout']['status'] == 'UNKNOWN'
 assert execute(m)['status'] == 'CLAIMED'
+assert len([c for c in m.calls if c[1] == 'git/refs' and c[0] == 'POST']) == 1
+assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
+m = MockTransport(); m.claim_timeout_before_persist = True
+out['claim_timeout_before_persist'] = execute(m)
+assert out['claim_timeout_before_persist']['status'] == 'UNKNOWN' and not m.claimed
+reopened_journal = d.SQLiteAttemptJournal(m.journal_path)
+assert execute(m, journal=reopened_journal)['status'] == 'FENCED'
 assert len([c for c in m.calls if c[1] == 'git/refs' and c[0] == 'POST']) == 1
 assert not any(c[1] == 'issues/717/assignees' for c in m.calls)
 m = MockTransport(); m.assignment_timeout = True; out['timeout'] = execute(m)
@@ -293,6 +315,8 @@ output(**out)
   assert.equal(result.inactive.status, 'INACTIVE');
   assert.equal(result.competing.status, 'CLAIMED');
   assert.equal(result.timeout.status, 'UNKNOWN');
+  assert.equal(result.missing_journal.status, 'BLOCKED');
+  assert.equal(result.claim_timeout_before_persist.status, 'UNKNOWN');
   assert.doesNotMatch(JSON.stringify(result), /SECRET|Bearer|TimeoutError/);
 });
 
