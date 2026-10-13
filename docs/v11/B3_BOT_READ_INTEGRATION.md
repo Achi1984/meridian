@@ -38,8 +38,11 @@ real-account and iPhone/Safari validation remain outstanding.
 Review 5499081564 reports zero open findings but is COMMENTED, not APPROVED;
 it requests exact-head CI and human validation. The complete PR now spans
 14 files after adding the B3 history-browser expectation correction.
-No local browser was run. This documentation-only follow-up changes the head,
-so its own exact-head CI/review must still be checked before activation.
+No local browser was run. Later follow-ups include evidence documentation,
+visible controlled-preview copy in v11/index.html, and matching version/history
+test contracts. Runtime JavaScript modules are unchanged by those follow-ups.
+Every resulting head requires its own CI and review before activation; the
+historical run above does not substitute for validation of a later head.
 
 ENGINE_BRIDGE_READINESS.md's historical BLOCKED engine assessment is unchanged.
 This isolated bot consumer proves neither V9 engine parity nor Safari/iPhone/PWA
