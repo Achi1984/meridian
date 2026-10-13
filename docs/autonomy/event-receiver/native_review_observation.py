@@ -11,6 +11,25 @@ def positive_id(value):
     return type(value) is int and 0 < value < 2**63
 
 
+def validate_expected(expected_raw):
+    """Validate the complete pinned scope before transport construction."""
+    need(type(expected_raw) is bytes and len(expected_raw) <= 16384, "INPUT")
+    expected = obj(decode(expected_raw))
+    need(set(expected) == {"scope", "review"}, "INPUT")
+    scope, review = obj(expected["scope"]), obj(expected["review"])
+    need(set(scope) == {"prNumber", "headSha", "baseSha", "ci"}, "INPUT")
+    need(positive_id(scope["prNumber"]) and sha(scope["headSha"]) and sha(scope["baseSha"]), "INPUT")
+    ci = obj(scope["ci"])
+    need(set(ci) == {"runId", "runAttempt", "workflowId", "headSha"}, "INPUT")
+    need(all(positive_id(ci[k]) for k in ("runId", "runAttempt", "workflowId")), "INPUT")
+    need(ci["workflowId"] == 347821227 and ci["headSha"] == scope["headSha"], "INPUT")
+    need(set(review) == {"id", "submittedAt", "bodySha256"}, "INPUT")
+    need(positive_id(review["id"]), "INPUT")
+    need(type(review["submittedAt"]) is str and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", review["submittedAt"]), "INPUT")
+    need(type(review["bodySha256"]) is str and re.fullmatch("[0-9a-f]{64}", review["bodySha256"]), "INPUT")
+    return expected
+
+
 def observe_native_review(expected_raw, api):
     """api is an injected GET-only reader, not an authenticated transport claim.
 
@@ -22,20 +41,8 @@ def observe_native_review(expected_raw, api):
                   dispatchAllowed=False, mergeAllowed=False, durable=False,
                   fullReviewEvidence=False, plannerResponse=None, observation=None)
     try:
-        need(type(expected_raw) is bytes and len(expected_raw) <= 16384, "INPUT")
-        expected = obj(decode(expected_raw))
-        need(set(expected) == {"scope", "review"}, "INPUT")
-        scope, review = obj(expected["scope"]), obj(expected["review"])
-        need(set(scope) == {"prNumber", "headSha", "baseSha", "ci"}, "INPUT")
-        need(positive_id(scope["prNumber"]) and sha(scope["headSha"]) and sha(scope["baseSha"]), "INPUT")
-        ci = obj(scope["ci"])
-        need(set(ci) == {"runId", "runAttempt", "workflowId", "headSha"}, "INPUT")
-        need(all(positive_id(ci[k]) for k in ("runId", "runAttempt", "workflowId")), "INPUT")
-        need(ci["workflowId"] == 347821227 and ci["headSha"] == scope["headSha"], "INPUT")
-        need(set(review) == {"id", "submittedAt", "bodySha256"}, "INPUT")
-        need(positive_id(review["id"]), "INPUT")
-        need(type(review["submittedAt"]) is str and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", review["submittedAt"]), "INPUT")
-        need(type(review["bodySha256"]) is str and re.fullmatch("[0-9a-f]{64}", review["bodySha256"]), "INPUT")
+        expected = validate_expected(expected_raw)
+        scope, review = expected["scope"], expected["review"]
         path = "pulls/" + str(scope["prNumber"]) + "/reviews/" + str(review["id"])
 
         def check_run(path):
