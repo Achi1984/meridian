@@ -1,0 +1,198 @@
+{
+  "schema": "OHLCV_PREPARATION_V1",
+  "executionAuthorized": false,
+  "strategyEvaluated": false,
+  "historicalPublicationVerified": false,
+  "identityVerified": false,
+  "quoteCurrency": "USDT",
+  "eurConverted": false,
+  "sourceAudit": "../warmup-history-audit-20241013.json",
+  "columns": [
+    "openTimeMs",
+    "exclusiveCloseTimeMs",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volumeBaseAsset"
+  ],
+  "availabilityMeaning": "CURRENT_ARCHIVE_RECEIPT_ONLY",
+  "assets": [
+    {
+      "symbol": "BTC",
+      "file": "BTC.json",
+      "rows": 201,
+      "sha256": "5997e3f495eed29d20a01c4c791b5f9ae169a13a73357c80515e989df6782d9e"
+    },
+    {
+      "symbol": "ETH",
+      "file": "ETH.json",
+      "rows": 201,
+      "sha256": "7cad90a3340e7c61b25a21278c6869d3827b4886cb782de3ca5203956799c580"
+    },
+    {
+      "symbol": "BNB",
+      "file": "BNB.json",
+      "rows": 201,
+      "sha256": "c52c00fa23d1576557e4cbc7f4908c0d54c2fe20687ade83f88a4ab1f0ac2759"
+    },
+    {
+      "symbol": "SOL",
+      "file": "SOL.json",
+      "rows": 201,
+      "sha256": "7bf02f02df8c4a369826011deb202608dd53e8b91f332d55dc5b73eebd1b8fb0"
+    },
+    {
+      "symbol": "XRP",
+      "file": "XRP.json",
+      "rows": 201,
+      "sha256": "82b1e9705986a213ab7fd9481cbe5d6151dbbec81646a291074fd2764780b3e1"
+    },
+    {
+      "symbol": "DOGE",
+      "file": "DOGE.json",
+      "rows": 201,
+      "sha256": "b7e0f5d5789f5b099c75aff912230a6f7e674e2e2f4346d471940a52fd782e91"
+    },
+    {
+      "symbol": "TRX",
+      "file": "TRX.json",
+      "rows": 201,
+      "sha256": "72e632947433c8c226d773f335e09221ff71535f7408bc55941c2ed60e361a49"
+    },
+    {
+      "symbol": "ADA",
+      "file": "ADA.json",
+      "rows": 201,
+      "sha256": "4c417a590b5e89cae47ad5aeae5837091a1d934b13a4a8a51a4a0de5380721b8"
+    },
+    {
+      "symbol": "AVAX",
+      "file": "AVAX.json",
+      "rows": 201,
+      "sha256": "2bcc70cc3814ad97eb47910b16f8be9ef4f6e37aa987a2cb7458b875b2a01fa2"
+    },
+    {
+      "symbol": "SHIB",
+      "file": "SHIB.json",
+      "rows": 201,
+      "sha256": "e895a0b9c2015a58a2d72e862e22f55f5bea3e78698d4b08c06f8a63396adee7"
+    },
+    {
+      "symbol": "LINK",
+      "file": "LINK.json",
+      "rows": 201,
+      "sha256": "9c82315912ee7c837d7dfab89be25ffd68ab7aa6201283def53affcf7b67d40f"
+    },
+    {
+      "symbol": "SUI",
+      "file": "SUI.json",
+      "rows": 201,
+      "sha256": "3353be7443b0db93ad9dc40e593307a5eae0fd2ae2c3036588dc283da46d6a40"
+    },
+    {
+      "symbol": "BCH",
+      "file": "BCH.json",
+      "rows": 201,
+      "sha256": "7f0ded92814fb11377fd6093c55029e4401d8ea7a533749784b4d58aadb64ff4"
+    },
+    {
+      "symbol": "DOT",
+      "file": "DOT.json",
+      "rows": 201,
+      "sha256": "a89583f190f967817d5074c862be77a4693925fbd220198cd93b420ec910bdc4"
+    },
+    {
+      "symbol": "NEAR",
+      "file": "NEAR.json",
+      "rows": 201,
+      "sha256": "536db4a77d53eb7f64f86d2a39b82cfbbb73dfeeca19a3179c1ce97655c8e88e"
+    },
+    {
+      "symbol": "APT",
+      "file": "APT.json",
+      "rows": 201,
+      "sha256": "2102c4c3aed44fba2d6c1b0792e4e348e3819f0c03d06fbbfffd5c7686dd6057"
+    },
+    {
+      "symbol": "LTC",
+      "file": "LTC.json",
+      "rows": 201,
+      "sha256": "10e3bbc4c9891a7592a1f4aaa9777ee56708ca7ec4c1bd6c4108eecf2005f0cb"
+    },
+    {
+      "symbol": "UNI",
+      "file": "UNI.json",
+      "rows": 201,
+      "sha256": "df50737271f86d8effeb8730cf3e790e013e3fe8117b4f66853ce85f11e2a1d3"
+    },
+    {
+      "symbol": "PEPE",
+      "file": "PEPE.json",
+      "rows": 201,
+      "sha256": "7d8855629dd123ffaa0c5a6c45074688952bc319ef38eb52781b0214e6c3df0d"
+    },
+    {
+      "symbol": "ICP",
+      "file": "ICP.json",
+      "rows": 201,
+      "sha256": "1f2607270fba8f92ee03d6ec10f393e82bc541aeeb391608ad1ce6f5ccf245b3"
+    },
+    {
+      "symbol": "FET",
+      "file": "FET.json",
+      "rows": 201,
+      "sha256": "0c3d7b57c627fd6edb5403d76adef0e229a459c297c98696e2c2199e6a2212aa"
+    }
+  ],
+  "assetCount": 21,
+  "totalRows": 4221,
+  "excluded": [
+    {
+      "symbol": "TON",
+      "rows": 67,
+      "missing": [
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07"
+      ]
+    },
+    {
+      "symbol": "LEO",
+      "rows": 0,
+      "missing": [
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10"
+      ]
+    },
+    {
+      "symbol": "TAO",
+      "rows": 186,
+      "missing": [
+        "2024-03"
+      ]
+    },
+    {
+      "symbol": "KAS",
+      "rows": 0,
+      "missing": [
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10"
+      ]
+    }
+  ]
+}
