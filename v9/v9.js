@@ -206,7 +206,23 @@ async function fetchTimed(url,options={},timeoutMs=FETCH_TIMEOUT_MS){
 }
 async function getJson(path){const r=await fetchTimed(API_BASE+path,{cache:'no-store',headers:{accept:'application/json',...(token()?{authorization:'Bearer '+token()}:{})}},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function postJson(path,body={}){const r=await fetchTimed(API_BASE+path,{method:'POST',cache:'no-store',headers:{accept:'application/json','content-type':'application/json',...(token()?{authorization:'Bearer '+token()}:{})},body:JSON.stringify(body)},10000);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
-async function manageAssetWatchShare(action='rotate'){const j=await postJson('/api/private/asset-watch-share',{action});return{...j,shareUrl:j?.sharePath?API_BASE+j.sharePath:null}}
+async function manageAssetWatchShare(action='rotate',credential,signal){
+ if(credential!==undefined&&typeof credential!=='string')throw new Error('invalid_read_access');
+ if(!['rotate','revoke'].includes(action))throw new Error('invalid_action');
+ let access=credential===undefined?token():String(credential).trim();
+ if(credential!==undefined&&(!access||access.length>4096||/[\x00-\x1f\x7f]/.test(access)||/^(?:[a-z][a-z0-9+.-]*:|\/\/|www\.)/i.test(access)))throw new Error('invalid_read_access');
+ if(API_BASE!=='https://p01--achi-meridian--ttvk44grdlp7.code.run')throw new Error('invalid_endpoint');
+ credential=undefined;
+ const controller=new AbortController(),abort=()=>controller.abort();
+ const timer=setTimeout(abort,10000);
+ if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+ try{
+  const pending=fetch(API_BASE+'/api/private/asset-watch-share',{method:'POST',cache:'no-store',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',signal:controller.signal,headers:{accept:'application/json','content-type':'application/json',...(access?{authorization:'Bearer '+access}:{})},body:JSON.stringify({action})});
+  access='';const response=await pending;
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const j=await response.json();return{...j,shareUrl:j?.sharePath?API_BASE+j.sharePath:null};
+ }finally{access='';clearTimeout(timer);signal?.removeEventListener('abort',abort)}
+}
 const PORTFOLIO_TICKER_CACHE_MS=25000;
 let portfolioTickerCache={at:0,rows:null};
 async function portfolioSpotTickers(){
