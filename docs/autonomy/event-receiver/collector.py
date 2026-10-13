@@ -44,7 +44,7 @@ def obj(value):
 
 def repository(value):
     value = obj(value)
-    need(value.get("full_name") == REPO and value.get("id") == REPO_ID
+    need(value.get("full_name") == REPO and integer(value.get("id")) and value.get("id") == REPO_ID
          and value.get("fork") is False, "REPOSITORY_SCOPE")
 
 
@@ -347,3 +347,4 @@ def cli():
 
 if __name__ == "__main__":
     cli()
+
