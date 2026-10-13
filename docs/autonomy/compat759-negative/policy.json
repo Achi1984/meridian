@@ -1,0 +1,32 @@
+{
+  "requiredChecks": [
+    {
+      "commandSha256": "202ca54695ef2cc54cc209bd516058e9b5f4a44dc11514046dd7ffd8f31d94b3",
+      "id": "current-pins"
+    },
+    {
+      "commandSha256": "6f3cc61a4b2b9cc205804d6b2529875de9160609ba843cf502e6f0f804349b6b",
+      "id": "complete-diff"
+    },
+    {
+      "commandSha256": "c10c71ba221fec8483c0a65530dfb54ee1a47e4bf38418ec63f81776bb92c89c",
+      "id": "current-ci"
+    },
+    {
+      "commandSha256": "b19e0a7d1351363b57032669c283dc226ab182c427542f7fa7241afa6d94b4f2",
+      "id": "scope-contract-tests"
+    },
+    {
+      "commandSha256": "90d6d4ec39a942fb2511ec480cb2450a6b4ad48ff7d24e404cc63608516d36d1",
+      "id": "continuity"
+    },
+    {
+      "commandSha256": "45ccb749c34f5cf8d7503ecd5a41a01c335d0b399ba87b7f99be4d7b18e16239",
+      "id": "frozen-guard"
+    },
+    {
+      "commandSha256": "c128363f691cf9576df72cf0aa26e9fcf5bc7520c7fa77e1222e07aeea038f96",
+      "id": "orchestration"
+    }
+  ]
+}

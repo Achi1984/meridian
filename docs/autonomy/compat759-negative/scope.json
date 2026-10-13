@@ -1,0 +1,14 @@
+{
+  "baseSha": "5aee595821666853d5f427785439e64474b1a838",
+  "ci": {
+    "headSha": "db0d0472f9151c98d8ee701f25ffbc6f7d2bda2d",
+    "runAttempt": 1,
+    "runId": 38448468207,
+    "workflowId": 347821227
+  },
+  "headSha": "db0d0472f9151c98d8ee701f25ffbc6f7d2bda2d",
+  "opId": "compat759-publication-test",
+  "prNumber": 759,
+  "repository": "Achi1984/meridian",
+  "requestId": "compat759-v2-negative"
+}
