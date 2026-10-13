@@ -43,8 +43,15 @@ No-fill events advance only lifecycle after account validation. Inputs are not m
 Caller must persist/restore both states together. This function supplies no disk
 transaction, locking, compare-and-swap, reservation or concurrent-write protection.
 
-This is not production safety infrastructure. Both inherited 10,000-ID capacity
-limits remain: exhaustion can block even a protective stop. Ledger overflow or
-malformed inputs can likewise leave the prior open position unchanged. No emergency
-execution path exists here. Modeled stress risk is not maximum loss, and indicative
-quotes are not guaranteed fills. Synthetic tests establish only composition behavior.
+This is not production safety infrastructure. The normal10,000-ID budgets now have
+bounded close-only reserves: three lifecycle IDs and50ledger fill IDs. The bridge
+accepts the complete ledger history up to10,050 and checks remaining close headroom.
+An existing position at both normal caps can stop-close atomically without losing
+history. Non-closing lifecycle quotes cannot consume reserve. One exit signal plus
+its quote fits; after that signal expires, the last lifecycle slot still supports
+a stop but not another two-ID exit signal. Entries remain blocked at exhausted
+budgets, even after closure; no history is discarded and no TTL extended.
+Malformed state, bad quotes, ledger overflow or other checks can still reject a
+stop and retain the prior position. This reserve is not an emergency execution path
+or continuous operation guarantee. Modeled stress risk is not maximum loss, and
+indicative quotes are not guaranteed fills. Tests establish composition behavior only.

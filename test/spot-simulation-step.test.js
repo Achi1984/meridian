@@ -36,10 +36,19 @@ test('replayed ledger fill rolls back candidate buy',()=>{
   const b=pending();b.account.processedFillIds=['q20'];
   assert.match(reject(b,quote()).errors[0],/FILL_ALREADY_PROCESSED/);
 });
-test('ledger history capacity blocks stop without deleting lots',()=>{
+test('both normal ID caps allow atomic stop close without discarding history',()=>{
   const b=long();b.account.processedFillIds=Array.from({length:10000},(_,i)=>`f${i}`);
-  assert.match(reject(b,quote(30,70,71)).errors[0],/CAPACITY/);
+  b.lifecycle.consumedIds.push(...Array.from({length:10000-b.lifecycle.consumedIds.length},(_,i)=>`pad${i}`));
+  const r=ok(b,quote(30,70,71));assert.equal(r.book.lifecycle.phase,'FLAT');
+  assert.deepEqual(r.book.account.positions,[]);assert.equal(r.book.account.processedFillIds.length,10001);
+  assert.equal(r.book.lifecycle.consumedIds.length,10001);
   assert.equal(b.account.positions[0].lots,'8');assert.equal(b.lifecycle.phase,'LONG');
+});
+test('reserve no-fill rejects atomically and buys remain blocked',()=>{
+  const b=long();b.lifecycle.consumedIds.push(...Array.from({length:10000-b.lifecycle.consumedIds.length},(_,i)=>`pad${i}`));
+  reject(b,quote(30));
+  const flat=initial();flat.account.processedFillIds=Array.from({length:10000},(_,i)=>`f${i}`);
+  const p=ok(flat,entry).book;assert.match(reject(p,quote()).errors[0],/CLOSE_ONLY/);
 });
 test('malformed accounts reject no-fill events',()=>{
   for(const patch of [{currency:'USD'},{cashMicros:'01'},{processedFillIds:['x','x']},

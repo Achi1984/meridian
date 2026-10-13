@@ -91,7 +91,30 @@ test('forged inconsistent states and authority reject',()=>{
 });
 test('bounded ID storage fails closed',()=>{
   const s={...initialState(),lastAt:1,consumedIds:Array.from({length:10000},(_,i)=>`id${i}`)};
-  assert.equal(transition(s,quote()).error,'ID_CAPACITY');
+  assert.equal(transition(s,quote()).error,'CLOSE_ONLY_ID_RESERVE');
+});
+test('close reserve permits exact-cap stop without discarding IDs',()=>{
+  const s=long();s.consumedIds.push(...Array.from({length:10000-s.consumedIds.length},(_,i)=>`pad${i}`));
+  const r=step(s,quote(30,80));assert.equal(r.fill.reason,'STOP');
+  assert.equal(r.state.consumedIds.length,10001);
+  assert.deepEqual(r.state.consumedIds.slice(0,10000),s.consumedIds);
+  assert.equal(transition(r.state,entry(40)).valid,false);
+  assert.equal(transition(r.state,{...quote(40),id:'q30'}).error,'ID_REPLAY_OR_COLLISION');
+});
+test('reserve supports exit signal plus quote; non-closing quotes consume nothing',()=>{
+  const s=long();s.consumedIds.push(...Array.from({length:10000-s.consumedIds.length},(_,i)=>`pad${i}`));
+  for(const at of [30,31]) {const r=transition(s,quote(at));assert.equal(r.valid,false);assert.equal(r.state,s);}
+  const p=step(s,exit(32)).state;assert.equal(p.consumedIds.length,10002);
+  assert.equal(transition(p,exit(33)).valid,false);
+  const r=step(p,quote(34));assert.equal(r.state.consumedIds.length,10003);
+  assert.equal(r.state.phase,'FLAT');assert.equal(transition(r.state,entry(40)).valid,false);
+});
+test('expired reserve exit preserves position and remaining stop slot',()=>{
+  const s=long();s.consumedIds.push(...Array.from({length:10000-s.consumedIds.length},(_,i)=>`pad${i}`));
+  const p=step(s,{...exit(30),expiresAt:31}).state;
+  assert.equal(transition(p,quote(32)).valid,false);
+  assert.equal(transition(p,exit(32)).valid,false);
+  assert.equal(step(p,quote(32,80)).fill.reason,'STOP');
 });
 test('busy entry and pre-entry exit reject',()=>{
   assert.equal(transition(long(),entry(30)).error,'ENTRY_WHILE_BUSY');

@@ -1,5 +1,6 @@
 // Pure hypothetical long-spot lifecycle. No I/O, orders, sizing or PnL.
 const MAX_IDS = 10000;
+const CLOSE_ID_LIMIT = MAX_IDS + 3;
 const MAX_QUOTE_AGE_MS = 1000;
 const flags = { executionAuthorized: false, researchOnly: true };
 const keys = (o, names) => o !== null && typeof o === 'object' &&
@@ -22,7 +23,7 @@ function validateState(s) {
     !['FLAT', 'PENDING_ENTRY', 'LONG', 'PENDING_EXIT'].includes(s.phase) ||
     ![s.lastAt, s.lastQuoteAt, s.lastExitAt].every(n => n === -1 || time(n)) ||
     s.lastQuoteAt > s.lastAt || s.lastExitAt > s.lastAt ||
-    !Array.isArray(s.consumedIds) || s.consumedIds.length > MAX_IDS)
+    !Array.isArray(s.consumedIds) || s.consumedIds.length > CLOSE_ID_LIMIT)
     fail('INVALID_STATE');
   const seen = new Set();
   for (const value of s.consumedIds) {
@@ -32,6 +33,8 @@ function validateState(s) {
   if ((s.lastAt === -1) !== (seen.size === 0)) fail('INVALID_INITIAL_STATE');
   const hasPosition = s.phase === 'LONG' || s.phase === 'PENDING_EXIT';
   const hasPending = s.phase === 'PENDING_ENTRY' || s.phase === 'PENDING_EXIT';
+  if ((hasPosition && seen.size >= CLOSE_ID_LIMIT) ||
+    (s.phase === 'PENDING_ENTRY' && seen.size > MAX_IDS)) fail('INVALID_CLOSE_HEADROOM');
   if (hasPosition) {
     const p = s.position;
     if (!keys(p, ['initialStop', 'entryAsk', 'entryBid', 'entryQuoteAt', 'entryAt',
@@ -66,7 +69,7 @@ function validateEvent(e, s) {
   const additions = quote ? [e.id] : [e.id, e.signalId];
   if (additions.some(v => !id(v) || s.consumedIds.includes(v)) ||
     new Set(additions).size !== additions.length) fail('ID_REPLAY_OR_COLLISION');
-  if (s.consumedIds.length + additions.length > MAX_IDS) fail('ID_CAPACITY');
+  if (s.consumedIds.length + additions.length > CLOSE_ID_LIMIT) fail('ID_CAPACITY');
   if (quote) {
     if (!time(e.quoteAt) || e.quoteAt <= s.lastQuoteAt || e.quoteAt > e.at ||
       e.at - e.quoteAt > MAX_QUOTE_AGE_MS || !positive(e.bid) ||
@@ -140,6 +143,13 @@ export function transition(state, event) {
           s.phase = 'LONG'; s.pending = null; reason = 'ENTRY_FILLED';
         }
       }
+    }
+    const totalIds = s.consumedIds.length + additions.length;
+    if (totalIds > MAX_IDS) {
+      const heldBefore = state.phase === 'LONG' || state.phase === 'PENDING_EXIT';
+      const reserveClose = heldBefore && fill?.side === 'SELL';
+      const reserveExit = heldBefore && e.type === 'EXIT_SIGNAL' && totalIds < CLOSE_ID_LIMIT;
+      if (!reserveClose && !reserveExit) fail('CLOSE_ONLY_ID_RESERVE');
     }
     s.lastAt = e.at;
     s.consumedIds.push(...additions);

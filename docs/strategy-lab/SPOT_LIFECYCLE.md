@@ -43,12 +43,24 @@ barriers above apply.
 There is no assertion that real fills occur at these quotes or for any quantity.
 
 The reducer does not mutate inputs. Rejections return the supplied state unchanged.
-Accepted state is JSON-serializable and stores consumed IDs in a shared namespace,
-bounded at 10,000; exhaustion rejects instead of forgetting replay history. Caller
-must treat capacity exhaustion as an offline-run failure: even stop quotes are
-rejected at the cap. This is not continuously available stop protection. Before
-paper/runtime use, a persistent replay design must allow risk reduction without
-discarding replay history; that design is not implemented here. Caller
+Accepted state is JSON-serializable and stores consumed IDs in a shared namespace.
+The normal budget is 10,000 IDs with three additional close-only slots. Above the
+normal budget, only a SELL quote for an already held position or an EXIT_SIGNAL
+with at least one slot remaining after it is accepted. Non-closing quotes reject
+without consuming reserve or changing state. New entries cannot use the reserve.
+One exit signal consumes two IDs and its sell quote one; repeated exit replacements
+are not unbounded. Example: LONG at 10,000 → exit at 10,002 → TTL expires. An
+above-stop quote then rejects unchanged, and a new two-ID exit signal cannot fit;
+a later stop-triggering quote can still sell using the final slot. TTL is never
+extended to rescue an exit. A completed FLAT state retains up to all 10,003 IDs,
+rejects replay, and cannot restart entry trading beyond the normal budget.
+This is a bounded stop-close reserve, not continuous operation or guaranteed fills.
+No ID is discarded, and an open-position state must retain at least one close slot.
+Reaching the normal 10,000-ID cap does not block an otherwise valid stop: the
+close-only reserve remains available. An open-position input with all 10,003 IDs
+already consumed is structurally invalid and rejects. Other validation failures
+can still block a stop. Before paper/runtime use, continuous operation requires
+a persistent replay design without history loss; that design is not implemented here. Caller
 must retain and reload the returned state across restarts. No actual persistence,
 authentication or proof against a caller forging a coherent history is provided;
 state validation checks structural consistency only. Restoring initialState loses

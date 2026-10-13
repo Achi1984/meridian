@@ -51,7 +51,7 @@ export function applySpotFill(input) {
   }
 
   const seen = new Set();
-  if (!Array.isArray(account.processedFillIds) || account.processedFillIds.length > 10000) {
+  if (!Array.isArray(account.processedFillIds) || account.processedFillIds.length > 10050) {
     errors.push('INVALID_PROCESSED_FILL_IDS');
   } else {
     for (const processedId of account.processedFillIds) {
@@ -83,10 +83,14 @@ export function applySpotFill(input) {
   if (errors.length) return reject(errors);
   // Keeping the entire replay history is part of the input contract; never
   // truncate IDs to fit the cap, which could make an old fill replayable.
-  if (seen.size === 10000) return reject(['PROCESSED_FILL_ID_CAPACITY']);
+  const openPositions = [...holdings.values()].filter(lots => lots > 0n).length;
+  if (10050 - seen.size < openPositions) return reject(['INSUFFICIENT_CLOSE_ID_HEADROOM']);
 
   const lots = BigInt(fill.lots), price = BigInt(fill.priceMicrosPerLot), fee = BigInt(fill.feeMicros);
   const cash = BigInt(account.cashMicros), held = holdings.get(fill.symbol) ?? 0n;
+  if (seen.size >= 10000 && (fill.side !== 'SELL' || held === 0n || lots !== held))
+    return reject(['CLOSE_ONLY_FILL_ID_RESERVE']);
+  if (seen.size === 10050) return reject(['PROCESSED_FILL_ID_CAPACITY']);
   const cost = lots * price;
   let nextCash, nextLots;
   if (fill.side === 'BUY') {

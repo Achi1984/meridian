@@ -18,7 +18,7 @@ function validateAccount(book) {
   const a = book.account;
   if (!keys(a,['currency','cashMicros','positions','processedFillIds']) || a.currency !== 'EUR' ||
     !integer(a.cashMicros) || !Array.isArray(a.positions) || !Array.isArray(a.processedFillIds) ||
-    a.processedFillIds.length > 10000) fail('INVALID_ACCOUNT');
+    a.processedFillIds.length > 10050) fail('INVALID_ACCOUNT');
   const seen = new Set();
   for (const id of a.processedFillIds) {
     if (typeof id !== 'string' || !LEDGER_ID.test(id) || seen.has(id)) fail('INVALID_FILL_HISTORY');
@@ -26,6 +26,7 @@ function validateAccount(book) {
   }
   const held = ['LONG','PENDING_EXIT'].includes(book.lifecycle?.phase);
   if (a.positions.length !== (held ? 1 : 0)) fail('POSITION_LIFECYCLE_MISMATCH');
+  if (10050 - seen.size < a.positions.length) fail('INSUFFICIENT_CLOSE_ID_HEADROOM');
   if (held) {
     const p = a.positions[0];
     if (!keys(p,['symbol','lots']) || p.symbol !== book.symbol ||

@@ -16,3 +16,24 @@ test('large integers retain values above floating point precision',()=>{const x=
 test('adverse sale fee cannot produce borrowing',()=>{const x=fixture();x.account.cashMicros='0';x.account.positions=[{symbol:'BTC',lots:'1'}];x.fill.side='SELL';x.fill.lots='1';x.fill.feeMicros='100000001';reject(x);});
 test('successful operation leaves caller state unchanged',()=>{const x=fixture();const before=structuredClone(x);applySpotFill(x);assert.deepEqual(x,before);});
 test('canonical amounts and symbols reject a trailing newline',()=>{for(const field of ['lots','priceMicrosPerLot','feeMicros','symbol']){const x=fixture();x.fill[field]+='\n';reject(x);}});
+test('reserve closes all 50 positions with full history retained',()=>{
+  const x=fixture();x.account.processedFillIds=Array.from({length:10000},(_,i)=>`old${i}`);
+  x.account.positions=Array.from({length:50},(_,i)=>({symbol:`A${i}`,lots:'2'}));
+  for(let i=0;i<50;i++) {
+    x.fill={...x.fill,id:`close${i}`,symbol:`A${i}`,side:'SELL',lots:'2',feeMicros:'0'};
+    const r=applySpotFill(x);assert.equal(r.valid,true,r.errors);x.account=r.account;
+  }
+  assert.equal(x.account.processedFillIds.length,10050);assert.deepEqual(x.account.positions,[]);
+  assert.equal(x.account.processedFillIds[0],'old0');reject(x);
+  x.fill={...x.fill,id:'newbuy',side:'BUY'};reject(x);
+});
+test('normal cap prevents buys and partial reserve sales',()=>{
+  const x=fixture();x.account.processedFillIds=Array.from({length:10000},(_,i)=>`old${i}`);
+  x.account.positions=[{symbol:'BTC',lots:'10'}];reject(x);
+  x.fill={...x.fill,side:'SELL',lots:'9'};reject(x);
+  x.fill.lots='10';assert.equal(applySpotFill(x).valid,true);
+});
+test('forged reserve state lacking one slot per held asset rejects',()=>{
+  const x=fixture();x.account.processedFillIds=Array.from({length:10050},(_,i)=>`old${i}`);
+  x.account.positions=[{symbol:'BTC',lots:'10'}];x.fill.side='SELL';reject(x);
+});
