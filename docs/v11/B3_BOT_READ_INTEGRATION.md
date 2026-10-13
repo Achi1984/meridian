@@ -26,10 +26,20 @@ Browser assertions cover manual fresh reads, absence of mount/provision reads,
 lock, synthetic hidden-event abort, focus without fetching, and four widths.
 Fresh-state screenshots use the existing V11_A2_EVIDENCE_DIR artifact route.
 
-Validation:34 selected nonbrowser tests plus the historical reversal test pass.
-Browser-test syntax passes; integrated browser assertions and screenshots have
-not run. One overly broad test-name filter also selected the browser test, which
-stopped before launch because no Chrome binary exists; no local browser was run.
+Validation: 34 selected nonbrowser tests plus the historical reversal test passed
+for the initial draft. The authentication-rejection correction passed 15 targeted
+tests and independent local review. At source head
+00fca5e9bfe1a5f121e3784f599396ac16a380fd, CI run 38349996422 passed 2322/2322
+tests, including integrated Chrome acceptance. Artifact 11790571086 has SHA256
+56708726b31cec1b1a81b0d3c09d8ee1f14e3edf5557672ab86bc22d626e0fa9.
+The lead inspected all four integrated fresh screenshots (320/375/390/430):
+readable controls and no visible horizontal overflow. These use synthetic data;
+real-account and iPhone/Safari validation remain outstanding.
+Review 5499081564 reports zero open findings but is COMMENTED, not APPROVED;
+it requests exact-head CI and human validation. The complete PR now spans
+14 files after adding the B3 history-browser expectation correction.
+No local browser was run. This documentation-only follow-up changes the head,
+so its own exact-head CI/review must still be checked before activation.
 
 ENGINE_BRIDGE_READINESS.md's historical BLOCKED engine assessment is unchanged.
 This isolated bot consumer proves neither V9 engine parity nor Safari/iPhone/PWA
