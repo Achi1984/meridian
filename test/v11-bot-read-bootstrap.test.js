@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mountBotReadAccess} from '../v11/bot-read-bootstrap.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
+const credentials=['synthetic-token','https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43)];
 class Target {
   constructor(){this.listeners=new Map();this.value='';this.textContent='';}
   addEventListener(k,f){if(!this.listeners.has(k))this.listeners.set(k,new Set());this.listeners.get(k).add(f);}
@@ -26,8 +27,8 @@ test('mount and explicit credential provision never start a request; field is cl
   h.client().refresh();assert.equal(h.calls.fetch,1);
 });
 test('view lock, pagehide and hidden revoke memory through client lock',()=>{
-  for(const trigger of [h=>h.client().lock(),h=>h.window.fire('pagehide'),h=>{h.document.hidden=true;h.document.fire('visibilitychange');}]){
-    const h=setup();h.nodes.get('bot-read-token').value='synthetic-token';h.nodes.get('bot-read-provide').fire('click');
+  for(const credential of credentials) for(const trigger of [h=>h.client().lock(),h=>h.window.fire('pagehide'),h=>{h.document.hidden=true;h.document.fire('visibilitychange');}]){
+    const h=setup();h.nodes.get('bot-read-token').value=credential;h.nodes.get('bot-read-provide').fire('click');
     const prior=h.states.length;trigger(h);assert.equal(h.getToken(),null);assert.ok(h.states.length>prior);
   }
 });
@@ -74,7 +75,7 @@ test('validated short expiry invalidates once without fetching and lock cancels 
   mounted.dispose();
 });
 test('actual 401 and 403 revoke the rejected credential until explicitly provided again',async()=>{
-  for(const statusCode of [401,403]) {
+  for(const credential of credentials) for(const statusCode of [401,403]) {
     const document=new Target(),window=new Target(),nodes=new Map(['bot-read-root','bot-read-token','bot-read-provide','bot-read-access-status'].map(id=>[id,new Target()]));
     document.getElementById=id=>nodes.get(id);let client,getToken,reads=0;const states=[];
     const mounted=mountBotReadAccess(document,window,{createClient:options=>{
@@ -82,8 +83,8 @@ test('actual 401 and 403 revoke the rejected credential until explicitly provide
       return createBotReadClient({...options,fetchImpl:async()=>{reads++;return new Response('private-server-error',{status:statusCode});}});
     },createView:(_root,options)=>{client=options.createClient({getToken:options.getToken,onChange:state=>states.push(state.status)});return {revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};}});
     const input=nodes.get('bot-read-token'),provide=nodes.get('bot-read-provide');
-    input.value='synthetic-token';provide.fire('click');
-    assert.equal(getToken(),'synthetic-token','access-driven initial lock must not invalidate provision');
+    input.value=credential;provide.fire('click');
+    assert.equal(getToken(),credential,'access-driven initial lock must not invalidate provision');
     await client.refresh();assert.equal(reads,1);assert.equal(getToken(),null);assert.equal(states.at(-1),'locked');
     assert.equal(nodes.get('bot-read-access-status').textContent,'Gesperrt. Der Lesezugang wird nicht gespeichert.');
     await client.refresh();assert.equal(reads,1,'rejected credential must not be retried');

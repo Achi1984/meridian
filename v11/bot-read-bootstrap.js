@@ -57,7 +57,7 @@ export function mountBotReadAccess(document, window, {
     const accepted=access.provide(value);
     status.textContent=accepted
       ? 'Lesezugang temporär übernommen. Erst „Bots aktualisieren“ prüft den Zugang.'
-      : 'Lesezugang nicht übernommen. Die Botansicht bleibt gesperrt.';
+      : 'Zugang nicht übernommen. Bitte einen bestehenden Asset-Watch-Freigabelink oder das Meridian-Lesepasswort verwenden.';
   }
   function visibility() {
     if(document.hidden)clear();else view.revalidate();

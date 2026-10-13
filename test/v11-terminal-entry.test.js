@@ -120,7 +120,35 @@ const b3Deltas=[
     "})();\n</script>\n<script type=\"module\" src=\"./bot-read-bootstrap.js\"></script>\n</body>\n</html>\n"
   ]
 ];
+const b4Deltas=[
+  [
+    "B3 DRAFT: Manual read-only bot access",
+    "B4 DRAFT: Scoped share link or private read-only bot access"
+  ],
+  [
+    "11 · Vorschau B3<small>",
+    "11 · Vorschau B4<small>"
+  ],
+  [
+    "<p><b>Diese Vorschau · B3:</b> Kontrollierte Testvorschau · Geräteabnahme ausstehend. Manueller, temporärer Lesezugang für Bot-Snapshots · <a href=\"https://github.com/Achi1984/meridian/pull/740\">Änderungsnachweis #740</a>.</p>",
+    "<p><b>Diese Vorschau · B4:</b> Asset-Watch-Freigabelink oder Meridian-Lesepasswort für manuelle Bot-Snapshots. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>"
+  ],
+  [
+    "      <ul class=\"version-history-list\">\n",
+    "      <ul class=\"version-history-list\">\n        <li><strong>Meridian 11 · B4</strong><span class=\"version-status\">Testvorschau</span><p>Bestehende Asset-Watch-Freigabelinks für manuelle Bot-Abfragen unterstützt. Zugang nur im Arbeitsspeicher; Geräteabnahme ausstehend.</p></li>\n"
+  ],
+  [
+    "Bestehender Meridian-Lesezugang</label>",
+    "Asset-Watch-Link oder Meridian-Lesepasswort</label>"
+  ],
+  [
+    "Kein Börsen-API-Schlüssel. Der Zugang bleibt",
+    "Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt"
+  ]
+];
 function restoreB2(source){
+ for(const [before,after] of b4Deltas){assert.equal(source.split(after).length-1,1,'one exact B4 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'94e8407bf9068eeff6bc8af75c6972749d804b26','exact reviewed B3 bytes restored');
  for(const [before,after] of b3Deltas){assert.equal(source.split(after).length-1,1,'one exact B3 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'9000de331c75c9a72e9578512da9673a130076d2','exact main78c694 B2 bytes restored');
  return source;
