@@ -47,9 +47,9 @@ test('B7 rejects bot-share and foreign URLs before making any request',async()=>
 test('B7 fixed GET only, bounded body, no mount read, no credential/error leakage',async()=>{
   const states=[];let reads=0;
   const c=createDepotReadClient({getToken:()=> 'synthetic-password',now:()=>NOW,onChange:s=>states.push(s),fetchImpl:async(url,o)=>{
-    reads++;assert.equal(url,'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1d');
+    reads++;assert.ok(['https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w','https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard','https://data-api.binance.vision/api/v3/ticker/price'].includes(url));
     assert.equal(o.method,'GET');assert.equal(o.credentials,'omit');assert.equal(o.redirect,'error');
-    assert.equal(o.headers.authorization,'Bearer synthetic-password');return new Response(JSON.stringify(snapshot()));}});
+    assert.equal(o.headers.authorization,url.includes('binance.vision')?undefined:'Bearer synthetic-password');return new Response(JSON.stringify(snapshot()));}});
   assert.equal(reads,0);await c.refresh();assert.equal(states.at(-1).status,'fresh');
   c.lock();assert.equal(states.at(-1).model,null);assert.doesNotMatch(JSON.stringify(states),/synthetic-password/);c.dispose();
   for(const response of [new Response('secret error',{status:500}),new Response('bad json'),
@@ -60,11 +60,11 @@ test('B7 fixed GET only, bounded body, no mount read, no credential/error leakag
 });
 test('B7 late response cannot refill locked state and changed credential aborts pending work',async()=>{
   for(const changed of [false,true]){
-    let resolve,credential='first';const states=[];
+    let resolvers=[],credential='first';const states=[];
     const c=createDepotReadClient({getToken:()=>credential,now:()=>NOW,onChange:s=>states.push(s),
-      fetchImpl:()=>new Promise(r=>{resolve=r;})});
+      fetchImpl:()=>new Promise(r=>{resolvers.push(r);})});
     const pending=c.refresh();if(changed){credential='second';c.revalidate();}else c.lock();
-    resolve(new Response(JSON.stringify(snapshot())));await pending;assert.equal(states.at(-1).status,'locked');c.dispose();
+    for(const resolve of resolvers)resolve(new Response(JSON.stringify(snapshot())));await pending;assert.equal(states.at(-1).status,'locked');c.dispose();
   }
 });
 class Target{
@@ -96,6 +96,22 @@ test('B7 memory access clears on hide/pagehide and401/403; focus and provision n
 test('B7 expiry invalidates foreground valuation without polling; rejected replacement clears access',async()=>{
   const h=mounted(()=>new Response(JSON.stringify(snapshot())));h.accept();await h.client().refresh();
   assert.equal(h.timers.size,1);const timer=[...h.timers.values()][0];assert.equal(timer.ms,898001);
-  h.clock(NOW+898001);timer.f();assert.equal(h.states.at(-1).status,'stale');assert.equal(h.reads(),1);
+  h.clock(NOW+898001);timer.f();assert.equal(h.states.at(-1).status,'stale');assert.equal(h.reads(),3);
   h.accept('https://foreign.example');assert.equal(h.token(),null);assert.equal(h.nodes.get('depot-read-token').value,'');h.mount.dispose();
+});
+
+test('B8 current value survives history failure; public price call never receives credentials',async()=>{
+ const out=[],calls=[];
+ const portfolio={holdings:[],manualVenueBalances:[{venue:'Ledger',valueUsd:100,updatedAt:NOW-1000},{venue:'OKX',valueUsd:20,updatedAt:NOW-1000}],pionexEquityUsd:30,pionexEquityUpdatedAt:NOW-1000};
+ const c=createDepotReadClient({getToken:()=> 'password',now:()=>NOW,onChange:s=>out.push(s),fetchImpl:async(url,o)=>{
+  calls.push(url);if(url.includes('binance')){assert.equal(o.headers.authorization,undefined);return new Response('[]');}
+  assert.equal(o.headers.authorization,'Bearer password');
+  return url.includes('/dashboard')?new Response(JSON.stringify({private:true,data:{portfolio}})):new Response('{}',{status:503});
+ }});
+ await c.refresh();assert.equal(out.at(-1).model.totalUsd,150);assert.equal(out.at(-1).model.source,'SERVER_PORTFOLIO_CURRENT');assert.equal(out.at(-1).history['1w'].status,'unavailable');
+ assert.equal(calls.length,3);c.lock();assert.equal(out.at(-1).history,null);assert.equal(out.at(-1).model,null);c.dispose();
+});
+test('B8 any private auth rejection revokes all value and chart access',async()=>{
+ const out=[];const c=createDepotReadClient({getToken:()=> 'password',onChange:s=>out.push(s),fetchImpl:async url=>new Response('{}',{status:url.includes('/dashboard')?403:200})});
+ await c.refresh();assert.equal(out.at(-1).status,'locked');assert.equal(out.at(-1).history,null);c.dispose();
 });

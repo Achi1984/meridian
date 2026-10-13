@@ -45,7 +45,7 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  assert.match(html,/<script type="module" src="\.\/bot-read-bootstrap\.js\?v=B6"><\/script>/);
- assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js?v=B6"></script>','').replace('<script type="module" src="./depot-read-bootstrap.js?v=B7"></script>',''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
+ assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js?v=B6"></script>','').replace('<script type="module" src="./depot-read-bootstrap.js?v=B8"></script>',''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
  assert.doesNotMatch(html,/<link\b[^>]*rel=["']manifest/i);
  const js=scripts[0][1].replace(/\/\*[\s\S]*?\*\//g,'');
  assert.doesNotMatch(js,/\b(fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts|localStorage|sessionStorage|indexedDB|serviceWorker|readToken|MERIDIAN_V10_BRIDGE)\b/);
