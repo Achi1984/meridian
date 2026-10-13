@@ -8,7 +8,7 @@
   <meta name="meridian-ui-generation" content="11-preview">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>MERIDIAN 11 — Next Generation · Entwurf</title>
-  <!-- B4 DRAFT: Scoped share link or private read-only bot access; no persistence, automatic request, engine, orders or service worker.
+  <!-- B5 DRAFT: Expandable read-only bot snapshot cards; no persistence, automatic request, engine, orders or service worker.
        The v9 engine is intentionally NOT loaded until the single-engine / lifecycle / safety tests exist.
        Noindex does not make this private: any future Pages publication makes the source publicly accessible. -->
   <style>
@@ -175,7 +175,21 @@
     .bot-access-controls button,.bot-read-view button{min-width:44px;min-height:44px;white-space:normal;border:1px solid #567a9f;border-radius:8px;padding:10px;background:#142235;color:var(--text);margin:4px 4px 4px 0}
     .bot-access-controls input:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
     .bot-access-controls p,.bot-read-view p,.bot-read-view time{overflow-wrap:anywhere;font-size:13px}
-    .bot-read-view li{margin:12px 0}.bot-read-view ul{padding-left:20px}
+    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:12px}
+    .bot-card{border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}
+    .bot-card summary{display:block;min-height:44px;padding:14px;cursor:pointer;overflow-wrap:anywhere;letter-spacing:normal;font-size:14px;font-weight:400}
+    .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}
+    .bot-card-heading{display:block;font-size:17px;font-weight:700}
+    .bot-card-reference{display:block;color:var(--muted);font-size:11px;margin:6px 0;overflow-wrap:anywhere}
+    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:12px;margin:12px 0}
+    .bot-card-metrics>div,.bot-card-metrics>span{min-width:0}
+    .bot-card-metrics dt{font-size:12px;color:var(--muted)}
+    .bot-card-metrics dd{margin:4px 0 0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+    .bot-read-view .bot-card summary span:last-child{transform:none;transition:none;color:inherit;font-size:inherit}
+    .bot-card summary .bot-card-metrics>span>span{font-size:12px;color:var(--muted)}
+    .bot-card summary>span:last-child{font-size:12px;color:var(--muted)}
+    .bot-card summary .bot-card-metrics>span>span,.bot-card summary .bot-card-metrics strong{display:block}
+    .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
   </style>
 </head>
 <body>
@@ -187,7 +201,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B4<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B5<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -200,7 +214,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B4:</b> Asset-Watch-Freigabelink oder Meridian-Lesepasswort für manuelle Bot-Snapshots. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href="https://github.com/Achi1984/meridian/pull/740">Botanbindung #740</a>.</p>
+          <p><b>Diese Vorschau · B5:</b> Aufklappbare Botkarten mit verfügbaren Kennzahlen und klar gekennzeichneten Datenlücken. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href="https://github.com/Achi1984/meridian/pull/740">Botanbindung #740</a>.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -213,6 +227,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B5</strong><span class="version-status">Testvorschau</span><p>Aufklappbare Botkarten mit Hebel, Kapital, P/L laut Quelle und Preisgrenzen. Fehlende oder nicht eindeutig bestätigte Werte bleiben nicht verfügbar.</p></li>
         <li><strong>Meridian 11 · B4</strong><span class="version-status">Testvorschau</span><p>Bestehende Asset-Watch-Freigabelinks für manuelle Bot-Abfragen unterstützt. Zugang nur im Arbeitsspeicher; Geräteabnahme ausstehend.</p></li>
         <li><strong>Meridian 11 · B3</strong><span class="version-status">Entwurf</span><p>Manueller Bot-Lesezugang ohne Speicherung oder automatische Abfragen. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/pull/740">Änderungsnachweis #740</a>.</p></li>
         <li><strong>Meridian 11 · B2</strong><span class="version-status">Vorschaustand</span><p>Statusleiste für autonome Entwicklung mit ausdrücklich unbekanntem Betriebsstatus. Noch ohne Betriebssignal.</p></li>

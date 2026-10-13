@@ -10,6 +10,13 @@ const LABELS = {
 const SIDES = {LONG:'Long', SHORT:'Short', NEUTRAL:'Neutral'};
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const CATEGORIES = {inverse:'COIN-M', linear:'Linear'};
+const MISSING = 'Nicht verfügbar';
+const number = value => typeof value === 'number' && Number.isFinite(value) && value !== 0 ? value : null;
+const formatNumber = value => new Intl.NumberFormat('de-DE', {maximumSignificantDigits:10}).format(value);
+function valueLabel(value, unit = '', positive = false) {
+  const valid = number(value);
+  return valid === null || (positive && valid < 0) ? MISSING : formatNumber(valid) + unit;
+}
 const ownLabel = (labels, key) => typeof key === 'string' && Object.hasOwn(labels,key) ? labels[key] : 'Unbekannt';
 function projection(state) {
   try {
@@ -25,7 +32,15 @@ function projection(state) {
     const bots = Array.from(model.bots, bot => {
       if (typeof bot?.symbol !== 'string' || !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) throw new Error();
       return {symbol:bot.symbol, side:ownLabel(SIDES,bot.side),
-        type:ownLabel(TYPES,bot.type), category:ownLabel(CATEGORIES,bot.category)};
+        ref: typeof bot.ref === 'string' && /^[a-f0-9]{20}$/.test(bot.ref) ? bot.ref : null,
+        type:ownLabel(TYPES,bot.type), category:ownLabel(CATEGORIES,bot.category),
+        leverage:valueLabel(bot.metrics?.leverage,'×',true),
+        investment:number(bot.metrics?.investmentUsd)>0 ? valueLabel(bot.metrics.investmentUsd,' USD/USDT',true) :
+          (typeof bot.metrics?.investmentCurrency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? valueLabel(bot.metrics.investmentAmount,' '+bot.metrics.investmentCurrency,true) : MISSING),
+        pnl:valueLabel(bot.metrics?.pnlUsd,' USD'),
+        lower:valueLabel(bot.metrics?.lower,'',true),upper:valueLabel(bot.metrics?.upper,'',true),
+        liquidation:valueLabel(bot.metrics?.liquidationPrice,'',true),
+        takeProfit:valueLabel(bot.metrics?.takeProfit,'',true),stopLoss:valueLabel(bot.metrics?.stopLoss,'',true)};
     });
     return {status,bots,snapshotAt:model.snapshotAt};
   } catch { return {status:'unavailable',bots:[]}; }
@@ -62,11 +77,31 @@ export function renderBotReadState(root, state) {
     details.append(element(document,'p',data.bots.length + ' Bots im Snapshot'));
     if (!data.bots.length) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
     else {
-      const list=element(document,'ul');list.setAttribute('aria-label','Bots im aktuellen Snapshot');
-      for (const bot of data.bots) {
-        const item=element(document,'li');item.append(element(document,'strong',bot.symbol));
-        item.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
-        list.append(item);
+      const list=element(document,'ul');list.className='bot-card-list';
+      list.setAttribute('aria-label','Bots im aktuellen Snapshot');
+      for (const [index,bot] of data.bots.entries()) {
+        const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
+        card.className='bot-card';
+        const heading=element(document,'span',bot.symbol+' · '+bot.side);heading.className='bot-card-heading';
+        const identity=element(document,'span','Bot '+(index+1)+(bot.ref?' · Referenz '+bot.ref:''));
+        identity.className='bot-card-reference';
+        summary.append(heading,identity);
+        const headline=element(document,'span');headline.className='bot-card-metrics';
+        for (const [label,value] of [['Hebel',bot.leverage],['Kapital',bot.investment],['P/L laut Quelle',bot.pnl]]) {
+          const group=element(document,'span');group.append(element(document,'span',label+': '),element(document,'strong',value));headline.append(group);
+        }
+        summary.append(headline,element(document,'span','Details anzeigen / ausblenden'));
+        const body=element(document,'div');body.className='bot-card-body';
+        body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
+        const metrics=element(document,'dl');metrics.className='bot-card-metrics';
+        for (const [label,value] of [
+          ['Grid-Untergrenze',bot.lower],['Grid-Obergrenze',bot.upper],['Grid-Gewinn',MISSING],
+          ['Liquidationspreis laut Quelle',bot.liquidation],['Risikopuffer',MISSING],
+          ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
+          const group=element(document,'div');group.append(element(document,'dt',label),element(document,'dd',value));metrics.append(group);
+        }
+        body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
+        card.append(summary,body);item.append(card);list.append(item);
       }
       details.append(list);
     }
