@@ -1,12 +1,13 @@
-import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r127';
-import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r127';
-import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r127';
-import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r127';
-import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r127';
-import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r127';
+import {createAssetWatchAccessDialog} from './asset-watch-access-dialog.js?v=10.0-r128';
+import {detectSwing,detectOpposingChildSwing,buildFibLevels,adjacentFibLevels,fibDistancePct,fibPlotPosition,skLongShortZones,skTargetZone,skDoubleAdvantage} from './fib-core.js?v=10.0-r128';
+import {SK_PAPERBOT_V1_RULESET,SK_PAPERBOT_V1_CONFIG,replaySkPaperBot,skChronologicalStability,evaluateSkPaperGate} from '../research/sk-paperbot-v1.js?v=10.0-r128';
+import {SK_RESEARCH_V2_RULESET,SK_RESEARCH_V2_ASSETS,aggregateSkResearchV2} from '../research/sk-research-v2.js?v=10.0-r128';
+import {DOCUMENTED_EDGE_V1_RULESET,DOCUMENTED_EDGE_ASSETS,runTsmomClassic,runXsmom3wPriceProxy,fundingCarryEvidence} from '../research/documented-edge-v1.js?v=10.0-r128';
+import {TSMOM_HOLDOUT_V1_RULESET,TSMOM_TRANSFER_ASSETS,runLegacyTimeHoldout,runTransferUniverseHoldout,evaluateCombinedTsmomHoldout} from '../research/tsmom-holdout-v1.js?v=10.0-r128';
+import {PAPERBOT_PROFIT_AGENT_V1_RULESET,PAPERBOT_PROFIT_AGENT_V1_ASSETS,runPaperBotProfitAgentV1} from '../research/paperbot-profit-special-agent-v1.js?v=10.0-r128';
 // MERIDIAN v10 r113 — isolated presentation/command adapter over the validated v9 engine.
 // No trading logic lives here. It consumes the read-only v9 bridge and never submits orders.
-const BUILD='10.0-r127';
+const BUILD='10.0-r128';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const bridge=()=>window.MERIDIAN_V10_BRIDGE||null;
@@ -805,33 +806,50 @@ function renderCommand(force=false){
   bindCommandActionHub(view);
   bindCommandPortfolioHero(view);
 }
+let assetWatchShareGeneration=0,assetWatchShareAbort=null;
+const assetWatchAccessDialog=createAssetWatchAccessDialog({document,submit:(action,credential)=>assetWatchShareAction(action,credential)});
+function clearAssetWatchAccess(){
+ assetWatchShareGeneration++;assetWatchShareAbort?.abort();assetWatchShareAbort=null;
+ assetWatchAccessDialog.close();assetWatchShareUi.shareUrl=null;assetWatchShareUi.busy=false;
+ assetWatchShareUi.message='Dialog geschlossen und Linkanzeige geleert. Bereits gesendete Anfragen können serverseitig abgeschlossen werden.';assetWatchShareUi.tone='muted';
+ renderBots(true);
+}
+window.addEventListener('pagehide',clearAssetWatchAccess);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')clearAssetWatchAccess()});
 function assetWatchShareCard(){
   const h=H(),available=typeof h.manageAssetWatchShare==='function',msg=assetWatchShareUi.message||'Erstellt einen eigenen widerrufbaren Read-only-Link nur für den bereinigten Asset-Watch-Bot-Snapshot.';
-  return '<section class="asset-watch-share-card"><div><span>ASSET WATCH API LINK</span><b class="tone-'+esc(assetWatchShareUi.tone)+'">'+(assetWatchShareUi.busy?'ARBEITET…':assetWatchShareUi.shareUrl?'AKTIV · LINK IM SPEICHER':'BEREIT')+'</b><small>'+esc(msg)+'</small></div><div class="asset-watch-share-actions"><button type="button" data-asset-watch-share="rotate" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>'+(assetWatchShareUi.shareUrl?'NEUEN LINK ERSTELLEN':'LINK ERSTELLEN')+'</button><button type="button" data-asset-watch-share="copy" '+(!assetWatchShareUi.shareUrl||assetWatchShareUi.busy?'disabled':'')+'>LINK KOPIEREN</button><button type="button" data-asset-watch-share="revoke" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>WIDERRUFEN</button></div><small>Der Link enthält einen separaten, auf Asset Watch begrenzten Token. Er erlaubt keine Trades und keinen Zugriff auf das übrige private Dashboard.</small></section>';
+  return '<section class="asset-watch-share-card"><div><span>ASSET WATCH API LINK</span><b class="tone-'+esc(assetWatchShareUi.tone)+'">'+(assetWatchShareUi.busy?'ARBEITET…':assetWatchShareUi.tone==='danger'?'AKTION FEHLGESCHLAGEN':assetWatchShareUi.shareUrl?'AKTIV · LINK IM SPEICHER':'BEREIT')+'</b><small>'+esc(msg)+'</small></div><div class="asset-watch-share-actions"><button type="button" data-asset-watch-share="access" '+(assetWatchShareUi.busy?'disabled':'')+'>LESEZUGANG VERWENDEN</button><button type="button" data-asset-watch-share="rotate" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>'+(assetWatchShareUi.shareUrl?'NEUEN LINK ERSTELLEN':'LINK ERSTELLEN')+'</button><button type="button" data-asset-watch-share="copy" '+(!assetWatchShareUi.shareUrl||assetWatchShareUi.busy?'disabled':'')+'>LINK KOPIEREN</button><button type="button" data-asset-watch-share="revoke" '+(!available||assetWatchShareUi.busy?'disabled':'')+'>WIDERRUFEN</button></div><small>Der Link enthält einen separaten, auf Asset Watch begrenzten Token. Er erlaubt keine Trades und keinen Zugriff auf das übrige private Dashboard.</small></section>';
 }
-async function assetWatchShareAction(action){
+async function assetWatchShareAction(action,credential){
   const h=H();
-  if(typeof h.manageAssetWatchShare!=='function')return;
+  if(typeof h.manageAssetWatchShare!=='function'||assetWatchShareUi.busy||document.visibilityState==='hidden')return;
+  if(action==='access'){assetWatchAccessDialog.open();return;}
+  const generation=++assetWatchShareGeneration;
+  const current=()=>generation===assetWatchShareGeneration&&document.visibilityState!=='hidden';
   if(action==='copy'){
     if(!assetWatchShareUi.shareUrl)return;
-    try{await navigator.clipboard.writeText(assetWatchShareUi.shareUrl);assetWatchShareUi.message='Link in Zwischenablage kopiert.';assetWatchShareUi.tone='safe'}
-    catch{assetWatchShareUi.message='Kopieren fehlgeschlagen. Link neu erstellen und Browser-Zugriff auf die Zwischenablage erlauben.';assetWatchShareUi.tone='watch'}
+    try{await navigator.clipboard.writeText(assetWatchShareUi.shareUrl);if(!current())return;assetWatchShareUi.message='Link in Zwischenablage kopiert.';assetWatchShareUi.tone='safe'}
+    catch{if(!current())return;assetWatchShareUi.message='Kopieren fehlgeschlagen. Browser-Zugriff auf die Zwischenablage erlauben.';assetWatchShareUi.tone='watch'}
     renderBots(true);return;
   }
-  assetWatchShareUi.busy=true;assetWatchShareUi.message=action==='revoke'?'Asset-Watch-Link wird widerrufen…':'Neuer Asset-Watch-Link wird erstellt…';assetWatchShareUi.tone='muted';renderBots(true);
+  if(!['rotate','revoke'].includes(action))return;
+  assetWatchShareAbort=new AbortController();
+  assetWatchShareUi.busy=true;assetWatchShareUi.shareUrl=null;assetWatchShareUi.message=action==='revoke'?'Asset-Watch-Link wird widerrufen…':'Neuer Asset-Watch-Link wird erstellt…';assetWatchShareUi.tone='muted';renderBots(true);
   try{
-    const result=await h.manageAssetWatchShare(action);
+    const pending=h.manageAssetWatchShare(action,credential,assetWatchShareAbort.signal);credential=undefined;
+    const result=await pending;if(!current())return;
     if(action==='revoke'){
-      assetWatchShareUi.shareUrl=null;assetWatchShareUi.message='Asset-Watch-Link widerrufen. Der bisherige Link ist ungültig.';assetWatchShareUi.tone='safe';
+      assetWatchShareUi.message='Asset-Watch-Link widerrufen. Der bisherige Link ist ungültig.';assetWatchShareUi.tone='safe';
     }else{
       assetWatchShareUi.shareUrl=result?.shareUrl||null;
       if(!assetWatchShareUi.shareUrl)throw new Error('share_url_missing');
-      try{await navigator.clipboard.writeText(assetWatchShareUi.shareUrl);assetWatchShareUi.message='Neuer Link erstellt und kopiert. Diesen Link nur für den MERIDIAN Asset Watch verwenden.';assetWatchShareUi.tone='safe'}
-      catch{assetWatchShareUi.message='Link erstellt. Mit „LINK KOPIEREN“ in die Zwischenablage übernehmen.';assetWatchShareUi.tone='watch'}
+      assetWatchShareUi.message='Link erstellt. Mit „LINK KOPIEREN“ in die Zwischenablage übernehmen.';assetWatchShareUi.tone='safe';
     }
   }catch(e){
-    assetWatchShareUi.message='Asset-Watch-Link fehlgeschlagen: '+String(e?.message||e).slice(0,100);assetWatchShareUi.tone='danger';
-  }finally{assetWatchShareUi.busy=false;renderBots(true)}
+    if(!current())return;
+    assetWatchShareUi.shareUrl=null;
+    assetWatchShareUi.message=String(e?.message||e)==='HTTP 401'?'Lesezugang fehlt oder ist ungültig. Bitte „LESEZUGANG VERWENDEN“ wählen.':'Asset-Watch-Aktion fehlgeschlagen. Bitte später erneut versuchen.';assetWatchShareUi.tone='danger';
+  }finally{credential=undefined;if(current()){assetWatchShareAbort=null;assetWatchShareUi.busy=false;renderBots(true)}}
 }
 function bindBotOverviewControls(view){
   const setOpen=open=>[...view.querySelectorAll('.asset-pair-details')].forEach(x=>{x.open=open});
