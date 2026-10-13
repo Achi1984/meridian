@@ -7,12 +7,14 @@ liefert die geprüfte Adresse; hier ist bewusst keine Test-URL vorgegeben.
 
 ## Bindung an den Kandidaten
 
-- PR: #740; Head: `31a4467c721c1e7201477fd61e57325649f6abde`.
+- PR: #740; Head: `cc89186939328889f986bf5a8867dadebc9b6552`.
 - Basis: `78c694256a2b0da8f79c02733bcd9e18568aca02`.
 - Vor Beginn muss die Bereitstellung diesem Head nachweislich entsprechen.
   Die sichtbare Kennung B3 allein genügt nicht. Bei Änderungen neu abgleichen.
-- Gelesene Quellen: `v11/bot-read-bootstrap.js`, `bot-read-view.js`,
-  `bot-read-client.js`, `bot-read-model.js`; keine privaten Kontodaten geprüft.
+- Gelesene Quellen: `v11/bot-read-bootstrap.js`, `bot-read-access.js`,
+  `bot-read-view.js`, `bot-read-client.js`, `bot-read-model.js`;
+  keine privaten Kontodaten geprüft. `bot-read-access.js` definiert die
+  Memory-Haltung, Eingabevalidierung und Löschung des Lesezugangs.
 - Umfang: Safari-Tab auf einem echten iPhone. Keine PWA-, Engine-Paritäts-,
   Handels-, Rendite- oder vollständige Sicherheitsabnahme.
 
