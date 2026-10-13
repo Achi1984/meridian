@@ -41,7 +41,7 @@ export function createDepotReadView(root,{getToken,createClient}={}){
     for(const [label,value] of [['Bewertung (UTC)',m.snapshotAt],['Pionex-Quelle (UTC)',m.sourceAt]]){
       const line=el('p',label+': '),time=el('time',value);time.dateTime=value;line.append(time);details.append(line);
     }
-    details.append(el('p',current?'Quelle: serverseitige Depotdaten und öffentliche Kurse. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
+    details.append(el('p',current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
     if(m.excludedIncompletePoints>0)details.append(el('p','Die Historie enthält Datenlücken. Unvollständige Bewertungen wurden ausgelassen.'));
   }
   const client=createClient({getToken,onChange:render});
