@@ -168,6 +168,32 @@ const b5Deltas=[
     "        <li><strong>Meridian 11 · B5</strong><span class=\"version-status\">Testvorschau</span><p>Aufklappbare Botkarten mit Hebel, Kapital, P/L laut Quelle und Preisgrenzen. Fehlende oder nicht eindeutig bestätigte Werte bleiben nicht verfügbar.</p></li>\n"
   ]
 ];
+const b6Deltas=[
+  [
+    "  <!-- B5 DRAFT: Expandable read-only bot snapshot cards; no persistence, automatic request, engine, orders or service worker.\n",
+    "  <!-- B6 DRAFT: Semantic P/L colors in read-only bot snapshot cards; no persistence, automatic request, engine, orders or service worker.\n"
+  ],
+  [
+    "",
+    "    .bot-read-view .bot-card .bot-pnl-negative{color:#ff9b9b}\n    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n"
+  ],
+  [
+    "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B5<small>Versionsverlauf ▾</small></button>\n",
+    "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B6<small>Versionsverlauf ▾</small></button>\n"
+  ],
+  [
+    "          <p><b>Diese Vorschau · B5:</b> Aufklappbare Botkarten mit verfügbaren Kennzahlen und klar gekennzeichneten Datenlücken. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n",
+    "          <p><b>Diese Vorschau · B6:</b> P/L-Werte farblich hervorgehoben: Verlust rot, Gewinn grün. Unbestätigte Werte bleiben neutral. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n"
+  ],
+  [
+    "",
+    "        <li><strong>Meridian 11 · B6</strong><span class=\"version-status\">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>\n"
+  ],
+  [
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js\"></script>\n",
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n"
+  ]
+];
 const r128Deltas=[
   [
     "        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n",
@@ -176,6 +202,8 @@ const r128Deltas=[
 ];
 function restoreB2(source){
  for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
+ for(const [before,after] of b6Deltas){assert.equal(source.split(after).length-1,1,'one exact B6 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'0d6e678613100cfe68d67665964b7b3d079193a3','exact reviewed B5 bytes restored');
  for(const [before,after] of b5Deltas){assert.equal(source.split(after).length-1,1,'one exact B5 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'af699030738545b6f22886155abd3b8dddd4756d','exact reviewed B4 bytes restored');
@@ -233,7 +261,8 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    if(request.method!=='GET'||url.search){response.writeHead(404);response.end();return;}
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6';
+    if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
       if(request.headers.authorization!=='Bearer synthetic-b3-token'){response.writeHead(401);response.end('{}');return;}
@@ -241,7 +270,7 @@ function deploymentServer(){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)aborts++;});return;
       }
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
-      response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:1,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}}]}));return;
+      response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:2,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}},{botRef:'b'.repeat(20),symbol:'ETH',side:'LONG',cateType:'linear',botType:'futures_grid',leverage:2,investment:{usd:100},pnl:{usd:8.25}}]}));return;
     }
     if(modules.has(path)){
       response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
@@ -346,12 +375,15 @@ async function browserRun(call,start,width,expectedBuild,server){
       assert.equal(await evaluate(`document.getElementById('bot-read-token').value`),'','input cleared');
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
-      assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),1);
+      assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
       assert.equal(await evaluate(`document.getElementById('bot-read-root').textContent.includes('synthetic-b3-token')`),false);
       const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,display:getComputedStyle(s).display,unrotated:[...s.querySelectorAll('span')].every(n=>getComputedStyle(n).transform==='none'),headingWidth:s.querySelector('.bot-card-heading').getBoundingClientRect().width,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
       let card=await cardMetrics();
       assert.equal(card.open,false);assert.equal(card.display,'block');assert.equal(card.unrotated,true);assert.ok(card.headingWidth>180,'heading has usable line width');assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44);
       assert.match(card.text,/3×/);assert.match(card.text,/0,42 ETH/);assert.match(card.text,/-12,5 USD/);
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-negative')).color`),'rgb(255, 155, 155)');
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
+      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'8,25 USD');
       assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
       await evaluate(`document.querySelector('#bot-read-root summary').focus();true`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
@@ -366,14 +398,17 @@ async function browserRun(call,start,width,expectedBuild,server){
         mkdirSync(evidence,{recursive:true});
         await evaluate(`document.getElementById('bot-read-root').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b5-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
+        writeFileSync(join(evidence,`v11-b6-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
       }
       await evaluate(`document.querySelector('#bot-read-root summary').click();true`);
       assert.equal((await cardMetrics()).open,false);
       if(evidence){
         await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b5-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
+        writeFileSync(join(evidence,`v11-b6-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
+        await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').closest('.bot-card').scrollIntoView({block:'center'});true`);
+        const positiveShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(evidence,`v11-b6-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
       await evaluate(`document.querySelectorAll('#bot-read-root button')[1].click();true`);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
