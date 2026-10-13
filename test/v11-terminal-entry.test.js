@@ -194,7 +194,15 @@ const b6Deltas=[
     "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n"
   ]
 ];
+const r128Deltas=[
+  [
+    "        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Veröffentlichter Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n",
+    "        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Einmaliger Meridian-Lesezugang für das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Historischer Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n"
+  ]
+];
 function restoreB2(source){
+ for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
  for(const [before,after] of b6Deltas){assert.equal(source.split(after).length-1,1,'one exact B6 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'0d6e678613100cfe68d67665964b7b3d079193a3','exact reviewed B5 bytes restored');
  for(const [before,after] of b5Deltas){assert.equal(source.split(after).length-1,1,'one exact B5 delta');source=source.replace(after,before);}

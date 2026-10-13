@@ -8,7 +8,8 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/id="version-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="version-panel"/);
  assert.match(html,/id="version-panel"[^>]*aria-labelledby="version-history-heading" hidden/);
  assert.match(html,/id="version-close"[^>]*aria-label="Versionsverlauf schließen">Schließen<\/button>/);
- assert.match(html,/Terminal 10\.0-r127/);
+ assert.match(html,/Terminal 10\.0-r128/);
+ assert.match(html,/Terminal 10\.0-r127<\/strong><span class="version-status">Historischer Stand/);
  assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B6<small>/);
  assert.match(html,/Meridian 11 · B6<\/strong>/);
  assert.match(html,/Asset-Watch-Link oder Meridian-Lesepasswort/);
