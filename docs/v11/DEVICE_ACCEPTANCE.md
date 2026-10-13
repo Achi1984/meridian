@@ -36,3 +36,9 @@ Fehlerfälle und verkürzte Fristen mit freigegebenen synthetischen Antworten te
 | Entscheidung und nächster Schritt | offen |
 
 Bei ungewollter Abfrage, nachgefüllten/verbleibenden Privatdaten, falschem Frischezustand oder unbedienbarer Sperre: FAIL, sperren/schließen und Ausweitung stoppen. Die Leitung entscheidet über Korrektur oder Rücknahme. Dieses Protokoll aktiviert keine Engine, PWA, Handel oder Hintergrundautomation.
+
+## B9 — Command valuation and history axis
+
+B8 owner screenshots (2026-10-13 23:00 Vienna) show stored valuation and nine history points on iPhone. This verifies visible stored data and chart, not the current-source path, all range interactions or lock behavior.
+
+B9 device acceptance NOT PERFORMED. Check Command after manual Depot refresh: same value and current/stored source label; no extra request on tab navigation. Lock, replace access, hide or leave: Command value clears together with Depot. Expired values clear or switch only to a still-valid stored valuation with corresponding label. History axis retains the selected query window, indicates local time and separately names actual first/last measurements. Sparse data is not stretched or extrapolated. Check 320/375/390/430 widths and actual iPhone.

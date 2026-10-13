@@ -211,7 +211,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -224,7 +224,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/764">B8-Umfang #764</a>.</p>
+          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -237,6 +237,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B9</strong><span class="version-status">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>
         <li><strong>Meridian 11 · B8</strong><span class="version-status">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>
         <li><strong>Meridian 11 · B7</strong><span class="version-status">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>
         <li><strong>Meridian 11 · B6</strong><span class="version-status">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>
@@ -257,20 +258,20 @@
   <main id="app-main" class="container" tabindex="-1">
     <section id="view-command" class="view active" aria-labelledby="command-heading">
       <div class="section-intro">
-        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Alles Wesentliche.<br>Ein Blick.</h1><p class="sub">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>
+        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Alles Wesentliche.<br>Ein Blick.</h1><p class="sub">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>
       </div>
       <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
         <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
-        <h2>Datenanbindung steht noch aus</h2>
-        <p>Diese Übersicht verarbeitet keine Depot- oder Marktdaten. Bot-Snapshots können ausschließlich im Bots-Tab manuell gelesen werden. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
+        <h2>Depot im Überblick · Risiko ungeklärt</h2>
+        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
         <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat</div>
       </section>
-      <section class="card" aria-label="Portfolio">
+      <section id="command-portfolio" class="card" aria-label="Portfolio">
         <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
         <div class="portfolio-row"><div><div class="portfolio-value" aria-label="Portfoliowert unbekannt">—</div><div class="portfolio-description">Gesamtwert nicht verifiziert</div></div></div>
         <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
         <div class="trust-grid" aria-label="Datenquellenstatus">
-          <div class="trust-cell"><strong>DEPOT</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
           <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
           <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
         </div>
@@ -282,12 +283,12 @@
       <details class="command-source-details">
         <summary><span>DATEN &amp; QUELLEN</span><span aria-hidden="true">+</span></summary>
         <div class="details-body">
-          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Bot-Lesezugang.</p>
+          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
           <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
           <p><b>Grundlage:</b> MERIDIAN 11 Architekturentscheid #603. Die geprüfte v10-Engine bleibt separat.</p>
           <section id="data-state-preview" class="data-state-preview" aria-labelledby="state-preview-heading">
             <h2 id="state-preview-heading">Datenstatus · Darstellungsbeispiele</h2>
-            <p>Nur Ansichtsmuster ohne Kontozugriff. Depotwert und Risikostatus bleiben unbekannt.</p>
+            <p>Nur Ansichtsmuster ohne Kontozugriff. Sie verändern weder die geladene Depotbewertung noch den Risikostatus.</p>
             <div class="state-controls" role="group" aria-label="Beispielzustand wählen">
               <button type="button" data-preview-state="unknown" aria-pressed="true" aria-controls="preview-data-status">Unbekannt</button>
               <button type="button" data-preview-state="loading" aria-pressed="false" aria-controls="preview-data-status">Lädt</button>
@@ -450,6 +451,6 @@
 })();
 </script>
 <script type="module" src="./bot-read-bootstrap.js?v=B6"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B8"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>
 </body>
 </html>

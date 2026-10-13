@@ -8,7 +8,7 @@ const LABELS={
   unavailable:['Nicht verfügbar','Keine verifizierbare Depotbewertung. Fehlende Daten sind nicht null.']
 };
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
-export function createDepotReadView(root,{getToken,createClient}={}){
+export function createDepotReadView(root,{getToken,createClient,commandRoot=null}={}){
   const document=root.ownerDocument;
   const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
   const controls=el('div'),refresh=el('button','Depot aktualisieren'),lock=el('button','Depot sperren');
@@ -29,6 +29,17 @@ export function createDepotReadView(root,{getToken,createClient}={}){
       typeof m.snapshotAt!=='string'||typeof m.sourceAt!=='string'))kind='unavailable';
     section.dataset.state=kind;
     const current=kind==='fresh'&&m?.source==='SERVER_PORTFOLIO_CURRENT';
+    if(commandRoot){
+      const set=(selector,text)=>{const n=commandRoot.querySelector(selector);if(n)n.textContent=text;};
+      set('.portfolio-value',kind==='fresh'?money(m.totalUsd):'—');
+      const value=commandRoot.querySelector('.portfolio-value');
+      value?.setAttribute('aria-label',kind==='fresh'?'Depotbewertung: '+money(m.totalUsd):'Portfoliowert unbekannt');
+      set('.state-label',kind==='fresh'?'BEWERTUNG GELADEN':LABELS[kind][0].toUpperCase());
+      set('.portfolio-description',kind==='fresh'?(current?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung'):LABELS[kind][1]);
+      set('.caption',kind==='fresh'?'Stand: '+new Date(m.snapshotAt).toLocaleString('de-AT')+' · '+(current?'Serverseitige Quellen; lokale Ergänzungen aus V10 fehlen.':'Gespeicherter Snapshot; keine Live-Kurse.'):'Im Depot entsperren und manuell aktualisieren.');
+      set('[data-command-depot-status]',kind==='fresh'?'Bewertung geladen':LABELS[kind][0]);
+      commandRoot.dataset.state=kind;
+    }
     status.replaceChildren(el('strong',current?'Depotbewertung':LABELS[kind][0]),el('p',current?'Aus serverseitigen Depotdaten. Lokale Ergänzungen aus V10 sind nicht enthalten.':LABELS[kind][1]));
     details.replaceChildren();details.setAttribute('aria-busy',String(kind==='loading'));
     if(kind!=='fresh')return;
