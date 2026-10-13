@@ -14,7 +14,9 @@ test('autonomy status is persistent and unknown without telemetry',()=>{
 });
 test('historical UI evidence is separate from current operation and draft revision',()=>{
  assert.match(strip,/Diese Vorschau · B3/);
- assert.match(strip,/Integrationszeit und Änderungsnachweis stehen/);
+ assert.match(strip,/Kontrollierte Testvorschau · Geräteabnahme ausstehend/);
+ assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/pull\/740/);
+ assert.doesNotMatch(strip,/Integrationszeit und Änderungsnachweis stehen|Noch nicht veröffentlicht/);
  assert.match(strip,/Zuletzt belegte UI-Änderung · B1/);
  assert.match(strip,/datetime="2026-10-11T19:30:28Z"/);
  assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/pull\/702/);
