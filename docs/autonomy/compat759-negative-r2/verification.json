@@ -1,0 +1,83 @@
+{
+  "adapter": {
+    "decision": "BLOCKED",
+    "reason": "STRICTEST_VERDICT"
+  },
+  "authenticated": false,
+  "authorized": false,
+  "binding": {
+    "decision": "BLOCKED",
+    "hasPlannerResponse": true,
+    "reason": "NON_GREEN_REVIEW"
+  },
+  "bodyBytes": 4560,
+  "bodySha256": "a1f2c49bf3c13e58e718e4d73949969c8b0507a437a0bbdcd42eaf0cf788fbf3",
+  "checkExecutionStatus": "all not_executed; no check receipt hashes supplied",
+  "ciObservationSource": "Root confirmed exact-head PR Safety 38450967975 attempt 1 and companion push Safety 38450961180 completed success. This does not establish execution of required review checks.",
+  "dispatchAllowed": false,
+  "durable": false,
+  "envelopeEvidenceSha256": "f82dc6caa0763fe79e01950a8e07fb1ab86b5403ec771d4c76d809b0467f3844",
+  "handoff": {
+    "decision": "BLOCKED",
+    "hasPlannerResponse": true,
+    "reason": "NON_GREEN_REVIEW",
+    "syntheticReads": 9
+  },
+  "hold": "Awaiting concrete owner execution approval; no live request, publication or execution authorized.",
+  "kind": "OFFLINE_SYNTHETIC_NEGATIVE_COMPATIBILITY_VERIFICATION",
+  "liveExecutionReady": false,
+  "mergeAllowed": false,
+  "policySha256": "e088617a3bd8431f95f9a337f97cf5b0ab4e2ff05cbc6aa533f0b735c9a7c99e",
+  "provenanceVerified": false,
+  "rejectionCases": [
+    {
+      "case": "wrong-actor",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "ACTOR_MISMATCH"
+    },
+    {
+      "case": "modified-body",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "COMMENT_VERSION_CHANGED"
+    },
+    {
+      "case": "wrong-head",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "CLAIM_REJECTED"
+    },
+    {
+      "case": "modified-version",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "COMMENT_VERSION_CHANGED"
+    },
+    {
+      "case": "handoff-wrong-actor",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "HANDOFF_INVALID"
+    },
+    {
+      "case": "handoff-modified-body",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "COMMENT_VERSION_CHANGED"
+    },
+    {
+      "case": "handoff-wrong-head",
+      "decision": "BLOCKED",
+      "passed": true,
+      "reason": "HANDOFF_INVALID"
+    }
+  ],
+  "requiredChecks": 7,
+  "syntheticOnly": [
+    "comment ID 789 and timestamps",
+    "API responses and rereads",
+    "adapter manifest and ownerApprovalRef",
+    "adapter job counts and execution state"
+  ]
+}

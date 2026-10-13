@@ -1,0 +1,16 @@
+CROSS_MODEL_REQUEST @claude
+Request-ID: compat759-v2-negative-r2
+Op-ID: compat759-publication-test-r2
+Purpose: one explicitly negative publication-compatibility test, not an independent review or an approval. This prepared request may be posted only after the owner approves this concrete invocation.
+
+First verify current Achi1984/meridian main is b26a10b31d2929f8c44d227358312726085209b9 and open PR759 head is 686795d61b5b87a4ca70a9a186827e7a189a750c with that base. Verify Release Safety run38450967975 attempt1 workflow347821227 is a successful pull_request run for that head/PR; companion38450961180 also succeeded. Stop if any pin moved or any fact cannot be verified. Do not repin or retry.
+
+Read the exact supplied JSON body through this immutable Git blob:
+https://api.github.com/repos/Achi1984/meridian/git/blobs/e50d6721771613a50b427ed276d9d47de6ac658a
+Use read-only retrieval. The raw UTF-8 body is4560bytes, SHA-256 a1f2c49bf3c13e58e718e4d73949969c8b0507a437a0bbdcd42eaf0cf788fbf3, with no trailing newline. The blob API may encode content as base64; that API wrapper is not the response body. Do not post the wrapper or a URL instead of the exact JSON.
+
+Publish that exact complete JSON as the one requested new CROSS_MODEL_RESPONSE comment in mailbox571 through your existing authorized comment capability while the action is running. The response marker and REVISION REQUIRED explanation are already inside the JSON finding. Do not add a prose prefix, Markdown fence, suffix or altered digest. Do not edit another comment, switch actor/token, export credentials or reuse an action token after cleanup. If the permitted comment capability cannot preserve the bytes, stop and report BLOCKED without pretending success.
+
+The payload is supplied test data: all seven review checks remain not_executed, with no execution-receipt hashes. Do not run catalog tests, execute PR code, checkout another branch, change files/workflows, provide GREEN, or represent this as your independent assessment. Publishing a negative fixture does not grant review, merge, dispatch, trading or worker authority.
+
+One existing workflow invocation only; actual configured limits35minutes/35modelturns. No rerun, follow-up invocation or repair loop. The lead will independently verify original body/author/version and run the existing non-authoritative validators. An ambiguous outcome stops without reposting. Existing action progress output is not review evidence.

@@ -1,0 +1,80 @@
+{
+  "controlSha": "b26a10b31d2929f8c44d227358312726085209b9",
+  "files": [
+    {
+      "path": "docs/autonomy/event-adapter/fixtures/scripts/codex-bridge-v3-review-coordinator.mjs",
+      "blob": "05971d00c2f5f9fad3e15cea21a7893ba0b4aa58",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/fixtures/scripts/continuation-contract.mjs",
+      "blob": "3963b21cf31a22ce3c6bd8906cba267673e32a23",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/fixtures/scripts/development-centre-planner.mjs",
+      "blob": "cee54e3dd3f9eaeade610221aecaf87e09692c6c",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/fixtures/scripts/event-continuation-intake.mjs",
+      "blob": "b4db44a654ddb73b14d2455166d0a2417c6019ff",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/fixtures/codex-bridge-v3-review-coordinator.mjs",
+      "blob": "05971d00c2f5f9fad3e15cea21a7893ba0b4aa58",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/fixtures/structured-review-transport.py",
+      "blob": "f11003993605ef60e964edcf1adbab8132b3592c",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/scripts/review-evidence-binding.py",
+      "blob": "3c77bb676efdf8755ee529b9e74dbcd3f5d27453",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/scripts/review-evidence-contract.py",
+      "blob": "a2e98d3ce05476d57b868b7ec72467ee9927f0b5",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/scripts/review-evidence-envelope-binding.py",
+      "blob": "ac17602427eaf28a145966660ceb1815ea7cf139",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/scripts/structured-response-producer.py",
+      "blob": "22f19fb80cba7720533669fb5f64b8e27d57f8c8",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/test/adapter-bridge.mjs",
+      "blob": "b525eedbc0cd2a1bd23847efa99d852e5fa05acb",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/review-binding/test/test_review_binding.py",
+      "blob": "af20a82e5e46e57ae9a56821e03f9bf3e55080c4",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-adapter/scripts/event-continuation-adapter.mjs",
+      "blob": "9c37261220ba732f4406d5e3dbb85909ee04b836",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-receiver/collector.py",
+      "blob": "fb95d1ad462c218cf2d2bab0d4d191d1bde7d6b4",
+      "matchesExactMain": true
+    },
+    {
+      "path": "docs/autonomy/event-receiver/review_handoff.py",
+      "blob": "86ec3844ef80a44cb3bd7d10542ec6963d72f0ac",
+      "matchesExactMain": true
+    }
+  ]
+}
