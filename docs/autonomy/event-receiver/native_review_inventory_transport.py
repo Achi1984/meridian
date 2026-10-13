@@ -38,7 +38,7 @@ def _links(headers, base, page):
     return 'next' in found
 
 
-def observe_inventory(expected_raw, token):
+def observe_inventory(expected_raw, token, *, _budget=None):
     """Two bounded passes, at most six GETs; sanitized fail-closed result.
 
     Returned evidence remains incomplete and unauthenticated: transport does not
@@ -52,6 +52,10 @@ def observe_inventory(expected_raw, token):
         base = ('https://api.github.com/repos/' + REPO + '/pulls/'
                 + str(expected['scope']['prNumber']) + '/reviews?per_page=50&page=')
         opener = urllib.request.build_opener(NoRedirect())
+        if _budget is not None:
+            from native_review_packet import _PacketBudget
+            need(type(_budget) is _PacketBudget, 'BUDGET_TYPE')
+            opener = _budget.wrap_opener(opener)
         deadline = time.monotonic() + 60
         pair = {}
         total = 0
@@ -86,3 +90,4 @@ def observe_inventory(expected_raw, token):
         return project_inventory(expected_raw, encoded)
     except Exception:
         return blocked
+
