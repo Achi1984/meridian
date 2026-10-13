@@ -191,19 +191,22 @@
     .bot-card summary .bot-card-metrics>span>span,.bot-card summary .bot-card-metrics strong{display:block}
     .bot-read-view .bot-card .bot-pnl-negative{color:#ff9b9b}
     .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}
+    .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}
+    .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}
     .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
   </style>
 </head>
 <body>
 <a class="skip-link" href="#app-main">Zum Inhalt</a>
-<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-read-only" data-execution-impact="false">
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-depot-read-only" data-execution-impact="false">
   <header class="topbar">
     <div class="header-inner">
       <div class="identity">
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B6<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -216,7 +219,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B6:</b> P/L-Werte farblich hervorgehoben: Verlust rot, Gewinn grün. Unbestätigte Werte bleiben neutral. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href="https://github.com/Achi1984/meridian/pull/740">Botanbindung #740</a>.</p>
+          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/762">B7-Umfang #762</a>.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -229,6 +232,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B7</strong><span class="version-status">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>
         <li><strong>Meridian 11 · B6</strong><span class="version-status">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>
         <li><strong>Meridian 11 · B5</strong><span class="version-status">Testvorschau</span><p>Aufklappbare Botkarten mit Hebel, Kapital, P/L laut Quelle und Preisgrenzen. Fehlende oder nicht eindeutig bestätigte Werte bleiben nicht verfügbar.</p></li>
         <li><strong>Meridian 11 · B4</strong><span class="version-status">Testvorschau</span><p>Bestehende Asset-Watch-Freigabelinks für manuelle Bot-Abfragen unterstützt. Zugang nur im Arbeitsspeicher; Geräteabnahme ausstehend.</p></li>
@@ -295,20 +299,21 @@
     <section id="view-depot" class="view" aria-labelledby="depot-heading" hidden>
       <div class="eyebrow">KAPITAL &amp; ÜBERSICHT</div><h1 id="depot-heading">Depot</h1>
       <section class="card" aria-labelledby="depot-summary-heading">
-        <div class="card-head"><h2 id="depot-summary-heading">Depotübersicht</h2><span class="limited">Statische Vorschau</span></div>
-        <div class="portfolio-row"><div><p class="caption">Gesamtwert</p><div class="portfolio-value" aria-label="Gesamtwert unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
-        <p class="caption">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>
-        <div class="trust-grid" aria-label="Datenstatus des Depots">
-          <div class="trust-cell"><strong>Quelle</strong><span>Nicht verbunden</span></div>
-          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
-          <div class="trust-cell"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>
+        <div class="card-head"><h2 id="depot-summary-heading">Depotbewertung</h2><span class="limited">Nur lesend</span></div>
+        <p class="caption">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>
+        <div class="bot-access-controls">
+          <label for="depot-read-token">Meridian-Lesepasswort für das Depot</label>
+          <input id="depot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="depot-read-access-help">
+          <p id="depot-read-access-help">Asset-Watch-Links gelten nur für Bots. Passwort nur vorübergehend im Arbeitsspeicher; Sperren, Ausblenden oder Verlassen der Seite löscht den Zugang.</p>
+          <button id="depot-read-provide" type="button">Depot-Lesezugang übernehmen</button>
+          <p id="depot-read-access-status" role="status" aria-live="polite"></p>
         </div>
+        <div id="depot-read-root"></div>
       </section>
       <section class="card card-muted" aria-labelledby="depot-holdings-heading">
         <h2 id="depot-holdings-heading">Deine Bestände</h2>
-        <p class="caption">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>
+        <p class="caption">Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.</p>
       </section>
-      <p class="caption">Diese Depotansicht ist nicht angebunden. „Terminal öffnen“ führt zum separaten Terminal.</p>
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
@@ -439,5 +444,6 @@
 })();
 </script>
 <script type="module" src="./bot-read-bootstrap.js?v=B6"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B7"></script>
 </body>
 </html>

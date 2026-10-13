@@ -1,0 +1,101 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {buildDepotReadModel} from '../v11/depot-read-model.js';
+import {createDepotReadClient,parseDepotReadCredential} from '../v11/depot-read-client.js';
+import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
+const NOW=Date.parse('2026-10-13T20:00:00Z');
+function snapshot(){return {version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',source:'POSTGRES_CANONICAL_HISTORY',
+  rawPointCount:1,excludedIncompletePoints:0,generatedAt:new Date(NOW).toISOString(),points:[{timestamp:NOW-1000,
+    spotUsd:120,tradingUsd:30,totalUsd:150,sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',
+      tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:NOW-2000}}]};}
+test('B7 accepts a complete stored valuation, including genuine zero, with source expiry',()=>{
+  const s=snapshot(),m=buildDepotReadModel(s,{now:NOW});
+  assert.equal(m.status,'FRESH_SNAPSHOT');assert.equal(m.totalUsd,150);assert.equal(m.expiresAt,NOW-2000+900000);
+  assert.equal(m.readOnly,true);assert.equal(m.executionAllowed,false);
+  s.points[0].spotUsd=s.points[0].tradingUsd=s.points[0].totalUsd=0;
+  assert.equal(buildDepotReadModel(s,{now:NOW}).totalUsd,0);
+});
+test('B7 rejects malformed, partial, inconsistent and unknown provenance without numeric fallback',()=>{
+  const changes=[s=>{s.source='NO_DATABASE';},s=>{s.version='old';},s=>{s.points=[];},
+    s=>{s.rawPointCount=2;},s=>{s.excludedIncompletePoints=-1;},s=>{s.points[0].totalUsd=999;},
+    s=>{s.points[0].sourceStatus.spot='STRICT_PARTIAL';},s=>{s.points[0].sourceStatus.tradingFresh=false;},
+    s=>{s.points[0].sourceStatus.tradingSource='MISSING';},s=>{s.points[0].timestamp=NOW+1;},
+    s=>{s.points[0].sourceStatus.tradingUpdatedAt=NOW;},
+    s=>{s.points[0].sourceStatus.tradingUpdatedAt='2026-02-30T00:00:00Z';}];
+  for(const field of ['totalUsd','spotUsd','tradingUsd'])for(const value of [null,'0',true,NaN,Infinity,-1])
+    changes.push(s=>{s.points[0][field]=value;});
+  for(const change of changes){const s=snapshot();change(s);const m=buildDepotReadModel(s,{now:NOW});
+    assert.equal(m.status,'UNKNOWN');assert.equal(m.totalUsd,null);}
+});
+test('B7 ages capture and source independently and does not use generatedAt or older fallback',()=>{
+  const s=snapshot();s.points[0].sourceStatus.tradingUpdatedAt=NOW-900001;
+  assert.equal(buildDepotReadModel(s,{now:NOW}).status,'STALE');
+  s.points[0].timestamp=NOW-900001;s.points[0].sourceStatus.tradingUpdatedAt=NOW-900002;
+  assert.equal(buildDepotReadModel(s,{now:NOW}).status,'STALE');
+  const bad=snapshot();bad.points.push({...bad.points[0],timestamp:NOW,totalUsd:null});bad.rawPointCount=2;
+  assert.equal(buildDepotReadModel(bad,{now:NOW}).totalUsd,null);
+  const gap=snapshot();gap.rawPointCount=3;gap.excludedIncompletePoints=2;
+  assert.equal(buildDepotReadModel(gap,{now:NOW}).excludedIncompletePoints,2);
+});
+test('B7 rejects bot-share and foreign URLs before making any request',async()=>{
+  for(const value of ['https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43),
+    'a'.repeat(43),'https://foreign.example/token','//foreign.example','bad\nsecret','']){
+    assert.equal(parseDepotReadCredential(value),null);let reads=0;
+    const c=createDepotReadClient({getToken:()=>value,fetchImpl:()=>{reads++;}});await c.refresh();assert.equal(reads,0);c.dispose();
+  }
+});
+test('B7 fixed GET only, bounded body, no mount read, no credential/error leakage',async()=>{
+  const states=[];let reads=0;
+  const c=createDepotReadClient({getToken:()=> 'synthetic-password',now:()=>NOW,onChange:s=>states.push(s),fetchImpl:async(url,o)=>{
+    reads++;assert.equal(url,'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1d');
+    assert.equal(o.method,'GET');assert.equal(o.credentials,'omit');assert.equal(o.redirect,'error');
+    assert.equal(o.headers.authorization,'Bearer synthetic-password');return new Response(JSON.stringify(snapshot()));}});
+  assert.equal(reads,0);await c.refresh();assert.equal(states.at(-1).status,'fresh');
+  c.lock();assert.equal(states.at(-1).model,null);assert.doesNotMatch(JSON.stringify(states),/synthetic-password/);c.dispose();
+  for(const response of [new Response('secret error',{status:500}),new Response('bad json'),
+    new Response('{}',{headers:{'content-length':String(512*1024+1)}}),new Response(' '.repeat(512*1024+1))]){
+    const out=[];const client=createDepotReadClient({getToken:()=> 'pass',onChange:s=>out.push(s),fetchImpl:async()=>response});
+    await client.refresh();assert.equal(out.at(-1).status,'unavailable');assert.doesNotMatch(JSON.stringify(out),/secret error/);client.dispose();
+  }
+});
+test('B7 late response cannot refill locked state and changed credential aborts pending work',async()=>{
+  for(const changed of [false,true]){
+    let resolve,credential='first';const states=[];
+    const c=createDepotReadClient({getToken:()=>credential,now:()=>NOW,onChange:s=>states.push(s),
+      fetchImpl:()=>new Promise(r=>{resolve=r;})});
+    const pending=c.refresh();if(changed){credential='second';c.revalidate();}else c.lock();
+    resolve(new Response(JSON.stringify(snapshot())));await pending;assert.equal(states.at(-1).status,'locked');c.dispose();
+  }
+});
+class Target{
+  constructor(){this.listeners=new Map();this.value='';this.textContent='';}
+  addEventListener(k,f){if(!this.listeners.has(k))this.listeners.set(k,new Set());this.listeners.get(k).add(f);}
+  removeEventListener(k,f){this.listeners.get(k)?.delete(f);}
+  fire(k){for(const f of this.listeners.get(k)||[])f();}
+}
+function mounted(response){
+  const document=new Target(),window=new Target(),nodes=new Map(['root','token','provide','access-status'].map(n=>['depot-read-'+n,new Target()]));
+  document.getElementById=id=>nodes.get(id);document.hidden=false;
+  let client,token,reads=0,clock=NOW;const states=[],timers=new Map();let next=0;
+  const mount=mountDepotReadAccess(document,window,{now:()=>clock,schedule:(f,ms)=>{timers.set(++next,{f,ms});return next;},cancelSchedule:id=>timers.delete(id),
+    createClient:options=>{token=options.getToken;return createDepotReadClient({...options,now:()=>clock,fetchImpl:async()=>{reads++;return response();}});},
+    createView:(_r,o)=>{client=o.createClient({getToken:o.getToken,onChange:s=>states.push(s)});return {revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};}});
+  return {document,window,nodes,states,timers,mount,client:()=>client,token:()=>token(),reads:()=>reads,
+    accept(value='synthetic-password'){nodes.get('depot-read-token').value=value;nodes.get('depot-read-provide').fire('click');},clock(value){clock=value;}};
+}
+test('B7 memory access clears on hide/pagehide and401/403; focus and provision never fetch',async()=>{
+  for(const code of [200,401,403]){
+    const h=mounted(()=>new Response(JSON.stringify(snapshot()),{status:code}));h.accept();
+    assert.equal(h.reads(),0);assert.equal(h.nodes.get('depot-read-token').value,'');await h.client().refresh();
+    if(code!==200){assert.equal(h.token(),null);assert.equal(h.states.at(-1).status,'locked');}
+    h.document.hidden=true;h.document.fire('visibilitychange');assert.equal(h.token(),null);
+    const reads=h.reads();h.window.fire('focus');h.window.fire('pageshow');assert.equal(h.reads(),reads);
+    h.accept();h.window.fire('pagehide');assert.equal(h.token(),null);h.mount.dispose();
+  }
+});
+test('B7 expiry invalidates foreground valuation without polling; rejected replacement clears access',async()=>{
+  const h=mounted(()=>new Response(JSON.stringify(snapshot())));h.accept();await h.client().refresh();
+  assert.equal(h.timers.size,1);const timer=[...h.timers.values()][0];assert.equal(timer.ms,898001);
+  h.clock(NOW+898001);timer.f();assert.equal(h.states.at(-1).status,'stale');assert.equal(h.reads(),1);
+  h.accept('https://foreign.example');assert.equal(h.token(),null);assert.equal(h.nodes.get('depot-read-token').value,'');h.mount.dispose();
+});

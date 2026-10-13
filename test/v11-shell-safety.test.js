@@ -29,7 +29,7 @@ test('A0: five accessible linked tabs, unique IDs and initial view',()=>{
 
 test('A0: exactly one decision and unknown data fail closed',()=>{
  assert.equal((html.match(/data-decision-owner=/g)||[]).length,1);
- assert.match(html,/data-preview-mode="manual-bot-read-only"/);
+ assert.match(html,/data-preview-mode="manual-bot-depot-read-only"/);
  assert.match(html,/data-execution-impact="false"/);
  assert.match(html,/JETZT WICHTIG[\s\S]*?UNGEKLÄRT/);
  assert.match(html,/<div class="portfolio-value"[^>]*>—<\/div>/);
@@ -40,12 +40,12 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
 });
 
 test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
- assert.equal((html.match(/<script\b/gi)||[]).length,2,'one navigation script plus exact manual read bootstrap');
+ assert.equal((html.match(/<script\b/gi)||[]).length,3,'one navigation script plus exact manual bot and depot read bootstraps');
  assert.match(html,/<script>/,'script must have no attributes');
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  assert.match(html,/<script type="module" src="\.\/bot-read-bootstrap\.js\?v=B6"><\/script>/);
- assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js?v=B6"></script>',''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
+ assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js?v=B6"></script>','').replace('<script type="module" src="./depot-read-bootstrap.js?v=B7"></script>',''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
  assert.doesNotMatch(html,/<link\b[^>]*rel=["']manifest/i);
  const js=scripts[0][1].replace(/\/\*[\s\S]*?\*\//g,'');
  assert.doesNotMatch(js,/\b(fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts|localStorage|sessionStorage|indexedDB|serviceWorker|readToken|MERIDIAN_V10_BRIDGE)\b/);
