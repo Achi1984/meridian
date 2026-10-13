@@ -23,14 +23,24 @@
     "dispatch": false
   },
   "universe": {
-    "status": "NOT_FROZEN",
+    "status": "TOP20_DESIGN_POINT_IN_TIME_DATA_PENDING",
+    "primaryEligibleCount": 20,
+    "comparisonEligibleCount": 10,
+    "rankMetric": "circulating market capitalization, descending, point-in-time",
+    "construction": "filter historical stablecoins and duplicate wrapped/staked representations, verify venue listing/liquidity/history, then take first N eligible in market-cap order",
+    "membershipSchedule": "weekly, latest independently available historical snapshot before Saturday selection",
+    "insufficientEligibleAssets": "INVALID_UNIVERSE_DO_NOT_FILL_FROM_CURRENT_RANKS",
     "initialDataFeasibilitySymbols": [
       "BTC",
       "ETH",
       "SOL"
     ],
     "selectionUniverse": null,
-    "rule": "Do not pass only three assets and claim to validate cross-sectional low-vol selection; freeze a broader point-in-time eligible universe or explicitly register a separate three-asset trend-only control."
+    "exclusions": [
+      "stablecoins by historical function",
+      "wrapped or staked duplicates of underlying exposure"
+    ],
+    "note": "N is research universe size, not number of holdings. H7 still chooses at most3, each25percent. Top10 versusTop20 is a counted universe variant, not free optimization."
   },
   "signal": {
     "historyDailyCloses": 201,
@@ -73,5 +83,13 @@
   "nextCandidates": [
     "H5_REBOUND_AFTER_COST_AND_FILL_MODEL",
     "LONG_SHORT_AFTER_INSTRUMENT_SPECIFIC_MARGIN_AND_FUNDING_MODEL"
-  ]
+  ],
+  "sourceDataPreparation": {
+    "module": "docs/strategy-lab/normalize-binance-daily.mjs",
+    "spotArchiveUnitBefore2025": "ms",
+    "spotArchiveUnitFrom2025": "us",
+    "availability": "explicit actual receipt supplied; never inferred from close",
+    "verifiedFormatProbes": 6,
+    "fullHistoryVerified": false
+  }
 }

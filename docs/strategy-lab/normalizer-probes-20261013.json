@@ -1,0 +1,83 @@
+{
+  "purpose": "Six source-format probes only; not strategy PnL or historical receipt certification",
+  "results": [
+    {
+      "symbol": "BTCUSDT",
+      "date": "2024-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1d/BTCUSDT-1d-2024-01-01.zip",
+      "sha256": "6322fa0e83995518b01066a110dca5c03ff837a6ef915a792b718fa76f0de205",
+      "checksumVerified": true,
+      "timestampUnit": "ms",
+      "availableAtMs": 1791917583613,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1704153600000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "date": "2025-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1d/BTCUSDT-1d-2025-01-01.zip",
+      "sha256": "7e60fb8bf56e1162522a544e9a78ce6823f7d6d59989a607a0aea09fa03a4845",
+      "checksumVerified": true,
+      "timestampUnit": "us",
+      "availableAtMs": 1791917583603,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1735776000000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "date": "2024-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1d/ETHUSDT-1d-2024-01-01.zip",
+      "sha256": "54ce6ae0eaaee2712ed2090872e458809e2ee393dc3c27cc44b5adc3f88243d5",
+      "checksumVerified": true,
+      "timestampUnit": "ms",
+      "availableAtMs": 1791917583553,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1704153600000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "date": "2025-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1d/ETHUSDT-1d-2025-01-01.zip",
+      "sha256": "0a0194452f93791e089adb2223174eab3513239f3d62e3a61c85aa1b0501eb0a",
+      "checksumVerified": true,
+      "timestampUnit": "us",
+      "availableAtMs": 1791917592973,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1735776000000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "date": "2024-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SOLUSDT/1d/SOLUSDT-1d-2024-01-01.zip",
+      "sha256": "e833762ae68ead290fd43e740f3099d5ff87f58c1c3b8c6db095ead40eb7b52a",
+      "checksumVerified": true,
+      "timestampUnit": "ms",
+      "availableAtMs": 1791917592923,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1704153600000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "date": "2025-01-01",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SOLUSDT/1d/SOLUSDT-1d-2025-01-01.zip",
+      "sha256": "b962b5346f3a66e406336366f29357da3baa82c0e0e357b87c6126f5bd9f2b02",
+      "checksumVerified": true,
+      "timestampUnit": "us",
+      "availableAtMs": 1791917592923,
+      "normalizedRows": 1,
+      "exclusiveCloseTimeMs": 1735776000000,
+      "normalizerValid": true,
+      "executionAuthorized": false
+    }
+  ]
+}
