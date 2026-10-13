@@ -200,7 +200,38 @@ const r128Deltas=[
     "        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Einmaliger Meridian-Lesezugang für das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Historischer Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n"
   ]
 ];
+const b7Deltas=[
+  [
+    "11 · Vorschau B6<small>",
+    "11 · Vorschau B7<small>"
+  ],
+  [
+    "          <p><b>Diese Vorschau · B6:</b> P/L-Werte farblich hervorgehoben: Verlust rot, Gewinn grün. Unbestätigte Werte bleiben neutral. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n",
+    "          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n"
+  ],
+  [
+    "        <li><strong>Meridian 11 · B6</strong><span class=\"version-status\">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>\n",
+    "        <li><strong>Meridian 11 · B7</strong><span class=\"version-status\">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>\n        <li><strong>Meridian 11 · B6</strong><span class=\"version-status\">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>\n"
+  ],
+  [
+    "data-preview-mode=\"manual-bot-read-only\"",
+    "data-preview-mode=\"manual-bot-depot-read-only\""
+  ],
+  [
+    "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}",
+    "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n    .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}\n    .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}\n    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}"
+  ],
+  [
+    "      <section class=\"card\" aria-labelledby=\"depot-summary-heading\">\n        <div class=\"card-head\"><h2 id=\"depot-summary-heading\">Depotübersicht</h2><span class=\"limited\">Statische Vorschau</span></div>\n        <div class=\"portfolio-row\"><div><p class=\"caption\">Gesamtwert</p><div class=\"portfolio-value\" aria-label=\"Gesamtwert unbekannt\">—</div><p class=\"portfolio-description\">Unbekannt</p></div></div>\n        <p class=\"caption\">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>\n        <div class=\"trust-grid\" aria-label=\"Datenstatus des Depots\">\n          <div class=\"trust-cell\"><strong>Quelle</strong><span>Nicht verbunden</span></div>\n          <div class=\"trust-cell\"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>\n          <div class=\"trust-cell\"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>\n        </div>\n      </section>\n      <section class=\"card card-muted\" aria-labelledby=\"depot-holdings-heading\">\n        <h2 id=\"depot-holdings-heading\">Deine Bestände</h2>\n        <p class=\"caption\">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>\n      </section>\n      <p class=\"caption\">Diese Depotansicht ist nicht angebunden. „Terminal öffnen“ führt zum separaten Terminal.</p>\n",
+    "      <section class=\"card\" aria-labelledby=\"depot-summary-heading\">\n        <div class=\"card-head\"><h2 id=\"depot-summary-heading\">Depotbewertung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n        <div class=\"bot-access-controls\">\n          <label for=\"depot-read-token\">Meridian-Lesepasswort für das Depot</label>\n          <input id=\"depot-read-token\" type=\"password\" autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"4096\" aria-describedby=\"depot-read-access-help\">\n          <p id=\"depot-read-access-help\">Asset-Watch-Links gelten nur für Bots. Passwort nur vorübergehend im Arbeitsspeicher; Sperren, Ausblenden oder Verlassen der Seite löscht den Zugang.</p>\n          <button id=\"depot-read-provide\" type=\"button\">Depot-Lesezugang übernehmen</button>\n          <p id=\"depot-read-access-status\" role=\"status\" aria-live=\"polite\"></p>\n        </div>\n        <div id=\"depot-read-root\"></div>\n      </section>\n      <section class=\"card card-muted\" aria-labelledby=\"depot-holdings-heading\">\n        <h2 id=\"depot-holdings-heading\">Deine Bestände</h2>\n        <p class=\"caption\">Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.</p>\n      </section>\n"
+  ],
+  [
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>",
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>"
+  ]
+];
 function restoreB2(source){
+ for(const [before,after] of b7Deltas){assert.equal(source.split(after).length-1,1,"one exact B7 delta");source=source.replace(after,before);}
  for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
  for(const [before,after] of b6Deltas){assert.equal(source.split(after).length-1,1,'one exact B6 delta');source=source.replace(after,before);}
@@ -241,14 +272,14 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
   const scriptHash=createHash('sha256').update(inlineScript).digest('base64');
   const policies=new Map(),requests=[],modules=new Map(),pending=new Set();
-  let reads=0,aborts=0,mode='fresh';
-  const endpoint='/meridian/__test/bot-snapshot';
+  let reads=0,aborts=0,depotReads=0,depotAborts=0,mode='fresh';
+  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/depot-snapshot';
   for(const name of moduleNames){
     let body=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js'){
@@ -256,12 +287,17 @@ function deploymentServer(){
       assert.equal(body.split(production).length,2,'exact fixed endpoint replaced only in served test copy');
       body=body.replace(production,endpoint);
     }
+    if(name==='depot-read-client.js'){
+      const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1d';
+      assert.equal(body.split(production).length,2,'exact Depot endpoint replaced only in served test copy');
+      body=body.replace(production,depotEndpoint);
+    }
     modules.set('/meridian/v11/'+name,body);
   }
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6';
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B7';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
@@ -272,6 +308,21 @@ function deploymentServer(){
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:2,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}},{botRef:'b'.repeat(20),symbol:'ETH',side:'LONG',cateType:'linear',botType:'futures_grid',leverage:2,investment:{usd:100},pnl:{usd:8.25}}]}));return;
     }
+    if(path===depotEndpoint){
+      depotReads++;
+      if(request.headers.authorization!=='Bearer synthetic-b7-password'||mode==='denied'){
+        response.writeHead(401);response.end('{}');return;
+      }
+      if(mode==='pending'){
+        pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;
+      }
+      const stamp=Date.now()-(mode==='stale'?901000:1000);
+      response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
+      response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',source:'POSTGRES_CANONICAL_HISTORY',
+        rawPointCount:2,excludedIncompletePoints:1,points:[{timestamp:stamp,spotUsd:12000,tradingUsd:3450,totalUsd:15450,
+        sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',
+        tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:stamp-1000}}]}));return;
+    }
     if(modules.has(path)){
       response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
     }
@@ -279,15 +330,15 @@ function deploymentServer(){
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
     const scriptSource=preview?`'sha256-${scriptHash}' `+moduleNames.map(name=>origin+'/meridian/v11/'+name).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint:"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint:"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
   return new Promise((resolve,reject)=>{
     server.once('error',reject);server.listen(0,'127.0.0.1',()=>resolve({
       base:`http://127.0.0.1:${server.address().port}/meridian/`,policies,requests,
-      metrics:()=>({reads,aborts,pending:pending.size}),setMode:value=>{mode=value;},
-      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,...modules.keys()]),
+      metrics:()=>({reads,aborts,depotReads,depotAborts,pending:pending.size}),setMode:value=>{mode=value;},
+      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,...modules.keys()]),
       close:()=>new Promise((done,fail)=>{for(const response of pending)response.destroy();server.close(error=>error?fail(error):done());server.closeAllConnections();})
     }));
   });
@@ -426,18 +477,35 @@ async function browserRun(call,start,width,expectedBuild,server){
 
     }
     if(tab==='depot'){
-      const depot=await evaluate(`(()=>{
-        const panel=document.getElementById('view-depot');
-        return {label:panel.querySelector('.limited').textContent,
-          value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
-          states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
-          viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
-      })()`);
-      assert.equal(depot.label,'Statische Vorschau');
-      assert.equal(depot.value,'Gesamtwert unbekannt');
-      assert.deepEqual(depot.states,[['Quelle','Nicht verbunden'],['Aktualität','Keine bestätigten Daten'],['Verlauf','Nicht verfügbar']]);
-      assert.equal(depot.viewport,width);
-      assert.ok(depot.body<=width+1&&depot.root<=width+1,'Depot panel overflow at '+width);
+      const initial=server.metrics().depotReads;
+      const readState=()=>evaluate(`document.querySelector('#depot-read-root [data-state]')?.dataset.state`);
+      const waitUntil=async check=>{for(let i=0;i<100;i++){if(await check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('Depot state timeout');};
+      await waitUntil(async()=>await readState()==='locked');
+      assert.equal(server.metrics().depotReads,initial,'mount/navigation never reads Depot');
+      const accept=async value=>evaluate(`(()=>{document.getElementById('depot-read-token').value=${JSON.stringify(value)};document.getElementById('depot-read-provide').click();return document.getElementById('depot-read-token').value;})()`);
+      const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
+      await accept('https://foreign.example/share');await refresh();assert.equal(server.metrics().depotReads,initial);
+      assert.equal(await accept('synthetic-b7-password'),'');assert.equal(server.metrics().depotReads,initial,'provision never reads');
+      await refresh();await waitUntil(async()=>await readState()==='fresh');
+      const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');return {
+        text:root.textContent,amount:root.querySelector('.depot-total').textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,
+        status:root.querySelector('[role=status]').getAttribute('aria-live'),focus:document.activeElement===root.querySelector('button'),
+        targets:[...root.querySelectorAll('button')].every(x=>x.getBoundingClientRect().height>=44)};})()`);
+      assert.match(depot.amount,/15.450/);assert.match(depot.text,/Datenlücken/);assert.match(depot.text,/keine Live-Kurse/);
+      assert.doesNotMatch(depot.text,/synthetic-b7-password/);assert.equal(depot.overflow,false);assert.equal(depot.status,'polite');assert.equal(depot.focus,true);assert.equal(depot.targets,true);
+      if(process.env.V11_A2_EVIDENCE_DIR){mkdirSync(process.env.V11_A2_EVIDENCE_DIR,{recursive:true});
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-'+width+'-fresh.png'),Buffer.from(shot.data,'base64'));}
+      server.setMode('stale');await refresh();await waitUntil(async()=>await readState()==='stale');
+      assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);
+      server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
+      const rejected=server.metrics().depotReads;await refresh();assert.equal(server.metrics().depotReads,rejected,'401 clears credential');
+      server.setMode('pending');await accept('synthetic-b7-password');const aborts=server.metrics().depotAborts;
+      await refresh();await waitUntil(()=>server.metrics().pending===1);
+      await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
+      await waitUntil(()=>server.metrics().depotAborts>aborts);assert.equal(await readState(),'locked');
+      const stopped=server.metrics().depotReads;await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));true`);
+      await refresh();assert.equal(server.metrics().depotReads,stopped,'hide clears Depot access; focus never reads');server.setMode('fresh');
     }
   }
   await evaluate(`document.getElementById('version-toggle').focus();true`);
