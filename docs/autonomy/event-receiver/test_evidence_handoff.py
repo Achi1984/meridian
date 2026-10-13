@@ -78,6 +78,60 @@ class EvidenceHandoffTests(unittest.TestCase):
             rejected=self.adapter_fixtures.run_bound_adapter(result,changed)
             self.assertNotEqual(rejected['decision'],'READY_FOR_OWNER_DECISION')
 
+    def assert_reconciled_rejection(self, mutate, after_binding):
+        expected, api, _ = self.candidate()
+        api.rows = copy.deepcopy(api.rows)
+        bound_results = []
+        if not after_binding:
+            mutate(api)
+        def bind(observation, pins):
+            result = self.binder.bind_envelope(observation, pins, json.dumps(POLICY))
+            bound_results.append(result)
+            if after_binding:
+                mutate(api)
+            return result
+        result = collect_review(json.dumps(expected), A, 'created', api, bind)
+        self.assertEqual(result['decision'], 'BLOCKED')
+        self.assertEqual(result['reason'], 'HANDOFF_INVALID')
+        self.assertIsNone(result['plannerResponse'])
+        self.assertIsNone(result['reviewBinding'])
+        self.assertIsNone(result['version'])
+        self.assertEqual(len(bound_results), int(after_binding))
+        if after_binding:
+            self.assertEqual(bound_results[0]['decision'], 'CANDIDATE_REVIEW')
+            self.assertIsNotNone(bound_results[0]['plannerResponse'])
+        for key in ('authenticated', 'provenanceVerified', 'authorized',
+                    'dispatchAllowed', 'mergeAllowed', 'durable'):
+            self.assertIs(result[key], False)
+
+    def test_ci_association_matches_pinned_pr_before_and_after_binding(self):
+        associations = [
+            [{'number': 702, 'head': {'sha': 'c' * 40}, 'base': {'sha': A, 'ref': 'main'}}],
+            [{'number': 702, 'head': {'sha': 'b' * 40}, 'base': {'sha': 'c' * 40, 'ref': 'main'}}],
+            [{'number': 702, 'head': {'sha': 'b' * 40}, 'base': {'sha': A, 'ref': 'other'}}],
+            [{'number': 702}], [],
+        ]
+        for association in associations:
+            for after in (False, True):
+                with self.subTest(association=association, after_binding=after):
+                    self.assert_reconciled_rejection(
+                        lambda api: api.rows['actions/runs/123'].update(pull_requests=association), after)
+
+    def test_observed_identifiers_require_integers_on_both_reads(self):
+        targets = [
+            (lambda api: api.rows['actions/runs/123'], 'workflow_id', 347821227),
+            (lambda api: api.rows['actions/runs/123']['pull_requests'][0], 'number', 702),
+            (lambda api: api.rows['pulls/702'], 'number', 702),
+            (lambda api: api.rows['pulls/702']['head']['repo'], 'id', 1342084551),
+            (lambda api: api.rows['actions/runs/123']['repository'], 'id', 1342084551),
+        ]
+        for target, key, identity in targets:
+            # JSON scientific notation decodes to a float, including exact-valued IDs.
+            for value in (float(identity), json.loads(str(identity) + 'e0'), True, False, None, str(identity)):
+                for after in (False, True):
+                    with self.subTest(key=key, identity=identity, value=value, after_binding=after):
+                        self.assert_reconciled_rejection(lambda api: target(api).update({key: value}), after)
+
     def test_edit_or_independent_policy_mismatch_cannot_produce_candidate(self):
         for edit_body in (True, False):
             with self.subTest(edit_body=edit_body):
@@ -163,3 +217,4 @@ process.stdout.write(JSON.stringify(reconcileContinuation(x)));"""
 
 if __name__ == '__main__':
     unittest.main()
+

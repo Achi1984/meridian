@@ -6,7 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
-from collector import REPO, WORKFLOWS, Rejected, decode, integer, need, obj, repository, sha
+from collector import REPO, WORKFLOWS, Rejected, decode, integer, need, obj, repository, run_pr_binding, sha
 
 ACTOR = {"id": 209825114, "login": "claude[bot]", "type": "Bot"}
 
@@ -35,7 +35,8 @@ def project_comment(raw, expected):
 
 def check_pr(api, scope, main_sha):
     pr = obj(api("pulls/" + str(scope["prNumber"])))
-    need(pr.get("number") == scope["prNumber"] and pr.get("state") == "open", "PR_NOT_OPEN")
+    need(integer(pr.get("number")) and pr.get("number") == scope["prNumber"]
+         and pr.get("state") == "open", "PR_NOT_OPEN")
     head, base = obj(pr.get("head")), obj(pr.get("base"))
     repository(head.get("repo")); repository(base.get("repo"))
     need(head.get("sha") == scope["headSha"] and base.get("sha") == scope["baseSha"] == main_sha
@@ -46,14 +47,14 @@ def check_ci(api, scope):
     ci = scope["ci"]
     run = obj(api("actions/runs/" + str(ci["runId"])))
     repository(run.get("repository")); repository(run.get("head_repository"))
-    need(integer(run.get("id")) and integer(run.get("run_attempt")) and
+    need(integer(run.get("id")) and integer(run.get("run_attempt")) and integer(run.get("workflow_id")) and
          run.get("id") == ci["runId"] and run.get("run_attempt") == ci["runAttempt"]
          and run.get("workflow_id") == ci["workflowId"] and run.get("head_sha") == ci["headSha"], "CI_SCOPE_CHANGED")
     name, path = WORKFLOWS[347821227]
     need(run.get("name") == name and run.get("path") == path and run.get("event") == "pull_request"
          and run.get("status") == "completed" and run.get("conclusion") == "success", "CI_NOT_CURRENT_SUCCESS")
-    prs = run.get("pull_requests")
-    need(type(prs) is list and len(prs) == 1 and obj(prs[0]).get("number") == scope["prNumber"], "CI_PR_ASSOCIATION")
+    need(run_pr_binding(run, "CI_PR_ASSOCIATION") ==
+         (scope["prNumber"], scope["headSha"], scope["baseSha"], "main"), "CI_PR_ASSOCIATION")
 
 
 def collect_review(expected_raw, main_sha, event_action, api, bind_review):
@@ -100,3 +101,4 @@ def collect_review(expected_raw, main_sha, event_action, api, bind_review):
         # Deletion/404/transport and malformed data share a bounded safe stop;
         # exception text can contain network bodies or credentials, so never emit it.
         return blocked
+
