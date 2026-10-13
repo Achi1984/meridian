@@ -12,8 +12,16 @@ test('r18 browser requests are bounded by AbortController timeouts',()=>{
   assert.match(v9,/async function fetchTimed/);
   assert.match(v9,/new AbortController\(\)/);
   assert.match(v9,/FETCH_TIMEOUT/);
-  const raw=(v9.match(/\bfetch\(/g)||[]).length;
-  assert.equal(raw,1,'only fetchTimed itself may call raw fetch');
+  const start=v9.indexOf('async function manageAssetWatchShare(');
+  const end=v9.indexOf('const PORTFOLIO_TICKER_CACHE_MS',start);
+  assert.ok(start>=0&&end>start,'bounded share transport exists');
+  const share=v9.slice(start,end),other=v9.slice(0,start)+v9.slice(end);
+  assert.equal((other.match(/\bfetch\(/g)||[]).length,1,'only fetchTimed may call raw fetch outside the isolated share transport');
+  assert.equal((share.match(/\bfetch\(/g)||[]).length,1,'one isolated share-management request');
+  assert.match(share,/const controller=new AbortController\(\),abort=\(\)=>controller.abort\(\)/);
+  assert.match(share,/const timer=setTimeout\(abort,10000\)/);
+  assert.match(share,/signal:controller.signal/);
+  assert.match(share,/finally\{access='';clearTimeout\(timer\);signal\?\.removeEventListener\('abort',abort\)/);
   assert.match(v9,/fetchTimed\(API_BASE\+path/);
   assert.match(v9,/fetchTimed\(u,\{cache:'no-store'\},8000\)/);
 });
@@ -75,3 +83,4 @@ test('r18+ gateway reports env-only read-auth source without embedded fallback m
 test('r18 v10 browser adapter still parses',()=>{
   assert.doesNotThrow(()=>new Function(v10.replace(/^import .*$/gm,'')));
 });
+

@@ -14,7 +14,7 @@ function block(startNeedle,endNeedle,src=js){
 }
 
 test('Stage 2 draft stays non-release and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r127');
+  assert.equal(release.terminalBuild,'10.0-r128');
   assert.equal(release.terminalExecutionImpact,false);
 });
 

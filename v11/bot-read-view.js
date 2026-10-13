@@ -38,6 +38,7 @@ function projection(state) {
         investment:number(bot.metrics?.investmentUsd)>0 ? valueLabel(bot.metrics.investmentUsd,' USD/USDT',true) :
           (typeof bot.metrics?.investmentCurrency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? valueLabel(bot.metrics.investmentAmount,' '+bot.metrics.investmentCurrency,true) : MISSING),
         pnl:valueLabel(bot.metrics?.pnlUsd,' USD'),
+        pnlTone:number(bot.metrics?.pnlUsd) === null ? null : bot.metrics.pnlUsd < 0 ? 'negative' : 'positive',
         lower:valueLabel(bot.metrics?.lower,'',true),upper:valueLabel(bot.metrics?.upper,'',true),
         liquidation:valueLabel(bot.metrics?.liquidationPrice,'',true),
         takeProfit:valueLabel(bot.metrics?.takeProfit,'',true),stopLoss:valueLabel(bot.metrics?.stopLoss,'',true)};
@@ -88,7 +89,9 @@ export function renderBotReadState(root, state) {
         summary.append(heading,identity);
         const headline=element(document,'span');headline.className='bot-card-metrics';
         for (const [label,value] of [['Hebel',bot.leverage],['Kapital',bot.investment],['P/L laut Quelle',bot.pnl]]) {
-          const group=element(document,'span');group.append(element(document,'span',label+': '),element(document,'strong',value));headline.append(group);
+          const group=element(document,'span'),amount=element(document,'strong',value);
+          if(label==='P/L laut Quelle' && bot.pnlTone) amount.className='bot-pnl-'+bot.pnlTone;
+          group.append(element(document,'span',label+': '),amount);headline.append(group);
         }
         summary.append(headline,element(document,'span','Details anzeigen / ausblenden'));
         const body=element(document,'div');body.className='bot-card-body';

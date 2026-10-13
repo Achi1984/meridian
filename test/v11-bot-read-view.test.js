@@ -181,3 +181,13 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
   renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
   assert.doesNotMatch(target.textContent,/125,5|a{20}|b{20}/);
 });
+
+ test('P/L alone receives semantic color; missing and coerced zeros remain neutral',()=>{
+  for(const [value,tone] of [[-2.75,'negative'],[2.75,'positive'],[0,null],[-0,null],[null,null],[undefined,null],['2',null],[NaN,null],[Infinity,null]]){
+    const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value,leverage:5,investmentUsd:120};
+    renderBotReadState(target,state);
+    const colored=all(target,'strong').filter(node=>node.className?.startsWith('bot-pnl-'));
+    assert.equal(colored.length,tone?1:0);
+    if(tone){assert.equal(colored[0].className,'bot-pnl-'+tone);assert.equal(colored[0].textContent,value<0?'-2,75 USD':'2,75 USD');}
+  }
+});
