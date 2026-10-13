@@ -146,7 +146,31 @@ const b4Deltas=[
     "Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt"
   ]
 ];
+const b5Deltas=[
+  [
+    "  <!-- B4 DRAFT: Scoped share link or private read-only bot access; no persistence, automatic request, engine, orders or service worker.\n",
+    "  <!-- B5 DRAFT: Expandable read-only bot snapshot cards; no persistence, automatic request, engine, orders or service worker.\n"
+  ],
+  [
+    "    .bot-read-view li{margin:12px 0}.bot-read-view ul{padding-left:20px}\n",
+    "    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:12px}\n    .bot-card{border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}\n    .bot-card summary{min-height:44px;padding:14px;cursor:pointer;overflow-wrap:anywhere}\n    .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}\n    .bot-card-heading{font-size:17px;font-weight:700}\n    .bot-card-reference{display:block;color:var(--muted);font-size:11px;margin:6px 0;overflow-wrap:anywhere}\n    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:12px;margin:12px 0}\n    .bot-card-metrics>div,.bot-card-metrics>span{min-width:0}\n    .bot-card-metrics dt{font-size:12px;color:var(--muted)}\n    .bot-card-metrics dd{margin:4px 0 0;font-size:14px;font-weight:600;overflow-wrap:anywhere}\n    .bot-card summary>span:last-child{font-size:12px;color:var(--muted)}\n    .bot-card summary .bot-card-metrics>span>span,.bot-card summary .bot-card-metrics strong{display:block}\n    .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}\n"
+  ],
+  [
+    "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B4<small>Versionsverlauf ▾</small></button>\n",
+    "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B5<small>Versionsverlauf ▾</small></button>\n"
+  ],
+  [
+    "          <p><b>Diese Vorschau · B4:</b> Asset-Watch-Freigabelink oder Meridian-Lesepasswort für manuelle Bot-Snapshots. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n",
+    "          <p><b>Diese Vorschau · B5:</b> Aufklappbare Botkarten mit verfügbaren Kennzahlen und klar gekennzeichneten Datenlücken. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n"
+  ],
+  [
+    "",
+    "        <li><strong>Meridian 11 · B5</strong><span class=\"version-status\">Testvorschau</span><p>Aufklappbare Botkarten mit Hebel, Kapital, P/L laut Quelle und Preisgrenzen. Fehlende oder nicht eindeutig bestätigte Werte bleiben nicht verfügbar.</p></li>\n"
+  ]
+];
 function restoreB2(source){
+ for(const [before,after] of b5Deltas){assert.equal(source.split(after).length-1,1,'one exact B5 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'af699030738545b6f22886155abd3b8dddd4756d','exact reviewed B4 bytes restored');
  for(const [before,after] of b4Deltas){assert.equal(source.split(after).length-1,1,'one exact B4 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'94e8407bf9068eeff6bc8af75c6972749d804b26','exact reviewed B3 bytes restored');
  for(const [before,after] of b3Deltas){assert.equal(source.split(after).length-1,1,'one exact B3 delta');source=source.replace(after,before);}
@@ -209,7 +233,7 @@ function deploymentServer(){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)aborts++;});return;
       }
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
-      response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:1,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset'}]}));return;
+      response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:1,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}}]}));return;
     }
     if(modules.has(path)){
       response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
@@ -316,12 +340,32 @@ async function browserRun(call,start,width,expectedBuild,server){
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
       assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),1);
       assert.equal(await evaluate(`document.getElementById('bot-read-root').textContent.includes('synthetic-b3-token')`),false);
+      const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
+      let card=await cardMetrics();
+      assert.equal(card.open,false);assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44);
+      assert.match(card.text,/3×/);assert.match(card.text,/0,42 ETH/);assert.match(card.text,/-12,5 USD/);
+      assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
+      await evaluate(`document.querySelector('#bot-read-root summary').focus();true`);
+      await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
+      await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+      card=await cardMetrics();assert.equal(card.open,true,'native keyboard expands card');
+      assert.ok(card.body<=width+1&&card.root<=width+1,'expanded card overflow');
+      const expanded=await evaluate(`document.querySelector('#bot-read-root .bot-card-body').textContent`);
+      assert.match(expanded,/Grid-Untergrenze/);assert.match(expanded,/2.000/);assert.match(expanded,/Nicht verfügbar/);
+      assert.equal(server.metrics().reads,initialReads+1,'disclosure must never request data');
       const evidence=process.env.V11_A2_EVIDENCE_DIR;
       if(evidence){
         mkdirSync(evidence,{recursive:true});
         await evaluate(`document.getElementById('bot-read-root').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b3-${width}-manual-fresh.png`),Buffer.from(shot.data,'base64'));
+        writeFileSync(join(evidence,`v11-b5-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
+      }
+      await evaluate(`document.querySelector('#bot-read-root summary').click();true`);
+      assert.equal((await cardMetrics()).open,false);
+      if(evidence){
+        await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(evidence,`v11-b5-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
       }
       await evaluate(`document.querySelectorAll('#bot-read-root button')[1].click();true`);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);

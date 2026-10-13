@@ -5,6 +5,20 @@ const MAX_AGE = 15 * 60 * 1000;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const enumValue = (value, allowed) => allowed.includes(value) ? value : null;
 
+// V1 bridge coerces absent numeric inputs to zero. Until provenance is fixed,
+// zero cannot be distinguished from missing and must never imply a known value.
+const metric = (value, positive = false) => typeof value === 'number' && Number.isFinite(value) &&
+  value !== 0 && (!positive || value > 0) ? value : null;
+function metrics(bot) {
+  return {leverage: metric(bot.leverage, true), investmentUsd: metric(bot.investment?.usd, true),
+    investmentAmount: metric(bot.investment?.quoteAmount, true),
+    investmentCurrency: typeof bot.investment?.currency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.investment.currency) ? bot.investment.currency : null,
+    pnlUsd: metric(bot.pnl?.usd), lower: metric(bot.limits?.lower, true),
+    upper: metric(bot.limits?.upper, true), liquidationPrice: metric(bot.limits?.liquidationPrice, true),
+    takeProfit: metric(bot.limits?.takeProfit, true), stopLoss: metric(bot.limits?.stopLoss, true),
+    gridProfitUsd: null, riskBufferPct: null};
+}
+
 export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   const result = {status: 'UNKNOWN', source: null, snapshotAt: null, ageMs: null,
     readOnly: true, executionAllowed: false, bots: []};
@@ -37,7 +51,8 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
       side: enumValue(bot.side, ['LONG', 'SHORT', 'NEUTRAL']),
       category: enumValue(bot.cateType, ['inverse', 'linear']),
       type: enumValue(bot.botType, ['futures_grid', 'future_hedge_grid']),
-      sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend'])});
+      sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend']),
+      metrics: metrics(bot)});
   }
   return {...result, status: 'FRESH_SNAPSHOT', source: snapshot.source,
     snapshotAt: stamp, ageMs: age, expiresAt: time + limit, bots};

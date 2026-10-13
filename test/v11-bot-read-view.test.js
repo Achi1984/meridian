@@ -73,7 +73,7 @@ test('malformed fresh data fails closed atomically',()=>{
 });
 test('unknown enums stay unknown, including inherited object names',()=>{
   const target=root(),state=fresh();Object.assign(state.model.bots[0],{side:'constructor',type:'__proto__',category:'secret'});
-  renderBotReadState(target,state);assert.equal((target.textContent.match(/Unbekannt/g)||[]).length,3);
+  renderBotReadState(target,state);assert.equal((target.textContent.match(/Unbekannt/g)||[]).length,4);
   assert.doesNotMatch(target.textContent,/constructor|__proto__|secret/);
 });
 test('sparse and undefined rows clear prior private data without throwing',()=>{
@@ -163,4 +163,21 @@ test('real client to model to renderer pipeline expires data, locks on logout an
   clock+=900000;client.revalidate();assert.equal(events.at(-1),'stale');assert.equal(all(target,'li').length,0);
   credential='';client.revalidate();assert.equal(events.at(-1),'locked');assert.equal(all(target,'li').length,0);
   client.dispose();await client.refresh();assert.equal(calls,1);
+});
+
+test('collapsed native cards distinguish equal symbols and render only whitelisted metrics',()=>{
+  const state=fresh(), target=root();
+  Object.assign(state.model.bots[0],{ref:'a'.repeat(20),metrics:{leverage:5,investmentUsd:125.5,pnlUsd:-2.75,
+    lower:0.00001234,upper:0.00002345,liquidationPrice:0,stopLoss:null,takeProfit:'SECRET',gridProfitUsd:999,riskBufferPct:100}});
+  state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20)});
+  renderBotReadState(target,state);
+  assert.equal(all(target,'details').length,2);assert.equal(all(target,'summary').length,2);
+  assert.ok(all(target,'details').every(node=>node.getAttribute('open')===null));
+  assert.match(target.textContent,/Referenz a{20}/);assert.match(target.textContent,/Referenz b{20}/);
+  assert.match(target.textContent,/5×/);assert.match(target.textContent,/125,5 USD\/USDT/);
+  assert.match(target.textContent,/P\/L laut Quelle: -2,75 USD/);assert.match(target.textContent,/0,00001234/);
+  assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
+  assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
+  renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
+  assert.doesNotMatch(target.textContent,/125,5|a{20}|b{20}/);
 });

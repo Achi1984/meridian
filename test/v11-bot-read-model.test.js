@@ -64,3 +64,29 @@ test('calendar normalization cannot make an invalid timestamp fresh',()=>{
   const input=fixture();input.sourceSnapshotAt='2028-02-29T19:59:00.123Z';
   assert.equal(buildBotReadModel(input,{now:Date.parse('2028-02-29T20:00:00Z')}).status,'FRESH_SNAPSHOT');
 });
+
+test('source metric projection preserves nonzero finite numeric values without coercion or derived risk',()=>{
+  const input=fixture();Object.assign(input.bots[0],{leverage:5,investment:{usd:120},pnl:{usd:-2.5},
+    limits:{lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95},grid:{profitUsd:999},riskBufferPct:99});
+  assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,
+    lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95,gridProfitUsd:null,riskBufferPct:null});
+});
+test('missing, coerced zero, invalid and negative positive-only metrics remain unavailable',()=>{
+  for(const value of [undefined,null,'',0,-0,'12',true,Infinity,NaN,{},[]]) {
+    const input=fixture();Object.assign(input.bots[0],{leverage:value,investment:{usd:value},pnl:{usd:value},
+      limits:{lower:value,upper:value,liquidationPrice:value,takeProfit:value,stopLoss:value}});
+    assert.ok(Object.values(buildBotReadModel(input,{now}).bots[0].metrics).every(item=>item===null));
+  }
+  const input=fixture();Object.assign(input.bots[0],{leverage:-2,investment:{usd:-2},limits:{lower:-2}});
+  assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.leverage,null);
+  assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.investmentUsd,null);
+  assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.lower,null);
+});
+
+test('capital fallback preserves only an explicit bounded source currency and positive amount',()=>{
+  const input=fixture();input.bots[0].investment={usd:null,quoteAmount:0.25,currency:'BTC'};
+  const metrics=buildBotReadModel(input,{now}).bots[0].metrics;
+  assert.equal(metrics.investmentUsd,null);assert.equal(metrics.investmentAmount,0.25);assert.equal(metrics.investmentCurrency,'BTC');
+  input.bots[0].investment.currency='<script>';
+  assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.investmentCurrency,null);
+});
