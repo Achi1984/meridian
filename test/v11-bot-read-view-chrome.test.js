@@ -43,10 +43,11 @@ const view=createBotReadView(root,{getToken:()=>credential,createClient:options=
  }});
  return {...client,refresh(){completion=client.refresh();return completion;}};
 }});
+const initialLive=root.querySelector('[role=status]');
 const refresh=()=>root.querySelectorAll('button')[0],lock=()=>root.querySelectorAll('button')[1];
 window.botQA={
  state(){return root.querySelector('[data-state]')?.dataset.state||'disposed';},
- metrics(){return {width:innerWidth,viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,rows:root.querySelectorAll('li').length,requests,unexpected,secretLeak:/synthetic-token|synthetic-private-error/.test(root.textContent),statusRole:root.querySelector('[role=status]')?.getAttribute('aria-live'),targets:[...root.querySelectorAll('button')].every(b=>b.getBoundingClientRect().height>=44),focusStable:document.activeElement===refresh()};},
+ metrics(){return {width:innerWidth,viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,rows:root.querySelectorAll('li').length,requests,unexpected,secretLeak:/synthetic-token|synthetic-private-error/.test(root.textContent),statusRole:root.querySelector('[role=status]')?.getAttribute('aria-live'),statusPersistent:root.querySelector('[role=status]')===initialLive,statusConnected:initialLive.isConnected,statusNotBusy:!initialLive.closest('[aria-busy="true"]'),targets:[...root.querySelectorAll('button')].every(b=>b.getBoundingClientRect().height>=44),focusStable:document.activeElement===refresh()};},
  async show(next){
   lock().click();mode=next;clock=Date.parse('2026-10-12T20:01:00Z');credential='synthetic-token';
   if(next==='locked')return;
@@ -87,6 +88,9 @@ test('V11 bot component Chrome: synthetic client/model/view states at four width
           assert.equal(measurements.width,width);assert.equal(measurements.viewport,width);
           assert.equal(measurements.overflow,false);assert.equal(measurements.secretLeak,false);
           assert.equal(measurements.unexpected,0);assert.equal(measurements.statusRole,'polite');
+          assert.equal(measurements.statusPersistent,true,'live region identity persists');
+          assert.equal(measurements.statusConnected,true,'live region stays connected');
+          assert.equal(measurements.statusNotBusy,true,'loading announcements are not suppressed');
           assert.equal(measurements.targets,true);assert.equal(measurements.rows,state==='fresh'?1:0);
           if(state!=='locked')assert.equal(measurements.focusStable,true,'refresh node retains focus');
           const evidence=process.env.V11_A2_EVIDENCE_DIR;

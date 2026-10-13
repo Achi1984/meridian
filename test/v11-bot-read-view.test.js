@@ -12,6 +12,7 @@ class Node {
   set innerHTML(_){throw new Error('HTML rendering forbidden');}
   append(...nodes){this.children.push(...nodes);}
   replaceChildren(...nodes){this.text='';this.children=nodes;}
+  contains(node){return this===node||this.children.some(child=>child.contains(node));}
   setAttribute(key,value){this.attrs[key]=String(value);}
   getAttribute(key){return this.attrs[key]??null;}
   addEventListener(type,fn){if(!this.listeners.has(type))this.listeners.set(type,new Set());this.listeners.get(type).add(fn);}
@@ -37,6 +38,22 @@ test('fresh rows use bounded labels, UTC time, correct side and no arbitrary dat
   assert.equal(all(target,'li').length,1);assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-12T20:00:00Z');
   const live=all(target,'div').find(x=>x.getAttribute('role')==='status');
   assert.equal(live.getAttribute('aria-live'),'polite');assert.equal(live.getAttribute('aria-atomic'),'true');
+});
+test('live status is attached empty and retains identity across all state transitions',()=>{
+  const target=root(),replace=target.replaceChildren.bind(target);let mounts=0;
+  target.replaceChildren=(...nodes)=>{
+    const live=nodes.flatMap(node=>all(node,'div')).find(node=>node.getAttribute('role')==='status');
+    assert.ok(live);assert.equal(live.textContent,'','live region must be empty when attached');
+    mounts++;replace(...nodes);
+  };
+  renderBotReadState(target,{status:'locked'});
+  const live=all(target,'div').find(node=>node.getAttribute('role')==='status');
+  for(const state of [{status:'loading'},fresh(),{status:'stale'},{status:'unavailable'},{status:'locked'}]) {
+    renderBotReadState(target,state);
+    assert.equal(all(target,'div').find(node=>node.getAttribute('role')==='status'),live);
+    assert.equal(target.contains(live),true);assert.ok(live.textContent.length>0);
+  }
+  assert.equal(mounts,1);
 });
 test('every nonfresh state removes all previously visible rows and timestamp',()=>{
   const target=root();
@@ -76,8 +93,12 @@ test('empty fresh snapshot reports absence rather than implying safety or active
 });
 test('mount is inactive, preserves controls and blocks repeated loading clicks',()=>{
   const h=mounted();assert.equal(h.calls.refresh,0);assert.match(h.target.textContent,/Gesperrt/);
+  const live=all(h.target,'div').find(node=>node.getAttribute('role')==='status');
   const [refresh,lock]=h.buttons;assert.equal(refresh.getAttribute('type'),'button');
   refresh.click();refresh.click();assert.equal(h.calls.refresh,1);
+  assert.equal(all(h.target,'div').find(node=>node.getAttribute('role')==='status'),live);
+  assert.ok(all(h.target,'div').some(node=>node.getAttribute('aria-busy')==='true'));
+  assert.ok(all(h.target,'div').filter(node=>node.contains(live)).every(node=>node.getAttribute('aria-busy')!=='true'),'loading status must not be hidden by busy ancestors');
   assert.equal(refresh.getAttribute('aria-disabled'),'true');assert.equal(all(h.target,'button')[0],refresh);
   h.publish(fresh());assert.equal(refresh.getAttribute('aria-disabled'),'false');
   assert.equal(all(h.target,'button')[1],lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);

@@ -36,23 +36,31 @@ function element(document, tag, text) {
   return node;
 }
 
-// Replaces only the status/data region; mount keeps focusable controls stable.
+// Keep the empty live region attached before populating it, then retain its identity.
+const regions = new WeakMap();
 export function renderBotReadState(root, state) {
   const document=root.ownerDocument, data=projection(state);
-  const section=element(document,'div');
-  section.className='bot-read-state';
+  let region=regions.get(root);
+  if (!region || !root.contains(region.section)) {
+    const section=element(document,'div'),status=element(document,'div'),details=element(document,'div');
+    section.className='bot-read-state';
+    status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+    status.setAttribute('aria-atomic','true');
+    section.append(status,details);
+    root.replaceChildren(section);
+    region={section,status,details};regions.set(root,region);
+  }
+  const {section,status,details}=region;
   section.setAttribute('data-state',data.status);
-  const status=element(document,'div');
-  status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-  status.setAttribute('aria-atomic','true');
-  status.append(element(document,'strong',LABELS[data.status][0]),element(document,'p',LABELS[data.status][1]));
-  section.append(status);
+  status.replaceChildren(element(document,'strong',LABELS[data.status][0]),element(document,'p',LABELS[data.status][1]));
+  details.replaceChildren();
+  details.setAttribute('aria-busy',data.status==='loading'?'true':'false');
   if (data.status === 'fresh') {
     const stamp=element(document,'time',data.snapshotAt);
     stamp.setAttribute('datetime',data.snapshotAt);
-    const source=element(document,'p','Snapshot-Zeit (UTC): ');source.append(stamp);section.append(source);
-    section.append(element(document,'p',data.bots.length + ' Bots im Snapshot'));
-    if (!data.bots.length) section.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
+    const source=element(document,'p','Snapshot-Zeit (UTC): ');source.append(stamp);details.append(source);
+    details.append(element(document,'p',data.bots.length + ' Bots im Snapshot'));
+    if (!data.bots.length) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
     else {
       const list=element(document,'ul');list.setAttribute('aria-label','Bots im aktuellen Snapshot');
       for (const bot of data.bots) {
@@ -60,10 +68,9 @@ export function renderBotReadState(root, state) {
         item.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
         list.append(item);
       }
-      section.append(list);
+      details.append(list);
     }
   }
-  root.replaceChildren(section);
   return data.status;
 }
 
@@ -81,7 +88,6 @@ export function createBotReadView(root, {createClient,getToken} = {}) {
     if(disposed)return;
     const status=renderBotReadState(content,state);
     refresh.setAttribute('aria-disabled',status==='loading'?'true':'false');
-    content.setAttribute('aria-busy',status==='loading'?'true':'false');
   };
   update({status:'locked'});
   try {
