@@ -1,0 +1,792 @@
+{
+  "schema": "CMC_BINANCE_JOIN_FEASIBILITY_V1",
+  "retrievedAtUtc": "2026-10-13T19:01:21.450581+00:00",
+  "snapshotDate": "2024-10-13",
+  "sourceUrl": "https://coinmarketcap.com/historical/20241013/",
+  "sourceHtmlSha256": "48db9180132aa10cd97ceaf0ea72f1bf9aaa156ebbff72f4a8afcccb1b3aec77",
+  "embeddedRecordCount": 200,
+  "rankSequenceAndUniqueIdsChecked": true,
+  "savedRankDepth": 40,
+  "classificationAsKnown": false,
+  "originalPublicationTimeVerified": false,
+  "canonicalUniverseApproved": false,
+  "executionAuthorized": false,
+  "strategyPnlCalculated": false,
+  "ranking": [
+    {
+      "providerId": 1,
+      "rank": 1,
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "marketCapUsd": 1242400412111.6543,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 1027,
+      "rank": 2,
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "marketCapUsd": 297067393557.1433,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 825,
+      "rank": 3,
+      "symbol": "USDT",
+      "name": "Tether USDt",
+      "marketCapUsd": 119685006579.39981,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": true,
+      "provisionalMatchedTags": [
+        "stablecoin"
+      ]
+    },
+    {
+      "providerId": 1839,
+      "rank": 4,
+      "symbol": "BNB",
+      "name": "BNB",
+      "marketCapUsd": 83447056461.15842,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 5426,
+      "rank": 5,
+      "symbol": "SOL",
+      "name": "Solana",
+      "marketCapUsd": 69306678915.92787,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 3408,
+      "rank": 6,
+      "symbol": "USDC",
+      "name": "USDC",
+      "marketCapUsd": 35020243733.39177,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": true,
+      "provisionalMatchedTags": [
+        "stablecoin"
+      ]
+    },
+    {
+      "providerId": 52,
+      "rank": 7,
+      "symbol": "XRP",
+      "name": "XRP",
+      "marketCapUsd": 30109135065.843983,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 74,
+      "rank": 8,
+      "symbol": "DOGE",
+      "name": "Dogecoin",
+      "marketCapUsd": 16294597934.994476,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 1958,
+      "rank": 9,
+      "symbol": "TRX",
+      "name": "TRON",
+      "marketCapUsd": 14074494294.407717,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 11419,
+      "rank": 10,
+      "symbol": "TON",
+      "name": "Toncoin",
+      "marketCapUsd": 13168181416.490377,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 2010,
+      "rank": 11,
+      "symbol": "ADA",
+      "name": "Cardano",
+      "marketCapUsd": 12169766148.094538,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 5805,
+      "rank": 12,
+      "symbol": "AVAX",
+      "name": "Avalanche",
+      "marketCapUsd": 11861111741.902945,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 5994,
+      "rank": 13,
+      "symbol": "SHIB",
+      "name": "Shiba Inu",
+      "marketCapUsd": 10375529404.202301,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 1975,
+      "rank": 14,
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "marketCapUsd": 6727137970.5611,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 20947,
+      "rank": 15,
+      "symbol": "SUI",
+      "name": "Sui",
+      "marketCapUsd": 6471893840.555288,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 1831,
+      "rank": 16,
+      "symbol": "BCH",
+      "name": "Bitcoin Cash",
+      "marketCapUsd": 6350929507.74051,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 6636,
+      "rank": 17,
+      "symbol": "DOT",
+      "name": "Polkadot",
+      "marketCapUsd": 6257387552.420701,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 6535,
+      "rank": 18,
+      "symbol": "NEAR",
+      "name": "NEAR Protocol",
+      "marketCapUsd": 5700560038.939998,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 3957,
+      "rank": 19,
+      "symbol": "LEO",
+      "name": "UNUS SED LEO",
+      "marketCapUsd": 5645934111.316937,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 4943,
+      "rank": 20,
+      "symbol": "DAI",
+      "name": "Dai",
+      "marketCapUsd": 5364293613.093523,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": true,
+      "provisionalMatchedTags": [
+        "stablecoin"
+      ]
+    },
+    {
+      "providerId": 21794,
+      "rank": 21,
+      "symbol": "APT",
+      "name": "Aptos",
+      "marketCapUsd": 5253028813.767954,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 2,
+      "rank": 22,
+      "symbol": "LTC",
+      "name": "Litecoin",
+      "marketCapUsd": 4861922914.403422,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 22974,
+      "rank": 23,
+      "symbol": "TAO",
+      "name": "Bittensor",
+      "marketCapUsd": 4731373505.215569,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 7083,
+      "rank": 24,
+      "symbol": "UNI",
+      "name": "Uniswap",
+      "marketCapUsd": 4611711811.167893,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 24478,
+      "rank": 25,
+      "symbol": "PEPE",
+      "name": "Pepe",
+      "marketCapUsd": 4074613357.5784464,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 8916,
+      "rank": 26,
+      "symbol": "ICP",
+      "name": "Internet Computer",
+      "marketCapUsd": 3741166747.5957055,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 3773,
+      "rank": 27,
+      "symbol": "FET",
+      "name": "Artificial Superintelligence Alliance",
+      "marketCapUsd": 3579356824.252637,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 20396,
+      "rank": 28,
+      "symbol": "KAS",
+      "name": "Kaspa",
+      "marketCapUsd": 3310723737.234965,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 26081,
+      "rank": 29,
+      "symbol": "FDUSD",
+      "name": "First Digital USD",
+      "marketCapUsd": 3192230935.6355405,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": true,
+      "provisionalMatchedTags": [
+        "stablecoin"
+      ]
+    },
+    {
+      "providerId": 5690,
+      "rank": 30,
+      "symbol": "RENDER",
+      "name": "Render",
+      "marketCapUsd": 2785066414.4056535,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 28321,
+      "rank": 31,
+      "symbol": "POL",
+      "name": "POL (ex-MATIC)",
+      "marketCapUsd": 2779074807.384717,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 1321,
+      "rank": 32,
+      "symbol": "ETC",
+      "name": "Ethereum Classic",
+      "marketCapUsd": 2765395051.9048243,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 328,
+      "rank": 33,
+      "symbol": "XMR",
+      "name": "Monero",
+      "marketCapUsd": 2740608639.507261,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 512,
+      "rank": 34,
+      "symbol": "XLM",
+      "name": "Stellar",
+      "marketCapUsd": 2682329050.8083405,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 28752,
+      "rank": 35,
+      "symbol": "WIF",
+      "name": "dogwifhat",
+      "marketCapUsd": 2660977787.241939,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 4847,
+      "rank": 36,
+      "symbol": "STX",
+      "name": "Stacks",
+      "marketCapUsd": 2580459135.767017,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 3897,
+      "rank": 37,
+      "symbol": "OKB",
+      "name": "OKB",
+      "marketCapUsd": 2494784379.560982,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 10603,
+      "rank": 38,
+      "symbol": "IMX",
+      "name": "Immutable",
+      "marketCapUsd": 2463826152.51324,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 7278,
+      "rank": 39,
+      "symbol": "AAVE",
+      "name": "Aave",
+      "marketCapUsd": 2313351541.8278294,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    },
+    {
+      "providerId": 11840,
+      "rank": 40,
+      "symbol": "OP",
+      "name": "Optimism",
+      "marketCapUsd": 2141921899.7640932,
+      "snapshotLabel": "2024-10-13T00:00:00.000Z",
+      "provisionalTagExclusion": false,
+      "provisionalMatchedTags": []
+    }
+  ],
+  "archiveProbes": [
+    {
+      "providerId": 1,
+      "rank": 1,
+      "symbol": "BTC",
+      "attemptedPair": "BTCUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1d/BTCUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "6b5ded9903028e94a57437de2bbad355b4244ba2340036b60bb8acb115b9a937",
+      "bytes": 236
+    },
+    {
+      "providerId": 1027,
+      "rank": 2,
+      "symbol": "ETH",
+      "attemptedPair": "ETHUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1d/ETHUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "82abdb1f107cdce697546d1fc199d244a75fa3f50190a3a32882f339e7397022",
+      "bytes": 236
+    },
+    {
+      "providerId": 1839,
+      "rank": 4,
+      "symbol": "BNB",
+      "attemptedPair": "BNBUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BNBUSDT/1d/BNBUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "d2d99ab9a9fa58e990a9f5f6bc55bf7f5caa888eee6400784d01fea8cae5ffed",
+      "bytes": 231
+    },
+    {
+      "providerId": 5426,
+      "rank": 5,
+      "symbol": "SOL",
+      "attemptedPair": "SOLUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SOLUSDT/1d/SOLUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "a6cb8ed3ea83ef3596b9625212469a42e31afc7ebc7c044163886f9bd36098a5",
+      "bytes": 231
+    },
+    {
+      "providerId": 52,
+      "rank": 7,
+      "symbol": "XRP",
+      "attemptedPair": "XRPUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/XRPUSDT/1d/XRPUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "9bd056ae6fdcc731c2c522f05c74376d190d373505c1750e9662745d82d8fdf6",
+      "bytes": 227
+    },
+    {
+      "providerId": 74,
+      "rank": 8,
+      "symbol": "DOGE",
+      "attemptedPair": "DOGEUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/DOGEUSDT/1d/DOGEUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "264c85cf48cb1e6f04b37f982b78b395bb738e299a0e7cf4eb1ef2c332549bfa",
+      "bytes": 233
+    },
+    {
+      "providerId": 1958,
+      "rank": 9,
+      "symbol": "TRX",
+      "attemptedPair": "TRXUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/TRXUSDT/1d/TRXUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "a58ff86224cdb2d994357d7386a61aa3815debe65f652b38252fe1f0c772ed56",
+      "bytes": 228
+    },
+    {
+      "providerId": 11419,
+      "rank": 10,
+      "symbol": "TON",
+      "attemptedPair": "TONUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/TONUSDT/1d/TONUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "fb73f499c0a6d69933439f99b1efc7d377619df9209a6aad6e04c7f540e7a15e",
+      "bytes": 229
+    },
+    {
+      "providerId": 2010,
+      "rank": 11,
+      "symbol": "ADA",
+      "attemptedPair": "ADAUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ADAUSDT/1d/ADAUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "4163945d616f64d05feb15827c03adabd49a6893d890da0a41276603142b7136",
+      "bytes": 228
+    },
+    {
+      "providerId": 5805,
+      "rank": 12,
+      "symbol": "AVAX",
+      "attemptedPair": "AVAXUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/AVAXUSDT/1d/AVAXUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "05a0977e20dde77fb822814914709b5ab2b686f40d9f9c517ef7327b5ee652e1",
+      "bytes": 230
+    },
+    {
+      "providerId": 5994,
+      "rank": 13,
+      "symbol": "SHIB",
+      "attemptedPair": "SHIBUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SHIBUSDT/1d/SHIBUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "7df2a278a5134ce0761c5ed94fb09cccf453b4de8f02a6b0a7fbbcfa10f7aa46",
+      "bytes": 234
+    },
+    {
+      "providerId": 1975,
+      "rank": 14,
+      "symbol": "LINK",
+      "attemptedPair": "LINKUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/LINKUSDT/1d/LINKUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "2e3133eb32c51dcaf53cea839d60d5d82eb22925ec9f3750b1d3e87b1215dcfd",
+      "bytes": 228
+    },
+    {
+      "providerId": 20947,
+      "rank": 15,
+      "symbol": "SUI",
+      "attemptedPair": "SUIUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SUIUSDT/1d/SUIUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "0d18c9fdb9e83410f7aa199d5755718eec512abd40a94a52e8236d860421bf69",
+      "bytes": 232
+    },
+    {
+      "providerId": 1831,
+      "rank": 16,
+      "symbol": "BCH",
+      "attemptedPair": "BCHUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BCHUSDT/1d/BCHUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "1acbc4711925ad7671c546b110980f102b08024ade4560ee91ffdf9e7c724060",
+      "bytes": 224
+    },
+    {
+      "providerId": 6636,
+      "rank": 17,
+      "symbol": "DOT",
+      "attemptedPair": "DOTUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/DOTUSDT/1d/DOTUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "8d853f8e11fb4f6bdf46c224e2c5ee5208e3a05d58a49946749ab485d2b66f63",
+      "bytes": 226
+    },
+    {
+      "providerId": 6535,
+      "rank": 18,
+      "symbol": "NEAR",
+      "attemptedPair": "NEARUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/NEARUSDT/1d/NEARUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "581abced088b4df77ea70d02165fc1aa25c063cca4e9a2d9115c65f091e11fa6",
+      "bytes": 228
+    },
+    {
+      "providerId": 3957,
+      "rank": 19,
+      "symbol": "LEO",
+      "attemptedPair": "LEOUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/LEOUSDT/1d/LEOUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "HTTP_ERROR",
+      "httpStatus": 404
+    },
+    {
+      "providerId": 21794,
+      "rank": 21,
+      "symbol": "APT",
+      "attemptedPair": "APTUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/APTUSDT/1d/APTUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "db3f151814b21f0783fa3523cee6955feb75d89296b3a79577efdcc39d41ae9c",
+      "bytes": 231
+    },
+    {
+      "providerId": 2,
+      "rank": 22,
+      "symbol": "LTC",
+      "attemptedPair": "LTCUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/LTCUSDT/1d/LTCUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "f15c6957a96b4241c289473ebca90b0ae5cf999cf8143e7182829b96ebe7f0f3",
+      "bytes": 228
+    },
+    {
+      "providerId": 22974,
+      "rank": 23,
+      "symbol": "TAO",
+      "attemptedPair": "TAOUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/TAOUSDT/1d/TAOUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "18e6422138c5178ba0ef08e21ab0611b91e0798e0e4bdd874f742c9f0747e42e",
+      "bytes": 230
+    },
+    {
+      "providerId": 7083,
+      "rank": 24,
+      "symbol": "UNI",
+      "attemptedPair": "UNIUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/UNIUSDT/1d/UNIUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "f2fa1d5e7737c407933960717710597e6ea3704e45632bf859af5c1ee25edd85",
+      "bytes": 230
+    },
+    {
+      "providerId": 24478,
+      "rank": 25,
+      "symbol": "PEPE",
+      "attemptedPair": "PEPEUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/PEPEUSDT/1d/PEPEUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "4fd8bad66cfe38527d5630bbb70949d418c916e71030acf32b5b0fedb8aa1e17",
+      "bytes": 233
+    },
+    {
+      "providerId": 8916,
+      "rank": 26,
+      "symbol": "ICP",
+      "attemptedPair": "ICPUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ICPUSDT/1d/ICPUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "325beb56b5f1de7f102c2cb3907a82206d7f32e922f3749c1563a493de4963f7",
+      "bytes": 228
+    },
+    {
+      "providerId": 3773,
+      "rank": 27,
+      "symbol": "FET",
+      "attemptedPair": "FETUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/FETUSDT/1d/FETUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "ONE_DAY_CANDLE_BYTES_VERIFIED",
+      "sha256": "00aefb7571f99ce97c0b5a8d7d2fe5eb3612d8aec4733dd34edca5f59608d138",
+      "bytes": 228
+    },
+    {
+      "providerId": 20396,
+      "rank": 28,
+      "symbol": "KAS",
+      "attemptedPair": "KASUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/KASUSDT/1d/KASUSDT-1d-2024-10-13.zip",
+      "identityMapping": "SYMBOL_CONCATENATION_UNVERIFIED",
+      "historicalEligibility": "UNVERIFIED",
+      "status": "HTTP_ERROR",
+      "httpStatus": 404
+    }
+  ],
+  "selectionRuleBeforeArchiveAccess": "first40 published ranks; provisional tag exclusions; first25 remaining; no replacement of failures",
+  "capOrderAudit": {
+    "retainedFirst40Descending": true,
+    "full200AdjacentInversions": [
+      {
+        "rankA": 43,
+        "rankB": 44
+      },
+      {
+        "rankA": 55,
+        "rankB": 56
+      },
+      {
+        "rankA": 63,
+        "rankB": 64
+      },
+      {
+        "rankA": 67,
+        "rankB": 68
+      },
+      {
+        "rankA": 85,
+        "rankB": 86
+      },
+      {
+        "rankA": 90,
+        "rankB": 91
+      },
+      {
+        "rankA": 104,
+        "rankB": 105
+      },
+      {
+        "rankA": 136,
+        "rankB": 137
+      },
+      {
+        "rankA": 143,
+        "rankB": 144
+      },
+      {
+        "rankA": 156,
+        "rankB": 157
+      },
+      {
+        "rankA": 179,
+        "rankB": 180
+      },
+      {
+        "rankA": 181,
+        "rankB": 182
+      },
+      {
+        "rankA": 190,
+        "rankB": 191
+      }
+    ]
+  },
+  "summary": {
+    "archiveAttempts": 25,
+    "checksumAndDailyShapePass": 23,
+    "http404": 2,
+    "failedAttemptSymbols": [
+      "LEO",
+      "KAS"
+    ]
+  }
+}
