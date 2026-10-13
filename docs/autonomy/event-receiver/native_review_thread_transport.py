@@ -15,7 +15,7 @@ from native_review_threads import project_threads
 ENDPOINT = 'https://api.github.com/graphql'
 
 
-def observe_threads(expected_raw, token):
+def observe_threads(expected_raw, token, *, _budget=None):
     """Fetch at most six bounded responses; keep evidence non-authoritative."""
     blocked = project_threads(b'{}', b'{}')
     try:
@@ -25,6 +25,10 @@ def observe_threads(expected_raw, token):
         need(type(token) is str and 0 < len(token) <= 4096
              and all(33 <= ord(c) <= 126 for c in token), 'TOKEN')
         opener = urllib.request.build_opener(NoRedirect())
+        if _budget is not None:
+            from native_review_packet import _PacketBudget
+            need(type(_budget) is _PacketBudget, 'BUDGET_TYPE')
+            opener = _budget.wrap_opener(opener)
         deadline = time.monotonic() + 60
         calls, total = 0, 0
 

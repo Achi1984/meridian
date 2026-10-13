@@ -70,8 +70,10 @@ def project_inventory(expected_raw, inventories_raw):
         digest = hashlib.sha256(json.dumps(first, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')).hexdigest()
         result.update(status='OBSERVED_INVENTORY_INCOMPLETE', reason='THREADS_AND_EXECUTED_CHECKS_MISSING',
                       observation=dict(scope=scope, review=selected, inventoryDigest=digest,
+                                       adverseReviewCount=sum(row['state'] in ('CHANGES_REQUESTED', 'PENDING') for row in first),
                                        reviewCount=len(first), suppliedPaginationComplete=True,
                                        transportPaginationVerified=False))
     except Exception:
         pass
     return result
+
