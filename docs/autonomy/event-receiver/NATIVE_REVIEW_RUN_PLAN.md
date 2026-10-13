@@ -1,28 +1,31 @@
-# Manual native review observation: prepared, not executed
+# Manual native review observation: historical consumed pilot
 
 This packet adds a manual entrypoint to the merged observer and exact-pin GET
-transport. It does not install a workflow or activate event-driven operation.
+transport. The separate PR738 pilot installed and ran its workflow; this document
+records that consumed invocation, not a new execution proposal.
 Import is inert. The explicit command flag permits one bounded observation comprising up to nine GitHub GET requests;
 it is not owner approval, complete review evidence or dispatch authority.
 
-## Concrete candidate
+## Historical pins — non-runnable
 
 Control source: main `03f5c78068b74fdeb0e3c02450a0b5a389b0612b`, including merged
-transport PR735. The entrypoint itself must first receive its own exact-head
-review and concrete one-shot execution decision. Use that exact reviewed immutable
-Draft head before any merge; merging first changes main and invalidates these pins.
-Target PR736 was observed open at the pins
-below. Reconcile those pins again immediately before any separately authorized
-invocation. Drift must block; do not silently update pins or select another review.
+transport PR735. The entrypoint required its own exact-head
+review and a concrete one-shot execution decision at preparation time. That decision
+was given at `2026-10-12T23:54:22+02:00` and has been consumed by PR738 run
+`38313572179` (SUCCESS). Target PR736 was open during that observation; it is now
+merged as `e1b82a366d8787c4f24bffa725d1d6ad08a9147d`. Main at this documentation
+reconciliation is `78c694256a2b0da8f79c02733bcd9e18568aca02`.
+The original pins below are preserved as historical evidence only. They are no
+longer a runnable configuration. No repinning, rerun or second ready transition
+is authorized.
 
-Expected config file contents (no credentials):
+Historical config contents (no credentials; do not execute):
 
 ```json
 {"scope":{"prNumber":736,"headSha":"2b4bce3ff1ece837b19e8acdf655db6d922390b8","baseSha":"03f5c78068b74fdeb0e3c02450a0b5a389b0612b","ci":{"runId":38306411836,"runAttempt":1,"workflowId":347821227,"headSha":"2b4bce3ff1ece837b19e8acdf655db6d922390b8"}},"review":{"id":5495805683,"submittedAt":"2026-10-12T20:48:50Z","bodySha256":"e94a2027902dc9d215e1dd740beddd15a9bc61365c148e5a1b8ec1609b9c12df"}}
 ```
 
-From the reviewed source directory, with an already provisioned `GH_TOKEN` in
-the environment and the independently reviewed config in `pins.json`:
+Historical invocation syntax only — not an instruction or authorization to run:
 
 ```sh
 python3 -I -B native_review_observe.py --allow-read-only-network pins.json
@@ -41,18 +44,24 @@ gate, and reports `OBSERVED_APPROVAL_INCOMPLETE`; blocked cases exit **1**.
 Review bodies, credentials and exception strings are not printed. Every existing
 authority flag remains false. This observes one selected approval; it proves
 neither complete/latest reviews, resolved threads nor executed-check evidence.
-No authenticated invocation has been performed in preparation of this packet.
+The completed pilot emitted `OBSERVED_APPROVAL_INCOMPLETE` with reason
+`FULL_REVIEW_EVIDENCE_MISSING`. Its authentication, provenance, authorization,
+dispatch, merge, durability and full-review-evidence flags remained false;
+`plannerResponse` remained null. Successful execution is not complete review
+validation or permission to continue automatically.
 
 Tests use mocked HTTP responses and a synthetic token only. Run the collector,
 observer, transport and entrypoint suites together; stage the existing sibling
 event adapter for its collector integration test.
 
-## Inactive Actions execution proposal
+## Consumed Actions execution record
 
-`native-observe-once.yml` is a reviewable template under docs, not an installed
-workflow. Its five Python modules are pinned to immutable source commit
+The copy of `native-observe-once.yml` under docs is still a template. Separately,
+PR738 installed `.github/workflows/native-observe-once.yml` on its pilot branch
+and ran the owner-authorized observation as run `38313572179` (SUCCESS).
+Its five Python modules were pinned to immutable source commit
 `b42966ab3ba05964bca4d9fcfb2bb00cea85922d` (bytecode fix included).
-The proposal performs at most 18 explicit GitHub GETs: five source downloads,
+The executed design permits at most 18 explicit GitHub GETs: five source downloads,
 four main/pilot-head guard reads, and up to nine observer reads. No intentional
 retry, schedule, checkout, repository mutation or new credential is included.
 The existing ephemeral `github.token` receives read-only contents/actions/PR
@@ -60,17 +69,16 @@ permissions. Temporary runner files hold source, pins and the redacted receipt.
 The launcher's no-file-write statement above applies to the Python observation,
 not this workflow's preparation of temporary files.
 
-After review, separately authorize installing the exact template as
-`.github/workflows/native-observe-once.yml` on the fixed pilot branch. Prepare
-its Draft PR, independently review the final pilot head, then obtain concrete
-owner approval for one ready-for-review transition after live pin reconciliation.
-Do not merge PR736 or change main first. Different sender, base or target pins
-block rather than silently repin. The workflow cannot embed its own commit hash;
-root verifies the approved exact head before triggering and the workflow verifies
-its event head against the live PR before and after observation.
+The concrete owner approval at `2026-10-12T23:54:22+02:00` covered one
+ready-for-review transition after review and live pin reconciliation. That grant
+is consumed. The workflow cannot embed its own commit hash; the execution design
+requires root to verify the approved exact head before triggering and checks the
+event head against the live PR before and after observation. Changed main and the
+merged target now invalidate the historical launch conditions. Never silently
+repin, reset a claim or repeat the pilot.
 
 `run_attempt == 1` blocks reruns, not repeated ready events. This is a single
 procedurally authorized invocation, not durable exactly-once delivery. No second
-ready transition or retry is authorized. Event delivery and sender identity must
-be verified from the actual run. A matching receipt remains incomplete and grants
-no dispatch or merge authority. No workflow has been installed or run.
+ready transition or retry is authorized. The completed run supplies the delivery observation for that invocation only.
+Its receipt remains incomplete and grants no dispatch or merge authority. No
+new installation, activation or execution is proposed by this historical record.

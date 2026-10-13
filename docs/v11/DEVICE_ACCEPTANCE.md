@@ -7,7 +7,7 @@ liefert die geprüfte Adresse; hier ist bewusst keine Test-URL vorgegeben.
 
 ## Bindung an den Kandidaten
 
-- PR: #740; Head: `1feaccf71499d44ce4bea90f63772ee6619f4556`.
+- PR: #740; Head: `31a4467c721c1e7201477fd61e57325649f6abde`.
 - Basis: `78c694256a2b0da8f79c02733bcd9e18568aca02`.
 - Vor Beginn muss die Bereitstellung diesem Head nachweislich entsprechen.
   Die sichtbare Kennung B3 allein genügt nicht. Bei Änderungen neu abgleichen.
