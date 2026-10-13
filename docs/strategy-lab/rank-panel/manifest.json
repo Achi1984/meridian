@@ -1,0 +1,114 @@
+{
+  "schema": "HISTORICAL_RANK_PANEL_FEASIBILITY_V1",
+  "executionAuthorized": false,
+  "strategyEvaluated": false,
+  "eligibleUniverseApproved": false,
+  "selection": "Four fixed semiannual source probes, not weekly rebalance history",
+  "snapshots": [
+    {
+      "date": "20230101",
+      "status": "PARSED",
+      "records": 40,
+      "htmlSha256": "c1161fa4c0f0c5924edec7c9a7d57c3e138ff81aea0dbcaeee82d64e596f224b",
+      "capInversions": 11
+    },
+    {
+      "date": "20230702",
+      "status": "PARSED",
+      "records": 40,
+      "htmlSha256": "d60a7e5010abe0f40067fd037aec9a6f19a881b5890ce738d422aa733ee6b805",
+      "capInversions": 16
+    },
+    {
+      "date": "20240107",
+      "status": "PARSED",
+      "records": 40,
+      "htmlSha256": "de42645962da1f4b2fe1cc5158d24e67517292d2eda448a07305e5955fc16118",
+      "capInversions": 22
+    },
+    {
+      "date": "20240707",
+      "status": "PARSED",
+      "records": 40,
+      "htmlSha256": "b4fc88d34d8b7d1e62f38d8d75ca2b686309a08f2f4f0563c017624ed18c7fe5",
+      "capInversions": 25
+    }
+  ],
+  "rawTop20Transitions": [
+    {
+      "from": "20230101",
+      "to": "20230702",
+      "entered": [
+        {
+          "providerId": 1831,
+          "symbol": "BCH"
+        },
+        {
+          "providerId": 11419,
+          "symbol": "TON"
+        }
+      ],
+      "left": [
+        {
+          "providerId": 7083,
+          "symbol": "UNI"
+        },
+        {
+          "providerId": 3957,
+          "symbol": "LEO"
+        }
+      ],
+      "meaning": "RAW_PROVIDER_TOP20_INCLUDES_STABLECOINS_AND_WRAPPERS_NOT_ELIGIBLE_TOP20"
+    },
+    {
+      "from": "20230702",
+      "to": "20240107",
+      "entered": [
+        {
+          "providerId": 1975,
+          "symbol": "LINK"
+        },
+        {
+          "providerId": 8916,
+          "symbol": "ICP"
+        }
+      ],
+      "left": [
+        {
+          "providerId": 3717,
+          "symbol": "WBTC"
+        },
+        {
+          "providerId": 4687,
+          "symbol": "BUSD"
+        }
+      ],
+      "meaning": "RAW_PROVIDER_TOP20_INCLUDES_STABLECOINS_AND_WRAPPERS_NOT_ELIGIBLE_TOP20"
+    },
+    {
+      "from": "20240107",
+      "to": "20240707",
+      "entered": [
+        {
+          "providerId": 3957,
+          "symbol": "LEO"
+        },
+        {
+          "providerId": 6535,
+          "symbol": "NEAR"
+        }
+      ],
+      "left": [
+        {
+          "providerId": 8916,
+          "symbol": "ICP"
+        },
+        {
+          "providerId": 2,
+          "symbol": "LTC"
+        }
+      ],
+      "meaning": "RAW_PROVIDER_TOP20_INCLUDES_STABLECOINS_AND_WRAPPERS_NOT_ELIGIBLE_TOP20"
+    }
+  ]
+}

@@ -1,0 +1,1075 @@
+{
+  "snapshotDate": "20240707",
+  "url": "https://coinmarketcap.com/historical/20240707/",
+  "historicalPublicationVerified": false,
+  "classificationAsOfVerified": false,
+  "executionAuthorized": false,
+  "status": "PARSED",
+  "retrievedAtMs": 1791922016114,
+  "htmlSha256": "b4fc88d34d8b7d1e62f38d8d75ca2b686309a08f2f4f0563c017624ed18c7fe5",
+  "inspectedRecords": 200,
+  "retainedRecords": 40,
+  "capOrderInversions": [
+    {
+      "higherRank": 17,
+      "lowerRank": 18
+    },
+    {
+      "higherRank": 36,
+      "lowerRank": 37
+    },
+    {
+      "higherRank": 58,
+      "lowerRank": 59
+    },
+    {
+      "higherRank": 76,
+      "lowerRank": 77
+    },
+    {
+      "higherRank": 79,
+      "lowerRank": 80
+    },
+    {
+      "higherRank": 90,
+      "lowerRank": 91
+    },
+    {
+      "higherRank": 97,
+      "lowerRank": 98
+    },
+    {
+      "higherRank": 99,
+      "lowerRank": 100
+    },
+    {
+      "higherRank": 108,
+      "lowerRank": 109
+    },
+    {
+      "higherRank": 112,
+      "lowerRank": 113
+    },
+    {
+      "higherRank": 121,
+      "lowerRank": 122
+    },
+    {
+      "higherRank": 123,
+      "lowerRank": 124
+    },
+    {
+      "higherRank": 128,
+      "lowerRank": 129
+    },
+    {
+      "higherRank": 133,
+      "lowerRank": 134
+    },
+    {
+      "higherRank": 144,
+      "lowerRank": 145
+    },
+    {
+      "higherRank": 147,
+      "lowerRank": 148
+    },
+    {
+      "higherRank": 152,
+      "lowerRank": 153
+    },
+    {
+      "higherRank": 163,
+      "lowerRank": 164
+    },
+    {
+      "higherRank": 167,
+      "lowerRank": 168
+    },
+    {
+      "higherRank": 169,
+      "lowerRank": 170
+    },
+    {
+      "higherRank": 172,
+      "lowerRank": 173
+    },
+    {
+      "higherRank": 184,
+      "lowerRank": 185
+    },
+    {
+      "higherRank": 185,
+      "lowerRank": 186
+    },
+    {
+      "higherRank": 195,
+      "lowerRank": 196
+    },
+    {
+      "higherRank": 198,
+      "lowerRank": 199
+    }
+  ],
+  "records": [
+    {
+      "providerId": 1,
+      "rank": 1,
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "slug": "bitcoin",
+      "marketCapUSD": 1101324021018.8833,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "sha-256",
+        "store-of-value",
+        "state-channel",
+        "coinbase-ventures-portfolio",
+        "three-arrows-capital-portfolio",
+        "polychain-capital-portfolio",
+        "binance-labs-portfolio",
+        "blockchain-capital-portfolio",
+        "boostvc-portfolio",
+        "cms-holdings-portfolio",
+        "dcg-portfolio",
+        "dragonfly-capital-portfolio",
+        "electric-capital-portfolio",
+        "fabric-ventures-portfolio",
+        "framework-ventures-portfolio",
+        "galaxy-digital-portfolio",
+        "huobi-capital-portfolio",
+        "alameda-research-portfolio",
+        "a16z-portfolio",
+        "1confirmation-portfolio",
+        "winklevoss-capital-portfolio",
+        "usv-portfolio",
+        "placeholder-ventures-portfolio",
+        "pantera-capital-portfolio",
+        "multicoin-capital-portfolio",
+        "paradigm-portfolio",
+        "bitcoin-ecosystem",
+        "ftx-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 1027,
+      "rank": 2,
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "slug": "ethereum",
+      "marketCapUSD": 352114562456.6746,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "pos",
+        "smart-contracts",
+        "ethereum-ecosystem",
+        "coinbase-ventures-portfolio",
+        "three-arrows-capital-portfolio",
+        "polychain-capital-portfolio",
+        "binance-labs-portfolio",
+        "blockchain-capital-portfolio",
+        "boostvc-portfolio",
+        "cms-holdings-portfolio",
+        "dcg-portfolio",
+        "dragonfly-capital-portfolio",
+        "electric-capital-portfolio",
+        "fabric-ventures-portfolio",
+        "framework-ventures-portfolio",
+        "hashkey-capital-portfolio",
+        "kenetic-capital-portfolio",
+        "huobi-capital-portfolio",
+        "alameda-research-portfolio",
+        "a16z-portfolio",
+        "1confirmation-portfolio",
+        "winklevoss-capital-portfolio",
+        "usv-portfolio",
+        "placeholder-ventures-portfolio",
+        "pantera-capital-portfolio",
+        "multicoin-capital-portfolio",
+        "paradigm-portfolio",
+        "injective-ecosystem",
+        "layer-1",
+        "ftx-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 825,
+      "rank": 3,
+      "symbol": "USDT",
+      "name": "Tether USDt",
+      "slug": "tether",
+      "marketCapUSD": 112204931885.79503,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "stablecoin",
+        "asset-backed-stablecoin",
+        "avalanche-ecosystem",
+        "solana-ecosystem",
+        "arbitrum-ecosytem",
+        "moonriver-ecosystem",
+        "injective-ecosystem",
+        "bnb-chain",
+        "usd-stablecoin",
+        "optimism-ecosystem",
+        "fiat-stablecoin"
+      ]
+    },
+    {
+      "providerId": 1839,
+      "rank": 4,
+      "symbol": "BNB",
+      "name": "BNB",
+      "slug": "bnb",
+      "marketCapUSD": 72406011944.90858,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "marketplace",
+        "centralized-exchange",
+        "payments",
+        "smart-contracts",
+        "alameda-research-portfolio",
+        "multicoin-capital-portfolio",
+        "bnb-chain",
+        "layer-1",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "celsius-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 5426,
+      "rank": 5,
+      "symbol": "SOL",
+      "name": "Solana",
+      "slug": "solana",
+      "marketCapUSD": 61083162174.13038,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "pos",
+        "platform",
+        "solana-ecosystem",
+        "cms-holdings-portfolio",
+        "kenetic-capital-portfolio",
+        "alameda-research-portfolio",
+        "multicoin-capital-portfolio",
+        "okx-ventures-portfolio",
+        "layer-1",
+        "ftx-bankruptcy-estate",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "cmc-crypto-awards-2024"
+      ]
+    },
+    {
+      "providerId": 3408,
+      "rank": 6,
+      "symbol": "USDC",
+      "name": "USDC",
+      "slug": "usd-coin",
+      "marketCapUSD": 33731094587.873177,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "medium-of-exchange",
+        "stablecoin",
+        "asset-backed-stablecoin",
+        "coinbase-ventures-portfolio",
+        "hedera-hashgraph-ecosystem",
+        "fantom-ecosystem",
+        "arbitrum-ecosytem",
+        "moonriver-ecosystem",
+        "bnb-chain",
+        "usd-stablecoin",
+        "optimism-ecosystem",
+        "fiat-stablecoin"
+      ]
+    },
+    {
+      "providerId": 52,
+      "rank": 7,
+      "symbol": "XRP",
+      "name": "XRP",
+      "slug": "xrp",
+      "marketCapUSD": 23393827164.84009,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "medium-of-exchange",
+        "enterprise-solutions",
+        "arrington-xrp-capital-portfolio",
+        "galaxy-digital-portfolio",
+        "a16z-portfolio",
+        "pantera-capital-portfolio",
+        "ftx-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 11419,
+      "rank": 8,
+      "symbol": "TON",
+      "name": "Toncoin",
+      "slug": "toncoin",
+      "marketCapUSD": 17725858086.055782,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "pos",
+        "layer-1",
+        "ftx-bankruptcy-estate",
+        "dwf-labs-portfolio",
+        "toncoin-ecosystem"
+      ]
+    },
+    {
+      "providerId": 74,
+      "rank": 9,
+      "symbol": "DOGE",
+      "name": "Dogecoin",
+      "slug": "dogecoin",
+      "marketCapUSD": 15116039715.883669,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "scrypt",
+        "medium-of-exchange",
+        "memes",
+        "payments",
+        "doggone-doggerel",
+        "bnb-chain",
+        "ftx-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 2010,
+      "rank": 10,
+      "symbol": "ADA",
+      "name": "Cardano",
+      "slug": "cardano",
+      "marketCapUSD": 12398538838.352262,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "dpos",
+        "pos",
+        "platform",
+        "research",
+        "smart-contracts",
+        "staking",
+        "cardano-ecosystem",
+        "cardano",
+        "layer-1",
+        "sec-security-token",
+        "alleged-sec-securities"
+      ]
+    },
+    {
+      "providerId": 1958,
+      "rank": 11,
+      "symbol": "TRX",
+      "name": "TRON",
+      "slug": "tron",
+      "marketCapUSD": 10865895817.060799,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "media",
+        "payments",
+        "tron-ecosystem",
+        "layer-1",
+        "dwf-labs-portfolio",
+        "sec-security-token",
+        "alleged-sec-securities"
+      ]
+    },
+    {
+      "providerId": 5805,
+      "rank": 12,
+      "symbol": "AVAX",
+      "name": "Avalanche",
+      "slug": "avalanche",
+      "marketCapUSD": 10135157017.283312,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "defi",
+        "smart-contracts",
+        "three-arrows-capital-portfolio",
+        "polychain-capital-portfolio",
+        "avalanche-ecosystem",
+        "cms-holdings-portfolio",
+        "dragonfly-capital-portfolio",
+        "moonriver-ecosystem",
+        "injective-ecosystem",
+        "real-world-assets",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 5994,
+      "rank": 13,
+      "symbol": "SHIB",
+      "name": "Shiba Inu",
+      "slug": "shiba-inu",
+      "marketCapUSD": 9135786706.408525,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "memes",
+        "ethereum-ecosystem",
+        "doggone-doggerel"
+      ]
+    },
+    {
+      "providerId": 6636,
+      "rank": 14,
+      "symbol": "DOT",
+      "name": "Polkadot",
+      "slug": "polkadot-new",
+      "marketCapUSD": 8492930594.885851,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "substrate",
+        "polkadot",
+        "binance-chain",
+        "polkadot-ecosystem",
+        "three-arrows-capital-portfolio",
+        "polychain-capital-portfolio",
+        "arrington-xrp-capital-portfolio",
+        "blockchain-capital-portfolio",
+        "boostvc-portfolio",
+        "cms-holdings-portfolio",
+        "coinfund-portfolio",
+        "fabric-ventures-portfolio",
+        "fenbushi-capital-portfolio",
+        "hashkey-capital-portfolio",
+        "kenetic-capital-portfolio",
+        "1confirmation-portfolio",
+        "placeholder-ventures-portfolio",
+        "pantera-capital-portfolio",
+        "exnetwork-capital-portfolio",
+        "web3",
+        "spartan-group",
+        "injective-ecosystem",
+        "bnb-chain",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 1975,
+      "rank": 15,
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "slug": "chainlink",
+      "marketCapUSD": 7510846394.204142,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "platform",
+        "defi",
+        "oracles",
+        "smart-contracts",
+        "substrate",
+        "polkadot",
+        "avalanche-ecosystem",
+        "solana-ecosystem",
+        "framework-ventures-portfolio",
+        "polygon-ecosystem",
+        "fantom-ecosystem",
+        "cardano-ecosystem",
+        "web3",
+        "near-protocol-ecosystem",
+        "arbitrum-ecosytem",
+        "cardano",
+        "injective-ecosystem",
+        "optimism-ecosystem",
+        "real-world-assets",
+        "celsius-bankruptcy-estate"
+      ]
+    },
+    {
+      "providerId": 1831,
+      "rank": 16,
+      "symbol": "BCH",
+      "name": "Bitcoin Cash",
+      "slug": "bitcoin-cash",
+      "marketCapUSD": 6170917603.237712,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "sha-256",
+        "marketplace",
+        "medium-of-exchange",
+        "store-of-value",
+        "enterprise-solutions",
+        "payments",
+        "bitcoin-ecosystem",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 4943,
+      "rank": 17,
+      "symbol": "DAI",
+      "name": "Dai",
+      "slug": "multi-collateral-dai",
+      "marketCapUSD": 5346416894.050707,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "defi",
+        "stablecoin",
+        "asset-backed-stablecoin",
+        "ethereum-ecosystem",
+        "avalanche-ecosystem",
+        "polygon-ecosystem",
+        "fantom-ecosystem",
+        "arbitrum-ecosytem",
+        "harmony-ecosystem",
+        "moonriver-ecosystem",
+        "bnb-chain",
+        "usd-stablecoin",
+        "optimism-ecosystem"
+      ]
+    },
+    {
+      "providerId": 3957,
+      "rank": 18,
+      "symbol": "LEO",
+      "name": "UNUS SED LEO",
+      "slug": "unus-sed-leo",
+      "marketCapUSD": 5347087216.933354,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "marketplace",
+        "centralized-exchange",
+        "discount-token",
+        "payments",
+        "kenetic-capital-portfolio",
+        "alameda-research-portfolio"
+      ]
+    },
+    {
+      "providerId": 6535,
+      "rank": 19,
+      "symbol": "NEAR",
+      "name": "NEAR Protocol",
+      "slug": "near-protocol",
+      "marketCapUSD": 4819688257.145112,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "platform",
+        "ai-big-data",
+        "staking",
+        "coinbase-ventures-portfolio",
+        "three-arrows-capital-portfolio",
+        "arrington-xrp-capital-portfolio",
+        "coinfund-portfolio",
+        "electric-capital-portfolio",
+        "fabric-ventures-portfolio",
+        "kenetic-capital-portfolio",
+        "near-protocol-ecosystem",
+        "cross-chain",
+        "injective-ecosystem",
+        "circle-ventures-portfolio",
+        "layer-1",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "account-abstraction",
+        "data-availability"
+      ]
+    },
+    {
+      "providerId": 3890,
+      "rank": 20,
+      "symbol": "MATIC",
+      "name": "Polygon",
+      "slug": "polygon",
+      "marketCapUSD": 4724154166.805959,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "pos",
+        "platform",
+        "enterprise-solutions",
+        "zero-knowledge-proofs",
+        "scaling",
+        "state-channel",
+        "coinbase-ventures-portfolio",
+        "layer-2",
+        "binance-launchpad",
+        "binance-labs-portfolio",
+        "polygon-ecosystem",
+        "moonriver-ecosystem",
+        "injective-ecosystem",
+        "ftx-bankruptcy-estate",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "modular-blockchain",
+        "standard-crypto-portfolio"
+      ]
+    },
+    {
+      "providerId": 2,
+      "rank": 21,
+      "symbol": "LTC",
+      "name": "Litecoin",
+      "slug": "litecoin",
+      "marketCapUSD": 4637643859.3535795,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "scrypt",
+        "medium-of-exchange"
+      ]
+    },
+    {
+      "providerId": 7083,
+      "rank": 22,
+      "symbol": "UNI",
+      "name": "Uniswap",
+      "slug": "uniswap",
+      "marketCapUSD": 4588103161.362245,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "decentralized-exchange-dex-token",
+        "defi",
+        "dao",
+        "yield-farming",
+        "amm",
+        "coinbase-ventures-portfolio",
+        "three-arrows-capital-portfolio",
+        "governance",
+        "blockchain-capital-portfolio",
+        "defiance-capital-portfolio",
+        "alameda-research-portfolio",
+        "a16z-portfolio",
+        "pantera-capital-portfolio",
+        "parafi-capital",
+        "paradigm-portfolio",
+        "arbitrum-ecosytem",
+        "injective-ecosystem",
+        "optimism-ecosystem",
+        "cmc-crypto-awards-2024"
+      ]
+    },
+    {
+      "providerId": 20396,
+      "rank": 23,
+      "symbol": "KAS",
+      "name": "Kaspa",
+      "slug": "kaspa",
+      "marketCapUSD": 3844329968.9113812,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "dag",
+        "pow",
+        "store-of-value",
+        "polychain-capital-portfolio",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 24478,
+      "rank": 24,
+      "symbol": "PEPE",
+      "name": "Pepe",
+      "slug": "pepe",
+      "marketCapUSD": 3544368062.4349427,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "memes"
+      ]
+    },
+    {
+      "providerId": 8916,
+      "rank": 25,
+      "symbol": "ICP",
+      "name": "Internet Computer",
+      "slug": "internet-computer",
+      "marketCapUSD": 3221348350.5502095,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "platform",
+        "distributed-computing",
+        "collectibles-nfts",
+        "defi",
+        "privacy",
+        "interoperability",
+        "smart-contracts",
+        "dao",
+        "wallet",
+        "storage",
+        "polychain-capital-portfolio",
+        "governance",
+        "launchpad",
+        "lending-borowing",
+        "metaverse",
+        "electric-capital-portfolio",
+        "fenbushi-capital-portfolio",
+        "hashkey-capital-portfolio",
+        "a16z-portfolio",
+        "multicoin-capital-portfolio",
+        "exnetwork-capital-portfolio",
+        "web3",
+        "internet-computer-ecosystem",
+        "bitcoin-ecosystem",
+        "real-world-assets",
+        "layer-1",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "depin"
+      ]
+    },
+    {
+      "providerId": 1321,
+      "rank": 26,
+      "symbol": "ETC",
+      "name": "Ethereum Classic",
+      "slug": "ethereum-classic",
+      "marketCapUSD": 2919646880.1767216,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "ethash",
+        "platform",
+        "smart-contracts",
+        "dcg-portfolio"
+      ]
+    },
+    {
+      "providerId": 3773,
+      "rank": 27,
+      "symbol": "FET",
+      "name": "Artificial Superintelligence Alliance",
+      "slug": "fetch",
+      "marketCapUSD": 2805324204.1206665,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "cosmos-ecosystem",
+        "ai-big-data",
+        "collectibles-nfts",
+        "iot",
+        "binance-launchpad",
+        "web3",
+        "injective-ecosystem",
+        "generative-ai",
+        "dwf-labs-portfolio"
+      ]
+    },
+    {
+      "providerId": 328,
+      "rank": 28,
+      "symbol": "XMR",
+      "name": "Monero",
+      "slug": "monero",
+      "marketCapUSD": 2750559303.3097196,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "pow",
+        "medium-of-exchange",
+        "privacy",
+        "ringct",
+        "boostvc-portfolio",
+        "electric-capital-portfolio",
+        "galaxy-digital-portfolio"
+      ]
+    },
+    {
+      "providerId": 21794,
+      "rank": 29,
+      "symbol": "APT",
+      "name": "Aptos",
+      "slug": "aptos",
+      "marketCapUSD": 2533985971.5040364,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "binance-labs-portfolio",
+        "aptos-ecosystem",
+        "circle-ventures-portfolio",
+        "layer-1",
+        "ftx-bankruptcy-estate",
+        "move-vm"
+      ]
+    },
+    {
+      "providerId": 5690,
+      "rank": 30,
+      "symbol": "RNDR",
+      "name": "Render",
+      "slug": "render",
+      "marketCapUSD": 2470230231.465561,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "art",
+        "media",
+        "vr-ar",
+        "ai-big-data",
+        "distributed-computing",
+        "collectibles-nfts",
+        "scaling",
+        "video",
+        "ethereum-ecosystem",
+        "solana-ecosystem",
+        "metaverse",
+        "alameda-research-portfolio",
+        "multicoin-capital-portfolio",
+        "polygon-ecosystem",
+        "web3",
+        "generative-ai",
+        "depin"
+      ]
+    },
+    {
+      "providerId": 512,
+      "rank": 31,
+      "symbol": "XLM",
+      "name": "Stellar",
+      "slug": "stellar",
+      "marketCapUSD": 2448439867.254321,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "medium-of-exchange",
+        "enterprise-solutions",
+        "decentralized-exchange-dex-token",
+        "smart-contracts",
+        "hashkey-capital-portfolio"
+      ]
+    },
+    {
+      "providerId": 4642,
+      "rank": 32,
+      "symbol": "HBAR",
+      "name": "Hedera",
+      "slug": "hedera",
+      "marketCapUSD": 2310292103.705857,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "dag",
+        "marketplace",
+        "enterprise-solutions",
+        "payments",
+        "dcg-portfolio",
+        "hedera-hashgraph-ecosystem",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 3794,
+      "rank": 33,
+      "symbol": "ATOM",
+      "name": "Cosmos",
+      "slug": "cosmos",
+      "marketCapUSD": 2263342222.5244036,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "platform",
+        "cosmos-ecosystem",
+        "content-creation",
+        "interoperability",
+        "polychain-capital-portfolio",
+        "dragonfly-capital-portfolio",
+        "hashkey-capital-portfolio",
+        "1confirmation-portfolio",
+        "paradigm-portfolio",
+        "exnetwork-capital-portfolio",
+        "injective-ecosystem",
+        "layer-1",
+        "sec-security-token",
+        "alleged-sec-securities"
+      ]
+    },
+    {
+      "providerId": 3897,
+      "rank": 34,
+      "symbol": "OKB",
+      "name": "OKB",
+      "slug": "okb",
+      "marketCapUSD": 2213223608.6703906,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "marketplace",
+        "centralized-exchange",
+        "discount-token",
+        "alameda-research-portfolio",
+        "x1-ecosystem"
+      ]
+    },
+    {
+      "providerId": 3635,
+      "rank": 35,
+      "symbol": "CRO",
+      "name": "Cronos",
+      "slug": "cronos",
+      "marketCapUSD": 2178853610.8999786,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "medium-of-exchange",
+        "cosmos-ecosystem",
+        "centralized-exchange",
+        "mobile",
+        "payments",
+        "injective-ecosystem",
+        "layer-1"
+      ]
+    },
+    {
+      "providerId": 2280,
+      "rank": 36,
+      "symbol": "FIL",
+      "name": "Filecoin",
+      "slug": "filecoin",
+      "marketCapUSD": 2063688623.622959,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "distributed-computing",
+        "filesharing",
+        "storage",
+        "polychain-capital-portfolio",
+        "blockchain-capital-portfolio",
+        "boostvc-portfolio",
+        "dcg-portfolio",
+        "hashkey-capital-portfolio",
+        "a16z-portfolio",
+        "winklevoss-capital-portfolio",
+        "pantera-capital-portfolio",
+        "web3",
+        "filecoin-ecosystem",
+        "sec-security-token",
+        "alleged-sec-securities",
+        "depin"
+      ]
+    },
+    {
+      "providerId": 11841,
+      "rank": 37,
+      "symbol": "ARB",
+      "name": "Arbitrum",
+      "slug": "arbitrum",
+      "marketCapUSD": 2102574322.113215,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "scaling",
+        "dao",
+        "dapp",
+        "ethereum-ecosystem",
+        "polychain-capital-portfolio",
+        "layer-2",
+        "rollups",
+        "pantera-capital-portfolio",
+        "arbitrum-ecosytem",
+        "modular-blockchain",
+        "egirl-capital-portfolio"
+      ]
+    },
+    {
+      "providerId": 27075,
+      "rank": 38,
+      "symbol": "MNT",
+      "name": "Mantle",
+      "slug": "mantle",
+      "marketCapUSD": 2047282092.4240615,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "ethereum-ecosystem",
+        "layer-2",
+        "dwf-labs-portfolio"
+      ]
+    },
+    {
+      "providerId": 1518,
+      "rank": 39,
+      "symbol": "MKR",
+      "name": "Maker",
+      "slug": "maker",
+      "marketCapUSD": 1971077482.2687407,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "store-of-value",
+        "defi",
+        "dao",
+        "polychain-capital-portfolio",
+        "governance",
+        "lending-borowing",
+        "dragonfly-capital-portfolio",
+        "electric-capital-portfolio",
+        "a16z-portfolio",
+        "1confirmation-portfolio",
+        "placeholder-ventures-portfolio",
+        "pantera-capital-portfolio",
+        "paradigm-portfolio",
+        "near-protocol-ecosystem",
+        "arbitrum-ecosytem",
+        "spartan-group",
+        "bnb-chain",
+        "real-world-assets",
+        "standard-crypto-portfolio"
+      ]
+    },
+    {
+      "providerId": 4847,
+      "rank": 40,
+      "symbol": "STX",
+      "name": "Stacks",
+      "slug": "stacks",
+      "marketCapUSD": 1941412693.5404167,
+      "sourceLastUpdated": "2024-07-07T00:00:00.000Z",
+      "quoteLastUpdated": "2024-07-07T00:00:00.000Z",
+      "observedTagsNotHistoricallyVerified": [
+        "mineable",
+        "platform",
+        "collectibles-nfts",
+        "defi",
+        "smart-contracts",
+        "metaverse",
+        "arrington-xrp-capital-portfolio",
+        "blockchain-capital-portfolio",
+        "dcg-portfolio",
+        "fabric-ventures-portfolio",
+        "hashkey-capital-portfolio",
+        "huobi-capital-portfolio",
+        "usv-portfolio",
+        "web3",
+        "injective-ecosystem",
+        "bitcoin-ecosystem"
+      ]
+    }
+  ]
+}
