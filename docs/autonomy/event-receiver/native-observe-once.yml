@@ -1,7 +1,8 @@
-# INACTIVE TEMPLATE: do not install or mark a pilot PR ready without separate
-# owner authorization of the concrete workflow head and single read-only run.
+# HISTORICAL INACTIVE TEMPLATE: PR738 consumed its one authorized run.
+# Do not install, repeat ready_for_review, repin, or rerun this archived pilot.
 # Exact pilot-head authorization is procedural before the ready_for_review event;
-# this source cannot contain its own commit SHA. Reruns are not durably prevented.
+# this source cannot contain its own commit SHA. New ready_for_review deliveries
+# are not durably deduplicated; run_attempt == 1 blocks workflow reruns.
 name: MERIDIAN Native Review Read Only Pilot
 on:
   pull_request:
