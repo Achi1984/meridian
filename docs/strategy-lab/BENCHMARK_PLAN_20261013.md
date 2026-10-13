@@ -1,7 +1,7 @@
 # Evidence-led strategy benchmark plan — 2026-10-13
 
 Status: DRAFT / source design only. Owner: ChatGPT paper-strategy lane.
-Base: c6153102f6aeeca28cfeb7fa3c32a17f71479bfd. Related: PRs 752, 755, 757.
+Integration base reconciled: 5aee595821666853d5f427785439e64474b1a838. Related: PRs 752, 755, 757, 758.
 
 ## Owner decision and implementation status
 
@@ -9,7 +9,7 @@ On 2026-10-13 the owner withdrew the mandatory 3:1 reward/risk constraint and de
 
 This document records the decision and proposed benchmark contract. It does NOT yet migrate `campaign-20261013.json`, its validator, or `evaluate-trade-plan.mjs`: those still implement the legacy 3:1 contract. In particular, `qualifiesPlannedCRV` means only compliance with that old mathematical threshold. It must not be consumed as a profitability or strategy-readiness verdict. All execution permissions remain unchanged. No research runner, recurring agent dispatcher or live activation is installed by this packet.
 
-The platform/autonomy lane retains ownership of runtime integration, CI/CD, scheduling and production behavior. This isolated document does not modify those paths. The known main postcheck blocker is Release Safety 38440715254 attempt 2 (Chrome startup timeout); its retry budget is exhausted. PR 745 owns the related helper work. Integration waits for the existing postcheck gate; independent source preparation can continue.
+The platform/autonomy lane retains ownership of runtime integration, CI/CD, scheduling and production behavior. This isolated document does not modify those paths. Update after the owner's 20:23 instruction: PR 756 is merged as 5aee595821666853d5f427785439e64474b1a838. Main Safety 38445176451, Smoke 38445176492, Coordinator 38445176468 and Pages 38445178905 were directly verified successful on that commit. The prior integration blocker is cleared; PR 745 is superseded. This does not establish that every intermittent Chrome failure is fixed or waive this candidate's own integration gates.
 
 ## What matters instead of a fixed ratio
 
@@ -77,3 +77,38 @@ Prepared review questions; no scheduled delivery or reviewer response is implied
 Next implementation packet: version the research payoff policy so fixed-ratio, trailing, time-based and portfolio-rebalance exits have appropriate models; remove universal minimum-3 enforcement for new candidates; preserve the legacy calculator's explicit contract and frozen research. Add focused tests preventing a below-3 ratio from becoming a universal rejection or a high ratio from becoming execution authorization. H7 must not fabricate a finite take-profit to satisfy a single-trade schema.
 
 Then complete and review the run manifest and offline execution model. Existing checkpoint research permissions and exact-head review gates apply to empirical execution; this draft does not authorize or claim a backtest, paper transition or live trading. The current synthetic tests establish code behavior only. Profitability remains unproven.
+
+## Expanded mandate — owner instruction at 20:23 Vienna
+
+The owner now delegates strategy, instrument, market and leverage choices to ChatGPT and its agents, explicitly including commodities and other markets. Profitability and risk management take precedence over a preferred trading style. Neither a 3:1 target nor 10x leverage is a design requirement. This is authority to develop the research direction; it does not claim an installed continuous optimizer or executed trades. Existing frozen results retain their original assumptions.
+
+The lead's initial choice is to investigate unlevered implementations first and retain the 10,000 EUR comparison account. This is a research baseline, not a universal claim that leverage is irrational. Derivative leverage is chosen only after determining appropriate nominal exposure, plausible adverse moves, correlation, liquidity and collateral reserves. A smaller stop cannot justify unlimited position size. Margin settings are not a return objective; the earlier 1x/3x/10x comparison is optional, not a mandatory ladder or a recommendation to exceed any existing limit.
+
+### Foundations before more variants
+
+Broaden the market feasibility review before spending the empirical trial budget. This prospectively supersedes the earlier crypto-only priority order; H7 and H5 remain registered existing designs, not mandatory winners. The first cross-market hypothesis will be a simple slow trend strategy, compared with passive exposure and cash at matched risk where feasible. Source feasibility work does not count as a performed backtest. Adding or replacing an evaluated candidate requires an explicit manifest revision and preserves all prior trial counts; this addendum does not silently enlarge the four-candidate first tranche or the campaign total.
+
+| Research priority | Market exposure | Implementation questions before selection |
+| --- | --- | --- |
+| First | Broad equity indices, government bonds, gold | Tradable unlevered fund/product, actual historical product returns, distributions, price gaps, FX, lot size and costs |
+| First, alongside cross-market work | Liquid crypto spot | Venue history, custody/exchange risk, point-in-time universe and comparison with passive BTC/ETH; H7 remains one hypothesis |
+| Second | Diversified commodity exposure including energy/metals/agriculture | Futures curve and roll economics, product tracking, concentration and collateral; commodity spot charts are not executable total returns |
+| Later / instrument-dependent | FX and futures long/short across asset classes | Contract granularity, broker access, financing, expiry/delivery, historical margins and liquidation; 10,000 EUR may not support the desired risk distribution |
+| Defer until simpler models justify extra complexity | Options, leveraged products, high-turnover intraday and event/whale strategies | Nonlinear/tail exposure, path dependence, execution/data quality and whether costs erase the proposed edge |
+
+This table selects research areas, not securities to purchase. ETF/ETC/futures exposures are not interchangeable. Account availability, product structure, jurisdiction-specific accessibility and actual broker pricing remain to be verified before freezing an instrument universe. No assumption that a product called micro is small enough for this portfolio.
+
+Proposed first cross-market baseline, still awaiting a complete instrument/data manifest: a single 12-month trend signal, monthly decisions on available closed total-return observations, Long/Cash, no fixed take-profit, and total nominal allocation at most 100% of equity. A nonpositive signal allocates that sleeve to cash. Define lagged risk scaling, lot rounding and cost assumptions before evaluation; no per-market lookback tuning. Compare with fixed-weight passive holdings of the same instruments and cash. This is a new candidate proposal, not an addition to the trial budget without registration. It is not a replication of the literature's long/short futures portfolio.
+
+Additional primary literature: Hurst, Ooi and Pedersen, *A Century of Evidence on Trend-Following Investing* (2017), extends the historical cross-asset trend evidence. It motivates the research priority, not a promise that an unlevered fund implementation reproduces the historical long/short futures strategy. The authors' asset-management affiliation and historical simulation assumptions should be visible in source appraisal. https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing
+
+### Proposed continual research and controlled adoption
+
+1. Agents generate hypotheses with economic rationale, failure modes and required data. The lead selects a bounded batch; evaluated market selection and manual parameter changes enter a cumulative trial ledger.
+2. Freeze a manifest, benchmark controls, risk limits and validation schedule before results. Development history is never recycled into an unseen holdout.
+3. Evaluate challengers with complete instrument-specific accounting. Compare after costs and at comparable risk; assess uncertainty and concentration rather than selecting the highest historical return.
+4. Qualifying challengers enter prospective shadow/paper comparison against an unchanged reference under the project's execution gates. Code tests, historical performance and prospective confirmation are separate evidence levels.
+5. Promote only under the applicable review and deployment rules. New rules become new versions; increased capital or risk is a separate decision. The optimizer cannot loosen risk caps to improve its score.
+6. Monitor data/accounting integrity, cost bands and predeclared loss limits. Technical defects block new entries while existing positions follow a defined protection procedure. Reassess economic deterioration at fixed review points rather than daily winner rotation. Roll back only if the previous version remains applicable; otherwise stay cash/no new positions.
+
+This lifecycle is a proposed interface to the parallel autonomy lane. No scheduler, background agent service, broker connection or automatic live promotion is created by the document. Continuous improvement means successive reproducible campaigns with cumulative search accounting, not unlimited optimization of one holdout. Claude's review should challenge market feasibility, economic rationale, trial contamination and whether the proposed automation can alter its own risk constraints.
