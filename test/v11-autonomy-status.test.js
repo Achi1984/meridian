@@ -13,13 +13,13 @@ test('autonomy status is persistent and unknown without telemetry',()=>{
  assert.doesNotMatch(strip,/data-state="(?:active|waiting|blocked|paused)"|role="status"/);
 });
 test('historical UI evidence is separate from current operation and draft revision',()=>{
- assert.match(strip,/Diese Vorschau · B8/);
+ assert.match(strip,/Diese Vorschau · B9/);
  assert.match(strip,/Kontrollierte Testvorschau · Geräteabnahme ausstehend/);
- assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/issues\/764/);
+ assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/issues\/766/);
  assert.doesNotMatch(strip,/Integrationszeit und Änderungsnachweis stehen|Noch nicht veröffentlicht/);
  assert.match(strip,/Zuletzt belegte UI-Änderung · B1/);
  assert.match(strip,/datetime="2026-10-11T19:30:28Z"/);
  assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/pull\/702/);
  assert.match(strip,/Versionsstand ist kein Lebenszeichen/);
- assert.match(html,/>11 · Vorschau B8<small>/);
+ assert.match(html,/>11 · Vorschau B9<small>/);
 });

@@ -27,7 +27,7 @@ export function mountDepotReadAccess(document, window, {
     status.textContent='Gesperrt. Der Lesezugang wird nicht gespeichert.';
   }
   try {
-    view=createView(root,{getToken:access.getToken,createClient:options=>{
+    view=createView(root,{commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,createClient:options=>{
       client=createClient({...options,onChange:state=>{
         cancelExpiry();
         if(disposed)return;
