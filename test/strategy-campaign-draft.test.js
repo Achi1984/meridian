@@ -45,3 +45,55 @@ test('JSON-shaped object and array identifiers are rejected without coercion', (
     assert.equal(validateCampaignDraft(d).valid,false);
   }
 });
+test('net CRV policy rejects absent, weaker, gross-only and misleading runtime contracts', () => {
+  const changes = [
+    d=>delete d.payoffPolicy,d=>d.payoffPolicy=null,
+    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=2.99,
+    d=>d.payoffPolicy.minimumPlannedNetRewardRisk='3',
+    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=Infinity,
+    d=>d.payoffPolicy.rewardBasis='GROSS_TARGET',
+    d=>d.payoffPolicy.riskBasis='MARGIN_ONLY',
+    d=>d.payoffPolicy.scope='DIRECTIONAL_ONLY',
+    d=>d.payoffPolicy.runtimeEnforcementImplemented=true,
+    d=>d.payoffPolicy.evaluationStage='RUNTIME',
+    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=4
+  ];
+  for (const change of changes) {
+    const d=draft();change(d);const r=validateCampaignDraft(d);
+    assert.equal(r.valid,false);assert.equal(r.executionAuthorized,false);
+  }
+});
+test('both payoff scenarios include conservative costs and every leg; missing or waived costs fail', () => {
+  for (const key of Object.keys(source.payoffPolicy.costs)) {
+    for (const value of [undefined,null,'IGNORE',false]) {
+      const d=draft();d.payoffPolicy.costs[key]=value;
+      assert.equal(validateCampaignDraft(d).valid,false,`${key}:${String(value)}`);
+    }
+  }
+  const d=draft();d.payoffPolicy.costs.discountedFees=true;
+  assert.equal(validateCampaignDraft(d).valid,false);
+});
+test('partial exit, residual, risk and stop-policy bypasses cannot qualify a draft', () => {
+  for (const [key,value] of [
+    ['partialExits','FINAL_TARGET_ONLY'],['undeclaredResidual','ASSUME_TARGET'],
+    ['unknownOrUnboundedRisk','ALLOW'],['stopRelocationToQualify','ALLOW'],
+    ['unsupportedFinitePayoff','EXEMPT'],['exemptions',['CARRY']],
+    ['exemptions',['HEDGE']],['exemptions',['SPOT']],
+    ['frozenReferenceTreatment','APPLY_TO_EXISTING_LOWVOL']
+  ]) {
+    const d=draft();d.payoffPolicy[key]=value;
+    assert.equal(validateCampaignDraft(d).valid,false,key);
+  }
+});
+test('all families including event, hedge, carry and allocator stay payoff-unverified with no exemptions', () => {
+  for (let index=0;index<source.families.length;index++) {
+    for (const change of [f=>delete f.payoffPolicyId,f=>f.payoffPolicyId='EXEMPT',f=>f.payoffReadiness='QUALIFIED']) {
+      const d=draft();change(d.families[index]);assert.equal(validateCampaignDraft(d).valid,false,source.families[index].id);
+    }
+  }
+});
+test('exact payoff policy ignores property ordering but rejects undeclared bypass fields', () => {
+  const d=draft();d.payoffPolicy=Object.fromEntries(Object.entries(d.payoffPolicy).reverse());
+  assert.equal(validateCampaignDraft(d).valid,true);
+  d.payoffPolicy.allowCarryException=false;assert.equal(validateCampaignDraft(d).valid,false);
+});
