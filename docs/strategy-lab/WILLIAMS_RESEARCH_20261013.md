@@ -1,6 +1,6 @@
 # Williams research and Meridian timeframe taxonomy
 
-Research date: 13 October 2026. Owner requests: continue data preparation; investigate Larry Williams, the five-minute claim, combinations and timeframe subcategories. The referenced photograph was not attached in the visible conversation; its strategies have not been identified or evaluated.
+Research date: 13 October 2026. Owner requests: continue data preparation; investigate Larry Williams, the five-minute claim, combinations and timeframe subcategories. The photograph was subsequently received and assessed; see PHOTO_STRATEGY_MAPPING_20261013.md for the owner-accepted mapping.
 
 Status: evidence review and proposed research designs only. No signal execution, backtest, performance ranking, paper activation, scheduler or live order. The user withdrew mandatory 3:1 reward/risk and mandatory 10x leverage. Existing campaign code still needs an explicit reviewed migration; this document does not silently change it.
 
@@ -35,7 +35,7 @@ The following numbers are transparent design assumptions, not fitted results or 
 
 ### P1 — daily trend pullback, crypto spot first
 
-Use only historically eligible members of the frozen Top20 procedure. Daily close above SMA200 defines long eligibility. Define %R10 as -100 × (highest high over ten completed daily bars minus close) / (highest high minus lowest low); zero range means no signal. A crossing from <= -80 to > -80 on a completed daily bar creates a candidate. Execute only at the next available quote after signal receipt. Initial stop is the signal day's low minus 0.5 × ATR14; ATR uses the arithmetic mean of the last 14 completed true ranges. Exit after a completed close below SMA200, %R10 >= -20, or ten subsequent daily bars, whichever occurs first; protective stop remains active. No widening, pyramiding or same-bar assumed fills.
+Use only historically eligible members of the frozen Top20 procedure. Daily close above SMA200 defines long eligibility. Define %R10 as -100 × (highest high over ten completed daily bars minus close) / (highest high minus lowest low); zero range means no signal. A crossing from <= -80 to > -80 on a completed daily bar creates a candidate only while current %R10 remains < -20. Exit conditions take precedence: a bar already in the exit region never opens a new position. Existing positions are evaluated for exit first; no same-bar re-entry. Execute only at the next available quote after signal receipt. Initial stop is the signal day's low minus 0.5 × ATR14; ATR uses the arithmetic mean of the last 14 completed true ranges. Exit after a completed close below SMA200, %R10 >= -20, or ten subsequent daily bars, whichever occurs first; protective stop remains active. No widening, pyramiding or same-bar assumed fills.
 
 Initial sizing assumption: planned loss including estimated adverse costs <=0.25% of current virtual equity, notional <=25% per asset, total gross <=100%, combined open planned loss <=0.75%. Reject when valid sizing/FX/lot precision is unavailable. Stop gaps can exceed the plan. Compare against the unchanged daily trend control with matched sizing/costs; the purpose is incremental entry value, not rewarding lower exposure with an unmatched benchmark. P2 is not yet specified; four-hour changes would consume a separate variant.
 
@@ -72,7 +72,7 @@ Selection criterion: positive out-of-sample expectancy after fees, spreads, adve
 
 The concurrent warmup audit completed 200 monthly attempts: 178 checksum successes and 22 failures. Twenty-one candidates have complete 201-day windows; TON has 67 rows, TAO 186, LEO/KAS zero under the attempted mappings. Independent review checked prepared closes against local rows. These are coverage results only; identities, historical membership, liquidity and costs still need verification. The inspected March–October 2024 scope is not an untouched holdout. Prepared closes alone are insufficient for ATR/%R or intraday execution; archived OHLCV must be retained and normalized for P1, and separate intraday data are required for B1/H5.
 
-The missing photo remains the only unassessed part of the owner's new strategy input. Claude can review the evidence and proposed experiment definitions when available; no future review or continuous execution has been scheduled by this packet.
+The photo's 22 concepts have now been classified; owner accepted the prioritization at 21:29 Europe/Vienna. Claude can review the evidence and proposed experiment definitions when available; no future review or continuous execution has been scheduled by this packet.
 
 ## Sources checked
 
