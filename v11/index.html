@@ -194,6 +194,11 @@
     .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}
     .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
     .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}
+    .depot-history{margin-top:24px;border-top:1px solid #334155;padding-top:16px}
+    .depot-history svg{display:block;width:100%;height:auto;color:#93c5fd;margin:16px 0}
+    .depot-range{display:flex;flex-wrap:wrap;gap:8px}
+    .depot-range button[aria-pressed="true"]{background:#1e3a5f;border-color:#93c5fd}
+    .depot-history p{overflow-wrap:anywhere;font-size:14px}
     .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
   </style>
 </head>
@@ -206,7 +211,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -219,7 +224,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/762">B7-Umfang #762</a>.</p>
+          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/764">B8-Umfang #764</a>.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -232,6 +237,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B8</strong><span class="version-status">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>
         <li><strong>Meridian 11 · B7</strong><span class="version-status">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>
         <li><strong>Meridian 11 · B6</strong><span class="version-status">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>
         <li><strong>Meridian 11 · B5</strong><span class="version-status">Testvorschau</span><p>Aufklappbare Botkarten mit Hebel, Kapital, P/L laut Quelle und Preisgrenzen. Fehlende oder nicht eindeutig bestätigte Werte bleiben nicht verfügbar.</p></li>
@@ -300,7 +306,7 @@
       <div class="eyebrow">KAPITAL &amp; ÜBERSICHT</div><h1 id="depot-heading">Depot</h1>
       <section class="card" aria-labelledby="depot-summary-heading">
         <div class="card-head"><h2 id="depot-summary-heading">Depotbewertung</h2><span class="limited">Nur lesend</span></div>
-        <p class="caption">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>
+        <p class="caption">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>
         <div class="bot-access-controls">
           <label for="depot-read-token">Meridian-Lesepasswort für das Depot</label>
           <input id="depot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="depot-read-access-help">
@@ -444,6 +450,6 @@
 })();
 </script>
 <script type="module" src="./bot-read-bootstrap.js?v=B6"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B7"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B8"></script>
 </body>
 </html>

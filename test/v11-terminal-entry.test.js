@@ -200,6 +200,7 @@ const r128Deltas=[
     "        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Einmaliger Meridian-Lesezugang für das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Historischer Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n"
   ]
 ];
+const b8Deltas=[["    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n", "    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n    .depot-history{margin-top:24px;border-top:1px solid #334155;padding-top:16px}\n    .depot-history svg{display:block;width:100%;height:auto;color:#93c5fd;margin:16px 0}\n    .depot-range{display:flex;flex-wrap:wrap;gap:8px}\n    .depot-range button[aria-pressed=\"true\"]{background:#1e3a5f;border-color:#93c5fd}\n    .depot-history p{overflow-wrap:anywhere;font-size:14px}\n"], ["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n", "          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n"], ["      <ul class=\"version-history-list\">\n", "      <ul class=\"version-history-list\">\n        <li><strong>Meridian 11 · B8</strong><span class=\"version-status\">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>\n"], ["        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n", "        <p class=\"caption\">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n"]];
 const b7Deltas=[
   [
     "11 · Vorschau B6<small>",
@@ -231,6 +232,7 @@ const b7Deltas=[
   ]
 ];
 function restoreB2(source){
+ for(const [before,after] of b8Deltas){assert.equal(source.split(after).length-1,1,"one exact B8 delta");source=source.replace(after,before);}
  for(const [before,after] of b7Deltas){assert.equal(source.split(after).length-1,1,"one exact B7 delta");source=source.replace(after,before);}
  for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
@@ -272,14 +274,14 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
   const scriptHash=createHash('sha256').update(inlineScript).digest('base64');
   const policies=new Map(),requests=[],modules=new Map(),pending=new Set();
   let reads=0,aborts=0,depotReads=0,depotAborts=0,mode='fresh';
-  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/depot-snapshot';
+  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/depot-snapshot',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices';
   for(const name of moduleNames){
     let body=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js'){
@@ -288,16 +290,17 @@ function deploymentServer(){
       body=body.replace(production,endpoint);
     }
     if(name==='depot-read-client.js'){
-      const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1d';
+      const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
       assert.equal(body.split(production).length,2,'exact Depot endpoint replaced only in served test copy');
-      body=body.replace(production,depotEndpoint);
+      body=body.replace(production,depotEndpoint).replace('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard',currentEndpoint).replace('https://data-api.binance.vision/api/v3/ticker/price',priceEndpoint);
     }
     modules.set('/meridian/v11/'+name,body);
   }
+  for(const path of ['portfolio-data-contract.js','v8-clean/live-price-core-r18.js'])modules.set('/meridian/'+path,readFileSync(new URL('../'+path,import.meta.url),'utf8'));
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B7';
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B8';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
@@ -308,6 +311,10 @@ function deploymentServer(){
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:2,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}},{botRef:'b'.repeat(20),symbol:'ETH',side:'LONG',cateType:'linear',botType:'futures_grid',leverage:2,investment:{usd:100},pnl:{usd:8.25}}]}));return;
     }
+    if(path===priceEndpoint||path===currentEndpoint){
+      assert.equal(request.headers.authorization,path===priceEndpoint?undefined:'Bearer synthetic-b7-password');
+      response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify(path===priceEndpoint?[]:mode==='current'?{private:true,data:{portfolio:{holdings:[],manualVenueBalances:[{venue:'Ledger',valueUsd:10000,updatedAt:new Date().toISOString()},{venue:'OKX',valueUsd:2000,updatedAt:new Date().toISOString()}],pionexEquityUsd:3450,pionexEquityUpdatedAt:new Date().toISOString()}}}:{}));return;
+    }
     if(path===depotEndpoint){
       depotReads++;
       if(request.headers.authorization!=='Bearer synthetic-b7-password'||mode==='denied'){
@@ -316,12 +323,14 @@ function deploymentServer(){
       if(mode==='pending'){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;
       }
+      if(mode==='current'){response.writeHead(503,{'Content-Type':'application/json'});response.end('{}');return;}
       const stamp=Date.now()-(mode==='stale'?901000:1000);
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
-      response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',source:'POSTGRES_CANONICAL_HISTORY',
-        rawPointCount:2,excludedIncompletePoints:1,points:[{timestamp:stamp,spotUsd:12000,tradingUsd:3450,totalUsd:15450,
+      const points=[2,1,0].map((n)=>({timestamp:stamp-n*300000,spotUsd:12000-n*50,tradingUsd:3450,totalUsd:15450-n*50,
         sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',
-        tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:stamp-1000}}]}));return;
+        tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:stamp-n*300000-1000}}));
+      response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',source:'POSTGRES_CANONICAL_HISTORY',
+        rawPointCount:mode==='curve'?3:4,excludedIncompletePoints:mode==='curve'?0:1,points}));return;
     }
     if(modules.has(path)){
       response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
@@ -329,8 +338,8 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+moduleNames.map(name=>origin+'/meridian/v11/'+name).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint:"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path).join(' '):"'none'";
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint:"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
@@ -338,7 +347,7 @@ function deploymentServer(){
     server.once('error',reject);server.listen(0,'127.0.0.1',()=>resolve({
       base:`http://127.0.0.1:${server.address().port}/meridian/`,policies,requests,
       metrics:()=>({reads,aborts,depotReads,depotAborts,pending:pending.size}),setMode:value=>{mode=value;},
-      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,...modules.keys()]),
+      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,currentEndpoint,priceEndpoint,...modules.keys()]),
       close:()=>new Promise((done,fail)=>{for(const response of pending)response.destroy();server.close(error=>error?fail(error):done());server.closeAllConnections();})
     }));
   });
@@ -462,14 +471,14 @@ async function browserRun(call,start,width,expectedBuild,server){
         writeFileSync(join(evidence,`v11-b6-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
       await evaluate(`document.querySelectorAll('#bot-read-root button')[1].click();true`);
-      assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
+      assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
       await accept();server.setMode('pending');const aborts=server.metrics().aborts;
       await refresh();await waitUntil(()=>server.metrics().pending===1);
       // Synthetic hidden event exercises lifecycle logic; this is not real Safari background acceptance.
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
       await waitUntil(()=>server.metrics().aborts>aborts);
-      assert.equal(await readState(),'locked');assert.equal(server.metrics().pending,0);
+      assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(server.metrics().pending,0);
       const readsAfterHide=server.metrics().reads;
       await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));true`);
       await refresh();assert.equal(server.metrics().reads,readsAfterHide,'hidden cleared credential; focus does not fetch');
@@ -496,6 +505,19 @@ async function browserRun(call,start,width,expectedBuild,server){
       if(process.env.V11_A2_EVIDENCE_DIR){mkdirSync(process.env.V11_A2_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-'+width+'-fresh.png'),Buffer.from(shot.data,'base64'));}
+      const beforeRange=server.metrics().depotReads;
+      for(const range of ['1h','1d','1w']){await evaluate(`document.querySelector('[data-range="${range}"]').click();true`);assert.equal(await evaluate(`document.querySelector('[data-range="${range}"]').getAttribute('aria-pressed')`),'true');}
+      assert.equal(server.metrics().depotReads,beforeRange,'range changes never request data');
+      server.setMode('curve');await refresh();await waitUntil(async()=>await readState()==='fresh');
+      assert.equal(await evaluate(`document.querySelectorAll('.depot-history svg polyline').length`),1);
+      assert.equal(await evaluate(`document.querySelectorAll('.depot-history svg circle').length`),3);
+      await evaluate(`document.querySelector('.depot-history').scrollIntoView({block:'center'});true`);
+      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
+      if(process.env.V11_A2_EVIDENCE_DIR){const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-history-'+width+'.png'),Buffer.from(shot.data,'base64'));}
+      server.setMode('current');await refresh();await waitUntil(async()=>await readState()==='fresh');
+      assert.match(await evaluate(`document.querySelector('#depot-read-root').textContent`),/serverseitigen Depotdaten/);
+      assert.match(await evaluate(`document.querySelector('#depot-read-root .depot-total').textContent`),/15.450/);
+      assert.match(await evaluate(`document.querySelector('.depot-history').textContent`),/Verlauf nicht verfügbar/);
       server.setMode('stale');await refresh();await waitUntil(async()=>await readState()==='stale');
       assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);
       server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
@@ -503,7 +525,7 @@ async function browserRun(call,start,width,expectedBuild,server){
       server.setMode('pending');await accept('synthetic-b7-password');const aborts=server.metrics().depotAborts;
       await refresh();await waitUntil(()=>server.metrics().pending===1);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
-      await waitUntil(()=>server.metrics().depotAborts>aborts);assert.equal(await readState(),'locked');
+      await waitUntil(()=>server.metrics().depotAborts>aborts);assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);
       const stopped=server.metrics().depotReads;await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));true`);
       await refresh();assert.equal(server.metrics().depotReads,stopped,'hide clears Depot access; focus never reads');server.setMode('fresh');
     }

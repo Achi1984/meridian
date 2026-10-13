@@ -1,7 +1,11 @@
+import {buildCurrentDepotModel} from './depot-current-model.js';
+import {buildDepotHistoryModel} from './depot-history-model.js';
 import {buildDepotReadModel} from './depot-read-model.js';
 import {parseBotReadCredential} from './bot-read-client.js';
 
-const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1d';
+const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
+const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
+const PRICE_ENDPOINT='https://data-api.binance.vision/api/v3/ticker/price';
 // Only the Meridian bearer password is accepted; bot share access never expands to Depot.
 export function parseDepotReadCredential(value) {
   const parsed = parseBotReadCredential(value);
@@ -41,89 +45,56 @@ async function readBounded(response, signal) {
   }
 }
 
-// Inactive until explicitly called. No token storage, engine import or account activation.
-export function createDepotReadClient({getToken, onChange = () => {}, fetchImpl = globalThis.fetch,
-  now = Date.now, schedule = setTimeout, cancelSchedule = clearTimeout} = {}) {
-  let generation = 0, pending = null, disposed = false, snapshot = null, snapshotToken = null, pendingToken = null;
-  const token = () => {
-    try {
-      const value = getToken();
-      return parseDepotReadCredential(value) ? value.trim() : null;
-    } catch { return null; }
-  };
-  const emit = (status, model = null) => {
-    if (disposed) return;
-    try { onChange({status, model}); } catch {}
-  };
-  const stop = () => {
-    generation++;
-    if (pending) { pending.abort(); pending = null; }
-    pendingToken = null;
-  };
-  const wipe = () => { snapshot = null; snapshotToken = null; };
-  const project = () => {
-    const model = buildDepotReadModel(snapshot, {now:now()});
-    emit(model.status === 'FRESH_SNAPSHOT' ? 'fresh' : model.status === 'STALE' ? 'stale' : 'unavailable', model);
-  };
-  function lock() { stop(); wipe(); emit('locked'); }
-  async function refresh() {
-    if (disposed) return;
-    stop(); wipe();
-    const credential = token();
-    if (!credential) { emit('locked'); return; }
-    const id = generation, controller = new AbortController();
-    pending = controller;
-    pendingToken = credential;
-    let timer, onAbort;
-    const aborted = new Promise((_, reject) => {
-      onAbort = () => reject(new Error('unavailable'));
-      controller.signal.addEventListener('abort', onAbort, {once:true});
-    });
-    aborted.catch(() => {});
-    try {
-      timer = schedule(() => controller.abort(), TIMEOUT_MS);
-      emit('loading');
-      if (id !== generation || disposed) return;
-      const operation = async () => {
-        const parsed = parseDepotReadCredential(credential);
-        const endpoint = ENDPOINT;
-        const headers = {accept:'application/json'};
-        headers.authorization = 'Bearer ' + parsed.value;
-        const response = await fetchImpl(endpoint, {method:'GET', redirect:'error', credentials:'omit',
-          cache:'no-store', referrerPolicy:'no-referrer', signal:controller.signal,
-          headers});
-        if (controller.signal.aborted) throw new Error('unavailable');
-        if (response.status === 401 || response.status === 403) return {locked:true};
-        return {snapshot:await readBounded(response, controller.signal)};
-      };
-      const result = await Promise.race([operation(), aborted]);
-      if (id !== generation || disposed) return;
-      if (token() !== credential || result.locked) { lock(); return; }
-      snapshot = result.snapshot; snapshotToken = credential;
-      project();
-    } catch {
-      if (id === generation && !disposed) {
-        wipe(); emit(token() === credential ? 'unavailable' : 'locked');
-      }
-    } finally {
-      if (timer !== undefined) cancelSchedule(timer);
-      controller.signal.removeEventListener('abort', onAbort);
-      if (pending === controller) { pending = null; pendingToken = null; }
-    }
+// Manual reads only. Independent source failures preserve other verified results.
+export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
+  now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
+  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null;
+  const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
+  let snapshotToken=null;
+  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history});}catch{}};
+  const stop=()=>{generation++;pending?.abort();pending=null;};
+  const wipe=()=>{current=null;stored=null;history=null;snapshotToken=null;};
+  function project(){
+    const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
+    const model=valid(current)?current:valid(stored)?stored:null;
+    emit(model?'fresh':current||stored?'stale':'unavailable',model);
   }
-  function revalidate() {
-    if (disposed) return;
-    const credential = token();
-    if (!credential || (snapshotToken && credential !== snapshotToken) ||
-        (pendingToken && credential !== pendingToken)) { lock(); return; }
-    if (snapshot) {
-      try { project(); } catch { wipe(); emit('unavailable'); }
-    }
+  function lock(){stop();wipe();emit('locked');}
+  async function read(url,credential,parent){
+    const ctl=new AbortController();let timer,aborted;
+    const abort=()=>ctl.abort();parent.addEventListener('abort',abort,{once:true});
+    if(parent.aborted)ctl.abort();
+    const deadline=new Promise((_,reject)=>{aborted=()=>reject(new Error('unavailable'));ctl.signal.addEventListener('abort',aborted,{once:true});if(ctl.signal.aborted)aborted();});
+    try{
+      timer=schedule(abort,TIMEOUT_MS);
+      const operation=(async()=>{
+        const headers={accept:'application/json'};if(credential)headers.authorization='Bearer '+credential;
+        const response=await fetchImpl(url,{method:'GET',redirect:'error',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal,headers});
+        if(ctl.signal.aborted)throw new Error('unavailable');
+        if(credential&&(response.status===401||response.status===403))return {locked:true};
+        return {data:await readBounded(response,ctl.signal),at:now()};
+      })();
+      return await Promise.race([operation,deadline]);
+    }catch{return {failed:true};}
+    finally{cancelSchedule(timer);parent.removeEventListener('abort',abort);ctl.signal.removeEventListener('abort',aborted);ctl.abort();}
   }
-  function dispose() {
-    if (disposed) return;
-    stop(); wipe(); disposed = true;
-    try { onChange({status:'locked', model:null}); } catch {}
+  async function refresh(){
+    if(disposed)return;stop();wipe();const credential=token();if(!credential){emit('locked');return;}
+    const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
+    if(id!==generation||disposed)return;
+    const [dashboard,prices,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(PRICE_ENDPOINT,null,ctl.signal),read(ENDPOINT,credential,ctl.signal)]);
+    if(disposed||id!==generation)return;
+    pending=null;if(token()!==credential||dashboard.locked||archive.locked){lock();return;}
+    const c=buildCurrentDepotModel(dashboard.data,{tickers:prices.data,tickersAt:prices.at,now:now()});
+    if(c.status==='FRESH_SNAPSHOT')current=c;
+    const h=buildDepotReadModel(archive.data,{now:now()});
+    if(h.status==='FRESH_SNAPSHOT')stored=h;
+    // Keep only validated graph projections, never the broad account response.
+    history=Object.fromEntries(['1h','1d','1w'].map(range=>[range,buildDepotHistoryModel(archive.data,{now:now(),range})]));
+    if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
+    project();
   }
-  return {refresh, lock, revalidate, dispose};
+  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}project();}
+  function dispose(){if(disposed)return;lock();disposed=true;}
+  return {refresh,lock,revalidate,dispose};
 }
