@@ -7,6 +7,25 @@ const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 function element(){return{value:'',open:false,events:{},addEventListener(k,f){this.events[k]=f},setAttribute(){},focus(){},showModal(){this.open=true},close(){this.open=false;this.events.close?.()}}}
 function dom(){const input=element(),form=element(),cancel=element(),dialog=element();dialog.querySelector=s=>s==='input'?input:s==='form'?form:cancel;return{input,form,cancel,dialog,document:{visibilityState:'visible',createElement:()=>dialog,body:{appendChild(){}}}}}
+for(const previousClose of ['escape','cancel','submit'])test('queued '+previousClose+' close event cannot clear a reopened dialog',()=>{
+ const d=dom(),queued=[],calls=[];
+ d.dialog.close=()=>{d.dialog.open=false;queued.push(()=>d.dialog.events.close?.());};
+ const ui=createAssetWatchAccessDialog({document:d.document,submit:(...args)=>calls.push(args)});
+ ui.open();d.input.value='previous-access';
+ if(previousClose==='escape'){d.dialog.events.cancel();d.dialog.close();}
+ else if(previousClose==='cancel')d.cancel.events.click();
+ else d.form.events.submit({preventDefault(){},submitter:{value:'rotate'}});
+ assert.equal(d.input.value,'');assert.equal(d.dialog.open,false);assert.equal(queued.length,1);
+ const before=calls.length;ui.open();d.input.value='new-access';queued.shift()();
+ assert.equal(d.dialog.open,true);assert.equal(d.input.value,'new-access');assert.equal(calls.length,before);
+ d.form.events.submit({preventDefault(){},submitter:{value:'rotate'}});
+ assert.deepEqual(calls.at(-1),['rotate','new-access']);assert.equal(calls.length,before+1);
+ assert.equal(d.input.value,'');assert.equal(d.dialog.open,false);queued.shift()();assert.equal(d.input.value,'');
+});
+test('close event still clears an externally closed dialog',()=>{
+ const d=dom(),ui=createAssetWatchAccessDialog({document:d.document,submit:()=>assert.fail('unexpected submit')});
+ ui.open();d.input.value='discard';d.dialog.close();assert.equal(d.input.value,'');
+});
 test('dialog does not submit on opening or typing; clears before explicit submit and on cancel',()=>{
  const d=dom(),calls=[];const ui=createAssetWatchAccessDialog({document:d.document,submit:(...args)=>{assert.equal(d.input.value,'');calls.push(args)}});
  ui.open();d.input.value='synthetic-password';ui.open();assert.equal(d.input.value,'synthetic-password');assert.equal(calls.length,0);
