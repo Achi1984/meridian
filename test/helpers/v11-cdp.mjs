@@ -4,15 +4,44 @@ import {existsSync,readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const STARTUP_STDERR_BYTES=4096;
+function spawnCategory(code){
+ if(['EAGAIN','ENOMEM','EMFILE','ENFILE'].includes(code))return 'RESOURCE_UNAVAILABLE';
+ if(code==='ENOENT')return 'EXECUTABLE_UNAVAILABLE';
+ if(['EACCES','EPERM'].includes(code))return 'EXECUTABLE_PERMISSION';
+ return 'SPAWN_FAILED';
+}
+function stderrCategory(bytes){
+ const text=bytes.toString('utf8');
+ // Fixed categories only: never emit Chrome output, paths, URLs or credentials.
+ if(/Resource temporarily unavailable|Cannot allocate memory|Too many open files/i.test(text))return 'RESOURCE_UNAVAILABLE';
+ if(/No usable sandbox|Running as root without --no-sandbox is not supported/i.test(text))return 'SANDBOX_UNAVAILABLE';
+ if(/error while loading shared libraries/i.test(text))return 'SHARED_LIBRARY_UNAVAILABLE';
+ if(/SingletonLock[^\n]*File exists|Failed to create a ProcessSingleton/i.test(text))return 'PROFILE_LOCK';
+ return 'UNKNOWN';
+}
 export async function withMobileChrome(chrome,width,url,probe){
  const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
- const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
-  '--remote-debugging-port=0','--user-data-dir='+dir,'about:blank'],{stdio:'ignore',detached:true});
+ let child,spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
  let ws;const pending=new Map();let seq=0;
+ const startupError=prefix=>Error(prefix+' ['+(spawnFailure||
+  (startupStderr.length?stderrCategory(startupStderr):stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN'))+']');
  try{
+  try{
+   child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
+    '--remote-debugging-port=0','--user-data-dir='+dir,'about:blank'],{stdio:['ignore','ignore','pipe'],detached:true});
+  }catch(error){spawnFailure=spawnCategory(error?.code);throw startupError('Chrome spawn failed');}
+  child.on('error',error=>{spawnFailure=spawnCategory(error?.code);});
+  child.stderr?.on('error',()=>{stderrReadFailed=true;});
+  child.stderr?.on('data',chunk=>{
+   if(!collectingStartup||!Buffer.isBuffer(chunk))return;
+   const remaining=STARTUP_STDERR_BYTES-startupStderr.length;
+   if(remaining>0)startupStderr=Buffer.concat([startupStderr,chunk.subarray(0,remaining)]);
+  });
   let port;
   for(let i=0;i<200;i++){
-   if(child.exitCode!==null)throw Error('Chrome exited '+child.exitCode);
+   if(spawnFailure)throw startupError('Chrome spawn failed');
+   if(child.exitCode!==null)throw startupError('Chrome exited '+child.exitCode);
    const f=join(dir,'DevToolsActivePort');
    if(existsSync(f)){
     const match=/^([0-9]+)\n/.exec(readFileSync(f,'utf8'));
@@ -21,7 +50,9 @@ export async function withMobileChrome(chrome,width,url,probe){
    }
    await sleep(50);
   }
-  if(!port)throw Error('Chrome DevTools startup timeout');
+  if(spawnFailure)throw startupError('Chrome spawn failed');
+  if(!port)throw startupError('Chrome DevTools startup timeout');
+  collectingStartup=false;startupStderr=Buffer.alloc(0);
   const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(5000)})).json();
   const page=targets.find(x=>x.type==='page');if(!page)throw Error('No Chrome page target');
   if(typeof WebSocket!=='function')throw Error('Node WebSocket unavailable; run Node with --experimental-websocket');
@@ -58,11 +89,11 @@ export async function withMobileChrome(chrome,width,url,probe){
   if(r.exceptionDetails)throw Error('CDP probe exception '+JSON.stringify(r.exceptionDetails));
   return r.result?.value;
  }finally{
+  collectingStartup=false;startupStderr=Buffer.alloc(0);
   if(ws)ws.close();
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('CDP closed'));}
-  try{process.kill(-child.pid,'SIGKILL');}catch{}
+  try{if(Number.isInteger(child?.pid)&&child.pid>0)process.kill(-child.pid,'SIGKILL');}catch{}
   await sleep(100);rmSync(dir,{recursive:true,force:true});
  }
 }
-
 
