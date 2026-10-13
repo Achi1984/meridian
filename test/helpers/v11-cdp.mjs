@@ -14,7 +14,11 @@ export async function withMobileChrome(chrome,width,url,probe){
   for(let i=0;i<200;i++){
    if(child.exitCode!==null)throw Error('Chrome exited '+child.exitCode);
    const f=join(dir,'DevToolsActivePort');
-   if(existsSync(f)){port=Number(readFileSync(f,'utf8').split('\n')[0]);break;}
+   if(existsSync(f)){
+    const match=/^([0-9]+)\n/.exec(readFileSync(f,'utf8'));
+    const candidate=match?Number(match[1]):0;
+    if(Number.isInteger(candidate)&&candidate>=1&&candidate<=65535){port=candidate;break;}
+   }
    await sleep(50);
   }
   if(!port)throw Error('Chrome DevTools startup timeout');
@@ -60,4 +64,5 @@ export async function withMobileChrome(chrome,width,url,probe){
   await sleep(100);rmSync(dir,{recursive:true,force:true});
  }
 }
+
 
