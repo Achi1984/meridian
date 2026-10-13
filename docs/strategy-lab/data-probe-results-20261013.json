@@ -1,0 +1,45 @@
+{
+  "retrievedAtUtc": "2026-10-13T18:46:50.766653+00:00",
+  "purpose": "one-day source-format/checksum probes only; not performance evidence",
+  "samples": [
+    {
+      "symbol": "BTCUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1d/BTCUSDT-1d-2024-01-01.zip",
+      "checksumUrl": "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1d/BTCUSDT-1d-2024-01-01.zip.CHECKSUM",
+      "bytes": 240,
+      "sha256": "6322fa0e83995518b01066a110dca5c03ff837a6ef915a792b718fa76f0de205",
+      "checksumVerified": true,
+      "rows": 1,
+      "columns": 12,
+      "openTimeRaw": "1704067200000",
+      "closeTimeRaw": "1704153599999",
+      "strategyPnlCalculated": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1d/ETHUSDT-1d-2024-01-01.zip",
+      "checksumUrl": "https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1d/ETHUSDT-1d-2024-01-01.zip.CHECKSUM",
+      "bytes": 236,
+      "sha256": "54ce6ae0eaaee2712ed2090872e458809e2ee393dc3c27cc44b5adc3f88243d5",
+      "checksumVerified": true,
+      "rows": 1,
+      "columns": 12,
+      "openTimeRaw": "1704067200000",
+      "closeTimeRaw": "1704153599999",
+      "strategyPnlCalculated": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "url": "https://data.binance.vision/data/spot/daily/klines/SOLUSDT/1d/SOLUSDT-1d-2024-01-01.zip",
+      "checksumUrl": "https://data.binance.vision/data/spot/daily/klines/SOLUSDT/1d/SOLUSDT-1d-2024-01-01.zip.CHECKSUM",
+      "bytes": 232,
+      "sha256": "e833762ae68ead290fd43e740f3099d5ff87f58c1c3b8c6db095ead40eb7b52a",
+      "checksumVerified": true,
+      "rows": 1,
+      "columns": 12,
+      "openTimeRaw": "1704067200000",
+      "closeTimeRaw": "1704153599999",
+      "strategyPnlCalculated": false
+    }
+  ]
+}
