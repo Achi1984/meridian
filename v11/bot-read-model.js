@@ -40,5 +40,5 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
       sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend'])});
   }
   return {...result, status: 'FRESH_SNAPSHOT', source: snapshot.source,
-    snapshotAt: stamp, ageMs: age, bots};
+    snapshotAt: stamp, ageMs: age, expiresAt: time + limit, bots};
 }

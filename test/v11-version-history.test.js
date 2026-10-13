@@ -9,7 +9,12 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/id="version-panel"[^>]*aria-labelledby="version-history-heading" hidden/);
  assert.match(html,/id="version-close"[^>]*aria-label="Versionsverlauf schließen">Schließen<\/button>/);
  assert.match(html,/Terminal 10\.0-r127/);
- assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B2<small>/);
+ assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B3<small>/);
+ const b3=html.match(/<li><strong>Meridian 11 · B3<\/strong>[\s\S]*?<\/li>/)?.[0];
+ assert.ok(b3);
+ assert.match(b3,/Kontrollierte Testvorschau · Geräteabnahme ausstehend/);
+ assert.match(b3,/pull\/740/);
+ assert.doesNotMatch(b3,/Noch nicht veröffentlicht|Integrationszeit und Änderungsnachweis stehen/);
  assert.match(html,/Meridian 11 · B1<\/strong><span class="version-status">Vorschaustand/);
  assert.match(html,/Meridian 11 · #700<\/strong><span class="version-status">Vorschaustand/);
  assert.match(html,/pull\/700">Änderungsnachweis #700/);
@@ -36,4 +41,3 @@ test('version button toggles, Escape closes and restores focus without touching 
  toggle.handlers.click();toggle.handlers.click();assert.equal(panel.hidden,true);
  toggle.handlers.keydown({key:'Escape',preventDefault(){throw Error('closed panel consumed Escape');}});
 });
-
