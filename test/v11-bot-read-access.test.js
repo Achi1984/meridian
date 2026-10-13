@@ -53,3 +53,11 @@ test('reentrant replacement during lock is refused and cannot survive logout',()
   reenter=true;assert.equal(access.provide('older-token'),false);assert.equal(access.getToken(),null);
   access.provide('prior-token');reenter=true;access.clear();assert.equal(access.getToken(),null);
 });
+
+test('scoped share URL is accepted only in memory; malformed URL clears previous access',()=>{
+ const access=createBotReadAccess({lock:()=>{}});
+ const link='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43);
+ assert.equal(access.provide(link),true);assert.equal(access.getToken(),link);
+ assert.equal(access.provide(link+'&other=1'),false);assert.equal(access.getToken(),null);
+ assert.equal(access.provide('YWJjL2RlZg+/='),true);assert.equal(access.provide('password?#'),true);access.clear();assert.equal(access.getToken(),null);
+});

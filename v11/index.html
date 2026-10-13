@@ -8,7 +8,7 @@
   <meta name="meridian-ui-generation" content="11-preview">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>MERIDIAN 11 — Next Generation · Entwurf</title>
-  <!-- B3 DRAFT: Manual read-only bot access; no persistence, automatic request, engine, orders or service worker.
+  <!-- B4 DRAFT: Scoped share link or private read-only bot access; no persistence, automatic request, engine, orders or service worker.
        The v9 engine is intentionally NOT loaded until the single-engine / lifecycle / safety tests exist.
        Noindex does not make this private: any future Pages publication makes the source publicly accessible. -->
   <style>
@@ -187,7 +187,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B3<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B4<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -200,7 +200,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B3:</b> Kontrollierte Testvorschau · Geräteabnahme ausstehend. Manueller, temporärer Lesezugang für Bot-Snapshots · <a href="https://github.com/Achi1984/meridian/pull/740">Änderungsnachweis #740</a>.</p>
+          <p><b>Diese Vorschau · B4:</b> Asset-Watch-Freigabelink oder Meridian-Lesepasswort für manuelle Bot-Snapshots. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href="https://github.com/Achi1984/meridian/pull/740">Botanbindung #740</a>.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -213,6 +213,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B4</strong><span class="version-status">Testvorschau</span><p>Bestehende Asset-Watch-Freigabelinks für manuelle Bot-Abfragen unterstützt. Zugang nur im Arbeitsspeicher; Geräteabnahme ausstehend.</p></li>
         <li><strong>Meridian 11 · B3</strong><span class="version-status">Entwurf</span><p>Manueller Bot-Lesezugang ohne Speicherung oder automatische Abfragen. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/pull/740">Änderungsnachweis #740</a>.</p></li>
         <li><strong>Meridian 11 · B2</strong><span class="version-status">Vorschaustand</span><p>Statusleiste für autonome Entwicklung mit ausdrücklich unbekanntem Betriebsstatus. Noch ohne Betriebssignal.</p></li>
         <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>
@@ -305,9 +306,9 @@
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
         <div class="bot-access-controls">
-          <label for="bot-read-token">Bestehender Meridian-Lesezugang</label>
+          <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
           <input id="bot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="bot-read-access-help">
-          <p id="bot-read-access-help">Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
+          <p id="bot-read-access-help">Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
           <button id="bot-read-provide" type="button">Lesezugang übernehmen</button>
           <p id="bot-read-access-status" role="status" aria-live="polite"></p>
         </div>

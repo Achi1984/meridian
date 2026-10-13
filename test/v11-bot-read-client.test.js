@@ -115,3 +115,34 @@ test('reentrant lock during loading does not dispatch or leak rejection',async()
     onChange:state=>{if(state.status==='loading')client.lock();}});
   await client.refresh();assert.equal(calls,0);
 });
+
+const shareBase='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch';
+const shareToken='a'.repeat(43);
+const shareLink=shareBase+'?share='+shareToken;
+test('scoped link performs one manual fixed GET with no bearer or credential disclosure',async()=>{
+ const calls=[];const h=harness({fetchImpl:async(...args)=>{calls.push(args);return response();}});
+ h.token(shareLink);assert.equal(calls.length,0);await h.client.refresh();
+ assert.equal(calls.length,1);assert.equal(calls[0][0],shareLink);
+ assert.equal(calls[0][1].headers.authorization,undefined);
+ assert.equal(calls[0][1].redirect,'error');assert.equal(calls[0][1].referrerPolicy,'no-referrer');
+ assert.equal(h.events.at(-1).status,'fresh');assert.ok(!JSON.stringify(h.events).includes(shareToken));
+});
+test('foreign, noncanonical and malformed share URLs never fetch or fall back to bearer',async()=>{
+ const invalid=[shareLink+'&x=1',shareLink+'&share='+shareToken,shareLink+'#x',shareLink+'#',
+ shareBase+'?share=',shareBase+'?share='+'a'.repeat(42),shareBase+'?share='+'a'.repeat(44),
+ shareBase+'?share=%61'+ 'a'.repeat(42),shareBase+'?share='+shareToken+'=',
+ shareLink.replace('https:','http:'),shareLink.replace('.code.run','.code.run.evil'),
+ shareLink.replace('https://','https://user@'),shareLink.replace('.run/','.run:443/'),
+ shareLink.replace('/api/','/x/../api/'),shareLink.replace('/api/','//api/'),
+ shareLink.replace('https://','//'), 'www.evil.test/?share='+shareToken,
+ shareLink.replace('/asset-watch?','/asset-watch/?'),shareLink.replace('?share=','?SHARE=')];
+ for(const input of invalid){let calls=0;const h=harness({fetchImpl:async()=>{calls++;return response();}});
+ h.token(input);await h.client.refresh();assert.equal(calls,0,input);assert.equal(h.events.at(-1).status,'locked');}
+});
+test('share authentication rejection locks and late share replies cannot restore locked data',async()=>{
+ for(const status of [401,403]){const h=harness({fetchImpl:async()=>new Response('',{status})});
+ h.token(shareLink);await h.client.refresh();assert.equal(h.events.at(-1).status,'locked');}
+ const d=deferred();const h=harness({fetchImpl:()=>d.promise});h.token(shareLink);
+ const work=h.client.refresh();h.client.lock();await work;d.resolve(response());await Promise.resolve();
+ assert.equal(h.events.at(-1).status,'locked');
+});

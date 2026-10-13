@@ -1,3 +1,5 @@
+import {parseBotReadCredential} from './bot-read-client.js';
+
 // Inactive memory-only credential holder. No authentication or account activation.
 // The caller supplies the existing client's lock operation; no token is sent to it.
 export function createBotReadAccess({lock} = {}) {
@@ -16,7 +18,7 @@ export function createBotReadAccess({lock} = {}) {
     if (!clear()) return false;
     // Reentrant access changes invalidate this operation and remain locked.
     if (generation !== id) return false;
-    if (typeof value !== 'string' || value.length > 4096 || /[\r\n]/.test(value)) return false;
+    if (!parseBotReadCredential(value)) return false;
     const candidate = value.trim();
     if (!candidate) return false;
     credential = candidate;

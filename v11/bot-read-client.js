@@ -1,6 +1,23 @@
 import {buildBotReadModel} from './bot-read-model.js';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch';
+// Exact canonical gateway links only. Never use a supplied URL as a fetch target.
+export function parseBotReadCredential(value) {
+  if (typeof value !== 'string' || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value)) return null;
+  const candidate = value.trim();
+  if (!candidate) return null;
+  const prefix = ENDPOINT + '?share=';
+  if (candidate.startsWith(prefix)) {
+    const share = candidate.slice(prefix.length);
+    // Gateway issues 32 random bytes encoded as 43 base64url characters.
+    if (!/^[A-Za-z0-9_-]{43}$/.test(share)) return null;
+    return {kind:'share', value:share};
+  }
+  // Malformed or foreign links must never be sent as bearer credentials.
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(candidate) || /^(?:[/\\]{2}|www\.)/i.test(candidate)) return null;
+  return {kind:'bearer', value:candidate};
+}
+
 const MAX_BYTES = 256 * 1024;
 const TIMEOUT_MS = 10000;
 
@@ -41,8 +58,7 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
   const token = () => {
     try {
       const value = getToken();
-      return typeof value === 'string' && value.length <= 4096 && !/[\r\n]/.test(value) && value.trim()
-        ? value.trim() : null;
+      return parseBotReadCredential(value) ? value.trim() : null;
     } catch { return null; }
   };
   const emit = (status, model = null) => {
@@ -79,9 +95,13 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
       emit('loading');
       if (id !== generation || disposed) return;
       const operation = async () => {
-        const response = await fetchImpl(ENDPOINT, {method:'GET', redirect:'error', credentials:'omit',
+        const parsed = parseBotReadCredential(credential);
+        const endpoint = parsed.kind === 'share' ? ENDPOINT + '?share=' + encodeURIComponent(parsed.value) : ENDPOINT;
+        const headers = {accept:'application/json'};
+        if (parsed.kind === 'bearer') headers.authorization = 'Bearer ' + parsed.value;
+        const response = await fetchImpl(endpoint, {method:'GET', redirect:'error', credentials:'omit',
           cache:'no-store', referrerPolicy:'no-referrer', signal:controller.signal,
-          headers:{accept:'application/json', authorization:'Bearer ' + credential}});
+          headers});
         if (controller.signal.aborted) throw new Error('unavailable');
         if (response.status === 401 || response.status === 403) return {locked:true};
         return {snapshot:await readBounded(response, controller.signal)};
