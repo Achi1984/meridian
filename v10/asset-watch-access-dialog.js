@@ -19,7 +19,9 @@ export function createAssetWatchAccessDialog({document,submit}){
         close();submit(action,credential);credential='';
       });
       dialog.querySelector('[data-cancel]').addEventListener('click',close);
-      dialog.addEventListener('cancel',clear);dialog.addEventListener('close',clear);
+      dialog.addEventListener('cancel',clear);
+      // Native close events are queued; an earlier session must not clear a reopened one.
+      dialog.addEventListener('close',()=>{if(!dialog.open)clear();});
       document.body.appendChild(dialog);
     }
     clear();dialog.showModal();input.focus();

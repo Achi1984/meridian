@@ -21,7 +21,7 @@ test('V10 one-use access dialog: native keyboard, clearing and responsive layout
  const dir=mkdtempSync(join(tmpdir(),'v10-access-'));
  try{
   const file=join(dir,'dialog.html');
-  writeFileSync(file,`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><button id="open">Lesezugang verwenden</button><script>${source}\nlet count=0,cleared=false;const ui=createAssetWatchAccessDialog({document,submit:()=>{count++;cleared=document.querySelector('input').value==='';}});document.getElementById('open').onclick=()=>ui.open();window.qa={open:()=>ui.open(),state:()=>({count,cleared,value:document.querySelector('input')?.value,open:document.querySelector('dialog')?.open})};window.fetch=()=>{throw Error('Unexpected network');};</script></body></html>`);
+  writeFileSync(file,`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body><button id="open">Lesezugang verwenden</button><script>${source}\nlet count=0,cleared=false;const ui=createAssetWatchAccessDialog({document,submit:()=>{count++;cleared=document.querySelector('input').value==='';}});document.getElementById('open').onclick=()=>ui.open();window.qa={open:()=>ui.open(),close:()=>ui.close(),state:()=>({count,cleared,value:document.querySelector('input')?.value,open:document.querySelector('dialog')?.open})};window.fetch=()=>{throw Error('Unexpected network');};</script></body></html>`);
   for(const width of [320,390,1280])await withMobileChrome(chrome,width,pathToFileURL(file).href,async call=>{
    if(width===1280)await call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:false,screenWidth:width,screenHeight:844});
    const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,'dialog exception');return r.result?.value;};
@@ -34,6 +34,9 @@ test('V10 one-use access dialog: native keyboard, clearing and responsive layout
    await key();let s=await evaluate('qa.state()');assert.equal(s.open,false);assert.equal(s.value,'');assert.equal(s.count,0);
    await evaluate("qa.open();document.querySelector('button[value=rotate]').click()");s=await evaluate('qa.state()');assert.equal(s.open,true);assert.equal(s.count,0);
    await evaluate("document.querySelector('input').value='synthetic-access';document.querySelector('input').focus()");await key('Enter');s=await evaluate('qa.state()');assert.equal(s.open,false);assert.equal(s.value,'');assert.equal(s.count,1);assert.equal(s.cleared,true);
+   s=await evaluate(`new Promise(resolve=>{qa.open();const d=document.querySelector('dialog');d.addEventListener('close',()=>resolve(qa.state()),{once:true});qa.close();qa.open();document.querySelector('input').value='reopened-access';})`);
+   assert.equal(s.open,true);assert.equal(s.value,'reopened-access');assert.equal(s.count,1);
+   await evaluate('qa.close()');assert.equal((await evaluate('qa.state()')).value,'');
    console.log('V10_ACCESS_DIALOG_WIDTH',width);
   });
  }finally{rmSync(dir,{recursive:true,force:true});}
