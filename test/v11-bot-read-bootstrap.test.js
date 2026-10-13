@@ -73,3 +73,23 @@ test('validated short expiry invalidates once without fetching and lock cancels 
   client.lock();assert.equal(timers.size,0);late.fn();assert.equal(states.at(-1),'locked');assert.equal(reads,2);
   mounted.dispose();
 });
+test('actual 401 and 403 revoke the rejected credential until explicitly provided again',async()=>{
+  for(const statusCode of [401,403]) {
+    const document=new Target(),window=new Target(),nodes=new Map(['bot-read-root','bot-read-token','bot-read-provide','bot-read-access-status'].map(id=>[id,new Target()]));
+    document.getElementById=id=>nodes.get(id);let client,getToken,reads=0;const states=[];
+    const mounted=mountBotReadAccess(document,window,{createClient:options=>{
+      getToken=options.getToken;
+      return createBotReadClient({...options,fetchImpl:async()=>{reads++;return new Response('private-server-error',{status:statusCode});}});
+    },createView:(_root,options)=>{client=options.createClient({getToken:options.getToken,onChange:state=>states.push(state.status)});return {revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};}});
+    const input=nodes.get('bot-read-token'),provide=nodes.get('bot-read-provide');
+    input.value='synthetic-token';provide.fire('click');
+    assert.equal(getToken(),'synthetic-token','access-driven initial lock must not invalidate provision');
+    await client.refresh();assert.equal(reads,1);assert.equal(getToken(),null);assert.equal(states.at(-1),'locked');
+    assert.equal(nodes.get('bot-read-access-status').textContent,'Gesperrt. Der Lesezugang wird nicht gespeichert.');
+    await client.refresh();assert.equal(reads,1,'rejected credential must not be retried');
+    input.value='replacement-token';provide.fire('click');assert.equal(getToken(),'replacement-token');
+    await client.refresh();assert.equal(reads,2);assert.equal(getToken(),null);
+    assert.doesNotMatch(nodes.get('bot-read-access-status').textContent,/synthetic-token|replacement-token|private-server-error/);
+    mounted.dispose();
+  }
+});

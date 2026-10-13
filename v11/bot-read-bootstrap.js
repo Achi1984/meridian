@@ -12,12 +12,15 @@ export function mountBotReadAccess(document, window, {
   const provide=document.getElementById('bot-read-provide');
   const status=document.getElementById('bot-read-access-status');
   if (!root || !input || !provide || !status) return null;
-  let client,view,disposed=false,expiryTimer=null,expiryGeneration=0;
+  let client,view,disposed=false,expiryTimer=null,expiryGeneration=0,accessLockActive=false;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
   }
-  const access=createBotReadAccess({lock:()=>{client?.lock();}});
+  const access=createBotReadAccess({lock:()=>{
+    accessLockActive=true;
+    try {client?.lock();} finally {accessLockActive=false;}
+  }});
   function clear() {
     cancelExpiry();
     input.value='';access.clear();
@@ -28,6 +31,9 @@ export function mountBotReadAccess(document, window, {
       client=createClient({...options,onChange:state=>{
         cancelExpiry();
         if(disposed)return;
+        // Server rejection revokes memory access too. Access-driven locks already
+        // clear it and must not reenter provide()/clear() while their lock runs.
+        if(state.status==='locked'&&!accessLockActive){clear();return;}
         options.onChange?.(state);
         if(state.status==='fresh'&&Number.isFinite(state.model?.expiresAt)){
           const generation=expiryGeneration;
