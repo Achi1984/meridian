@@ -103,7 +103,7 @@ test('A2: local examples never write portfolio, risk, sources or any privileged 
   const examples = script.slice(script.indexOf('const preview ='));
   assert.doesNotMatch(examples, /portfolio-value|data-decision-owner|trust-cell|MERIDIAN|\.innerHTML|\.outerHTML/);
   assert.doesNotMatch(script, /\b(fetch|XMLHttpRequest|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|setTimeout|setInterval)\s*\(/);
-  assert.doesNotMatch(html, /<script[^>]*src=|<iframe|<form|rel="manifest"/);
-  assert.match(html, /data-preview-mode="static-no-live-data"/);
+  assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js"></script>',''), /<script[^>]*src=|<iframe|<form|rel="manifest"/);
+  assert.match(html, /data-preview-mode="manual-bot-read-only"/);
   assert.match(html, /data-execution-impact="false"/);
 });

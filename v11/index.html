@@ -8,7 +8,7 @@
   <meta name="meridian-ui-generation" content="11-preview">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>MERIDIAN 11 — Next Generation · Entwurf</title>
-  <!-- GATE A0: Standalone public source preview. No manifest, API, token, data engine, storage, orders or service worker.
+  <!-- B3 DRAFT: Manual read-only bot access; no persistence, automatic request, engine, orders or service worker.
        The v9 engine is intentionally NOT loaded until the single-engine / lifecycle / safety tests exist.
        Noindex does not make this private: any future Pages publication makes the source publicly accessible. -->
   <style>
@@ -170,18 +170,24 @@
     .autonomy-strip strong{color:var(--state-unknown)}
     .autonomy-strip details{margin:8px 0 0;background:transparent}
     .autonomy-strip a{color:#a9d4ff;text-underline-offset:3px}
+    .bot-access-controls{display:grid;gap:10px;margin:14px 0}
+    .bot-access-controls input{width:100%;min-width:0;min-height:44px;font-size:16px;color:var(--text);background:#101b28;border:1px solid #567a9f;border-radius:8px;padding:8px}
+    .bot-access-controls button,.bot-read-view button{min-width:44px;min-height:44px;white-space:normal;border:1px solid #567a9f;border-radius:8px;padding:10px;background:#142235;color:var(--text);margin:4px 4px 4px 0}
+    .bot-access-controls input:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .bot-access-controls p,.bot-read-view p,.bot-read-view time{overflow-wrap:anywhere;font-size:13px}
+    .bot-read-view li{margin:12px 0}.bot-read-view ul{padding-left:20px}
   </style>
 </head>
 <body>
 <a class="skip-link" href="#app-main">Zum Inhalt</a>
-<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="static-no-live-data" data-execution-impact="false">
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-read-only" data-execution-impact="false">
   <header class="topbar">
     <div class="header-inner">
       <div class="identity">
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B2<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B3<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
@@ -194,7 +200,7 @@
         <div class="details-body">
           <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
           <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B2:</b> Statusleiste ergänzt. Integrationszeit und Änderungsnachweis stehen für diesen Entwurf noch aus.</p>
+          <p><b>Diese Vorschau · B3:</b> Manueller, temporärer Lesezugang für Bot-Snapshots vorbereitet. Integrationszeit und Änderungsnachweis stehen für diesen Entwurf noch aus.</p>
           <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
           <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
         </div>
@@ -207,6 +213,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B3</strong><span class="version-status">Entwurf</span><p>Manueller Bot-Lesezugang ohne Speicherung oder automatische Abfragen. Noch nicht veröffentlicht.</p></li>
         <li><strong>Meridian 11 · B2</strong><span class="version-status">Vorschaustand</span><p>Statusleiste für autonome Entwicklung mit ausdrücklich unbekanntem Betriebsstatus. Noch ohne Betriebssignal.</p></li>
         <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>
         <li><strong>Meridian 11 · #700</strong><span class="version-status">Vorschaustand</span><p>Depotübersicht mit klar gekennzeichnetem Gesamtwert, Datenquelle und Aktualität. Ohne Live-Daten. <a href="https://github.com/Achi1984/meridian/pull/700">Änderungsnachweis #700</a></p></li>
@@ -225,8 +232,8 @@
       <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
         <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
         <h2>Datenanbindung steht noch aus</h2>
-        <p>In dieser Vorschau liegen keine verifizierten Depot-, Bot- oder Marktdaten vor. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
-        <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Vorschau ohne Kontozugriff</div>
+        <p>Diese Übersicht verarbeitet keine Depot- oder Marktdaten. Bot-Snapshots können ausschließlich im Bots-Tab manuell gelesen werden. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
+        <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat</div>
       </section>
       <section class="card" aria-label="Portfolio">
         <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
@@ -245,8 +252,8 @@
       <details class="command-source-details">
         <summary><span>DATEN &amp; QUELLEN</span><span aria-hidden="true">+</span></summary>
         <div class="details-body">
-          <p><b>Modus:</b> Statische, öffentliche Entwicklungs-Vorschau.</p>
-          <p><b>Daten:</b> Keine Live-Feeds, keine private Kontoanbindung, keine Handelsfreigabe.</p>
+          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Bot-Lesezugang.</p>
+          <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
           <p><b>Grundlage:</b> MERIDIAN 11 Architekturentscheid #603. Die geprüfte v10-Engine bleibt separat.</p>
           <section id="data-state-preview" class="data-state-preview" aria-labelledby="state-preview-heading">
             <h2 id="state-preview-heading">Datenstatus · Darstellungsbeispiele</h2>
@@ -281,25 +288,33 @@
         <h2 id="depot-holdings-heading">Deine Bestände</h2>
         <p class="caption">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>
       </section>
-      <p class="caption">Diese Vorschau hat keinen Kontozugriff. „Terminal öffnen“ führt zum separaten Terminal.</p>
+      <p class="caption">Diese Depotansicht ist nicht angebunden. „Terminal öffnen“ führt zum separaten Terminal.</p>
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
       <section class="card view-placeholder" aria-labelledby="bots-summary-heading">
-        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Statische Vorschau</span></div>
+        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Nur lesend</span></div>
         <div class="portfolio-row"><div><p class="caption">Aktive Bots</p><div class="portfolio-value" aria-label="Anzahl aktiver Bots unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
-        <p class="caption">Keine Botdaten verbunden. Die Anzahl ist unbekannt – nicht null.</p>
+        <p class="caption">Aktive Bot-Prozesse werden nicht überwacht. Die Anzahl im gelesenen Snapshot erscheint unten.</p>
         <div class="trust-grid" aria-label="Datenstatus der Bots">
-          <div class="trust-cell"><strong>Quelle</strong><span>Nicht verbunden</span></div>
-          <div class="trust-cell"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>
+          <div class="trust-cell"><strong>Quelle</strong><span>Snapshot unten</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Je manueller Abfrage</span></div>
           <div class="trust-cell"><strong>Risiko</strong><span>Nicht bestimmbar</span></div>
         </div>
       </section>
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
+        <div class="bot-access-controls">
+          <label for="bot-read-token">Bestehender Meridian-Lesezugang</label>
+          <input id="bot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="bot-read-access-help">
+          <p id="bot-read-access-help">Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
+          <button id="bot-read-provide" type="button">Lesezugang übernehmen</button>
+          <p id="bot-read-access-status" role="status" aria-live="polite"></p>
+        </div>
+        <div id="bot-read-root"></div>
         <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
       </section>
-      <p class="caption">Diese Vorschau hat keinen Kontozugriff und steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>
+      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>
     </section>
     <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
       <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
@@ -403,8 +418,6 @@
   }
 })();
 </script>
+<script type="module" src="./bot-read-bootstrap.js"></script>
 </body>
 </html>
-
-
-

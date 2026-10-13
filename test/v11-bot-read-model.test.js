@@ -8,6 +8,12 @@ const fixture = () => ({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
   sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:1,
   bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',
     botType:'futures_grid',sideSource:'economic_inverse_asset',apiKey:'SECRET'}]});
+test('fresh expiry preserves the validated source limit rather than assuming fifteen minutes',()=>{
+  const input=fixture();input.freshnessLimitMs=120000;
+  const model=buildBotReadModel(input,{now});
+  assert.equal(model.status,'FRESH_SNAPSHOT');assert.equal(model.expiresAt,Date.parse(input.sourceSnapshotAt)+120000);
+  assert.equal(buildBotReadModel(input,{now:model.expiresAt+1}).status,'STALE');
+});
 test('fresh projection preserves explicit inverse side and drops arbitrary fields',()=>{
   const input=fixture(),before=structuredClone(input),out=buildBotReadModel(input,{now});
   assert.equal(out.status,'FRESH_SNAPSHOT');assert.equal(out.ageMs,60000);
