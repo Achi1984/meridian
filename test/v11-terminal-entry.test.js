@@ -253,7 +253,8 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    if(request.method!=='GET'||url.search){response.writeHead(404);response.end();return;}
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6';
+    if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
       if(request.headers.authorization!=='Bearer synthetic-b3-token'){response.writeHead(401);response.end('{}');return;}
