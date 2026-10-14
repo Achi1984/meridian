@@ -1,9 +1,9 @@
 # LowVol frozen-artifact receipt verification — 14 October 2026
 
 - **Op-ID:** `STRATEGY-RECEIPT-VERIFICATION-20261014`
-- **Disposition:** `RECEIPTS_VERIFIED; TIMING_DOCUMENT_RECONCILIATION_OPEN; NO_PROMOTION`
-- **Audit code head:** `08aea54c5169ff7bd9c70b72206636399ef45ebc`
-- **Verifier SHA-256:** `fcc801d45e86a015c3a9b9f5037ca965494db3c4dacddce78286d9e0c60100d7`
+- **Disposition:** `RECEIPTS_VERIFIED; PRESTART_36H_AUTHORIZATION_RECORDED; OLDER_12H_TEXT_RECONCILIATION_AND_INDEPENDENT_AUTHORITY_PROVENANCE_OPEN; NO_PROMOTION`
+- **Audit code head:** `2154003a8bed26aef4f4f56258ae0cf68eba6815`
+- **Verifier SHA-256:** `32e5f193c215b464c16c2a4b5fbcf93a863ca3dc463218da9cd721d39f0010df`
 - **Base/main:** `386013c1e78c4be5ea5d6c89063c9c4b8dacda66`
 
 ## Executed receipt checks
@@ -14,7 +14,7 @@ GitHub Actions metadata confirmed all six pinned artifacts were available and bo
 
 **Exact-head result:** `VERIFIED`, 52/52 inputs verified, 0 unavailable, 0 mismatches. For every archive and payload, observed SHA-256 and byte size equal the pinned expectation. The manifest includes all expected file names, sizes, digests, artifact IDs, run IDs and source commits.
 
-**Tests at the audit head:** `node --test test/strategy-evidence-receipts.test.js` passed 12/12; `node --test test/*.test.js` passed 2,453/2,453; both changed JavaScript files passed `node --check`. The initial full-suite attempt lacked the lockfile’s existing `pg` install; after `npm ci` (0 vulnerabilities reported), the rerun passed.
+**Corrected-head checks:** `node --test test/strategy-evidence-receipts.test.js` passed 15/15; `node --test test/*.test.js` passed 2,456/2,456 after `npm ci` installed existing lockfile dependencies (0 vulnerabilities reported); both changed JavaScript files passed `node --check`. The corrected verifier CLI reported `VERIFIED`, 52/52 inputs, 0 unavailable and 0 mismatched. An earlier full-suite attempt at the preceding audit head lacked the lockfile’s existing `pg` install; after `npm ci`, that historical run passed 2,453/2,453. A preliminary malformed CLI invocation omitted the repeated `--input` flags and exited during argument parsing without reading inputs; it is not counted as an audit check.
 
 | Artifact | Run / source commit / ID | Expected ZIP SHA-256 | Observed ZIP SHA-256 | Payload receipt |
 |---|---|---|---|---|
@@ -29,20 +29,22 @@ The source manifests declare 12/12 required assets for Development, Holdout and 
 
 The verifier deliberately reports `zipMemberVerification: NOT_PERFORMED`: it hashes supplied bytes and validates pre-extracted member paths but does not parse ZIPs. For this audit, Python’s standard-library `zipfile` separately checked each downloaded ZIP’s CRC, exact member list, unique/safe relative names, no symlink members, bounded sizes and member bytes before staging them under `/tmp`. ZIP parsing is not part of the verifier’s guarantee.
 
+**Separately attributed lead checks:** the lead independently downloaded and hashed the existing Development and Holdout source/result artifacts in memory. The reported ZIP hashes, source-manifest hashes, all 12 asset payload hashes per source archive, and result JSON/Markdown hashes match the pinned values above. The lead’s checks independently confirm byte identity only; they do not establish raw-source authenticity/economic validity or reproduce PnL. These are lead-reported checks, not part of my verifier run.
+
 ## Prospective timing provenance
 
 - The pinned implementation contract at blob `d156db5409c94bc6cfface2a65e5fb6bef9a6f40` still says 12 hours after a Saturday 00:00 cutoff and a Saturday 01:15 UTC schedule.
-- Engine commit [`ef7f25043a8d8b62a021a883f3bff33945d7064a`](https://github.com/Achi1984/meridian/commit/ef7f25043a8d8b62a021a883f3bff33945d7064a), timestamped 2026-10-03 18:19:34 UTC, changed the source limit from 12 to 36 hours. Workflow commit [`25f6d286b0d56a947c951329849cb0e0340b9cf8`](https://github.com/Achi1984/meridian/commit/25f6d286b0d56a947c951329849cb0e0340b9cf8), 2026-10-03 18:19:37 UTC, changed the schedule from Saturday 01:15 to Sunday 02:15. Both source changes predate the 2026-10-10 boundary by more than six days.
-- PR #479 merged at 18:11:37 UTC, before those timing commits. PR #482 merged by the owner at 18:27:21 UTC and records the prospective start authorization and pinned source/workflow blobs. Its available review/comment endpoints do not explicitly reconcile the still-present 12h/Saturday contract against the 36h/Sunday rule. The merged start authorization is evidence for the authorized start; the source code alone is not authorization to supersede the conflicting document.
+- Engine commit [`ef7f25043a8d8b62a021a883f3bff33945d7064a`](https://github.com/Achi1984/meridian/commit/ef7f25043a8d8b62a021a883f3bff33945d7064a), timestamped 2026-10-03 18:19:34 UTC, changed the source limit from 12 to 36 hours. Workflow commit [`25f6d286b0d56a947c951329849cb0e0340b9cf8`](https://github.com/Achi1984/meridian/commit/25f6d286b0d56a947c951329849cb0e0340b9cf8), 18:19:37 UTC, changed the schedule from Saturday 01:15 to Sunday 02:15. PR #481 merged at 18:21:13 UTC (`1a34e9dae390ca91de59588b4b102da43579f527`); all these source changes predate the 2026-10-10 boundary by more than six days.
+- The original start authorization was committed at 18:25:24 UTC in [`30fa358e816dbeaf86b712c30ffb6b4845a4e1c6`](https://github.com/Achi1984/meridian/commit/30fa358e816dbeaf86b712c30ffb6b4845a4e1c6); its exact authorization-document blob is `1d4ec4f2386005b7a5094ea3f4ea2d3143b9b9a7`. That document explicitly records 36h/Sunday, the corrected engine/workflow hashes, and the 2026-10-10 start as authorized. PR #482 merged at 18:27:21 UTC (`86a1c7f82c849e91c4d2c8db091b5347b330d4f9`). GitHub commit metadata, document blob, and both PR review/comment lists were checked for this report; both lists were empty. This is a pre-start recorded authorization chronology, not independent proof of direct human instruction or an independently attributable historical reviewer receipt. Neither is established here; owner-associated commit/merge identity alone does not prove either.
 - Run `38125893276` collected the fixed `2026-10-10T00:00:00Z` cutoff at `2026-10-11T08:45:05.499Z`, 117,905,499 ms (32h45m05.499s) later. The snapshot says `timely=true` under the 36h source rule, has 0 completed and eligible observations, `dataIntegrityFailure=false`, and Paper/Live false. The exact evidence-branch JSON was added at `b6b72a1`; this bounded Git history and matching artifact/blob do not independently prove storage immutability. Runs `38149124458` and `38156356512` preserved that first-write snapshot and reported `timely=false`; the reason for their lateness is not established here.
 
-**Timing disposition:** **timely under 36h source rule; older 12h document reconciliation status: unresolved.** This is not a retrospective relaxation: both timing source commits predate the fixed boundary. An explicit reconciliation is still required before relying on future `timely` flags.
+**Timing disposition:** **timely under 36h source rule; older 12h document reconciliation status: unresolved.** The 36h/Sunday rule and start authorization are recorded before the fixed boundary, so the evidence does not indicate a retrospective relaxation. The frozen 12h/Saturday contract itself remains unchanged; documentary reconciliation and independently attributable human/reviewer provenance are still open before relying on future `timely` flags.
 
 ## Checks not performed / remaining blockers
 
 - No strategy evaluator, return/PnL recomputation, backtest, new market-data collection, canonical workflow, or Discovery/Validation/Holdout/Paper/Live execution was run. No profitability or raw-source economic-validity claim is made.
 - No eligible prospective week had completed: the first ends 2026-10-17; the fixed first-12 endpoint remains 2027-01-02. Later ledger continuity and the later retries’ `timely=false` reason remain unverified.
 - No independent proof of artifact-store immutability or complete raw-source economic validity is established by matching artifact hashes and declared source manifests.
-- The older 12h/Saturday document has not been explicitly reconciled to the owner-merged 36h/Sunday start authorization. Actual fee/depth/slippage, margin/liquidation, venue/product access, EUR capital suitability, Paper observation, benchmark and Live controls remain separate blockers.
+- The pre-start authorization document records 36h/Sunday, but the older frozen 12h/Saturday contract remains unreconciled and no independent direct-human instruction/reviewer receipt was established. Actual fee/depth/slippage, margin/liquidation, venue/product access, EUR capital suitability, Paper observation, benchmark and Live controls remain separate blockers.
 
 All execution and promotion authorizations remain unchanged and false. The receipt results close only the artifact hash, manifest, payload, and committed-summary consistency gaps.

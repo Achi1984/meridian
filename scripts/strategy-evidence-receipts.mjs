@@ -380,20 +380,23 @@ export function readLocalFileWithoutSymlinks(filePath, maxBytes, maxTotalBytes =
       if (count === 0) break;
       bytesRead += count;
     }
-    if (bytesRead === stat.size) {
-      const sentinel = Buffer.allocUnsafe(1);
-      if (fs.readSync(descriptor, sentinel, 0, 1, null) > 0) {
-        const error = new Error(`input grew while reading: ${absolutePath}`);
-        error.code = 'EFBIG';
-        throw error;
-      }
+    if (bytesRead !== stat.size) {
+      const error = new Error(`input changed while reading: ${absolutePath}`);
+      error.code = 'ESTALE';
+      throw error;
+    }
+    const sentinel = Buffer.allocUnsafe(1);
+    if (fs.readSync(descriptor, sentinel, 0, 1, null) > 0) {
+      const error = new Error(`input grew while reading: ${absolutePath}`);
+      error.code = 'EFBIG';
+      throw error;
     }
     if (bytesRead > maxBytes || bytesRead > maxTotalBytes) {
       const error = new Error(`input exceeds a declared size limit: ${absolutePath}`);
       error.code = 'EFBIG';
       throw error;
     }
-    return output.subarray(0, bytesRead);
+    return output;
   } finally {
     fs.closeSync(descriptor);
   }

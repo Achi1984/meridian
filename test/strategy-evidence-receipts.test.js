@@ -178,9 +178,24 @@ test('regular-file reader rejects FIFOs before opening and respects the aggregat
   assert.notEqual(result.error?.code, 'ETIMEDOUT');
   assert.equal(JSON.parse(result.stdout).status, 'MISMATCH');
 
-  const small = path.join(directory, 'small.bin');
-  fs.writeFileSync(small, '12345678901');
-  assert.throws(() => readLocalFileWithoutSymlinks(small, 20, 10), error => error.code === 'EFBIG');
+  const files = ['1234', '5678', '9abc'].map((content, index) => {
+    const file = path.join(directory, `small-${index}.bin`);
+    fs.writeFileSync(file, content);
+    return file;
+  });
+  let remainingBytes = 10;
+  let allocatedBytes = 0;
+  for (const [index, file] of files.entries()) {
+    if (index === 2) {
+      assert.throws(() => readLocalFileWithoutSymlinks(file, 4, remainingBytes), error => error.code === 'EFBIG');
+      continue;
+    }
+    const data = readLocalFileWithoutSymlinks(file, 4, remainingBytes);
+    allocatedBytes += data.length;
+    remainingBytes -= data.length;
+  }
+  assert.equal(allocatedBytes, 8);
+  assert.equal(remainingBytes, 2);
 });
 
 test('CLI safely bounds and rejects manifest FIFOs, symlinks, and oversized files', t => {
@@ -224,6 +239,16 @@ test('CLI rejects duplicate input identities before opening any input', t => {
   assert.notEqual(result.error?.code, 'ETIMEDOUT');
   assert.equal(JSON.parse(result.stdout).status, 'MISMATCH');
   assert.equal(JSON.parse(result.stdout).verified, false);
+
+  const duplicateLocalIdentity = spawnSync(process.execPath, [
+    verifierPath,
+    '--manifest', manifestPath,
+    '--input', `archives/result.zip=${fifo}`,
+    '--input', `members/result.json=${fifo}`
+  ], {encoding: 'utf8', timeout: 1500});
+  assert.notEqual(duplicateLocalIdentity.error?.code, 'ETIMEDOUT');
+  assert.equal(JSON.parse(duplicateLocalIdentity.stdout).status, 'MISMATCH');
+  assert.equal(JSON.parse(duplicateLocalIdentity.stdout).verified, false);
 });
 
 test('duplicate artifact identities are invalid', () => {
