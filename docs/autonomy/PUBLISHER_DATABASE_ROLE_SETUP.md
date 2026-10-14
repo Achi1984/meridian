@@ -25,20 +25,131 @@ existing validation role, or an administrator credential as a runtime substitute
 
 ## Secure creation and credential handoff
 
-Use a separately approved provider/owner administration flow to create ordinary
-login roles and deliver three distinct random passwords directly to the approved
-secret store. Do not put passwords in SQL examples, repository files, chat,
-workflow inputs, command-line arguments, logs or artifacts. This document does
-not prescribe a password-bearing command or retrieve an existing password.
+**Operator: Christoph, on his trusted PC using PostgreSQL 16 `psql`.** This is
+an owner-operated prerequisite, not an automated connector step. It requires the
+separate provisioning approval and an existing authorized administrator identity
+for the exact TEST branch. Do not create these roles through Neon Console, CLI,
+or role-creation API: Neon documents that those paths add `neon_superuser`
+membership. Use SQL role creation below instead.
 
-For all three roles require LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE,
-NOREPLICATION and NOBYPASSRLS. Prefer NOINHERIT as additional defense, but it is
-not a replacement for **zero membership in other roles**. Require no ownership
-of database/schema/tables/functions, no grant/admin options, and no membership
-in an administrator or provider-managed privileged role. Verify the actual
-catalog state after creation; do not assume a provider UI/API creates ordinary
-roles. If its creation path adds privileged membership, stop and obtain a
-separately reviewed ordinary-role creation procedure. Do not repair that silently.
+Keep new roles NOLOGIN until passwords, grants and the six protected-environment
+secrets have been installed and checked. No existing role is altered or reused.
+For all three require NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOREPLICATION,
+NOBYPASSRLS and NOINHERIT, **zero membership in other roles**, no object ownership,
+and no grant/admin options. NOINHERIT does not replace the membership check.
+
+### 1. Verify the administrator connection on the PC
+
+In Neon, independently confirm the fixed project/branch/database/endpoint above.
+Use the existing administrator's username and locally trusted CA bundle; neither
+is guessed here. Confirm `psql --version` is PostgreSQL 16. Start interactive
+psql with the following template, replacing only the administrator username and
+absolute CA bundle path with the locally verified values:
+
+```text
+psql -X -n -W -v ON_ERROR_STOP=1 "host=ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech port=5432 dbname=publisher_ledger user=VERIFIED_ADMIN_USERNAME sslmode=verify-full sslrootcert=ABSOLUTE_TRUSTED_CA_BUNDLE_PATH connect_timeout=10 options='-c search_path=pg_catalog'"
+```
+
+Enter the administrator password only at the terminal password prompt. Do not
+paste a password-bearing connection URI, set `PGPASSWORD`, enable query echo or
+terminal recording, use a SQL web editor for passwords, or share screenshots of
+password-manager/secret-entry screens. `-X` disables psql startup files; `-n`
+disables command history. If certificate verification or target verification
+fails, stop; do not weaken TLS. `\conninfo` must show the fixed host, database and
+TLS connection. Check these non-secret session facts:
+
+```sql
+SELECT current_database(), current_user, session_user,
+       current_setting('search_path'), current_setting('server_version_num');
+```
+
+Expected database `publisher_ledger`, the verified administrator for both user
+fields, search path `pg_catalog`, and PostgreSQL 16. SQL alone does not establish
+the Neon branch ID: the independent Console endpoint binding remains mandatory.
+
+### 2. Create three fresh disabled ordinary roles atomically
+
+Run this block only after the target check and provisioning approval. Any
+existing proposed name aborts the transaction; never add IF NOT EXISTS or alter
+an existing identity to force completion. PostgreSQL role creation is scoped to
+the connected cluster/branch rather than one database, which is why the branch
+binding matters.
+
+```sql
+BEGIN;
+DO $guard$
+BEGIN
+  IF current_database() <> 'publisher_ledger' OR EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN
+      ('meridian_test_reservation','meridian_test_sender','meridian_test_reader')
+  ) THEN
+    RAISE EXCEPTION 'Wrong database or proposed role already exists; stop';
+  END IF;
+END;
+$guard$;
+CREATE ROLE meridian_test_reservation NOLOGIN NOSUPERUSER NOCREATEDB
+  NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+CREATE ROLE meridian_test_sender NOLOGIN NOSUPERUSER NOCREATEDB
+  NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+CREATE ROLE meridian_test_reader NOLOGIN NOSUPERUSER NOCREATEDB
+  NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+COMMIT;
+```
+
+On an error, stop and `ROLLBACK;` if the transaction remains open. Do not resume
+at a later line or delete/recreate roles automatically. Confirm all three roles
+remain disabled and have no other-role memberships; retain only this non-secret
+evidence and role OIDs:
+
+```sql
+SELECT r.oid, r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb,
+       r.rolcreaterole, r.rolreplication, r.rolbypassrls, r.rolinherit,
+       EXISTS (SELECT 1 FROM pg_catalog.pg_roles parent
+               WHERE parent.oid <> r.oid
+                 AND pg_catalog.pg_has_role(r.oid, parent.oid, 'MEMBER')) AS other_membership
+FROM pg_catalog.pg_roles r
+WHERE r.rolname IN ('meridian_test_reservation','meridian_test_sender','meridian_test_reader')
+ORDER BY r.rolname;
+```
+
+Exactly three rows are required, with every boolean false. Independently inspect
+ownership and existing effective grants before the grant proposal below. If
+there is any unexpected membership or privilege, leave the new roles NOLOGIN
+and stop for review; do not revoke provider roles or modify other principals.
+
+### 3. Set SCRAM passwords interactively and hand them to GitHub
+
+Christoph generates and retains three distinct high-entropy passwords in his
+password manager (at least 32 random characters), then uses the same verified
+psql session. Set and verify the password encoding before prompting:
+
+```sql
+SET password_encryption = 'scram-sha-256';
+SHOW password_encryption;
+```
+
+The result must be `scram-sha-256`. Enter these psql meta-commands individually:
+
+```text
+\password meridian_test_reservation
+\password meridian_test_sender
+\password meridian_test_reader
+```
+
+Enter each password only at its hidden confirmation prompts. PostgreSQL's psql
+documentation states that `\password` encrypts the password before sending the
+ALTER ROLE command, avoiding cleartext password text in SQL history/server logs.
+No plaintext PASSWORD SQL statement, environment variable, pipe, script, command
+argument or chat handoff is part of this procedure. Treat password-manager and
+clipboard access as local owner responsibilities; this procedure does not
+automatically transfer or verify GitHub secrets.
+
+Keep all three roles NOLOGIN. After applying and inspecting the separately
+approved grant block below, Christoph installs the six exact secrets through
+GitHub's repository Settings → Environments → `meridian-publisher-test` UI.
+Required reviewers and main-only deployment protection must already be verified.
+The password values come directly from his password manager; only secret names
+and completion status are recorded. Do not use repository-wide fallback secrets.
 
 The exact six secret mappings proposed for the separately approved protected
 environment are:
@@ -54,6 +165,34 @@ environment are:
 
 `MERIDIAN_PUBLISHER_TEST_DATABASE=publisher_ledger` is a non-secret exact
 deployment binding. The runtime uses no generic `DATABASE_URL` or `PG*` fallback.
+
+### 4. Enable only these newly created identities after handoff
+
+First complete the grant proposal and effective-privilege review below. In the
+same owner-controlled setup session, recheck the recorded role OIDs and all role
+attributes/memberships, confirm the three passwords were set successfully and
+the six protected-environment secret entries were installed. If the session was
+lost, state changed, a name/OID differs, or any step is uncertain, stop for owner
+reconciliation; do not run an ALTER against an unverified pre-existing identity.
+
+Only then, within the separately approved provisioning scope, enable login:
+
+```sql
+BEGIN;
+ALTER ROLE meridian_test_reservation LOGIN;
+ALTER ROLE meridian_test_sender LOGIN;
+ALTER ROLE meridian_test_reader LOGIN;
+COMMIT;
+```
+
+Re-run the non-secret role query: only `rolcanlogin` becomes true, every other
+boolean remains false, and OIDs remain unchanged. This LOGIN step creates usable
+credentials and is part of provisioning authorization, not source-merge approval.
+Do not dispatch a workflow here. A separately approved readiness run will test
+the installed credentials; absence of that run means their handoff is not yet
+operationally verified. On a handoff/setup failure leave roles NOLOGIN and stop;
+do not reset passwords, broaden grants or replace existing GitHub secrets by
+guessing. Close the administrator session with `\q` when finished.
 
 ## Reviewable grant proposal
 
@@ -154,5 +293,8 @@ and guards remain the canonical definitions.
 
 - [PostgreSQL 16 GRANT](https://www.postgresql.org/docs/16/sql-grant.html)
 - [PostgreSQL 16 CREATE ROLE](https://www.postgresql.org/docs/16/sql-createrole.html)
+- [PostgreSQL 16 psql password command](https://www.postgresql.org/docs/16/app-psql.html)
+- [PostgreSQL 16 password encryption](https://www.postgresql.org/docs/16/runtime-config-connection.html#GUC-PASSWORD-ENCRYPTION)
+- [Neon SQL-created roles versus Console/API roles](https://neon.com/docs/manage/roles#manage-roles-with-sql)
 - [Readiness scope and exclusions](PUBLISHER_DATABASE_READINESS.md)
 - [Execution proposal](PUBLISHER_DATABASE_EXECUTION_PROPOSAL.md)

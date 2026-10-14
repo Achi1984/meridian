@@ -53,6 +53,23 @@ financial database access. Reservation table-wide INSERT and INSERT on
 `created_at`/`comment_id` remain denied. Distinct names/passwords do not prove
 effective privilege separation; inherited and PUBLIC rights must be checked.
 
+These are write-capable application credentials, even though this diagnostic
+issues only SELECTs. In particular, sender table INSERT can supply
+`send_records.created_at`; its default is not enforced against an explicit value.
+`guard_send_record` rejects UPDATE, DELETE and TRUNCATE, but does not guard
+INSERT. The reviewed sender inserts `operation_key` and `comment_id`, allowing
+the timestamp default; its reader and confirmation/recovery consumers never read
+that timestamp or use it as freshness, approval or provenance evidence.
+
+The foreign key, unique constraints and positive comment-ID check do not prove
+that a supplied comment ID came from GitHub. The trusted sender must retain its
+actual publication response; confirmation separately verifies the binding,
+published comment and current admission evidence. This profile therefore trusts
+the sender credential holder and must not be described as database-enforced
+comment authenticity or timestamp authenticity. Restricting sender INSERT to
+two columns would be a further least-privilege change requiring a separate
+readiness-profile/test revision; it is not silently included in this proposal.
+
 No roles or credentials have been created for this proposal. Password generation
 and delivery belong to a secure owner-controlled provisioning step, never this
 document, source, chat, logs or SQL committed to GitHub. The separate
@@ -60,6 +77,20 @@ document, source, chat, logs or SQL committed to GitHub. The separate
 must be reviewed before execution. Do not automatically revoke PUBLIC rights,
 change existing owners, replace triggers, or broaden grants to make the check pass.
 Unexpected existing access or schema drift stops provisioning for reconciliation.
+
+The selected operator procedure is now concrete: Christoph uses PostgreSQL 16
+`psql` on his trusted PC, with the fixed TEST endpoint, independently verified
+administrator identity, local trusted CA bundle and `sslmode=verify-full`.
+The linked role plan specifies fresh ordinary roles created **NOLOGIN**, aborts
+on any existing proposed name, records role OIDs/attributes/membership, and uses
+interactive `\password` with verified SCRAM encoding. Passwords move from his
+password manager to the six protected environment secrets, never through chat.
+Only after grant review and secret handoff does the same verified administration
+session recheck the new role identities and enable their LOGIN attributes.
+Uncertainty leaves the roles disabled. Neon UI/API role creation is not the
+selected path because automatic privileged membership would violate this profile.
+This procedure is proposed and unexecuted; no administrator username, credential,
+CA path, role OID, environment setup, or prior run history has been fabricated.
 
 ## Protected environment and secrets
 
@@ -70,6 +101,14 @@ manually dispatched diagnostic, set **Prevent self-review: disabled**, so
 not a claim that it is configured. Verify that the GitHub plan/settings support
 required reviewer enforcement. If it is unavailable, stop and revise the approval
 mechanism before installing or running anything.
+
+This is a sole-owner approval pause, **not independent second-person review**.
+The environment's branch restriction does not bind its secrets to this one
+workflow: another main-branch workflow can request the same environment, subject
+to its required owner review. Before approving a job, the owner must verify the
+exact installed workflow revision and permitted job, not merely the environment
+name. No new CODEOWNERS or repository-governance rule is installed by this packet;
+additional governance can be considered separately.
 
 The environment's existence, reviewers, branch restrictions and secrets have
 not been verified. No environment/secret installation capability is assumed from
@@ -156,11 +195,19 @@ durability. It does not authorize live financial activity.
 
 The architecture and names above are selected; no design choice is delegated to
 the owner. Once exact source review is complete, the owner approves the scoped
-provisioning/installation/one-attempt proposal, performs any required secure
-environment/secret setup through GitHub's supported interface, and approves the
+provisioning/installation/one-attempt proposal, performs the linked verified-PC
+psql procedure and secure environment/secret setup through GitHub's supported
+interface, and approves the
 protected job when ready. We can prepare and verify the reviewable source and
 available metadata; unsupported secret entry must not be simulated or exposed
 in chat. A missing capability or protection remains an explicit blocker.
+
+The approval record must identify the sole-owner pause explicitly, acknowledge
+that the credentials remain write-capable beyond the SELECT-only diagnostic,
+and bind the exact reviewed workflow/source pins, role/grant procedure and
+one-attempt scope. Before approval to execute, record observed role setup,
+protected-environment configuration, secret-name completion and unused workflow
+run history. Source GREEN does not establish those remaining operational facts.
 
 After the attempt, record actual source/run/job/timestamps and sanitized outcome;
 consume the allowance on either success or failure. Any remediation or second
