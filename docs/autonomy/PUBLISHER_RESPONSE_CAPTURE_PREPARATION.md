@@ -22,8 +22,9 @@ reservation stays consumed and requires reconciliation, never another send.
 
 This function is not an HTTP endpoint and must not receive caller-controlled response
 objects or database dependencies. The trusted host must capture and bound the actual
-network response and authenticate its own storage access. No POST transport, sender
-credentials, route, host bootstrap or signed receipt is installed here. Input-object
+network response and authenticate its own storage access. A separate inactive POST
+transport primitive is now prepared; no sender credentials, route, host bootstrap
+or signed receipt is installed here. Input-object
 validation alone cannot prove response origin or which workflow sent a comment.
 Production durability and atomic approval/record revocation remain unsolved.
 

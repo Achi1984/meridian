@@ -6,6 +6,7 @@ import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {prepareAdmission,reserveAdmission,confirmPublication,capturePublicationResponse} from '../scripts/publication-service.mjs';
 import {createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
 import {createSendRecordReader,RETAIN_SQL} from '../scripts/publication-send-record.mjs';
+import {createPublicationPostTransport} from '../scripts/publication-post-transport.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -112,6 +113,18 @@ function capture(){
   assert.equal(args[5],3333);return {rowCount:1,rows:[{operation_key:args[0],comment_id:'3333'}]};}};
  return {...s,response,captures:()=>writes};
 }
+test('mock POST transport composes with actual admission and conditional record capture',async()=>{
+ const s=capture();let posts=0;
+ const post=createPublicationPostTransport({fetchFn:async(url,options)=>{
+  posts++;assert.equal(JSON.parse(options.body).body,s.request.body);
+  return {status:201,url,redirected:false,body:new ReadableStream({start(c){
+   c.enqueue(new TextEncoder().encode(JSON.stringify(s.comment)));c.close();}})};
+ }});
+ const sent=await post({body:s.request.body},'test_token');assert.equal(sent.outcome,'RESPONSE_CAPTURED');
+ const captured=await capturePublicationResponse(s.request,sent.response,s.config,s.deps);
+ assert.equal(captured.outcome,'ACKNOWLEDGED');assert.equal(s.captures(),1);assert.equal(s.writes(),0);
+ assert.equal((await post({body:s.request.body},'test_token')).outcome,'ALREADY_CONSUMED');assert.equal(posts,1);
+});
 test('actual response capture validates admission and retains once without sending',async()=>{
  const s=capture();const r=await capturePublicationResponse(s.request,s.response,s.config,s.deps);
  assert.equal(r.kind,'INACTIVE_RESPONSE_CAPTURE_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
