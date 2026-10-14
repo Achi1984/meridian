@@ -22,9 +22,17 @@ The service forwards only the trusted configuration pin. Unknown configuration k
 
 An environment JWT claim proves the claimed job environment only after signature verification; it does not prove that required reviewers or branch protection have been configured. Actual protection settings, owner-approved credential identity and activation still require independent deployment evidence. This source packet installs no workflow, acquires no token, opens no database connection and publishes nothing.
 
-## Remaining coherent deployment boundary
+## One-shot Actions composition
 
-The next source packet must bind actual Actions OIDC acquisition and owner approval bootstrap to the fixed configuration, instantiate separate narrowly scoped PostgreSQL roles with verified TLS and bounded statement/connect timeouts, and wire the existing host/recovery modules. Retain consumed operations across job exit and uncertainty. Never share the portfolio financial database or retry an uncertain publication.
+The source-only Actions bootstrap now composes offline plan validation, token acquisition, actual preflight, three separate database pools and the existing publication host. A trusted manifest binds body, approval/configuration, host context, identity configuration and database configuration. The new bootstrap requires an explicitly pinned environment profile. Imports are inert; there is no CLI, installed workflow or environment-variable discovery. Calling the bootstrap with real adapters can perform real effects; false authority flags are evidence labels, not an execution switch.
+
+The identity adapter accepts an exact deployment-trusted HTTPS endpoint pin and explicit runner request credential, adds the fixed audience, rejects redirects and limits time and response size. Acquisition checks JWT syntax only; the existing verifier authenticates the signed claims before any pool is constructed. The endpoint pin must come from trusted deployment configuration independently of untrusted requests; copying the same arbitrary URL into both fields is not host authentication.
+
+The pool adapter takes an injected audited PostgreSQL Pool constructor and three distinct explicit credentials for reservation, sender-record writing and sender-record reading on the fixed isolated Neon TEST endpoint. TLS trust, hostname and SNI verification are explicit, with bounded connection, statement, query and lock timeouts. Constructors are lazy and establish neither connectivity nor SQL privileges. Role names and distinct passwords do not prove least-privilege grants. Cleanup is bounded and idempotent; a shutdown timeout cannot prove driver handles were released.
+
+The bootstrap is one-shot per instance and retains reserve-before-publisher-credential ordering. Cancellation, late completion, failed cleanup or publication uncertainty never cause a retry. A new process or instance is not itself durable single-use enforcement; the existing PostgreSQL ledger must retain consumed operations. Existing recovery is limited to the original still-active run, first attempt and unexpired approval/token. After job exit, uncertainty requires owner reconciliation; this packet does not implement cross-job recovery. Never share the portfolio financial database or retry an uncertain publication.
+
+## Remaining deployment evidence
 
 Before deployment, complete the selected Neon pilot evidence: network reachability from Actions, verified direct application TLS, role ownership, bounded connect/statement timeouts, backup/restart behavior and DB/host clock behavior. The isolated schema/role checks do not substitute for these deployment checks. This source packet requires no new paid resource and approves no additional spend. No connection string or secret is included in this packet.
 
@@ -32,5 +40,7 @@ Before installation/activation, review the exact workflow, permissions, protecte
 
 ## Verification
 
-Environment identity packet: OIDC and service suites 53/53 pass; complete local publisher Node suites 154/154 pass, zero fail/skip/cancel/todo. Five added tests exercise signed environment success and rejection matrices. Existing ref-profile host, preflight and recovery fixtures pass unchanged. No live APIs or database were used. Exact-head CI and independent Claude review remain pending for this source packet.
+Environment identity packet: OIDC and service suites 53/53 pass; complete local publisher Node suites 154/154 pass, zero fail/skip/cancel/todo. The CI bridge directly includes OIDC/service suites and passed 109/109 before the Actions composition additions. PR784 source was independently reviewed and merged after exact-head CI. Existing ref-profile fixtures remain supported.
+
+The Actions adapter and bootstrap tests use synthetic transports, signed test tokens and injected database pools. The root CI bridge includes all three new suites. They are not evidence of a real token endpoint, database connection, protection configuration or live publication. Exact-head CI and independent review for the Actions composition are separate pending gates.
 
