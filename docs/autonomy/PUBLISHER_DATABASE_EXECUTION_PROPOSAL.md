@@ -92,6 +92,43 @@ selected path because automatic privileged membership would violate this profile
 This procedure is proposed and unexecuted; no administrator username, credential,
 CA path, role OID, environment setup, or prior run history has been fabricated.
 
+The proposed administration model retains the creator's **ADMIN OPTION only on
+these three newly created roles** for password maintenance. For those membership
+edges, INHERIT and SET must both be false. This is distinct from the application
+roles' restrictions: the three new roles must have zero outbound membership in
+other roles and must not acquire administrative authority. Creator maintenance
+authority is not an application credential or a runtime fallback.
+The trusted creator remains privileged: retained ADMIN OPTION can permit later
+changes to membership options, including granting itself SET/INHERIT, so their
+current false values are not a tamper-proof restriction on that administrator.
+
+Before creation, the verified PostgreSQL 16 administration session must explicitly
+verify `createrole_self_grant` is empty and inspect the creator's relevant role
+flags/capability using the linked procedure. The selected prerequisite is exactly
+`publisher_owner` as current/session user, with CREATEROLE and without SUPERUSER,
+and direct ownership of `publisher_ledger`, the publisher schema and both tables.
+These are required observations, not a claim that a session has confirmed them.
+After creation, inspect the actual
+membership edge direction and ADMIN/INHERIT/SET flags rather than assuming
+NOINHERIT controls them. Unexpected or missing required creator authority, extra
+membership, wrong flags, or unverified role identity is a stop condition; do not
+repair roles or transfer ownership silently.
+
+The role plan's concrete effective-privilege verification must return **zero
+mismatches** before LOGIN is enabled or an execution approval is requested.
+Its cardinality checks require three roles, two ordinary tables, eleven exact
+columns and 186 privilege checks. SQL errors or any GRANT warning mean STOP;
+successful COMMIT alone is insufficient. Record exactly the three expected
+incoming creator membership edges and zero outgoing new-role membership edges;
+record their actual grantor rather than guessing it.
+Identity, role flags, ownership, table/column privileges and grant options must
+be checked, not inferred from successful GRANT statements. Database TEMPORARY
+access is observed and recorded separately; it is not a reason for an automatic
+PUBLIC revoke, nor evidence that complete database isolation has been verified.
+Require three non-NULL TEMPORARY observations and include them in owner review.
+These checks remain proposed source steps until independently reviewed and
+actually executed under the separate provisioning approval.
+
 ## Protected environment and secrets
 
 After approval, configure `meridian-publisher-test` with the owner as required
@@ -204,7 +241,9 @@ in chat. A missing capability or protection remains an explicit blocker.
 
 The approval record must identify the sole-owner pause explicitly, acknowledge
 that the credentials remain write-capable beyond the SELECT-only diagnostic,
-and bind the exact reviewed workflow/source pins, role/grant procedure and
+and explicitly cover the creator's retained ADMIN OPTION on only the three
+new TEST roles, with INHERIT/SET false on those edges. The record must also
+bind the exact reviewed workflow/source pins, role/grant procedure and
 one-attempt scope. Before approval to execute, record observed role setup,
 protected-environment configuration, secret-name completion and unused workflow
 run history. Source GREEN does not establish those remaining operational facts.

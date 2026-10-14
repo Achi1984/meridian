@@ -41,13 +41,16 @@ and no grant/admin options. NOINHERIT does not replace the membership check.
 ### 1. Verify the administrator connection on the PC
 
 In Neon, independently confirm the fixed project/branch/database/endpoint above.
-Use the existing administrator's username and locally trusted CA bundle; neither
-is guessed here. Confirm `psql --version` is PostgreSQL 16. Start interactive
-psql with the following template, replacing only the administrator username and
-absolute CA bundle path with the locally verified values:
+Use the approved `publisher_owner` administrator identity and a locally verified
+CA bundle. This procedure requires that identity to own the database, publisher
+schema and both tables directly; if catalog evidence differs, stop for a revised
+grantor plan, with no SET ROLE or alternate-administrator fallback.
+Confirm `psql --version` is PostgreSQL 16. Start interactive
+psql with the following template, replacing only the absolute CA bundle path
+with the locally verified value:
 
 ```text
-psql -X -n -W -v ON_ERROR_STOP=1 "host=ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech port=5432 dbname=publisher_ledger user=VERIFIED_ADMIN_USERNAME sslmode=verify-full sslrootcert=ABSOLUTE_TRUSTED_CA_BUNDLE_PATH connect_timeout=10 options='-c search_path=pg_catalog'"
+psql -X -n -W -v ON_ERROR_STOP=1 "host=ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech port=5432 dbname=publisher_ledger user=publisher_owner sslmode=verify-full sslrootcert=ABSOLUTE_TRUSTED_CA_BUNDLE_PATH connect_timeout=10 options='-c search_path=pg_catalog'"
 ```
 
 Enter the administrator password only at the terminal password prompt. Do not
@@ -66,6 +69,41 @@ SELECT current_database(), current_user, session_user,
 Expected database `publisher_ledger`, the verified administrator for both user
 fields, search path `pg_catalog`, and PostgreSQL 16. SQL alone does not establish
 the Neon branch ID: the independent Console endpoint binding remains mandatory.
+
+Before creation and again before GRANT, run this fail-closed prerequisite block.
+An error, missing row or unexpected owner means STOP, not permission to continue:
+
+```sql
+SHOW createrole_self_grant;
+DO $precheck$
+DECLARE owner_oid oid;
+BEGIN
+  SELECT oid INTO owner_oid FROM pg_catalog.pg_roles
+    WHERE rolname='publisher_owner' AND rolcreaterole AND NOT rolsuper;
+  IF current_user <> 'publisher_owner' OR session_user <> 'publisher_owner'
+     OR owner_oid IS NULL OR current_database() <> 'publisher_ledger'
+     OR current_setting('server_version_num')::integer / 10000 <> 16
+     OR current_setting('search_path') <> 'pg_catalog'
+     OR current_setting('createrole_self_grant') <> ''
+     OR (SELECT count(*) FROM pg_catalog.pg_database
+         WHERE datname='publisher_ledger' AND datdba=owner_oid) <> 1
+     OR (SELECT count(*) FROM pg_catalog.pg_namespace
+         WHERE nspname='meridian_publisher' AND nspowner=owner_oid) <> 1
+     OR (SELECT count(*) FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+         WHERE n.nspname='meridian_publisher'
+           AND c.relname IN ('reservations','send_records')
+           AND c.relkind='r' AND c.relowner=owner_oid) <> 2 THEN
+    RAISE EXCEPTION 'Grantor, ownership, version or self-grant prerequisite failed';
+  END IF;
+END;
+$precheck$;
+```
+
+PostgreSQL 16 defaults `createrole_self_grant` to the empty string. This disables
+automatic SET/INHERIT privileges, but does **not** suppress the creator's implicit
+ADMIN OPTION on its newly created roles. Do not change this setting to force a
+pass; investigate unexpected configuration first.
 
 ### 2. Create three fresh disabled ordinary roles atomically
 
@@ -116,6 +154,34 @@ Exactly three rows are required, with every boolean false. Independently inspect
 ownership and existing effective grants before the grant proposal below. If
 there is any unexpected membership or privilege, leave the new roles NOLOGIN
 and stop for review; do not revoke provider roles or modify other principals.
+
+Also inspect both directions of every membership touching the new roles:
+
+```sql
+SELECT parent.rolname AS granted_role, member.rolname AS member_role,
+       grantor.rolname AS grantor, m.admin_option, m.inherit_option, m.set_option
+FROM pg_catalog.pg_auth_members m
+JOIN pg_catalog.pg_roles parent ON parent.oid=m.roleid
+JOIN pg_catalog.pg_roles member ON member.oid=m.member
+JOIN pg_catalog.pg_roles grantor ON grantor.oid=m.grantor
+WHERE parent.rolname IN ('meridian_test_reservation','meridian_test_sender','meridian_test_reader')
+   OR member.rolname IN ('meridian_test_reservation','meridian_test_sender','meridian_test_reader')
+ORDER BY granted_role, member_role, grantor;
+```
+
+Expected: exactly three rows, one for each new `granted_role`, with
+`member_role=publisher_owner`, ADMIN true, INHERIT false, SET false. Record the
+actual grantor as non-secret evidence; PostgreSQL's implicit creator grant may
+be recorded as granted by its bootstrap superuser rather than the creator.
+There must be **zero** rows in which a new role is `member_role`. Missing or extra
+rows, a different member, or different option flags mean STOP. This incoming
+administrator authority lets `publisher_owner` maintain passwords; it does not
+give the new roles membership in `publisher_owner`. Retaining precisely that
+creator ADMIN authority is part of the proposed owner-approved provisioning
+scope. It is not automatically revoked, expanded or granted to other operators.
+The creator can use its ADMIN authority to grant itself SET/INHERIT later;
+their current false values prevent accidental use, not administrator compromise.
+This procedure does not claim isolation from the administrator.
 
 ### 3. Set SCRAM passwords interactively and hand them to GitHub
 
@@ -197,7 +263,8 @@ guessing. Close the administrator session with `\q` when finished.
 ## Reviewable grant proposal
 
 Prerequisites: the three new roles have no pre-existing object privileges or
-memberships; canonical tables and enabled guards exist under an independent
+outbound memberships; only the verified incoming creator ADMIN grants described
+above are retained. Canonical tables and enabled guards exist under an independent
 owner; effective PUBLIC grants do not widen this matrix. The administrator must
 connect to the exact branch/database above. These additive grants do not remove
 old or inherited privileges and therefore are not a repair script.
@@ -246,6 +313,109 @@ the canonical invoker-security functions and their `search_path=pg_catalog`.
 This block grants no function EXECUTE, schema CREATE, DELETE, TRUNCATE, REFERENCES,
 TRIGGER, sequence permissions, role membership or ownership.
 
+**Any GRANT warning is STOP**, including a warning about a privilege not granted.
+`ON_ERROR_STOP` does not turn server warnings into errors and does not establish
+that every requested grant was applied. Record the non-secret warning, keep roles
+NOLOGIN and reconcile; do not continue merely because COMMIT succeeded.
+
+### Mandatory post-GRANT matrix verification
+
+Run the following as the same verified `publisher_owner`, before LOGIN. Expected
+output is **zero mismatch rows**; any SQL error also means STOP. It checks effective
+permissions, not only explicit ACL text. The cardinality and column-name checks
+make absent roles, missing objects and unexpected columns failures rather than
+an empty-result success. It does not replace the separate ownership and
+membership queries above.
+
+```sql
+WITH
+wanted_roles(role_name,lane) AS (VALUES
+ ('meridian_test_reservation','reservation'),('meridian_test_sender','sender'),
+ ('meridian_test_reader','reader')),
+roles AS (SELECT w.*,r.oid FROM wanted_roles w
+ LEFT JOIN pg_catalog.pg_roles r ON r.rolname=w.role_name),
+wanted_tables(table_name) AS (VALUES ('reservations'),('send_records')),
+tables AS (SELECT w.table_name,c.oid,c.relkind FROM wanted_tables w
+ LEFT JOIN pg_catalog.pg_namespace n ON n.nspname='meridian_publisher'
+ LEFT JOIN pg_catalog.pg_class c ON c.relnamespace=n.oid AND c.relname=w.table_name),
+wanted_columns(table_name,column_name) AS (VALUES
+ ('reservations','operation_key'),('reservations','intent_sha256'),
+ ('reservations','body_sha256'),('reservations','run_id'),
+ ('reservations','run_attempt'),('reservations','status'),
+ ('reservations','comment_id'),('reservations','created_at'),
+ ('send_records','operation_key'),('send_records','comment_id'),('send_records','created_at')),
+columns AS (SELECT t.table_name,t.oid,a.attnum,a.attname AS column_name
+ FROM tables t JOIN pg_catalog.pg_attribute a ON a.attrelid=t.oid
+ WHERE a.attnum>0 AND NOT a.attisdropped),
+column_matrix AS (
+ SELECT r.role_name,r.lane,r.oid AS role_oid,w.table_name,w.column_name,c.oid AS table_oid,c.attnum,p.privilege,
+  CASE WHEN p.privilege='SELECT' THEN w.table_name='reservations' OR r.lane<>'reservation'
+       WHEN p.privilege='INSERT' THEN
+         (r.lane='sender' AND w.table_name='send_records') OR
+         (r.lane='reservation' AND w.table_name='reservations'
+          AND w.column_name IN ('operation_key','intent_sha256','body_sha256','run_id','run_attempt','status'))
+       WHEN p.privilege='UPDATE' THEN w.table_name='reservations' AND
+         ((r.lane='reservation' AND w.column_name IN ('status','comment_id')) OR
+          (r.lane='sender' AND w.column_name='created_at'))
+       ELSE false END AS expected
+ FROM roles r CROSS JOIN wanted_columns w
+ LEFT JOIN columns c ON c.table_name=w.table_name AND c.column_name=w.column_name
+ CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) p(privilege)),
+checks(role_name,target,privilege,expected,actual,grant_option) AS (
+ SELECT r.role_name,'database publisher_ledger',p.privilege,p.privilege='CONNECT',
+  CASE WHEN r.oid IS NOT NULL THEN pg_catalog.has_database_privilege(r.oid,'publisher_ledger',p.privilege) END,
+  CASE WHEN r.oid IS NOT NULL THEN pg_catalog.has_database_privilege(r.oid,'publisher_ledger',p.privilege||' WITH GRANT OPTION') END
+ FROM roles r CROSS JOIN (VALUES ('CONNECT'),('CREATE')) p(privilege)
+ UNION ALL
+ SELECT r.role_name,'schema meridian_publisher',p.privilege,p.privilege='USAGE',
+  CASE WHEN r.oid IS NOT NULL THEN pg_catalog.has_schema_privilege(r.oid,'meridian_publisher',p.privilege) END,
+  CASE WHEN r.oid IS NOT NULL THEN pg_catalog.has_schema_privilege(r.oid,'meridian_publisher',p.privilege||' WITH GRANT OPTION') END
+ FROM roles r CROSS JOIN (VALUES ('USAGE'),('CREATE')) p(privilege)
+ UNION ALL
+ SELECT r.role_name,'table '||t.table_name,p.privilege,
+  CASE WHEN p.privilege='SELECT' THEN t.table_name='reservations' OR r.lane<>'reservation'
+       WHEN p.privilege='INSERT' THEN r.lane='sender' AND t.table_name='send_records' ELSE false END,
+  CASE WHEN r.oid IS NOT NULL AND t.oid IS NOT NULL THEN pg_catalog.has_table_privilege(r.oid,t.oid,p.privilege) END,
+  CASE WHEN r.oid IS NOT NULL AND t.oid IS NOT NULL THEN pg_catalog.has_table_privilege(r.oid,t.oid,p.privilege||' WITH GRANT OPTION') END
+ FROM roles r CROSS JOIN tables t
+ CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(privilege)
+ UNION ALL
+ SELECT role_name,'column '||table_name||'.'||column_name,privilege,expected,
+  CASE WHEN role_oid IS NOT NULL AND table_oid IS NOT NULL AND attnum IS NOT NULL THEN pg_catalog.has_column_privilege(role_oid,table_oid,attnum,privilege) END,
+  CASE WHEN role_oid IS NOT NULL AND table_oid IS NOT NULL AND attnum IS NOT NULL THEN pg_catalog.has_column_privilege(role_oid,table_oid,attnum,privilege||' WITH GRANT OPTION') END
+ FROM column_matrix),
+mismatches AS (
+ SELECT role_name,target,privilege FROM checks
+ WHERE actual IS DISTINCT FROM expected OR grant_option IS DISTINCT FROM false
+ UNION ALL SELECT '*','cardinality','roles/tables/columns/checks'
+ WHERE (SELECT count(oid) FROM roles)<>3
+    OR (SELECT count(*) FROM tables WHERE oid IS NOT NULL AND relkind='r')<>2
+    OR (SELECT count(*) FROM columns)<>11 OR (SELECT count(*) FROM checks)<>186
+ UNION ALL SELECT '*','column inventory','unexpected/missing'
+ WHERE EXISTS (SELECT table_name,column_name FROM columns
+               EXCEPT SELECT table_name,column_name FROM wanted_columns)
+    OR EXISTS (SELECT table_name,column_name FROM wanted_columns
+               EXCEPT SELECT table_name,column_name FROM columns))
+SELECT * FROM mismatches ORDER BY role_name,target,privilege;
+```
+
+Observe TEMPORARY separately, without treating its common PUBLIC default as an
+automatic denial or permission to revoke PUBLIC. This query must produce exactly
+three non-NULL observations; include them in the owner review:
+
+```sql
+SELECT r.rolname,
+ pg_catalog.has_database_privilege(r.oid,'publisher_ledger','TEMPORARY') AS temporary,
+ pg_catalog.has_database_privilege(r.oid,'publisher_ledger','TEMPORARY WITH GRANT OPTION') AS temporary_grant
+FROM pg_catalog.pg_roles r
+WHERE r.rolname IN ('meridian_test_reservation','meridian_test_sender','meridian_test_reader')
+ORDER BY r.rolname;
+```
+
+TEMPORARY values are explicitly outside the zero-mismatch matrix. They require
+owner review before activation, not automatic broad revocation or a universal
+least-privilege claim.
+
 ## Effective privilege and PUBLIC review
 
 Inspect direct, inherited and PUBLIC permissions, database CONNECT/CREATE,
@@ -293,6 +463,8 @@ and guards remain the canonical definitions.
 
 - [PostgreSQL 16 GRANT](https://www.postgresql.org/docs/16/sql-grant.html)
 - [PostgreSQL 16 CREATE ROLE](https://www.postgresql.org/docs/16/sql-createrole.html)
+- [PostgreSQL 16 creator self-grant defaults](https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-CREATEROLE-SELF-GRANT)
+- [PostgreSQL 16 membership catalog](https://www.postgresql.org/docs/16/catalog-pg-auth-members.html)
 - [PostgreSQL 16 psql password command](https://www.postgresql.org/docs/16/app-psql.html)
 - [PostgreSQL 16 password encryption](https://www.postgresql.org/docs/16/runtime-config-connection.html#GUC-PASSWORD-ENCRYPTION)
 - [Neon SQL-created roles versus Console/API roles](https://neon.com/docs/manage/roles#manage-roles-with-sql)
