@@ -81,4 +81,36 @@ class EvidenceTests(unittest.TestCase):
   c,a,e,p=fixture();a['findings']=[{'severity':'advisory','text':'x'*513}]
   with self.assertRaises(ValueError):produce(c,a,e,p)
 
+class NegativePublicationTests(unittest.TestCase):
+ def candidate(self):
+  c,a,e,p=fixture();c['verdict']='REVISION_REQUIRED'
+  a['findings']=[{'severity':'blocking','text':'COMPATIBILITY-ONLY SUPPLIED TEST DATA. No checks executed.'}]
+  for row in a['checks']:row.update(status='not_executed',executed=False,exitCode=None,evidenceSha256=None)
+  return c,a,e,p
+ def prepare(self,body,e,p,digest=None):
+  return contract.prepare_negative_publication(body,json.dumps(e),json.dumps(p),digest or contract.hashlib.sha256(body.encode()).hexdigest())
+ def test_preserves_exact_bytes_and_false_authority(self):
+  c,a,e,p=self.candidate();body=produce(c,a,e,p)
+  r=self.prepare(body,e,p);self.assertEqual(r['body'],body);self.assertEqual(r['verdict'],'REVISION_REQUIRED')
+  for flag in contract.FLAGS:self.assertIs(r[flag],False)
+  with self.assertRaisesRegex(ValueError,'PUBLICATION_BODY_MISMATCH'):self.prepare(body+'\n',e,p,r['bodySha256'])
+ def test_no_wrapper_repair_or_green(self):
+  c,a,e,p=self.candidate();body=produce(c,a,e,p)
+  for wrapped in ['Claude finished\n'+body,'```json\n'+body+'\n```']:
+   with self.assertRaises(ValueError):self.prepare(wrapped,e,p)
+  c,a,e,p=fixture()
+  with self.assertRaisesRegex(ValueError,'PUBLICATION_NEGATIVE_ONLY'):self.prepare(produce(c,a,e,p),e,p)
+ def test_complete_unexecuted_policy_required_even_for_negative(self):
+  c,a,e,p=self.candidate();a['checks'].pop()
+  with self.assertRaisesRegex(ValueError,'PUBLICATION_COMPLETE_POLICY'):self.prepare(produce(c,a,e,p),e,p)
+  for status,exit_code in [('passed',0),('failed',1)]:
+   c,a,e,p=self.candidate();a['checks'][0].update(status=status,executed=True,exitCode=exit_code,evidenceSha256='e'*64)
+   with self.assertRaisesRegex(ValueError,'PUBLICATION_UNEXECUTED_ONLY'):self.prepare(produce(c,a,e,p),e,p)
+ def test_marker_and_trigger_guards(self):
+  c,a,e,p=self.candidate();a['findings'][0]['text']='Ordinary negative assessment'
+  with self.assertRaisesRegex(ValueError,'PUBLICATION_TEST_MARKER'):self.prepare(produce(c,a,e,p),e,p)
+  for text in [' @Claude',' cross_model_request']:
+   c,a,e,p=self.candidate();a['findings'][0]['text']+=text
+   with self.assertRaisesRegex(ValueError,'PUBLICATION_TRIGGER_FORBIDDEN'):self.prepare(produce(c,a,e,p),e,p)
+
 if __name__=='__main__':unittest.main(verbosity=2)
