@@ -40,12 +40,28 @@ The result kind is `INACTIVE_DATABASE_READINESS_RESULT`. Its outcomes distinguis
 
 | Dedicated role | Reservations | Send records |
 | --- | --- | --- |
-| Ledger | Table SELECT/INSERT; column UPDATE only `status`, `comment_id` | No table or column access |
+| Ledger | Table SELECT; column INSERT only the six receipt fields listed below; column UPDATE only `status`, `comment_id` | No table or column access |
 | Sender writer | Table SELECT; column UPDATE only `created_at` | Table SELECT/INSERT; no UPDATE |
 | Confirmation reader | Table SELECT; no writes | Table SELECT; no writes |
 
-All three require database CONNECT and publisher-schema USAGE. This matrix
-follows the canonical fixtures and integration role setup. The sender's narrow
+The ledger's exact INSERT columns are `operation_key`, `intent_sha256`,
+`body_sha256`, `run_id`, `run_attempt`, and `status`. Table-wide INSERT must be
+false; INSERT on `created_at` and `comment_id` must also be false. The database
+default supplies the reservation timestamp. Combined with UPDATE only on
+`status` and `comment_id`, this supports both fresh receipt acquisition and
+terminal settlement without permitting caller-supplied timestamps.
+
+This is the intended receipt-safe deployment profile, not a claim about installed
+roles. No actual dedicated Neon role credentials have been provisioned for this
+profile. The legacy `publication-postgres-integration.mjs` app role grants
+table-wide INSERT, and the ledger fixture's older comment describes that broader
+profile. Neither is the receipt-safe deployment authority. The dedicated
+`publication-reservation-receipt-integration.mjs` role grants the six columns and
+tests rejection of explicit `created_at` INSERT/UPDATE. The reservation trigger
+does not reject a caller-supplied timestamp during INSERT; its later immutability
+checks do not substitute for these narrower INSERT privileges.
+
+All three require database CONNECT and publisher-schema USAGE. The sender's narrow
 UPDATE grant supports `SELECT FOR UPDATE`; it is not permission to change the
 reservation's timestamp under the reviewed trigger contract.
 The query also requires effective CONNECT, denies CREATE on the current database,
@@ -73,10 +89,21 @@ matching only a configured role name proves nothing about its grants.
 
 ## Transport and time limits
 
+The revised pool contract pins `search_path=pg_catalog` at connection startup;
+the readiness evidence must require that exact setting. Qualified catalog
+functions alone do not prevent an explicitly reordered search path from changing
+unqualified operator/type resolution. This is a startup configuration and fixed
+catalog check, not a diagnostic SET command or permission to modify roles.
+
 Use `pg_stat_ssl` only for `pid = pg_backend_pid()`. A positive result establishes
 encryption for that PostgreSQL backend; it does not independently prove the
 client checked certificate trust, hostname, or SNI, especially across a proxy.
 Retain the pool adapter's verified TLS configuration and separate TLS diagnostic.
+The separately approved fixed-endpoint probe succeeded in run `38596478549`,
+job `115964404663`, at `2026-10-14T16:15:19.9994384Z` after PR #786 merge
+`62e6efb809078aec52fad68d4b5a2057ffc2325d`. Its allowance is consumed. This
+point-in-time transport result does not establish database credentials/grants
+or authorize a fresh readiness connection.
 
 Read effective server `statement_timeout` and `lock_timeout` values with their
 units; PostgreSQL may render equivalent settings in different textual forms.
@@ -117,7 +144,8 @@ not by itself prove the driver released all sockets or cancelled server work.
 - [PostgreSQL 16 timeout settings](https://www.postgresql.org/docs/16/runtime-config-client.html)
 - [PostgreSQL SSL statistics](https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-SSL-VIEW)
 
-Static review of `publication-database-readiness.mjs` found its effective
-table/column matrix consistent with the stated PostgreSQL 16 scope. No real SQL
+Initial static review missed the legacy-versus-receipt INSERT distinction; the
+corrected intended matrix above must be enforced by the revised readiness source
+and tests before accepting that source's review. No real SQL
 parsing/execution, credentials, or database probe formed part of that review.
 Requirements and synthetic results are not evidence of deployment readiness.

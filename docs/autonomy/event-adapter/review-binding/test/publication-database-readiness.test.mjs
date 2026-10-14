@@ -9,11 +9,11 @@ function fixture(){
  const config={host:'ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech',database:'synthetic_test',
   reservation:{user:'reservation_role',password:'reservation-test'},senderRecord:{user:'sender_role',password:'sender-test'},
   sendRecordRead:{user:'reader_role',password:'reader-test'}};
- const allowed={reservation:{reservations:['SELECT','INSERT'],send_records:[]},
+ const allowed={reservation:{reservations:['SELECT'],send_records:[]},
   senderRecord:{reservations:['SELECT'],send_records:['SELECT','INSERT']},sendRecordRead:{reservations:['SELECT'],send_records:['SELECT']}};
  const updates={reservation:['status','comment_id'],senderRecord:['created_at'],sendRecordRead:[]};
  const evidence=Object.fromEntries(roles.map(role=>[role,{currentUser:config[role].user,sessionUser:config[role].user,
-  database:config.database,serverVersion:160004,roleFlags:{superuser:false,createDb:false,createRole:false,replication:false,bypassRls:false},
+  database:config.database,searchPath:'pg_catalog',serverVersion:160004,roleFlags:{superuser:false,createDb:false,createRole:false,replication:false,bypassRls:false},
   membership:false,databaseOwner:false,securityDefiner:false,databasePrivileges:{connect:true,connectGrant:false,create:false,createGrant:false},
   schema:{owner:false,usage:true,create:false,usageGrant:false,createGrant:false},
   tls:{ssl:true,version:'TLSv1.3',bits:256},
@@ -21,7 +21,7 @@ function fixture(){
   tables:Object.keys(cols).map(name=>({name,kind:'r',owner:false,rowSecurity:false,forceRowSecurity:false,
    privileges:Object.fromEntries(privileges.map(p=>[p,{allowed:allowed[role][name].includes(p),grant:false}])),
    columns:cols[name].map(column=>({name:column,privileges:Object.fromEntries(colPrivileges.map(p=>[p,{
-    allowed:allowed[role][name].includes(p)||(name==='reservations'&&p==='UPDATE'&&updates[role].includes(column)),grant:false}]))}))}))}]));
+    allowed:allowed[role][name].includes(p)||(name==='reservations'&&role==='reservation'&&p==='INSERT'&&['operation_key','intent_sha256','body_sha256','run_id','run_attempt','status'].includes(column))||(name==='reservations'&&p==='UPDATE'&&updates[role].includes(column)),grant:false}]))}))}))}]));
  const opened=[],queries=[],closed=[];
  let handler=async(role)=>({rowCount:1,rows:[{evidence:evidence[role]}]}),endHandler=async()=>{};
  class Pool{
@@ -152,4 +152,24 @@ test('deadline during otherwise successful cleanup cannot report passed',async t
  t.mock.timers.enable({apis:['setTimeout']});
  const work=createPublicationDatabaseReadiness(s.config,{Pool:s.Pool,timeoutMs:100})();
  await ready;t.mock.timers.tick(100);finish();assert.equal((await work).outcome,'INDETERMINATE');
+});
+test('reservation INSERT is restricted to six input columns and excludes database timestamp and comment id',async()=>{
+ const s=fixture(),reservation=s.evidence.reservation.tables[0];
+ assert.equal(reservation.privileges.INSERT.allowed,false);
+ assert.deepEqual(reservation.columns.filter(c=>c.privileges.INSERT.allowed).map(c=>c.name),
+  ['operation_key','intent_sha256','body_sha256','run_id','run_attempt','status']);
+ assert.equal((await createPublicationDatabaseReadiness(s.config,{Pool:s.Pool})()).outcome,'SCOPED_READ_ONLY_CHECKS_PASSED');
+ for(const edit of [e=>e.tables[0].privileges.INSERT.allowed=true,
+  ...['created_at','comment_id'].map(name=>e=>e.tables[0].columns.find(c=>c.name===name).privileges.INSERT.allowed=true),
+  ...['operation_key','intent_sha256','body_sha256','run_id','run_attempt','status'].map(name=>e=>e.tables[0].columns.find(c=>c.name===name).privileges.INSERT.allowed=false)]){
+  const x=fixture();edit(x.evidence.reservation);
+  assert.equal((await createPublicationDatabaseReadiness(x.config,{Pool:x.Pool})()).outcome,'SCOPED_CHECKS_FAILED');
+ }
+});
+test('search path must be exactly pg_catalog with missing null or hostile path rejected',async()=>{
+ assert.ok(DATABASE_READINESS_SQL.includes("'searchPath',pg_catalog.current_setting('search_path')"));
+ for(const value of [undefined,null,'public','"$user", public','pg_catalog, public','public, pg_catalog','pg_temp, pg_catalog','PG_CATALOG']){
+  const s=fixture();if(value===undefined)delete s.evidence.reservation.searchPath;else s.evidence.reservation.searchPath=value;
+  assert.equal((await createPublicationDatabaseReadiness(s.config,{Pool:s.Pool})()).outcome,'SCOPED_CHECKS_FAILED');
+ }
 });

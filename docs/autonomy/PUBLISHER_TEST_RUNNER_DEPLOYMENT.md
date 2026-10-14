@@ -5,9 +5,12 @@ provisioning, database modification, publication, merge, or trading activation i
 authorized by this document. Future workflow path:
 `.github/workflows/meridian-negative-publisher.yml`.
 
-PR #786 TLS diagnostic has green CI and review at this checkpoint; installation
-and an actual network probe are not approved. Synthetic tests do not establish
-Neon reachability, certificate trust in the eventual runner, or cold-start latency.
+TLS PR #786 merged at `62e6efb809078aec52fad68d4b5a2057ffc2325d`.
+Approved owner-run `38596478549`, job `115964404663`, main/attempt 1, succeeded
+at `2026-10-14T16:15:19.9994384Z`, verifying certificate and hostname for the
+fixed test endpoint. That probe allowance is consumed; it does not authorize a
+rerun. It supplies point-in-time TLS evidence, not database-role readiness,
+credential provisioning, publication approval, or measured cold-start behavior.
 
 ## Trust and acquisition order
 
@@ -88,6 +91,10 @@ object, **not** the approved manifest and never a log/artifact payload.
 - TLS requires certificate trust and hostname verification, explicit SNI and TLS
   1.2 minimum. Bounds are 1.5 s connect, 2 s statement, 2.5 s query, 1 s lock,
   and 2 s pool closure. These are failure bounds, not measured latency claims.
+- The revised pool startup contract pins `search_path=pg_catalog` through its
+  trusted startup options. The corresponding readiness check must observe that
+  exact value. Schema-qualified function names alone do not pin unqualified
+  operator/type resolution; a role/database-default search path is not trusted.
 - Install and pin the separately reviewed Node/pg runtime and Python 3 environment
   through a future approved deployment. Include the Python planner and its local
   dependencies. Importing the source modules must remain inert.
@@ -104,9 +111,18 @@ the successful operations below. The observed integration contract is:
 
 | Role | Required operation surface |
 | --- | --- |
-| Reservation/ledger | SELECT and INSERT on `meridian_publisher.reservations`; UPDATE only `status`, `comment_id` |
+| Reservation/ledger | SELECT on reservations; INSERT only `operation_key`, `intent_sha256`, `body_sha256`, `run_id`, `run_attempt`, `status`; UPDATE only `status`, `comment_id` |
 | Sender record | SELECT on reservations; UPDATE only `created_at`; SELECT and INSERT on `meridian_publisher.send_records` |
 | Record reader | SELECT on reservations and send records |
+
+For the ledger role, table-wide INSERT and column INSERT on `created_at` or
+`comment_id` must be denied. This is the receipt-safe deployment contract: use
+the six-column grant exercised by the receipt integration, with the two-column
+settlement UPDATE grant. The older general integration role/table-INSERT fixture
+comment is a legacy test profile, not permission to widen this contract. INSERT
+must leave the timestamp to its database default; the reservation trigger alone
+does not prevent insertion of a supplied timestamp. Actual dedicated Neon role
+credentials for this profile remain unprovisioned.
 
 All need the corresponding database CONNECT/schema USAGE. No role should obtain
 admin, schema ownership, DELETE/TRUNCATE, broad UPDATE, or financial database

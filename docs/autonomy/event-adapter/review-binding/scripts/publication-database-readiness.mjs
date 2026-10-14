@@ -15,6 +15,7 @@ export const DATABASE_READINESS_SQL=`SELECT pg_catalog.jsonb_build_object(
   'connectGrant',pg_catalog.has_database_privilege(current_user,pg_catalog.current_database(),'CONNECT WITH GRANT OPTION'),
   'create',pg_catalog.has_database_privilege(current_user,pg_catalog.current_database(),'CREATE'),
   'createGrant',pg_catalog.has_database_privilege(current_user,pg_catalog.current_database(),'CREATE WITH GRANT OPTION')),
+ 'searchPath',pg_catalog.current_setting('search_path'),
  'serverVersion',pg_catalog.current_setting('server_version_num')::integer,
  'roleFlags',(SELECT pg_catalog.jsonb_build_object('superuser',r.rolsuper,'createDb',r.rolcreatedb,
   'createRole',r.rolcreaterole,'replication',r.rolreplication,'bypassRls',r.rolbypassrls)
@@ -75,18 +76,21 @@ function configSnapshot(config){
 }
 function tableAllowed(role,table,privilege){
  if(privilege==='SELECT')return table==='reservations'||role!=='reservation';
- return privilege==='INSERT'&&(role==='reservation'&&table==='reservations'||role==='senderRecord'&&table==='send_records');
+ return privilege==='INSERT'&&role==='senderRecord'&&table==='send_records';
 }
 function columnAllowed(role,table,column,privilege){
  if(tableAllowed(role,table,privilege))return true;
+ if(privilege==='INSERT'&&role==='reservation'&&table==='reservations')
+  return ['operation_key','intent_sha256','body_sha256','run_id','run_attempt','status'].includes(column);
  return privilege==='UPDATE'&&table==='reservations'&&(role==='reservation'&&['status','comment_id'].includes(column)
   ||role==='senderRecord'&&column==='created_at');
 }
 function privilege(actual,allowed){shape(actual,'allowed,grant');need(actual.allowed===allowed&&actual.grant===false);}
 function validateEvidence(row,role,config){
  shape(row,'evidence');const e=row.evidence;
- shape(e,'currentUser,database,databaseOwner,databasePrivileges,membership,roleFlags,schema,securityDefiner,serverVersion,sessionUser,tables,timeouts,tls');
+ shape(e,'currentUser,database,databaseOwner,databasePrivileges,membership,roleFlags,schema,searchPath,securityDefiner,serverVersion,sessionUser,tables,timeouts,tls');
  need(e.currentUser===config[role].user&&e.sessionUser===config[role].user&&e.database===config.database);
+ need(e.searchPath==='pg_catalog');
  need(Number.isSafeInteger(e.serverVersion)&&Math.floor(e.serverVersion/10000)===16);
  shape(e.roleFlags,'bypassRls,createDb,createRole,replication,superuser');need(Object.values(e.roleFlags).every(v=>v===false));
  need(e.membership===false&&e.databaseOwner===false&&e.securityDefiner===false);
