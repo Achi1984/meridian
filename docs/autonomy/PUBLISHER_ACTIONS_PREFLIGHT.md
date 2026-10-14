@@ -2,7 +2,7 @@
 
 Historical architecture choice: 2026-10-14 12:00:02 Europe/Vienna, “Wie du es für richtig empfindest- go”, recorded in mailbox #571 comment 6165402603, initially selected GitHub Actions with a dedicated persistent Northflank PostgreSQL ledger separate from the financial DATABASE_URL.
 
-Superseding status — 2026-10-14: the owner-approved dedicated Neon Free pilot has been provisioned as project `wandering-queen-12324132`. The isolated schema/role test branch passed 20 checks; direct application TLS remains unverified. Approval/status are recorded in mailbox #571 comment 6165402603 and issue #778 comments 6168196333 and 6168230680. The Northflank financial depot remains unchanged. Provisioning and schema checks do not establish protected-environment readiness, credential readiness or live-publication authorization.
+Superseding status — 2026-10-14: the owner-approved dedicated Neon Free pilot has been provisioned as project `wandering-queen-12324132`. The isolated schema/role test branch passed 20 checks. The separately approved one-run Actions diagnostic `38596478549`, job `115964404663`, passed direct certificate/hostname-verified TLS to the fixed TEST endpoint at main `62e6efb809078aec52fad68d4b5a2057ffc2325d`. Its one-run allowance is consumed. Approval/status are recorded in mailbox #571 comments 6171875654 and 6172901597 and issue #778 comments 6168196333 and 6168230680. The Northflank financial depot remains unchanged. TLS and schema checks do not establish database login, effective deployment grants, protected-environment readiness or live-publication authorization.
 
 ## Implemented preparation
 
@@ -44,7 +44,9 @@ The complete deployment boundary and unresolved run-bound approval handoff are r
 
 ## Remaining deployment evidence
 
-Before deployment, complete the selected Neon pilot evidence: network reachability from Actions, verified direct application TLS, role ownership, bounded connect/statement timeouts, backup/restart behavior and DB/host clock behavior. The isolated schema/role checks do not substitute for these deployment checks. This source packet requires no new paid resource and approves no additional spend. No connection string or secret is included in this packet.
+The standalone database-readiness source packet and [its evidence contract](PUBLISHER_DATABASE_READINESS.md) prepare a bounded catalog check through the existing TEST pool adapter. It is separate from publisher execution and does not change the runner's admission logic. Synthetic tests are not real database evidence. An authenticated diagnostic run, credential provisioning and any remediation of grants require a concrete reviewed execution proposal; TLS-only approval does not extend to them.
+
+Before deployment, retain the dated Actions reachability/TLS evidence and complete the remaining selected Neon pilot evidence: authenticated role identity and grants, role ownership, bounded connect/statement timeouts, backup/restart behavior and DB/host clock behavior. The isolated schema/role checks do not substitute for these deployment checks. This source packet requires no new paid resource and approves no additional spend. No connection string or secret is included in this packet.
 
 Before installation/activation, review the exact workflow, permissions, protected environment and credential identity, including the expired key diagnostic. A future workflow requires separate review and owner approval; none is installed here. The exact body/target, direct owner approval, publisher run, one-attempt allowance and owner handling of uncertainty remain gates. No real publication, trading, strategy evaluation or new isolated DB run is authorized by this packet.
 
