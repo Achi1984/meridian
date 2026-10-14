@@ -49,4 +49,23 @@ The official PostgreSQL **16.10** source archive was downloaded from `https://ft
 
 Real integration remains a separate gate in a disposable environment with an ordinary unprivileged account, PostgreSQL 16, and the reviewed driver. Exercise the actual helper SQL and transaction behavior with synthetic roles/passwords. The helper checks its own backend TLS, so a local Unix socket alone is insufficient: use local TCP, a synthetic CA/server certificate, and verified TLS. A test adapter may assert the fixed production connection arguments and substitute only explicit disposable transport coordinates; do not relax production host or identity checks. Verify successful SCRAM storage and preserved role state, catalog drift rejection before writes, rollback on intermediate failure, and ambiguous commit handling. A synthetic TLS fixture does not verify Neon.
 
-No Neon connection, actual role creation, password setup, browser operation, workflow installation, or production credential access occurred for this dependency evidence. CPython 3.14 execution and real PostgreSQL integration are still outstanding.
+The local dependency investigation above made no Neon connection or production credential access. The later Codespace execution below supersedes its Python 3.14 and local PostgreSQL execution gaps; provider behavior remains unverified.
+
+## Executed Codespace evidence — 2026-10-14
+
+The existing owner-authorized blank Codespace provided ordinary CPython **3.14.2** and UID **1000**. PostgreSQL **16.10** was built from the SHA256-verified official archive above, without system installation, into `/tmp/meridian-pg16`. Build options were `--without-readline --without-zlib --without-icu --with-ssl=openssl`. No production database was contacted.
+
+The exact repository commit `2ba6cade419e91dbc4c3e54e2244d0803629398f` was checked in the test checkout. A fresh virtual environment installed the deployment lock using `pip install --require-hashes --only-binary=:all:`. The selected packages were Psycopg 3.3.6 and Psycopg Binary 3.3.6, including the locked CPython 3.14 wheel.
+
+The combined isolated unittest discovery command passed **20/20 tests** on Python 3.14.2: 18 helper tests and 2 real-driver composition tests. An earlier run on parent `f676015dcd339d72a8cdec65a456959e57e0e91f` failed three outcome subcases because its mock replaced all `sys.flags` with an incomplete object. The test-only correction preserves other interpreter flags; the production helper was unchanged.
+
+The opt-in harness `test/publisher_test_password_setup_pg16.py --run-local-pg16 --pg-bin /tmp/meridian-pg16/bin`, executed with the isolated virtual-environment Python, passed **four real PostgreSQL cases**:
+
+1. Actual SQL composition/parsing and SCRAM verifier storage for three distinct synthetic passwords containing quote/backslash syntax.
+2. Wrong approved role OID rejected before password changes.
+3. Injected second-ALTER failure rolls the transaction back, preserving prior verifiers.
+4. Commit applied but acknowledgement lost returns INDETERMINATE; no automatic retry.
+
+The harness used its own UTF8 temporary cluster, loopback-only TCP, a synthetic localhost certificate with verify-full TLS, synthetic owner/roles and canonical empty-table fixtures. It verified final OIDs/memberships, NOLOGIN and zero application rows, and stopped the temporary cluster before removal. No user secrets were requested. Roles remain NOLOGIN, so this does **not** prove successful password authentication.
+
+Remaining operational gates: independent source review, native network/cleanup deadline implementation and fault evidence, actual deployment CA provenance, independently approved real-role baseline/provisioning, owner acceptance of provider logging, and provider-specific behavior. The local TLS certificate and PostgreSQL server do not certify Neon or authorize live credentials.
