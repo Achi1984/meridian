@@ -1,7 +1,8 @@
 # Strategy lineage reconciliation — 14 October 2026
 
-**Status: PARTIAL, SOURCE-BASED RECONCILIATION; NOT A CANONICAL TRIAL LEDGER.**  
-Pinned source tree: `Achi1984/meridian@7e0b9f11b0280ec781353266c6ea57ce74134da0`.  
+**Status: PARTIAL, SOURCE-BASED RECONCILIATION; NOT A CANONICAL TRIAL LEDGER.**
+
+Pinned source tree: `Achi1984/meridian@7e0b9f11b0280ec781353266c6ea57ce74134da0`.
 Scope: H7, H5, X1, P1 and C1 identity, proposal/run separation, recorded outcomes and allocation blockers. No history, PnL, run artifact, or cumulative trial registry was independently replayed.
 
 ## Reconciled identities and allocation
