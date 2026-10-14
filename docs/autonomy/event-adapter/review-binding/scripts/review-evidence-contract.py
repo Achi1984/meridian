@@ -97,3 +97,24 @@ def produce_envelope(claim_raw,assessment_raw,expected_scope_raw,required_policy
     envelope['evidenceSha256']=digest(envelope);body=canonical(envelope)
     validate_envelope(body,expected_scope_raw,required_policy_raw)
     return body
+
+def prepare_negative_publication(body_raw,expected_scope_raw,required_policy_raw,expected_body_sha256):
+    """Offline candidate only. No publisher, actor authentication or execution.
+
+    Preserve the original bytes; never strip an action wrapper or repair JSON.
+    This stricter preparation mode does not change the general review validator.
+    """
+    checked=validate_envelope(body_raw,expected_scope_raw,required_policy_raw)
+    need(hex64(expected_body_sha256) and checked['bodySha256']==expected_body_sha256,'PUBLICATION_BODY_MISMATCH')
+    need(checked['verdict']=='REVISION_REQUIRED','PUBLICATION_NEGATIVE_ONLY')
+    policy=policy_checked(required_policy_raw)
+    checks=checked['assessment']['checks']
+    need({r['id'] for r in checks}=={r['id'] for r in policy['requiredChecks']},'PUBLICATION_COMPLETE_POLICY')
+    need(all(r['status']=='not_executed' and r['executed'] is False and
+             r['exitCode'] is None and r['evidenceSha256'] is None for r in checks),'PUBLICATION_UNEXECUTED_ONLY')
+    marker='COMPATIBILITY-ONLY SUPPLIED TEST DATA'
+    need(any(f['severity']=='blocking' and marker in f['text'] for f in checked['assessment']['findings']),'PUBLICATION_TEST_MARKER')
+    need('@claude' not in body_raw.lower() and 'CROSS_MODEL_REQUEST' not in body_raw.upper(),'PUBLICATION_TRIGGER_FORBIDDEN')
+    return {'kind':'OFFLINE_NEGATIVE_PUBLICATION_CANDIDATE','body':body_raw,
+            'bodySha256':checked['bodySha256'],'policySha256':checked['policySha256'],
+            'verdict':checked['verdict'],**{k:False for k in FLAGS}}
