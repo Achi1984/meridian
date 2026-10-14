@@ -19,7 +19,14 @@ test('inactive publisher host integration: synthetic adapters and failure paths'
  });
  assert.ifError(run.error);
  assert.equal(run.status,0,`Synthetic publisher integration failed:\n${run.stdout}\n${run.stderr}`);
- assert.match(run.stdout,/# fail 0\b|ℹ fail 0\b/);
- assert.match(run.stdout,/# tests [1-9][0-9]*\b/);
+ const total=name=>{
+  const matches=[...run.stdout.matchAll(new RegExp('^# '+name+' (\\d+)\\r?$','gm'))];
+  assert.equal(matches.length,1,`Expected one TAP ${name} total`);
+  return Number(matches[0][1]);
+ };
+ const tests=total('tests');
+ assert.ok(tests>=37,`Expected all integrated suites (at least 37 tests), received ${tests}`);
+ assert.equal(total('pass'),tests);
+ for(const name of ['fail','cancelled','skipped','todo'])assert.equal(total(name),0);
  t.diagnostic(run.stdout.split('\n').filter(line=>/^# (tests|pass|fail|skipped) /.test(line)).join('; '));
 });

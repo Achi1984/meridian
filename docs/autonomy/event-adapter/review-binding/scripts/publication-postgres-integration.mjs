@@ -5,6 +5,8 @@ import {readFileSync} from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
 import {reserve,settle} from './publication-ledger.mjs';
 import {checkSendRecords,checkSendRecordRestart} from './publication-send-record-integration.mjs';
+import {checkReservationReceipts,checkReservationReceiptRestart} from './publication-reservation-receipt-integration.mjs';
+import {checkPublicationHostPostgres,checkPublicationHostRestart} from './publication-host-postgres-integration.mjs';
 
 assert.equal(process.env.MERIDIAN_ISOLATED_DB_TEST,'YES');
 assert.equal(process.env.GITHUB_ACTIONS,'true');
@@ -75,6 +77,8 @@ try{
  }finally{client.release();}
  assert.equal((await reserve(app,binding(4))).outcome,'ACKNOWLEDGED');checks++;
  const sendRecords=await checkSendRecords({admin,app,pool,binding});checks+=sendRecords.checks;
+ const receipts=await checkReservationReceipts({admin,app,pool,binding});checks+=receipts.checks;
+ const host=await checkPublicationHostPostgres({admin,app,pool});checks+=host.checks;
  await app.end();app=null;await admin.end();admin=null;
  docker('kill','--signal','KILL',name);docker('start',name);
  admin=pool();await ready();app=pool({user:'publisher_test_role',password:'isolated-role-only'});
@@ -82,7 +86,11 @@ try{
  assert.deepEqual(rows.rows.map(r=>r.status),['CONFIRMED','RESERVED','AMBIGUOUS','RESERVED']);
  for(let n=1;n<=4;n++)assert.equal((await reserve(app,binding(n))).outcome,'NOT_ACQUIRED');
  checks++;checks+=await checkSendRecordRestart(admin,binding,sendRecords.firstCommentId);
+ checks+=await checkReservationReceiptRestart(admin,app,binding,receipts);
+ checks+=await checkPublicationHostRestart(admin,host.restartState);
  console.log(JSON.stringify({result:'PASS',checks,postgresMajor:16,
+  suites:{legacy:33,receipt:receipts.checks+1,host:host.checks+1},
+  syntheticPosts:host.syntheticPosts,actualPublications:0,
   crashRecovery:'local-container-only',productionDurability:false,sendAllowed:false}));
 }finally{
  await Promise.allSettled([app?.end(),admin?.end()]);

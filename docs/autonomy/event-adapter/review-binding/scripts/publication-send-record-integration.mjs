@@ -88,7 +88,8 @@ export async function checkSendRecords({admin,app,pool,binding}){
  }finally{await Promise.allSettled([sender?.end(),reader?.end()]);}
 }
 export async function checkSendRecordRestart(admin,binding,firstCommentId){
- const r=await admin.query('SELECT operation_key,comment_id::text AS comment_id FROM meridian_publisher.send_records ORDER BY operation_key');
+ // Assert the complete legacy suite range; other integration suites own other keys.
+ const r=await admin.query('SELECT operation_key,comment_id::text AS comment_id FROM meridian_publisher.send_records WHERE operation_key >= $1 AND operation_key <= $2 ORDER BY operation_key',[binding(100).operationKey,binding(107).operationKey]);
  assert.deepEqual(r.rows,[{operation_key:binding(100).operationKey,comment_id:String(firstCommentId)},
   {operation_key:binding(101).operationKey,comment_id:'9201'},
   {operation_key:binding(104).operationKey,comment_id:'9304'}]);
