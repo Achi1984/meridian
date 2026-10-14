@@ -212,6 +212,37 @@ These references describe capabilities, not evidence that this setup has run.
 
 ## Candidate invocation and baseline format
 
+Check the supplied local inputs without credentials first:
+
+```text
+python -I scripts/publisher_test_password_setup.py --check-inputs --baseline /ABSOLUTE/approved-role-baseline.json --ca /ABSOLUTE/verified-ca-bundle.pem
+```
+
+This mode requires neither a TTY nor the provider-logging acknowledgement. It
+never starts the supervisor, imports/connects the database driver, prompts for
+passwords or sends a network request. It reuses the strict baseline, isolated
+Linux/environment and installed driver metadata/origin checks. It loads a
+bounded PEM CA bundle through Python's SSL trust-store parser and requires at
+least one CA certificate. Only `INPUT_CHECKS_PASSED` or `INPUT_CHECKS_FAILED` is
+printed; success additionally requires exit code zero. Output failure exits
+nonzero. No file paths, OIDs, environment values or raw errors are printed.
+
+The CA must be an absolute regular-file path, not a final-component symlink,
+with at most 1 MiB of data. Nonblocking open and descriptor checks reject FIFOs
+and other special files; the read is capped even if file size changes. Existing
+baseline handling is unchanged. A real, independently approved baseline is
+still required; there is no automatic role discovery or invented OID fallback.
+
+Passing this check establishes local parsing/configuration only. It does not
+prove CA provenance, a valid Neon certificate chain, actual role/grant state,
+TTY availability, supervisor readiness, actual binary-driver loading or
+operational approval. Python SSL and Psycopg's bundled libpq/OpenSSL may
+have different behavior. Distribution metadata/origin is not full binary
+attestation. Files are not sealed by this check: no receipt/token is created,
+and no claim is made that later path substitution is impossible. Password mode
+repeats CA parsing inside its supervised setup phase before driver import and
+all secret prompts, while retaining actual driver version/origin checks there.
+
 The candidate requires explicit flags and rejects ambient `PG*`, `PSYCOPG*`,
 `OTEL_*`, `PYTHON*` and `SSL_CERT_*` variables, plus `LD_PRELOAD`,
 `LD_LIBRARY_PATH`, `OPENSSL_CONF` and `SSLKEYLOGFILE`, rather than silently
@@ -228,7 +259,7 @@ hook or already-loaded native library. The interpreter and installed site
 packages must be independently trusted and dependency hashes/provenance reviewed
 before credential entry. Rejecting loader variables inside Python cannot undo
 code loaded before interpreter startup; start from a trusted clean environment.
-Launching it still requires operational approval; the acknowledgement
+Launching password-setting mode still requires operational approval; the acknowledgement
 flag documents the operator's choice and is not a replacement for that approval.
 The following command contains no credential values:
 
@@ -259,7 +290,7 @@ renew a timer. The fixed production budgets are:
 
 | Phase | Budget | Conservative deadline outcome |
 | --- | --- | --- |
-| Driver import and version/origin checks | 15 seconds | Failed; no password entered |
+| CA parsing, driver import and version/origin checks | 15 seconds | Failed; no password entered |
 | Connect and initial catalog verification | 15 seconds | Failed; no password mutation requested |
 | Fresh verification, three changes, postcheck and commit | 30 seconds | Indeterminate, even if commit may not yet have started |
 | Rollback/close | 3 seconds | Indeterminate cleanup; no retry or rollback claim |

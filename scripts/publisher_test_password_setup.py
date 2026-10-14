@@ -2,12 +2,14 @@
 import argparse
 import ctypes
 import getpass
+import importlib.metadata
 import importlib.util
 import json
 import os
 from pathlib import Path
 import select
 import signal
+import stat
 import sys
 import sysconfig
 import termios
@@ -21,6 +23,9 @@ OWNER = 'publisher_owner'
 STATUS_OK = 'PASSWORD_SETUP_CONFIRMED'
 STATUS_FAIL = 'PASSWORD_SETUP_FAILED'
 STATUS_UNKNOWN = 'PASSWORD_SETUP_INDETERMINATE'
+INPUT_OK = 'INPUT_CHECKS_PASSED'
+INPUT_FAIL = 'INPUT_CHECKS_FAILED'
+MAX_CA_BYTES = 1024 * 1024
 PHASE_BUDGETS = {'setup': 15, 'connect': 15, 'mutation': 30, 'cleanup': 3, 'exit': 3}
 
 
@@ -267,6 +272,29 @@ def read_baseline(path):
     return validate_baseline(json.loads(path.read_text(), object_pairs_hook=unique))
 
 
+def load_ca(path):
+    """Offline PEM trust-store load only; not CA provenance or endpoint proof."""
+    if not path.is_absolute():
+        raise ValueError('ca')
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_CA_BYTES:
+            raise ValueError('ca')
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
+            content = stream.read(MAX_CA_BYTES + 1)
+    finally:
+        os.close(fd)
+    if not 0 < len(content) <= MAX_CA_BYTES:
+        raise ValueError('ca')
+    import ssl  # Password-mode invocation occurs only in supervised child SETUP.
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_verify_locations(cadata=content.decode('ascii'))
+    if context.cert_store_stats()['x509_ca'] < 1:
+        raise ValueError('ca')
+    return content
+
+
 def verify(cursor, baseline):
     cursor.execute(IDENTITY_SQL)
     rows = cursor.fetchall()
@@ -400,17 +428,33 @@ def verify_dependency_origin(module_path):
         raise ValueError('dependency origin')
 
 
+def verify_installed_dependency():
+    """Metadata/origin only; never import the database driver in the parent."""
+    spec = importlib.util.find_spec('psycopg')
+    if spec is None:
+        raise ValueError('dependency')
+    verify_dependency_origin(spec.origin)
+    if importlib.metadata.version('psycopg') != '3.3.6':
+        raise ValueError('dependency')
+
+
 def main(argv=None):
-    outcome = STATUS_FAIL
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    checking = '--check-inputs' in arguments
+    outcome = INPUT_FAIL if checking else STATUS_FAIL
     try:
-        parser = QuietParser(add_help=False)
-        parser.add_argument('--set-test-passwords', action='store_true', required=True)
-        parser.add_argument('--acknowledge-provider-logging', action='store_true', required=True)
+        parser = QuietParser(add_help=False, allow_abbrev=False)
+        modes = parser.add_mutually_exclusive_group(required=True)
+        modes.add_argument('--set-test-passwords', action='store_true')
+        modes.add_argument('--check-inputs', action='store_true')
+        parser.add_argument('--acknowledge-provider-logging', action='store_true')
         parser.add_argument('--baseline', type=Path, required=True)
         parser.add_argument('--ca', type=Path, required=True)
-        args = parser.parse_args(argv)
-        if (sys.flags.isolated != 1
-                or not sys.stdin.isatty() or not sys.stderr.isatty()
+        args = parser.parse_args(arguments)
+        if args.set_test_passwords and not args.acknowledge_provider_logging:
+            raise ValueError('acknowledgement')
+        if (sys.platform != 'linux' or sys.flags.isolated != 1
+                or (args.set_test_passwords and (not sys.stdin.isatty() or not sys.stderr.isatty()))
                 or sys.gettrace() is not None or sys.getprofile() is not None
                 or any(k.startswith(('PG', 'PSYCOPG', 'OTEL_', 'PYTHON', 'SSL_CERT_'))
                        or k in {'LD_PRELOAD', 'LD_LIBRARY_PATH', 'OPENSSL_CONF', 'SSLKEYLOGFILE'}
@@ -419,11 +463,9 @@ def main(argv=None):
         if not args.ca.is_absolute() or not args.ca.is_file() or args.ca.stat().st_size == 0:
             raise ValueError('ca')
         baseline = read_baseline(args.baseline)
-        spec = importlib.util.find_spec('psycopg')
-        if spec is None:
-            raise ValueError('dependency')
-        verify_dependency_origin(spec.origin)
+        verify_installed_dependency()
         def worker(phase):
+            load_ca(args.ca)
             import psycopg  # Child setup deadline; before any password prompt.
             verify_dependency_origin(psycopg.__file__)
             if psycopg.__version__ != '3.3.6':
@@ -431,12 +473,16 @@ def main(argv=None):
             from psycopg import sql
             psycopg.sql = sql
             return perform(baseline, args.ca, psycopg, getpass.getpass, phase)
-        outcome = supervise(worker)
+        if args.check_inputs:
+            load_ca(args.ca)
+            outcome = INPUT_OK
+        else:
+            outcome = supervise(worker)
     except BaseException:
         pass
     if not emit_status(outcome):
         return 2
-    return 0 if outcome == STATUS_OK else 2 if outcome == STATUS_UNKNOWN else 1
+    return 0 if outcome in (STATUS_OK, INPUT_OK) else 2 if outcome == STATUS_UNKNOWN else 1
 
 
 if __name__ == '__main__':

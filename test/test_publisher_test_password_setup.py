@@ -299,6 +299,10 @@ class MainGateTests(unittest.TestCase):
             stack.enter_context(patch.object(m.sys, 'flags', Flags()))
             stack.enter_context(patch.dict(m.sys.modules, {'psycopg': package}))
             spec_mock = stack.enter_context(patch('importlib.util.find_spec', return_value=SimpleNamespace(origin=package.__file__)))
+            stack.enter_context(patch('importlib.metadata.version', return_value=package.__version__))
+            # CA parsing has dedicated real-SSL tests; keep these gate tests
+            # focused on ordering and failure before prompts/mutations.
+            stack.enter_context(patch.object(m, 'load_ca', return_value=b'synthetic-ca'))
             if fault == 'missing_dependency': spec_mock.return_value = None
             origin = stack.enter_context(patch.object(m, 'verify_dependency_origin'))
             if fault == 'provenance': origin.side_effect = ValueError('secret-canary')
