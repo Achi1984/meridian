@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "MERIDIAN_STRATEGY_CAMPAIGN_DRAFT_V1",
+  "schemaVersion": "MERIDIAN_STRATEGY_CAMPAIGN_DRAFT_V2",
   "campaignId": "paper-strategy-lab-20261013",
   "status": "DRAFT",
   "sourceOnly": true,
@@ -50,7 +50,7 @@
         "Point-in-time asset universe",
         "Complete daily candles including delistings",
         "Independent unseen evaluation window",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Daily close above SMA200 and positive trailing 90-day return; enter after the closed signal.",
@@ -58,8 +58,9 @@
       "failureRegime": "Whipsaw and sudden trend reversal",
       "lineage": "Related to failed regime trend/breakout V1; not a validated new edge.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "TRAILING_OR_TIME"
     },
     {
       "id": "H2",
@@ -75,7 +76,7 @@
         "Original publication timestamps",
         "Revision-aware primary event records",
         "Sufficient independent matched controls",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Study a predeclared signed 24-hour excess return after first publication; no orders.",
@@ -83,8 +84,9 @@
       "failureRegime": "Announcements already priced in or correlated with market moves",
       "lineage": "New proposed event mechanism relative to inspected families; global repository novelty unverified.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "EVENT_STUDY"
     },
     {
       "id": "H3",
@@ -100,7 +102,7 @@
         "Point-in-time returns and regime inputs",
         "Borrow/perpetual instrument availability",
         "Independent feature validation",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "First validate lagged relative weakness conditional on a predefined negative market regime.",
@@ -108,8 +110,9 @@
       "failureRegime": "Weak assets rebound and relative losers still rise",
       "lineage": "Not a rescue of failed taker-flow shorts; no asset exclusions based on prior losses.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "TRAILING_OR_TIME"
     },
     {
       "id": "H4",
@@ -126,7 +129,7 @@
         "Underlying portfolio exposure",
         "Mark/index prices and funding",
         "Tail-risk baseline comparison",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Enter a capped hedge after a lagged volatility stress trigger and negative market direction.",
@@ -134,8 +137,9 @@
       "failureRegime": "Repeated hedge cost and rapid market rebound",
       "lineage": "Evaluate incremental portfolio protection, not hedge profit alone.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "TRAILING_OR_TIME"
     },
     {
       "id": "H5",
@@ -153,16 +157,17 @@
         "Stable signal versus execution timestamps",
         "Two-sided cost and funding model",
         "Independent unseen event sample",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Closed 5m move >=3 prior ATR14 and volume >=3 prior 20-bar median; within next 3 closed bars reclaim shock midpoint; reverse signs for short. Enter only afterward.",
-      "exitSketch": "Stop beyond shock extreme plus 0.25 prior ATR; thesis-supported declared target must provide planned net CRV >=3:1 after conservative costs or reject trade; maximum 6 bars; one attempt per event. The earlier 1.5R sketch is superseded, not retrospectively rescued.",
+      "exitSketch": "Proposed benchmark: stop beyond shock extreme plus 0.25 prior ATR; target the shock-bar open; maximum 6 bars; one attempt per event. Model target, stop and time exits after costs. No invented 3:1 target and no validation claim.",
       "failureRegime": "Fundamental trend resumes after temporary bounce",
       "lineage": "Distinct reversal hypothesis from failed breakout continuation; do not label liquidation or whale without actual feeds.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "FIXED_TARGET"
     },
     {
       "id": "H6",
@@ -180,7 +185,7 @@
         "Both executable order books",
         "Hedge ratio estimation without future data",
         "Leg risk and funding model",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Validate BTC/ETH residual stability first; draft 90-day hourly hedge estimate, entry residual z beyond +/-2.",
@@ -188,8 +193,9 @@
       "failureRegime": "Structural relationship break and asynchronous fills",
       "lineage": "Not an inventory grid; preregister independently and verify novelty in complete registry.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "MULTI_LEG"
     },
     {
       "id": "H7",
@@ -208,7 +214,7 @@
         "Point-in-time universe and candles",
         "Spot execution and benchmark model",
         "New independent validation of changed exposure",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Draft weekly top 3 lowest trailing 30-day volatility assets among daily close>SMA200; maximum 25% each; minimum 25% cash.",
@@ -216,8 +222,9 @@
       "failureRegime": "Low historical volatility fails during broad selloff",
       "lineage": "Separate long-only derivative of known LowVol family; frozen V2 stays unchanged and its PASS does not transfer.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "REBALANCE"
     },
     {
       "id": "H8",
@@ -236,7 +243,7 @@
         "Actual received and confirmation timestamps",
         "Licensed sufficient independent history",
         "Matched price/volume-only control",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Native external exchange transfer above prior 30-day 99.5 percentile; exclude internal transfers/mint/burn; separately test inflow-negative and outflow-positive 60-minute excess returns from actual receipt.",
@@ -244,8 +251,9 @@
       "failureRegime": "Internal relabeling, delayed alerts, transfers unrelated to trades",
       "lineage": "Not a relabeled taker-flow V1/V2; both known flow lines remain failed.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "EVENT_STUDY"
     },
     {
       "id": "H9",
@@ -262,7 +270,7 @@
         "Two-leg executable quotes",
         "Financing and capital lockup",
         "Independent basis sample",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Study executable spot/futures paired entry only when net locked basis exceeds declared full costs and buffer.",
@@ -270,8 +278,9 @@
       "failureRegime": "Margin stress, settlement mismatch and costly exit",
       "lineage": "Distinct from perpetual cross-venue funding; full-family audit still required.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "MULTI_LEG"
     },
     {
       "id": "H10",
@@ -288,7 +297,7 @@
         "Expected versus realized rates",
         "High-resolution price timestamps",
         "Cost-aware independent feature validation",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Preregister event excess returns around true venue funding timestamps using information known before settlement.",
@@ -296,8 +305,9 @@
       "failureRegime": "Expected effects arbitraged away and changing settlement conventions",
       "lineage": "Separate feature question, not a claim that existing CV2 funding research is new.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "EVENT_STUDY"
     },
     {
       "id": "H11",
@@ -316,7 +326,7 @@
         "Independent event count",
         "Point-in-time constituents",
         "Market and liquidity matched controls",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Study predeclared signed effect between first announcement and effective timestamp against matched controls.",
@@ -324,8 +334,9 @@
       "failureRegime": "Too few events, anticipatory trading and data revisions",
       "lineage": "Novelty relative to entire repository unverified; no hindsight winner selection.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "EVENT_STUDY"
     },
     {
       "id": "H12",
@@ -345,7 +356,7 @@
         "Frozen weights and point-in-time regime code",
         "Same future specialist paths for fixed-weight control",
         "No use of realized future winning strategy",
-        "Independently justified finite payoff plan satisfying planned net CRV >=3:1 after conservative costs; otherwise research-only"
+        "Separately preregistered strategy-appropriate net payoff evaluation, cost model and independent validation; unknown inputs remain research-only"
       ],
       "variants": [],
       "entrySketch": "Daily closed data: stress if 20d volatility exceeds preceding 365d 90th percentile; otherwise bull close>SMA200 and SMA50 rising over 5d, bear inverse, else range. Require 2 matching days except stress; next executable decision.",
@@ -353,8 +364,9 @@
       "failureRegime": "Regime misclassification, switching costs and shared specialist risks",
       "lineage": "Meta-allocation, not independent alpha; shadow comparison after specialist validation; one EUR10000 portfolio, not sum of test accounts.",
       "validationStatus": "UNVALIDATED",
-      "payoffPolicyId": "PLANNED_NET_CRV_MIN_3_V1",
-      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED"
+      "payoffPolicyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+      "payoffReadiness": "RESEARCH_ONLY_PAYOFF_UNVERIFIED",
+      "payoffEvaluationMode": "REBALANCE"
     }
   ],
   "purpose": "Offline source-only research register. Flags deny capabilities; this file is not an authorization mechanism.",
@@ -368,7 +380,15 @@
     "scope": "Autonomous creative strategy development, testing and bounded optimization across bull, bear, range and hybrid; robust results first. This packet performs no execution.",
     "payoffUpdate": {
       "at": "2026-10-13T18:50:00+02:00",
-      "requirement": "Planned net CRV at least 3:1 for all new candidate trades; frozen LowVol unchanged."
+      "requirement": "Planned net CRV at least 3:1 for all new candidate trades; frozen LowVol unchanged.",
+      "status": "SUPERSEDED",
+      "supersededBy": "STRATEGY_SPECIFIC_NET_PAYOFF_V2"
+    },
+    "payoffRevision": {
+      "date": "2026-10-13",
+      "exactTime": null,
+      "source": "User instruction in strategy-development conversation; universal 3:1 and mandatory 10x withdrawn, research design delegated.",
+      "requirement": "Use strategy-appropriate net payoff evaluation without universal reward:risk minimum or mandatory leverage. No execution authorization."
     }
   },
   "preregistration": {
@@ -383,9 +403,9 @@
     "pointInTimeDataVerified": null,
     "unseenEvaluationWindowVerified": null,
     "costModelValidated": null,
-    "tenTimesMarginSimulatorValidated": null,
     "independentReviewPassed": null,
-    "netPayoffContractVerified": null
+    "netPayoffContractVerified": null,
+    "instrumentSpecificMarginSimulatorValidated": null
   },
   "variantAccounting": {
     "allManualVariantsCount": true,
@@ -396,9 +416,9 @@
     "finalists": []
   },
   "blockers": [
-    "Realistic 10x margin/liquidation simulation is missing or not verified; 10x cannot be represented by multiplying returns.",
+    "Leverage is optional. Margin/liquidation simulation is missing or unverified for leveraged designs; the legacy 10x planning ceiling is not a target or authorization, and multiplying returns by leverage is invalid. This is not a margin-simulator prerequisite for unleveraged spot or non-trading event studies.",
     "No strategy implementation, data license or fresh holdout is implied by this DRAFT.",
-    "No candidate has a verified finite payoff model meeting net CRV >=3:1; family cards remain research-only. This draft validator does not enforce trades at runtime."
+    "No family has a verified strategy-appropriate payoff model or validated costs; all cards remain unvalidated research-only. This draft validator does not enforce trades at runtime."
   ],
   "validatorRequirements": [
     "Offline only: no network, remote reads, scheduler or dispatch.",
@@ -447,26 +467,33 @@
   "holdoutPolicy": "Already inspected history cannot become a new untouched holdout by resplitting, renaming, changing strategies or changing features. Record inspected scope and use independently unseen or prospectively collected data after separate authorization.",
   "optimizationObjective": "Robust constrained net outcome across regimes after execution costs, drawdowns and stability; no optimum or profitability guarantee.",
   "payoffPolicy": {
-    "policyId": "PLANNED_NET_CRV_MIN_3_V1",
-    "scope": "ALL_NEW_CANDIDATE_TRADES",
-    "minimumPlannedNetRewardRisk": 3,
-    "rewardBasis": "CONSERVATIVE_NET_TARGET_OUTCOME",
-    "riskBasis": "POSITIVE_FINITE_CONSERVATIVE_NET_STOP_LOSS",
+    "policyId": "STRATEGY_SPECIFIC_NET_PAYOFF_V2",
+    "scope": "ALL_NEW_RESEARCH_FAMILIES",
+    "universalMinimumRewardRisk": null,
+    "evaluationModes": {
+      "FIXED_TARGET": "DECLARED_TARGET_STOP_AND_FULL_EXIT_DISTRIBUTION_AFTER_COSTS",
+      "TRAILING_OR_TIME": "PATH_DEPENDENT_EXIT_DISTRIBUTION_NO_INVENTED_FINITE_TARGET",
+      "REBALANCE": "PORTFOLIO_RETURN_DRAWDOWN_TURNOVER_AND_BENCHMARK_AFTER_COSTS",
+      "MULTI_LEG": "JOINT_LEG_PAYOFF_FINANCING_MARGIN_AND_ASYNCHRONOUS_FILL_STRESS",
+      "EVENT_STUDY": "PREDECLARED_HORIZON_EXCESS_RETURN_MATCHED_CONTROLS_NO_ORDERS"
+    },
     "costs": {
-      "entry": "BOTH_TARGET_AND_STOP_OUTCOMES",
-      "exit": "SCENARIO_SPECIFIC_TARGET_AND_STOP",
-      "spread": "BOTH_TARGET_AND_STOP_OUTCOMES",
-      "slippage": "CONSERVATIVE_SCENARIO_SPECIFIC",
-      "fundingAndBorrow": "ADVERSE_HOLDING_HORIZON_BOUND",
+      "entry": "ALL_APPLICABLE_ENTRIES",
+      "exit": "ALL_ACTUAL_EXIT_PATHS",
+      "spread": "ALL_APPLICABLE_FILLS",
+      "slippage": "CONSERVATIVE_PATH_AND_STRESS_ASSUMPTIONS",
+      "fundingAndBorrow": "APPLICABLE_HOLDING_HORIZON",
       "allLegs": true,
-      "unknownCosts": "REJECT"
+      "unknownCosts": "RESEARCH_ONLY_NO_PROMOTION"
     },
     "partialExits": "QUANTITY_WEIGHTED_ALL_EXITS_INCLUDING_DECLARED_RESIDUAL",
-    "undeclaredResidual": "REJECT",
-    "unknownOrUnboundedRisk": "REJECT",
+    "undeclaredResidual": "RESEARCH_ONLY_NO_PROMOTION",
+    "unknownOrUnboundedRisk": "RESEARCH_ONLY_NO_PROMOTION",
+    "unknownOrUnsupportedModel": "RESEARCH_ONLY_NO_PROMOTION",
     "stopRelocationToQualify": "FORBIDDEN",
-    "unsupportedFinitePayoff": "RESEARCH_ONLY",
-    "exemptions": [],
+    "ratioTreatment": "DESCRIPTIVE_WHERE_MEANINGFUL_NOT_UNIVERSAL_ACCEPTANCE_OR_AUTHORITY",
+    "leverageTreatment": "OPTIONAL_DESIGN_CHOICE_LEGACY_10X_PLANNING_CEILING_NOT_TARGET_OR_AUTHORITY",
+    "promotion": "SEPARATE_REVIEWED_EVIDENCE_AND_EXPLICIT_DECISION_OUTSIDE_PACKET",
     "frozenReferenceTreatment": "UNCHANGED_OUT_OF_SCOPE",
     "evaluationStage": "DRAFT_CONTRACT_ONLY",
     "runtimeEnforcementImplemented": false
