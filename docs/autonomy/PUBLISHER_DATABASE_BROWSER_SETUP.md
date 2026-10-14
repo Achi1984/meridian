@@ -178,15 +178,23 @@ reset preserves attributes. Do not create an elevated Console role as a shortcut
 - Pin and independently review the candidate helper and dependency provenance.
 - The original offline unit tests exercise a fake adapter: they are not evidence
   of real Psycopg escaping, PostgreSQL parsing or Neon behavior. Driver/local
-  database evidence must be recorded separately. The new supervisor subprocess
-  suite exercises actual OS process boundaries; independent review must assess
+  database evidence must be recorded separately. The supervised local PG16
+  companion passed both cases (2/2) against helper source commit
+  `65ce06d982c2384ff1c8542439e10040f3ad70e3` and companion blob
+  `9e19dca3329750a05fbfc92d03a0308884975670`:
+  confirmed success, and a real commit followed by synthetic acknowledgement
+  loss returning indeterminate. Both used synthetic roles/passwords and local
+  verified TLS. This covers supervisor/driver/SQL composition, not Neon behavior,
+  real-password authentication, CLI terminal handling or operational approval.
+  The supervisor subprocess suite exercises actual OS process boundaries;
+  independent review must assess
   that evidence before approving operational deadlines.
-- Run the Python tests explicitly as a manual source-validation step:
-  `python -I -m unittest discover -s test -p test_publisher_test_password_setup.py`.
-  They are not automatically included in the repository's Node CI totals. This
-  package changes no workflow to make that claim. Record the observed manual
-  test count and result separately from GitHub CI. The supervisor tests have
-  their own explicit discovery pattern; no workflow is changed to include them.
+- The separate owner-approved Python 3.14 CI now runs the 41 scoped helper,
+  driver-composition, preflight and supervisor tests. These counts are separate
+  from Node CI totals. It excludes the opt-in PostgreSQL integration harnesses;
+  their explicitly requested runs and results remain separate evidence. Manual
+  validation uses `python -I -m unittest discover -s test -p 'test_publisher_test_password_setup*.py'`
+  with the reviewed dependencies.
 - Verify hidden-input failures, strict connection settings, wrong OID/identity,
   unexpected membership/flags, escaping, rollback and indeterminate commit
   behavior without real credentials. No real Neon mutation for implementation
