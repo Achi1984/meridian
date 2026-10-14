@@ -290,7 +290,13 @@ class MainGateTests(unittest.TestCase):
             stack.enter_context(patch.object(m.sys, 'stderr', stderr))
             stack.enter_context(patch.object(m.sys, 'gettrace', return_value=trace))
             stack.enter_context(patch.object(m.sys, 'getprofile', return_value=profile))
-            stack.enter_context(patch.object(m.sys, 'flags', SimpleNamespace(isolated=isolated)))
+            # Preserve flags used by other stdlib code (including Python 3.14
+            # argparse color handling); override only this test's isolation gate.
+            real_flags = m.sys.flags
+            class Flags:
+                def __getattr__(self, name):
+                    return isolated if name == 'isolated' else getattr(real_flags, name)
+            stack.enter_context(patch.object(m.sys, 'flags', Flags()))
             stack.enter_context(patch.dict(m.sys.modules, {'psycopg': package}))
             spec_mock = stack.enter_context(patch('importlib.util.find_spec', return_value=SimpleNamespace(origin=package.__file__)))
             if fault == 'missing_dependency': spec_mock.return_value = None
