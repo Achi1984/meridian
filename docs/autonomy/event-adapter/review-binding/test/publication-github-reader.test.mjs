@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGithubEvidenceReader,normalizeGithubEvidence} from '../scripts/publication-github-reader.mjs';
+import {createGithubEvidenceReader,normalizeGithubEvidence,createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
 const root='https://api.github.com/repos/Achi1984/meridian';
 function fixture(){
  const c={repositoryId:1342084551,ownerId:319562141,approvalCommentId:11,prNumber:770,ciRunId:22,publisherRunId:33};
@@ -55,4 +55,42 @@ test('hanging transport has bounded rejection',async()=>{
 test('already aborted caller causes no request',async()=>{
  const {c,records}=fixture(),f=fetcher(records),abort=new AbortController();abort.abort();
  await assert.rejects(createGithubEvidenceReader(c,{fetchFn:f.fn})(abort.signal),/REJECTED/);assert.equal(f.calls.length,0);
+});
+function comment(){return {id:3333,url:root+'/issues/comments/3333',issue_url:root+'/issues/571',
+ user:{id:4321,type:'Bot'},body:'original',created_at:'2026-10-14T06:00:00Z',updated_at:'2026-10-14T06:00:00Z'};}
+test('published comment uses exactly one fixed GET and returns only required fields',async()=>{
+ const raw={...comment(),extra:'discard'},f=fetcher([raw]);
+ assert.deepEqual(await createPublishedCommentReader({fetchFn:f.fn})(3333),comment());
+ assert.equal(f.calls.length,1);assert.equal(f.calls[0].url,raw.url);
+ const o=f.calls[0].options;assert.equal(o.method,'GET');assert.equal(o.redirect,'error');
+ assert.equal(o.cache,'no-store');assert.equal(o.headers.authorization,undefined);
+});
+test('invalid comment IDs and pre-abort never fetch',async()=>{
+ const f=fetcher([]),read=createPublishedCommentReader({fetchFn:f.fn});
+ for(const id of [0,-1,true,'3333','../571',1.5,Number.MAX_SAFE_INTEGER+1])await assert.rejects(read(id),/REJECTED/);
+ const abort=new AbortController();abort.abort();await assert.rejects(read(3333,abort.signal),/REJECTED/);
+ assert.equal(f.calls.length,0);
+});
+test('published comment rejects wrong identity mailbox actor and bounded fields',async()=>{
+ for(const edit of [c=>c.id++,c=>c.url+='x',c=>c.issue_url=root+'/issues/572',c=>c.user.id=0,
+ c=>c.user.type='User',c=>c.body='x'.repeat(8193),c=>delete c.created_at,c=>c.updated_at='x'.repeat(65)]){
+ const c=comment();edit(c);const f=fetcher([c]);
+ await assert.rejects(createPublishedCommentReader({fetchFn:f.fn})(3333),/REJECTED/);assert.equal(f.calls.length,1);}
+});
+test('comment transport failures never retry',async()=>{
+ for(const change of [r=>({...r,status:403}),r=>({...r,redirected:true}),r=>({...r,url:'https://evil.invalid'}),
+ r=>({...r,body:new Response('not-json').body}),r=>({...r,body:new Response('x'.repeat(131073)).body})]){
+ const f=fetcher([comment()],change);await assert.rejects(createPublishedCommentReader({fetchFn:f.fn})(3333),/REJECTED/);
+ assert.equal(f.calls.length,1);}
+});
+test('comment deadline aborts stalled transport without retry',async()=>{
+ let calls=0,signal;const start=Date.now();
+ const read=createPublishedCommentReader({fetchFn:(_url,o)=>{calls++;signal=o.signal;return new Promise(()=>{});}});
+ await assert.rejects(read(3333),/REJECTED/);assert.equal(calls,1);assert.equal(signal.aborted,true);
+ assert.ok(Date.now()-start<6500);
+});
+test('caller abort cancels an active comment read',async()=>{
+ const abort=new AbortController();let signal;
+ const read=createPublishedCommentReader({fetchFn:(_url,o)=>{signal=o.signal;queueMicrotask(()=>abort.abort());return new Promise(()=>{});}});
+ await assert.rejects(read(3333,abort.signal),/REJECTED/);assert.equal(signal.aborted,true);
 });

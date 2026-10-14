@@ -57,11 +57,7 @@ async function readOne(url,fetchFn,signal){
   return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(parts)));
  }finally{signal.removeEventListener('abort',cancel);cancel();try{reader.releaseLock();}catch{}}
 }
-export function createGithubEvidenceReader(config,{fetchFn=globalThis.fetch}={}){
- const c=checked(config),urls=endpoints(c);
- // Public API TLS supplies source authenticity. No credentials, alternate base URL
- // or caller-selected endpoints are supported by this version.
- return async function readEvidence(parentSignal){
+async function readBatch(urls,fetchFn,parentSignal){
   need(!parentSignal?.aborted);
   const abort=new AbortController();let timer,onAbort;
   const deadline=new Promise((_,reject)=>{
@@ -72,8 +68,25 @@ export function createGithubEvidenceReader(config,{fetchFn=globalThis.fetch}={})
   try{
    need(!abort.signal.aborted);
    const work=Promise.all(urls.map(url=>readOne(url,fetchFn,abort.signal)));
-   return normalizeGithubEvidence(c,await Promise.race([work,deadline]));
+   return await Promise.race([work,deadline]);
   }catch{throw new Error('GITHUB_EVIDENCE_REJECTED');}
   finally{clearTimeout(timer);parentSignal?.removeEventListener('abort',onAbort);abort.abort();}
+}
+export function createGithubEvidenceReader(config,{fetchFn=globalThis.fetch}={}){
+ const c=checked(config),urls=endpoints(c);
+ return async parentSignal=>normalizeGithubEvidence(c,await readBatch(urls,fetchFn,parentSignal));
+}
+// Public API TLS supplies source authenticity. No credentials, alternate base URL
+// or caller-selected endpoints. Exact publisher/body/calendar checks remain in service.
+export function createPublishedCommentReader({fetchFn=globalThis.fetch}={}){
+ return async function readPublishedComment(commentId,parentSignal){
+  need(positive(commentId));
+  const url=`${ROOT}/issues/comments/${commentId}`;
+  const [raw]=await readBatch([url],fetchFn,parentSignal);
+  need(raw?.id===commentId&&raw.url===url&&raw.issue_url===ROOT+'/issues/571'
+   &&positive(raw.user?.id)&&raw.user.type==='Bot'&&bounded(raw.body,8192)
+   &&bounded(raw.created_at,64)&&bounded(raw.updated_at,64));
+  return {id:raw.id,url:raw.url,issue_url:raw.issue_url,user:{id:raw.user.id,type:raw.user.type},
+   body:raw.body,created_at:raw.created_at,updated_at:raw.updated_at};
  };
 }

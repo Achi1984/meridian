@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
 import {reserve,settle} from './publication-ledger.mjs';
+import {checkSendRecords,checkSendRecordRestart} from './publication-send-record-integration.mjs';
 
 assert.equal(process.env.MERIDIAN_ISOLATED_DB_TEST,'YES');
 assert.equal(process.env.GITHUB_ACTIONS,'true');
@@ -73,13 +74,15 @@ try{
   await client.query('ROLLBACK');
  }finally{client.release();}
  assert.equal((await reserve(app,binding(4))).outcome,'ACKNOWLEDGED');checks++;
+ const sendRecords=await checkSendRecords({admin,app,pool,binding});checks+=sendRecords.checks;
  await app.end();app=null;await admin.end();admin=null;
  docker('kill','--signal','KILL',name);docker('start',name);
  admin=pool();await ready();app=pool({user:'publisher_test_role',password:'isolated-role-only'});
- const rows=await app.query('SELECT status FROM meridian_publisher.reservations ORDER BY operation_key');
+ const rows=await app.query('SELECT status FROM meridian_publisher.reservations WHERE operation_key <= $1 ORDER BY operation_key',[binding(4).operationKey]);
  assert.deepEqual(rows.rows.map(r=>r.status),['CONFIRMED','RESERVED','AMBIGUOUS','RESERVED']);
  for(let n=1;n<=4;n++)assert.equal((await reserve(app,binding(n))).outcome,'NOT_ACQUIRED');
- checks++;console.log(JSON.stringify({result:'PASS',checks,postgresMajor:16,
+ checks++;checks+=await checkSendRecordRestart(admin,binding,sendRecords.firstCommentId);
+ console.log(JSON.stringify({result:'PASS',checks,postgresMajor:16,
   crashRecovery:'local-container-only',productionDurability:false,sendAllowed:false}));
 }finally{
  await Promise.allSettled([app?.end(),admin?.end()]);

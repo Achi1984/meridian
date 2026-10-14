@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
-import {prepareAdmission,reserveAdmission} from '../scripts/publication-service.mjs';
+import {prepareAdmission,reserveAdmission,confirmPublication} from '../scripts/publication-service.mjs';
+import {createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
+import {createSendRecordReader} from '../scripts/publication-send-record.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -86,4 +88,145 @@ test('unresponsive evidence source times out before database call',async()=>{
 test('untrusted extra config and arbitrary candidate do not bypass validators',async()=>{
  const s=setup();s.config.authorized=true;
  assert.equal((await prepareAdmission(s.request,s.config,s.deps)).kind,'ADMISSION_REJECTED');assert.equal(s.calls(),0);
+});
+
+function confirmation(){
+ const s=setup();s.request.commentId=3333;
+ const root='https://api.github.com/repos/Achi1984/meridian';
+ const comment={id:3333,url:root+'/issues/comments/3333',issue_url:root+'/issues/571',
+  user:{id:4321,type:'Bot'},body:s.request.body,
+  created_at:'2026-10-14T06:00:00Z',updated_at:'2026-10-14T06:00:00Z'};
+ s.deps.readPublishedComment=async()=>comment;
+ s.deps.readSendRecord=async binding=>({...binding,commentId:3333});
+ let writes=0;
+ s.deps.pool.query=async(sql,args)=>{writes++;
+  assert.ok(sql.startsWith('UPDATE '));assert.equal(args[5],'CONFIRMED');assert.equal(args[6],3333);
+  return{rowCount:1,rows:[{operation_key:args[0],intent_sha256:args[1],status:'CONFIRMED'}]};};
+ return {...s,comment,writes:()=>writes};
+}
+test('confirmation uses real admission checks and one exact reserved-row settlement',async()=>{
+ const s=confirmation();const r=await confirmPublication(s.request,s.config,s.deps);
+ assert.equal(r.kind,'INACTIVE_CONFIRMATION_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
+ assert.equal(s.writes(),1);assert.equal(r.sendAllowed,false);assert.equal(r.provenanceVerified,false);
+});
+test('concrete GET reader composes with real admission and conditional settlement',async()=>{
+ for(const bad of [false,true]){
+  const s=confirmation();let reads=0;if(bad)s.comment.body+='changed';
+  s.deps.readPublishedComment=createPublishedCommentReader({fetchFn:async(url,options)=>{
+   reads++;assert.equal(url,s.comment.url);assert.equal(options.method,'GET');
+   return {status:200,url,redirected:false,body:new Response(JSON.stringify(s.comment)).body};
+  }});
+  const r=await confirmPublication(s.request,s.config,s.deps);assert.equal(reads,1);
+  assert.equal(r.kind,bad?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),bad?0:1);assert.equal(r.sendAllowed,false);
+ }
+});
+test('concrete database record reader composes with confirmation and missing record rejects',async()=>{
+ for(const missing of [false,true]){
+  const s=confirmation();let reads=0;
+  s.deps.readSendRecord=createSendRecordReader({query:async(_sql,args)=>{
+   reads++;return missing?{rowCount:0,rows:[]}:{rowCount:1,rows:[{
+    operation_key:args[0],intent_sha256:args[1],body_sha256:args[2],
+    run_id:String(args[3]),run_attempt:args[4],comment_id:'3333'}]};
+  }});
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(r.kind,missing?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),missing?0:1);assert.equal(reads,missing?1:2);
+ }
+});
+test('confirmation requires exact trusted sender record before comment lookup',async()=>{
+ for(const edit of [r=>null,r=>({...r,commentId:4444}),r=>({...r,runId:String(r.runId)}),
+  r=>({...r,runAttempt:2}),r=>({...r,operationKey:'a'.repeat(64)}),
+  r=>({...r,intentSha256:'b'.repeat(64)}),r=>({...r,bodySha256:'c'.repeat(64)}),r=>({...r,extra:true})]){
+  const s=confirmation();s.deps.readSendRecord=async b=>edit({...b,commentId:3333});
+  s.deps.readPublishedComment=()=>assert.fail('must not read comment');
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+ const s=confirmation();delete s.deps.readSendRecord;
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');assert.equal(s.writes(),0);
+});
+test('sender record is rechecked and its lookup binding is immutable',async()=>{
+ for(const revoked of [false,true]){
+  const s=confirmation();let reads=0,first;
+  s.deps.readSendRecord=async binding=>{
+   reads++;assert.ok(Object.isFrozen(binding));
+   if(first)assert.deepEqual(binding,first);else first={...binding};
+   return revoked&&reads===2?null:{...binding,commentId:3333};
+  };
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(reads,2);assert.equal(r.kind,revoked?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),revoked?0:1);
+ }
+});
+test('expiry during final sender-record read blocks settlement',async()=>{
+ const s=confirmation();let reads=0,time=now;s.deps.clock=()=>time;
+ s.deps.readSendRecord=async b=>{if(++reads===2)time=now+295;return {...b,commentId:3333};};
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');assert.equal(s.writes(),0);
+});
+test('stalled sender-record source is bounded before comment or settlement',async()=>{
+ const s=confirmation();let signal;s.deps.readSendRecord=(_b,sig)=>{signal=sig;return new Promise(()=>{});};
+ s.deps.readPublishedComment=()=>assert.fail('must not read comment');const start=Date.now();
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);assert.equal(signal.aborted,true);assert.ok(Date.now()-start<8000);
+});
+test('wrong comment identity actor mailbox or original bytes cannot settle',async()=>{
+ for(const edit of [c=>c.id++,c=>c.url+='x',c=>c.issue_url=c.issue_url.replace('571','572'),
+ c=>c.user.id++,c=>c.user.type='User',c=>c.body+='\n']){
+  const s=confirmation();edit(s.comment);
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+});
+test('revocation or token expiry during comment read blocks settlement',async()=>{
+ for(const mode of ['approval','run','token']){
+  const s=confirmation();let time=now;s.deps.clock=()=>time;
+  s.deps.readPublishedComment=async()=>{
+   if(mode==='approval')s.snapshot.approval.body+='revoked';
+   if(mode==='run')s.snapshot.run.status='completed';
+   if(mode==='token')time=now+295;
+   return s.comment;
+  };
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+});
+test('missing malformed calendar or edited timestamps cannot settle',async()=>{
+ for(const stamp of [undefined,'2026-02-30T06:00:00Z','0000-01-01T00:00:00Z',
+  '2026-10-14T06:00:00+00:00','2026-10-14T06:00:00.000Z','invalid']){
+  const s=confirmation();s.comment.created_at=stamp;s.comment.updated_at=stamp;
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+ const s=confirmation();s.comment.updated_at='2026-10-14T06:00:01Z';
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);
+});
+test('confirmation snapshots input and config across awaited reads',async()=>{
+ const s=confirmation();s.deps.readPublishedComment=async()=>{
+  s.request.commentId=4444;s.request.body='mutated';s.config.pinsRaw='{}';return s.comment;
+ };
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).outcome,'ACKNOWLEDGED');
+ assert.equal(s.writes(),1);
+});
+test('confirmation conflicts and lost DB replies never retry or grant authority',async()=>{
+ for(const fail of [false,true]){const s=confirmation();let calls=0;
+  s.deps.pool.query=async()=>{calls++;if(fail)throw new Error('private');return{rowCount:0,rows:[]};};
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(r.outcome,fail?'UNCERTAIN':'NOT_ACQUIRED');assert.equal(calls,1);assert.equal(r.durable,false);
+ }
+});
+test('stalled comment reader is bounded without settlement',async()=>{
+ const s=confirmation();s.deps.readPublishedComment=()=>new Promise(()=>{});const start=Date.now();
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);assert.ok(Date.now()-start<8000);
+});
+test('invalid confirmation request or forged token is rejected before comment read',async()=>{
+ for(const mode of ['id','extra','token']){const s=confirmation();
+  if(mode==='id')s.request.commentId=-1;if(mode==='extra')s.request.authorized=true;
+  if(mode==='token')s.request.token='forged';
+  s.deps.readPublishedComment=()=>assert.fail('must not read');
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
 });
