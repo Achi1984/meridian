@@ -271,7 +271,7 @@
       "sourceIds": [
         "S06"
       ],
-      "recordedStatus": "REJECTED — no Paper launch and no production execution impact.",
+      "recordedStatus": "REJECTED \u2014 no Paper launch and no production execution impact.",
       "statusLocation": "line 5",
       "familyLinks": [
         "H1"
@@ -406,7 +406,8 @@
     "Current result status documents prove recorded decisions only. Underlying workflow artifacts, full failed/discarded/manual variant lists and deduplication across stages were not independently replayed or exhaustively audited.",
     "Related strategy names do not prove economic novelty or equal candidate identity. H2/H4/H9/H10/H11/H12 have no empirical lineage reconciled in this bounded packet; this is not proof of no prior work.",
     "Read-only discovery did not establish any authoritative complete repository-wide trial registry. Per-strategy trade ledgers, preregistration docs and source registers have distinct scopes.",
-    "Earlier p1-historical-experiment-draft.json unresolved flags remain unchanged. Later schema/time adapter work does not make trialLedgerReconciled true or clear execution gates."
+    "Earlier p1-historical-experiment-draft.json unresolved flags remain unchanged. Later schema/time adapter work does not make trialLedgerReconciled true or clear execution gates.",
+    "Elliott Wave3 V1, Wave3 V2 replication and Wave5 V1 are known recorded research in supplementalLineagePointers; cumulative run/variant deduplication and budget assignment remain unresolved. Source-correction fixtures neither erase these records nor authorize another historical trial."
   ],
   "nextEvidenceRequests": [
     "Retrieve original BENCHMARK_PLAN first-tranche allocation and CROSS_MARKET_BASELINE proposed/manual candidate history at pinned refs; match named candidates before claiming remaining slots.",
@@ -455,5 +456,34 @@
       "gitBlobSha": "d275a40644c06b2fa7dd84ea685588f24cdadc4b",
       "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
     }
-  ]
+  ],
+  "supplementalLineagePointers": {
+    "addedAtStrategyCommit": "e80047ba6d8d7977a07a785e535a59df816c877b",
+    "sourcePath": "docs/strategy-lab/ELLIOTT_SOURCE_ASSESSMENT_20261014.md",
+    "status": "KNOWN_RECORDED_RESEARCH_BUDGET_ASSIGNMENT_UNRESOLVED",
+    "original18SourceAuditScopeUnchanged": true,
+    "records": [
+      {
+        "id": "ELLIOTT_WAVE3_V1",
+        "pr": 88,
+        "frozenCommit": "a1283b68419bdb2a5d22ff2b49fff5b4109354db",
+        "recordedDisposition": "FROZEN_NEAR_PASS_NOT_PROMOTED",
+        "candidateVariantCount": null
+      },
+      {
+        "id": "ELLIOTT_WAVE3_V2_REPLICATION",
+        "pr": 89,
+        "frozenCommit": "465555c16bc0d64f69ba3afe1f29fcf3fe73c6ea",
+        "recordedDisposition": "CLOSED_UNCHANGED_RULE_REPLICATION_SAMPLE_FAIL",
+        "candidateVariantCount": null
+      },
+      {
+        "id": "ELLIOTT_WAVE5_V1",
+        "pr": 90,
+        "frozenCommit": "5f30cce5fc64778c83fcb03e33edc39dc3003f0c",
+        "recordedDisposition": "REJECTED_KEEP_CLOSED",
+        "candidateVariantCount": null
+      }
+    ]
+  }
 }

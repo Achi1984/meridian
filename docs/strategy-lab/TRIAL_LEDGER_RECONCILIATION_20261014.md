@@ -80,3 +80,7 @@ Git blob SHA-1 values identify source versions; they are not dataset hashes or n
 
 The companion `trial-ledger-reconciliation-20261014.json` contains structured record classifications, source status locations, unresolved counts, preserved limits and discovered-but-unread paths.
 
+
+## Subsequent Elliott lineage supplement
+
+The original 18-source / 15-record snapshot above remains a bounded audit at its pinned commit. The companion JSON now also retains three **known, uncounted research pointers** recovered in `ELLIOTT_SOURCE_ASSESSMENT_20261014.md` at `e80047ba6d8d7977a07a785e535a59df816c877b`: PR88 Wave3 V1 (frozen near-pass), PR89 Wave3 V2 (closed unchanged-rule replication, sample failure), PR90 Wave5 V1 (rejected). These supplement the original inventory rather than retroactively expanding its asserted source-read scope. Their original exact commits are in the JSON. Underlying result artifacts and cumulative deduplication remain unverified. Three records do not establish three candidate variants; all global counts, remaining slots and completeLineageAudit remain null. See `CLAUDE_ELLIOTT_DISPOSITION_20261014.md` for the independent review and prospective comparison rules.
