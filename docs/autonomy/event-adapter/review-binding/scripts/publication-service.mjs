@@ -1,13 +1,10 @@
 // Inactive service composition. No routes, credentials, dispatch or sender.
-import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
-import {dirname} from 'node:path';
+import {planForPublication} from './publication-plan-process.mjs';
 import {createHash} from 'node:crypto';
 import {verifyPublicationToken} from './publication-oidc.mjs';
 import {reserve,settle} from './publication-ledger.mjs';
 import {retainSendRecord} from './publication-send-record.mjs';
 import {snapshotPublicationWindow,checkPublicationWindow} from './publication-time-window.mjs';
-const bridge=fileURLToPath(new URL('./publication-plan-bridge.py',import.meta.url));
 const flags={authenticated:false,provenanceVerified:false,authorized:false,
  dispatchAllowed:false,mergeAllowed:false,durable:false,sendAllowed:false};
 const hash=s=>createHash('sha256').update(s,'utf8').digest('hex');
@@ -18,14 +15,6 @@ async function boundedRead(reader){
  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(new Error('deadline'));},5000);});
  try{return await Promise.race([Promise.resolve().then(()=>reader(abort.signal)),deadline]);}
  finally{clearTimeout(timer);abort.abort();}
-}
-function planFor(body,config){
- const input=JSON.stringify({body,scopeRaw:config.scopeRaw,policyRaw:config.policyRaw,pinsRaw:config.pinsRaw});
- need(Buffer.byteLength(input)<=65536);
- const child=spawnSync('python3',['-I','-B',bridge],{input,encoding:'utf8',timeout:10000,
-  maxBuffer:32768,env:{PATH:dirname(process.execPath)+':/usr/bin:/bin',LANG:'C',LC_ALL:'C'}});
- need(!child.error&&child.status===0);const plan=JSON.parse(child.stdout);
- need(plan.kind==='OFFLINE_ACTIONS_PUBLICATION_PLAN');return plan;
 }
 function evidenceMatches(snapshot,config,plan,now){
  // Snapshot MUST come from the host's fixed authenticated readers. Comparisons
@@ -60,7 +49,7 @@ export async function prepareAdmission({token,body},trustedConfig,{readEvidence,
   need(Object.keys(config).sort().join()==='approvalUpdatedAt,expiresAt,issuedAt,ownerId,pinsRaw,policyRaw,scopeRaw,subject');
   need(Number.isSafeInteger(config.ownerId)&&config.ownerId>0&&typeof config.approvalUpdatedAt==='string');
   need(typeof body==='string'&&Buffer.byteLength(body)<=8192&&typeof token==='string'&&token.length<=16384);
-  const plan=planFor(body,config),pins=plan.intent.pins;
+  const plan=await planForPublication(body,config),pins=plan.intent.pins;
   const identity=await verifyPublicationToken(token,{repositoryId:String(pins.repositoryId),
    ownerId:String(config.ownerId),runId:String(pins.runId),controlSha:pins.controlSha,subject:config.subject},{fetchFn,clock});
   need(identity.tokenVerified===true);
