@@ -1,76 +1,64 @@
 # Paper-first evidence contract — offline advisory
 
-Status: source-only contract proposal. It is not research, trading, operational, or execution authorization.
+This source-only packet defines an evidence vocabulary and checks bounded caller-supplied structure. It grants no authorization. It does not retrieve or authenticate evidence, calculate PnL or metrics, assign edge health, rank or allocate strategies, register candidates, mutate state, or advance lifecycle. Its authority result is always `{source:'OFFLINE_ADVISORY', executionAuthorized:false, autoPromotion:false}`. Checkpoint truth and runtime gates remain enforced outside this validator.
 
-## Purpose and boundary
+## Why this is a separate contract
 
-`validate-evidence-contract.mjs` validates the shape and continuity of an explicitly supplied evidence packet. It reports whether claimed evidence is structurally complete, what is missing or invalid, and which evidence is required for the named next lifecycle stage. It does not retrieve or authenticate the referenced evidence, calculate PnL or metrics, recommend or rank strategies, allocate capital, register candidates, mutate state, or invoke a lifecycle transition. Its result always contains `executionAuthorized: false` and `autoPromotion: false`.
+- `validate-campaign.mjs` validates one fixed inert campaign draft, not evidence receipts, historical access, or cross-stage identity.
+- `paper-learning-policy.js` is a legacy Paper heuristic with fixed checkpoints and PF 99/0 coercion when losses or trades are absent. Those are scope-excluded runtime limitations; this validator neither imports nor repairs it and performs no PnL calculation.
+- `paper-edge-v1-data-contract.js` and `paper-edge-v1-state-machine.js` validate one strategy's source data and position mechanics, not shared lifecycle evidence.
+- The autonomy review-evidence envelope validates caller claims for review transport, not strategy stages or empirical evidence.
 
-This contract fills a distinct gap rather than replacing existing components:
+`validateEvidenceContract(input)` accepts one bounded JSON-like object. Accessors, cyclic/prototype-polluting or malformed objects, unknown fields/enums, nonfinite numbers, and over-bound shapes return structured invalid output without invoking accessors. No file, network, environment, scheduler, workflow, market, credential, or runtime interface is used.
 
-- `validate-campaign.mjs` checks one fixed, inert hypothesis-card draft and its denial permissions; it does not validate evidence receipts or lifecycle continuity.
-- `paper-learning-policy.js` summarizes a prospective trade phase using its existing fixed checkpoints; it is not a provenance, holdout, or lifecycle validator.
-- `paper-edge-v1-data-contract.js` and `paper-edge-v1-state-machine.js` validate or model one frozen strategy's data and position mechanics; they do not govern cross-strategy stage evidence.
-- The autonomy review-evidence contract binds a caller-supplied review envelope and explicitly leaves execution authenticity to a trusted boundary. This validator applies the same limitation to strategy evidence, without reusing its reviewer/CI-specific schema.
+## Output axes
 
-The validator accepts one bounded JSON-shaped object:
+- `lifecycle` preserves the claimed stage and receipt claims with `UNVERIFIED_CALLER_SUPPLIED` provenance.
+- `evidenceCompleteness` reports per-item `PRESENT_ASSERTED`, `MISSING`, `NOT_ASSESSED`, `FAILED`, `INCONCLUSIVE`, or `INVALID` states and counts. The strongest aggregate description is `ASSERTED_WELL_FORMED`; it is not readiness or a stage pass.
+- `edgeHealth` remains `UNKNOWN` unless a sourced measurement is supplied, and then remains `ASSERTED_UNVERIFIED`. No status is derived from metrics.
+- `operationalReadiness` is always `NOT_ASSESSED`.
+- `authority` is constant and all execution/promotion permissions are false.
 
-```text
-{
-  schemaVersion, assessmentAt,
-  checkpoint: { id, mainSha, stage, sourceOnly, flags },
-  strategy: {
-    id, version, hypothesis, entry, exit, risk, positionSizing,
-    costAssumptions, marketConditions, telemetry,
-    invalidationConditions, frozenAt, disposition
-  },
-  lifecycle: { currentStage, proposedNextStage, receipts }
-}
-```
+Hashes with valid syntax are `HASH_FORMAT_VALID_UNAUTHENTICATED`; references, timestamps, sources, and checkpoint flags are still caller assertions. `asOf` is required input, not a clock lookup. A synthetic fixture may be marked `syntheticFixture:true`, which remains visible in the result.
 
-The API is `validateEvidenceContract(input)`. It is pure and deterministic for the same input. Unknown fields and enums, non-JSON shapes, nonfinite numbers, unsafe object properties, excess nesting/size, missing required timestamps, stale data receipts, and inconsistent identity or evidence references fail closed. SHA-256 and commit-looking strings are syntax-checked only: they are caller assertions, not verified hashes, signatures, source provenance, or proof that a run occurred.
+## Lifecycle, timing and historical records
 
-## Authority and lifecycle
-
-The checkpoint must identify `MERIDIAN_LIVE_CHECKPOINT`, say `SOURCE_AUDIT`, and explicitly set every listed canonical execution, PnL, Discovery, Validation, Holdout, Paper, and Live authority flag to `false`. Missing, unknown, or contradictory checkpoint/flag data blocks readiness. Caller-supplied `true` flags cannot grant authority; even an entirely structurally complete packet can never authorize execution.
-
-The lifecycle is strictly contiguous and ordered:
+The one lifecycle vocabulary is:
 
 ```text
 IDEA → RESEARCH → BACKTEST → OUT_OF_SAMPLE_HOLDOUT → PAPER_BOT
      → FORWARD_VALIDATION → ROBUSTNESS_REVIEW → LIVE_CANDIDATE
 ```
 
-Receipts must cover every stage through `currentStage` exactly once, in order, and `proposedNextStage` must be the immediate successor. Each receipt is bound to the same strategy ID/version and has immutable-looking receipt, source, dataset, and digest references. Reusing an ID with a different digest, reusing or overlapping development data as Holdout, or changing strategy identity blocks readiness. Holdout tuning must be explicitly false. `PAPER_BOT` and `FORWARD_VALIDATION` require `FORWARD` evidence starting no earlier than the frozen strategy timestamp and after the prior forward window; all other stages require `RETROSPECTIVE` evidence. This is a structural chronology check, not a determination that data was genuinely unseen or collected prospectively.
+The roadmap mapping and external gates are in [`MERIDIAN_STAGE_ROADMAP.md`](../MERIDIAN_STAGE_ROADMAP.md). Evidence completeness at a stage does not open any checkpoint gate. `LIVE_CANDIDATE` means eligible for a separate decision only; it is not execution authority.
 
-Known frozen/failed identities (Baseline 6.2, Shadow V1, Regime V1, Elliott Wave 5, Breakout V1, taker-flow V1/V2, and regime-grid V2) and the frozen LowVol reference are not eligible for a synthetic promotion claim. Existing or retrospective strategies require explicit migration and evidence reconciliation; this contract cannot invent earlier receipts. A green synthetic fixture demonstrates only that the schema can be complete.
+Receipts are contiguous, monotonic, and bound to one strategy ID, version, and exact rules reference. Every forward receipt binds to the same frozen rules identity. Stage-specific datasets have separate IDs, hashes, roles, declared disjointness, and as-known timestamps; their hashes are not required to equal one another. Incorrect stage roles, undeclared Development/Holdout disjointness, overlapping Holdout windows, or identity mismatch are reported without rewriting claims.
 
-Evidence outcomes are `PASS`, `FAILED`, `INCONCLUSIVE`, and `NOT_ASSESSED`. Failed or inconclusive receipts block proposed-stage readiness; `NOT_ASSESSED` remains distinct and is not treated as a failure or a pass. The output separately reports evidence completeness and `READY_UNVERIFIED` (a structural advisory only), `BLOCKED`, or `NOT_ASSESSED`; terminal `LIVE_CANDIDATE` returns `NO_NEXT_STAGE`. It explicitly leaves `operationalReadiness` as `NOT_ASSESSED` and `authorityStatus` as `NOT_GRANTED`; it does not advance the lifecycle.
+`PAPER_BOT` is a `PAPER_SETUP` receipt with a frozen version and a planned observation window. Setup may be recorded before that future window ends, and carries no completed outcome or performance metrics. `FORWARD_VALIDATION` and other outcome receipts require observation end no later than recording, data availability no earlier than the end and no later than `asOf`, and a rules freeze before collection. A completion timestamp in the future is invalid.
 
-## Evidence and metric requirements
+Holdout access history distinguishes `FIRST_EXPOSURE`, `SELECTION_OR_TUNING`, `EXACT_REPRODUCTION`, `AUDIT`, `HASH_INSPECTION`, and `REUSED_FOR_NEW_HYPOTHESIS`. Selection/tuning and reuse for another hypothesis make the independence claim unavailable. Unknown history stays `UNKNOWN`. Exact reproduction, audit, and hash inspection may be recorded as `DIAGNOSTIC_ONLY`; repeated diagnostic access by itself is not contamination and cannot become fresh confirmation. Existing consumed Holdout evidence remains usable for reproduction/audit, not as new validation.
 
-Every stage receipt carries source and data references, a dated data window, availability and validity timestamps, and a freshness-policy source. Assessment after the declared `validThrough` timestamp is stale. Data timestamps and hash formats are checked, but their truth is not authenticated.
+`RETROSPECTIVE_RECONCILIATION` is an inventory annotation with explicit historical gaps. It creates no stage receipt, does not satisfy or skip a lifecycle prerequisite, and changes no thresholds or authority. Existing frozen failures and the frozen LowVol reference remain unchanged; no synthetic fixture can establish their empirical performance.
 
-Strategy definition requires an explicit hypothesis, entry, exit, position sizing, applicable market conditions, telemetry, invalidation conditions, and costs for fees, spread, slippage, funding, and borrow. A stop-based risk policy must state its stop definition. A non-stop portfolio-risk policy is allowed only when explicitly named and justified, with no invented stop.
+## Evidence fields
 
-`BACKTEST` and later stages require a complete metric set:
+Each performance outcome carries a declared sample size/unit, dependence and uncertainty approach, source/rules/data references, a timestamped data window, freshness reference, and sourced predeclared criteria. The validator checks structure and chronology, not claimed values or threshold outcomes.
 
-- net expectancy, profit factor, and drawdown;
-- Sharpe and Sortino, or an explicit reason each is inapplicable;
-- tail risk and cost/slippage sensitivity;
-- regime, time, and asset stability;
-- OOS/Holdout evidence;
-- uncertainty, sample dependence, and selection/overfitting risk.
+Declared metrics include net expectancy, profit factor, drawdown, Sharpe, Sortino, tail risk, cost/slippage sensitivity, regime/time/asset stability, uncertainty, sample dependence, and selection risk. Each metric states `APPLICABLE`, `NOT_APPLICABLE`, or `UNDEFINED`, with an explicit value or null, unit/denominator where applicable, and a reason when not assessed. Core expectancy, risk, cost, and uncertainty dimensions cannot be excused as inapplicable. Sharpe/Sortino may be inapplicable with a reason. No default zero, universal financial threshold, winner, or win-rate-only qualification is produced.
 
-Each assessed metric includes a finite value, unit, positive denominator with unit, and a stage-specific threshold with a source and predeclaration timestamp before the evidence window. The validator checks the declared comparison; it defines no universal financial cutoff. Undefined/inapplicable metrics need reasons, not zero defaults. Win rate is not a qualifying metric and cannot replace net expectancy or any required dimension. OOS/Holdout may remain explicitly `NOT_ASSESSED` before the Holdout stage; it must be assessed at that stage and thereafter.
+Stage-specific thresholds are caller-supplied through a predeclared, sourced preregistration or metric threshold assertion. No numeric threshold is invented here. Missing/undefined performance remains distinct from failure and does not count as evidence that a stage succeeded.
 
-## Evidence of this packet
+Risk policy explicitly states STOP_BASED (with stop definition and bound) or PORTFOLIO_LEVEL_NO_STOP (with justification, bound and source). The latter invents no stop and reports `PLANNED_NET_CRV_MIN_3_V1` as `NOT_APPLICABLE_NO_FINITE_TRADE_PAYOFF`, `NOT_ASSESSED`, and research-only. For other strategies, the existing fixed 3:1 CRV contract is represented as an unverified policy reference only; this validator does not import or replace its arithmetic and cannot claim it satisfied.
 
-Tests use deterministic synthetic inputs only. They do not reproduce or revalidate historical results and do not qualify any existing or proposed strategy:
+Sizing must declare its own method, unit, policy, and source. Any defaults mentioned elsewhere—EUR 10,000, futures leverage 10x, spot 1x, gross exposure 1.5x—are draft research defaults only, never approved sizing.
+
+## Verification
+
+Deterministic fixtures are synthetic schema tests only:
 
 ```sh
 node --test test/strategy-evidence-contract.test.js
 node --test test/strategy-campaign-draft.test.js
 ```
 
-No network, market fetch, PnL run, workflow, scheduler, credential, runtime activation, registration, or authority change is part of this contract.
+The candidate's returned assertions are not real historical validation, profitability evidence, operational acceptance, or authorization.
