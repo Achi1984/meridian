@@ -1,10 +1,10 @@
 # LowVol frozen-artifact receipt verification — 14 October 2026
 
-**Op-ID:** `STRATEGY-RECEIPT-VERIFICATION-20261014`  
-**Disposition:** `RECEIPTS_VERIFIED; TIMING_DOCUMENT_RECONCILIATION_OPEN; NO_PROMOTION`  
-**Audit code head:** `3c9731180898b7c65e02f094e590204c48ff78ba`  
-**Verifier SHA-256:** `69535afb17eb009fa2880a87c3cb9345dab01070bc26444044a4950157772cb5`  
-**Base/main:** `386013c1e78c4be5ea5d6c89063c9c4b8dacda66`
+- **Op-ID:** `STRATEGY-RECEIPT-VERIFICATION-20261014`
+- **Disposition:** `RECEIPTS_VERIFIED; TIMING_DOCUMENT_RECONCILIATION_OPEN; NO_PROMOTION`
+- **Audit code head:** `08aea54c5169ff7bd9c70b72206636399ef45ebc`
+- **Verifier SHA-256:** `fcc801d45e86a015c3a9b9f5037ca965494db3c4dacddce78286d9e0c60100d7`
+- **Base/main:** `386013c1e78c4be5ea5d6c89063c9c4b8dacda66`
 
 ## Executed receipt checks
 
