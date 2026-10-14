@@ -1,7 +1,7 @@
 # Frozen strategy passports — 14 October 2026
 
-**Scope:** exact existing rules only; no tuning, rescue, result transfer, or new registration.  
-**Pinned main:** [`ee7c2c7b6343fbb1564e910341b2b148c1dd94c8`](https://github.com/Achi1984/meridian/commit/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8).  
+**Scope:** exact existing rules only; no tuning, rescue, result transfer, or new registration.
+**Pinned main:** [`ee7c2c7b6343fbb1564e910341b2b148c1dd94c8`](https://github.com/Achi1984/meridian/commit/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8).
 `UNKNOWN` means the inspected source does not define the fact; it is not a default or an approval.
 
 ## Passport 1 — LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN
@@ -16,7 +16,7 @@
 | Historical gates and state | Development `DEVELOPMENT_PASS_HOLDOUT_REQUIRED`; Holdout `HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY`. Reports: Holdout 34 periods, +15.0184% compounded, stress +13.8589%, max DD 5.4217%. These are research-period returns, not annualized. Artifact/log boundaries and lack of independent ZIP reproduction are recorded in the evidence review. |
 | Failure / kill conditions | Fail closed for missing source/features/prices/funding, incomplete asset coverage, funding gap/coverage failure, degenerate rank denominator, exposure invariant error or frozen-lineage mismatch. No strategy stop-loss, take-profit, liquidation rule, or explicit operational kill-switch is specified: **UNKNOWN / not defined by this ruleset**. |
 | Risk, funding, FX, shorting | Shorting is integral: 0.5 gross short perpetual exposure. Funding is modeled from historical rates. Actual margin, collateral, liquidation, venue short limits, borrow/short availability, account-level risk cap, EUR conversion/FX, and funding/fee behavior at deployable size are **UNKNOWN / not verified**. A draft campaign’s generic 10x futures ceiling is not this strategy’s leverage setting or proof of margin feasibility. |
-| Prospective status | The separately frozen shadow protocol fixes a 2026-10-10 boundary, first eligible week ending 2026-10-17, first-12-week endpoint 2027-01-02, 12 observations and 84 elapsed days. The committed start-evidence file records a 2026-09-26 pre-start diagnostic with 0 eligible observations and says the 2026-10-10 boundary snapshot is required; that boundary snapshot is not independently evidenced here. Paper/live remain false. |
+| Prospective status | The separately frozen shadow protocol fixes a 2026-10-10 boundary, first eligible week ending 2026-10-17, first-12-week endpoint 2027-01-02, 12 observations and 84 elapsed days. Run `38125893276` persisted the immutable 2026-10-10 boundary snapshot at evidence commit `b6b72a1`: timely, 0 completed/eligible observations, no integrity failure. Later retries of the same cutoff did not overwrite it. No eligible weekly return is reported as of 14 October; Paper/live remain false. |
 
 **Applicable source documents:** [preregistration](https://github.com/Achi1984/meridian/blob/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8/research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PREREGISTRATION.md), [implementation](https://github.com/Achi1984/meridian/blob/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8/research/LOW-VOLATILITY-RANK-WEIGHTED-V2-IMPLEMENTATION.md), [prospective implementation](https://github.com/Achi1984/meridian/blob/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8/research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-SHADOW-IMPLEMENTATION.md), [prospective start evidence](https://github.com/Achi1984/meridian/blob/ee7c2c7b6343fbb1564e910341b2b148c1dd94c8/research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-EVIDENCE.md).
 
@@ -82,4 +82,3 @@ The campaign proposal is a closed 5-minute shock (≥3 prior ATR14 and ≥3× pr
 - Research gross exposure/leverage caps are not a substitute for venue margin, liquidation, borrow, short availability, portfolio-level concentration controls, or a production kill-switch.
 - A ruleset’s recorded data-cost model is not a live execution quote. Any unspecified slippage, funding, fees, taxes, FX, settlement, product access or operational control remains **UNKNOWN**.
 - The draft “Meridian Strategy Lab” name is provisional and not user-approved branding. No product rename is proposed.
-
