@@ -40,11 +40,13 @@ function reference(stage,index,disjointFrom=[]){
 }
 
 function outcome(stage,index,{status='PRESENT_ASSERTED',kind='OUTCOME',windowStart,windowEnd,availableAt,recordedAt,disjointFrom=[]}={}){
+  const dataRef=reference(stage,index,disjointFrom);
+  if(availableAt)dataRef.asKnownAt=availableAt;
   return{
     stage,kind,status,receiptRef:`receipt-${stage.toLowerCase()}`,
     recordedAt:recordedAt??time([12,22,34,44][index]??50,'12'),
     strategyId:'hypothesis-alpha',strategyVersion:'v1',rulesRef:structuredClone(rulesRef),
-    dataRef:reference(stage,index,disjointFrom),
+    dataRef,
     dataWindow:{
       start:windowStart??time([2,13,25,35][index]??40),
       end:windowEnd??time([10,20,30,40][index]??45),
@@ -95,7 +97,7 @@ function packet(){
     outcome('FORWARD_VALIDATION',2,{
       windowStart:'2025-02-01T00:00:00Z',windowEnd:'2025-02-28T00:00:00Z',
       availableAt:'2025-03-01T00:00:00Z',recordedAt:'2025-03-02T12:00:00Z',
-      disjointFrom:['dataset-holdout']
+      disjointFrom:['dataset-out_of_sample_holdout']
     }),
     outcome('ROBUSTNESS_REVIEW',3,{
       windowStart:'2025-03-03T00:00:00Z',windowEnd:'2025-03-10T00:00:00Z',
@@ -174,6 +176,9 @@ test('a prospective Paper setup can precede its planned window without claiming 
   assert.equal(result.lifecycle.receipts.at(-1).kind,'PAPER_SETUP');
   assert.equal(result.lifecycle.receipts.at(-1).metrics.length,0);
   assert.equal(issue(result,'OUTCOME_NOT_AVAILABLE_AT_RECORDING'),false);
+  const beforeFreeze=packet();
+  beforeFreeze.lifecycle.receipts[4].recordedAt='2024-12-31T00:00:00Z';
+  assert.ok(issue(validateEvidenceContract(beforeFreeze),'PAPER_SETUP_PRECEDES_RULES_FREEZE'));
 });
 
 test('completed results cannot be recorded before the observed window or after as-of',()=>{
@@ -206,6 +211,21 @@ test('stage-specific data digests may differ when their references and roles are
   assert.ok(issue(validateEvidenceContract(wrongRole),'DATA_REFERENCE_WRONG_STAGE'));
 });
 
+test('holdout and forward evidence must be disjoint in both declared identity and observed windows',()=>{
+  const overlap=packet();
+  overlap.lifecycle.receipts[3].dataWindow.start='2025-01-08T00:00:00Z';
+  assert.ok(issue(validateEvidenceContract(overlap),'HOLDOUT_WINDOW_OVERLAP'));
+  const reused=packet();
+  reused.lifecycle.receipts[5].dataRef.datasetId=reused.lifecycle.receipts[3].dataRef.datasetId;
+  assert.ok(issue(validateEvidenceContract(reused),'FORWARD_DATASET_REUSED'));
+  const undeclared=packet();
+  undeclared.lifecycle.receipts[5].dataRef.disjointFrom=[];
+  assert.ok(issue(validateEvidenceContract(undeclared),'HOLDOUT_FORWARD_DISJOINTNESS_NOT_DECLARED'));
+  const forwardOverlap=packet();
+  forwardOverlap.lifecycle.receipts[5].dataWindow.start='2025-01-20T00:00:00Z';
+  assert.ok(issue(validateEvidenceContract(forwardOverlap),'FORWARD_WINDOW_PRECEDES_HOLDOUT_END'));
+});
+
 test('Holdout audit and exact reproduction remain diagnostic, not contaminated or fresh confirmation',()=>{
   const input=packet();
   input.lifecycle.receipts[3].holdoutAccess.exposures.push(
@@ -232,7 +252,7 @@ test('unknown holdout exposure history blocks an independence claim; access coun
     {role:'HASH_INSPECTION',at:'2025-02-02T00:00:00Z',purpose:'Hash inspection.'}
   ];
   const auditResult=validateEvidenceContract(manyAudits);
-  assert.equal(auditResult.holdoutIndependence.status,'FIRST_EXPOSURE_ASSERTED');
+  assert.equal(auditResult.holdoutIndependence.status,'DIAGNOSTIC_ONLY');
   assert.equal(auditResult.evidenceCompleteness.issues.some(item=>item.reason==='HOLDOUT_NOT_INDEPENDENT_FOR_CONFIRMATION'),false);
 });
 

@@ -134,6 +134,10 @@ export function validateEvidenceContract(input) {
     add('input', 'INVALID', error.message === 'INPUT_NUMBER' ? 'NONFINITE_NUMBER' : 'UNSAFE_OR_UNBOUNDED_SHAPE');
     return result();
   }
+  if (!object(value)) {
+    add('input', 'INVALID', 'OBJECT_REQUIRED');
+    return result();
+  }
 
   function result() {
     const lifecycle = object(value?.lifecycle) ? value.lifecycle : {};
@@ -442,6 +446,30 @@ export function validateEvidenceContract(input) {
       if (stage === 'OUT_OF_SAMPLE_HOLDOUT' && object(receipt.dataRef)) {
         holdoutRef = receipt.dataRef;
         validateHoldout(receipt, path, developmentRef);
+        const development = lifecycle.receipts.find(row => object(row) && row.stage === 'BACKTEST');
+        if (object(development?.dataWindow) && timestamp(development.dataWindow.start) &&
+          timestamp(development.dataWindow.end) && object(receipt.dataWindow) &&
+          timestamp(receipt.dataWindow.start) && timestamp(receipt.dataWindow.end) &&
+          Date.parse(receipt.dataWindow.start) <= Date.parse(development.dataWindow.end) &&
+          Date.parse(receipt.dataWindow.end) >= Date.parse(development.dataWindow.start)) {
+          add(`${path}.dataWindow`, 'INVALID', 'HOLDOUT_WINDOW_OVERLAP');
+        }
+      }
+      if (stage === 'FORWARD_VALIDATION' && object(receipt.dataRef) && object(holdoutRef)) {
+        if (receipt.dataRef.datasetId === holdoutRef.datasetId) {
+          add(`${path}.dataRef.datasetId`, 'INVALID', 'FORWARD_DATASET_REUSED');
+        }
+        if (!Array.isArray(receipt.dataRef.disjointFrom) ||
+          !receipt.dataRef.disjointFrom.includes(holdoutRef.datasetId)) {
+          add(`${path}.dataRef.disjointFrom`, 'NOT_ASSESSED', 'HOLDOUT_FORWARD_DISJOINTNESS_NOT_DECLARED');
+        }
+        const holdoutReceipt = lifecycle.receipts.find(row =>
+          object(row) && row.stage === 'OUT_OF_SAMPLE_HOLDOUT');
+        if (timestamp(holdoutReceipt?.dataWindow?.end) &&
+          timestamp(receipt.dataWindow?.start) &&
+          Date.parse(receipt.dataWindow.start) <= Date.parse(holdoutReceipt.dataWindow.end)) {
+          add(`${path}.dataWindow.start`, 'INVALID', 'FORWARD_WINDOW_PRECEDES_HOLDOUT_END');
+        }
       }
       if (stage === 'FORWARD_VALIDATION' && object(receipt.dataWindow) && timestamp(receipt.dataWindow.end)) {
         const start = Date.parse(receipt.dataWindow.start);
@@ -488,6 +516,10 @@ export function validateEvidenceContract(input) {
       if (![receipt.plannedWindow.start, receipt.plannedWindow.end].every(timestamp)) {
         add(`${path}.plannedWindow`, 'INVALID', 'INVALID_PLANNED_WINDOW');
       } else {
+        if (!timestamp(receipt.recordedAt) ||
+          Date.parse(receipt.recordedAt) < Date.parse(value.strategy?.frozenAt)) {
+          add(`${path}.recordedAt`, 'INVALID', 'PAPER_SETUP_PRECEDES_RULES_FREEZE');
+        }
         if (Date.parse(receipt.plannedWindow.start) < Date.parse(value.strategy?.frozenAt)) {
           add(`${path}.plannedWindow.start`, 'INVALID', 'PAPER_WINDOW_BEFORE_RULES_FREEZE');
         }
@@ -526,13 +558,6 @@ export function validateEvidenceContract(input) {
         if (stage === 'FORWARD_VALIDATION' && timestamp(value.strategy?.frozenAt) &&
           start < Date.parse(value.strategy.frozenAt)) {
           add(`${path}.dataWindow.start`, 'INVALID', 'FORWARD_WINDOW_PRECEDES_RULES_FREEZE');
-        }
-        if (stage === 'OUT_OF_SAMPLE_HOLDOUT' && object(receipt.dataRef)) {
-          const development = value.lifecycle.receipts.find(row => object(row) && row.stage === 'BACKTEST')?.dataRef;
-          if (object(development) && start <= Date.parse(receipt.dataWindow.end) &&
-            Date.parse(development.dataWindow?.end ?? 'invalid') >= start) {
-            add(`${path}.dataWindow`, 'INVALID', 'HOLDOUT_WINDOW_OVERLAP');
-          }
         }
       }
     }
