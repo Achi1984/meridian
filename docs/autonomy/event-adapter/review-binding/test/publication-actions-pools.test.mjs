@@ -42,7 +42,7 @@ test('explicit independent pools, verified TLS and finite operation bounds', asy
     for (const key of ['connectionTimeoutMillis','statement_timeout','query_timeout','lock_timeout','idleTimeoutMillis']) {
       assert.equal(Number.isFinite(options[key]) && options[key] > 0 && options[key] <= 2500, true);
     }
-    assert.equal(options.options, '-c statement_timeout=2000 -c lock_timeout=1000');
+    assert.equal(options.options, '-c statement_timeout=2000 -c lock_timeout=1000 -c search_path=pg_catalog');
     assert.equal(options.application_name, 'meridian-publication-test');
   }
   f.instances[0].emit('error', new Error('SECRET idle error'));

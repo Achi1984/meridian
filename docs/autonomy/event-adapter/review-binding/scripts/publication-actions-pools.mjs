@@ -33,8 +33,9 @@ function checked(config) {
       checkServerIdentity: tls.checkServerIdentity},
     max: 1, connectionTimeoutMillis: 1500, statement_timeout: 2000,
     query_timeout: 2500, lock_timeout: 1000, idleTimeoutMillis: 1000,
+    // Pin name/operator resolution to the catalog before the first statement.
     // Nonempty options also prevent pg's truthy-fallback lookup of PGOPTIONS.
-    allowExitOnIdle: true, options: '-c statement_timeout=2000 -c lock_timeout=1000',
+    allowExitOnIdle: true, options: '-c statement_timeout=2000 -c lock_timeout=1000 -c search_path=pg_catalog',
     application_name: 'meridian-publication-test'}));
 }
 
