@@ -23,12 +23,22 @@ const TEST = /^test\/((?:strategy-|elliott-|trend-pullback-)[A-Za-z0-9_-]+)\.tes
 const DOC = /^docs\/strategy-lab\/([A-Za-z0-9][A-Za-z0-9_-]{0,95})\.(?:md|mjs|json)$/;
 const FROZEN = new Set(['docs/strategy-lab/fixtures/elliott-frozen-v1.mjs',
   'docs/strategy-lab/fixtures/elliott-frozen-wave5.mjs']);
+const PROTECTED_NAMES = new Set([
+  'validate-campaign.mjs', 'strategy-work-packet.mjs', 'strategy-work-packet.test.js',
+  'strategy-campaign-draft.test.js', 'strategy_work_packet_v1.md',
+  'strategy_autonomy_handoff_contract_20261014.md'
+]);
+function protectedWrite(path) {
+  const name = path.slice(path.lastIndexOf('/') + 1).toLowerCase();
+  return PROTECTED_NAMES.has(name) || /^campaign-.*\.json$/.test(name) ||
+    name.startsWith('trial-ledger') || name.startsWith('trial_ledger');
+}
 function pathAllowed(path, {write = false, testOnly = false} = {}) {
   if (typeof path !== 'string' || path.includes('\n')) return false;
   if (!write && !testOnly && FROZEN.has(path)) return true;
   const match = TEST.exec(path) || (!testOnly && DOC.exec(path));
   if (!match || match[1].length > 96 || /(^|[-_.])m11([-_.]|$)/i.test(match[1])) return false;
-  return !write || !match[1].startsWith('elliott-frozen-');
+  return !write || (!match[1].startsWith('elliott-frozen-') && !protectedWrite(path));
 }
 function canonicalRecord(value) {
   if (Array.isArray(value)) return value.map(canonicalRecord);

@@ -149,3 +149,57 @@ test('all list and engineering bounds, including fully populated maxima',()=>{
  mutate(p=>{p.revision=1000001},'REVISION');
  mutate(p=>{p.allowedPaths.push(doc(3));p.proposedWrites.push(doc(3))},'ENGINEERING_BUDGET');
 });
+test('campaign, ledger and validator governance paths are read-only metadata',()=>{
+ const protectedPaths=[
+  'docs/strategy-lab/campaign-20261013.json',
+  'docs/strategy-lab/CAMPAIGN-EXAMPLE.json',
+  'docs/strategy-lab/trial-ledger-reconciliation.json',
+  'docs/strategy-lab/TRIAL_LEDGER_RECONCILIATION.md',
+  'docs/strategy-lab/validate-campaign.mjs',
+  'docs/strategy-lab/strategy-work-packet.mjs',
+  'test/strategy-work-packet.test.js',
+  'test/strategy-campaign-draft.test.js',
+  'docs/strategy-lab/STRATEGY_WORK_PACKET_V1.md',
+  'docs/strategy-lab/STRATEGY_AUTONOMY_HANDOFF_CONTRACT_20261014.md'
+ ];
+ for(const path of protectedPaths) {
+  mutate(p=>{p.allowedPaths=[path]},'ALLOWED_PATHS');
+  mutate(p=>{p.proposedWrites=[path]},'PROPOSED_WRITES');
+  const p=packet();p.sources[0].path=path;
+  assert.equal(validate(p,observation()).valid,true,`read-only source ${path}`);
+ }
+ const p=packet();p.acceptance=[{id:'own-validator',testPath:'test/strategy-work-packet.test.js'},
+  {id:'campaign-validator',testPath:'test/strategy-campaign-draft.test.js'}];
+ assert.equal(validate(p,observation()).valid,true,'inert acceptance is not write authority');
+});
+test('both frozen fixtures stay readable and unwritable',()=>{
+ for(const name of ['elliott-frozen-v1.mjs','elliott-frozen-wave5.mjs']) {
+  const path=`docs/strategy-lab/fixtures/${name}`,p=packet();p.sources[0].path=path;
+  assert.equal(validate(p,observation()).valid,true);
+  mutate(p=>{p.allowedPaths=[path]},'ALLOWED_PATHS');
+  mutate(p=>{p.proposedWrites=[path]},'PROPOSED_WRITES');
+ }
+});
+test('predecessor key participates in identity and never aliases caller data',()=>{
+ const p=packet();p.revision=2;p.predecessor={packetId:p.packetId,revision:1,operationKey:'d'.repeat(64)};
+ const before=structuredClone(p),r=validate(p,observation());assert.equal(r.valid,true);
+ r.canonicalPacket.predecessor.operationKey='e'.repeat(64);
+ assert.deepEqual(p,before);assert.notEqual(r.operationKey,validate(r.canonicalPacket,observation()).operationKey);
+ assert.equal(validate(p,observation()).operationKey,r.operationKey);
+});
+test('96 character names admit, 97 reject; M11 acceptance remains forbidden',()=>{
+ for(const prefix of ['docs/strategy-lab/','test/']) {
+  const name=prefix==='test/'?'strategy-'+'x'.repeat(87):'x'.repeat(96);
+  const suffix=prefix==='test/'?'.test.js':'.md',path=prefix+name+suffix;
+  const p=packet();p.allowedPaths=[path];p.proposedWrites=[path];
+  assert.equal(validate(p,observation()).valid,true);
+  mutate(p=>{p.allowedPaths=[prefix+name+'x'+suffix]},'ALLOWED_PATHS');
+ }
+ mutate(p=>{p.acceptance[0].testPath='test/strategy-M11-check.test.js'},'ACCEPTANCE');
+});
+test('trusted null-prototype records preserve metadata and canonical identity',()=>{
+ const convert=value=>Array.isArray(value)?value.map(convert):value!==null&&typeof value==='object'?
+  Object.assign(Object.create(null),Object.fromEntries(Object.entries(value).map(([k,v])=>[k,convert(v)]))):value;
+ const p=packet(),o=observation();
+ assert.deepEqual(validate(convert(p),convert(o)),validate(p,o));
+});
