@@ -2,7 +2,7 @@
 
 - **Op-ID:** `STRATEGY-RECEIPT-VERIFICATION-20261014`
 - **Disposition:** `RECEIPTS_VERIFIED; PRESTART_36H_AUTHORIZATION_RECORDED; OLDER_12H_TEXT_RECONCILIATION_AND_INDEPENDENT_AUTHORITY_PROVENANCE_OPEN; NO_PROMOTION`
-- **Audit code head:** `2154003a8bed26aef4f4f56258ae0cf68eba6815`
+- **Audit code head:** `7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633`
 - **Verifier SHA-256:** `32e5f193c215b464c16c2a4b5fbcf93a863ca3dc463218da9cd721d39f0010df`
 - **Base/main:** `386013c1e78c4be5ea5d6c89063c9c4b8dacda66`
 
@@ -14,7 +14,7 @@ GitHub Actions metadata confirmed all six pinned artifacts were available and bo
 
 **Exact-head result:** `VERIFIED`, 52/52 inputs verified, 0 unavailable, 0 mismatches. For every archive and payload, observed SHA-256 and byte size equal the pinned expectation. The manifest includes all expected file names, sizes, digests, artifact IDs, run IDs and source commits.
 
-**Corrected-head checks:** `node --test test/strategy-evidence-receipts.test.js` passed 15/15; `node --test test/*.test.js` passed 2,456/2,456 after `npm ci` installed existing lockfile dependencies (0 vulnerabilities reported); both changed JavaScript files passed `node --check`. The corrected verifier CLI reported `VERIFIED`, 52/52 inputs, 0 unavailable and 0 mismatched. An earlier full-suite attempt at the preceding audit head lacked the lockfile’s existing `pg` install; after `npm ci`, that historical run passed 2,453/2,453. A preliminary malformed CLI invocation omitted the repeated `--input` flags and exited during argument parsing without reading inputs; it is not counted as an audit check.
+**Corrected-head checks:** `node --test test/strategy-evidence-receipts.test.js` passed 15/15; `node --test test/*.test.js` passed 2,456/2,456 after `npm ci` installed existing lockfile dependencies (0 vulnerabilities reported); both changed JavaScript files passed `node --check`. The corrected verifier CLI reported `VERIFIED`, 52/52 inputs, 0 unavailable and 0 mismatched. Actions run `38636260048` for audit code head `7a13ea1` concluded `action_required` with zero jobs and no failed-job logs; it is neither a CI pass nor a test failure. An earlier full-suite attempt at the preceding audit head lacked the lockfile’s existing `pg` install; after `npm ci`, that historical run passed 2,453/2,453. A preliminary malformed CLI invocation omitted the repeated `--input` flags and exited during argument parsing without reading inputs; it is not counted as an audit check.
 
 | Artifact | Run / source commit / ID | Expected ZIP SHA-256 | Observed ZIP SHA-256 | Payload receipt |
 |---|---|---|---|---|
