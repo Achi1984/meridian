@@ -30,6 +30,9 @@ No automatic retry, storage settlement or admission is hidden in this transport.
 All authority and durability flags stay false. Host bootstrap, authentication,
 credential acquisition, atomic admission/reservation orchestration, production DB
 durability and signed receipts remain separate unresolved integration work.
+Capture's temporal validation is now prepared separately in
+`PUBLISHER_TIME_WINDOW_PREPARATION.md`; the transport does not itself generate or
+authenticate that reservation/send/receive metadata.
 
 PR772's prior-head CI38524976030 failed in the existing V10 keyboard test because
 Chrome DevTools startup timed out. CI38524903156 passed. The new source head must

@@ -107,6 +107,9 @@ function confirmation(){
 }
 function capture(){
  const s=confirmation();delete s.request.commentId;let writes=0;
+ s.comment.created_at=s.comment.updated_at=new Date((now-1)*1000).toISOString().replace('.000Z','Z');
+ s.deps.publicationWindow={reservedAtMs:(now-2)*1000,sendStartedAtMs:(now-1)*1000,responseReceivedAtMs:now*1000};
+ s.deps.publicationClock=()=>now*1000;
  const response={status:201,url:'https://api.github.com/repos/Achi1984/meridian/issues/571/comments',
   redirected:false,comment:s.comment};
  s.deps.senderRecordPool={query:async(sql,args)=>{writes++;assert.equal(sql,RETAIN_SQL);
@@ -169,6 +172,34 @@ test('capture rejects missing host pool before admission lookup',async()=>{
  s.deps.readEvidence=async()=>{reads++;return s.snapshot;};
  assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).kind,'RESPONSE_CAPTURE_REJECTED');
  assert.equal(reads,0);assert.equal(s.captures(),0);
+});
+test('capture rejects missing window, old response and elapsed capture freshness',async()=>{
+ for(const mode of ['missing','old','future','stale']){
+  const s=capture();
+  if(mode==='missing')delete s.deps.publicationWindow;
+  if(mode==='old'||mode==='future')s.comment.created_at=s.comment.updated_at=new Date((now+(mode==='old'?-3:1))*1000).toISOString().replace('.000Z','Z');
+  // Clock function identity is pinned: advance its returned time, not the function.
+  if(mode==='stale'){let time=now*1000;s.deps.publicationClock=()=>time;s.deps.readEvidence=async()=>{time+=31000;return s.snapshot;};}
+  assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).kind,'RESPONSE_CAPTURE_REJECTED');
+  assert.equal(s.captures(),0);assert.equal(s.writes(),0);
+ }
+});
+test('capture snapshots host time window before admission awaits',async()=>{
+ const s=capture();s.deps.readEvidence=async()=>{
+  s.deps.publicationWindow.sendStartedAtMs=(now+100)*1000;s.deps.publicationWindow={};return s.snapshot;
+ };
+ assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).outcome,'ACKNOWLEDGED');
+ assert.equal(s.captures(),1);
+});
+test('capture uses pinned millisecond clock for subsecond receive and rejects real future',async()=>{
+ for(const future of [false,true]){
+  const s=capture();s.deps.publicationWindow.responseReceivedAtMs=now*1000+500;
+  s.deps.publicationClock=()=>now*1000+(future?499:700);
+  s.deps.readEvidence=async()=>{s.deps.publicationClock=()=>0;return s.snapshot;};
+  const r=await capturePublicationResponse(s.request,s.response,s.config,s.deps);
+  assert.equal(r.kind,future?'RESPONSE_CAPTURE_REJECTED':'INACTIVE_RESPONSE_CAPTURE_RESULT');
+  assert.equal(s.captures(),future?0:1);
+ }
 });
 test('capture conflict and lost write response never retry or confirm',async()=>{
  for(const lost of [false,true]){const s=capture();let calls=0;

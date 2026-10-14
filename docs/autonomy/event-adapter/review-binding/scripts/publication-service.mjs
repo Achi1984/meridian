@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto';
 import {verifyPublicationToken} from './publication-oidc.mjs';
 import {reserve,settle} from './publication-ledger.mjs';
 import {retainSendRecord} from './publication-send-record.mjs';
+import {snapshotPublicationWindow,checkPublicationWindow} from './publication-time-window.mjs';
 const bridge=fileURLToPath(new URL('./publication-plan-bridge.py',import.meta.url));
 const flags={authenticated:false,provenanceVerified:false,authorized:false,
  dispatchAllowed:false,mergeAllowed:false,durable:false,sendAllowed:false};
@@ -105,6 +106,9 @@ export async function capturePublicationResponse(request,trustedResponse,trusted
   const pool=dependencies?.senderRecordPool;
   need(typeof pool?.query==='function');
   const senderRecordPool=Object.freeze({query:pool.query.bind(pool)});
+  const publicationWindow=snapshotPublicationWindow(dependencies.publicationWindow);
+  const publicationClock=dependencies.publicationClock??Date.now;
+  need(typeof publicationClock==='function');
   need(request&&Object.keys(request).sort().join()==='body,token');
   const input={body:request.body,token:request.token};
   const config=JSON.parse(JSON.stringify(trustedConfig));
@@ -116,6 +120,7 @@ export async function capturePublicationResponse(request,trustedResponse,trusted
   checkComment(response.comment,response.comment.id,input.body,JSON.parse(config.pinsRaw));
   const admission=await prepareAdmission(input,config,dependencies);
   need(admission.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE');
+  checkPublicationWindow(publicationWindow,response.comment.createdAt,publicationClock());
   const result=await retainSendRecord(senderRecordPool,admission.ledgerBinding,response.comment.id);
   return {kind:'INACTIVE_RESPONSE_CAPTURE_RESULT',outcome:result.outcome,...flags};
  }catch{return {kind:'RESPONSE_CAPTURE_REJECTED',...flags};}

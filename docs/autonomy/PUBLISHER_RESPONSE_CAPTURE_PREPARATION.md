@@ -31,9 +31,11 @@ transport primitive is now prepared; no sender credentials, route, host bootstra
 or signed receipt is installed here. Input-object
 validation alone cannot prove response origin or which workflow sent a comment.
 Production durability and atomic approval/record revocation remain unsolved.
-Before live host integration, the captured comment timestamp must also be bound to
-the acknowledged reservation/send window and a trusted clock. Current calendar and
-unedited checks do not reject an old matching response supplied by a trusted host.
+Capture now also requires a snapshotted host-supplied reservation/send/receive window
+and checks the comment creation second within it after admission. See
+`PUBLISHER_TIME_WINDOW_PREPARATION.md`. Deriving that window from the exact acknowledged
+reservation and authentic transport remains future host integration; time checks
+do not authenticate host-supplied metadata or distinguish old same-second responses.
 Neither this packet nor a GREEN_SOURCE_ONLY review establishes live readiness.
 
 Five new service tests cover matching retention, malformed/substituted responses,
