@@ -25,7 +25,13 @@ const vectors=[
  {rows:[E,[115,120,109,112]],mode:'NO_RELOCATION',events:[['TP1',0,'RANGE_PROXY',130,500000],['STOP',1,'RANGE_PROXY',110,500000]],r:-1/11},
  {rows:[[125,129,120,128]],events:[],r:0},
  {rows:[[125,141,120,135]],events:[['TP1',0,'RANGE_PROXY',130,500000],['TP2',0,'RANGE_PROXY',140,500000]],r:14/11},
- {rows:[[135,141,109,125]],events:[['TP1',0,'OPEN',130,500000],['STOP',0,'RANGE_PROXY',110,500000,'AMBIGUOUS_STOP_FIRST']],r:-1/11}
+ {rows:[[135,141,109,125]],events:[['TP1',0,'OPEN',130,500000],['STOP',0,'RANGE_PROXY',110,500000,'AMBIGUOUS_STOP_FIRST']],r:-1/11},
+ {rows:[[135,139,120,125]],events:[['TP1',0,'OPEN',130,500000]],r:4.5/11,pending:true},
+ {rows:[[135,139,120,125],[120,125,119,122]],events:[['TP1',0,'OPEN',130,500000],['STOP',1,'OPEN',120,500000]],r:4/11,be:true},
+ {rows:[E,[135,141,125,140]],events:[['TP1',0,'RANGE_PROXY',130,500000],['TP2',1,'RANGE_PROXY',140,500000]],r:14/11,be:true},
+ {rows:[E,[125,129,122,128]],events:[['TP1',0,'RANGE_PROXY',130,500000]],r:4.5/11,be:true},
+ {rows:[E,[125,129,122,128],[121,125,120,123]],events:[['TP1',0,'RANGE_PROXY',130,500000],['STOP',2,'OPEN',121,500000]],r:4.5/11,be:true},
+ {rows:[[125,126,109,120]],slip:2,events:[['STOP',0,'RANGE_PROXY',108,1000000]],r:-13/11}
 ];
 for(const side of ['LONG','SHORT'])for(const tf of ['4H','1D'])test(`full hand-vector outputs ${side} ${tf}`,()=>{
  for(const v of vectors){
@@ -85,4 +91,27 @@ test('atomic fill rejection, numeric underflow/overflow and cost-first normaliza
 test('pending end not activated by later horizon; equality stop at opening',()=>{
  const x=fixture([E]);x.asOfMs+=86400000;assert.equal(replay(x).finalState.pendingBreakEvenAtMs,x.bars[0].closeTimeMs);
  for(const side of ['LONG','SHORT']){const r=replay(fixture([[110,115,109,112]],side));assert.equal(r.events[0].phase,'OPEN');assert.equal(r.accounting.grossRealizedR,-1);}
+});
+
+test('native SHORT price geometry and range-stop slippage outside observed OHLC',()=>{
+ for(const timeframe of ['4H','1D']){
+  // Independent native SHORT: D=20; half at180 then half at160 gives 1.5R.
+  const x=fixture([[175,190,170,185],[165,175,155,160]],'LONG',timeframe);
+  Object.assign(x.initialPosition,{side:'SHORT',entryPrice:200,originalStopPrice:220,targets:[180,160]});
+  const before=structuredClone(x),r=replay(x);
+  assert.equal(r.valid,true);assert.deepEqual(x,before);
+  assert.deepEqual(r.events.map(e=>[e.kind,e.phase,e.fillPrice,e.portionPpm]),
+   [['TP1','OPEN',180,500000],['TP2','RANGE_PROXY',160,500000]]);
+  assert.deepEqual(r.finalState,{originalRiskDistance:20,effectiveStopPrice:200,remainingPortionPpm:0,
+   target1Filled:true,target2Filled:true,pendingBreakEvenAtMs:null,closed:true});
+  assert.equal(r.accounting.grossRealizedR,1.5);assert.equal(r.accounting.netRealizedR,1.5);
+  for(const side of ['LONG','SHORT']){
+   const gap=fixture([[125,126,109,120]],side,timeframe);gap.stopSlippagePrice=2;
+   const out=replay(gap),event=out.events[0];assert.equal(event.phase,'RANGE_PROXY');
+   assert.equal(event.modeledFillTimeMs,null);assert.equal(event.ambiguity,'NONE');
+   assert.equal(event.fillPrice,side==='LONG'?108:134);
+   assert.ok(side==='LONG'?event.fillPrice<gap.bars[0].low:event.fillPrice>gap.bars[0].high);
+   assert.ok(Math.abs(out.accounting.grossRealizedR-(-13/11))<1e-12);
+  }
+ }
 });
