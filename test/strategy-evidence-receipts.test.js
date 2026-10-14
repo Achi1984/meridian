@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {
   parseReceiptManifest,
   readLocalFileWithoutSymlinks,
@@ -12,6 +14,7 @@ import {
 
 const bytes = value => Buffer.from(value);
 const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
+const verifierPath = fileURLToPath(new URL('../scripts/strategy-evidence-receipts.mjs', import.meta.url));
 
 function manifestFor(archive = bytes('zip-bytes'), payload = bytes('payload')) {
   return {
@@ -158,6 +161,69 @@ test('filesystem symlinks are rejected for supplied inputs', t => {
   ]);
   assert.equal(rejected.status, 'MISMATCH');
   assert.equal(rejected.verified, false);
+});
+
+test('regular-file reader rejects FIFOs before opening and respects the aggregate budget', t => {
+  if (process.platform === 'win32') return t.skip('FIFO fixtures require POSIX');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strategy-receipt-'));
+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const fifo = path.join(directory, 'input.fifo');
+  const manifestPath = path.join(directory, 'manifest.json');
+  fs.writeFileSync(manifestPath, textOf(manifestFor()));
+  assert.equal(spawnSync('mkfifo', [fifo]).status, 0);
+  const result = spawnSync(process.execPath, [
+    verifierPath, '--manifest', manifestPath,
+    '--input', `archives/result.zip=${fifo}`
+  ], {encoding: 'utf8', timeout: 1500});
+  assert.notEqual(result.error?.code, 'ETIMEDOUT');
+  assert.equal(JSON.parse(result.stdout).status, 'MISMATCH');
+
+  const small = path.join(directory, 'small.bin');
+  fs.writeFileSync(small, '12345678901');
+  assert.throws(() => readLocalFileWithoutSymlinks(small, 20, 10), error => error.code === 'EFBIG');
+});
+
+test('CLI safely bounds and rejects manifest FIFOs, symlinks, and oversized files', t => {
+  if (process.platform === 'win32') return t.skip('FIFO fixtures require POSIX');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strategy-receipt-'));
+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const validManifest = path.join(directory, 'manifest.json');
+  fs.writeFileSync(validManifest, textOf(manifestFor()));
+  const fifo = path.join(directory, 'manifest.fifo');
+  assert.equal(spawnSync('mkfifo', [fifo]).status, 0);
+  const symlink = path.join(directory, 'manifest-link.json');
+  fs.symlinkSync(validManifest, symlink);
+  const oversized = path.join(directory, 'oversized.json');
+  fs.writeFileSync(oversized, Buffer.alloc(128 * 1024 + 1, 0x20));
+
+  for (const manifestPath of [fifo, symlink, oversized]) {
+    const result = spawnSync(process.execPath, [verifierPath, '--manifest', manifestPath], {
+      encoding: 'utf8',
+      timeout: 1500
+    });
+    assert.notEqual(result.error?.code, 'ETIMEDOUT', manifestPath);
+    assert.equal(JSON.parse(result.stdout).status, 'INVALID_MANIFEST', manifestPath);
+    assert.notEqual(result.status, 0, manifestPath);
+  }
+});
+
+test('CLI rejects duplicate input identities before opening any input', t => {
+  if (process.platform === 'win32') return t.skip('FIFO fixtures require POSIX');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'strategy-receipt-'));
+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const manifestPath = path.join(directory, 'manifest.json');
+  fs.writeFileSync(manifestPath, textOf(manifestFor()));
+  const fifo = path.join(directory, 'input.fifo');
+  assert.equal(spawnSync('mkfifo', [fifo]).status, 0);
+  const result = spawnSync(process.execPath, [
+    verifierPath,
+    '--manifest', manifestPath,
+    '--input', `archives/result.zip=${fifo}`,
+    '--input', `archives/result.zip=${fifo}`
+  ], {encoding: 'utf8', timeout: 1500});
+  assert.notEqual(result.error?.code, 'ETIMEDOUT');
+  assert.equal(JSON.parse(result.stdout).status, 'MISMATCH');
+  assert.equal(JSON.parse(result.stdout).verified, false);
 });
 
 test('duplicate artifact identities are invalid', () => {

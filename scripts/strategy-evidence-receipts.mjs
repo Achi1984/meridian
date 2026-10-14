@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 const SCHEMA = 'MERIDIAN_STRATEGY_RECEIPT_MANIFEST_V1';
 const MAX_ARTIFACTS = 64;
 const MAX_MEMBERS = 256;
+const MAX_MANIFEST_BYTES = 128 * 1024;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -106,7 +107,7 @@ function rejectDuplicateObjectKeys(text) {
 }
 
 export function parseReceiptManifest(manifestText) {
-  if (typeof manifestText !== 'string' || Buffer.byteLength(manifestText, 'utf8') > 128 * 1024) {
+  if (typeof manifestText !== 'string' || Buffer.byteLength(manifestText, 'utf8') > MAX_MANIFEST_BYTES) {
     throw new Error('manifest must be a UTF-8 string no larger than 128 KiB');
   }
   const parsed = JSON.parse(manifestText);
@@ -262,7 +263,9 @@ export function verifyReceiptManifest(manifestText, suppliedFiles) {
         error: 'input is not bytes'
       };
     }
-    const data = Buffer.from(supplied.data);
+    const data = Buffer.isBuffer(supplied.data)
+      ? supplied.data
+      : Buffer.from(supplied.data.buffer, supplied.data.byteOffset, supplied.data.byteLength);
     if (data.length > expected.maxBytes) {
       errors.push(`input exceeds maxBytes: ${expected.path}`);
       return {
@@ -305,9 +308,14 @@ export function verifyReceiptManifest(manifestText, suppliedFiles) {
   };
 }
 
-export function readLocalFileWithoutSymlinks(filePath, maxBytes) {
+export function readLocalFileWithoutSymlinks(filePath, maxBytes, maxTotalBytes = MAX_TOTAL_BYTES) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > MAX_FILE_BYTES) {
     const error = new Error('maxBytes is outside the supported limit');
+    error.code = 'EINVAL';
+    throw error;
+  }
+  if (!Number.isSafeInteger(maxTotalBytes) || maxTotalBytes < 0 || maxTotalBytes > MAX_TOTAL_BYTES) {
+    const error = new Error('maxTotalBytes is outside the supported limit');
     error.code = 'EINVAL';
     throw error;
   }
@@ -315,6 +323,8 @@ export function readLocalFileWithoutSymlinks(filePath, maxBytes) {
   const {root} = path.parse(absolutePath);
   const segments = absolutePath.slice(root.length).split(path.sep).filter(Boolean);
   let current = root;
+  const components = [];
+  let finalStat;
   for (const [index, segment] of segments.entries()) {
     current = path.join(current, segment);
     const stat = fs.lstatSync(current);
@@ -328,29 +338,58 @@ export function readLocalFileWithoutSymlinks(filePath, maxBytes) {
       error.code = 'ENOTDIR';
       throw error;
     }
+    components.push({path: current, dev: stat.dev, ino: stat.ino});
+    if (index === segments.length - 1) finalStat = stat;
   }
-  const descriptor = fs.openSync(absolutePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  if (!finalStat?.isFile()) {
+    const error = new Error(`input is not a regular file: ${absolutePath}`);
+    error.code = 'EINVAL';
+    throw error;
+  }
+  if (finalStat.size > maxBytes || finalStat.size > maxTotalBytes) {
+    const error = new Error(`input exceeds a declared size limit: ${absolutePath}`);
+    error.code = 'EFBIG';
+    throw error;
+  }
+  const descriptor = fs.openSync(absolutePath,
+    fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
   try {
     const stat = fs.fstatSync(descriptor);
-    if (!stat.isFile()) {
-      const error = new Error(`input is not a regular file: ${absolutePath}`);
-      error.code = 'EINVAL';
+    if (!stat.isFile() || stat.dev !== finalStat.dev || stat.ino !== finalStat.ino) {
+      const error = new Error(`input changed while opening: ${absolutePath}`);
+      error.code = 'ESTALE';
       throw error;
     }
-    if (stat.size > maxBytes) {
-      const error = new Error(`input exceeds maxBytes: ${absolutePath}`);
+    for (const component of components) {
+      const currentStat = fs.lstatSync(component.path);
+      if (currentStat.isSymbolicLink() || currentStat.dev !== component.dev || currentStat.ino !== component.ino) {
+        const error = new Error(`input path changed while opening: ${component.path}`);
+        error.code = 'ESTALE';
+        throw error;
+      }
+    }
+    if (stat.size > maxBytes || stat.size > maxTotalBytes) {
+      const error = new Error(`input exceeds a declared size limit: ${absolutePath}`);
       error.code = 'EFBIG';
       throw error;
     }
-    const output = Buffer.alloc(maxBytes + 1);
+    const output = Buffer.allocUnsafe(stat.size);
     let bytesRead = 0;
     while (bytesRead < output.length) {
       const count = fs.readSync(descriptor, output, bytesRead, output.length - bytesRead, null);
       if (count === 0) break;
       bytesRead += count;
     }
-    if (bytesRead > maxBytes) {
-      const error = new Error(`input exceeds maxBytes: ${absolutePath}`);
+    if (bytesRead === stat.size) {
+      const sentinel = Buffer.allocUnsafe(1);
+      if (fs.readSync(descriptor, sentinel, 0, 1, null) > 0) {
+        const error = new Error(`input grew while reading: ${absolutePath}`);
+        error.code = 'EFBIG';
+        throw error;
+      }
+    }
+    if (bytesRead > maxBytes || bytesRead > maxTotalBytes) {
+      const error = new Error(`input exceeds a declared size limit: ${absolutePath}`);
       error.code = 'EFBIG';
       throw error;
     }
@@ -392,7 +431,8 @@ function main() {
   let manifestText;
   let parsed;
   try {
-    manifestText = fs.readFileSync(cli.manifestPath, 'utf8');
+    manifestText = new TextDecoder('utf-8', {fatal: true})
+      .decode(readLocalFileWithoutSymlinks(cli.manifestPath, MAX_MANIFEST_BYTES, MAX_MANIFEST_BYTES));
     parsed = parseReceiptManifest(manifestText);
   } catch (error) {
     process.stdout.write(`${JSON.stringify({
@@ -409,11 +449,27 @@ function main() {
   }
 
   const limits = new Map(parsed.expectedFiles.map(file => [file.path, file.maxBytes]));
-  const suppliedFiles = cli.inputs.map(input => {
+  const suppliedPaths = new Set();
+  const localPaths = new Set();
+  const preflightErrors = cli.inputs.map(input => {
+    const localPath = path.resolve(input.localPath);
+    if (!limits.has(input.path)) return 'extra input path';
+    if (suppliedPaths.has(input.path)) return 'duplicate supplied input path';
+    if (localPaths.has(localPath)) return 'duplicate local input identity';
+    suppliedPaths.add(input.path);
+    localPaths.add(localPath);
+    return null;
+  });
+  const invalidInputs = preflightErrors.some(Boolean);
+  let remainingBytes = parsed.manifest.maxTotalBytes;
+  const suppliedFiles = cli.inputs.map((input, index) => {
     const maxBytes = limits.get(input.path);
-    if (maxBytes === undefined) return {path: input.path, error: 'extra input path'};
+    if (preflightErrors[index]) return {path: input.path, data: null, error: preflightErrors[index]};
+    if (invalidInputs) return {path: input.path, data: null, error: 'input set failed preflight'};
     try {
-      return {path: input.path, data: readLocalFileWithoutSymlinks(input.localPath, maxBytes)};
+      const data = readLocalFileWithoutSymlinks(input.localPath, maxBytes, remainingBytes);
+      remainingBytes -= data.length;
+      return {path: input.path, data};
     } catch (error) {
       return {path: input.path, data: null, error: error.code === 'ENOENT' ? undefined : error.code ?? error.message};
     }
