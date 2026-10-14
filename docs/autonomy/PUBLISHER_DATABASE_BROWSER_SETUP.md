@@ -1,0 +1,352 @@
+# Publisher TEST browser setup — candidate procedure
+
+Status: **source draft, not an approved or executed provisioning procedure**.
+This document replaces the PC prerequisite with an owner-operated browser
+terminal. It does not authorize database changes, credential retrieval,
+environment changes, workflow installation or dispatch. Source review and the
+operational authorization below remain outstanding.
+
+## Scope and correction
+
+The existing `PUBLISHER_DATABASE_ROLE_SETUP.md` step 3 proposes psql `\password`.
+That command hashes the password client-side. Neon's role documentation says
+passwords must be supplied as plaintext and pre-hashed passwords are unsupported.
+**Do not execute that step or merely move it into Codespaces.** The ordinary
+NOLOGIN role creation, grant matrix and catalog verification remain separate
+prerequisites; no broader privileges are proposed here.
+
+Christoph has personally trusted the existing Codespace
+`ideal-umbrella-g5qx5p796rxfvjx`, created from `github/codespaces-blank` using a
+two-core Europe West machine. This is a hosted workspace, not his local PC.
+Trusting/opening it is not evidence that dependencies, certificates, code or
+database operations have been approved. This draft does not create another
+Codespace or change billing limits. Verify available allowance before use; do
+not purchase capacity or enable paid overages implicitly. Stop the Codespace
+after the session; deleting it is a separate owner action.
+
+## Fixed target
+
+| Binding | Required value |
+| --- | --- |
+| Project | `wandering-queen-12324132` |
+| Branch | `br-delicate-field-b9uijh3y` |
+| Direct host | `ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech` |
+| Port / database | `5432` / `publisher_ledger` |
+| Administrator | `publisher_owner` |
+| New roles | `meridian_test_reservation`, `meridian_test_sender`, `meridian_test_reader` |
+
+Confirm the endpoint-to-branch mapping independently in Neon. SQL does not
+establish that mapping. Never select an administrator connection string as a
+runtime credential or create application roles through Neon's role-creation
+Console/API, which grants `neon_superuser` membership.
+
+## Owner handoff and execution order
+
+1. Review and pin a small Python 3 / Psycopg 3 helper and its dependencies before
+   any credential entry. A candidate implementation now exists at
+   `scripts/publisher_test_password_setup.py`, with offline fault-injection
+   tests in `test/test_publisher_test_password_setup.py`. It is not operationally
+   approved for Neon; local PostgreSQL validation does not approve that use.
+   Psycopg 3.3.6 is
+   pinned in `scripts/publisher-test-password-setup-requirements.txt` and checked
+   before prompts; dependency hash/provenance review, real SQL composition and independent
+   review remain outstanding. Install dependencies before providing credentials;
+   do not run package installation hooks while credentials are present.
+2. Establish the ordinary roles and their non-secret OID baseline only under
+   the separately approved role-creation procedure. Verify all role attributes,
+   incoming/outgoing membership, ownership and grants using that procedure.
+   Never reuse an existing same-named role or manufacture a baseline by trusting
+   whatever the helper first discovers. Retain OIDs and administrator OID as
+   non-secret review evidence, alongside the fixed project/branch binding.
+3. Give Christoph sole control of the Codespaces terminal for secret entry.
+   Pause browser automation, screenshots, terminal observation and agent access
+   to process state. Disable terminal recording, debugging, Python tracing and
+   command echo. The operator must independently trust this workspace and its
+   extensions/processes; hidden input does not protect against a compromised
+   Codespace. Never request passwords or password screenshots in chat.
+4. Run the reviewed helper using a command containing only its path and
+   non-secret baseline/CA paths. Enter the administrator password and three
+   distinct new passwords at hidden prompts. Generate and retain the new values
+   in the owner's password manager; require at least 32 random ASCII characters.
+   The helper must confirm each new value with a second hidden prompt, reject
+   equal role passwords and reject reuse of the administrator password.
+5. On confirmed success leave every role NOLOGIN. Christoph copies the three
+   new passwords directly from his password manager into the exact six
+   `meridian-publisher-test` environment secrets listed in the role setup
+   document. Configure and verify the owner review and main-only environment
+   protection before installing secrets. Browser secret entry is supported by
+   GitHub; the particular iPhone layout still needs owner confirmation.
+6. Record only role names/OIDs, fixed target, approved code version and coarse
+   completion status. The helper does not automatically transfer or validate
+   GitHub secret values. Fresh full grant/membership/ownership checks, explicit
+   LOGIN enablement, workflow installation and one diagnostic dispatch are
+   later separately scoped actions. Do not silently combine them with password
+   initialization.
+
+## Required minimal helper contract
+
+Use Python `getpass.getpass`, treating `getpass.GetPassWarning` as an error and
+requiring a real interactive TTY. Abort before reading any password if echo-free
+input is unavailable. No command-line, environment-variable, pipe, file, URL,
+browser storage or clipboard-reading fallback is allowed. Do not write secrets
+to source files, shell history, logs, transcripts, artifacts or exception text.
+
+Connect with Psycopg using explicit keyword values for every target field,
+`sslmode='verify-full'`, an independently verified absolute CA bundle path,
+`connect_timeout=10`, and fixed startup options for `search_path=pg_catalog`,
+bounded statement/lock timeouts. Do not use a connection URI, service file,
+passfile, ambient `PG*` configuration, alternate endpoint or TLS fallback.
+Psycopg/libpq must receive the password directly from the hidden prompt in
+memory. Require PostgreSQL 16, matching `current_user` and `session_user`, exact
+database, expected search path, and a TLS connection with verified hostname.
+
+Before **any password mutation**, run the existing grantor/ownership precheck
+and compare the administrator and all three role OIDs to the approved baseline.
+Require exactly the three named roles, with all seven role booleans false:
+LOGIN, SUPERUSER, CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS and INHERIT.
+Require zero outgoing role memberships and exactly the documented creator
+incoming ADMIN grants (INHERIT/SET false), including the approved grantor
+identity. Reject missing/extra roles or changed membership/ownership. Fail
+closed on an unrecognized result, warning or SQL error.
+
+Use one explicit database transaction for the three password changes, with
+`password_encryption='scram-sha-256'` checked before mutation. For the fixed
+allowlisted role names, compose each statement with Psycopg's SQL composition:
+
+```python
+# Composition used by the candidate; not a standalone runnable command.
+# Never print, log, stringify or persist the composed statement.
+statement = sql.SQL("ALTER ROLE {} PASSWORD {}").format(
+    sql.Identifier(approved_role_name), sql.Literal(hidden_password)
+)
+cursor.execute(statement)
+```
+
+SQL utility statements such as ALTER ROLE are not a reason to interpolate raw
+strings or use unsafe f-strings. Psycopg SQL Identifier/Literal composition is
+required here; ordinary server-side bind placeholders must not be assumed to
+work in this statement. Confirm the exact reviewed Psycopg version's behavior
+in a disposable local PostgreSQL test before operational use.
+
+Repeat identity, OID, attributes and membership checks inside the same
+transaction before commit. The helper must issue **no** CREATE ROLE, GRANT,
+REVOKE, LOGIN, role rename, ownership change or application-table writes.
+Independent administrators remain trusted: these checks do not establish
+isolation from concurrent privileged changes. Do not automatically revoke or
+repair differences to obtain a pass.
+
+The initial identity SELECT starts a transaction before the new-password
+prompts. That transaction remains open while the owner enters and confirms all
+three values. This is deliberately not described as a short transaction or as
+immune to provider/session idle-in-transaction timeouts. Do not disable or raise
+those limits to force completion. If the server closes the session while the
+owner is typing, the next verification must fail before mutation; stop and
+reconcile rather than automatically reconnecting/replaying inputs. Confirm
+actual idle timeout behavior and acceptable owner interaction time before
+operational use. The new supervisor below requires independent review of its
+network/cleanup deadline evidence before that gate can be closed.
+
+Suppress database notices and exception details. Print only fixed statuses
+such as `PASSWORD_SETUP_CONFIRMED`, `PASSWORD_SETUP_FAILED` or
+`PASSWORD_SETUP_INDETERMINATE`. Never print query text, connection parameters
+containing passwords, SQL exceptions, tracebacks, password length or hashes.
+On a failure before commit, attempt rollback and close. A connection loss or
+exception during commit is **indeterminate**, not proof of rollback: stop and
+reconcile; do not retry automatically. Keep roles disabled. Bound connection,
+queries and cleanup; do not impose a short timer on the owner's password entry.
+Close the connection and exit; Python object deletion is not a guarantee of
+memory zeroization.
+
+## Plaintext boundary and unresolved provider logging
+
+The actual password is plaintext **inside** the TLS-protected protocol payload
+because Neon requires that input. The helper keeps it out of local commands,
+files and output; it cannot guarantee exclusion from provider-managed database
+logs, privileged tracing, crash dumps, hosted-machine inspection or compromised
+extensions. Neon's cited documentation does not establish comprehensive
+redaction of password-bearing SQL across provider logs. Do not claim otherwise.
+
+The owner must accept this specific hosted trust and provider logging boundary
+in the concrete operational approval, or choose a provider-confirmed alternative
+before execution. A source merge or the general permission to perform merges
+does not resolve this boundary. Console reset of a newly SQL-created passwordless
+NOLOGIN role is not a verified fallback; do not promise it works or assume that
+reset preserves attributes. Do not create an elevated Console role as a shortcut.
+
+## Remaining gates
+
+- Pin and independently review the candidate helper and dependency provenance.
+- The original offline unit tests exercise a fake adapter: they are not evidence
+  of real Psycopg escaping, PostgreSQL parsing or Neon behavior. Driver/local
+  database evidence must be recorded separately. The new supervisor subprocess
+  suite exercises actual OS process boundaries; independent review must assess
+  that evidence before approving operational deadlines.
+- Run the Python tests explicitly as a manual source-validation step:
+  `python -I -m unittest discover -s test -p test_publisher_test_password_setup.py`.
+  They are not automatically included in the repository's Node CI totals. This
+  package changes no workflow to make that claim. Record the observed manual
+  test count and result separately from GitHub CI. The supervisor tests have
+  their own explicit discovery pattern; no workflow is changed to include them.
+- Verify hidden-input failures, strict connection settings, wrong OID/identity,
+  unexpected membership/flags, escaping, rollback and indeterminate commit
+  behavior without real credentials. No real Neon mutation for implementation
+  testing is authorized by this draft.
+- Confirm the actual Codespace terminal/CA/dependencies and owner-only secret
+  handoff; review the exact non-secret baseline and existing role/grant state.
+- Obtain concrete authorization for named role creation/grants/password setup
+  and environment changes, with the logging/trust boundary understood. Honor
+  already granted scope; do not require duplicate authorization for it.
+- Perform post-setup checks before separately authorized LOGIN and dispatch.
+
+## Primary references
+
+- Neon role creation/password requirements:
+  https://neon.com/docs/manage/roles
+- GitHub browser environment secret setup:
+  https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets
+- Psycopg SQL composition (must be checked against the pinned release during
+  implementation): https://www.psycopg.org/psycopg3/docs/api/sql.html
+- Python hidden input: https://docs.python.org/3/library/getpass.html
+
+These references describe capabilities, not evidence that this setup has run.
+
+## Candidate invocation and baseline format
+
+Check the supplied local inputs without credentials first:
+
+```text
+python -I scripts/publisher_test_password_setup.py --check-inputs --baseline /ABSOLUTE/approved-role-baseline.json --ca /ABSOLUTE/verified-ca-bundle.pem
+```
+
+This mode requires neither a TTY nor the provider-logging acknowledgement. It
+never starts the supervisor, imports/connects the database driver, prompts for
+passwords or sends a network request. It reuses the strict baseline, isolated
+Linux/environment and installed driver metadata/origin checks. It loads a
+bounded PEM CA bundle through Python's SSL trust-store parser and requires at
+least one CA certificate. Only `INPUT_CHECKS_PASSED` or `INPUT_CHECKS_FAILED` is
+printed; success additionally requires exit code zero. Output failure exits
+nonzero. No file paths, OIDs, environment values or raw errors are printed.
+
+The CA must be an absolute regular-file path, not a final-component symlink,
+with at most 1 MiB of data. Nonblocking open and descriptor checks reject FIFOs
+and other special files; the read is capped even if file size changes. Existing
+baseline handling is unchanged. A real, independently approved baseline is
+still required; there is no automatic role discovery or invented OID fallback.
+
+Passing this check establishes local parsing/configuration only. It does not
+prove CA provenance, a valid Neon certificate chain, actual role/grant state,
+TTY availability, supervisor readiness, actual binary-driver loading or
+operational approval. Python SSL and Psycopg's bundled libpq/OpenSSL may
+have different behavior. Distribution metadata/origin is not full binary
+attestation. Files are not sealed by this check: no receipt/token is created,
+and no claim is made that later path substitution is impossible. Password mode
+repeats CA parsing inside its supervised setup phase before driver import and
+all secret prompts, while retaining actual driver version/origin checks there.
+Use an owner-controlled CA file and directory tree without untrusted writers,
+and keep them unchanged for the entire check/password-setting session. Checking
+the final file with `O_NOFOLLOW` does not reject symlinked parent directories or
+seal the pathname. Libpq later opens the CA path separately; an attacker able
+to replace the file or its directories between those operations can change the
+trust input. This procedure requires that local filesystem trust boundary; it
+does not claim to eliminate the path replacement race.
+
+The candidate requires explicit flags and rejects ambient `PG*`, `PSYCOPG*`,
+`OTEL_*`, `PYTHON*` and `SSL_CERT_*` variables, plus `LD_PRELOAD`,
+`LD_LIBRARY_PATH`, `OPENSSL_CONF` and `SSLKEYLOGFILE`, rather than silently
+inheriting client, loader, TLS or tracing configuration. It requires Python's
+isolated mode (`-I`), which removes the working/script directory and user site
+from normal import lookup and ignores Python environment configuration. It
+checks Psycopg's discovered origin before import and its actual `__file__`
+afterward against the interpreter's resolved `purelib`/`platlib` installation
+directories, then requires exactly version 3.3.6 before prompting.
+
+These checks reject workspace substitution; they do not authenticate package
+bytes or a compromised interpreter, installation directory, system-site startup
+hook or already-loaded native library. The interpreter and installed site
+packages must be independently trusted and dependency hashes/provenance reviewed
+before credential entry. Rejecting loader variables inside Python cannot undo
+code loaded before interpreter startup; start from a trusted clean environment.
+Launching password-setting mode still requires operational approval; the acknowledgement
+flag documents the operator's choice and is not a replacement for that approval.
+The following command contains no credential values:
+
+```text
+python -I scripts/publisher_test_password_setup.py --set-test-passwords --acknowledge-provider-logging --baseline /ABSOLUTE/approved-role-baseline.json --ca /ABSOLUTE/verified-ca-bundle.pem
+```
+
+The baseline contains only `owner_oid` and `roles`. `roles` contains exactly the
+three fixed role names, each mapping to an object with integer `oid` and
+`grantor_oid`. Supply independently approved observed catalog values; there are
+no default or example OIDs that may be accepted as actual evidence. The reader
+rejects duplicate JSON keys, unknown keys, malformed OIDs and duplicate role
+identities. Existing roles are never automatically adopted.
+
+## Linux network supervisor candidate
+
+The CLI now starts a separate supervisor/worker pair **before importing Psycopg
+or reading any password**. Only the worker receives hidden terminal input and
+uses the database. The parent receives single-byte phase/result messages, never
+passwords, connection strings, SQL text or exceptions. This is a source
+candidate requiring independent review and fault-injection evidence before
+operational approval. The unsupervised `perform()` function remains a test seam;
+only the reviewed CLI provides process supervision.
+
+The parent starts each deadline before acknowledging that the child may enter
+the phase. Unknown, duplicate and out-of-order messages fail closed; they cannot
+renew a timer. The fixed production budgets are:
+
+| Phase | Budget | Conservative deadline outcome |
+| --- | --- | --- |
+| CA parsing, driver import and version/origin checks | 15 seconds | Failed; no password entered |
+| Connect and initial catalog verification | 15 seconds | Failed; no password mutation requested |
+| Fresh verification, three changes, postcheck and commit | 30 seconds | Indeterminate, even if commit may not yet have started |
+| Rollback/close | 3 seconds | Indeterminate cleanup; no retry or rollback claim |
+| Worker result to acknowledged normal exit | 3 seconds | Failed before mutation; otherwise indeterminate |
+
+Administrator and new-password entry phases have **no deadline**. Normal active
+phase budgets total 66 seconds excluding owner input and OS scheduling overhead.
+If termination is needed, the parent sends SIGKILL first, then spends at most a
+further three seconds checking child exit with nonblocking waitpid. It does not
+wait indefinitely for a native client call, cleanup or terminal output. These
+are per-phase budgets, not a fresh budget for every SQL statement. There is no
+CLI/environment option to enlarge them. Shorter injected budgets exist only for
+local subprocess tests.
+
+The parent never loads the driver or inherits an already connected database
+session from the worker. The supported entry point requires single-threaded
+Linux execution; no fork occurs after credentials or native database state are
+created. The child sets Linux `PR_SET_PDEATHSIG` to SIGKILL and checks its expected
+parent PID immediately afterward, closing the parent-death-before-registration
+race. On a normal exception, Ctrl-C or SIGTERM, the supervisor terminates its worker and
+attempts to restore the terminal settings captured before forking. It does not
+read terminal input. If the supervisor itself is forcibly killed, its worker
+dies too, but automatic terminal echo restoration cannot be guaranteed; the
+owner may need to reset/reopen the terminal. Never paste a password to repair it.
+
+Only the parent emits a fixed final status using one nonblocking write, then
+restores stdout's original blocking flag in `finally`. File-status flags are
+shared with descriptors inherited from the invoking shell; duplicating stdout
+would not isolate that change. If the write or restoration fails, the CLI exits
+with code 2. A missing/truncated status or silent termination must be treated as
+indeterminate, even if no database mutation is known to have started. Stop and
+verify the state out of band before any next step; do not automatically retry
+or infer rollback from missing output. `PASSWORD_SETUP_CONFIRMED` is accepted
+only with exit code zero,
+valid phase order, acknowledged commit, completed cleanup and normal worker
+exit. Lost commit acknowledgement, abnormal worker termination after entering
+the mutation phase, cleanup errors or a cleanup deadline produce indeterminate
+status. No such status authorizes a retry or proves server rollback. A killed
+client cannot certify when the server releases resources.
+
+Server `statement_timeout=10000`, `lock_timeout=2000` and libpq
+`connect_timeout=10` remain useful inner limits. A Python signal handler alone
+would not enforce the outer bound because native code may defer that handler.
+The separate parent process avoids that dependency. A trusted Linux kernel,
+scheduler and interpreter remain assumptions: this is not a guarantee against
+machine suspension, an unkillable kernel task, privileged interference or a
+compromised installation. Subprocess tests and independent review must cover
+stalled connect/query/commit/cleanup, output backpressure, parent/worker death,
+input exemption and malformed protocol before treating this gate as closed.
+
+Python signal execution reference:
+https://docs.python.org/3/library/signal.html#execution-of-python-signal-handlers
