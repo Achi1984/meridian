@@ -1,0 +1,1953 @@
+{
+  "schemaVersion": "STRATEGY_INTEGRATION_INVENTORY_DRAFT_V1",
+  "purpose": "Pinned inventory for human-reviewed source-only integration planning; not executable or authorizing",
+  "sourceHead": "7bc92dc79afdc944bb7bed5f3faa9ae3bd1f03de",
+  "stackedBase": "5e33c91f383b6339d709bb6072186f72b4bda5a9",
+  "observedMain": "18304c935e6a5fed2df6a8e086d7de2f698c1a20",
+  "basePullRequest": {
+    "number": 758,
+    "state": "OPEN_UNMERGED"
+  },
+  "strategyPullRequest": 768,
+  "counts": {
+    "strategyDelta": 42,
+    "baseDelta": 79,
+    "union": 120,
+    "absentOnObservedMain": 115,
+    "differentOnObservedMain": 5
+  },
+  "flags": {
+    "inventoryOnly": true,
+    "fullSourceReviewComplete": false,
+    "dependencyClosureVerified": false,
+    "mergeAuthorized": false,
+    "dispatchAuthorized": false,
+    "empiricalRunAuthorized": false,
+    "runtimeAuthorized": false
+  },
+  "files": [
+    {
+      "path": "docs/strategy-lab/BENCHMARK_PLAN_20261013.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "ff8948c030ddd114a9c31e566170a9aa6036d439",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/CLAUDE_CONCEPT_DISPOSITION_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "1eaa37c8971aed5b37c976af16b11b1122c8e9a9",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/CLAUDE_ELLIOTT_DISPOSITION_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "27a8f840f1d0fbd10c9cf7a3fa3fde856d51cf3d",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/CORE_HISTORY_EXTENSION.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "5df8ac26ae8ed660a31c54ab84c8bdfa34d014f1",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/CROSS_MARKET_BASELINE.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "b781d613682b00117112a118ad2ecf9cf16cb9b6",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "CROSS_MARKET_PROTOTYPE",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Separate source packet unless demonstrated dependency of selected subset",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/CRYPTO_DATA_PREPARATION.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "791982140f2e8959ea34ba979b403c13f877db45",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/DUAL_LANE_BENCHMARK.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "20fec08596f554e1da18d4eaf575697a8da91709",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_CORRECTION_CONTRACT_DRAFT_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "0820b9384f252ccbc280ee27458d7e11fa771908",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_CORRECTION_HELPERS.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "2941edcb706c4ad2e9e533b47efe7041a8127634",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_PIVOT_ADMISSION_CONTRACT_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "b066a66f3fa6a75ae2b67b94d449b3d29915fa5b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_PIVOT_ADMISSION_IMPLEMENTATION.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "367e7286c31f2a230fd49f7b998d6968a6f633a5",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SOURCE_ASSESSMENT_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "b3388ad2f911450f564ddceea3ba2093bb46524e",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_FINDINGS_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "ed0a2d764bec84d60cbee108ecc1f4a41c30c332",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_PATH_CONTRACT_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "86124d137fdb62df394b89fd4558a4a4c806ac26",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_PATH_IMPLEMENTATION.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "84ffbc61781dfe4db4e3d954fdad87fc22957948",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/HISTORICAL_HANDOFF.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "b7e2f5f54a1eae5bb7ae6a1b40870aadd98277d8",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/OHLCV_AND_COSTS.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "c9e49545d8bb70c0e0149336b016b3e17397020c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/P1_HISTORICAL_EXPERIMENT_DRAFT.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "e5ec3241d2d4664e0fa13cb2305657428426b545",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/P1_SYNTHETIC_RUNNER.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "80ae56ba69175b70beb57517493526000784d279",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/P1_TIME_SEPARATION.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "fedfb3cb78064309df936051417486e3c19bad4c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/PAYOFF_POLICY_MIGRATION.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "abee2ee846d7807539b4b1041c2c6c5e1ff9bb2a",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/PHOTO_STRATEGY_MAPPING_20261013.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "5a9215d244f7433975a89e48e5b9b09069cfb6ed",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/RANK_PANEL_AUDIT.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "dc78609519fbed571a8f936790f1c6e9ff3f3775",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/README.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "340cd9c740801dc65f23c5f8f6d82f66a5d79831",
+      "observedMainBlob": "4d99a09de43feb5246231200eca7941f9e2154a7",
+      "mainRelation": "DIFFERENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/REPLAY_TIME_ADMISSION.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "b7677d4a346550d3d4244ef2fae733717cb59d68",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_JOURNAL.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "1a200b2290ce1d6583a481908a2443fb0c9e01cb",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_LEDGER.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "f5e2343f674cf6c449c811a55b5fe1dc525f9591",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_LIFECYCLE.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "90bcb393e59b07b0ad13be8439a7bf35a25211f6",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_RISK_SIZING.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "6a78ece2df15345db09c8f849049623045b4aaf3",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_SIMULATION_STEP.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "3b80038c5dfaca792a27da74f57316881198cf87",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_AUTONOMY_HANDOFF_CONTRACT_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "f6b53f1205d76ee4b3d5d87b952b83469f16dbfa",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "OFFLINE_METADATA",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Metadata-only; host enforcement remains separate",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_COVERAGE_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "6cc0ec4bbd89f0051a91b4cc446654ee65a3309f",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_WORK_PACKET_V1.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "7929af396d7d635c9665d2408a96c4b01e17400f",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "OFFLINE_METADATA",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Metadata-only; host enforcement remains separate",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/TRADE_PLAN_CRV.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "990dbf4cbd51ac3e9eb2bdfb68909c99bf4acce4",
+      "observedMainBlob": "2a2ce4c23842a9ed5570c46b0a69e70a28f224ab",
+      "mainRelation": "DIFFERENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/TREND_PULLBACK_PROTOTYPE.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "06a95cf1c47a5a712a275790ea6621a50d6e702c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/TRIAL_LEDGER_RECONCILIATION_20261014.md",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "15e439ba507f590dde31ab212c108904fe21bfe6",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/UNIVERSE_SOURCE_AUDIT.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "5eb9ee8fcf333289f532c5cb5d644a6643623e04",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/WARMUP_DATA_AUDIT.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "a2135b5bb7db28a81772ee7c21890c09f330ab35",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/WILLIAMS_RESEARCH_20261013.md",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "487719ca44b2d6f8565ef009576601eddb080392",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DOCUMENTATION_REQUIRES_REVIEW",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/audit-core-handoff.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "05a4e859e176b1e65be7047a25d3aeae76998ad3",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "DATA_TOOLING",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Requires separate IO and data-use review; not needed for first synthetic packet",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/campaign-20261013.json",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "0e9db15f6155eda1d98c86d4eda9081ecec6d02a",
+      "observedMainBlob": "925df80ed748901f169cc898c66b320dab75e9c3",
+      "mainRelation": "DIFFERENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/BTC.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "4fff30099bc4f22d37c7ad83e66d5a7648c23f88",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/ETH.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "d7768ee70e47d6951fe99a46c117acf04dd37507",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/extension-audit.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "f3ef9b978186f1154a5b3b0394f62c492dec994b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/manifest.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "19722b4f307f3d6eb341d6b7f173769a1d6d192b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/cross-market-manifest.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "942ad55432bc4e2ced769980f676546afcdd8985",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/cross-market-trend.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "339da5a4fd507dbf9c5a9a9ee7a06f8523f3ddfd",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "CROSS_MARKET_PROTOTYPE",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Separate source packet unless demonstrated dependency of selected subset",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/crypto-manifest.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "e6da8fcbb5b60ecdfbbdac186ade5ebf8d8dcf44",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/data-probe-results-20261013.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "73c430bb4086f41a5b870c713bba7da02941e3ad",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-correction-helpers.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "b134d1d069ba70452f64edb6cc6a03ed8c7afb55",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-pivot-admission.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "6329c6cec83c611caeb4a3a53bf0a3cf47be7477",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-synthetic-path.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "6baedca3e0965cb42ef415d687c0afe1bc6bc1a9",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-v1.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "aa2eefd3dc9e2169a184c1ac625207c44102f8ca",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "FROZEN_COMPARATORS",
+      "proposedDisposition": "SELECT_BYTE_IDENTICAL",
+      "dispositionReason": "Historical comparator; no repair or recomputation",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-wave5.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "a5923b65ef439caf1a8766b6982ac46c2013e33b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "FROZEN_COMPARATORS",
+      "proposedDisposition": "SELECT_BYTE_IDENTICAL",
+      "dispositionReason": "Historical comparator; no repair or recomputation",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/normalize-binance-daily.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "e8966ccc30cbe5b547ce793325a85d556e2e06a4",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "DATA_TOOLING",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Requires separate IO and data-use review; not needed for first synthetic packet",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/normalizer-probes-20261013.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "2f537bef4dd7abfeba708fc585d083260230833a",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ADA.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "fa1739b3f0d6c8678853e849fb0d2a793634e802",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/APT.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "95ee3d5657d199b2ec32316c2d6dc23792a78998",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/AVAX.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "f180d0ce83212d7119e83838e2fdda58987533f2",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BCH.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "d9c836255a5e76b09ee3eff584970f74b2d1b09b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BNB.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "0755f61f6fbc756b81ceea68d3c9442f1fbf3bcd",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BTC.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "a0dedbb9e5fe157f02d06a020376093ebb0f6688",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/DOGE.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "87b9b132cd79156850f2689b2c8b05dc02a2bee4",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/DOT.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "04a87af4b57fb43dce86a4bad5cf46c20b147c18",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ETH.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "6ff2e2c74892baf690e93aea095476faa9633604",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/FET.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "8fbe6f6437bbedd667e51c060af013202a1173c6",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ICP.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "a6c503a60bbaa614668d14ad11e357d9b625c64d",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/LINK.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "26046610b072f36df86b9ca876c3e9293ac125a7",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/LTC.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "f6dcbf38da4b9fcef3626038257ffb3578d06b1c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/NEAR.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "15667bc7e38d56cb92cb36d77173c1ae3b60828c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/PEPE.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "690c87aff83faa640552d8957f1f5c10ee0146a2",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SHIB.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "acad88dff8a65a6102e1598fdd2d120c70c001ba",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SOL.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "b55b7afefcdc32abafd8bfc495b3a90bf836ac4c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SUI.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "c21065874b64572ac2956cbd3fa5b8b8484bb978",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/TRX.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "3b804bf738829182840fa6c738ef63eaff383ded",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/UNI.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "bdd8ca27b80255701f3262e873f2913773ef5ed5",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/XRP.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "fa99b33d79fb96709436d056040060d44cbbdfbf",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/manifest.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "c59c4f163da40c0c0665de117eac1c9754dbb4c2",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/p1-historical-experiment-draft.json",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "5234ffc13d65084ca31df22bbe0e44f16ed2b615",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "RESEARCH_DOCUMENTATION",
+      "proposedDisposition": "SELECT_FOR_DOCUMENT_REVIEW",
+      "dispositionReason": "Preserve concept coverage, original evidence and unresolved research gates",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/p1-synthetic-runner.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "db99fed1ddbc0fe12bab234ba38f9741372382b5",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/prepare-core-history.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "5f67c3c6ff4b353b193b4029a7e8849784875eef",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "DATA_TOOLING",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Requires separate IO and data-use review; not needed for first synthetic packet",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/prepare-ohlcv-windows.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "0afd6b544d8891153783ae1799b16ec7c9cf5bb3",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "DATA_TOOLING",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Requires separate IO and data-use review; not needed for first synthetic packet",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/prepared-close-windows-20241013.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "9aca62e27c2ea3947bd76fa48ba51d5647f3ccec",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20230101.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "7e5d62bd2f688d4598ee50ae2534ce80918127b2",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20230702.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "714ba84da3d7774dfb19fc0961c0225042daa112",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20240107.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "ae54b18d26397548d7f1bf22333efe91e9c1af1c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20240707.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "faa9f19eb669b1fb3a095c18bce55951ccce9dcf",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/manifest.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "f6b38b2be1201dcee0d6f1f338b83f86123f4f6f",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/replay-time-admission.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "d25d133067c8f5e11e1cb553414842c3725e48b0",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-cost-assumptions.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "559af6caa0c61b3cdd6518f8201eb4487fff7493",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-journal.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "9e502aabc39a19b01d29a0a568d3bc4746dbd1c5",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-ledger.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "54748e14e0479d51974bc31de858e7be6ddfcf25",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-lifecycle.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "3a09f1bef970a08732314a4f3672e6946274445d",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-risk-sizing.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "7c7a036eefc0f2f62b5af47c579e4511950f637e",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/spot-simulation-step.mjs",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "fd425a61c02989f5b4965c120a5b1303671aa457",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/strategy-work-packet.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "0cb062edb9f636a93c236d273a23d20c2b94bfda",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "OFFLINE_METADATA",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Metadata-only; host enforcement remains separate",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback-core.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "b1d5de1fdcb987f6d589e2feaea3abad35d1ba26",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback-replay.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "3a96781b068c9517518a2afd40b03d6801a22149",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback.mjs",
+      "originPullRequests": [
+        758,
+        768
+      ],
+      "sourceBlob": "fa536f477382b39dd599fd889a51b3b275c00177",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/trial-ledger-reconciliation-20261014.json",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "1394dcbb82d28425cd9d6fbe6158eb70e0b2e81c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/universe-join-probe-20241013.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "73e7aaf0da66d3370affc45bac4bf2d46d73a080",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/validate-campaign.mjs",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "333a35d5f1b6c1a329ef011225764a7509613685",
+      "observedMainBlob": "2fa98525cdd15d21e7f0b813e0226d7303df552f",
+      "mainRelation": "DIFFERENT",
+      "kind": "SOURCE_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "docs/strategy-lab/warmup-history-audit-20241013.json",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "3410997a5d361463c23f88f04f95c0a66b3b0608",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "DATA_OR_CONFIGURATION_REQUIRES_CLASSIFICATION",
+      "proposedGroup": "HISTORICAL_EVIDENCE",
+      "proposedDisposition": "RETAIN_BY_PINNED_REFERENCE",
+      "dispositionReason": "Inspected data/provenance; no fresh holdout or execution authority",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/cross-market-trend.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "81cc6eb4d127557f12ec3298005773af52875d79",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "CROSS_MARKET_PROTOTYPE",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Separate source packet unless demonstrated dependency of selected subset",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/elliott-correction-helpers.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "a9c7ddd59b20e261c80d5446b70a428b7401fa98",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/elliott-frozen-characterization.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "0f997e9f3505bcad8947f9470433052ffd1af6e2",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/elliott-pivot-admission.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "61080e8f2f92fd63e7cec41d3005842f9b523947",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/elliott-synthetic-path.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "1c78d41f3aebd503e0139f0290665deba5f2d691",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "ELLIOTT_SYNTHETIC",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Synthetic helpers and evidence; no efficacy or wave-entry engine claim",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/normalize-binance-daily.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "4174e6b7e199cc4c0279ca52d79051e46f4621ac",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "DATA_TOOLING",
+      "proposedDisposition": "DEFER",
+      "dispositionReason": "Requires separate IO and data-use review; not needed for first synthetic packet",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/p1-synthetic-runner.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "f1c59a51c33ac60531796ee6382d54e67240f3fc",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/replay-time-admission.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "24797a99ad7f28cb8e9dfae4ebab1fd7a84f5303",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/spot-journal.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "5f72b8fbd765b3c76f5dd4a4e703731446c2dc76",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/spot-ledger.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "bbd1bc8fc890cf7ea60c70b587e0058fc7c49c39",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/spot-lifecycle.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "c86530a407fcccb3880ff2bfdbce3e5e3594335b",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/spot-risk-sizing.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "25c1639627a4cce77569b01d0c76cd20b5bc1949",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/spot-simulation-step.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "6f2bb7b1d6278372fc5877803d343dbf41fbe9f3",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/strategy-campaign-draft.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "62882a4e2c6bf4f9df6b7ba24aaaacc4868c82ce",
+      "observedMainBlob": "daa14839fe3304ea1abceac307c2d10b148cc1a8",
+      "mainRelation": "DIFFERENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "PROTECTED_POLICY",
+      "proposedDisposition": "SELECT_AFTER_POLICY_RECONCILIATION",
+      "dispositionReason": "Compare current main; explicit protected-path review and unresolved trial accounting",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/strategy-work-packet.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "606d190863fe16863814bc30fda0291d3063033f",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "OFFLINE_METADATA",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Metadata-only; host enforcement remains separate",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/trend-pullback-replay.test.js",
+      "originPullRequests": [
+        768
+      ],
+      "sourceBlob": "e3892422ee59e07cf1f902dd439571c4c893332c",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    },
+    {
+      "path": "test/trend-pullback.test.js",
+      "originPullRequests": [
+        758
+      ],
+      "sourceBlob": "d7eeaa78beb98cc50b14a96e42fbcabe38b405f1",
+      "observedMainBlob": null,
+      "mainRelation": "ABSENT",
+      "kind": "SYNTHETIC_TEST_CANDIDATE_REQUIRES_REVIEW",
+      "proposedGroup": "P1_SYNTHETIC_DEPENDENCIES",
+      "proposedDisposition": "SELECT_AFTER_DEPENDENCY_REVIEW",
+      "dispositionReason": "Review recursive imports, IO boundaries and pure test scope before target transfer",
+      "nextOwnerRole": "STRATEGY_LEAD",
+      "dependencyStatus": "NOT_VERIFIED",
+      "contentReviewStatus": "PENDING"
+    }
+  ],
+  "dispositionsAreProposals": true,
+  "reviewStatus": "PENDING_INDEPENDENT_REVIEW"
+}
