@@ -54,10 +54,29 @@ extra-field or stalled records reject before settlement. The source is read befo
 the comment and again before final fresh admission, catching observed revocation
 and expiry during the extra await. Both reads have five-second bounds.
 
-This is a fail-closed consumer contract, not an implemented sender-response store.
+This is a fail-closed consumer contract, not a deployed sender-response store.
 The future host must supply an authenticated, protected store populated exclusively
 from the actual sender response; request/comment/model content cannot populate it.
 No atomicity between the last read and DB settlement is claimed: later revocation
 still needs a transactional host design. No provenance flag is promoted.
 Four further tests cover exact record binding, missing source, immutable lookup,
 observed revocation, final-read expiry and a stalled source.
+
+`publication-send-record.mjs` now prepares the concrete PostgreSQL adapter and
+`publication-send-record.sql` its separate, unapplied schema fixture. One immutable
+record links a reservation to a globally unique comment ID; digests/run identity
+are read from the immutable reservation columns. Retention uses one parameterized
+INSERT-SELECT with a reservation row lock and all five bindings plus RESERVED state.
+Conflicts never become acknowledgments; lost replies remain UNCERTAIN without retry.
+The reader returns only the service's six fields, strictly parses bigint text,
+requires RESERVED state and bounds its wait to 4.5 seconds. This JS deadline does
+not cancel database work; host statement_timeout remains necessary.
+
+Only a trusted sender pool may insert records from actual sender responses.
+Confirmation's record-reader pool must be SELECT-only; its settlement pool is
+separate. No role is created or granted here. The fixture blocks record mutation,
+deletion and truncation, but administrative owners remain trusted. The fixture is
+not installed or wired into the completed isolated-test runner. Seven adapter tests
+and one real reader/service composition test use synthetic database responses.
+SQL execution, role separation, race/rollback behavior and durability remain
+unverified for this new fixture pending a separately approved isolated DB run.

@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {prepareAdmission,reserveAdmission,confirmPublication} from '../scripts/publication-service.mjs';
 import {createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
+import {createSendRecordReader} from '../scripts/publication-send-record.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -118,6 +119,19 @@ test('concrete GET reader composes with real admission and conditional settlemen
   const r=await confirmPublication(s.request,s.config,s.deps);assert.equal(reads,1);
   assert.equal(r.kind,bad?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
   assert.equal(s.writes(),bad?0:1);assert.equal(r.sendAllowed,false);
+ }
+});
+test('concrete database record reader composes with confirmation and missing record rejects',async()=>{
+ for(const missing of [false,true]){
+  const s=confirmation();let reads=0;
+  s.deps.readSendRecord=createSendRecordReader({query:async(_sql,args)=>{
+   reads++;return missing?{rowCount:0,rows:[]}:{rowCount:1,rows:[{
+    operation_key:args[0],intent_sha256:args[1],body_sha256:args[2],
+    run_id:String(args[3]),run_attempt:args[4],comment_id:'3333'}]};
+  }});
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(r.kind,missing?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),missing?0:1);assert.equal(reads,missing?1:2);
  }
 });
 test('confirmation requires exact trusted sender record before comment lookup',async()=>{
