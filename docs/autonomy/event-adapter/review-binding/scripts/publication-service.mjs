@@ -46,12 +46,16 @@ export async function prepareAdmission({token,body},trustedConfig,{readEvidence,
  try{
   // Snapshot trusted bootstrap configuration before any asynchronous work.
   const config=JSON.parse(JSON.stringify(trustedConfig));
-  need(Object.keys(config).sort().join()==='approvalUpdatedAt,expiresAt,issuedAt,ownerId,pinsRaw,policyRaw,scopeRaw,subject');
+  const environmentProfile=Object.hasOwn(config,'environment');
+  need(Object.keys(config).sort().join()===(environmentProfile
+   ?'approvalUpdatedAt,environment,expiresAt,issuedAt,ownerId,pinsRaw,policyRaw,scopeRaw,subject'
+   :'approvalUpdatedAt,expiresAt,issuedAt,ownerId,pinsRaw,policyRaw,scopeRaw,subject'));
   need(Number.isSafeInteger(config.ownerId)&&config.ownerId>0&&typeof config.approvalUpdatedAt==='string');
   need(typeof body==='string'&&Buffer.byteLength(body)<=8192&&typeof token==='string'&&token.length<=16384);
   const plan=await planForPublication(body,config),pins=plan.intent.pins;
   const identity=await verifyPublicationToken(token,{repositoryId:String(pins.repositoryId),
-   ownerId:String(config.ownerId),runId:String(pins.runId),controlSha:pins.controlSha,subject:config.subject},{fetchFn,clock});
+   ownerId:String(config.ownerId),runId:String(pins.runId),controlSha:pins.controlSha,subject:config.subject,
+   ...(environmentProfile?{environment:config.environment}:{})},{fetchFn,clock});
   need(identity.tokenVerified===true);
   // Reader is deployment-injected, not read from the request/config or JWT.
   const snapshot=await boundedRead(readEvidence);
@@ -150,3 +154,4 @@ export async function confirmPublication(request,trustedConfig,dependencies){
   return {kind:'INACTIVE_CONFIRMATION_RESULT',outcome:result.outcome,...flags};
  }catch{return {kind:'CONFIRMATION_REJECTED',...flags};}
 }
+
