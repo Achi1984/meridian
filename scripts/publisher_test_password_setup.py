@@ -194,13 +194,23 @@ def supervise(worker, budgets=None):
 
 
 def emit_status(outcome):
-    """One best-effort nonblocking write; output backpressure cannot hang exit."""
+    """One nonblocking write; restore flags shared with the invoking shell."""
+    original_blocking = None
+    delivered = False
     try:
+        original_blocking = os.get_blocking(1)
         os.set_blocking(1, False)
         payload = (outcome + '\n').encode('ascii')
-        return os.write(1, payload) == len(payload)
+        delivered = os.write(1, payload) == len(payload)
     except BaseException:
-        return False
+        delivered = False
+    finally:
+        if original_blocking is not None:
+            try:
+                os.set_blocking(1, original_blocking)
+            except BaseException:
+                delivered = False
+    return delivered
 
 IDENTITY_SQL = """
 SELECT current_database(), current_user, session_user,

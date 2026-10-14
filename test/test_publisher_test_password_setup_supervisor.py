@@ -4,6 +4,7 @@ python -I -m unittest discover -s test -p test_publisher_test_password_setup_sup
 Linux process primitives are required; failures are not silently skipped.
 """
 from pathlib import Path
+import os
 import subprocess
 import sys
 import time
@@ -65,10 +66,46 @@ if scenario=='full_output':
     try:
         while True: os.write(wr,b'x'*4096)
     except BlockingIOError: pass
+    os.set_blocking(wr,True)
+    alias=os.dup(wr)
     os.dup2(wr,1); os.close(wr)
     # No reader consumes this pipe; emit must return promptly, then exit2.
     assert m.emit_status(result) is False
-    os.close(rd); os._exit(2)
+    assert os.get_blocking(1) is True and os.get_blocking(alias) is True
+    os.close(alias); os.close(rd); os._exit(2)
+
+if scenario=='stdout_success':
+    os._exit(0 if m.emit_status(m.STATUS_OK) else 2)
+
+if scenario in ('output_partial','output_broken','output_restore_failure'):
+    saved=os.dup(1)
+    rd,wr=os.pipe(); alias=os.dup(wr); os.dup2(wr,1); os.close(wr)
+    original_write=m.os.write; original_set=m.os.set_blocking
+    if scenario=='output_partial':
+        # A small pipe write is normally atomic. Inject the documented short
+        # return path while retaining a real write and shared descriptor flags.
+        m.os.write=lambda fd,data: original_write(fd,data[:5])
+    if scenario=='output_broken':
+        os.close(rd); rd=None
+    restores=[]
+    if scenario=='output_restore_failure':
+        def fail_restore(fd,blocking):
+            restores.append(blocking)
+            if blocking: raise OSError('SYNTHETIC_SECRET_MUST_NOT_LEAK')
+            return original_set(fd,blocking)
+        m.os.set_blocking=fail_restore
+    assert m.emit_status(m.STATUS_OK) is False
+    m.os.write=original_write; m.os.set_blocking=original_set
+    if scenario=='output_restore_failure':
+        assert restores==[False,True]
+        original_set(1,True)
+    else:
+        assert os.get_blocking(1) is True and os.get_blocking(alias) is True
+    os.dup2(saved,1); os.close(saved); os.close(alias)
+    if rd is not None:
+        payload=os.read(rd,4096); os.close(rd)
+        assert payload==(b'PASSW' if scenario=='output_partial' else (m.STATUS_OK+'\n').encode())
+    finish(m.STATUS_UNKNOWN)
 
 if scenario=='exit_stall':
     original=m._child_transition
@@ -174,6 +211,33 @@ class SupervisorTests(unittest.TestCase):
 
     def test_full_stdout_pipe_never_blocks_exit_or_reports_success(self):
         self.scenario('full_output', '', 2)
+
+    def test_output_restores_flags_on_the_parent_shared_open_file_description(self):
+        for originally_blocking in (True, False):
+            with self.subTest(blocking=originally_blocking):
+                rd, wr = os.pipe()
+                try:
+                    os.set_blocking(wr, originally_blocking)
+                    alias = os.dup(wr)
+                    try:
+                        result = subprocess.run([sys.executable, '-I', '-c', CHILD, str(FIXTURES), 'stdout_success'],
+                                                stdout=wr, stderr=subprocess.PIPE, timeout=8)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(result.stderr, b'')
+                        self.assertEqual(os.get_blocking(wr), originally_blocking)
+                        self.assertEqual(os.get_blocking(alias), originally_blocking)
+                    finally:
+                        os.close(alias)
+                    os.close(wr); wr = None
+                    self.assertEqual(os.read(rd, 4096), b'PASSWORD_SETUP_CONFIRMED\n')
+                finally:
+                    os.close(rd)
+                    if wr is not None: os.close(wr)
+
+    def test_partial_broken_and_flag_restore_failures_cannot_report_success(self):
+        for scenario in ('output_partial', 'output_broken', 'output_restore_failure'):
+            with self.subTest(scenario=scenario):
+                self.scenario(scenario, 'PASSWORD_SETUP_INDETERMINATE', 2)
 
     def test_parent_death_kills_worker_even_in_unbounded_input(self):
         self.scenario('parent_death', 'PASSWORD_SETUP_INDETERMINATE', 2)

@@ -242,6 +242,13 @@ attestation. Files are not sealed by this check: no receipt/token is created,
 and no claim is made that later path substitution is impossible. Password mode
 repeats CA parsing inside its supervised setup phase before driver import and
 all secret prompts, while retaining actual driver version/origin checks there.
+Use an owner-controlled CA file and directory tree without untrusted writers,
+and keep them unchanged for the entire check/password-setting session. Checking
+the final file with `O_NOFOLLOW` does not reject symlinked parent directories or
+seal the pathname. Libpq later opens the CA path separately; an attacker able
+to replace the file or its directories between those operations can change the
+trust input. This procedure requires that local filesystem trust boundary; it
+does not claim to eliminate the path replacement race.
 
 The candidate requires explicit flags and rejects ambient `PG*`, `PSYCOPG*`,
 `OTEL_*`, `PYTHON*` and `SSL_CERT_*` variables, plus `LD_PRELOAD`,
@@ -316,9 +323,15 @@ read terminal input. If the supervisor itself is forcibly killed, its worker
 dies too, but automatic terminal echo restoration cannot be guaranteed; the
 owner may need to reset/reopen the terminal. Never paste a password to repair it.
 
-Only the parent emits a fixed final status using one nonblocking write. If the
-output cannot be delivered, the CLI exits nonzero; a missing/truncated status
-is not success. `PASSWORD_SETUP_CONFIRMED` is accepted only with exit code zero,
+Only the parent emits a fixed final status using one nonblocking write, then
+restores stdout's original blocking flag in `finally`. File-status flags are
+shared with descriptors inherited from the invoking shell; duplicating stdout
+would not isolate that change. If the write or restoration fails, the CLI exits
+with code 2. A missing/truncated status or silent termination must be treated as
+indeterminate, even if no database mutation is known to have started. Stop and
+verify the state out of band before any next step; do not automatically retry
+or infer rollback from missing output. `PASSWORD_SETUP_CONFIRMED` is accepted
+only with exit code zero,
 valid phase order, acknowledged commit, completed cleanup and normal worker
 exit. Lost commit acknowledgement, abnormal worker termination after entering
 the mutation phase, cleanup errors or a cleanup deadline produce indeterminate
