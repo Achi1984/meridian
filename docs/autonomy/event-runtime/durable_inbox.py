@@ -149,7 +149,12 @@ def _connection(database):
 def _receipt(row):
     need(row is not None,'EVENT_NOT_FOUND')
     event_id,binding,state,owner,fence,attempts,result_sha,result_json,continuation_json,continuation_sha=row
-    decoded=json.loads(binding);need(_validate(decoded)==binding and _key(decoded)==event_id,'STORED_BINDING_CORRUPT')
+    try:
+        need(type(binding) is str,'STORED_BINDING_CORRUPT')
+        decoded=json.loads(binding)
+        need(_validate(decoded)==binding and _key(decoded)==event_id,'STORED_BINDING_CORRUPT')
+    except (ValueError,TypeError,RecursionError):
+        raise InboxError('STORED_BINDING_CORRUPT') from None
     if state in ('COMPLETE','UNKNOWN'):need(_digest(result_sha),'STORED_RESULT_DIGEST')
     else:need(result_sha is None and result_json is None,'STORED_RESULT_STATE')
     summary=None
