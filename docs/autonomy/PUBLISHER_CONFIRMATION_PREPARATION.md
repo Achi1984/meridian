@@ -19,12 +19,12 @@ Missing rows, conflicts or ambiguous DB replies never trigger retries or sending
 This records matching observed content, not independent proof that this particular
 workflow created the comment. Shared bot identity is insufficient for provenance.
 The future sender must retain its actual response and bind it to the reserved
-operation; trusted bootstrap and fixed authenticated comment-reader installation
-remain outstanding. A comment can change after observation, so consumers need
+operation; trusted bootstrap and host installation of the prepared fixed-origin
+comment reader remain outstanding. A comment can change after observation, so consumers need
 fresh readback and an authenticated receipt service. No receipt endpoint or durable
 publication proof is claimed. All authority/provenance/durability flags stay false.
 
-The reader has a five-second bound. Final admission repeats the bounded crypto and
+The service reader has a five-second bound. Final admission repeats the bounded crypto and
 evidence checks, so the host must budget the complete operation, not assume a
 five-second end-to-end request. DB timeout/autocommit constraints remain the
 trusted host's responsibility. A failed/late confirmation leaves the reservation
@@ -36,3 +36,12 @@ actor/mailbox/body; mid-read revocation/expiry; caller mutation; DB uncertainty;
 stalled reads; malformed requests/forged tokens; missing/invalid/edited timestamps.
 They do not perform publication
 or prove a deployed reader, sender or receipt channel.
+
+`createPublishedCommentReader` now supplies the concrete public GitHub GET reader.
+It accepts only a positive safe integer comment ID, fixes the repository and mailbox,
+returns only required fields, and shares the evidence reader's 4.5-second deadline,
+128 KiB streaming cap, exact response URL and no-redirect/no-retry transport.
+No credentials or alternate API origin are supplied. Six reader tests cover identity,
+field bounds, transport errors, deadline and abort behavior. A composition test feeds
+its actual parsed response through crypto/admission and conditional settlement,
+including a changed-body rejection. HTTP and database responses remain synthetic.

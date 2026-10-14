@@ -4,6 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {prepareAdmission,reserveAdmission,confirmPublication} from '../scripts/publication-service.mjs';
+import {createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -105,6 +106,18 @@ test('confirmation uses real admission checks and one exact reserved-row settlem
  const s=confirmation();const r=await confirmPublication(s.request,s.config,s.deps);
  assert.equal(r.kind,'INACTIVE_CONFIRMATION_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
  assert.equal(s.writes(),1);assert.equal(r.sendAllowed,false);assert.equal(r.provenanceVerified,false);
+});
+test('concrete GET reader composes with real admission and conditional settlement',async()=>{
+ for(const bad of [false,true]){
+  const s=confirmation();let reads=0;if(bad)s.comment.body+='changed';
+  s.deps.readPublishedComment=createPublishedCommentReader({fetchFn:async(url,options)=>{
+   reads++;assert.equal(url,s.comment.url);assert.equal(options.method,'GET');
+   return {status:200,url,redirected:false,body:new Response(JSON.stringify(s.comment)).body};
+  }});
+  const r=await confirmPublication(s.request,s.config,s.deps);assert.equal(reads,1);
+  assert.equal(r.kind,bad?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),bad?0:1);assert.equal(r.sendAllowed,false);
+ }
 });
 test('wrong comment identity actor mailbox or original bytes cannot settle',async()=>{
  for(const edit of [c=>c.id++,c=>c.url+='x',c=>c.issue_url=c.issue_url.replace('571','572'),
