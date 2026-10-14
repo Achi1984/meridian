@@ -76,7 +76,21 @@ Only a trusted sender pool may insert records from actual sender responses.
 Confirmation's record-reader pool must be SELECT-only; its settlement pool is
 separate. No role is created or granted here. The fixture blocks record mutation,
 deletion and truncation, but administrative owners remain trusted. The fixture is
-not installed or wired into the completed isolated-test runner. Seven adapter tests
+not installed. Seven adapter tests
 and one real reader/service composition test use synthetic database responses.
 SQL execution, role separation, race/rollback behavior and durability remain
 unverified for this new fixture pending a separately approved isolated DB run.
+
+The isolated harness now includes a prepared send-record extension, not yet run.
+It loads the actual schema/adapter into the same disposable localhost PostgreSQL16
+container and creates separate test sender and reader roles. Sender gets only
+UPDATE(created_at) for row-lock eligibility; immutable-reservation triggers reject
+changes, and status updates are not granted. Tests cover conflicting concurrent
+retention, global comment uniqueness, lost acknowledgments, mismatched bindings,
+role denials, immutable triggers, integer bounds and rollback. Both retain/settle
+orderings use observed database lock waits before releasing the held transaction.
+The existing SIGKILL/restart test additionally verifies committed send records.
+The manual workflow, fixed image digest and localhost-only target are unchanged.
+Syntax and independent source review do not substitute for executing these checks.
+The prior one-run authorization was consumed by run38520287239; this extension
+requires explicit approval of the reviewed PR and one new isolated run before use.
