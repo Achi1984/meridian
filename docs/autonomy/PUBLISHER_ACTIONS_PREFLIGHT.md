@@ -34,6 +34,14 @@ The pool adapter takes an injected audited PostgreSQL Pool constructor and three
 
 The bootstrap is one-shot per instance and retains reserve-before-publisher-credential ordering. Cancellation, late completion, failed cleanup or publication uncertainty never cause a retry. A new process or instance is not itself durable single-use enforcement; the existing PostgreSQL ledger must retain consumed operations. Existing recovery is limited to the original still-active run, first attempt and unexpired approval/token. After job exit, uncertainty requires owner reconciliation; this packet does not implement cross-job recovery. Never share the portfolio financial database or retry an uncertain publication.
 
+## Runner composition packet
+
+`publication-actions-test-runner.mjs` provides the source-only deployment seam around the existing identity, pools and bootstrap. The caller supplies an explicit allowlisted runner environment snapshot and independently trusted adapters. The wrapper captures runner identity before invoking the approved-manifest reader, compares the actual run context with the approved pins, and does not repair a conflicting approval by substituting current values. It does not read `process.env` or install a CLI or workflow.
+
+The approved manifest excludes identity and database credentials. Role credentials are acquired only after offline validation and runner-context checks, but before bootstrap construction because that existing API requires the complete database configuration. The publisher credential remains deferred until the existing reservation acknowledgement. Synthetic transports and injected pools prove composition and rejection behavior; they do not prove a protected environment, real grants or durable database behavior.
+
+The complete deployment boundary and unresolved run-bound approval handoff are recorded in [PUBLISHER_TEST_RUNNER_DEPLOYMENT.md](PUBLISHER_TEST_RUNNER_DEPLOYMENT.md). A TEST database does not make the publisher a dry run: invoking the composed host with real adapters can post a real mailbox comment. Installation and bounded publication therefore still need separate concrete authorization.
+
 ## Remaining deployment evidence
 
 Before deployment, complete the selected Neon pilot evidence: network reachability from Actions, verified direct application TLS, role ownership, bounded connect/statement timeouts, backup/restart behavior and DB/host clock behavior. The isolated schema/role checks do not substitute for these deployment checks. This source packet requires no new paid resource and approves no additional spend. No connection string or secret is included in this packet.
@@ -45,4 +53,5 @@ Before installation/activation, review the exact workflow, permissions, protecte
 Environment identity packet: OIDC and service suites 53/53 pass; complete local publisher Node suites 154/154 pass, zero fail/skip/cancel/todo. The CI bridge directly includes OIDC/service suites and passed 109/109 before the Actions composition additions. PR784 source was independently reviewed and merged after exact-head CI. Existing ref-profile fixtures remain supported.
 
 The Actions composition was independently reviewed in PR785 and passed the exact-head CI bridge156/156 and overall suite2433/2433 before merge. Tests use synthetic transports, signed test tokens and injected database pools. The root CI bridge includes all three Actions suites. They are not evidence of a real token endpoint, database connection, protection configuration or live publication. The endpoint-provenance followup requires its own exact-head CI and independent review.
+
 
