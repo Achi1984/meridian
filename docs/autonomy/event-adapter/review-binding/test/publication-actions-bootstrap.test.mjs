@@ -98,7 +98,7 @@ function setup(store){
  const manifest={body:s.request.body,trustedConfig:s.config,
   hostContext:{repository:'Achi1984/meridian',actorId:s.config.ownerId,event:'workflow_dispatch',
    ref:'refs/heads/main',runAttempt:1,runId:p.runId,sha:p.controlSha},
-  identityConfig:{requestUrl:'https://token.test.invalid/oidc',endpointPin:'https://token.test.invalid/oidc',
+  identityConfig:{requestUrl:'https://synthetic.actions.githubusercontent.com/oidc',endpointPin:'https://synthetic.actions.githubusercontent.com/oidc',
    requestToken:'identity-test',audience:'meridian-negative-publisher'},
   databaseConfig:{host:'ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech',database:'publisher_test',reservation:{user:'reserve',password:'reserve-test'},
    senderRecord:{user:'sender',password:'sender-test'},sendRecordRead:{user:'reader',password:'reader-test'}}};
@@ -215,7 +215,7 @@ test('abort after durable reservation blocks late credential and closes pools',a
 });
 test('real identity and pool adapters compose with actual signed-token preflight and host',async()=>{
  const s=setup(),constructed=[],ended=[];let acquisitions=0;
- s.deps.acquireToken=createActionsPublicationIdentity({fetchFn:async(url,options)=>{
+ s.deps.acquireToken=createActionsPublicationIdentity({runnerUrl:'https://synthetic.actions.githubusercontent.com/oidc',fetchFn:async(url,options)=>{
   acquisitions++;assert.equal(url,s.manifest.identityConfig.requestUrl+'?audience=meridian-negative-publisher');
   assert.equal(options.headers.authorization,'Bearer identity-test');
   return {status:200,url,redirected:false,body:new Response(JSON.stringify({value:s.request.token})).body};

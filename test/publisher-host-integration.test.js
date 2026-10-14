@@ -28,7 +28,7 @@ test('inactive publisher host integration: synthetic adapters and failure paths'
   return Number(matches[0][1]);
  };
  const tests=total('tests');
- assert.ok(tests>=156,`Expected all integrated suites (at least 156 tests), received ${tests}`);
+ assert.ok(tests>=160,`Expected all integrated suites (at least 160 tests), received ${tests}`);
  assert.equal(total('pass'),tests);
  for(const name of ['fail','cancelled','skipped','todo'])assert.equal(total(name),0);
  t.diagnostic(run.stdout.split('\n').filter(line=>/^# (tests|pass|fail|skipped) /.test(line)).join('; '));
