@@ -44,7 +44,7 @@ Console/API, which grants `neon_superuser` membership.
 
 1. Review and pin a small Python 3 / Psycopg 3 helper and its dependencies before
    any credential entry. A candidate implementation now exists at
-   `scripts/publisher_test_password_setup.py`, with nine offline fault-injection
+   `scripts/publisher_test_password_setup.py`, with offline fault-injection
    tests in `test/test_publisher_test_password_setup.py`. It has not been run
    against PostgreSQL or Neon and is not operationally approved. Psycopg 3.3.6 is
    pinned in `scripts/publisher-test-password-setup-requirements.txt` and checked
@@ -134,6 +134,16 @@ Independent administrators remain trusted: these checks do not establish
 isolation from concurrent privileged changes. Do not automatically revoke or
 repair differences to obtain a pass.
 
+The initial identity SELECT starts a transaction before the new-password
+prompts. That transaction remains open while the owner enters and confirms all
+three values. This is deliberately not described as a short transaction or as
+immune to provider/session idle-in-transaction timeouts. Do not disable or raise
+those limits to force completion. If the server closes the session while the
+owner is typing, the next verification must fail before mutation; stop and
+reconcile rather than automatically reconnecting/replaying inputs. Confirm
+actual idle timeout behavior and acceptable owner interaction time before
+operational use. Network/cleanup deadlines remain an unresolved gate below.
+
 Suppress database notices and exception details. Print only fixed statuses
 such as `PASSWORD_SETUP_CONFIRMED`, `PASSWORD_SETUP_FAILED` or
 `PASSWORD_SETUP_INDETERMINATE`. Never print query text, connection parameters
@@ -164,9 +174,14 @@ reset preserves attributes. Do not create an elevated Console role as a shortcut
 ## Remaining gates
 
 - Pin and independently review the candidate helper and dependency provenance.
-- The nine current offline tests exercise a fake adapter: they are not evidence
+- The current offline tests exercise a fake adapter: they are not evidence
   of real Psycopg escaping, PostgreSQL parsing, Neon behavior or enforced
   end-to-end network/cleanup deadlines. Resolve those limits before execution.
+- Run the Python tests explicitly as a manual source-validation step:
+  `python -I -m unittest discover -s test -p test_publisher_test_password_setup.py`.
+  They are not automatically included in the repository's Node CI totals. This
+  package changes no workflow to make that claim. Record the observed manual
+  test count and result separately from GitHub CI.
 - Verify hidden-input failures, strict connection settings, wrong OID/identity,
   unexpected membership/flags, escaping, rollback and indeterminate commit
   behavior without real credentials. No real Neon mutation for implementation
@@ -193,13 +208,27 @@ These references describe capabilities, not evidence that this setup has run.
 ## Candidate invocation and baseline format
 
 The candidate requires explicit flags and rejects ambient `PG*`, `PSYCOPG*`,
-`OTEL_*` and `PYTHON*` variables rather than silently inheriting client or tracing
-configuration. Launching it still requires operational approval; the acknowledgement
+`OTEL_*`, `PYTHON*` and `SSL_CERT_*` variables, plus `LD_PRELOAD`,
+`LD_LIBRARY_PATH`, `OPENSSL_CONF` and `SSLKEYLOGFILE`, rather than silently
+inheriting client, loader, TLS or tracing configuration. It requires Python's
+isolated mode (`-I`), which removes the working/script directory and user site
+from normal import lookup and ignores Python environment configuration. It
+checks Psycopg's discovered origin before import and its actual `__file__`
+afterward against the interpreter's resolved `purelib`/`platlib` installation
+directories, then requires exactly version 3.3.6 before prompting.
+
+These checks reject workspace substitution; they do not authenticate package
+bytes or a compromised interpreter, installation directory, system-site startup
+hook or already-loaded native library. The interpreter and installed site
+packages must be independently trusted and dependency hashes/provenance reviewed
+before credential entry. Rejecting loader variables inside Python cannot undo
+code loaded before interpreter startup; start from a trusted clean environment.
+Launching it still requires operational approval; the acknowledgement
 flag documents the operator's choice and is not a replacement for that approval.
 The following command contains no credential values:
 
 ```text
-python scripts/publisher_test_password_setup.py --set-test-passwords --acknowledge-provider-logging --baseline /ABSOLUTE/approved-role-baseline.json --ca /ABSOLUTE/verified-ca-bundle.pem
+python -I scripts/publisher_test_password_setup.py --set-test-passwords --acknowledge-provider-logging --baseline /ABSOLUTE/approved-role-baseline.json --ca /ABSOLUTE/verified-ca-bundle.pem
 ```
 
 The baseline contains only `owner_oid` and `roles`. `roles` contains exactly the

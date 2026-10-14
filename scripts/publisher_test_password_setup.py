@@ -1,10 +1,12 @@
 """Owner-operated candidate; no action on import. Never log database errors."""
 import argparse
 import getpass
+import importlib.util
 import json
 import os
 from pathlib import Path
 import sys
+import sysconfig
 import warnings
 
 HOST = 'ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech'
@@ -192,6 +194,19 @@ class QuietParser(argparse.ArgumentParser):
         raise ValueError('arguments')
 
 
+def verify_dependency_origin(module_path):
+    """Reject workspace/user-site substitution; installed packages remain trusted."""
+    if type(module_path) is not str:
+        raise ValueError('dependency origin')
+    origin = Path(module_path).resolve(strict=True)
+    paths = sysconfig.get_paths()
+    roots = {Path(paths[key]).resolve(strict=True) for key in ('purelib', 'platlib')}
+    if (not origin.is_file() or origin.name != '__init__.py'
+            or origin.parent.name != 'psycopg'
+            or not any(origin.is_relative_to(root) for root in roots)):
+        raise ValueError('dependency origin')
+
+
 def main(argv=None):
     outcome = STATUS_FAIL
     try:
@@ -201,14 +216,22 @@ def main(argv=None):
         parser.add_argument('--baseline', type=Path, required=True)
         parser.add_argument('--ca', type=Path, required=True)
         args = parser.parse_args(argv)
-        if (not sys.stdin.isatty() or not sys.stderr.isatty()
+        if (sys.flags.isolated != 1
+                or not sys.stdin.isatty() or not sys.stderr.isatty()
                 or sys.gettrace() is not None or sys.getprofile() is not None
-                or any(k.startswith(('PG', 'PSYCOPG', 'OTEL_', 'PYTHON')) for k in os.environ)):
+                or any(k.startswith(('PG', 'PSYCOPG', 'OTEL_', 'PYTHON', 'SSL_CERT_'))
+                       or k in {'LD_PRELOAD', 'LD_LIBRARY_PATH', 'OPENSSL_CONF', 'SSLKEYLOGFILE'}
+                       for k in os.environ)):
             raise ValueError('environment')
         if not args.ca.is_absolute() or not args.ca.is_file() or args.ca.stat().st_size == 0:
             raise ValueError('ca')
         baseline = read_baseline(args.baseline)
+        spec = importlib.util.find_spec('psycopg')
+        if spec is None:
+            raise ValueError('dependency')
+        verify_dependency_origin(spec.origin)
         import psycopg  # Late import; dependencies installed/reviewed before entry.
+        verify_dependency_origin(psycopg.__file__)
         if psycopg.__version__ != '3.3.6':
             raise ValueError('dependency')
         from psycopg import sql
