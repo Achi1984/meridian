@@ -151,6 +151,25 @@ test('capture snapshots POST response and request across admission awaits',async
  s.response.comment.id=4444;s.response.comment.body='changed';s.request.body='changed';s.config.pinsRaw='{}';return s.snapshot;};
  assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).outcome,'ACKNOWLEDGED');assert.equal(s.captures(),1);
 });
+test('capture pins original pool and query receiver across admission await',async()=>{
+ const s=capture();const original=s.deps.senderRecordPool;const query=original.query;
+ let replacementCalls=0,receiver;
+ original.query=async function(...args){receiver=this;return query(...args);};
+ s.deps.readEvidence=async()=>{
+  original.query=async()=>{replacementCalls++;throw Error('replaced method');};
+  s.deps.senderRecordPool={query:async()=>{replacementCalls++;throw Error('replaced pool');}};
+  return s.snapshot;
+ };
+ const r=await capturePublicationResponse(s.request,s.response,s.config,s.deps);
+ assert.equal(r.outcome,'ACKNOWLEDGED');assert.equal(s.captures(),1);
+ assert.equal(receiver,original);assert.equal(replacementCalls,0);assert.equal(s.writes(),0);
+});
+test('capture rejects missing host pool before admission lookup',async()=>{
+ const s=capture();let reads=0;delete s.deps.senderRecordPool;
+ s.deps.readEvidence=async()=>{reads++;return s.snapshot;};
+ assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).kind,'RESPONSE_CAPTURE_REJECTED');
+ assert.equal(reads,0);assert.equal(s.captures(),0);
+});
 test('capture conflict and lost write response never retry or confirm',async()=>{
  for(const lost of [false,true]){const s=capture();let calls=0;
  s.deps.senderRecordPool={query:async()=>{calls++;if(lost)throw Error('private');return {rowCount:0,rows:[]};}};

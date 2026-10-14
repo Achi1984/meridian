@@ -6,7 +6,13 @@ fetch only. No new credentials, actual comments, DB runs or activation are reque
 
 The primitive fixes the repository and mailbox571 POST URL, rejects redirects,
 limits body to8192 UTF-8 bytes and response to128KiB, and bounds the whole operation
-to4.5seconds including response streaming. It returns a captured201 response for
+to4.5seconds including response streaming.
+
+An optional Content-Length header is checked before acquiring a stream reader;
+malformed or oversized declarations reject early. The streaming cap always remains
+mandatory because the header can be absent or inaccurate and compression can change
+the decoded size. A single transport chunk can still be materialized before checking.
+It returns a captured201 response for
 `capturePublicationResponse`; that service still checks comment identity, actor,
 body and fresh admission before conditional record retention. JSON capture is not
 proof of authenticity: fetch injection is a trusted-host dependency.

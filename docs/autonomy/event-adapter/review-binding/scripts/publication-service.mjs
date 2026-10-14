@@ -100,6 +100,11 @@ function checkComment(comment,commentId,body,pins){
 // This preparation does not perform POST, acquire credentials or authenticate a host.
 export async function capturePublicationResponse(request,trustedResponse,trustedConfig,dependencies){
  try{
+  // Pin the host-selected pool and query method before admission awaits. The
+  // receiver stays the real pool; this is not authentication of that dependency.
+  const pool=dependencies?.senderRecordPool;
+  need(typeof pool?.query==='function');
+  const senderRecordPool=Object.freeze({query:pool.query.bind(pool)});
   need(request&&Object.keys(request).sort().join()==='body,token');
   const input={body:request.body,token:request.token};
   const config=JSON.parse(JSON.stringify(trustedConfig));
@@ -111,7 +116,7 @@ export async function capturePublicationResponse(request,trustedResponse,trusted
   checkComment(response.comment,response.comment.id,input.body,JSON.parse(config.pinsRaw));
   const admission=await prepareAdmission(input,config,dependencies);
   need(admission.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE');
-  const result=await retainSendRecord(dependencies.senderRecordPool,admission.ledgerBinding,response.comment.id);
+  const result=await retainSendRecord(senderRecordPool,admission.ledgerBinding,response.comment.id);
   return {kind:'INACTIVE_RESPONSE_CAPTURE_RESULT',outcome:result.outcome,...flags};
  }catch{return {kind:'RESPONSE_CAPTURE_REJECTED',...flags};}
 }

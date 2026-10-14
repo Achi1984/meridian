@@ -11,6 +11,13 @@ async function readResponse(response,signal){
  if(signal.aborted||response?.status!==201||response.url!==URL||response.redirected!==false||!response.body){
   cancel(response?.body);need(false);
  }
+ // A header can reject early, but never replaces the streaming byte limit:
+ // it may be absent, incorrect, or describe compressed rather than decoded bytes.
+ try{
+  const length=response.headers?.get('content-length');
+  need(length==null||(typeof length==='string'&&/^(0|[1-9][0-9]*)$/.test(length)
+   &&Number.isSafeInteger(Number(length))&&Number(length)<=131072));
+ }catch{cancel(response.body);need(false);}
  const reader=response.body.getReader();const chunks=[];let size=0;
  const stop=()=>{try{reader.cancel().catch(()=>{});}catch{}};
  signal.addEventListener('abort',stop,{once:true});

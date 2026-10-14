@@ -37,6 +37,25 @@ test('HTTP errors, redirects, foreign URL, malformed and oversized responses sta
   assert.equal((await post({body:'x'},'x')).outcome,'ALREADY_CONSUMED');assert.equal(calls,1);
  }
 });
+test('oversized or malformed length is rejected before acquiring stream reader',async()=>{
+ for(const length of ['131073','999999999999999999999','-1','1.5','garbage']){
+  let reads=0,cancelled=0,calls=0;
+  const post=createPublicationPostTransport({fetchFn:async()=>{calls++;return response('',{
+   headers:new Headers({'content-length':length}),body:{getReader(){reads++;throw Error('must not read');},cancel(){cancelled++;return Promise.resolve();}}
+  });}});
+  assert.equal((await post({body:'x'},'x')).outcome,'UNCERTAIN');assert.equal(reads,0);assert.equal(cancelled,1);
+  assert.equal((await post({body:'x'},'x')).outcome,'ALREADY_CONSUMED');assert.equal(calls,1);
+ }
+});
+test('allowed or missing length still requires bounded streaming',async()=>{
+ for(const length of [null,'2','131072']){
+  const headers=new Headers();if(length!==null)headers.set('content-length',length);
+  const good=createPublicationPostTransport({fetchFn:async()=>response('{}',{headers})});
+  assert.equal((await good({body:'x'},'x')).outcome,'RESPONSE_CAPTURED');
+  const oversized=createPublicationPostTransport({fetchFn:async()=>response(' '.repeat(131073),{headers})});
+  assert.equal((await oversized({body:'x'},'x')).outcome,'UNCERTAIN');
+ }
+});
 test('network exceptions do not expose credentials or retry',async()=>{
  let calls=0;const post=createPublicationPostTransport({fetchFn:async()=>{calls++;throw Error('secret_test_token');}});
  const out=await post({body:'x'},'secret_test_token');assert.equal(out.outcome,'UNCERTAIN');assert.ok(!JSON.stringify(out).includes('secret'));

@@ -12,6 +12,10 @@ and a comment with exact actor/body/URLs and valid, unedited timestamps. Require
 primitives and configuration are copied before admission awaits. The real admission
 verifier then checks current token, approval, PR and run before the actual record
 adapter performs one conditional retention via a dedicated senderRecordPool.
+The pool and its bound query method are now pinned before admission awaits, so
+replacing either during an evidence lookup cannot redirect record retention.
+This preserves the original receiver but does not authenticate a hostile pool or
+freeze its internal state. Host dependencies remain trusted.
 
 Capture shares comment checks with confirmation. Capture acknowledgment means only
 that the adapter acknowledged record retention; confirmation still requires fresh
@@ -27,6 +31,10 @@ transport primitive is now prepared; no sender credentials, route, host bootstra
 or signed receipt is installed here. Input-object
 validation alone cannot prove response origin or which workflow sent a comment.
 Production durability and atomic approval/record revocation remain unsolved.
+Before live host integration, the captured comment timestamp must also be bound to
+the acknowledged reservation/send window and a trusted clock. Current calendar and
+unedited checks do not reject an old matching response supplied by a trusted host.
+Neither this packet nor a GREEN_SOURCE_ONLY review establishes live readiness.
 
 Five new service tests cover matching retention, malformed/substituted responses,
 forged/revoked admission, mutation during awaits, conflict and lost acknowledgment.
