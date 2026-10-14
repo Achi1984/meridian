@@ -1,0 +1,1097 @@
+{
+  "schemaVersion": "STRATEGY_TRANSFER_DISPOSITION_V1",
+  "sourceHead": "7e0b9f11b0280ec781353266c6ea57ce74134da0",
+  "targetMain": "219a1e72aa5ab3e485ff3e42d8759684900f6f02",
+  "scope": "All120inventory rows assigned for first bounded transfer; not full semantic or empirical audit",
+  "files": [
+    {
+      "path": "docs/strategy-lab/BENCHMARK_PLAN_20261013.md",
+      "sourceBlob": "ff8948c030ddd114a9c31e566170a9aa6036d439",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/CLAUDE_CONCEPT_DISPOSITION_20261014.md",
+      "sourceBlob": "1eaa37c8971aed5b37c976af16b11b1122c8e9a9",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/CLAUDE_ELLIOTT_DISPOSITION_20261014.md",
+      "sourceBlob": "27a8f840f1d0fbd10c9cf7a3fa3fde856d51cf3d",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/CORE_HISTORY_EXTENSION.md",
+      "sourceBlob": "5df8ac26ae8ed660a31c54ab84c8bdfa34d014f1",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/CROSS_MARKET_BASELINE.md",
+      "sourceBlob": "b781d613682b00117112a118ad2ecf9cf16cb9b6",
+      "targetBlob": null,
+      "group": "CROSS_MARKET_PROTOTYPE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/CRYPTO_DATA_PREPARATION.md",
+      "sourceBlob": "791982140f2e8959ea34ba979b403c13f877db45",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/DUAL_LANE_BENCHMARK.md",
+      "sourceBlob": "20fec08596f554e1da18d4eaf575697a8da91709",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_CORRECTION_CONTRACT_DRAFT_20261014.md",
+      "sourceBlob": "0820b9384f252ccbc280ee27458d7e11fa771908",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_CORRECTION_HELPERS.md",
+      "sourceBlob": "2941edcb706c4ad2e9e533b47efe7041a8127634",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_PIVOT_ADMISSION_CONTRACT_20261014.md",
+      "sourceBlob": "b066a66f3fa6a75ae2b67b94d449b3d29915fa5b",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_PIVOT_ADMISSION_IMPLEMENTATION.md",
+      "sourceBlob": "367e7286c31f2a230fd49f7b998d6968a6f633a5",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SOURCE_ASSESSMENT_20261014.md",
+      "sourceBlob": "b3388ad2f911450f564ddceea3ba2093bb46524e",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_FINDINGS_20261014.md",
+      "sourceBlob": "ed0a2d764bec84d60cbee108ecc1f4a41c30c332",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_PATH_CONTRACT_20261014.md",
+      "sourceBlob": "86124d137fdb62df394b89fd4558a4a4c806ac26",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ELLIOTT_SYNTHETIC_PATH_IMPLEMENTATION.md",
+      "sourceBlob": "84ffbc61781dfe4db4e3d954fdad87fc22957948",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Historical contract/findings retained by immutable reference in integration guide",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/HISTORICAL_HANDOFF.md",
+      "sourceBlob": "b7e2f5f54a1eae5bb7ae6a1b40870aadd98277d8",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/OHLCV_AND_COSTS.md",
+      "sourceBlob": "c9e49545d8bb70c0e0149336b016b3e17397020c",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/P1_HISTORICAL_EXPERIMENT_DRAFT.md",
+      "sourceBlob": "e5ec3241d2d4664e0fa13cb2305657428426b545",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/P1_SYNTHETIC_RUNNER.md",
+      "sourceBlob": "80ae56ba69175b70beb57517493526000784d279",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/P1_TIME_SEPARATION.md",
+      "sourceBlob": "fedfb3cb78064309df936051417486e3c19bad4c",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/PAYOFF_POLICY_MIGRATION.md",
+      "sourceBlob": "abee2ee846d7807539b4b1041c2c6c5e1ff9bb2a",
+      "targetBlob": null,
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/PHOTO_STRATEGY_MAPPING_20261013.md",
+      "sourceBlob": "5a9215d244f7433975a89e48e5b9b09069cfb6ed",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/RANK_PANEL_AUDIT.md",
+      "sourceBlob": "dc78609519fbed571a8f936790f1c6e9ff3f3775",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/README.md",
+      "sourceBlob": "340cd9c740801dc65f23c5f8f6d82f66a5d79831",
+      "targetBlob": "4d99a09de43feb5246231200eca7941f9e2154a7",
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/REPLAY_TIME_ADMISSION.md",
+      "sourceBlob": "b7677d4a346550d3d4244ef2fae733717cb59d68",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_JOURNAL.md",
+      "sourceBlob": "1a200b2290ce1d6583a481908a2443fb0c9e01cb",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_LEDGER.md",
+      "sourceBlob": "f5e2343f674cf6c449c811a55b5fe1dc525f9591",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_LIFECYCLE.md",
+      "sourceBlob": "90bcb393e59b07b0ad13be8439a7bf35a25211f6",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_RISK_SIZING.md",
+      "sourceBlob": "6a78ece2df15345db09c8f849049623045b4aaf3",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/SPOT_SIMULATION_STEP.md",
+      "sourceBlob": "3b80038c5dfaca792a27da74f57316881198cf87",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_AUTONOMY_HANDOFF_CONTRACT_20261014.md",
+      "sourceBlob": "f6b53f1205d76ee4b3d5d87b952b83469f16dbfa",
+      "targetBlob": null,
+      "group": "OFFLINE_METADATA",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_COVERAGE_20261014.md",
+      "sourceBlob": "6cc0ec4bbd89f0051a91b4cc446654ee65a3309f",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/STRATEGY_WORK_PACKET_V1.md",
+      "sourceBlob": "7929af396d7d635c9665d2408a96c4b01e17400f",
+      "targetBlob": null,
+      "group": "OFFLINE_METADATA",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/TRADE_PLAN_CRV.md",
+      "sourceBlob": "990dbf4cbd51ac3e9eb2bdfb68909c99bf4acce4",
+      "targetBlob": "2a2ce4c23842a9ed5570c46b0a69e70a28f224ab",
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/TREND_PULLBACK_PROTOTYPE.md",
+      "sourceBlob": "06a95cf1c47a5a712a275790ea6621a50d6e702c",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/TRIAL_LEDGER_RECONCILIATION_20261014.md",
+      "sourceBlob": "15e439ba507f590dde31ab212c108904fe21bfe6",
+      "targetBlob": null,
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/UNIVERSE_SOURCE_AUDIT.md",
+      "sourceBlob": "5eb9ee8fcf333289f532c5cb5d644a6643623e04",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/WARMUP_DATA_AUDIT.md",
+      "sourceBlob": "a2135b5bb7db28a81772ee7c21890c09f330ab35",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/WILLIAMS_RESEARCH_20261013.md",
+      "sourceBlob": "487719ca44b2d6f8565ef009576601eddb080392",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/audit-core-handoff.mjs",
+      "sourceBlob": "05a4e859e176b1e65be7047a25d3aeae76998ad3",
+      "targetBlob": null,
+      "group": "DATA_TOOLING",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/campaign-20261013.json",
+      "sourceBlob": "0e9db15f6155eda1d98c86d4eda9081ecec6d02a",
+      "targetBlob": "925df80ed748901f169cc898c66b320dab75e9c3",
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/BTC.json",
+      "sourceBlob": "4fff30099bc4f22d37c7ad83e66d5a7648c23f88",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/ETH.json",
+      "sourceBlob": "d7768ee70e47d6951fe99a46c117acf04dd37507",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/extension-audit.json",
+      "sourceBlob": "f3ef9b978186f1154a5b3b0394f62c492dec994b",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/core-history-20241013/manifest.json",
+      "sourceBlob": "19722b4f307f3d6eb341d6b7f173769a1d6d192b",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/cross-market-manifest.json",
+      "sourceBlob": "942ad55432bc4e2ced769980f676546afcdd8985",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/cross-market-trend.mjs",
+      "sourceBlob": "339da5a4fd507dbf9c5a9a9ee7a06f8523f3ddfd",
+      "targetBlob": null,
+      "group": "CROSS_MARKET_PROTOTYPE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/crypto-manifest.json",
+      "sourceBlob": "e6da8fcbb5b60ecdfbbdac186ade5ebf8d8dcf44",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/data-probe-results-20261013.json",
+      "sourceBlob": "73c430bb4086f41a5b870c713bba7da02941e3ad",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-correction-helpers.mjs",
+      "sourceBlob": "b134d1d069ba70452f64edb6cc6a03ed8c7afb55",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-pivot-admission.mjs",
+      "sourceBlob": "6329c6cec83c611caeb4a3a53bf0a3cf47be7477",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-synthetic-path.mjs",
+      "sourceBlob": "6baedca3e0965cb42ef415d687c0afe1bc6bc1a9",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-v1.mjs",
+      "sourceBlob": "aa2eefd3dc9e2169a184c1ac625207c44102f8ca",
+      "targetBlob": null,
+      "group": "FROZEN_COMPARATORS",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-wave5.mjs",
+      "sourceBlob": "a5923b65ef439caf1a8766b6982ac46c2013e33b",
+      "targetBlob": null,
+      "group": "FROZEN_COMPARATORS",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/normalize-binance-daily.mjs",
+      "sourceBlob": "e8966ccc30cbe5b547ce793325a85d556e2e06a4",
+      "targetBlob": null,
+      "group": "DATA_TOOLING",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/normalizer-probes-20261013.json",
+      "sourceBlob": "2f537bef4dd7abfeba708fc585d083260230833a",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ADA.json",
+      "sourceBlob": "fa1739b3f0d6c8678853e849fb0d2a793634e802",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/APT.json",
+      "sourceBlob": "95ee3d5657d199b2ec32316c2d6dc23792a78998",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/AVAX.json",
+      "sourceBlob": "f180d0ce83212d7119e83838e2fdda58987533f2",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BCH.json",
+      "sourceBlob": "d9c836255a5e76b09ee3eff584970f74b2d1b09b",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BNB.json",
+      "sourceBlob": "0755f61f6fbc756b81ceea68d3c9442f1fbf3bcd",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/BTC.json",
+      "sourceBlob": "a0dedbb9e5fe157f02d06a020376093ebb0f6688",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/DOGE.json",
+      "sourceBlob": "87b9b132cd79156850f2689b2c8b05dc02a2bee4",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/DOT.json",
+      "sourceBlob": "04a87af4b57fb43dce86a4bad5cf46c20b147c18",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ETH.json",
+      "sourceBlob": "6ff2e2c74892baf690e93aea095476faa9633604",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/FET.json",
+      "sourceBlob": "8fbe6f6437bbedd667e51c060af013202a1173c6",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/ICP.json",
+      "sourceBlob": "a6c503a60bbaa614668d14ad11e357d9b625c64d",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/LINK.json",
+      "sourceBlob": "26046610b072f36df86b9ca876c3e9293ac125a7",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/LTC.json",
+      "sourceBlob": "f6dcbf38da4b9fcef3626038257ffb3578d06b1c",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/NEAR.json",
+      "sourceBlob": "15667bc7e38d56cb92cb36d77173c1ae3b60828c",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/PEPE.json",
+      "sourceBlob": "690c87aff83faa640552d8957f1f5c10ee0146a2",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SHIB.json",
+      "sourceBlob": "acad88dff8a65a6102e1598fdd2d120c70c001ba",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SOL.json",
+      "sourceBlob": "b55b7afefcdc32abafd8bfc495b3a90bf836ac4c",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/SUI.json",
+      "sourceBlob": "c21065874b64572ac2956cbd3fa5b8b8484bb978",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/TRX.json",
+      "sourceBlob": "3b804bf738829182840fa6c738ef63eaff383ded",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/UNI.json",
+      "sourceBlob": "bdd8ca27b80255701f3262e873f2913773ef5ed5",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/XRP.json",
+      "sourceBlob": "fa99b33d79fb96709436d056040060d44cbbdfbf",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/ohlcv-20241013/manifest.json",
+      "sourceBlob": "c59c4f163da40c0c0665de117eac1c9754dbb4c2",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/p1-historical-experiment-draft.json",
+      "sourceBlob": "5234ffc13d65084ca31df22bbe0e44f16ed2b615",
+      "targetBlob": null,
+      "group": "RESEARCH_DOCUMENTATION",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/p1-synthetic-runner.mjs",
+      "sourceBlob": "db99fed1ddbc0fe12bab234ba38f9741372382b5",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/prepare-core-history.mjs",
+      "sourceBlob": "5f67c3c6ff4b353b193b4029a7e8849784875eef",
+      "targetBlob": null,
+      "group": "DATA_TOOLING",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/prepare-ohlcv-windows.mjs",
+      "sourceBlob": "0afd6b544d8891153783ae1799b16ec7c9cf5bb3",
+      "targetBlob": null,
+      "group": "DATA_TOOLING",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/prepared-close-windows-20241013.json",
+      "sourceBlob": "9aca62e27c2ea3947bd76fa48ba51d5647f3ccec",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20230101.json",
+      "sourceBlob": "7e5d62bd2f688d4598ee50ae2534ce80918127b2",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20230702.json",
+      "sourceBlob": "714ba84da3d7774dfb19fc0961c0225042daa112",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20240107.json",
+      "sourceBlob": "ae54b18d26397548d7f1bf22333efe91e9c1af1c",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/20240707.json",
+      "sourceBlob": "faa9f19eb669b1fb3a095c18bce55951ccce9dcf",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/rank-panel/manifest.json",
+      "sourceBlob": "f6b38b2be1201dcee0d6f1f338b83f86123f4f6f",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/replay-time-admission.mjs",
+      "sourceBlob": "d25d133067c8f5e11e1cb553414842c3725e48b0",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-cost-assumptions.json",
+      "sourceBlob": "559af6caa0c61b3cdd6518f8201eb4487fff7493",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-journal.mjs",
+      "sourceBlob": "9e502aabc39a19b01d29a0a568d3bc4746dbd1c5",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-ledger.mjs",
+      "sourceBlob": "54748e14e0479d51974bc31de858e7be6ddfcf25",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-lifecycle.mjs",
+      "sourceBlob": "3a09f1bef970a08732314a4f3672e6946274445d",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-risk-sizing.mjs",
+      "sourceBlob": "7c7a036eefc0f2f62b5af47c579e4511950f637e",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/spot-simulation-step.mjs",
+      "sourceBlob": "fd425a61c02989f5b4965c120a5b1303671aa457",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/strategy-work-packet.mjs",
+      "sourceBlob": "0cb062edb9f636a93c236d273a23d20c2b94bfda",
+      "targetBlob": null,
+      "group": "OFFLINE_METADATA",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback-core.mjs",
+      "sourceBlob": "b1d5de1fdcb987f6d589e2feaea3abad35d1ba26",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback-replay.mjs",
+      "sourceBlob": "3a96781b068c9517518a2afd40b03d6801a22149",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/trend-pullback.mjs",
+      "sourceBlob": "fa536f477382b39dd599fd889a51b3b275c00177",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/trial-ledger-reconciliation-20261014.json",
+      "sourceBlob": "1394dcbb82d28425cd9d6fbe6158eb70e0b2e81c",
+      "targetBlob": null,
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/universe-join-probe-20241013.json",
+      "sourceBlob": "73e7aaf0da66d3370affc45bac4bf2d46d73a080",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/validate-campaign.mjs",
+      "sourceBlob": "333a35d5f1b6c1a329ef011225764a7509613685",
+      "targetBlob": "2fa98525cdd15d21e7f0b813e0226d7303df552f",
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "docs/strategy-lab/warmup-history-audit-20241013.json",
+      "sourceBlob": "3410997a5d361463c23f88f04f95c0a66b3b0608",
+      "targetBlob": null,
+      "group": "HISTORICAL_EVIDENCE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/cross-market-trend.test.js",
+      "sourceBlob": "81cc6eb4d127557f12ec3298005773af52875d79",
+      "targetBlob": null,
+      "group": "CROSS_MARKET_PROTOTYPE",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/elliott-correction-helpers.test.js",
+      "sourceBlob": "a9c7ddd59b20e261c80d5446b70a428b7401fa98",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/elliott-frozen-characterization.test.js",
+      "sourceBlob": "0f997e9f3505bcad8947f9470433052ffd1af6e2",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/elliott-pivot-admission.test.js",
+      "sourceBlob": "61080e8f2f92fd63e7cec41d3005842f9b523947",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/elliott-synthetic-path.test.js",
+      "sourceBlob": "1c78d41f3aebd503e0139f0290665deba5f2d691",
+      "targetBlob": null,
+      "group": "ELLIOTT_SYNTHETIC",
+      "decision": "SELECT_EXACT_SYNTHETIC_SUBSET",
+      "reason": "Dependency-contained synthetic module/test or immutable comparator; exact-head review pending",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/normalize-binance-daily.test.js",
+      "sourceBlob": "4174e6b7e199cc4c0279ca52d79051e46f4621ac",
+      "targetBlob": null,
+      "group": "DATA_TOOLING",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Preserve historical evidence/tooling without rerunning; licensing, inspected-data status and availability not authenticated",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/p1-synthetic-runner.test.js",
+      "sourceBlob": "f1c59a51c33ac60531796ee6382d54e67240f3fc",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/replay-time-admission.test.js",
+      "sourceBlob": "24797a99ad7f28cb8e9dfae4ebab1fd7a84f5303",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/spot-journal.test.js",
+      "sourceBlob": "5f72b8fbd765b3c76f5dd4a4e703731446c2dc76",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/spot-ledger.test.js",
+      "sourceBlob": "bbd1bc8fc890cf7ea60c70b587e0058fc7c49c39",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/spot-lifecycle.test.js",
+      "sourceBlob": "c86530a407fcccb3880ff2bfdbce3e5e3594335b",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/spot-risk-sizing.test.js",
+      "sourceBlob": "25c1639627a4cce77569b01d0c76cd20b5bc1949",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/spot-simulation-step.test.js",
+      "sourceBlob": "6f2bb7b1d6278372fc5877803d343dbf41fbe9f3",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/strategy-campaign-draft.test.js",
+      "sourceBlob": "62882a4e2c6bf4f9df6b7ba24aaaacc4868c82ce",
+      "targetBlob": "daa14839fe3304ea1abceac307c2d10b148cc1a8",
+      "group": "PROTECTED_POLICY",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Policy and trial accounting require separate reconciliation; do not overwrite target",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/strategy-work-packet.test.js",
+      "sourceBlob": "606d190863fe16863814bc30fda0291d3063033f",
+      "targetBlob": null,
+      "group": "OFFLINE_METADATA",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/trend-pullback-replay.test.js",
+      "sourceBlob": "e3892422ee59e07cf1f902dd439571c4c893332c",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    },
+    {
+      "path": "test/trend-pullback.test.js",
+      "sourceBlob": "d7eeaa78beb98cc50b14a96e42fbcabe38b405f1",
+      "targetBlob": null,
+      "group": "P1_SYNTHETIC_DEPENDENCIES",
+      "decision": "RETAIN_PINNED_DEFER_TRANSFER",
+      "reason": "Separate source packet: content and dependency review not yet complete; no implicit transfer",
+      "contentApproval": "NOT_GRANTED_BY_DISPOSITION"
+    }
+  ],
+  "selected": 9,
+  "retained": 111,
+  "dataLicensing": "UNKNOWN_NOT_AUTHENTICATED",
+  "freshHoldout": "NOT_ESTABLISHED",
+  "trialAllocation": "UNKNOWN_P1_C1_UNRESOLVED",
+  "empiricalRunAuthorized": false,
+  "runtimeAuthorized": false,
+  "mergeAuthorized": false,
+  "independentReview": "PENDING"
+}
