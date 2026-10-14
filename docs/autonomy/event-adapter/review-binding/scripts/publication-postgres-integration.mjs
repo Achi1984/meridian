@@ -9,7 +9,7 @@ assert.equal(process.env.MERIDIAN_ISOLATED_DB_TEST,'YES');
 assert.equal(process.env.GITHUB_ACTIONS,'true');
 assert.equal(process.env.GITHUB_EVENT_NAME,'workflow_dispatch');
 const digest=process.env.MERIDIAN_POSTGRES_DIGEST;
-assert.match(digest??'',/^sha256:[a-f0-9]{64}$/);
+assert.equal(digest,'sha256:75adc2a65806c96bc0e59030230bfe3f1c1b0d6d8f8181a8913e2b8b53bdc166');
 const {default:pg}=await import('pg');
 const name='meridian-publisher-test-'+process.pid;
 const docker=(...args)=>execFileSync('docker',args,{timeout:90000,stdio:['ignore','pipe','pipe']});

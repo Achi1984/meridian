@@ -24,11 +24,10 @@ This is not failover, storage hardware loss or production durability proof.
 ## Before installation or execution
 
 Review the exact candidate commit, all harness/SQL/adapter source, and existing
-package lock. Resolve and independently verify an official PostgreSQL 16 image
-digest; record it with the source SHA and one-run approval. No digest is invented
-or mutable image tag silently used. The workflow requires both values and checks
-that the approved source equals its actual GitHub SHA. Digest syntax does not
-authenticate image provenance or owner approval: those are external review gates.
+package lock. Record the fixed image digest below with the source SHA and one-run
+approval. The workflow checks that the approved source equals its actual GitHub
+SHA. Both workflow and harness pin the same image; no caller-selected digest or
+mutable tag is accepted. Owner approval remains an external review gate.
 The workflow alone does not enforce a single-use execution approval.
 
 Action commit pins were resolved through the public GitHub API on 2026-10-14.
@@ -40,3 +39,20 @@ Local validation can check JavaScript syntax, YAML structure and the existing
 preparation tests. Actual PostgreSQL execution remains unrun: this environment
 has no Docker/PostgreSQL, and normal package setup fails at setgroups/seteuid.
 Do not report the database checks as passed until the isolated job actually runs.
+
+## Verified official image pin (2026-10-14)
+
+Source: `https://hub.docker.com/v2/repositories/library/postgres/tags/16`,
+last updated 2026-10-07T19:07:56.71584Z. Official `library/postgres` tag 16:
+
+- Index: `sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d`
+- Linux amd64 manifest: `sha256:75adc2a65806c96bc0e59030230bfe3f1c1b0d6d8f8181a8913e2b8b53bdc166`
+- Config: `sha256:275447c94b11b151decd1f29877965301d5a77032037c46de93d990f739f00a9`
+
+The exact index and child manifest were fetched from
+`https://registry-1.docker.io/v2/library/postgres/manifests/<digest>`.
+SHA256 of each raw manifest matched its Docker-Content-Digest header and the
+DockerHub values; the index links that child to linux/amd64. Only a transient
+anonymous public-pull token was used, without logging or storing it. This verifies
+registry correspondence/content addressing, not a vulnerability audit. The
+harness additionally asserts PostgreSQL major 16 at runtime.

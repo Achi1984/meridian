@@ -7,10 +7,6 @@ name: Publisher isolated PostgreSQL test
         description: Exact independently reviewed commit for this single test
         required: true
         type: string
-      postgres_digest:
-        description: Independently verified official PostgreSQL 16 sha256 image digest
-        required: true
-        type: string
 permissions:
   contents: read
 jobs:
@@ -18,14 +14,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Validate exact source and image pins
+      - name: Validate exact source pin
         env:
           APPROVED_SHA: ${{ inputs.approved_source_sha }}
-          IMAGE_DIGEST: ${{ inputs.postgres_digest }}
         run: |
           [[ "$APPROVED_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$APPROVED_SHA" == "$GITHUB_SHA" ]]
-          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
@@ -42,5 +36,5 @@ jobs:
       - name: Actual PostgreSQL schema, claims and crash recovery
         env:
           MERIDIAN_ISOLATED_DB_TEST: 'YES'
-          MERIDIAN_POSTGRES_DIGEST: ${{ inputs.postgres_digest }}
+          MERIDIAN_POSTGRES_DIGEST: sha256:75adc2a65806c96bc0e59030230bfe3f1c1b0d6d8f8181a8913e2b8b53bdc166
         run: node docs/autonomy/event-adapter/review-binding/scripts/publication-postgres-integration.mjs
