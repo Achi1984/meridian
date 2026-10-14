@@ -1,5 +1,10 @@
 # Actions negative publisher — inactive architecture preparation
 
+Backend preparation update: [PostgreSQL publication ledger](POSTGRES_PUBLICATION_LEDGER.md)
+now specifies an isolated schema, parameterized reservation/settlement adapter and
+boundary tests. It is not provisioned or authenticated; the runtime prerequisites
+below remain gates, not satisfied claims.
+
 Owner approved preparation of decision #571 comment 6160988345 on 2026-10-14
 at 06:47:45 Europe/Vienna. This changes the proposed publication architecture,
 not any installed workflow, existing actor allowlist or execution authority.
