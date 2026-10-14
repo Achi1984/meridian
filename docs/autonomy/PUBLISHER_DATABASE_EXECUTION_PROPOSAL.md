@@ -1,5 +1,12 @@
 # Publisher database execution proposal
 
+> **Execution hold (2026-10-14):** The local-PC/password procedure below is
+> superseded by the candidate [browser setup](PUBLISHER_DATABASE_BROWSER_SETUP.md).
+> Do not use its `psql \password` step: Neon's documented password-input
+> requirements conflict with the assumed client-hashed input. Review and verify
+> the replacement before credential entry. The source-only workflow fixture
+> remains inactive; no provisioning or diagnostic attempt is implied.
+
 Operation: `M11-READINESS-EXECUTION-PROPOSAL-20261014`.
 Status: concrete source proposal pending exact-version review and owner approval.
 Nothing here installs a workflow, provisions a role/secret, or authorizes a run.

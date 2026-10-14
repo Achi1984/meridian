@@ -1,5 +1,13 @@
 # Publisher TEST role setup proposal
 
+> **Execution hold (2026-10-14):** Do not execute the password step below.
+> Neon's current role documentation requires plaintext password input and says
+> pre-hashed passwords are unsupported; the proposed client-hashing `psql
+> \password` path has not been validated against Neon. The browser replacement
+> is specified in [PUBLISHER_DATABASE_BROWSER_SETUP.md](PUBLISHER_DATABASE_BROWSER_SETUP.md)
+> and requires its own implementation review and operational approval. Prior
+> source review and CI were not proof of real password initialization.
+
 Status: **proposal only; not executed**. This packet creates no roles, retrieves
 no credentials and changes no grants. Provisioning, secret installation and the
 readiness run require their own concrete owner authorization. A source merge is
