@@ -305,6 +305,10 @@ class MainGateTests(unittest.TestCase):
             if fault == 'loaded_provenance': origin.side_effect = [None, ValueError('secret-canary')]
             prompt = stack.enter_context(patch.object(m.getpass, 'getpass', side_effect=AssertionError('unexpected prompt')))
             perform = stack.enter_context(patch.object(m, 'perform', return_value=outcome or m.STATUS_OK))
+            # Unit-test main's gates in this process; the separate subprocess
+            # supervisor suite exercises the actual fork/IPC/output boundary.
+            stack.enter_context(patch.object(m, 'supervise', side_effect=lambda worker: worker(lambda token: None)))
+            stack.enter_context(patch.object(m, 'emit_status', side_effect=lambda status: print(status) is None))
             output = io.StringIO()
             with redirect_stdout(output): code = m.main(argv)
             prompt.assert_not_called()

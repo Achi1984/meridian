@@ -45,8 +45,9 @@ Console/API, which grants `neon_superuser` membership.
 1. Review and pin a small Python 3 / Psycopg 3 helper and its dependencies before
    any credential entry. A candidate implementation now exists at
    `scripts/publisher_test_password_setup.py`, with offline fault-injection
-   tests in `test/test_publisher_test_password_setup.py`. It has not been run
-   against PostgreSQL or Neon and is not operationally approved. Psycopg 3.3.6 is
+   tests in `test/test_publisher_test_password_setup.py`. It is not operationally
+   approved for Neon; local PostgreSQL validation does not approve that use.
+   Psycopg 3.3.6 is
    pinned in `scripts/publisher-test-password-setup-requirements.txt` and checked
    before prompts; dependency hash/provenance review, real SQL composition and independent
    review remain outstanding. Install dependencies before providing credentials;
@@ -142,7 +143,8 @@ those limits to force completion. If the server closes the session while the
 owner is typing, the next verification must fail before mutation; stop and
 reconcile rather than automatically reconnecting/replaying inputs. Confirm
 actual idle timeout behavior and acceptable owner interaction time before
-operational use. Network/cleanup deadlines remain an unresolved gate below.
+operational use. The new supervisor below requires independent review of its
+network/cleanup deadline evidence before that gate can be closed.
 
 Suppress database notices and exception details. Print only fixed statuses
 such as `PASSWORD_SETUP_CONFIRMED`, `PASSWORD_SETUP_FAILED` or
@@ -174,14 +176,17 @@ reset preserves attributes. Do not create an elevated Console role as a shortcut
 ## Remaining gates
 
 - Pin and independently review the candidate helper and dependency provenance.
-- The current offline tests exercise a fake adapter: they are not evidence
-  of real Psycopg escaping, PostgreSQL parsing, Neon behavior or enforced
-  end-to-end network/cleanup deadlines. Resolve those limits before execution.
+- The original offline unit tests exercise a fake adapter: they are not evidence
+  of real Psycopg escaping, PostgreSQL parsing or Neon behavior. Driver/local
+  database evidence must be recorded separately. The new supervisor subprocess
+  suite exercises actual OS process boundaries; independent review must assess
+  that evidence before approving operational deadlines.
 - Run the Python tests explicitly as a manual source-validation step:
   `python -I -m unittest discover -s test -p test_publisher_test_password_setup.py`.
   They are not automatically included in the repository's Node CI totals. This
   package changes no workflow to make that claim. Record the observed manual
-  test count and result separately from GitHub CI.
+  test count and result separately from GitHub CI. The supervisor tests have
+  their own explicit discovery pattern; no workflow is changed to include them.
 - Verify hidden-input failures, strict connection settings, wrong OID/identity,
   unexpected membership/flags, escaping, rollback and indeterminate commit
   behavior without real credentials. No real Neon mutation for implementation
@@ -238,46 +243,66 @@ no default or example OIDs that may be accepted as actual evidence. The reader
 rejects duplicate JSON keys, unknown keys, malformed OIDs and duplicate role
 identities. Existing roles are never automatically adopted.
 
-## Network deadline design — not implemented
+## Linux network supervisor candidate
 
-The candidate currently sets libpq `connect_timeout=10`, server
-`statement_timeout=10000` and `lock_timeout=2000`. These are useful limits but
-**not a whole-operation wall-clock bound**. They do not establish that stalled
-native calls, lost commit acknowledgements or cleanup always return promptly.
-The current rollback/close attempts are not evidence of confirmed server cleanup.
-No additional signal-only timeout has been added: Python documents that native
-code can delay execution of Python signal handlers. The runtime deadline gate
-therefore remains open even when offline or local PostgreSQL tests pass.
+The CLI now starts a separate supervisor/worker pair **before importing Psycopg
+or reading any password**. Only the worker receives hidden terminal input and
+uses the database. The parent receives single-byte phase/result messages, never
+passwords, connection strings, SQL text or exceptions. This is a source
+candidate requiring independent review and fault-injection evidence before
+operational approval. The unsupervised `perform()` function remains a test seam;
+only the reviewed CLI provides process supervision.
 
-A future independently reviewed Linux supervisor design could provide three
-separate wall-clock budgets, excluding all owner password-entry time:
+The parent starts each deadline before acknowledging that the child may enter
+the phase. Unknown, duplicate and out-of-order messages fail closed; they cannot
+renew a timer. The fixed production budgets are:
 
-| Phase | Proposed budget | Conservative deadline outcome |
+| Phase | Budget | Conservative deadline outcome |
 | --- | --- | --- |
+| Driver import and version/origin checks | 15 seconds | Failed; no password entered |
 | Connect and initial catalog verification | 15 seconds | Failed; no password mutation requested |
 | Fresh verification, three changes, postcheck and commit | 30 seconds | Indeterminate, even if commit may not yet have started |
 | Rollback/close | 3 seconds | Indeterminate cleanup; no retry or rollback claim |
+| Worker result to acknowledged normal exit | 3 seconds | Failed before mutation; otherwise indeterminate |
 
-The supervisor must be a separate OS process so a blocked client interpreter
-cannot postpone termination. Deadline termination must not wait on terminal
-output: terminate the client first and make any fixed status output best-effort
-and nonblocking. Success requires both acknowledged commit and clean completion
-of the supervision protocol; text output alone is insufficient. Lost/ambiguous
-supervision or commit acknowledgement must stop the procedure, never trigger
-automatic password replay. The three phases must not become three independent
-budgets for every SQL statement; the proposed total is 48 seconds of network
-phases plus scheduling overhead, explicitly excluding owner input.
+Administrator and new-password entry phases have **no deadline**. Normal active
+phase budgets total 66 seconds excluding owner input and OS scheduling overhead.
+If termination is needed, the parent sends SIGKILL first, then spends at most a
+further three seconds checking child exit with nonblocking waitpid. It does not
+wait indefinitely for a native client call, cleanup or terminal output. These
+are per-phase budgets, not a fresh budget for every SQL statement. There is no
+CLI/environment option to enlarge them. Shorter injected budgets exist only for
+local subprocess tests.
 
-Before selecting this design, review parent/child lifecycle, reaping/disarming
-races, parent death and PID identity, handling of Ctrl-C, inherited descriptors,
-native-library fork safety and the temporary additional in-memory copy of
-credentials in a forked process. The supervisor must never use or clean up the
-inherited database connection. A trusted Linux host/scheduler is an assumption,
-not a guarantee against a paused machine or hostile privileged process.
-Subprocess fault-injection tests must cover stalled connect, query, commit and
-cleanup, a full output pipe, parent disappearance and normal disarm. This design
-adds no current executable behavior and must not be presented as an operational
-deadline guarantee.
+The parent never loads the driver or inherits an already connected database
+session from the worker. The supported entry point requires single-threaded
+Linux execution; no fork occurs after credentials or native database state are
+created. The child sets Linux `PR_SET_PDEATHSIG` to SIGKILL and checks its expected
+parent PID immediately afterward, closing the parent-death-before-registration
+race. On a normal exception, Ctrl-C or SIGTERM, the supervisor terminates its worker and
+attempts to restore the terminal settings captured before forking. It does not
+read terminal input. If the supervisor itself is forcibly killed, its worker
+dies too, but automatic terminal echo restoration cannot be guaranteed; the
+owner may need to reset/reopen the terminal. Never paste a password to repair it.
+
+Only the parent emits a fixed final status using one nonblocking write. If the
+output cannot be delivered, the CLI exits nonzero; a missing/truncated status
+is not success. `PASSWORD_SETUP_CONFIRMED` is accepted only with exit code zero,
+valid phase order, acknowledged commit, completed cleanup and normal worker
+exit. Lost commit acknowledgement, abnormal worker termination after entering
+the mutation phase, cleanup errors or a cleanup deadline produce indeterminate
+status. No such status authorizes a retry or proves server rollback. A killed
+client cannot certify when the server releases resources.
+
+Server `statement_timeout=10000`, `lock_timeout=2000` and libpq
+`connect_timeout=10` remain useful inner limits. A Python signal handler alone
+would not enforce the outer bound because native code may defer that handler.
+The separate parent process avoids that dependency. A trusted Linux kernel,
+scheduler and interpreter remain assumptions: this is not a guarantee against
+machine suspension, an unkillable kernel task, privileged interference or a
+compromised installation. Subprocess tests and independent review must cover
+stalled connect/query/commit/cleanup, output backpressure, parent/worker death,
+input exemption and malformed protocol before treating this gate as closed.
 
 Python signal execution reference:
 https://docs.python.org/3/library/signal.html#execution-of-python-signal-handlers
