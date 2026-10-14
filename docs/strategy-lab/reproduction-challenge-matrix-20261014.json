@@ -514,24 +514,7 @@
     "winnerSelectionOrPromotion": false,
     "removeLosingAssets": false,
     "modifyFrozenRules": false,
-    "allAttemptsRemainInLedger": true,
-    "retainedDiagnostics": [
-      "tail loss and return-distribution limitations",
-      "cost and slippage sensitivity",
-      "regime and chronological-time/block effects",
-      "asset attribution without new portfolios",
-      "selection and survivorship risk"
-    ],
-    "portfolioPeriodExpectancy": "mean weekly net return, descriptive only, n=48 Development and n=34 historical Holdout audit",
-    "tailMetrics": {
-      "worstWeek": "minimum weekly net return",
-      "empirical5thPercentile": "nearest-rank convention",
-      "lowerTailMean": "mean of lowest max(1,ceil(0.05*n)) weekly net returns",
-      "newAcceptanceGate": false
-    },
-    "tradeLevelExpectancy": "UNDEFINED unless frozen strategy defines trades and denominator",
-    "winRateIsNotExpectancy": true,
-    "undefinedAndUnavailableMetricsRequireReason": true
+    "allAttemptsRemainInLedger": true
   },
   "proposedExecutionLimits": {
     "measured": false,
@@ -570,14 +553,6 @@
     "allReceiptsAvailableAndVerifiedAtExecution": "REQUIRED",
     "economicModelAudit": "SEPARATE_REVIEW_REQUIRED",
     "priorExposureDeclaration": "REQUIRED_BEFORE_IMPLEMENTATION",
-    "robustPositiveExpectancyAfterRealisticCostsAndRisk": "PRODUCT_OBJECTIVE_NOT_ESTABLISHED_BY_TECHNICAL_REPRODUCTION",
-    "lifecycle": [
-      "Paper",
-      "ForwardValidation",
-      "RobustnessReview",
-      "possible LiveCandidacy"
-    ],
-    "historicalOrProspectiveShadowRecordsCompletePaperStages": false,
     "holdoutRetuningOrFreshConfirmation": false,
     "paperLiveOrAuthorizationChanges": false
   }
