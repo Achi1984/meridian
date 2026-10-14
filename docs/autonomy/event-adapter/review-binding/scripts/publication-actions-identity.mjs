@@ -4,14 +4,20 @@ const MAX_BYTES=32768;
 const rejected=()=>new Error('publication identity rejected');
 function need(ok){if(!ok)throw rejected();}
 function cancel(body){try{Promise.resolve(body?.cancel()).catch(()=>{});}catch{}}
-function request(config){
+function request(config,runnerUrl){
+ // Independently supplied by the reviewed runner wrapper, never from a manifest.
+ need(typeof runnerUrl==='string'&&runnerUrl.length>0&&runnerUrl.length<=8192);
+ const url=new URL(runnerUrl);
+ // GitHub documents this domain family for hosted-runner OIDC retrieval.
+ // The exact host/path/query still come from this run's separate runner URL.
+ need(url.protocol==='https:'&&url.port===''&&url.username===''&&url.password===''
+  &&!runnerUrl.includes('#')&&url.href===runnerUrl&&url.hostname.length<=253
+  &&/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+actions\.githubusercontent\.com$/.test(url.hostname));
  need(config!==null&&typeof config==='object'&&!Array.isArray(config));
  need(Object.keys(config).sort().join()==='audience,endpointPin,requestToken,requestUrl');
  need(config.audience===AUDIENCE);
  need(typeof config.requestUrl==='string'&&config.requestUrl.length<=8192);
- need(config.requestUrl===config.endpointPin);
- const url=new URL(config.requestUrl);
- need(url.protocol==='https:'&&url.hostname&&url.username===''&&url.password===''&&!config.requestUrl.includes('#'));
+ need(config.requestUrl===runnerUrl&&config.endpointPin===runnerUrl);
  // Reject normalization ambiguities; retain the exact trusted path and query.
  need(url.href===config.endpointPin&&!url.searchParams.has('audience'));
  need(typeof config.requestToken==='string'&&config.requestToken.length>0&&config.requestToken.length<=16384
@@ -20,10 +26,10 @@ function request(config){
  return {url:url.href,credential:config.requestToken};
 }
 
-export async function acquireActionsPublicationToken(config,{signal,fetchFn=globalThis.fetch,timeoutMs=5000}={}){
+export async function acquireActionsPublicationToken(config,{runnerUrl,signal,fetchFn=globalThis.fetch,timeoutMs=5000}={}){
  let controller,reader,timer,onAbort;
  try{
-  const target=request(config);
+  const target=request(config,runnerUrl);
   need(typeof fetchFn==='function'&&Number.isInteger(timeoutMs)&&timeoutMs>0&&timeoutMs<=5000);
   need(signal===undefined||signal instanceof AbortSignal);
   need(!signal?.aborted);
@@ -70,6 +76,7 @@ export async function acquireActionsPublicationToken(config,{signal,fetchFn=glob
 }
 
 export function createActionsPublicationIdentity(options={}){
- const {fetchFn=globalThis.fetch,timeoutMs=5000}=options;
- return (config,signal)=>acquireActionsPublicationToken(config,{signal,fetchFn,timeoutMs});
+ // Snapshot the primitive URL before any per-run manifest can be supplied.
+ const {runnerUrl,fetchFn=globalThis.fetch,timeoutMs=5000}=options;
+ return (config,signal)=>acquireActionsPublicationToken(config,{runnerUrl,signal,fetchFn,timeoutMs});
 }
