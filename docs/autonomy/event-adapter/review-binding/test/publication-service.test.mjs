@@ -96,6 +96,7 @@ function confirmation(){
   user:{id:4321,type:'Bot'},body:s.request.body,
   created_at:'2026-10-14T06:00:00Z',updated_at:'2026-10-14T06:00:00Z'};
  s.deps.readPublishedComment=async()=>comment;
+ s.deps.readSendRecord=async binding=>({...binding,commentId:3333});
  let writes=0;
  s.deps.pool.query=async(sql,args)=>{writes++;
   assert.ok(sql.startsWith('UPDATE '));assert.equal(args[5],'CONFIRMED');assert.equal(args[6],3333);
@@ -118,6 +119,42 @@ test('concrete GET reader composes with real admission and conditional settlemen
   assert.equal(r.kind,bad?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
   assert.equal(s.writes(),bad?0:1);assert.equal(r.sendAllowed,false);
  }
+});
+test('confirmation requires exact trusted sender record before comment lookup',async()=>{
+ for(const edit of [r=>null,r=>({...r,commentId:4444}),r=>({...r,runId:String(r.runId)}),
+  r=>({...r,runAttempt:2}),r=>({...r,operationKey:'a'.repeat(64)}),
+  r=>({...r,intentSha256:'b'.repeat(64)}),r=>({...r,bodySha256:'c'.repeat(64)}),r=>({...r,extra:true})]){
+  const s=confirmation();s.deps.readSendRecord=async b=>edit({...b,commentId:3333});
+  s.deps.readPublishedComment=()=>assert.fail('must not read comment');
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+ const s=confirmation();delete s.deps.readSendRecord;
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');assert.equal(s.writes(),0);
+});
+test('sender record is rechecked and its lookup binding is immutable',async()=>{
+ for(const revoked of [false,true]){
+  const s=confirmation();let reads=0,first;
+  s.deps.readSendRecord=async binding=>{
+   reads++;assert.ok(Object.isFrozen(binding));
+   if(first)assert.deepEqual(binding,first);else first={...binding};
+   return revoked&&reads===2?null:{...binding,commentId:3333};
+  };
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(reads,2);assert.equal(r.kind,revoked?'CONFIRMATION_REJECTED':'INACTIVE_CONFIRMATION_RESULT');
+  assert.equal(s.writes(),revoked?0:1);
+ }
+});
+test('expiry during final sender-record read blocks settlement',async()=>{
+ const s=confirmation();let reads=0,time=now;s.deps.clock=()=>time;
+ s.deps.readSendRecord=async b=>{if(++reads===2)time=now+295;return {...b,commentId:3333};};
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');assert.equal(s.writes(),0);
+});
+test('stalled sender-record source is bounded before comment or settlement',async()=>{
+ const s=confirmation();let signal;s.deps.readSendRecord=(_b,sig)=>{signal=sig;return new Promise(()=>{});};
+ s.deps.readPublishedComment=()=>assert.fail('must not read comment');const start=Date.now();
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);assert.equal(signal.aborted,true);assert.ok(Date.now()-start<8000);
 });
 test('wrong comment identity actor mailbox or original bytes cannot settle',async()=>{
  for(const edit of [c=>c.id++,c=>c.url+='x',c=>c.issue_url=c.issue_url.replace('571','572'),

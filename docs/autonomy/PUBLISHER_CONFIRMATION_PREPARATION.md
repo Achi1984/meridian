@@ -45,3 +45,19 @@ No credentials or alternate API origin are supplied. Six reader tests cover iden
 field bounds, transport errors, deadline and abort behavior. A composition test feeds
 its actual parsed response through crypto/admission and conditional settlement,
 including a changed-body rejection. HTTP and database responses remain synthetic.
+
+Confirmation additionally requires a host-only `readSendRecord(binding, signal)`
+dependency. Its exact six-field record binds operationKey, intentSha256,
+bodySha256, runId, runAttempt and commentId to the retained sender response.
+The admission binding is copied and frozen before lookup. Missing, mismatched,
+extra-field or stalled records reject before settlement. The source is read before
+the comment and again before final fresh admission, catching observed revocation
+and expiry during the extra await. Both reads have five-second bounds.
+
+This is a fail-closed consumer contract, not an implemented sender-response store.
+The future host must supply an authenticated, protected store populated exclusively
+from the actual sender response; request/comment/model content cannot populate it.
+No atomicity between the last read and DB settlement is claimed: later revocation
+still needs a transactional host design. No provenance flag is promoted.
+Four further tests cover exact record binding, missing source, immutable lookup,
+observed revocation, final-read expiry and a stalled source.

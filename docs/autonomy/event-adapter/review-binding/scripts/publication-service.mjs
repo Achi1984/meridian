@@ -89,6 +89,18 @@ export async function confirmPublication(request,trustedConfig,dependencies){
   const input={body,token};
   const before=await prepareAdmission(input,config,dependencies);
   need(before.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE');
+  const binding=Object.freeze({...before.ledgerBinding});
+  // Host-only source of the retained sender response, never supplied by the request.
+  // This contract is not provenance until an authenticated store is installed.
+  async function requireSendRecord(){
+   const raw=await boundedRead(signal=>dependencies.readSendRecord(binding,signal));
+   need(raw&&Object.keys(raw).sort().join()==='bodySha256,commentId,intentSha256,operationKey,runAttempt,runId');
+   const record={operationKey:raw.operationKey,intentSha256:raw.intentSha256,
+    bodySha256:raw.bodySha256,runId:raw.runId,runAttempt:raw.runAttempt,commentId:raw.commentId};
+   need(Object.entries(binding).every(([key,value])=>equal(record[key],value))
+    &&record.commentId===commentId);
+  }
+  await requireSendRecord();
   const pins=JSON.parse(config.pinsRaw);
   const rawComment=await boundedRead(signal=>dependencies.readPublishedComment(commentId,signal));
   const comment={id:rawComment?.id,url:rawComment?.url,issueUrl:rawComment?.issue_url,
@@ -104,6 +116,7 @@ export async function confirmPublication(request,trustedConfig,dependencies){
    &&new Date(comment.createdAt).toISOString()===comment.createdAt.replace('Z','.000Z'));
   // Revalidate token, approval, PR and run after the additional network await.
   // The comment's shared bot identity alone is not workflow provenance.
+  await requireSendRecord();
   const after=await prepareAdmission(input,config,dependencies);
   need(after.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE'
    &&JSON.stringify(before.ledgerBinding)===JSON.stringify(after.ledgerBinding));
