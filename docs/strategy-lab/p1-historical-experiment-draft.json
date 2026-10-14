@@ -1,0 +1,135 @@
+{
+  "schema": "P1_HISTORICAL_ENGINEERING_CONTRACT_DRAFT_V1",
+  "experimentId": "P1-C1-DAILY-ENGINEERING-20261014-V1",
+  "status": "DRAFT_BLOCKED",
+  "frozenAt": null,
+  "executionAuthorized": false,
+  "strategyEvaluated": false,
+  "sourceCommit": "8c6e48d3a0d9a62487b407b7e6a268b8cb032699",
+  "specification": {
+    "path": "docs/strategy-lab/P1_HISTORICAL_EXPERIMENT_DRAFT.md",
+    "sha256": "d097a8b0e212dc29b7098ca7ecdc7321e86a4fca2528b9ab2e4a60b3747a2a02"
+  },
+  "data": {
+    "assets": [
+      {
+        "symbol": "BTC",
+        "pair": "BTCUSDT",
+        "path": "docs/strategy-lab/core-history-20241013/BTC.json",
+        "sha256": "95a747ec2eca2d7bfc9d05a7f20526470d91eb566a147f3d42def39527939d13",
+        "rows": 652,
+        "archiveRetrievedAtMs": 1791920915925
+      },
+      {
+        "symbol": "ETH",
+        "pair": "ETHUSDT",
+        "path": "docs/strategy-lab/core-history-20241013/ETH.json",
+        "sha256": "29f693915470729a336be88a15d347d0255cbaf8b685f3bd444a4ac12347b1b1",
+        "rows": 652,
+        "archiveRetrievedAtMs": 1791920939418
+      }
+    ],
+    "quoteCurrency": "USDT",
+    "openDates": [
+      "2023-01-01",
+      "2024-10-13"
+    ],
+    "warmupBars": 201,
+    "classification": "INSPECTED_DEVELOPMENT_ENGINEERING_SELECTED_SURVIVORS",
+    "top20MembershipVerified": false,
+    "historicalAvailabilityVerified": false,
+    "secondVenueVerified": false
+  },
+  "time": {
+    "mode": "ASSUMED_PUBLICATION_V1",
+    "publicationDelayMs": 60000,
+    "decision": "EXCLUSIVE_CLOSE_PLUS_DELAY",
+    "entryExecution": "FIRST_DAILY_OPEN_STRICTLY_AFTER_DECISION",
+    "terminalUnfillableSignals": "LOG_UNFILLED_NO_EXTRAPOLATION"
+  },
+  "model": {
+    "id": "DAILY_OPEN_RANGE_PROXY_V1",
+    "isExecutableEvidence": false,
+    "isWorstCaseBound": false,
+    "intradayStop": "RANGE_TOUCH_WITH_OPEN_GAP_PRECEDENCE",
+    "sameDayReentry": false,
+    "terminalLiquidation": false,
+    "auditAllDecisionsRequired": true
+  },
+  "proposedCandidates": [
+    {
+      "id": "H1.P1.DAILY.V1",
+      "rules": "PINNED_P1_UNCHANGED",
+      "countsAgainstBudget": true
+    },
+    {
+      "id": "H1.C1.NONCROSSING.V1",
+      "rules": "P1_WITH_PREVIOUS_R_CROSSING_REQUIREMENT_REMOVED_ONLY",
+      "countsAgainstBudget": true
+    }
+  ],
+  "capital": {
+    "currency": "EUR",
+    "perCandidateScenario": "10000",
+    "perAssetSleeve": "5000",
+    "sleeveTransfers": false,
+    "entryRiskPctPreviousDailySleeveEquity": "0.25",
+    "stressExitFractionOfStop": "0.90",
+    "leverage": "1",
+    "cashYield": "0",
+    "shorts": false
+  },
+  "costs": {
+    "sourceAssumptionsPath": "docs/strategy-lab/spot-cost-assumptions.json",
+    "sourceAssumptionsSha256": "dffb4cfe4d040a56e327fc71ff599a18370c8a5d4758399bf4be47322849757d",
+    "anchorOverride": "RAW_OHLC_TRADE_PRICE_NOT_OBSERVED_MIDQUOTE",
+    "scenarios": [
+      {
+        "id": "BASE_ASSUMPTION",
+        "feeBps": 10,
+        "halfSpreadBps": 5,
+        "adverseSlippageBps": 5
+      },
+      {
+        "id": "STRESS_ASSUMPTION",
+        "feeBps": 20,
+        "halfSpreadBps": 10,
+        "adverseSlippageBps": 20
+      },
+      {
+        "id": "SHOCK_ASSUMPTION",
+        "feeBps": 20,
+        "halfSpreadBps": 30,
+        "adverseSlippageBps": 60
+      }
+    ],
+    "reportAll": true,
+    "calibrated": false,
+    "fxCostsIncludedInTheseBps": false
+  },
+  "unresolved": {
+    "instrumentManifest": null,
+    "fxManifest": null,
+    "executableCodeHashes": null,
+    "trialLedgerReconciled": false,
+    "payoffPolicyMigrated": false,
+    "historicalAdapterReviewed": false,
+    "dailyExecutionModelReviewed": false,
+    "fullDecisionAuditImplemented": false,
+    "finalIndependentReview": null,
+    "ownerExecutionApproval": null,
+    "intradayStopTimestampAndFxRule": null
+  },
+  "interpretation": {
+    "technicalFailure": "INVALID",
+    "technicallyValidOutcome": "DESCRIPTIVE_ONLY",
+    "profitabilityPassAllowed": false,
+    "holdoutClaimAllowed": false,
+    "promotionAllowed": false
+  },
+  "resourceIsolation": {
+    "claudeInvocation": false,
+    "platformWrites": false,
+    "schedulerChanges": false
+  }
+}

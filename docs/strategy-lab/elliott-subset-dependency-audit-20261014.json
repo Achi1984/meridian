@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "ELLIOTT_SUBSET_DEPENDENCY_AUDIT_V1",
+  "sourceHead": "d2356108915364f76de5e73ea3022956b4c1b0ff",
+  "targetMain": "219a1e72aa5ab3e485ff3e42d8759684900f6f02",
+  "files": [
+    {
+      "path": "docs/strategy-lab/elliott-correction-helpers.mjs",
+      "sourceBlob": "b134d1d069ba70452f64edb6cc6a03ed8c7afb55",
+      "imports": [],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-pivot-admission.mjs",
+      "sourceBlob": "6329c6cec83c611caeb4a3a53bf0a3cf47be7477",
+      "imports": [
+        "./elliott-correction-helpers.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "docs/strategy-lab/elliott-synthetic-path.mjs",
+      "sourceBlob": "6baedca3e0965cb42ef415d687c0afe1bc6bc1a9",
+      "imports": [
+        "./elliott-correction-helpers.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-v1.mjs",
+      "sourceBlob": "aa2eefd3dc9e2169a184c1ac625207c44102f8ca",
+      "imports": [],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "docs/strategy-lab/fixtures/elliott-frozen-wave5.mjs",
+      "sourceBlob": "a5923b65ef439caf1a8766b6982ac46c2013e33b",
+      "imports": [],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "test/elliott-correction-helpers.test.js",
+      "sourceBlob": "a9c7ddd59b20e261c80d5446b70a428b7401fa98",
+      "imports": [
+        "node:test",
+        "node:assert/strict",
+        "../docs/strategy-lab/elliott-correction-helpers.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "test/elliott-frozen-characterization.test.js",
+      "sourceBlob": "0f997e9f3505bcad8947f9470433052ffd1af6e2",
+      "imports": [
+        "node:test",
+        "node:assert/strict",
+        "node:fs",
+        "node:crypto",
+        "../docs/strategy-lab/fixtures/elliott-frozen-v1.mjs",
+        "../docs/strategy-lab/fixtures/elliott-frozen-wave5.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "test/elliott-pivot-admission.test.js",
+      "sourceBlob": "61080e8f2f92fd63e7cec41d3005842f9b523947",
+      "imports": [
+        "node:test",
+        "node:assert/strict",
+        "../docs/strategy-lab/elliott-pivot-admission.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    },
+    {
+      "path": "test/elliott-synthetic-path.test.js",
+      "sourceBlob": "1c78d41f3aebd503e0139f0290665deba5f2d691",
+      "imports": [
+        "node:test",
+        "node:assert/strict",
+        "../docs/strategy-lab/elliott-synthetic-path.mjs"
+      ],
+      "targetRelation": "ABSENT"
+    }
+  ],
+  "syntheticTests": {
+    "total": 48,
+    "passed": 48,
+    "failed": 0,
+    "command": "node --test test/elliott-*.test.js",
+    "scope": "isolated nine pinned files, not full target checkout"
+  },
+  "runtimeImportsClosed": true,
+  "externalPackages": [],
+  "contentReviewComplete": false,
+  "wholeInventoryReviewed": false,
+  "targetHeadCiVerified": false,
+  "mergeAuthorized": false,
+  "empiricalRunAuthorized": false,
+  "runtimeAuthorized": false,
+  "notes": [
+    "Initial local copy added a newline; frozen hash test failed. All nine files restored to remote exact bytes before final 48/48 run.",
+    "Static import/effect inspection and isolated execution; not exhaustive security review.",
+    "All nine paths absent in full target tree; no target file overwritten.",
+    "Documentation and historical lineage retained by pinned source reference until full disposition review."
+  ]
+}

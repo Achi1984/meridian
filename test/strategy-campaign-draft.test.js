@@ -45,55 +45,61 @@ test('JSON-shaped object and array identifiers are rejected without coercion', (
     assert.equal(validateCampaignDraft(d).valid,false);
   }
 });
-test('net CRV policy rejects absent, weaker, gross-only and misleading runtime contracts', () => {
-  const changes = [
-    d=>delete d.payoffPolicy,d=>d.payoffPolicy=null,
-    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=2.99,
-    d=>d.payoffPolicy.minimumPlannedNetRewardRisk='3',
-    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=Infinity,
-    d=>d.payoffPolicy.rewardBasis='GROSS_TARGET',
-    d=>d.payoffPolicy.riskBasis='MARGIN_ONLY',
-    d=>d.payoffPolicy.scope='DIRECTIONAL_ONLY',
-    d=>d.payoffPolicy.runtimeEnforcementImplemented=true,
-    d=>d.payoffPolicy.evaluationStage='RUNTIME',
-    d=>d.payoffPolicy.minimumPlannedNetRewardRisk=4
-  ];
-  for (const change of changes) {
-    const d=draft();change(d);const r=validateCampaignDraft(d);
-    assert.equal(r.valid,false);assert.equal(r.executionAuthorized,false);
+test('V2 replaces universal ratio policy and rejects changed or runtime contracts', () => {
+  for (const change of [d=>d.schemaVersion='MERIDIAN_STRATEGY_CAMPAIGN_DRAFT_V1',d=>delete d.payoffPolicy,d=>d.payoffPolicy.universalMinimumRewardRisk=3,d=>d.payoffPolicy.runtimeEnforcementImplemented=true,d=>d.payoffPolicy.promotion='AUTOMATIC',d=>d.payoffPolicy.ratioTreatment='ACCEPT_ABOVE_3']) {
+    const d=draft();change(d);const r=validateCampaignDraft(d);assert.equal(r.valid,false);assert.equal(r.executionAuthorized,false);
   }
 });
-test('both payoff scenarios include conservative costs and every leg; missing or waived costs fail', () => {
-  for (const key of Object.keys(source.payoffPolicy.costs)) {
-    for (const value of [undefined,null,'IGNORE',false]) {
-      const d=draft();d.payoffPolicy.costs[key]=value;
-      assert.equal(validateCampaignDraft(d).valid,false,`${key}:${String(value)}`);
-    }
+test('time and rebalance designs need no invented finite target; event studies have no orders', () => {
+  for (const [id,mode] of [['H1','TRAILING_OR_TIME'],['H7','REBALANCE'],['H12','REBALANCE'],['H2','EVENT_STUDY'],['H6','MULTI_LEG'],['H5','FIXED_TARGET']]) {
+    const f=source.families.find(f=>f.id===id);assert.equal(f.payoffEvaluationMode,mode);
+    assert.equal(f.prerequisites.some(p=>p.includes('finite payoff')||p.includes('>=3')),false);
   }
-  const d=draft();d.payoffPolicy.costs.discountedFees=true;
-  assert.equal(validateCampaignDraft(d).valid,false);
+  assert.equal(source.payoffPolicy.universalMinimumRewardRisk,null);
+  assert.match(source.payoffPolicy.evaluationModes.TRAILING_OR_TIME,/NO_INVENTED_FINITE_TARGET/);
+  assert.match(source.payoffPolicy.evaluationModes.EVENT_STUDY,/NO_ORDERS/);
+  assert.equal(validateCampaignDraft(draft()).valid,true);
 });
-test('partial exit, residual, risk and stop-policy bypasses cannot qualify a draft', () => {
-  for (const [key,value] of [
-    ['partialExits','FINAL_TARGET_ONLY'],['undeclaredResidual','ASSUME_TARGET'],
-    ['unknownOrUnboundedRisk','ALLOW'],['stopRelocationToQualify','ALLOW'],
-    ['unsupportedFinitePayoff','EXEMPT'],['exemptions',['CARRY']],
-    ['exemptions',['HEDGE']],['exemptions',['SPOT']],
-    ['frozenReferenceTreatment','APPLY_TO_EXISTING_LOWVOL']
-  ]) {
-    const d=draft();d.payoffPolicy[key]=value;
-    assert.equal(validateCampaignDraft(d).valid,false,key);
+test('legacy lower ratio is not universal rejection and high ratio never authorizes V2', async () => {
+  const {evaluateTradePlan}=await import('../docs/strategy-lab/evaluate-trade-plan.mjs');
+  for (const [target,qualifies] of [[120,false],[150,true]]) {
+    const plan={schemaVersion:'MERIDIAN_LINEAR_TRADE_PLAN_V1',instrument:'LINEAR_SPOT',direction:'LONG',quantity:1,entryPrice:100,stopPrice:90,exits:[{price:target,portionBps:10000}],targetCosts:{fee:0,spread:0,slippage:0,fundingBorrow:0},stopCosts:{fee:0,spread:0,slippage:0,fundingBorrow:0}};
+    const ratio=evaluateTradePlan(plan);assert.equal(ratio.valid,true);assert.equal(ratio.qualifiesPlannedCRV,qualifies);assert.equal(ratio.executionAuthorized,false);
+    // Campaign does not consume a legacy scenario score or implicitly register a trial.
+    const result=validateCampaignDraft(draft());assert.equal(result.valid,true);assert.equal(result.executionAuthorized,false);
   }
 });
-test('all families including event, hedge, carry and allocator stay payoff-unverified with no exemptions', () => {
-  for (let index=0;index<source.families.length;index++) {
-    for (const change of [f=>delete f.payoffPolicyId,f=>f.payoffPolicyId='EXEMPT',f=>f.payoffReadiness='QUALIFIED']) {
-      const d=draft();change(d.families[index]);assert.equal(validateCampaignDraft(d).valid,false,source.families[index].id);
-    }
+test('unknown costs, risk, residuals and unsupported models remain research-only without promotion', () => {
+  for (const key of ['unknownOrUnsupportedModel','unknownOrUnboundedRisk','undeclaredResidual']) {
+    assert.equal(source.payoffPolicy[key],'RESEARCH_ONLY_NO_PROMOTION');
+    const d=draft();d.payoffPolicy[key]='ALLOW';assert.equal(validateCampaignDraft(d).valid,false);
+  }
+  assert.equal(source.payoffPolicy.costs.unknownCosts,'RESEARCH_ONLY_NO_PROMOTION');
+  for (const key of Object.keys(source.payoffPolicy.costs)) for (const value of [undefined,null,'IGNORE',false]) {
+    const d=draft();d.payoffPolicy.costs[key]=value;assert.equal(validateCampaignDraft(d).valid,false);
+  }
+  for (const f of source.families) assert.equal(f.validationStatus,'UNVALIDATED');
+  const d=draft();d.families[0].validationStatus='VALIDATED';assert.equal(validateCampaignDraft(d).valid,false);
+});
+test('all family modes and research-only statuses are enforced and cannot inherit reference PASS', () => {
+  for (let i=0;i<source.families.length;i++) for (const change of [f=>delete f.payoffPolicyId,f=>f.payoffReadiness='QUALIFIED',f=>f.payoffEvaluationMode='EXEMPT']) {
+    const d=draft();change(d.families[i]);assert.equal(validateCampaignDraft(d).valid,false);
+  }
+  for (const [key,value] of [['partialExits','FINAL_TARGET_ONLY'],['stopRelocationToQualify','ALLOW'],['frozenReferenceTreatment','APPLY_TO_EXISTING_LOWVOL'],['leverageTreatment','MANDATORY_10X']]) {
+    const d=draft();d.payoffPolicy[key]=value;assert.equal(validateCampaignDraft(d).valid,false);
   }
 });
-test('exact payoff policy ignores property ordering but rejects undeclared bypass fields', () => {
-  const d=draft();d.payoffPolicy=Object.fromEntries(Object.entries(d.payoffPolicy).reverse());
-  assert.equal(validateCampaignDraft(d).valid,true);
+test('historical mandate is superseded, H5 restores proposed shock-open benchmark, no new trials', () => {
+  assert.equal(source.userMandate.payoffUpdate.status,'SUPERSEDED');
+  assert.match(source.userMandate.payoffUpdate.requirement,/3:1/);
+  assert.match(source.families.find(f=>f.id==='H5').exitSketch,/target the shock-bar open/);
+  assert.equal(source.validationPrerequisites.instrumentSpecificMarginSimulatorValidated,null);
+  assert.equal(Object.hasOwn(source.validationPrerequisites,'tenTimesMarginSimulatorValidated'),false);
+  assert.equal(source.defaults.maxFuturesLeverage,10);
+  assert.match(source.payoffPolicy.leverageTreatment,/NOT_TARGET_OR_AUTHORITY/);
+  assert.equal(source.families.flatMap(f=>f.variants).length,0);
+});
+test('exact payoff policy ignores property order and rejects undeclared bypass fields', () => {
+  const d=draft();d.payoffPolicy=Object.fromEntries(Object.entries(d.payoffPolicy).reverse());assert.equal(validateCampaignDraft(d).valid,true);
   d.payoffPolicy.allowCarryException=false;assert.equal(validateCampaignDraft(d).valid,false);
 });

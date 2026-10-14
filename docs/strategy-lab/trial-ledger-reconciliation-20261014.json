@@ -1,0 +1,489 @@
+{
+  "schemaVersion": "MERIDIAN_PARTIAL_TRIAL_LEDGER_RECONCILIATION_V1",
+  "status": "PARTIAL_SOURCE_AUDIT_NOT_CANONICAL_LEDGER",
+  "date": "2026-10-14",
+  "repository": "Achi1984/meridian",
+  "pinnedCommit": "7d019f82be76cf0a9cefbb5c5e6537c182be7546",
+  "scope": {
+    "treeEntries": 1358,
+    "treeTruncated": false,
+    "contentSourcesRead": 18,
+    "method": "Untruncated pinned tree path discovery, then bounded targeted source metadata/status reads; no historical strategy execution or recalculation.",
+    "exhaustive": false,
+    "otherBranchesIssuesWorkflowArtifactsAndDeletedHistoryAudited": false
+  },
+  "permissions": {
+    "executionAuthorized": false,
+    "canonicalResearch": false,
+    "paperOrders": false,
+    "liveOrders": false,
+    "dispatch": false,
+    "autoPromotion": false
+  },
+  "completeLineageAudit": null,
+  "counts": {
+    "cumulativeEmpiricalTrials": null,
+    "cumulativeVariants": null,
+    "perFamilyUsage": null,
+    "remainingCampaignSlots": null,
+    "remainingFirstTrancheSlots": null,
+    "accountingStatus": "UNKNOWN_UNRECONCILED",
+    "sourceDocumentsAreNotTrialCounts": true
+  },
+  "budget": {
+    "maxFamilies": 12,
+    "maxVariantsPerFamily": 3,
+    "maxCandidates": 36,
+    "maxFinalists": 3,
+    "firstTrancheCandidateCap": 4,
+    "firstTrancheSource": "S13 lines 26-33; original controlling plan remains to reconcile",
+    "resetAuthorized": false
+  },
+  "sources": [
+    {
+      "id": "S01",
+      "path": "docs/strategy-lab/campaign-20261013.json",
+      "gitBlobSha": "0e9db15f6155eda1d98c86d4eda9081ecec6d02a",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/campaign-20261013.json"
+    },
+    {
+      "id": "S02",
+      "path": "docs/strategy-lab/p1-historical-experiment-draft.json",
+      "gitBlobSha": "5234ffc13d65084ca31df22bbe0e44f16ed2b615",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/p1-historical-experiment-draft.json"
+    },
+    {
+      "id": "S03",
+      "path": "research/PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md",
+      "gitBlobSha": "9cf7f2177fca99f9d0a4c354319d1a69b302725a",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/PAPER-EDGE-V1-DISCOVERY-ACCOUNTING.md"
+    },
+    {
+      "id": "S04",
+      "path": "research/r42-candidates.js",
+      "gitBlobSha": "f7f7c309582aab76bb8a47844f3ce19c37eafa0d",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/r42-candidates.js"
+    },
+    {
+      "id": "S05",
+      "path": "research/r42-ledger.js",
+      "gitBlobSha": "3562f09de24f075f4dedcf51d1f3d29e59956de2",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/r42-ledger.js"
+    },
+    {
+      "id": "S06",
+      "path": "research/trend-pullback-v1-evidence-r34.md",
+      "gitBlobSha": "49caf33e654bf99e9346a66010c254b3c1a61ca6",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/trend-pullback-v1-evidence-r34.md"
+    },
+    {
+      "id": "S07",
+      "path": "research/results/regime-trend-breakout-v1-holdout-result.json",
+      "gitBlobSha": "f68452cae0bad17448a336113a9a264c3c999213",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/results/regime-trend-breakout-v1-holdout-result.json"
+    },
+    {
+      "id": "S08",
+      "path": "research/perpetual-taker-order-flow-v1-development-result.json",
+      "gitBlobSha": "4acc8cbbe3b77a653400720cd9d874a2631ad6e3",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/perpetual-taker-order-flow-v1-development-result.json"
+    },
+    {
+      "id": "S09",
+      "path": "research/results/perpetual-taker-order-flow-relative-strength-v2-result.json",
+      "gitBlobSha": "6494dbfb5760671eadbde7b77ff619acd1f5073d",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/results/perpetual-taker-order-flow-relative-strength-v2-result.json"
+    },
+    {
+      "id": "S10",
+      "path": "research/results/low-volatility-rank-weighted-v2-holdout-frozen-summary.json",
+      "gitBlobSha": "4e59899559fefe5c8f6697f9f4fc320fc9ed8516",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/results/low-volatility-rank-weighted-v2-holdout-frozen-summary.json"
+    },
+    {
+      "id": "S11",
+      "path": "research/REGIME-GATED-GRID-V2-RESULT.md",
+      "gitBlobSha": "f0c41ebcf5b30f6dd5a12bf4054eda151c1079f6",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/REGIME-GATED-GRID-V2-RESULT.md"
+    },
+    {
+      "id": "S12",
+      "path": "research/PAPER-EDGE-V1-DISCOVERY-DECISION.md",
+      "gitBlobSha": "6221e3fd9645a7f1bd577b98c46662974127f070",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/PAPER-EDGE-V1-DISCOVERY-DECISION.md"
+    },
+    {
+      "id": "S13",
+      "path": "docs/strategy-lab/P1_HISTORICAL_EXPERIMENT_DRAFT.md",
+      "gitBlobSha": "e5ec3241d2d4664e0fa13cb2305657428426b545",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/P1_HISTORICAL_EXPERIMENT_DRAFT.md"
+    },
+    {
+      "id": "S14",
+      "path": "docs/strategy-lab/CLAUDE_CONCEPT_DISPOSITION_20261014.md",
+      "gitBlobSha": "1eaa37c8971aed5b37c976af16b11b1122c8e9a9",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/CLAUDE_CONCEPT_DISPOSITION_20261014.md"
+    },
+    {
+      "id": "S15",
+      "path": "docs/strategy-lab/data-probe-results-20261013.json",
+      "gitBlobSha": "73c430bb4086f41a5b870c713bba7da02941e3ad",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/data-probe-results-20261013.json"
+    },
+    {
+      "id": "S16",
+      "path": "docs/strategy-lab/P1_TIME_SEPARATION.md",
+      "gitBlobSha": "fedfb3cb78064309df936051417486e3c19bad4c",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/docs/strategy-lab/P1_TIME_SEPARATION.md"
+    },
+    {
+      "id": "S17",
+      "path": "research/PAIRS-OFFLINE-V1.md",
+      "gitBlobSha": "f1d2f40ffe5b7fb0c915ed146e164e7cbb82e5e3",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/PAIRS-OFFLINE-V1.md"
+    },
+    {
+      "id": "S18",
+      "path": "research/R42-MOMENTUM-CARRY-AUDIT-2026-09-14.md",
+      "gitBlobSha": "58e4c9e4af8617e4ec79445407736fe6f667809e",
+      "readStatus": "CONTENT_READ_TARGETED_METADATA",
+      "pinnedUrl": "https://github.com/Achi1984/meridian/blob/7d019f82be76cf0a9cefbb5c5e6537c182be7546/research/R42-MOMENTUM-CARRY-AUDIT-2026-09-14.md"
+    }
+  ],
+  "records": [
+    {
+      "id": "CAMPAIGN_H1_H12",
+      "kind": "CONCEPT_REGISTER",
+      "sourceIds": [
+        "S01"
+      ],
+      "recordedStatus": "DRAFT / all families UNVALIDATED",
+      "statusLocation": "/status; /families/*/validationStatus",
+      "familyLinks": [
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5",
+        "H6",
+        "H7",
+        "H8",
+        "H9",
+        "H10",
+        "H11",
+        "H12"
+      ],
+      "mapping": "EXPLICIT_CARD_IDENTITIES",
+      "counting": "Empty variants arrays are not evidence of zero prior trials or available slots."
+    },
+    {
+      "id": "H1.P1.DAILY.V1",
+      "kind": "PROPOSED_CANDIDATE",
+      "sourceIds": [
+        "S02",
+        "S13"
+      ],
+      "recordedStatus": "DRAFT_BLOCKED",
+      "statusLocation": "/status; /proposedCandidates/0",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "EXPLICIT_PROPOSED_ID",
+      "countsAgainstBudget": true,
+      "counting": "Budget-intended proposed slot; campaign allocation and cumulative usage unresolved; no empirical result recorded in inspected draft."
+    },
+    {
+      "id": "H1.C1.NONCROSSING.V1",
+      "kind": "PROPOSED_CANDIDATE",
+      "sourceIds": [
+        "S02",
+        "S13"
+      ],
+      "recordedStatus": "DRAFT_BLOCKED",
+      "statusLocation": "/status; /proposedCandidates/1",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "EXPLICIT_PROPOSED_ID",
+      "countsAgainstBudget": true,
+      "counting": "Matched non-crossing control, not pure SMA control; separately budget-intended, not silently free."
+    },
+    {
+      "id": "SMA200_CONTEXT",
+      "kind": "PROPOSED_NONSELECTABLE_CONTEXT",
+      "sourceIds": [
+        "S14"
+      ],
+      "recordedStatus": "Non-selectable simple trend context",
+      "statusLocation": "section Non-selectable simple trend context",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "CONTEXT_ONLY_NOT_A_REGISTERED_VARIANT",
+      "counting": "Record any future run; selection, tuning or promotion requires candidate accounting/revised budget. Do not declare blanket exemption."
+    },
+    {
+      "id": "P1_TIME_SEPARATION",
+      "kind": "SYNTHETIC_ENGINEERING",
+      "sourceIds": [
+        "S16"
+      ],
+      "recordedStatus": "tested only on synthetic fixtures",
+      "statusLocation": "opening paragraph; Verification and scope",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "TECHNICAL_SUPPORT_ONLY",
+      "counting": "Unit tests and equivalence fixtures are not empirical trials or evidence of an edge."
+    },
+    {
+      "id": "SOURCE_PROBES_20261013",
+      "kind": "DATA_PROBE",
+      "sourceIds": [
+        "S15"
+      ],
+      "recordedStatus": "one-day source-format/checksum probes only; not performance evidence",
+      "statusLocation": "/purpose; /samples/*/strategyPnlCalculated=false",
+      "familyLinks": [],
+      "mapping": "SHARED_DATA_INFRASTRUCTURE",
+      "counting": "Source probes are not empirical performance trials; inspected-history provenance must still be tracked."
+    },
+    {
+      "id": "TREND_PULLBACK_V1_R34",
+      "kind": "RECORDED_EMPIRICAL_STRATEGY_RESULT",
+      "sourceIds": [
+        "S06"
+      ],
+      "recordedStatus": "REJECTED \u2014 no Paper launch and no production execution impact.",
+      "statusLocation": "line 5",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "RELATED_PULLBACK_LINEAGE_NOT_IDENTICAL_P1",
+      "counting": "Retain failed predecessor; exact prior variant/run count and campaign allocation unknown."
+    },
+    {
+      "id": "REGIME_TREND_BREAKOUT_V1",
+      "kind": "RECORDED_EMPIRICAL_STRATEGY_RESULT",
+      "sourceIds": [
+        "S07",
+        "S01"
+      ],
+      "recordedStatus": "REGIME_TREND_BREAKOUT_V1_HOLDOUT_FAIL",
+      "statusLocation": "/result/decision",
+      "familyLinks": [
+        "H1",
+        "H5"
+      ],
+      "mapping": "H1_EXPLICIT_RELATED_LINEAGE; H5_COMPARATOR_NOT_SAME_REVERSAL_STRATEGY",
+      "counting": "Discovery and holdout are stages of recorded ruleset, not automatically new variants; failed holdout retained."
+    },
+    {
+      "id": "TAKER_ORDER_FLOW_V1",
+      "kind": "RECORDED_EMPIRICAL_STRATEGY_RESULT",
+      "sourceIds": [
+        "S08",
+        "S01"
+      ],
+      "recordedStatus": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+      "statusLocation": "/decision",
+      "familyLinks": [
+        "H3",
+        "H8"
+      ],
+      "mapping": "EXPLICIT_FAILURE_COMPARATORS_NOT_NEW_CARD_EQUIVALENCE",
+      "counting": "No relabeling or losing-side deletion; prior variants/allocation unknown."
+    },
+    {
+      "id": "TAKER_FLOW_RELATIVE_STRENGTH_V2",
+      "kind": "RECORDED_EMPIRICAL_FEATURE_TRIAL",
+      "sourceIds": [
+        "S09",
+        "S01"
+      ],
+      "recordedStatus": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
+      "statusLocation": "/decision; /gate/strategyPnlCalculated=false",
+      "familyLinks": [
+        "H8"
+      ],
+      "mapping": "EXPLICIT_FAILURE_COMPARATOR_NOT_WHALE_FLOW_EQUIVALENCE",
+      "counting": "Feature validation is empirical even without portfolio PnL; retain failure."
+    },
+    {
+      "id": "REGIME_GATED_GRID_V2",
+      "kind": "RECORDED_EMPIRICAL_STRATEGY_RESULT",
+      "sourceIds": [
+        "S11",
+        "S01"
+      ],
+      "recordedStatus": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "statusLocation": "section Frozen decision",
+      "familyLinks": [],
+      "mapping": "KNOWN_FAILED_COMPARATOR; NO_FORCED_H_ASSIGNMENT",
+      "counting": "Multiple tested candidates are stated; total variants not verified here, never infer one from one result document."
+    },
+    {
+      "id": "LOWVOL_V2_FROZEN",
+      "kind": "FROZEN_EXTERNAL_REFERENCE",
+      "sourceIds": [
+        "S10",
+        "S01"
+      ],
+      "recordedStatus": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+      "statusLocation": "/decision",
+      "familyLinks": [
+        "H7"
+      ],
+      "mapping": "H7_DERIVATIVE_LINEAGE_ONLY; IMMUTABLE_REFERENCE_SEPARATE",
+      "counting": "No PASS transfer, runtime permission or automatic new-campaign slot assignment."
+    },
+    {
+      "id": "PAPER_EDGE_V1",
+      "kind": "RECORDED_EMPIRICAL_STRATEGY_RESULT",
+      "sourceIds": [
+        "S12",
+        "S03"
+      ],
+      "recordedStatus": "EDGE_V1_DISCOVERY_FAIL",
+      "statusLocation": "S12 section Gate decision; V1 closed, validation and holdout locked",
+      "familyLinks": [],
+      "mapping": "PULLBACK_RELATED_DISCOVERY_LINE; PRECISE_H_ASSIGNMENT_UNRESOLVED",
+      "counting": "S03 is trade/fill/split accounting, not cumulative variant registry. Retain permanently closed failed V1."
+    },
+    {
+      "id": "PAIRS_OFFLINE_V1",
+      "kind": "RECORDED_EMPIRICAL_SCAN_AND_WALKFORWARD",
+      "sourceIds": [
+        "S17",
+        "S05"
+      ],
+      "recordedStatus": "NO_ROBUST_PAIR_IN_WALK_FORWARD",
+      "statusLocation": "S17 lines 71-72; S05 sealed path",
+      "familyLinks": [
+        "H6"
+      ],
+      "mapping": "RELATED_PAIR_REVERSION_PREDECESSOR_NOT_SAME_DESIGN",
+      "counting": "28 pairs and 84 pair/window statistical tests are not automatically 28 or 84 campaign variants; zero eligible trades does not mean no empirical trial."
+    },
+    {
+      "id": "R42_MOMENTUM",
+      "kind": "RECORDED_EMPIRICAL_WALKFORWARD",
+      "sourceIds": [
+        "S18",
+        "S05",
+        "S04"
+      ],
+      "recordedStatus": "HISTORICAL_WALK_FORWARD_REJECTED",
+      "statusLocation": "S18 lines 47-49; S05 sealed paths",
+      "familyLinks": [
+        "H1"
+      ],
+      "mapping": "RELATED_MOMENTUM_PREDECESSOR; EXACT_VARIANT_MAPPING_UNKNOWN",
+      "counting": "R42 candidate functions and trade-ledger code are not a global experiment registry; failed predecessor retained."
+    }
+  ],
+  "unresolved": [
+    "Campaign variants[] empty versus two explicitly budget-counting proposed H1 P1/C1 IDs: allocation must be reconciled, not inferred zero or automatically appended.",
+    "Full earlier H1/H5/H7, cross-market and manual trial sequence plus four-candidate first tranche remains unresolved. Existing failures count and cannot be reset by schema migration.",
+    "Three compulsory cost sensitivities produce six P1/C1 scenario combinations, not automatically six independent candidates; selection or tuning must be recorded as variation.",
+    "Current result status documents prove recorded decisions only. Underlying workflow artifacts, full failed/discarded/manual variant lists and deduplication across stages were not independently replayed or exhaustively audited.",
+    "Related strategy names do not prove economic novelty or equal candidate identity. H2/H4/H9/H10/H11/H12 have no empirical lineage reconciled in this bounded packet; this is not proof of no prior work.",
+    "Read-only discovery did not establish any authoritative complete repository-wide trial registry. Per-strategy trade ledgers, preregistration docs and source registers have distinct scopes.",
+    "Earlier p1-historical-experiment-draft.json unresolved flags remain unchanged. Later schema/time adapter work does not make trialLedgerReconciled true or clear execution gates.",
+    "Elliott Wave3 V1, Wave3 V2 replication and Wave5 V1 are known recorded research in supplementalLineagePointers; cumulative run/variant deduplication and budget assignment remain unresolved. Source-correction fixtures neither erase these records nor authorize another historical trial."
+  ],
+  "nextEvidenceRequests": [
+    "Retrieve original BENCHMARK_PLAN first-tranche allocation and CROSS_MARKET_BASELINE proposed/manual candidate history at pinned refs; match named candidates before claiming remaining slots.",
+    "Recover the cumulative run/variant manifest including failed, aborted, discarded and manual settings from authorized prior work and referenced workflow artifacts, with stable candidate and stage identifiers.",
+    "Read existing LowVol funding correction and other result-line sources discovered below before any broad lineage-complete claim; preserve corrections and failures.",
+    "Reconcile P1/C1 proposed slots and optional future SMA context run log against that ledger; do not register or run candidates until separate reviewed contract gates are met."
+  ],
+  "discoveredNotRead": [
+    {
+      "path": "docs/strategy-lab/BENCHMARK_PLAN_20261013.md",
+      "gitBlobSha": "ff8948c030ddd114a9c31e566170a9aa6036d439",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "docs/strategy-lab/CROSS_MARKET_BASELINE.md",
+      "gitBlobSha": "b781d613682b00117112a118ad2ecf9cf16cb9b6",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-FUNDING-TIMESTAMP-CORRECTION.md",
+      "gitBlobSha": "ad5694309438c80aac0717700b7772fd94bc8f89",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/ADAPTIVE-TREND-SHARPE-PROXY-V1-RESULT.md",
+      "gitBlobSha": "567b30f0048854dfb6efb7e877a5c7eee0705ef3",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/PAPERBOT-PROFIT-TSMOM-V2-RESULT.md",
+      "gitBlobSha": "471e4b3f44c2b7ea57d9aea64a49af0746402969",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/PERPETUAL-QUARTER-HOUR-BOUNDARY-IMBALANCE-STRATEGY-V2-RESULT.md",
+      "gitBlobSha": "7bc0ef10fec1c89d0daa6023372ac03f8243c53e",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/SPOT-PERP-FUNDING-HARVEST-V1-RESULT.md",
+      "gitBlobSha": "1687ae94d88ad4d9e92f530f9da840da3c854d17",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    },
+    {
+      "path": "research/CROSS-VENUE-FUNDING-SPREAD-V1-RESULT.md",
+      "gitBlobSha": "d275a40644c06b2fa7dd84ea685588f24cdadc4b",
+      "readStatus": "TREE_ONLY_NOT_CONTENT_VERIFIED"
+    }
+  ],
+  "supplementalLineagePointers": {
+    "addedAtStrategyCommit": "e80047ba6d8d7977a07a785e535a59df816c877b",
+    "sourcePath": "docs/strategy-lab/ELLIOTT_SOURCE_ASSESSMENT_20261014.md",
+    "status": "KNOWN_RECORDED_RESEARCH_BUDGET_ASSIGNMENT_UNRESOLVED",
+    "original18SourceAuditScopeUnchanged": true,
+    "records": [
+      {
+        "id": "ELLIOTT_WAVE3_V1",
+        "pr": 88,
+        "frozenCommit": "a1283b68419bdb2a5d22ff2b49fff5b4109354db",
+        "recordedDisposition": "FROZEN_NEAR_PASS_NOT_PROMOTED",
+        "candidateVariantCount": null
+      },
+      {
+        "id": "ELLIOTT_WAVE3_V2_REPLICATION",
+        "pr": 89,
+        "frozenCommit": "465555c16bc0d64f69ba3afe1f29fcf3fe73c6ea",
+        "recordedDisposition": "CLOSED_UNCHANGED_RULE_REPLICATION_SAMPLE_FAIL",
+        "candidateVariantCount": null
+      },
+      {
+        "id": "ELLIOTT_WAVE5_V1",
+        "pr": 90,
+        "frozenCommit": "5f30cce5fc64778c83fcb03e33edc39dc3003f0c",
+        "recordedDisposition": "REJECTED_KEEP_CLOSED",
+        "candidateVariantCount": null
+      }
+    ]
+  }
+}

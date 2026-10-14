@@ -1,3 +1,4 @@
+import {evaluateTrendPullbackCore} from './trend-pullback-core.mjs';
 // P1: pure, offline daily signal. Never an order, fill or performance evaluator.
 const DAY = 86400000;
 const record = x => x !== null && typeof x === 'object' && !Array.isArray(x) &&
@@ -20,28 +21,8 @@ export function evaluateTrendPullback(input) {
   const last=bars[200];
   if (asOfMs-last.closeTimeMs >= DAY) return reject('STALE_WINDOW');
   if (position && position.entryAtMs < bars[0].closeTimeMs) return reject('POSITION_OUTSIDE_WINDOW');
-  let sma=bars[1].close;
-  for (let i=2;i<=200;i++) sma += (bars[i].close-sma)/i;
-  const percentR = end => {
-    const w=bars.slice(end-9,end+1), high=Math.max(...w.map(b=>b.high)),low=Math.min(...w.map(b=>b.low));
-    return high===low ? null : -100*((high-bars[end].close)/(high-low));
-  };
-  const previousR=percentR(199),currentR=percentR(200);
-  const atr=bars.slice(187).reduce((s,b,j)=>s+Math.max(b.high-b.low,Math.abs(b.high-bars[186+j].close),Math.abs(b.low-bars[186+j].close))/14,0);
-  if (![sma,atr].every(Number.isFinite) || [previousR,currentR].some(x=>x!==null && !Number.isFinite(x))) return reject('NUMERIC_RANGE');
-  const heldBars=position ? bars.filter(b=>b.closeTimeMs>position.entryAtMs).length : 0;
-  const reasons=[];
-  if (last.close<sma) reasons.push('TREND_EXIT');
-  if (currentR!==null && currentR>=-20) reasons.push('OSCILLATOR_EXIT');
-  if (position && heldBars>=10) reasons.push('TIME_EXIT');
-  let action='NONE',initialStop=null;
-  if (position) action=reasons.length ? 'EXIT_LONG' : 'HOLD_LONG';
-  else if (!reasons.length && last.close>sma && previousR!==null && currentR!==null && previousR<=-80 && currentR>-80 && currentR<-20) {
-    initialStop=last.low-0.5*atr;
-    if (!Number.isFinite(initialStop) || initialStop<=0 || initialStop>=last.close) return reject('INVALID_STOP');
-    action='ENTER_LONG_CANDIDATE';
-  }
-  return {valid:true,action,reasons,sma200:sma,previousR,currentR,atr14:atr,heldBars,initialStop,
-    signalAvailableAtMs:Math.max(asOfMs,...bars.map(b=>b.availableAtMs)),
-    executionAuthorized:false,researchOnly:true};
+  const rawBars=bars.map(({availableAtMs,...raw})=>raw);
+  const {timeAdmissionPerformed,...signal}=evaluateTrendPullbackCore({bars:rawBars,decisionAtMs:asOfMs,position});
+  if (!signal.valid) return signal;
+  return {...signal,signalAvailableAtMs:Math.max(asOfMs,...bars.map(b=>b.availableAtMs))};
 }

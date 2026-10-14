@@ -1,6 +1,8 @@
-# Offline planned net CRV evaluator
+# Legacy offline planned net CRV evaluator
 
 `evaluate-trade-plan.mjs` exports the pure deterministic function `evaluateTradePlan(plan)`. It performs no I/O, networking, scheduling, persistence or orders. `executionAuthorized` is always false, including when `valid` and `qualifiesPlannedCRV` are true. Mathematical qualification is **not** strategy readiness, evidence of realistic costs, profitability, research permission or runtime enforcement.
+
+The universal 3:1 mandate was superseded by `STRATEGY_SPECIFIC_NET_PAYOFF_V2`. This module and its tests are deliberately unchanged for reproducibility. Its `qualifiesPlannedCRV` field answers only the historical 3:1 scenario question: false does not universally reject a V2 research design, and true never authorizes execution or promotion. It does not evaluate trailing/time, rebalance, multi-leg or event-study strategies. See `PAYOFF_POLICY_MIGRATION.md`.
 
 ## Exact input contract
 
@@ -18,7 +20,7 @@
 }
 ```
 
-Only one **linear** spot long or linear perpetual long/short position is supported. Inverse contracts, options, spot shorts, multi-leg trades, pair/carry payoff structures and unknown products are rejected. There is no leverage field and returns are never multiplied by leverage. This does not exempt unsupported strategies from the campaign's CRV policy; they remain research-only until separately reviewed appropriate models exist.
+Only one **linear** spot long or linear perpetual long/short position is supported. Inverse contracts, options, spot shorts, multi-leg trades, pair/carry payoff structures and unknown products are rejected. There is no leverage field and returns are never multiplied by leverage. Unsupported strategies require separately reviewed appropriate models under the strategy-specific V2 policy and remain research-only. No finite target is invented to fit this legacy calculator.
 
 All object keys are exact; missing and extra fields reject the input. Quantity is the base-asset quantity, not contract count. Prices and every PNL/cost amount share one quote currency. Quantity/prices must be finite positive numbers. The stop must be strictly below entry for long, above entry for short. No stop is inferred, adjusted or moved to force qualification.
 
