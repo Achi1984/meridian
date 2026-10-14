@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
-import {prepareAdmission,reserveAdmission} from '../scripts/publication-service.mjs';
+import {prepareAdmission,reserveAdmission,confirmPublication} from '../scripts/publication-service.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -86,4 +86,83 @@ test('unresponsive evidence source times out before database call',async()=>{
 test('untrusted extra config and arbitrary candidate do not bypass validators',async()=>{
  const s=setup();s.config.authorized=true;
  assert.equal((await prepareAdmission(s.request,s.config,s.deps)).kind,'ADMISSION_REJECTED');assert.equal(s.calls(),0);
+});
+
+function confirmation(){
+ const s=setup();s.request.commentId=3333;
+ const root='https://api.github.com/repos/Achi1984/meridian';
+ const comment={id:3333,url:root+'/issues/comments/3333',issue_url:root+'/issues/571',
+  user:{id:4321,type:'Bot'},body:s.request.body,
+  created_at:'2026-10-14T06:00:00Z',updated_at:'2026-10-14T06:00:00Z'};
+ s.deps.readPublishedComment=async()=>comment;
+ let writes=0;
+ s.deps.pool.query=async(sql,args)=>{writes++;
+  assert.ok(sql.startsWith('UPDATE '));assert.equal(args[5],'CONFIRMED');assert.equal(args[6],3333);
+  return{rowCount:1,rows:[{operation_key:args[0],intent_sha256:args[1],status:'CONFIRMED'}]};};
+ return {...s,comment,writes:()=>writes};
+}
+test('confirmation uses real admission checks and one exact reserved-row settlement',async()=>{
+ const s=confirmation();const r=await confirmPublication(s.request,s.config,s.deps);
+ assert.equal(r.kind,'INACTIVE_CONFIRMATION_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
+ assert.equal(s.writes(),1);assert.equal(r.sendAllowed,false);assert.equal(r.provenanceVerified,false);
+});
+test('wrong comment identity actor mailbox or original bytes cannot settle',async()=>{
+ for(const edit of [c=>c.id++,c=>c.url+='x',c=>c.issue_url=c.issue_url.replace('571','572'),
+ c=>c.user.id++,c=>c.user.type='User',c=>c.body+='\n']){
+  const s=confirmation();edit(s.comment);
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+});
+test('revocation or token expiry during comment read blocks settlement',async()=>{
+ for(const mode of ['approval','run','token']){
+  const s=confirmation();let time=now;s.deps.clock=()=>time;
+  s.deps.readPublishedComment=async()=>{
+   if(mode==='approval')s.snapshot.approval.body+='revoked';
+   if(mode==='run')s.snapshot.run.status='completed';
+   if(mode==='token')time=now+295;
+   return s.comment;
+  };
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+});
+test('missing malformed calendar or edited timestamps cannot settle',async()=>{
+ for(const stamp of [undefined,'2026-02-30T06:00:00Z','0000-01-01T00:00:00Z',
+  '2026-10-14T06:00:00+00:00','2026-10-14T06:00:00.000Z','invalid']){
+  const s=confirmation();s.comment.created_at=stamp;s.comment.updated_at=stamp;
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
+ const s=confirmation();s.comment.updated_at='2026-10-14T06:00:01Z';
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);
+});
+test('confirmation snapshots input and config across awaited reads',async()=>{
+ const s=confirmation();s.deps.readPublishedComment=async()=>{
+  s.request.commentId=4444;s.request.body='mutated';s.config.pinsRaw='{}';return s.comment;
+ };
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).outcome,'ACKNOWLEDGED');
+ assert.equal(s.writes(),1);
+});
+test('confirmation conflicts and lost DB replies never retry or grant authority',async()=>{
+ for(const fail of [false,true]){const s=confirmation();let calls=0;
+  s.deps.pool.query=async()=>{calls++;if(fail)throw new Error('private');return{rowCount:0,rows:[]};};
+  const r=await confirmPublication(s.request,s.config,s.deps);
+  assert.equal(r.outcome,fail?'UNCERTAIN':'NOT_ACQUIRED');assert.equal(calls,1);assert.equal(r.durable,false);
+ }
+});
+test('stalled comment reader is bounded without settlement',async()=>{
+ const s=confirmation();s.deps.readPublishedComment=()=>new Promise(()=>{});const start=Date.now();
+ assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+ assert.equal(s.writes(),0);assert.ok(Date.now()-start<8000);
+});
+test('invalid confirmation request or forged token is rejected before comment read',async()=>{
+ for(const mode of ['id','extra','token']){const s=confirmation();
+  if(mode==='id')s.request.commentId=-1;if(mode==='extra')s.request.authorized=true;
+  if(mode==='token')s.request.token='forged';
+  s.deps.readPublishedComment=()=>assert.fail('must not read');
+  assert.equal((await confirmPublication(s.request,s.config,s.deps)).kind,'CONFIRMATION_REJECTED');
+  assert.equal(s.writes(),0);
+ }
 });

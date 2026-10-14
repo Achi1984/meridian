@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {verifyPublicationToken} from './publication-oidc.mjs';
-import {reserve} from './publication-ledger.mjs';
+import {reserve,settle} from './publication-ledger.mjs';
 const bridge=fileURLToPath(new URL('./publication-plan-bridge.py',import.meta.url));
 const flags={authenticated:false,provenanceVerified:false,authorized:false,
  dispatchAllowed:false,mergeAllowed:false,durable:false,sendAllowed:false};
@@ -77,4 +77,37 @@ export async function reserveAdmission(request,trustedConfig,dependencies){
  if(candidate.kind!=='UNAUTHENTICATED_ADMISSION_CANDIDATE')return candidate;
  const result=await reserve(dependencies.pool,candidate.ledgerBinding);
  return {kind:'INACTIVE_RESERVATION_RESULT',outcome:result.outcome,...flags};
+}
+
+export async function confirmPublication(request,trustedConfig,dependencies){
+ // Inactive host composition: readers/pool/config must not come from HTTP input.
+ try{
+  const config=JSON.parse(JSON.stringify(trustedConfig));
+  need(request&&Object.keys(request).sort().join()==='body,commentId,token');
+  const {body,token,commentId}=request;
+  need(Number.isSafeInteger(commentId)&&commentId>0);
+  const input={body,token};
+  const before=await prepareAdmission(input,config,dependencies);
+  need(before.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE');
+  const pins=JSON.parse(config.pinsRaw);
+  const rawComment=await boundedRead(signal=>dependencies.readPublishedComment(commentId,signal));
+  const comment={id:rawComment?.id,url:rawComment?.url,issueUrl:rawComment?.issue_url,
+   actorId:rawComment?.user?.id,actorType:rawComment?.user?.type,body:rawComment?.body,
+   createdAt:rawComment?.created_at,updatedAt:rawComment?.updated_at};
+  const root='https://api.github.com/repos/Achi1984/meridian';
+  need(comment?.id===commentId&&comment.url===`${root}/issues/comments/${commentId}`
+   &&comment.issueUrl===`${root}/issues/571`&&comment.actorId===pins.publisherActorId
+   &&comment.actorType==='Bot'&&comment.body===body);
+  need(typeof comment.createdAt==='string'
+   &&/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(comment.createdAt)
+   &&Number(comment.createdAt.slice(0,4))>0&&comment.updatedAt===comment.createdAt
+   &&new Date(comment.createdAt).toISOString()===comment.createdAt.replace('Z','.000Z'));
+  // Revalidate token, approval, PR and run after the additional network await.
+  // The comment's shared bot identity alone is not workflow provenance.
+  const after=await prepareAdmission(input,config,dependencies);
+  need(after.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE'
+   &&JSON.stringify(before.ledgerBinding)===JSON.stringify(after.ledgerBinding));
+  const result=await settle(dependencies.pool,after.ledgerBinding,'CONFIRMED',commentId);
+  return {kind:'INACTIVE_CONFIRMATION_RESULT',outcome:result.outcome,...flags};
+ }catch{return {kind:'CONFIRMATION_REJECTED',...flags};}
 }
