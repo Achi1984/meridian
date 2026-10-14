@@ -1,0 +1,52 @@
+# This job supplies exact-candidate Python unit/subprocess/driver evidence.
+# It does not run test/publisher_test_password_setup_pg16.py; actual PostgreSQL
+# integration remains separately recorded disposable-test evidence.
+# No OS-level network isolation is claimed. Public action/runtime/package
+# downloads and the hosted runner's normal network access remain available.
+name: Publisher Python candidate tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/publisher_test_password_setup.py'
+      - 'scripts/publisher-test-password-setup-cp314-linux-x86_64.lock'
+      - 'test/test_publisher_test_password_setup*.py'
+      - '.github/workflows/publisher-python-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publisher-python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up ordinary CPython
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.14.2'
+          architecture: x64
+
+      - name: Verify candidate and create isolated dependency environment
+        shell: bash
+        env:
+          EXPECTED_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE_SHA"
+          python -I -c 'import platform, sys, sysconfig; assert sys.version_info[:3] == (3, 14, 2); assert platform.system() == "Linux" and platform.machine() == "x86_64"; assert not sysconfig.get_config_var("Py_GIL_DISABLED"); print(sys.version)'
+          openssl version
+          python -I -m venv "$RUNNER_TEMP/publisher-python-ci"
+          "$RUNNER_TEMP/publisher-python-ci/bin/python" -I -m pip --isolated install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: --index-url https://pypi.org/simple -r scripts/publisher-test-password-setup-cp314-linux-x86_64.lock
+
+      - name: Run complete scoped Python suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/publisher-python-ci/bin/python" -I -B -m unittest discover -s test -p 'test_publisher_test_password_setup*.py' -v
