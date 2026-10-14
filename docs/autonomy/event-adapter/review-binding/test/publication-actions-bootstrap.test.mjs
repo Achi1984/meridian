@@ -189,10 +189,16 @@ test('abort during pool opening cleans late pools and cannot send',async()=>{
  finish(s.pools);await new Promise(resolve=>setImmediate(resolve));
  assert.equal(s.counts().closes,1);assert.equal(s.posts(),0);assert.equal(s.events.length,0);
 });
-test('deadline bounds hung identity acquisition and late token cannot open pools',async()=>{
- const s=setup();let finish;s.deps.deadlineMs=150;
- s.deps.acquireToken=()=>new Promise(resolve=>{finish=resolve;});
- const run=createActionsPublicationBootstrap(s.manifest,s.deps),r=await run();
+test('deadline bounds hung identity acquisition and late token cannot open pools',async t=>{
+ const s=setup();let finish,entered;s.deps.deadlineMs=150;
+ const identityEntered=new Promise(resolve=>{entered=resolve;});
+ s.deps.acquireToken=()=>{entered();return new Promise(resolve=>{finish=resolve;});};
+ // Complete the real Python plan before advancing virtual time: runner load
+ // must not decide which stage the timeout exercises.
+ t.mock.timers.enable({apis:['setTimeout']});
+ const run=createActionsPublicationBootstrap(s.manifest,s.deps),work=run();
+ await identityEntered;t.mock.timers.tick(150);
+ const r=await work;
  assert.equal(r.outcome,'REJECTED');assert.equal(r.stage,'IDENTITY');
  finish(s.request.token);await new Promise(resolve=>setImmediate(resolve));
  assert.equal(s.counts().opens,0);assert.equal(s.posts(),0);
