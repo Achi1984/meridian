@@ -5,6 +5,7 @@ import {dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {verifyPublicationToken} from './publication-oidc.mjs';
 import {reserve,settle} from './publication-ledger.mjs';
+import {retainSendRecord} from './publication-send-record.mjs';
 const bridge=fileURLToPath(new URL('./publication-plan-bridge.py',import.meta.url));
 const flags={authenticated:false,provenanceVerified:false,authorized:false,
  dispatchAllowed:false,mergeAllowed:false,durable:false,sendAllowed:false};
@@ -79,6 +80,41 @@ export async function reserveAdmission(request,trustedConfig,dependencies){
  return {kind:'INACTIVE_RESERVATION_RESULT',outcome:result.outcome,...flags};
 }
 
+function commentSnapshot(raw){
+ return {id:raw?.id,url:raw?.url,issueUrl:raw?.issue_url,
+  actorId:raw?.user?.id,actorType:raw?.user?.type,body:raw?.body,
+  createdAt:raw?.created_at,updatedAt:raw?.updated_at};
+}
+function checkComment(comment,commentId,body,pins){
+ const root='https://api.github.com/repos/Achi1984/meridian';
+ need(Number.isSafeInteger(commentId)&&commentId>0);
+ need(comment.id===commentId&&comment.url===`${root}/issues/comments/${commentId}`
+  &&comment.issueUrl===`${root}/issues/571`&&comment.actorId===pins.publisherActorId
+  &&comment.actorType==='Bot'&&comment.body===body);
+ need(typeof comment.createdAt==='string'
+  &&/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(comment.createdAt)
+  &&Number(comment.createdAt.slice(0,4))>0&&comment.updatedAt===comment.createdAt
+  &&new Date(comment.createdAt).toISOString()===comment.createdAt.replace('Z','.000Z'));
+}
+// trustedResponse is the host's captured POST result, never HTTP request input.
+// This preparation does not perform POST, acquire credentials or authenticate a host.
+export async function capturePublicationResponse(request,trustedResponse,trustedConfig,dependencies){
+ try{
+  need(request&&Object.keys(request).sort().join()==='body,token');
+  const input={body:request.body,token:request.token};
+  const config=JSON.parse(JSON.stringify(trustedConfig));
+  need(trustedResponse&&Object.keys(trustedResponse).sort().join()==='comment,redirected,status,url');
+  const response={status:trustedResponse.status,url:trustedResponse.url,redirected:trustedResponse.redirected,
+   comment:commentSnapshot(trustedResponse.comment)};
+  need(response.status===201&&response.redirected===false
+   &&response.url==='https://api.github.com/repos/Achi1984/meridian/issues/571/comments');
+  checkComment(response.comment,response.comment.id,input.body,JSON.parse(config.pinsRaw));
+  const admission=await prepareAdmission(input,config,dependencies);
+  need(admission.kind==='UNAUTHENTICATED_ADMISSION_CANDIDATE');
+  const result=await retainSendRecord(dependencies.senderRecordPool,admission.ledgerBinding,response.comment.id);
+  return {kind:'INACTIVE_RESPONSE_CAPTURE_RESULT',outcome:result.outcome,...flags};
+ }catch{return {kind:'RESPONSE_CAPTURE_REJECTED',...flags};}
+}
 export async function confirmPublication(request,trustedConfig,dependencies){
  // Inactive host composition: readers/pool/config must not come from HTTP input.
  try{
@@ -103,17 +139,8 @@ export async function confirmPublication(request,trustedConfig,dependencies){
   await requireSendRecord();
   const pins=JSON.parse(config.pinsRaw);
   const rawComment=await boundedRead(signal=>dependencies.readPublishedComment(commentId,signal));
-  const comment={id:rawComment?.id,url:rawComment?.url,issueUrl:rawComment?.issue_url,
-   actorId:rawComment?.user?.id,actorType:rawComment?.user?.type,body:rawComment?.body,
-   createdAt:rawComment?.created_at,updatedAt:rawComment?.updated_at};
-  const root='https://api.github.com/repos/Achi1984/meridian';
-  need(comment?.id===commentId&&comment.url===`${root}/issues/comments/${commentId}`
-   &&comment.issueUrl===`${root}/issues/571`&&comment.actorId===pins.publisherActorId
-   &&comment.actorType==='Bot'&&comment.body===body);
-  need(typeof comment.createdAt==='string'
-   &&/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(comment.createdAt)
-   &&Number(comment.createdAt.slice(0,4))>0&&comment.updatedAt===comment.createdAt
-   &&new Date(comment.createdAt).toISOString()===comment.createdAt.replace('Z','.000Z'));
+  const comment=commentSnapshot(rawComment);
+  checkComment(comment,commentId,body,pins);
   // Revalidate token, approval, PR and run after the additional network await.
   // The comment's shared bot identity alone is not workflow provenance.
   await requireSendRecord();

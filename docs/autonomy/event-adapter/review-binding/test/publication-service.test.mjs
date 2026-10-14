@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
-import {prepareAdmission,reserveAdmission,confirmPublication} from '../scripts/publication-service.mjs';
+import {prepareAdmission,reserveAdmission,confirmPublication,capturePublicationResponse} from '../scripts/publication-service.mjs';
 import {createPublishedCommentReader} from '../scripts/publication-github-reader.mjs';
-import {createSendRecordReader} from '../scripts/publication-send-record.mjs';
+import {createSendRecordReader,RETAIN_SQL} from '../scripts/publication-send-record.mjs';
 const cwd=fileURLToPath(new URL('.',import.meta.url));
 // Actual shared envelope producer, not a hand-built imitation of its digest rules.
 const fixture=spawnSync('python3',['-B','-c',`import json
@@ -104,6 +104,46 @@ function confirmation(){
   return{rowCount:1,rows:[{operation_key:args[0],intent_sha256:args[1],status:'CONFIRMED'}]};};
  return {...s,comment,writes:()=>writes};
 }
+function capture(){
+ const s=confirmation();delete s.request.commentId;let writes=0;
+ const response={status:201,url:'https://api.github.com/repos/Achi1984/meridian/issues/571/comments',
+  redirected:false,comment:s.comment};
+ s.deps.senderRecordPool={query:async(sql,args)=>{writes++;assert.equal(sql,RETAIN_SQL);
+  assert.equal(args[5],3333);return {rowCount:1,rows:[{operation_key:args[0],comment_id:'3333'}]};}};
+ return {...s,response,captures:()=>writes};
+}
+test('actual response capture validates admission and retains once without sending',async()=>{
+ const s=capture();const r=await capturePublicationResponse(s.request,s.response,s.config,s.deps);
+ assert.equal(r.kind,'INACTIVE_RESPONSE_CAPTURE_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
+ assert.equal(s.captures(),1);assert.equal(s.writes(),0);
+ for(const k of ['authenticated','provenanceVerified','authorized','dispatchAllowed','mergeAllowed','durable','sendAllowed'])assert.equal(r[k],false);
+});
+test('capture rejects wrong POST result identity content and edited timestamps before storing',async()=>{
+ for(const edit of [r=>r.status=200,r=>r.redirected=true,r=>r.url+='x',r=>r.extra=true,
+ r=>r.comment.id=0,r=>r.comment.user.id++,r=>r.comment.user.type='User',r=>r.comment.body+='x',
+ r=>r.comment.issue_url+='x',r=>r.comment.url+='x',r=>r.comment.updated_at='2026-10-14T06:00:01Z',
+ r=>r.comment.created_at=r.comment.updated_at='2026-02-30T06:00:00Z']){
+ const s=capture();edit(s.response);assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).kind,'RESPONSE_CAPTURE_REJECTED');
+ assert.equal(s.captures(),0);}
+});
+test('capture cannot retain under forged identity or revoked approval',async()=>{
+ for(const mode of ['token','approval','extra']){const s=capture();
+ if(mode==='token')s.request.token='forged';if(mode==='approval')s.snapshot.approval.body+='revoked';
+ if(mode==='extra')s.request.response=s.response;
+ assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).kind,'RESPONSE_CAPTURE_REJECTED');
+ assert.equal(s.captures(),0);}
+});
+test('capture snapshots POST response and request across admission awaits',async()=>{
+ const s=capture();s.deps.readEvidence=async()=>{
+ s.response.comment.id=4444;s.response.comment.body='changed';s.request.body='changed';s.config.pinsRaw='{}';return s.snapshot;};
+ assert.equal((await capturePublicationResponse(s.request,s.response,s.config,s.deps)).outcome,'ACKNOWLEDGED');assert.equal(s.captures(),1);
+});
+test('capture conflict and lost write response never retry or confirm',async()=>{
+ for(const lost of [false,true]){const s=capture();let calls=0;
+ s.deps.senderRecordPool={query:async()=>{calls++;if(lost)throw Error('private');return {rowCount:0,rows:[]};}};
+ const r=await capturePublicationResponse(s.request,s.response,s.config,s.deps);
+ assert.equal(r.outcome,lost?'UNCERTAIN':'NOT_ACQUIRED');assert.equal(calls,1);assert.equal(s.writes(),0);}
+});
 test('confirmation uses real admission checks and one exact reserved-row settlement',async()=>{
  const s=confirmation();const r=await confirmPublication(s.request,s.config,s.deps);
  assert.equal(r.kind,'INACTIVE_CONFIRMATION_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');
