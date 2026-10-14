@@ -237,3 +237,47 @@ three fixed role names, each mapping to an object with integer `oid` and
 no default or example OIDs that may be accepted as actual evidence. The reader
 rejects duplicate JSON keys, unknown keys, malformed OIDs and duplicate role
 identities. Existing roles are never automatically adopted.
+
+## Network deadline design — not implemented
+
+The candidate currently sets libpq `connect_timeout=10`, server
+`statement_timeout=10000` and `lock_timeout=2000`. These are useful limits but
+**not a whole-operation wall-clock bound**. They do not establish that stalled
+native calls, lost commit acknowledgements or cleanup always return promptly.
+The current rollback/close attempts are not evidence of confirmed server cleanup.
+No additional signal-only timeout has been added: Python documents that native
+code can delay execution of Python signal handlers. The runtime deadline gate
+therefore remains open even when offline or local PostgreSQL tests pass.
+
+A future independently reviewed Linux supervisor design could provide three
+separate wall-clock budgets, excluding all owner password-entry time:
+
+| Phase | Proposed budget | Conservative deadline outcome |
+| --- | --- | --- |
+| Connect and initial catalog verification | 15 seconds | Failed; no password mutation requested |
+| Fresh verification, three changes, postcheck and commit | 30 seconds | Indeterminate, even if commit may not yet have started |
+| Rollback/close | 3 seconds | Indeterminate cleanup; no retry or rollback claim |
+
+The supervisor must be a separate OS process so a blocked client interpreter
+cannot postpone termination. Deadline termination must not wait on terminal
+output: terminate the client first and make any fixed status output best-effort
+and nonblocking. Success requires both acknowledged commit and clean completion
+of the supervision protocol; text output alone is insufficient. Lost/ambiguous
+supervision or commit acknowledgement must stop the procedure, never trigger
+automatic password replay. The three phases must not become three independent
+budgets for every SQL statement; the proposed total is 48 seconds of network
+phases plus scheduling overhead, explicitly excluding owner input.
+
+Before selecting this design, review parent/child lifecycle, reaping/disarming
+races, parent death and PID identity, handling of Ctrl-C, inherited descriptors,
+native-library fork safety and the temporary additional in-memory copy of
+credentials in a forked process. The supervisor must never use or clean up the
+inherited database connection. A trusted Linux host/scheduler is an assumption,
+not a guarantee against a paused machine or hostile privileged process.
+Subprocess fault-injection tests must cover stalled connect, query, commit and
+cleanup, a full output pipe, parent disappearance and normal disarm. This design
+adds no current executable behavior and must not be presented as an operational
+deadline guarantee.
+
+Python signal execution reference:
+https://docs.python.org/3/library/signal.html#execution-of-python-signal-handlers
