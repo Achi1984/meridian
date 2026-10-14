@@ -1,0 +1,36 @@
+# INACTIVE CANDIDATE: installation and one-run approval are separate.
+name: Publisher PostgreSQL TLS diagnostic
+'on':
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tls-diagnostic:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.event.repository.owner.type == 'User' &&
+      github.repository_owner == 'Achi1984' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Run the fixed PostgreSQL TLS probe once
+        run: |
+          if node docs/autonomy/event-adapter/review-binding/scripts/publication-postgres-tls-probe.mjs --probe >/dev/null 2>&1; then
+            echo "TLS certificate and hostname verification succeeded for the fixed TEST endpoint."
+          else
+            echo "::error::TLS diagnostic failed; raw probe output was suppressed."
+            exit 1
+          fi
