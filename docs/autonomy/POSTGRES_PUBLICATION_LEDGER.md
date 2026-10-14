@@ -1,5 +1,9 @@
 # PostgreSQL publication ledger — source preparation, not deployed
 
+The separate [publisher OIDC verifier](PUBLISHER_OIDC_PREPARATION.md) is now
+prepared with synthetic signed-token tests. Service composition, authenticated
+approval/run binding and real PostgreSQL tests remain outstanding.
+
 Continuation of owner-approved architecture preparation #571/6160988345.
 Main source already contains PostgreSQL support in `server.js` and a separate
 Asset Watch verifier in `github-actions-oidc.js`. Their existence does not prove
