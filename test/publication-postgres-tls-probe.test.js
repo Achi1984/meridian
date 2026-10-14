@@ -55,10 +55,14 @@ test('import is inert and CLI rejects all implicit runs and overrides', () => {
 
 test('CLI deadline exits despite a synthetic lingering DNS handle, with sanitized output', () => {
   // Preload prevents all real networking and simulates a native lookup that
-  // cannot be cancelled by destroying its socket. Shorten only test timers.
+  // cannot be cancelled by destroying its socket. Accelerate only the probe
+  // deadline, preserving the separate hard-exit fallback. Scaling both timers
+  // leaves just 5ms for stdout under load and can legitimately yield no output.
+  // The child timeout is shorter than the unmodified fallback, so success here
+  // proves the normal result-flush exit handles the lingering native work.
   const preload = `import net from 'node:net'; import {EventEmitter} from 'node:events';
     const nativeTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = (fn, ms, ...args) => nativeTimeout(fn, ms / 100, ...args);
+    globalThis.setTimeout = (fn, ms, ...args) => nativeTimeout(fn, ms === 5000 ? 0 : ms, ...args);
     net.connect = () => { const s = new EventEmitter(); s.destroy = () => {};
       setInterval(() => {}, 1000); return s; };`;
   const cli = spawnSync(process.execPath, ['--import',
