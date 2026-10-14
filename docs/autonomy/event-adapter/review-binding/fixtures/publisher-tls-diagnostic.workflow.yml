@@ -28,7 +28,7 @@ jobs:
           node-version: 22
       - name: Run the fixed PostgreSQL TLS probe once
         run: |
-          if node docs/autonomy/event-adapter/review-binding/scripts/publication-postgres-tls-probe.mjs >/dev/null 2>&1; then
+          if node docs/autonomy/event-adapter/review-binding/scripts/publication-postgres-tls-probe.mjs --probe >/dev/null 2>&1; then
             echo "TLS certificate and hostname verification succeeded for the fixed TEST endpoint."
           else
             echo "::error::TLS diagnostic failed; raw probe output was suppressed."
