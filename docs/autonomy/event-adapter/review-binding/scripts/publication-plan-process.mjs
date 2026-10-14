@@ -8,8 +8,10 @@ export async function planForPublication(body,config){
  if(Buffer.byteLength(input)>65536)throw Error('PLAN_REJECTED');
  return new Promise((resolve,reject)=>{
   let done=false,total=0;const chunks=[];
-  const child=spawn('python3',['-I','-B',bridge],{stdio:['pipe','pipe','pipe'],
-   env:{PATH:dirname(process.execPath)+':/usr/bin:/bin',LANG:'C',LC_ALL:'C'}});
+  let child;
+  try{child=spawn('python3',['-I','-B',bridge],{stdio:['pipe','pipe','pipe'],
+   env:{PATH:dirname(process.execPath)+':/usr/bin:/bin',LANG:'C',LC_ALL:'C'}});}
+  catch{reject(Error('PLAN_REJECTED'));return;}
   const timer=setTimeout(()=>finish(),10000);
   function finish(plan){
    if(done)return;done=true;clearTimeout(timer);
@@ -33,3 +35,4 @@ export async function planForPublication(body,config){
   child.stdin.end(input);
  });
 }
+
