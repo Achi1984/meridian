@@ -24,6 +24,7 @@ async function check(t=token(),p=pins(),f=fetcher()){
 }
 test('signed exact token validates with fixed JWKS and no operation authority',async()=>{
  const f=fetcher(),r=await check(token(),pins(),f);assert.equal(r.tokenVerified,true);
+ assert.equal(r.validUntil,now+290);
  assert.equal(r.authenticated,false);assert.equal(r.dispatchAllowed,false);assert.equal(r.durable,false);
  assert.equal(f.calls[0].url,'https://token.actions.githubusercontent.com/.well-known/jwks');
  assert.equal(f.calls[0].options.redirect,'error');assert.equal(f.calls.length,1);

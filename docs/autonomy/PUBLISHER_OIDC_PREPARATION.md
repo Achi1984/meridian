@@ -1,5 +1,11 @@
 # Publisher OIDC verifier — inactive standalone source
 
+The [service composition](PUBLISHER_SERVICE_PREPARATION.md) now connects this
+verifier with the real negative-envelope validator and ledger reservation adapter
+using synthetic readers/pool in tests. Authenticated production adapters remain
+unimplemented. The minimal token result now also includes `validUntil` so the
+caller can reject token expiry after later awaited work without another key fetch.
+
 Prepared under owner direction #571/6160988345. This is a separate module under
 the source-preparation directory. No server import, API route, workflow, id-token
 permission, token acquisition or database access is introduced. Asset Watch's

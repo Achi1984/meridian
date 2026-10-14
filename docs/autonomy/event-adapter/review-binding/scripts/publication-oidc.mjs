@@ -81,6 +81,6 @@ export async function verifyPublicationToken(token,pins,{fetchFn=globalThis.fetc
   need(verify('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),publicKey,signature));
   claimsCheck(claims,pins,clock());
   return {kind:'VERIFIED_TOKEN_ONLY',tokenVerified:true,runId:pins.runId,
-    controlSha:pins.controlSha,...flags};
+    controlSha:pins.controlSha,validUntil:Math.min(claims.exp,claims.iat+301),...flags};
  }catch{return {kind:'TOKEN_REJECTED',tokenVerified:false,...flags};}
 }
