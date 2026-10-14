@@ -115,3 +115,52 @@ test('schema/time/OHLC mutations and no external geometric-result laundering',()
  [x=>{x.bars[0].high=NaN},'OHLCV'],[x=>{x.bars[0].volume=-1},'OHLCV']];
  for(const [change,error] of cases){const x=fixture();change(x);rejected(x,error);}
 });
+test('asymmetric 2/1 and 1/3 windows bind derived pivot, confirmation and every receipt',()=>{
+ for(const timeframe of ['4H','1D'])for(const kind of ['HIGH','LOW'])for(const [leftBars,rightBars] of [[2,1],[1,3]]) {
+  const T=timeframe==='4H'?14400000:86400000;
+  const rows=[...Array.from({length:leftBars},()=>[8,10,7,9]),[10,12,8,11],
+   ...Array.from({length:rightBars},()=>[10,11,9,10])];
+  const x=fixture(timeframe,kind);
+  x.leftBars=leftBars;x.rightBars=rightBars;
+  x.bars=rows.map(([o,h,l,c],i)=>({openTimeMs:i*T,closeTimeMs:(i+1)*T,
+   open:kind==='HIGH'?o:20-o,high:kind==='HIGH'?h:20-l,
+   low:kind==='HIGH'?l:20-h,close:kind==='HIGH'?c:20-c,volume:1}));
+  const geometric=(leftBars+1+rightBars)*T;
+  x.decisionMs=geometric+5;
+  x.admission.receipts=x.bars.map((b,i)=>({barIndex:i,openTimeMs:b.openTimeMs,
+   receivedAtMs:i===0?geometric+5:b.closeTimeMs}));
+  const before=structuredClone(x),r=bind(x);
+  assert.equal(r.valid,true);
+  assert.deepEqual(r.pivot,{kind,price:kind==='HIGH'?12:8,barIndex:leftBars,
+   openTimeMs:leftBars*T,closeTimeMs:(leftBars+1)*T});
+  assert.equal(r.geometricConfirmationAtMs,geometric);
+  assert.equal(r.admittedAtMs,geometric+5);
+  assert.equal(r.earliestHypotheticalEntryOpenMs,geometric+T);
+  assert.deepEqual(r.evidence,{assetId:x.assetId,timeframe,leftBars,rightBars,
+   bars:before.bars,admission:before.admission});
+  assert.deepEqual(x,before);
+  // Each position is independently necessary, not merely candidate/final receipt.
+  for(let i=0;i<x.bars.length;i++) {
+   const late=structuredClone(x);late.admission.receipts[i].receivedAtMs=x.decisionMs+1;
+   rejected(late,'NOT_YET_RECEIVED');
+  }
+ }
+});
+test('width32 tests every neighbor: sole farthest-left/right violations HIGH and LOW',()=>{
+ for(const timeframe of ['4H','1D'])for(const kind of ['HIGH','LOW'])for(const edge of [0,64]) {
+  const x=fixture(timeframe,kind,32);
+  assert.equal(bind(x).pivot.kind,kind);
+  const key=kind==='HIGH'?'high':'low';
+  // Strict left is defeated by equality; inclusive right needs a strict exceedance.
+  const price=kind==='HIGH'?(edge===0?12:13):(edge===0?8:7);
+  x.bars[edge][key]=price;
+  assert.ok(x.bars[edge].low<=Math.min(x.bars[edge].open,x.bars[edge].close));
+  assert.ok(x.bars[edge].high>=Math.max(x.bars[edge].open,x.bars[edge].close));
+  const candidate=x.bars[32];
+  const violations=x.bars.flatMap((b,i)=>i===32?[]:
+   ((kind==='HIGH'?(i<32?candidate.high<=b.high:candidate.high<b.high):
+    (i<32?candidate.low>=b.low:candidate.low>b.low))?[i]:[]));
+  assert.deepEqual(violations,[edge]);
+  rejected(x,'NOT_A_PIVOT');
+ }
+});
