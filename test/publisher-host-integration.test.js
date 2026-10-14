@@ -10,7 +10,8 @@ test('inactive publisher host integration: synthetic adapters and failure paths'
  const prefix='docs/autonomy/event-adapter/review-binding/test/';
  const suites=['publication-reservation-receipt.test.mjs','publication-host.test.mjs',
   'publication-recovery.test.mjs','publication-run-preflight.test.mjs',
-  'publication-plan-process.test.mjs'];
+  'publication-plan-process.test.mjs','publication-oidc.test.mjs',
+  'publication-service.test.mjs'];
  const childEnv={...process.env,PYTHONDONTWRITEBYTECODE:'1'};
  // Do not inherit the parent's Node test-worker context into a fresh test runner.
  delete childEnv.NODE_TEST_CONTEXT;
@@ -26,7 +27,7 @@ test('inactive publisher host integration: synthetic adapters and failure paths'
   return Number(matches[0][1]);
  };
  const tests=total('tests');
- assert.ok(tests>=56,`Expected all integrated suites (at least 56 tests), received ${tests}`);
+ assert.ok(tests>=109,`Expected all integrated suites (at least 109 tests), received ${tests}`);
  assert.equal(total('pass'),tests);
  for(const name of ['fail','cancelled','skipped','todo'])assert.equal(total(name),0);
  t.diagnostic(run.stdout.split('\n').filter(line=>/^# (tests|pass|fail|skipped) /.test(line)).join('; '));
