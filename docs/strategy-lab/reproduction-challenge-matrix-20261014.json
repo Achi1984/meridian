@@ -10,6 +10,11 @@
     "firstStage": "independent faithful reproduction, Development then historical Holdout audit",
     "developmentPeriods": 48,
     "historicalHoldoutPeriods": 34,
+    "baselineStageRuns": 2,
+    "maximumDiagnosticCells": 6,
+    "maximumStageScenarioCells": 8,
+    "eachCellAtMostOnce": true,
+    "automaticOrManualRetryAllowed": false,
     "holdoutIsFreshConfirmation": false,
     "dataAcquisitionAllowed": false,
     "evaluationOrPnlRunPerformed": false,
@@ -135,6 +140,15 @@
       "baseSyncConfirmationComment": 6178523406,
       "interpretation": "existing receipt/byte-identity evidence only; not an independent PnL reproduction, raw-source authenticity certification, economic audit, or review of this protocol"
     }
+  },
+  "independenceAndBlinding": {
+    "independentCode": "required; derive from pinned specification without importing/copying/transliterating evaluator or collector",
+    "resultBlinding": "NOT_BLINDED",
+    "reason": "preparation author inspected pinned outcomes and this protocol names prior gate decisions; future implementer must declare prior exposure",
+    "freezeIndependentCodeAndSyntheticChecksBeforeAdditionalExpectedOutputComparison": true,
+    "blindnessCanBeRestoredByNewImplementer": false,
+    "ifBlindComparisonRequiredButPriorExposureKnown": "stop blind-comparison claim; any independent-code reproduction requires separate authorization and honest NOT_BLINDED label",
+    "historicalHoldoutFreshConfirmation": false
   },
   "existingHistoricalArtifacts": {
     "fullMemberNamesSizesAndSha256Pin": {
@@ -397,6 +411,14 @@
   },
   "comparison": {
     "numericRule": "abs(actual-expected)<=max(absTol,relTol*abs(expected)); finite values required",
+    "comparisonTolerancesAreNotStrategyGates": true,
+    "doesNotRelax": [
+      "frozen absolute-net-exposure invariant <=1e-12",
+      "original frozen gross-exposure numerical invariant",
+      "exact rank and decision rules",
+      "any original strategy gate threshold"
+    ],
+    "originalGrossExposureInvariantResolution": "use exact pinned implementation/specification before execution; never substitute comparison tolerance",
     "exactComparisons": [
       "UTC timestamps and interval endpoints",
       "archive/member identities, byte sizes and SHA-256",
@@ -469,6 +491,17 @@
   ],
   "diagnosticExecutionConventions": {
     "maxScenarios": 6,
+    "baselineStageRuns": [
+      "one Development reproduction",
+      "one historical Holdout audit"
+    ],
+    "maximumStageScenarioCells": 8,
+    "eachCellAttemptedAtMostOnce": true,
+    "automaticRetry": false,
+    "manualRetryOrRerun": false,
+    "failedCellConsumesCapacityAndStopsDependentWork": true,
+    "unavailableCellConsumesEvaluatorExecution": false,
+    "aggregateLimitsMayStopBeforeAllCellsComplete": true,
     "cartesianSweep": false,
     "serialOnly": true,
     "developmentOnly": true,
@@ -481,7 +514,24 @@
     "winnerSelectionOrPromotion": false,
     "removeLosingAssets": false,
     "modifyFrozenRules": false,
-    "allAttemptsRemainInLedger": true
+    "allAttemptsRemainInLedger": true,
+    "retainedDiagnostics": [
+      "tail loss and return-distribution limitations",
+      "cost and slippage sensitivity",
+      "regime and chronological-time/block effects",
+      "asset attribution without new portfolios",
+      "selection and survivorship risk"
+    ],
+    "portfolioPeriodExpectancy": "mean weekly net return, descriptive only, n=48 Development and n=34 historical Holdout audit",
+    "tailMetrics": {
+      "worstWeek": "minimum weekly net return",
+      "empirical5thPercentile": "nearest-rank convention",
+      "lowerTailMean": "mean of lowest max(1,ceil(0.05*n)) weekly net returns",
+      "newAcceptanceGate": false
+    },
+    "tradeLevelExpectancy": "UNDEFINED unless frozen strategy defines trades and denominator",
+    "winRateIsNotExpectancy": true,
+    "undefinedAndUnavailableMetricsRequireReason": true
   },
   "proposedExecutionLimits": {
     "measured": false,
@@ -500,6 +550,8 @@
       "residentMemoryMiBMax": 1024,
       "outputMiBMax": 512
     },
+    "aggregateLimitMayPreventEightCells": true,
+    "noAutomaticRetryOrSilentBudgetIncrease": true,
     "networkPaidResourcesWorkflowDispatch": false
   },
   "outcomes": {
@@ -517,6 +569,15 @@
     "concreteExecutionAuthorization": "REQUIRED_BEFORE_ANY_PNL",
     "allReceiptsAvailableAndVerifiedAtExecution": "REQUIRED",
     "economicModelAudit": "SEPARATE_REVIEW_REQUIRED",
+    "priorExposureDeclaration": "REQUIRED_BEFORE_IMPLEMENTATION",
+    "robustPositiveExpectancyAfterRealisticCostsAndRisk": "PRODUCT_OBJECTIVE_NOT_ESTABLISHED_BY_TECHNICAL_REPRODUCTION",
+    "lifecycle": [
+      "Paper",
+      "ForwardValidation",
+      "RobustnessReview",
+      "possible LiveCandidacy"
+    ],
+    "historicalOrProspectiveShadowRecordsCompletePaperStages": false,
     "holdoutRetuningOrFreshConfirmation": false,
     "paperLiveOrAuthorizationChanges": false
   }
