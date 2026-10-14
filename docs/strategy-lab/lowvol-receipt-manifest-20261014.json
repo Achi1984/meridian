@@ -8,7 +8,7 @@
       "runCommitSha": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
       "name": "lowvol-rank-v2-development-source",
       "kind": "development-source",
-      "zip": {"path":"archives/dev-source.zip","sha256":"b62f7b3eadacc7c55a1d61006d645caea385dbd73c33854522c30624499e5556","sizeBytes":1485803,"maxBytes":8388608},
+      "zip": {"path":"archives/dev-source.zip","sha256":"b62f7b3eadacc7c55a1d61006d645caea385dbd73c33854522c30624499e5556","sizeBytes":1485803,"maxBytes":1485803},
       "members": [
         {"name":"ADA.json","path":"members/development-source/ADA.json","sha256":"43c92508ec52bc56e8f92e5b634bfb61108beb2e9926234b7bc12aed9609b53b","sizeBytes":413484,"maxBytes":413484},
         {"name":"AVAX.json","path":"members/development-source/AVAX.json","sha256":"1da0bd90f04d809f360b858abefa104c61280df3539d3a57bc6e5f9a792ea7e9","sizeBytes":413662,"maxBytes":413662},
@@ -31,7 +31,7 @@
       "runCommitSha": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
       "name": "lowvol-rank-v2-development-result",
       "kind": "development-result",
-      "zip": {"path":"archives/dev-result.zip","sha256":"e076f9424b4373621bec7502d9835945a00a1211716ba299057b7adcd7b22314","sizeBytes":24755,"maxBytes":8388608},
+      "zip": {"path":"archives/dev-result.zip","sha256":"e076f9424b4373621bec7502d9835945a00a1211716ba299057b7adcd7b22314","sizeBytes":24755,"maxBytes":24755},
       "members": [
         {"name":"low-volatility-rank-weighted-v2-development-result.json","path":"members/development-result/low-volatility-rank-weighted-v2-development-result.json","sha256":"c72046db7aeb0e28a87e3e8e2c181b9d67f8ed9b8eae275c3b7f4037793a16bb","sizeBytes":134312,"maxBytes":134312},
         {"name":"low-volatility-rank-weighted-v2-development-result.md","path":"members/development-result/low-volatility-rank-weighted-v2-development-result.md","sha256":"e0a2c60b690ddd0c3b5cf141e21208bf2f255de0f1952f1853f1df14fcbeec62","sizeBytes":1005,"maxBytes":1005}
@@ -43,7 +43,7 @@
       "runCommitSha": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
       "name": "lowvol-rank-v2-holdout-source",
       "kind": "holdout-source",
-      "zip": {"path":"archives/holdout-source.zip","sha256":"8f9ed3953268ba985034ecd6db09a4a3e5900c835061ce6930b710320de50426","sizeBytes":1012867,"maxBytes":8388608},
+      "zip": {"path":"archives/holdout-source.zip","sha256":"8f9ed3953268ba985034ecd6db09a4a3e5900c835061ce6930b710320de50426","sizeBytes":1012867,"maxBytes":1012867},
       "members": [
         {"name":"ADA.json","path":"members/holdout-source/ADA.json","sha256":"1ef696d8fcfb4f821936beae595db288e373f5b4f85ca39805c3f6580160354e","sizeBytes":301918,"maxBytes":301918},
         {"name":"AVAX.json","path":"members/holdout-source/AVAX.json","sha256":"1bac481860c8e91c034d6ac328e57ba03dca0439851c02f43be9126585a27317","sizeBytes":282754,"maxBytes":282754},
@@ -66,7 +66,7 @@
       "runCommitSha": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
       "name": "lowvol-rank-v2-holdout-result",
       "kind": "holdout-result",
-      "zip": {"path":"archives/holdout-result.zip","sha256":"7c96e9456d80f3eb61047f6c7f108dddddbf704409f6526643f5fa3f8e1106af","sizeBytes":19092,"maxBytes":8388608},
+      "zip": {"path":"archives/holdout-result.zip","sha256":"7c96e9456d80f3eb61047f6c7f108dddddbf704409f6526643f5fa3f8e1106af","sizeBytes":19092,"maxBytes":19092},
       "members": [
         {"name":"low-volatility-rank-weighted-v2-holdout-result.json","path":"members/holdout-result/low-volatility-rank-weighted-v2-holdout-result.json","sha256":"c88ab6074e3fc0777f3a69693d6e549a9b704f7a668b384a44d0e0db02a01dd0","sizeBytes":96875,"maxBytes":96875},
         {"name":"low-volatility-rank-weighted-v2-holdout-result.md","path":"members/holdout-result/low-volatility-rank-weighted-v2-holdout-result.md","sha256":"24cdf3b1d54a943fa17645bcb77237b3082ba73e72dc196554ed13b767f24e7a","sizeBytes":1074,"maxBytes":1074}
@@ -78,7 +78,7 @@
       "runCommitSha": "a5ba7eca2004ce51ec98720955b5fcc3716f09ef",
       "name": "lowvol-v2-prospective-source-38125893276",
       "kind": "prospective-source",
-      "zip": {"path":"archives/prospective-source.zip","sha256":"c27f46bac87f3831bec139ef36cc659b7e77a9bce159f1f0f6b0dac7d6fe1ce8","sizeBytes":117072,"maxBytes":8388608},
+      "zip": {"path":"archives/prospective-source.zip","sha256":"c27f46bac87f3831bec139ef36cc659b7e77a9bce159f1f0f6b0dac7d6fe1ce8","sizeBytes":117072,"maxBytes":117072},
       "members": [
         {"name":"AVAX.json","path":"members/prospective-source/AVAX.json","sha256":"eb8330705d8800e7737cc04fca41c583396a124f6e8b5056e783b0beb774cd1b","sizeBytes":31237,"maxBytes":31237},
         {"name":"BCH.json","path":"members/prospective-source/BCH.json","sha256":"7c4eb59b3e79ca3ebaecb2a0b2ed48d60e13264bf2d09f28044c4617f15ee3d7","sizeBytes":32064,"maxBytes":32064},
@@ -101,7 +101,7 @@
       "runCommitSha": "a5ba7eca2004ce51ec98720955b5fcc3716f09ef",
       "name": "lowvol-v2-prospective-snapshot-38125893276",
       "kind": "prospective-snapshot",
-      "zip": {"path":"archives/prospective-snapshot.zip","sha256":"f942087ec71480be577cac9edbe7ec050f68683c41246b6453d942998c8d9394","sizeBytes":1921,"maxBytes":8388608},
+      "zip": {"path":"archives/prospective-snapshot.zip","sha256":"f942087ec71480be577cac9edbe7ec050f68683c41246b6453d942998c8d9394","sizeBytes":1921,"maxBytes":1921},
       "members": [
         {"name":"snapshot-id.txt","path":"members/prospective-snapshot/snapshot-id.txt","sha256":"47fc1409607daf2ee71d93cd4fea2cc99cd032f1e65ae302a119df1635bd92b7","sizeBytes":19,"maxBytes":19},
         {"name":"snapshot.json","path":"members/prospective-snapshot/snapshot.json","sha256":"911cc803b1c89f77f478e9b94127f51192b182eaf8dc1ddb03a80c0bcba9ccc7","sizeBytes":2337,"maxBytes":2337},

@@ -114,6 +114,12 @@ test('declared and observed size limits fail closed', () => {
   assert.equal(invalidManifest.status, 'INVALID_MANIFEST');
   assert.equal(invalidManifest.verified, false);
 
+  const excessiveTotal = manifestFor();
+  excessiveTotal.maxTotalBytes = 199;
+  const totalLimit = verifyReceiptManifest(textOf(excessiveTotal), validInputs());
+  assert.equal(totalLimit.status, 'INVALID_MANIFEST');
+  assert.equal(totalLimit.verified, false);
+
   const manifest = manifestFor();
   manifest.artifacts[0].members[0].maxBytes = 6;
   manifest.artifacts[0].members[0].sizeBytes = 6;

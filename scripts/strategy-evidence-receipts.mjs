@@ -125,7 +125,7 @@ export function parseReceiptManifest(manifestText) {
   const artifactIds = new Set();
   const expectedFiles = [];
   const inputPaths = new Set();
-  let expectedBytes = 0;
+  let maximumBytes = 0;
   let memberCount = 0;
   const addFile = (file, context, expectedName) => {
     const keys = expectedName
@@ -144,8 +144,8 @@ export function parseReceiptManifest(manifestText) {
     }
     if (inputPaths.has(file.path)) throw new Error(`duplicate expected input path: ${file.path}`);
     inputPaths.add(file.path);
-    expectedBytes += file.sizeBytes;
-    if (expectedBytes > parsed.maxTotalBytes) throw new Error('expected inputs exceed maxTotalBytes');
+    maximumBytes += file.maxBytes;
+    if (maximumBytes > parsed.maxTotalBytes) throw new Error('input size limits exceed maxTotalBytes');
     expectedFiles.push({
       path: file.path,
       sha256: file.sha256,
